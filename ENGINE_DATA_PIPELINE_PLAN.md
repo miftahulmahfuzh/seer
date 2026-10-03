@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/engine-data-pipeline`
 **Branch:** `feature/engine-data-pipeline` (base: `origin/main` @ `c059f59`)
 **Phases:** 5
-**Status:** phases 1, 3, 4 of 5 complete
+**Status:** phases 1–4 of 5 complete
 **Coordinator:** —
 
 ---
@@ -135,7 +135,7 @@ engine/tests/conftest.py   fixtures: pg (migrated throwaway schema, committed/id
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
 | 1 (done) | Engine foundation: package, migration 002, dates, DB helpers, demo purge | R2, R4, R5, R6 | `engine/`, `db/` | 27 | — | HARD | `.workflows/plan/engine-data-pipeline/phase-1.md` | P1-ENG-VP1R | — |
-| 2 | Point-in-time universe membership | R2, R4, R6 | `engine/` | 8 | 1 | NORMAL | `.workflows/plan/engine-data-pipeline/phase-2.md` | P1-ENG-853Z | — |
+| 2 (done) | Point-in-time universe membership | R2, R4, R6 | `engine/` | 8 | 1 | NORMAL | `.workflows/plan/engine-data-pipeline/phase-2.md` | P1-ENG-853Z | — |
 | 3 (done) | yfinance + FX history backfill | R1, R4, R6 | `engine/` | 3 | 1 | NORMAL | `.workflows/plan/engine-data-pipeline/phase-3.md` | P1-ENG-L73U | — |
 | 4 (done) | Nightly command: Massive bars, splits, FX, runs | R3, R4, R6 | `engine/` | 6 | 1 | HARD | `.workflows/plan/engine-data-pipeline/phase-4.md` | P1-ENG-GF8Y | — |
 | 5 | Workflows, seed guard, runbook, live run on Neon | R1, R3, R5 | `.github/`, `web/scripts`, `docs/` | 7 (+1 data append only on drift) | 2, 3, 4 | NORMAL | `.workflows/plan/engine-data-pipeline/phase-5.md` | P1-ROOT-2QEA | — |

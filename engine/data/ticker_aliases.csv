@@ -1,0 +1,35 @@
+old,new,effective_date,note
+ABC,COR,2023-08-30,AmerisourceBergen renamed Cencora
+ANTM,ELV,2022-06-28,Anthem renamed Elevance Health
+ARNC,HWM,2020-04-06,Arconic Inc renamed Howmet Aerospace 2020-04-01 (first snapshot without ARNC is 2020-04-06); ARNC was then reused by the Arconic Corp spin-off
+BBT,TFC,2019-12-09,BB&T merged with SunTrust as Truist Financial (BB&T the surviving entity)
+BHGE,BKR,2019-10-18,Baker Hughes a GE company renamed Baker Hughes
+BK,BNY,2026-05-21,Bank of New York Mellon ticker change
+BLL,BALL,2022-05-17,Ball Corp ticker change
+CBS,PSKY,2019-12-04,CBS renamed ViacomCBS (VIAC) then Paramount (PARA) then Paramount Skydance (PSKY)
+CDAY,DAY,2024-02-01,Ceridian renamed Dayforce
+COG,CTRA,2021-10-01,Cabot Oil & Gas merged with Cimarex as Coterra Energy (Cabot the surviving entity)
+CTRP,TCOM,2021-12-20,Ctrip renamed Trip.com 2019-10-31; the NDX snapshots keep CTRP until its 2021 removal
+DISCA,WBD,2022-04-11,Discovery Inc renamed Warner Bros. Discovery (Discovery the surviving entity)
+FB,META,2022-06-09,Facebook renamed Meta Platforms
+FBHS,FBIN,2022-12-15,Fortune Brands Home & Security renamed Fortune Brands Innovations (left the S&P 500 before the rename)
+FI,FISV,2025-11-11,Fiserv ticker FISV->FI 2023-06-07 and back to FISV 2025-11-11 (the FISV->FI direction is deliberately absent)
+FLT,CPAY,2024-03-25,FleetCor renamed Corpay
+HCP,DOC,2019-11-05,HCP renamed Healthpeak (PEAK) then took ticker DOC 2024-03-01
+HFC,DINO,2022-03-14,HollyFrontier became HF Sinclair (left the S&P 500 before the rename)
+HRS,LHX,2019-07-01,Harris merged with L3 as L3Harris Technologies (Harris the surviving entity)
+JEC,J,2019-12-10,Jacobs Engineering ticker change
+LB,BBWI,2021-08-03,L Brands renamed Bath & Body Works
+MMC,MRSH,2026-01-14,Marsh & McLennan ticker change
+MYL,VTRS,2020-11-16,Mylan combined with Upjohn as Viatris
+NLOK,GEN,2022-11-08,NortonLifeLock renamed Gen Digital
+PARA,PSKY,2025-08-07,Paramount Global merged with Skydance as Paramount Skydance
+PCLN,BKNG,2018-02-27,Priceline Group renamed Booking Holdings
+PEAK,DOC,2024-03-01,Healthpeak ticker change after the Physicians Realty merger
+PKI,RVTY,2023-05-16,PerkinElmer renamed Revvity
+RE,EG,2023-07-10,Everest Re renamed Everest Group
+SYMC,GEN,2019-11-05,Symantec renamed NortonLifeLock (NLOK) then Gen Digital (GEN)
+TMK,GL,2019-08-09,Torchmark renamed Globe Life
+UTX,RTX,2020-04-03,United Technologies merged with Raytheon as Raytheon Technologies (UTX the surviving entity)
+VIAC,PSKY,2022-02-16,ViacomCBS renamed Paramount (PARA) then Paramount Skydance (PSKY)
+WLTW,WTW,2022-01-10,Willis Towers Watson ticker change

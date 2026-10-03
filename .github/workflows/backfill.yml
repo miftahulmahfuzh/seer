@@ -1,0 +1,87 @@
+name: Backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      start:
+        description: 'First date to fetch (YYYY-MM-DD)'
+        type: string
+        default: '2015-01-02'
+      symbols:
+        description: 'Comma-separated symbols in dot form (BRK.B); empty = every ever-member'
+        type: string
+        default: ''
+      retry_failed:
+        description: 'Retry symbols logged as failed or empty'
+        type: boolean
+        default: false
+      batch_size:
+        description: 'Symbols per yfinance call'
+        type: string
+        default: '40'
+      dry_run:
+        description: 'Fetch and compute everything, then roll back (writes nothing)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seer-db-writer
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+      START: ${{ inputs.start }}
+      SYMBOLS: ${{ inputs.symbols }}
+      RETRY_FAILED: ${{ inputs.retry_failed }}
+      BATCH_SIZE: ${{ inputs.batch_size }}
+      DRY_RUN: ${{ inputs.dry_run == true }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - name: Check secrets
+        run: |
+          if [ -z "$DATABASE_URL_UNPOOLED" ]; then
+            echo "::error::Repository secret DATABASE_URL_UNPOOLED is not set. See docs/runbooks/data-pipeline.md (Owner steps)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: engine/pyproject.toml
+
+      - name: Install engine
+        run: python -m pip install -e engine
+
+      - name: Migrate
+        run: |
+          flags=()
+          if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
+          python -m seer_engine "${flags[@]}" migrate
+
+      - name: Refresh membership
+        run: |
+          flags=(-v)
+          if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
+          python -m seer_engine "${flags[@]}" universe refresh
+
+      - name: Backfill
+        # Exit 0: no symbol failed (delisted names land as `empty` and are fine).
+        # Exit 1: some symbol failed (rate limit) or FX failed; re-run with retry_failed.
+        # Exit 2: empty universe or bad input.
+        run: |
+          flags=(-v)
+          if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
+          args=(--start "$START" --batch-size "${BATCH_SIZE:-40}")
+          if [ -n "$SYMBOLS" ]; then args+=(--symbols "$SYMBOLS"); fi
+          if [ "$RETRY_FAILED" = "true" ]; then args+=(--retry-failed); fi
+          python -m seer_engine "${flags[@]}" backfill "${args[@]}"

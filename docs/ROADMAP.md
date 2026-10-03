@@ -12,7 +12,7 @@ Real money is out of scope until the go-live checklist is fully green.
 - Accounts: Massive, Google OAuth, Finnhub, LLM, Vercel, Neon: all verified 2026-10-03
 - **Done when:** schema migrated on Neon, CI runs lint + tests on push
 
-## P1 — Data pipeline
+## P1 — Data pipeline · done 2026-10-03 locally on Neon (backfill + nightly, [runbook](runbooks/data-pipeline.md)); Actions schedule awaits secrets + push
 - Point-in-time S&P 500 ∪ Nasdaq-100 membership
 - Backfill 10+ years of split-adjusted daily bars via yfinance (Massive free tier only reaches ~2 years back); nightly incremental fetch via Massive grouped-daily
 - Market calendar (holidays, half days)

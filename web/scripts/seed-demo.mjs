@@ -1,6 +1,6 @@
 // Fills Neon with the Seer v2 design's sample data, flagged is_demo so the UI
 // warns "Demo data". Dates are relative to now so the demo is never stale.
-// Refuses to run once the real engine has written a run.
+// Refuses to run once the real engine has written a run or backfilled bars.
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import ws from 'ws';
 
@@ -99,6 +99,8 @@ const c = await pool.connect();
 try {
   const real = await c.query('SELECT count(*)::int AS n FROM runs WHERE NOT is_demo');
   if (real.rows[0].n > 0) throw new Error('Real engine runs exist; refusing to overwrite with demo data.');
+  const bars = await c.query('SELECT count(*)::int AS n FROM bars');
+  if (bars.rows[0].n > 100) throw new Error('Real bars exist (backfill ran); refusing to overwrite with demo data.');
 
   await c.query('BEGIN');
   await c.query('TRUNCATE action_dismissals, orders, equity_snapshots, bars, fx_rates, runs, strategies RESTART IDENTITY CASCADE');

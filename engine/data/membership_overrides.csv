@@ -1,0 +1,21 @@
+date,index_id,action,ticker,note
+2026-06-22,NDX,add,ALAB,Wikipedia NASDAQ-100 component changes (read 2026-10-03): replaces CHTR
+2026-06-22,NDX,remove,CHTR,Wikipedia NASDAQ-100 component changes (read 2026-10-03): replaced by ALAB
+2026-06-22,NDX,add,CRWV,Wikipedia NASDAQ-100 component changes (read 2026-10-03): replaces CTSH
+2026-06-22,NDX,remove,CTSH,Wikipedia NASDAQ-100 component changes (read 2026-10-03): replaced by CRWV
+2026-06-22,NDX,add,NBIS,Wikipedia NASDAQ-100 component changes (read 2026-10-03): replaces INSM
+2026-06-22,NDX,remove,INSM,Wikipedia NASDAQ-100 component changes (read 2026-10-03): replaced by NBIS
+2026-06-22,NDX,add,RKLB,Wikipedia NASDAQ-100 component changes (read 2026-10-03): replaces VRSK
+2026-06-22,NDX,remove,VRSK,Wikipedia NASDAQ-100 component changes (read 2026-10-03): replaced by RKLB
+2026-06-22,NDX,add,TER,Wikipedia NASDAQ-100 component changes (read 2026-10-03): replaces ZS
+2026-06-22,NDX,remove,ZS,Wikipedia NASDAQ-100 component changes (read 2026-10-03): replaced by TER
+2026-06-29,NDX,add,HONA,Wikipedia NASDAQ-100 component changes (read 2026-10-03)
+2026-07-07,NDX,add,SPCX,Wikipedia NASDAQ-100 component changes (read 2026-10-03)
+2026-08-04,NDX,remove,EA,Wikipedia NASDAQ-100 component changes (read 2026-10-03)
+2026-09-14,NDX,remove,KHC,Wikipedia NASDAQ-100 component changes (read 2026-10-03)
+2026-09-21,SP500,add,BE,Wikipedia S&P 500 selected changes (read 2026-10-03): replaces TAP
+2026-09-21,SP500,remove,TAP,Wikipedia S&P 500 selected changes (read 2026-10-03): replaced by BE
+2026-09-21,SP500,add,P,Wikipedia S&P 500 selected changes (read 2026-10-03): replaces TTD
+2026-09-21,SP500,remove,TTD,Wikipedia S&P 500 selected changes (read 2026-10-03): replaced by P
+2026-09-21,SP500,add,ILMN,Wikipedia S&P 500 selected changes (read 2026-10-03): replaces BLDR
+2026-09-21,SP500,remove,BLDR,Wikipedia S&P 500 selected changes (read 2026-10-03): replaced by ILMN

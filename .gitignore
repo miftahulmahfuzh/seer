@@ -17,6 +17,11 @@ __pycache__/
 # backtest bars cache (seer_engine.backtest.io)
 engine/.cache/
 
+# P7a research store (seer_engine.research; rebuilt by `python -m seer_engine research_store`)
+engine/.research/
+engine/.research.tmp/
+engine/.research.old/
+
 # misc
 .DS_Store
 *.log

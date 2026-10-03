@@ -17,8 +17,9 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 import pandas as pd
 
@@ -218,3 +219,135 @@ def frame_to_bars(symbol: str, sub: pd.DataFrame) -> list[Bar]:
         d = ts.date()
         by_date[d] = bars.make_bar(symbol, d, _dec(o), _dec(h), _dec(l), _dec(c), volume)
     return [by_date[d] for d in sorted(by_date)]
+
+
+# ---- dividends-aware download (the P7a research store) -------------------------------------
+#
+# Same price convention as above (auto_adjust=False: split-adjusted, NOT dividend-adjusted),
+# plus yfinance's ``Dividends`` column (actions=True): cash dividends per share on the ex-date,
+# split-adjusted by Yahoo to the same scale as the prices (verified: AAPL 2012-08-09 is 0.094643
+# = $2.65 / 28). ``Stock Splits`` and ``Capital Gains`` are ignored: prices are already
+# split-adjusted, and capital-gain distributions are not cash dividends.
+
+DIVIDENDS_COLUMN = "Dividends"
+DIVIDEND_QUANTUM = Decimal("0.000001")
+
+
+@dataclass(frozen=True)
+class TickerHistory:
+    """One ticker's split-adjusted bars and split-adjusted cash dividends, both ascending."""
+
+    bars: tuple[Bar, ...]
+    dividends: tuple[tuple[date, Decimal], ...]
+
+
+EMPTY_HISTORY = TickerHistory(bars=(), dividends=())
+
+
+def yf_download_actions(tickers: list[str], start: date, end_exclusive: date) -> pd.DataFrame | None:
+    """Like :func:`yf_download`, with ``actions=True`` (adds ``Dividends`` / ``Stock Splits``).
+
+    Raises :class:`RateLimited` if yfinance raised or logged a rate-limit error for any
+    ticker in the batch.
+    """
+    import yfinance as yf
+    from yfinance.exceptions import YFRateLimitError
+
+    yf_logger = logging.getLogger("yfinance")
+    capture = _ErrorCapture()
+    yf_logger.addHandler(capture)
+    try:
+        frame = yf.download(
+            tickers=list(tickers),
+            start=start.isoformat(),
+            end=end_exclusive.isoformat(),
+            interval="1d",
+            auto_adjust=False,
+            actions=True,
+            group_by="ticker",
+            threads=False,
+            progress=False,
+            repair=False,
+            multi_level_index=True,
+        )
+    except YFRateLimitError as exc:
+        raise RateLimited(str(exc)) from exc
+    finally:
+        yf_logger.removeHandler(capture)
+
+    for message in capture.messages:
+        if any(marker in message for marker in _RATE_LIMIT_MARKERS):
+            raise RateLimited(message)
+    return frame
+
+
+def download_actions(
+    symbols: Sequence[str],
+    start: date,
+    end_exclusive: date,
+    *,
+    downloader: Downloader | None = None,
+) -> dict[str, TickerHistory]:
+    """Fetch bars AND cash dividends for canonical ``symbols`` in ``[start, end_exclusive)``.
+
+    Returns ``{canonical_symbol: TickerHistory}`` with an entry (possibly
+    :data:`EMPTY_HISTORY`) for every requested symbol. Date filtering against the caller's
+    inclusive range is the caller's job.
+    """
+    canonical = list(dict.fromkeys(s.strip().upper() for s in symbols))
+    tickers = [to_yahoo(s) for s in canonical]
+    fetch = downloader if downloader is not None else yf_download_actions
+    frame = fetch(tickers, start, end_exclusive)
+    parsed = parse_frame_actions(frame, tickers)
+    return {s: parsed.get(s, EMPTY_HISTORY) for s in canonical}
+
+
+def parse_frame_actions(frame: pd.DataFrame | None, tickers: Sequence[str]) -> dict[str, TickerHistory]:
+    """Turn a yfinance ``actions=True`` frame into ``{canonical_symbol: TickerHistory}``.
+
+    Accepts the same column shapes as :func:`parse_frame`. Bars are exactly what
+    :func:`frame_to_bars` makes; dividends come from :func:`frame_to_dividends`.
+    """
+    out: dict[str, TickerHistory] = {from_yahoo(t): EMPTY_HISTORY for t in tickers}
+    if frame is None or len(frame.index) == 0:
+        return out
+    single = len(tickers) == 1
+    for ticker in tickers:
+        sub = _ticker_frame(frame, ticker, single=single)
+        if sub is None:
+            log.debug("yahoo: %s not present in frame", ticker)
+            continue
+        symbol = from_yahoo(ticker)
+        out[symbol] = TickerHistory(
+            bars=tuple(frame_to_bars(symbol, sub)),
+            dividends=frame_to_dividends(sub),
+        )
+    return out
+
+
+def frame_to_dividends(sub: pd.DataFrame) -> tuple[tuple[date, Decimal], ...]:
+    """One ticker's frame -> ascending ``(ex_date, amount)`` cash dividends.
+
+    Only finite amounts > 0 are kept (yfinance writes 0.0 on every other day and NaN where
+    the ticker has no row). Amounts go through the float's shortest repr and are rounded
+    half-up to 6 decimals (:data:`DIVIDEND_QUANTUM`); one that rounds to 0 is dropped. Dates
+    are the exchange-local index dates, as in :func:`frame_to_bars`.
+    """
+    if DIVIDENDS_COLUMN not in {str(c) for c in sub.columns}:
+        return ()
+    index = pd.DatetimeIndex(sub.index)
+    if index.tz is not None:
+        index = index.tz_localize(None)
+    values = sub[DIVIDENDS_COLUMN].to_numpy(dtype=float)
+    by_date: dict[date, Decimal] = {}
+    for ts, raw in zip(index, values):
+        if pd.isna(ts):
+            continue
+        value = float(raw)
+        if not math.isfinite(value) or value <= 0:
+            continue
+        amount = Decimal(repr(value)).quantize(DIVIDEND_QUANTUM, rounding=ROUND_HALF_UP)
+        if amount <= 0:
+            continue
+        by_date[ts.date()] = amount
+    return tuple((d, by_date[d]) for d in sorted(by_date))

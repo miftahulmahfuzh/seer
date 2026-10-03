@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 21:40:00
-**Total Active Tasks**: 12
+**Last Updated**: 2026-10-03 22:00:00
+**Total Active Tasks**: 11
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 7
+- P1 High: 6
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 5
-- Completed: 28
+- Completed: 29
 
 ---
 
@@ -48,16 +48,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R1 — `TradeRules`: `DESIGN_V0` reproduces §5, and A, A2 and B re-render byte-identically (synthetic test plus a real-data `cmp`). Each new lever has its own synthetic-bar tests; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
   - **Depends on**: P1-ENG-OY9Z, P1-ENG-XORE
   - **Plan**: `.workflows/plan/P1-ENG-CPHN.md`
-
-- [ ] **P1-ENG-CQ5M** Phase 4: Research store: build, load, verify, command, real build
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns new `seer_engine/research.py`, new `commands/research_store.py`, additive dividends-aware download/parse in `yahoo.py`, `.gitignore` entries (`engine/.research/`, `.research.tmp/`, `.research.old/`), new `tests/test_research_store.py` (34, fake downloader + fake FX fetcher); also does the real build into the worktree's `engine/.research/` (30-60 min background), logging counts and fingerprint, verifying SPY has a bar on every NYSE session 1993-02-01..`DEV_END`, yfinance SPY dividends equal `engine/data/spy_dividends.csv` on 2015-03-20..2015-10-16, and AAPL 2012 split-adjusted dividend consistency. Does not touch `membership.py`, `fx.py`, `backfill.py`, Neon (constant equality with `backtest.dev` tested in phase 12, D-I). Exit: suite green; re-running `build_store` on the same fake downloads gives byte-identical files and the same fingerprint; `load_store` rejects a tampered file and a row after `DEV_END`; `research_store --verify` exits 0 on the real store.
-  - **Status**: in_progress
-  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 4 of 13)
-  - **Satisfies**: R2 — A research store command: pre-2015 member bars, the L9 ETFs, dividends from the start, unserved members per year, no Neon writes, deterministic, with a fingerprint; R4 — The dev window is enforced in code (no session after 2015-10-16), and a test proves it
-  - **Depends on**: none
-  - **Plan**: `.workflows/plan/P1-ENG-CQ5M.md`
 
 - [ ] **P1-ENG-ZNTC** Phase 5: Families F1/F10/F11: index timing and calendar
   - **Difficulty**: NORMAL
@@ -160,6 +150,35 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-CQ5M** Phase 4: Research store: build, load, verify, command, real build
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `seer_engine/research.py`, new `commands/research_store.py`, additive dividends-aware download/parse in `yahoo.py`, `.gitignore` entries (`engine/.research/`, `.research.tmp/`, `.research.old/`), new `tests/test_research_store.py` (34, fake downloader + fake FX fetcher); also does the real build into the worktree's `engine/.research/` (30-60 min background), logging counts and fingerprint, verifying SPY has a bar on every NYSE session 1993-02-01..`DEV_END`, yfinance SPY dividends equal `engine/data/spy_dividends.csv` on 2015-03-20..2015-10-16, and AAPL 2012 split-adjusted dividend consistency. Does not touch `membership.py`, `fx.py`, `backfill.py`, Neon (constant equality with `backtest.dev` tested in phase 12, D-I). Exit: suite green; re-running `build_store` on the same fake downloads gives byte-identical files and the same fingerprint; `load_store` rejects a tampered file and a row after `DEV_END`; `research_store --verify` exits 0 on the real store.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 4 of 13)
+  - **Satisfies**: R2 — A research store command: pre-2015 member bars, the L9 ETFs, dividends from the start, unserved members per year, no Neon writes, deterministic, with a fingerprint; R4 — The dev window is enforced in code (no session after 2015-10-16), and a test proves it
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-CQ5M.md`
+  - **Completed**: 2026-10-03 22:00
+  - **Method**: /implement
+  - **Files**: .gitignore, engine/src/seer_engine/yahoo.py, engine/src/seer_engine/research.py, engine/src/seer_engine/commands/research_store.py, engine/tests/test_research_store.py
+  - **Drift**:
+    - none: the code matched the plan's quotes; code blocks applied verbatim
+    - real build had 522 of 1061 requested symbols unserved (plan estimated ~400); all are index members (ETFs all served); recorded per year for the D4 survivorship caveat, not a check failure
+  - **Decided**:
+    - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 13 tasks (tie-break: narrower blast radius, avoid racing peers on todos.md; same as strategy-b-ranker precedent)
+    - readme-updater -> skip; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope)
+    - Phase 12 (P1-ENG-ZWP9) left blocked: its other deps, phases 10 and 11, are not complete
+  - **Phase log**:
+    - fingerprint: 5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a
+    - symbols: 539 served of 1061 requested, 522 unserved
+    - rows: 2,490,793 bars, 28,206 dividends, 4,300 fx
+    - unserved members by year (unserved of members): 1996 267/506, 1997 258/516, 1998 260/526, 1999 260/533, 2000 267/546, 2001 243/522, 2002 231/517, 2003 214/503, 2004 219/513, 2005 209/511, 2006 216/529, 2007 240/593, 2008 219/586, 2009 202/569, 2010 182/549, 2011 175/553, 2012 164/552, 2013 154/550, 2014 142/540, 2015 137/548
+    - check spy-sessions: ok: 5721 NYSE sessions 1993-02-01..2015-10-16, 0 without a SPY bar
+    - check spy-dividends: ok: 2015-03-20..2015-10-16: store 2015-03-20=0.931, 2015-06-19=1.03, 2015-09-18=1.033 | vendored 2015-03-20=0.931, 2015-06-19=1.03, 2015-09-18=1.033
+    - check dividend-scale-AAPL-2012: ok: 2012-08-09: 0.094643 / close 22.1379 = 0.4275%; 2012-11-07: 0.094643 / close 20.8161 = 0.4547%
+    - build wall time 34:45; store size 130M (engine/.research/, gitignored, never committed)
+
 - [x] **P1-ENG-XORE** Phase 2: Allocator protocol, adapters, overlays, `return_window`
   - **Difficulty**: NORMAL
   - **Type**: Feature

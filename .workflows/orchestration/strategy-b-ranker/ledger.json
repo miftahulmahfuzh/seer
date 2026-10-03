@@ -62,7 +62,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "28c8920",
       "depends_on": [
         1,
         2,
@@ -70,10 +70,10 @@
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "no DONE message; recorded by coordinator from git (28c8920 on origin/feature) + todos.md [x]",
       "package": "backtest",
       "plan": ".workflows/plan/strategy-b-ranker/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T11:56:31+00:00",
       "satisfies": [
         "R1",
         "R3",
@@ -81,7 +81,7 @@
         "R5",
         "R6"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ENG-U5JJ",
       "title": "B walk-forward: candidate table, purge, per-fold fits, runs, diagnostics, gate"
     },
@@ -102,7 +102,7 @@
         "R6",
         "R7"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": "P1-ENG-VK5P",
       "title": "B report rendering"
     },
@@ -152,7 +152,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-b-ranker/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-b-ranker",
-  "updated": "2026-10-03T11:51:16+00:00",
-  "verified_at": "2026-10-03T11:49:21+00:00",
+  "updated": "2026-10-03T11:56:32+00:00",
+  "verified_at": "2026-10-03T11:56:21+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-b-ranker"
 }

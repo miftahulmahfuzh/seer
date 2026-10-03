@@ -83,21 +83,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "9998194",
       "depends_on": [
         2
       ],
       "difficulty": "NORMAL",
       "n": 5,
-      "note": null,
+      "note": "f_index +109; suite 1509 pass / 1 fail test_wall_times_reach_logs_only (wall<1000s under load 62, env)",
       "package": "strategies",
       "plan": ".workflows/plan/trade-rules-dev-search/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T22:07:59+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-ZNTC",
       "title": "Families F1/F10/F11: index timing and calendar"
     },
     {
@@ -271,7 +271,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/trade-rules-dev-search/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trade-rules-dev-search",
-  "updated": "2026-10-03T14:33:36+00:00",
+  "updated": "2026-10-03T22:07:59+00:00",
   "verified_at": "2026-10-03T14:04:32+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trade-rules-dev-search"
 }

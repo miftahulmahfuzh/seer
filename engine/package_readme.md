@@ -38,10 +38,12 @@ engine/
     dates.py                NYSE sessions, RunDates
     demo.py                 demo-data purge
     universe.py             read-only point-in-time membership queries
-    bars.py                 Bar value type, rounding, upsert_bars()
+    prices.py               pure Bar, PRICE_QUANTUM, to_decimal (no psycopg)
+    bars.py                 re-exports prices; to_volume, make_bar, upsert_bars()
     fx.py                   Frankfurter USD/IDR fetch, upsert_fx()
     yahoo.py                yfinance download + frame parsing, BRK.B <-> BRK-B (phase 3)
     runs.py                 start_run / finish_run / fail_run
+    sim/                    fill simulator, in progress (documented in phase 4, P1-ENG-SEZ7)
     commands/
       __init__.py           command-module contract
       migrate.py            `migrate` command
@@ -148,6 +150,8 @@ Passing a `datetime` where a `date` is expected raises `TypeError`, because `dat
 
 Prices are split-adjusted only (no dividend adjustment) and stored as `numeric(12,4)`. Volume is an `int`. Symbols use the canonical dot form (`BRK.B`).
 
+`PRICE_QUANTUM`, `Bar` and `to_decimal` are defined in the pure module `seer_engine.prices` (no psycopg, no network) and re-exported from `bars`, so `from seer_engine.bars import Bar` keeps working. Code that must stay free of psycopg (the `sim` core) imports from `prices`.
+
 - `PRICE_QUANTUM = Decimal("0.0001")`
 - `@dataclass(frozen) Bar(symbol, date, open, high, low, close: Decimal, volume: int)`
 - `to_decimal(x) -> Decimal`: rounds half-up to 4 dp. Floats go through `repr`, so `0.1` becomes `0.1000`. Raises on bool and non-finite values.
@@ -234,7 +238,7 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 ### Internal module graph
 - `cli` imports `config` and `commands`. `commands.migrate` imports `config` and `db`.
 - `db` imports `config`. `demo` imports `db`.
-- `fx` imports `http` and `bars.to_decimal`. `runs` imports `dates.RunDates` and `http.redact`.
+- `bars` imports and re-exports `prices` (which imports nothing from the package). `fx` imports `http` and `bars.to_decimal`. `runs` imports `dates.RunDates` and `http.redact`.
 - `http` imports `__version__` for `USER_AGENT`.
 - `yahoo` imports `bars` and pandas. `commands.backfill` imports `bars`, `dates`, `db`, `demo`, `fx`, `universe` and `yahoo`.
 

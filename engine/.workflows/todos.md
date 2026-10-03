@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 06:22:43
-**Total Active Tasks**: 5
+**Last Updated**: 2026-10-04 06:29:28
+**Total Active Tasks**: 4
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 2
-- Completed: 35
+- Completed: 36
 
 ---
 
@@ -49,16 +49,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Depends on**: P1-ENG-2E01
   - **Plan**: `.workflows/plan/P1-ENG-PLRV.md`
 
-- [ ] **P1-ENG-078U** Phase 11: The candidate registry (54 entries, append-only test)
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns new `backtest/registry.py` and `tests/test_registry.py` (74): ids unique and the first 54 are the index table in order (row 54 under `SWING_T20`); <= 60 entries; (id, digest) pins append-only; declared owner inputs equal `candidate_owner_inputs`; every rules preset valid for its allocator; every candidate runs one short smoke window on a synthetic market (every fixed symbol, BIL and the leveraged ETFs) through `run_candidate`. Exit: suite green and the registry committed before any real dev run (agreement with `research` is phase 12's test).
-  - **Status**: open
-  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 11 of 13)
-  - **Satisfies**: R5 — The candidate registry is committed before the dev run: ≤ 60 entries, append-only, each with a family, rules, fixed params, a rationale and an owner-verification flag
-  - **Depends on**: P1-ENG-ZNTC, P1-ENG-76SL, P1-ENG-SB1Q, P1-ENG-5U7B, P1-ENG-2E01
-  - **Plan**: `.workflows/plan/P1-ENG-078U.md`
-
 - [ ] **P1-ENG-ZWP9** Phase 12: `backtest_dev` command, io writer, runtime on the real store
   - **Difficulty**: NORMAL
   - **Type**: Feature
@@ -90,6 +80,27 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-078U** Phase 11: The candidate registry (54 entries, append-only test)
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/registry.py` and `tests/test_registry.py` (74): ids unique and the first 54 are the index table in order (row 54 under `SWING_T20`); <= 60 entries; (id, digest) pins append-only; declared owner inputs equal `candidate_owner_inputs`; every rules preset valid for its allocator; every candidate runs one short smoke window on a synthetic market (every fixed symbol, BIL and the leveraged ETFs) through `run_candidate`. Exit: suite green and the registry committed before any real dev run (agreement with `research` is phase 12's test).
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 11 of 13)
+  - **Satisfies**: R5 — The candidate registry is committed before the dev run: ≤ 60 entries, append-only, each with a family, rules, fixed params, a rationale and an owner-verification flag
+  - **Depends on**: P1-ENG-ZNTC, P1-ENG-76SL, P1-ENG-SB1Q, P1-ENG-5U7B, P1-ENG-2E01
+  - **Plan**: `.workflows/plan/P1-ENG-078U.md`
+  - **Completed**: 2026-10-04 06:29
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/registry.py, engine/tests/test_registry.py
+  - **Drift**:
+    - None in the plan's code. Plan index Status line was stale (it omitted phases 7 and 9, which are complete in todos.md and git); dependencies 5-9 were verified complete.
+    - Full suite: 1663 passed, 3 failed, 0 skipped. All 3 failures are in engine/tests/test_backtest_dev_report.py, phase 10's untracked work in progress written concurrently in this worktree by session impl-trade-rules-dev-search-p10; not part of this phase. Excluding phase 10's 32 tests: 1560 (through phase 9) + 74 (phase 11) = 1634, all passed.
+    - test_registry.py: 74 passed (20 + 54 smoke cases); smoke wall time ~10 s (well under 60 s, nothing to note for phase 12's D13). test_strategy_purity covers registry.py. grep -c UNPINNED = 0. Frozen-set git diff vs 2546a92 is empty.
+  - **Decided**:
+    - FIRST_APPEND date -> date(2026, 10, 4) (also the '# ---- 2026-10-04' registry comment), because the commit is made 2026-10-04 (rung 3: the phase plan's Step 1 says to set it to the commit date). The digest excludes `added`, so the pins are unaffected.
+    - P1-ENG-ZWP9 left blocked: its other dep P1-ENG-PLRV (phase 10) is not complete (completion-handler)
+    - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 13 per the plan index phase table (rung 4: index scope; same call phase 3 made)
+
 - [x] **P1-ENG-2E01** Phase 9: Dev runner: window guard, candidate windows, D8, deflated Sharpe
   - **Difficulty**: HARD
   - **Type**: Feature

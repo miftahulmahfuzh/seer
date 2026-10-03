@@ -75,6 +75,7 @@ engine/
       labels.py             vectorized bracket labeler: net-of-cost label and resolution date per order (P6a)
       b_walkforward.py      candidate table, purge, per-fold fits, probe, B / B-linear runs, calibration, gate_p6a() (P6a)
       b_report.py           BReport, machine lines, Markdown, equity CSV, SVG (P6a)
+      book_runner.py        run_book() / BookResult, run_rules() dispatch, run_stats() / RunStats (P7a)
       io.py                 Neon loader + bar cache, dividends CSV, report writers write_report() / write_wf_report() / write_b_report(), write_model_artifact() (impure)
     commands/
       __init__.py           command-module contract
@@ -877,6 +878,33 @@ B's one round has failed on this data. B is not reworked on it, no model is froz
 2015-10-19 have no bars at all. A learned model can absorb that bias more than a rule can, because
 the losers it never saw are exactly the ones it would have needed to learn to avoid. The report says
 so.
+
+### backtest book runner (P7a)
+
+`backtest/book_runner.py` is pure (covered by `tests/test_strategy_purity.py`); tests in
+`tests/test_book_runner.py`.
+
+- **`run_book(market, allocator, params, rules, start, end, *, prepared=None, dividends=..., initial_idr=INITIAL_IDR, usd_idr=None) -> BookResult`**:
+  drives an `Allocator` under book `TradeRules` (`rules.engine == "book"`) through `sim.book.step_book`
+  over every NYSE session in `[start, end]`, in `run_backtest`'s shape. On a decision session
+  (`sim.rules.is_decision_session`) the allocator maps history through `data_date = prev_session(S)`
+  to target weights (via `targets_prepared` when `prepared` is given, else `targets`); other sessions
+  pass `None`. With `rules.idle_symbol` the residual `1 - sum(weights)` goes to that instrument.
+  Held-symbol dividends with ex-date S are passed only when `rules.dividends`. Positions with no bar
+  on S or later are force-closed (`close_book_unpriced`). `usd_idr` defaults to
+  `market.usd_idr_on(start)`. `DESIGN_V0` rules are a ValueError here.
+  `BookResult` carries snapshots, fills, trades, `open_at_end`, `dividends_usd`, `costs_usd` and
+  `rejections` (by reason).
+- **`run_rules(market, strategy_or_allocator, params, rules, start, end, *, prepared=None, dividends=..., usd_idr=None) -> RunResult | BookResult`**:
+  the single P7a dispatch. `DESIGN_V0` (`"bracket_v0"`) with a `Strategy` goes to the unchanged
+  `run_backtest` (so A, A2 and B stay byte-identical by construction; dividends ignored; `usd_idr`
+  must be None or equal `market.usd_idr_on(start)`); book rules with an `Allocator` go to
+  `run_book`; any other pairing is a TypeError.
+- **`run_stats(RunResult | BookResult) -> RunStats`**: what the dev report needs from either
+  result: `metrics` (non-idle trades for a book run, plus `avg_days_held` and `exit_reasons`),
+  `exposure`, annualized `turnover`, `costs_usd`, `gross_pnl_usd`, `cost_drag`, `dividends_usd`,
+  `daily_returns`, `sharpe` (population stdev, x sqrt(252)), `year_returns` and `worst_year`.
+  Floats exist only here, summed left to right as in `backtest.metrics`.
 
 ## Migration 002 (`db/migrations/002_engine.sql`)
 

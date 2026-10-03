@@ -87,22 +87,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "38b12165eb417d77978932c6e3a3cb94624fa652",
       "depends_on": [
         4
       ],
       "difficulty": "HARD",
       "n": 5,
-      "note": null,
+      "note": "b_report.py + 27 tests applied verbatim, no drift; suite 941 passed 0 skipped; readme left to phase 7",
       "package": "backtest",
       "plan": ".workflows/plan/strategy-b-ranker/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T12:00:48+00:00",
       "satisfies": [
         "R5",
         "R6",
         "R7"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ENG-VK5P",
       "title": "B report rendering"
     },
@@ -122,7 +122,7 @@
         "R5",
         "R7"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": "P1-ENG-UREW",
       "title": "backtest_b` command + io writers"
     },
@@ -152,7 +152,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-b-ranker/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-b-ranker",
-  "updated": "2026-10-03T11:56:32+00:00",
+  "updated": "2026-10-03T12:01:02+00:00",
   "verified_at": "2026-10-03T11:56:21+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-b-ranker"
 }

@@ -159,23 +159,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "8e224a2",
       "depends_on": [
         3
       ],
       "difficulty": "HARD",
       "n": 9,
-      "note": null,
+      "note": "dev.py +50; suite 1560/0 skipped; frozen set clean",
       "package": "backtest",
       "plan": ".workflows/plan/trade-rules-dev-search/phase-9.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T23:23:59+00:00",
       "satisfies": [
         "R4",
         "R5",
         "R8"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-2E01",
       "title": "Dev runner: window guard, candidate windows, D8, deflated Sharpe"
     },
     {
@@ -195,7 +195,7 @@
         "R7",
         "R8"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Dev report and pre-registration renderers"
     },
@@ -218,7 +218,7 @@
       "satisfies": [
         "R5"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The candidate registry (54 entries, append-only test)"
     },
@@ -271,7 +271,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/trade-rules-dev-search/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trade-rules-dev-search",
-  "updated": "2026-10-03T23:20:33+00:00",
+  "updated": "2026-10-03T23:23:59+00:00",
   "verified_at": "2026-10-03T14:04:32+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trade-rules-dev-search"
 }

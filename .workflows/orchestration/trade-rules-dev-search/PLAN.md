@@ -925,7 +925,7 @@ is the registered behaviour and the docs report it.
 | 6 ✓ | Families F2/F3: ETF rotation | R3 | `strategies` | 2 | 2 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-6.md` | P1-ENG-76SL | — |
 | 7 | Families F4/F5/F6: stock factors | R3 | `strategies` | 2 | 2 | HARD | `.workflows/plan/trade-rules-dev-search/phase-7.md` | P1-ENG-SB1Q | — |
 | 8 ✓ | Family F7: longer-horizon mean reversion | R3 | `strategies` | 2 | 2 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-8.md` | P1-ENG-5U7B | — |
-| 9 | Dev runner: window guard, candidate windows, D8, deflated Sharpe | R4, R5, R8 | `backtest` | 2 | 3 | HARD | `.workflows/plan/trade-rules-dev-search/phase-9.md` | P1-ENG-2E01 | — |
+| 9 ✓ | Dev runner: window guard, candidate windows, D8, deflated Sharpe | R4, R5, R8 | `backtest` | 2 | 3 | HARD | `.workflows/plan/trade-rules-dev-search/phase-9.md` | P1-ENG-2E01 | — |
 | 10 | Dev report and pre-registration renderers | R6, R7, R8 | `backtest` | 2 | 9 | HARD | `.workflows/plan/trade-rules-dev-search/phase-10.md` | P1-ENG-PLRV | — |
 | 11 | The candidate registry (54 entries, append-only test) | R5 | `backtest` | 2 | 5, 6, 7, 8, 9 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-11.md` | P1-ENG-078U | — |
 | 12 | `backtest_dev` command, io writer, runtime on the real store | R4, R6, R8 | `commands`, `backtest` | 3 | 4, 10, 11 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-12.md` | P1-ENG-ZWP9 | — |

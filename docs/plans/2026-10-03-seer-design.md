@@ -25,7 +25,7 @@ paper before real money (20,000,000 IDR) is risked.
 - **Whole shares only** for limit orders.
 - No time-based exit → time stop is a manual action Seer reminds about.
 - "Trade in all market hours" stays **off** (regular session only).
-- Open: whether an unfilled limit order persists across days. Seer assumes **day order**.
+- Unverified, **assumed** (user, 2026-10-03): unfilled limit orders expire end of day; fees + slippage = 0.1% per side.
 
 ## 3. Architecture
 
@@ -54,7 +54,8 @@ Vercel — Next.js, read-only UI — seertrade.site
 | Hosting / UI | Vercel (Hobby) |
 | Database | Neon Postgres |
 | Scheduler + compute | GitHub Actions cron |
-| EOD prices | Polygon.io / Massive (free, grouped-daily endpoint) — verify current limits |
+| EOD prices (nightly + last ~2 yrs) | Massive (ex-Polygon) free: grouped-daily = whole market in 1 call; 5 calls/min; **history limited to ~2 years** (verified 2026-10-03) |
+| EOD prices (10-yr backtest backfill) | yfinance, one-off backfill run locally/in Actions (free, unofficial; no delisted tickers → survivorship caveat) |
 | News (Strategy C) | Finnhub free tier |
 | LLM | GLM via z.ai (Anthropic-compatible endpoint, `LLM_*` env) |
 | Auth | Auth.js, **Google provider only**, single allowlisted email (`ALLOWED_EMAIL`) |

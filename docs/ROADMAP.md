@@ -9,12 +9,12 @@ Real money is out of scope until the go-live checklist is fully green.
 - Repo layout: `web/` (Next.js), `engine/` (Python), `.github/workflows/`
 - `.gitignore`, `.env.example`; rotate any secrets that were ever exposed
 - Neon schema + migrations (tables from design §7)
-- Accounts: Polygon/Massive API key, Google OAuth client, Finnhub key (for P5)
+- Accounts: Massive, Google OAuth, Finnhub, LLM, Vercel, Neon: all verified 2026-10-03
 - **Done when:** schema migrated on Neon, CI runs lint + tests on push
 
 ## P1 — Data pipeline
 - Point-in-time S&P 500 ∪ Nasdaq-100 membership
-- Backfill 10+ years of split-adjusted daily bars; nightly incremental fetch
+- Backfill 10+ years of split-adjusted daily bars via yfinance (Massive free tier only reaches ~2 years back); nightly incremental fetch via Massive grouped-daily
 - Market calendar (holidays, half days)
 - **Done when:** nightly job keeps `bars` current for the whole universe, idempotent re-runs
 

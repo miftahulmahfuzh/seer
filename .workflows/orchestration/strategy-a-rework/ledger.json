@@ -3,6 +3,12 @@
   "coordinator": "orch-strategy-a-rework",
   "coordinator_session_id": "d1b2a80b-2ae3-4718-9a91-bf01edb60ff9",
   "created": "2026-10-03T10:11:39+00:00",
+  "landed": {
+    "at": "2026-10-03T10:58:42+00:00",
+    "base": "main",
+    "commit": "de71cbd22103c7d497a0438b0872e0decc00bc9d",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -105,22 +111,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "eef07d85155cd80ba3c7b5d552a68174c0cd8ac1",
       "depends_on": [
         5
       ],
       "difficulty": "NORMAL",
       "n": 6,
-      "note": null,
+      "note": "P3b gate FAILED (+9.1% vs +187.6% TR SPY, PF 1.02, DD 29.1%); STRATEGY_A2_PARAMS stays None; readme Step 9 applied by anchor text (line numbers drifted); CI green",
       "package": "docs`, `strategies`, `tests",
       "plan": ".workflows/plan/strategy-a-rework/phase-6.md",
-      "reported_at": "2026-10-03T10:21:54+00:00",
+      "reported_at": "2026-10-03T10:58:09+00:00",
       "satisfies": [
         "R6",
         "R7",
         "R8"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ENG-RTWR",
       "title": "Real run on Neon, freeze or stop, docs"
     }
@@ -128,6 +134,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-a-rework/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-a-rework",
-  "updated": "2026-10-03T10:35:01+00:00",
+  "updated": "2026-10-03T10:58:42+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-a-rework"
 }

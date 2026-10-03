@@ -6,21 +6,21 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "11ddc96",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": null,
+      "note": "strategies/a2.py: A2Params+variants V0-V3, regime strict, 62 tests; suite 673 w/ p2 tree, 0 skipped",
       "package": "strategies",
       "plan": ".workflows/plan/strategy-a-rework/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T10:21:33+00:00",
       "satisfies": [
         "R1",
         "R2",
         "R5"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-WCIA",
       "title": "Strategy A2: variants V0\u2013V3"
     },
     {
@@ -32,13 +32,13 @@
       "note": null,
       "package": "backtest",
       "plan": ".workflows/plan/strategy-a-rework/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T10:21:54+00:00",
       "satisfies": [
         "R3",
         "R8"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "running",
+      "task_id": "P1-ENG-3PA3",
       "title": "Runner params schedule, `metrics_through`, `select` fallback"
     },
     {
@@ -53,14 +53,14 @@
       "note": null,
       "package": "backtest",
       "plan": ".workflows/plan/strategy-a-rework/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T10:21:54+00:00",
       "satisfies": [
         "R3",
         "R4",
         "R5"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ENG-ODYP",
       "title": "Walk-forward engine"
     },
     {
@@ -74,13 +74,13 @@
       "note": null,
       "package": "backtest",
       "plan": ".workflows/plan/strategy-a-rework/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T10:21:54+00:00",
       "satisfies": [
         "R5",
         "R6"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ENG-BVN5",
       "title": "Walk-forward report rendering"
     },
     {
@@ -94,13 +94,13 @@
       "note": null,
       "package": "commands`, `backtest",
       "plan": ".workflows/plan/strategy-a-rework/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T10:21:54+00:00",
       "satisfies": [
         "R4",
         "R6"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ENG-U4G0",
       "title": "backtest_wf` command + `write_wf_report"
     },
     {
@@ -114,20 +114,20 @@
       "note": null,
       "package": "docs`, `strategies`, `tests",
       "plan": ".workflows/plan/strategy-a-rework/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T10:21:54+00:00",
       "satisfies": [
         "R6",
         "R7",
         "R8"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ENG-RTWR",
       "title": "Real run on Neon, freeze or stop, docs"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-a-rework/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-a-rework",
-  "updated": "2026-10-03T10:11:39+00:00",
+  "updated": "2026-10-03T10:21:54+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-a-rework"
 }

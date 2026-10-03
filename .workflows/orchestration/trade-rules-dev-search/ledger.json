@@ -44,23 +44,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "903aedc",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "HARD",
       "n": 3,
-      "note": null,
+      "note": "book_runner +47; V0 parity A/A2/B seeds 39,4; suite 1509/1 fail wall-time load flake (23/23 alone); frozen set clean",
       "package": "backtest",
       "plan": ".workflows/plan/trade-rules-dev-search/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T23:18:10+00:00",
       "satisfies": [
         "R1",
         "R8"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-CPHN",
       "title": "Book runner, `run_rules` dispatch, run stats, V0 parity"
     },
     {
@@ -102,21 +102,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "68182c4",
       "depends_on": [
         2
       ],
       "difficulty": "NORMAL",
       "n": 6,
-      "note": null,
+      "note": "f_rotation +39; suite 1509/1 fail wall-time under load (9.6s alone); commit carries p7's plan-index tick early",
       "package": "strategies",
       "plan": ".workflows/plan/trade-rules-dev-search/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T23:17:43+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-76SL",
       "title": "Families F2/F3: ETF rotation"
     },
     {
@@ -174,7 +174,7 @@
         "R5",
         "R8"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Dev runner: window guard, candidate windows, D8, deflated Sharpe"
     },
@@ -271,7 +271,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/trade-rules-dev-search/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trade-rules-dev-search",
-  "updated": "2026-10-03T23:16:43+00:00",
+  "updated": "2026-10-03T23:18:10+00:00",
   "verified_at": "2026-10-03T14:04:32+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trade-rules-dev-search"
 }

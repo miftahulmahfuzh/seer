@@ -1,0 +1,114 @@
+.splash {
+  position: relative;
+  min-height: 100dvh;
+  background: var(--splash);
+  color: var(--splash-ink);
+  overflow: hidden;
+}
+
+/* The art is drawn on the XS Max's 414×896 canvas, anchored top-left. */
+.art {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 414px;
+  height: 896px;
+}
+
+.words {
+  position: absolute;
+  top: calc(14px + var(--safe-top));
+  left: 14px;
+  display: flex;
+  flex-direction: column;
+  font-size: 62px;
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+  color: var(--splash-words);
+}
+
+.star { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+.mark {
+  position: absolute;
+  left: 16px;
+  top: 548px;
+  font-size: 84px;
+  line-height: 1;
+  letter-spacing: -0.06em;
+  font-weight: 500;
+}
+
+.bottom {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(20px + max(34px, var(--safe-bottom)));
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.google {
+  position: relative;
+  width: 100%;
+  height: 84px;
+  border-radius: 999px;
+  border: 1.5px solid var(--splash-ink);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--splash-ink);
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s;
+}
+.google:hover { background: rgba(255, 255, 255, 0.12); }
+.google:focus-visible { outline: 2px solid var(--splash-ink); outline-offset: 3px; }
+
+.gdot {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chev { position: absolute; right: 30px; top: 50%; margin-top: -12px; display: flex; }
+
+.refused {
+  background: var(--butter-solid);
+  color: #1d1c1a;
+  border-radius: 32px;
+  padding: 20px 22px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.refusedIcon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.refusedText { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.refusedTitle { font-size: 20px; font-weight: 500; letter-spacing: -0.01em; }
+.refusedSub { font-size: 15px; line-height: 1.4; color: #4a483f; overflow-wrap: anywhere; }
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

@@ -1,0 +1,42 @@
+.summary { padding-bottom: 64px; gap: 20px; }
+.filters { display: flex; justify-content: space-between; gap: 8px; }
+.group { display: flex; gap: 6px; }
+.stats { display: flex; align-items: flex-end; gap: 26px; }
+.stat { display: flex; flex-direction: column; gap: 2px; }
+.big { font-size: 52px; line-height: 0.95; letter-spacing: -0.04em; }
+.mid { font-size: 26px; }
+.sub { font-size: 15px; }
+.key { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 14px; color: var(--ink-2); }
+.key span { display: flex; align-items: center; gap: 5px; }
+
+.list { padding: 16px 22px var(--nav-clear); gap: 0; flex: 1; }
+.none { padding: 32px 0; text-align: center; font-size: 17px; color: var(--ink-2); }
+.row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--hair); }
+.reason {
+  flex: none; width: 46px; height: 46px; border-radius: 999px; background: var(--chip-solid);
+  display: flex; align-items: center; justify-content: center;
+}
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.line1 { display: flex; align-items: center; gap: 8px; }
+.sym { font-size: 20px; font-weight: 500; letter-spacing: -0.01em; }
+.tag {
+  height: 24px; padding: 0 9px; border-radius: 999px; background: var(--chip);
+  display: flex; align-items: center; gap: 4px; font-size: 12px;
+}
+.line2 { font-size: 14px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.result { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-size: 13px; }
+.pct { font-size: 19px; }
+
+@media (min-width: 1024px) {
+  .summary {
+    border-radius: 40px; padding: 28px 30px; flex-direction: row; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; gap: 20px 32px;
+  }
+  .filters { order: 2; gap: 18px; }
+  .key { order: 3; width: 100%; }
+  .list {
+    margin-top: 12px; border-radius: 40px; padding: 8px 30px 20px;
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; align-content: start;
+  }
+  .none { grid-column: 1 / -1; }
+}

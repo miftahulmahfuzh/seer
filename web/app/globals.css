@@ -1,0 +1,206 @@
+/* Seer v2 tokens — from docs/design/Seer v2.dc.html */
+:root {
+  color-scheme: light;
+  --bg: #e6e2d6;
+  --sheet: #ffffff;
+  --ink: #1d1c1a;
+  --ink-2: #5f5b52;
+  --ink-3: #8e897d;
+  --outline: #cfcabd;
+  --hair: rgba(29, 28, 26, 0.1);
+  --chip: rgba(255, 255, 255, 0.6);
+  --chip-solid: #ffffff;
+  --coral: #f47862;
+  --on-coral: #1d1c1a;
+  --butter: #fbe0a9;
+  --butter-solid: #fbe0a9;
+  --lav: #eceefb;
+  --sky: #d6e8ee;
+  --stone: #efe8dd;
+  --pos: #2b7d38;
+  --neg: #b8321f;
+  --bar: #1d1c1a;
+  --bar-ink: #e6e2d6;
+  --line-b: #6b72d6;
+  --line-c: #c4902a;
+  --alarm: #1d1c1a;
+  --alarm-ink: #ffffff;
+  --splash: #f47862;
+  --splash-words: #cf5a45;
+  --splash-star: #f8d07f;
+  --splash-ink: #1d1c1a;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nav-clear: calc(150px + var(--safe-bottom));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #141311;
+    --sheet: #211f1c;
+    --ink: #f4f1ea;
+    --ink-2: #b0ab9f;
+    --ink-3: #7d786d;
+    --outline: #45423c;
+    --hair: rgba(244, 241, 234, 0.12);
+    --chip: rgba(255, 255, 255, 0.08);
+    --chip-solid: rgba(255, 255, 255, 0.14);
+    --butter: #3e3420;
+    --lav: #2a2c40;
+    --sky: #1d3038;
+    --stone: #2c2823;
+    --pos: #86d483;
+    --neg: #ff9180;
+    --bar: #f4f1ea;
+    --bar-ink: #1d1c1a;
+    --line-b: #a3a8f5;
+    --line-c: #e5bb5c;
+    --alarm: #f4f1ea;
+    --alarm-ink: #1d1c1a;
+    --splash: #1b1916;
+    --splash-words: #3a2a24;
+    --splash-star: #f47862;
+    --splash-ink: #f4f1ea;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-outfit), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+button, a { font: inherit; color: inherit; }
+a { text-decoration: none; }
+p { margin: 0; }
+h1, h2 { margin: 0; font-weight: 400; }
+
+.num { font-variant-numeric: tabular-nums; }
+.pos { color: var(--pos); }
+.neg { color: var(--neg); }
+
+.eyebrow {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Outlined/filled circular icon-only buttons. Every control in Seer is one of these. */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 1px solid var(--outline);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  transition: background 0.12s, color 0.12s;
+}
+.icon-btn:hover { background: var(--chip); }
+.icon-btn:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.icon-btn.sm { width: 44px; height: 44px; }
+.icon-btn.md { width: 46px; height: 46px; }
+.icon-btn.solid { border: 0; background: var(--chip-solid); }
+.icon-btn.solid:hover { background: var(--ink); color: var(--sheet); }
+.icon-btn.soft { border: 0; background: var(--chip); }
+.icon-btn.soft:hover { background: var(--chip-solid); }
+.icon-btn.inverted, .icon-btn[aria-current='true'] { border-color: var(--ink); background: var(--ink); color: var(--sheet); }
+
+.chip {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--chip);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.pill-outline {
+  height: 46px;
+  padding: 0 18px;
+  border: 1px solid var(--outline);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+/* ---- Stacked sheets (mobile) -------------------------------------------------- */
+.stack {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.sheet {
+  position: relative;
+  flex: none;
+  border-radius: 40px;
+  padding: 28px 24px 66px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: var(--sheet);
+}
+/* Mobile: each sheet slides 40px under the one before it. */
+.over { margin-top: -40px; }
+.nav-clear { flex: none; height: var(--nav-clear); margin-top: -40px; }
+
+@media (min-width: 1024px) {
+  .over { margin-top: 0; }
+  .nav-clear { display: none; }
+}
+
+.bg-sheet { background: var(--sheet); }
+.bg-lav { background: var(--lav); }
+.bg-butter { background: var(--butter); }
+.bg-sky { background: var(--sky); }
+.bg-stone { background: var(--stone); }
+.bg-coral { background: var(--coral); color: var(--on-coral); }
+
+@media (max-width: 1023.98px) {
+  .desk-only { display: none !important; }
+}
+@media (min-width: 1024px) {
+  .mobile-only { display: none !important; }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.slot-dots { display: flex; }
+.slot-dot {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 500;
+  border: 3px solid var(--sheet);
+  color: var(--ink);
+}
+.slot-dot + .slot-dot { margin-left: -10px; }
+.slot-dot.empty { background: var(--sheet); border: 1.5px dashed var(--outline); color: var(--ink-3); }

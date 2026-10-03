@@ -1,0 +1,9 @@
+.row { display: flex; align-items: center; gap: 12px; }
+.label { font-size: 15px; color: var(--ink-2); }
+.why { margin-top: -4px; font-size: 17px; line-height: 1.5; text-wrap: pretty; }
+
+@media (min-width: 1024px) {
+  .row { gap: 10px; }
+  .label { font-size: 14px; }
+  .why { margin-top: 0; font-size: 15px; }
+}

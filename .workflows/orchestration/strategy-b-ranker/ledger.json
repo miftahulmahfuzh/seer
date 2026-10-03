@@ -3,6 +3,12 @@
   "coordinator": "orch-strategy-b-ranker",
   "coordinator_session_id": "aa26a177-2f72-4727-a075-fa6b15b0ccaf",
   "created": "2026-10-03T11:43:04+00:00",
+  "landed": {
+    "at": "2026-10-03T12:37:37+00:00",
+    "base": "main",
+    "commit": "2086664194acded3cab9ca0d5edabf5af9ac3118",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -128,23 +134,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "2d77af8edaf70ebfff0a6e40cbc486add6a6617e",
       "depends_on": [
         6
       ],
       "difficulty": "NORMAL",
       "n": 7,
-      "note": null,
+      "note": "P6a gate FAILED (B +13.3% vs SPY TR +187.6%, PF 1.03, DD 57.6%); STRATEGY_B_FROZEN None, no artifact; A2 cmp-identical; 970 passed; CI green e71c059; readme anchored by content (line drift); plan index Status edit uncommitted in main checkout",
       "package": "docs`, `strategies`, `tests",
       "plan": ".workflows/plan/strategy-b-ranker/phase-7.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T12:35:15+00:00",
       "satisfies": [
         "R4",
         "R7",
         "R8",
         "R9"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ENG-M99E",
       "title": "Real run on Neon, A2 byte-identity check, freeze or stop, docs"
     }
@@ -152,7 +158,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-b-ranker/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-b-ranker",
-  "updated": "2026-10-03T12:06:13+00:00",
+  "updated": "2026-10-03T12:37:37+00:00",
   "verified_at": "2026-10-03T11:56:21+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-b-ranker"
 }

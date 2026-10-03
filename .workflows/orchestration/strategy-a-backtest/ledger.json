@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "9dad278",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "strategies/{base,indicators,a}.py + backtest/__init__ + purity glob; 448 passed 0 skipped; plan path \u2192 STRATEGY_A_BACKTEST_PLAN.md (given -f path absent)",
       "package": "seer_engine.strategies",
       "plan": ".workflows/plan/strategy-a-backtest/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T08:31:31+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-WHQG",
       "title": "Strategy interface, indicators, Strategy A"
     },
     {
@@ -36,7 +36,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "SPY buy-and-hold benchmark + vendored dividends"
     },
@@ -55,7 +55,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Point-in-time market + backtest runner + survivorship"
     },
@@ -125,6 +125,6 @@
   "plan": "/home/miftah/.worktrees/seer/strategy-a-backtest/.workflows/orchestration/strategy-a-backtest/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-a-backtest",
-  "updated": "2026-10-03T08:21:01+00:00",
+  "updated": "2026-10-03T08:31:47+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-a-backtest"
 }

@@ -136,7 +136,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - full suite 1 failed / 1509 passed (8h31m, load avg ~41 from concurrent phase sessions sharing this worktree): test_backtest_b_command.py::test_wall_times_reach_logs_only asserts real wall times < 1000 s -> treated as a load-induced flake, not relaxed (frozen test file, outside phase scope); passes in isolation in 7 s (tie-break: never relax a check)
     - ruff not installed in engine/.venv -> lint step skipped; pytest + purity glob are the plan's verification
     - readme-updater -> skipped; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope; same as phases 4 and 5)
-    - Phase 11 (P1-ENG-078U) left blocked: its deps 6 and 9 are not complete
+    - Phase 11 (P1-ENG-078U) left blocked: its dep 9 (P1-ENG-2E01) is not complete
 
 
 - [x] **P1-ENG-5U7B** Phase 8: Family F7: longer-horizon mean reversion

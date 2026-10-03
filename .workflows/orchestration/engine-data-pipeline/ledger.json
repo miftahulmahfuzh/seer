@@ -6,22 +6,22 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "117b2ff",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "recorded by coordinator from git; phase did not write ledger",
       "package": "engine/`, `db/",
       "plan": ".workflows/plan/engine-data-pipeline/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T05:54:45+00:00",
       "satisfies": [
         "R2",
         "R4",
         "R5",
         "R6"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-VP1R",
       "title": "Engine foundation: package, migration 002, dates, DB helpers, demo purge"
     },
     {
@@ -41,7 +41,7 @@
         "R4",
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Point-in-time universe membership"
     },
@@ -62,7 +62,7 @@
         "R4",
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "yfinance + FX history backfill"
     },
@@ -83,7 +83,7 @@
         "R4",
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Nightly command: Massive bars, splits, FX, runs"
     },
@@ -114,6 +114,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/engine-data-pipeline/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "engine-data-pipeline",
-  "updated": "2026-10-03T05:49:01+00:00",
+  "updated": "2026-10-03T05:54:55+00:00",
+  "verified_at": "2026-10-03T05:54:29+00:00",
   "worktree": "/home/miftah/.worktrees/seer/engine-data-pipeline"
 }

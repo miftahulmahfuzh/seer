@@ -121,21 +121,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "5de5ced",
       "depends_on": [
         2
       ],
       "difficulty": "HARD",
       "n": 7,
-      "note": null,
+      "note": "f_factor +78 (+index fix 7c34944); suite 1509/1 fail wall-time load flake (7s alone); frozen set clean",
       "package": "strategies",
       "plan": ".workflows/plan/trade-rules-dev-search/phase-7.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T23:20:33+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-SB1Q",
       "title": "Families F4/F5/F6: stock factors"
     },
     {
@@ -271,7 +271,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/trade-rules-dev-search/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trade-rules-dev-search",
-  "updated": "2026-10-03T23:18:10+00:00",
+  "updated": "2026-10-03T23:20:33+00:00",
   "verified_at": "2026-10-03T14:04:32+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trade-rules-dev-search"
 }

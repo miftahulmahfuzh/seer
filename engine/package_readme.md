@@ -54,11 +54,12 @@ engine/
       sizing.py             Pick, Rejection, SizingResult, size_picks()
       split_adjust.py       apply_split()
     strategies/             strategy layer: pure; float64 indicators, Decimal picks (P3)
-      __init__.py           re-exports the public names of base, a and a2
+      __init__.py           re-exports the public names of base, a, a2 and b
       base.py               History, history_from_bars(), Strategy protocol
-      indicators.py         sma / wilder_rsi / wilder_atr / mean_dollar_volume windows, rolling()
+      indicators.py         sma / wilder_rsi / wilder_atr / mean_dollar_volume / mean / stdev_return windows, rolling()
       a.py                  Strategy A: AParams, DESIGN_PARAMS, STRATEGY_A_PARAMS (frozen), StrategyA
       a2.py                 Strategy A2 (P3b): A2Params, VARIANTS V0-V3, regime_on, STRATEGY_A2_PARAMS, StrategyA2
+      b.py                  Strategy B (P6a, in progress): features, Design, prepare_b, BParams, FrozenModel, StrategyB; documented in phase 7
     backtest/               10-year backtest (P3) and walk-forward (P3b); every module but io.py is pure
       __init__.py           docstring only
       market.py             Membership, Market: bars, universe and FX in memory
@@ -419,6 +420,8 @@ result is bit-identical whatever the number of rows.
 - `wilder_atr_window(high, low, close, n)`: `TR = max(h − l, |h − c_prev|, |l − c_prev|)` from the
   window's second bar; seed = mean of the first `n` TRs; Wilder after.
 - `mean_dollar_volume_window(close, volume, n)`: mean of `close × volume` over the last `n` bars.
+- `mean_window(x, n)`: mean of the last `n` columns of any series, summed left to right, `/ n` (Strategy B: volume).
+- `stdev_return_window(close, n)`: population (ddof 0) stdev of the last `n` one-bar returns `c_i / c_{i−1} − 1`; `NaN` when `W < n + 1`.
 - `rolling(fn, *series, window, **kw)`: a length-T series → length-T result via
   `sliding_window_view`, `NaN` for `t < window − 1`.
 

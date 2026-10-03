@@ -141,6 +141,50 @@ def mean_dollar_volume_window(close: np.ndarray, volume: np.ndarray, n: int) -> 
     return acc / n
 
 
+def mean_window(x: np.ndarray, n: int) -> np.ndarray:
+    """Mean of the last ``n`` columns of ``x``: summed left to right, then divided by ``n``.
+
+    Any series (Strategy B: volume). NaN for every row when ``W < n``.
+    """
+    x = _matrix("x", x)
+    n = _period(n)
+    w = x.shape[1]
+    if w < n:
+        return _nan_rows(x)
+    return _column_mean(x, w - n, n)
+
+
+def _one_bar_return(close: np.ndarray, i: int) -> np.ndarray:
+    return close[:, i] / close[:, i - 1] - 1.0
+
+
+def stdev_return_window(close: np.ndarray, n: int) -> np.ndarray:
+    """Population (ddof 0) standard deviation of the last ``n`` one-bar returns.
+
+    ``r_i = c_i / c_{i-1} - 1`` for the last ``n`` bars (i = W-n .. W-1). mean = Σ r / n, summed
+    left to right; var = Σ (r - mean)^2 / n, summed left to right; result ``sqrt(var)``. A zero
+    previous close gives a non-finite value (numpy's division warning suppressed). NaN for every
+    row when the window has fewer than ``n`` returns (``W < n + 1``).
+    """
+    close = _matrix("close", close)
+    n = _period(n)
+    w = close.shape[1]
+    if w < n + 1:
+        return _nan_rows(close)
+    first = w - n
+    with np.errstate(divide="ignore", invalid="ignore"):
+        mean = _one_bar_return(close, first)
+        for i in range(first + 1, w):
+            mean = mean + _one_bar_return(close, i)
+        mean = mean / n
+        dev = _one_bar_return(close, first) - mean
+        acc = dev * dev
+        for i in range(first + 1, w):
+            dev = _one_bar_return(close, i) - mean
+            acc = acc + dev * dev
+        return np.sqrt(acc / n)
+
+
 def rolling(fn: Callable[..., np.ndarray], *series: np.ndarray, window: int, **kw: object) -> np.ndarray:
     """``fn`` over every sliding window of ``window`` bars of 1-D ``series``.
 

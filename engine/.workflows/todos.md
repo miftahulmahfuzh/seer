@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 18:48:27
-**Total Active Tasks**: 6
+**Last Updated**: 2026-10-03 18:49:33
+**Total Active Tasks**: 5
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 6
+- P1 High: 5
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 4
-- Completed: 21
+- Blocked: 3
+- Completed: 22
 
 ---
 
@@ -23,15 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ENG-1OMN** Phase 2: B features, ranks, candidates, `StrategyB`
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns additive `mean_window` and `stdev_return_window` in `strategies/indicators.py` (tests in new `tests/test_indicators_b.py`), new `strategies/b.py` exactly as the index contract, `strategies/__init__.py` exports from `b.py` only (never imports `b_model`), and new `tests/test_strategy_b.py` (every feature hand-computed; `prepare_b` vs `design_at` bit-identity; `rank01` ties and n=0/1; ranks from members on d only; SPY features through d, no candidates when SPY missing/short; `picks_from_design` positive-only, symbol tie-break order, invalid-bracket drop; P4 identity over several dates and fake models; no look-ahead incl. SPY bars from S on; SPY never picked; `SPY_SYMBOL == universe.BENCHMARK`; `MIN_DOLLAR_VOLUME == a.DESIGN_PARAMS.min_dollar_volume`). Does not touch `a.py`, `a2.py`, `base.py`, existing indicators, `b_model.py`, `backtest/`. Exit: suite green, 0 skipped (+59: 11 + 48); purity glob covers `b.py`; `import seer_engine.strategies` loads no `sklearn`; `STRATEGY_B_FROZEN` not re-exported (D24).
-  - **Status**: in_progress
-  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 2 of 7)
-  - **Satisfies**: R2 — Features. Each is hand-computed. The rolling and single-window paths are bit-identical. Ranks use that date's candidates only, ties averaged. SPY features read SPY's bars through `data_date` only; R3 — P4 identity and no look-ahead, for B and B-linear, with a fixed model. SPY bars dated ≥ S are included; R6 — Purity. The new modules pass the globbing purity test
-  - **Depends on**: none
-  - **Plan**: `.workflows/plan/P1-ENG-1OMN.md`
 - [x] **P1-ENG-DKWU** Phase 3: Vectorized bracket labeler
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -51,7 +42,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns new `backtest/b_walkforward.py` exactly as the index contract (`FoldModel` value equality D20, `calibration` drops NaN labels itself D21, `gate_p6a` changes only the subject for B-linear D22, `passed_nights` traded == `len(run.snapshots) - 1`, five private `walkforward.py` helpers imported read-only D26) and new `tests/test_backtest_b_walkforward.py` (35 tests on synthetic markets: `CandidateTable` rows equal `design_on`; purge -- mutating bars after `tune_end(Y)` leaves fold Y's mask, X, labels and model digest unchanged; folds equal `walkforward.folds`; `train_folds` for both kinds; schedule switches at year starts and a 31 Dec open order keeps its bracket; P4 identity with real tree and ridge `BParams`; `oos_predictions` uses the right fold's model; hand-checked calibration deciles; passed nights equal empty-pick sessions; `gate_p6a` sentences in both kinds and outcomes; two identical calls give `==`; `probe_determinism` True on synthetic data). Does not touch `walkforward.py` or any out-of-scope file. Exit: suite green, 0 skipped (914); purity glob covers the module.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 4 of 7)
   - **Satisfies**: R1 — Labels. Synthetic tests cover every label path. The vectorized labeler agrees with a one-order `sim` run on a seeded sample. Changing a bar after `tune_end(Y)` leaves fold Y's training set unchanged; R3 — P4 identity and no look-ahead, for B and B-linear, with a fixed model. SPY bars dated ≥ S are included; R4 — Walk-forward. The folds are exactly P3b's. Training uses purged labels only. One chained portfolio, whose brackets survive the year boundary. `backtest_wf`'s A2 report stays byte-identical; R5 — Determinism. `==` results and byte-identical files. The gated model is bit-identical across runs and thread counts, or the pre-registered switch to B-linear takes effect; R6 — Purity. The new modules pass the globbing purity test
   - **Depends on**: P1-ENG-CW71, P1-ENG-1OMN, P1-ENG-DKWU
@@ -95,6 +86,20 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-1OMN** Phase 2: B features, ranks, candidates, `StrategyB`
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns additive `mean_window` and `stdev_return_window` in `strategies/indicators.py` (tests in new `tests/test_indicators_b.py`), new `strategies/b.py` exactly as the index contract, `strategies/__init__.py` exports from `b.py` only (never imports `b_model`), and new `tests/test_strategy_b.py` (every feature hand-computed; `prepare_b` vs `design_at` bit-identity; `rank01` ties and n=0/1; ranks from members on d only; SPY features through d, no candidates when SPY missing/short; `picks_from_design` positive-only, symbol tie-break order, invalid-bracket drop; P4 identity over several dates and fake models; no look-ahead incl. SPY bars from S on; SPY never picked; `SPY_SYMBOL == universe.BENCHMARK`; `MIN_DOLLAR_VOLUME == a.DESIGN_PARAMS.min_dollar_volume`). Does not touch `a.py`, `a2.py`, `base.py`, existing indicators, `b_model.py`, `backtest/`. Exit: suite green, 0 skipped (+59: 11 + 48); purity glob covers `b.py`; `import seer_engine.strategies` loads no `sklearn`; `STRATEGY_B_FROZEN` not re-exported (D24).
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 2 of 7)
+  - **Satisfies**: R2 — Features. Each is hand-computed. The rolling and single-window paths are bit-identical. Ranks use that date's candidates only, ties averaged. SPY features read SPY's bars through `data_date` only; R3 — P4 identity and no look-ahead, for B and B-linear, with a fixed model. SPY bars dated ≥ S are included; R6 — Purity. The new modules pass the globbing purity test
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-1OMN.md`
+  - **Completed**: 2026-10-03 18:49
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/indicators.py, engine/src/seer_engine/strategies/b.py, engine/src/seer_engine/strategies/__init__.py, engine/tests/test_indicators_b.py, engine/tests/test_strategy_b.py
+  - **Decided**:
+    - Step 3 task creation skipped: peer session impl-strategy-b-ranker-p1 created all 7 tasks (p2 = P1-ENG-1OMN) in the shared worktree, to avoid duplicate tasks from concurrent sessions (tie-break: narrower blast radius)
 - [x] **P1-ENG-CW71** Phase 1: B model interface + scikit-learn dependency
   - **Difficulty**: NORMAL
   - **Type**: Feature

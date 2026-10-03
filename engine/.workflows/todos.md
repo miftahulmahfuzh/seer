@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 22:00:00
-**Total Active Tasks**: 11
+**Last Updated**: 2026-10-04 04:54:58
+**Total Active Tasks**: 10
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 6
+- P1 High: 5
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 5
-- Completed: 29
+- Completed: 30
 
 ---
 
@@ -48,16 +48,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R1 — `TradeRules`: `DESIGN_V0` reproduces §5, and A, A2 and B re-render byte-identically (synthetic test plus a real-data `cmp`). Each new lever has its own synthetic-bar tests; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
   - **Depends on**: P1-ENG-OY9Z, P1-ENG-XORE
   - **Plan**: `.workflows/plan/P1-ENG-CPHN.md`
-
-- [ ] **P1-ENG-ZNTC** Phase 5: Families F1/F10/F11: index timing and calendar
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns new `strategies/f_index.py` and `tests/test_f_index.py` (109): hand-checked signals (SMA, month-end SMA, absolute momentum, always, turn-of-month calendar around month ends and holidays), P4 identity and no look-ahead, locally and through the phase-2 kit (D-E). Exit: suite green; purity glob covers the module.
-  - **Status**: open
-  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 5 of 13)
-  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
-  - **Depends on**: P1-ENG-XORE
-  - **Plan**: `.workflows/plan/P1-ENG-ZNTC.md`
 
 - [ ] **P1-ENG-76SL** Phase 6: Families F2/F3: ETF rotation
   - **Difficulty**: NORMAL
@@ -150,6 +140,26 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-ZNTC** Phase 5: Families F1/F10/F11: index timing and calendar
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/f_index.py` and `tests/test_f_index.py` (109): hand-checked signals (SMA, month-end SMA, absolute momentum, always, turn-of-month calendar around month ends and holidays), P4 identity and no look-ahead, locally and through the phase-2 kit (D-E). Exit: suite green; purity glob covers the module.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 5 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
+  - **Depends on**: P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-ZNTC.md`
+  - **Completed**: 2026-10-04 04:54
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/f_index.py, engine/tests/test_f_index.py
+  - **Drift**:
+    - none: both files written verbatim from the phase-5 plan code blocks
+  - **Decided**:
+    - full suite 1 failed / 1509 passed (7h01m, machine load avg ~62 from concurrent swarm sessions): test_backtest_b_command.py::test_wall_times_reach_logs_only asserts real wall times < 1000s; under this load the real run exceeds it (isolated rerun could not finish in 900s). Nothing imports f_index except test_f_index.py, so environmental, not this phase -> proceeded without touching the test (tie-break: never relax a check; not a phase-5 regression)
+    - ruff not installed in engine/.venv -> lint not run (not part of the plan's verification)
+    - readme-updater -> skip; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope; same as phase 4)
+    - Phase 11 (P1-ENG-078U) left blocked: its other deps, phases 6, 7, 8 and 9, are not complete
+
 - [x] **P1-ENG-CQ5M** Phase 4: Research store: build, load, verify, command, real build
   - **Difficulty**: HARD
   - **Type**: Feature

@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/trade-rules-dev-search`
 **Branch:** `feature/trade-rules-dev-search` (base: `origin/main` @ `2546a92`)
 **Phases:** 13
-**Status:** phase 2/13 complete
+**Status:** 4/13 phases complete (1, 2, 4, 5)
 **Coordinator:** —
 
 ---
@@ -921,7 +921,7 @@ is the registered behaviour and the docs report it.
 | 2 ✓ | Allocator protocol, adapters, overlays, `return_window` | R3, R8 | `strategies` | 4 | 1 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-2.md` | P1-ENG-XORE | — |
 | 3 | Book runner, `run_rules` dispatch, run stats, V0 parity | R1, R8 | `backtest` | 2 | 1, 2 | HARD | `.workflows/plan/trade-rules-dev-search/phase-3.md` | P1-ENG-CPHN | — |
 | 4 | Research store: build, load, verify, command, real build | R2, R4 | root, `commands` | 5 (+ the gitignored store) | — | HARD | `.workflows/plan/trade-rules-dev-search/phase-4.md` | P1-ENG-CQ5M | — |
-| 5 | Families F1/F10/F11: index timing and calendar | R3 | `strategies` | 2 | 2 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-5.md` | P1-ENG-ZNTC | — |
+| 5 ✓ | Families F1/F10/F11: index timing and calendar | R3 | `strategies` | 2 | 2 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-5.md` | P1-ENG-ZNTC | — |
 | 6 | Families F2/F3: ETF rotation | R3 | `strategies` | 2 | 2 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-6.md` | P1-ENG-76SL | — |
 | 7 | Families F4/F5/F6: stock factors | R3 | `strategies` | 2 | 2 | HARD | `.workflows/plan/trade-rules-dev-search/phase-7.md` | P1-ENG-SB1Q | — |
 | 8 | Family F7: longer-horizon mean reversion | R3 | `strategies` | 2 | 2 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-8.md` | P1-ENG-5U7B | — |

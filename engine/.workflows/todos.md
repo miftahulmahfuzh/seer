@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 06:15:44
-**Total Active Tasks**: 7
+**Last Updated**: 2026-10-04 06:16:18
+**Total Active Tasks**: 6
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 4
-- Completed: 33
+- Completed: 34
 
 ---
 
@@ -38,16 +38,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Decided**:
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
-
-- [ ] **P1-ENG-76SL** Phase 6: Families F2/F3: ETF rotation
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns new `strategies/f_rotation.py` and `tests/test_f_rotation.py` (39): momentum ranking with ties, absolute filter, fallback, trend filter, missing or short ETFs, P4 identity and no look-ahead (locally and through the kit). Exit: suite green.
-  - **Status**: open
-  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 6 of 13)
-  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
-  - **Depends on**: P1-ENG-XORE
-  - **Plan**: `.workflows/plan/P1-ENG-76SL.md`
 
 - [ ] **P1-ENG-2E01** Phase 9: Dev runner: window guard, candidate windows, D8, deflated Sharpe
   - **Difficulty**: HARD
@@ -110,6 +100,24 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-76SL** Phase 6: Families F2/F3: ETF rotation
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/f_rotation.py` and `tests/test_f_rotation.py` (39): momentum ranking with ties, absolute filter, fallback, trend filter, missing or short ETFs, P4 identity and no look-ahead (locally and through the kit). Exit: suite green.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 6 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
+  - **Depends on**: P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-76SL.md`
+  - **Completed**: 2026-10-04 06:16
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/f_rotation.py, engine/tests/test_f_rotation.py
+  - **Drift**:
+    - None: both files written verbatim from the phase-6 plan's code blocks.
+  - **Decided**:
+    - Full-suite wall-clock flake under swarm load (test_backtest_b_command.py::test_wall_times_reach_logs_only; 8h31m run at load avg ~41; passes alone in 9.6s) -> accepted on an isolated re-pass, no check relaxed (tie-break: never relax a check; the test itself passes unchanged)
+    - readme-updater -> skipped; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope)
+
 - [x] **P1-ENG-SB1Q** Phase 7: Families F4/F5/F6: stock factors
   - **Difficulty**: HARD
   - **Type**: Feature

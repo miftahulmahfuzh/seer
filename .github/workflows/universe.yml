@@ -1,0 +1,49 @@
+name: Universe
+
+on:
+  schedule:
+    # 00:30 UTC Monday = 07:30 WIB Monday = Sunday 20:30 EDT / 19:30 EST.
+    - cron: '30 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seer-db-writer
+  cancel-in-progress: false
+
+jobs:
+  universe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - name: Check secrets
+        run: |
+          if [ -z "$DATABASE_URL_UNPOOLED" ]; then
+            echo "::error::Repository secret DATABASE_URL_UNPOOLED is not set. See docs/runbooks/data-pipeline.md (Owner steps)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: engine/pyproject.toml
+
+      - name: Install engine
+        run: python -m pip install -e engine
+
+      - name: Migrate
+        run: python -m seer_engine migrate
+
+      - name: Refresh membership
+        run: python -m seer_engine -v universe refresh
+
+      - name: Check against Wikipedia (fails on drift)
+        run: python -m seer_engine -v universe check

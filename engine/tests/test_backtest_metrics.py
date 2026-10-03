@@ -4,11 +4,22 @@ and exit reasons. Every expected string was produced by node 20 from metrics.ts'
 from __future__ import annotations
 
 import math
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+from test_backtest_runner import (
+    END,
+    START,
+    TABLE,
+    TABLE_B,
+    FixedPicks,
+    ParamPicks,
+    scenario_market,
+    smoke_market,
+)
 
+from seer_engine import dates
 from seer_engine.backtest.benchmark import BenchmarkCurve
 from seer_engine.backtest.metrics import (
     DASH,
@@ -24,12 +35,14 @@ from seer_engine.backtest.metrics import (
     fmt_pf,
     fmt_signed_pct,
     forced_closes,
+    metrics_through,
     run_metrics,
     strategy_metrics,
     to_fixed,
 )
-from seer_engine.backtest.runner import RunResult
+from seer_engine.backtest.runner import ParamsSchedule, RunResult, run_backtest
 from seer_engine.sim import Event, Order, Snapshot
+from seer_engine.strategies.a import DESIGN_PARAMS, STRATEGY_A
 
 D = date.fromisoformat
 
@@ -294,3 +307,74 @@ def test_curve_metrics_has_no_trades():
     assert m.max_drawdown == (1020.0 - 1010.0) / 1020.0
     assert m.trades == 0 and m.profit_factor is None and m.win_rate is None
     assert m.exit_reasons == () and m.avg_days_held is None
+
+
+# --------------------------------------------------------------------------- metrics_through (P3b)
+#
+# The prefix property: cutting a long run's metrics at e1 equals the metrics of a run that
+# stops at e1. Walk-forward tuning relies on it (one run per combination, sliced per fold).
+
+
+def test_metrics_through_the_scenario_equals_a_run_that_stops_there():
+    market = scenario_market()
+    full = run_backtest(market, FixedPicks(TABLE), None, START, END)
+    forced = [e.session_date for e in full.events if e.forced]
+    assert forced == [D("2025-03-06")]  # BBB, the session after its last bar
+    for e1 in dates.sessions(START, END):
+        short = run_backtest(market, FixedPicks(TABLE), None, START, e1)
+        assert metrics_through(full, e1) == run_metrics(short), e1
+    # The forced close falls on the session right after 03-05 (left out) and on 03-06 itself.
+    assert metrics_through(full, D("2025-03-05")).trades == 1  # AAA only
+    assert metrics_through(full, D("2025-03-06")).trades == 2  # AAA, then BBB forced
+    assert metrics_through(full, D("2025-03-06")).exit_reasons == (("tp", 1), ("sl", 0), ("time", 1), ("gap", 0))
+    assert metrics_through(full, END) == run_metrics(full)
+
+
+def test_metrics_through_a_schedule_run_equals_a_run_that_stops_there():
+    market = scenario_market()
+    sched = ParamsSchedule(((START, "a"), (D("2025-03-07"), "b")))
+    tables = {"a": TABLE, "b": TABLE_B}
+    full = run_backtest(market, ParamPicks(tables), sched, START, END)
+    for e1 in dates.sessions(START, END):
+        short = run_backtest(market, ParamPicks(tables), sched, START, e1)
+        assert metrics_through(full, e1) == run_metrics(short), e1
+
+
+def test_metrics_through_the_strategy_a_smoke_market_with_a_forced_close():
+    # UPC's bars stop on 2025-01-24, the day its limit fills (see the smoke trades): from
+    # 2025-01-27 on it is gone, so the runner force-closes it on 2025-01-27.
+    market, start, end = smoke_market(cut=D("2025-01-24"))
+    prepared = STRATEGY_A.prepare(market.history)
+    full = run_backtest(market, STRATEGY_A, DESIGN_PARAMS, start, end, prepared=prepared)
+    forced = [(e.session_date, e.order.symbol) for e in full.events if e.forced]
+    assert forced == [(D("2025-01-27"), "UPC")]
+    assert len(full.closed) > 3
+    cuts = [
+        start,
+        D("2024-11-14"),  # an ordinary tp exit day
+        D("2025-01-24"),  # the forced close is on the next session: left out
+        D("2025-01-27"),  # the forced close is on this session: kept
+        D("2025-02-13"),
+        end,
+    ]
+    for e1 in cuts:
+        short = run_backtest(market, STRATEGY_A, DESIGN_PARAMS, start, e1, prepared=prepared)
+        assert metrics_through(full, e1) == run_metrics(short), e1
+    before = metrics_through(full, D("2025-01-24"))
+    at = metrics_through(full, D("2025-01-27"))
+    assert at.trades == before.trades + 1
+    assert dict(at.exit_reasons)["time"] == dict(before.exit_reasons)["time"] + 1
+
+
+def test_metrics_through_rejects_an_end_outside_the_run_or_not_a_session():
+    full = run_backtest(scenario_market(), FixedPicks(TABLE), None, START, END)
+    with pytest.raises(ValueError):
+        metrics_through(full, dates.prev_session(START))  # the snapshot-0 date is not in the window
+    with pytest.raises(ValueError):
+        metrics_through(full, dates.next_session(END))
+    with pytest.raises(ValueError):
+        metrics_through(full, D("2025-03-08"))  # a Saturday inside the window
+    with pytest.raises(TypeError):
+        metrics_through(full, datetime(2025, 3, 6))
+    with pytest.raises(TypeError):
+        metrics_through(run_metrics(full), END)

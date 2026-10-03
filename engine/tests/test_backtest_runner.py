@@ -18,7 +18,8 @@ Simulator arithmetic used in the comments (``seer_engine.sim``):
 from __future__ import annotations
 
 from collections.abc import Mapping, Set as AbstractSet
-from datetime import date
+from dataclasses import replace
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -27,7 +28,14 @@ from simkit import D, P, bar
 
 from seer_engine import dates
 from seer_engine.backtest.market import Market, Membership
-from seer_engine.backtest.runner import INITIAL_IDR, RunResult, YearGap, run_backtest, survivorship
+from seer_engine.backtest.runner import (
+    INITIAL_IDR,
+    ParamsSchedule,
+    RunResult,
+    YearGap,
+    run_backtest,
+    survivorship,
+)
 from seer_engine.prices import Bar
 from seer_engine.sim import Pick, Snapshot
 from seer_engine.strategies.a import DESIGN_PARAMS, STRATEGY_A
@@ -372,3 +380,166 @@ def test_strategy_a_smoke_prepared_equals_plain():
     assert len(plain.snapshots) == len(dates.sessions(start, end)) + 1
     assert any(e.kind == "fill" for e in plain.events)
     assert {o.symbol for o in plain.closed} <= {"UPA", "UPB", "UPC"}
+
+
+# --------------------------------------------------------------------------- params schedule (P3b)
+
+
+class ParamPicks(FixedPicks):
+    """``FixedPicks`` whose table is chosen by ``params``: ``tables[params][data_date]``.
+
+    Records ``(data_date, params)`` for every call, so a test can see which params the runner
+    handed over for which session.
+    """
+
+    id = "PARAM"
+
+    def __init__(self, tables: Mapping[str, Mapping[date, tuple[Pick, ...]]]):
+        super().__init__({})
+        self.tables = {k: dict(v) for k, v in tables.items()}
+        self.seen: list[tuple[date, Any]] = []
+
+    def _for(self, members: AbstractSet[str], data_date: date, params: Any) -> list[Pick]:
+        self.seen.append((data_date, params))
+        return [p for p in self.tables[params].get(data_date, ()) if p.symbol in members]
+
+    def picks(self, history: Mapping[str, History], members: AbstractSet[str],
+              data_date: date, params: Any) -> list[Pick]:
+        return self._for(members, data_date, params)
+
+    def picks_prepared(self, prepared: Any, members: AbstractSet[str],
+                       data_date: date, params: Any) -> list[Pick]:
+        return self._for(members, data_date, params)
+
+
+# "b" differs from TABLE only for data_date 03-06 (session 03-07): DDD at limit 5.1, which the
+# 03-07 bar (o 5.1, l 5.05) fills at min(5.1, 5.1) = 5.1. Under TABLE's limit 5 it expires.
+TABLE_B = {**TABLE, D("2025-03-06"): (pick("DDD", "5.1", "6", "4"),)}
+SWITCH = D("2025-03-07")  # first traded session of segment "b"; its data_date is 03-06
+
+
+def test_params_schedule_validates_its_segments():
+    s = ParamsSchedule(((START, "a"), (SWITCH, "b")))
+    assert s.segments == ((START, "a"), (SWITCH, "b"))
+    assert ParamsSchedule([[START, "a"], [SWITCH, "b"]]) == s  # sequences are stored as tuples
+    with pytest.raises(ValueError):
+        ParamsSchedule(())  # empty
+    with pytest.raises(ValueError):
+        ParamsSchedule(((SWITCH, "b"), (START, "a")))  # descending
+    with pytest.raises(ValueError):
+        ParamsSchedule(((START, "a"), (START, "b")))  # not strictly ascending
+    with pytest.raises(ValueError):
+        ParamsSchedule(((D("2025-03-08"), "a"),))  # a Saturday
+    with pytest.raises(ValueError):
+        ParamsSchedule(((START, "a"), (D("2025-03-09"), "b")))  # a Sunday, second segment
+    with pytest.raises(TypeError):
+        ParamsSchedule(((datetime(2025, 3, 4), "a"),))
+    with pytest.raises(TypeError):
+        ParamsSchedule(((START,),))  # not a pair
+    with pytest.raises(TypeError):
+        ParamsSchedule("ab")
+    with pytest.raises(TypeError):
+        ParamsSchedule(((START, s),))  # no nesting
+
+
+def test_params_schedule_at_takes_the_last_segment_started_on_or_before():
+    s = ParamsSchedule(((START, "a"), (SWITCH, "b"), (D("2025-03-12"), "c")))
+    assert s.at(START) == "a"
+    assert s.at(D("2025-03-06")) == "a"
+    assert s.at(SWITCH) == "b"
+    assert s.at(D("2025-03-08")) == "b"  # any date is looked up, sessions or not
+    assert s.at(D("2025-03-11")) == "b"
+    assert s.at(D("2025-03-12")) == "c"
+    assert s.at(D("2030-01-02")) == "c"
+    with pytest.raises(ValueError):
+        s.at(D("2025-03-03"))  # before the first segment
+    with pytest.raises(TypeError):
+        s.at(datetime(2025, 3, 7))
+
+
+def test_schedule_run_rejects_a_start_before_the_first_segment():
+    sched = ParamsSchedule(((D("2025-03-05"), "a"),))
+    with pytest.raises(ValueError):
+        run_backtest(scenario_market(), ParamPicks({"a": TABLE}), sched, START, END)
+    # Starting on or after the first segment is fine.
+    r = run_backtest(scenario_market(), ParamPicks({"a": TABLE}), sched, D("2025-03-05"), END)
+    assert r.params is sched
+
+
+@pytest.mark.parametrize("prepared", [False, True])
+def test_schedule_params_are_keyed_by_the_traded_session_not_data_date(prepared):
+    market = scenario_market()
+    strategy = ParamPicks({"a": TABLE, "b": TABLE_B})
+    sched = ParamsSchedule(((START, "a"), (SWITCH, "b")))
+    prep = strategy.prepare(market.history) if prepared else None
+    r = run_backtest(market, strategy, sched, START, END, prepared=prep)
+
+    sessions = dates.sessions(START, END)
+    assert strategy.seen == [
+        (dates.prev_session(s), "a" if s < SWITCH else "b") for s in sessions
+    ]
+    # Session 03-07 is traded with "b" although its data_date (03-06) is before the switch.
+    assert (D("2025-03-06"), "b") in strategy.seen
+    on_switch = [(e.kind, e.order.symbol, e.order.limit_price) for e in r.events if e.session_date == SWITCH]
+    assert on_switch == [("fill", "DDD", P("5.1"))]
+    assert r.params is sched
+
+    # The same run with plain "a" lets DDD expire on 03-07: the switch is what changed it.
+    plain = run_backtest(scenario_market(), ParamPicks({"a": TABLE, "b": TABLE_B}), "a", START, END)
+    assert [(e.kind, e.order.symbol) for e in plain.events if e.session_date == SWITCH] == [("expire", "DDD")]
+
+
+def test_an_order_open_across_the_switch_keeps_its_bracket():
+    # CCC is placed under "a" (data_date 03-05, session 03-06) with tp 55 / sl 45 and is still
+    # open on the switch session 03-07. Under "b" nothing re-brackets it: it exits at its own
+    # sl 45 on 03-10, exactly as in the plain "a" run.
+    sched = ParamsSchedule(((START, "a"), (SWITCH, "b")))
+    r = run_backtest(scenario_market(), ParamPicks({"a": TABLE, "b": TABLE_B}), sched, START, END)
+    plain = run_backtest(scenario_market(), ParamPicks({"a": TABLE, "b": TABLE_B}), "a", START, END)
+    ccc = [o for o in r.closed if o.symbol == "CCC"]
+    assert len(ccc) == 1
+    c = ccc[0]
+    assert c.session_date < SWITCH < c.exit_date
+    assert (c.limit_price, c.tp_price, c.sl_price) == (P("50"), P("55"), P("45"))
+    assert (c.exit_date, c.exit_price, c.exit_reason) == (D("2025-03-10"), P("45"), "sl")
+    assert c == [o for o in plain.closed if o.symbol == "CCC"][0]
+
+
+def test_one_segment_schedule_equals_the_plain_run_but_for_params():
+    sched = ParamsSchedule(((START, None),))
+    for prepared in (False, True):
+        market = scenario_market()
+        strategy = FixedPicks(TABLE)
+        prep = strategy.prepare(market.history) if prepared else None
+        with_sched = run_backtest(market, strategy, sched, START, END, prepared=prep)
+        plain = run_backtest(market, FixedPicks(TABLE), None, START, END, prepared=prep)
+        assert with_sched.params is sched
+        assert replace(with_sched, params=None) == plain
+
+
+def test_one_segment_schedule_equals_the_plain_run_on_the_strategy_a_smoke_market():
+    market, start, end = smoke_market()
+    prepared = STRATEGY_A.prepare(market.history)
+    sched = ParamsSchedule(((start, DESIGN_PARAMS),))
+    with_sched = run_backtest(market, STRATEGY_A, sched, start, end, prepared=prepared)
+    plain = run_backtest(market, STRATEGY_A, DESIGN_PARAMS, start, end, prepared=prepared)
+    assert any(e.kind == "exit" for e in plain.events)
+    assert replace(with_sched, params=DESIGN_PARAMS) == plain
+
+
+def smoke_market(cut: date | None = None) -> tuple[Market, date, date]:
+    """The Strategy A smoke market of ``test_strategy_a_smoke_prepared_equals_plain``; with
+    ``cut``, UPC's bars stop at ``cut`` (it is "delisted" after it)."""
+    sessions = dates.sessions(D("2024-01-02"), D("2025-03-31"))
+    history = {}
+    for s, phase in (("UPA", 0), ("UPB", 7), ("UPC", 13)):
+        bars = _smoke_bars(s, sessions, phase)
+        if s == "UPC" and cut is not None:
+            bars = [b for b in bars if b.date <= cut]
+        history[s] = history_from_bars(s, bars)
+    market = Market(
+        history=history,
+        membership=Membership(tuple((s, D("2020-01-02"), None) for s in sorted(history))),
+        fx=((D("2023-12-29"), Decimal("16000")),),
+    )
+    return market, sessions[200], sessions[-1]

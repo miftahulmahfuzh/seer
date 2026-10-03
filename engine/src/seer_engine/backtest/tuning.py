@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from seer_engine.backtest.metrics import CheckItem, Metrics, checklist, fmt_pct, fmt_signed_pct
 from seer_engine.strategies.a import DESIGN_PARAMS, AParams
@@ -74,17 +75,19 @@ def qualifies(m: Metrics) -> bool:
     )
 
 
-def select(rows: Sequence[GridRow]) -> Selection:
+def select(rows: Sequence[GridRow], *, fallback: Any = DESIGN_PARAMS) -> Selection:
     """The qualifying row with the highest in-sample total return.
 
     Ties go to the lower max drawdown, then to the earlier grid index. When no row qualifies,
-    ``DESIGN_PARAMS`` is kept with ``qualified=False``.
+    ``fallback`` (by default ``DESIGN_PARAMS``) is kept with ``qualified=False``; the reason
+    string is the same whatever the fallback is. ``fallback`` is returned as given, never
+    copied or checked.
     """
     n = len(rows)
     candidates = [(i, row) for i, row in enumerate(rows) if qualifies(row.metrics)]
     if not candidates:
         return Selection(
-            params=DESIGN_PARAMS,
+            params=fallback,
             qualified=False,
             reason=(
                 f"No in-sample grid run had max drawdown ≤ 15% and profit factor ≥ 1.3 (0 of {n}), "

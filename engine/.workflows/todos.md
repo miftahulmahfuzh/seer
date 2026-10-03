@@ -2,8 +2,8 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 17:20:20
-**Total Active Tasks**: 5
+**Last Updated**: 2026-10-03 17:22:02
+**Total Active Tasks**: 4
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
@@ -13,8 +13,8 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 4
-- Completed: 15
+- Blocked: 3
+- Completed: 16
 
 ---
 
@@ -24,15 +24,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ### [P1] High
 
-- [ ] **P1-ENG-3PA3** Phase 2: Runner params schedule, `metrics_through`, `select` fallback
-  - **Difficulty**: NORMAL
+- [ ] **P1-ENG-ODYP** Phase 3: Walk-forward engine
+  - **Difficulty**: HARD
   - **Type**: Feature
-  - **Context**: Owns `ParamsSchedule` + the schedule branch in `run_backtest`, `metrics_through` in `metrics.py`, keyword-only `fallback=` (default `DESIGN_PARAMS`, D19) on `tuning.select`; tests in `test_backtest_runner.py` / `test_backtest_metrics.py` / `test_backtest_tuning.py` (mid-run param switch keeps open bracket; one-segment schedule `==` plain run except `RunResult.params`; prefix property on scenario + Strategy A smoke markets incl. forced closes; `select` with/without fallback; helpers `ParamPicks`, `TABLE_B`, `SWITCH`, `smoke_market(cut=None)` appended, existing helpers untouched). Only changed assertion: `select` signature guard widened to `["rows", "fallback"]`. Does not touch `strategies/`, `report.py`, `commands/`. Exit: suite green, 0 skipped (611 alone, 673 with phase 1); every existing runner/tuning/metrics test unchanged and passing except the widened guard.
-  - **Status**: pending
-  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 2 of 6)
-  - **Satisfies**: R3 — Anchored yearly walk-forward: folds as defined, each fold's selection sees only its tuning window, segments chain into one portfolio, brackets survive the year boundary, the fallback is used when nothing qualifies; R8 — The v1 `backtest` report is byte-identical when re-run on the same data; `engine/package_readme.md` documents the variants, walk-forward and the new command; the suite is green with 0 skipped; CI is green
-  - **Depends on**: —
-  - **Plan**: `.workflows/plan/P1-ENG-3PA3.md`
+  - **Context**: Owns `backtest/walkforward.py` (new: `folds`, `combinations`, `tune`, `select_fold`, `schedule`, `walk_forward`, `diagnostics`, `window_metrics`, `curve_window_metrics`, `gate_p3b`) and `tests/test_backtest_walkforward.py` (new, synthetic: folds as defined incl. real calendar 2018…2026 vs end 2026-10-02 and edge cases; 324 combinations in order; `tune` rows `==` direct per-fold runs; mutating a bar inside a traded year leaves that fold unchanged; one portfolio with year-start param switches, bracket survives 31 Dec; fallback used when nothing qualifies; diagnostics hand-computed; gate sentences; determinism). Does not touch `runner.py`, `metrics.py`, `tuning.py`, `strategies/`, existing tests. Exit: suite green, 0 skipped (712); purity glob covers the module.
+  - **Status**: open
+  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 3 of 6)
+  - **Satisfies**: R3 — Anchored yearly walk-forward: folds as defined, each fold's selection sees only its tuning window, segments chain into one portfolio, brackets survive the year boundary, the fallback is used when nothing qualifies; R4 — Determinism: `==` results and byte-identical files; a parallel gather, if any, comes back in a fixed order; R5 — The new modules pass the globbing purity test
+  - **Depends on**: P1-ENG-WCIA, P1-ENG-3PA3
+  - **Plan**: `.workflows/plan/P1-ENG-ODYP.md`
 
 ### [P2] Medium
 
@@ -41,16 +41,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P4] Backlog
 
 ### 🚫 Blocked
-
-- [ ] **P1-ENG-ODYP** Phase 3: Walk-forward engine
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `backtest/walkforward.py` (new: `folds`, `combinations`, `tune`, `select_fold`, `schedule`, `walk_forward`, `diagnostics`, `window_metrics`, `curve_window_metrics`, `gate_p3b`) and `tests/test_backtest_walkforward.py` (new, synthetic: folds as defined incl. real calendar 2018…2026 vs end 2026-10-02 and edge cases; 324 combinations in order; `tune` rows `==` direct per-fold runs; mutating a bar inside a traded year leaves that fold unchanged; one portfolio with year-start param switches, bracket survives 31 Dec; fallback used when nothing qualifies; diagnostics hand-computed; gate sentences; determinism). Does not touch `runner.py`, `metrics.py`, `tuning.py`, `strategies/`, existing tests. Exit: suite green, 0 skipped (712); purity glob covers the module.
-  - **Status**: blocked
-  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 3 of 6)
-  - **Satisfies**: R3 — Anchored yearly walk-forward: folds as defined, each fold's selection sees only its tuning window, segments chain into one portfolio, brackets survive the year boundary, the fallback is used when nothing qualifies; R4 — Determinism: `==` results and byte-identical files; a parallel gather, if any, comes back in a fixed order; R5 — The new modules pass the globbing purity test
-  - **Depends on**: P1-ENG-WCIA, P1-ENG-3PA3
-  - **Plan**: `.workflows/plan/P1-ENG-ODYP.md`
 
 - [ ] **P1-ENG-BVN5** Phase 4: Walk-forward report rendering
   - **Difficulty**: HARD
@@ -85,6 +75,20 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-3PA3** Phase 2: Runner params schedule, `metrics_through`, `select` fallback
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `ParamsSchedule` + the schedule branch in `run_backtest`, `metrics_through` in `metrics.py`, keyword-only `fallback=` (default `DESIGN_PARAMS`, D19) on `tuning.select`; tests in `test_backtest_runner.py` / `test_backtest_metrics.py` / `test_backtest_tuning.py` (mid-run param switch keeps open bracket; one-segment schedule `==` plain run except `RunResult.params`; prefix property on scenario + Strategy A smoke markets incl. forced closes; `select` with/without fallback; helpers `ParamPicks`, `TABLE_B`, `SWITCH`, `smoke_market(cut=None)` appended, existing helpers untouched). Only changed assertion: `select` signature guard widened to `["rows", "fallback"]`. Does not touch `strategies/`, `report.py`, `commands/`. Exit: suite green, 0 skipped (611 alone, 673 with phase 1); every existing runner/tuning/metrics test unchanged and passing except the widened guard.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 2 of 6)
+  - **Satisfies**: R3 — Anchored yearly walk-forward: folds as defined, each fold's selection sees only its tuning window, segments chain into one portfolio, brackets survive the year boundary, the fallback is used when nothing qualifies; R8 — The v1 `backtest` report is byte-identical when re-run on the same data; `engine/package_readme.md` documents the variants, walk-forward and the new command; the suite is green with 0 skipped; CI is green
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-3PA3.md`
+  - **Completed**: 2026-10-03 17:22
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/runner.py, engine/src/seer_engine/backtest/metrics.py, engine/src/seer_engine/backtest/tuning.py, engine/tests/test_backtest_runner.py, engine/tests/test_backtest_metrics.py, engine/tests/test_backtest_tuning.py
+  - **Drift**: None. Every anchor the plan quotes matched e14de0c exactly, and the code blocks were applied verbatim.
+  - **Decided**: Worktree venv: p1 and p2 both ran the install concurrently in the shared worktree, and p1 re-ran pip install afterwards. seer_engine imports from the worktree. (rung 6: invariant 1 venv rule)
 - [x] **P1-ENG-WCIA** Phase 1: Strategy A2: variants V0–V3
   - **Difficulty**: NORMAL
   - **Type**: Feature

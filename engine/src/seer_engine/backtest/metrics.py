@@ -18,9 +18,10 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal, localcontext
 
+from seer_engine import dates
 from seer_engine.backtest.benchmark import BenchmarkCurve
 from seer_engine.backtest.runner import RunResult
 from seer_engine.sim import Order
@@ -151,6 +152,33 @@ def run_metrics(r: RunResult) -> Metrics:
     pnls = [float(o.pnl_usd) for o in r.closed if o.pnl_usd is not None]
     base = strategy_metrics(snaps, pnls)
     return replace(base, avg_days_held=avg_days_held(r.closed), exit_reasons=exit_reason_counts(r.closed))
+
+
+def metrics_through(r: RunResult, end: date) -> Metrics:
+    """``run_metrics`` of ``r`` cut at the session ``end``.
+
+    Keeps the snapshots dated ``<= end`` and the orders whose exit event has
+    ``session_date <= end``, in event order. A forced close (``close_unpriced``) is dated the
+    session it happens on, so one on the session after ``end`` is left out, as it would be
+    in a run that stops at ``end``. ``end`` must be an NYSE session with
+    ``r.start <= end <= r.end``.
+
+    Prefix property: the runner's loop never reads ``end`` except to bound its sessions, so
+    this equals ``run_metrics(run_backtest(<same market, strategy, params, start, prepared>,
+    end=end))``.
+    """
+    if not isinstance(r, RunResult):
+        raise TypeError(f"r must be a RunResult, got {type(r).__name__}")
+    if isinstance(end, datetime) or not isinstance(end, date):
+        raise TypeError(f"end must be a date, got {type(end).__name__}")
+    if not dates.is_session(end):
+        raise ValueError(f"end {end} is not an NYSE session")
+    if not r.start <= end <= r.end:
+        raise ValueError(f"end {end} is outside the run's window [{r.start}, {r.end}]")
+    snapshots = tuple(s for s in r.snapshots if s.date <= end)
+    events = tuple(e for e in r.events if e.session_date <= end)
+    closed = tuple(e.order for e in events if e.kind == "exit")
+    return run_metrics(replace(r, end=end, snapshots=snapshots, events=events, closed=closed))
 
 
 def curve_metrics(c: BenchmarkCurve) -> Metrics:

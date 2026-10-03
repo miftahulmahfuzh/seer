@@ -42,6 +42,17 @@ Real money is out of scope until the go-live checklist is fully green.
   - (b) accept SPY buy-and-hold as the honest champion for now: paper-trade research strategies, and recommend no real-money picks;
   - (c) revisit a design-§5 trade rule (for example the 5-day time stop or the 4 slots). That is a design change, and it needs the owner's explicit decision and a new handover; it is never done inside a rework.
 
+## P6a — Strategy B (ML ranker) under walk-forward · done 2026-10-03: **Gate failed — B's one round failed on this data; P4 stays blocked** ([report](backtests/2026-10-02-strategy-b-walkforward.md))
+- Spec: [handover](handover/2026-10-03-strategy-b-ranker.md). Option (a) of the P3b verdict, run ahead of P4. Research-only and read-only; no trade rule changed
+- Tried, all pre-registered before any B result: gradient-boosted regression trees (fixed hyperparameters, no search) on 15 cross-sectional feature ranks + 3 raw SPY features, trained per fold on the net-of-cost return of A's fixed bracket order, purged at each fold's tuning end; picks are every candidate with a predicted net return > 0, so B may sit a night out. B-linear (ridge) ran beside it as information only. P3b's folds, one continuous portfolio 2018-01-02 → 2026-10-02, with A2 on the same chart
+- Determinism probe on the last fold: bit-identical at 1 thread and at the default, so B is gated
+- **Gate:** the walk-forward curve must beat total-return SPY over the same span with PF ≥ 1.3 and max DD ≤ 15%
+- **Verdict (2026-10-02 data, walk-forward 2018-01-02 → 2026-10-02):** Strategy B fails the P6a gate: walk-forward from 2018-01-02 to 2026-10-02 it returned +13.3% against +187.6% for total-return SPY, with profit factor 1.03 and max drawdown 57.6%, so it fails on beating total-return SPY, profit factor ≥ 1.3 and max drawdown ≤ 15%; Strategy B's one round has failed on this data, and P4 stays blocked.
+- B's one round failed on this data; P4 stays blocked. B is not reworked on this data, `STRATEGY_B_FROZEN` stays `None`, and no model is committed. The owner decides next (handover §8):
+  - (b) accept SPY buy-and-hold as the honest champion for now: Seer can still paper-trade research strategies (P4 without real-money picks), and the home screen recommends no buys;
+  - (c) revisit a design-§5 trade rule (for example the 5-day time stop, the 4 slots, or a longer holding horizon). That is a design change: it needs the owner's explicit decision and a new handover, and it is never done inside a strategy phase;
+  - (d) Strategy C (news + LLM veto) is forward-paper only by design §4, so it cannot pass a backtest gate and does not unblock P4 under the current ROADMAP wording; changing that wording is the owner's call.
+
 ## P4 — Nightly forward paper trading
 - GitHub Actions cron ~06:00 WIB: fetch → settle → pick → snapshot → run log
 - LLM explanation per pick (GLM via z.ai); failure-tolerant

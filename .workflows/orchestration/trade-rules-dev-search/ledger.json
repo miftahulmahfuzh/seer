@@ -224,7 +224,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "b8bdacf",
       "depends_on": [
         4,
         10,
@@ -232,17 +232,17 @@
       ],
       "difficulty": "NORMAL",
       "n": 12,
-      "note": null,
+      "note": "backtest_dev + io writers +28; suite 1694/0 skipped (= plan); smoke 16 cands 28.8s, full est 1.1 min -> no D13 pool; byte-identity test strips sibling file names (Decisions: Report file names)",
       "package": "commands`, `backtest",
       "plan": ".workflows/plan/trade-rules-dev-search/phase-12.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T23:59:22+00:00",
       "satisfies": [
         "R4",
         "R6",
         "R8"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-ZWP9",
       "title": "backtest_dev` command, io writer, runtime on the real store"
     },
     {
@@ -263,7 +263,7 @@
         "R7",
         "R9"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The real dev run, report, pre-registration, V0 `cmp`, docs"
     }
@@ -271,7 +271,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/trade-rules-dev-search/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trade-rules-dev-search",
-  "updated": "2026-10-03T23:48:50+00:00",
+  "updated": "2026-10-03T23:59:22+00:00",
   "verified_at": "2026-10-03T14:04:32+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trade-rules-dev-search"
 }

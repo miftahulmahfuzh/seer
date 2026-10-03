@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/trade-rules-dev-search`
 **Branch:** `feature/trade-rules-dev-search` (base: `origin/main` @ `2546a92`)
 **Phases:** 13
-**Status:** phase 11/13 complete (phases 1–11 done)
+**Status:** phase 12/13 complete (phases 1–12 done)
 **Coordinator:** —
 
 ---
@@ -928,7 +928,7 @@ is the registered behaviour and the docs report it.
 | 9 ✓ | Dev runner: window guard, candidate windows, D8, deflated Sharpe | R4, R5, R8 | `backtest` | 2 | 3 | HARD | `.workflows/plan/trade-rules-dev-search/phase-9.md` | P1-ENG-2E01 | — |
 | 10 ✓ | Dev report and pre-registration renderers | R6, R7, R8 | `backtest` | 2 | 9 | HARD | `.workflows/plan/trade-rules-dev-search/phase-10.md` | P1-ENG-PLRV | — |
 | 11 ✓ | The candidate registry (54 entries, append-only test) | R5 | `backtest` | 2 | 5, 6, 7, 8, 9 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-11.md` | P1-ENG-078U | — |
-| 12 | `backtest_dev` command, io writer, runtime on the real store | R4, R6, R8 | `commands`, `backtest` | 3 | 4, 10, 11 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-12.md` | P1-ENG-ZWP9 | — |
+| 12 ✓ | `backtest_dev` command, io writer, runtime on the real store | R4, R6, R8 | `commands`, `backtest` | 3 | 4, 10, 11 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-12.md` | P1-ENG-ZWP9 | — |
 | 13 | The real dev run, report, pre-registration, V0 `cmp`, docs | R1, R6, R7, R9 | `docs` | 8 | 12 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-13.md` | P1-ENG-904W | — |
 
 Concurrency: phases 1 and 4 start together; after phase 2, phases 3, 5, 6, 7 and 8 run

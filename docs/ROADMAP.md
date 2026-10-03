@@ -32,6 +32,16 @@ Real money is out of scope until the go-live checklist is fully green.
 - **Gate:** if A cannot beat SPY in backtest, rework before P4. Don't paper-trade a loser.
 - **Verdict (2026-10-02 data, out-of-sample 2022-01-03 → 2026-10-02):** Strategy A fails the P3 gate: out of sample it returned −15.0% against +71.9% for total-return SPY, with profit factor 0.92 and max drawdown 33.3%, so it fails on beating total-return SPY, profit factor ≥ 1.3 and max drawdown ≤ 15%; P4 must not start until Strategy A is reworked.
 
+## P3b — Strategy A rework under walk-forward · done 2026-10-03: **Gate failed — Strategy A's one rework failed; P4 stays blocked** ([report](backtests/2026-10-02-strategy-a2-walkforward.md))
+- Spec: [handover](handover/2026-10-03-strategy-a-rework.md). The 2022-01-03 → 2026-10-02 window was burned by P3, so validation is an anchored yearly walk-forward: tune on 2015-10-19 → the end of Y−1, trade Y, 2018 → 2026-10-02, as one continuous portfolio
+- Tried, all pre-registered: V0 `control` (v1), V1 `regime` (no new picks when SPY ≤ its SMA(200)), V2 `regime_calm` (rank by ATR/close), V3 `regime_calm_floor` (close ≥ $10) × P3's 81-run grid = 324 combinations per fold, selected by P3's rule; every variant's own walk-forward is in the report too
+- **Gate:** the walk-forward curve must beat total-return SPY over the same span with PF ≥ 1.3 and max DD ≤ 15%
+- **Verdict (2026-10-02 data, walk-forward 2018-01-02 → 2026-10-02):** Strategy A2 fails the P3b gate: walk-forward from 2018-01-02 to 2026-10-02 it returned +9.1% against +187.6% for total-return SPY, with profit factor 1.02 and max drawdown 29.1%, so it fails on beating total-return SPY, profit factor ≥ 1.3 and max drawdown ≤ 15%; Strategy A's one rework has failed, and P4 stays blocked.
+- Strategy A's one rework failed. Strategy A is not reworked again on this data, `STRATEGY_A2_PARAMS` stays `None`, and P4 stays blocked. The owner decides next (handover §8):
+  - (a) go to P6's Strategy B (ML ranker), validated with the same walk-forward machinery;
+  - (b) accept SPY buy-and-hold as the honest champion for now: paper-trade research strategies, and recommend no real-money picks;
+  - (c) revisit a design-§5 trade rule (for example the 5-day time stop or the 4 slots). That is a design change, and it needs the owner's explicit decision and a new handover; it is never done inside a rework.
+
 ## P4 — Nightly forward paper trading
 - GitHub Actions cron ~06:00 WIB: fetch → settle → pick → snapshot → run log
 - LLM explanation per pick (GLM via z.ai); failure-tolerant

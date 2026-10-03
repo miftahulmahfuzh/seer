@@ -180,23 +180,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "7f46d38",
       "depends_on": [
         9
       ],
       "difficulty": "HARD",
       "n": 10,
-      "note": null,
+      "note": "dev_report +32; suite 1666/0 skipped; fixed plan tests only (per plan); session did not find the swarm, never reported -- derived from git",
       "package": "backtest",
       "plan": ".workflows/plan/trade-rules-dev-search/phase-10.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T23:48:50+00:00",
       "satisfies": [
         "R6",
         "R7",
         "R8"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-PLRV",
       "title": "Dev report and pre-registration renderers"
     },
     {
@@ -241,7 +241,7 @@
         "R6",
         "R8"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "backtest_dev` command, io writer, runtime on the real store"
     },
@@ -271,7 +271,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/trade-rules-dev-search/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trade-rules-dev-search",
-  "updated": "2026-10-03T23:30:57+00:00",
+  "updated": "2026-10-03T23:48:50+00:00",
   "verified_at": "2026-10-03T14:04:32+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trade-rules-dev-search"
 }

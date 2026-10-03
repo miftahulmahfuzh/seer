@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap">
+<style>body{margin:0;background:#b1af9c;font-family:'Outfit',system-ui,sans-serif;-webkit-font-smoothing:antialiased}*{box-sizing:border-box}a{color:#1d1c1a}a:hover{color:#f47862}button{font:inherit}</style>
+<script src="./seer-ui.js"></script>
+</helmet>
+<section id="t2" style="display:flex;flex-direction:column">
+<div style="padding:48px 64px 12px;display:flex;flex-direction:column;gap:8px;color:#1d1c1a">
+<span style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase;color:#4a483f">Seer · v2</span>
+<span style="font-size:44px;font-weight:400;letter-spacing:-0.03em;line-height:1">Stacked sheets, soft pastels, one coral.</span>
+<span style="font-size:17px;line-height:1.45;color:#3d3b33;max-width:880px;text-wrap:pretty">Rebuilt from the reference video: a geometric sans, big rounded sheets that stack, outlined circular icon buttons and a typographic splash. Each pick slot (S, E, E, R) gets its own pastel sheet. Coral marks Seer and things you need to act on. Green and red still only mean profit and loss.</span>
+</div>
+<sc-for list="{{themes}}" as="th" hint-placeholder-count="2">
+<div style="{{th.vars}}">
+<div id="{{th.id}}" data-screen-label="{{th.name}}" style="background:var(--canvas);color:var(--ink);padding:44px 64px 72px;display:flex;flex-direction:column;gap:32px">
+<div style="display:flex;align-items:center;gap:12px">
+<span style="font-size:13px;font-weight:500;padding:6px 14px;border-radius:999px;background:var(--ink);color:var(--sheet)">{{th.badge}}</span>
+<span style="font-size:26px;letter-spacing:-0.02em;color:var(--canvas-ink)">{{th.name}}</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:48px;align-items:flex-start">
+<sc-for list="{{screens}}" as="sc" hint-placeholder-count="8">
+<div style="display:flex;flex-direction:column;gap:14px;flex:none">
+<span style="font-size:14px;color:var(--canvas-ink)">{{sc.label}}</span>
+<div style="padding:10px;border-radius:66px;background:#111110;flex:none">
+<div data-screen-label="{{sc.label}}" style="position:relative;width:414px;height:896px;border-radius:56px;overflow:hidden;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;font-family:'Outfit',system-ui,sans-serif">
+<div style="position:absolute;top:0;left:50%;margin-left:-105px;width:210px;height:30px;background:#111110;border-radius:0 0 20px 20px;z-index:6"></div>
+
+<sc-if value="{{sc.auth}}" hint-placeholder-val="{{false}}">
+<div style="position:absolute;inset:0;background:var(--splash);overflow:hidden">
+<div style="position:absolute;top:0;left:0;right:0;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 30px 0 38px;font-size:15px;font-weight:600;color:var(--splash-ink);z-index:5"><span>9:41</span><span style="display:flex;gap:5px;align-items:center"><lu-icon name="signal" size="16" stroke="2.25"></lu-icon><lu-icon name="wifi" size="16" stroke="2.25"></lu-icon><lu-icon name="battery-full" size="20"></lu-icon></span></div>
+<div style="position:absolute;top:58px;left:14px;display:flex;flex-direction:column;font-size:62px;line-height:0.9;letter-spacing:-0.045em;font-weight:400;color:var(--splash-words)">
+<span>Strategic</span><span>Econometric</span><span>Ensemble</span><span>Resolver</span><span>Patience</span><span>Discipline</span><span>Risk</span><span>Limits</span><span>Targets</span><span>Stops</span><span>Signal</span>
+</div>
+<svg viewBox="0 0 414 896" style="position:absolute;inset:0;width:100%;height:100%">
+<path d="M120 300 Q120 600 400 600 Q120 600 120 900 Q120 600 -160 600 Q120 600 120 300 Z" style="fill:var(--splash-star)"></path>
+<line x1="120" x2="120" y1="300" y2="896" style="stroke:var(--splash);stroke-width:1"></line>
+<line x1="0" x2="400" y1="600" y2="600" style="stroke:var(--splash);stroke-width:1"></line>
+</svg>
+<span style="position:absolute;left:16px;top:548px;font-size:84px;line-height:1;letter-spacing:-0.06em;font-weight:500;color:var(--splash-ink)">Seer.</span>
+<div style="position:absolute;left:16px;right:16px;bottom:54px;display:flex;flex-direction:column;gap:14px">
+<sc-if value="{{sc.unauth}}" hint-placeholder-val="{{false}}">
+<div style="background:var(--butter-solid);color:#1d1c1a;border-radius:32px;padding:20px 22px;display:flex;gap:14px;align-items:flex-start">
+<span style="flex:none;width:44px;height:44px;border-radius:999px;background:#ffffff;display:flex;align-items:center;justify-content:center"><lu-icon name="user-x" size="20"></lu-icon></span>
+<div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+<span style="font-size:20px;font-weight:500;letter-spacing:-0.01em">This account isn’t allowed</span>
+<span style="font-size:15px;color:#4a483f">someone.else@gmail.com</span>
+<span style="font-size:15px;line-height:1.4;color:#4a483f;text-wrap:pretty">Seer is private to one Google account. Try again with that one.</span>
+</div>
+</div>
+</sc-if>
+<button data-tip="Sign in with Google" aria-label="Sign in with Google" style="position:relative;height:84px;border-radius:999px;border:1.5px solid var(--splash-ink);background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--splash-ink);-webkit-touch-callout:none;user-select:none;-webkit-tap-highlight-color:transparent" style-hover="background:rgba(255,255,255,0.12)">
+<span style="width:48px;height:48px;border-radius:999px;background:#ffffff;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"></path><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"></path><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"></path><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"></path></svg></span>
+<span style="position:absolute;right:30px;top:50%;margin-top:-12px;display:flex"><lu-icon name="chevron-right" size="24"></lu-icon></span>
+</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{sc.app}}" hint-placeholder-val="{{true}}">
+<div style="flex:none;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 30px 0 38px;font-size:15px;font-weight:600"><span>9:41</span><span style="display:flex;gap:5px;align-items:center"><lu-icon name="signal" size="16" stroke="2.25"></lu-icon><lu-icon name="wifi" size="16" stroke="2.25"></lu-icon><lu-icon name="battery-full" size="20"></lu-icon></span></div>
+<header style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 22px 26px 26px">
+<div style="display:flex;flex-direction:column;gap:2px">
+<span style="font-size:15px;color:var(--ink-2)">Wed, Oct 7</span>
+<span style="font-size:32px;line-height:1.05;letter-spacing:-0.03em">{{sc.title}}</span>
+</div>
+<button data-tip="Sign out" aria-label="Sign out" style="display:flex;align-items:center;justify-content:center;flex:none;width:52px;height:52px;padding:0;border:1px solid var(--outline);border-radius:999px;background:transparent;color:var(--ink);cursor:pointer;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none" style-hover="background:var(--chip)"><lu-icon name="log-out" size="21" stroke="1.5"></lu-icon></button>
+</header>
+<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding-bottom:0">
+
+<sc-if value="{{sc.today}}" hint-placeholder-val="{{false}}">
+<div style="position:relative;flex:none;background:var(--sheet);border-radius:40px;padding:28px 24px 64px;display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+<span style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase">US session</span>
+<span style="height:46px;padding:0 20px;border:1px solid var(--outline);border-radius:999px;display:flex;align-items:center;font-size:16px;color:var(--ink-2)">Thu, Oct 8</span>
+</div>
+<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<span style="font-size:52px;line-height:0.95;letter-spacing:-0.04em">{{sc.count}}</span>
+<span style="font-size:16px">Picks tonight</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+<div style="display:flex">
+<sc-for list="{{sc.slots}}" as="sl" hint-placeholder-count="4"><span style="{{sl.style}}">{{sl.letter}}</span></sc-for>
+</div>
+<span style="display:flex;align-items:center;gap:6px;font-size:15px"><lu-icon name="crown" size="15"></lu-icon>Strategy A · Mean Reversion</span>
+</div>
+</div>
+</div>
+
+<sc-if value="{{sc.stale}}" hint-placeholder-val="{{false}}">
+<div style="position:relative;flex:none;margin-top:-40px;background:var(--alarm);color:var(--alarm-ink);border-radius:40px;padding:28px 24px 150px;display:flex;flex-direction:column;gap:18px;min-height:560px">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<span style="width:60px;height:60px;border-radius:999px;background:var(--coral);color:#1d1c1a;display:flex;align-items:center;justify-content:center"><lu-icon name="triangle-alert" size="28"></lu-icon></span>
+<button data-tip="Check for new data" aria-label="Check for new data" style="display:flex;align-items:center;justify-content:center;width:52px;height:52px;padding:0;border:1px solid var(--alarm-ink);border-radius:999px;background:transparent;color:var(--alarm-ink);cursor:pointer;-webkit-touch-callout:none;user-select:none"><lu-icon name="refresh-cw" size="21" stroke="1.5"></lu-icon></button>
+</div>
+<span style="font-size:46px;line-height:1;letter-spacing:-0.04em;text-wrap:pretty">Data is from Oct 6. Do not trade today.</span>
+<span style="font-size:16px;line-height:1.45;opacity:0.8">Last good run Tue, Oct 6 at 21:14 WIB. Picks stay hidden until fresh prices arrive.</span>
+</div>
+</sc-if>
+
+<sc-if value="{{sc.empty}}" hint-placeholder-val="{{false}}">
+<div style="position:relative;flex:none;margin-top:-40px;background:var(--stone);border-radius:40px;padding:44px 26px 160px;display:flex;flex-direction:column;gap:6px;min-height:540px">
+<span style="font-size:56px;line-height:0.95;letter-spacing:-0.045em">No setups today.</span>
+<span style="font-size:56px;line-height:0.95;letter-spacing:-0.045em;color:var(--ink-3)">Cash is a position.</span>
+</div>
+</sc-if>
+
+<sc-if value="{{sc.normal}}" hint-placeholder-val="{{false}}">
+<sc-for list="{{actions}}" as="a" hint-placeholder-count="1">
+<div style="position:relative;flex:none;margin-top:-40px;background:var(--coral);color:#1d1c1a;border-radius:40px;padding:26px 22px 66px 24px;display:flex;flex-direction:column;gap:10px">
+<span style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase">Action needed</span>
+<div style="display:flex;align-items:center;gap:14px">
+<span style="flex:1;min-width:0;font-size:21px;line-height:1.25;letter-spacing:-0.01em;text-wrap:pretty"><span style="font-weight:600">{{a.t}}</span>: {{a.text}}</span>
+<button data-tip="Mark as done" aria-label="Mark as done" onClick="{{a.dismiss}}" style="display:flex;align-items:center;justify-content:center;flex:none;width:52px;height:52px;padding:0;border:1px solid #1d1c1a;border-radius:999px;background:transparent;color:#1d1c1a;cursor:pointer;-webkit-touch-callout:none;user-select:none" style-hover="background:rgba(255,255,255,0.25)"><lu-icon name="check" size="22"></lu-icon></button>
+</div>
+</div>
+</sc-for>
+<sc-for list="{{picks}}" as="p" hint-placeholder-count="3">
+<article style="{{p.cardStyle}}">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+<span style="font-size:40px;line-height:1;letter-spacing:-0.03em;font-weight:500">{{p.t}}</span>
+<span style="font-size:16px;color:var(--ink-2)">{{p.name}}</span>
+</div>
+<span style="flex:none;width:52px;height:52px;border-radius:999px;background:var(--chip-solid);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:500">{{p.slot}}</span>
+</div>
+<div style="display:flex;align-items:center;gap:12px">
+<span style="height:34px;padding:0 14px;border-radius:999px;background:var(--chip);display:flex;align-items:center;font-size:15px">Last ${{p.price}}</span>
+<span style="font-size:15px;color:var(--ink-2)">Bracket order, exits by day 5</span>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px 14px;padding-top:4px">
+<sc-for list="{{p.fields}}" as="f" hint-placeholder-count="4">
+<div style="display:flex;flex-direction:column;gap:6px">
+<span style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-2)">{{f.label}}</span>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+<span style="display:flex;align-items:baseline;gap:2px;font-variant-numeric:tabular-nums"><span style="font-size:18px;color:var(--ink-2)">{{f.unit}}</span><span style="font-size:32px;letter-spacing:-0.03em">{{f.value}}</span></span>
+<button data-tip="{{f.tip}}" aria-label="{{f.tip}}" data-copy="{{f.value}}" style="display:flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;padding:0;border:0;border-radius:999px;background:var(--chip-solid);color:var(--ink);cursor:pointer;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;user-select:none" style-hover="background:var(--ink);color:var(--sheet)"><lu-icon name="copy" size="18" stroke="1.6"></lu-icon></button>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding-top:16px;border-top:1px solid var(--hair)">
+<div style="display:flex;flex-direction:column;gap:1px"><span style="font-size:20px;letter-spacing:-0.02em">{{p.cost}}</span><span style="font-size:12px;color:var(--ink-2)">{{p.costIdr}}</span><span style="font-size:14px;padding-top:4px">Est. cost</span></div>
+<div style="display:flex;flex-direction:column;gap:1px;color:var(--pos)"><span style="font-size:20px;letter-spacing:-0.02em">{{p.profit}}</span><span style="font-size:12px">{{p.profitIdr}}</span><span style="font-size:14px;padding-top:4px;color:var(--ink)">Est. profit</span></div>
+<div style="display:flex;flex-direction:column;gap:1px;color:var(--neg)"><span style="font-size:20px;letter-spacing:-0.02em">{{p.loss}}</span><span style="font-size:12px">{{p.lossIdr}}</span><span style="font-size:14px;padding-top:4px;color:var(--ink)">Est. loss</span></div>
+</div>
+<div style="display:flex;align-items:center;gap:12px">
+<sc-if value="{{p.closed}}" hint-placeholder-val="{{true}}"><button data-tip="Why this pick" aria-label="Why this pick" onClick="{{p.toggle}}" style="display:flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;padding:0;border:0;border-radius:999px;background:var(--chip);color:var(--ink);cursor:pointer;-webkit-touch-callout:none;user-select:none" style-hover="background:var(--chip-solid)"><lu-icon name="chevron-down" size="20"></lu-icon></button></sc-if>
+<sc-if value="{{p.open}}" hint-placeholder-val="{{false}}"><button data-tip="Hide explanation" aria-label="Hide explanation" onClick="{{p.toggle}}" style="display:flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;padding:0;border:0;border-radius:999px;background:var(--ink);color:var(--sheet);cursor:pointer;-webkit-touch-callout:none;user-select:none"><lu-icon name="chevron-up" size="20"></lu-icon></button></sc-if>
+<span style="font-size:15px;color:var(--ink-2)">Why this pick</span>
+</div>
+<sc-if value="{{p.open}}" hint-placeholder-val="{{false}}"><p style="margin:-4px 0 0;font-size:17px;line-height:1.5;text-wrap:pretty">{{p.why}}</p></sc-if>
+</article>
+</sc-for>
+<div style="position:relative;flex:none;margin-top:-40px;background:var(--sheet);border-radius:40px;padding:28px 24px 150px;display:flex;align-items:center;gap:16px">
+<span style="flex:none;width:52px;height:52px;border-radius:999px;border:1.5px dashed var(--outline);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--ink-3)">R</span>
+<div style="display:flex;flex-direction:column;gap:2px">
+<span style="font-size:21px;letter-spacing:-0.01em">Empty slot</span>
+<span style="font-size:15px;color:var(--ink-2)">No fourth stock passed the rules tonight.</span>
+</div>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{sc.positions}}" hint-placeholder-val="{{false}}">
+<div style="position:relative;flex:none;background:var(--sheet);border-radius:40px;padding:28px 24px 64px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+<span style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase">Unrealized P/L</span>
+<span style="height:46px;padding:0 18px;border:1px solid var(--outline);border-radius:999px;display:flex;align-items:center;gap:6px;font-size:15px;color:var(--ink-2)"><lu-icon name="crown" size="15"></lu-icon>Strategy A</span>
+</div>
+<div style="display:flex;align-items:flex-end;gap:28px">
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:52px;line-height:0.95;letter-spacing:-0.04em;color:var(--neg)">−$2.10</span><span style="font-size:15px;color:var(--neg)">−Rp 35.000</span></div>
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:26px;letter-spacing:-0.02em">3</span><span style="font-size:15px">Open</span></div>
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:26px;letter-spacing:-0.02em">1</span><span style="font-size:15px">Exits today</span></div>
+</div>
+</div>
+<sc-for list="{{positions}}" as="q" hint-placeholder-count="3">
+<article style="{{q.cardStyle}}">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+<div style="display:flex;flex-direction:column;gap:2px">
+<span style="font-size:36px;line-height:1;letter-spacing:-0.03em;font-weight:500">{{q.t}}</span>
+<span style="font-size:16px;color:var(--ink-2)">{{q.name}} · {{q.shLabel}}</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+<sc-if value="{{q.up}}" hint-placeholder-val="{{true}}"><span style="font-size:28px;letter-spacing:-0.03em;color:var(--pos)">{{q.pct}}</span><span style="font-size:15px;color:var(--pos)">{{q.usd}}</span></sc-if>
+<sc-if value="{{q.down}}" hint-placeholder-val="{{false}}"><span style="font-size:28px;letter-spacing:-0.03em;color:var(--neg)">{{q.pct}}</span><span style="font-size:15px;color:var(--neg)">{{q.usd}}</span></sc-if>
+</div>
+</div>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<span style="height:34px;padding:0 14px;border-radius:999px;background:var(--chip);display:flex;align-items:center;font-size:15px">Entry ${{q.entry}}</span>
+<span style="height:34px;padding:0 14px;border-radius:999px;background:var(--chip-solid);display:flex;align-items:center;font-size:15px;font-weight:500">Now ${{q.cur}}</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;font-size:15px"><span>Stop ${{q.sl}}</span><span>Target ${{q.tp}}</span></div>
+<div style="position:relative;height:6px;border-radius:999px;background:var(--hair)">
+<div style="{{q.fillStyle}}"></div>
+<div style="{{q.entryStyle}}"></div>
+<div style="{{q.curStyle}}"></div>
+</div>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+<div style="display:flex;align-items:flex-end;gap:6px;height:30px">
+<sc-for list="{{q.days}}" as="d" hint-placeholder-count="5">
+<sc-if value="{{d.on}}" hint-placeholder-val="{{true}}"><span style="width:5px;height:28px;border-radius:999px;background:var(--ink)"></span></sc-if>
+<sc-if value="{{d.off}}" hint-placeholder-val="{{false}}"><span style="width:5px;height:5px;border-radius:999px;background:var(--ink)"></span></sc-if>
+</sc-for>
+</div>
+<span style="font-size:17px;font-weight:500">{{q.dayLabel}}</span>
+</div>
+</article>
+</sc-for>
+<div style="flex:none;height:150px;margin-top:-40px"></div>
+</sc-if>
+
+<sc-if value="{{sc.leader}}" hint-placeholder-val="{{false}}">
+<div style="position:relative;flex:none;background:var(--sheet);border-radius:40px;padding:28px 0 64px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 24px">
+<span style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase">Forward test</span>
+<span style="height:46px;padding:0 18px;border:1px solid var(--outline);border-radius:999px;display:flex;align-items:center;font-size:15px;color:var(--ink-2)">Jul 6 – Oct 7</span>
+</div>
+<div style="display:flex;align-items:flex-end;gap:26px;padding:0 24px">
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:52px;line-height:0.95;letter-spacing:-0.04em;color:var(--pos)">+6.8%</span><span style="font-size:15px;display:flex;align-items:center;gap:5px"><lu-icon name="crown" size="14"></lu-icon>A · Quant</span></div>
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:26px;letter-spacing:-0.02em">+4.6%</span><span style="font-size:15px">SPY</span></div>
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:26px;letter-spacing:-0.02em">66</span><span style="font-size:15px">Sessions</span></div>
+</div>
+<svg viewBox="0 0 340 170" style="width:100%;height:auto;display:block;overflow:visible">
+<line x1="0" x2="340" y1="14.2" y2="14.2" style="stroke:var(--hair)"></line>
+<line x1="0" x2="340" y1="70.8" y2="70.8" style="stroke:var(--hair)"></line>
+<line x1="0" x2="340" y1="127.5" y2="127.5" style="stroke:var(--outline);stroke-dasharray:3 3"></line>
+<path d="{{chartM.spy}}" style="fill:none;stroke:var(--ink-3);stroke-width:1.75;stroke-dasharray:1 4;stroke-linecap:round"></path>
+<path d="{{chartM.c}}" style="fill:none;stroke:var(--line-c);stroke-width:2;stroke-linejoin:round"></path>
+<path d="{{chartM.b}}" style="fill:none;stroke:var(--line-b);stroke-width:2;stroke-linejoin:round"></path>
+<path d="{{chartM.a}}" style="fill:none;stroke:var(--ink);stroke-width:2.75;stroke-linejoin:round"></path>
+<circle cx="340" cy="31.2" r="5" style="fill:var(--ink)"></circle>
+</svg>
+<div style="display:flex;justify-content:space-between;padding:0 24px;font-size:13px;color:var(--ink-2)"><span>Jul 6</span><span>Aug</span><span>Sep</span><span>Oct 7</span></div>
+<div style="display:flex;flex-wrap:wrap;gap:8px 18px;padding:0 24px;font-size:14px">
+<span style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:3px;border-radius:9px;background:var(--ink)"></span>A Quant</span>
+<span style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:3px;border-radius:9px;background:var(--line-b)"></span>B ML</span>
+<span style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:3px;border-radius:9px;background:var(--line-c)"></span>C LLM-veto</span>
+<span style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:0;border-top:2.5px dotted var(--ink-3)"></span>SPY</span>
+</div>
+</div>
+<div style="position:relative;flex:none;margin-top:-40px;background:var(--butter);border-radius:40px;padding:28px 24px 64px;display:flex;flex-direction:column;gap:8px">
+<span style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase">Go-live checklist · A</span>
+<div style="display:flex;align-items:center;gap:12px;padding-bottom:8px"><span style="font-size:52px;line-height:1;letter-spacing:-0.04em">4/5</span><span style="font-size:16px;line-height:1.3;color:var(--ink-2)">Paper trading until<br>all five pass</span></div>
+<sc-for list="{{checklist}}" as="c" hint-placeholder-count="5">
+<div style="display:flex;align-items:center;gap:14px;padding:6px 0">
+<sc-if value="{{c.ok}}" hint-placeholder-val="{{true}}"><span style="flex:none;width:40px;height:40px;border-radius:999px;background:var(--ink);color:var(--sheet);display:flex;align-items:center;justify-content:center"><lu-icon name="check" size="18" stroke="2.25"></lu-icon></span></sc-if>
+<sc-if value="{{c.no}}" hint-placeholder-val="{{false}}"><span style="flex:none;width:40px;height:40px;border-radius:999px;border:1.5px solid var(--ink);display:flex;align-items:center;justify-content:center"><lu-icon name="x" size="18" stroke="2.25"></lu-icon></span></sc-if>
+<span style="flex:1;font-size:17px">{{c.label}}</span>
+<span style="height:32px;padding:0 12px;border-radius:999px;background:var(--chip);display:flex;align-items:center;font-size:14px">{{c.val}}</span>
+</div>
+</sc-for>
+</div>
+<sc-for list="{{strategies}}" as="s" hint-placeholder-count="4">
+<article style="{{s.cardStyle}}">
+<div style="display:flex;align-items:center;gap:14px">
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+<span style="display:flex;align-items:center;gap:8px;font-size:24px;letter-spacing:-0.02em;font-weight:500">{{s.name}}<sc-if value="{{s.champ}}" hint-placeholder-val="{{false}}"><span data-tip="Champion" style="display:flex"><lu-icon name="crown" size="20"></lu-icon></span></sc-if></span>
+<span style="font-size:15px;color:var(--ink-2)">{{s.sub}}</span>
+</div>
+<span style="flex:none;width:52px;height:52px;border-radius:999px;background:var(--chip-solid);display:flex;align-items:center;justify-content:center"><lu-icon name="{{s.icon}}" size="22" stroke="1.6"></lu-icon></span>
+</div>
+<div style="display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr 1fr;gap:8px;align-items:end">
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:24px;letter-spacing:-0.03em;color:var(--pos)">{{s.ret}}</span><span style="font-size:12px">Return</span></div>
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:18px">{{s.win}}</span><span style="font-size:12px">Win rate</span></div>
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:18px">{{s.pf}}</span><span style="font-size:12px">Profit f.</span></div>
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:18px">{{s.dd}}</span><span style="font-size:12px">Max DD</span></div>
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:18px">{{s.trades}}</span><span style="font-size:12px">Trades</span></div>
+</div>
+</article>
+</sc-for>
+<div style="flex:none;height:150px;margin-top:-40px"></div>
+</sc-if>
+
+<sc-if value="{{sc.history}}" hint-placeholder-val="{{false}}">
+<div style="position:relative;flex:none;background:var(--sheet);border-radius:40px;padding:28px 24px 64px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;justify-content:space-between;gap:8px">
+<div style="display:flex;gap:6px">
+<sc-for list="{{stratBtns}}" as="b" hint-placeholder-count="4">
+<sc-if value="{{b.active}}" hint-placeholder-val="{{false}}"><button data-tip="{{b.tip}}" aria-label="{{b.tip}}" aria-pressed="true" onClick="{{b.onClick}}" style="display:flex;align-items:center;justify-content:center;width:46px;height:46px;padding:0;border:1px solid var(--ink);border-radius:999px;background:var(--ink);color:var(--sheet);cursor:pointer;-webkit-touch-callout:none;user-select:none"><lu-icon name="{{b.icon}}" size="19"></lu-icon></button></sc-if>
+<sc-if value="{{b.idle}}" hint-placeholder-val="{{true}}"><button data-tip="{{b.tip}}" aria-label="{{b.tip}}" onClick="{{b.onClick}}" style="display:flex;align-items:center;justify-content:center;width:46px;height:46px;padding:0;border:1px solid var(--outline);border-radius:999px;background:transparent;color:var(--ink);cursor:pointer;-webkit-touch-callout:none;user-select:none" style-hover="background:var(--chip)"><lu-icon name="{{b.icon}}" size="19" stroke="1.5"></lu-icon></button></sc-if>
+</sc-for>
+</div>
+<div style="display:flex;gap:6px">
+<sc-for list="{{outBtns}}" as="b" hint-placeholder-count="3">
+<sc-if value="{{b.active}}" hint-placeholder-val="{{false}}"><button data-tip="{{b.tip}}" aria-label="{{b.tip}}" aria-pressed="true" onClick="{{b.onClick}}" style="display:flex;align-items:center;justify-content:center;width:46px;height:46px;padding:0;border:1px solid var(--ink);border-radius:999px;background:var(--ink);color:var(--sheet);cursor:pointer;-webkit-touch-callout:none;user-select:none"><lu-icon name="{{b.icon}}" size="19"></lu-icon></button></sc-if>
+<sc-if value="{{b.idle}}" hint-placeholder-val="{{true}}"><button data-tip="{{b.tip}}" aria-label="{{b.tip}}" onClick="{{b.onClick}}" style="display:flex;align-items:center;justify-content:center;width:46px;height:46px;padding:0;border:1px solid var(--outline);border-radius:999px;background:transparent;color:var(--ink);cursor:pointer;-webkit-touch-callout:none;user-select:none" style-hover="background:var(--chip)"><lu-icon name="{{b.icon}}" size="19" stroke="1.5"></lu-icon></button></sc-if>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;align-items:flex-end;gap:26px">
+<div style="display:flex;flex-direction:column;gap:2px">
+<sc-if value="{{hist.up}}" hint-placeholder-val="{{true}}"><span style="font-size:52px;line-height:0.95;letter-spacing:-0.04em;color:var(--pos)">{{hist.net}}</span></sc-if>
+<sc-if value="{{hist.down}}" hint-placeholder-val="{{false}}"><span style="font-size:52px;line-height:0.95;letter-spacing:-0.04em;color:var(--neg)">{{hist.net}}</span></sc-if>
+<span style="font-size:15px">Net result</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:26px">{{hist.wins}}</span><span style="font-size:15px">Won</span></div>
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:26px">{{hist.losses}}</span><span style="font-size:15px">Lost</span></div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px 14px;font-size:14px;color:var(--ink-2)">
+<span style="display:flex;align-items:center;gap:5px"><lu-icon name="target" size="15"></lu-icon>Take profit</span>
+<span style="display:flex;align-items:center;gap:5px"><lu-icon name="octagon-x" size="15"></lu-icon>Stop loss</span>
+<span style="display:flex;align-items:center;gap:5px"><lu-icon name="hourglass" size="15"></lu-icon>Day 5</span>
+<span style="display:flex;align-items:center;gap:5px"><lu-icon name="skip-forward" size="15"></lu-icon>Gap</span>
+</div>
+</div>
+<div style="position:relative;flex:none;margin-top:-40px;background:var(--stone);border-radius:40px;padding:16px 22px 160px;display:flex;flex-direction:column">
+<sc-for list="{{hist.rows}}" as="r" hint-placeholder-count="8">
+<div style="display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--hair)">
+<span data-tip="{{r.reasonTip}}" style="flex:none;width:46px;height:46px;border-radius:999px;background:var(--chip-solid);display:flex;align-items:center;justify-content:center"><lu-icon name="{{r.reasonIcon}}" size="19" stroke="1.6"></lu-icon></span>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+<span style="display:flex;align-items:center;gap:8px"><span style="font-size:20px;font-weight:500;letter-spacing:-0.01em">{{r.t}}</span><span data-tip="{{r.stratTip}}" style="height:24px;padding:0 9px;border-radius:999px;background:var(--chip);display:flex;align-items:center;gap:4px;font-size:12px"><lu-icon name="{{r.stratIcon}}" size="12"></lu-icon>{{r.s}}</span></span>
+<span style="font-size:14px;color:var(--ink-2);white-space:nowrap">{{r.entry}} → {{r.exit}} · {{r.date}}</span>
+</div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px">
+<sc-if value="{{r.win}}" hint-placeholder-val="{{true}}"><span style="font-size:19px;color:var(--pos)">{{r.pct}}</span><span style="font-size:13px;color:var(--pos)">{{r.usd}}</span></sc-if>
+<sc-if value="{{r.loss}}" hint-placeholder-val="{{false}}"><span style="font-size:19px;color:var(--neg)">{{r.pct}}</span><span style="font-size:13px;color:var(--neg)">{{r.usd}}</span></sc-if>
+</div>
+</div>
+</sc-for>
+<sc-if value="{{hist.none}}" hint-placeholder-val="{{false}}"><div style="padding:32px 0;text-align:center;font-size:17px;color:var(--ink-2)">No trades match these filters.</div></sc-if>
+</div>
+</sc-if>
+</div>
+
+<nav style="position:absolute;left:50%;bottom:30px;margin-left:-138px;width:276px;height:68px;border-radius:999px;background:var(--bar);padding:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;z-index:5">
+<sc-for list="{{sc.tabs}}" as="tb" hint-placeholder-count="4">
+<sc-if value="{{tb.active}}" hint-placeholder-val="{{false}}"><button data-tip="{{tb.tip}}" aria-label="{{tb.tip}}" aria-current="page" style="display:flex;align-items:center;justify-content:center;height:52px;border-radius:999px;border:0;padding:0;background:var(--coral);color:#1d1c1a;cursor:pointer;-webkit-touch-callout:none;user-select:none"><lu-icon name="{{tb.icon}}" size="22" stroke="1.75"></lu-icon></button></sc-if>
+<sc-if value="{{tb.idle}}" hint-placeholder-val="{{true}}"><button data-tip="{{tb.tip}}" aria-label="{{tb.tip}}" style="display:flex;align-items:center;justify-content:center;height:52px;border-radius:999px;border:0;padding:0;background:transparent;color:var(--bar-ink);cursor:pointer;-webkit-touch-callout:none;user-select:none" style-hover="background:rgba(255,255,255,0.1)"><lu-icon name="{{tb.icon}}" size="22" stroke="1.5"></lu-icon></button></sc-if>
+</sc-for>
+</nav>
+</sc-if>
+<div style="position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:999px;background:var(--ink);z-index:6"></div>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:14px">
+<span style="font-size:14px;color:var(--canvas-ink)">09 Desktop · Today · 1280 × 820</span>
+<div data-screen-label="09 Desktop Today" style="width:1280px;height:820px;border-radius:28px;overflow:hidden;background:var(--bg);color:var(--ink);display:flex;gap:0;font-family:'Outfit',system-ui,sans-serif">
+<nav style="flex:none;width:104px;display:flex;flex-direction:column;align-items:center;padding:28px 0;gap:28px">
+<span style="font-size:24px;font-weight:500;letter-spacing:-0.05em">Seer.</span>
+<div style="display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:999px;background:var(--bar)">
+<sc-for list="{{deskTabsToday}}" as="tb" hint-placeholder-count="4">
+<sc-if value="{{tb.active}}" hint-placeholder-val="{{false}}"><button data-tip="{{tb.tip}}" aria-label="{{tb.tip}}" style="display:flex;align-items:center;justify-content:center;width:52px;height:52px;padding:0;border:0;border-radius:999px;background:var(--coral);color:#1d1c1a;cursor:pointer"><lu-icon name="{{tb.icon}}" size="22"></lu-icon></button></sc-if>
+<sc-if value="{{tb.idle}}" hint-placeholder-val="{{true}}"><button data-tip="{{tb.tip}}" aria-label="{{tb.tip}}" style="display:flex;align-items:center;justify-content:center;width:52px;height:52px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--bar-ink);cursor:pointer" style-hover="background:rgba(255,255,255,0.1)"><lu-icon name="{{tb.icon}}" size="22" stroke="1.5"></lu-icon></button></sc-if>
+</sc-for>
+</div>
+</nav>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:0 20px 20px 0">
+<header style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:28px 8px 24px 4px">
+<div style="display:flex;flex-direction:column;gap:2px">
+<span style="font-size:16px;color:var(--ink-2)">Wed, Oct 7</span>
+<span style="font-size:40px;line-height:1.05;letter-spacing:-0.035em">Picks for US session Thu, Oct 8</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<span style="height:52px;padding:0 20px;border:1px solid var(--outline);border-radius:999px;display:flex;align-items:center;gap:8px;font-size:16px"><lu-icon name="crown" size="16"></lu-icon>Strategy A · Mean Reversion</span>
+<button data-tip="Sign out" aria-label="Sign out" style="display:flex;align-items:center;justify-content:center;flex:none;width:52px;height:52px;padding:0;border:1px solid var(--outline);border-radius:999px;background:transparent;color:var(--ink);cursor:pointer" style-hover="background:var(--chip)"><lu-icon name="log-out" size="21" stroke="1.5"></lu-icon></button>
+</div>
+</header>
+<div style="flex:1;min-height:0;overflow-y:auto;background:var(--sheet);border-radius:40px;padding:20px;display:flex;flex-direction:column;gap:16px">
+<sc-for list="{{actions}}" as="a" hint-placeholder-count="1">
+<div style="flex:none;display:flex;align-items:center;gap:16px;padding:10px 10px 10px 26px;border-radius:999px;background:var(--coral);color:#1d1c1a">
+<span style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase">Action needed</span>
+<span style="flex:1;min-width:0;font-size:19px"><span style="font-weight:600">{{a.t}}</span>: {{a.text}}</span>
+<button data-tip="Mark as done" aria-label="Mark as done" onClick="{{a.dismiss}}" style="display:flex;align-items:center;justify-content:center;flex:none;width:52px;height:52px;padding:0;border:1px solid #1d1c1a;border-radius:999px;background:transparent;color:#1d1c1a;cursor:pointer" style-hover="background:rgba(255,255,255,0.25)"><lu-icon name="check" size="22"></lu-icon></button>
+</div>
+</sc-for>
+<div style="flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start">
+<sc-for list="{{picks}}" as="p" hint-placeholder-count="3">
+<article style="{{p.deskStyle}}">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:36px;line-height:1;letter-spacing:-0.03em;font-weight:500">{{p.t}}</span><span style="font-size:15px;color:var(--ink-2)">{{p.name}}</span></div>
+<span style="flex:none;width:46px;height:46px;border-radius:999px;background:var(--chip-solid);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:500">{{p.slot}}</span>
+</div>
+<span style="align-self:flex-start;height:32px;padding:0 13px;border-radius:999px;background:var(--chip);display:flex;align-items:center;font-size:14px">Last ${{p.price}}</span>
+<div style="display:flex;flex-direction:column;gap:12px">
+<sc-for list="{{p.fields}}" as="f" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+<div style="display:flex;flex-direction:column;gap:2px">
+<span style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-2)">{{f.label}}</span>
+<span style="display:flex;align-items:baseline;gap:2px"><span style="font-size:16px;color:var(--ink-2)">{{f.unit}}</span><span style="font-size:28px;letter-spacing:-0.03em">{{f.value}}</span></span>
+</div>
+<button data-tip="{{f.tip}}" aria-label="{{f.tip}}" data-copy="{{f.value}}" style="display:flex;align-items:center;justify-content:center;flex:none;width:44px;height:44px;padding:0;border:0;border-radius:999px;background:var(--chip-solid);color:var(--ink);cursor:pointer" style-hover="background:var(--ink);color:var(--sheet)"><lu-icon name="copy" size="18" stroke="1.6"></lu-icon></button>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid var(--hair);font-size:14px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span>Est. cost</span><span style="display:flex;flex-direction:column;align-items:flex-end"><span style="font-size:17px">{{p.cost}}</span><span style="font-size:12px;color:var(--ink-2)">{{p.costIdr}}</span></span></div>
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span>Est. profit</span><span style="display:flex;flex-direction:column;align-items:flex-end;color:var(--pos)"><span style="font-size:17px">{{p.profit}}</span><span style="font-size:12px">{{p.profitIdr}}</span></span></div>
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span>Est. loss</span><span style="display:flex;flex-direction:column;align-items:flex-end;color:var(--neg)"><span style="font-size:17px">{{p.loss}}</span><span style="font-size:12px">{{p.lossIdr}}</span></span></div>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<sc-if value="{{p.closed}}" hint-placeholder-val="{{true}}"><button data-tip="Why this pick" aria-label="Why this pick" onClick="{{p.toggle}}" style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0;border:0;border-radius:999px;background:var(--chip);color:var(--ink);cursor:pointer" style-hover="background:var(--chip-solid)"><lu-icon name="chevron-down" size="20"></lu-icon></button></sc-if>
+<sc-if value="{{p.open}}" hint-placeholder-val="{{false}}"><button data-tip="Hide explanation" aria-label="Hide explanation" onClick="{{p.toggle}}" style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;padding:0;border:0;border-radius:999px;background:var(--ink);color:var(--sheet);cursor:pointer"><lu-icon name="chevron-up" size="20"></lu-icon></button></sc-if>
+<span style="font-size:14px;color:var(--ink-2)">Why this pick</span>
+</div>
+<sc-if value="{{p.open}}" hint-placeholder-val="{{false}}"><p style="margin:0;font-size:15px;line-height:1.5;text-wrap:pretty">{{p.why}}</p></sc-if>
+</article>
+</sc-for>
+<div style="border:1.5px dashed var(--outline);border-radius:32px;padding:22px;display:flex;flex-direction:column;gap:12px;min-height:420px">
+<span style="width:46px;height:46px;border-radius:999px;border:1.5px dashed var(--outline);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--ink-3)">R</span>
+<span style="font-size:24px;letter-spacing:-0.02em">Empty slot</span>
+<span style="font-size:15px;line-height:1.4;color:var(--ink-2)">No fourth stock passed the rules tonight.</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:14px">
+<span style="font-size:14px;color:var(--canvas-ink)">10 Desktop · Leaderboard · 1280 × 820</span>
+<div data-screen-label="10 Desktop Leaderboard" style="width:1280px;height:820px;border-radius:28px;overflow:hidden;background:var(--bg);color:var(--ink);display:flex;font-family:'Outfit',system-ui,sans-serif">
+<nav style="flex:none;width:104px;display:flex;flex-direction:column;align-items:center;padding:28px 0;gap:28px">
+<span style="font-size:24px;font-weight:500;letter-spacing:-0.05em">Seer.</span>
+<div style="display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:999px;background:var(--bar)">
+<sc-for list="{{deskTabsLeader}}" as="tb" hint-placeholder-count="4">
+<sc-if value="{{tb.active}}" hint-placeholder-val="{{false}}"><button data-tip="{{tb.tip}}" aria-label="{{tb.tip}}" style="display:flex;align-items:center;justify-content:center;width:52px;height:52px;padding:0;border:0;border-radius:999px;background:var(--coral);color:#1d1c1a;cursor:pointer"><lu-icon name="{{tb.icon}}" size="22"></lu-icon></button></sc-if>
+<sc-if value="{{tb.idle}}" hint-placeholder-val="{{true}}"><button data-tip="{{tb.tip}}" aria-label="{{tb.tip}}" style="display:flex;align-items:center;justify-content:center;width:52px;height:52px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--bar-ink);cursor:pointer" style-hover="background:rgba(255,255,255,0.1)"><lu-icon name="{{tb.icon}}" size="22" stroke="1.5"></lu-icon></button></sc-if>
+</sc-for>
+</div>
+</nav>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:0 20px 20px 0">
+<header style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:28px 8px 24px 4px">
+<div style="display:flex;flex-direction:column;gap:2px">
+<span style="font-size:16px;color:var(--ink-2)">Wed, Oct 7</span>
+<span style="font-size:40px;line-height:1.05;letter-spacing:-0.035em">Leaderboard</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<span style="height:52px;padding:0 20px;border:1px solid var(--outline);border-radius:999px;display:flex;align-items:center;font-size:16px">Forward test · Jul 6 – Oct 7</span>
+<button data-tip="Sign out" aria-label="Sign out" style="display:flex;align-items:center;justify-content:center;flex:none;width:52px;height:52px;padding:0;border:1px solid var(--outline);border-radius:999px;background:transparent;color:var(--ink);cursor:pointer" style-hover="background:var(--chip)"><lu-icon name="log-out" size="21" stroke="1.5"></lu-icon></button>
+</div>
+</header>
+<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px">
+<div style="flex:none;display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:12px">
+<div style="background:var(--sheet);border-radius:40px;padding:28px 0 20px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:26px;padding:0 30px">
+<div style="display:flex;align-items:flex-end;gap:32px">
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:60px;line-height:0.95;letter-spacing:-0.045em;color:var(--pos)">+6.8%</span><span style="font-size:16px;display:flex;align-items:center;gap:6px"><lu-icon name="crown" size="15"></lu-icon>A · Quant, champion</span></div>
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:28px">+4.6%</span><span style="font-size:16px">SPY</span></div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px 18px;font-size:14px">
+<span style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:3px;border-radius:9px;background:var(--ink)"></span>A</span>
+<span style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:3px;border-radius:9px;background:var(--line-b)"></span>B</span>
+<span style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:3px;border-radius:9px;background:var(--line-c)"></span>C</span>
+<span style="display:flex;align-items:center;gap:7px"><span style="width:18px;height:0;border-top:2.5px dotted var(--ink-3)"></span>SPY</span>
+</div>
+</div>
+<svg viewBox="0 0 340 170" preserveAspectRatio="none" style="width:100%;height:290px;display:block;overflow:visible">
+<line x1="0" x2="340" y1="14.2" y2="14.2" vector-effect="non-scaling-stroke" style="stroke:var(--hair)"></line>
+<line x1="0" x2="340" y1="70.8" y2="70.8" vector-effect="non-scaling-stroke" style="stroke:var(--hair)"></line>
+<line x1="0" x2="340" y1="127.5" y2="127.5" vector-effect="non-scaling-stroke" style="stroke:var(--outline);stroke-dasharray:4 4"></line>
+<path d="{{chartM.spy}}" vector-effect="non-scaling-stroke" style="fill:none;stroke:var(--ink-3);stroke-width:2;stroke-dasharray:1 5;stroke-linecap:round"></path>
+<path d="{{chartM.c}}" vector-effect="non-scaling-stroke" style="fill:none;stroke:var(--line-c);stroke-width:2.25;stroke-linejoin:round"></path>
+<path d="{{chartM.b}}" vector-effect="non-scaling-stroke" style="fill:none;stroke:var(--line-b);stroke-width:2.25;stroke-linejoin:round"></path>
+<path d="{{chartM.a}}" vector-effect="non-scaling-stroke" style="fill:none;stroke:var(--ink);stroke-width:3;stroke-linejoin:round"></path>
+</svg>
+<div style="display:flex;justify-content:space-between;padding:0 30px;font-size:13px;color:var(--ink-2)"><span>Jul 6</span><span>Aug</span><span>Sep</span><span>Oct 7</span></div>
+</div>
+<div style="background:var(--butter);border-radius:40px;padding:28px;display:flex;flex-direction:column;gap:6px">
+<span style="font-size:13px;letter-spacing:0.12em;text-transform:uppercase">Go-live checklist · A</span>
+<div style="display:flex;align-items:center;gap:12px;padding-bottom:8px"><span style="font-size:52px;line-height:1;letter-spacing:-0.04em">4/5</span><span style="font-size:15px;line-height:1.3;color:var(--ink-2)">Paper trading until<br>all five pass</span></div>
+<sc-for list="{{checklist}}" as="c" hint-placeholder-count="5">
+<div style="display:flex;align-items:center;gap:12px;padding:5px 0">
+<sc-if value="{{c.ok}}" hint-placeholder-val="{{true}}"><span style="flex:none;width:38px;height:38px;border-radius:999px;background:var(--ink);color:var(--sheet);display:flex;align-items:center;justify-content:center"><lu-icon name="check" size="17" stroke="2.25"></lu-icon></span></sc-if>
+<sc-if value="{{c.no}}" hint-placeholder-val="{{false}}"><span style="flex:none;width:38px;height:38px;border-radius:999px;border:1.5px solid var(--ink);display:flex;align-items:center;justify-content:center"><lu-icon name="x" size="17" stroke="2.25"></lu-icon></span></sc-if>
+<span style="flex:1;font-size:16px">{{c.label}}</span>
+<span style="height:30px;padding:0 11px;border-radius:999px;background:var(--chip);display:flex;align-items:center;font-size:13px">{{c.val}}</span>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+<sc-for list="{{strategies}}" as="s" hint-placeholder-count="4">
+<article style="{{s.deskStyle}}">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="display:flex;align-items:center;gap:8px;font-size:22px;font-weight:500;letter-spacing:-0.02em">{{s.name}}<sc-if value="{{s.champ}}" hint-placeholder-val="{{false}}"><span data-tip="Champion" style="display:flex"><lu-icon name="crown" size="18"></lu-icon></span></sc-if></span><span style="font-size:14px;color:var(--ink-2)">{{s.sub}}</span></div>
+<span style="flex:none;width:46px;height:46px;border-radius:999px;background:var(--chip-solid);display:flex;align-items:center;justify-content:center"><lu-icon name="{{s.icon}}" size="20" stroke="1.6"></lu-icon></span>
+</div>
+<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:36px;letter-spacing:-0.04em;color:var(--pos)">{{s.ret}}</span><span style="font-size:14px">Total return</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding-top:12px;border-top:1px solid var(--hair)">
+<div style="display:flex;flex-direction:column"><span style="font-size:19px">{{s.win}}</span><span style="font-size:13px;color:var(--ink-2)">Win rate</span></div>
+<div style="display:flex;flex-direction:column"><span style="font-size:19px">{{s.pf}}</span><span style="font-size:13px;color:var(--ink-2)">Profit factor</span></div>
+<div style="display:flex;flex-direction:column"><span style="font-size:19px">{{s.dd}}</span><span style="font-size:13px;color:var(--ink-2)">Max drawdown</span></div>
+<div style="display:flex;flex-direction:column"><span style="font-size:19px">{{s.trades}}</span><span style="font-size:13px;color:var(--ink-2)">Trades</span></div>
+</div>
+</article>
+</sc-for>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</sc-for>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { open: { GE: true }, done: {}, strat: 'all', outcome: 'all' };
+
+  renderVals() {
+    const S = this.state;
+    const RATE = 16530;
+    const usd = v => '$' + Math.abs(v).toFixed(2);
+    const rp = v => 'Rp ' + (Math.round(Math.abs(v) * RATE / 1000) * 1000).toLocaleString('id-ID');
+    const LIGHT = {
+      '--canvas': '#b1af9c', '--canvas-ink': '#2a2924', '--bg': '#e6e2d6', '--sheet': '#ffffff', '--ink': '#1d1c1a', '--ink-2': '#5f5b52', '--ink-3': '#8e897d',
+      '--outline': '#cfcabd', '--hair': 'rgba(29,28,26,0.1)', '--chip': 'rgba(255,255,255,0.6)', '--chip-solid': '#ffffff',
+      '--coral': '#f47862', '--butter': '#fbe0a9', '--butter-solid': '#fbe0a9', '--lav': '#eceefb', '--sky': '#d6e8ee', '--stone': '#efe8dd',
+      '--pos': '#2b7d38', '--neg': '#b8321f', '--bar': '#1d1c1a', '--bar-ink': '#e6e2d6', '--line-b': '#6b72d6', '--line-c': '#c4902a',
+      '--alarm': '#1d1c1a', '--alarm-ink': '#ffffff',
+      '--splash': '#f47862', '--splash-words': '#cf5a45', '--splash-star': '#f8d07f', '--splash-ink': '#1d1c1a', colorScheme: 'light',
+    };
+    const DARK = {
+      '--canvas': '#2a2925', '--canvas-ink': '#e6e2d6', '--bg': '#141311', '--sheet': '#211f1c', '--ink': '#f4f1ea', '--ink-2': '#b0ab9f', '--ink-3': '#7d786d',
+      '--outline': '#45423c', '--hair': 'rgba(244,241,234,0.12)', '--chip': 'rgba(255,255,255,0.08)', '--chip-solid': 'rgba(255,255,255,0.14)',
+      '--coral': '#f47862', '--butter': '#3e3420', '--butter-solid': '#fbe0a9', '--lav': '#2a2c40', '--sky': '#1d3038', '--stone': '#2c2823',
+      '--pos': '#86d483', '--neg': '#ff9180', '--bar': '#f4f1ea', '--bar-ink': '#1d1c1a', '--line-b': '#a3a8f5', '--line-c': '#e5bb5c',
+      '--alarm': '#f4f1ea', '--alarm-ink': '#1d1c1a',
+      '--splash': '#1b1916', '--splash-words': '#3a2a24', '--splash-star': '#f47862', '--splash-ink': '#f4f1ea', colorScheme: 'dark',
+    };
+    const themes = [
+      { id: 'light', badge: 'A', name: 'Light', vars: LIGHT },
+      { id: 'dark', badge: 'B', name: 'Dark', vars: DARK },
+    ];
+    const SLOT_BG = ['var(--lav)', 'var(--butter)', 'var(--sky)', 'var(--stone)'];
+    const stack = bg => ({ position: 'relative', flex: 'none', marginTop: -40, background: bg, borderRadius: 40, padding: '28px 24px 66px', display: 'flex', flexDirection: 'column', gap: 18 });
+    const desk = bg => ({ background: bg, borderRadius: 32, padding: 22, display: 'flex', flexDirection: 'column', gap: 16 });
+
+    const raw = [
+      { slot: 'S', t: 'GE', name: 'GE Aerospace', price: '273.18', lim: 271.40, tp: 278.90, sl: 260.15, sh: 1,
+        why: 'GE fell three days in a row and now sits below its usual range, while its longer trend is still up. Strategy A buys short dips like this when they have usually recovered within a week. The limit is a little under the last price, so you only buy if it dips further at the open.' },
+      { slot: 'E', t: 'LRCX', name: 'Lam Research', price: '99.64', lim: 98.20, tp: 102.10, sl: 92.35, sh: 3,
+        why: 'Chip-equipment stocks sold off on Tuesday and Lam Research dropped more than its peers without news of its own. Past drops of this size have tended to win back part of the move within five sessions. The stop sits below last month’s low.' },
+      { slot: 'E', t: 'CSCO', name: 'Cisco Systems', price: '67.42', lim: 66.85, tp: 68.30, sl: 64.70, sh: 4,
+        why: 'Cisco is a steady, slow-moving stock that slipped to the bottom of its two-week range. The target is modest because Cisco rarely moves far. Four shares keep the possible loss in line with the other picks.' },
+    ];
+    const picks = raw.map((p, i) => {
+      const cost = p.lim * p.sh, pr = (p.tp - p.lim) * p.sh, ls = (p.lim - p.sl) * p.sh, open = !!S.open[p.t];
+      return {
+        ...p, open, closed: !open, cardStyle: stack(SLOT_BG[i]), deskStyle: desk(SLOT_BG[i]),
+        fields: [
+          { label: 'Limit buy', unit: '$', value: p.lim.toFixed(2), tip: 'Copy limit price' },
+          { label: 'Take profit', unit: '$', value: p.tp.toFixed(2), tip: 'Copy take-profit price' },
+          { label: 'Stop loss', unit: '$', value: p.sl.toFixed(2), tip: 'Copy stop-loss price' },
+          { label: 'Shares', unit: '', value: String(p.sh), tip: 'Copy number of shares' },
+        ],
+        cost: usd(cost), costIdr: rp(cost), profit: '+' + usd(pr), profitIdr: '+' + rp(pr), loss: '−' + usd(ls), lossIdr: '−' + rp(ls),
+        toggle: () => this.setState(s => ({ open: { ...s.open, [p.t]: !s.open[p.t] } })),
+      };
+    });
+
+    const actions = [{ id: 'nvda', t: 'NVDA', text: 'day 5 of 5. Cancel bracket and sell at market.' }]
+      .filter(a => !S.done[a.id])
+      .map(a => ({ ...a, dismiss: () => this.setState(s => ({ done: { ...s.done, [a.id]: true } })) }));
+
+    const tabsFor = k => [['today', 'layout-grid', 'Today'], ['positions', 'briefcase', 'Positions'], ['leader', 'trophy', 'Leaderboard'], ['history', 'history', 'History']]
+      .map(([id, icon, tip]) => ({ icon, tip, active: id === k, idle: id !== k }));
+    const dot = (bg, filled, first) => ({ width: 46, height: 46, borderRadius: 999, marginLeft: first ? 0 : -10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, fontWeight: 500,
+      background: filled ? bg : 'var(--sheet)', border: filled ? '3px solid var(--sheet)' : '1.5px dashed var(--outline)', color: filled ? 'var(--ink)' : 'var(--ink-3)' });
+    const L = ['S', 'E', 'E', 'R'];
+    const slots = n => L.map((letter, i) => ({ letter, style: dot(SLOT_BG[i], i < n, i === 0) }));
+    const screens = [
+      { label: '01 Sign-in', auth: true },
+      { label: '02 Sign-in · unauthorized', auth: true, unauth: true },
+      { label: '03 Today', app: true, title: 'Today', today: true, normal: true, count: '3', slots: slots(3), tabs: tabsFor('today') },
+      { label: '04 Today · no setups', app: true, title: 'Today', today: true, empty: true, count: '0', slots: slots(0), tabs: tabsFor('today') },
+      { label: '05 Today · stale data', app: true, title: 'Today', today: true, stale: true, count: '—', slots: slots(0), tabs: tabsFor('today') },
+      { label: '06 Positions', app: true, title: 'Positions', positions: true, tabs: tabsFor('positions') },
+      { label: '07 Leaderboard', app: true, title: 'Leaderboard', leader: true, tabs: tabsFor('leader') },
+      { label: '08 History', app: true, title: 'History', history: true, tabs: tabsFor('history') },
+    ];
+
+    const positions = [
+      { t: 'NVDA', name: 'Nvidia', sh: 1, entry: 184.20, cur: 186.95, tp: 190.60, sl: 176.80, day: 5 },
+      { t: 'AMZN', name: 'Amazon', sh: 2, entry: 221.50, cur: 218.10, tp: 228.90, sl: 212.40, day: 3 },
+      { t: 'KO', name: 'Coca-Cola', sh: 3, entry: 69.40, cur: 70.05, tp: 71.20, sl: 67.30, day: 1 },
+    ].map((q, i) => {
+      const pos = v => (v - q.sl) / (q.tp - q.sl) * 100;
+      const e = pos(q.entry), c = pos(q.cur), up = q.cur >= q.entry, d = (q.cur - q.entry) * q.sh;
+      return {
+        t: q.t, name: q.name, shLabel: q.sh === 1 ? '1 share' : q.sh + ' shares', cardStyle: stack(SLOT_BG[i]),
+        entry: q.entry.toFixed(2), cur: q.cur.toFixed(2), tp: q.tp.toFixed(2), sl: q.sl.toFixed(2),
+        up, down: !up,
+        pct: (up ? '+' : '−') + Math.abs((q.cur / q.entry - 1) * 100).toFixed(2) + '%',
+        usd: (up ? '+' : '−') + usd(d),
+        fillStyle: { position: 'absolute', top: 0, bottom: 0, borderRadius: 999, left: Math.min(e, c) + '%', width: Math.abs(c - e) + '%', background: up ? 'var(--pos)' : 'var(--neg)' },
+        entryStyle: { position: 'absolute', top: -6, bottom: -6, left: e + '%', width: 2, marginLeft: -1, borderRadius: 2, background: 'var(--ink-2)' },
+        curStyle: { position: 'absolute', top: '50%', left: c + '%', width: 20, height: 20, marginLeft: -10, marginTop: -10, borderRadius: 999, background: 'var(--ink)', border: '4px solid var(--chip-solid)' },
+        days: [1, 2, 3, 4, 5].map(k => ({ on: k <= q.day, off: k > q.day })),
+        dayLabel: q.day === 5 ? 'Day 5/5 · exit today' : 'Day ' + q.day + '/5',
+      };
+    });
+
+    const SI = { A: ['sigma', 'Strategy A · Quant'], B: ['brain-circuit', 'Strategy B · ML'], C: ['gavel', 'Strategy C · LLM-veto'] };
+    const RI = { TP: ['target', 'Take profit hit'], SL: ['octagon-x', 'Stop loss hit'], Time: ['hourglass', 'Time exit, day 5'], Gap: ['skip-forward', 'Gapped past stop at open'] };
+    const trades = [
+      ['MSFT', 'A', 412.30, 421.10, 1, 'TP', 'Oct 6'], ['AMD', 'B', 162.40, 156.90, 2, 'SL', 'Oct 6'],
+      ['JPM', 'A', 298.15, 300.02, 2, 'Time', 'Oct 5'], ['XOM', 'C', 114.60, 118.40, 3, 'TP', 'Oct 2'],
+      ['PLTR', 'B', 178.20, 169.05, 1, 'Gap', 'Oct 1'], ['HD', 'A', 401.80, 409.90, 1, 'TP', 'Sep 30'],
+      ['INTC', 'C', 36.40, 35.12, 4, 'SL', 'Sep 29'], ['COST', 'A', 912.00, 908.40, 1, 'Time', 'Sep 26'],
+    ].map(([t, s, en, ex, sh, r, date]) => {
+      const d = (ex - en) * sh, win = d >= 0;
+      return { t, s, entry: en.toFixed(2), exit: ex.toFixed(2), date, d, win, loss: !win,
+        pct: (win ? '+' : '−') + Math.abs((ex / en - 1) * 100).toFixed(2) + '%', usd: (win ? '+' : '−') + usd(d),
+        stratIcon: SI[s][0], stratTip: SI[s][1], reasonIcon: RI[r][0], reasonTip: RI[r][1] };
+    });
+    const rows = trades.filter(r => (S.strat === 'all' || r.s === S.strat) && (S.outcome === 'all' || (S.outcome === 'win') === r.win));
+    const net = rows.reduce((a, r) => a + r.d, 0), wins = rows.filter(r => r.win).length;
+    const hist = { rows, none: rows.length === 0, up: net >= 0, down: net < 0, net: (net >= 0 ? '+' : '−') + usd(net), wins: String(wins), losses: String(rows.length - wins) };
+    const mk = (key, list) => list.map(([v, icon, tip]) => ({ icon, tip, active: S[key] === v, idle: S[key] !== v, onClick: () => this.setState({ [key]: v }) }));
+    const stratBtns = mk('strat', [['all', 'list-filter', 'All strategies'], ['A', 'sigma', 'Strategy A only'], ['B', 'brain-circuit', 'Strategy B only'], ['C', 'gavel', 'Strategy C only']]);
+    const outBtns = mk('outcome', [['all', 'list', 'Wins and losses'], ['win', 'trending-up', 'Wins only'], ['loss', 'trending-down', 'Losses only']]);
+
+    const strategies = [
+      { icon: 'sigma', name: 'A · Quant', sub: 'Mean Reversion', ret: '+6.8%', win: '58%', pf: '1.42', dd: '7.9%', trades: '84', champ: true, bg: 'var(--lav)' },
+      { icon: 'brain-circuit', name: 'B · ML', sub: 'Gradient-boosted ranker', ret: '+4.1%', win: '54%', pf: '1.21', dd: '9.6%', trades: '91', bg: 'var(--sky)' },
+      { icon: 'gavel', name: 'C · LLM-veto', sub: 'Quant picks, LLM can veto', ret: '+3.2%', win: '61%', pf: '1.18', dd: '5.4%', trades: '47', bg: 'var(--stone)' },
+      { icon: 'landmark', name: 'SPY', sub: 'S&P 500, buy and hold', ret: '+4.6%', win: '—', pf: '—', dd: '6.1%', trades: '—', bg: 'var(--sheet)' },
+    ].map(s => ({ ...s, cardStyle: stack(s.bg), deskStyle: desk(s.bg) }));
+    const checklist = [
+      ['≥ 3 months forward', '3.0 mo', true], ['≥ 100 trades', '84 / 100', false], ['Beats SPY', '+6.8 vs +4.6', true],
+      ['Profit factor ≥ 1.3', '1.42', true], ['Max drawdown ≤ 15%', '7.9%', true],
+    ].map(([label, val, ok]) => ({ label, val, ok, no: !ok }));
+
+    const series = (seed, target, vol) => {
+      let x = seed; const r = () => (x = (x * 16807) % 2147483647) / 2147483647;
+      const n = 66, w = [0];
+      for (let i = 1; i < n; i++) w.push(w[i - 1] + (r() - 0.5) * vol);
+      const yOf = v => (170 - (v + 3) / 12 * 170).toFixed(1);
+      return w.map((v, i) => {
+        const val = i === 0 ? 0 : v - w[n - 1] * i / (n - 1) + target * i / (n - 1);
+        return (i ? 'L' : 'M') + (i / (n - 1) * 340).toFixed(1) + ' ' + yOf(val);
+      }).join(' ');
+    };
+    const chartM = { a: series(11, 6.8, 1.1), b: series(29, 4.1, 1.3), c: series(7, 3.2, 0.8), spy: series(53, 4.6, 0.9) };
+
+    return {
+      themes, screens, picks, actions, positions, hist, stratBtns, outBtns,
+      strategies, checklist, chartM, deskTabsToday: tabsFor('today'), deskTabsLeader: tabsFor('leader'),
+    };
+  }
+}
+</script>
+</body>
+</html>
+

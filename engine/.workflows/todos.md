@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 17:19:26
-**Total Active Tasks**: 6
+**Last Updated**: 2026-10-03 17:20:20
+**Total Active Tasks**: 5
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 4
-- Completed: 14
+- Completed: 15
 
 ---
 
@@ -23,16 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-
-- [ ] **P1-ENG-WCIA** Phase 1: Strategy A2: variants V0–V3
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `strategies/a2.py` (new, exactly the shared contract; `STRATEGY_A2_PARAMS = None` under a two-line placeholder comment, `Decimal` imported), `strategies/__init__.py` exports, `tests/test_strategy_a2.py` (new: every R1 rule; V0 `==` v1 over a contract set for several params; P4 identity for all four variants; no look-ahead with SPY mutated/truncated from S; SPY never picked; `REGIME_SYMBOL == universe.BENCHMARK`), reusing `tests/stratkit.py` unedited. Does not touch `a.py`, `base.py`, `indicators.py`, `stratkit.py`, `test_strategy_purity.py`, `backtest/`. Exit: suite green, 0 skipped (660 alone, 673 with phase 2); purity glob covers `a2.py`; `a.py`, `base.py`, `indicators.py` byte-identical to `e14de0c`.
-  - **Status**: in_progress
-  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 1 of 6)
-  - **Satisfies**: R1 — Variants V0–V3 with tests of each added rule: regime off at SPY close ≤ SMA(200), including equality; the ATR% ranking and its tie order; the $10 floor at exactly 10.0000; V0 picks `==` v1 picks; R2 — P4 identity and no look-ahead for every variant, including SPY's own bars dated ≥ S; R5 — The new modules pass the globbing purity test
-  - **Depends on**: —
-  - **Plan**: `.workflows/plan/P1-ENG-WCIA.md`
 
 - [ ] **P1-ENG-3PA3** Phase 2: Runner params schedule, `metrics_through`, `select` fallback
   - **Difficulty**: NORMAL
@@ -95,6 +85,18 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-WCIA** Phase 1: Strategy A2: variants V0–V3
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `strategies/a2.py` (new, exactly the shared contract; `STRATEGY_A2_PARAMS = None` under a two-line placeholder comment, `Decimal` imported), `strategies/__init__.py` exports, `tests/test_strategy_a2.py` (new: every R1 rule; V0 `==` v1 over a contract set for several params; P4 identity for all four variants; no look-ahead with SPY mutated/truncated from S; SPY never picked; `REGIME_SYMBOL == universe.BENCHMARK`), reusing `tests/stratkit.py` unedited. Does not touch `a.py`, `base.py`, `indicators.py`, `stratkit.py`, `test_strategy_purity.py`, `backtest/`. Exit: suite green, 0 skipped (660 alone, 673 with phase 2); purity glob covers `a2.py`; `a.py`, `base.py`, `indicators.py` byte-identical to `e14de0c`.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 1 of 6)
+  - **Satisfies**: R1 — Variants V0–V3 with tests of each added rule: regime off at SPY close ≤ SMA(200), including equality; the ATR% ranking and its tie order; the $10 floor at exactly 10.0000; V0 picks `==` v1 picks; R2 — P4 identity and no look-ahead for every variant, including SPY's own bars dated ≥ S; R5 — The new modules pass the globbing purity test
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-WCIA.md`
+  - **Completed**: 2026-10-03 17:20
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/a2.py, engine/src/seer_engine/strategies/__init__.py, engine/tests/test_strategy_a2.py
 - [x] **P1-ENG-KG5T** Phase 6: Real 10-year run, freeze params, committed report, docs
   - **Difficulty**: NORMAL
   - **Type**: Feature

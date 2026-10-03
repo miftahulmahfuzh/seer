@@ -57,6 +57,7 @@ engine/
       base.py               History, history_from_bars(), Strategy protocol
       indicators.py         sma / wilder_rsi / wilder_atr / mean_dollar_volume windows, rolling()
       a.py                  Strategy A: AParams, DESIGN_PARAMS, STRATEGY_A_PARAMS (frozen), StrategyA
+      a2.py                 Strategy A2 variants V0–V3 (rework P1; full docs pending phase 6)
     backtest/               10-year backtest (P3); every module but io.py is pure
       __init__.py           docstring only
       market.py             Membership, Market: bars, universe and FX in memory

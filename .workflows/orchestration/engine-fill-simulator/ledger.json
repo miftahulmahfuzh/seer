@@ -25,40 +25,40 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "052d67e",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "363 passed, 0 skipped",
       "package": "seer_engine.sim",
       "plan": ".workflows/plan/engine-fill-simulator/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T07:28:45+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-2PWS",
       "title": "Whole-share sizing of picks into slots"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "1300882",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "363 passed, 0 skipped",
       "package": "seer_engine.sim",
       "plan": ".workflows/plan/engine-fill-simulator/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T07:28:15+00:00",
       "satisfies": [
         "R5"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-56QL",
       "title": "Split recompute for live orders"
     },
     {
@@ -77,7 +77,7 @@
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Public API, scenario, determinism, benchmark, docs"
     }
@@ -85,7 +85,7 @@
   "plan": "/home/miftah/.worktrees/seer/engine-fill-simulator/.workflows/orchestration/engine-fill-simulator/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "engine-fill-simulator",
-  "updated": "2026-10-03T07:25:16+00:00",
-  "verified_at": "2026-10-03T07:25:02+00:00",
+  "updated": "2026-10-03T07:28:46+00:00",
+  "verified_at": "2026-10-03T07:28:15+00:00",
   "worktree": "/home/miftah/.worktrees/seer/engine-fill-simulator"
 }

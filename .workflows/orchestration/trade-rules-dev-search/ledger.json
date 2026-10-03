@@ -140,21 +140,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "77cfc02",
       "depends_on": [
         2
       ],
       "difficulty": "NORMAL",
       "n": 8,
-      "note": null,
+      "note": "f_swing +87; suite 1509/1 fail wall-time under load; that test file re-run alone 23/23 in 19.5s (settles p5's failure as env)",
       "package": "strategies",
       "plan": ".workflows/plan/trade-rules-dev-search/phase-8.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T23:16:43+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-5U7B",
       "title": "Family F7: longer-horizon mean reversion"
     },
     {
@@ -271,7 +271,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/trade-rules-dev-search/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trade-rules-dev-search",
-  "updated": "2026-10-03T22:07:59+00:00",
+  "updated": "2026-10-03T23:16:43+00:00",
   "verified_at": "2026-10-03T14:04:32+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trade-rules-dev-search"
 }

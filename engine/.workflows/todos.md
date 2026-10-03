@@ -2,8 +2,8 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 17:25:05
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-03 17:28:52
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
@@ -13,8 +13,8 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 2
-- Completed: 17
+- Blocked: 1
+- Completed: 18
 
 ---
 
@@ -24,15 +24,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ### [P1] High
 
-- [ ] **P1-ENG-BVN5** Phase 4: Walk-forward report rendering
-  - **Difficulty**: HARD
+- [ ] **P1-ENG-U4G0** Phase 5: `backtest_wf` command + `write_wf_report`
+  - **Difficulty**: NORMAL
   - **Type**: Feature
-  - **Context**: Owns `backtest/wf_report.py` (new: `WalkForwardReport`, `report_stem`, machine lines, `parse_machine_line`, `render_markdown`, `equity_csv`, `grid_csv`, `equity_svg`, `variants_svg`) and `tests/test_backtest_wf_report.py` (new, from a small synthetic walk-forward). 16 report sections in order (title, verdict, Data, Method listing everything tried, Folds with top-10, WF vs both SPY curves, per-variant tables/selections, Diagnostics, "Seen before" from 2022-01-03, go-live checklist, survivorship, open positions, equity curves, gate verdict, fail-only owner options (a)-(c), machine lines per D14). Imports `report.py` helpers read-only, defines its own `_STYLE`. Does not touch `report.py`. Exit: suite green, 0 skipped (740); two renders byte-equal (invariant 5, D16).
+  - **Context**: Owns `io.write_wf_report` and `commands/backtest_wf.py` (args, `resolve` preconditions mirroring v1 exit-2 cases, `tune_all` per-combination timing via `walkforward.tune` (D17), `run_walk_forward`, `execute` building SPY curves + verdict as `wf_report._validate` recomputes; logs prepare time, per-combo/total tuning time, per-fold selections, verdict, `STRATEGY_A2_PARAMS` match) plus `tests/test_backtest_wf_command.py` (discovery/defaults, exit-2 cases, end-to-end on synthetic PG schema spanning >= 2 trade years: read-only, five file names, cache hit, byte-identical re-run). Does not touch `commands/backtest.py`, `report.py`, `walkforward.py`, `wf_report.py` (except logged defect fixes). Exit: suite green, 0 skipped (757); `python -m seer_engine backtest_wf --help` works; `tune_all == tune` on a subset tested.
   - **Status**: open
-  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 4 of 6)
-  - **Satisfies**: R5 — The new modules pass the globbing purity test; R6 — One real walk-forward run on Neon, with a committed report holding fold selections and tables, per-variant curves, WF vs both SPY curves, diagnostics, the "seen before" window, the survivorship note and the P3b verdict sentence
-  - **Depends on**: P1-ENG-ODYP
-  - **Plan**: `.workflows/plan/P1-ENG-BVN5.md`
+  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 5 of 6)
+  - **Satisfies**: R4 — Determinism: `==` results and byte-identical files; a parallel gather, if any, comes back in a fixed order; R6 — One real walk-forward run on Neon, with a committed report holding fold selections and tables, per-variant curves, WF vs both SPY curves, diagnostics, the "seen before" window, the survivorship note and the P3b verdict sentence
+  - **Depends on**: P1-ENG-BVN5
+  - **Plan**: `.workflows/plan/P1-ENG-U4G0.md`
 
 ### [P2] Medium
 
@@ -41,16 +41,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P4] Backlog
 
 ### 🚫 Blocked
-
-- [ ] **P1-ENG-U4G0** Phase 5: `backtest_wf` command + `write_wf_report`
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `io.write_wf_report` and `commands/backtest_wf.py` (args, `resolve` preconditions mirroring v1 exit-2 cases, `tune_all` per-combination timing via `walkforward.tune` (D17), `run_walk_forward`, `execute` building SPY curves + verdict as `wf_report._validate` recomputes; logs prepare time, per-combo/total tuning time, per-fold selections, verdict, `STRATEGY_A2_PARAMS` match) plus `tests/test_backtest_wf_command.py` (discovery/defaults, exit-2 cases, end-to-end on synthetic PG schema spanning >= 2 trade years: read-only, five file names, cache hit, byte-identical re-run). Does not touch `commands/backtest.py`, `report.py`, `walkforward.py`, `wf_report.py` (except logged defect fixes). Exit: suite green, 0 skipped (757); `python -m seer_engine backtest_wf --help` works; `tune_all == tune` on a subset tested.
-  - **Status**: blocked
-  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 5 of 6)
-  - **Satisfies**: R4 — Determinism: `==` results and byte-identical files; a parallel gather, if any, comes back in a fixed order; R6 — One real walk-forward run on Neon, with a committed report holding fold selections and tables, per-variant curves, WF vs both SPY curves, diagnostics, the "seen before" window, the survivorship note and the P3b verdict sentence
-  - **Depends on**: P1-ENG-BVN5
-  - **Plan**: `.workflows/plan/P1-ENG-U4G0.md`
 
 - [ ] **P1-ENG-RTWR** Phase 6: Real run on Neon, freeze or stop, docs
   - **Difficulty**: NORMAL
@@ -65,6 +55,20 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-BVN5** Phase 4: Walk-forward report rendering
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `backtest/wf_report.py` (new: `WalkForwardReport`, `report_stem`, machine lines, `parse_machine_line`, `render_markdown`, `equity_csv`, `grid_csv`, `equity_svg`, `variants_svg`) and `tests/test_backtest_wf_report.py` (new, from a small synthetic walk-forward). 16 report sections in order (title, verdict, Data, Method listing everything tried, Folds with top-10, WF vs both SPY curves, per-variant tables/selections, Diagnostics, "Seen before" from 2022-01-03, go-live checklist, survivorship, open positions, equity curves, gate verdict, fail-only owner options (a)-(c), machine lines per D14). Imports `report.py` helpers read-only, defines its own `_STYLE`. Does not touch `report.py`. Exit: suite green, 0 skipped (740); two renders byte-equal (invariant 5, D16).
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 4 of 6)
+  - **Satisfies**: R5 — The new modules pass the globbing purity test; R6 — One real walk-forward run on Neon, with a committed report holding fold selections and tables, per-variant curves, WF vs both SPY curves, diagnostics, the "seen before" window, the survivorship note and the P3b verdict sentence
+  - **Depends on**: P1-ENG-ODYP
+  - **Plan**: `.workflows/plan/P1-ENG-BVN5.md`
+  - **Completed**: 2026-10-03 17:28
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/wf_report.py, engine/tests/test_backtest_wf_report.py
+  - **Drift**: ruff is not installed in engine/.venv and not configured in the project, so the plan's lint step was skipped; imports kept in the plan's order.
+  - **Decided**: test_grid_csv_has_every_run_and_one_mark_per_fold counted the header line (which ends in ',selected') → count body rows only via lines[1:] (rung 3: the plan's exact GRID_CSV_HEADER code block wins over the test's miscount; assertion intent unchanged: exactly one selected and one fallback row)
 - [x] **P1-ENG-ODYP** Phase 3: Walk-forward engine
   - **Difficulty**: HARD
   - **Type**: Feature

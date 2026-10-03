@@ -5,7 +5,7 @@ Design: [docs/plans/2026-10-03-seer-design.md](plans/2026-10-03-seer-design.md)
 v0.1.0 goal: **Strategy A forward paper trading live every night, visible on the phone.**
 Real money is out of scope until the go-live checklist is fully green.
 
-## P0 — Foundations
+## P0 — Foundations · mostly done 2026-10-03 (CI still open)
 - Repo layout: `web/` (Next.js), `engine/` (Python), `.github/workflows/`
 - `.gitignore`, `.env.example`; rotate any secrets that were ever exposed
 - Neon schema + migrations (tables from design §7)
@@ -37,7 +37,7 @@ Real money is out of scope until the go-live checklist is fully green.
 - Stale-data and failed-run handling
 - **Done when:** 5 consecutive trading days run unattended with correct settlement
 
-## P5 — Web app
+## P5 — Web app · done 2026-10-03 on demo data (seed: `npm run db:seed-demo`); awaiting seertrade.site DNS
 - Implement the Claude Design output: Sign-in, Today, Positions, Leaderboard, History
 - Auth.js, Google only, single `ALLOWED_EMAIL`
 - PWA manifest + apple-touch-icon; Lucide icon-only buttons

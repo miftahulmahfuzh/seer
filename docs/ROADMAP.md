@@ -18,7 +18,7 @@ Real money is out of scope until the go-live checklist is fully green.
 - Market calendar (holidays, half days)
 - **Done when:** nightly job keeps `bars` current for the whole universe, idempotent re-runs
 
-## P2 — Fill simulator (critical path)
+## P2 — Fill simulator (critical path) · done 2026-10-03 on synthetic bars (`engine/src/seer_engine/sim/`, API in [engine/package_readme.md](../engine/package_readme.md)); P3/P4 wire it in
 - Order lifecycle exactly as design §5 (strict fill, SL-first, gaps, time stop, costs)
 - Whole-share sizing, 4 slots, equity ÷ 4
 - Exhaustive unit tests on synthetic bars

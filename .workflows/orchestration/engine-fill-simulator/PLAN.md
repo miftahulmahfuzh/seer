@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/engine-fill-simulator`
 **Branch:** `feature/engine-fill-simulator` (base: `HEAD` @ `b9780b8`)
 **Phases:** 4
-**Status:** 3/4 phases complete (1, 2, 3)
+**Status:** 4/4 phases complete (1, 2, 3, 4)
 **Coordinator:** —
 
 ---
@@ -166,7 +166,7 @@ order's fill price; `equity` defaults to `q(cash + Σ shares × mark)`).
 | 1 | Pure price types, sim model and session lifecycle | R1, R3, R4 | `seer_engine`, `seer_engine.sim` | 8 | — | HARD | `.workflows/plan/engine-fill-simulator/phase-1.md` | P1-ENG-DQFG ✓ done | — |
 | 2 | Whole-share sizing of picks into slots | R2 | `seer_engine.sim` | 2 | 1 | NORMAL | `.workflows/plan/engine-fill-simulator/phase-2.md` | P1-ENG-2PWS ✓ done | — |
 | 3 | Split recompute for live orders | R5 | `seer_engine.sim` | 2 | 1 | NORMAL | `.workflows/plan/engine-fill-simulator/phase-3.md` | P1-ENG-56QL ✓ done | — |
-| 4 | Public API, scenario, determinism, benchmark, docs | R4 | `seer_engine.sim`, docs | 4 | 2, 3 | NORMAL | `.workflows/plan/engine-fill-simulator/phase-4.md` | P1-ENG-SEZ7 | — |
+| 4 | Public API, scenario, determinism, benchmark, docs | R4 | `seer_engine.sim`, docs | 4 | 2, 3 | NORMAL | `.workflows/plan/engine-fill-simulator/phase-4.md` | P1-ENG-SEZ7 ✓ done | — |
 
 Phases 2 and 3 share no file and can run concurrently.
 

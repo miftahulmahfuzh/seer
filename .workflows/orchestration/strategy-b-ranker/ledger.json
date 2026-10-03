@@ -108,21 +108,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "a2c76dcadb5588a25854eee732cf4a34c36ac479",
       "depends_on": [
         5
       ],
       "difficulty": "NORMAL",
       "n": 6,
-      "note": null,
+      "note": "backtest_b command + io writers (write_b_report, write_model_artifact, MODELS_DIR); 964 passed 0 skipped; no drift; readme left to phase 7",
       "package": "commands`, `backtest",
       "plan": ".workflows/plan/strategy-b-ranker/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T12:06:01+00:00",
       "satisfies": [
         "R5",
         "R7"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ENG-UREW",
       "title": "backtest_b` command + io writers"
     },
@@ -144,7 +144,7 @@
         "R8",
         "R9"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": "P1-ENG-M99E",
       "title": "Real run on Neon, A2 byte-identity check, freeze or stop, docs"
     }
@@ -152,7 +152,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-b-ranker/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-b-ranker",
-  "updated": "2026-10-03T12:01:02+00:00",
+  "updated": "2026-10-03T12:06:13+00:00",
   "verified_at": "2026-10-03T11:56:21+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-b-ranker"
 }

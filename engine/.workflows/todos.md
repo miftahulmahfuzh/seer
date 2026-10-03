@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 15:40:00
-**Total Active Tasks**: 1
+**Last Updated**: 2026-10-03 15:54:18
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 13
+- Completed: 14
 
 ---
 
@@ -23,15 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ENG-KG5T** Phase 6: Real 10-year run, freeze params, committed report, docs
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `engine/src/seer_engine/strategies/a.py` (`STRATEGY_A_PARAMS` only, written in the grid constants' spelling), `docs/backtests/<end>-strategy-a.md`, `<end>-strategy-a-equity.csv`, `<end>-strategy-a-equity.svg` (new, produced by the command), `engine/tests/test_strategy_a_frozen.py` (new: the frozen params equal the ones recorded in the committed report), `engine/package_readme.md` (strategy interface, indicators, Strategy A, backtest modules, command, report), `docs/ROADMAP.md` (P3 status + verdict). Does not touch any other source module. If the real run exposes a bug, fix it in the owning module and record it in the commit message; never change a rule to move the result. Exit: one real run on Neon (`SEER_ENV_FILE=/home/miftah/seer/.env.local`, read-only), report committed, `STRATEGY_A_PARAMS` equals the selection with a comment naming the report, a re-run reproduces byte-identical report files, the verdict sentence is in the report and in ROADMAP P3. If the gate fails, ROADMAP says so and that P4 must not start. readme documents everything above, `--cache-dir` included. 3 new tests (`test_strategy_a_frozen.py`, via `report.parse_params_line`); suite **598**, 0 skipped.
-  - **Status**: open
-  - **Plan Set**: `STRATEGY_A_BACKTEST_PLAN.md` (phase 6 of 6)
-  - **Satisfies**: R4 — Tune on in-sample with the fixed 81-run grid, validate once on out-of-sample, freeze params in code; R5 — Backtest report (curves vs SPY, return, CAGR, win rate, PF, max DD, trades, exit reasons, go-live criteria, IS/OOS separately, survivorship note, gate verdict), metrics identical to `web/lib/metrics.ts`; R6 — One real 10-year run on Neon, report committed, gate verdict stated, API documented in `engine/package_readme.md`, suite green with 0 skipped, CI green
-  - **Depends on**: P1-ENG-5LGI
-  - **Plan**: `.workflows/plan/P1-ENG-KG5T.md`
 
 ### [P2] Medium
 
@@ -44,6 +35,29 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-KG5T** Phase 6: Real 10-year run, freeze params, committed report, docs
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/strategies/a.py` (`STRATEGY_A_PARAMS` only, written in the grid constants' spelling), `docs/backtests/<end>-strategy-a.md`, `<end>-strategy-a-equity.csv`, `<end>-strategy-a-equity.svg` (new, produced by the command), `engine/tests/test_strategy_a_frozen.py` (new: the frozen params equal the ones recorded in the committed report), `engine/package_readme.md` (strategy interface, indicators, Strategy A, backtest modules, command, report), `docs/ROADMAP.md` (P3 status + verdict). Does not touch any other source module. If the real run exposes a bug, fix it in the owning module and record it in the commit message; never change a rule to move the result. Exit: one real run on Neon (`SEER_ENV_FILE=/home/miftah/seer/.env.local`, read-only), report committed, `STRATEGY_A_PARAMS` equals the selection with a comment naming the report, a re-run reproduces byte-identical report files, the verdict sentence is in the report and in ROADMAP P3. If the gate fails, ROADMAP says so and that P4 must not start. readme documents everything above, `--cache-dir` included. 3 new tests (`test_strategy_a_frozen.py`, via `report.parse_params_line`); suite **598**, 0 skipped.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_A_BACKTEST_PLAN.md` (phase 6 of 6)
+  - **Satisfies**: R4 — Tune on in-sample with the fixed 81-run grid, validate once on out-of-sample, freeze params in code; R5 — Backtest report (curves vs SPY, return, CAGR, win rate, PF, max DD, trades, exit reasons, go-live criteria, IS/OOS separately, survivorship note, gate verdict), metrics identical to `web/lib/metrics.ts`; R6 — One real 10-year run on Neon, report committed, gate verdict stated, API documented in `engine/package_readme.md`, suite green with 0 skipped, CI green
+  - **Depends on**: P1-ENG-5LGI
+  - **Plan**: `.workflows/plan/P1-ENG-KG5T.md`
+  - **Completed**: 2026-10-03 15:54
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/a.py, engine/tests/test_strategy_a_frozen.py, docs/backtests/2026-10-02-strategy-a.md, docs/backtests/2026-10-02-strategy-a-equity.csv, docs/backtests/2026-10-02-strategy-a-equity.svg, engine/package_readme.md, docs/ROADMAP.md
+  - **Drift**:
+    - package_readme.md anchors were shifted by +2 lines (phase 1 added two placeholder layout lines for strategies/ and backtest/); those placeholders were replaced by the full layout entries. Edits applied by text anchor.
+    - Module-graph bullet corrected against the code: commands.backtest also imports prices; backtest.io also imports numpy; pure backtest modules import numpy.
+    - Cold-load time taken from run-log timestamps (~25 s streaming COPY) rather than run1-run3 wall difference.
+  - **Decided**:
+    - Plan Rule 3 'never push' vs /implement pusher + swarm coordinator instruction -> push to feature/strategy-a-backtest (not main). Rung: coordinator owns landing; phases 1-5 were pushed to the same branch.
+    - Survivorship readme examples (SIVB, FRC, CHK, ATVI, CELG) dropped - not verified against the never-fetched list. Rung 6.
+  - **Result**:
+    - Real run on Neon, data through 2026-10-02 (1,817,429 bar rows, 663 symbols). 0 of 81 in-sample grid runs qualified (max DD <= 15% and PF >= 1.3) -> design fallback frozen as explicit AParams literal {"rsi_max": "10", "limit_atr": "0.5", "tp_atr": "1", "sl_atr": "1.5", "min_dollar_volume": "20000000"}.
+    - Gate FAILED: out of sample -15.0% vs +71.9% total-return SPY, PF 0.92, max DD 33.3%. P4 must not start until Strategy A is reworked.
+    - Runs #1/#2/#3 byte-identical; Neon fingerprint unchanged; grid 37.7-39.0 s total. Suite: 598 passed, 0 skipped.
 - [x] **P1-ENG-5LGI** Phase 5: Neon loader with cache + `backtest` command
   - **Difficulty**: NORMAL
   - **Type**: Feature

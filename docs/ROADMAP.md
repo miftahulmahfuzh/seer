@@ -24,12 +24,13 @@ Real money is out of scope until the go-live checklist is fully green.
 - Exhaustive unit tests on synthetic bars
 - **Done when:** every edge case in design §5 has a passing test
 
-## P3 — Strategy A + backtest
+## P3 — Strategy A + backtest · done 2026-10-03: **Gate failed — rework before P4; P4 must not start** ([report](backtests/2026-10-02-strategy-a.md))
 - Implement Strategy A on the shared simulator
 - 10-year backtest vs SPY; tune parameters on early years, validate on later years
   (no tuning on the validation window), then freeze parameters
 - Backtest report: equity curve, return, win rate, profit factor, max drawdown
 - **Gate:** if A cannot beat SPY in backtest, rework before P4. Don't paper-trade a loser.
+- **Verdict (2026-10-02 data, out-of-sample 2022-01-03 → 2026-10-02):** Strategy A fails the P3 gate: out of sample it returned −15.0% against +71.9% for total-return SPY, with profit factor 0.92 and max drawdown 33.3%, so it fails on beating total-return SPY, profit factor ≥ 1.3 and max drawdown ≤ 15%; P4 must not start until Strategy A is reworked.
 
 ## P4 — Nightly forward paper trading
 - GitHub Actions cron ~06:00 WIB: fetch → settle → pick → snapshot → run log

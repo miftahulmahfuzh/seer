@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (src layout: `engine/src/seer_engine`)
-**Last Updated**: 2026-10-03 (fill simulator P2, phase 4 of `ENGINE_FILL_SIMULATOR_PLAN.md`: `prices`, `sim`)
+**Last Updated**: 2026-10-03 (Strategy A + backtest P3, phase 6 of `STRATEGY_A_BACKTEST_PLAN.md`: `strategies`, `backtest`, `backtest` command, committed report)
 
 ## Overview
 
@@ -22,6 +22,8 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - Purging demo rows before the first real write
 - Applying `db/migrations/*.sql`, sharing `schema_migrations` with web's `db:migrate`
 - The pure fill simulator (`sim/`): order lifecycle, whole-share sizing, cash/equity and split recompute, shared by the backtest (P3) and nightly paper trading (P4)
+- The pure strategy layer (`strategies/`): the `Strategy` protocol, numpy indicator windows and Strategy A with its frozen parameters, shared by the backtest (P3) and nightly picks (P4)
+- The 10-year backtest (`backtest/`, `backtest` command): point-in-time market, the session loop around the simulator, SPY benchmarks, metrics identical to the web's, the in-sample grid, the out-of-sample gate and the committed report
 
 ## Layout
 
@@ -50,13 +52,29 @@ engine/
       lifecycle.py          step(), close_unpriced()
       sizing.py             Pick, Rejection, SizingResult, size_picks()
       split_adjust.py       apply_split()
-    strategies/             pure strategy interface, indicators, Strategy A (P3; full docs land with P3 phase 6)
-    backtest/               10-year backtest (P3; docstring only so far, full docs land with P3 phase 6)
+    strategies/             strategy layer: pure; float64 indicators, Decimal picks (P3)
+      __init__.py           re-exports the public names of base and a
+      base.py               History, history_from_bars(), Strategy protocol
+      indicators.py         sma / wilder_rsi / wilder_atr / mean_dollar_volume windows, rolling()
+      a.py                  Strategy A: AParams, DESIGN_PARAMS, STRATEGY_A_PARAMS (frozen), StrategyA
+    backtest/               10-year backtest (P3); every module but io.py is pure
+      __init__.py           docstring only
+      market.py             Membership, Market: bars, universe and FX in memory
+      runner.py             run_backtest(), RunResult, survivorship()
+      benchmark.py          SPY buy-and-hold, price-only and total-return
+      metrics.py            Metrics, strategy_metrics(), checklist() (web/lib/metrics.ts parity)
+      tuning.py             windows, the 81-run grid, select(), gate()
+      report.py             BacktestReport, render_markdown(), equity_csv(), equity_svg()
+      io.py                 Neon loader + bar cache, dividends CSV, report writer (impure)
     commands/
       __init__.py           command-module contract
       migrate.py            `migrate` command
       backfill.py           `backfill` command (phase 3)
+      backtest.py           `backtest` command (P3)
   tests/                    pytest; DB tests need PG_TEST_URL
+  data/spy_dividends.csv    SPY dividends (ex_date, amount_usd), vendored from yfinance (see data/SOURCES.md)
+  .cache/                   gitignored; bars-<max date>-<rows>.pkl written by the backtest loader
+docs/backtests/             committed backtest reports: <data end>-strategy-a.md, -equity.csv, -equity.svg
 db/migrations/002_engine.sql  (outside the package, owned by it)
 ```
 
@@ -115,6 +133,38 @@ A one-off, resumable history load: daily bars from yfinance plus USD/IDR history
 - **Exit codes**: 0 when everything succeeded (empty symbols are not a failure); 1 when any symbol failed or the FX fetch failed; 2 for a bad range or an empty universe (`BackfillError`).
 - **Testing seams**: `backfill(conn, opts, *, downloader=None, sleep=time.sleep, fetch_fx=None) -> Summary` takes injectable network and sleep callables. `fetch_batch`, `select_symbols`, `options_from_args` and `format_summary` are also public.
 
+### `backtest` (P3)
+
+```
+SEER_ENV_FILE=/path/to/.env.local python -m seer_engine backtest [--out DIR] [--cache-dir DIR]
+    [--refresh-cache] [--is-start YYYY-MM-DD] [--oos-start YYYY-MM-DD] [--end YYYY-MM-DD] [--dividends PATH]
+```
+
+Runs Strategy A's 10-year backtest against Neon and writes the report. **Read-only**: it reads
+`bars`, `universe` and `fx_rates` and writes nothing to any table; `--dry-run` changes nothing.
+
+- **Defaults are the committed run.** `--out` defaults to `<repo>/docs/backtests`, the windows to
+  `tuning.IS_START` / `tuning.OOS_START` / the last SPY bar, `--dividends` to
+  `engine/data/spy_dividends.csv`. The window flags exist for synthetic tests; passing them for a
+  real run is how out-of-sample tuning starts, so don't.
+- **Steps:** load the market (cached), `STRATEGY_A.prepare` once, the 81 in-sample grid runs,
+  `select` on in-sample metrics only, then one out-of-sample run and one full-window run with the
+  selection, both SPY curves per window, the survivorship count, the gate, and the three files.
+- **Cache:** bars are read with one streamed `COPY ... TO STDOUT` and pickled to
+  `<cache dir>/bars-<max date>-<rows>.pkl`; `--cache-dir` defaults to `engine/.cache` (gitignored)
+  and exists so tests keep the cache out of the repo. Each run first asks Neon for
+  `max(date), count(*)` from `bars`; a different fingerprint reloads. `--refresh-cache` forces a
+  reload. `universe` and `fx_rates` are small and read every time.
+- **Output:** `<out>/<data end>-strategy-a.md`, `-equity.csv`, `-equity.svg`. The stem uses the
+  data end date, so a re-run on the same data overwrites the same files byte-identically.
+- **Logs:** cache hit or miss, wall time per grid run and in total, the selection, the gate verdict.
+- **Exit codes:** 0 whether the gate passes or fails (a losing verdict is a result); 1 on an error;
+  2 on a precondition (no bars, no SPY bars, a window date that is not an NYSE session or is after
+  the last SPY bar, `is_start < oos_start <= end` violated, no FX row on or before `--is-start`, a
+  missing dividends file).
+- **Worktrees:** `config.REPO_ROOT` is the worktree, which has no `.env.local`, so set
+  `SEER_ENV_FILE` to the main checkout's file. Never `source` it.
+
 ## Exported API
 
 ### config
@@ -161,7 +211,6 @@ Pure value types for prices, with no database import, so the simulator can use `
 - `PRICE_QUANTUM = Decimal("0.0001")`
 - `@dataclass(frozen, slots) Bar(symbol, date, open, high, low, close: Decimal, volume: int)`
 - `to_decimal(x) -> Decimal`: rounds half-up to 4 dp. Floats go through `repr`, so `0.1` becomes `0.1000`. Raises on bool and non-finite values.
-```
 
 ### bars
 
@@ -284,6 +333,138 @@ Pure and deterministic: no database, no network, no clock, no randomness, no log
 
 **Determinism:** the same inputs give `==` and `repr`-identical events and snapshots. The insertion order of `bars` does not matter. `tests/test_sim_scenario.py` checks this, and also holds the 12-session hand-checked scenario.
 
+### strategies (P3)
+
+Pure, like `sim`: no database, network, clock, randomness or logging, and never `bars`.
+`tests/test_strategy_purity.py` globs every module in `strategies/` and `backtest/` (except
+`backtest/io.py`) and checks this in a subprocess and on the AST. P4 calls this code nightly and
+P6 adds strategies B and C beside `a.py`.
+
+**`strategies.base`**
+- `@dataclass(frozen, slots) History(symbol, dates, open, high, low, close, volume)`: one symbol's
+  daily bars, ascending, one row per bar it has (gaps allowed). `dates` is `datetime64[D]`; the
+  rest are float64 arrays of the same length. `len(h)`, `h.upto(d)` (bars dated `<= d`, a view),
+  `h.last_date()`, `h.index_of(d)` (row of the bar dated `d`, else `None`).
+- `history_from_bars(symbol, bars: Sequence[Bar]) -> History`: `float(Decimal)` per field.
+- `Strategy` protocol: `id: str`, `lookback: int` (bars per symbol `picks` needs), and
+  - `picks(history, members, data_date, params) -> list[Pick]`: the nightly entry point. `history`
+    maps symbol → `History` through `data_date`; longer histories are fine, only the last
+    `lookback` bars dated `<= data_date` are read.
+  - `prepare(history) -> Any` and `picks_prepared(prepared, members, data_date, params)`: the
+    backtest's fast path, computing parameter-independent features once for every date.
+  - **Contract:** `picks_prepared(prepare(H), M, d, p) == picks({s: h.upto(d)}, M, d, p)` for
+    every `d`. A test proves it on a multi-symbol synthetic set.
+
+**`strategies.indicators`** — window functions take 2-D float64 arrays shaped `(rows, W)`, oldest
+column first, and return one float64 per row, `NaN` when `W` is too short. They use only
+elementwise numpy and an explicit loop over columns (never a reduction along time), so a row's
+result is bit-identical whatever the number of rows.
+- `sma_window(close, n)`: the last `n` closes summed left to right, `/ n`.
+- `wilder_rsi_window(close, n)`: changes `d_i = c_i − c_{i−1}`; seed = mean of the first `n` gains
+  and losses; then `avg = (avg·(n−1) + x) / n`; `100` when the average loss is 0, else
+  `100 − 100 / (1 + avgG/avgL)`.
+- `wilder_atr_window(high, low, close, n)`: `TR = max(h − l, |h − c_prev|, |l − c_prev|)` from the
+  window's second bar; seed = mean of the first `n` TRs; Wilder after.
+- `mean_dollar_volume_window(close, volume, n)`: mean of `close × volume` over the last `n` bars.
+- `rolling(fn, *series, window, **kw)`: a length-T series → length-T result via
+  `sliding_window_view`, `NaN` for `t < window − 1`.
+
+**`strategies.a`** (design §4)
+- `LOOKBACK = 200`, `SMA_N = 200`, `RSI_N = 2`, `ATR_N = 14`, `DV_N = 20`.
+- `@dataclass(frozen, slots) AParams(rsi_max=10.0, limit_atr=Decimal("0.5"), tp_atr=Decimal("1.0"), sl_atr=Decimal("1.5"), min_dollar_volume=20_000_000.0)`;
+  `as_dict() -> dict[str, str]` in a stable key order (what P4 writes to `strategies.params`).
+- `DESIGN_PARAMS = AParams()`: design §4's starting values, the selection fallback.
+- `STRATEGY_A_PARAMS`: **the frozen parameters**: `{"rsi_max": "10", "limit_atr": "0.5", "tp_atr": "1", "sl_atr": "1.5", "min_dollar_volume": "20000000"}`,
+  selected on the in-sample window only by the committed report `docs/backtests/2026-10-02-strategy-a.md`
+  (no grid run qualified, so these are the design values, written as an explicit literal).
+  `tests/test_strategy_a_frozen.py` fails if code and report disagree. Changing a value means
+  re-running the backtest and committing its report, and it resets the forward clock.
+- `features_at(history, data_date) -> list[Features]` (sorted by symbol) and
+  `picks_from_features(features, members, params) -> list[Pick]`; `StrategyA` implements
+  `Strategy` with `id = "A"`, `lookback = LOOKBACK`; `STRATEGY_A = StrategyA()`.
+
+| Rule | Strategy A |
+|---|---|
+| Timing | Picks for session S use bars through `data_date = prev_session(S)` only; `last_price` = that close. Every indicator is a function of the symbol's last 200 bars ending at `data_date`, Wilder recursions seeded inside that window, so the backtest and the nightly job compute bit-identical floats |
+| Eligible | member on `data_date` (point-in-time), a bar dated `data_date`, ≥ 200 bars through it |
+| Setup | `close > SMA200` and `RSI(2) < rsi_max` and 20-day mean `close × volume > min_dollar_volume`, all strict |
+| Prices | `last = to_decimal(close)`, `atr = to_decimal(ATR14)`, `limit = q(last − limit_atr·atr)`, `tp = q(limit + tp_atr·atr)`, `sl = q(limit − sl_atr·atr)` |
+| Dropped | after `q`: `last ≤ 0`, `limit ≤ 0`, `sl ≤ 0`, `sl ≥ limit` or `tp ≤ limit` (`Pick` would raise); dropped silently, never raised |
+| Ranking | `(rsi, symbol)` ascending; every qualifying candidate is returned. Held symbols are not filtered: `size_picks` rejects them as `held` without using a slot |
+
+**Float vs Decimal.** Indicators and the setup comparisons are float64; everything handed to the
+simulator is a 4-dp `Decimal`. `bars.close` is `numeric(12,4)` (at most 12 significant digits), so
+`to_decimal(float(close))` round-trips exactly through `repr`. A float could flip a strict
+threshold only within about 1e-12 of it (RSI exactly 10.0 is excluded by `<`), and because the
+window math is bit-identical, it flips the same way in the backtest and nightly.
+
+### backtest (P3)
+
+Every module except `io.py` is pure (same purity test as `strategies`). Nothing here writes to
+the database.
+
+- **`backtest.market`**: `Membership(intervals)` with `members_on(d) -> frozenset[str]` (both
+  indices unioned, `[start, end)`), evaluated in memory instead of one query per date.
+  `Market(history, membership, fx)`: `bar(symbol, d) -> Bar | None` builds a 4-dp `Decimal` `Bar`
+  on demand (only for symbols with a live order, and SPY), `bars_on(d, symbols)`,
+  `last_bar_date(symbol)`, `usd_idr_on(d)` (latest FX row dated `<= d`, `ValueError` when none),
+  `spy()`.
+- **`backtest.runner`**: `INITIAL_IDR = Decimal("20000000")`.
+  `run_backtest(market, strategy, params, start, end, *, prepared=None, initial_idr=INITIAL_IDR) -> RunResult`
+  is the "P3 backtest loop" below: each session `size_picks(picks(prev_session(S)))` → `step` →
+  `close_unpriced` for held symbols whose bars ended for good (`last_bar_date < S`; a halt whose
+  bars resume is left to the simulator's missing-bar rule). `RunResult` holds `snapshots`
+  (`[0] = Snapshot(prev_session(start), cash0, cash0)`, then one per session), `events`, `closed`,
+  `open_at_end` (marked at the last close, never liquidated) and rejection counts.
+  `survivorship(market, start, end) -> tuple[YearGap, ...]`: per year, the (member, session) pairs
+  with no bar, split into never-fetched symbols and other gaps.
+- **`backtest.benchmark`**: `parse_dividends(text)`, `buy_and_hold(spy, start, end, initial_cash, *, dividends=(), name)`
+  and `spy_curves(...) -> (price, total_return)`. Whole shares at the first session's open after
+  the 0.1% cost, idle remainder, marked at each close, never sold. Total-return reinvests a
+  dividend when `start < ex_date ≤ end`: cash `+= q(shares × amount)`, then whole shares at that
+  close with `buy_cost`.
+- **`backtest.metrics`**: `strategy_metrics(snaps, pnls) -> Metrics` and `checklist(m, spy_return)`,
+  identical to `web/lib/metrics.ts` (a loss is `pnl ≤ 0`; PF = gross win / gross loss, `inf` with
+  no loss; max drawdown on per-session equity; total return = last / first − 1;
+  months = days / 30.44). Adds CAGR, average `days_held` and the exit-reason breakdown.
+  `run_metrics(RunResult)`, `curve_metrics(BenchmarkCurve)`. `tests/test_backtest_metrics.py`
+  replays every case in `web/lib/metrics.test.ts`.
+- **`backtest.tuning`**: `IS_START = 2015-10-19` (the first session with 200 bars of history behind
+  its `data_date`), `OOS_START = 2022-01-03` (in-sample ends 2021-12-31). `grid()`: the 81 params
+  fixed before any result was seen — RSI `{5, 10, 15}` × limit `{0.25, 0.5, 0.75}` × TP
+  `{0.75, 1.0, 1.5}` × SL `{1.0, 1.5, 2.0}` ATR. `select(rows)`: highest in-sample total return
+  among runs with max DD ≤ 15% and PF ≥ 1.3; ties → lower max DD → earlier grid index;
+  `DESIGN_PARAMS` when none qualifies. `gate(oos, spy_tr_oos) -> Verdict`: passes only when, on
+  **out-of-sample**, total return > total-return SPY, PF ≥ 1.3 and max DD ≤ 15%.
+- **`backtest.report`**: `BacktestReport`, `render_markdown`, `equity_csv`, `equity_svg`,
+  `report_stem(data_end)`. Deterministic: the same inputs give byte-identical files. The Markdown
+  carries two machine-readable lines, `frozen-params:` (the code's `STRATEGY_A_PARAMS` at run
+  time) and `selected-params:` (the in-sample selection), which `test_strategy_a_frozen.py` reads
+  with `parse_params_line`.
+- **`backtest.io`** (impure): `load_market(conn, *, cache_dir=CACHE_DIR, refresh=False) -> (Market, bars_rows)`,
+  `read_dividends(path=DIVIDENDS_CSV)`, `write_report(out_dir, report) -> list[Path]`.
+
+**Windows.** In-sample 2015-10-19 → 2021-12-31 (tuning); out-of-sample 2022-01-03 → the last SPY
+bar (validation, run once); full 2015-10-19 → the last SPY bar (one continuous portfolio). Each
+window starts its own 20,000,000 IDR portfolio at the FX rate on or before its first session, and
+its own two SPY curves on the same session.
+
+**The report** (`docs/backtests/<data end>-strategy-a.md`): data inventory; the in-sample grid,
+all 81 rows; the selection and why; in-sample, out-of-sample and full-window results each against
+price-only and total-return SPY (total return, CAGR, win rate, PF, max DD, trades, average days
+held, exit reasons, go-live checklist); the survivorship note with per-year missing
+(member, session) counts; the gate verdict in one sentence. `-equity.csv` is wide (`date` + one
+column per curve) and `-equity.svg` is a hand-written chart, no plotting dependency.
+
+**Committed result** (2026-10-02 data): gate **FAILED**. Strategy A fails the P3 gate: out of sample it returned −15.0% against +71.9% for total-return SPY, with profit factor 0.92 and max drawdown 33.3%, so it fails on beating total-return SPY, profit factor ≥ 1.3 and max drawdown ≤ 15%; P4 must not start until Strategy A is reworked.
+See `docs/backtests/2026-10-02-strategy-a.md`.
+
+**Survivorship.** 115 index members in the full window have no bars at all (delisted or
+acquired; Yahoo no longer serves them), so the backtest cannot trade them (115 is the report's
+"Index members in the window with no bars at all"). A dip-buying strategy is exactly what those
+collapses would have hurt, so the result is biased in Strategy A's favour; the report counts the
+gap per year.
+
 ## Migration 002 (`db/migrations/002_engine.sql`)
 
 This migration is additive only. It is written by the engine, and web does not read these tables.
@@ -308,6 +489,7 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 ### External
 - `psycopg[binary]>=3.2`: the Postgres driver, used for COPY into temp tables in the upserts.
 - `pandas>=2.2`, `pandas_market_calendars>=5.0`: the NYSE schedule, including closes, half days and DST.
+- `numpy>=2`: indicator math and the float64 arrays in `strategies.base.History` (declared in P3; it was already installed through pandas).
 - `requests>=2.32`: HTTP, through one module-level `Session` in `http.py`.
 - `python-dotenv>=1.0`: parses `.env.local`. The file is parsed, never `source`d, because it contains an unquoted `&`.
 - `yfinance>=1.0`: used only by `yahoo.py` (phase 3 backfill), imported lazily inside `yf_download`.
@@ -320,6 +502,8 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 - `http` imports `__version__` for `USER_AGENT`.
 - `yahoo` imports `bars` and pandas. `commands.backfill` imports `bars`, `dates`, `db`, `demo`, `fx`, `universe` and `yahoo`.
 - `sim.model` imports `prices`. `sim.lifecycle` and `sim.split_adjust` import `dates`, `prices` and `sim.model`. `sim.sizing` imports `dates` and `sim.model`. Nothing in `sim` imports `bars`, `db` or `http`.
+- `strategies.*` import numpy, `prices`, `sim` (for `Pick` and `q`) and each other. `backtest.market`, `runner`, `benchmark`, `metrics`, `tuning` and `report` import numpy, `dates`, `prices`, `sim`, `strategies` and each other. None of them imports `bars`, `db`, `http` or `config`.
+- `backtest.io` imports `config`, psycopg, pandas, numpy and the pure backtest modules. `commands.backtest` imports `config`, `db`, `dates`, `prices`, `universe` (for `BENCHMARK`), `backtest.*` and `strategies.a`.
 
 ### Standard library
 `argparse`, `importlib`/`pkgutil` (command discovery), `logging`, `contextlib`, `dataclasses`, `decimal`, `functools.lru_cache`, `re`, `time`.
@@ -328,6 +512,7 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 
 - Within `engine/`, the phase 2 to 4 modules consume the API above exactly as written in the plan's "Shared interface contract": `membership.py` and `commands/universe.py` (phase 2), `yahoo.py` and `commands/backfill.py` (phase 3), and `massive.py`, `splits.py` and `commands/nightly.py` (phase 4).
 - Phase 5 will add `.github/workflows/{engine-ci,nightly,universe,backfill}.yml`, which invoke the CLI.
+- P4 (nightly) will call `strategies.a.STRATEGY_A.picks(...)` with `STRATEGY_A_PARAMS` and write `STRATEGY_A_PARAMS.as_dict()` to `strategies.params`. P6 adds strategies B and C beside `a.py`, implementing the same `Strategy` protocol.
 - Nothing in `web/` imports the engine. The two share only the database schema and `schema_migrations`.
 
 ## Concurrency
@@ -354,6 +539,12 @@ The temp tables `_seer_bars_in` and `_seer_fx_in` are scoped to a session (`ON C
 - The NYSE schedule is computed once per year and cached for the life of the process.
 - Network calls are the expensive part. `get_json` waits 5 s, then 10 s, then 20 s between retries by default. `fx.fetch_range` makes one request per year.
 - Simulator: `tests/test_sim_scenario.py::test_benchmark_2950_sessions_x_4_slots` runs 2,950 NYSE sessions (2015-01-02 onward) × 4 slots with `size_picks` + `step` every session on synthetic bars, using `Decimal` throughout. Measured: **0.20 s** on WSL2, Python 3.11 (bound in the test: 20 s). A 10-year backtest is therefore dominated by loading bars and computing signals, not by the simulator. Floats are not needed.
+- Backtest (P3), measured on the 2026-10-02 data (1,817,429 bar rows, 663 symbols), WSL2, Python 3.11:
+  - Load: about 25 s from Neon on a cache miss (one streamed `COPY`, timed from the run log), 0.7 s from the 90 MB pickle cache (including the fingerprint query).
+  - `STRATEGY_A.prepare` over all symbols and dates: 2.8 s, once per command.
+  - Grid: 81 in-sample runs in 37.7–39.0 s, about 0.5 s each.
+  - Whole command: 1:09 cold, 0:46–0:53 with the cache; peak RSS 420 MB.
+  - Bars live as float64 arrays; `Decimal` `Bar`s are built only for symbols with a live order and for SPY, so the simulator's share of the time stays small.
 - There is no benchmark coverage for the DB writers.
 
 ## Usage
@@ -397,6 +588,8 @@ def run(args):
 ### Simulator: P3 backtest loop
 
 History is already split-adjusted backwards, so the backtest never calls `apply_split`.
+
+`backtest.runner.run_backtest` implements this loop; the sketch below is the shape.
 
 ```python
 from decimal import Decimal
@@ -443,6 +636,36 @@ insert_orders(conn, strategy_id, sized.placed)                # status 'pending'
 
 `Event.order` maps 1:1 onto `orders` columns. Its row key is `(strategy_id, order.session_date, order.symbol)`. Everything runs inside one `db.transaction`, so a failed night leaves nothing half-written.
 
+### Strategy: P4 nightly picks
+
+```python
+from seer_engine import dates
+from seer_engine.sim import size_picks
+from seer_engine.strategies.a import STRATEGY_A, STRATEGY_A_PARAMS
+from seer_engine.strategies.base import history_from_bars
+
+rd = dates.run_dates()
+# At least STRATEGY_A.lookback (200) bars per symbol, ending at rd.data_date; more is fine.
+history = {s: history_from_bars(s, bars) for s, bars in last_bars_by_symbol(conn, rd.data_date).items()}
+members = universe.members_on(conn, rd.data_date)
+picks = STRATEGY_A.picks(history, members, rd.data_date, STRATEGY_A_PARAMS)  # ranked, deepest RSI first
+sized = size_picks(result.portfolio, picks, rd.session_date)                  # after settling data_date
+```
+
+These are the same functions and parameters the committed backtest ran, so a night's picks are the
+backtest's picks for that date given the same bars.
+
+### Backtest: run and read the report
+
+```
+cd <repo or worktree root>
+SEER_ENV_FILE=/home/miftah/seer/.env.local engine/.venv/bin/python -m seer_engine backtest
+```
+
+Then read `docs/backtests/<data end>-strategy-a.md`. If `STRATEGY_A_PARAMS` differs from the new
+report's `selected-params:` line, `test_strategy_a_frozen.py` fails until the constant is updated
+(with its comment) or the report is not committed.
+
 ### Gotchas
 - Do not use `with psycopg.connect(...) as conn`, because it commits on exit and defeats `--dry-run`. Use `contextlib.closing` instead.
 - Every write must be inside `db.transaction(conn, dry_run)`. The helpers never commit, so a write outside it is lost or left open.
@@ -458,3 +681,7 @@ Documentation created on 2026-10-03 for P1-ENG-VP1R (phase 1). Phases 2 to 4 (P1
 P1-ENG-L73U, P1-ENG-GF8Y) will add the `universe`, `backfill` and `nightly` commands, and this
 document should gain their sections when they land. The full design, invariants and
 reconciliation log are in `ENGINE_DATA_PIPELINE_PLAN.md`.
+
+The P3 sections (`strategies`, `backtest`, the `backtest` command and the committed report) were
+added on 2026-10-03; their design, invariants and decisions are in `STRATEGY_A_BACKTEST_PLAN.md`
+and `docs/handover/2026-10-03-strategy-a-backtest.md`.

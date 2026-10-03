@@ -1,6 +1,7 @@
-# Membership data sources
+# Vendored data sources
 
-Vendored inputs for `seer_engine.membership` / `python -m seer_engine universe refresh`.
+Vendored inputs for `seer_engine.membership` / `python -m seer_engine universe refresh`, and the
+SPY dividend history for the backtest benchmark (`seer_engine.backtest`).
 Owner of this directory: the engine. Read by nothing else.
 
 ## sp500_history.csv: S&P 500
@@ -82,3 +83,57 @@ curl -fsSL -o ndx_history.csv \
 Then update this file: commit, last row, sha256. Drop the overrides the new files now cover,
 then run `pytest tests/test_membership.py`, `python -m seer_engine universe check` and
 `python -m seer_engine universe refresh`.
+
+## spy_dividends.csv: SPY cash dividends (backtest benchmark)
+
+| | |
+|---|---|
+| Upstream | Yahoo Finance via yfinance `Ticker("SPY").dividends` (per-share cash distributions by ex-date) |
+| Fetched | 2026-10-03, yfinance 1.7.0 |
+| Range | ex-dates 2015-01-01 onward; 47 rows, 2015-03-20 .. 2026-09-18 |
+| License | Yahoo Finance data, personal/research use; not redistributed beyond this repo |
+| sha256 | `3251a8525bfcb6e1e3fe7b74db88326122826c808be5a6005eba767fbb5b598a` |
+
+`ex_date,amount_usd`, ascending, one row per ex-date. `amount_usd` is USD per share as yfinance
+reports it (shortest float repr, not rounded). SPY has had no split since 2015, so no adjustment
+applies. Read by `seer_engine.backtest.io.read_dividends` -> `benchmark.parse_dividends`, which
+rejects a bad header, a non-positive amount or a non-ascending date. Used only for the
+total-return SPY curve (`spy_tr`), which the P3 gate compares against; `bars` are not
+dividend-adjusted, so the price-only curve understates SPY by roughly 1.3-1.8 %/yr.
+`tests/test_benchmark.py::test_vendored_spy_dividends_parse_and_cover_2015_2026` checks 4 rows a
+year 2015-2025, every ex-date an NYSE session, every amount in (0.5, 3).
+
+Never edit rows by hand. To refresh (for a later backtest end date), re-run the fetch with the
+engine venv and update the table above:
+
+```sh
+engine/.venv/bin/python - engine/data/spy_dividends.csv <<'EOF'
+import sys
+from datetime import date
+from decimal import Decimal
+import yfinance as yf
+
+START = date(2015, 1, 1)
+out_path = sys.argv[1]
+s = yf.Ticker("SPY").dividends
+if s is None or len(s) == 0:
+    sys.exit("yfinance returned no SPY dividends; stop and report")
+rows = []
+for ts, amount in s.items():
+    d = ts.date()
+    if d < START:
+        continue
+    a = Decimal(repr(float(amount)))
+    if not a.is_finite() or a <= 0:
+        sys.exit(f"bad amount {amount!r} on {d}; stop and report")
+    rows.append((d, a))
+rows.sort()
+if any(b[0] <= a[0] for a, b in zip(rows, rows[1:])):
+    sys.exit("duplicate ex_date; stop and report")
+with open(out_path, "w", encoding="utf-8", newline="\n") as f:
+    f.write("ex_date,amount_usd\n")
+    for d, a in rows:
+        f.write(f"{d.isoformat()},{format(a, 'f')}\n")
+print(f"{len(rows)} rows {rows[0][0]} .. {rows[-1][0]}")
+EOF
+```

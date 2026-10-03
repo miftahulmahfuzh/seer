@@ -94,7 +94,21 @@ class AParams:
 
 
 DESIGN_PARAMS = AParams()
-STRATEGY_A_PARAMS: AParams = DESIGN_PARAMS  # phase 6 replaces this with the frozen selection
+# Frozen by P3 (Strategy A + 10-year backtest), run on Neon data through 2026-10-02.
+# Selected by the fixed 81-run grid on the IN-SAMPLE window 2015-10-19..2021-12-31 only:
+# highest in-sample total return among runs with max drawdown <= 15% and profit factor >= 1.3
+# (DESIGN_PARAMS when none qualifies). The out-of-sample window 2022-01-03..2026-10-02 was run once
+# with these values and never tuned on. Gate verdict: FAILED.
+# Report: docs/backtests/2026-10-02-strategy-a.md
+# tests/test_strategy_a_frozen.py fails if these drift from that report's frozen-params line.
+# Changing any value resets the forward clock: re-run `seer_engine backtest` and commit its report.
+STRATEGY_A_PARAMS: AParams = AParams(
+    rsi_max=10.0,
+    limit_atr=Decimal("0.5"),
+    tp_atr=Decimal("1.0"),
+    sl_atr=Decimal("1.5"),
+    min_dollar_volume=20_000_000.0,
+)
 
 
 @dataclass(frozen=True, slots=True)

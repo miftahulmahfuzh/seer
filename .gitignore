@@ -14,6 +14,9 @@ __pycache__/
 .venv/
 .pytest_cache/
 
+# backtest bars cache (seer_engine.backtest.io)
+engine/.cache/
+
 # misc
 .DS_Store
 *.log

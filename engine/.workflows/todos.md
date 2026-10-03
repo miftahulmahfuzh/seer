@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 06:29:28
-**Total Active Tasks**: 4
+**Last Updated**: 2026-10-04 06:35:00
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 2
-- Completed: 36
+- Blocked: 1
+- Completed: 37
 
 ---
 
@@ -39,21 +39,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
-- [ ] **P1-ENG-PLRV** Phase 10: Dev report and pre-registration renderers
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns new `backtest/dev_report.py` and `tests/test_backtest_dev_report.py` (32) using structural checks and byte-stability. Exit: suite green; two renders are byte-identical; rendered content contains no run date outside sibling-file names; `top_years` lists the finalists first (D-G).
-  - **Status**: open
-  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 10 of 13)
-  - **Satisfies**: R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R7 — The pre-registration file (≤ 3 finalists exactly specified, or "none eligible"), with the proposed §5 revision; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
-  - **Depends on**: P1-ENG-2E01
-  - **Plan**: `.workflows/plan/P1-ENG-PLRV.md`
-
 - [ ] **P1-ENG-ZWP9** Phase 12: `backtest_dev` command, io writer, runtime on the real store
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns new `commands/backtest_dev.py` running the registry through `dev.run_registry(on_result=...)` (D-D), additive `backtest/io.py` (`dev_report_files`, `write_dev_report`), new `tests/test_backtest_dev_command.py` (28) incl. the D-I tests (`research.DEV_END`, `MEMBERSHIP_START`, `FX_START` equal `dev`'s; `registry.SECTOR_ETFS == research.SECTOR_ETFS`; registry fixed symbols subset of `research.RESEARCH_ETFS`) on a synthetic store; also a timed `--only` smoke run on the real store with no docs written, adding a fixed-order process pool (D13; +2 tests) if the estimated whole run exceeds 60 min. Exit: suite green at 1694 (1696 with the pool); the command's dirty-registry refusal is tested.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 12 of 13)
   - **Satisfies**: R4 — The dev window is enforced in code (no session after 2015-10-16), and a test proves it; R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
   - **Depends on**: P1-ENG-CQ5M, P1-ENG-PLRV, P1-ENG-078U
@@ -80,6 +70,28 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-PLRV** Phase 10: Dev report and pre-registration renderers
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/dev_report.py` and `tests/test_backtest_dev_report.py` (32) using structural checks and byte-stability. Exit: suite green; two renders are byte-identical; rendered content contains no run date outside sibling-file names; `top_years` lists the finalists first (D-G).
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 10 of 13)
+  - **Satisfies**: R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R7 — The pre-registration file (≤ 3 finalists exactly specified, or "none eligible"), with the proposed §5 revision; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-2E01
+  - **Plan**: `.workflows/plan/P1-ENG-PLRV.md`
+  - **Completed**: 2026-10-04 06:35
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/backtest/dev_report.py, engine/tests/test_backtest_dev_report.py
+  - **Drift**:
+    - Phase 9's DevRow.__post_init__ already calls check_dev_session(end) and checks beats_spy agrees with failed; the plan's fixture predated that. Fixed in the test fixture only (per the plan's prototype note: fix the fixture, never the other phase): the 'after-dev-end' bad report now forces end past construction with object.__setattr__ so the renderer's own third D9 guard is what is exercised; beats_spy is derived as '"beats SPY TR" not in failed' so the all_fail fixture builds a consistent DevRow.
+    - Verification: test_backtest_dev_report.py 32 passed; test_strategy_purity green (glob covers dev_report.py); full suite 1666 passed, 0 skipped (1560 through phase 9 + 32 phase 10 + 74 phase 11); frozen-set git diff vs 2546a92 empty.
+  - **Decided**:
+    - Plan fixture vs landed DevRow validation -> adapt the test fixture, module unchanged (rung 3: the plan's Verification note that a contract mismatch is fixed in the fixture or this module, never the other phase)
+    - readme-updater -> skip; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope; same as phases 4 and 5)
+    - Completion bookkeeping waited for phase 11's concurrent commit (b2ec090) before editing todos.md and the index, so neither commit carries the other phase's edits (tie-break: narrower blast radius)
+    - Phase 12 (P1-ENG-ZWP9) unblocked: its deps 4, 10 and 11 are all complete (completion-handler)
+
+
 - [x] **P1-ENG-078U** Phase 11: The candidate registry (54 entries, append-only test)
   - **Difficulty**: NORMAL
   - **Type**: Feature

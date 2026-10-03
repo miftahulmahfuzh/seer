@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 04:54:58
-**Total Active Tasks**: 10
+**Last Updated**: 2026-10-04 06:15:44
+**Total Active Tasks**: 7
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 5
+- P1 High: 3
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 5
-- Completed: 30
+- Blocked: 4
+- Completed: 33
 
 ---
 
@@ -39,16 +39,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
-- [ ] **P1-ENG-CPHN** Phase 3: Book runner, `run_rules` dispatch, run stats, V0 parity
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns new `backtest/book_runner.py` and `tests/test_book_runner.py` (47). Does not touch `runner.py`, `metrics.py`, `benchmark.py` (imported read-only). Exit: suite green, and on seeded synthetic markets: `run_rules(..., DESIGN_V0) == run_backtest(...)` for A, A2 and B (fake predictor); `run_book(PICKS(A), V0_BOOK)` matches `run_backtest` snapshots, trades, fills and open positions exactly (seeds 39 and 4 plus the hand-checked FixedPicks scenario); the allocator never sees the idle position in `held` (D-J); `run_stats` hand-checked on small books.
-  - **Status**: open
-  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 3 of 13)
-  - **Satisfies**: R1 — `TradeRules`: `DESIGN_V0` reproduces §5, and A, A2 and B re-render byte-identically (synthetic test plus a real-data `cmp`). Each new lever has its own synthetic-bar tests; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
-  - **Depends on**: P1-ENG-OY9Z, P1-ENG-XORE
-  - **Plan**: `.workflows/plan/P1-ENG-CPHN.md`
-
 - [ ] **P1-ENG-76SL** Phase 6: Families F2/F3: ETF rotation
   - **Difficulty**: NORMAL
   - **Type**: Feature
@@ -59,31 +49,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Depends on**: P1-ENG-XORE
   - **Plan**: `.workflows/plan/P1-ENG-76SL.md`
 
-- [ ] **P1-ENG-SB1Q** Phase 7: Families F4/F5/F6: stock factors
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns new `strategies/f_factor.py` (vectorized, param-independent `prepare` like `prepare_a`) and `tests/test_f_factor.py` (78): hand-computed 12-1 momentum, vol and dollar-volume eligibility; mom_lowvol pool selection; inverse-vol weights summing to <= 1; trend filter; members only with SPY excluded; P4 identity with bit-identity between prepared and single-window features; no look-ahead (locally and through the kit). Exit: suite green.
-  - **Status**: open
-  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 7 of 13)
-  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
-  - **Depends on**: P1-ENG-XORE
-  - **Plan**: `.workflows/plan/P1-ENG-SB1Q.md`
-
-- [ ] **P1-ENG-5U7B** Phase 8: Family F7: longer-horizon mean reversion
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns new `strategies/f_swing.py` and `tests/test_f_swing.py` (87): setup and dip/close limits; stop and take from ATR; signal exits (SMA and RSI); self-capped slots with keep-first ordering; held symbols that left the index; market-trend gate for new entries only; P4 identity and no look-ahead (locally and through the kit). Exit: suite green.
-  - **Status**: open
-  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 8 of 13)
-  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
-  - **Depends on**: P1-ENG-XORE
-  - **Plan**: `.workflows/plan/P1-ENG-5U7B.md`
-
 - [ ] **P1-ENG-2E01** Phase 9: Dev runner: window guard, candidate windows, D8, deflated Sharpe
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns new `backtest/dev.py` and `tests/test_backtest_dev.py` (50): `DevWindowError` on any end, session, bar, FX row or dividend after 2015-10-16 from every public entry point; `candidate_window` across ETF launches and the membership start; a window starting before 1999-01-04 converting at the `FX_START` rate (D-C); D8 selection incl. one-per-family, ties and `mar is None` ranked last; deflated Sharpe vs hand-computed cases; `run_registry` order, determinism, one prepare per allocator id and the `on_result` callback. Exit: suite green.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 9 of 13)
   - **Satisfies**: R4 — The dev window is enforced in code (no session after 2015-10-16), and a test proves it; R5 — The candidate registry is committed before the dev run: ≤ 60 entries, append-only, each with a family, rules, fixed params, a rationale and an owner-verification flag; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
   - **Depends on**: P1-ENG-CPHN
@@ -140,6 +110,60 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-SB1Q** Phase 7: Families F4/F5/F6: stock factors
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/f_factor.py` (vectorized, param-independent `prepare` like `prepare_a`) and `tests/test_f_factor.py` (78): hand-computed 12-1 momentum, vol and dollar-volume eligibility; mom_lowvol pool selection; inverse-vol weights summing to <= 1; trend filter; members only with SPY excluded; P4 identity with bit-identity between prepared and single-window features; no look-ahead (locally and through the kit). Exit: suite green.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 7 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
+  - **Depends on**: P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-SB1Q.md`
+  - **Completed**: 2026-10-04 06:15
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/f_factor.py, engine/tests/test_f_factor.py
+  - **Drift**:
+    - none: plan code blocks applied verbatim
+  - **Decided**:
+    - full suite 1 failed / 1509 passed (8h31m, load avg ~41 from concurrent phase sessions sharing this worktree): test_backtest_b_command.py::test_wall_times_reach_logs_only asserts real wall times < 1000 s -> treated as a load-induced flake, not relaxed (frozen test file, outside phase scope); passes in isolation in 7 s (tie-break: never relax a check)
+    - ruff not installed in engine/.venv -> lint step skipped; pytest + purity glob are the plan's verification
+    - readme-updater -> skipped; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope; same as phases 4 and 5)
+    - Phase 11 (P1-ENG-078U) left blocked: its deps 6 and 9 are not complete
+
+
+- [x] **P1-ENG-5U7B** Phase 8: Family F7: longer-horizon mean reversion
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/f_swing.py` and `tests/test_f_swing.py` (87): setup and dip/close limits; stop and take from ATR; signal exits (SMA and RSI); self-capped slots with keep-first ordering; held symbols that left the index; market-trend gate for new entries only; P4 identity and no look-ahead (locally and through the kit). Exit: suite green.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 8 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
+  - **Depends on**: P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-5U7B.md`
+  - **Completed**: 2026-10-04 06:15
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/f_swing.py, engine/tests/test_f_swing.py
+  - **Decided**:
+    - Full suite: 1 failed / 1509 passed / 0 skipped in 8h29m under load avg ~40 (several phase sessions sharing the machine); the failure was test_backtest_b_command.py::test_wall_times_reach_logs_only (wall-time < 1000s assertion), unrelated to F7; re-run alone: 23/23 passed in 19.5s -> treated as load-induced, not a phase-8 regression (no check relaxed)
+    - No task unblocked: phase 11 (P1-ENG-078U) still waits on phases 4-7 and 9 (index phase table Depends on)
+    - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 13 per the plan index (index scope)
+
+- [x] **P1-ENG-CPHN** Phase 3: Book runner, `run_rules` dispatch, run stats, V0 parity
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/book_runner.py` and `tests/test_book_runner.py` (47). Does not touch `runner.py`, `metrics.py`, `benchmark.py` (imported read-only). Exit: suite green, and on seeded synthetic markets: `run_rules(..., DESIGN_V0) == run_backtest(...)` for A, A2 and B (fake predictor); `run_book(PICKS(A), V0_BOOK)` matches `run_backtest` snapshots, trades, fills and open positions exactly (seeds 39 and 4 plus the hand-checked FixedPicks scenario); the allocator never sees the idle position in `held` (D-J); `run_stats` hand-checked on small books.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 3 of 13)
+  - **Satisfies**: R1 — `TradeRules`: `DESIGN_V0` reproduces §5, and A, A2 and B re-render byte-identically (synthetic test plus a real-data `cmp`). Each new lever has its own synthetic-bar tests; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-OY9Z, P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-CPHN.md`
+  - **Completed**: 2026-10-04 06:15
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/book_runner.py, engine/tests/test_book_runner.py
+  - **Decided**:
+    - full-suite failure test_backtest_b_command.py::test_wall_times_reach_logs_only -> treated as a load flake, not a phase-3 defect (the full run took 8h30m at load avg ~61 with 4 concurrent suites, so a real step exceeded the test's 1000 s wall-time bound; rerun alone: 23/23 passed in 16 s; phase 3 touches no file that test imports)
+    - Unblocked phase 9 (P1-ENG-2E01) -> open; its only dependency is phase 3 (index phase table Depends on)
+
 - [x] **P1-ENG-ZNTC** Phase 5: Families F1/F10/F11: index timing and calendar
   - **Difficulty**: NORMAL
   - **Type**: Feature

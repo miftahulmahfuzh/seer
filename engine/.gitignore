@@ -1,0 +1,4 @@
+# setuptools build output from `pip install -e engine`
+*.egg-info/
+build/
+dist/

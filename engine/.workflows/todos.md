@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 19:33:00
-**Total Active Tasks**: 1
+**Last Updated**: 2026-10-03 21:03:08
+**Total Active Tasks**: 13
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 3
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 0
-- Completed: 26
+- Blocked: 10
+- Completed: 27
 
 ---
 
@@ -39,6 +39,126 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
+- [ ] **P1-ENG-XORE** Phase 2: Allocator protocol, adapters, overlays, `return_window`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/allocator.py` (`Allocator`, `target_from_close`, `month_end_closes`, `last_close`, `scale_weight`, `vol_scale`, `LazyPrepared`, `PicksAllocator`, `BlendAllocator`, `VolTargetAllocator`), additive `return_window` in `strategies/indicators.py`, new `tests/test_allocator.py` (55) and the reusable P4-identity/no-look-ahead kit `tests/allocatorkit.py` (contract API, D-E) that phases 5-8 import. Does not touch existing indicator functions, `base.py`, `a.py`, `a2.py`, `b.py`, `strategies/__init__.py`. Exit: suite green; purity glob covers `allocator.py`; P4 identity of `PicksAllocator`/`BlendAllocator`/`VolTargetAllocator` tested with fake inner allocators; the kit rejects a look-ahead fake, a broken prepared path and a too-short lookback.
+  - **Status**: open
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 2 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-OY9Z
+  - **Plan**: `.workflows/plan/P1-ENG-XORE.md`
+
+- [ ] **P1-ENG-CPHN** Phase 3: Book runner, `run_rules` dispatch, run stats, V0 parity
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/book_runner.py` and `tests/test_book_runner.py` (47). Does not touch `runner.py`, `metrics.py`, `benchmark.py` (imported read-only). Exit: suite green, and on seeded synthetic markets: `run_rules(..., DESIGN_V0) == run_backtest(...)` for A, A2 and B (fake predictor); `run_book(PICKS(A), V0_BOOK)` matches `run_backtest` snapshots, trades, fills and open positions exactly (seeds 39 and 4 plus the hand-checked FixedPicks scenario); the allocator never sees the idle position in `held` (D-J); `run_stats` hand-checked on small books.
+  - **Status**: blocked
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 3 of 13)
+  - **Satisfies**: R1 — `TradeRules`: `DESIGN_V0` reproduces §5, and A, A2 and B re-render byte-identically (synthetic test plus a real-data `cmp`). Each new lever has its own synthetic-bar tests; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-OY9Z, P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-CPHN.md`
+
+- [ ] **P1-ENG-CQ5M** Phase 4: Research store: build, load, verify, command, real build
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `seer_engine/research.py`, new `commands/research_store.py`, additive dividends-aware download/parse in `yahoo.py`, `.gitignore` entries (`engine/.research/`, `.research.tmp/`, `.research.old/`), new `tests/test_research_store.py` (34, fake downloader + fake FX fetcher); also does the real build into the worktree's `engine/.research/` (30-60 min background), logging counts and fingerprint, verifying SPY has a bar on every NYSE session 1993-02-01..`DEV_END`, yfinance SPY dividends equal `engine/data/spy_dividends.csv` on 2015-03-20..2015-10-16, and AAPL 2012 split-adjusted dividend consistency. Does not touch `membership.py`, `fx.py`, `backfill.py`, Neon (constant equality with `backtest.dev` tested in phase 12, D-I). Exit: suite green; re-running `build_store` on the same fake downloads gives byte-identical files and the same fingerprint; `load_store` rejects a tampered file and a row after `DEV_END`; `research_store --verify` exits 0 on the real store.
+  - **Status**: in_progress
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 4 of 13)
+  - **Satisfies**: R2 — A research store command: pre-2015 member bars, the L9 ETFs, dividends from the start, unserved members per year, no Neon writes, deterministic, with a fingerprint; R4 — The dev window is enforced in code (no session after 2015-10-16), and a test proves it
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-CQ5M.md`
+
+- [ ] **P1-ENG-ZNTC** Phase 5: Families F1/F10/F11: index timing and calendar
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/f_index.py` and `tests/test_f_index.py` (109): hand-checked signals (SMA, month-end SMA, absolute momentum, always, turn-of-month calendar around month ends and holidays), P4 identity and no look-ahead, locally and through the phase-2 kit (D-E). Exit: suite green; purity glob covers the module.
+  - **Status**: blocked
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 5 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
+  - **Depends on**: P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-ZNTC.md`
+
+- [ ] **P1-ENG-76SL** Phase 6: Families F2/F3: ETF rotation
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/f_rotation.py` and `tests/test_f_rotation.py` (39): momentum ranking with ties, absolute filter, fallback, trend filter, missing or short ETFs, P4 identity and no look-ahead (locally and through the kit). Exit: suite green.
+  - **Status**: blocked
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 6 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
+  - **Depends on**: P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-76SL.md`
+
+- [ ] **P1-ENG-SB1Q** Phase 7: Families F4/F5/F6: stock factors
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/f_factor.py` (vectorized, param-independent `prepare` like `prepare_a`) and `tests/test_f_factor.py` (78): hand-computed 12-1 momentum, vol and dollar-volume eligibility; mom_lowvol pool selection; inverse-vol weights summing to <= 1; trend filter; members only with SPY excluded; P4 identity with bit-identity between prepared and single-window features; no look-ahead (locally and through the kit). Exit: suite green.
+  - **Status**: blocked
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 7 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
+  - **Depends on**: P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-SB1Q.md`
+
+- [ ] **P1-ENG-5U7B** Phase 8: Family F7: longer-horizon mean reversion
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/f_swing.py` and `tests/test_f_swing.py` (87): setup and dip/close limits; stop and take from ATR; signal exits (SMA and RSI); self-capped slots with keep-first ordering; held symbols that left the index; market-trend gate for new entries only; P4 identity and no look-ahead (locally and through the kit). Exit: suite green.
+  - **Status**: blocked
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 8 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
+  - **Depends on**: P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-5U7B.md`
+
+- [ ] **P1-ENG-2E01** Phase 9: Dev runner: window guard, candidate windows, D8, deflated Sharpe
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/dev.py` and `tests/test_backtest_dev.py` (50): `DevWindowError` on any end, session, bar, FX row or dividend after 2015-10-16 from every public entry point; `candidate_window` across ETF launches and the membership start; a window starting before 1999-01-04 converting at the `FX_START` rate (D-C); D8 selection incl. one-per-family, ties and `mar is None` ranked last; deflated Sharpe vs hand-computed cases; `run_registry` order, determinism, one prepare per allocator id and the `on_result` callback. Exit: suite green.
+  - **Status**: blocked
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 9 of 13)
+  - **Satisfies**: R4 — The dev window is enforced in code (no session after 2015-10-16), and a test proves it; R5 — The candidate registry is committed before the dev run: ≤ 60 entries, append-only, each with a family, rules, fixed params, a rationale and an owner-verification flag; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-CPHN
+  - **Plan**: `.workflows/plan/P1-ENG-2E01.md`
+
+- [ ] **P1-ENG-PLRV** Phase 10: Dev report and pre-registration renderers
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/dev_report.py` and `tests/test_backtest_dev_report.py` (32) using structural checks and byte-stability. Exit: suite green; two renders are byte-identical; rendered content contains no run date outside sibling-file names; `top_years` lists the finalists first (D-G).
+  - **Status**: blocked
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 10 of 13)
+  - **Satisfies**: R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R7 — The pre-registration file (≤ 3 finalists exactly specified, or "none eligible"), with the proposed §5 revision; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-2E01
+  - **Plan**: `.workflows/plan/P1-ENG-PLRV.md`
+
+- [ ] **P1-ENG-078U** Phase 11: The candidate registry (54 entries, append-only test)
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/registry.py` and `tests/test_registry.py` (74): ids unique and the first 54 are the index table in order (row 54 under `SWING_T20`); <= 60 entries; (id, digest) pins append-only; declared owner inputs equal `candidate_owner_inputs`; every rules preset valid for its allocator; every candidate runs one short smoke window on a synthetic market (every fixed symbol, BIL and the leveraged ETFs) through `run_candidate`. Exit: suite green and the registry committed before any real dev run (agreement with `research` is phase 12's test).
+  - **Status**: blocked
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 11 of 13)
+  - **Satisfies**: R5 — The candidate registry is committed before the dev run: ≤ 60 entries, append-only, each with a family, rules, fixed params, a rationale and an owner-verification flag
+  - **Depends on**: P1-ENG-ZNTC, P1-ENG-76SL, P1-ENG-SB1Q, P1-ENG-5U7B, P1-ENG-2E01
+  - **Plan**: `.workflows/plan/P1-ENG-078U.md`
+
+- [ ] **P1-ENG-ZWP9** Phase 12: `backtest_dev` command, io writer, runtime on the real store
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `commands/backtest_dev.py` running the registry through `dev.run_registry(on_result=...)` (D-D), additive `backtest/io.py` (`dev_report_files`, `write_dev_report`), new `tests/test_backtest_dev_command.py` (28) incl. the D-I tests (`research.DEV_END`, `MEMBERSHIP_START`, `FX_START` equal `dev`'s; `registry.SECTOR_ETFS == research.SECTOR_ETFS`; registry fixed symbols subset of `research.RESEARCH_ETFS`) on a synthetic store; also a timed `--only` smoke run on the real store with no docs written, adding a fixed-order process pool (D13; +2 tests) if the estimated whole run exceeds 60 min. Exit: suite green at 1694 (1696 with the pool); the command's dirty-registry refusal is tested.
+  - **Status**: blocked
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 12 of 13)
+  - **Satisfies**: R4 — The dev window is enforced in code (no session after 2015-10-16), and a test proves it; R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-CQ5M, P1-ENG-PLRV, P1-ENG-078U
+  - **Plan**: `.workflows/plan/P1-ENG-ZWP9.md`
+
+- [ ] **P1-ENG-904W** Phase 13: The real dev run, report, pre-registration, V0 `cmp`, docs
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns the committed report set and pre-registration file, an identical re-run (`cmp`), the real-data `cmp` of `docs/backtests/2026-10-02-*` (per Decisions), `engine/package_readme.md`, `docs/ROADMAP.md` (P7a entry with the result, and the P7b entry), and one appended Decisions row in the index (the R1 outcome). Never stops to ask (D-H): a missing store is rebuilt, a differing fingerprint is recorded and the run proceeds, a defect fixable only in `registry.py` or a frozen file ends the phase with the run uncommitted and a note in the phase log and completion summary. Exit: every handover §7 item checked off in the phase log; suite green with 0 skipped (1694 plus only Bug-protocol tests); CI green.
+  - **Status**: blocked
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 13 of 13)
+  - **Satisfies**: R1 — `TradeRules`: `DESIGN_V0` reproduces §5, and A, A2 and B re-render byte-identically (synthetic test plus a real-data `cmp`). Each new lever has its own synthetic-bar tests; R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R7 — The pre-registration file (≤ 3 finalists exactly specified, or "none eligible"), with the proposed §5 revision; R9 — Docs (package readme, ROADMAP P7a and P7b). The suite is green with 0 skipped, and CI is green
+  - **Depends on**: P1-ENG-ZWP9
+  - **Plan**: `.workflows/plan/P1-ENG-904W.md`
+
 ### [P2] Medium
 
 ### [P3] Low
@@ -50,6 +170,24 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-OY9Z** Phase 1: `TradeRules` + the book engine
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `sim/rules.py` and `sim/book.py` (exactly as contracted), additive exports in `sim/__init__.py`, new `tests/test_sim_rules.py` (35) and `tests/test_sim_book.py` (56) with at least one synthetic-bar test per lever: signal exit at next open incl. missing bar (`exit_pending`); rebalance trims/adds under `RESIZE_BAND`; dividends on ex-date; fractional shares; `open`/`open_limit` entries (gap above band unfilled); `limit` entry and its D-B fallback; `max_positions` != 4 and sum weight > 1 only under a slot cap (D-A); time stop 10/20/None; vol-scaled weights; idle T-bill target; cash guard; `close_book_unpriced`; episode P&L reconciling with cash exactly; session-by-session replay of `size_picks` + `step` under `V0_BOOK`. Does not touch `sim/model.py`, `lifecycle.py`, `sizing.py`, `split_adjust.py` or anything outside `sim/`. Exit: suite green, 0 skipped (+91); `test_sim_purity.py` covers both new modules; `DESIGN_V0` agrees with the `model` constants (tested); V0 replay passes for 3 seeds.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 1 of 13)
+  - **Satisfies**: R1 — `TradeRules`: `DESIGN_V0` reproduces §5, and A, A2 and B re-render byte-identically (synthetic test plus a real-data `cmp`). Each new lever has its own synthetic-bar tests; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-OY9Z.md`
+  - **Completed**: 2026-10-03 21:03
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/sim/rules.py, engine/src/seer_engine/sim/book.py, engine/src/seer_engine/sim/__init__.py, engine/tests/test_sim_rules.py, engine/tests/test_sim_book.py
+  - **Decided**:
+    - Step 3 task creation in a concurrent swarm -> phase 1 session created all 13 tasks (P1-ENG-OY9Z..904W) (convention from strategy-b-ranker set; avoid peers racing on todos.md)
+    - Phase 4 task (P1-ENG-CQ5M) status -> in_progress, not blocked (it has no dependencies and its session is running) (rung 4: index phase table Depends on '—')
+    - readme-updater -> skip for this phase; engine/package_readme.md is owned by phase 13 (rung 4: index Scope / phase 13 Owns; phase 1 Handoffs: 'this phase writes no docs')
+
+
 - [x] **P1-ENG-M99E** Phase 7: Real run on Neon, A2 byte-identity check, freeze or stop, docs
   - **Difficulty**: NORMAL
   - **Type**: Feature

@@ -6,21 +6,21 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "4b3e4c4",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "292 passed, 0 skipped",
       "package": "seer_engine`, `seer_engine.sim",
       "plan": ".workflows/plan/engine-fill-simulator/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T07:25:12+00:00",
       "satisfies": [
         "R1",
         "R3",
         "R4"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-DQFG",
       "title": "Pure price types, sim model and session lifecycle"
     },
     {
@@ -38,7 +38,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Whole-share sizing of picks into slots"
     },
@@ -57,7 +57,7 @@
       "satisfies": [
         "R5"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Split recompute for live orders"
     },
@@ -85,6 +85,7 @@
   "plan": "/home/miftah/.worktrees/seer/engine-fill-simulator/.workflows/orchestration/engine-fill-simulator/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "engine-fill-simulator",
-  "updated": "2026-10-03T07:21:14+00:00",
+  "updated": "2026-10-03T07:25:16+00:00",
+  "verified_at": "2026-10-03T07:25:02+00:00",
   "worktree": "/home/miftah/.worktrees/seer/engine-fill-simulator"
 }

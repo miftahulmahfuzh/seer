@@ -2,8 +2,8 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 14:26:00
-**Total Active Tasks**: 2
+**Last Updated**: 2026-10-03 14:27:00
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
@@ -13,8 +13,8 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 6
+- Blocked: 0
+- Completed: 7
 
 ---
 
@@ -24,15 +24,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ### [P1] High
 
-- [ ] **P1-ENG-2PWS** Phase 2: Whole-share sizing of picks into slots
+- [ ] **P1-ENG-SEZ7** Phase 4: Public API, scenario, determinism, benchmark, docs
   - **Difficulty**: NORMAL
   - **Type**: Feature
-  - **Context**: Owns `engine/src/seer_engine/sim/sizing.py` (new), `engine/tests/test_sim_sizing.py` (new). Exit: tests for whole-share sizing, equity ÷ 4 from the last snapshot, the cash cap with earlier placements that night, `lt_one_share`, `held` (no adding, including a symbol already pending and a duplicate pick), `no_slot`, 0 picks, the lowest free slot first in pick order, slot reuse after an exit or expiry on the same session (driven through `step`), and validation errors. Suite green.
+  - **Context**: Owns `engine/src/seer_engine/sim/__init__.py` (add the sizing and split exports), `engine/tests/test_sim_scenario.py` (new), `engine/package_readme.md` (`sim` + `prices` sections, layout, performance, P3/P4 usage loop), `docs/ROADMAP.md` (P2 status line). Exit: a ≥10-session, 4-slot, mixed-outcome scenario with hand-checked final cash, every snapshot's equity, and every closed trade's `pnl_usd` (12 sessions; final cash 985.0996, final equity 1340.5996, Σ pnl 84.6604). Running the scenario twice gives identical outputs. A benchmark of 2,950 sessions × 4 slots finishes under a generous bound, and the measured time is written in the readme. The readme documents the API for P3 and P4. Suite green with 0 skipped.
   - **Status**: open
-  - **Plan Set**: `ENGINE_FILL_SIMULATOR_PLAN.md` (phase 2 of 4)
-  - **Satisfies**: R2 — Whole-share sizing, 4 slots, equity ÷ 4 recomputed daily, cash cap, ineligible < 1 share, no adding, 0 picks valid
-  - **Depends on**: P1-ENG-DQFG
-  - **Plan**: `.workflows/plan/P1-ENG-2PWS.md`
+  - **Plan Set**: `ENGINE_FILL_SIMULATOR_PLAN.md` (phase 4 of 4)
+  - **Satisfies**: R4 — Small pure deterministic API for P3/P4, import-purity test, ≥10-session hand-checked scenario, documented in `engine/package_readme.md`
+  - **Depends on**: P1-ENG-2PWS, P1-ENG-56QL (both done 2026-10-03)
+  - **Plan**: `.workflows/plan/P1-ENG-SEZ7.md`
 
 ### [P2] Medium
 
@@ -42,19 +42,22 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ### 🚫 Blocked
 
-- [ ] **P1-ENG-SEZ7** Phase 4: Public API, scenario, determinism, benchmark, docs
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `engine/src/seer_engine/sim/__init__.py` (add the sizing and split exports), `engine/tests/test_sim_scenario.py` (new), `engine/package_readme.md` (`sim` + `prices` sections, layout, performance, P3/P4 usage loop), `docs/ROADMAP.md` (P2 status line). Exit: a ≥10-session, 4-slot, mixed-outcome scenario with hand-checked final cash, every snapshot's equity, and every closed trade's `pnl_usd` (12 sessions; final cash 985.0996, final equity 1340.5996, Σ pnl 84.6604). Running the scenario twice gives identical outputs. A benchmark of 2,950 sessions × 4 slots finishes under a generous bound, and the measured time is written in the readme. The readme documents the API for P3 and P4. Suite green with 0 skipped.
-  - **Status**: blocked
-  - **Plan Set**: `ENGINE_FILL_SIMULATOR_PLAN.md` (phase 4 of 4)
-  - **Satisfies**: R4 — Small pure deterministic API for P3/P4, import-purity test, ≥10-session hand-checked scenario, documented in `engine/package_readme.md`
-  - **Depends on**: P1-ENG-2PWS, P1-ENG-56QL (done 2026-10-03; now waits only on P1-ENG-2PWS)
-  - **Plan**: `.workflows/plan/P1-ENG-SEZ7.md`
-
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-2PWS** Phase 2: Whole-share sizing of picks into slots
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/sim/sizing.py` (new), `engine/tests/test_sim_sizing.py` (new). Exit: tests for whole-share sizing, equity ÷ 4 from the last snapshot, the cash cap with earlier placements that night, `lt_one_share`, `held` (no adding, including a symbol already pending and a duplicate pick), `no_slot`, 0 picks, the lowest free slot first in pick order, slot reuse after an exit or expiry on the same session (driven through `step`), and validation errors. Suite green.
+  - **Status**: completed
+  - **Plan Set**: `ENGINE_FILL_SIMULATOR_PLAN.md` (phase 2 of 4)
+  - **Satisfies**: R2 — Whole-share sizing, 4 slots, equity ÷ 4 recomputed daily, cash cap, ineligible < 1 share, no adding, 0 picks valid
+  - **Depends on**: P1-ENG-DQFG
+  - **Plan**: `.workflows/plan/P1-ENG-2PWS.md`
+  - **Completed**: 2026-10-03 14:27
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/sim/sizing.py, engine/tests/test_sim_sizing.py
+
 - [x] **P1-ENG-56QL** Phase 3: Split recompute for live orders
   - **Difficulty**: NORMAL
   - **Type**: Feature

@@ -26,65 +26,65 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "4ea9360",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "216 tests green; refresh 1544 rows, idempotent; check vs live Wikipedia exit 0; first commit 9c22915 swept p4 staged files via shared index, split by p2",
       "package": "engine/",
       "plan": ".workflows/plan/engine-data-pipeline/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T05:57:50+00:00",
       "satisfies": [
         "R2",
         "R4",
         "R6"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-853Z",
       "title": "Point-in-time universe membership"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "eee9263",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "backfill + yahoo.py; 32/32 test_backfill, 216 full suite; live yfinance 1.7.0 shape matches plan; docs fd26362, 9e0019d; not pushed; no decisions",
       "package": "engine/",
       "plan": ".workflows/plan/engine-data-pipeline/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T05:59:46+00:00",
       "satisfies": [
         "R1",
         "R4",
         "R6"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-L73U",
       "title": "yfinance + FX history backfill"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "b7c484e",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "54 new tests, full suite 216 green 0 skipped; skipped readme-updater/pusher per coordinator no-push note",
       "package": "engine/",
       "plan": ".workflows/plan/engine-data-pipeline/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T05:58:23+00:00",
       "satisfies": [
         "R3",
         "R4",
         "R6"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-GF8Y",
       "title": "Nightly command: Massive bars, splits, FX, runs"
     },
     {
@@ -106,7 +106,7 @@
         "R3",
         "R5"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Workflows, seed guard, runbook, live run on Neon"
     }
@@ -114,7 +114,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/engine-data-pipeline/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "engine-data-pipeline",
-  "updated": "2026-10-03T05:54:55+00:00",
-  "verified_at": "2026-10-03T05:54:29+00:00",
+  "updated": "2026-10-03T06:00:19+00:00",
+  "verified_at": "2026-10-03T05:57:40+00:00",
   "worktree": "/home/miftah/.worktrees/seer/engine-data-pipeline"
 }

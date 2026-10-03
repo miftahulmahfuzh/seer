@@ -3,6 +3,12 @@
   "coordinator": "orch-strategy-a-backtest",
   "coordinator_session_id": "7e18a970-15be-4e17-be15-907eea316bfa",
   "created": "2026-10-03T08:21:01+00:00",
+  "landed": {
+    "at": "2026-10-03T08:56:58+00:00",
+    "base": "main",
+    "commit": "2e6994f1b24240d663523e4c7a4ee35b4ff73404",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -102,30 +108,30 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "a573a40",
       "depends_on": [
         5
       ],
       "difficulty": "NORMAL",
       "n": 6,
-      "note": null,
+      "note": "Gate FAILED (OOS \u221215.0% vs SPY TR +71.9%, PF 0.92, DD 33.3%); 0/81 qualified \u2192 design params frozen; Rule 3 no-push overridden per coordinator",
       "package": "seer_engine.strategies`, docs",
       "plan": ".workflows/plan/strategy-a-backtest/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T08:55:42+00:00",
       "satisfies": [
         "R4",
         "R5",
         "R6"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-KG5T",
       "title": "Real 10-year run, freeze params, committed report, docs"
     }
   ],
   "plan": "/home/miftah/.worktrees/seer/strategy-a-backtest/.workflows/orchestration/strategy-a-backtest/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-a-backtest",
-  "updated": "2026-10-03T08:41:57+00:00",
+  "updated": "2026-10-03T08:56:58+00:00",
   "verified_at": "2026-10-03T08:35:28+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-a-backtest"
 }

@@ -1,0 +1,157 @@
+{
+  "branch": "feature/strategy-b-ranker",
+  "coordinator": "orch-strategy-b-ranker",
+  "coordinator_session_id": "aa26a177-2f72-4727-a075-fa6b15b0ccaf",
+  "created": "2026-10-03T11:43:04+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 1,
+      "note": null,
+      "package": "strategies",
+      "plan": ".workflows/plan/strategy-b-ranker/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R5",
+        "R6",
+        "R9"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "B model interface + scikit-learn dependency"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "strategies",
+      "plan": ".workflows/plan/strategy-b-ranker/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R3",
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "B features, ranks, candidates, `StrategyB"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 3,
+      "note": null,
+      "package": "backtest",
+      "plan": ".workflows/plan/strategy-b-ranker/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Vectorized bracket labeler"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2,
+        3
+      ],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": null,
+      "package": "backtest",
+      "plan": ".workflows/plan/strategy-b-ranker/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R3",
+        "R4",
+        "R5",
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "B walk-forward: candidate table, purge, per-fold fits, runs, diagnostics, gate"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        4
+      ],
+      "difficulty": "HARD",
+      "n": 5,
+      "note": null,
+      "package": "backtest",
+      "plan": ".workflows/plan/strategy-b-ranker/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R5",
+        "R6",
+        "R7"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "B report rendering"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        5
+      ],
+      "difficulty": "NORMAL",
+      "n": 6,
+      "note": null,
+      "package": "commands`, `backtest",
+      "plan": ".workflows/plan/strategy-b-ranker/phase-6.md",
+      "reported_at": null,
+      "satisfies": [
+        "R5",
+        "R7"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "backtest_b` command + io writers"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        6
+      ],
+      "difficulty": "NORMAL",
+      "n": 7,
+      "note": null,
+      "package": "docs`, `strategies`, `tests",
+      "plan": ".workflows/plan/strategy-b-ranker/phase-7.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4",
+        "R7",
+        "R8",
+        "R9"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Real run on Neon, A2 byte-identity check, freeze or stop, docs"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/strategy-b-ranker/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "strategy-b-ranker",
+  "updated": "2026-10-03T11:43:13+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/strategy-b-ranker"
+}

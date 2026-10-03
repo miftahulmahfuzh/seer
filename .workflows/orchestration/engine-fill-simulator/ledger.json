@@ -3,6 +3,12 @@
   "coordinator": "orch-engine-fill-simulator",
   "coordinator_session_id": "9e178c63-2566-4dc2-bedf-41b4676121ca",
   "created": "2026-10-03T07:20:44+00:00",
+  "landed": {
+    "at": "2026-10-03T07:33:28+00:00",
+    "base": "main",
+    "commit": "28638616081aac9320bde42766a216a249cf8b45",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -63,29 +69,29 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "2897398",
       "depends_on": [
         2,
         3
       ],
       "difficulty": "NORMAL",
       "n": 4,
-      "note": null,
+      "note": "374 passed, 0 skipped; bench 2950x4 0.20s",
       "package": "seer_engine.sim`, docs",
       "plan": ".workflows/plan/engine-fill-simulator/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T07:32:33+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-SEZ7",
       "title": "Public API, scenario, determinism, benchmark, docs"
     }
   ],
   "plan": "/home/miftah/.worktrees/seer/engine-fill-simulator/.workflows/orchestration/engine-fill-simulator/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "engine-fill-simulator",
-  "updated": "2026-10-03T07:28:46+00:00",
+  "updated": "2026-10-03T07:33:28+00:00",
   "verified_at": "2026-10-03T07:28:15+00:00",
   "worktree": "/home/miftah/.worktrees/seer/engine-fill-simulator"
 }

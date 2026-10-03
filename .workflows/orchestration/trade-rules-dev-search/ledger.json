@@ -6,20 +6,20 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "ef4bdde",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "sim/rules.py + sim/book.py landed per plan; 1095 passed (incl phase 4's uncommitted +34); created all 13 tasks; phase 4 task set in_progress",
       "package": "sim",
       "plan": ".workflows/plan/trade-rules-dev-search/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T14:04:22+00:00",
       "satisfies": [
         "R1",
         "R8"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-OY9Z",
       "title": "TradeRules` + the book engine"
     },
     {
@@ -38,7 +38,7 @@
         "R3",
         "R8"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Allocator protocol, adapters, overlays, `return_window"
     },
@@ -69,16 +69,16 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "live in @50; real store build in background (verify had no git evidence yet)",
       "package": "root, `commands",
       "plan": ".workflows/plan/trade-rules-dev-search/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T14:04:41+00:00",
       "satisfies": [
         "R2",
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "running",
+      "task_id": "P1-ENG-CQ5M",
       "title": "Research store: build, load, verify, command, real build"
     },
     {
@@ -271,6 +271,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/trade-rules-dev-search/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trade-rules-dev-search",
-  "updated": "2026-10-03T13:53:38+00:00",
+  "updated": "2026-10-03T14:04:46+00:00",
+  "verified_at": "2026-10-03T14:04:32+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trade-rules-dev-search"
 }

@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 19:30:00
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-03 19:05:00
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 24
+- Blocked: 0
+- Completed: 25
 
 ---
 
@@ -38,20 +38,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Decided**:
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
-- [ ] **P1-ENG-UREW** Phase 6: `backtest_b` command + io writers
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns additive `backtest/io.py` (`MODELS_DIR`, `write_b_report`, `write_model_artifact`; the only phase editing `io.py`), new `commands/backtest_b.py` incl. public `recompute_a2(market, folds)` with eager imports (every CLI command now loads scikit-learn via `cli.discover`, D19), and new `tests/test_backtest_b_command.py` (23 tests: `execute` twice on a synthetic market gives `==` reports and byte-identical files; gate pass writes the artifact, fail does not; exit 2 on a precondition; A2 curve equals `backtest_wf`'s combined curve; wall times in logs only; synthetic-market helpers live in the test file). Does not touch `backtest_wf.py` (imported only) or `cli.py`. Exit: suite green, 0 skipped (964); `python -m seer_engine backtest_b --help` works.
-  - **Status**: open
-  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 6 of 7)
-  - **Satisfies**: R5 — Determinism. `==` results and byte-identical files. The gated model is bit-identical across runs and thread counts, or the pre-registered switch to B-linear takes effect; R7 — One real run on Neon, with the committed report holding every section §6.7 lists
-  - **Depends on**: P1-ENG-VK5P
-  - **Plan**: `.workflows/plan/P1-ENG-UREW.md`
 - [ ] **P1-ENG-M99E** Phase 7: Real run on Neon, A2 byte-identity check, freeze or stop, docs
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns the real `backtest_b` run on Neon from the worktree (`SEER_ENV_FILE`; record data end, wall time, peak RSS); re-run `backtest_wf --end 2026-10-02 --out <scratch>` and `cmp` all 5 files against committed `docs/backtests/2026-10-02-strategy-a2-walkforward*` (a difference stops the phase); commit the B report set. On a pass: set `STRATEGY_B_FROZEN` in `b.py` (report, artifact, `train_end`, sha256; only that line and its two comment lines), commit the artifact, re-run so the report records `frozen-model`, and `tests/test_strategy_b_frozen.py` (6 tests) asserts constant == machine line, sha256 of artifact bytes, and `loads(artifact).digest` == last-fold digest (D23-D25). On a fail: constant stays None and the test asserts `failed`, `frozen-model: null` and no artifact under `engine/data/models/`. Docs: `engine/package_readme.md` (B, labeler, features, model, `backtest_b`, performance, module graph) and `docs/ROADMAP.md` (P6a verdict; on a fail, B's one round failed, P4 stays blocked, owner's options). Exit: suite green, 0 skipped (970 plus any Bug-protocol regression tests), CI green, report committed.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 7 of 7)
   - **Satisfies**: R4 — Walk-forward. The folds are exactly P3b's. Training uses purged labels only. One chained portfolio, whose brackets survive the year boundary. `backtest_wf`'s A2 report stays byte-identical; R7 — One real run on Neon, with the committed report holding every section §6.7 lists; R8 — Freeze or stop. **Pass:** artifact + constant + tie test. **Fail:** ROADMAP records the failure, P4 stays blocked, and the report lists the owner's options; R9 — The readme documents B. The suite is green with 0 skipped. CI is green with scikit-learn
   - **Depends on**: P1-ENG-UREW
@@ -68,6 +59,20 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-UREW** Phase 6: `backtest_b` command + io writers
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns additive `backtest/io.py` (`MODELS_DIR`, `write_b_report`, `write_model_artifact`; the only phase editing `io.py`), new `commands/backtest_b.py` incl. public `recompute_a2(market, folds)` with eager imports (every CLI command now loads scikit-learn via `cli.discover`, D19), and new `tests/test_backtest_b_command.py` (23 tests: `execute` twice on a synthetic market gives `==` reports and byte-identical files; gate pass writes the artifact, fail does not; exit 2 on a precondition; A2 curve equals `backtest_wf`'s combined curve; wall times in logs only; synthetic-market helpers live in the test file). Does not touch `backtest_wf.py` (imported only) or `cli.py`. Exit: suite green, 0 skipped (964); `python -m seer_engine backtest_b --help` works.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 6 of 7)
+  - **Satisfies**: R5 — Determinism. `==` results and byte-identical files. The gated model is bit-identical across runs and thread counts, or the pre-registered switch to B-linear takes effect; R7 — One real run on Neon, with the committed report holding every section §6.7 lists
+  - **Depends on**: P1-ENG-VK5P
+  - **Plan**: `.workflows/plan/P1-ENG-UREW.md`
+  - **Completed**: 2026-10-03 19:05
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/io.py, engine/src/seer_engine/commands/backtest_b.py, engine/tests/test_backtest_b_command.py
+  - **Decided**:
+    - readme-updater -> skip for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope / phase 7 Owns (rung 4: index scope) -- same decision phases 3-5 recorded
 - [x] **P1-ENG-VK5P** Phase 5: B report rendering
   - **Difficulty**: HARD
   - **Type**: Feature

@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/strategy-a-backtest`
 **Branch:** `feature/strategy-a-backtest` (base: `origin/main` = `HEAD` @ `d3a2e1d`)
 **Phases:** 6
-**Status:** phase 3/6 complete
+**Status:** phase 4/6 complete
 **Coordinator:** —
 
 ---
@@ -261,7 +261,7 @@ def never_fetched_members(market, start, end) -> int               # the one def
 | 1 ✓ | Strategy interface, indicators, Strategy A | R1 | `seer_engine.strategies` | 10 | — | HARD | `.workflows/plan/strategy-a-backtest/phase-1.md` | P1-ENG-WHQG | — |
 | 2 ✓ | SPY buy-and-hold benchmark + vendored dividends | R3 | `seer_engine.backtest` | 4 | 1 | NORMAL | `.workflows/plan/strategy-a-backtest/phase-2.md` | P1-ENG-3WDD | — |
 | 3 ✓ | Point-in-time market + backtest runner + survivorship | R2 | `seer_engine.backtest` | 4 | 1 | HARD | `.workflows/plan/strategy-a-backtest/phase-3.md` | P1-ENG-HCER | — |
-| 4 | Metrics (web parity), grid + selection + gate, report rendering | R4, R5 | `seer_engine.backtest` | 6 | 2, 3 | NORMAL | `.workflows/plan/strategy-a-backtest/phase-4.md` | P1-ENG-VTZ5 | — |
+| 4 ✓ | Metrics (web parity), grid + selection + gate, report rendering | R4, R5 | `seer_engine.backtest` | 6 | 2, 3 | NORMAL | `.workflows/plan/strategy-a-backtest/phase-4.md` | P1-ENG-VTZ5 | — |
 | 5 | Neon loader with cache + `backtest` command | R5, R6 | `seer_engine.backtest`, `seer_engine.commands` | 5 | 4 | NORMAL | `.workflows/plan/strategy-a-backtest/phase-5.md` | P1-ENG-5LGI | — |
 | 6 | Real 10-year run, freeze params, committed report, docs | R4, R5, R6 | `seer_engine.strategies`, docs | 7 | 5 | NORMAL | `.workflows/plan/strategy-a-backtest/phase-6.md` | P1-ENG-KG5T | — |
 

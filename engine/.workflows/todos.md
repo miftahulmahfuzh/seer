@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 17:55:38
-**Total Active Tasks**: 0
+**Last Updated**: 2026-10-03 19:33:00
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 20
+- Completed: 26
 
 ---
 
@@ -23,6 +23,21 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [x] **P1-ENG-DKWU** Phase 3: Vectorized bracket labeler
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/labels.py` exactly as the index contract and new `tests/test_backtest_labels.py`: synthetic bars for every path (no fill: no bar / low >= limit; fill at limit; fill at open when open < limit; TP and SL intraday; both in range -> SL first; gap through SL / TP at the open; day-5 time stop; time stop delayed by a missing bar; forced close after the last bar; unresolved at the end), every label net of 0.1% per side, sim parity on a seeded synthetic market for a few thousand rows vs `run_backtest` with a one-pick fake strategy (same exit reason, `forced` ~ sim `time` with `forced=True`, same exit date or expiry, return within 1e-6; RNG allowed in the test only), and mutating bars after a row's resolved date leaves its label unchanged. Does not touch `sim/`, `runner.py`, `strategies/`. Exit: suite green, 0 skipped (+30); purity glob covers the module.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 3 of 7)
+  - **Satisfies**: R1 — Labels. Synthetic tests cover every label path. The vectorized labeler agrees with a one-order `sim` run on a seeded sample. Changing a bar after `tune_end(Y)` leaves fold Y's training set unchanged; R6 — Purity. The new modules pass the globbing purity test
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-DKWU.md`
+  - **Completed**: 2026-10-03 18:48
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/labels.py, engine/tests/test_backtest_labels.py
+  - **Decided**:
+    - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
+    - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
 ### [P2] Medium
 
@@ -35,6 +50,93 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-M99E** Phase 7: Real run on Neon, A2 byte-identity check, freeze or stop, docs
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns the real `backtest_b` run on Neon from the worktree (`SEER_ENV_FILE`; record data end, wall time, peak RSS); re-run `backtest_wf --end 2026-10-02 --out <scratch>` and `cmp` all 5 files against committed `docs/backtests/2026-10-02-strategy-a2-walkforward*` (a difference stops the phase); commit the B report set. On a pass: set `STRATEGY_B_FROZEN` in `b.py` (report, artifact, `train_end`, sha256; only that line and its two comment lines), commit the artifact, re-run so the report records `frozen-model`, and `tests/test_strategy_b_frozen.py` (6 tests) asserts constant == machine line, sha256 of artifact bytes, and `loads(artifact).digest` == last-fold digest (D23-D25). On a fail: constant stays None and the test asserts `failed`, `frozen-model: null` and no artifact under `engine/data/models/`. Docs: `engine/package_readme.md` (B, labeler, features, model, `backtest_b`, performance, module graph) and `docs/ROADMAP.md` (P6a verdict; on a fail, B's one round failed, P4 stays blocked, owner's options). Exit: suite green, 0 skipped (970 plus any Bug-protocol regression tests), CI green, report committed.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 7 of 7)
+  - **Satisfies**: R4 — Walk-forward. The folds are exactly P3b's. Training uses purged labels only. One chained portfolio, whose brackets survive the year boundary. `backtest_wf`'s A2 report stays byte-identical; R7 — One real run on Neon, with the committed report holding every section §6.7 lists; R8 — Freeze or stop. **Pass:** artifact + constant + tie test. **Fail:** ROADMAP records the failure, P4 stays blocked, and the report lists the owner's options; R9 — The readme documents B. The suite is green with 0 skipped. CI is green with scikit-learn
+  - **Depends on**: P1-ENG-UREW
+  - **Plan**: `.workflows/plan/P1-ENG-M99E.md`
+  - **Completed**: 2026-10-03 19:33
+  - **Method**: /do
+  - **Files**: docs/backtests/2026-10-02-strategy-b-walkforward.md, docs/backtests/2026-10-02-strategy-b-walkforward-equity.csv, docs/backtests/2026-10-02-strategy-b-walkforward-equity.svg, engine/tests/test_strategy_b_frozen.py, engine/package_readme.md, docs/ROADMAP.md
+  - **Outcome**: P6a gate FAILED (fail branch). B +13.3% vs +187.6% total-return SPY, PF 1.03, max DD 57.6%; B-linear +20.6%, PF 1.05, DD 32.4%; A2 +9.1%. Determinism probe bit-identical, gated model B. STRATEGY_B_FROZEN stays None, no artifact under engine/data/models. A2 5 files cmp-identical on re-run (R4). Run #2 byte-identical to run #1. Neon fingerprint (2026-10-02, 1817429) unchanged across the phase. Suite 970 passed, 0 skipped. Whole command 5:47 / 5:53, peak RSS 1548 MB. CI run 37123034970 green on e71c059.
+  - **Drift**:
+    - engine/package_readme.md line numbers had shifted (phases 2 and 4 added 'in progress' lines); edits were anchored by content, and the in-progress placeholders (layout b.py / b_walkforward.py lines, the '### backtest Strategy B walk-forward (P6a, in progress…)' section) were replaced by the final text.
+  - **Decided**:
+    - Readme module-graph and imports text -> written from the actual imports (labels imports sim.model TIME_STOP_DAYS not COST_RATE; b_walkforward does not import benchmark; command imports numpy/b_model, not dates/universe) (plan Step 9: 'where the code differs from this text, the code wins')
+    - Plan 9g's indicators paragraph -> not added; phase 2 already documented mean_window / stdev_return_window as bullets in the indicators list (rung 6, avoid duplicating existing doc)
+    - Commits of run + docs and the branch push -> done by main context per the phase plan's Steps 8/10/11 (rung 3: the phase plan's code blocks), since CI green on the pushed head is an exit criterion
+- [x] **P1-ENG-UREW** Phase 6: `backtest_b` command + io writers
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns additive `backtest/io.py` (`MODELS_DIR`, `write_b_report`, `write_model_artifact`; the only phase editing `io.py`), new `commands/backtest_b.py` incl. public `recompute_a2(market, folds)` with eager imports (every CLI command now loads scikit-learn via `cli.discover`, D19), and new `tests/test_backtest_b_command.py` (23 tests: `execute` twice on a synthetic market gives `==` reports and byte-identical files; gate pass writes the artifact, fail does not; exit 2 on a precondition; A2 curve equals `backtest_wf`'s combined curve; wall times in logs only; synthetic-market helpers live in the test file). Does not touch `backtest_wf.py` (imported only) or `cli.py`. Exit: suite green, 0 skipped (964); `python -m seer_engine backtest_b --help` works.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 6 of 7)
+  - **Satisfies**: R5 — Determinism. `==` results and byte-identical files. The gated model is bit-identical across runs and thread counts, or the pre-registered switch to B-linear takes effect; R7 — One real run on Neon, with the committed report holding every section §6.7 lists
+  - **Depends on**: P1-ENG-VK5P
+  - **Plan**: `.workflows/plan/P1-ENG-UREW.md`
+  - **Completed**: 2026-10-03 19:05
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/io.py, engine/src/seer_engine/commands/backtest_b.py, engine/tests/test_backtest_b_command.py
+  - **Decided**:
+    - readme-updater -> skip for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope / phase 7 Owns (rung 4: index scope) -- same decision phases 3-5 recorded
+- [x] **P1-ENG-VK5P** Phase 5: B report rendering
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/b_report.py` (`BReport` with `curves()`/`gated_curve()`, `_validate`, `top_features`, machine lines with `label_sum` as a JSON string of `repr(float)` D23, `render_markdown`, `equity_csv`, `equity_svg`; Markdown sections in order: title, data, method, per-fold training summary for B and B-linear, results vs both SPY curves, year by year, diagnostics incl. passed nights and calibration, seen before, go-live checklist, survivorship with learned-model caveat, open positions, curves SVG link, verdict sentence, owner's options (b)/(c)/(d) on a fail, machine fence) and new `tests/test_backtest_b_report.py` (27 tests from a small synthetic run via phase 4's API). Does not touch `wf_report.py` or `report.py` (helpers imported only). Exit: suite green, 0 skipped (941); rendering twice is byte-identical; `_validate` rejects a mismatched verdict, a misaligned curve and a schedule not matching `fold_models`.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 5 of 7)
+  - **Satisfies**: R5 — Determinism. `==` results and byte-identical files. The gated model is bit-identical across runs and thread counts, or the pre-registered switch to B-linear takes effect; R6 — Purity. The new modules pass the globbing purity test; R7 — One real run on Neon, with the committed report holding every section §6.7 lists
+  - **Depends on**: P1-ENG-U5JJ
+  - **Plan**: `.workflows/plan/P1-ENG-VK5P.md`
+  - **Completed**: 2026-10-03 19:30
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/backtest/b_report.py, engine/tests/test_backtest_b_report.py
+  - **Decided**:
+    - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope) -- same decision phases 1-4 recorded
+- [x] **P1-ENG-U5JJ** Phase 4: B walk-forward: candidate table, purge, per-fold fits, runs, diagnostics, gate
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/b_walkforward.py` exactly as the index contract (`FoldModel` value equality D20, `calibration` drops NaN labels itself D21, `gate_p6a` changes only the subject for B-linear D22, `passed_nights` traded == `len(run.snapshots) - 1`, five private `walkforward.py` helpers imported read-only D26) and new `tests/test_backtest_b_walkforward.py` (35 tests on synthetic markets: `CandidateTable` rows equal `design_on`; purge -- mutating bars after `tune_end(Y)` leaves fold Y's mask, X, labels and model digest unchanged; folds equal `walkforward.folds`; `train_folds` for both kinds; schedule switches at year starts and a 31 Dec open order keeps its bracket; P4 identity with real tree and ridge `BParams`; `oos_predictions` uses the right fold's model; hand-checked calibration deciles; passed nights equal empty-pick sessions; `gate_p6a` sentences in both kinds and outcomes; two identical calls give `==`; `probe_determinism` True on synthetic data). Does not touch `walkforward.py` or any out-of-scope file. Exit: suite green, 0 skipped (914); purity glob covers the module.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 4 of 7)
+  - **Satisfies**: R1 — Labels. Synthetic tests cover every label path. The vectorized labeler agrees with a one-order `sim` run on a seeded sample. Changing a bar after `tune_end(Y)` leaves fold Y's training set unchanged; R3 — P4 identity and no look-ahead, for B and B-linear, with a fixed model. SPY bars dated ≥ S are included; R4 — Walk-forward. The folds are exactly P3b's. Training uses purged labels only. One chained portfolio, whose brackets survive the year boundary. `backtest_wf`'s A2 report stays byte-identical; R5 — Determinism. `==` results and byte-identical files. The gated model is bit-identical across runs and thread counts, or the pre-registered switch to B-linear takes effect; R6 — Purity. The new modules pass the globbing purity test
+  - **Depends on**: P1-ENG-CW71, P1-ENG-1OMN, P1-ENG-DKWU
+  - **Plan**: `.workflows/plan/P1-ENG-U5JJ.md`
+  - **Completed**: 2026-10-03 18:54
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/b_walkforward.py, engine/tests/test_backtest_b_walkforward.py
+  - **Decided**:
+    - Manual purity grep matches the docstring word 'logging' (b_walkforward.py:3) -> kept the code block verbatim (rung 3: reconciled code block; the AST-based test_strategy_purity.py passes, and walkforward.py:3 has the identical line)
+- [x] **P1-ENG-1OMN** Phase 2: B features, ranks, candidates, `StrategyB`
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns additive `mean_window` and `stdev_return_window` in `strategies/indicators.py` (tests in new `tests/test_indicators_b.py`), new `strategies/b.py` exactly as the index contract, `strategies/__init__.py` exports from `b.py` only (never imports `b_model`), and new `tests/test_strategy_b.py` (every feature hand-computed; `prepare_b` vs `design_at` bit-identity; `rank01` ties and n=0/1; ranks from members on d only; SPY features through d, no candidates when SPY missing/short; `picks_from_design` positive-only, symbol tie-break order, invalid-bracket drop; P4 identity over several dates and fake models; no look-ahead incl. SPY bars from S on; SPY never picked; `SPY_SYMBOL == universe.BENCHMARK`; `MIN_DOLLAR_VOLUME == a.DESIGN_PARAMS.min_dollar_volume`). Does not touch `a.py`, `a2.py`, `base.py`, existing indicators, `b_model.py`, `backtest/`. Exit: suite green, 0 skipped (+59: 11 + 48); purity glob covers `b.py`; `import seer_engine.strategies` loads no `sklearn`; `STRATEGY_B_FROZEN` not re-exported (D24).
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 2 of 7)
+  - **Satisfies**: R2 — Features. Each is hand-computed. The rolling and single-window paths are bit-identical. Ranks use that date's candidates only, ties averaged. SPY features read SPY's bars through `data_date` only; R3 — P4 identity and no look-ahead, for B and B-linear, with a fixed model. SPY bars dated ≥ S are included; R6 — Purity. The new modules pass the globbing purity test
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-1OMN.md`
+  - **Completed**: 2026-10-03 18:49
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/indicators.py, engine/src/seer_engine/strategies/b.py, engine/src/seer_engine/strategies/__init__.py, engine/tests/test_indicators_b.py, engine/tests/test_strategy_b.py
+  - **Decided**:
+    - Step 3 task creation skipped: peer session impl-strategy-b-ranker-p1 created all 7 tasks (p2 = P1-ENG-1OMN) in the shared worktree, to avoid duplicate tasks from concurrent sessions (tie-break: narrower blast radius)
+- [x] **P1-ENG-CW71** Phase 1: B model interface + scikit-learn dependency
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/pyproject.toml` (scikit-learn pin `>=1.9,<1.10`), new `strategies/b_model.py` exactly as the index contract, and new `tests/test_b_model.py` (synthetic fit/predict; ridge vs a hand-solved case; per-row batch independence for both kinds; two fits give `==` models with equal digests; thread-count determinism via subprocesses at `OMP_NUM_THREADS` 1 and 4 on ~50k x 18 rows; `dumps`/`loads` round trip keeps predictions and digest; importance shares sum to 1; `r2`; input validation; purity glob covers the module). Does not touch `b.py`, `strategies/__init__.py` or `backtest/`. Exit: suite green, 0 skipped (790 alone); `pip install -e 'engine[dev]'` pulls scikit-learn 1.9.x; artifact identity is sha256 of file bytes and `loads(b).digest`, never re-pickled bytes (D25).
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 1 of 7)
+  - **Satisfies**: R5 — Determinism. `==` results and byte-identical files. The gated model is bit-identical across runs and thread counts, or the pre-registered switch to B-linear takes effect; R6 — Purity. The new modules pass the globbing purity test; R9 — The readme documents B. The suite is green with 0 skipped. CI is green with scikit-learn
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-CW71.md`
+  - **Completed**: 2026-10-03 18:48
+  - **Method**: /do
+  - **Files**: engine/pyproject.toml, engine/src/seer_engine/strategies/b_model.py, engine/tests/test_b_model.py
 - [x] **P1-ENG-RTWR** Phase 6: Real run on Neon, freeze or stop, docs
   - **Difficulty**: NORMAL
   - **Type**: Feature

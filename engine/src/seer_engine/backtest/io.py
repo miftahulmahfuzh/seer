@@ -1,5 +1,6 @@
 """Impure edge of the backtest: read the database once, read the vendored SPY dividends,
-write the report files (v1's ``write_report`` and the walk-forward ``write_wf_report``).
+write the report files (v1's ``write_report``, the walk-forward ``write_wf_report``, Strategy B's
+``write_b_report``) and Strategy B's model artifact (``write_model_artifact``).
 
 The only module in ``seer_engine.backtest`` that touches the database or the filesystem;
 ``test_strategy_purity.py`` skips it by name. Read-only: ``load_market`` runs one
@@ -16,7 +17,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Iterable
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
@@ -27,7 +28,7 @@ import psycopg
 from psycopg.pq import TransactionStatus
 
 from seer_engine import config
-from seer_engine.backtest import wf_report
+from seer_engine.backtest import b_report, wf_report
 from seer_engine.backtest.benchmark import Dividend, parse_dividends
 from seer_engine.backtest.market import Market, Membership
 from seer_engine.backtest.report import (
@@ -38,12 +39,14 @@ from seer_engine.backtest.report import (
     report_stem,
 )
 from seer_engine.prices import to_decimal
+from seer_engine.strategies import b_model
 from seer_engine.strategies.base import History
 
 log = logging.getLogger(__name__)
 
 CACHE_DIR = config.REPO_ROOT / "engine" / ".cache"
 DIVIDENDS_CSV = config.REPO_ROOT / "engine" / "data" / "spy_dividends.csv"
+MODELS_DIR = config.REPO_ROOT / "engine" / "data" / "models"
 
 BAR_COLUMNS = ("symbol", "date", "open", "high", "low", "close", "volume")
 FLOAT_COLUMNS = ("open", "high", "low", "close", "volume")
@@ -314,3 +317,45 @@ def write_wf_report(out_dir: Path, report: wf_report.WalkForwardReport) -> list[
         path.write_text(text, encoding="utf-8", newline="\n")
         paths.append(path)
     return paths
+
+
+def write_b_report(out_dir: Path, report: b_report.BReport) -> list[Path]:
+    """Write Strategy B's walk-forward report set into ``out_dir`` (created if needed) with LF
+    line endings and return the paths in this order: <stem>.md, <stem>-equity.csv,
+    <stem>-equity.svg. All three are rendered before any is written, so a render error leaves
+    no partial set."""
+    out_dir = Path(out_dir)
+    stem = b_report.report_stem(report.data_end)
+    files = (
+        (f"{stem}.md", b_report.render_markdown(report)),
+        (f"{stem}-equity.csv", b_report.equity_csv(report)),
+        (f"{stem}-equity.svg", b_report.equity_svg(report)),
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    paths: list[Path] = []
+    for name, text in files:
+        path = out_dir / name
+        path.write_text(text, encoding="utf-8", newline="\n")
+        paths.append(path)
+    return paths
+
+
+def write_model_artifact(model_dir: Path, data_end: date, model: b_model.BModel) -> tuple[Path, str]:
+    """Write ``b_model.dumps(model)`` to ``<model_dir>/<data_end>-strategy-b.pkl`` (the directory
+    is created if needed) and return ``(path, sha256 hex of the written bytes)``.
+
+    The bytes are serialized first and land through a temporary file plus ``os.replace``, so a
+    failure never leaves a truncated artifact. Re-writing the same model gives the same bytes.
+    """
+    if isinstance(data_end, datetime) or not isinstance(data_end, date):
+        raise TypeError(f"data_end must be a date, got {type(data_end).__name__}")
+    if not isinstance(model, b_model.BModel):
+        raise TypeError(f"model must be a b_model.BModel, got {type(model).__name__}")
+    data = b_model.dumps(model)
+    model_dir = Path(model_dir)
+    model_dir.mkdir(parents=True, exist_ok=True)
+    path = model_dir / f"{data_end.isoformat()}-strategy-b.pkl"
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_bytes(data)
+    os.replace(tmp, path)
+    return path, b_model.sha256(data)

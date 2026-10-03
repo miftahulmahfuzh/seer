@@ -68,6 +68,7 @@ engine/
       metrics.py            Metrics, strategy_metrics(), checklist() (web/lib/metrics.ts parity), metrics_through() (P3b)
       tuning.py             windows, the 81-run grid, select(fallback=), gate()
       walkforward.py        folds, 324 combinations, tune(), select_fold(), walk_forward(), diagnostics(), gate_p3b() (P3b)
+      b_walkforward.py      Strategy B walk-forward (P6a, in progress): candidate table, purged per-fold fits, chained B / B-linear runs, gate_p6a(); documented in phase 7
       report.py             BacktestReport, render_markdown(), equity_csv(), equity_svg()
       wf_report.py          WalkForwardReport, machine lines, Markdown, equity/grid CSVs, two SVGs (P3b)
       io.py                 Neon loader + bar cache, dividends CSV, report writers write_report() / write_wf_report() (impure)
@@ -656,6 +657,17 @@ Strategy A's one rework has failed. Strategy A is not reworked again on this dat
 **Survivorship.** This is the same gap as P3: 115 index members in the window from
 2015-10-19 have no bars at all. It biases every variant in its favour, and the report counts the gap
 per year.
+
+### backtest Strategy B walk-forward (P6a, in progress; full docs pending phase 7)
+
+`backtest.b_walkforward` runs Strategy B under P3b's anchored yearly folds, reusing
+`backtest.walkforward` (`Fold`, `folds`) without editing it. It is pure and covered by the purity
+glob. Public names: `B = "B"`, `B_LINEAR = "B-linear"`, `DECILES`, `TOP_FEATURES`;
+`CandidateTable`, `FoldModel`, `BWalkForward`, `CalibrationRow`; `candidate_table()`,
+`training_mask()` (the purge: fold Y trains only on labels resolved by `tune_end(Y)`),
+`train_folds()`, `probe_determinism()` (the pre-registered tree-vs-ridge switch),
+`model_schedule()`, `walk_forward_b()` (one chained `run_backtest` per curve),
+`oos_predictions()`, `calibration()`, `passed_nights()` and `gate_p6a()`.
 
 ## Migration 002 (`db/migrations/002_engine.sql`)
 

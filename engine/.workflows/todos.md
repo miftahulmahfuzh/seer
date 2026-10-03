@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 21:03:08
-**Total Active Tasks**: 13
+**Last Updated**: 2026-10-03 21:40:00
+**Total Active Tasks**: 12
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 7
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 10
-- Completed: 27
+- Blocked: 5
+- Completed: 28
 
 ---
 
@@ -39,21 +39,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
-- [ ] **P1-ENG-XORE** Phase 2: Allocator protocol, adapters, overlays, `return_window`
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns new `strategies/allocator.py` (`Allocator`, `target_from_close`, `month_end_closes`, `last_close`, `scale_weight`, `vol_scale`, `LazyPrepared`, `PicksAllocator`, `BlendAllocator`, `VolTargetAllocator`), additive `return_window` in `strategies/indicators.py`, new `tests/test_allocator.py` (55) and the reusable P4-identity/no-look-ahead kit `tests/allocatorkit.py` (contract API, D-E) that phases 5-8 import. Does not touch existing indicator functions, `base.py`, `a.py`, `a2.py`, `b.py`, `strategies/__init__.py`. Exit: suite green; purity glob covers `allocator.py`; P4 identity of `PicksAllocator`/`BlendAllocator`/`VolTargetAllocator` tested with fake inner allocators; the kit rejects a look-ahead fake, a broken prepared path and a too-short lookback.
-  - **Status**: open
-  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 2 of 13)
-  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
-  - **Depends on**: P1-ENG-OY9Z
-  - **Plan**: `.workflows/plan/P1-ENG-XORE.md`
-
 - [ ] **P1-ENG-CPHN** Phase 3: Book runner, `run_rules` dispatch, run stats, V0 parity
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns new `backtest/book_runner.py` and `tests/test_book_runner.py` (47). Does not touch `runner.py`, `metrics.py`, `benchmark.py` (imported read-only). Exit: suite green, and on seeded synthetic markets: `run_rules(..., DESIGN_V0) == run_backtest(...)` for A, A2 and B (fake predictor); `run_book(PICKS(A), V0_BOOK)` matches `run_backtest` snapshots, trades, fills and open positions exactly (seeds 39 and 4 plus the hand-checked FixedPicks scenario); the allocator never sees the idle position in `held` (D-J); `run_stats` hand-checked on small books.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 3 of 13)
   - **Satisfies**: R1 — `TradeRules`: `DESIGN_V0` reproduces §5, and A, A2 and B re-render byte-identically (synthetic test plus a real-data `cmp`). Each new lever has its own synthetic-bar tests; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
   - **Depends on**: P1-ENG-OY9Z, P1-ENG-XORE
@@ -73,7 +63,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns new `strategies/f_index.py` and `tests/test_f_index.py` (109): hand-checked signals (SMA, month-end SMA, absolute momentum, always, turn-of-month calendar around month ends and holidays), P4 identity and no look-ahead, locally and through the phase-2 kit (D-E). Exit: suite green; purity glob covers the module.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 5 of 13)
   - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
   - **Depends on**: P1-ENG-XORE
@@ -83,7 +73,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns new `strategies/f_rotation.py` and `tests/test_f_rotation.py` (39): momentum ranking with ties, absolute filter, fallback, trend filter, missing or short ETFs, P4 identity and no look-ahead (locally and through the kit). Exit: suite green.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 6 of 13)
   - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
   - **Depends on**: P1-ENG-XORE
@@ -93,7 +83,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns new `strategies/f_factor.py` (vectorized, param-independent `prepare` like `prepare_a`) and `tests/test_f_factor.py` (78): hand-computed 12-1 momentum, vol and dollar-volume eligibility; mom_lowvol pool selection; inverse-vol weights summing to <= 1; trend filter; members only with SPY excluded; P4 identity with bit-identity between prepared and single-window features; no look-ahead (locally and through the kit). Exit: suite green.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 7 of 13)
   - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
   - **Depends on**: P1-ENG-XORE
@@ -103,7 +93,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns new `strategies/f_swing.py` and `tests/test_f_swing.py` (87): setup and dip/close limits; stop and take from ATR; signal exits (SMA and RSI); self-capped slots with keep-first ordering; held symbols that left the index; market-trend gate for new entries only; P4 identity and no look-ahead (locally and through the kit). Exit: suite green.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 8 of 13)
   - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
   - **Depends on**: P1-ENG-XORE
@@ -170,6 +160,23 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-XORE** Phase 2: Allocator protocol, adapters, overlays, `return_window`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/allocator.py` (`Allocator`, `target_from_close`, `month_end_closes`, `last_close`, `scale_weight`, `vol_scale`, `LazyPrepared`, `PicksAllocator`, `BlendAllocator`, `VolTargetAllocator`), additive `return_window` in `strategies/indicators.py`, new `tests/test_allocator.py` (55) and the reusable P4-identity/no-look-ahead kit `tests/allocatorkit.py` (contract API, D-E) that phases 5-8 import. Does not touch existing indicator functions, `base.py`, `a.py`, `a2.py`, `b.py`, `strategies/__init__.py`. Exit: suite green; purity glob covers `allocator.py`; P4 identity of `PicksAllocator`/`BlendAllocator`/`VolTargetAllocator` tested with fake inner allocators; the kit rejects a look-ahead fake, a broken prepared path and a too-short lookback.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 2 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-OY9Z
+  - **Plan**: `.workflows/plan/P1-ENG-XORE.md`
+  - **Completed**: 2026-10-03 21:40
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/allocator.py, engine/src/seer_engine/strategies/indicators.py, engine/tests/allocatorkit.py, engine/tests/test_allocator.py
+  - **Decided**:
+    - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 13 (rung 4: index Scope / phase 13 Owns; same call as phase 1)
+    - Unblocked phases 3, 5, 6, 7, 8 (P1-ENG-CPHN, ZNTC, 76SL, SB1Q, 5U7B) -> open; every dependency (phases 1, 2) is complete (rung 4: index phase table Depends on)
+
+
 - [x] **P1-ENG-OY9Z** Phase 1: `TradeRules` + the book engine
   - **Difficulty**: HARD
   - **Type**: Feature

@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 06:16:18
-**Total Active Tasks**: 6
+**Last Updated**: 2026-10-04 06:22:43
+**Total Active Tasks**: 5
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 3
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 4
-- Completed: 34
+- Blocked: 2
+- Completed: 35
 
 ---
 
@@ -39,21 +39,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
-- [ ] **P1-ENG-2E01** Phase 9: Dev runner: window guard, candidate windows, D8, deflated Sharpe
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns new `backtest/dev.py` and `tests/test_backtest_dev.py` (50): `DevWindowError` on any end, session, bar, FX row or dividend after 2015-10-16 from every public entry point; `candidate_window` across ETF launches and the membership start; a window starting before 1999-01-04 converting at the `FX_START` rate (D-C); D8 selection incl. one-per-family, ties and `mar is None` ranked last; deflated Sharpe vs hand-computed cases; `run_registry` order, determinism, one prepare per allocator id and the `on_result` callback. Exit: suite green.
-  - **Status**: open
-  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 9 of 13)
-  - **Satisfies**: R4 — The dev window is enforced in code (no session after 2015-10-16), and a test proves it; R5 — The candidate registry is committed before the dev run: ≤ 60 entries, append-only, each with a family, rules, fixed params, a rationale and an owner-verification flag; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
-  - **Depends on**: P1-ENG-CPHN
-  - **Plan**: `.workflows/plan/P1-ENG-2E01.md`
-
 - [ ] **P1-ENG-PLRV** Phase 10: Dev report and pre-registration renderers
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns new `backtest/dev_report.py` and `tests/test_backtest_dev_report.py` (32) using structural checks and byte-stability. Exit: suite green; two renders are byte-identical; rendered content contains no run date outside sibling-file names; `top_years` lists the finalists first (D-G).
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 10 of 13)
   - **Satisfies**: R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R7 — The pre-registration file (≤ 3 finalists exactly specified, or "none eligible"), with the proposed §5 revision; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
   - **Depends on**: P1-ENG-2E01
@@ -63,7 +53,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns new `backtest/registry.py` and `tests/test_registry.py` (74): ids unique and the first 54 are the index table in order (row 54 under `SWING_T20`); <= 60 entries; (id, digest) pins append-only; declared owner inputs equal `candidate_owner_inputs`; every rules preset valid for its allocator; every candidate runs one short smoke window on a synthetic market (every fixed symbol, BIL and the leveraged ETFs) through `run_candidate`. Exit: suite green and the registry committed before any real dev run (agreement with `research` is phase 12's test).
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 11 of 13)
   - **Satisfies**: R5 — The candidate registry is committed before the dev run: ≤ 60 entries, append-only, each with a family, rules, fixed params, a rationale and an owner-verification flag
   - **Depends on**: P1-ENG-ZNTC, P1-ENG-76SL, P1-ENG-SB1Q, P1-ENG-5U7B, P1-ENG-2E01
@@ -100,6 +90,21 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-2E01** Phase 9: Dev runner: window guard, candidate windows, D8, deflated Sharpe
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/dev.py` and `tests/test_backtest_dev.py` (50): `DevWindowError` on any end, session, bar, FX row or dividend after 2015-10-16 from every public entry point; `candidate_window` across ETF launches and the membership start; a window starting before 1999-01-04 converting at the `FX_START` rate (D-C); D8 selection incl. one-per-family, ties and `mar is None` ranked last; deflated Sharpe vs hand-computed cases; `run_registry` order, determinism, one prepare per allocator id and the `on_result` callback. Exit: suite green.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 9 of 13)
+  - **Satisfies**: R4 — The dev window is enforced in code (no session after 2015-10-16), and a test proves it; R5 — The candidate registry is committed before the dev run: ≤ 60 entries, append-only, each with a family, rules, fixed params, a rationale and an owner-verification flag; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-CPHN
+  - **Plan**: `.workflows/plan/P1-ENG-2E01.md`
+  - **Completed**: 2026-10-04 06:22
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/dev.py, engine/tests/test_backtest_dev.py
+  - **Decided**:
+    - readme-updater -> skipped; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope)
+
 - [x] **P1-ENG-76SL** Phase 6: Families F2/F3: ETF rotation
   - **Difficulty**: NORMAL
   - **Type**: Feature

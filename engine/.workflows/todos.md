@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 14:23:00
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-03 14:26:00
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 1
-- Completed: 5
+- Completed: 6
 
 ---
 
@@ -34,16 +34,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Depends on**: P1-ENG-DQFG
   - **Plan**: `.workflows/plan/P1-ENG-2PWS.md`
 
-- [ ] **P1-ENG-56QL** Phase 3: Split recompute for live orders
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `engine/src/seer_engine/sim/split_adjust.py` (new), `engine/tests/test_sim_split.py` (new). Exit: tests for a forward split (10:1, 3:2) and a reverse split (1:32, 1:3 with a fractional remainder → cash in lieu) on an open position and on a pending order, a pending order flooring to 0 → `expire` event, an open position flooring to 0 → forced `exit` paid in lieu, prices that 4 dp cannot hold → `ValueError` with the input untouched, symbols not affected, `marks` rescaled, and a split followed by `step` on adjusted bars giving the same economic P/L. Suite green.
-  - **Status**: open
-  - **Plan Set**: `ENGINE_FILL_SIMULATOR_PLAN.md` (phase 3 of 4)
-  - **Satisfies**: R5 — Pure split-recompute function for live orders (forward and reverse)
-  - **Depends on**: P1-ENG-DQFG
-  - **Plan**: `.workflows/plan/P1-ENG-56QL.md`
-
 ### [P2] Medium
 
 ### [P3] Low
@@ -59,12 +49,25 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Status**: blocked
   - **Plan Set**: `ENGINE_FILL_SIMULATOR_PLAN.md` (phase 4 of 4)
   - **Satisfies**: R4 — Small pure deterministic API for P3/P4, import-purity test, ≥10-session hand-checked scenario, documented in `engine/package_readme.md`
-  - **Depends on**: P1-ENG-2PWS, P1-ENG-56QL
+  - **Depends on**: P1-ENG-2PWS, P1-ENG-56QL (done 2026-10-03; now waits only on P1-ENG-2PWS)
   - **Plan**: `.workflows/plan/P1-ENG-SEZ7.md`
 
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-56QL** Phase 3: Split recompute for live orders
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/sim/split_adjust.py` (new), `engine/tests/test_sim_split.py` (new). Exit: tests for a forward split (10:1, 3:2) and a reverse split (1:32, 1:3 with a fractional remainder → cash in lieu) on an open position and on a pending order, a pending order flooring to 0 → `expire` event, an open position flooring to 0 → forced `exit` paid in lieu, prices that 4 dp cannot hold → `ValueError` with the input untouched, symbols not affected, `marks` rescaled, and a split followed by `step` on adjusted bars giving the same economic P/L. Suite green.
+  - **Status**: completed
+  - **Plan Set**: `ENGINE_FILL_SIMULATOR_PLAN.md` (phase 3 of 4)
+  - **Satisfies**: R5 — Pure split-recompute function for live orders (forward and reverse)
+  - **Depends on**: P1-ENG-DQFG
+  - **Plan**: `.workflows/plan/P1-ENG-56QL.md`
+  - **Completed**: 2026-10-03 14:26
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/sim/split_adjust.py, engine/tests/test_sim_split.py
+
 - [x] **P1-ENG-DQFG** Phase 1: Pure price types, sim model and session lifecycle
   - **Difficulty**: HARD
   - **Type**: Feature

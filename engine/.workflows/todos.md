@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 19:05:00
-**Total Active Tasks**: 2
+**Last Updated**: 2026-10-03 19:33:00
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 25
+- Completed: 26
 
 ---
 
@@ -38,15 +38,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Decided**:
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
-- [ ] **P1-ENG-M99E** Phase 7: Real run on Neon, A2 byte-identity check, freeze or stop, docs
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns the real `backtest_b` run on Neon from the worktree (`SEER_ENV_FILE`; record data end, wall time, peak RSS); re-run `backtest_wf --end 2026-10-02 --out <scratch>` and `cmp` all 5 files against committed `docs/backtests/2026-10-02-strategy-a2-walkforward*` (a difference stops the phase); commit the B report set. On a pass: set `STRATEGY_B_FROZEN` in `b.py` (report, artifact, `train_end`, sha256; only that line and its two comment lines), commit the artifact, re-run so the report records `frozen-model`, and `tests/test_strategy_b_frozen.py` (6 tests) asserts constant == machine line, sha256 of artifact bytes, and `loads(artifact).digest` == last-fold digest (D23-D25). On a fail: constant stays None and the test asserts `failed`, `frozen-model: null` and no artifact under `engine/data/models/`. Docs: `engine/package_readme.md` (B, labeler, features, model, `backtest_b`, performance, module graph) and `docs/ROADMAP.md` (P6a verdict; on a fail, B's one round failed, P4 stays blocked, owner's options). Exit: suite green, 0 skipped (970 plus any Bug-protocol regression tests), CI green, report committed.
-  - **Status**: open
-  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 7 of 7)
-  - **Satisfies**: R4 — Walk-forward. The folds are exactly P3b's. Training uses purged labels only. One chained portfolio, whose brackets survive the year boundary. `backtest_wf`'s A2 report stays byte-identical; R7 — One real run on Neon, with the committed report holding every section §6.7 lists; R8 — Freeze or stop. **Pass:** artifact + constant + tie test. **Fail:** ROADMAP records the failure, P4 stays blocked, and the report lists the owner's options; R9 — The readme documents B. The suite is green with 0 skipped. CI is green with scikit-learn
-  - **Depends on**: P1-ENG-UREW
-  - **Plan**: `.workflows/plan/P1-ENG-M99E.md`
 
 ### [P2] Medium
 
@@ -59,6 +50,25 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-M99E** Phase 7: Real run on Neon, A2 byte-identity check, freeze or stop, docs
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns the real `backtest_b` run on Neon from the worktree (`SEER_ENV_FILE`; record data end, wall time, peak RSS); re-run `backtest_wf --end 2026-10-02 --out <scratch>` and `cmp` all 5 files against committed `docs/backtests/2026-10-02-strategy-a2-walkforward*` (a difference stops the phase); commit the B report set. On a pass: set `STRATEGY_B_FROZEN` in `b.py` (report, artifact, `train_end`, sha256; only that line and its two comment lines), commit the artifact, re-run so the report records `frozen-model`, and `tests/test_strategy_b_frozen.py` (6 tests) asserts constant == machine line, sha256 of artifact bytes, and `loads(artifact).digest` == last-fold digest (D23-D25). On a fail: constant stays None and the test asserts `failed`, `frozen-model: null` and no artifact under `engine/data/models/`. Docs: `engine/package_readme.md` (B, labeler, features, model, `backtest_b`, performance, module graph) and `docs/ROADMAP.md` (P6a verdict; on a fail, B's one round failed, P4 stays blocked, owner's options). Exit: suite green, 0 skipped (970 plus any Bug-protocol regression tests), CI green, report committed.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 7 of 7)
+  - **Satisfies**: R4 — Walk-forward. The folds are exactly P3b's. Training uses purged labels only. One chained portfolio, whose brackets survive the year boundary. `backtest_wf`'s A2 report stays byte-identical; R7 — One real run on Neon, with the committed report holding every section §6.7 lists; R8 — Freeze or stop. **Pass:** artifact + constant + tie test. **Fail:** ROADMAP records the failure, P4 stays blocked, and the report lists the owner's options; R9 — The readme documents B. The suite is green with 0 skipped. CI is green with scikit-learn
+  - **Depends on**: P1-ENG-UREW
+  - **Plan**: `.workflows/plan/P1-ENG-M99E.md`
+  - **Completed**: 2026-10-03 19:33
+  - **Method**: /do
+  - **Files**: docs/backtests/2026-10-02-strategy-b-walkforward.md, docs/backtests/2026-10-02-strategy-b-walkforward-equity.csv, docs/backtests/2026-10-02-strategy-b-walkforward-equity.svg, engine/tests/test_strategy_b_frozen.py, engine/package_readme.md, docs/ROADMAP.md
+  - **Outcome**: P6a gate FAILED (fail branch). B +13.3% vs +187.6% total-return SPY, PF 1.03, max DD 57.6%; B-linear +20.6%, PF 1.05, DD 32.4%; A2 +9.1%. Determinism probe bit-identical, gated model B. STRATEGY_B_FROZEN stays None, no artifact under engine/data/models. A2 5 files cmp-identical on re-run (R4). Run #2 byte-identical to run #1. Neon fingerprint (2026-10-02, 1817429) unchanged across the phase. Suite 970 passed, 0 skipped. Whole command 5:47 / 5:53, peak RSS 1548 MB. CI run 37123034970 green on e71c059.
+  - **Drift**:
+    - engine/package_readme.md line numbers had shifted (phases 2 and 4 added 'in progress' lines); edits were anchored by content, and the in-progress placeholders (layout b.py / b_walkforward.py lines, the '### backtest Strategy B walk-forward (P6a, in progress…)' section) were replaced by the final text.
+  - **Decided**:
+    - Readme module-graph and imports text -> written from the actual imports (labels imports sim.model TIME_STOP_DAYS not COST_RATE; b_walkforward does not import benchmark; command imports numpy/b_model, not dates/universe) (plan Step 9: 'where the code differs from this text, the code wins')
+    - Plan 9g's indicators paragraph -> not added; phase 2 already documented mean_window / stdev_return_window as bullets in the indicators list (rung 6, avoid duplicating existing doc)
+    - Commits of run + docs and the branch push -> done by main context per the phase plan's Steps 8/10/11 (rung 3: the phase plan's code blocks), since CI green on the pushed head is an exit criterion
 - [x] **P1-ENG-UREW** Phase 6: `backtest_b` command + io writers
   - **Difficulty**: NORMAL
   - **Type**: Feature

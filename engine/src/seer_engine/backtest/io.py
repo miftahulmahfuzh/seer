@@ -1,6 +1,6 @@
 """Impure edge of the backtest: read the database once, read the vendored SPY dividends,
 write the report files (v1's ``write_report``, the walk-forward ``write_wf_report``, Strategy B's
-``write_b_report``) and Strategy B's model artifact (``write_model_artifact``).
+``write_b_report``, P7a's ``write_dev_report``) and Strategy B's model artifact (``write_model_artifact``).
 
 The only module in ``seer_engine.backtest`` that touches the database or the filesystem;
 ``test_strategy_purity.py`` skips it by name. Read-only: ``load_market`` runs one
@@ -28,7 +28,7 @@ import psycopg
 from psycopg.pq import TransactionStatus
 
 from seer_engine import config
-from seer_engine.backtest import b_report, wf_report
+from seer_engine.backtest import b_report, dev_report, wf_report
 from seer_engine.backtest.benchmark import Dividend, parse_dividends
 from seer_engine.backtest.market import Market, Membership
 from seer_engine.backtest.report import (
@@ -359,3 +359,37 @@ def write_model_artifact(model_dir: Path, data_end: date, model: b_model.BModel)
     tmp.write_bytes(data)
     os.replace(tmp, path)
     return path, b_model.sha256(data)
+
+
+def dev_report_files(
+    out_dir: Path, plans_dir: Path, report: dev_report.DevReport
+) -> tuple[tuple[Path, str], ...]:
+    """Every file of the P7a dev report set, rendered, as ``(path, text)`` in write order:
+    <stem>.md, <stem>-rows.csv, <stem>-curves.csv, <stem>-frontier.svg in ``out_dir``, then the
+    P7b pre-registration in ``plans_dir``. Nothing is written; ``backtest_dev --only`` renders
+    through this to exercise the renderers without touching ``docs/``."""
+    out_dir = Path(out_dir)
+    plans_dir = Path(plans_dir)
+    stem = dev_report.report_stem(report.run_date)
+    return (
+        (out_dir / f"{stem}.md", dev_report.render_markdown(report)),
+        (out_dir / f"{stem}-rows.csv", dev_report.rows_csv(report)),
+        (out_dir / f"{stem}-curves.csv", dev_report.curves_csv(report)),
+        (out_dir / f"{stem}-frontier.svg", dev_report.frontier_svg(report)),
+        (plans_dir / dev_report.preregistration_name(report.run_date), dev_report.render_preregistration(report)),
+    )
+
+
+def write_dev_report(out_dir: Path, plans_dir: Path, report: dev_report.DevReport) -> list[Path]:
+    """Write the P7a dev report set into ``out_dir`` and the pre-registration into ``plans_dir``
+    (both created if needed) with LF line endings; return the paths in ``dev_report_files``
+    order. All five are rendered before any directory is created or file written, so a render
+    error leaves no partial set."""
+    files = dev_report_files(out_dir, plans_dir, report)
+    for directory in sorted({path.parent for path, _ in files}):
+        directory.mkdir(parents=True, exist_ok=True)
+    paths: list[Path] = []
+    for path, text in files:
+        path.write_text(text, encoding="utf-8", newline="\n")
+        paths.append(path)
+    return paths

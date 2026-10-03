@@ -2,8 +2,8 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 06:35:00
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-04 07:05:00
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
@@ -13,8 +13,8 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 37
+- Blocked: 0
+- Completed: 38
 
 ---
 
@@ -39,21 +39,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
-- [ ] **P1-ENG-ZWP9** Phase 12: `backtest_dev` command, io writer, runtime on the real store
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns new `commands/backtest_dev.py` running the registry through `dev.run_registry(on_result=...)` (D-D), additive `backtest/io.py` (`dev_report_files`, `write_dev_report`), new `tests/test_backtest_dev_command.py` (28) incl. the D-I tests (`research.DEV_END`, `MEMBERSHIP_START`, `FX_START` equal `dev`'s; `registry.SECTOR_ETFS == research.SECTOR_ETFS`; registry fixed symbols subset of `research.RESEARCH_ETFS`) on a synthetic store; also a timed `--only` smoke run on the real store with no docs written, adding a fixed-order process pool (D13; +2 tests) if the estimated whole run exceeds 60 min. Exit: suite green at 1694 (1696 with the pool); the command's dirty-registry refusal is tested.
-  - **Status**: open
-  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 12 of 13)
-  - **Satisfies**: R4 — The dev window is enforced in code (no session after 2015-10-16), and a test proves it; R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
-  - **Depends on**: P1-ENG-CQ5M, P1-ENG-PLRV, P1-ENG-078U
-  - **Plan**: `.workflows/plan/P1-ENG-ZWP9.md`
-
 - [ ] **P1-ENG-904W** Phase 13: The real dev run, report, pre-registration, V0 `cmp`, docs
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns the committed report set and pre-registration file, an identical re-run (`cmp`), the real-data `cmp` of `docs/backtests/2026-10-02-*` (per Decisions), `engine/package_readme.md`, `docs/ROADMAP.md` (P7a entry with the result, and the P7b entry), and one appended Decisions row in the index (the R1 outcome). Never stops to ask (D-H): a missing store is rebuilt, a differing fingerprint is recorded and the run proceeds, a defect fixable only in `registry.py` or a frozen file ends the phase with the run uncommitted and a note in the phase log and completion summary. Exit: every handover §7 item checked off in the phase log; suite green with 0 skipped (1694 plus only Bug-protocol tests); CI green.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 13 of 13)
   - **Satisfies**: R1 — `TradeRules`: `DESIGN_V0` reproduces §5, and A, A2 and B re-render byte-identically (synthetic test plus a real-data `cmp`). Each new lever has its own synthetic-bar tests; R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R7 — The pre-registration file (≤ 3 finalists exactly specified, or "none eligible"), with the proposed §5 revision; R9 — Docs (package readme, ROADMAP P7a and P7b). The suite is green with 0 skipped, and CI is green
   - **Depends on**: P1-ENG-ZWP9
@@ -70,6 +60,34 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-ZWP9** Phase 12: `backtest_dev` command, io writer, runtime on the real store
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `commands/backtest_dev.py` running the registry through `dev.run_registry(on_result=...)` (D-D), additive `backtest/io.py` (`dev_report_files`, `write_dev_report`), new `tests/test_backtest_dev_command.py` (28) incl. the D-I tests (`research.DEV_END`, `MEMBERSHIP_START`, `FX_START` equal `dev`'s; `registry.SECTOR_ETFS == research.SECTOR_ETFS`; registry fixed symbols subset of `research.RESEARCH_ETFS`) on a synthetic store; also a timed `--only` smoke run on the real store with no docs written, adding a fixed-order process pool (D13; +2 tests) if the estimated whole run exceeds 60 min. Exit: suite green at 1694 (1696 with the pool); the command's dirty-registry refusal is tested.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 12 of 13)
+  - **Satisfies**: R4 — The dev window is enforced in code (no session after 2015-10-16), and a test proves it; R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-CQ5M, P1-ENG-PLRV, P1-ENG-078U
+  - **Plan**: `.workflows/plan/P1-ENG-ZWP9.md`
+  - **Completed**: 2026-10-04 07:05
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/io.py, engine/src/seer_engine/commands/backtest_dev.py, engine/tests/test_backtest_dev_command.py
+  - **Drift**:
+    - none: every API the plan quotes (io.py lines, dev.run_registry on_result, research constants/load_store, DevReport fields, registry ids) matched the tree
+  - **Decided**:
+    - test_full_run_writes_byte_identical_files asserted the run date never appears in rendered text, but dev_report's markdown links its sibling files by name (which carry the run date) -> the test strips the five sibling file names before asserting no run date remains (rung 1 / Decisions row 'Report file names': the run date appears in file names only, and so in the links between the sibling files); renderer unchanged
+    - Step 6 commit-before-smoke folded into the single phase commit: --only skips the registry check and registry.py is untouched (git status clean), so ordering does not matter (rung 6; /implement: main context performs no git ops)
+    - D13: sequential, estimated 1.1 min for 54 candidates from 16 timed, no pool; Step 8 not implemented (plan Step 7 decision rule)
+    - readme-updater -> skipped; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope; same call phases 9-11 made)
+    - Phase 13 (P1-ENG-904W) unblocked: its only dep, phase 12, is complete (completion-handler)
+  - **Outcome**:
+    - Suite: `PG_TEST_URL=... engine/.venv/bin/pytest engine/tests -q` -> 1694 passed, 0 skipped (2 pandas deprecation warnings from the test's fake downloader concat)
+    - Frozen set: `git diff --stat 2546a92 -- <frozen set>` printed nothing
+    - Research store verify: exit 0; fingerprint 5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a (equals phase 4's logged value); 539 symbols with bars, 2,490,793 bar rows, 28,206 dividends, 4,300 fx rows, 522 unserved
+    - Smoke: `backtest_dev --only` (16 candidates) on the real store: exit 0, wall 0:28.79, peak RSS 866,764 KB; `git status --porcelain docs/` empty
+    - Smoke timings: [1/16] REF-SPY-HOLD 0.76s; [2/16] REF-A-V0 4.26s (pre-1999 FX path ran fine, D-C); [3/16] F1-SPY-SMA200-D 0.71s; [4/16] F1-SPY-10MSMA-M 0.15s; [5/16] F1-SPY-VT12-W 0.33s; [6/16] F10-SSO-SMA200-D 0.25s; [7/16] F11-SPY-TOM-TREND 0.33s; [8/16] F2-GEM-SPYEFA-IEF 0.09s; [9/16] F3-SEC-TOP3-6M 0.22s; [10/16] F4-MOM12-N10-TREND 1.01s; [11/16] F4-MOM12-N10-TREND-W 0.99s; [12/16] F5-LV60-N20 1.38s; [13/16] F6-ML-P50-N10-VT12 1.55s; [14/16] F7-RSI2-T20-DIP 4.19s; [15/16] F9-SPY200M70-MOM30 1.07s; [16/16] F9-SPY200D50-SWING50 4.88s
+    - Estimated full run: 1.1 min for 54 candidates. D13: sequential, no pool
+
 - [x] **P1-ENG-PLRV** Phase 10: Dev report and pre-registration renderers
   - **Difficulty**: HARD
   - **Type**: Feature

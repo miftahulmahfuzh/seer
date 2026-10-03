@@ -201,7 +201,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "b2ec090",
       "depends_on": [
         5,
         6,
@@ -211,15 +211,15 @@
       ],
       "difficulty": "NORMAL",
       "n": 11,
-      "note": null,
+      "note": "registry 54 + 74 tests; FIRST_APPEND=2026-10-04 (commit date, plan Step 1); suite 1634 excl p10 in-progress",
       "package": "backtest",
       "plan": ".workflows/plan/trade-rules-dev-search/phase-11.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T23:30:57+00:00",
       "satisfies": [
         "R5"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-078U",
       "title": "The candidate registry (54 entries, append-only test)"
     },
     {
@@ -271,7 +271,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/trade-rules-dev-search/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trade-rules-dev-search",
-  "updated": "2026-10-03T23:23:59+00:00",
+  "updated": "2026-10-03T23:30:57+00:00",
   "verified_at": "2026-10-03T14:04:32+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trade-rules-dev-search"
 }

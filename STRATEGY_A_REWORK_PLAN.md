@@ -333,12 +333,12 @@ def write_wf_report(out_dir: Path, report: WalkForwardReport) -> list[Path]
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Strategy A2: variants V0–V3 | R1, R2, R5 | `strategies` | 3 | — | NORMAL | `.workflows/plan/strategy-a-rework/phase-1.md` | — | — |
-| 2 | Runner params schedule, `metrics_through`, `select` fallback | R3, R8 | `backtest` | 6 | — | NORMAL | `.workflows/plan/strategy-a-rework/phase-2.md` | — | — |
-| 3 | Walk-forward engine | R3, R4, R5 | `backtest` | 2 | 1, 2 | HARD | `.workflows/plan/strategy-a-rework/phase-3.md` | — | — |
-| 4 | Walk-forward report rendering | R5, R6 | `backtest` | 2 | 3 | HARD | `.workflows/plan/strategy-a-rework/phase-4.md` | — | — |
-| 5 | `backtest_wf` command + `write_wf_report` | R4, R6 | `commands`, `backtest` | 3 | 4 | NORMAL | `.workflows/plan/strategy-a-rework/phase-5.md` | — | — |
-| 6 | Real run on Neon, freeze or stop, docs | R6, R7, R8 | `docs`, `strategies`, `tests` | 8 (fail) / 9 (pass); 5 generated | 5 | NORMAL | `.workflows/plan/strategy-a-rework/phase-6.md` | — | — |
+| 1 | Strategy A2: variants V0–V3 | R1, R2, R5 | `strategies` | 3 | — | NORMAL | `.workflows/plan/strategy-a-rework/phase-1.md` | P1-ENG-WCIA | — |
+| 2 | Runner params schedule, `metrics_through`, `select` fallback | R3, R8 | `backtest` | 6 | — | NORMAL | `.workflows/plan/strategy-a-rework/phase-2.md` | P1-ENG-3PA3 | — |
+| 3 | Walk-forward engine | R3, R4, R5 | `backtest` | 2 | 1, 2 | HARD | `.workflows/plan/strategy-a-rework/phase-3.md` | P1-ENG-ODYP | — |
+| 4 | Walk-forward report rendering | R5, R6 | `backtest` | 2 | 3 | HARD | `.workflows/plan/strategy-a-rework/phase-4.md` | P1-ENG-BVN5 | — |
+| 5 | `backtest_wf` command + `write_wf_report` | R4, R6 | `commands`, `backtest` | 3 | 4 | NORMAL | `.workflows/plan/strategy-a-rework/phase-5.md` | P1-ENG-U4G0 | — |
+| 6 | Real run on Neon, freeze or stop, docs | R6, R7, R8 | `docs`, `strategies`, `tests` | 8 (fail) / 9 (pass); 5 generated | 5 | NORMAL | `.workflows/plan/strategy-a-rework/phase-6.md` | P1-ENG-RTWR | — |
 
 ### Phase 1: Strategy A2, variants V0–V3
 **Satisfies:** R1, R2, R5. One module, so the variant rules and their identity/look-ahead tests cannot be split.

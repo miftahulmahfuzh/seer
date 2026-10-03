@@ -2,18 +2,18 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 15:54:18
-**Total Active Tasks**: 0
+**Last Updated**: 2026-10-03 17:19:26
+**Total Active Tasks**: 6
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 0
+- Blocked: 4
 - Completed: 14
 
 ---
@@ -24,6 +24,26 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ### [P1] High
 
+- [ ] **P1-ENG-WCIA** Phase 1: Strategy A2: variants V0–V3
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `strategies/a2.py` (new, exactly the shared contract; `STRATEGY_A2_PARAMS = None` under a two-line placeholder comment, `Decimal` imported), `strategies/__init__.py` exports, `tests/test_strategy_a2.py` (new: every R1 rule; V0 `==` v1 over a contract set for several params; P4 identity for all four variants; no look-ahead with SPY mutated/truncated from S; SPY never picked; `REGIME_SYMBOL == universe.BENCHMARK`), reusing `tests/stratkit.py` unedited. Does not touch `a.py`, `base.py`, `indicators.py`, `stratkit.py`, `test_strategy_purity.py`, `backtest/`. Exit: suite green, 0 skipped (660 alone, 673 with phase 2); purity glob covers `a2.py`; `a.py`, `base.py`, `indicators.py` byte-identical to `e14de0c`.
+  - **Status**: in_progress
+  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 1 of 6)
+  - **Satisfies**: R1 — Variants V0–V3 with tests of each added rule: regime off at SPY close ≤ SMA(200), including equality; the ATR% ranking and its tie order; the $10 floor at exactly 10.0000; V0 picks `==` v1 picks; R2 — P4 identity and no look-ahead for every variant, including SPY's own bars dated ≥ S; R5 — The new modules pass the globbing purity test
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-WCIA.md`
+
+- [ ] **P1-ENG-3PA3** Phase 2: Runner params schedule, `metrics_through`, `select` fallback
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `ParamsSchedule` + the schedule branch in `run_backtest`, `metrics_through` in `metrics.py`, keyword-only `fallback=` (default `DESIGN_PARAMS`, D19) on `tuning.select`; tests in `test_backtest_runner.py` / `test_backtest_metrics.py` / `test_backtest_tuning.py` (mid-run param switch keeps open bracket; one-segment schedule `==` plain run except `RunResult.params`; prefix property on scenario + Strategy A smoke markets incl. forced closes; `select` with/without fallback; helpers `ParamPicks`, `TABLE_B`, `SWITCH`, `smoke_market(cut=None)` appended, existing helpers untouched). Only changed assertion: `select` signature guard widened to `["rows", "fallback"]`. Does not touch `strategies/`, `report.py`, `commands/`. Exit: suite green, 0 skipped (611 alone, 673 with phase 1); every existing runner/tuning/metrics test unchanged and passing except the widened guard.
+  - **Status**: pending
+  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 2 of 6)
+  - **Satisfies**: R3 — Anchored yearly walk-forward: folds as defined, each fold's selection sees only its tuning window, segments chain into one portfolio, brackets survive the year boundary, the fallback is used when nothing qualifies; R8 — The v1 `backtest` report is byte-identical when re-run on the same data; `engine/package_readme.md` documents the variants, walk-forward and the new command; the suite is green with 0 skipped; CI is green
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-3PA3.md`
+
 ### [P2] Medium
 
 ### [P3] Low
@@ -31,6 +51,46 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P4] Backlog
 
 ### 🚫 Blocked
+
+- [ ] **P1-ENG-ODYP** Phase 3: Walk-forward engine
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `backtest/walkforward.py` (new: `folds`, `combinations`, `tune`, `select_fold`, `schedule`, `walk_forward`, `diagnostics`, `window_metrics`, `curve_window_metrics`, `gate_p3b`) and `tests/test_backtest_walkforward.py` (new, synthetic: folds as defined incl. real calendar 2018…2026 vs end 2026-10-02 and edge cases; 324 combinations in order; `tune` rows `==` direct per-fold runs; mutating a bar inside a traded year leaves that fold unchanged; one portfolio with year-start param switches, bracket survives 31 Dec; fallback used when nothing qualifies; diagnostics hand-computed; gate sentences; determinism). Does not touch `runner.py`, `metrics.py`, `tuning.py`, `strategies/`, existing tests. Exit: suite green, 0 skipped (712); purity glob covers the module.
+  - **Status**: blocked
+  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 3 of 6)
+  - **Satisfies**: R3 — Anchored yearly walk-forward: folds as defined, each fold's selection sees only its tuning window, segments chain into one portfolio, brackets survive the year boundary, the fallback is used when nothing qualifies; R4 — Determinism: `==` results and byte-identical files; a parallel gather, if any, comes back in a fixed order; R5 — The new modules pass the globbing purity test
+  - **Depends on**: P1-ENG-WCIA, P1-ENG-3PA3
+  - **Plan**: `.workflows/plan/P1-ENG-ODYP.md`
+
+- [ ] **P1-ENG-BVN5** Phase 4: Walk-forward report rendering
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `backtest/wf_report.py` (new: `WalkForwardReport`, `report_stem`, machine lines, `parse_machine_line`, `render_markdown`, `equity_csv`, `grid_csv`, `equity_svg`, `variants_svg`) and `tests/test_backtest_wf_report.py` (new, from a small synthetic walk-forward). 16 report sections in order (title, verdict, Data, Method listing everything tried, Folds with top-10, WF vs both SPY curves, per-variant tables/selections, Diagnostics, "Seen before" from 2022-01-03, go-live checklist, survivorship, open positions, equity curves, gate verdict, fail-only owner options (a)-(c), machine lines per D14). Imports `report.py` helpers read-only, defines its own `_STYLE`. Does not touch `report.py`. Exit: suite green, 0 skipped (740); two renders byte-equal (invariant 5, D16).
+  - **Status**: blocked
+  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 4 of 6)
+  - **Satisfies**: R5 — The new modules pass the globbing purity test; R6 — One real walk-forward run on Neon, with a committed report holding fold selections and tables, per-variant curves, WF vs both SPY curves, diagnostics, the "seen before" window, the survivorship note and the P3b verdict sentence
+  - **Depends on**: P1-ENG-ODYP
+  - **Plan**: `.workflows/plan/P1-ENG-BVN5.md`
+
+- [ ] **P1-ENG-U4G0** Phase 5: `backtest_wf` command + `write_wf_report`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `io.write_wf_report` and `commands/backtest_wf.py` (args, `resolve` preconditions mirroring v1 exit-2 cases, `tune_all` per-combination timing via `walkforward.tune` (D17), `run_walk_forward`, `execute` building SPY curves + verdict as `wf_report._validate` recomputes; logs prepare time, per-combo/total tuning time, per-fold selections, verdict, `STRATEGY_A2_PARAMS` match) plus `tests/test_backtest_wf_command.py` (discovery/defaults, exit-2 cases, end-to-end on synthetic PG schema spanning >= 2 trade years: read-only, five file names, cache hit, byte-identical re-run). Does not touch `commands/backtest.py`, `report.py`, `walkforward.py`, `wf_report.py` (except logged defect fixes). Exit: suite green, 0 skipped (757); `python -m seer_engine backtest_wf --help` works; `tune_all == tune` on a subset tested.
+  - **Status**: blocked
+  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 5 of 6)
+  - **Satisfies**: R4 — Determinism: `==` results and byte-identical files; a parallel gather, if any, comes back in a fixed order; R6 — One real walk-forward run on Neon, with a committed report holding fold selections and tables, per-variant curves, WF vs both SPY curves, diagnostics, the "seen before" window, the survivorship note and the P3b verdict sentence
+  - **Depends on**: P1-ENG-BVN5
+  - **Plan**: `.workflows/plan/P1-ENG-U4G0.md`
+
+- [ ] **P1-ENG-RTWR** Phase 6: Real run on Neon, freeze or stop, docs
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns one real `backtest_wf` run with committed `docs/backtests/<end>-strategy-a2-walkforward{.md,-equity.csv,-equity.svg,-variants.svg,-grid.csv}`; on pass replace the placeholder with an `A2Params(...)` literal of the last fold selection + comment naming the report and re-run, on fail leave `None`; `tests/test_strategy_a2_frozen.py` asserts the branch taken; v1 byte-identity check vs committed `2026-10-02-strategy-a.*` (D9); `docs/ROADMAP.md` P3b line with verdict (fail: one rework failed, P4 stays blocked); `engine/package_readme.md` (strategies A2/variants, backtest schedule/`metrics_through`/walkforward/wf_report, `backtest_wf` section, `## Performance`, Usage). Does not touch pure-module logic except tested, logged defect fixes. Exit: report committed; frozen test green; v1 identity verified; suite green, 0 skipped (761); CI green on push.
+  - **Status**: blocked
+  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 6 of 6)
+  - **Satisfies**: R6 — One real walk-forward run on Neon, with a committed report holding fold selections and tables, per-variant curves, WF vs both SPY curves, diagnostics, the "seen before" window, the survivorship note and the P3b verdict sentence; R7 — Freeze or stop: on a pass, frozen A2 params with a comment naming the report and a code↔report test; on a fail, ROADMAP records that the one rework failed and P4 stays blocked, and the report lists what was tried; R8 — The v1 `backtest` report is byte-identical when re-run on the same data; `engine/package_readme.md` documents the variants, walk-forward and the new command; the suite is green with 0 skipped; CI is green
+  - **Depends on**: P1-ENG-U4G0
+  - **Plan**: `.workflows/plan/P1-ENG-RTWR.md`
 
 ---
 

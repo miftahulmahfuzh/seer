@@ -25,41 +25,41 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "2a0e15e",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "ParamsSchedule, metrics_through, select fallback; 673 passed 0 skipped",
       "package": "backtest",
       "plan": ".workflows/plan/strategy-a-rework/phase-2.md",
-      "reported_at": "2026-10-03T10:21:54+00:00",
+      "reported_at": "2026-10-03T10:23:17+00:00",
       "satisfies": [
         "R3",
         "R8"
       ],
-      "status": "running",
+      "status": "done",
       "task_id": "P1-ENG-3PA3",
       "title": "Runner params schedule, `metrics_through`, `select` fallback"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "c4fe664",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "HARD",
       "n": 3,
-      "note": null,
+      "note": "walkforward engine; 712 passed 0 skipped; landed without sending a report, verified from git",
       "package": "backtest",
       "plan": ".workflows/plan/strategy-a-rework/phase-3.md",
-      "reported_at": "2026-10-03T10:21:54+00:00",
+      "reported_at": "2026-10-03T10:26:38+00:00",
       "satisfies": [
         "R3",
         "R4",
         "R5"
       ],
-      "status": "pending",
+      "status": "done",
       "task_id": "P1-ENG-ODYP",
       "title": "Walk-forward engine"
     },
@@ -79,7 +79,7 @@
         "R5",
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": "P1-ENG-BVN5",
       "title": "Walk-forward report rendering"
     },
@@ -128,6 +128,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-a-rework/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-a-rework",
-  "updated": "2026-10-03T10:21:54+00:00",
+  "updated": "2026-10-03T10:26:38+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-a-rework"
 }

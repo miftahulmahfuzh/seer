@@ -25,20 +25,20 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "3bf02a5",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "b.py + mean_window/stdev_return_window, +59 tests; full suite 879/0 skipped with p1+p3; Step 3 left to p1 (shared tree)",
       "package": "strategies",
       "plan": ".workflows/plan/strategy-b-ranker/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T11:50:58+00:00",
       "satisfies": [
         "R2",
         "R3",
         "R6"
       ],
-      "status": "pending",
+      "status": "done",
       "task_id": "P1-ENG-1OMN",
       "title": "B features, ranks, candidates, `StrategyB"
     },
@@ -81,7 +81,7 @@
         "R5",
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": "P1-ENG-U5JJ",
       "title": "B walk-forward: candidate table, purge, per-fold fits, runs, diagnostics, gate"
     },
@@ -152,7 +152,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-b-ranker/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-b-ranker",
-  "updated": "2026-10-03T11:50:13+00:00",
+  "updated": "2026-10-03T11:51:16+00:00",
   "verified_at": "2026-10-03T11:49:21+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-b-ranker"
 }

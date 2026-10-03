@@ -1,0 +1,119 @@
+{
+  "branch": "feature/engine-data-pipeline",
+  "coordinator": "orch-engine-data-pipeline",
+  "coordinator_session_id": "2b1a19a9-32c7-42ba-9389-1de28a861ed5",
+  "created": "2026-10-03T05:49:01+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "engine/`, `db/",
+      "plan": ".workflows/plan/engine-data-pipeline/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R4",
+        "R5",
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Engine foundation: package, migration 002, dates, DB helpers, demo purge"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 2,
+      "note": null,
+      "package": "engine/",
+      "plan": ".workflows/plan/engine-data-pipeline/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R4",
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Point-in-time universe membership"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "engine/",
+      "plan": ".workflows/plan/engine-data-pipeline/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R4",
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "yfinance + FX history backfill"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": null,
+      "package": "engine/",
+      "plan": ".workflows/plan/engine-data-pipeline/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3",
+        "R4",
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Nightly command: Massive bars, splits, FX, runs"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2,
+        3,
+        4
+      ],
+      "difficulty": "NORMAL",
+      "n": 5,
+      "note": null,
+      "package": ".github/`, `web/scripts`, `docs/",
+      "plan": ".workflows/plan/engine-data-pipeline/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R3",
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Workflows, seed guard, runbook, live run on Neon"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/engine-data-pipeline/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "engine-data-pipeline",
+  "updated": "2026-10-03T05:49:01+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/engine-data-pipeline"
+}

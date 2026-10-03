@@ -1,0 +1,90 @@
+{
+  "branch": "feature/engine-fill-simulator",
+  "coordinator": "orch-engine-fill-simulator",
+  "coordinator_session_id": "9e178c63-2566-4dc2-bedf-41b4676121ca",
+  "created": "2026-10-03T07:20:44+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "seer_engine`, `seer_engine.sim",
+      "plan": ".workflows/plan/engine-fill-simulator/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R3",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Pure price types, sim model and session lifecycle"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 2,
+      "note": null,
+      "package": "seer_engine.sim",
+      "plan": ".workflows/plan/engine-fill-simulator/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Whole-share sizing of picks into slots"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "seer_engine.sim",
+      "plan": ".workflows/plan/engine-fill-simulator/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Split recompute for live orders"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2,
+        3
+      ],
+      "difficulty": "NORMAL",
+      "n": 4,
+      "note": null,
+      "package": "seer_engine.sim`, docs",
+      "plan": ".workflows/plan/engine-fill-simulator/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Public API, scenario, determinism, benchmark, docs"
+    }
+  ],
+  "plan": "/home/miftah/.worktrees/seer/engine-fill-simulator/.workflows/orchestration/engine-fill-simulator/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "engine-fill-simulator",
+  "updated": "2026-10-03T07:20:44+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/engine-fill-simulator"
+}

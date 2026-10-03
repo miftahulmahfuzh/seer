@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 18:54:00
-**Total Active Tasks**: 4
+**Last Updated**: 2026-10-03 19:30:00
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 4
+- P1 High: 3
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 2
-- Completed: 23
+- Blocked: 1
+- Completed: 24
 
 ---
 
@@ -38,20 +38,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Decided**:
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
-- [ ] **P1-ENG-VK5P** Phase 5: B report rendering
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns new `backtest/b_report.py` (`BReport` with `curves()`/`gated_curve()`, `_validate`, `top_features`, machine lines with `label_sum` as a JSON string of `repr(float)` D23, `render_markdown`, `equity_csv`, `equity_svg`; Markdown sections in order: title, data, method, per-fold training summary for B and B-linear, results vs both SPY curves, year by year, diagnostics incl. passed nights and calibration, seen before, go-live checklist, survivorship with learned-model caveat, open positions, curves SVG link, verdict sentence, owner's options (b)/(c)/(d) on a fail, machine fence) and new `tests/test_backtest_b_report.py` (27 tests from a small synthetic run via phase 4's API). Does not touch `wf_report.py` or `report.py` (helpers imported only). Exit: suite green, 0 skipped (941); rendering twice is byte-identical; `_validate` rejects a mismatched verdict, a misaligned curve and a schedule not matching `fold_models`.
-  - **Status**: open
-  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 5 of 7)
-  - **Satisfies**: R5 — Determinism. `==` results and byte-identical files. The gated model is bit-identical across runs and thread counts, or the pre-registered switch to B-linear takes effect; R6 — Purity. The new modules pass the globbing purity test; R7 — One real run on Neon, with the committed report holding every section §6.7 lists
-  - **Depends on**: P1-ENG-U5JJ
-  - **Plan**: `.workflows/plan/P1-ENG-VK5P.md`
 - [ ] **P1-ENG-UREW** Phase 6: `backtest_b` command + io writers
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns additive `backtest/io.py` (`MODELS_DIR`, `write_b_report`, `write_model_artifact`; the only phase editing `io.py`), new `commands/backtest_b.py` incl. public `recompute_a2(market, folds)` with eager imports (every CLI command now loads scikit-learn via `cli.discover`, D19), and new `tests/test_backtest_b_command.py` (23 tests: `execute` twice on a synthetic market gives `==` reports and byte-identical files; gate pass writes the artifact, fail does not; exit 2 on a precondition; A2 curve equals `backtest_wf`'s combined curve; wall times in logs only; synthetic-market helpers live in the test file). Does not touch `backtest_wf.py` (imported only) or `cli.py`. Exit: suite green, 0 skipped (964); `python -m seer_engine backtest_b --help` works.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 6 of 7)
   - **Satisfies**: R5 — Determinism. `==` results and byte-identical files. The gated model is bit-identical across runs and thread counts, or the pre-registered switch to B-linear takes effect; R7 — One real run on Neon, with the committed report holding every section §6.7 lists
   - **Depends on**: P1-ENG-VK5P
@@ -77,6 +68,20 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-VK5P** Phase 5: B report rendering
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/b_report.py` (`BReport` with `curves()`/`gated_curve()`, `_validate`, `top_features`, machine lines with `label_sum` as a JSON string of `repr(float)` D23, `render_markdown`, `equity_csv`, `equity_svg`; Markdown sections in order: title, data, method, per-fold training summary for B and B-linear, results vs both SPY curves, year by year, diagnostics incl. passed nights and calibration, seen before, go-live checklist, survivorship with learned-model caveat, open positions, curves SVG link, verdict sentence, owner's options (b)/(c)/(d) on a fail, machine fence) and new `tests/test_backtest_b_report.py` (27 tests from a small synthetic run via phase 4's API). Does not touch `wf_report.py` or `report.py` (helpers imported only). Exit: suite green, 0 skipped (941); rendering twice is byte-identical; `_validate` rejects a mismatched verdict, a misaligned curve and a schedule not matching `fold_models`.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_B_RANKER_PLAN.md` (phase 5 of 7)
+  - **Satisfies**: R5 — Determinism. `==` results and byte-identical files. The gated model is bit-identical across runs and thread counts, or the pre-registered switch to B-linear takes effect; R6 — Purity. The new modules pass the globbing purity test; R7 — One real run on Neon, with the committed report holding every section §6.7 lists
+  - **Depends on**: P1-ENG-U5JJ
+  - **Plan**: `.workflows/plan/P1-ENG-VK5P.md`
+  - **Completed**: 2026-10-03 19:30
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/backtest/b_report.py, engine/tests/test_backtest_b_report.py
+  - **Decided**:
+    - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope) -- same decision phases 1-4 recorded
 - [x] **P1-ENG-U5JJ** Phase 4: B walk-forward: candidate table, purge, per-fold fits, runs, diagnostics, gate
   - **Difficulty**: HARD
   - **Type**: Feature

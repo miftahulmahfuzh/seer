@@ -3,6 +3,12 @@
   "coordinator": "orch-engine-data-pipeline",
   "coordinator_session_id": "2b1a19a9-32c7-42ba-9389-1de28a861ed5",
   "created": "2026-10-03T05:49:01+00:00",
+  "landed": {
+    "at": "2026-10-03T06:31:22+00:00",
+    "base": "main",
+    "commit": "c81c1e8aa35e53b9be0c06318d8e6ccae1d3b8d8",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -89,7 +95,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "d7a3b7a",
       "depends_on": [
         2,
         3,
@@ -97,24 +103,24 @@
       ],
       "difficulty": "NORMAL",
       "n": 5,
-      "note": null,
+      "note": "4 workflows (actionlint clean), seed guard, runbook 7/7; Neon live: demo purged, 663 ok/133 empty/0 failed, 1.82M bars 177MB, nightly x2+dry identical, run 1 = 2026-10-02->10-05; local commit only, not pushed",
       "package": ".github/`, `web/scripts`, `docs/",
       "plan": ".workflows/plan/engine-data-pipeline/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T06:29:58+00:00",
       "satisfies": [
         "R1",
         "R3",
         "R5"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-2QEA",
       "title": "Workflows, seed guard, runbook, live run on Neon"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/engine-data-pipeline/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "engine-data-pipeline",
-  "updated": "2026-10-03T06:00:19+00:00",
+  "updated": "2026-10-03T06:31:22+00:00",
   "verified_at": "2026-10-03T05:57:40+00:00",
   "worktree": "/home/miftah/.worktrees/seer/engine-data-pipeline"
 }

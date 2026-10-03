@@ -20,7 +20,7 @@
         "R9"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ENG-CW71",
       "title": "B model interface + scikit-learn dependency"
     },
     {
@@ -39,25 +39,25 @@
         "R6"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ENG-1OMN",
       "title": "B features, ranks, candidates, `StrategyB"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "d49a9ef",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 3,
-      "note": null,
+      "note": "labels.py + 30 tests; suite 850 passed (761+30+p2's 59), 0 skipped; Step 3 left to p1; readme left to p7",
       "package": "backtest",
       "plan": ".workflows/plan/strategy-b-ranker/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T11:49:09+00:00",
       "satisfies": [
         "R1",
         "R6"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-DKWU",
       "title": "Vectorized bracket labeler"
     },
     {
@@ -82,7 +82,7 @@
         "R6"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ENG-U5JJ",
       "title": "B walk-forward: candidate table, purge, per-fold fits, runs, diagnostics, gate"
     },
     {
@@ -103,7 +103,7 @@
         "R7"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ENG-VK5P",
       "title": "B report rendering"
     },
     {
@@ -123,7 +123,7 @@
         "R7"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ENG-UREW",
       "title": "backtest_b` command + io writers"
     },
     {
@@ -145,13 +145,14 @@
         "R9"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ENG-M99E",
       "title": "Real run on Neon, A2 byte-identity check, freeze or stop, docs"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-b-ranker/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-b-ranker",
-  "updated": "2026-10-03T11:43:13+00:00",
+  "updated": "2026-10-03T11:49:21+00:00",
+  "verified_at": "2026-10-03T11:49:21+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-b-ranker"
 }

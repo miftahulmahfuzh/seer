@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/strategy-b-ranker`
 **Branch:** `feature/strategy-b-ranker` (base: `origin/main` @ `0e91d8a`)
 **Phases:** 7
-**Status:** planned
+**Status:** phase 3/7 complete (phases 1, 2, 3 done)
 **Coordinator:** —
 
 ---
@@ -469,13 +469,13 @@ def write_model_artifact(model_dir: Path, data_end: date, model: BModel) -> tupl
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | B model interface + scikit-learn dependency | R5, R6, R9 | `strategies` | 3 | — | NORMAL | `.workflows/plan/strategy-b-ranker/phase-1.md` | — | — |
-| 2 | B features, ranks, candidates, `StrategyB` | R2, R3, R6 | `strategies` | 5 | — | HARD | `.workflows/plan/strategy-b-ranker/phase-2.md` | — | — |
-| 3 | Vectorized bracket labeler | R1, R6 | `backtest` | 2 | — | HARD | `.workflows/plan/strategy-b-ranker/phase-3.md` | — | — |
-| 4 | B walk-forward: candidate table, purge, per-fold fits, runs, diagnostics, gate | R1, R3, R4, R5, R6 | `backtest` | 2 | 1, 2, 3 | HARD | `.workflows/plan/strategy-b-ranker/phase-4.md` | — | — |
-| 5 | B report rendering | R5, R6, R7 | `backtest` | 2 | 4 | HARD | `.workflows/plan/strategy-b-ranker/phase-5.md` | — | — |
-| 6 | `backtest_b` command + io writers | R5, R7 | `commands`, `backtest` | 3 | 5 | NORMAL | `.workflows/plan/strategy-b-ranker/phase-6.md` | — | — |
-| 7 | Real run on Neon, A2 byte-identity check, freeze or stop, docs | R4, R7, R8, R9 | `docs`, `strategies`, `tests` | 6–8 | 6 | NORMAL | `.workflows/plan/strategy-b-ranker/phase-7.md` | — | — |
+| 1 | B model interface + scikit-learn dependency | R5, R6, R9 | `strategies` | 3 | — | NORMAL | `.workflows/plan/strategy-b-ranker/phase-1.md` | P1-ENG-CW71 | — |
+| 2 | B features, ranks, candidates, `StrategyB` | R2, R3, R6 | `strategies` | 5 | — | HARD | `.workflows/plan/strategy-b-ranker/phase-2.md` | P1-ENG-1OMN | — |
+| 3 | Vectorized bracket labeler | R1, R6 | `backtest` | 2 | — | HARD | `.workflows/plan/strategy-b-ranker/phase-3.md` | P1-ENG-DKWU | — |
+| 4 | B walk-forward: candidate table, purge, per-fold fits, runs, diagnostics, gate | R1, R3, R4, R5, R6 | `backtest` | 2 | 1, 2, 3 | HARD | `.workflows/plan/strategy-b-ranker/phase-4.md` | P1-ENG-U5JJ | — |
+| 5 | B report rendering | R5, R6, R7 | `backtest` | 2 | 4 | HARD | `.workflows/plan/strategy-b-ranker/phase-5.md` | P1-ENG-VK5P | — |
+| 6 | `backtest_b` command + io writers | R5, R7 | `commands`, `backtest` | 3 | 5 | NORMAL | `.workflows/plan/strategy-b-ranker/phase-6.md` | P1-ENG-UREW | — |
+| 7 | Real run on Neon, A2 byte-identity check, freeze or stop, docs | R4, R7, R8, R9 | `docs`, `strategies`, `tests` | 6–8 | 6 | NORMAL | `.workflows/plan/strategy-b-ranker/phase-7.md` | P1-ENG-M99E | — |
 
 ### Phase 1: B model interface + scikit-learn dependency
 **Satisfies:** R5 (model determinism), R6, R9 (the dependency reaches CI).

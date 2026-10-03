@@ -50,6 +50,8 @@ engine/
       lifecycle.py          step(), close_unpriced()
       sizing.py             Pick, Rejection, SizingResult, size_picks()
       split_adjust.py       apply_split()
+    strategies/             pure strategy interface, indicators, Strategy A (P3; full docs land with P3 phase 6)
+    backtest/               10-year backtest (P3; docstring only so far, full docs land with P3 phase 6)
     commands/
       __init__.py           command-module contract
       migrate.py            `migrate` command

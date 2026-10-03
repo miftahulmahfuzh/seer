@@ -124,6 +124,23 @@ def test_select_falls_back_to_design_values_when_nothing_qualifies():
     assert select([]).params == DESIGN_PARAMS
 
 
+def test_select_fallback_is_used_only_when_nothing_qualifies():
+    nothing = rows_with(M(0.5, dd=0.2), M(0.4, pf=1.0))
+    sentinel = object()
+    s = select(nothing, fallback=sentinel)
+    assert s.params is sentinel
+    assert s.qualified is False
+    assert s.reason == select(nothing).reason  # same words whatever the fallback
+    assert select([], fallback=sentinel).params is sentinel
+    # With a qualifying row the fallback is ignored: same Selection as without it.
+    some = rows_with(M(0.5, dd=0.2), M(0.1), M(0.2))
+    assert select(some, fallback=sentinel) == select(some)
+    assert select(some, fallback=sentinel).params == grid()[2]
+    # The default is DESIGN_PARAMS, exactly as before.
+    assert select(nothing) == select(nothing, fallback=DESIGN_PARAMS)
+    assert select(nothing).params is DESIGN_PARAMS
+
+
 def test_select_is_deterministic():
     rows = rows_with(*(M(0.01 * (i % 7), dd=0.05 + 0.001 * i) for i in range(81)))
     assert select(rows) == select(list(rows))
@@ -173,10 +190,14 @@ def test_gate_accepts_an_infinite_profit_factor():
 
 
 def test_gate_and_select_see_only_their_own_window():
-    # Structural guard for invariant 6: neither takes the other window's data.
+    # Structural guard for invariant 6: neither takes the other window's data. select's only
+    # extra parameter is the keyword-only fallback params object (P3b), never a metrics window.
     import inspect
 
-    assert list(inspect.signature(select).parameters) == ["rows"]
+    params = inspect.signature(select).parameters
+    assert list(params) == ["rows", "fallback"]
+    assert params["fallback"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert params["fallback"].default is DESIGN_PARAMS
     assert list(inspect.signature(gate).parameters) == ["oos", "spy_tr_oos"]
 
 

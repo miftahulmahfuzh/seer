@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (src layout: `engine/src/seer_engine`)
-**Last Updated**: 2026-10-03 (Strategy A + backtest P3, phase 6 of `STRATEGY_A_BACKTEST_PLAN.md`: `strategies`, `backtest`, `backtest` command, committed report)
+**Last Updated**: 2026-10-03 (Strategy A rework P3b, phase 6 of `STRATEGY_A_REWORK_PLAN.md`: `strategies.a2`, walk-forward, `backtest_wf` command, committed walk-forward report)
 
 ## Overview
 
@@ -24,6 +24,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - The pure fill simulator (`sim/`): order lifecycle, whole-share sizing, cash/equity and split recompute, shared by the backtest (P3) and nightly paper trading (P4)
 - The pure strategy layer (`strategies/`): the `Strategy` protocol, numpy indicator windows and Strategy A with its frozen parameters, shared by the backtest (P3) and nightly picks (P4)
 - The 10-year backtest (`backtest/`, `backtest` command): point-in-time market, the session loop around the simulator, SPY benchmarks, metrics identical to the web's, the in-sample grid, the out-of-sample gate and the committed report
+- The Strategy A rework (P3b): `strategies.a2` (Strategy A's pre-registered variants V0–V3), an anchored yearly walk-forward (`backtest/walkforward.py`) that drives one portfolio whose params change by year, its report (`backtest/wf_report.py`) and the `backtest_wf` command
 
 ## Layout
 
@@ -53,28 +54,32 @@ engine/
       sizing.py             Pick, Rejection, SizingResult, size_picks()
       split_adjust.py       apply_split()
     strategies/             strategy layer: pure; float64 indicators, Decimal picks (P3)
-      __init__.py           re-exports the public names of base and a
+      __init__.py           re-exports the public names of base, a and a2
       base.py               History, history_from_bars(), Strategy protocol
       indicators.py         sma / wilder_rsi / wilder_atr / mean_dollar_volume windows, rolling()
       a.py                  Strategy A: AParams, DESIGN_PARAMS, STRATEGY_A_PARAMS (frozen), StrategyA
-    backtest/               10-year backtest (P3); every module but io.py is pure
+      a2.py                 Strategy A2 (P3b): A2Params, VARIANTS V0-V3, regime_on, STRATEGY_A2_PARAMS, StrategyA2
+    backtest/               10-year backtest (P3) and walk-forward (P3b); every module but io.py is pure
       __init__.py           docstring only
       market.py             Membership, Market: bars, universe and FX in memory
-      runner.py             run_backtest(), RunResult, survivorship()
+      runner.py             run_backtest(), RunResult, survivorship(), ParamsSchedule (P3b)
       benchmark.py          SPY buy-and-hold, price-only and total-return
-      metrics.py            Metrics, strategy_metrics(), checklist() (web/lib/metrics.ts parity)
-      tuning.py             windows, the 81-run grid, select(), gate()
+      metrics.py            Metrics, strategy_metrics(), checklist() (web/lib/metrics.ts parity), metrics_through() (P3b)
+      tuning.py             windows, the 81-run grid, select(fallback=), gate()
+      walkforward.py        folds, 324 combinations, tune(), select_fold(), walk_forward(), diagnostics(), gate_p3b() (P3b)
       report.py             BacktestReport, render_markdown(), equity_csv(), equity_svg()
-      io.py                 Neon loader + bar cache, dividends CSV, report writer (impure)
+      wf_report.py          WalkForwardReport, machine lines, Markdown, equity/grid CSVs, two SVGs (P3b)
+      io.py                 Neon loader + bar cache, dividends CSV, report writers write_report() / write_wf_report() (impure)
     commands/
       __init__.py           command-module contract
       migrate.py            `migrate` command
       backfill.py           `backfill` command (phase 3)
       backtest.py           `backtest` command (P3)
+      backtest_wf.py        `backtest_wf` command (P3b)
   tests/                    pytest; DB tests need PG_TEST_URL
   data/spy_dividends.csv    SPY dividends (ex_date, amount_usd), vendored from yfinance (see data/SOURCES.md)
   .cache/                   gitignored; bars-<max date>-<rows>.pkl written by the backtest loader
-docs/backtests/             committed backtest reports: <data end>-strategy-a.md, -equity.csv, -equity.svg
+docs/backtests/             committed reports: <end>-strategy-a{.md,-equity.csv,-equity.svg} (P3); <end>-strategy-a2-walkforward{.md,-equity.csv,-equity.svg,-variants.svg,-grid.csv} (P3b)
 db/migrations/002_engine.sql  (outside the package, owned by it)
 ```
 
@@ -164,6 +169,54 @@ Runs Strategy A's 10-year backtest against Neon and writes the report. **Read-on
   missing dividends file).
 - **Worktrees:** `config.REPO_ROOT` is the worktree, which has no `.env.local`, so set
   `SEER_ENV_FILE` to the main checkout's file. Never `source` it.
+
+### `backtest_wf` (P3b)
+
+```
+SEER_ENV_FILE=/path/to/.env.local python -m seer_engine backtest_wf [--dry-run] [-v] [--out DIR] [--cache-dir DIR]
+    [--refresh-cache] [--is-start YYYY-MM-DD] [--first-year YYYY] [--end YYYY-MM-DD] [--dividends PATH]
+```
+
+This runs Strategy A2's anchored yearly walk-forward against Neon and writes the P3b report.
+Command names are module names, and a hyphen is not legal in one, hence the underscore.
+**Read-only**, like `backtest`: it reads `bars`, `universe` and `fx_rates` and writes nothing to
+any table, `strategies.params` included. `--dry-run` changes nothing (there are no DB writes to roll
+back); the report files are still written.
+
+- **Defaults are the committed run.**
+  - `--out` defaults to `<repo>/docs/backtests`, `--is-start` to `tuning.IS_START` (2015-10-19),
+    `--first-year` to `walkforward.FIRST_TRADE_YEAR` (2018), `--end` to the last SPY bar, and
+    `--dividends` to `engine/data/spy_dividends.csv`.
+  - The window flags exist for synthetic tests. Passing them for a real run is how tuning on traded
+    data starts, so don't.
+- **Steps:**
+  1. Load the market (the same bar cache as `backtest`).
+  2. `STRATEGY_A2.prepare` once, then the folds.
+  3. Tuning: one run per each of the 324 (variant × grid) combinations over 2015-10-19 → the last
+     fold's tune end, sliced per fold with `metrics_through`.
+  4. The combined selection per fold, and each variant's own.
+  5. Five walk-forward runs (combined + 4 variants), each one continuous portfolio from 2018-01-02.
+  6. Both SPY curves from the same starting cash, survivorship, `gate_p3b`, and the five files.
+- **Output:** `<out>/<data end>-strategy-a2-walkforward.md`, `-equity.csv`, `-equity.svg`,
+  `-variants.svg`, `-grid.csv`. A re-run on the same data overwrites them byte-identically.
+- **Logs:**
+  - cache hit or miss;
+  - the prepare time;
+  - wall time per combination and in total;
+  - every fold's selection;
+  - the gate verdict;
+  - whether `STRATEGY_A2_PARAMS` equals the last fold's selection.
+- **Exit codes:**
+  - 0 whether the gate passes or fails, because a losing verdict is a result.
+  - 1 on an error.
+  - 2 on a precondition, as for `backtest`: no bars, no SPY bars, a window date that is not an NYSE
+    session or is after the last SPY bar, no fold to trade, no FX row on or before `--is-start`, or
+    a missing dividends file.
+- **Worktrees:** as for `backtest`, set `SEER_ENV_FILE` to the main checkout's `.env.local`. Never
+  `source` it.
+- **One round.** The committed run is P3b's single rework of Strategy A. Re-running it on newer data
+  re-measures the same pre-registered procedure. Adding a variant or a grid value after seeing
+  results is not allowed.
 
 ## Exported API
 
@@ -398,6 +451,47 @@ simulator is a 4-dp `Decimal`. `bars.close` is `numeric(12,4)` (at most 12 signi
 threshold only within about 1e-12 of it (RSI exactly 10.0 is excluded by `<`), and because the
 window math is bit-identical, it flips the same way in the backtest and nightly.
 
+**`strategies.a2`** (P3b: the Strategy A rework, `docs/handover/2026-10-03-strategy-a-rework.md`)
+
+Strategy A2 is Strategy A plus four pre-registered variants, fixed before any result was seen. It
+reuses `a.py`'s features, setup and bracket helpers unchanged. `a.py` and `STRATEGY_A_PARAMS` are
+v1's record and do not move.
+
+- `REGIME_SYMBOL = "SPY"`. It equals `universe.BENCHMARK`, which a test asserts. `a2` cannot
+  import `universe`, because that imports psycopg.
+- `FLOOR_PRICE = 10.0`.
+- `VARIANTS = ("control", "regime", "regime_calm", "regime_calm_floor")`, which is V0–V3, in this
+  order everywhere.
+- `@dataclass(frozen, slots) A2Params(variant="control", rsi_max=10.0, limit_atr=Decimal("0.5"), tp_atr=Decimal("1.0"), sl_atr=Decimal("1.5"), min_dollar_volume=20_000_000.0)`:
+  - A's five fields, validated and coerced exactly as `AParams`; an unknown variant is a
+    `ValueError`.
+  - `a_params()` gives the `AParams` of the same five values.
+  - `as_dict()` puts `variant` first, then `AParams.as_dict()`. This is what P4 would write to
+    `strategies.params`.
+  - `A2Params.from_a(variant, p)`.
+- `A2_DESIGN_PARAMS = A2Params()`: V0 with the design values, the walk-forward fallback.
+- `STRATEGY_A2_PARAMS = None`.
+  - The P3b gate failed (`docs/backtests/2026-10-02-strategy-a2-walkforward.md`), so nothing is frozen
+    and A2 may not be deployed.
+  - `tests/test_strategy_a2_frozen.py` fails if a value appears without a passing report.
+- `regime_on(spy, data_date) -> bool`, `picks_from_features_a2(features, members, params, regime)`.
+- `A2Prepared` / `prepare_a2(history)`: `prepare_a`'s columns plus SPY's regime column, computed
+  once.
+- `picks_prepared_a2(...)`.
+- `StrategyA2` implements `Strategy` with `id = "A2"`, `lookback = LOOKBACK`; `STRATEGY_A2 = StrategyA2()`.
+
+| Variant | Rule on top of Strategy A |
+|---|---|
+| V0 `control` | none: its picks `==` `STRATEGY_A.picks` for the same five params (tested) |
+| V1 `regime` | no new picks on a `data_date` where SPY's close ≤ SPY's SMA(200). The rule is strict `>`, so equality means off. It is also off when SPY has no bar on `data_date` or fewer than 200 bars through it. The SMA is `sma_window` over SPY's last 200 closes ending at `data_date`, bit-identical between `picks` and `prepare` |
+| V2 `regime_calm` | V1, ranked by `(ATR(14) / close, RSI(2), symbol)` ascending instead of `(RSI(2), symbol)` |
+| V3 `regime_calm_floor` | V2, plus `close ≥ 10.00` (inclusive; fixed, never tuned) |
+
+SPY is read from the same `history` mapping as the members, never from `members`. It can never be a
+pick: it is excluded explicitly, and the universe never lists it. The P4 identity
+(`picks_prepared(prepare(H)) == picks(upto(d))`) and no look-ahead hold for every variant,
+including SPY's own bars dated ≥ S.
+
 ### backtest (P3)
 
 Every module except `io.py` is pure (same purity test as `strategies`). Nothing here writes to
@@ -442,7 +536,10 @@ the database.
   time) and `selected-params:` (the in-sample selection), which `test_strategy_a_frozen.py` reads
   with `parse_params_line`.
 - **`backtest.io`** (impure): `load_market(conn, *, cache_dir=CACHE_DIR, refresh=False) -> (Market, bars_rows)`,
-  `read_dividends(path=DIVIDENDS_CSV)`, `write_report(out_dir, report) -> list[Path]`.
+  `read_dividends(path=DIVIDENDS_CSV)`, `write_report(out_dir, report) -> list[Path]`,
+  `write_wf_report(out_dir, report: WalkForwardReport) -> list[Path]` (renders all five files,
+  `<stem>.md`, `-equity.csv`, `-equity.svg`, `-variants.svg`, `-grid.csv`, before writing any, LF
+  endings; returns the paths in that order).
 
 **Windows.** In-sample 2015-10-19 → 2021-12-31 (tuning); out-of-sample 2022-01-03 → the last SPY
 bar (validation, run once); full 2015-10-19 → the last SPY bar (one continuous portfolio). Each
@@ -464,6 +561,98 @@ acquired; Yahoo no longer serves them), so the backtest cannot trade them (115 i
 "Index members in the window with no bars at all"). A dip-buying strategy is exactly what those
 collapses would have hurt, so the result is biased in Strategy A's favour; the report counts the
 gap per year.
+
+### backtest walk-forward (P3b)
+
+This adds to P3 without changing it. Every v1 call takes its unchanged code path, and the
+committed v1 report re-renders byte-identically on its own data (checked by re-running `backtest` on the unchanged Neon data (2026-10-02, 1,817,429 bar rows)). Like
+the rest of `backtest/`, every module here except `io.py` is pure, and the purity glob covers it.
+
+- **`backtest.runner.ParamsSchedule(segments)`**: `segments` is `((first_session, params), ...)`,
+  NYSE sessions, strictly ascending, at least one. `at(session)` gives the params of the last
+  segment starting on or before `session`, and raises `ValueError` before the first.
+  `run_backtest(..., params=<ParamsSchedule>, ...)` picks for session S with `params.at(S)` (S is
+  the session traded, not `data_date`), and raises `ValueError` if `start` is before the first
+  segment. Orders keep the bracket they were placed with across a switch. With any other `params`,
+  `run_backtest` behaves exactly as in P3.
+- **`backtest.metrics.metrics_through(r, end)`**: `run_metrics` of `r` cut at session `end`, using
+  snapshots dated `<= end` and exits on or before `end`. **Prefix property:** it equals
+  `run_metrics` of the same run with `end=end`, which tests prove on the scenario market and a
+  Strategy A market.
+- **`backtest.tuning.select(rows, *, fallback=DESIGN_PARAMS)`**: P3's rule, tie-breaks and reason
+  strings, with the none-qualifies params as an argument. Without it, it behaves exactly as in P3.
+- **`backtest.walkforward`**:
+  - `FIRST_TRADE_YEAR = 2018`, `SEEN_BEFORE_START = tuning.OOS_START` (2022-01-03, the burned P3
+    out-of-sample start), `COMBINED = "walk-forward"`.
+  - `Fold(year, tune_start, tune_end, trade_start, trade_end)` and
+    `folds(is_start, first_year, end)`.
+  - `combinations()`: 324 `A2Params`, variant outer, grid inner.
+  - `tune(market, strategy, prepared, combos, folds)`: one run per combination, and per fold a
+    `GridRow` via `metrics_through(run, fold.tune_end)`. Sequential, in combination order.
+  - `select_fold(rows, variant=None)`. The combined selection falls back to `A2_DESIGN_PARAMS`; a
+    variant's own falls back to `A2Params(variant=v)`.
+  - `schedule(folds, selections)`, then `walk_forward(...) -> WalkForward(name, folds, selections,
+    run)`: one continuous portfolio from the first trade session to the data end.
+  - `diagnostics(run) -> Diagnostics`: P/L by exit reason and by exit year, trades with < 3 shares,
+    gross P/L, costs, and cost drag = costs ÷ gross ("—" when gross ≤ 0). Diagnostics **explain**
+    the result and never reach `select`.
+  - `window_metrics(run, start)` and `curve_window_metrics(curve, start)`: the "seen before" slice
+    of the continuous curves.
+  - `gate_p3b(wf, spy_tr, start, end) -> Verdict`.
+- **`backtest.wf_report`**:
+  - `WalkForwardReport`, `report_stem(data_end)` (`<data end>-strategy-a2-walkforward`),
+    `render_markdown`, `equity_csv`, `grid_csv`, `equity_svg`, `variants_svg`. Deterministic: two
+    renders are byte-equal.
+  - Machine lines `p3b-gate:` (`GATE_KEY`), `last-fold-params:` (`LAST_FOLD_KEY`) and
+    `frozen-params:` (`FROZEN_KEY`, `null` when nothing is frozen), read with
+    `parse_machine_line(markdown, key) -> str`.
+- **`backtest.io.write_wf_report(out_dir, report) -> list[Path]`**: the five files, all rendered
+  before any is written.
+
+**Folds** (anchored, yearly). For each trade year Y from 2018 to the data end's year:
+
+- **Tune** on 2015-10-19 → the last session of Y−1.
+- **Trade** the first session of Y → the last session of Y, or the data end.
+
+The traded segments form **one** portfolio: 20,000,000 IDR at `prev_session(2018-01-02)`'s FX, with
+params switching at each year's first session. Picks for that session use `data_date` = the last
+session of Y−1 = `tune_end(Y)`. Each fold selects among all 324 (variant × grid) combinations with
+P3's rule (highest tuning-window total return among max DD ≤ 15% and PF ≥ 1.3; ties → lower DD →
+combination order), else V0 with the design values. Each variant also gets its own walk-forward,
+with the variant fixed and the grid tuned per fold.
+
+**Gate (P3b).** A2 passes only if the combined walk-forward curve (2018-01-02 → data end) beats
+total-return SPY over the same span with PF ≥ 1.3 and max DD ≤ 15%, measured with P3's `metrics`
+(web parity). The 2022-01-03 → data end window has been seen before. The report shows it only as a
+labelled slice of the continuous curves, and it never feeds the gate.
+
+**The report** (`docs/backtests/<data end>-strategy-a2-walkforward.md`) contains, in order:
+
+1. the verdict;
+2. data;
+3. method, which lists everything tried;
+4. every fold's windows, selection, reason and top-10 tuning rows (all 324 per fold are in
+   `-grid.csv`);
+5. the walk-forward vs both SPY curves;
+6. the per-variant curves and selections;
+7. the diagnostics;
+8. "seen before";
+9. the go-live checklist;
+10. survivorship;
+11. positions open at the end;
+12. both charts and links to both CSVs (`-equity.svg`: walk-forward vs SPY; `-variants.svg`: the
+    four variants + total-return SPY);
+13. the gate verdict;
+14. on a fail, the owner's options (handover §8);
+15. the machine lines.
+
+**Committed result** (2026-10-02 data, walk-forward 2018-01-02 → 2026-10-02): gate **FAILED**. Strategy A2 fails the P3b gate: walk-forward from 2018-01-02 to 2026-10-02 it returned +9.1% against +187.6% for total-return SPY, with profit factor 1.02 and max drawdown 29.1%, so it fails on beating total-return SPY, profit factor ≥ 1.3 and max drawdown ≤ 15%; Strategy A's one rework has failed, and P4 stays blocked.
+See `docs/backtests/2026-10-02-strategy-a2-walkforward.md`.
+Strategy A's one rework has failed. Strategy A is not reworked again on this data, and P4 stays blocked until the owner chooses among the report's options.
+
+**Survivorship.** This is the same gap as P3: 115 index members in the window from
+2015-10-19 have no bars at all. It biases every variant in its favour, and the report counts the gap
+per year.
 
 ## Migration 002 (`db/migrations/002_engine.sql`)
 
@@ -504,7 +693,8 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 - `sim.model` imports `prices`. `sim.lifecycle` and `sim.split_adjust` import `dates`, `prices` and `sim.model`. `sim.sizing` imports `dates` and `sim.model`. Nothing in `sim` imports `bars`, `db` or `http`.
 - `strategies.*` import numpy, `prices`, `sim` (for `Pick` and `q`) and each other. `backtest.market`, `runner`, `benchmark`, `metrics`, `tuning` and `report` import numpy, `dates`, `prices`, `sim`, `strategies` and each other. None of them imports `bars`, `db`, `http` or `config`.
 - `backtest.io` imports `config`, psycopg, pandas, numpy and the pure backtest modules. `commands.backtest` imports `config`, `db`, `dates`, `prices`, `universe` (for `BENCHMARK`), `backtest.*` and `strategies.a`.
-
+- `strategies.a2` imports numpy, `sim`, `strategies.a`, `strategies.base` and `strategies.indicators`; never `universe` (psycopg), so `REGIME_SYMBOL` repeats `universe.BENCHMARK` and a test asserts they are equal. `backtest.walkforward` imports `dates`, `strategies.a2`, `strategies.base` and `backtest.runner`, `metrics`, `tuning`, `market` and `benchmark`. `backtest.wf_report` imports `backtest.report`'s helpers (read-only), `dates`, `sim`, `strategies.a` (`ATR_N`, `SMA_N`), `strategies.a2`, and `backtest.metrics`, `runner`, `tuning`, `benchmark` and `walkforward`. None of them imports `bars`, `db`, `http` or `config`.
+- `backtest.io` also imports `wf_report` (for `write_wf_report`). `commands.backtest_wf` imports `config`, `db`, `dates`, `universe` (for `BENCHMARK`), `backtest.io`, `walkforward`, `benchmark`, `market`, `metrics`, `runner`, `tuning`, `wf_report`, `commands.backtest` (for `never_fetched_members`) and `strategies.a2`.
 ### Standard library
 `argparse`, `importlib`/`pkgutil` (command discovery), `logging`, `contextlib`, `dataclasses`, `decimal`, `functools.lru_cache`, `re`, `time`.
 
@@ -513,6 +703,7 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 - Within `engine/`, the phase 2 to 4 modules consume the API above exactly as written in the plan's "Shared interface contract": `membership.py` and `commands/universe.py` (phase 2), `yahoo.py` and `commands/backfill.py` (phase 3), and `massive.py`, `splits.py` and `commands/nightly.py` (phase 4).
 - Phase 5 will add `.github/workflows/{engine-ci,nightly,universe,backfill}.yml`, which invoke the CLI.
 - P4 (nightly) will call `strategies.a.STRATEGY_A.picks(...)` with `STRATEGY_A_PARAMS` and write `STRATEGY_A_PARAMS.as_dict()` to `strategies.params`. P6 adds strategies B and C beside `a.py`, implementing the same `Strategy` protocol.
+- P4 is blocked: the P3b gate failed, and `STRATEGY_A2_PARAMS` is `None`. Nothing may deploy Strategy A or A2. P6's Strategy B can reuse `backtest.walkforward` (handover §8 option (a)), if the owner chooses it.
 - Nothing in `web/` imports the engine. The two share only the database schema and `schema_migrations`.
 
 ## Concurrency
@@ -545,6 +736,11 @@ The temp tables `_seer_bars_in` and `_seer_fx_in` are scoped to a session (`ON C
   - Grid: 81 in-sample runs in 37.7–39.0 s, about 0.5 s each.
   - Whole command: 1:09 cold, 0:46–0:53 with the cache; peak RSS 420 MB.
   - Bars live as float64 arrays; `Decimal` `Bar`s are built only for symbols with a live order and for SPY, so the simulator's share of the time stays small.
+- Walk-forward (P3b), measured on the 2026-10-02 data (1,817,429 bar rows, 663 symbols), WSL2, Python 3.11:
+  - Load: 0.6 s from the 90 MB pickle cache (about 37 s from Neon on a miss). `STRATEGY_A2.prepare` (Strategy A's columns plus SPY's regime column): 2.8 s, once per command.
+  - Tuning: 324 combinations, sequential, in 236.9 s, about 0.7 s each. Each combination is **one** run over 2015-10-19 → 2025-12-31, sliced into the 9 folds' tuning windows with `metrics_through`. That is exact by the runner's prefix property, and about 9× less work than re-simulating every fold.
+  - The five walk-forward runs (combined + 4 variants, 2018-01-02 → 2026-10-02) and their SPY curves: about 4 s.
+  - Whole command: 4:13 for the first run, 4:14 for the re-run; peak RSS 430 MB.
 - There is no benchmark coverage for the DB writers.
 
 ## Usage
@@ -666,6 +862,23 @@ Then read `docs/backtests/<data end>-strategy-a.md`. If `STRATEGY_A_PARAMS` diff
 report's `selected-params:` line, `test_strategy_a_frozen.py` fails until the constant is updated
 (with its comment) or the report is not committed.
 
+### Backtest: walk-forward (P3b)
+
+```
+cd <repo or worktree root>
+SEER_ENV_FILE=/home/miftah/seer/.env.local engine/.venv/bin/python -m seer_engine backtest_wf
+```
+
+Then read `docs/backtests/<data end>-strategy-a2-walkforward.md`. Its `p3b-gate:`,
+`last-fold-params:` and `frozen-params:` lines are what `test_strategy_a2_frozen.py` reads:
+
+- On a passing report, `STRATEGY_A2_PARAMS` must equal `last-fold-params:`, and the comment above
+  it must name the report.
+- On a failing report, it must be `None`.
+
+A newer report with a different outcome or selection fails the test until the constant follows it.
+Committing a newer report is a re-measurement on new data, not a new rework.
+
 ### Gotchas
 - Do not use `with psycopg.connect(...) as conn`, because it commits on exit and defeats `--dry-run`. Use `contextlib.closing` instead.
 - Every write must be inside `db.transaction(conn, dry_run)`. The helpers never commit, so a write outside it is lost or left open.
@@ -685,3 +898,7 @@ reconciliation log are in `ENGINE_DATA_PIPELINE_PLAN.md`.
 The P3 sections (`strategies`, `backtest`, the `backtest` command and the committed report) were
 added on 2026-10-03; their design, invariants and decisions are in `STRATEGY_A_BACKTEST_PLAN.md`
 and `docs/handover/2026-10-03-strategy-a-backtest.md`.
+
+The P3b sections (`strategies.a2`, the walk-forward modules, the `backtest_wf` command and the
+committed walk-forward report) were added on 2026-10-03. Their design, invariants and decisions are
+in `STRATEGY_A_REWORK_PLAN.md` and `docs/handover/2026-10-03-strategy-a-rework.md`.

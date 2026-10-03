@@ -20,6 +20,7 @@ into members never fetched at all and members missing a bar on that session.
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from collections import Counter
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -77,6 +78,54 @@ def _session(name: str, d: object) -> date:
     return d
 
 
+@dataclass(frozen=True)
+class ParamsSchedule:
+    """Strategy params that change by traded session (P3b walk-forward, Decision D1/D6).
+
+    ``segments[i] = (first_session_i, params_i)``: ``params_i`` is used for every traded session
+    from ``first_session_i`` up to the session before ``first_session_{i+1}`` (the last segment
+    runs to the end of the window). First sessions are NYSE sessions, strictly ascending, and
+    there is at least one segment. A list or other sequence is accepted and stored as a tuple
+    of 2-tuples. A segment's params may not itself be a ``ParamsSchedule``.
+    """
+
+    segments: tuple[tuple[date, Any], ...]
+
+    def __post_init__(self) -> None:
+        raw = self.segments
+        if isinstance(raw, (str, bytes)) or not hasattr(raw, "__iter__"):
+            raise TypeError(f"segments must be a sequence of (date, params), got {type(raw).__name__}")
+        segments: list[tuple[date, Any]] = []
+        for i, seg in enumerate(raw):
+            if isinstance(seg, (str, bytes)) or not hasattr(seg, "__len__") or len(seg) != 2:
+                raise TypeError(f"segments[{i}] must be a (first_session, params) pair")
+            first, params = seg[0], seg[1]
+            _session(f"segments[{i}] first session", first)
+            if isinstance(params, ParamsSchedule):
+                raise TypeError(f"segments[{i}] params must not be a ParamsSchedule")
+            if segments and first <= segments[-1][0]:
+                raise ValueError(
+                    f"segments[{i}] first session {first} is not after segments[{i - 1}] ({segments[-1][0]})"
+                )
+            segments.append((first, params))
+        if not segments:
+            raise ValueError("a ParamsSchedule needs at least one segment")
+        object.__setattr__(self, "segments", tuple(segments))
+
+    def at(self, session: date) -> Any:
+        """The params of the last segment whose first session is ``<= session``.
+
+        ``session`` must be a ``date`` (not a ``datetime``); ValueError when it is before the
+        first segment's first session.
+        """
+        if isinstance(session, datetime) or not isinstance(session, date):
+            raise TypeError(f"session must be a date, got {type(session).__name__}")
+        i = bisect_right([first for first, _ in self.segments], session)
+        if i == 0:
+            raise ValueError(f"session {session} is before the schedule's first session {self.segments[0][0]}")
+        return self.segments[i - 1][1]
+
+
 def run_backtest(
     market: Market,
     strategy: Strategy,
@@ -94,6 +143,12 @@ def run_backtest(
     ``strategy.prepare(market.history)``), picks come from ``strategy.picks_prepared``;
     without it, from ``strategy.picks`` on every history cut at ``data_date``. The strategy
     contract makes both give the same result.
+
+    ``params`` may be a ``ParamsSchedule``: then ``start`` must not be before its first
+    segment, and the picks for session S use ``params.at(S)``, keyed by the session being
+    traded, not by ``data_date``. Orders keep the bracket they were placed with; the simulator
+    never rewrites one. ``RunResult.params`` is the schedule itself. Any other ``params`` value
+    is handed to the strategy unchanged for every session.
     """
     if not isinstance(market, Market):
         raise TypeError(f"market must be a Market, got {type(market).__name__}")
@@ -101,6 +156,9 @@ def run_backtest(
     _session("end", end)
     if end < start:
         raise ValueError(f"end {end} is before start {start}")
+    schedule = params if isinstance(params, ParamsSchedule) else None
+    if schedule is not None and start < schedule.segments[0][0]:
+        raise ValueError(f"start {start} is before the schedule's first session {schedule.segments[0][0]}")
     usd_idr = market.usd_idr_on(start)
     cash0 = initial_cash_usd(initial_idr, usd_idr)
 
@@ -112,11 +170,12 @@ def run_backtest(
 
     for session in dates.sessions(start, end):
         members = market.membership.members_on(data_date)
+        session_params = params if schedule is None else schedule.at(session)
         if prepared is None:
             history = {s: h.upto(data_date) for s, h in market.history.items()}
-            picks = strategy.picks(history, members, data_date, params)
+            picks = strategy.picks(history, members, data_date, session_params)
         else:
-            picks = strategy.picks_prepared(prepared, members, data_date, params)
+            picks = strategy.picks_prepared(prepared, members, data_date, session_params)
 
         sized = size_picks(pf, picks, session)
         for r in sized.rejected:

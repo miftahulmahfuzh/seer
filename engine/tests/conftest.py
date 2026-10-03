@@ -7,12 +7,28 @@ DB tests need a real Postgres at PG_TEST_URL. Locally::
 
 Each DB test gets its own throwaway schema (``t_<hex>``), dropped afterwards, so tests
 never see each other's rows and never touch ``public``.
+
+Native thread pools are capped at one thread before numpy, scipy or scikit-learn load.
+The suite's arrays are small, so the pools buy nothing alone, and several suites running
+at once (one per swarm phase) oversubscribed 24 cores into ~200x slowdowns. An explicit
+value in the environment still wins.
 """
 
 from __future__ import annotations
 
-import logging
 import os
+
+for _var in (
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "BLIS_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+):
+    os.environ.setdefault(_var, "1")
+
+import logging
 import uuid
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass

@@ -65,19 +65,19 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "d861e64",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 4,
-      "note": "live in @50; real store build in background (verify had no git evidence yet)",
+      "note": "store 34m45s, fp 5451195f\u2026, 539/1061 served (522 unserved all members, every ETF served), --verify 0",
       "package": "root, `commands",
       "plan": ".workflows/plan/trade-rules-dev-search/phase-4.md",
-      "reported_at": "2026-10-03T14:04:41+00:00",
+      "reported_at": "2026-10-03T14:33:36+00:00",
       "satisfies": [
         "R2",
         "R4"
       ],
-      "status": "running",
+      "status": "done",
       "task_id": "P1-ENG-CQ5M",
       "title": "Research store: build, load, verify, command, real build"
     },
@@ -271,7 +271,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/trade-rules-dev-search/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trade-rules-dev-search",
-  "updated": "2026-10-03T14:10:17+00:00",
+  "updated": "2026-10-03T14:33:36+00:00",
   "verified_at": "2026-10-03T14:04:32+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trade-rules-dev-search"
 }

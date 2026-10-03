@@ -8,43 +8,14 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable
-from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 
 import psycopg
 
-PRICE_QUANTUM = Decimal("0.0001")
-
-
-@dataclass(frozen=True, slots=True)
-class Bar:
-    symbol: str
-    date: date
-    open: Decimal
-    high: Decimal
-    low: Decimal
-    close: Decimal
-    volume: int
-
-
-def to_decimal(x: Decimal | float | int | str) -> Decimal:
-    """``x`` as a Decimal rounded half-up to 4 decimals (Postgres numeric rounding).
-
-    Floats go through their shortest repr, so 0.1 becomes Decimal('0.1000'), not the
-    binary expansion.
-    """
-    if isinstance(x, bool):
-        raise TypeError("bool is not a price")
-    if isinstance(x, float):
-        if not math.isfinite(x):
-            raise ValueError(f"non-finite value: {x!r}")
-        d = Decimal(repr(x))
-    else:
-        d = Decimal(x)
-    if not d.is_finite():
-        raise ValueError(f"non-finite value: {x!r}")
-    return d.quantize(PRICE_QUANTUM, rounding=ROUND_HALF_UP)
+# Re-exported: these moved to the pure seer_engine.prices so the sim core can use them
+# without importing psycopg. Every `from seer_engine.bars import Bar, ...` keeps working.
+from seer_engine.prices import PRICE_QUANTUM, Bar, to_decimal  # noqa: F401
 
 
 def to_volume(v: Decimal | float | int | str) -> int:

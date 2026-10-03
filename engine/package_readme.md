@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (src layout: `engine/src/seer_engine`)
-**Last Updated**: 2026-10-03 (P1-ENG-VP1R, phase 1 of `ENGINE_DATA_PIPELINE_PLAN.md`)
+**Last Updated**: 2026-10-03 (fill simulator P2, phase 4 of `ENGINE_FILL_SIMULATOR_PLAN.md`: `prices`, `sim`)
 
 ## Overview
 
@@ -21,6 +21,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - The `runs` row lifecycle: one real row per target session
 - Purging demo rows before the first real write
 - Applying `db/migrations/*.sql`, sharing `schema_migrations` with web's `db:migrate`
+- The pure fill simulator (`sim/`): order lifecycle, whole-share sizing, cash/equity and split recompute, shared by the backtest (P3) and nightly paper trading (P4)
 
 ## Layout
 
@@ -38,10 +39,17 @@ engine/
     dates.py                NYSE sessions, RunDates
     demo.py                 demo-data purge
     universe.py             read-only point-in-time membership queries
-    bars.py                 Bar value type, rounding, upsert_bars()
+    prices.py               pure Bar, PRICE_QUANTUM, to_decimal (no psycopg)
+    bars.py                 re-exports prices; to_volume, make_bar, upsert_bars()
     fx.py                   Frankfurter USD/IDR fetch, upsert_fx()
     yahoo.py                yfinance download + frame parsing, BRK.B <-> BRK-B (phase 3)
     runs.py                 start_run / finish_run / fail_run
+    sim/                    fill simulator: pure, deterministic, Decimal-only (P2)
+      __init__.py           public surface; import everything from seer_engine.sim
+      model.py              constants, money helpers, Order, Portfolio, Event, Snapshot, StepResult
+      lifecycle.py          step(), close_unpriced()
+      sizing.py             Pick, Rejection, SizingResult, size_picks()
+      split_adjust.py       apply_split()
     commands/
       __init__.py           command-module contract
       migrate.py            `migrate` command
@@ -144,13 +152,20 @@ All dates are `datetime.date`. The only timezone-aware datetimes are the UTC "no
 
 Passing a `datetime` where a `date` is expected raises `TypeError`, because `datetime` is a `date` subclass and would otherwise slip through.
 
+### prices
+
+Pure value types for prices, with no database import, so the simulator can use `Bar` without loading `psycopg`. `bars` re-exports all three names, so `from seer_engine.bars import Bar, PRICE_QUANTUM, to_decimal` keeps working.
+
+- `PRICE_QUANTUM = Decimal("0.0001")`
+- `@dataclass(frozen, slots) Bar(symbol, date, open, high, low, close: Decimal, volume: int)`
+- `to_decimal(x) -> Decimal`: rounds half-up to 4 dp. Floats go through `repr`, so `0.1` becomes `0.1000`. Raises on bool and non-finite values.
+```
+
 ### bars
 
 Prices are split-adjusted only (no dividend adjustment) and stored as `numeric(12,4)`. Volume is an `int`. Symbols use the canonical dot form (`BRK.B`).
 
-- `PRICE_QUANTUM = Decimal("0.0001")`
-- `@dataclass(frozen) Bar(symbol, date, open, high, low, close: Decimal, volume: int)`
-- `to_decimal(x) -> Decimal`: rounds half-up to 4 dp. Floats go through `repr`, so `0.1` becomes `0.1000`. Raises on bool and non-finite values.
+- `PRICE_QUANTUM`, `Bar`, `to_decimal`: defined in `prices` and re-exported here unchanged.
 - `to_volume(v) -> int`: rounds half-up. Raises on bool, non-finite and negative values. Massive reports volume as a float.
 - `make_bar(symbol, d, o, h, l, c, v) -> Bar`: validates and rounds. Raises `ValueError` for an empty symbol and `TypeError` for a non-date or datetime `d`.
 - `upsert_bars(conn, bars) -> int`: COPYs into the temp table `_seer_bars_in`, then runs `INSERT ... ON CONFLICT (symbol, date) DO UPDATE ... WHERE ... IS DISTINCT FROM`. Returns the number of rows inserted or changed. An identical re-run returns 0 and creates no new row versions (`xmin` is unchanged). Raises `ValueError` when a batch holds the same `(symbol, date)` twice.
@@ -202,6 +217,71 @@ Demo bars and FX rows look exactly like real ones, so the trigger is that a `run
 - `purge_demo(conn) -> bool`: `TRUNCATE <DEMO_TABLES> RESTART IDENTITY` when demo data exists. Does not commit.
 - `purge_demo_if_needed(conn, dry_run) -> bool`: runs `purge_demo` in its own `db.transaction`. Under `dry_run` the purge runs, is rolled back and logs "would purge". The return value still says whether it purged or would have.
 
+### sim (fill simulator, P2)
+
+Pure and deterministic: no database, no network, no clock, no randomness, no logging. It imports only `seer_engine.dates` and `seer_engine.prices`, never `bars`, and `tests/test_sim_purity.py` checks in a subprocess that `psycopg`, `requests` and `yfinance` stay out of `sys.modules`. Every value is a frozen dataclass, and every function returns new values. All money and prices are `Decimal`, quantized to 4 dp half-up (`q`). Shares are `int`. A float or any other non-`Decimal` price raises `TypeError`. Import everything from `seer_engine.sim`.
+
+**Rules** (design §5 + handover §3, all tested on synthetic bars):
+
+| Topic | Rule |
+|---|---|
+| Fill | session `low < limit` (strict; a touch does not fill). Fill at the **open** if `open < limit`, else at the limit. Fill session = day 1 |
+| Unfilled | the pending order expires at the end of its session; the slot is free for that night's picks |
+| Session order | (1) time stop at the open, (2) gap at the open (`open <= SL` → `gap`, then `open >= TP` → `tp`), (3) intraday `low <= SL` → `sl` at SL, then `high > TP` → `tp` at TP (SL first), (4) fills, (5) expiries, (6) mark to close. A position filled today is not checked against TP/SL today |
+| Time stop | `days_held >= 5` and a bar → exit at that bar's open, reason `time`, before any gap/TP/SL check |
+| `days_held` | fill session = 1; +1 for every later session survived, bar or not. Intraday exit on day k records k; an exit at the open of day k (time, gap, gap-TP) records k − 1, so a time exit records 5 |
+| Costs | `buy_cost = q(price × shares × 1.001)`, `sell_proceeds = q(price × shares × 0.999)`. Fill: `cash -= buy_cost`; exit: `cash += sell_proceeds` |
+| `pnl_usd` | `sell_proceeds − buy_cost`, so Σ `pnl_usd` reconciles with cash exactly. Within 0.0001 of handover §3's `(exit − fill) × sh − 0.001 × (exit + fill) × sh` |
+| Equity | `q(cash + Σ shares × last known close)` at each session's close. Pending orders reserve nothing in equity |
+| Sizing | picks in rank order; each placed pick takes the lowest free slot. `budget = min(q(equity / 4), cash − Σ buy_cost(limit, shares) of pending orders)`, with `equity` the last snapshot. `shares = floor(budget / (limit × 1.001))`. Rejections: `held` (symbol has a live order, or a duplicate pick), then `no_slot`, then `lt_one_share`. A rejection never uses a slot. 0 picks is valid |
+| Missing bar | an open position without a bar: no event, the day still counts, marked at the last close. A due time stop waits for the next bar's open. A pending order without a bar expires |
+| Holidays | the caller steps NYSE sessions only (`dates.sessions`). `step` raises on a non-session |
+| Splits | `apply_split` rewrites live orders in post-split units (see below) |
+
+**Constants and helpers** (`sim.model`):
+- `SLOTS = 4`, `TIME_STOP_DAYS = 5`, `COST_RATE = Decimal("0.001")`
+- `OrderStatus = Literal["pending", "open", "closed", "expired"]`, `ExitReason = Literal["tp", "sl", "time", "gap"]`, `EventKind = Literal["fill", "expire", "exit", "split"]`
+- `q(x) -> Decimal`: quantize to `PRICE_QUANTUM`, half-up.
+- `buy_cost(price, shares)`, `sell_proceeds(price, shares) -> Decimal`: as in the table.
+- `initial_cash_usd(idr, usd_idr) -> Decimal`: `q(idr / usd_idr)`, with `usd_idr` the IDR price of 1 USD on the start date.
+
+**Values:**
+- `Order(session_date, slot, symbol, last_price, limit_price, tp_price, sl_price, shares, status="pending", fill_date=None, fill_price=None, days_held=0, exit_date=None, exit_price=None, exit_reason=None, pnl_usd=None)`: mirrors the `orders` columns except `strategy_id`, `company`, `explanation`, `id` and `created_at`. It validates itself: `slot` is 1–4, `shares >= 1`, `sl < tp`, the fill fields exactly when `open`/`closed`, and the exit fields exactly when `closed`.
+- `Portfolio(cash, equity, orders=(), marks=(), last_session=None)`: one strategy's state between sessions.
+  - `orders` holds **live** orders only (pending + open), sorted by slot, at most one per slot and one per symbol.
+  - `marks` is `(symbol, last close)` for exactly the open symbols, sorted.
+  - `equity` is the last snapshot's (or the initial cash).
+  - Methods: `open_orders()`, `pending_orders()`, `free_slots()` (ascending), `held_symbols()` (all live, sorted), `mark(symbol)`.
+- `new_portfolio(cash_usd) -> Portfolio`: `cash = equity = q(cash_usd)`.
+- `Event(session_date, kind, order, forced=False, cash_usd=None)`:
+  - `order` is the order state after the event. A terminal order (closed or expired) leaves the portfolio and appears only here, which is where P4 writes it.
+  - `cash_usd` is the cash moved: `-buy_cost` on a fill, `+proceeds` on an exit, cash in lieu on a split, and `None` on an expire.
+  - `forced=True` marks an exit made without a bar (`close_unpriced`, or a split that floors an open position to 0 shares).
+- `Snapshot(date, cash_usd, equity_usd)`: one `equity_snapshots` row.
+- `StepResult(portfolio, events, snapshot)`.
+
+**Functions:**
+- `step(portfolio, session_date, bars: Mapping[str, Bar]) -> StepResult` (`sim.lifecycle`): advances through one session.
+  - `bars` holds split-adjusted bars keyed by symbol. Only bars for symbols with a live order are read and validated; the rest are ignored. A symbol absent from `bars` has no bar this session.
+  - **Event order:** all exits in slot order, then all fills in slot order, then all expiries in slot order.
+  - Raises `ValueError` when `session_date` is not an NYSE session, is not after `last_session`, or differs from a pending order's `session_date`, or when a bar has the wrong symbol or date. Raises `TypeError` on a non-`Bar` or a non-`Decimal` price.
+- `close_unpriced(portfolio, symbols) -> (Portfolio, events)` (`sim.lifecycle`): force-closes open positions that will never get another bar (delisted, halted for good). Each exits at its mark, reason `time`, `exit_date = last_session`, with `forced=True`. It recomputes `equity`, so persist the snapshot after it. The caller decides that no bar will come; a pure step cannot know.
+- `Pick(symbol, last_price, limit_price, tp_price, sl_price)` (`sim.sizing`): one ranked pick before sizing. It requires `sl < limit < tp`.
+- `size_picks(portfolio, picks, session_date) -> SizingResult(portfolio, placed, rejected)` (`sim.sizing`): sizes the picks for the next session.
+  - `placed: tuple[Order, ...]` and `rejected: tuple[Rejection(symbol, reason), ...]` are in pick order. `RejectReason = Literal["no_slot", "held", "lt_one_share"]`.
+  - Cash does not change; a pending order pays at its fill.
+  - Raises `ValueError` when `session_date` is not a session after `last_session`, or when a pending order for another session is still in the portfolio (step that session first).
+- `apply_split(portfolio, symbol, factor, session_date) -> (Portfolio, events)` (`sim.split_adjust`):
+  - `factor = split_to / split_from`, the same number as `splits.Split.factor`. 10 is a 10-for-1; `Decimal(1) / 32` is a 1-for-32 reverse split.
+  - Call it once per split, after session S−1's `step` and before stepping the execution session S, with `session_date = S`.
+  - Prices become `q(p / factor)`, and `shares = floor(shares × factor)`. The open position's fractional remainder is paid as cash in lieu at the adjusted mark, with no cost and outside `pnl_usd`; the amount is on the `split` event's `cash_usd`.
+  - A pending order that floors to 0 shares emits `expire`. An open position that floors to 0 is paid out in lieu, emitting a forced `exit` (reason `time`, `pnl_usd = in lieu − buy_cost`).
+  - Events are in slot order. `equity` stays at the last snapshot until the next `step` (unlike `close_unpriced`, which recomputes it). The caller applies each split exactly once (`split_adjustments` guarantees this).
+  - Raises `ValueError` when a rescaled price or mark rounds to 0 at 4 dp, or SL rounds up to TP, and leaves the input untouched. Real listed stocks never get there.
+  - P3 does not need it: backfilled history is already adjusted backwards.
+
+**Determinism:** the same inputs give `==` and `repr`-identical events and snapshots. The insertion order of `bars` does not matter. `tests/test_sim_scenario.py` checks this, and also holds the 12-session hand-checked scenario.
+
 ## Migration 002 (`db/migrations/002_engine.sql`)
 
 This migration is additive only. It is written by the engine, and web does not read these tables.
@@ -234,9 +314,10 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 ### Internal module graph
 - `cli` imports `config` and `commands`. `commands.migrate` imports `config` and `db`.
 - `db` imports `config`. `demo` imports `db`.
-- `fx` imports `http` and `bars.to_decimal`. `runs` imports `dates.RunDates` and `http.redact`.
+- `prices` imports only the standard library; `bars` imports `prices` and re-exports it. `fx` imports `http` and `bars.to_decimal`. `runs` imports `dates.RunDates` and `http.redact`.
 - `http` imports `__version__` for `USER_AGENT`.
 - `yahoo` imports `bars` and pandas. `commands.backfill` imports `bars`, `dates`, `db`, `demo`, `fx`, `universe` and `yahoo`.
+- `sim.model` imports `prices`. `sim.lifecycle` and `sim.split_adjust` import `dates`, `prices` and `sim.model`. `sim.sizing` imports `dates` and `sim.model`. Nothing in `sim` imports `bars`, `db` or `http`.
 
 ### Standard library
 `argparse`, `importlib`/`pkgutil` (command discovery), `logging`, `contextlib`, `dataclasses`, `decimal`, `functools.lru_cache`, `re`, `time`.
@@ -270,7 +351,8 @@ The temp tables `_seer_bars_in` and `_seer_fx_in` are scoped to a session (`ON C
 - Bulk writes use COPY into a temp table and then one set-based `INSERT ... ON CONFLICT`. Writes that change nothing are skipped by the `IS DISTINCT FROM` guard, so re-runs cause no table bloat.
 - The NYSE schedule is computed once per year and cached for the life of the process.
 - Network calls are the expensive part. `get_json` waits 5 s, then 10 s, then 20 s between retries by default. `fx.fetch_range` makes one request per year.
-- There is no benchmark coverage.
+- Simulator: `tests/test_sim_scenario.py::test_benchmark_2950_sessions_x_4_slots` runs 2,950 NYSE sessions (2015-01-02 onward) × 4 slots with `size_picks` + `step` every session on synthetic bars, using `Decimal` throughout. Measured: **0.20 s** on WSL2, Python 3.11 (bound in the test: 20 s). A 10-year backtest is therefore dominated by loading bars and computing signals, not by the simulator. Floats are not needed.
+- There is no benchmark coverage for the DB writers.
 
 ## Usage
 
@@ -309,6 +391,55 @@ def run(args):
             runs.finish_run(conn, run_id)
     return 0
 ```
+
+### Simulator: P3 backtest loop
+
+History is already split-adjusted backwards, so the backtest never calls `apply_split`.
+
+```python
+from decimal import Decimal
+from seer_engine import dates
+from seer_engine.sim import (
+    Snapshot, close_unpriced, initial_cash_usd, new_portfolio, size_picks, step,
+)
+
+pf = new_portfolio(initial_cash_usd(Decimal("20000000"), usd_idr_on(start)))
+events, snapshots = [], []
+for session in dates.sessions(start, end):
+    picks = strategy.picks(data_date=dates.prev_session(session))  # ranked Picks, made after that close
+    pf = size_picks(pf, picks, session).portfolio
+    result = step(pf, session, bars_on(session, pf.held_symbols()))  # {symbol: Bar}; missing = no bar
+    pf = result.portfolio
+    events += result.events
+    snapshots.append(result.snapshot)
+    gone = delisted_after(session, pf.open_orders())  # P3 knows from data when a symbol's bars end
+    if gone:
+        pf, forced = close_unpriced(pf, gone)
+        events += forced
+        snapshots[-1] = Snapshot(session, pf.cash, pf.equity)
+```
+
+### Simulator: P4 nightly
+
+One strategy, one night: `rd = dates.run_dates()`. The session to settle is `rd.data_date`, and the picks are for `rd.session_date`.
+
+```python
+pf = load_portfolio(conn, strategy_id)
+# Portfolio(cash, equity) from the last equity_snapshots row; orders = rows with status
+# pending/open, sorted by slot; marks = last close per open symbol; last_session = last snapshot date.
+# The marks must be in the same (pre-split) units as the orders: take them from closes as they were
+# before splits.apply rescaled history, or apply_split would rescale an already-adjusted mark.
+for split in splits_executing_on(conn, rd.data_date):        # recorded by splits.apply this run
+    pf, split_events = apply_split(pf, split.symbol, split.factor, rd.data_date)
+    persist_events(conn, strategy_id, split_events)            # UPDATE orders prices/shares; cash in lieu
+result = step(pf, rd.data_date, bars_on(conn, rd.data_date, pf.held_symbols()))
+persist_events(conn, strategy_id, result.events)              # fill/exit/expire -> UPDATE orders
+persist_snapshot(conn, strategy_id, result.snapshot)          # equity_snapshots (strategy_id, date)
+sized = size_picks(result.portfolio, ranked_picks, rd.session_date)
+insert_orders(conn, strategy_id, sized.placed)                # status 'pending', slot 1..4
+```
+
+`Event.order` maps 1:1 onto `orders` columns. Its row key is `(strategy_id, order.session_date, order.symbol)`. Everything runs inside one `db.transaction`, so a failed night leaves nothing half-written.
 
 ### Gotchas
 - Do not use `with psycopg.connect(...) as conn`, because it commits on exit and defeats `--dry-run`. Use `contextlib.closing` instead.

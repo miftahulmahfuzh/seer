@@ -6,20 +6,20 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "9a3389f31bf931dfe0d8093c09cbe3d61f960ed8",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": null,
+      "note": "b_model.py + sklearn 1.9.1 pin; 29 tests; suite 879 w/ p2+p3 in tree, 0 skipped",
       "package": "strategies",
       "plan": ".workflows/plan/strategy-b-ranker/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-03T11:50:13+00:00",
       "satisfies": [
         "R5",
         "R6",
         "R9"
       ],
-      "status": "pending",
+      "status": "done",
       "task_id": "P1-ENG-CW71",
       "title": "B model interface + scikit-learn dependency"
     },
@@ -152,7 +152,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-b-ranker/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-b-ranker",
-  "updated": "2026-10-03T11:49:21+00:00",
+  "updated": "2026-10-03T11:50:13+00:00",
   "verified_at": "2026-10-03T11:49:21+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-b-ranker"
 }

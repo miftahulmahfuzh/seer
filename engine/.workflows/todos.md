@@ -2,8 +2,8 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 17:22:02
-**Total Active Tasks**: 4
+**Last Updated**: 2026-10-03 17:25:05
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
@@ -13,8 +13,8 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 3
-- Completed: 16
+- Blocked: 2
+- Completed: 17
 
 ---
 
@@ -24,15 +24,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ### [P1] High
 
-- [ ] **P1-ENG-ODYP** Phase 3: Walk-forward engine
+- [ ] **P1-ENG-BVN5** Phase 4: Walk-forward report rendering
   - **Difficulty**: HARD
   - **Type**: Feature
-  - **Context**: Owns `backtest/walkforward.py` (new: `folds`, `combinations`, `tune`, `select_fold`, `schedule`, `walk_forward`, `diagnostics`, `window_metrics`, `curve_window_metrics`, `gate_p3b`) and `tests/test_backtest_walkforward.py` (new, synthetic: folds as defined incl. real calendar 2018…2026 vs end 2026-10-02 and edge cases; 324 combinations in order; `tune` rows `==` direct per-fold runs; mutating a bar inside a traded year leaves that fold unchanged; one portfolio with year-start param switches, bracket survives 31 Dec; fallback used when nothing qualifies; diagnostics hand-computed; gate sentences; determinism). Does not touch `runner.py`, `metrics.py`, `tuning.py`, `strategies/`, existing tests. Exit: suite green, 0 skipped (712); purity glob covers the module.
+  - **Context**: Owns `backtest/wf_report.py` (new: `WalkForwardReport`, `report_stem`, machine lines, `parse_machine_line`, `render_markdown`, `equity_csv`, `grid_csv`, `equity_svg`, `variants_svg`) and `tests/test_backtest_wf_report.py` (new, from a small synthetic walk-forward). 16 report sections in order (title, verdict, Data, Method listing everything tried, Folds with top-10, WF vs both SPY curves, per-variant tables/selections, Diagnostics, "Seen before" from 2022-01-03, go-live checklist, survivorship, open positions, equity curves, gate verdict, fail-only owner options (a)-(c), machine lines per D14). Imports `report.py` helpers read-only, defines its own `_STYLE`. Does not touch `report.py`. Exit: suite green, 0 skipped (740); two renders byte-equal (invariant 5, D16).
   - **Status**: open
-  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 3 of 6)
-  - **Satisfies**: R3 — Anchored yearly walk-forward: folds as defined, each fold's selection sees only its tuning window, segments chain into one portfolio, brackets survive the year boundary, the fallback is used when nothing qualifies; R4 — Determinism: `==` results and byte-identical files; a parallel gather, if any, comes back in a fixed order; R5 — The new modules pass the globbing purity test
-  - **Depends on**: P1-ENG-WCIA, P1-ENG-3PA3
-  - **Plan**: `.workflows/plan/P1-ENG-ODYP.md`
+  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 4 of 6)
+  - **Satisfies**: R5 — The new modules pass the globbing purity test; R6 — One real walk-forward run on Neon, with a committed report holding fold selections and tables, per-variant curves, WF vs both SPY curves, diagnostics, the "seen before" window, the survivorship note and the P3b verdict sentence
+  - **Depends on**: P1-ENG-ODYP
+  - **Plan**: `.workflows/plan/P1-ENG-BVN5.md`
 
 ### [P2] Medium
 
@@ -41,16 +41,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P4] Backlog
 
 ### 🚫 Blocked
-
-- [ ] **P1-ENG-BVN5** Phase 4: Walk-forward report rendering
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `backtest/wf_report.py` (new: `WalkForwardReport`, `report_stem`, machine lines, `parse_machine_line`, `render_markdown`, `equity_csv`, `grid_csv`, `equity_svg`, `variants_svg`) and `tests/test_backtest_wf_report.py` (new, from a small synthetic walk-forward). 16 report sections in order (title, verdict, Data, Method listing everything tried, Folds with top-10, WF vs both SPY curves, per-variant tables/selections, Diagnostics, "Seen before" from 2022-01-03, go-live checklist, survivorship, open positions, equity curves, gate verdict, fail-only owner options (a)-(c), machine lines per D14). Imports `report.py` helpers read-only, defines its own `_STYLE`. Does not touch `report.py`. Exit: suite green, 0 skipped (740); two renders byte-equal (invariant 5, D16).
-  - **Status**: blocked
-  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 4 of 6)
-  - **Satisfies**: R5 — The new modules pass the globbing purity test; R6 — One real walk-forward run on Neon, with a committed report holding fold selections and tables, per-variant curves, WF vs both SPY curves, diagnostics, the "seen before" window, the survivorship note and the P3b verdict sentence
-  - **Depends on**: P1-ENG-ODYP
-  - **Plan**: `.workflows/plan/P1-ENG-BVN5.md`
 
 - [ ] **P1-ENG-U4G0** Phase 5: `backtest_wf` command + `write_wf_report`
   - **Difficulty**: NORMAL
@@ -75,6 +65,18 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-ODYP** Phase 3: Walk-forward engine
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `backtest/walkforward.py` (new: `folds`, `combinations`, `tune`, `select_fold`, `schedule`, `walk_forward`, `diagnostics`, `window_metrics`, `curve_window_metrics`, `gate_p3b`) and `tests/test_backtest_walkforward.py` (new, synthetic: folds as defined incl. real calendar 2018…2026 vs end 2026-10-02 and edge cases; 324 combinations in order; `tune` rows `==` direct per-fold runs; mutating a bar inside a traded year leaves that fold unchanged; one portfolio with year-start param switches, bracket survives 31 Dec; fallback used when nothing qualifies; diagnostics hand-computed; gate sentences; determinism). Does not touch `runner.py`, `metrics.py`, `tuning.py`, `strategies/`, existing tests. Exit: suite green, 0 skipped (712); purity glob covers the module.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_A_REWORK_PLAN.md` (phase 3 of 6)
+  - **Satisfies**: R3 — Anchored yearly walk-forward: folds as defined, each fold's selection sees only its tuning window, segments chain into one portfolio, brackets survive the year boundary, the fallback is used when nothing qualifies; R4 — Determinism: `==` results and byte-identical files; a parallel gather, if any, comes back in a fixed order; R5 — The new modules pass the globbing purity test
+  - **Depends on**: P1-ENG-WCIA, P1-ENG-3PA3
+  - **Plan**: `.workflows/plan/P1-ENG-ODYP.md`
+  - **Completed**: 2026-10-03 17:25
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/walkforward.py, engine/tests/test_backtest_walkforward.py
 - [x] **P1-ENG-3PA3** Phase 2: Runner params schedule, `metrics_through`, `select` fallback
   - **Difficulty**: NORMAL
   - **Type**: Feature

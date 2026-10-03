@@ -65,6 +65,7 @@ engine/
       benchmark.py          SPY buy-and-hold, price-only and total-return
       metrics.py            Metrics, strategy_metrics(), checklist() (web/lib/metrics.ts parity)
       tuning.py             windows, the 81-run grid, select(), gate()
+      walkforward.py        anchored yearly walk-forward for A2: folds, tune, select_fold, gate_p3b (rework P3; full docs pending phase 6)
       report.py             BacktestReport, render_markdown(), equity_csv(), equity_svg()
       io.py                 Neon loader + bar cache, dividends CSV, report writer (impure)
     commands/

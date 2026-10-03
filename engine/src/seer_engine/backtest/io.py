@@ -1,5 +1,5 @@
 """Impure edge of the backtest: read the database once, read the vendored SPY dividends,
-write the report files.
+write the report files (v1's ``write_report`` and the walk-forward ``write_wf_report``).
 
 The only module in ``seer_engine.backtest`` that touches the database or the filesystem;
 ``test_strategy_purity.py`` skips it by name. Read-only: ``load_market`` runs one
@@ -27,6 +27,7 @@ import psycopg
 from psycopg.pq import TransactionStatus
 
 from seer_engine import config
+from seer_engine.backtest import wf_report
 from seer_engine.backtest.benchmark import Dividend, parse_dividends
 from seer_engine.backtest.market import Market, Membership
 from seer_engine.backtest.report import (
@@ -282,6 +283,29 @@ def write_report(out_dir: Path, report: BacktestReport) -> list[Path]:
         (f"{stem}.md", render_markdown(report)),
         (f"{stem}-equity.csv", equity_csv(report)),
         (f"{stem}-equity.svg", equity_svg(report)),
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    paths: list[Path] = []
+    for name, text in files:
+        path = out_dir / name
+        path.write_text(text, encoding="utf-8", newline="\n")
+        paths.append(path)
+    return paths
+
+
+def write_wf_report(out_dir: Path, report: wf_report.WalkForwardReport) -> list[Path]:
+    """Write the walk-forward report set into ``out_dir`` (created if needed) with LF line
+    endings and return the paths in this order: <stem>.md, <stem>-equity.csv,
+    <stem>-equity.svg, <stem>-variants.svg, <stem>-grid.csv. All five are rendered before any
+    is written, so a render error leaves no partial set."""
+    out_dir = Path(out_dir)
+    stem = wf_report.report_stem(report.data_end)
+    files = (
+        (f"{stem}.md", wf_report.render_markdown(report)),
+        (f"{stem}-equity.csv", wf_report.equity_csv(report)),
+        (f"{stem}-equity.svg", wf_report.equity_svg(report)),
+        (f"{stem}-variants.svg", wf_report.variants_svg(report)),
+        (f"{stem}-grid.csv", wf_report.grid_csv(report)),
     )
     out_dir.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []

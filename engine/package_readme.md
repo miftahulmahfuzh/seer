@@ -68,12 +68,13 @@ engine/
       walkforward.py        anchored yearly walk-forward for A2: folds, tune, select_fold, gate_p3b (rework P3; full docs pending phase 6)
       report.py             BacktestReport, render_markdown(), equity_csv(), equity_svg()
       wf_report.py          walk-forward (P3b) report: WalkForwardReport, render_markdown(), equity/grid CSVs, equity/variants SVGs, machine lines (rework P4; full docs pending phase 6)
-      io.py                 Neon loader + bar cache, dividends CSV, report writer (impure)
+      io.py                 Neon loader + bar cache, dividends CSV, report writers write_report() / write_wf_report() (impure)
     commands/
       __init__.py           command-module contract
       migrate.py            `migrate` command
       backfill.py           `backfill` command (phase 3)
       backtest.py           `backtest` command (P3)
+      backtest_wf.py        `backtest_wf` command: A2 anchored yearly walk-forward vs SPY, P3b gate, report (read-only; flags --out --cache-dir --refresh-cache --is-start --first-year --end --dividends; exit 0 pass or fail, 2 bad data/args) (rework P5; full docs pending phase 6)
   tests/                    pytest; DB tests need PG_TEST_URL
   data/spy_dividends.csv    SPY dividends (ex_date, amount_usd), vendored from yfinance (see data/SOURCES.md)
   .cache/                   gitignored; bars-<max date>-<rows>.pkl written by the backtest loader
@@ -445,7 +446,10 @@ the database.
   time) and `selected-params:` (the in-sample selection), which `test_strategy_a_frozen.py` reads
   with `parse_params_line`.
 - **`backtest.io`** (impure): `load_market(conn, *, cache_dir=CACHE_DIR, refresh=False) -> (Market, bars_rows)`,
-  `read_dividends(path=DIVIDENDS_CSV)`, `write_report(out_dir, report) -> list[Path]`.
+  `read_dividends(path=DIVIDENDS_CSV)`, `write_report(out_dir, report) -> list[Path]`,
+  `write_wf_report(out_dir, report: WalkForwardReport) -> list[Path]` (renders all five files,
+  `<stem>.md`, `-equity.csv`, `-equity.svg`, `-variants.svg`, `-grid.csv`, before writing any, LF
+  endings; returns the paths in that order).
 
 **Windows.** In-sample 2015-10-19 → 2021-12-31 (tuning); out-of-sample 2022-01-03 → the last SPY
 bar (validation, run once); full 2015-10-19 → the last SPY bar (one continuous portfolio). Each

@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 18:07:31
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-04 18:10:00
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 50
+- Blocked: 0
+- Completed: 51
 
 ---
 
@@ -38,20 +38,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Decided**:
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
-- [ ] **P1-ENG-2548** Phase 3: Finnhub client and LLM call options
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `engine/src/seer_engine/finnhub.py` (K5) + `engine/tests/test_finnhub.py` (fake transport/clock); `llm.py` keyword options (K5) + `test_llm.py` additions (body byte-identical without keywords; with them `temperature`, `thinking`, `max_tokens` present). Does not touch: commands (`explain` keeps calling `complete(system, prompt)`), store, web. Exit: spacing ≥ 1.0 s between any two requests, retries included; key only in a header and scrubbed from errors, logs and repr; one retry on connection error/timeout/429/5xx (Retry-After capped at 60 s), none on other 4xx; earnings earliest-in-window; tests green.
-  - **Status**: open
-  - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 3 of 7)
-  - **Satisfies**: R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
-  - **Depends on**: P1-ENG-KIBJ
-  - **Plan**: `.workflows/plan/P1-ENG-2548.md`
 - [ ] **P1-ENG-QRXI** Phase 4: `veto` command
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `engine/src/seer_engine/commands/veto.py` (K6, incl. the H1 guard) + `engine/tests/test_veto_command.py` (27 tests; PG + fake Finnhub/LLM injected through `execute(conn, *, now, dry_run, finnhub=..., llm=...)` factories). Does not touch: `paper.py`, `paper_check.py`, store (calls K3 only), `test_paper_command.py` (imports its helpers), workflow, docs. Exit: tests for each acceptance-3 failure (no LLM config, timeout/HTTP error, unparsable, Finnhub error, no Finnhub key, model mismatch, consecutive-failure stop); look-ahead (news at/after start never in the prompt or stored; bars dated ≥ session never change candidates); idempotent re-run makes zero client calls and writes nothing; **after Paper decided the session (late-verdict retry) no client call, no row, and C's `paper_check` stays ok; Paper deciding during the checks → the write transaction writes nothing**; failed/missing bars run → exit 1, nothing written; `--dry-run` writes nothing; no secret in rows or logs; LLM options are `float(params.temperature)`, `params.thinking`, `params.max_tokens`.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 4 of 7)
   - **Satisfies**: R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
   - **Depends on**: P1-ENG-4I4B, P1-ENG-2548
@@ -77,6 +68,23 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-2548** Phase 3: Finnhub client and LLM call options
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/finnhub.py` (K5) + `engine/tests/test_finnhub.py` (fake transport/clock); `llm.py` keyword options (K5) + `test_llm.py` additions (body byte-identical without keywords; with them `temperature`, `thinking`, `max_tokens` present). Does not touch: commands (`explain` keeps calling `complete(system, prompt)`), store, web. Exit: spacing ≥ 1.0 s between any two requests, retries included; key only in a header and scrubbed from errors, logs and repr; one retry on connection error/timeout/429/5xx (Retry-After capped at 60 s), none on other 4xx; earnings earliest-in-window; tests green.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 3 of 7)
+  - **Satisfies**: R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
+  - **Depends on**: P1-ENG-KIBJ
+  - **Plan**: `.workflows/plan/P1-ENG-2548.md`
+  - **Completed**: 2026-10-04 18:10
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/finnhub.py, engine/src/seer_engine/llm.py, engine/tests/test_finnhub.py, engine/tests/test_llm.py
+  - **Decided**:
+    - readme-updater for phase 3 -> skipped; engine/package_readme.md is owned by phase 7 only (rung 1: invariant 9) (completion-handler)
+  - **Verified**: targeted test_finnhub/test_llm/test_strategy_purity/test_massive/test_http 85 passed (matches plan); full engine suite on HEAD + these 4 files 2079 passed, 0 skipped; ruff clean; web vitest 65 passed + tsc clean
+  - **Next**: P1-ENG-QRXI (phase 4) unblocked: both its dependencies (P1-ENG-4I4B, P1-ENG-2548) are complete (completion-handler)
+
 - [x] **P1-ENG-4I4B** Phase 2: Migration 004, roster entry C, verdict store
   - **Difficulty**: NORMAL
   - **Type**: Feature

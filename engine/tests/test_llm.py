@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 import requests
 
@@ -154,3 +156,88 @@ def test_connection_error_text_is_redacted(caplog):
 def test_scrub():
     assert llm.scrub(f"a {KEY} b ?token=xyz", KEY) == "a REDACTED b ?token=REDACTED"
     assert llm.scrub("plain", None) == "plain"
+
+
+# --- Call options for Strategy C's veto (P6 phase 3) -------------------------------------------
+
+LEGACY_BODY_JSON = (
+    '{"model": "glm-test", "max_tokens": 400, "system": "sys text", '
+    '"messages": [{"role": "user", "content": "user text"}]}'
+)
+
+
+def test_no_keywords_keeps_the_body_byte_identical():
+    t = FakeTransport(ok())
+    make(t).complete("sys text", "user text")
+    [call] = t.calls
+    assert json.dumps(call["json"]) == LEGACY_BODY_JSON
+    assert list(call["json"]) == ["model", "max_tokens", "system", "messages"]
+
+
+def test_explicit_none_keywords_equal_no_keywords():
+    t = FakeTransport(ok())
+    make(t).complete("sys text", "user text", temperature=None, thinking=None, max_tokens=None)
+    assert json.dumps(t.calls[0]["json"]) == LEGACY_BODY_JSON
+
+
+def test_veto_options_reach_the_body():
+    t = FakeTransport(ok('{"verdict": "allow", "reason": "No company news."}'))
+    text = make(t).complete("sys", "user", temperature=0.0, thinking="disabled", max_tokens=1024)
+    assert text == '{"verdict": "allow", "reason": "No company news."}'
+    [call] = t.calls
+    assert call["json"] == {
+        "model": "glm-test",
+        "max_tokens": 1024,
+        "system": "sys",
+        "messages": [{"role": "user", "content": "user"}],
+        "temperature": 0.0,
+        "thinking": {"type": "disabled"},
+    }
+
+
+def test_each_option_is_independent():
+    t = FakeTransport(ok(), ok(), ok())
+    c = make(t, max_tokens=300)
+    c.complete("s", "p", temperature=0.0)
+    c.complete("s", "p", thinking="disabled")
+    c.complete("s", "p", max_tokens=50)
+    first, second, third = (call["json"] for call in t.calls)
+    assert first["temperature"] == 0.0 and "thinking" not in first and first["max_tokens"] == 300
+    assert second["thinking"] == {"type": "disabled"} and "temperature" not in second
+    assert third["max_tokens"] == 50 and "temperature" not in third and "thinking" not in third
+
+
+def test_max_tokens_override_is_per_call():
+    t = FakeTransport(ok(), ok())
+    c = make(t)
+    c.complete("s", "p", max_tokens=1024)
+    c.complete("s", "p")
+    assert [call["json"]["max_tokens"] for call in t.calls] == [1024, llm.DEFAULT_MAX_TOKENS]
+
+
+def test_options_survive_a_retry():
+    sleeps: list[float] = []
+    t = FakeTransport(_Resp(503, text="busy"), ok())
+    make(t, sleeps).complete("s", "p", temperature=0.0, thinking="disabled", max_tokens=1024)
+    assert len(t.calls) == 2 and t.calls[0]["json"] == t.calls[1]["json"]
+    assert t.calls[1]["json"]["thinking"] == {"type": "disabled"}
+
+
+def test_thinking_block_beside_text_still_returns_the_text():
+    body = {
+        "content": [
+            {"type": "thinking", "thinking": ""},
+            {"type": "text", "text": '{"verdict": "veto", "reason": "Guidance cut."}'},
+        ],
+        "stop_reason": "end_turn",
+    }
+    t = FakeTransport(_Resp(200, body))
+    assert make(t).complete("s", "p", thinking="disabled") == '{"verdict": "veto", "reason": "Guidance cut."}'
+
+
+@pytest.mark.parametrize("kw", [{"max_tokens": 0}, {"max_tokens": -5}, {"thinking": ""}, {"thinking": "  "}])
+def test_invalid_options_raise_before_any_request(kw):
+    t = FakeTransport()
+    with pytest.raises(ValueError):
+        make(t).complete("s", "p", **kw)
+    assert t.calls == []

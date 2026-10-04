@@ -62,22 +62,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "2738f60af28d37d6c1ac27f434c60dfe15917733",
       "depends_on": [
         2,
         3
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "veto command + H1 guard, 27 tests; full suite 2159/0 skipped; readme skipped (phase 7 owns it); commit scoped to own files in shared tree",
       "package": "engine/commands",
       "plan": ".workflows/plan/strategy-c-news-veto/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T11:22:11+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-QRXI",
       "title": "veto` command"
     },
     {
@@ -144,7 +144,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-c-news-veto/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-c-news-veto",
-  "updated": "2026-10-04T11:20:38+00:00",
+  "updated": "2026-10-04T11:22:11+00:00",
   "verified_at": "2026-10-04T11:20:38+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-c-news-veto"
 }

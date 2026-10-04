@@ -29,12 +29,19 @@ Design: `docs/plans/2026-10-04-method-lab-design.md`. CLI: `python -m seer_engin
 | idea | you choose it | already reserved as an `idea` row `MNNNN`; refine it, keep its id |
 | python | `engine/.venv/bin/python` | `PYTHONPATH=$PWD/engine/src /home/miftah/seer/engine/.venv/bin/python` (a worktree has no venv) |
 | database | `lab/lab.sqlite` in this checkout | the shared one: `export SEER_LAB_DB=/home/miftah/seer/lab/lab.sqlite SEER_RESEARCH_STORE=/home/miftah/seer/engine/.research` |
-| commits | method file, then `lab/lab.sqlite`, to `main` | method file only; **never commit `lab/lab.sqlite`** (the coordinator does) |
+| commits | method file, then `lab stage` (`lab/lab.sqlite` + `web/data/lab.json`), to `main` | method file only; **never commit `lab/lab.sqlite` or `web/data/lab.json`** (the coordinator does) |
 | promotion | do it yourself (below) | `lab` marks it `dev-eligible`; report it, and the coordinator promotes |
 | end | short report to the user | report to the coordinator (below), then stop |
 
 Run every command from the checkout root (`engine/` for pytest). In child mode, `export` both
 variables first in every shell.
+
+`tests/test_lab_snapshot.py` checks that `web/data/lab.json` is the export of `lab/lab.sqlite`.
+After any lab write (`run`, `note`, `insight`, `idea`, …) it fails until `lab stage` regenerates
+the JSON, by design. So solo: run the full engine `pytest` only **after** `lab stage`. The
+contract test in step 5 (`tests/test_lab_methods.py`) is unaffected. A child never stages: its
+own checkout's database is untouched (it writes the shared one through `SEER_LAB_DB`), so the
+check stays green there, and `lab stage` writes the JSON into the checkout that owns the database.
 
 ## One run
 
@@ -74,26 +81,38 @@ variables first in every shell.
    origin/main && git push origin HEAD:main`; solo: `git push`.
 6. **Run** `lab run MNNNN`. It takes seconds to minutes. Use `run_in_background` and wait for it.
 7. **Analyze honestly** in a scratch file, then `lab note MNNNN --file F --verdict "<one line>"`.
-   The page at seertrade.site/sera shows this to the owner, so write plainly. Cover:
+   The owner reads the analysis and the verdict on seertrade.site/sera (the method's page),
+   and is not a quant. Write plainly: short sentences, everyday words, numbers with their meaning ("lost
+   at most 13% from a peak, under the 15% limit"), and a plain gloss on any term you can't avoid
+   (CAGR, drawdown, profit factor, DSR). Markdown is fine. Cover:
    - result vs total-return SPY, and which conditions failed and by how much
-   - DSR at N
+   - DSR at N, in words: how likely the result is real rather than luck after N tries
    - worst year and when the drawdown hit
    - **why**: the mechanism, not just the numbers
    - whether the hypothesis held and whether the expected failure happened
    - comparison with the parent or near misses
-   - your **opinion**: is this direction worth more trials?
+   - end with a paragraph that starts **`My opinion:`**. Say plainly whether this direction is
+     worth more trials, what you would try next, and why. Commit to a view; no hedging.
+   The verdict is one plain line the site shows next to the method's name.
 8. **Journal at least one insight**: `lab insight --kind observation|hypothesis|data-wish|feature-wish|risk
    --title … --body … --method MNNNN`. Useful kinds: what this taught about markets, data you
-   wish the lab had, a feature that would make the search better, a risk you noticed.
+   wish the lab had, a feature that would make the search better, a risk you noticed. The owner
+   reads these on seertrade.site/sera (Journal and Ideas) as food for thought. Write them as plainly
+   as the analysis: a title that says the point, and a body that says why it matters and what to do about it.
+   (`synthesis` is Sera's batch summary; a single run never uses it.)
 9. **Queue at least one next idea**: `lab idea --name … --family … --source-kind … --hypothesis …`
    (plus `--parent`), drawn from what this result taught.
 10. **Promotion** if `lab run` printed an ELIGIBLE trial: solo, see **Promotion** below; child, report it.
 11. **Finish.**
-    - Solo: commit and push `lab/lab.sqlite` with anything new, then give a short report: idea, result vs SPY, verdict, insight, next idea, N, test looks.
+    - Solo: run `lab stage`. It takes the database's write lock, regenerates `web/data/lab.json`
+      (the snapshot seertrade.site/sera is built from) and `git add`s both files. Never
+      `git add lab/lab.sqlite` by hand. Commit both files and push; Vercel redeploys the site from
+      that push. Then give a short report: idea, result vs SPY, verdict, insight, next idea, N, test looks.
     - Child: make sure your method file is on `origin/main`. Then
       `SendMessage` to the coordinator (re-read `ListAgents` first):
       `DONE MNNNN <rejected|dev-eligible|blocked> — <verdict>; next: M00xx`. If the coordinator
-      is gone, the database already holds everything, so just stop. Never commit `lab/lab.sqlite`.
+      is gone, the database already holds everything, so just stop. Never commit `lab/lab.sqlite`
+      or `web/data/lab.json`.
 
 ## Promotion (dev-eligible): autonomous, one counted look
 
@@ -113,7 +132,7 @@ Then:
 3. Write the analysis and verdict.
 4. **Pass:** add it to the paper roster under a new id with its own clock, following
    `docs/runbooks/paper-trading.md` and the existing roster code. Set the method to `paper`.
-   Commit, push, verify. **Real money stays out of scope:** design §1 needs ≥ 3 months and
+   Commit (the database through `lab stage`), push, verify. **Real money stays out of scope:** design §1 needs ≥ 3 months and
    ≥ 100 closed trades of forward paper first.
 5. **Fail:** `test-failed` is final. Queue a variation if the evidence supports one.
 
@@ -128,7 +147,8 @@ Then:
 | "Delete that embarrassing trial" | Trials and insights are append-only (triggers). |
 | "Max DD 16% is basically 15%" | Design §1 is fixed. Never edit §1/§5, `tuning` thresholds or the P7a registry. |
 | "Nothing worked, stop here" | Journal the insight and queue the next idea. |
-| "Child: commit lab.sqlite too" | Never. A binary file committed by two sessions is a conflict nobody can merge. |
+| "Child: commit lab.sqlite too" | Never, and never `web/data/lab.json` either. A binary file committed by two sessions is a conflict nobody can merge. |
+| "Solo: `git add lab/lab.sqlite` is quicker" | Always `lab stage`. It is the only thing that keeps `web/data/lab.json` in sync, and CI fails a lab commit without it. |
 
 ## Quick reference
 
@@ -139,5 +159,7 @@ lab note M0007 --file /tmp/a.md --verdict "..."
 lab insight --kind data-wish --title "Quarterly fundamentals" --body "..." --method M0007
 lab idea --name "..." --family ... --source-kind variation --parent M0007 --hypothesis "..."
 lab block M0012 --on "quarterly fundamentals"   lab drop M0013 --why "duplicate of M0004"
+lab stage                         # solo only: writes web/data/lab.json, git-adds it and lab/lab.sqlite
 lab export                        # lab/lab.xlsx (gitignored)
+lab export-json                   # web/data/lab.json without staging (lab stage already does this)
 ```

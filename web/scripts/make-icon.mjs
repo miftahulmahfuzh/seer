@@ -6,10 +6,12 @@
 //   node scripts/make-icon.mjs --preview  also writes scripts/.icon/preview.png at 1024
 //
 // The model draws the eye, which nothing else here can do; this draws everything exact. It always
-// draws a pupil however hard the prompt forbids it, so the pupil is erased here: the almond's inner
-// lid edges are measured either side of the pupil, fitted with a quadratic each, and everything
-// between the two curves across the pupil's span becomes ground again. Then the Sigma goes in, from
-// Lucide's own path, so it is the same glyph the roster draws.
+// draws a pupil, but a lumpy one, so it is erased here: the almond's inner lid edges are measured
+// either side of it, fitted with a quadratic each, and everything between the two curves across the
+// pupil's span becomes ground again. A true circle goes back in its place, larger than the drawn one,
+// and the Sigma (Lucide's own path, the glyph the roster draws) is cut out of it in the ground colour.
+// The Sigma is grown until it would leave the ink, so its bars run into the lids instead of being
+// shrunk to fit the pupil.
 // sharp comes with next; no extra dependency.
 import sharp from 'sharp';
 import { mkdirSync } from 'node:fs';
@@ -25,8 +27,10 @@ const GROUND = '#f47862';
 const INK = '#1d1c1a';
 // lucide-react sigma, 24-unit box.
 const SIGMA = 'M18 7V5a1 1 0 0 0-1-1H6.5a.5.5 0 0 0-.4.8l4.5 6a2 2 0 0 1 0 2.4l-4.5 6a.5.5 0 0 0 .4.8H17a1 1 0 0 0 1-1v-2';
-const SIGMA_STROKE = 3; // Lucide's 2 is a hairline at 60px; this matches the eye's stroke weight
-const SIGMA_FILL = 0.64; // glyph height as a share of the opening, so its bars clear both lids
+const SIGMA_STROKE = 4.5; // in Lucide units (its own is 2): heavy enough to stand next to the eye's strokes
+const PUPIL = 1.8; // pupil radius over half the opening: big, so it swallows the lids at the centre
+const RIM = 0.012; // ink left around the Sigma, as a share of the mask width
+const K = 1.5; // the mark is built at 1.5x the source: the splash draws it ~520px wide on a 3x screen
 
 const PX = 1024;
 const EYE_W = 0.8; // eye width as a fraction of the tile: wide and short, so the squircle's corners stay clear
@@ -141,32 +145,66 @@ const scale = (PX * EYE_W) / bw;
 const ew = Math.round(bw * scale), eh = Math.round(bh * scale);
 const ox = Math.round((PX - ew) / 2), oy = Math.round((PX - eh) / 2);
 
-const rgba = Buffer.alloc(bw * bh * 4);
-const [ir, ig, ib] = [1, 3, 5].map(k => parseInt(INK.slice(k, k + 2), 16));
-for (let y = 0; y < bh; y++)
-  for (let x = 0; x < bw; x++) {
-    const o = (y * bw + x) * 4;
-    rgba[o] = ir; rgba[o + 1] = ig; rgba[o + 2] = ib;
-    rgba[o + 3] = alpha[(y + y0) * w + (x + x0)];
-  }
-const eye = await sharp(rgba, { raw: { width: bw, height: bh, channels: 4 } }).resize(ew, eh, { kernel: 'lanczos3' }).png().toBuffer();
-
-// The Sigma, centred in the opening, as tall as the opening allows. Lucide's glyph spans y 4..20.
-const sigmaSvg = (W, H, x, y, height, colour) => {
+// The mark: eye ∪ pupil − Sigma, as an alpha mask at K x the trimmed source, in one colour.
+const mw = Math.round(bw * K), mh = Math.round(bh * K);
+const openMid = ((openTop + openBot) / 2 - y0) * K; // the opening's centre row, in the mask
+const pupilR = (PUPIL * (openBot - openTop) * K) / 2;
+const svg = body => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${mw}" height="${mh}">${body}</svg>`);
+// Lucide's glyph spans x 6..18, y 4..20, so (12, 12) is its centre.
+const sigmaPath = (x, y, height, stroke) => {
   const unit = height / 16;
-  return Buffer.from(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
-      `<g transform="translate(${x - 12 * unit} ${y - 12 * unit}) scale(${unit})">` +
-      `<path d="${SIGMA}" fill="none" stroke="${colour}" stroke-width="${SIGMA_STROKE}" stroke-linecap="round" stroke-linejoin="round"/>` +
-      `</g></svg>`,
-  );
+  return `<g transform="translate(${x - 12 * unit} ${y - 12 * unit}) scale(${unit})"><path d="${SIGMA}" fill="none" stroke="#fff" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round"/></g>`;
 };
-const openMid = (openTop + openBot) / 2 - y0; // the opening's centre row, in the trimmed box
-const sigma = sigmaSvg(PX, PX, ox + (cx - x0) * scale, oy + openMid * scale, (openBot - openTop) * scale * SIGMA_FILL, INK);
+const alphaChannel = async img => (await sharp(img).ensureAlpha().extractChannel(3).raw().toBuffer());
+
+/** Eye and pupil, white, mirrored or not; the pupil sits where the drawn one was. */
+async function inkLayer(mirror) {
+  const white = Buffer.alloc(bw * bh * 4, 255);
+  for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) white[(y * bw + x) * 4 + 3] = alpha[(y + y0) * w + (x + x0)];
+  let eye = sharp(white, { raw: { width: bw, height: bh, channels: 4 } });
+  if (mirror) eye = eye.flop();
+  const px = (mirror ? x1 - cx : cx - x0) * K;
+  const blank = { create: { width: mw, height: mh, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 0 } } };
+  const img = await sharp(blank)
+    .composite([
+      { input: await eye.resize(mw, mh, { kernel: 'lanczos3' }).png().toBuffer() },
+      { input: svg(`<circle cx="${px}" cy="${openMid}" r="${pupilR}" fill="#fff"/>`) },
+    ])
+    .png()
+    .toBuffer();
+  return { img, px };
+}
+
+// Grow the Sigma (binary search on its height) while it, widened by the rim, stays inside the ink.
+const plain = await inkLayer(false);
+const ink = await alphaChannel(plain.img);
+const rim = RIM * mw;
+const fits = async height => {
+  const unit = height / 16;
+  const probe = await alphaChannel(svg(sigmaPath(plain.px, openMid, height, SIGMA_STROKE + (2 * rim) / unit)));
+  for (let i = 0; i < probe.length; i++) if (probe[i] > 128 && ink[i] < 128) return false;
+  return true;
+};
+let lo = pupilR * 0.5, hi = pupilR * 3;
+for (let i = 0; i < 14; i++) { const mid = (lo + hi) / 2; if (await fits(mid)) lo = mid; else hi = mid; }
+const sigmaH = lo;
+console.log(`pupil r ${(pupilR / K).toFixed(0)} · sigma ${(sigmaH / K).toFixed(0)} tall, stroke ${((SIGMA_STROKE * sigmaH) / 16 / K).toFixed(0)} (source px)`);
+
+/** The finished mark in `colour`: the ink layer with the Sigma cut out, upright even when mirrored. */
+async function mark(colour, mirror) {
+  const { img, px } = mirror ? await inkLayer(true) : plain;
+  const cut = await sharp(img).composite([{ input: svg(sigmaPath(px, openMid, sigmaH, SIGMA_STROKE)), blend: 'dest-out' }]).png().toBuffer();
+  const a = await alphaChannel(cut);
+  const [r, g, b] = [1, 3, 5].map(k => parseInt(colour.slice(k, k + 2), 16));
+  const out = Buffer.alloc(mw * mh * 4);
+  for (let i = 0; i < mw * mh; i++) { out[i * 4] = r; out[i * 4 + 1] = g; out[i * 4 + 2] = b; out[i * 4 + 3] = a[i]; }
+  return sharp(out, { raw: { width: mw, height: mh, channels: 4 } }).png().toBuffer();
+}
+const eye = await sharp(await mark(INK, false)).resize(ew, eh, { kernel: 'lanczos3' }).png().toBuffer();
 
 // RGB, never RGBA: iOS composites a transparent apple-touch-icon onto black.
 const master = await sharp({ create: { width: PX, height: PX, channels: 3, background: GROUND } })
-  .composite([{ input: eye, left: ox, top: oy }, { input: sigma, left: 0, top: 0 }])
+  .composite([{ input: eye, left: ox, top: oy }])
   .removeAlpha()
   .png()
   .toBuffer();
@@ -198,20 +236,8 @@ await sharp(master)
   .toFile(join(WEB, 'app/icon.png'));
 console.log(`wrote app/icon.png ${FAV}² (rounded favicon)`);
 
-// The splash: the eye as an alpha mask, painted by CSS in --splash-star so it follows the colour
+// The splash: the mark as an alpha mask, painted by CSS in --splash-star so it follows the colour
 // scheme. Mirrored, so the spiral hangs right and the pocket under the eye's left end is empty for
-// the "Seer." mark; the Sigma is drawn after the flip so it stays the right way round. Rendered at
-// 1.5x the source because the splash draws it ~470px wide on a 3x screen.
-const K = 1.5;
-const mw = Math.round(bw * K), mh = Math.round(bh * K);
-const white = Buffer.alloc(bw * bh * 4, 255);
-for (let i = 0; i < bw * bh; i++) white[i * 4 + 3] = rgba[i * 4 + 3];
-const flipped = await sharp(white, { raw: { width: bw, height: bh, channels: 4 } }).flop().resize(mw, mh, { kernel: 'lanczos3' }).png().toBuffer();
-await sharp({ create: { width: mw, height: mh, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 0 } } })
-  .composite([
-    { input: flipped, left: 0, top: 0 },
-    { input: sigmaSvg(mw, mh, (x1 - cx) * K, openMid * K, (openBot - openTop) * K * SIGMA_FILL, '#fff'), left: 0, top: 0 },
-  ])
-  .png({ compressionLevel: 9 })
-  .toFile(join(WEB, 'public/splash-eye.png'));
+// the "Seer." mark; the Sigma is cut after the flip so it stays the right way round.
+await sharp(await mark('#ffffff', true)).png({ compressionLevel: 9 }).toFile(join(WEB, 'public/splash-eye.png'));
 console.log(`wrote public/splash-eye.png ${mw}x${mh} (splash mask, mirrored) · aspect ${(mw / mh).toFixed(4)}`);

@@ -24,7 +24,8 @@ jobs:
   nightly:
     runs-on: ubuntu-latest
     # 45, not 30: nightly makes 3 Massive calls per missing session (bars, splits, dividends) at
-    # 12.5 s spacing, then Paper, Paper check and Explain run in the same job.
+    # 12.5 s spacing (about 40 s a session), then Veto (about 1 min, never more than its own
+    # 10-minute limit), Paper, Paper check and Explain run in the same job.
     timeout-minutes: 45
     env:
       DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
@@ -65,6 +66,26 @@ jobs:
           flags=(-v)
           if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
           python -m seer_engine "${flags[@]}" nightly
+
+      # Strategy C's news check (handover D6): A's first 10 candidates for the next session,
+      # Finnhub headlines and earnings dates, one LLM verdict each, stored in news_vetoes before
+      # Paper reads them. Never fails the night: missing secrets, a Finnhub or LLM outage, an
+      # LLM_MODEL other than C's frozen one, a crash or the 10-minute limit only make C sit the
+      # session out (a failed or missing verdict is no trade, design §8); the other four
+      # strategies never read it. Nominally about 1 minute. A re-run for a session already
+      # checked makes no calls. See docs/runbooks/paper-trading.md (Strategy C: the news check).
+      - name: Veto
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+        run: |
+          flags=(-v)
+          if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
+          python -m seer_engine "${flags[@]}" veto
 
       - name: Paper
         run: |

@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (src layout: `engine/src/seer_engine`)
-**Last Updated**: 2026-10-04 (P4 paper-only, phase 13 of `PAPER_TRADING_SHIP_PLAN.md`: migration 003, the `paper/` package, the book split rule, Massive dividends, the `paper`, `paper_check` and `explain` commands, ruff lint in CI)
+**Last Updated**: 2026-10-04 (P6 Strategy C, phase 7 of `STRATEGY_C_NEWS_VETO_PLAN.md`: `strategies.c`, `finnhub`, `llm` call options, roster entry `C`, the `news_vetoes` store, migration 004, the `veto` command, `paper` / `paper_check` deciding and replaying C)
 
 ## Overview
 
@@ -28,6 +28,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - Strategy B (P6a): `strategies.b` (an ML cross-sectional ranker on 15 ranked features and 3 SPY features, keeping A's bracket and passing on nights with no positive prediction), `strategies.b_model` (fixed-hyperparameter gradient-boosted trees, plus a ridge for information), a vectorized net-of-cost bracket labeler (`backtest/labels.py`), the B walk-forward over P3b's folds with a label purge (`backtest/b_walkforward.py`), its report (`backtest/b_report.py`), and the `backtest_b` command
 - Trade rules as a value and a dev-window strategy search (P7a): `sim.rules` (`TradeRules`, with `DESIGN_V0` reproducing design §5 exactly) and a second pure engine, `sim.book` (signal exits, rebalancing, dividends, fractional shares, open entries, idle instruments); the `Allocator` protocol and the families F1–F11 (`strategies/allocator.py`, `f_index.py`, `f_rotation.py`, `f_factor.py`, `f_swing.py`); `backtest/book_runner.py`; a local, gitignored research store of pre-2015 history (`research.py`, `research_store` command); and a pre-registered registry run only on the development window (≤ 2015-10-16) by `backtest/dev.py`, `dev_report.py`, `registry.py` and the `backtest_dev` command, which writes the dev report and the P7b pre-registration
 - Nightly paper trading (P4, paper-only by the owner's option (b), 2026-10-04): a frozen roster of four paper portfolios (`SPY` the champion and benchmark, `A`, `F4-MOM12-N20-TREND`, `F1-SPY-SMA200-M`) stepped one session at a time by pure night functions (`paper/bracket.py`, `paper/book.py`, `paper/benchmark.py`) that mirror the backtest runners' loop bodies; persisted in migration 003's tables by `paper/store.py`; driven by the `paper` command after `nightly`; proven equal to a one-shot `run_rules` / `buy_and_hold` replay by `paper_check`; optionally explained by an LLM (`explain`). No real-money path exists, and design §1 is unchanged
+- Strategy C on paper (P6): a fifth roster entry `C` whose picks are A's first 10 ranked candidates minus every symbol whose nightly news check did not say `allow`. `strategies.c` holds the pure part (the `NewsVeto` strategy, the frozen prompt `c-veto-v1`, the JSON verdict parser); `finnhub.py` reads company news and earnings dates; the `veto` command asks the LLM once per candidate before `paper` and stores every verdict and the headlines it saw in `news_vetoes` (migration 004); `paper` and `paper_check` read only stored verdicts, so the replay never re-asks the LLM. A failed or missing verdict is no trade (design §8). No backtest gate applies (design §1 item 5)
 
 ## Layout
 
@@ -52,7 +53,8 @@ engine/
     runs.py                 start_run / finish_run / fail_run
     research.py             local research store: build_store() / load_store(), DEV_END guard (impure; P7a)
     dividends.py            Massive cash dividends (CD + SC) per ex-date, upsert into `dividends` (P4)
-    llm.py                  optional Anthropic-compatible Messages call for `explain`; never raises past it (P4)
+    llm.py                  Anthropic-compatible Messages call for `explain` (P4) and `veto` (P6, with temperature/thinking/max_tokens per call)
+    finnhub.py              Finnhub company news and earnings calendar, rate-limited, key in a header only (P6)
     sim/                    fill simulator: pure, deterministic, Decimal-only (P2)
       __init__.py           public surface; import everything from seer_engine.sim
       model.py              constants, money helpers, Order, Portfolio, Event, Snapshot, StepResult
@@ -63,12 +65,12 @@ engine/
       book.py               the book engine: Target, Book, Position, Fill, Trade, step_book(), close_book_unpriced() (P7a); apply_book_split(), BookSplit (P4)
     paper/                  nightly paper trading (P4); every module but store.py is pure
       __init__.py           docstring only
-      roster.py             the frozen roster: four entries, canonical spec text, digest, backtest_gate
+      roster.py             the frozen roster: five entries (C since P6), canonical spec text, digest, backtest_gate
       bracket.py            settle_bracket(), decide_bracket(): run_backtest's loop body for one session
       book.py               settle_book(), decide_book(): run_book's loop body for one session
       benchmark.py          BenchmarkState, start_benchmark(), split_benchmark(), step_benchmark(): buy_and_hold for one session
       replay.py             the pure comparison behind paper_check
-      store.py              load/save paper state, windowed market, splits and dividends queries (impure)
+      store.py              load/save paper state, windowed market, splits and dividends queries, news verdicts (impure)
     strategies/             strategy layer: pure; float64 indicators, Decimal picks (P3)
       __init__.py           re-exports the public names of base, a, a2 and b (never b_model, so importing the package does not load scikit-learn)
       base.py               History, history_from_bars(), Strategy protocol
@@ -77,6 +79,7 @@ engine/
       a2.py                 Strategy A2 (P3b): A2Params, VARIANTS V0-V3, regime_on, STRATEGY_A2_PARAMS, StrategyA2
       b_model.py            Strategy B's model (P6a): fit_tree / fit_ridge, BModel (digest identity), importance, dumps / loads
       b.py                  Strategy B (P6a): 18 features, rank01, candidates, BParams, picks > 0, FrozenModel, STRATEGY_B_FROZEN, StrategyB
+      c.py                  Strategy C (P6): CParams, STRATEGY_C_PARAMS, the frozen prompt c-veto-v1, candidates(), NewsVeto, parse_verdict()
       allocator.py          Allocator protocol (target weights), target_from_close, month_end_closes, PICKS / BLEND / VOLTARGET (P7a)
       f_index.py            F1/F10 TIMING (trend-timed index), F11 CALENDAR (turn of month) (P7a)
       f_rotation.py         F2/F3 ROTATION (dual momentum, sector rotation) (P7a)
@@ -113,6 +116,7 @@ engine/
       paper.py              `paper` command (P4)
       paper_check.py        `paper_check` command (P4)
       explain.py            `explain` command (P4)
+      veto.py               `veto` command (P6): Strategy C's nightly news check
   tests/                    pytest; DB tests need PG_TEST_URL
   data/spy_dividends.csv    SPY dividends (ex_date, amount_usd), vendored from yfinance (see data/SOURCES.md)
   .cache/                   gitignored; bars-<max date>-<rows>.pkl written by the backtest loader
@@ -121,6 +125,7 @@ docs/backtests/             committed reports: <end>-strategy-a{.md,-equity.csv,
 docs/plans/                 <run date>-p7b-preregistration.md: the P7b finalists (or "none eligible"), written by backtest_dev (P7a)
 db/migrations/002_engine.sql  (outside the package, owned by it)
 db/migrations/003_paper.sql   (outside the package; paper state, book tables, dividends, roster rows; P4)
+db/migrations/004_news_veto.sql (outside the package; the C roster row and news_vetoes; P6)
 ```
 
 ## CLI
@@ -383,6 +388,7 @@ The nightly paper step for the frozen roster (`docs/runbooks/paper-trading.md`).
 - **Precondition**: the real `runs` row for `run_dates(now).session_date` has `status = success`. Otherwise nothing is written and it exits 1 (design §8: a failed bars run means no paper step).
 - **First night**: writes each roster row's frozen spec (`params`) and `paper_start = session_date`, `paper_state` (initial cash 20,000,000 IDR at the latest FX on or before `data_date`), day-0 snapshots at `data_date`, and the first decisions.
 - **Every night**: steps every session after `paper_state.last_session` through `data_date` for every strategy, then decides `session_date`. See Usage, "Paper: one night".
+- **Strategy C**: C's strategy object is given the verdicts stored in `news_vetoes` for the sessions being decided (`store.allowed_between`); only `allow` is bought, and a missing verdict counts as `failed`. `paper` makes no network call and never fails because of C's verdicts.
 - **Idempotent** per (strategy, session): a re-run for a session already done writes nothing.
 - **One transaction** for the whole night plus `runs.paper_status`. A failure rolls back everything and records `paper_status = failed`.
 - **Frozen spec**: a started strategy whose stored digest differs from `paper/roster.py` fails the night as `store.SpecMismatch` (rolled back, `paper_status = failed`, exit 1). A `paper_start` with no `paper_state` is refused the same way until the clock is reset.
@@ -394,7 +400,7 @@ The nightly paper step for the frozen roster (`docs/runbooks/paper-trading.md`).
 usage: seer_engine paper_check [-h] [--dry-run] [-v] [--require-sessions N]
 ```
 
-The read-only replay check (D7). See Usage, "Paper: replay check". "Not started" (no `paper_start`) is a pass. A strategy touched by an applied split is reported `split-affected`, not failed. `--require-sessions N` is the v0.1.0 release check. Exit codes: 0 = every started strategy `ok` or `split-affected` (or none started); 1 = a mismatch, or `--require-sessions N` unmet (`not-started` counts as 0); 2 = missing setting.
+The read-only replay check (D7). See Usage, "Paper: replay check". C is replayed from its stored verdicts, read in the same read-only transaction; the LLM is never asked again. "Not started" (no `paper_start`) is a pass. A strategy touched by an applied split is reported `split-affected`, not failed. `--require-sessions N` is the v0.1.0 release check. Exit codes: 0 = every started strategy `ok` or `split-affected` (or none started); 1 = a mismatch, or `--require-sessions N` unmet (`not-started` counts as 0); 2 = missing setting.
 
 ### `explain` (P4)
 
@@ -403,6 +409,23 @@ usage: seer_engine explain [-h] [--dry-run] [-v]
 ```
 
 Optional LLM explanations (D9) for new paper entries without one: `orders.explanation` for A's new pending orders, `book_targets.explanation` for new entries of the latest decision. Missing or empty `LLM_*` settings, or any LLM error, leave the text NULL and exit 0. Paper correctness never depends on it. Exit 1 only on a database error; 2 when `LLM_*` is set but `DATABASE_URL_UNPOOLED` is missing.
+
+### `veto` (P6, Strategy C)
+
+```
+usage: seer_engine veto [-h] [--dry-run] [-v] [--now ISO8601]
+```
+
+Strategy C's nightly news check (handover D6; `docs/runbooks/paper-trading.md`, "Strategy C: the news check"). The nightly job runs it after `nightly` and before `paper`, as a `continue-on-error` step with a 10-minute limit. It runs outside `paper`'s transaction, so `paper` stays one network-free transaction.
+
+- **Clock**: `started_at = now` (tz-aware UTC; `--now` for tests) is both the news cutoff and every row's `decided_at`. `rd = dates.run_dates(now)`; the session checked is `rd.session_date`.
+- **Precondition**: the real `runs` row for that session has `status = success`. Otherwise exit 1, nothing written, no network call.
+- **Nothing to do**: C already has rows for the session (`store.has_vetoes`): "already checked", exit 0, no Finnhub or LLM call. `paper` has already decided the session: "too late", exit 0, nothing written.
+- **Candidates**: `strategies.c.candidates` on `store.load_market_window(conn, store.market_window_since(rd.data_date))` at `rd.data_date` (A's ranked picks, the first 10), read and rolled back before any network call. None: exit 0, nothing written.
+- **Per candidate**, in rank order: `finnhub.Client.company_news(symbol, *news_dates(started_at, 3))` → `select_headlines(..., cutoff=started_at, cap=20)`; `finnhub.Client.earnings(symbol, *earnings_window(session, 5))`; `llm.Client(cfg, timeout=30.0, retries=1).complete(SYSTEM_PROMPT, user_prompt(...), temperature=float(params.temperature), thinking=params.thinking, max_tokens=params.max_tokens)` (0.0, "disabled", 1024, all from C's frozen `CParams`) → `parse_verdict`.
+- **A failure is a verdict, never an exception**: `failed`, with a plain reason redacted and cut to 300 characters, when `FINNHUB_API_KEY` is unset, any `LLM_*` is unset, `LLM_MODEL` is not C's frozen model ("LLM_MODEL <x> is not C's frozen model glm-5.3"), Finnhub or the LLM errors, the reply is unparsable, or `MAX_CONSECUTIVE_FAILURES = 3` network failures in a row stopped the rest ("skipped after 3 consecutive failures").
+- **One write**: one transaction re-checks `has_vetoes` (another run may have won) and writes every row with `store.write_vetoes`. `--dry-run` makes the real calls, then rolls back. No secret reaches a row or a log line.
+- **Exit codes**: 0 = rows written (whatever the verdicts, all `failed` included), nothing to do, or no candidates; 1 = no successful bars run for the session, or a database error; 2 = missing setting (`DATABASE_URL_UNPOOLED`).
 
 ## Exported API
 
@@ -503,7 +526,7 @@ Membership intervals are `[start_date, end_date)`, where `end_date` is exclusive
 
 Demo bars and FX rows look exactly like real ones, so the trigger is that a `runs` row with `is_demo` exists. While one exists, every row in the demo-owned tables is treated as demo data.
 
-- `DEMO_TABLES = ("action_dismissals", "orders", "equity_snapshots", "paper_state", "book_positions", "book_targets", "book_fills", "book_trades", "bars", "fx_rates", "runs")`. `strategies` is kept on purpose. A purge also resets `strategies.paper_start` and `params` (the demo seed's paper clock; `RESET_PAPER_CLOCK`), so the first real `paper` run starts cleanly; `dividends` is never purged.
+- `DEMO_TABLES = ("action_dismissals", "orders", "equity_snapshots", "paper_state", "book_positions", "book_targets", "book_fills", "book_trades", "news_vetoes", "bars", "fx_rates", "runs")`. `strategies` is kept on purpose. A purge also resets `strategies.paper_start` and `params` (the demo seed's paper clock; `RESET_PAPER_CLOCK`), so the first real `paper` run starts cleanly; `dividends` is never purged.
 - `has_demo(conn) -> bool`
 - `purge_demo(conn) -> bool`: `TRUNCATE <DEMO_TABLES> RESTART IDENTITY` when demo data exists. Does not commit.
 - `purge_demo_if_needed(conn, dry_run) -> bool`: runs `purge_demo` in its own `db.transaction`. Under `dry_run` the purge runs, is rolled back and logs "would purge". The return value still says whether it purged or would have.
@@ -735,6 +758,25 @@ keeps A's fixed bracket. `a.py` and `a2.py` are not changed.
   StrategyB()`. Its contract is `picks_prepared(prepare(H), M, d, p) == picks({s: h.upto(d)}, M, d,
   p)` for every model, and no look-ahead, SPY's bars included. B-linear is the same `STRATEGY_B`
   with a ridge `BParams`.
+
+### strategies.c (P6, Strategy C)
+
+Pure like the rest of `strategies/` (the purity tests cover it): no psycopg, requests, clock,
+randomness, logging or `fromtimestamp`. The network half lives in `finnhub.py`, `llm.py` and
+`commands/veto.py`.
+
+- `PROMPT_VERSION = "c-veto-v1"`, `FROZEN_MODEL = "glm-5.3"`, `STRATEGY_C_ID = "C-news-veto"` (the object id in C's spec; the roster id is `C`). `Verdict = Literal["allow", "veto", "failed"]`, `VERDICTS`.
+- `Headline(id, published, source, headline, summary)`: one Finnhub news item as C reads it; `published` is tz-aware UTC.
+- `CParams(a=STRATEGY_A_PARAMS, max_candidates=10, news_days=3, max_headlines=20, max_summary_chars=280, earnings_sessions=5, model=FROZEN_MODEL, prompt_version=PROMPT_VERSION, temperature="0", thinking="disabled", max_tokens=1024)`; `as_dict()` gives every key as a plain string: A's params as `a.<key>`, `a_object`, `a_object_id`, the fields above, and the full `system_prompt` and `user_template` texts, so C's digest moves if any of them changes. `STRATEGY_C_PARAMS = CParams()`.
+- `SYSTEM_PROMPT`, `USER_TEMPLATE`: the frozen `c-veto-v1` texts (the plan's K1, verbatim). The system prompt lists what is a veto (earnings inside the holding window or in the last 3 days; guidance cut, warning or large miss; accounting problems or fraud; a lawsuit, regulatory action, investigation or recall; M&A, spin-off or tender news; a halt, delisting, bankruptcy or going-concern doubt; a major analyst or credit downgrade; the CEO or CFO leaving) and asks for one JSON object `{"verdict": "allow" | "veto", "reason": "<one sentence>"}`.
+- `candidates(history, members, data_date, params)` / `candidates_prepared(prepared, members, data_date, params)`: `STRATEGY_A.picks(...)` / `picks_prepared(...)` with `params.a`, cut to `params.max_candidates`. The one place C's candidates are computed (`veto` and `NewsVeto` both call it).
+- `NewsVeto(allowed: Mapping[date, frozenset[str]], id=STRATEGY_C_ID, lookback=STRATEGY_A.lookback)` implements `Strategy`: `picks` keeps the candidates whose symbol is in `allowed[next_session(data_date)]`, in rank order; `prepare` is A's; `picks_prepared` is the same filter on `candidates_prepared`. `with_allowed(allowed)` returns a copy carrying stored verdicts. `STRATEGY_C = NewsVeto(allowed={})` (with no verdicts it never buys).
+- `news_dates(started_at, days) -> (from, to)`: ET calendar dates for Finnhub; `to` is `started_at` in New York.
+- `earnings_window(session, n) -> (session, the n-th session counting session as 1)`.
+- `select_headlines(items, cutoff, cap)`: items published strictly before `cutoff`, newest first (ties: higher id first), at most `cap`.
+- `user_prompt(symbol, session, window_end, earnings, cutoff, headlines, params) -> str`: `USER_TEMPLATE` filled; summaries cut to `max_summary_chars` at a word boundary; `No headlines.` when there are none.
+- `parse_verdict(text) -> (verdict, reason)`: accepts surrounding whitespace and a fenced JSON block, takes the first `{...}` object; the verdict must be exactly `allow` or `veto` (case-insensitive) and the reason a non-empty string (whitespace collapsed, at most 300 characters). Anything else is `("failed", "unparsable reply: <first 120 chars>")`.
+- `allowed_map(rows) -> {session: frozenset of allowed symbols}` from `(session, symbol, verdict)` rows.
 
 ### backtest (P3)
 
@@ -1303,14 +1345,14 @@ synthetic sessions.
 
 - **`paper.roster`**: the frozen roster (D1, D4).
   - `BENCHMARK_ID = "SPY"`, `F4_ID = "F4-MOM12-N20-TREND"`, `F1_ID = "F1-SPY-SMA200-M"`.
-  - `RosterEntry` (frozen dataclass), one paper portfolio: `id, name, sub, icon, is_champion, is_benchmark, sort` (equal to migration 003's rows), `engine: Engine`, `rules: TradeRules | None`, `obj: Strategy | Allocator | None`, `object_name`, `params`, `registry_id: str | None`, `lookback: int`, `gate_note: str`.
-  - `ROSTER: tuple[RosterEntry, ...]` (SPY, A, F4, F1), `ROSTER_IDS`, `MAX_LOOKBACK_BARS = max(e.lookback for e in ROSTER)`.
+  - `RosterEntry` (frozen dataclass), one paper portfolio: `id, name, sub, icon, is_champion, is_benchmark, sort` (equal to the rows migrations 003 and 004 insert), `engine: Engine`, `rules: TradeRules | None`, `obj: Strategy | Allocator | None`, `object_name`, `params`, `registry_id: str | None`, `lookback: int`, `gate_note: str`, `gate_applicable: bool = True` (P6; false only for `C`).
+  - `ROSTER: tuple[RosterEntry, ...]` (SPY, A, F4, F1, C), `ROSTER_IDS`, `MAX_LOOKBACK_BARS = max(e.lookback for e in ROSTER)`. `C` (P6): `C · News veto`, icon `gavel`, sort 5, engine `bracket`, rules `DESIGN_V0`, `obj = STRATEGY_C`, `params = STRATEGY_C_PARAMS`, gate note "Backtest gate: not applicable (LLM strategy, design §1 item 5)".
   - `entry(strategy_id) -> RosterEntry`: the roster entry; `KeyError` when it is not on the roster.
   - `rules_dict(rules: TradeRules) -> dict[str, str | None]`: every `TradeRules` field, in field order, as plain strings.
   - `spec(e) -> dict[str, Any]`: the frozen spec (C2 `params.spec`), JSON-ready, strings and nulls only.
   - `spec_text(s) -> str`: the canonical text of a spec: JSON with sorted keys, no whitespace, ASCII only.
-  - `spec_digest(s) -> str`: sha256 (hex) of `spec_text(s)` in UTF-8. The four digests are pinned in `tests/test_paper_roster.py`.
-  - `backtest_gate(e) -> dict[str, Any]`: C2 `params.backtest_gate`, `passed` false for every entry, with `e.gate_note`.
+  - `spec_digest(s) -> str`: sha256 (hex) of `spec_text(s)` in UTF-8. The five digests are pinned in `tests/test_paper_roster.py`; the four P4 digests never change.
+  - `backtest_gate(e) -> dict[str, Any]`: C2 `params.backtest_gate`, `passed` false for every entry, with `e.gate_note`; for `C` also `"applicable": false` (the web shows "Not applicable" and counts it as not passed). Not part of the spec, so no digest depends on it.
   - `strategy_params(e) -> dict[str, Any]`: the whole `strategies.params` jsonb (`spec`, `digest`, `backtest_gate`), as `paper` writes it.
 - **`paper.bracket`**:
   - `BracketNight(session, portfolio, events, snapshot)`: one settled session of a bracket strategy.
@@ -1340,6 +1382,7 @@ synthetic sessions.
   - Book: `LoadedBook(book, pending_session, targets, idle_added)`; `load_book(conn, strategy_id, *, idle_symbol=None) -> LoadedBook`; `save_book_night(conn, strategy_id, book, fills, trades, snapshot, *, executed_targets=None)`; `save_book_decision(conn, strategy_id, session, targets)` (an empty decision writes no row); `read_book_positions`, `read_book_targets(conn, strategy_id, session)`, `read_book_fills`, `read_book_trades`.
   - Benchmark: `load_benchmark(conn, strategy_id="SPY") -> BenchmarkState`; `save_benchmark_night(conn, strategy_id, state, snapshot, fills)`.
   - Market: `dividends_on(conn, session, symbols)`, `dividends_between(conn, start, end)` (`book_runner.DividendMap` shape); `applied_splits_on(conn, session) -> tuple[tuple[str, Decimal], ...]`, `applied_splits_between(conn, start, end)`; `market_window_since(data_date) -> date`; `load_market_window(conn, since) -> Market` (bars via `backtest.io.read_bars_frame(conn, since=...)`, every membership interval, FX).
+  - News verdicts (P6): `NewsVerdict(rank, symbol, verdict, reason, model, prompt_version, headlines, earnings_date, decided_at)`; `has_vetoes(conn, strategy_id, session) -> bool`; `write_vetoes(conn, strategy_id, session, verdicts) -> int` (plain INSERTs after validating ranks 1..n, unique symbols, a known verdict and a tz-aware `decided_at`; a duplicate is a database error, so callers check `has_vetoes` first in the same transaction); `read_vetoes(conn, strategy_id, session)` (by rank); `allowed_between(conn, strategy_id, start, end) -> dict[date, frozenset[str]]` (only `allow`, sessions `start..end` inclusive).
 
 ### dividends (P4)
 
@@ -1357,7 +1400,16 @@ synthetic sessions.
 - `LlmError(RuntimeError)`: a request failed after retries, or the reply held no text.
 - `LlmConfig(base_url, api_key, model)` (`api_key` excluded from `repr`); `load_config() -> LlmConfig | None`: None when any of `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` is unset or empty.
 - `messages_url(base_url) -> str`: the Messages endpoint for `base_url`. `scrub(text, secret) -> str`: key/token query parameters and every occurrence of `secret` redacted.
-- `Client(cfg, *, transport=None, timeout=20.0, retries=1, backoff=2.0, max_tokens=400, sleep=time.sleep)`; `Client.complete(system, prompt) -> str`. The key goes out as both `x-api-key` and `Authorization: Bearer` (z.ai compatibility). `explain` catches every `LlmError`, so it never raises past it.
+- `Client(cfg, *, transport=None, timeout=20.0, retries=1, backoff=2.0, max_tokens=400, sleep=time.sleep)`; `Client.complete(system, prompt, *, temperature=None, thinking=None, max_tokens=None) -> str`. The key goes out as both `x-api-key` and `Authorization: Bearer` (z.ai compatibility). `explain` calls it with no keywords, and its request body is byte-identical to P4's; `veto` (P6) passes `temperature=0.0`, `thinking="disabled"` (sent as `{"type": "disabled"}`) and `max_tokens=1024`, because `glm-5.3` with a small budget spends it on reasoning and returns no text. `explain` and `veto` catch every `LlmError`, so neither raises past it.
+
+### finnhub (P6)
+
+- `BASE_URL = "https://finnhub.io/api/v1"`, `MIN_INTERVAL = 1.0` (s between calls: the free tier's 60 a minute), `DEFAULT_TIMEOUT_S = 15.0`.
+- `FinnhubError(message, status)`: a request failed after its retry. The text never holds the key.
+- `load_key() -> str | None`: `config.get("FINNHUB_API_KEY")`.
+- `Client(key, *, transport=None, base_url=BASE_URL, min_interval=MIN_INTERVAL, timeout=DEFAULT_TIMEOUT_S, retries=1, backoff=2.0, clock=time.monotonic, sleep=time.sleep)`; the key travels only in the `X-Finnhub-Token` header. One retry on a connection error, a timeout, 429 or 5xx (honouring a longer numeric `Retry-After`, capped at 60 s); anything else raises `FinnhubError`. Calls are spaced from the end of the previous attempt, retries included.
+  - `company_news(symbol, start, end) -> list[Headline]` (`GET /company-news`; symbols in the dot form `bars` stores, e.g. `BRK.B`); items with a missing or non-integer `id` or `datetime`, or an empty headline, are dropped. No cutoff here: `veto` applies `select_headlines`.
+  - `earnings(symbol, start, end) -> date | None` (`GET /calendar/earnings`): the earliest date in `[start, end]`, else None. For `BRK.B` the free tier returns the `BRK.A` row.
 
 ### P4 additions to existing modules
 
@@ -1393,6 +1445,15 @@ Additive only: new columns are nullable or defaulted, `orders` keeps every type 
 - Data: the four roster display rows (upsert; `SPY` is the only champion and the benchmark), and `B`/`C` deleted only when no `orders` or `equity_snapshots` row references them.
 - Applied to Neon on 2026-10-04 (runbook ship check).
 
+## Migration 004 (`db/migrations/004_news_veto.sql`, P6)
+
+Additive only.
+
+- Data: the `C` roster row (`C · News veto`, "A's picks, LLM can veto on news", icon `gavel`, sort 5, engine `bracket`, rules `design-v0`, not champion, not benchmark), as an upsert: 003 had deleted the old unreferenced `C` row.
+- `news_vetoes(strategy_id → strategies, session_date, rank ≥ 1, symbol, verdict IN ('allow','veto','failed'), reason, model NULL when unset, prompt_version, headlines jsonb [{id, datetime, source, headline}] newest first, earnings_date, decided_at timestamptz)`, PK `(strategy_id, session_date, symbol)`, unique `(strategy_id, session_date, rank)`. One row per candidate checked; `paper` and `paper_check` read it, the LLM is never re-asked. About 0.55 MB a month.
+- Demo-owned: `demo.DEMO_TABLES` includes `news_vetoes`. `paper`'s orphaned-rows guard does not count it (verdicts exist before C starts).
+- Applied to Neon by the nightly `Migrate` step on the first scheduled run after the merge; that night also starts C's clock.
+
 ## Data Flow
 
 Phase 1 provides the building blocks. Write commands in later phases use them in this order:
@@ -1403,6 +1464,11 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 4. Reads (`dates.run_dates`, `universe.*`, `http.get_json` / `fx.fetch_*`) are followed by writes (`bars.upsert_bars`, `fx.upsert_fx`, `runs.*`) inside `with db.transaction(conn, args.dry_run):`.
 5. The transaction commits, or rolls back and re-raises. `main` maps exceptions to exit codes.
 
+`veto` (P6) is the one write command that calls the network after reading the database: it reads the
+candidates in a transaction it rolls back, makes every Finnhub and LLM call with no transaction open,
+then writes all its rows in one short transaction. A network failure becomes a `failed` row, never an
+exception. The real night is `migrate` → `nightly` → `veto` → `paper` → `paper_check` → `explain`.
+
 ## Dependencies
 
 ### External
@@ -1412,6 +1478,7 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 - `requests>=2.32`: HTTP, through one module-level `Session` in `http.py`.
 - `python-dotenv>=1.0`: parses `.env.local`. The file is parsed, never `source`d, because it contains an unquoted `&`.
 - `yfinance>=1.0`: used only by `yahoo.py` (phase 3 backfill, and P7a's research store through its dividends-aware download with `actions=True`), imported lazily.
+- Finnhub REST (P6, no new package: `requests`): `company-news` and `calendar/earnings` on the free tier, 60 calls a minute.
 - `scikit-learn>=1.9,<1.10` (P6a): Strategy B's `HistGradientBoostingRegressor`, used only by `strategies.b_model`. The minor version is pinned, because a frozen model is a pickle of its estimator, and `b_model`'s digest reads the fitted trees' private node arrays. It brings `threadpoolctl` (used to cap the threads in the determinism probe), `joblib` and `scipy`. `cli.discover` imports every command, so `backtest_b` makes every command load scikit-learn at startup (about 0.5–1 s); `import seer_engine.strategies` alone does not.
 - dev: `pytest>=8`, `ruff>=0.16,<0.17` (lint config in `[tool.ruff]`: `py311`, selects `E9` and `F`, ignores `F401`).
 
@@ -1433,6 +1500,7 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 - `strategies.allocator` imports numpy, `dates`, `prices`, `sim` (`Pick`, `q`), `sim.book`, `strategies.base` and `strategies.indicators`. `strategies.f_index`, `f_rotation`, `f_factor` and `f_swing` import numpy, `strategies.allocator` (`target_from_close`, and `month_end_closes` in `f_index`), `strategies.base`, `strategies.indicators` and `sim` / `sim.book`, plus `dates` (`f_index`) or `prices` (`f_rotation`, `f_swing`); none imports another family or `universe`.
 - `backtest.book_runner` imports `dates`, `market`, `metrics`, `runner` (`run_backtest`, `RunResult`, `INITIAL_IDR`, read-only), `sim.book`, `sim.model`, `sim.rules`, `strategies.allocator` and `strategies.base`. `backtest.dev` imports `dates`, `tuning`, `benchmark`, `book_runner`, `market`, `metrics`, `runner` (`RunResult`), `sim.rules`, `strategies.allocator` and `strategies.base`. `backtest.dev_report` imports `benchmark`, `dev`, `metrics`, `report`'s helpers (read-only), `runner` (`INITIAL_IDR`, `YearGap`), `tuning` (thresholds), `sim.rules` and `strategies.allocator`. `backtest.registry` imports `dev`, `sim.rules`, `strategies.a` (`STRATEGY_A`, for `REF-A-V0`), `strategies.allocator`, `strategies.base` and every family module. None of them imports `bars`, `db`, `http` or `config`.
 - `research` (impure) imports `config`, `dates`, `fx`, `membership`, `yahoo` (the dividends-aware download), `prices`, `backtest.benchmark`, `backtest.io` (`histories_from_frame`, `merge_intervals`) and `backtest.market`; it never imports `db`. `commands.research_store` imports `research` and `backtest.io` (the vendored SPY dividends for `--verify`). `backtest.io` also imports `dev_report` (for `dev_report_files` and `write_dev_report`). `commands.backtest_dev` imports `config`, `research`, `backtest.dev`, `dev_report`, `registry`, `backtest.io`, `benchmark`, `market`, `metrics`, `runner` and `sim`, and `subprocess` for the `git status` registry check.
+- `strategies.c` imports `dates`, `sim` (`Pick`), `strategies.a` (`STRATEGY_A`, `STRATEGY_A_PARAMS`, `AParams`) and `strategies.base`; never `finnhub`, `llm`, `db` or `universe`. `finnhub` imports `config`, `http` (`redact`), `requests` and `strategies.c` (`Headline`). `commands.veto` imports `db`, `dates`, `demo`, `runs`, `finnhub`, `llm`, `commands.nightly` (`_parse_now`), `paper.roster`, `paper.store`, `sim.sizing` (`Pick`) and `strategies.c`.
 ### Standard library
 `argparse`, `importlib`/`pkgutil` (command discovery), `logging`, `contextlib`, `dataclasses`, `decimal`, `functools.lru_cache`, `re`, `time`.
 
@@ -1446,8 +1514,8 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 - P4 stays blocked through P7a: no registry candidate was eligible on the dev window, so P7b does not run, and nothing in `strategies/` or `backtest/registry.py` may be deployed. The owner decides next with the dev frontier.
 - Nothing in `web/` imports the engine. The two share only the database schema and `schema_migrations`.
 - P4 runs **paper-only** (owner option (b), 2026-10-04): `commands/paper.py` steps the frozen roster (`paper/roster.py`: `SPY`, `A` with `STRATEGY_A_PARAMS`, `F4-MOM12-N20-TREND` and `F1-SPY-SMA200-M` from `backtest/registry.py`, read-only) through the same `sim` and strategy/allocator code the backtests ran. Nothing is a real-money recommendation: SPY is the champion, and `strategies.params.backtest_gate.passed` is false for every entry.
-- `web/lib/data.ts` reads `paper_state`, `book_positions`, `book_targets`, `book_trades`, `orders`, `equity_snapshots`, `runs.paper_*` and `strategies.params`/`paper_start` (read-only). The web never imports the engine; the schema in migration 003 is the contract.
-- `.github/workflows/nightly.yml` runs `migrate` → `nightly` → `paper` → `paper_check` → `explain`; `.github/workflows/engine-ci.yml` runs `ruff check engine` (rules in `pyproject.toml`) before pytest.
+- `web/lib/data.ts` reads `paper_state`, `book_positions`, `book_targets`, `book_trades`, `orders`, `equity_snapshots`, `news_vetoes` (P6, Positions' "Vetoed tonight"), `runs.paper_*` and `strategies.params`/`paper_start` (read-only; `params.backtest_gate.applicable`). The web never imports the engine; the schema in migrations 003 and 004 is the contract.
+- `.github/workflows/nightly.yml` runs `migrate` → `nightly` → `veto` (P6, `continue-on-error`, 10 minutes) → `paper` → `paper_check` → `explain`; `.github/workflows/engine-ci.yml` runs `ruff check engine` (rules in `pyproject.toml`) before pytest.
 
 ## Concurrency
 
@@ -1503,6 +1571,7 @@ The temp tables `_seer_bars_in` and `_seer_fx_in` are scoped to a session (`ON C
     `run_rules` per strategy over `[paper_start, last_session]`.
   - Migration 003 left the database at 186 MB (186 MB before; bars are 177 MB of it). The paper tables
     grow by kilobytes per month.
+- Veto (P6), measured on 2026-10-04 from WSL2 with a local smoke (10 liquid symbols, no database): Finnhub `company-news` median 0.29 s (its 1 s spacing already passed during the previous LLM call) and `calendar/earnings` median 1.26 s (including the spacing), LLM verdict (`glm-5.3`, thinking disabled) median 3.05 s (max 4.97 s), 45.1 s for all 10. A night is at most 10 candidates, about 1 minute; the workflow step's 10-minute limit bounds the worst case. Details: the runbook's "Strategy C: the news check".
 - There is no benchmark coverage for the DB writers.
 
 ## Usage
@@ -1583,6 +1652,7 @@ Every arrow below is a call into code the backtests also run.
 4. First night only (`_start`): `store.freeze_spec` writes each frozen spec (`roster.strategy_params(e)`) and `paper_start = rd.session_date`; `store.init_paper_state` writes `paper_state` (initial cash `initial_cash_usd(INITIAL_IDR, the latest fx_rates rate ≤ rd.data_date)`) and the day-0 snapshot at `rd.data_date`; then the decision for `paper_start`.
 5. For every session S after `paper_state.last_session` through `rd.data_date`, per strategy:
    - A: `paper.bracket.settle_bracket(pf, S, bars, splits, last_bar_date)`, which is `apply_split` per applied split, then `sim.step`, then `close_unpriced`, with the snapshot replaced; `store.save_bracket_night`; then `decide_bracket(pf, e.obj, e.params, history, members, S)` → `store.insert_pending_orders`, `store.write_pending`;
+   - C: exactly as A, with `e.obj.with_allowed(store.allowed_between(conn, "C", first, last))` as the strategy, so its picks are A's first 10 minus every symbol without a stored `allow`;
    - F4, F1: `paper.book.settle_book(book, S, bars, targets, idle_added, rules, dividends, splits, last_bar_date)`, which is `sim.apply_book_split` per applied split, then `sim.step_book`, then `close_book_unpriced`; `store.save_book_night(..., executed_targets=)`; then `decide_book(view, e.obj, e.params, rules, S, held)` → `store.save_book_decision` (targets, or `None` when the next session is not a month's first);
    - SPY: `paper.benchmark.step_benchmark(state, S, bar, dividend, split=<applied SPY split on S or None>)`, the `buy_and_hold` rules; `store.save_benchmark_night`, `store.write_pending`.
 6. `runs.finish_paper` sets `runs.paper_status = success` inside the same transaction, so a failure rolls back everything; `runs.fail_paper` then records `paper_status = failed` and the redacted error in its own transaction (exit 1).
@@ -1595,7 +1665,7 @@ SEER_ENV_FILE=/home/miftah/seer/.env.local engine/.venv/bin/python -m seer_engin
 SEER_ENV_FILE=/home/miftah/seer/.env.local engine/.venv/bin/python -m seer_engine -v paper_check
 ```
 
-The real night runs only in `nightly.yml` (Paper → Paper check → Explain).
+The real night runs only in `nightly.yml` (Veto → Paper → Paper check → Explain).
 
 ### Paper: replay check (P4)
 
@@ -1605,6 +1675,17 @@ compares them with the stored state through `paper.replay` (pure: `expected_brac
 `expected_book`, `expected_benchmark`, `compare`, `judge`): every snapshot, order, fill, closed trade,
 stored decision and open position. `--require-sessions N` also demands ≥ N stepped sessions per
 strategy. That is the v0.1.0 release check.
+
+### Strategy C: the news check (P6)
+
+```
+cd <repo or worktree root>
+SEER_ENV_FILE=/home/miftah/seer/.env.local engine/.venv/bin/python -m seer_engine --dry-run -v veto   # real calls, rolled back
+```
+
+`veto` needs `FINNHUB_API_KEY` and `LLM_*` (with `LLM_MODEL=glm-5.3`); without them every verdict is
+`failed`. Only the nightly job runs it for real. Then `paper` decides C from the stored verdicts and
+`paper_check` replays it from the same rows.
 
 ### Backtest: run and read the report
 
@@ -1688,6 +1769,9 @@ which writes nothing. A committed report always comes from a full run over a cle
 - `paper` runs only after a successful bars run for the same session, and only in the `seer-db-writer` concurrency group. Never run a real (non-`--dry-run`) `paper` locally against Neon while the scheduled job may run, and never before the code is on `main` (D11: no back-dated paper days).
 - `paper_check` reports a strategy `split-affected` (not failed) once an applied split touched a symbol it held or had pending: whole-share rounding before and after a split cannot match a replay over adjusted bars.
 - `explain` must never decide anything: it writes text only, and a failure leaves NULL.
+- **C's verdicts are decided once.** `paper_check` replays C from `news_vetoes` and never re-asks the LLM. Never edit, delete or re-run verdicts for a session Paper already decided: the replay would no longer match what Paper did. `veto` refuses on its own once the session is checked or decided.
+- **C's model is part of its spec.** `LLM_MODEL` must be `glm-5.3`; another value makes every C verdict `failed`. Editing `strategies.c.FROZEN_MODEL`, the prompt or any `CParams` field changes C's digest and fails the whole night with `SpecMismatch`. A different model or prompt is a new roster id.
+- **No look-ahead in news.** `select_headlines` keeps only items published before the `veto` run started (`decided_at`); the earnings window is the schedule as known then.
 
 ## Notes
 
@@ -1721,3 +1805,10 @@ the book split rule, migration 003, the P4 additions to `massive`, `splits`, `ni
 P4 runs paper-only by the owner's option (b) of 2026-10-04: no real-money recommendations, design §1
 unchanged. Design, invariants and decisions: `PAPER_TRADING_SHIP_PLAN.md` and
 `docs/handover/2026-10-04-paper-trading-ship.md`; operations: `docs/runbooks/paper-trading.md`.
+
+The P6 Strategy C sections (`strategies.c`, `finnhub`, the `llm` call options, roster entry `C`,
+the `news_vetoes` store, migration 004, the `veto` command, and C in `paper`, `paper_check` and the
+nightly flow) were added on 2026-10-04. C runs on paper only: no backtest gate applies to an LLM
+strategy (design §1 item 5), and real money for C would need an explicit owner decision. Design,
+invariants and decisions: `STRATEGY_C_NEWS_VETO_PLAN.md` and
+`docs/handover/2026-10-04-strategy-c-news-veto.md`; operations: `docs/runbooks/paper-trading.md`.

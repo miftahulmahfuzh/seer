@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-03 19:33:00
+**Last Updated**: 2026-10-04 07:37:02
 **Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 26
+- Completed: 39
 
 ---
 
@@ -50,6 +50,277 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-904W** Phase 13: The real dev run, report, pre-registration, V0 `cmp`, docs
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns the committed report set and pre-registration file, an identical re-run (`cmp`), the real-data `cmp` of `docs/backtests/2026-10-02-*` (per Decisions), `engine/package_readme.md`, `docs/ROADMAP.md` (P7a entry with the result, and the P7b entry), and one appended Decisions row in the index (the R1 outcome). Never stops to ask (D-H): a missing store is rebuilt, a differing fingerprint is recorded and the run proceeds, a defect fixable only in `registry.py` or a frozen file ends the phase with the run uncommitted and a note in the phase log and completion summary. Exit: every handover §7 item checked off in the phase log; suite green with 0 skipped (1694 plus only Bug-protocol tests); CI green.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 13 of 13)
+  - **Satisfies**: R1 — `TradeRules`: `DESIGN_V0` reproduces §5, and A, A2 and B re-render byte-identically (synthetic test plus a real-data `cmp`). Each new lever has its own synthetic-bar tests; R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R7 — The pre-registration file (≤ 3 finalists exactly specified, or "none eligible"), with the proposed §5 revision; R9 — Docs (package readme, ROADMAP P7a and P7b). The suite is green with 0 skipped, and CI is green
+  - **Depends on**: P1-ENG-ZWP9
+  - **Plan**: `.workflows/plan/P1-ENG-904W.md`
+  - **Completed**: 2026-10-04 07:37
+  - **Method**: /do
+  - **Files**: docs/backtests/2026-10-04-p7a-dev-exploration.md, docs/backtests/2026-10-04-p7a-dev-exploration-rows.csv, docs/backtests/2026-10-04-p7a-dev-exploration-curves.csv, docs/backtests/2026-10-04-p7a-dev-exploration-frontier.svg, docs/plans/2026-10-04-p7b-preregistration.md, engine/package_readme.md, docs/ROADMAP.md, TRADE_RULES_DEV_SEARCH_PLAN.md
+  - **Drift**:
+    - package_readme.md line numbers (as of 2546a92) had moved: phase 3's readme-updater had added a book_runner layout line and a 'backtest book runner (P7a)' section. Blocks were placed by content anchor; phase 3's section kept, not duplicated.
+    - Readme text follows landed code where the plan draft differed: V0_BOOK is not in PRESETS; backtest_dev --only writes nothing (not 'send to scratch'); extra exit-2 cases (unknown --only id, DEV_END mismatch); --dry-run/-v flags on both commands; close_book_unpriced returns (book, fills, trades).
+    - Step 1c's test-diff guard showed engine/tests/conftest.py modified since 2546a92 (commit 992f2eb, thread caps, additive, no test changed); proceeded.
+  - **Decided**:
+    - conftest.py diff in Step 1c's no-test-modified guard -> proceed (rung 1: invariant 3's frozen set is empty-diff; conftest holds no test and the change is additive infra the coordinator committed)
+    - Readme anchors drifted -> place by content, keep phase 3's book-runner section (small drift rule; narrower blast radius)
+    - readme-updater -> skipped; engine/package_readme.md was this phase's own deliverable, already written and committed in e273531 (completion-handler, per coordinator instruction)
+    - Landing -> not done here; swarm coordinator orch-trade-rules-dev-search owns the merge (analyze-orchestrator Step 5) (completion-handler)
+  - **Outcome**:
+    - Commits: 7a24b84 (dev run), e273531 (docs); CI green https://github.com/miftahulmahfuzh/seer/actions/runs/37165273861
+    - Store fingerprint 5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a (equals phase 4's); registry 54 candidates / 11 families / 11 owner-input, committed at b2ec090 before the run
+    - D8: none eligible (35 beat SPY TR, 0 max DD<=15%, 40 PF>=1.3, 33 >=100 trades, 43 no owner input). Best MAR F4-MOM12-N20-TREND (CAGR +16.2% vs +7.9%, DD 22.2%, PF 2.27, 1154 trades, MAR 0.73), failed only on DD. P7b does not run
+    - Re-run cmp: same=5, byte-identical; R1 real-data cmp: Neon fingerprint unchanged, all 11 docs/backtests/2026-10-02-* cmp-equal
+    - Suite: 1694 passed, 0 skipped (before and after); dev run 0:51, re-run 0:49, peak RSS 847 MB, sequential
+    - Sanity: REF-SPY-HOLD +594.6% vs SPY TR +594.7%; date scan FAILURES 0
+
+- [x] **P1-ENG-ZWP9** Phase 12: `backtest_dev` command, io writer, runtime on the real store
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `commands/backtest_dev.py` running the registry through `dev.run_registry(on_result=...)` (D-D), additive `backtest/io.py` (`dev_report_files`, `write_dev_report`), new `tests/test_backtest_dev_command.py` (28) incl. the D-I tests (`research.DEV_END`, `MEMBERSHIP_START`, `FX_START` equal `dev`'s; `registry.SECTOR_ETFS == research.SECTOR_ETFS`; registry fixed symbols subset of `research.RESEARCH_ETFS`) on a synthetic store; also a timed `--only` smoke run on the real store with no docs written, adding a fixed-order process pool (D13; +2 tests) if the estimated whole run exceeds 60 min. Exit: suite green at 1694 (1696 with the pool); the command's dirty-registry refusal is tested.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 12 of 13)
+  - **Satisfies**: R4 — The dev window is enforced in code (no session after 2015-10-16), and a test proves it; R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-CQ5M, P1-ENG-PLRV, P1-ENG-078U
+  - **Plan**: `.workflows/plan/P1-ENG-ZWP9.md`
+  - **Completed**: 2026-10-04 07:05
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/io.py, engine/src/seer_engine/commands/backtest_dev.py, engine/tests/test_backtest_dev_command.py
+  - **Drift**:
+    - none: every API the plan quotes (io.py lines, dev.run_registry on_result, research constants/load_store, DevReport fields, registry ids) matched the tree
+  - **Decided**:
+    - test_full_run_writes_byte_identical_files asserted the run date never appears in rendered text, but dev_report's markdown links its sibling files by name (which carry the run date) -> the test strips the five sibling file names before asserting no run date remains (rung 1 / Decisions row 'Report file names': the run date appears in file names only, and so in the links between the sibling files); renderer unchanged
+    - Step 6 commit-before-smoke folded into the single phase commit: --only skips the registry check and registry.py is untouched (git status clean), so ordering does not matter (rung 6; /implement: main context performs no git ops)
+    - D13: sequential, estimated 1.1 min for 54 candidates from 16 timed, no pool; Step 8 not implemented (plan Step 7 decision rule)
+    - readme-updater -> skipped; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope; same call phases 9-11 made)
+    - Phase 13 (P1-ENG-904W) unblocked: its only dep, phase 12, is complete (completion-handler)
+  - **Outcome**:
+    - Suite: `PG_TEST_URL=... engine/.venv/bin/pytest engine/tests -q` -> 1694 passed, 0 skipped (2 pandas deprecation warnings from the test's fake downloader concat)
+    - Frozen set: `git diff --stat 2546a92 -- <frozen set>` printed nothing
+    - Research store verify: exit 0; fingerprint 5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a (equals phase 4's logged value); 539 symbols with bars, 2,490,793 bar rows, 28,206 dividends, 4,300 fx rows, 522 unserved
+    - Smoke: `backtest_dev --only` (16 candidates) on the real store: exit 0, wall 0:28.79, peak RSS 866,764 KB; `git status --porcelain docs/` empty
+    - Smoke timings: [1/16] REF-SPY-HOLD 0.76s; [2/16] REF-A-V0 4.26s (pre-1999 FX path ran fine, D-C); [3/16] F1-SPY-SMA200-D 0.71s; [4/16] F1-SPY-10MSMA-M 0.15s; [5/16] F1-SPY-VT12-W 0.33s; [6/16] F10-SSO-SMA200-D 0.25s; [7/16] F11-SPY-TOM-TREND 0.33s; [8/16] F2-GEM-SPYEFA-IEF 0.09s; [9/16] F3-SEC-TOP3-6M 0.22s; [10/16] F4-MOM12-N10-TREND 1.01s; [11/16] F4-MOM12-N10-TREND-W 0.99s; [12/16] F5-LV60-N20 1.38s; [13/16] F6-ML-P50-N10-VT12 1.55s; [14/16] F7-RSI2-T20-DIP 4.19s; [15/16] F9-SPY200M70-MOM30 1.07s; [16/16] F9-SPY200D50-SWING50 4.88s
+    - Estimated full run: 1.1 min for 54 candidates. D13: sequential, no pool
+
+- [x] **P1-ENG-PLRV** Phase 10: Dev report and pre-registration renderers
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/dev_report.py` and `tests/test_backtest_dev_report.py` (32) using structural checks and byte-stability. Exit: suite green; two renders are byte-identical; rendered content contains no run date outside sibling-file names; `top_years` lists the finalists first (D-G).
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 10 of 13)
+  - **Satisfies**: R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R7 — The pre-registration file (≤ 3 finalists exactly specified, or "none eligible"), with the proposed §5 revision; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-2E01
+  - **Plan**: `.workflows/plan/P1-ENG-PLRV.md`
+  - **Completed**: 2026-10-04 06:35
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/backtest/dev_report.py, engine/tests/test_backtest_dev_report.py
+  - **Drift**:
+    - Phase 9's DevRow.__post_init__ already calls check_dev_session(end) and checks beats_spy agrees with failed; the plan's fixture predated that. Fixed in the test fixture only (per the plan's prototype note: fix the fixture, never the other phase): the 'after-dev-end' bad report now forces end past construction with object.__setattr__ so the renderer's own third D9 guard is what is exercised; beats_spy is derived as '"beats SPY TR" not in failed' so the all_fail fixture builds a consistent DevRow.
+    - Verification: test_backtest_dev_report.py 32 passed; test_strategy_purity green (glob covers dev_report.py); full suite 1666 passed, 0 skipped (1560 through phase 9 + 32 phase 10 + 74 phase 11); frozen-set git diff vs 2546a92 empty.
+  - **Decided**:
+    - Plan fixture vs landed DevRow validation -> adapt the test fixture, module unchanged (rung 3: the plan's Verification note that a contract mismatch is fixed in the fixture or this module, never the other phase)
+    - readme-updater -> skip; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope; same as phases 4 and 5)
+    - Completion bookkeeping waited for phase 11's concurrent commit (b2ec090) before editing todos.md and the index, so neither commit carries the other phase's edits (tie-break: narrower blast radius)
+    - Phase 12 (P1-ENG-ZWP9) unblocked: its deps 4, 10 and 11 are all complete (completion-handler)
+
+
+- [x] **P1-ENG-078U** Phase 11: The candidate registry (54 entries, append-only test)
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/registry.py` and `tests/test_registry.py` (74): ids unique and the first 54 are the index table in order (row 54 under `SWING_T20`); <= 60 entries; (id, digest) pins append-only; declared owner inputs equal `candidate_owner_inputs`; every rules preset valid for its allocator; every candidate runs one short smoke window on a synthetic market (every fixed symbol, BIL and the leveraged ETFs) through `run_candidate`. Exit: suite green and the registry committed before any real dev run (agreement with `research` is phase 12's test).
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 11 of 13)
+  - **Satisfies**: R5 — The candidate registry is committed before the dev run: ≤ 60 entries, append-only, each with a family, rules, fixed params, a rationale and an owner-verification flag
+  - **Depends on**: P1-ENG-ZNTC, P1-ENG-76SL, P1-ENG-SB1Q, P1-ENG-5U7B, P1-ENG-2E01
+  - **Plan**: `.workflows/plan/P1-ENG-078U.md`
+  - **Completed**: 2026-10-04 06:29
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/registry.py, engine/tests/test_registry.py
+  - **Drift**:
+    - None in the plan's code. Plan index Status line was stale (it omitted phases 7 and 9, which are complete in todos.md and git); dependencies 5-9 were verified complete.
+    - Full suite: 1663 passed, 3 failed, 0 skipped. All 3 failures are in engine/tests/test_backtest_dev_report.py, phase 10's untracked work in progress written concurrently in this worktree by session impl-trade-rules-dev-search-p10; not part of this phase. Excluding phase 10's 32 tests: 1560 (through phase 9) + 74 (phase 11) = 1634, all passed.
+    - test_registry.py: 74 passed (20 + 54 smoke cases); smoke wall time ~10 s (well under 60 s, nothing to note for phase 12's D13). test_strategy_purity covers registry.py. grep -c UNPINNED = 0. Frozen-set git diff vs 2546a92 is empty.
+  - **Decided**:
+    - FIRST_APPEND date -> date(2026, 10, 4) (also the '# ---- 2026-10-04' registry comment), because the commit is made 2026-10-04 (rung 3: the phase plan's Step 1 says to set it to the commit date). The digest excludes `added`, so the pins are unaffected.
+    - P1-ENG-ZWP9 left blocked: its other dep P1-ENG-PLRV (phase 10) is not complete (completion-handler)
+    - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 13 per the plan index phase table (rung 4: index scope; same call phase 3 made)
+
+- [x] **P1-ENG-2E01** Phase 9: Dev runner: window guard, candidate windows, D8, deflated Sharpe
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/dev.py` and `tests/test_backtest_dev.py` (50): `DevWindowError` on any end, session, bar, FX row or dividend after 2015-10-16 from every public entry point; `candidate_window` across ETF launches and the membership start; a window starting before 1999-01-04 converting at the `FX_START` rate (D-C); D8 selection incl. one-per-family, ties and `mar is None` ranked last; deflated Sharpe vs hand-computed cases; `run_registry` order, determinism, one prepare per allocator id and the `on_result` callback. Exit: suite green.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 9 of 13)
+  - **Satisfies**: R4 — The dev window is enforced in code (no session after 2015-10-16), and a test proves it; R5 — The candidate registry is committed before the dev run: ≤ 60 entries, append-only, each with a family, rules, fixed params, a rationale and an owner-verification flag; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-CPHN
+  - **Plan**: `.workflows/plan/P1-ENG-2E01.md`
+  - **Completed**: 2026-10-04 06:22
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/dev.py, engine/tests/test_backtest_dev.py
+  - **Decided**:
+    - readme-updater -> skipped; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope)
+
+- [x] **P1-ENG-76SL** Phase 6: Families F2/F3: ETF rotation
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/f_rotation.py` and `tests/test_f_rotation.py` (39): momentum ranking with ties, absolute filter, fallback, trend filter, missing or short ETFs, P4 identity and no look-ahead (locally and through the kit). Exit: suite green.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 6 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
+  - **Depends on**: P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-76SL.md`
+  - **Completed**: 2026-10-04 06:16
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/f_rotation.py, engine/tests/test_f_rotation.py
+  - **Drift**:
+    - None: both files written verbatim from the phase-6 plan's code blocks.
+  - **Decided**:
+    - Full-suite wall-clock flake under swarm load (test_backtest_b_command.py::test_wall_times_reach_logs_only; 8h31m run at load avg ~41; passes alone in 9.6s) -> accepted on an isolated re-pass, no check relaxed (tie-break: never relax a check; the test itself passes unchanged)
+    - readme-updater -> skipped; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope)
+
+- [x] **P1-ENG-SB1Q** Phase 7: Families F4/F5/F6: stock factors
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/f_factor.py` (vectorized, param-independent `prepare` like `prepare_a`) and `tests/test_f_factor.py` (78): hand-computed 12-1 momentum, vol and dollar-volume eligibility; mom_lowvol pool selection; inverse-vol weights summing to <= 1; trend filter; members only with SPY excluded; P4 identity with bit-identity between prepared and single-window features; no look-ahead (locally and through the kit). Exit: suite green.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 7 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
+  - **Depends on**: P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-SB1Q.md`
+  - **Completed**: 2026-10-04 06:15
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/f_factor.py, engine/tests/test_f_factor.py
+  - **Drift**:
+    - none: plan code blocks applied verbatim
+  - **Decided**:
+    - full suite 1 failed / 1509 passed (8h31m, load avg ~41 from concurrent phase sessions sharing this worktree): test_backtest_b_command.py::test_wall_times_reach_logs_only asserts real wall times < 1000 s -> treated as a load-induced flake, not relaxed (frozen test file, outside phase scope); passes in isolation in 7 s (tie-break: never relax a check)
+    - ruff not installed in engine/.venv -> lint step skipped; pytest + purity glob are the plan's verification
+    - readme-updater -> skipped; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope; same as phases 4 and 5)
+    - Phase 11 (P1-ENG-078U) left blocked: its dep 9 (P1-ENG-2E01) is not complete
+
+
+- [x] **P1-ENG-5U7B** Phase 8: Family F7: longer-horizon mean reversion
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/f_swing.py` and `tests/test_f_swing.py` (87): setup and dip/close limits; stop and take from ATR; signal exits (SMA and RSI); self-capped slots with keep-first ordering; held symbols that left the index; market-trend gate for new entries only; P4 identity and no look-ahead (locally and through the kit). Exit: suite green.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 8 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
+  - **Depends on**: P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-5U7B.md`
+  - **Completed**: 2026-10-04 06:15
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/f_swing.py, engine/tests/test_f_swing.py
+  - **Decided**:
+    - Full suite: 1 failed / 1509 passed / 0 skipped in 8h29m under load avg ~40 (several phase sessions sharing the machine); the failure was test_backtest_b_command.py::test_wall_times_reach_logs_only (wall-time < 1000s assertion), unrelated to F7; re-run alone: 23/23 passed in 19.5s -> treated as load-induced, not a phase-8 regression (no check relaxed)
+    - No task unblocked: phase 11 (P1-ENG-078U) still waits on phases 4-7 and 9 (index phase table Depends on)
+    - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 13 per the plan index (index scope)
+
+- [x] **P1-ENG-CPHN** Phase 3: Book runner, `run_rules` dispatch, run stats, V0 parity
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `backtest/book_runner.py` and `tests/test_book_runner.py` (47). Does not touch `runner.py`, `metrics.py`, `benchmark.py` (imported read-only). Exit: suite green, and on seeded synthetic markets: `run_rules(..., DESIGN_V0) == run_backtest(...)` for A, A2 and B (fake predictor); `run_book(PICKS(A), V0_BOOK)` matches `run_backtest` snapshots, trades, fills and open positions exactly (seeds 39 and 4 plus the hand-checked FixedPicks scenario); the allocator never sees the idle position in `held` (D-J); `run_stats` hand-checked on small books.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 3 of 13)
+  - **Satisfies**: R1 — `TradeRules`: `DESIGN_V0` reproduces §5, and A, A2 and B re-render byte-identically (synthetic test plus a real-data `cmp`). Each new lever has its own synthetic-bar tests; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-OY9Z, P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-CPHN.md`
+  - **Completed**: 2026-10-04 06:15
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/book_runner.py, engine/tests/test_book_runner.py
+  - **Decided**:
+    - full-suite failure test_backtest_b_command.py::test_wall_times_reach_logs_only -> treated as a load flake, not a phase-3 defect (the full run took 8h30m at load avg ~61 with 4 concurrent suites, so a real step exceeded the test's 1000 s wall-time bound; rerun alone: 23/23 passed in 16 s; phase 3 touches no file that test imports)
+    - Unblocked phase 9 (P1-ENG-2E01) -> open; its only dependency is phase 3 (index phase table Depends on)
+
+- [x] **P1-ENG-ZNTC** Phase 5: Families F1/F10/F11: index timing and calendar
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/f_index.py` and `tests/test_f_index.py` (109): hand-checked signals (SMA, month-end SMA, absolute momentum, always, turn-of-month calendar around month ends and holidays), P4 identity and no look-ahead, locally and through the phase-2 kit (D-E). Exit: suite green; purity glob covers the module.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 5 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree
+  - **Depends on**: P1-ENG-XORE
+  - **Plan**: `.workflows/plan/P1-ENG-ZNTC.md`
+  - **Completed**: 2026-10-04 04:54
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/f_index.py, engine/tests/test_f_index.py
+  - **Drift**:
+    - none: both files written verbatim from the phase-5 plan code blocks
+  - **Decided**:
+    - full suite 1 failed / 1509 passed (7h01m, machine load avg ~62 from concurrent swarm sessions): test_backtest_b_command.py::test_wall_times_reach_logs_only asserts real wall times < 1000s; under this load the real run exceeds it (isolated rerun could not finish in 900s). Nothing imports f_index except test_f_index.py, so environmental, not this phase -> proceeded without touching the test (tie-break: never relax a check; not a phase-5 regression)
+    - ruff not installed in engine/.venv -> lint not run (not part of the plan's verification)
+    - readme-updater -> skip; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope; same as phase 4)
+    - Phase 11 (P1-ENG-078U) left blocked: its other deps, phases 6, 7, 8 and 9, are not complete
+
+- [x] **P1-ENG-CQ5M** Phase 4: Research store: build, load, verify, command, real build
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `seer_engine/research.py`, new `commands/research_store.py`, additive dividends-aware download/parse in `yahoo.py`, `.gitignore` entries (`engine/.research/`, `.research.tmp/`, `.research.old/`), new `tests/test_research_store.py` (34, fake downloader + fake FX fetcher); also does the real build into the worktree's `engine/.research/` (30-60 min background), logging counts and fingerprint, verifying SPY has a bar on every NYSE session 1993-02-01..`DEV_END`, yfinance SPY dividends equal `engine/data/spy_dividends.csv` on 2015-03-20..2015-10-16, and AAPL 2012 split-adjusted dividend consistency. Does not touch `membership.py`, `fx.py`, `backfill.py`, Neon (constant equality with `backtest.dev` tested in phase 12, D-I). Exit: suite green; re-running `build_store` on the same fake downloads gives byte-identical files and the same fingerprint; `load_store` rejects a tampered file and a row after `DEV_END`; `research_store --verify` exits 0 on the real store.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 4 of 13)
+  - **Satisfies**: R2 — A research store command: pre-2015 member bars, the L9 ETFs, dividends from the start, unserved members per year, no Neon writes, deterministic, with a fingerprint; R4 — The dev window is enforced in code (no session after 2015-10-16), and a test proves it
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-CQ5M.md`
+  - **Completed**: 2026-10-03 22:00
+  - **Method**: /implement
+  - **Files**: .gitignore, engine/src/seer_engine/yahoo.py, engine/src/seer_engine/research.py, engine/src/seer_engine/commands/research_store.py, engine/tests/test_research_store.py
+  - **Drift**:
+    - none: the code matched the plan's quotes; code blocks applied verbatim
+    - real build had 522 of 1061 requested symbols unserved (plan estimated ~400); all are index members (ETFs all served); recorded per year for the D4 survivorship caveat, not a check failure
+  - **Decided**:
+    - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 13 tasks (tie-break: narrower blast radius, avoid racing peers on todos.md; same as strategy-b-ranker precedent)
+    - readme-updater -> skip; engine/package_readme.md is owned by phase 13 per the plan index (rung 4: index scope)
+    - Phase 12 (P1-ENG-ZWP9) left blocked: its other deps, phases 10 and 11, are not complete
+  - **Phase log**:
+    - fingerprint: 5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a
+    - symbols: 539 served of 1061 requested, 522 unserved
+    - rows: 2,490,793 bars, 28,206 dividends, 4,300 fx
+    - unserved members by year (unserved of members): 1996 267/506, 1997 258/516, 1998 260/526, 1999 260/533, 2000 267/546, 2001 243/522, 2002 231/517, 2003 214/503, 2004 219/513, 2005 209/511, 2006 216/529, 2007 240/593, 2008 219/586, 2009 202/569, 2010 182/549, 2011 175/553, 2012 164/552, 2013 154/550, 2014 142/540, 2015 137/548
+    - check spy-sessions: ok: 5721 NYSE sessions 1993-02-01..2015-10-16, 0 without a SPY bar
+    - check spy-dividends: ok: 2015-03-20..2015-10-16: store 2015-03-20=0.931, 2015-06-19=1.03, 2015-09-18=1.033 | vendored 2015-03-20=0.931, 2015-06-19=1.03, 2015-09-18=1.033
+    - check dividend-scale-AAPL-2012: ok: 2012-08-09: 0.094643 / close 22.1379 = 0.4275%; 2012-11-07: 0.094643 / close 20.8161 = 0.4547%
+    - build wall time 34:45; store size 130M (engine/.research/, gitignored, never committed)
+
+- [x] **P1-ENG-XORE** Phase 2: Allocator protocol, adapters, overlays, `return_window`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `strategies/allocator.py` (`Allocator`, `target_from_close`, `month_end_closes`, `last_close`, `scale_weight`, `vol_scale`, `LazyPrepared`, `PicksAllocator`, `BlendAllocator`, `VolTargetAllocator`), additive `return_window` in `strategies/indicators.py`, new `tests/test_allocator.py` (55) and the reusable P4-identity/no-look-ahead kit `tests/allocatorkit.py` (contract API, D-E) that phases 5-8 import. Does not touch existing indicator functions, `base.py`, `a.py`, `a2.py`, `b.py`, `strategies/__init__.py`. Exit: suite green; purity glob covers `allocator.py`; P4 identity of `PicksAllocator`/`BlendAllocator`/`VolTargetAllocator` tested with fake inner allocators; the kit rejects a look-ahead fake, a broken prepared path and a too-short lookback.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 2 of 13)
+  - **Satisfies**: R3 — No look-ahead and P4 identity for every new family; the prepared and single-window paths agree; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: P1-ENG-OY9Z
+  - **Plan**: `.workflows/plan/P1-ENG-XORE.md`
+  - **Completed**: 2026-10-03 21:40
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/allocator.py, engine/src/seer_engine/strategies/indicators.py, engine/tests/allocatorkit.py, engine/tests/test_allocator.py
+  - **Decided**:
+    - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 13 (rung 4: index Scope / phase 13 Owns; same call as phase 1)
+    - Unblocked phases 3, 5, 6, 7, 8 (P1-ENG-CPHN, ZNTC, 76SL, SB1Q, 5U7B) -> open; every dependency (phases 1, 2) is complete (rung 4: index phase table Depends on)
+
+
+- [x] **P1-ENG-OY9Z** Phase 1: `TradeRules` + the book engine
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `sim/rules.py` and `sim/book.py` (exactly as contracted), additive exports in `sim/__init__.py`, new `tests/test_sim_rules.py` (35) and `tests/test_sim_book.py` (56) with at least one synthetic-bar test per lever: signal exit at next open incl. missing bar (`exit_pending`); rebalance trims/adds under `RESIZE_BAND`; dividends on ex-date; fractional shares; `open`/`open_limit` entries (gap above band unfilled); `limit` entry and its D-B fallback; `max_positions` != 4 and sum weight > 1 only under a slot cap (D-A); time stop 10/20/None; vol-scaled weights; idle T-bill target; cash guard; `close_book_unpriced`; episode P&L reconciling with cash exactly; session-by-session replay of `size_picks` + `step` under `V0_BOOK`. Does not touch `sim/model.py`, `lifecycle.py`, `sizing.py`, `split_adjust.py` or anything outside `sim/`. Exit: suite green, 0 skipped (+91); `test_sim_purity.py` covers both new modules; `DESIGN_V0` agrees with the `model` constants (tested); V0 replay passes for 3 seeds.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 1 of 13)
+  - **Satisfies**: R1 — `TradeRules`: `DESIGN_V0` reproduces §5, and A, A2 and B re-render byte-identically (synthetic test plus a real-data `cmp`). Each new lever has its own synthetic-bar tests; R8 — Determinism and purity: `==` results, byte-identical files, and the purity globs pass
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-OY9Z.md`
+  - **Completed**: 2026-10-03 21:03
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/sim/rules.py, engine/src/seer_engine/sim/book.py, engine/src/seer_engine/sim/__init__.py, engine/tests/test_sim_rules.py, engine/tests/test_sim_book.py
+  - **Decided**:
+    - Step 3 task creation in a concurrent swarm -> phase 1 session created all 13 tasks (P1-ENG-OY9Z..904W) (convention from strategy-b-ranker set; avoid peers racing on todos.md)
+    - Phase 4 task (P1-ENG-CQ5M) status -> in_progress, not blocked (it has no dependencies and its session is running) (rung 4: index phase table Depends on '—')
+    - readme-updater -> skip for this phase; engine/package_readme.md is owned by phase 13 (rung 4: index Scope / phase 13 Owns; phase 1 Handoffs: 'this phase writes no docs')
+
+
 - [x] **P1-ENG-M99E** Phase 7: Real run on Neon, A2 byte-identity check, freeze or stop, docs
   - **Difficulty**: NORMAL
   - **Type**: Feature

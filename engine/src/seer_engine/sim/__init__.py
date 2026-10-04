@@ -6,8 +6,27 @@ network, no clock: importing this package must never load psycopg, requests or y
 
 Per session S: ``apply_split`` (only if a split executes on S) -> ``step(S)`` -> persist
 events and snapshot -> ``size_picks(..., next session)``. See engine/package_readme.md.
+
+P7a adds trade rules as a value (``sim.rules``: ``TradeRules``, ``DESIGN_V0`` and the presets)
+and the book engine every non-default rule set runs on (``sim.book``: ``step_book``).
+``DESIGN_V0`` keeps running on ``size_picks`` + ``step`` above, unchanged.
 """
 
+from seer_engine.sim.book import (
+    WEIGHT_QUANTUM,
+    Book,
+    BookSnapshot,
+    BookStep,
+    Fill,
+    Position,
+    Target,
+    Trade,
+    close_book_unpriced,
+    equal_weight,
+    new_book,
+    step_book,
+    to_weight,
+)
 from seer_engine.sim.lifecycle import close_unpriced, step
 from seer_engine.sim.model import (
     COST_RATE,
@@ -27,32 +46,87 @@ from seer_engine.sim.model import (
     q,
     sell_proceeds,
 )
+from seer_engine.sim.rules import (
+    DAILY_SWITCH,
+    DAILY_SWITCH_TBILL,
+    DEFAULT_ETFS,
+    DESIGN_V0,
+    LEVERAGED_ETFS,
+    MONTHLY_HOLD,
+    MONTHLY_HOLD_TBILL,
+    OPEN_LIMIT_BAND,
+    PRESETS,
+    RESIZE_BAND,
+    SHARE_QUANTUM,
+    SWING_T10,
+    SWING_T20,
+    SWING_T20_OPEN,
+    V0_BOOK,
+    WEEKLY_HOLD,
+    TradeRules,
+    describe_rules,
+    is_decision_session,
+    rule_owner_inputs,
+)
 from seer_engine.sim.sizing import Pick, RejectReason, Rejection, SizingResult, size_picks
 from seer_engine.sim.split_adjust import apply_split
 
 __all__ = [
     "COST_RATE",
+    "DAILY_SWITCH",
+    "DAILY_SWITCH_TBILL",
+    "DEFAULT_ETFS",
+    "DESIGN_V0",
+    "LEVERAGED_ETFS",
+    "MONTHLY_HOLD",
+    "MONTHLY_HOLD_TBILL",
+    "OPEN_LIMIT_BAND",
+    "PRESETS",
+    "RESIZE_BAND",
+    "SHARE_QUANTUM",
     "SLOTS",
+    "SWING_T10",
+    "SWING_T20",
+    "SWING_T20_OPEN",
     "TIME_STOP_DAYS",
+    "V0_BOOK",
+    "WEEKLY_HOLD",
+    "WEIGHT_QUANTUM",
+    "Book",
+    "BookSnapshot",
+    "BookStep",
     "Event",
     "EventKind",
     "ExitReason",
+    "Fill",
     "Order",
     "OrderStatus",
     "Pick",
     "Portfolio",
+    "Position",
     "RejectReason",
     "Rejection",
     "SizingResult",
     "Snapshot",
     "StepResult",
+    "Target",
+    "Trade",
+    "TradeRules",
     "apply_split",
     "buy_cost",
+    "close_book_unpriced",
     "close_unpriced",
+    "describe_rules",
+    "equal_weight",
     "initial_cash_usd",
+    "is_decision_session",
+    "new_book",
     "new_portfolio",
     "q",
+    "rule_owner_inputs",
     "sell_proceeds",
     "size_picks",
     "step",
+    "step_book",
+    "to_weight",
 ]

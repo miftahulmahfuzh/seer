@@ -53,6 +53,23 @@ Real money is out of scope until the go-live checklist is fully green.
   - (c) revisit a design-§5 trade rule (for example the 5-day time stop, the 4 slots, or a longer holding horizon). That is a design change: it needs the owner's explicit decision and a new handover, and it is never done inside a strategy phase;
   - (d) Strategy C (news + LLM veto) is forward-paper only by design §4, so it cannot pass a backtest gate and does not unblock P4 under the current ROADMAP wording; changing that wording is the owner's call.
 
+## P7a — Trade rules as a value + dev-window strategy search · done 2026-10-04: **None eligible on the dev window — P7b does not run; P4 stays blocked** ([report](backtests/2026-10-04-p7a-dev-exploration.md), [pre-registration](plans/2026-10-04-p7b-preregistration.md))
+- Spec: [handover](handover/2026-10-03-trade-rules-revision.md). The owner's option (c) of the P6a verdict: design §5 became a parameter. Design §1 is unchanged, and design §5 itself is not edited (D10): any revision is proposed only in the pre-registration file
+- Rules as a value: `TradeRules`, with `DESIGN_V0` reproducing §5 exactly. A, A2 and B re-render byte-identically: re-running `backtest`, `backtest_wf` and `backtest_b` on the unchanged Neon data (1,817,429 bar rows through 2026-10-02): all 11 `docs/backtests/2026-10-02-*` files `cmp`-equal (phase 13, 2026-10-04)
+- Data: a local, gitignored research store (never Neon) of 2,490,793 bar rows, 539 of 1,061 symbols served (522 members unserved, so single-stock results are optimistic, D4), 28,206 dividends, fingerprint `5451195fd552`. Development window only: each candidate's first session with enough history → 2015-10-16, enforced in code. No P7a number comes from a later session
+- Tried, all pre-registered in `backtest/registry.py` (committed at `b2ec090` and pushed before the run): **54 candidates** across 11 families (F1–F7, F9–F11 and two references), 11 of them needing owner inputs. Each was judged against total-return SPY on its own window, and the report shows every row, the frontier and a deflated-Sharpe multiple-testing note
+- Finalist rule (D8, written before any result): eligible = beats total-return SPY, max DD ≤ 15%, PF ≥ 1.3, ≥ 100 closed trades and no owner input; rank by CAGR ÷ max DD; top 3, at most one per family
+- **Result (dev window, ≤ 2015-10-16):** none eligible. Of 54 candidates, 35 beat total-return SPY, 0 kept max DD ≤ 15%, 40 reached PF ≥ 1.3, 33 made ≥ 100 trades and 43 needed no owner input; none met all five. Best MAR: `F4-MOM12-N20-TREND` (F4), CAGR +16.2% vs +7.9%, max DD 22.2%, PF 2.27, 1,154 trades; it failed on max DD ≤ 15%
+- The frontier in the report shows what drawdown was reachable at a SPY-beating return on 1993–2015 data. That is the evidence for the owner's next decision
+- **Real money (owner facts, handover §3):** the owner's plan to put 20,000,000 IDR in on 2026-11-01 conflicts with design §1, which is not moved. Real money needs a strategy that has passed the backtest gate **and** ≥ 3 months plus ≥ 100 closed trades of forward paper. As of 2026-10-04 none has passed and P4 has not started, and with no finalist there is no §1-compliant real-money date yet. The earliest would be about 3 months after some future passing strategy's paper trading starts. The owner remains free to put the money into SPY itself on 2026-11-01; that is the benchmark and needs no Seer approval
+
+## P7b — Run the pre-registered finalists once on the test window · not run: none eligible
+- P7a found no candidate eligible under D8 on the dev window, so P7b does not run and no P7a candidate touches the test window 2015-10-19 → data end ([pre-registration](plans/2026-10-04-p7b-preregistration.md) records "none eligible"). Design §5 is not edited (D10)
+- The owner decides next with the [dev frontier](backtests/2026-10-04-p7a-dev-exploration-frontier.svg) in hand (handover §9):
+  - (b) accept SPY buy-and-hold as the honest champion: Seer can still paper-trade research strategies (P4 without real-money picks), and the home screen recommends no buys;
+  - a §1 discussion, with the frontier as the evidence of what drawdown was reachable at a SPY-beating return;
+  - new ideas appended to the registry under D6 (each committed before its dev run, every try reported) in a new handover; the answers to the owner-input questions (ETFs, fractional shares, market-on-open, fees, leverage, T-bills) may make more candidates eligible
+
 ## P4 — Nightly forward paper trading
 - GitHub Actions cron ~06:00 WIB: fetch → settle → pick → snapshot → run log
 - LLM explanation per pick (GLM via z.ai); failure-tolerant

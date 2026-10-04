@@ -185,6 +185,26 @@ def stdev_return_window(close: np.ndarray, n: int) -> np.ndarray:
         return np.sqrt(acc / n)
 
 
+def return_window(close: np.ndarray, n: int, skip: int = 0) -> np.ndarray:
+    """Return over ``n`` bars, ending ``skip`` bars before the window's last bar.
+
+    ``c[:, -1-skip] / c[:, -1-n] - 1``: the close ``skip`` bars before the last, over the close
+    ``n`` bars before the last. ``skip = 0`` is plain n-bar momentum; ``n = 252, skip = 21`` is
+    12-1 momentum. Reads two columns only, so it is bit-identical alone and under ``rolling``.
+    A zero base close gives a non-finite value (numpy's division warning suppressed). NaN for
+    every row when the window has fewer than ``n + 1`` bars. Requires ``0 <= skip < n``.
+    """
+    close = _matrix("close", close)
+    n = _period(n)
+    if isinstance(skip, bool) or not isinstance(skip, int) or not 0 <= skip < n:
+        raise ValueError(f"skip must be an int with 0 <= skip < n = {n}, got {skip!r}")
+    w = close.shape[1]
+    if w < n + 1:
+        return _nan_rows(close)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return close[:, w - 1 - skip] / close[:, w - 1 - n] - 1.0
+
+
 def rolling(fn: Callable[..., np.ndarray], *series: np.ndarray, window: int, **kw: object) -> np.ndarray:
     """``fn`` over every sliding window of ``window`` bars of 1-D ``series``.
 

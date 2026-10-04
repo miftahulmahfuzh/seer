@@ -1,6 +1,6 @@
 // Composes the home-screen icon: the generated Eye of Horus with its pupil replaced by the Lucide
-// Sigma (the A · Quant icon), on the splash's coral. Writes app/apple-icon.png (iOS home screen)
-// and public/icons/icon-{192,512}.png (manifest).
+// Sigma (the A · Quant icon), on the splash's coral. Writes app/apple-icon.png (iOS home screen),
+// public/icons/icon-{192,512}.png (manifest) and app/icon.png (favicon, rounded).
 //
 //   node scripts/make-icon.mjs            reads scripts/.icon/eye.png (promoted from gen_app_icon.py)
 //   node scripts/make-icon.mjs --preview  also writes scripts/.icon/preview.png at 1024
@@ -181,3 +181,17 @@ for (const [path, size] of outputs) {
   await sharp(master).resize(size, size, { kernel: 'lanczos3' }).removeAlpha().png({ compressionLevel: 9 }).toFile(out);
   console.log(`wrote ${path} ${size}²`);
 }
+
+// The favicon: the same art as a rounded tile (the old icon.svg's rx 22 of 100). Transparent
+// corners are fine in a browser tab; only the home-screen icons above must stay RGB.
+const FAV = 96;
+const corners = Buffer.from(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${FAV}" height="${FAV}"><rect width="${FAV}" height="${FAV}" rx="${FAV * 0.22}" fill="#fff"/></svg>`,
+);
+await sharp(master)
+  .resize(FAV, FAV, { kernel: 'lanczos3' })
+  .ensureAlpha()
+  .composite([{ input: corners, blend: 'dest-in' }])
+  .png({ compressionLevel: 9 })
+  .toFile(join(WEB, 'app/icon.png'));
+console.log(`wrote app/icon.png ${FAV}² (rounded favicon)`);

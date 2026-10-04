@@ -29,10 +29,11 @@ web/
   auth.ts                   NextAuth (Google, JWT sessions), currentUser()
   scripts/
     gen_app_icon.py         OpenRouter (OPENROUTER_API_KEY in .env.local) draws eye candidates; spends money
-    make-icon.mjs           erases the drawn pupil, adds the Lucide Sigma, writes apple-icon.png + public/icons/*
+    make-icon.mjs           erases the drawn pupil, adds the Lucide Sigma, writes apple-icon.png, icon.png + public/icons/*
     .icon/eye.png           the promoted candidate make-icon.mjs reads
   app/
-    layout.tsx, globals.css, manifest.ts, icon.svg (favicon star)
+    layout.tsx, globals.css, manifest.ts
+    icon.png                favicon: the same eye as a rounded tile (scripts/make-icon.mjs)
     apple-icon.png          home-screen icon: Eye of Horus, Sigma pupil, on coral (scripts/make-icon.mjs)
     signin/                 sign-in / denied page
     api/auth/               NextAuth route handlers

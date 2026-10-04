@@ -9,9 +9,10 @@
     lab drop M0007 --why "..."             an idea dropped before running
     lab seen KEY [--method M] [--note N] | lab seen --find TEXT
     lab insight --kind K --title T (--body B | --file F) [--method M]   the lab journal
-    lab stage                       git-add the database under its write lock (a consistent copy)
+    lab stage                       under the write lock: write web/data/lab.json, git-add it and the database
     lab next-id                     the next free method id
     lab export [--out F]            the lab as an xlsx workbook (gitignored)
+    lab export-json [--out F]       the web snapshot (default: web/data/lab.json beside the database's repo)
     lab seed                        one-time import of the pre-lab record
 
 Parallel sessions (sera-the-explorer) share one database: SEER_LAB_DB sets --db and
@@ -84,10 +85,13 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s.add_argument("--file", type=Path, default=None)
     s.add_argument("--method", default=None)
 
-    sub.add_parser("stage", help="git-add the database while holding its write lock")
+    sub.add_parser("stage", help="write the web snapshot and git-add it with the database, under the write lock")
     sub.add_parser("next-id", help="the next free method id")
     s = sub.add_parser("export", help="write the lab as an xlsx workbook")
     s.add_argument("--out", type=Path, default=store.XLSX_PATH)
+    s = sub.add_parser("export-json", help="write the web snapshot (seertrade.site/sera)")
+    s.add_argument("--out", type=Path, default=None,
+                   help="output file (default: web/data/lab.json in the database's repo)")
     sub.add_parser("seed", help="one-time import of the pre-lab record")
 
 
@@ -278,19 +282,27 @@ def _insight(conn, args) -> int:
 
 
 def _stage(conn, args) -> int:
-    """``git add`` the database file while holding an exclusive lock, so a parallel session's
-    half-written transaction can never be what gets committed."""
+    """Write the web snapshot and ``git add`` it with the database, both while holding an
+    exclusive lock: a parallel session's half-written transaction can never be what gets
+    committed, and the staged ``web/data/lab.json`` is always the export of the staged database.
+    The snapshot goes beside the database's own repo (``store.snapshot_path``), so a worktree
+    session with ``SEER_LAB_DB`` stages both files in the checkout that owns the database."""
     import subprocess
 
     path = Path(args.db).resolve()
+    snap = store.snapshot_path(path)
     conn.execute("BEGIN EXCLUSIVE")
     try:
-        out = subprocess.run(["git", "add", "--", path.name], cwd=path.parent, capture_output=True, text=True)
+        store.write_snapshot(conn, snap)
+        out = subprocess.run(
+            ["git", "add", "--", str(path), str(snap)], cwd=path.parent, capture_output=True, text=True
+        )
     finally:
         conn.rollback()
     if out.returncode != 0:
-        raise store.LabError(f"git add {path} failed: {out.stderr.strip()}")
+        raise store.LabError(f"git add {path} {snap} failed: {out.stderr.strip()}")
     print(f"staged {path}")
+    print(f"staged {snap}")
     return 0
 
 
@@ -301,6 +313,14 @@ def _next_id(conn, args) -> int:
 
 def _export(conn, args) -> int:
     path = store.export_xlsx(conn, args.out)
+    print(path)
+    return 0
+
+
+def _export_json(conn, args) -> int:
+    path = Path(args.out) if args.out is not None else store.snapshot_path(args.db)
+    if not store.write_snapshot(conn, path):
+        log.info("%s already up to date", path)
     print(path)
     return 0
 
@@ -326,5 +346,6 @@ _HANDLERS = {
     "stage": _stage,
     "next-id": _next_id,
     "export": _export,
+    "export-json": _export_json,
     "seed": _seed,
 }

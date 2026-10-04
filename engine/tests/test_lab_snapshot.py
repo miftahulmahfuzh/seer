@@ -1,0 +1,297 @@
+"""Schema v2 (the ``synthesis`` insight kind) and the web snapshot ``web/data/lab.json``
+(SERA_LAB_SITE_PLAN.md, phase 1): the v1 -> v2 migration, the snapshot's contract and
+determinism, ``lab export-json`` / ``lab stage``, and the guard that the committed snapshot is
+the export of the committed database."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import shutil
+import sqlite3
+import subprocess
+
+import pytest
+
+from seer_engine import cli
+from seer_engine.lab import seed as seed_mod
+from seer_engine.lab import store
+from seer_engine.lab.seed import seed
+
+V1_SCHEMA = store._SCHEMA.replace(", 'synthesis'", "")
+V1_INSIGHTS = [
+    (1, "observation", "Vol scaling buys drawdown", "It costs CAGR.", "M0001", "2026-10-02T00:00:00+00:00"),
+    (2, "data-wish", "Delisted stocks", "Survivorship.", None, "2026-10-02T00:00:01+00:00"),
+    (3, "risk", "The 15% bar", "2008 is in the window.", None, "2026-10-02T00:00:02+00:00"),
+]
+LABELS = {"beats SPY TR", "max DD <= 15%", "PF >= 1.3", ">= 100 trades", "owner inputs", "DSR >= 0.95"}
+METHOD_KEYS = {"id", "name", "family", "parentId", "sourceKind", "sourceRef", "hypothesis", "expectedFailure",
+               "status", "analysis", "verdict", "blockedOn", "created", "updated", "historical"}
+TRIAL_KEYS = {"n", "methodId", "candidateId", "rulesId", "allocatorId", "configText", "window", "start", "end",
+              "gitSha", "runAt", "totalReturn", "cagr", "maxDrawdown", "profitFactor", "pfInfinite", "trades",
+              "sharpe", "exposure", "turnover", "worstYear", "worstYearReturn", "spyTrReturn", "spyTrCagr", "mar",
+              "failed", "eligible", "dsr", "nTrialsAtRun", "curve"}
+
+
+def _v1_db(path):
+    """A schema-v1 database as the first lab wrote it: one method, three insights (ids 1-3)."""
+    assert V1_SCHEMA != store._SCHEMA
+    c = sqlite3.connect(path)
+    c.executescript(V1_SCHEMA)
+    c.executemany("INSERT INTO transitions (src, dst) VALUES (?, ?)", store.TRANSITIONS)
+    c.execute("INSERT INTO meta (key, value) VALUES ('schema_version', '1')")
+    c.execute(
+        "INSERT INTO methods (id, name, family, source_kind, hypothesis, status, created, updated) "
+        "VALUES ('M0001', 'n', 'f', 'knowledge', 'h', 'idea', '2026-10-01T00:00:00+00:00', "
+        "'2026-10-01T00:00:00+00:00')"
+    )
+    c.executemany("INSERT INTO insights (id, kind, title, body, method_id, added) VALUES (?, ?, ?, ?, ?, ?)", V1_INSIGHTS)
+    c.commit()
+    with pytest.raises(sqlite3.IntegrityError, match="CHECK"):
+        c.execute("INSERT INTO insights (kind, title, body, added) VALUES ('synthesis', 't', 'b', 'x')")
+    c.close()
+
+
+def _insights_schema(conn) -> list[tuple[str, str, str]]:
+    return [tuple(r) for r in conn.execute(
+        "SELECT type, name, sql FROM sqlite_master WHERE tbl_name = 'insights' ORDER BY type, name"
+    )]
+
+
+def test_connect_migrates_a_v1_database_keeping_rows_and_triggers(tmp_path):
+    _v1_db(tmp_path / "lab.sqlite")
+    conn = store.connect(tmp_path / "lab.sqlite")
+    fresh = store.connect(tmp_path / "fresh.sqlite")
+    try:
+        assert store.schema_version(conn) == "2"
+        rows = conn.execute("SELECT id, kind, title, body, method_id, added FROM insights ORDER BY id").fetchall()
+        assert [tuple(r) for r in rows] == V1_INSIGHTS
+        assert _insights_schema(conn) == _insights_schema(fresh)  # same table and triggers as a new v2 db
+        assert conn.execute("SELECT count(*) FROM sqlite_master WHERE name = 'insights_v1'").fetchone()[0] == 0
+        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            conn.execute("UPDATE insights SET body = 'x'")
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            conn.execute("DELETE FROM insights")
+        with conn:
+            n = store.add_insight(conn, kind="synthesis", title="Batch 1", body="Where the search stands.")
+        assert n == 4  # the AUTOINCREMENT counter carried over
+    finally:
+        conn.close()
+        fresh.close()
+    again = store.connect(tmp_path / "lab.sqlite")  # a second connect is a no-op
+    try:
+        assert store.schema_version(again) == "2"
+        assert again.execute("SELECT count(*) FROM insights").fetchone()[0] == 4
+    finally:
+        again.close()
+
+
+def test_a_new_database_starts_at_v2(tmp_path):
+    conn = store.connect(tmp_path / "lab.sqlite")
+    try:
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "2"
+        assert "synthesis" in store.INSIGHT_KINDS
+        with conn:
+            assert store.add_insight(conn, kind="synthesis", title="t", body="b") == 1
+    finally:
+        conn.close()
+
+
+def test_an_unknown_schema_version_is_refused(tmp_path):
+    conn = store.connect(tmp_path / "lab.sqlite")
+    with conn:
+        conn.execute("UPDATE meta SET value = '9' WHERE key = 'schema_version'")
+    conn.close()
+    with pytest.raises(store.LabError, match="'9'"):
+        store.connect(tmp_path / "lab.sqlite")
+
+
+def test_the_snapshot_reads_a_v1_database_read_only_and_migration_does_not_change_it(tmp_path):
+    db = tmp_path / "lab" / "lab.sqlite"
+    db.parent.mkdir()
+    _v1_db(db)
+    before = db.read_bytes()
+    ro = store.connect_readonly(db)
+    try:
+        v1_text = store.snapshot_json(ro)
+        with pytest.raises(sqlite3.OperationalError, match="readonly"):
+            ro.execute("INSERT INTO meta (key, value) VALUES ('x', 'y')")
+    finally:
+        ro.close()
+    assert db.read_bytes() == before  # opened as it is: not migrated, not written
+    store.connect(db).close()  # migrates to v2
+    ro = store.connect_readonly(db)
+    try:
+        assert store.schema_version(ro) == "2"
+        assert store.snapshot_json(ro) == v1_text
+    finally:
+        ro.close()
+
+
+def test_connect_readonly_refuses_a_missing_file(tmp_path):
+    with pytest.raises(store.LabError, match="no lab database"):
+        store.connect_readonly(tmp_path / "nope.sqlite")
+    assert not (tmp_path / "nope.sqlite").exists()
+
+
+@pytest.fixture()
+def lab(tmp_path):
+    """The seeded record plus one lab method with an infinite-PF trial, insights and a seen key."""
+    c = store.connect(tmp_path / "lab" / "lab.sqlite")
+    seed(c)
+    with c:
+        store.add_method(
+            c, id="M0001", name="Vol-scaled momentum", family="momentum", source_kind="knowledge",
+            hypothesis="Scaling cuts the drawdown.\n\nExpected failure: Monthly is too slow.", status="registered",
+        )
+        store.insert_trials(c, [store.TrialRow(
+            method_id="M0001", candidate_id="M0001-A", config_digest="d1", config_text="t", rules_id="r",
+            allocator_id="a", window="dev", start="2000-01-03", end="2015-10-16", store_fingerprint="fp",
+            git_sha="abc", run_at="2026-10-05T00:00:00+00:00", total_return=1.0, cagr=0.1234567891,
+            max_drawdown=0.2, profit_factor=math.inf, trades=200, sharpe=0.8, exposure=0.9, turnover=1.0,
+            worst_year=2008, worst_year_return=-0.2, spy_tr_return=0.5, spy_tr_cagr=0.07, mar=0.5,
+            failed="beats SPY TR; DSR >= 0.95", eligible=False, dsr=0.4123456789, n_trials_at_run=55,
+            curve_json='[["2000-01-31",1.0],["2000-02-29",1.0123456789]]',
+        )])
+        store.add_insight(c, kind="observation", title="Obs", body="b", method_id="M0001")
+        store.add_insight(c, kind="synthesis", title="Batch", body="Where we stand.")
+        store.mark_seen(c, "url:https://example.com/paper", "M0001", "a paper")
+    yield c
+    c.close()
+
+
+def test_the_snapshot_follows_the_contract(lab):
+    s = store.snapshot(lab)
+    assert list(s) == ["version", "asOf", "gate", "data", "summary", "benchmark", "methods", "trials",
+                       "insights", "ideasSeen"]
+    assert s["version"] == 1
+    assert s["gate"] == {"maxDrawdown": 0.15, "minProfitFactor": 1.3, "minTrades": 100, "dsrMin": 0.95,
+                         "devStart": "1993-01-29", "devEnd": "2015-10-16", "testStart": "2015-10-19"}
+    assert s["data"] == {
+        "storeStart": "1993-01-29", "membershipStart": "1996-01-02", "fxStart": "1999-01-04",
+        "fingerprints": sorted({seed_mod.P7A_FINGERPRINT, "fp"}),
+        "barRows": 2490793, "symbolsRequested": 1061, "symbolsServed": 539, "dividendRows": 28206,
+    }
+    summary = s["summary"]
+    assert {k: v for k, v in summary.items() if k != "byStatus"} == {
+        "devTrials": 55, "testLooks": 0, "methods": 15, "labMethods": 1, "historicalMethods": 14, "insights": 2,
+    }
+    assert list(summary["byStatus"]) == list(store.STATUSES)
+    assert summary["byStatus"]["rejected"] == 14 and summary["byStatus"]["registered"] == 1
+    assert sum(summary["byStatus"].values()) == 15
+
+    spy_tr, spy_price = s["benchmark"]["spyTr"], s["benchmark"]["spyPrice"]
+    assert spy_tr[0] == ["1993-01-29", 1.0] and spy_price[0] == ["1993-01-29", 1.0]
+    assert spy_tr[-1][0] == spy_price[-1][0] == "2015-10-16"
+    assert len(spy_tr) == len(spy_price) == 274
+
+    ids = [m["id"] for m in s["methods"]]
+    assert ids == sorted(ids) and ids[0].startswith("H-") and ids[-1] == "M0001"
+    for m in s["methods"]:
+        assert set(m) == METHOD_KEYS
+        assert m["historical"] == m["id"].startswith("H-")
+    m1 = s["methods"][-1]
+    assert m1["hypothesis"] == "Scaling cuts the drawdown." and m1["expectedFailure"] == "Monthly is too slow."
+    assert s["methods"][0]["expectedFailure"] is None
+
+    assert [t["n"] for t in s["trials"]] == list(range(1, 56))
+    for t in s["trials"]:
+        assert set(t) == TRIAL_KEYS
+        assert set(t["failed"]) <= LABELS
+        assert all(isinstance(p[0], str) and isinstance(p[1], float) for p in t["curve"])
+    t55 = s["trials"][-1]
+    assert t55["profitFactor"] is None and t55["pfInfinite"] is True
+    assert t55["cagr"] == 0.123457 and t55["dsr"] == 0.412346
+    assert t55["failed"] == ["beats SPY TR", "DSR >= 0.95"] and t55["eligible"] is False
+    assert t55["curve"] == [["2000-01-31", 1.0], ["2000-02-29", 1.012346]]
+    assert not any(t["pfInfinite"] for t in s["trials"][:54])
+
+    assert [(i["id"], i["kind"], i["methodId"]) for i in s["insights"]] == [(1, "observation", "M0001"), (2, "synthesis", None)]
+    keys = [x["key"] for x in s["ideasSeen"]]
+    assert keys == sorted(keys) and "url:https://example.com/paper" in keys
+    assert set(s["ideasSeen"][0]) == {"key", "methodId", "note", "added"}
+
+    stamps = ([m["updated"] for m in s["methods"]] + [t["runAt"] for t in s["trials"]]
+              + [i["added"] for i in s["insights"]] + [x["added"] for x in s["ideasSeen"]])
+    assert s["asOf"] == max(stamps)
+
+
+def test_the_snapshot_json_is_deterministic(lab, tmp_path):
+    text = store.snapshot_json(lab)
+    assert text == store.snapshot_json(lab)
+    assert text.endswith("}\n") and text.count("\n") == 1
+    assert "NaN" not in text and "Infinity" not in text
+    assert json.loads(text) == store.snapshot(lab)
+    copy = tmp_path / "copy.sqlite"
+    shutil.copyfile(tmp_path / "lab" / "lab.sqlite", copy)
+    ro = store.connect_readonly(copy)
+    try:
+        assert store.snapshot_json(ro) == text
+    finally:
+        ro.close()
+
+
+def test_an_empty_lab_has_an_empty_as_of(tmp_path):
+    conn = store.connect(tmp_path / "lab.sqlite")
+    try:
+        s = store.snapshot(conn)
+    finally:
+        conn.close()
+    assert s["asOf"] == "" and s["methods"] == [] and s["trials"] == [] and s["data"]["fingerprints"] == []
+
+
+def test_snapshot_path_is_beside_the_databases_repo(tmp_path):
+    assert store.snapshot_path(tmp_path / "lab" / "lab.sqlite") == (tmp_path / "web" / "data" / "lab.json").resolve()
+    assert store.snapshot_path(store.COMMITTED_DB) == store.config.REPO_ROOT / "web" / "data" / "lab.json"
+
+
+def _git(repo, *args) -> str:
+    return subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True).stdout
+
+
+def test_export_json_and_stage_write_the_snapshot_beside_the_database(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "lab").mkdir(parents=True)
+    _git(repo, "init", "-q")
+    db = repo / "lab" / "lab.sqlite"
+    store.connect(db).close()
+    snap = repo / "web" / "data" / "lab.json"
+
+    assert cli.main(["lab", "--db", str(db), "export-json"]) == 0
+    ro = store.connect_readonly(db)
+    try:
+        assert snap.read_text(encoding="utf-8") == store.snapshot_json(ro)
+    finally:
+        ro.close()
+    out = tmp_path / "elsewhere.json"
+    assert cli.main(["lab", "--db", str(db), "export-json", "--out", str(out)]) == 0
+    assert out.read_bytes() == snap.read_bytes()
+
+    assert cli.main(["lab", "--db", str(db), "insight", "--kind", "synthesis", "--title", "Batch 1",
+                     "--body", "Where the search stands."]) == 0
+    assert cli.main(["lab", "--db", str(db), "stage"]) == 0
+    staged = set(_git(repo, "diff", "--cached", "--name-only").split())
+    assert staged == {"lab/lab.sqlite", "web/data/lab.json"}
+    assert json.loads(snap.read_text(encoding="utf-8"))["insights"][0]["kind"] == "synthesis"
+    assert not (repo / "web" / "data" / "lab.json.tmp").exists()
+
+
+def test_the_committed_snapshot_is_the_export_of_the_committed_database():
+    """Invariant 2: web/data/lab.json == `lab export-json` of lab/lab.sqlite, byte for byte.
+    Read-only: the committed database is opened with mode=ro, never migrated or written."""
+    db = store.COMMITTED_DB
+    before = hashlib.sha256(db.read_bytes()).hexdigest()
+    ro = store.connect_readonly(db)
+    try:
+        expected = store.snapshot_json(ro)
+    finally:
+        ro.close()
+    assert hashlib.sha256(db.read_bytes()).hexdigest() == before
+    committed = store.snapshot_path(db).read_bytes().decode("utf-8")
+    if committed != expected:
+        pytest.fail(
+            "web/data/lab.json is not the export of lab/lab.sqlite: run "
+            "`python -m seer_engine lab stage` (or `lab export-json`) and commit both files"
+        )

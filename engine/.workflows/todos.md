@@ -2,7 +2,7 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 18:21:00
+**Last Updated**: 2026-10-04 22:20:00
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 53
+- Completed: 54
 
 ---
 
@@ -50,6 +50,21 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-6QQA** Phase 1: Lab snapshot export + synthesis kind
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/lab/store.py` (schema v2: `synthesis` insight kind via a `connect()`-time migration rebuilding `insights` with the new CHECK, copying rows, recreating triggers, `schema_version='2'`; plus `snapshot(conn)` / `snapshot_json(conn)` per the index's `web/data/lab.json` Interface Contract), `lab/seed.py` (store-fact constants + benchmark curve reader), `commands/lab.py` (`lab export-json [--out web/data/lab.json]`; `lab stage` also writes the snapshot under the same exclusive lock and `git add`s both files), new `tests/test_lab_snapshot.py` (migration, determinism, contract shape, CLI, sync guard), and the generated `web/data/lab.json` + migrated `lab/lab.sqlite`. Does not touch `web/` code, skills, CI. Exit: `python -m seer_engine lab export-json` reproduces the committed `web/data/lab.json` byte for byte; `lab insight --kind synthesis` works; all engine tests green.
+  - **Status**: completed
+  - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 1 of 7)
+  - **Satisfies**: R3 — Show every experiment, as detailed as possible, kept current with no human step; R6 — Insights from every exploration; food for thought on features and data sources; R7 — As comprehensive as possible (cross-cutting)
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-6QQA.md`
+  - **Completed**: 2026-10-04 22:20
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/store.py, engine/src/seer_engine/lab/seed.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_snapshot.py, lab/lab.sqlite, web/data/lab.json
+  - **Decided**:
+    - Step 3 task creation in a concurrent swarm -> phase 1's session created all 7 tasks (repo precedent; phase 3 runs concurrently in the same worktree)
+    - readme-updater -> skip: engine/package_readme.md does not document the lab CLI (plan reconciliation row 16); lab docs (web/package_readme.md, ROADMAP) are owned by phase 7 (rung 4: index scope)
 - [x] **P1-ENG-QRXI** Phase 4: `veto` command
   - **Difficulty**: HARD
   - **Type**: Feature

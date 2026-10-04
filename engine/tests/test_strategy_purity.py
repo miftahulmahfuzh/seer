@@ -1,8 +1,9 @@
-"""Strategy and backtest core modules are pure (handover §6.8, plan invariant 2).
+"""Strategy, backtest and paper core modules are pure (handover §6.8, plan invariant 2;
+paper-trading-ship invariant 4).
 
-Globs ``seer_engine/strategies/*.py`` and ``seer_engine/backtest/*.py`` (every module except
-``backtest/io.py``, the one impure edge), so modules added later are covered without editing
-this file.
+Globs ``seer_engine/strategies/*.py``, ``seer_engine/backtest/*.py`` and
+``seer_engine/paper/*.py`` (every module except the impure edges ``backtest/io.py`` and
+``paper/store.py``), so modules added later are covered without editing this file.
 
 - Importing them in a fresh interpreter loads no psycopg, requests or yfinance, and never
   seer_engine.bars (which imports psycopg).
@@ -23,14 +24,14 @@ FORBIDDEN_MODULES = ("psycopg", "requests", "yfinance", "seer_engine.bars")
 FORBIDDEN_IMPORT_ROOTS = {"psycopg", "requests", "yfinance", "time", "random", "logging", "urllib", "socket"}
 FORBIDDEN_ATTRS = {"now", "utcnow", "today", "fromtimestamp", "random"}  # "random" catches numpy.random
 FORBIDDEN_CALLS = {"print", "open", "input"}
-IMPURE = {("backtest", "io.py")}
+IMPURE = {("backtest", "io.py"), ("paper", "store.py")}
 
 PKG = Path(seer_engine.__file__).resolve().parent
 
 
 def _pure_sources() -> list[Path]:
     files = []
-    for package in ("strategies", "backtest"):
+    for package in ("strategies", "backtest", "paper"):
         files += [p for p in sorted((PKG / package).glob("*.py")) if (package, p.name) not in IMPURE]
     return files
 
@@ -64,8 +65,11 @@ def test_the_glob_finds_the_strategy_modules():
         "seer_engine.strategies.indicators",
         "seer_engine.strategies.a",
         "seer_engine.backtest",
+        "seer_engine.paper",
+        "seer_engine.paper.roster",
     } <= names
     assert "seer_engine.backtest.io" not in names
+    assert "seer_engine.paper.store" not in names
 
 
 def test_pure_modules_load_no_db_or_network_module():

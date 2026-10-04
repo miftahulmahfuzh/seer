@@ -3,7 +3,7 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-04 09:36:00
-**Total Active Tasks**: 9
+**Total Active Tasks**: 7
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
@@ -13,8 +13,8 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 7
-- Completed: 40
+- Blocked: 3
+- Completed: 41
 
 ---
 
@@ -53,7 +53,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `paper/book.py` (C3); tests proving `decide_book`+`settle_book` looped equal `run_book` for `MONTHLY_HOLD` with FACTOR and TIMING on synthetic markets (incl. dividends and a forced close), split on a held position and on pending targets, no look-ahead. Does not touch: `sim/*` (uses phase 2's `apply_book_split`), runners, DB. Exit: equality tests green; purity green.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 4 of 13)
   - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
   - **Depends on**: P1-ENG-N6UC, P1-ENG-HCYN

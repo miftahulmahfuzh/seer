@@ -1,0 +1,52 @@
+/* Ideas: tally chips, then backlog cards, the data wishlist, and the reading list. */
+.page { display: flex; flex-direction: column; gap: 12px; }
+.tally { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0 2px; }
+.tally :global(.chip) { background: var(--sheet); }
+
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.card { border-radius: 28px; padding: 22px 24px 20px; display: flex; flex-direction: column; gap: 12px; }
+.cardHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.cardTitles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cardId { font-size: 13px; letter-spacing: 0.12em; color: var(--ink-2); }
+.cardTitle { margin: 0; font-size: 21px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.25; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips :global(.chip) { background: var(--sheet); font-size: 14px; height: 30px; }
+.text { font-size: 15.5px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
+.risk { font-size: 15px; line-height: 1.45; color: var(--ink-2); white-space: pre-line; }
+.label { display: block; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 2px; }
+.cardFoot { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+.ref { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.refText { font-size: 14px; color: var(--ink-2); min-width: 0; overflow-wrap: anywhere; }
+
+.wishes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.wish { display: flex; align-items: flex-start; gap: 16px; padding: 18px 22px; border-radius: 24px; background: var(--stone); }
+.wishMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.wishHead { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.wishName { font-size: 18px; font-weight: 500; }
+.needs { background: var(--butter); color: var(--ink); height: 30px; font-size: 14px; white-space: normal; }
+
+.more { display: flex; align-items: center; justify-content: flex-end; gap: 12px; font-size: 14px; color: var(--ink-2); }
+
+.subhead { margin: 6px 0 0; font-size: 13px; font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); }
+.links { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.link { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--hair); }
+.link:last-child { border-bottom: 0; }
+.linkMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.linkText { font-size: 16px; overflow-wrap: anywhere; }
+.linkNote { font-size: 14px; color: var(--ink-2); }
+
+.groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.group { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border-radius: 24px; background: var(--stone); }
+.groupHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; font-weight: 500; }
+.tags { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { background: var(--sheet); height: 30px; font-size: 13.5px; cursor: default; }
+.sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.empty { font-size: 16px; color: var(--ink-2); }
+
+@media (max-width: 1023.98px) {
+  .cards, .groups { grid-template-columns: 1fr; }
+}

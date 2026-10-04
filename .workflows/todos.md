@@ -13,7 +13,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
+- Blocked: 0
 - Completed: 3
 
 ---
@@ -27,7 +27,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: EASY
   - **Type**: Feature
   - **Context**: Owns `.github/workflows/engine-ci.yml` (`lab/**` in both path filters), `.claude/skills/explore-and-experiment-new-method/SKILL.md` (solo mode commits through `lab stage`, full pytest after staging, plain-language analysis with explicit `My opinion:`), `.claude/skills/sera-the-explorer/SKILL.md` (every `lab stage` commit includes `web/data/lab.json`, preflight tests after staging, batch synthesis via `--kind synthesis`), `docs/ROADMAP.md` (P8 entry for the method lab and Sera), `web/package_readme.md` (Sera section matching the reconciled tree). Does not touch code. Exit: docs accurate to the merged code; CI green.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 7 of 7)
   - **Satisfies**: R3 — Show every experiment, as detailed as possible, kept current with no human step; R5 — Concise, non-technical explanations, with analysis and opinion on every method; R6 — Insights from every exploration; food for thought on features and data sources; R7 — As comprehensive as possible (cross-cutting)
   - **Depends on**: P1-ENG-6QQA, P1-WEB-RL9Z, P1-WEB-9ANC, P1-WEB-08WD

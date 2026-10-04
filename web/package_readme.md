@@ -1,7 +1,7 @@
 # Package: seer-web
 
 **Location**: `web` (Next.js app router; package name `seer-web`, private)
-**Last Updated**: 2026-10-04 (P1-WEB-EQ4I, sera-lab-site phase 3: `/sera` access gate, desktop Sera shell, SVG chart kit; no `/sera` pages yet, they land in phases 4-6)
+**Last Updated**: 2026-10-04 (P1-WEB-08WD, sera-lab-site phase 6: `/sera/journal`, `/sera/ideas`, `/sera/how` pages and the `components/sera/diagrams/` SVG diagrams)
 
 ## Overview
 
@@ -17,7 +17,7 @@ write (`action_dismissals`).
 - One data layer (`lib/data.ts`) that turns rows of all three engines (`bracket`, `book`, `benchmark`) into typed view models
 - Pure, DB-free logic that tests run without a connection: metrics and the go-live checklist (`lib/metrics.ts`), month-by-month paper performance (`lib/monthly.ts`), strategy row helpers (`lib/strategy.ts`), slot letters and card colours (`lib/slots.ts`), session freshness (`lib/session.ts`), number/date formatting (`lib/format.ts`)
 - Four pages: Today, Positions, History, Leaderboard
-- Sera (`/sera`), the method lab section: gated to one account (`lib/sera/`), its own desktop shell and rail (`app/sera/layout.tsx`, `components/sera/`), a dependency-free SVG chart kit (`components/sera/charts/`), and a pure data layer over the bundled lab snapshot `data/lab.json` (`lib/sera/types.ts`, `lab.ts`, `derive.ts`, `glossary.ts`, `markdown.ts`). Shell only so far; no `page.tsx` under `app/sera/` yet
+- Sera (`/sera`), the method lab section: gated to one account (`lib/sera/`), its own desktop shell and rail (`app/sera/layout.tsx`, `components/sera/`), a dependency-free SVG chart kit (`components/sera/charts/`), hand-built SVG diagrams for How it works (`components/sera/diagrams/`), and a pure data layer over the bundled lab snapshot `data/lab.json` (`lib/sera/types.ts`, `lab.ts`, `derive.ts`, `glossary.ts`, `markdown.ts`). Pages: Overview, Methods list + detail, Journal, Ideas, How it works; each page keeps its logic in a pure, tested `view.ts`
 - Shared roster UI (`components/StrategySwitch.tsx`, `components/PaperChip.tsx`, `components/roster.ts`): icon-only strategy switching by `?s=` and the paper marker on research strategies' holdings, orders and trades
 - Migrations runner shared with the engine (`scripts/migrate.mjs`) and a demo seeder (`scripts/seed-demo.mjs`)
 
@@ -53,6 +53,9 @@ web/
       sera.module.css
       methods/page.tsx      /sera/methods list (view.ts pure helpers + view.test.ts)
       methods/[id]/page.tsx /sera/methods/[id] method detail
+      journal/page.tsx      /sera/journal insights grouped by kind, ?kind= filter (view.ts + view.test.ts, journal.module.css)
+      ideas/page.tsx        /sera/ideas backlog, blocked-on-data wishlist, reading list (view.ts + view.test.ts, ideas.module.css)
+      how/page.tsx          /sera/how path, calendar, hurdles, honesty rules, data, glossary (view.ts + view.test.ts, how.module.css)
   components/               AppHeader (eye mark left of the titles, mobile only), Nav, CopyButton, RefreshButton, WhyToggle, TooltipLayer, tooltip
     StrategySwitch.tsx      icon-only roster switcher (Links), ALL sentinel           (server component)
     PaperChip.tsx           "Paper" data label with tooltip, sm | md
@@ -69,6 +72,11 @@ web/
         parts.tsx           HRef / VRef reference lines
         LineChart.tsx, ScatterChart.tsx, BarChart.tsx (+ barGroups), Legend.tsx (+ legendFromSeries)
         scale.test.ts, charts.test.tsx
+      diagrams/
+        geometry.ts         pure layout: PipelineStage, Era, rowBoxes, timeScale, yearTicks, monthYear (+ geometry.test.ts)
+        Pipeline.tsx        idea -> real money stage boxes with a dashed "fails" lane (one per page: fixed marker ids)
+        Windows.tsx         dev / test / paper timeline with shaded bear markets
+        diagrams.module.css
   lib/
     db.ts                   sql = neon(DATABASE_URL)
     data.ts                 all DB reads (server only)
@@ -254,7 +262,7 @@ function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null befo
 - `lib/allow.ts`: `isAllowed(email, allowed)`, case/space-insensitive exact match. `safeNext(next, fallback = '/')`: returns `next` (first value if an array) only when it is an internal path: starts with `/`, not `//` or `/\`, no control characters or backslashes; else `fallback`. Sign-in uses it for its post-login redirect.
 - `lib/sera/access.ts`: `SERA_EMAIL = 'mahfuzh74@gmail.com'`; `isSeraUser(email)` trimmed, case-insensitive equality with it.
 - `lib/sera/gate.ts`: `requireSera(next = '/sera')`: signed out -> `redirect('/signin?next=…')`; signed in but not `ALLOWED_EMAIL` or not `SERA_EMAIL` -> `notFound()` (the section is not revealed); else returns the user. Called by `app/sera/layout.tsx`.
-- `lib/sera/types.ts`: the `data/lab.json` contract (`LabSnapshot` with `gate`, `benchmark`, `methods`, `trials`, `insights`, `seen`), derived aliases (`LabStatus`, `InsightKind`, `SourceKind`, `Gate`, `Benchmark`, `Point = [date, value]`) and the `METHOD_STATUSES` / `INSIGHT_KINDS` / `SOURCE_KINDS` lists. Must match the engine's `lab stage` export.
+- `lib/sera/types.ts`: the `data/lab.json` contract (`LabSnapshot` with `asOf`, `gate`, `data`, `summary`, `benchmark`, `methods`, `trials`, `insights`, `ideasSeen`), derived aliases (`LabStatus`, `InsightKind`, `SourceKind`, `Gate`, `Benchmark`, `Point = [date, value]`) and the `METHOD_STATUSES` / `INSIGHT_KINDS` / `SOURCE_KINDS` lists. Must match the engine's `lab stage` export.
 - `lib/sera/lab.ts`: `lab` (the JSON imported at build time; server components only, it is large), `methodById(id)`, `trialsOf(methodId)` (by n), `insightsOf(methodId)` (by id), `childrenOf(methodId)` (by id).
 - `lib/sera/derive.ts` (pure): six hurdles `CONDITION_KEYS` (`spy, drawdown, pf, trades, owner, dsr`) with `CONDITION_LABEL` / `FAILURE_LABEL`; `conditionOk` (null = not measured), `gateChecks(trial, gate)`, `conditionsPassed`, `misses`, `excessCagr`; over dev-window trials: `closest(trials, k)` (most hurdles, then MAR, then earliest), `bestVariant` (fewest misses, falls back to non-dev trials), `funnel`, `progress` (running best); `families(methods, trials)` aggregates; `trialsByMethod`; `spyForWindow(trial, benchmark)` rebases SPY TR to 1.0 at the trial start on its curve dates; `drawdownSeries(curve)`, `yearlyReturns(curve)` (calendar years).
 - `lib/sera/glossary.ts` (pure): `GLOSSARY` / `GLOSSARY_ORDER` plain-language definitions, `CONDITION_TERM`, `STATUS_LABEL` (label, meaning, tone), `INSIGHT_KIND_LABEL`, `SOURCE_KIND_LABEL`.
@@ -263,6 +271,10 @@ function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null befo
 - `components/Nav.tsx`: `Nav({ showSera })`; the `(app)` layout passes `isSeraUser(user.email)`, which adds a `Telescope` link to `/sera` at the foot of the desktop rail only (no mobile entry).
 - `components/tooltip.ts`: short tips stay one-line pills; long tips wrap in a box (max 340px); a `\n` in the text forces a line break (`pre-line`).
 - `components/sera/charts/`: server-renderable inline-SVG charts, no chart library. `LineChart` (series of `[x, y|null, tip?]` points, numeric or date x, reference lines), `ScatterChart` (points plus shaded regions), `BarChart` (groups; `barGroups` lifts a flat list), `Legend` (`line|dash|dot|ring|zone` shapes). Point and bar tooltips use the shared `data-tip` layer. `scale.ts` is pure and unit-tested.
+- `components/sera/diagrams/`: server-rendered inline SVG on a fixed 1240-wide viewBox, no library. `Pipeline({ stages, failLabel, label })` lays `PipelineStage` boxes out by `weight` (SVG text does not wrap, so titles/details arrive pre-broken into short lines; `fails` stages draw a dashed arrow into the journal lane; `final` gets the accent fill). `Windows({ start, devEnd, testStart, today, testNote, paperSince, bears, label })` draws the dev and test bands, the paper strip and `Era` shading over a year axis. `label` is the accessible summary of each diagram. Geometry is pure in `geometry.ts`.
+- `app/sera/journal/view.ts` (pure): `KIND_COPY` (caption, empty text, sheet tone per insight kind), `parseKind(?kind)` (unknown -> `'all'`), `journalHref`, `newestFirst` (by `added`, then higher id), `kindCounts`, `journalGroups(insights, filter)` (one group per kind in `INSIGHT_KINDS` order), `dayLabel` (UTC).
+- `app/sera/ideas/view.ts` (pure): `methodsWithStatus(methods, status)` (numeric-aware id order; page uses `idea` and `blocked-data`), `needs(blockedOn)`, `sourceLabel`, `sourceLink` (http(s) only, else null), `urlParts` (safe flag, host, 72-char display), `readingList(ideasSeen)`: `url:` keys become links newest first, every other key is a concept (`concept:` prefix dropped) grouped by method id, untied last.
+- `app/sera/how/view.ts` (pure, takes a structurally narrowed `HowInput`): `stageCounts`, `pipelineStages` / `pipelineLabel` (Pipeline model), `windowsModel` (Windows model; `paperSince` = earliest `updated` of a `paper` method; `asOf` falls back to `gate.testStart` for an empty lab), `hurdles(gate, tries)` (the six `CONDITION_KEYS` in plain words), `honestyRules`, `dataFacts(data, gate)` (has / lacks), `BEARS` (2000-02, 2008-09) and `PAPER_MONTHS = 3` / `PAPER_TRADES = 100` (design section 1's paper bar; not in `snapshot.gate`).
 - `auth.ts`: `handlers, auth, signIn, signOut`, `currentUser()`.
 - `app/(app)/actions.ts`: server action `dismiss(formData)` (auth check, validates `orderId`, revalidates `/`).
 
@@ -312,7 +324,7 @@ window lacks two month starts.
 - `DATABASE_URL` (app, pooled HTTP), `DATABASE_URL_UNPOOLED` (scripts), `ALLOWED_EMAIL`, NextAuth Google credentials. Scripts read `web/.env.local` via `node --env-file`.
 - `npm run db:migrate`: apply new migrations in name order, one transaction each.
 - `npm run db:seed-demo [-- --dry-run]`: builds a 66-session demo (day 0 + paper start, at least three calendar months) ending at the last completed session, flagged `is_demo`. Roster: SPY (champion, buy and hold), A (bracket), F4-MOM12-N20-TREND and F1-SPY-SMA200-M (monthly book strategies, deciding on each month's first session), and C (bracket, its own younger clock, gate `applicable: false`). Needs migration 004 applied first. Writes strategies (with `engine`, `rules_id`, `paper_start`, `params.backtest_gate`), runs (with paper status), fx, bars, orders, equity snapshots, `paper_state`, `book_positions`, `book_targets`, `book_trades`, and six `news_vetoes` rows for C's pending session. `--dry-run` builds every row and prints counts without connecting.
-- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`, `sera/access`), `components/roster`, `components/sera/charts` and `app/(app)/leaderboard/view`.
+- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`, `sera/access`), `components/roster`, `components/sera/charts`, `components/sera/diagrams/geometry`, `app/(app)/leaderboard/view` and the `app/sera/*/view` helpers.
 
 ## Gotchas
 
@@ -329,7 +341,9 @@ window lacks two month starts.
 - Positions defaults to the first research strategy, not the champion: with SPY as champion, `selectStrategy` skips the benchmark unless `?s=` asks for it.
 - `StrategySwitch` takes `href` as a function, so it must stay a server component (functions cannot cross into a client component).
 - Sera access is two locks: sign-in still needs `ALLOWED_EMAIL`, and `/sera` additionally needs `SERA_EMAIL` (hard-coded). Any other signed-in account gets a 404, not a denial page, by design.
-- `SeraNav` links to `/sera/methods`, `/sera/journal`, `/sera/ideas` and `/sera/how`, which do not exist until phases 4-6; until then they 404 inside the shell.
+- Every `SeraNav` destination now has a page (`/sera`, `/sera/methods`, `/sera/journal`, `/sera/ideas`, `/sera/how`); each page also calls `requireSera(<its path>)` so sign-in returns to it.
+- `Pipeline` uses fixed SVG marker ids: render at most one per page. Its stage text must be pre-broken (title lines <= 14 chars, detail <= 18, <= 26 on a weight-1.35 box) or it overflows the boxes.
+- The paper bar (3 months, 100 trades) on How it works is a constant in `app/sera/how/view.ts`, not snapshot data; change it there if design section 1 changes.
 
 ## Notes
 

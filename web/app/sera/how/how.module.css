@@ -1,0 +1,43 @@
+/* How it works: two full-width diagram sheets, then hurdle cards, rules, data columns, glossary. */
+.page { display: flex; flex-direction: column; gap: 12px; }
+.diagram { width: 100%; padding: 6px 0 2px; }
+
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.card { background: var(--stone); border-radius: 28px; padding: 22px 24px; display: flex; flex-direction: column; gap: 10px; }
+.cardHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.idx { font-size: 13px; letter-spacing: 0.12em; color: var(--ink-3); }
+.cardTitle { margin: 0; font-size: 19px; font-weight: 500; letter-spacing: -0.01em; line-height: 1.25; }
+.target { align-self: flex-start; background: var(--sheet); font-size: 14px; height: 30px; }
+.plain { font-size: 15px; line-height: 1.45; color: var(--ink-2); }
+
+.rules { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.rule { display: flex; gap: 14px; align-items: flex-start; background: var(--stone); border-radius: 28px; padding: 20px 22px; }
+.ruleIcon {
+  flex: none; width: 44px; height: 44px; border-radius: 999px; background: var(--ink); color: var(--sheet);
+  display: flex; align-items: center; justify-content: center;
+}
+.ruleText { display: flex; flex-direction: column; gap: 4px; }
+.ruleTitle { margin: 0; font-size: 17px; font-weight: 500; }
+
+.cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.col { border-radius: 28px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; }
+.colHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.colTitle { margin: 0; font-size: 20px; font-weight: 500; }
+.links { display: flex; gap: 8px; }
+.facts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.fact { display: flex; flex-direction: column; gap: 3px; }
+.factTitle { font-size: 16px; font-weight: 500; }
+.factBody { font-size: 15px; line-height: 1.45; color: var(--ink-2); }
+
+.glossary { margin: 0; display: grid; grid-template-columns: 240px minmax(0, 1fr); column-gap: 28px; }
+.glossary dt { padding: 12px 0; font-size: 16px; font-weight: 500; border-bottom: 1px solid var(--hair); }
+.glossary dd { margin: 0; padding: 12px 0; font-size: 15.5px; line-height: 1.45; color: var(--ink-2); border-bottom: 1px solid var(--hair); }
+
+@media (max-width: 1023.98px) {
+  .grid3, .rules, .cols { grid-template-columns: 1fr; }
+  .glossary { grid-template-columns: 1fr; }
+  .glossary dt { border-bottom: 0; padding-bottom: 0; }
+  /* The diagrams are drawn for desktop; below 1024px they scroll sideways instead of shrinking text. */
+  .diagram { overflow-x: auto; }
+  .diagram > svg { min-width: 960px; }
+}

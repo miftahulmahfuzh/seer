@@ -2,19 +2,19 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-10-04 22:13:10
-**Total Active Tasks**: 1
+**Last Updated**: 2026-10-04 22:30:00
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 8
+- Completed: 9
 
 ---
 
@@ -23,15 +23,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-WEB-08WD** Phase 6: Journal, Ideas, How it works
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `web/app/sera/journal/page.tsx`, `web/app/sera/ideas/page.tsx`, `web/app/sera/how/page.tsx` (one CSS module + tested `view.ts` each; each calls `requireSera(<own path>)`) and `web/components/sera/diagrams/` (`geometry.ts` +test, Pipeline, Windows). Journal: insights grouped by plain headings per kind (synthesis first), kind filter, newest first, method links. Ideas: `idea` backlog, blocked-on-data as a data wishlist, `ideasSeen` reading list. How it works: pipeline and time-windows diagrams, each hurdle with its threshold from `snapshot.gate`, honesty rules, data the lab has/lacks, glossary. Does not touch shell, chart kit, lib, other pages. Exit: tsc + vitest green; the three routes compile in `next build`.
-  - **Status**: open
-  - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 6 of 7)
-  - **Satisfies**: R1 — Optimize the UI for desktop only (for now); R4 — Draw all the important graphs and diagrams; R5 — Concise, non-technical explanations, with analysis and opinion on every method; R6 — Insights from every exploration; food for thought on features and data sources; R7 — As comprehensive as possible (cross-cutting)
-  - **Depends on**: P1-WEB-5767, P1-WEB-EQ4I
-  - **Plan**: `.workflows/plan/P1-WEB-08WD.md`
+
 
 ### [P2] Medium
 
@@ -152,6 +144,18 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Completed**: 2026-10-04 22:13
   - **Method**: /do
   - **Files**: web/app/sera/methods/view.ts, web/app/sera/methods/view.test.ts, web/app/sera/methods/page.tsx, web/app/sera/methods/methods.module.css, web/app/sera/methods/[id]/page.tsx, web/app/sera/methods/[id]/method.module.css
+- [x] **P1-WEB-08WD** Phase 6: Journal, Ideas, How it works
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `web/app/sera/journal/page.tsx`, `web/app/sera/ideas/page.tsx`, `web/app/sera/how/page.tsx` (one CSS module + tested `view.ts` each; each calls `requireSera(<own path>)`) and `web/components/sera/diagrams/` (`geometry.ts` +test, Pipeline, Windows). Journal: insights grouped by plain headings per kind (synthesis first), kind filter, newest first, method links. Ideas: `idea` backlog, blocked-on-data as a data wishlist, `ideasSeen` reading list. How it works: pipeline and time-windows diagrams, each hurdle with its threshold from `snapshot.gate`, honesty rules, data the lab has/lacks, glossary. Does not touch shell, chart kit, lib, other pages. Exit: tsc + vitest green; the three routes compile in `next build`.
+  - **Status**: done
+  - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 6 of 7)
+  - **Satisfies**: R1 — Optimize the UI for desktop only (for now); R4 — Draw all the important graphs and diagrams; R5 — Concise, non-technical explanations, with analysis and opinion on every method; R6 — Insights from every exploration; food for thought on features and data sources; R7 — As comprehensive as possible (cross-cutting)
+  - **Depends on**: P1-WEB-5767, P1-WEB-EQ4I
+  - **Plan**: `.workflows/plan/P1-WEB-08WD.md`
+  - **Completed**: 2026-10-04 22:30
+  - **Method**: /do
+  - **Files**: web/components/sera/diagrams/geometry.ts, web/components/sera/diagrams/geometry.test.ts, web/components/sera/diagrams/diagrams.module.css, web/components/sera/diagrams/Pipeline.tsx, web/components/sera/diagrams/Windows.tsx, web/app/sera/journal/view.ts, web/app/sera/journal/view.test.ts, web/app/sera/journal/journal.module.css, web/app/sera/journal/page.tsx, web/app/sera/ideas/view.ts, web/app/sera/ideas/view.test.ts, web/app/sera/ideas/ideas.module.css, web/app/sera/ideas/page.tsx, web/app/sera/how/view.ts, web/app/sera/how/view.test.ts, web/app/sera/how/how.module.css, web/app/sera/how/page.tsx
 
 ---
 

@@ -22,9 +22,11 @@ export function showTip(el: Element, text?: string) {
     padding: '9px 14px', borderRadius: '999px', whiteSpace: 'nowrap', opacity: '1', transition: 'opacity .12s',
   });
   tip.textContent = t;
+  // Inside a [data-tip-anchor] (the mobile tab bar) the caption clears the whole container, not just the tab.
+  const box = el.closest('[data-tip-anchor]');
   const r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
   const x = Math.max(6, Math.min(innerWidth - w - 6, r.left + r.width / 2 - w / 2));
-  let y = r.top - h - 8;
+  let y = box ? box.getBoundingClientRect().top - h - 10 : r.top - h - 8;
   if (y < 6) y = r.bottom + 8;
   tip.style.left = x + 'px';
   tip.style.top = y + 'px';

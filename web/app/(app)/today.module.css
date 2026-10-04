@@ -1,7 +1,7 @@
 .between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
 /* ---- Summary sheet (mobile) ---- */
-.summary { padding-bottom: 64px; gap: 22px; }
+.summary { padding-bottom: 58px; gap: 18px; }
 .count { display: flex; flex-direction: column; gap: 4px; }
 .countNum { font-size: 52px; line-height: 0.95; letter-spacing: -0.04em; }
 .countLabel { font-size: 16px; }
@@ -21,12 +21,12 @@
 
 /* ---- No setups ---- */
 .none {
-  gap: 6px; padding: 44px 26px 160px; min-height: 540px;
-  font-size: 56px; line-height: 0.95; letter-spacing: -0.045em;
+  gap: 4px; padding: 32px 24px 150px; min-height: 480px;
+  font-size: 46px; line-height: 0.95; letter-spacing: -0.045em;
 }
 .noneSub {
-  margin-top: auto; padding-top: 28px; max-width: 34ch;
-  font-size: 16px; line-height: 1.45; letter-spacing: 0; color: var(--ink-2); text-wrap: pretty;
+  margin-top: auto; padding-top: 20px; max-width: 34ch;
+  font-size: 15px; line-height: 1.4; letter-spacing: 0; color: var(--ink-2); text-wrap: pretty;
 }
 
 /* ---- Board: stacked on mobile, one big sheet with a grid on desktop ---- */

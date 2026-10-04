@@ -1,4 +1,4 @@
-import { Gavel, Landmark, Shield, Sigma, TrendingUp } from 'lucide-react';
+import { Gauge, Gavel, Landmark, Shield, Sigma } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 import { selectStrategy, sharesLabel, strategyIcon } from './roster';
 
@@ -29,7 +29,7 @@ describe('selectStrategy', () => {
 describe('strategyIcon', () => {
   it('maps the roster icons and falls back to Sigma', () => {
     expect(strategyIcon('landmark')).toBe(Landmark);
-    expect(strategyIcon('trending-up')).toBe(TrendingUp);
+    expect(strategyIcon('trending-up')).toBe(Gauge);
     expect(strategyIcon('shield')).toBe(Shield);
     expect(strategyIcon('gavel')).toBe(Gavel);
     expect(strategyIcon('sigma')).toBe(Sigma);

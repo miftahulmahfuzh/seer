@@ -21,7 +21,7 @@ export function Nav() {
         <span className={s.wordmark}>Seer.</span>
         <Tabs path={path} vertical />
       </aside>
-      <nav className={`${s.bar} mobile-only`} aria-label="Sections">
+      <nav className={`${s.bar} mobile-only`} aria-label="Sections" data-tip-anchor>
         <Tabs path={path} />
       </nav>
     </>

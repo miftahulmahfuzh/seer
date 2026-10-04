@@ -1,4 +1,4 @@
-"""Massive (ex-Polygon) REST client: grouped daily bars and stock splits.
+"""Massive (ex-Polygon) REST client: grouped daily bars, stock splits and cash dividends.
 
 Free tier allows 5 calls/min, so calls are spaced >= MIN_INTERVAL seconds apart (measured from the
 end of the previous call). Retries on 429/5xx are delegated to http.get_json with a backoff that is
@@ -17,6 +17,7 @@ from typing import Any, Protocol
 from seer_engine import bars as bars_mod
 from seer_engine import http
 from seer_engine.bars import Bar
+from seer_engine.dividends import Dividend, parse_massive
 from seer_engine.splits import Split
 
 log = logging.getLogger(__name__)
@@ -39,6 +40,8 @@ class MassiveSource(Protocol):
     def grouped(self, d: date) -> dict[str, Bar]: ...
 
     def splits(self, d: date) -> list[Split]: ...
+
+    def dividends(self, d: date) -> list[Dividend]: ...
 
 
 class Client:
@@ -144,3 +147,46 @@ class Client:
                 return out
             url, params = next_url, {}
         raise MassiveError(f"splits {d.isoformat()}: more than {MAX_PAGES} pages")
+
+    def dividends(self, d: date) -> list[Dividend]:
+        """USD cash dividends (types CD and SC) going ex on d, one per Massive row (follows next_url).
+
+        Rows of other types (LT/ST capital gains) or currencies are dropped, rows with another
+        ex-date are ignored, and a row repeated under the same Massive id is kept once. Rows are
+        not summed here: ``dividends.totals`` sums them per (symbol, ex-date).
+        """
+        url = f"{self.base_url}/v3/reference/dividends"
+        params: dict[str, Any] = {"ex_dividend_date": d.isoformat(), "limit": 1000}
+        out: list[Dividend] = []
+        seen_ids: set[str] = set()
+        dropped = 0
+        for _ in range(MAX_PAGES):
+            data = self._get(url, params)
+            status = data.get("status")
+            if status is not None and status not in OK_STATUSES:
+                detail = data.get("message") or data.get("error") or ""
+                raise MassiveError(f"dividends {d.isoformat()}: status {status!r} {detail}".strip())
+            for raw in data.get("results") or []:
+                try:
+                    dividend = parse_massive(raw)
+                except (KeyError, ValueError, TypeError, InvalidOperation) as e:
+                    log.warning("dividends %s: skipped malformed row %r (%s)", d.isoformat(), raw, e)
+                    continue
+                if dividend is None:
+                    dropped += 1
+                    continue
+                if dividend.ex_date != d:
+                    continue
+                row_id = raw.get("id")
+                if isinstance(row_id, str) and row_id:
+                    if row_id in seen_ids:
+                        log.debug("dividends %s: repeated id %s skipped", d.isoformat(), row_id)
+                        continue
+                    seen_ids.add(row_id)
+                out.append(dividend)
+            next_url = data.get("next_url")
+            if not next_url:
+                log.info("dividends %s: %d cash, %d other dropped", d.isoformat(), len(out), dropped)
+                return out
+            url, params = next_url, {}
+        raise MassiveError(f"dividends {d.isoformat()}: more than {MAX_PAGES} pages")

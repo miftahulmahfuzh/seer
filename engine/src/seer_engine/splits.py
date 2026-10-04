@@ -1,9 +1,10 @@
 """Stock splits: decide whether stored history still needs a split, and apply it exactly once.
 
 A split with factor f = split_to / split_from (NVDA 2024-06-10: 1 -> 10, f = 10) means every bar
-before the execution date must be rewritten: prices * 1/f, volume * f. `split_adjustments` holds
-one row per (symbol, execution_date); a split whose row already exists is never applied again, so
-re-runs and replays cannot double-adjust.
+before the execution date must be rewritten: prices * 1/f, volume * f, and every stored cash
+dividend with an earlier ex-date * 1/f (6 dp). `split_adjustments` holds one row per
+(symbol, execution_date); a split whose row already exists is never applied again, so re-runs and
+replays cannot double-adjust.
 """
 from __future__ import annotations
 
@@ -71,6 +72,7 @@ class SplitOutcome:
     applied: bool  # stored history was rewritten by this call
     reason: str
     rows: int  # bars rows rewritten
+    dividend_rows: int = 0  # dividends rows rewritten (ex_date before the execution date)
 
 
 def should_apply(prev_close: Decimal | float, open_today: Decimal | float, factor: Decimal | float) -> bool:
@@ -148,6 +150,20 @@ UPDATE bars SET
 WHERE symbol = %(symbol)s AND date < %(execution_date)s
 """
 
+# Dividends are stored in the same units as bars: an applied split rewrites every earlier
+# ex-date for the symbol (cash per share * split_from / split_to, 6 dp). A row that would round
+# to zero is removed first (dividends.amount must stay > 0).
+_DROP_TINY_DIVIDENDS = """
+DELETE FROM dividends
+WHERE symbol = %(symbol)s AND ex_date < %(execution_date)s
+  AND round(amount * %(split_from)s / %(split_to)s, 6) = 0
+"""
+
+_REWRITE_DIVIDENDS = """
+UPDATE dividends SET amount = round(amount * %(split_from)s / %(split_to)s, 6)
+WHERE symbol = %(symbol)s AND ex_date < %(execution_date)s
+"""
+
 
 def apply_splits(
     conn: psycopg.Connection,
@@ -156,9 +172,12 @@ def apply_splits(
 ) -> list[SplitOutcome]:
     """Record every split once and rewrite stored history for the ones that need it.
 
-    Must run inside the caller's write transaction, before any bar fetched in this batch is
-    upserted (fetched bars are adjusted as of fetch time and must not be rewritten).
-    `first_opens[symbol]` is the open of the earliest fetched bar for that symbol in this batch.
+    Stored history is the symbol's bars and its cash dividends with an ex-date before the
+    execution date (same units as the bars). Must run inside the caller's write transaction,
+    before any bar or dividend fetched in this batch is upserted (fetched bars are adjusted as of
+    fetch time and fetched dividends are adjusted by ``dividends.adjust_for_splits``; neither may
+    be rewritten again). `first_opens[symbol]` is the open of the earliest fetched bar for that
+    symbol in this batch.
     """
     by_symbol: dict[str, dict[date, Split]] = defaultdict(dict)
     for s in items:
@@ -186,12 +205,23 @@ def apply_splits(
                     log.info("split %s %s already recorded; skipped", symbol, split.execution_date)
                     continue
                 rows = 0
+                dividend_rows = 0
                 if apply:
                     cur.execute(_REWRITE, params)
                     rows = cur.rowcount
-                outcomes.append(SplitOutcome(split, True, apply, reason, rows))
+                    cur.execute(_DROP_TINY_DIVIDENDS, params)
+                    if cur.rowcount:
+                        log.warning(
+                            "split %s %s: %d earlier dividend(s) round to 0 after the split; removed",
+                            symbol,
+                            split.execution_date,
+                            cur.rowcount,
+                        )
+                    cur.execute(_REWRITE_DIVIDENDS, params)
+                    dividend_rows = cur.rowcount
+                outcomes.append(SplitOutcome(split, True, apply, reason, rows, dividend_rows))
                 log.info(
-                    "split %s %s %s:%s %s (%s; %d rows)",
+                    "split %s %s %s:%s %s (%s; %d rows, %d dividends)",
                     symbol,
                     split.execution_date,
                     split.split_from,
@@ -199,5 +229,6 @@ def apply_splits(
                     "applied" if apply else "not applied",
                     reason,
                     rows,
+                    dividend_rows,
                 )
     return outcomes

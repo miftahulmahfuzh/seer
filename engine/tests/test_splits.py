@@ -159,3 +159,62 @@ def test_symbols_with_bars(pg):
     assert splits.symbols_with_bars(pg, ["AAA", "BBB"]) == {"AAA"}
     assert splits.symbols_with_bars(pg, []) == set()
     pg.rollback()
+
+
+# ---- dividends move with the bars (migration 003 table) ----
+
+def seed_dividends(conn, rows):
+    with db.transaction(conn, False):
+        conn.execute(
+            "INSERT INTO dividends (symbol, ex_date, amount) SELECT * FROM unnest(%s::text[], %s::date[], %s::numeric[])",
+            ([r[0] for r in rows], [r[1] for r in rows], [r[2] for r in rows]),
+        )
+
+
+def stored_dividends(conn):
+    with conn.cursor(row_factory=tuple_row) as cur:
+        cur.execute("SELECT symbol, ex_date, amount FROM dividends ORDER BY symbol, ex_date")
+        rows = cur.fetchall()
+    conn.rollback()
+    return rows
+
+
+def test_applied_split_rewrites_earlier_dividends_once(pg):
+    seed(pg, [("NVDA", D0, 1190, 1210, 1180, 1200, 1_000_000), ("NVDA", D1, 1200, 1220, 1190, 1210, 2_000_000)])
+    seed_dividends(pg, [("NVDA", D0, Decimal("1.000000")), ("NVDA", D2, Decimal("0.100000")), ("AAPL", D0, Decimal("0.260000"))])
+    first = apply(pg, [NVDA_SPLIT], {"NVDA": Decimal("121")})
+    assert [(o.applied, o.rows, o.dividend_rows) for o in first] == [(True, 2, 1)]
+    assert stored_dividends(pg) == [
+        ("AAPL", D0, Decimal("0.260000")),
+        ("NVDA", D0, Decimal("0.100000")),
+        ("NVDA", D2, Decimal("0.100000")),  # ex on the execution date: already post-split
+    ]
+    second = apply(pg, [NVDA_SPLIT], {"NVDA": Decimal("121")})
+    assert [(o.recorded, o.dividend_rows) for o in second] == [(False, 0)]
+    assert stored_dividends(pg)[1] == ("NVDA", D0, Decimal("0.100000"))
+
+
+def test_split_not_applied_leaves_dividends(pg):
+    seed(pg, [("NVDA", D1, 120, 122, 119, 121, 20_000_000)])
+    seed_dividends(pg, [("NVDA", D0, Decimal("0.100000"))])
+    out = apply(pg, [NVDA_SPLIT], {"NVDA": Decimal("121.5")})
+    assert [(o.applied, o.dividend_rows) for o in out] == [(False, 0)]
+    assert stored_dividends(pg) == [("NVDA", D0, Decimal("0.100000"))]
+
+
+def test_dividend_rewrite_rounds_to_6dp_and_reverse_splits_scale_up(pg):
+    seed(pg, [("ABC", D1, 100, 100, 100, 100, 1001), ("XYZ", D1, Decimal("0.5"), Decimal("0.5"), Decimal("0.5"), Decimal("0.5"), 3200)])
+    seed_dividends(pg, [("ABC", D0, Decimal("1.000001")), ("XYZ", D0, Decimal("0.010000"))])
+    apply(pg, [Split("ABC", D2, Decimal(2), Decimal(3)), Split("XYZ", D2, Decimal(32), Decimal(1))], {"ABC": Decimal("66.5"), "XYZ": Decimal("16.2")})
+    assert stored_dividends(pg) == [
+        ("ABC", D0, Decimal("0.666667")),  # 1.000001 * 2 / 3 = 0.66666733..
+        ("XYZ", D0, Decimal("0.320000")),  # reverse 32:1
+    ]
+
+
+def test_dividend_that_rounds_to_zero_is_removed(pg):
+    seed(pg, [("NVDA", D1, 1200, 1200, 1200, 1200, 1)])
+    seed_dividends(pg, [("NVDA", D0, Decimal("0.000001")), ("NVDA", D1, Decimal("1.000000"))])
+    out = apply(pg, [NVDA_SPLIT], {"NVDA": Decimal("121")})
+    assert [(o.applied, o.dividend_rows) for o in out] == [(True, 1)]
+    assert stored_dividends(pg) == [("NVDA", D1, Decimal("0.100000"))]

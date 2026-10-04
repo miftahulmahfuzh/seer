@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 09:49:40
-**Total Active Tasks**: 6
+**Last Updated**: 2026-10-04 09:55:00
+**Total Active Tasks**: 4
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 3
-- Completed: 42
+- Completed: 44
 
 ---
 
@@ -39,16 +39,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
-- [ ] **P1-ENG-79OL** Phase 3: Bracket and benchmark night cores
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `paper/bracket.py`, `paper/benchmark.py` (C3, incl. `split_benchmark` and `step_benchmark(..., split=)`); tests proving `settle_bracket`+`decide_bracket` looped over ≥ 300 synthetic sessions equal `run_backtest` (snapshots, events, closed, open), `step_benchmark` looped equals `buy_and_hold` with dividends; split on a pending and on an open bracket order; no look-ahead. Does not touch: `sim/*`, runners, `paper/book.py`, DB. Exit: equality tests green; purity green.
-  - **Status**: open
-  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 3 of 13)
-  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
-  - **Depends on**: P1-ENG-N6UC
-  - **Plan**: `.workflows/plan/P1-ENG-79OL.md`
-
 - [ ] **P1-ENG-1BVI** Phase 4: Book night core
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -58,16 +48,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
   - **Depends on**: P1-ENG-N6UC, P1-ENG-HCYN
   - **Plan**: `.workflows/plan/P1-ENG-1BVI.md`
-
-- [ ] **P1-ENG-X99Y** Phase 5: Dividends and held-symbol bars in `nightly`
-  - **Difficulty**: NORMAL
-  - **Type**: Update
-  - **Context**: Owns `massive.Client.dividends(d)` (+ `MassiveSource` protocol); new `dividends.py` (parse CD+SC, sum per symbol/ex-date, upsert into `dividends`); `splits.apply_splits` also rewrites `dividends` before the execution date (`round(amount * from / to, 6)`); `nightly` fetches dividends per missing session in the same transaction and adds paper-held symbols (`universe.paper_symbols(conn, d)`: open/pending `orders`, `book_positions`, `book_targets` for sessions ≥ the session) to each session's wanted set; tests (`test_massive`, `test_nightly`, `test_splits`, new `test_dividends`). Does not touch: `paper/*`, workflows, web. Exit: fake-client tests for dividends, split rewrite of dividends, held symbol outside the universe still fetched; nightly stays one transaction.
-  - **Status**: open
-  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 5 of 13)
-  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
-  - **Depends on**: P1-ENG-N6UC
-  - **Plan**: `.workflows/plan/P1-ENG-X99Y.md`
 
 - [ ] **P1-ENG-AYRQ** Phase 6: Paper store (load and save state)
   - **Difficulty**: HARD
@@ -110,6 +90,38 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-79OL** Phase 3: Bracket and benchmark night cores
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `paper/bracket.py`, `paper/benchmark.py` (C3, incl. `split_benchmark` and `step_benchmark(..., split=)`); tests proving `settle_bracket`+`decide_bracket` looped over ≥ 300 synthetic sessions equal `run_backtest` (snapshots, events, closed, open), `step_benchmark` looped equals `buy_and_hold` with dividends; split on a pending and on an open bracket order; no look-ahead. Does not touch: `sim/*`, runners, `paper/book.py`, DB. Exit: equality tests green; purity green.
+  - **Status**: completed
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 3 of 13)
+  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
+  - **Depends on**: P1-ENG-N6UC
+  - **Plan**: `.workflows/plan/P1-ENG-79OL.md`
+  - **Completed**: 2026-10-04 09:55
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/paper/bracket.py, engine/src/seer_engine/paper/benchmark.py, engine/tests/test_paper_bracket.py, engine/tests/test_paper_benchmark.py
+  - **Verified**: focused 31 passed; full engine suite 1792 passed, 0 skipped; web vitest 44 passed
+  - **Next**: P1-ENG-AYRQ (phase 6) left blocked: also depends on P1-ENG-1BVI (phase 4), still open (completion-handler)
+
+- [x] **P1-ENG-X99Y** Phase 5: Dividends and held-symbol bars in `nightly`
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns `massive.Client.dividends(d)` (+ `MassiveSource` protocol); new `dividends.py` (parse CD+SC, sum per symbol/ex-date, upsert into `dividends`); `splits.apply_splits` also rewrites `dividends` before the execution date (`round(amount * from / to, 6)`); `nightly` fetches dividends per missing session in the same transaction and adds paper-held symbols (`universe.paper_symbols(conn, d)`: open/pending `orders`, `book_positions`, `book_targets` for sessions ≥ the session) to each session's wanted set; tests (`test_massive`, `test_nightly`, `test_splits`, new `test_dividends`). Does not touch: `paper/*`, workflows, web. Exit: fake-client tests for dividends, split rewrite of dividends, held symbol outside the universe still fetched; nightly stays one transaction.
+  - **Status**: completed
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 5 of 13)
+  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
+  - **Depends on**: P1-ENG-N6UC
+  - **Plan**: `.workflows/plan/P1-ENG-X99Y.md`
+  - **Completed**: 2026-10-04 09:50
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/dividends.py, engine/src/seer_engine/massive.py, engine/src/seer_engine/splits.py, engine/src/seer_engine/universe.py, engine/src/seer_engine/commands/nightly.py, engine/tests/test_dividends.py, engine/tests/test_massive.py, engine/tests/test_splits.py, engine/tests/test_universe_queries.py, engine/tests/test_nightly.py
+  - **Drift**:
+    - test_universe_queries.py was 73 lines (plan said append after l.60); paper_symbols tests appended at end of file. No other drift.
+  - **Verified**: focused 103 passed; full engine suite 1836 passed, 0 skipped; web vitest 44 passed
+  - **Next**: P1-ENG-AYRQ (phase 6) left blocked: also depends on P1-ENG-79OL (phase 3) and P1-ENG-1BVI (phase 4), both still open (completion-handler)
+
 - [x] **P1-ENG-YEW4** Phase 9: `explain`: optional LLM explanations
   - **Difficulty**: NORMAL
   - **Type**: Feature

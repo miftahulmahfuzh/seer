@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 07:05:00
-**Total Active Tasks**: 2
+**Last Updated**: 2026-10-04 07:37:02
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 38
+- Completed: 39
 
 ---
 
@@ -39,16 +39,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
-- [ ] **P1-ENG-904W** Phase 13: The real dev run, report, pre-registration, V0 `cmp`, docs
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns the committed report set and pre-registration file, an identical re-run (`cmp`), the real-data `cmp` of `docs/backtests/2026-10-02-*` (per Decisions), `engine/package_readme.md`, `docs/ROADMAP.md` (P7a entry with the result, and the P7b entry), and one appended Decisions row in the index (the R1 outcome). Never stops to ask (D-H): a missing store is rebuilt, a differing fingerprint is recorded and the run proceeds, a defect fixable only in `registry.py` or a frozen file ends the phase with the run uncommitted and a note in the phase log and completion summary. Exit: every handover §7 item checked off in the phase log; suite green with 0 skipped (1694 plus only Bug-protocol tests); CI green.
-  - **Status**: open
-  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 13 of 13)
-  - **Satisfies**: R1 — `TradeRules`: `DESIGN_V0` reproduces §5, and A, A2 and B re-render byte-identically (synthetic test plus a real-data `cmp`). Each new lever has its own synthetic-bar tests; R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R7 — The pre-registration file (≤ 3 finalists exactly specified, or "none eligible"), with the proposed §5 revision; R9 — Docs (package readme, ROADMAP P7a and P7b). The suite is green with 0 skipped, and CI is green
-  - **Depends on**: P1-ENG-ZWP9
-  - **Plan**: `.workflows/plan/P1-ENG-904W.md`
-
 ### [P2] Medium
 
 ### [P3] Low
@@ -60,6 +50,35 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-904W** Phase 13: The real dev run, report, pre-registration, V0 `cmp`, docs
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns the committed report set and pre-registration file, an identical re-run (`cmp`), the real-data `cmp` of `docs/backtests/2026-10-02-*` (per Decisions), `engine/package_readme.md`, `docs/ROADMAP.md` (P7a entry with the result, and the P7b entry), and one appended Decisions row in the index (the R1 outcome). Never stops to ask (D-H): a missing store is rebuilt, a differing fingerprint is recorded and the run proceeds, a defect fixable only in `registry.py` or a frozen file ends the phase with the run uncommitted and a note in the phase log and completion summary. Exit: every handover §7 item checked off in the phase log; suite green with 0 skipped (1694 plus only Bug-protocol tests); CI green.
+  - **Status**: completed
+  - **Plan Set**: `TRADE_RULES_DEV_SEARCH_PLAN.md` (phase 13 of 13)
+  - **Satisfies**: R1 — `TradeRules`: `DESIGN_V0` reproduces §5, and A, A2 and B re-render byte-identically (synthetic test plus a real-data `cmp`). Each new lever has its own synthetic-bar tests; R6 — One dev run over every candidate, with the committed report holding every §7.6 section; R7 — The pre-registration file (≤ 3 finalists exactly specified, or "none eligible"), with the proposed §5 revision; R9 — Docs (package readme, ROADMAP P7a and P7b). The suite is green with 0 skipped, and CI is green
+  - **Depends on**: P1-ENG-ZWP9
+  - **Plan**: `.workflows/plan/P1-ENG-904W.md`
+  - **Completed**: 2026-10-04 07:37
+  - **Method**: /do
+  - **Files**: docs/backtests/2026-10-04-p7a-dev-exploration.md, docs/backtests/2026-10-04-p7a-dev-exploration-rows.csv, docs/backtests/2026-10-04-p7a-dev-exploration-curves.csv, docs/backtests/2026-10-04-p7a-dev-exploration-frontier.svg, docs/plans/2026-10-04-p7b-preregistration.md, engine/package_readme.md, docs/ROADMAP.md, TRADE_RULES_DEV_SEARCH_PLAN.md
+  - **Drift**:
+    - package_readme.md line numbers (as of 2546a92) had moved: phase 3's readme-updater had added a book_runner layout line and a 'backtest book runner (P7a)' section. Blocks were placed by content anchor; phase 3's section kept, not duplicated.
+    - Readme text follows landed code where the plan draft differed: V0_BOOK is not in PRESETS; backtest_dev --only writes nothing (not 'send to scratch'); extra exit-2 cases (unknown --only id, DEV_END mismatch); --dry-run/-v flags on both commands; close_book_unpriced returns (book, fills, trades).
+    - Step 1c's test-diff guard showed engine/tests/conftest.py modified since 2546a92 (commit 992f2eb, thread caps, additive, no test changed); proceeded.
+  - **Decided**:
+    - conftest.py diff in Step 1c's no-test-modified guard -> proceed (rung 1: invariant 3's frozen set is empty-diff; conftest holds no test and the change is additive infra the coordinator committed)
+    - Readme anchors drifted -> place by content, keep phase 3's book-runner section (small drift rule; narrower blast radius)
+    - readme-updater -> skipped; engine/package_readme.md was this phase's own deliverable, already written and committed in e273531 (completion-handler, per coordinator instruction)
+    - Landing -> not done here; swarm coordinator orch-trade-rules-dev-search owns the merge (analyze-orchestrator Step 5) (completion-handler)
+  - **Outcome**:
+    - Commits: 7a24b84 (dev run), e273531 (docs); CI green https://github.com/miftahulmahfuzh/seer/actions/runs/37165273861
+    - Store fingerprint 5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a (equals phase 4's); registry 54 candidates / 11 families / 11 owner-input, committed at b2ec090 before the run
+    - D8: none eligible (35 beat SPY TR, 0 max DD<=15%, 40 PF>=1.3, 33 >=100 trades, 43 no owner input). Best MAR F4-MOM12-N20-TREND (CAGR +16.2% vs +7.9%, DD 22.2%, PF 2.27, 1154 trades, MAR 0.73), failed only on DD. P7b does not run
+    - Re-run cmp: same=5, byte-identical; R1 real-data cmp: Neon fingerprint unchanged, all 11 docs/backtests/2026-10-02-* cmp-equal
+    - Suite: 1694 passed, 0 skipped (before and after); dev run 0:51, re-run 0:49, peak RSS 847 MB, sequential
+    - Sanity: REF-SPY-HOLD +594.6% vs SPY TR +594.7%; date scan FAILURES 0
+
 - [x] **P1-ENG-ZWP9** Phase 12: `backtest_dev` command, io writer, runtime on the real store
   - **Difficulty**: NORMAL
   - **Type**: Feature

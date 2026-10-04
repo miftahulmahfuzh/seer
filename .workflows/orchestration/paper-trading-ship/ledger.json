@@ -13,29 +13,29 @@
       "note": null,
       "package": "db`, `engine/paper",
       "plan": ".workflows/plan/paper-trading-ship/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T02:37:27+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "running",
       "task_id": null,
       "title": "Migration 003 and the frozen roster"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "cf54ce9",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "readme-updater skipped: package_readme owned by phase 13 (invariant 8)",
       "package": "engine/sim",
       "plan": ".workflows/plan/paper-trading-ship/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T02:37:27+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-HCYN",
       "title": "Book-engine split rule"
     },
     {
@@ -259,6 +259,7 @@
   "plan": "/home/miftah/.worktrees/seer/paper-trading-ship/.workflows/orchestration/paper-trading-ship/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "paper-trading-ship",
-  "updated": "2026-10-04T02:28:58+00:00",
+  "updated": "2026-10-04T02:37:27+00:00",
+  "verified_at": "2026-10-04T02:37:21+00:00",
   "worktree": "/home/miftah/.worktrees/seer/paper-trading-ship"
 }

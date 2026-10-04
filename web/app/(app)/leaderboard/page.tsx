@@ -89,7 +89,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
             <span className={s.statLabel}>Sessions</span>
           </div>
         </div>
-        <Legend rows={board.rows} lookOf={lookOf} className="desk-only" short />
+        <Legend rows={board.rows} lookOf={lookOf} className="desk-only" />
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={s.chart} role="img"
         aria-label="Equity curves of each strategy against SPY">
@@ -101,7 +101,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
         ))}
       </svg>
       <div className={`${s.axis} ${s.pad}`}>{chart.labels.map((l, i) => <span key={i}>{l}</span>)}</div>
-      <Legend rows={board.rows} lookOf={lookOf} className={`${s.pad} mobile-only`} />
+      <Legend rows={board.rows} lookOf={lookOf} className={`${s.pad} ${s.legendRow} mobile-only`} />
     </section>
   );
 
@@ -225,19 +225,20 @@ function MonthRow({ line, total }: { line: MonthLine; total?: boolean }) {
   );
 }
 
-function Legend({ rows, lookOf, className, short }: {
-  rows: Board['rows']; lookOf: (id: string) => Look; className: string; short?: boolean;
+/** One swatch + short label per strategy (full name as its tooltip), so the legend stays on one row. */
+function Legend({ rows, lookOf, className }: {
+  rows: Board['rows']; lookOf: (id: string) => Look; className: string;
 }) {
   return (
     <div className={`${s.legend} ${className}`}>
       {rows.map(({ strategy: st }) => {
         const look = lookOf(st.id);
         return (
-          <span key={st.id} className={s.legendItem}>
+          <span key={st.id} className={s.legendItem} data-tip={st.name} aria-label={st.name}>
             {look.dotted
               ? <span className={s.swatchDot} />
               : <span className={s.swatch} style={{ background: look.line }} />}
-            {short ? st.short : st.name}
+            {st.short}
           </span>
         );
       })}

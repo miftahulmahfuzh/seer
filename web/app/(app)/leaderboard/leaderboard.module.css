@@ -13,7 +13,9 @@
 .chart { width: 100%; height: 170px; display: block; overflow: visible; }
 .axis { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-2); }
 .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; }
-.legendItem { display: flex; align-items: center; gap: 7px; }
+.legendItem { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+/* Mobile: spread edge to edge under the axis labels, never wrapping. */
+.legendRow { flex-wrap: nowrap; justify-content: space-between; gap: 10px; }
 .swatch { width: 18px; height: 3px; border-radius: 9px; }
 .swatchDot { width: 18px; height: 0; border-top: 2.5px dotted var(--ink-3); }
 

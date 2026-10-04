@@ -241,3 +241,9 @@ console.log(`wrote app/icon.png ${FAV}² (rounded favicon)`);
 // the "Seer." mark; the Sigma is cut after the flip so it stays the right way round.
 await sharp(await mark('#ffffff', true)).png({ compressionLevel: 9 }).toFile(join(WEB, 'public/splash-eye.png'));
 console.log(`wrote public/splash-eye.png ${mw}x${mh} (splash mask, mirrored) · aspect ${(mw / mh).toFixed(4)}`);
+
+// The in-app header mark: the same mark unmirrored, as a mask painted in --ink. ~58px wide there.
+const MARK_W = 240;
+await sharp(await mark('#ffffff', false)).resize(MARK_W, Math.round((MARK_W * mh) / mw), { kernel: 'lanczos3' })
+  .png({ compressionLevel: 9 }).toFile(join(WEB, 'public/eye-mark.png'));
+console.log(`wrote public/eye-mark.png ${MARK_W}x${Math.round((MARK_W * mh) / mw)} (header mask)`);

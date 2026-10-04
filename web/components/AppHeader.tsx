@@ -13,6 +13,7 @@ type Props = {
 export function AppHeader({ date, title, deskTitle, deskAside, demo }: Props) {
   return (
     <header className={s.header}>
+      <span className={`${s.eye} mobile-only`} aria-hidden="true" />
       <div className={s.titles}>
         <span className={s.date}>
           {date}

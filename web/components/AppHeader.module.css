@@ -7,7 +7,19 @@
   padding: 14px 22px 26px 26px;
 }
 
-.titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; margin-right: auto; }
+
+/* The eye (scripts/make-icon.mjs → public/eye-mark.png) as a mask, so it is --ink in either scheme.
+   Mobile only: the desktop rail already carries the wordmark. */
+.eye {
+  display: block;
+  flex: none;
+  width: 58px;
+  aspect-ratio: 1061 / 798;
+  background: var(--ink);
+  -webkit-mask: url(/eye-mark.png) center / contain no-repeat;
+  mask: url(/eye-mark.png) center / contain no-repeat;
+}
 
 .date {
   display: flex;

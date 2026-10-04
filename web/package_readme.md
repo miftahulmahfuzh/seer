@@ -29,7 +29,7 @@ web/
   auth.ts                   NextAuth (Google, JWT sessions), currentUser()
   scripts/
     gen_app_icon.py         OpenRouter (OPENROUTER_API_KEY in .env.local) draws eye candidates; spends money
-    make-icon.mjs           erases the drawn pupil, adds the Lucide Sigma, writes apple-icon.png, icon.png, public/icons/* and the splash mask public/splash-eye.png
+    make-icon.mjs           erases the drawn pupil, adds the Lucide Sigma, writes apple-icon.png, icon.png, public/icons/* the splash mask public/splash-eye.png and the header mask public/eye-mark.png
     .icon/eye.png           the promoted candidate make-icon.mjs reads
   app/
     layout.tsx, globals.css, manifest.ts
@@ -46,7 +46,7 @@ web/
       leaderboard/page.tsx  roster-driven equity curves, champion crown, per-strategy go-live checklist (?s=), month-by-month sheet
       leaderboard/view.ts   looks, researchOf, bestResearch, scoreOf, monthLines, sinceStartLine  (pure)
       leaderboard/view.test.ts  vitest suite for view.ts
-  components/               AppHeader, Nav, CopyButton, RefreshButton, WhyToggle, TooltipLayer, tooltip
+  components/               AppHeader (eye mark left of the titles, mobile only), Nav, CopyButton, RefreshButton, WhyToggle, TooltipLayer, tooltip
     StrategySwitch.tsx      icon-only roster switcher (Links), ALL sentinel           (server component)
     PaperChip.tsx           "Paper" data label with tooltip, sm | md
     roster.ts               strategyIcon, selectStrategy, sharesLabel                (pure)

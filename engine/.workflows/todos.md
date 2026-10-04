@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 18:10:00
-**Total Active Tasks**: 2
+**Last Updated**: 2026-10-04 18:19:27
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 51
+- Completed: 52
 
 ---
 
@@ -47,15 +47,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
   - **Depends on**: P1-ENG-4I4B, P1-ENG-2548
   - **Plan**: `.workflows/plan/P1-ENG-QRXI.md`
-- [ ] **P1-ENG-IIZE** Phase 5: `paper`, `paper_check`, `explain` decide and replay C
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `commands/paper.py` (K7: `_bracket_strategy`, `_start`, `_step_bracket`), `commands/paper_check.py` (K7: `_expected(conn, ...)`); new `engine/tests/test_paper_c.py` (14 tests, verdict rows via `store.write_vetoes`). Does not touch: `paper/*` cores, `replay.py`, store, `veto.py`, `explain.py`, `test_paper_command.py`, `test_paper_check.py` / `test_paper_store.py` (phase 2's edits stand), web. Exit: C starts on its first night with its own `paper_start` while the other four keep theirs; ≥ 5 synthetic nights → `paper_check` ok for all five; the replay really reads stored verdicts (flipping one → C mismatch); all-allow C orders == A orders; veto/failed/missing → no C order for that symbol and `paper` exit 0; catch-up night with verdicts only for the newest session; re-run writes nothing; the four existing strategies' rows identical with and without C; explain fills C's pending orders.
-  - **Status**: open
-  - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 5 of 7)
-  - **Satisfies**: R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
-  - **Depends on**: P1-ENG-4I4B
-  - **Plan**: `.workflows/plan/P1-ENG-IIZE.md`
 
 ### [P2] Medium
 
@@ -68,6 +59,25 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-IIZE** Phase 5: `paper`, `paper_check`, `explain` decide and replay C
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `commands/paper.py` (K7: `_bracket_strategy`, `_start`, `_step_bracket`), `commands/paper_check.py` (K7: `_expected(conn, ...)`); new `engine/tests/test_paper_c.py` (14 tests, verdict rows via `store.write_vetoes`). Does not touch: `paper/*` cores, `replay.py`, store, `veto.py`, `explain.py`, `test_paper_command.py`, `test_paper_check.py` / `test_paper_store.py` (phase 2's edits stand), web. Exit: C starts on its first night with its own `paper_start` while the other four keep theirs; ≥ 5 synthetic nights → `paper_check` ok for all five; the replay really reads stored verdicts (flipping one → C mismatch); all-allow C orders == A orders; veto/failed/missing → no C order for that symbol and `paper` exit 0; catch-up night with verdicts only for the newest session; re-run writes nothing; the four existing strategies' rows identical with and without C; explain fills C's pending orders.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 5 of 7)
+  - **Satisfies**: R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
+  - **Depends on**: P1-ENG-4I4B
+  - **Plan**: `.workflows/plan/P1-ENG-IIZE.md`
+  - **Completed**: 2026-10-04 18:19
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/commands/paper.py, engine/src/seer_engine/commands/paper_check.py, engine/tests/test_paper_c.py
+  - **Drift**: none — plan applied verbatim; code matched the quoted lines
+  - **Decided**:
+    - readme-updater for phase 5 -> skipped; engine/package_readme.md is owned by phase 7 only (rung 1: invariant 9) (completion-handler)
+    - plan index not ticked here; PLAN.md lives on main and is updated by swarm coordinator orch-strategy-c-news-veto when it records the phase (completion-handler)
+  - **Verified**: full engine suite 2132 passed, 0 skipped; ruff clean; web vitest 83 passed + tsc clean
+  - **Next**: P1-ROOT-ZEOM (phase 7) stays blocked: it still depends on P1-ENG-QRXI (phase 4) and P1-WEB-8YO3 (phase 6), both still in progress (completion-handler)
+
 - [x] **P1-ENG-2548** Phase 3: Finnhub client and LLM call options
   - **Difficulty**: NORMAL
   - **Type**: Feature

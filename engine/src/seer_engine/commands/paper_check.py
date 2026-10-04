@@ -4,9 +4,13 @@
 
 For every roster strategy with a paper start, replay it from ``paper_start`` through its last
 stepped session on the bars in the database and compare every stored record with the replay
-(``paper.replay``): every ``equity_snapshots`` row from day 0; A's every ``orders`` row and open
-marks; the book strategies' ``book_positions``, ``book_fills`` (in order), ``book_trades`` (in
+(``paper.replay``): every ``equity_snapshots`` row from day 0; A's and C's every ``orders`` row and
+open marks; the book strategies' ``book_positions``, ``book_fills`` (in order), ``book_trades`` (in
 order) and every stored ``book_targets`` decision; the benchmark's SPY holding; ``paper_state``.
+
+C is replayed from the verdicts ``veto`` stored (``news_vetoes``), read in the same transaction;
+the LLM is never asked again (handover D8): only ``allow`` verdicts can be bought, a ``veto``,
+``failed`` or missing verdict is no trade, exactly as ``paper`` decided it.
 
 Read-only: everything is read in one REPEATABLE READ, READ ONLY transaction that is rolled back,
 so ``--dry-run`` changes nothing. Exit 0 when every started strategy is ``ok`` or
@@ -24,9 +28,10 @@ from datetime import date, timedelta
 import psycopg
 from psycopg.pq import TransactionStatus
 
-from seer_engine import db
+from seer_engine import dates, db
 from seer_engine.backtest.book_runner import DividendMap
 from seer_engine.backtest.market import Market
+from seer_engine.commands.paper import _bracket_strategy
 from seer_engine.paper import replay, roster, store
 from seer_engine.paper.replay import CheckResult, Holding, PaperHead, Records
 from seer_engine.paper.roster import RosterEntry
@@ -158,7 +163,7 @@ def _check(conn: psycopg.Connection, entries: Sequence[RosterEntry]) -> tuple[Ch
             if head is None:
                 continue
             try:
-                expected = _expected(entry, head, market, dividends)
+                expected = _expected(conn, entry, head, market, dividends)
             except Exception as exc:  # noqa: BLE001 - a replay that cannot run is that strategy's failed check
                 results[entry.id] = replay.broken(
                     entry.id,
@@ -215,9 +220,14 @@ def _stored_records(conn: psycopg.Connection, engine: str, strategy_id: str, sta
     raise ValueError(f"{strategy_id}: unknown engine {engine!r}")
 
 
-def _expected(entry: RosterEntry, head: PaperHead, market: Market, dividends: DividendMap) -> Records:
+def _expected(
+    conn: psycopg.Connection, entry: RosterEntry, head: PaperHead, market: Market, dividends: DividendMap
+) -> Records:
     if entry.engine == "bracket":
-        return replay.expected_bracket(market, entry.obj, entry.params, head)
+        # The replay decides paper_start .. next_session(last_session): C carries the verdicts
+        # stored for exactly those sessions (read in this read-only transaction).
+        strategy = _bracket_strategy(conn, entry, head.paper_start, dates.next_session(head.last_session))
+        return replay.expected_bracket(market, strategy, entry.params, head)
     if entry.engine == "book":
         return replay.expected_book(market, entry.obj, entry.params, entry.rules, head, dividends)
     if entry.engine == "benchmark":

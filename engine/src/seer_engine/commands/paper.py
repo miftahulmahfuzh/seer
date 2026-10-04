@@ -28,6 +28,12 @@ So catching up several sessions in one night takes the decisions the missed nigh
 taken. Undoing a split is exact only up to the 4-dp (bars) / 6-dp (dividends) rounding of the
 stored rewrite; such sessions are inside the replay check's split-affected scope anyway.
 
+Strategy C (``strategies.c.NewsVeto``) is decided like A, by ``decide_bracket``, on a copy of
+its roster object that carries the verdicts ``veto`` stored for the sessions being decided
+(``store.allowed_between``): only a symbol whose stored verdict is ``allow`` can be bought; a
+``veto``, a ``failed`` verdict or no row at all is no trade (design §8). ``paper`` never calls the
+network and never fails because of C's verdicts.
+
 Trade logic lives in ``paper.bracket``, ``paper.book`` and ``paper.benchmark`` (pure), and all
 persistence in ``paper.store``; this module only sequences them.
 """
@@ -54,7 +60,8 @@ from seer_engine.paper.bracket import decide_bracket, settle_bracket
 from seer_engine.paper.roster import RosterEntry
 from seer_engine.paper.store import PaperState, StrategyRow
 from seer_engine.sim import initial_cash_usd, new_portfolio
-from seer_engine.strategies.base import History
+from seer_engine.strategies.base import History, Strategy
+from seer_engine.strategies.c import NewsVeto
 
 log = logging.getLogger(__name__)
 
@@ -348,6 +355,19 @@ def _has_paper_rows(conn: psycopg.Connection, strategy_id: str) -> bool:
     return bool(conn.execute(_PAPER_ROWS_SQL, {"id": strategy_id}).fetchone()[0])
 
 
+def _bracket_strategy(conn: psycopg.Connection, e: RosterEntry, first: date, last: date) -> Strategy:
+    """The strategy object ``decide_bracket`` gets for ``e`` when it decides sessions ``first`` ..
+    ``last`` (inclusive).
+
+    Every bracket entry but C: ``e.obj`` unchanged. C (a ``NewsVeto``): ``e.obj`` carrying the
+    ``allow`` verdicts stored for those sessions (``store.allowed_between``), so a candidate with
+    a ``veto`` or ``failed`` verdict, or with no verdict row, is not bought (handover D6, D8).
+    """
+    if not isinstance(e.obj, NewsVeto):
+        return e.obj
+    return e.obj.with_allowed(store.allowed_between(conn, e.id, first, last))
+
+
 def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight: _Tonight) -> None:
     """Start ``e`` tonight.
 
@@ -383,7 +403,7 @@ def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight
     if e.engine == "bracket":
         sized = decide_bracket(
             new_portfolio(cash0),
-            e.obj,
+            _bracket_strategy(conn, e, paper_start, paper_start),
             e.params,
             view.history,
             view.membership.members_on(rd.data_date),
@@ -403,11 +423,14 @@ def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight
 
 def _step_bracket(conn: psycopg.Connection, e: RosterEntry, sessions: Sequence[date], tonight: _Tonight) -> None:
     pf = store.load_portfolio(conn, e.id)
+    if not sessions:
+        return
+    strategy = _bracket_strategy(conn, e, dates.next_session(sessions[0]), dates.next_session(sessions[-1]))
     for s in sessions:
         view = tonight.view(s)
         night = settle_bracket(pf, s, view.bars_on(s, pf.held_symbols()), tonight.splits_on(s), view.last_bar_date)
         store.save_bracket_night(conn, e.id, night.portfolio, night.events, night.snapshot)
-        sized = decide_bracket(night.portfolio, e.obj, e.params, view.history, view.membership.members_on(s), s)
+        sized = decide_bracket(night.portfolio, strategy, e.params, view.history, view.membership.members_on(s), s)
         store.insert_pending_orders(conn, e.id, sized.placed)
         store.write_pending(conn, e.id, dates.next_session(s), decision=False)
         pf = sized.portfolio

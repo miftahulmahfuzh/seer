@@ -10,6 +10,9 @@ a demo run (``paper`` runs only after ``nightly``, which purges first). The seed
 the roster rows' paper clock (``strategies.paper_start`` and ``params``); the purge keeps
 the rows but resets those two columns, so the first real ``paper`` run starts cleanly.
 
+``news_vetoes`` (migration 004) is demo-owned as well: the demo seed writes verdict rows for
+C, and real verdicts never coexist with a demo run (``veto`` purges first, like ``paper``).
+
 ``dividends`` is **not** demo-owned. Its rows are Massive facts keyed by (symbol,
 ex-date), fetched only for the sessions ``nightly`` is missing, so a purge would lose
 ex-dates for good and the replay check (D7) could no longer reproduce a dividend credit.
@@ -36,6 +39,7 @@ DEMO_TABLES = (
     "book_targets",
     "book_fills",
     "book_trades",
+    "news_vetoes",
     "bars",
     "fx_rates",
     "runs",

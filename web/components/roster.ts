@@ -1,7 +1,7 @@
 import { BrainCircuit, Gavel, Landmark, Shield, Sigma, TrendingUp, type LucideIcon } from 'lucide-react';
 
 // The `icon` column of `strategies` names a Lucide icon (kebab-case). Roster: landmark (SPY),
-// sigma (A), trending-up (F4), shield (F1); brain-circuit and gavel kept for old demo rows.
+// sigma (A), trending-up (F4), shield (F1), gavel (C, migration 004); brain-circuit kept for old demo rows.
 const ICONS: Record<string, LucideIcon> = {
   landmark: Landmark,
   sigma: Sigma,

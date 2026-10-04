@@ -1,14 +1,15 @@
 # Runbook — Seer paper trading (P4, paper-only)
 
 Spec: [handover 2026-10-04](../handover/2026-10-04-paper-trading-ship.md) ·
-Plan: `PAPER_TRADING_SHIP_PLAN.md` · Roadmap: [P4](../ROADMAP.md) ·
+Plan: `PAPER_TRADING_SHIP_PLAN.md` · Roadmap: [P4, P6](../ROADMAP.md) ·
+Strategy C: [handover](../handover/2026-10-04-strategy-c-news-veto.md), `STRATEGY_C_NEWS_VETO_PLAN.md` ·
 Bars, splits and FX: [data-pipeline.md](data-pipeline.md)
 
 **Paper only.** The owner chose ROADMAP option (b) on 2026-10-04:
 - SPY buy-and-hold is the champion;
 - Seer recommends no real buys;
-- four frozen portfolios trade on paper every night, and the app shows them month by month next
-  to SPY.
+- five frozen portfolios trade on paper every night (the four of P4, plus Strategy C since P6),
+  and the app shows them month by month next to SPY.
 
 Design §1 is unchanged: no strategy has passed a backtest gate, so nothing here leads to real
 money, whatever the paper results show. One month of results is mostly luck. The monthly table is
@@ -16,10 +17,12 @@ for watching, not for deciding.
 
 ## The roster
 
-Fixed on 2026-10-04, before any paper result (D1). Every entry starts from 20,000,000 IDR,
-converted at the latest `fx_rates` rate on or before the first paper night's `data_date`; the rate
-is stored in `paper_state.usd_idr`. Every entry starts on the same first paper session
-(`strategies.paper_start`).
+Fixed on 2026-10-04, before any paper result (D1). `C` was added by the Strategy C set (P6), also
+before any paper result. Every entry starts from 20,000,000 IDR, converted at the latest `fx_rates`
+rate on or before its first paper night's `data_date`; the rate is stored in `paper_state.usd_idr`.
+The four P4 entries share one first paper session (`strategies.paper_start`). `C` has its own: the
+session decided on the first scheduled night after the Strategy C merge (see
+[Strategy C: the news check](#strategy-c-the-news-check)).
 
 | Id | What it is | Engine | Rules | Backtest gate |
 |---|---|---|---|---|
@@ -27,6 +30,7 @@ is stored in `paper_state.usd_idr`. Every entry starts on the same first paper s
 | `A` | Strategy A, `STRATEGY_A_PARAMS` (frozen in P3); 5-day brackets, 4 slots | bracket | `design-v0` | failed (P3, and the P3b rework) |
 | `F4-MOM12-N20-TREND` | Top 20 S&P 500 ∪ NDX members by 12-1 momentum, SPY 200-day filter, monthly | book | `monthly-hold` | not passed: P7a dev window only, max DD 22.2% > 15% |
 | `F1-SPY-SMA200-M` | Hold SPY while it closes above its 200-day average, checked monthly; else cash | book | `monthly-hold` | not passed: P7a dev window only, max DD 18.7% > 15%, 11 trades |
+| `C` | Strategy C: A's first 10 ranked candidates for the session, minus every symbol whose nightly news check did not say `allow` (Finnhub headlines and earnings dates, LLM `glm-5.3`, prompt `c-veto-v1`); 5-day brackets, 4 slots | bracket | `design-v0` | not applicable: an LLM strategy (design §1 item 5); counted as not passed |
 
 Monthly entries decide only on the first session of a month. A paper start in early October means
 F4 and F1 hold cash until the open of Monday 2026-11-02, and their October shows 0%. That is the
@@ -39,7 +43,8 @@ same semantics the backtest runner (`run_book`) uses, so it is not a bug.
 - the strategy or allocator object;
 - the registry id or `STRATEGY_A_PARAMS`;
 - the rules id;
-- the params;
+- the params (for `C` also: the candidate cap, the news window and headline cap, the prompt version
+  and full prompt text, the LLM call settings and the LLM model `glm-5.3`);
 - a sha256 `digest` of the canonical spec text;
 - the `backtest_gate` note the app shows.
 
@@ -65,42 +70,54 @@ never a reason to change a running entry.
 ```
 GitHub Actions nightly.yml   cron 23:00 UTC Mon-Fri (06:00 WIB), retry 01:00 UTC; group seer-db-writer
 │
-├─ Check secrets             DATABASE_URL_UNPOOLED, MASSIVE_API_KEY (LLM_* are optional)
+├─ Check secrets             DATABASE_URL_UNPOOLED, MASSIVE_API_KEY (FINNHUB_API_KEY and LLM_* are optional)
 ├─ Migrate                   db/migrations/*.sql not yet applied
 ├─ Nightly                   one transaction: missing sessions' bars (universe ∪ SPY ∪ symbols held or
 │                            pending in paper state), splits (split_adjustments; history rewritten
 │                            backwards, dividends too), cash dividends (Massive CD + SC → dividends),
-│                            USD/IDR; runs.status = success.   A failure → no bars, no paper.
+│                            USD/IDR; runs.status = success.   A failure → no bars, no veto, no paper.
+├─ Veto                      Strategy C's news check for session_date; never fails the night
+│                            (continue-on-error, 10-minute step limit). A's first 10 ranked candidates
+│                            → per candidate: Finnhub headlines of the last 3 days published before the
+│                            step started, earnings dates in the 5-session window, one LLM verdict
+│                            (allow / veto / failed) → news_vetoes, one transaction. A session already
+│                            checked: no calls, no writes.
 ├─ Paper                     only if runs.status = success for run_dates(now).session_date.
-│                            One transaction for all four strategies + runs.paper_status:
+│                            One transaction for all five strategies + runs.paper_status:
 │                              for every session after paper_state.last_session through data_date:
 │                                splits applied on that session (state rescaled once, in its own units)
-│                                → settle (A: sim.step; F4/F1: sim.step_book; SPY: buy_and_hold rules)
+│                                → settle (A, C: sim.step; F4/F1: sim.step_book; SPY: buy_and_hold rules)
 │                                → dividends on the ex-date (F4, F1, SPY) → force-close symbols whose
 │                                bars ended → equity snapshot
 │                              then decide session_date (A: picks → size_picks → pending orders;
+│                              C: A's picks minus every symbol without a stored `allow` → size_picks;
 │                              F4/F1: targets on a month's first session → book_targets; SPY: hold)
 ├─ Paper check               read-only replay: run_rules / buy_and_hold over [paper_start, last
-│                            session] on Neon's bars must equal what Paper stored. Red on mismatch.
-└─ Explain                   optional LLM text for new paper entries; never fails the night
+│                            session] on Neon's bars must equal what Paper stored (C from its stored
+│                            verdicts; the LLM is never re-asked). Red on mismatch.
+└─ Explain                   optional LLM text for new paper entries (C's included); never fails the night
 ```
 
 The web (Vercel) only reads. Today shows the SPY-champion "no buys" state. Positions and History
-show every research strategy's paper orders and positions, labelled **paper**. The Leaderboard has
-the metrics, the honest go-live checklist ("Backtest gate passed: no" for every entry) and the
-**Month by month** sheet.
+show every research strategy's paper orders and positions, labelled **paper**; Positions for `C`
+also shows **Vetoed tonight**, the news check behind its pending orders. The Leaderboard has the
+metrics, the honest go-live checklist ("Backtest gate passed: no" for every entry, "Not applicable"
+for `C`) and the **Month by month** sheet.
 
 Timing follows the NYSE calendar (`dates.run_dates`):
 - `data_date` is the last session whose close is at least an hour old;
 - `session_date` is the next session, the one tonight's decisions are for;
 - decisions for session S read only data dated ≤ `prev_session(S)` and members on that date (no
-  look-ahead).
+  look-ahead); C's verdicts for S read only news published before that night's Veto step started.
 
 **First night.** The first scheduled run after the code is on `main` writes:
 - each strategy's spec and `paper_start = session_date`;
 - `paper_state`;
 - a day-0 snapshot at `data_date`;
 - the first decisions.
+
+`C`'s first night is the first scheduled run after the Strategy C merge: Migrate applies `004`, Veto
+writes C's first verdicts, and Paper starts `C` the same way while the four others step as usual.
 
 Nothing before `paper_start` is paper evidence (D11).
 
@@ -117,6 +134,8 @@ Run from the repo root or a worktree. Locally, point `SEER_ENV_FILE` at the main
 | `… -m seer_engine -v paper_check` | the replay check over every started strategy | nothing |
 | `… -m seer_engine paper_check --require-sessions 5` | the same, and also requires ≥ 5 stepped sessions per strategy (the release check) | nothing |
 | `… -m seer_engine -v explain` | LLM explanations for new paper entries that have none yet | `orders.explanation`, `book_targets.explanation` |
+| `… -m seer_engine --dry-run -v veto` | Strategy C's news check for `run_dates(now).session_date`: real Finnhub and LLM calls, then rolls back | nothing |
+| `… -m seer_engine -v veto` | the same, kept. Only the nightly job runs this for real: verdicts written by hand at another hour would be what Paper then trades on | `news_vetoes` |
 
 Global flags go before the command: `--dry-run` (do everything, roll back) and `-v` (debug logs).
 
@@ -127,16 +146,18 @@ Global flags go before the command: `--dry-run` (do everything, roll back) and `
 | `paper` | night stepped and decided (`runs.paper_status = success`), or already done for this session (no-op) | no successful bars run for the session (design §8: no paper step, nothing written); or the night failed: everything rolled back, `runs.paper_status = failed`, `paper_error` set (a changed spec digest fails here as `SpecMismatch`) | missing setting (`DATABASE_URL_UNPOOLED`) |
 | `paper_check` | every started strategy equals its replay (strategies touched by a split are reported `split-affected`, not failed), or nothing has started yet (`not-started`) | a mismatch: the first differing snapshot, trade or position is logged; or `--require-sessions N` is given and a strategy stepped fewer than N sessions (`not-started` counts as 0) | missing setting (`DATABASE_URL_UNPOOLED`) |
 | `explain` | always, including when any `LLM_*` is unset or empty (logged "explanations unavailable", no database connection) or an entry's LLM call fails (text stays NULL) | only a database error (connection or SQL), which `cli.main` turns into 1; the workflow step is `continue-on-error` | `LLM_*` set but `DATABASE_URL_UNPOOLED` missing |
+| `veto` | verdicts written (any mix of `allow`, `veto`, `failed`, all `failed` included); no candidates tonight; the session is already checked; or Paper has already decided the session (too late, nothing written) | no successful bars run for the session (nothing written, no call); or a database error. The workflow step is `continue-on-error`, so neither fails the night | missing setting (`DATABASE_URL_UNPOOLED`) |
 
 ## Failure states (design §8) and what the app shows
 
 | What happened | Engine result | Workflow | App | Fix |
 |---|---|---|---|---|
-| Bars run failed (Massive or Frankfurter down, coverage < 90%) | `runs.status = failed`; `paper` refuses and writes nothing | red at "Nightly"; Paper, Paper check and Explain are skipped | stale-data screen ("do not trade") | nothing: the 01:00 retry, or `gh workflow run nightly.yml` |
+| Bars run failed (Massive or Frankfurter down, coverage < 90%) | `runs.status = failed`; `paper` refuses and writes nothing | red at "Nightly"; Veto, Paper, Paper check and Explain are skipped | stale-data screen ("do not trade") | nothing: the 01:00 retry, or `gh workflow run nightly.yml` |
 | Paper failed (a bug, a DB error, Neon full) | whole paper transaction rolled back; `runs.paper_status = failed`, `paper_error` | red at "Paper" | paper warning on Positions; data stays at the last good night | read `paper_error` (Health check), fix, then `gh workflow run nightly.yml` (bars are a no-op, paper catches up every missed session) |
 | Paper check mismatch | paper state already committed | red at "Paper check"; Explain still runs | no change | run `paper_check -v` locally; the log names the first difference. A mismatch is a same-path bug: open a card, do not edit rows by hand |
 | A split on a held or pending symbol | state rescaled once (`apply_split` / `apply_book_split`); `paper_check` reports that strategy `split-affected` from then on | green | positions in post-split shares and prices | none: whole-share rounding across a split makes exact replay equality impossible (see Splits) |
 | Explain failed or `LLM_*` not set | text stays NULL | green (`continue-on-error`) | "explanation unavailable" | Owner step 1 |
+| Veto failed in any way (secrets missing, Finnhub or LLM down, wrong `LLM_MODEL`, crash, 10-minute limit) | C buys nothing it has no `allow` for; the other four strategies are untouched | green (Veto shows a warning when it failed) | Positions for C: "Vetoed tonight" with the reason, or "No news check for {date}: A had no candidates, or the check did not run. C buys nothing this session." | see [Strategy C: the news check](#strategy-c-the-news-check) |
 | Holiday / weekend | the run finds the session already succeeded: bars no-op, paper no-op | green | unchanged | none |
 | Data stale (no successful run for the next session) | — | — | stale-data screen first on Today | as for a failed bars run |
 | Spec digest changed in code | `paper` fails the night with `SpecMismatch`: rolled back, `runs.paper_status = failed` | red at "Paper" | paper warning on Positions; data stays at the last good night | revert the change; a changed strategy needs a new id (see The roster) |
@@ -172,13 +193,119 @@ Global flags go before the command: `--dry-run` (do everything, roll back) and `
 
 For every strategy with a `paper_start`, `paper_check`:
 - loads Neon's bars from about 550 calendar days before `paper_start`;
-- re-runs `run_rules` for A, F4 and F1, or `buy_and_hold` for SPY, over
-  `[paper_start, paper_state.last_session]` with the stored `paper_state.usd_idr`;
+- re-runs `run_rules` for A, C, F4 and F1, or `buy_and_hold` for SPY, over
+  `[paper_start, paper_state.last_session]` with the stored `paper_state.usd_idr`. C's replay
+  uses the verdicts stored in `news_vetoes` (only `allow` is bought; `veto`, `failed` and a missing
+  row are not); the LLM is never asked again;
 - compares every equity snapshot (day 0 included), every closed trade and every open order or
   position with what `paper` stored.
 
 It is the proof that backtest and live share one code path (design §9, D7). It runs every night
 after Paper, and before the release with `--require-sessions 5`.
+
+## Strategy C: the news check
+
+Spec: [handover](../handover/2026-10-04-strategy-c-news-veto.md) (D1–D12). Plan:
+`STRATEGY_C_NEWS_VETO_PLAN.md`. C is A with a second opinion: it takes the stocks A would buy for
+the next session and buys only those whose recent news the LLM lets through. A backtest of C would
+be contaminated (the LLM has read the past's news, design §4), so C is judged only on paper, month
+by month next to A.
+
+### What the Veto step does
+
+For `session_date` S, in `commands/veto.py`, after a successful Nightly and before Paper:
+1. Nothing to do when `news_vetoes` already holds C's rows for S ("already checked": no Finnhub or
+   LLM call), or when Paper has already decided S (too late: nothing written).
+2. A's ranked picks for S from Neon's bars through `prev_session(S)` (the same
+   `STRATEGY_A` / `STRATEGY_A_PARAMS` call Paper makes), the first 10 only. None: nothing written.
+3. Per candidate, in rank order:
+   - Finnhub `company-news` over the last 3 days (ET dates), keeping items published **before the
+     step started**, newest first, at most 20;
+   - Finnhub `calendar/earnings` over S .. the 5th session from S;
+   - one LLM call under the frozen prompt `c-veto-v1` (temperature 0, thinking disabled,
+     `max_tokens` 1024, 30 s timeout, one retry) → `allow` or `veto` with a one-sentence reason.
+4. One transaction writes one row per candidate: rank, symbol, verdict, reason, model, prompt
+   version, the headlines shown (id, time, source, headline; never the summaries), the earnings date
+   found, and `decided_at` (the step's start, which is the news cutoff).
+
+Paper then gives C A's candidates minus every symbol without a stored `allow`, through the same
+`decide_bracket` / `size_picks` as A. Lower ranks refill slots a veto freed, up to rank 10.
+
+### Measured (2026-10-04, local smoke, 10 liquid symbols, real Finnhub free key and z.ai `glm-5.3`)
+
+| Call | Calls | Min | Median | Max |
+|---|---|---|---|---|
+| Finnhub `company-news` (the client's ≥ 1 s spacing had already passed during the previous LLM call) | 10 | 0.26 s | 0.29 s | 0.36 s |
+| Finnhub `calendar/earnings` (includes the ≥ 1 s spacing after `company-news`) | 10 | 1.26 s | 1.26 s | 1.27 s |
+| LLM verdict (`glm-5.3`, temperature 0, thinking disabled, `max_tokens` 1024) | 10 | 1.52 s | 3.05 s | 4.97 s |
+
+- The whole loop over 10 symbols: 45.1 s wall. A night has at most 10 candidates (A's median is 15
+  picks, so the cap binds on 61.6 % of nights; about 7.8 checked per night on 2016–2026 bars).
+- Verdicts: 8 allow, 2 veto, 0 failed; headlines shown per symbol 13–20; earnings found
+  in the window: none (window 2026-10-05..2026-10-09; the reasons for JPM and UNH name their mid-October
+  reports from the headlines and place them outside the window). The two vetoes: AAPL (Supreme
+  Court oral arguments inside the window) and XOM (a Wells Fargo downgrade on 2026-10-01).
+- Symbols: AAPL, MSFT, NVDA, AMZN, GOOGL, META, JPM, BRK.B, XOM, UNH; news 2026-10-01..2026-10-04,
+  cutoff 2026-10-04 11:26 UTC, session 2026-10-05.
+- Budget: the step's 10-minute limit is the worst case; the nightly job's 45 minutes still holds
+  (Nightly ≈ 40 s per missing session, Paper ≈ 7 s, Paper check seconds).
+- Smoke script: run from the session scratchpad, never committed, no database connection.
+
+### Failure states and what C and the app do
+
+A failed or missing verdict is **no trade** for that candidate (design §8). Veto never fails the
+night, and the other four strategies never read its rows. In every case below, C's open positions
+still settle normally; only new buys are affected. "Vetoed tonight" is the sheet under C's paper
+orders on Positions: it lists the `veto` and `failed` rows (symbol, verdict, the one-line reason,
+headline count) and a line "`n` checked · `k` allowed".
+
+| What happened | `news_vetoes` for S | C for session S | App (Positions, C) | Workflow | Fix |
+|---|---|---|---|---|---|
+| `FINNHUB_API_KEY` or any `LLM_*` secret not set | one `failed` row per candidate, the reason names the missing setting | buys nothing | every candidate listed `failed`, the shared reason shown once | green | Owner step 1 |
+| `LLM_MODEL` is not `glm-5.3` | every row `failed`: "LLM_MODEL <x> is not C's frozen model glm-5.3" | buys nothing | the shared reason | green | set `LLM_MODEL` back to `glm-5.3` (Owner step 1). Another model is a new id (below) |
+| Finnhub error, LLM timeout or HTTP error, or an unparsable reply, for one candidate | that row `failed` with the redacted error | skips that candidate; the others can still be bought | that row listed `failed` with its reason | green | none (transient) |
+| Three network failures in a row | the rest `failed`: "skipped after 3 consecutive failures" | buys only what was allowed before the stop | those rows listed `failed` | green | none; if it repeats for several nights, check Finnhub and z.ai status and the secrets |
+| Veto crashed, hit a database error or its 10-minute limit | none (the write is one transaction at the end) | buys nothing (missing = failed) | "No news check for {date}: A had no candidates, or the check did not run. C buys nothing this session." | green, Veto shows a warning | read the Veto step log. Do not re-run Veto for that session: the 01:00 retry and any manual re-run write nothing once Paper has decided S |
+| No successful bars run for S | none (Veto is skipped, or exits 1 without a call) | no paper step at all | stale-data screen | red at "Nightly" | as for a failed bars run |
+| A has no candidates tonight | none | decides an empty list, like A | "No news check for {date}: A had no candidates, or the check did not run. C buys nothing this session." (the same line as a check that did not run: `veto` writes no rows on a night with no candidates, so the app cannot tell the two apart and says so; A shows no new orders that night either) | green | none |
+| Catch-up night (Paper steps several sessions at once after missed nights) | rows only for the newest session; earlier sessions have none unless their own night's Veto ran | sits the earlier sessions out | unchanged for past sessions | green | none: the runbook's rule, not a bug |
+| Re-run (01:00 retry, `gh workflow run`) after a written check | unchanged ("already checked") | unchanged | unchanged | green | none |
+| `workflow_dispatch` with `dry_run` | real Finnhub and LLM calls, then rolled back | — | unchanged | green | none |
+
+`paper` never fails because of C's verdicts, and `paper_check` replays C from exactly the rows Paper
+used.
+
+### C's clock
+
+- `C`'s `paper_start` is the session decided on the **first scheduled night after the Strategy C
+  merge** (Migrate applies `004` that night; no session is back-dated). The four P4 clocks do not
+  move.
+- **Until the four secrets exist, every verdict is `failed` and C makes no trades**: it holds its
+  20,000,000 IDR in cash, and those flat sessions stay in its record (no reset to hide them). Set the
+  secrets (Owner step 1) before the first scheduled night after the merge, so C trades from its
+  first session.
+- `paper_check --require-sessions 5` counts every roster strategy, `C` included. C's clock starts
+  after the four P4 clocks, so the v0.1.0 operational check also waits for C's 5th stepped session.
+- The 3-month forward clock of design §1 counts from C's own `paper_start`. It unlocks nothing: C has
+  no backtest gate (design §1 item 5), and real money for C would need an explicit owner decision
+  even if every other checklist row passed (D9).
+
+### Changing the LLM model is a new id
+
+`glm-5.3` is frozen into C's spec (`strategies.c.FROZEN_MODEL`, part of its digest), with the prompt
+`c-veto-v1`. One `LLM_MODEL` secret serves both Explain and Veto:
+- Set `LLM_MODEL` to anything else and every C verdict is `failed`: C sits out every night, nothing
+  else changes, and Explain keeps working with the other model.
+- Never edit `FROZEN_MODEL`, the prompt or any other C parameter in code: C's digest changes and
+  Paper then fails the **whole night** with `SpecMismatch` (see The roster).
+- To try another model or prompt, add a new roster entry with a new id that freezes it (a new
+  handover, a new migration row, its own clock), as for any changed strategy. While `LLM_MODEL`
+  points at the new model, C sits out.
+
+### Storage
+
+About 163 rows a month (≈ 7.8 candidates a night) × ≈ 3.4 KB (headlines ≈ 3.1 KB) ≈ 0.55 MB a month,
+≈ 6.6 MB a year. Negligible on Neon's free 0.5 GB; no retention job.
 
 ## Health checks
 
@@ -197,11 +324,21 @@ with db.connect() as conn:
     for r in conn.execute("SELECT strategy_id, count(*) - 1 AS sessions, min(date), max(date) "
                           "FROM equity_snapshots GROUP BY 1 ORDER BY 1"):
         print(r)
+    # Strategy C's news checks, newest first: checked, allowed, vetoed, failed, decided at.
+    for r in conn.execute("SELECT session_date, count(*), count(*) FILTER (WHERE verdict = 'allow'), "
+                          "count(*) FILTER (WHERE verdict = 'veto'), count(*) FILTER (WHERE verdict = 'failed'), "
+                          "min(decided_at) FROM news_vetoes WHERE strategy_id = 'C' "
+                          "GROUP BY 1 ORDER BY 1 DESC LIMIT 10"):
+        print(r)
+    for r in conn.execute("SELECT session_date, rank, symbol, left(reason, 120) FROM news_vetoes "
+                          "WHERE strategy_id = 'C' AND verdict = 'failed' "
+                          "ORDER BY session_date DESC, rank LIMIT 10"):
+        print(r)
 PY
 ```
 
-Storage: the paper tables add kilobytes per month. Watch the database size with the query in
-[data-pipeline.md](data-pipeline.md#storage-budget). Neon free is 0.5 GB.
+Storage: the paper tables add kilobytes per month, `news_vetoes` about 0.55 MB. Watch the database
+size with the query in [data-pipeline.md](data-pipeline.md#storage-budget). Neon free is 0.5 GB.
 
 ## Owner steps
 
@@ -209,18 +346,26 @@ These need the owner, so the pipeline session does not do them. Each one is inde
 from the main checkout `/home/miftah/seer` after the feature branch is merged into `main`. No
 command echoes a secret, and nothing is `source`d.
 
-### 1. LLM secrets for the Explain step (optional)
+### 1. News and LLM secrets for Veto and Explain
 
-Without them the night is still correct, and the app shows "explanation unavailable".
+Four repository secrets. Without them the night is still correct: Explain leaves "explanation
+unavailable", and every Strategy C verdict is `failed`, so **C makes no trades** until they exist.
+Set them before the first scheduled night after the Strategy C merge so that C trades from its first
+session. `LLM_MODEL` must be `glm-5.3`, the model frozen into C's spec (another value makes every C
+verdict `failed`, see [Changing the LLM model is a new id](#changing-the-llm-model-is-a-new-id)).
 
 ```bash
 cd /home/miftah/seer
-for n in LLM_API_KEY LLM_BASE_URL LLM_MODEL; do
+for n in FINNHUB_API_KEY LLM_API_KEY LLM_BASE_URL; do
   engine/.venv/bin/python -c "from dotenv import dotenv_values; print(dotenv_values('.env.local')['$n'], end='')" \
     | gh secret set "$n" --repo miftahulmahfuzh/seer
 done
-gh secret list --repo miftahulmahfuzh/seer     # LLM_API_KEY, LLM_BASE_URL, LLM_MODEL listed (values never shown)
+printf '%s' 'glm-5.3' | gh secret set LLM_MODEL --repo miftahulmahfuzh/seer
+gh secret list --repo miftahulmahfuzh/seer     # FINNHUB_API_KEY, LLM_API_KEY, LLM_BASE_URL, LLM_MODEL listed (values never shown)
 ```
+
+Check on the next night: the Veto step log shows one verdict per candidate and no "is not set"
+reason, and the Health check's `news_vetoes` query shows `allow`/`veto` rows for that session.
 
 ### 2. Google sign-in on seertrade.site
 
@@ -279,16 +424,18 @@ release, right before the GitHub release.
 1. **≥ 5 consecutive paper sessions** ran unattended.
    - `gh run list --workflow nightly.yml --repo miftahulmahfuzh/seer --limit 10`: the last five
      scheduled runs are green through "Paper" and "Paper check".
-   - The Health check shows `sessions ≥ 5` for all four strategies, and `paper_status = success`
-     on each of those runs.
+   - The Health check shows `sessions ≥ 5` for all five strategies (`C` counts too: its clock
+     started later, so this waits for C's 5th session), and `paper_status = success` on each of
+     those runs.
 2. **Replay check on Neon:**
    `SEER_ENV_FILE=/home/miftah/seer/.env.local engine/.venv/bin/python -m seer_engine -v paper_check --require-sessions 5`
    must exit 0 (`split-affected` is allowed and must be named in the release notes).
 3. **App check** on the XS Max and on desktop, light and dark:
    - Today shows the SPY-champion "no buys" state;
-   - Positions and History show A's paper orders labelled paper;
-   - the Leaderboard's Month by month shows October as a partial month for all four, with the
-     SPY column.
+   - Positions and History show A's and C's paper orders labelled paper, and Positions for C shows
+     "Vetoed tonight";
+   - the Leaderboard's Month by month shows each strategy's first month as a partial month, with
+     the SPY column, and C's checklist reads "Backtest gate: Not applicable".
 4. **README.md**: write the full README (what Seer is, paper-only, the roster, how to run, links
    to the runbooks). `/update-readme` does not apply; this is the repo README.
 5. **ROADMAP**: mark P4 "done <date>: 5 consecutive sessions, replay check passed" and v0.1.0
@@ -308,22 +455,44 @@ real money also needs a passed backtest gate, and none has passed.
 
 ## Rollback
 
-- **Stop paper trading, keep bars:** delete the "Paper", "Paper check" and "Explain" steps from
-  `nightly.yml`, then commit and push. Paper state stays where it was.
-- **Reset paper state** (this also resets the clock; the next nightly starts over with a new
-  `paper_start`), in one transaction through Python:
+- **Stop paper trading, keep bars:** delete the "Veto", "Paper", "Paper check" and "Explain" steps
+  from `nightly.yml`, then commit and push. Paper state stays where it was.
+- **Stop only Strategy C's news check:** delete the "Veto" step. C then has no verdicts and buys
+  nothing (missing = failed); its clock keeps running. The four other strategies are unaffected.
+- **Reset paper state** (this also resets every clock; the next nightly starts over with a new
+  `paper_start`), in one transaction through Python, in the day (never between 22:30 and 02:00
+  UTC, while a nightly may run):
   ```sql
   TRUNCATE paper_state, book_positions, book_targets, book_fills, book_trades;
-  DELETE FROM orders WHERE strategy_id IN ('SPY', 'A', 'F4-MOM12-N20-TREND', 'F1-SPY-SMA200-M');
-  DELETE FROM equity_snapshots WHERE strategy_id IN ('SPY', 'A', 'F4-MOM12-N20-TREND', 'F1-SPY-SMA200-M');
+  DELETE FROM orders WHERE strategy_id IN ('SPY', 'A', 'F4-MOM12-N20-TREND', 'F1-SPY-SMA200-M', 'C');
+  DELETE FROM equity_snapshots WHERE strategy_id IN ('SPY', 'A', 'F4-MOM12-N20-TREND', 'F1-SPY-SMA200-M', 'C');
   UPDATE strategies SET paper_start = NULL, params = '{}'::jsonb;
   UPDATE runs SET paper_status = NULL, paper_error = NULL, paper_finished_at = NULL;
   ```
-  The repo is public and losses are shown on purpose: never reset to hide a result.
+- **Reset only C's clock** (the four others keep theirs; same timing rule), in one transaction
+  through Python:
+  ```sql
+  DELETE FROM orders WHERE strategy_id = 'C';
+  DELETE FROM equity_snapshots WHERE strategy_id = 'C';
+  DELETE FROM paper_state WHERE strategy_id = 'C';
+  UPDATE strategies SET paper_start = NULL, params = '{}'::jsonb WHERE id = 'C';
+  ```
+  C is a bracket strategy, so it has no `book_*` rows. The next nightly's Veto checks the new
+  session and Paper starts C again with a new `paper_start`.
+- **Neither reset deletes `news_vetoes`.** Verdicts are inputs and a record of what the news check
+  said: Paper and the replay read only sessions from C's (new) `paper_start` on, so older rows are
+  never traded on again, and keeping them keeps the record honest.
+- The repo is public and losses are shown on purpose: never reset to hide a result, and never
+  delete a vetoed or failed verdict to hide what the news check did.
 - **Migration 003 is additive.** The web from before this set ignores its tables.
   `UPDATE strategies SET is_champion = (id = 'A')` restores the old champion flag, but A then
   shows research picks as advice, which the paper-only decision forbids. Prefer reverting the
   code to resetting the data.
+- **Migration 004 is additive** (the `C` roster row and `news_vetoes`). Reverting the Strategy C code
+  leaves them unread. Remove them only after the C reset above, with
+  `DROP TABLE news_vetoes; DELETE FROM strategies WHERE id = 'C';` (no `orders`, `paper_state` or
+  `equity_snapshots` row may reference `C`), and delete `004_news_veto.sql` from
+  `schema_migrations` only if the file is also removed from `db/migrations/`.
 
 ## Ship check — 2026-10-04
 
@@ -369,3 +538,20 @@ vercel ls --format json | python3 -c 'import json,sys; d=[x for x in json.load(s
 sign-in on the phone) and 5 (Add to Home Screen). Step 3 is not needed: all five Vercel env names
 are present. DNS is live: no step. The paper clock starts with the first scheduled nightly after the
 merge.
+
+## Ship check — Strategy C (2026-10-04)
+
+Run from the worktree `/home/miftah/.worktrees/seer/strategy-c-news-veto` (phases 1–6 landed). Nothing
+touched Neon or the GitHub secrets.
+
+**CI commands, locally:**
+- `ruff check engine` (ruff 0.16.10): All checks passed.
+- `npx tsc --noEmit`: clean.
+- Engine tests: 2159 passed in 321.33s (0:05:21), 0 skipped.
+- Web tests: 10 files, 83 passed.
+- actionlint: clean for all four workflows.
+
+**Live smoke** (Finnhub + z.ai, no database): see [Measured](#strategy-c-the-news-check) above.
+
+**Remaining owner step:** 1 (the four secrets), before the first scheduled night after the merge.
+C's clock starts that night.

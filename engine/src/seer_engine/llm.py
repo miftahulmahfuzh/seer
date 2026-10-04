@@ -8,7 +8,11 @@ Configured by three environment variables (see ``.env.example``):
     LLM_MODEL      the model id passed in the request body
 
 ``Client.complete(system, prompt)`` POSTs one non-streaming Messages request to
-``messages_url(LLM_BASE_URL)`` and returns the reply's text. Connection errors, timeouts, 429
+``messages_url(LLM_BASE_URL)`` and returns the reply's text. Optional keywords
+``temperature``, ``thinking`` and ``max_tokens`` add ``"temperature"`` and
+``"thinking": {"type": ...}`` to the body and override the client's ``max_tokens`` for that call
+(Strategy C's veto); without them the body is exactly ``{model, max_tokens, system, messages}``
+(``explain``). Connection errors, timeouts, 429
 and 5xx are retried ``retries`` times; any other failure raises ``LlmError`` at once. Every
 error message is scrubbed of the API key and of key/token query parameters.
 
@@ -150,8 +154,26 @@ class Client:
     def __repr__(self) -> str:
         return f"Client(url={self._url!r}, model={self._cfg.model!r})"
 
-    def complete(self, system: str, prompt: str) -> str:
-        """Send one user ``prompt`` under ``system`` and return the reply's text."""
+    def complete(
+        self,
+        system: str,
+        prompt: str,
+        *,
+        temperature: float | None = None,
+        thinking: str | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        """Send one user ``prompt`` under ``system`` and return the reply's text.
+
+        ``temperature`` adds ``"temperature"`` to the body, ``thinking`` adds
+        ``"thinking": {"type": thinking}`` (e.g. ``"disabled"``), and ``max_tokens`` replaces the
+        client's default for this call. With none of them the body is byte-identical to the
+        keyword-less call ``explain`` makes.
+        """
+        if max_tokens is not None and max_tokens < 1:
+            raise ValueError(f"max_tokens must be >= 1, got {max_tokens}")
+        if thinking is not None and not thinking.strip():
+            raise ValueError("thinking must be a non-empty type such as 'disabled'")
         headers = {
             "x-api-key": self._cfg.api_key,
             "authorization": f"Bearer {self._cfg.api_key}",
@@ -161,10 +183,14 @@ class Client:
         }
         body: dict[str, Any] = {
             "model": self._cfg.model,
-            "max_tokens": self._max_tokens,
+            "max_tokens": self._max_tokens if max_tokens is None else max_tokens,
             "system": system,
             "messages": [{"role": "user", "content": prompt}],
         }
+        if temperature is not None:
+            body["temperature"] = temperature
+        if thinking is not None:
+            body["thinking"] = {"type": thinking}
         attempt = 0
         while True:
             attempt += 1

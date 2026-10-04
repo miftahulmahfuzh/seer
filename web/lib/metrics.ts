@@ -40,15 +40,23 @@ export function strategyMetrics(snaps: Snapshot[], pnls: number[]): Metrics {
 /** One go-live rule. `note` explains a backtest-gate verdict when the roster gives one. */
 export type CheckItem = { label: string; val: string; ok: boolean; note?: string };
 
+/** The sixth rule: "Backtest gate passed", or "Not applicable" for C (design §1 item 5), which never counts as passed. */
+export function gateItem(gate: Gate): CheckItem {
+  const item: CheckItem = gate.applicable
+    ? { label: 'Backtest gate passed', val: gate.passed ? 'Passed' : 'Not passed', ok: gate.passed }
+    : { label: 'Backtest gate', val: 'Not applicable', ok: false };
+  if (gate.note !== null) item.note = gate.note;
+  return item;
+}
+
 /**
  * The fixed go-live rules from the design doc (§1): five forward-test metrics, then
  * "Backtest gate passed" from `strategies.params.backtest_gate` (D12). All six must hold.
+ * A strategy whose backtest item is not applicable (C, handover D9) can never pass all six.
  */
 export function checklist(m: Metrics, spyReturn: number | null, gate: Gate): CheckItem[] {
   const ret = m.totalReturn ?? 0;
   const p1 = (v: number) => (v >= 0 ? '+' : '−') + Math.abs(v * 100).toFixed(1);
-  const gateItem: CheckItem = { label: 'Backtest gate passed', val: gate.passed ? 'Passed' : 'Not passed', ok: gate.passed };
-  if (gate.note !== null) gateItem.note = gate.note;
   return [
     { label: '≥ 3 months forward', val: `${(Math.floor(m.months * 10) / 10).toFixed(1)} mo`, ok: m.months >= 3 },
     { label: '≥ 100 trades', val: `${m.trades} / 100`, ok: m.trades >= 100 },
@@ -67,6 +75,6 @@ export function checklist(m: Metrics, spyReturn: number | null, gate: Gate): Che
       val: m.maxDrawdown === null ? '—' : (m.maxDrawdown * 100).toFixed(1) + '%',
       ok: m.maxDrawdown !== null && m.maxDrawdown <= 0.15,
     },
-    gateItem,
+    gateItem(gate),
   ];
 }

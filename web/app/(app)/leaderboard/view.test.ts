@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { MonthlyTable } from '../../../lib/monthly';
 import {
-  bestResearch, CHECKS, looks, monthLabel, monthLines, researchOf, scoreOf, sinceStartLine, type RosterIn,
+  bestResearch, CHECKS, looks, monthLabel, monthLines, monthsBg, NO_GATE, researchOf, scoreOf, sinceStartLine,
+  type RosterIn,
 } from './view';
 
 const roster: RosterIn[] = [
@@ -9,8 +10,9 @@ const roster: RosterIn[] = [
   { id: 'A', isChampion: false, isBenchmark: false },
   { id: 'F4-MOM12-N20-TREND', isChampion: false, isBenchmark: false },
   { id: 'F1-SPY-SMA200-M', isChampion: false, isBenchmark: false },
+  { id: 'C', isChampion: false, isBenchmark: false },
 ];
-const RESEARCH = ['A', 'F4-MOM12-N20-TREND', 'F1-SPY-SMA200-M'];
+const RESEARCH = ['A', 'F4-MOM12-N20-TREND', 'F1-SPY-SMA200-M', 'C'];
 
 describe('looks', () => {
   it('gives the benchmark the dotted line on a plain sheet', () => {
@@ -18,22 +20,36 @@ describe('looks', () => {
   });
   it('assigns research sheets and lines in roster order', () => {
     const l = looks(roster);
-    expect(RESEARCH.map(id => l.get(id)!.bg)).toEqual(['bg-lav', 'bg-sky', 'bg-stone']);
-    expect(RESEARCH.map(id => l.get(id)!.line)).toEqual(['var(--ink)', 'var(--line-b)', 'var(--line-c)']);
-    expect(RESEARCH.map(id => l.get(id)!.width)).toEqual([2, 2, 2]);
+    expect(RESEARCH.map(id => l.get(id)!.bg)).toEqual(['bg-lav', 'bg-sky', 'bg-stone', 'bg-butter']);
+    expect(RESEARCH.map(id => l.get(id)!.line)).toEqual(['var(--ink)', 'var(--line-b)', 'var(--line-c)', 'var(--coral)']);
+    expect(RESEARCH.map(id => l.get(id)!.width)).toEqual([2, 2, 2, 2]);
+  });
+  it('never gives C the look of A', () => {
+    const l = looks(roster);
+    expect(l.get('C')).not.toEqual(l.get('A'));
+    expect(l.get('C')).toEqual({ bg: 'bg-butter', line: 'var(--coral)', width: 2, dotted: false });
   });
   it('follows roster order, not ids', () => {
     const l = looks([roster[3], roster[0], roster[1]]);
     expect(l.get('F1-SPY-SMA200-M')).toEqual({ bg: 'bg-lav', line: 'var(--ink)', width: 2, dotted: false });
     expect(l.get('A')).toEqual({ bg: 'bg-sky', line: 'var(--line-b)', width: 2, dotted: false });
   });
-  it('cycles sheets and uses the spare line for a fourth research strategy', () => {
+  it('cycles sheets and uses the spare line for a fifth research strategy', () => {
     const l = looks([...roster, { id: 'X9', isChampion: false, isBenchmark: false }]);
     expect(l.get('X9')).toEqual({ bg: 'bg-lav', line: 'var(--ink-2)', width: 2, dotted: false });
   });
   it('emphasises a non-benchmark champion', () => {
     const l = looks([{ ...roster[0], isChampion: false }, { ...roster[1], isChampion: true }]);
     expect(l.get('A')!.width).toBe(2.75);
+  });
+});
+
+describe('monthsBg', () => {
+  it('keeps the card sheet, except butter, which would merge into the butter checklist above it', () => {
+    const l = looks(roster);
+    expect(monthsBg(l.get('A')!)).toBe('bg-lav');
+    expect(monthsBg(l.get('F4-MOM12-N20-TREND')!)).toBe('bg-sky');
+    expect(monthsBg(l.get('C')!)).toBe('bg-stone');
   });
 });
 
@@ -46,7 +62,7 @@ describe('researchOf', () => {
 describe('bestResearch', () => {
   const row = (i: number, totalReturn: number | null) => ({ strategy: roster[i], metrics: { totalReturn } });
   it('ignores the benchmark and strategies without a return', () => {
-    const b = bestResearch([row(0, 0.05), row(1, -0.01), row(2, 0.02), row(3, null)]);
+    const b = bestResearch([row(0, 0.05), row(1, -0.01), row(2, 0.02), row(3, null), row(4, 0.01)]);
     expect(b?.strategy.id).toBe('F4-MOM12-N20-TREND');
     expect(b?.ret).toBeCloseTo(0.02);
   });
@@ -57,20 +73,36 @@ describe('bestResearch', () => {
 
 describe('scoreOf', () => {
   const items = (oks: boolean[]) => oks.map(ok => ({ ok }));
+  const PASSED = { passed: true, applicable: true };
+  const FAILED = { passed: false, applicable: true };
+  const NOT_APPLICABLE = { passed: false, applicable: false };
   it('scores out of six and says paper only while the gate has not passed', () => {
-    const sc = scoreOf(items([true, true, true, true, true, false]), false);
+    const sc = scoreOf(items([true, true, true, true, true, false]), FAILED);
     expect(sc).toEqual({ passed: 5, total: CHECKS, ready: false, lines: ['Paper only.', 'Backtest gate not passed'] });
+    expect(scoreOf([], NO_GATE).lines).toEqual(['Paper only.', 'Backtest gate not passed']);
   });
   it('says paper trading until all six pass when only the gate has passed', () => {
-    expect(scoreOf(items([false, false, true, true, true, true]), true).lines).toEqual(['Paper trading until', 'all six pass']);
+    expect(scoreOf(items([false, false, true, true, true, true]), PASSED).lines).toEqual(['Paper trading until', 'all six pass']);
   });
   it('is ready only when all six pass', () => {
-    const sc = scoreOf(items([true, true, true, true, true, true]), true);
+    const sc = scoreOf(items([true, true, true, true, true, true]), PASSED);
     expect(sc.ready).toBe(true);
     expect(sc.lines).toEqual(['All six pass.', 'Ready for real money']);
   });
   it('is never ready with fewer than six items', () => {
-    expect(scoreOf(items([true, true, true, true, true]), true).ready).toBe(false);
+    expect(scoreOf(items([true, true, true, true, true]), PASSED).ready).toBe(false);
+  });
+  it('says real money needs an owner decision when the gate is not applicable (C, handover D9)', () => {
+    const sc = scoreOf(items([true, true, true, true, true, false]), NOT_APPLICABLE);
+    expect(sc).toEqual({
+      passed: 5, total: CHECKS, ready: false,
+      lines: ['Paper only. No backtest gate.', 'Real money needs an owner decision'],
+    });
+  });
+  it('is never ready when the gate is not applicable, whatever the items say', () => {
+    const sc = scoreOf(items([true, true, true, true, true, true]), NOT_APPLICABLE);
+    expect(sc.ready).toBe(false);
+    expect(sc.lines[1]).toBe('Real money needs an owner decision');
   });
 });
 

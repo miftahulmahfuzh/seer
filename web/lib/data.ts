@@ -2,9 +2,11 @@ import { sql } from '@/lib/db';
 import { strategyMetrics, type Metrics, type Snapshot } from '@/lib/metrics';
 import { monthlyTable, type MonthlyTable } from '@/lib/monthly';
 import { isStale } from '@/lib/session';
-import { engineOf, parseGate, shortLabel, type Engine, type Gate } from '@/lib/strategy';
+import { checksNews, engineOf, parseGate, shortLabel, type Engine, type Gate } from '@/lib/strategy';
+import { parseVerdict, type Veto } from '@/lib/vetoes';
 
 export type { Engine, Gate } from '@/lib/strategy';
+export type { Veto, Verdict } from '@/lib/vetoes';
 
 type Row = Record<string, any>;
 
@@ -24,18 +26,20 @@ export type Strategy = {
   icon: string;
   isChampion: boolean;
   isBenchmark: boolean;
-  /** 'bracket' (A), 'book' (F4, F1) or 'benchmark' (SPY). */
+  /** 'bracket' (A, C), 'book' (F4, F1) or 'benchmark' (SPY). */
   engine: Engine;
   /** 'design-v0', 'monthly-hold'; null for SPY. */
   rulesId: string | null;
   /** First paper session; null until the engine's `paper` command starts the clock. */
   paperStart: string | null;
-  /** params->'backtest_gate'; { passed: false, note: null } until `paper` writes the frozen spec. */
+  /** params->'backtest_gate'; { passed: false, applicable: true, note: null } until `paper` writes the frozen spec. */
   gate: Gate;
   /** A research strategy: its orders and positions are paper only and never a buy recommendation. */
   isPaper: boolean;
-  /** 'A', 'F4', 'F1', 'SPY': the part of the name before the middle dot. */
+  /** 'A', 'C', 'F4', 'F1', 'SPY': the part of the name before the middle dot. */
   short: string;
+  /** Runs the nightly news check (C): Positions shows its verdicts under the paper orders. */
+  checksNews: boolean;
 };
 
 function toStrategy(r: Row): Strategy {
@@ -54,12 +58,13 @@ function toStrategy(r: Row): Strategy {
     gate: parseGate(r.gate),
     isPaper: !isBenchmark && !isChampion,
     short: shortLabel(r.name, r.id),
+    checksNews: checksNews(r.id, r.spec_object),
   };
 }
 
 export async function strategies(): Promise<Strategy[]> {
   const rows = await sql`SELECT id, name, sub, icon, is_champion, is_benchmark, engine, rules_id,
-      paper_start::text AS paper_start, params->'backtest_gate' AS gate
+      paper_start::text AS paper_start, params->'backtest_gate' AS gate, params->'spec'->>'object' AS spec_object
     FROM strategies ORDER BY sort, id`;
   return rows.map(toStrategy);
 }
@@ -277,6 +282,21 @@ export async function pendingOrders(strategyId: string): Promise<Pending> {
     return { sessionDate: pendingSession, decision: ps?.pending_decision === true, orders: items };
   }
   return { sessionDate: pendingSession, decision: false, orders: [] };
+}
+
+/**
+ * The news check's verdicts for one strategy and session (`news_vetoes`, migration 004), every
+ * verdict, by rank in A's list. Empty when the `veto` step did not run (or found no candidates).
+ */
+export async function vetoes(strategyId: string, sessionDate: string): Promise<Veto[]> {
+  const rows = await sql`SELECT rank, symbol, verdict, reason, jsonb_array_length(headlines) AS headline_count,
+      earnings_date::text AS earnings_date, decided_at
+    FROM news_vetoes WHERE strategy_id = ${strategyId} AND session_date = ${sessionDate} ORDER BY rank`;
+  return rows.map(r => ({
+    rank: n(r.rank), symbol: r.symbol, verdict: parseVerdict(r.verdict), reason: String(r.reason ?? ''),
+    headlineCount: n(r.headline_count), earningsDate: ymdOrNull(r.earnings_date),
+    decidedAt: new Date(r.decided_at).toISOString(),
+  }));
 }
 
 /** Bracket exits (design §5) plus the book engine's signal and forced exits. */

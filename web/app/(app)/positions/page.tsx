@@ -1,16 +1,17 @@
-import { Crown, Landmark, TriangleAlert } from 'lucide-react';
+import { Crown, Gavel, Landmark, TriangleAlert } from 'lucide-react';
 import { AppHeader } from '@/components/AppHeader';
 import { PaperChip } from '@/components/PaperChip';
 import { selectStrategy, sharesLabel, strategyIcon } from '@/components/roster';
 import { StrategySwitch } from '@/components/StrategySwitch';
 import { WhyToggle } from '@/components/WhyToggle';
 import {
-  pendingOrders, positions as getPositions, runStatus, strategies,
-  type Holding, type Pending, type PendingOrder, type RunStatus, type Strategy,
+  pendingOrders, positions as getPositions, runStatus, strategies, vetoes as getVetoes,
+  type Holding, type Pending, type PendingOrder, type RunStatus, type Strategy, type Veto,
 } from '@/lib/data';
-import { pct, shortDate, signedPct, signedRp, signedUsd, usd } from '@/lib/format';
+import { monthDay, pct, shortDate, signedPct, signedRp, signedUsd, usd } from '@/lib/format';
 import { wibDate } from '@/lib/session';
 import { cardBg } from '@/lib/slots';
+import { checkedLine, headlinesLabel, noCheckLine, vetoSheet, type VetoSheet } from '@/lib/vetoes';
 import s from './positions.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -43,6 +44,11 @@ export default async function Positions({ searchParams }: { searchParams: Promis
   const href = (id: string) => `/positions?s=${encodeURIComponent(id)}`;
   const [noneTitle, noneSub] = emptyState(strat);
   const orderSession = showOrders ? pending.sessionDate : null;
+  // The news check's verdicts for the same session (C, handover D10). Read only for a strategy that runs
+  // the check: its roster row comes from migration 004, which also creates news_vetoes.
+  const showChecks = !!strat && !!orderSession && strat.checksNews && strat.engine === 'bracket';
+  const checks = showChecks && strat && orderSession ? await getVetoes(strat.id, orderSession) : [];
+  const sheet = showChecks ? vetoSheet(checks) : null;
 
   return (
     <>
@@ -106,7 +112,7 @@ export default async function Positions({ searchParams }: { searchParams: Promis
             </div>
             {pending.orders.some(o => o.kind === 'book') && <span className={s.ordersSub}>Target portfolio after the open, by rank</span>}
             {pending.orders.length === 0 ? (
-              <span className={s.ordersNone}>{noOrders(strat, pending)}</span>
+              <span className={s.ordersNone}>{noOrders(strat, pending, sheet)}</span>
             ) : (
               <ul className={s.orderList}>
                 {pending.orders.map(o => <OrderRow key={o.key} o={o} />)}
@@ -114,6 +120,8 @@ export default async function Positions({ searchParams }: { searchParams: Promis
             )}
           </section>
         )}
+
+        {strat && orderSession && sheet && <VetoedTonight st={strat} session={orderSession} sheet={sheet} />}
         <div className="nav-clear" />
       </div>
     </>
@@ -139,13 +147,75 @@ function emptyState(st: Strategy | null): [string, string | null] {
   return ['No open positions.', null];
 }
 
-function noOrders(st: Strategy, p: Pending): string {
+function noOrders(st: Strategy, p: Pending, sheet: VetoSheet | null): string {
   if (st.engine === 'book') {
     return p.decision
       ? `No orders. ${st.short} decided to hold cash.`
       : `No orders. ${st.short} decides on the first session of each month.`;
   }
+  if (sheet && sheet.state === 'missing') return `No orders. ${st.short} buys nothing this session.`;
+  if (sheet && sheet.state === 'failed') return `No orders. ${st.short} sits this session out.`;
+  if (sheet && sheet.allowed === 0) return 'No orders. Nothing passed the news check.';
   return 'No setups tonight. Cash is a position.';
+}
+
+/**
+ * "Vetoed tonight" (handover D10): what the news check took out of A's picks for this session.
+ * A failed check is no trade (design §8), so failed rows are listed with the vetoes.
+ */
+function VetoedTonight({ st, session, sheet }: { st: Strategy; session: string; sheet: VetoSheet }) {
+  return (
+    <section className={`sheet over bg-stone ${s.vetoes}`}>
+      <div className={`${s.between} ${s.vetoHead}`}>
+        <span className="eyebrow">Vetoed tonight</span>
+        {sheet.state !== 'missing' && (
+          <span className={`chip num ${s.vetoCount}`}>{checkedLine(sheet.checked, sheet.state === 'listed' ? sheet.allowed : 0)}</span>
+        )}
+      </div>
+      {sheet.state === 'missing' && (
+        <span className={s.ordersNone}>{noCheckLine(shortDate(session), st.short)}</span>
+      )}
+      {sheet.state === 'failed' && (
+        <>
+          <span className={s.ordersNone}>News check failed for {shortDate(session)}: {st.short} sits this session out.</span>
+          <span className={s.vetoReason}>{sheet.reason}</span>
+        </>
+      )}
+      {sheet.state === 'listed' && (sheet.rows.length === 0 ? (
+        <span className={s.ordersNone}>Nothing vetoed. Every pick passed the news check.</span>
+      ) : (
+        <ul className={s.orderList}>
+          {sheet.rows.map(v => <VetoRow key={v.symbol} v={v} />)}
+        </ul>
+      ))}
+    </section>
+  );
+}
+
+function VetoRow({ v }: { v: Veto }) {
+  const veto = v.verdict === 'veto';
+  const facts = headlinesLabel(v.headlineCount) + (v.earningsDate ? ` · earnings ${monthDay(v.earningsDate)}` : '');
+  return (
+    <li className={s.order}>
+      <div className={s.orderHead}>
+        <span className={s.rank} data-tip="Rank among A's picks">{v.rank}</span>
+        <span className={s.orderSym}>{v.symbol}</span>
+        <span className={s.vetoGap} />
+        {veto ? (
+          <span className={`chip ${s.vetoChip}`} data-tip="The LLM vetoed this pick on its news">
+            <Gavel size={15} aria-hidden="true" />Veto
+          </span>
+        ) : (
+          <span className={`chip ${s.failChip}`} data-tip="The news check failed, so no trade (design §8)">
+            <TriangleAlert size={15} aria-hidden="true" />Failed
+          </span>
+        )}
+      </div>
+      <span className={s.vetoFacts}>{facts}</span>
+      <WhyToggle text={v.reason.trim() === '' ? null : v.reason} label={veto ? 'Why vetoed' : 'Why it failed'}
+        missing="No reason was stored for this check." />
+    </li>
+  );
 }
 
 function Change({ pnl, ratio }: { pnl: number; ratio: number | null }) {

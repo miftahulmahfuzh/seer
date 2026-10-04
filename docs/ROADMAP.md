@@ -85,20 +85,27 @@ money is out of scope; design §1 is unchanged, and no strategy has passed a bac
 - PWA manifest + apple-touch-icon; Lucide icon-only buttons
 - Deploy to Vercel, connect seertrade.site: done. The paper-trading build was proven as a preview deploy on 2026-10-04 and reaches production with the merge
 - Paper-only additions (P4 set): Today shows "SPY buy-and-hold is the champion; Seer recommends no buys"; research orders and positions labelled paper; Month by month on the Leaderboard; checklist row "Backtest gate passed"
-- Owner checks left ([runbook](runbooks/paper-trading.md#owner-steps)): the Google OAuth redirect URI for seertrade.site and a sign-in from the XS Max, Add to Home Screen, and the optional `LLM_*` repo secrets
+- Owner checks left ([runbook](runbooks/paper-trading.md#owner-steps)): the Google OAuth redirect URI for seertrade.site and a sign-in from the XS Max, Add to Home Screen, and the `FINNHUB_API_KEY` and `LLM_*` repo secrets (optional for the night; Strategy C trades only with them)
 - **Done when:** usable from the XS Max home screen; picks copyable into Gotrade (for the paper-only ship: the paper views readable on the phone)
 
-## P6 — Challengers
-- Strategy B (ML ranker), walk-forward backtest, then forward paper
-- Strategy C (Finnhub news + LLM veto on A's candidates), forward paper only
-- Leaderboard + champion selection + go-live checklist
-- **Done when:** A, B, C each have independent paper portfolios on the leaderboard
+## P6 — Challengers · B closed (failed P6a); C code landed 2026-10-04, on paper from the first scheduled nightly after the merge ([runbook](runbooks/paper-trading.md#strategy-c-the-news-check))
+- Strategy B (ML ranker): walk-forward backtest failed P6a (above). Closed record: `STRATEGY_B_FROZEN = None`, no committed model, not on the paper roster (D11)
+- Strategy C (Finnhub news + LLM veto on A's candidates), forward paper only: a backtest of an LLM on past news is contaminated (design §4). Spec: [handover](handover/2026-10-04-strategy-c-news-veto.md). Plan: `STRATEGY_C_NEWS_VETO_PLAN.md` (7 phases)
+  - Each night the new Veto step takes A's first 10 ranked candidates for the next session, reads up to 20 Finnhub headlines from the last 3 days published before the step started plus the earnings dates in the 5-session window, and asks the LLM for `allow` or `veto` under the frozen prompt `c-veto-v1` and model `glm-5.3`. C buys A's candidates minus everything not allowed, through the same `DESIGN_V0` brackets as A
+  - Any failure (missing secret, Finnhub or LLM error, unparsable reply, another `LLM_MODEL`) is a `failed` verdict: no trade (design §8), never a failed night
+  - Verdicts and the headlines seen are stored in `news_vetoes` (migration 004); `paper_check` replays C from them and never re-asks the LLM
+  - Backtest gate: not applicable (LLM strategy, design §1 item 5); the checklist counts it as not passed, and real money for C would need an explicit owner decision
+  - Owner step: the repo secrets `FINNHUB_API_KEY`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` ([runbook](runbooks/paper-trading.md#owner-steps)). Until they exist every verdict is `failed` and C makes no trades
+- Leaderboard, go-live checklist and Month by month landed with P4 (SPY is the champion); C appears in every roster view, and Positions shows its "Vetoed tonight" list
+- **Done when:** A and C each have an independent paper portfolio; B failed P6a and is closed
 
 ## v0.1.0 release · pending the 5-night check
 Paper-only (owner option (b), 2026-10-04): P0, P1, P2 and P5 done; P4 code landed and running on paper.
 Release when P4's "Done when" holds: ≥ 5 consecutive paper sessions, `paper_check --require-sessions 5`
 green on Neon. Then the README, then `gh release create v0.1.0`
 ([release checklist](runbooks/paper-trading.md#release-checklist-v010)). P6 may trail into v0.2.0.
+`paper_check --require-sessions 5` counts every roster strategy, so once Strategy C is on the roster
+the check also waits for C's 5th paper session.
 The 3-month forward clock of design §1 starts on the first live paper day, but it unlocks nothing
 by itself: no roster strategy has passed a backtest gate.
 

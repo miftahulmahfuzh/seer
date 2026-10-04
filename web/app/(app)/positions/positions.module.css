@@ -71,6 +71,16 @@
 .cell dt { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); }
 .cell dd { margin: 0; font-size: 18px; letter-spacing: -0.01em; white-space: nowrap; }
 
+/* ---- Vetoed tonight (C's news check) ---- */
+.vetoes { gap: 14px; }
+.vetoHead { flex-wrap: wrap; row-gap: 8px; }
+.vetoCount { flex: none; font-size: 14px; }
+.vetoReason { font-size: 16px; line-height: 1.45; color: var(--ink-2); text-wrap: pretty; overflow-wrap: anywhere; }
+.vetoGap { flex: 1; }
+.vetoFacts { margin-top: -4px; font-size: 15px; color: var(--ink-2); }
+.vetoChip { flex: none; background: var(--ink); color: var(--sheet); }
+.failChip { flex: none; background: transparent; border: 1.5px dashed var(--outline); color: var(--ink-2); }
+
 @media (min-width: 1024px) {
   .summary { border-radius: 40px; }
   .warn { margin-top: 12px; border-radius: 40px; padding: 22px 30px; }
@@ -78,5 +88,6 @@
   .card { border-radius: 32px; padding: 22px; }
   .none { margin-top: 12px; border-radius: 40px; }
   .orders { margin-top: 12px; border-radius: 40px; padding: 28px 30px; }
+  .vetoes { margin-top: 12px; border-radius: 40px; padding: 28px 30px; }
   .orderList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; }
 }

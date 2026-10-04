@@ -2,7 +2,7 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-04 10:22:05
+**Last Updated**: 2026-10-04 18:36:00
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 2
+- Completed: 3
 
 ---
 
@@ -35,6 +35,23 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-ZEOM** Phase 7: Ship: Veto workflow step, live smoke, docs
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `.github/workflows/nightly.yml` (`Veto` step after `Nightly`, before `Paper`; `continue-on-error: true`; `timeout-minutes: 10`; env `FINNHUB_API_KEY`, `LLM_*` from secrets; job stays 45 min); a live smoke (local, scratchpad, never committed, no database) of the phase-3 clients + K1 prompt/parser for 10 liquid symbols with timings recorded in the runbook; `engine/package_readme.md` (`veto` incl. H1, `finnhub`, `strategies.c`, store additions, migration 004); `docs/runbooks/paper-trading.md` (the veto step, failure states quoting phase 6's exact strings, owner steps for `FINNHUB_API_KEY` and `LLM_*`, C's clock, `--require-sessions` counting C, reset procedures that keep `news_vetoes`); `docs/ROADMAP.md` (P6 with D11's wording); `.env.example` comment. Does not touch: source behaviour; `web/**` (incl. `web/package_readme.md`, phase 6's); Neon; GitHub secrets. Exit: `actionlint`-clean YAML (or the YAML assertion), CI commands pass locally, smoke timings recorded, no `‹` left in the docs, docs updated, diff limited to the five files and free of secrets.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 7 of 7)
+  - **Satisfies**: R3 — Workflow: `Veto` step between `Nightly` and `Paper`, inside the 45-minute job; R5 — Docs: engine readme, paper runbook (veto step, failures, owner steps, C's clock), ROADMAP P6 (D11)
+  - **Depends on**: P1-ENG-QRXI, P1-ENG-IIZE, P1-WEB-8YO3
+  - **Plan**: `.workflows/plan/P1-ROOT-ZEOM.md`
+  - **Completed**: 2026-10-04 18:36
+  - **Method**: /do
+  - **Files**: .github/workflows/nightly.yml, docs/runbooks/paper-trading.md, engine/package_readme.md, docs/ROADMAP.md, .env.example
+  - **Drift**:
+    - None in the target files (all anchor lines matched HEAD). The live smoke script was run from the session scratchpad and NOT committed, as planned.
+  - **Decided**:
+    - Runbook Measured table label for Finnhub company-news: the plan's prose said the time 'includes the client's >= 1 s spacing', but the smoke measured 0.26-0.36 s because the spacing had already passed during the previous LLM call. The label now says so (and the readme Performance line likewise); calendar/earnings keeps 'includes the spacing' (1.26 s). Rung 6 / honest reporting: measured values over an expectation in prose.
 
 - [x] **P1-ROOT-FOK3** Phase 13: Ship: CI lint, workflow, Neon, Vercel, docs
   - **Difficulty**: NORMAL

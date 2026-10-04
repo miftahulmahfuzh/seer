@@ -9,7 +9,7 @@ import { monthDay, monthName, shortDate, signedPct } from '@/lib/format';
 import { checklist } from '@/lib/metrics';
 import { wibDate } from '@/lib/session';
 import {
-  bestResearch, LOOK_FALLBACK, looks, monthLines, researchOf, scoreOf, sinceStartLine,
+  bestResearch, LOOK_FALLBACK, looks, monthLines, monthsBg, NO_GATE, researchOf, scoreOf, sinceStartLine,
   type Look, type MonthLine,
 } from './view';
 import s from './leaderboard.module.css';
@@ -39,7 +39,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
   const pickRow = pick ? board.rows.find(r => r.strategy.id === pick.id) : undefined;
   const gate = pickRow?.strategy.gate ?? null;
   const items = pickRow && gate ? checklist(pickRow.metrics, spyRet, gate) : [];
-  const score = scoreOf(items, gate?.passed === true);
+  const score = scoreOf(items, gate ?? NO_GATE);
   // The latest month is partial while the engine's next session (runStatus().sessionDate) is in it.
   const table = pick ? await monthly(pick.id, run.sessionDate) : null;
   const since = table ? sinceStartLine(table) : null;
@@ -132,7 +132,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
   );
 
   const monthsSheet = (
-    <section className={`sheet over ${pick ? lookOf(pick.id).bg : 'bg-sheet'} ${s.months}`} aria-labelledby="months-title">
+    <section className={`sheet over ${pick ? monthsBg(lookOf(pick.id)) : 'bg-sheet'} ${s.months}`} aria-labelledby="months-title">
       <div className={s.between}>
         <h2 id="months-title" className="eyebrow">Month by month · {pick ? pick.short : '—'}</h2>
         {pick && <PaperChip />}
@@ -170,7 +170,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
       <div className="stack">
         <div className={s.top}>{chartSheet}{checklistSheet}</div>
         {monthsSheet}
-        <div className={s.cards} style={{ '--cols': Math.min(Math.max(board.rows.length, 1), 4) } as CSSProperties}>
+        <div className={s.cards} style={{ '--cols': Math.min(Math.max(board.rows.length, 1), 5) } as CSSProperties}>
           {board.rows.map(({ strategy: st, metrics: m }) => {
             const Icon = strategyIcon(st.icon);
             const dash = (v: string) => (st.isBenchmark ? '—' : v);

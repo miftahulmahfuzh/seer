@@ -1,7 +1,7 @@
 """The frozen paper roster (handover D1, D2, D4; plan contract C2).
 
-Pure: no database, no clock, no I/O. Four portfolios paper-trade every night from the same
-first paper day; this module is the single place that says what each one is.
+Pure: no database, no clock, no I/O. Five portfolios paper-trade every night, each on its own
+paper clock; this module is the single place that says what each one is.
 
 - ``SPY``: buy-and-hold SPY with dividends reinvested (``backtest.benchmark.buy_and_hold``
   rules), the champion and the yardstick (D2).
@@ -9,10 +9,15 @@ first paper day; this module is the single place that says what each one is.
 - ``F4-MOM12-N20-TREND`` and ``F1-SPY-SMA200-M``: the P7a registry entries of those ids,
   taken from ``backtest.registry.REGISTRY`` as they are (the registry is read, never edited),
   under their own ``MONTHLY_HOLD`` rules (the book engine).
+- ``C``: Strategy C (``strategies.c.STRATEGY_C`` with ``STRATEGY_C_PARAMS``) under
+  ``DESIGN_V0``: A's ranked candidates minus every symbol the stored news check did not
+  allow (strategy-c-news-veto handover D1, D5). The roster object carries no verdicts, so
+  it never buys on its own; ``paper`` and ``paper_check`` hand the engine a copy carrying
+  the stored verdicts.
 
 Each entry's display fields (``name`` .. ``sort``, ``engine``, ``rules_id``) equal the row that
-``db/migrations/003_paper.sql`` inserts; ``tests/test_paper_roster.py`` checks that against a
-migrated database.
+``db/migrations/003_paper.sql`` (``C``: ``004_news_veto.sql``) inserts;
+``tests/test_paper_roster.py`` checks that against a migrated database.
 
 **The frozen spec (D4).** :func:`spec` is the entry's trial-defining parts as a JSON-ready
 dict of strings: engine, the strategy/allocator object (module-level name and its ``id``),
@@ -27,6 +32,8 @@ differs).
 
 ``backtest_gate`` is a display fact for the go-live checklist (D12), not part of the spec:
 correcting its note does not reset a paper clock. Every entry is ``passed: false`` today.
+An entry with ``gate_applicable=False`` (C, an LLM strategy: design §1 item 5, handover D9)
+also says ``applicable: false``; the four quant/benchmark entries' gate dicts are unchanged.
 
 :data:`MAX_LOOKBACK_BARS` is the most bars through a data date any roster object reads
 (FACTOR's ``factor_lookback`` = 253); the paper store's windowed history load must cover it.
@@ -48,6 +55,7 @@ from seer_engine.sim.rules import DESIGN_V0, MONTHLY_HOLD, TradeRules
 from seer_engine.strategies.a import STRATEGY_A, STRATEGY_A_PARAMS
 from seer_engine.strategies.allocator import Allocator
 from seer_engine.strategies.base import Strategy
+from seer_engine.strategies.c import STRATEGY_C, STRATEGY_C_PARAMS
 from seer_engine.strategies.f_factor import FACTOR
 from seer_engine.strategies.f_index import TIMING
 
@@ -66,7 +74,8 @@ class RosterEntry:
     ``object_name`` is its module-level name (``STRATEGY_A``, ``FACTOR``, ``TIMING``) or
     ``buy_and_hold`` for the benchmark. ``rules`` is ``None`` only for the benchmark.
     ``lookback`` is the bars through a data date ``obj`` reads (1 for the benchmark, which
-    reads only the session's own bar).
+    reads only the session's own bar). ``gate_applicable`` is ``False`` only for an entry the
+    quant backtest gate does not apply to (C); it changes ``backtest_gate``, never the spec.
     """
 
     id: str
@@ -84,6 +93,7 @@ class RosterEntry:
     registry_id: str | None
     lookback: int
     gate_note: str
+    gate_applicable: bool = True
 
     @property
     def rules_id(self) -> str | None:
@@ -108,7 +118,7 @@ def _registered(registry_id: str, expected_obj: Allocator, rules: TradeRules) ->
 _F4_OBJ, _F4_PARAMS = _registered(F4_ID, FACTOR, MONTHLY_HOLD)
 _F1_OBJ, _F1_PARAMS = _registered(F1_ID, TIMING, MONTHLY_HOLD)
 
-# Sorted by ``sort``; every value is the 003 migration's INSERT row for the same id.
+# Sorted by ``sort``; every value is the 003 (C: 004) migration's INSERT row for the same id.
 ROSTER: tuple[RosterEntry, ...] = (
     RosterEntry(
         id=BENCHMARK_ID,
@@ -180,6 +190,24 @@ ROSTER: tuple[RosterEntry, ...] = (
         registry_id=F1_ID,
         lookback=_F1_OBJ.lookback(_F1_PARAMS),
         gate_note="P7a dev window only; failed max DD <= 15% (18.7%) and >= 100 trades (11)",
+    ),
+    RosterEntry(
+        id="C",
+        name="C · News veto",
+        sub="A's picks, LLM can veto on news",
+        icon="gavel",
+        is_champion=False,
+        is_benchmark=False,
+        sort=5,
+        engine="bracket",
+        rules=DESIGN_V0,
+        obj=STRATEGY_C,
+        object_name="STRATEGY_C",
+        params=STRATEGY_C_PARAMS,
+        registry_id=None,
+        lookback=STRATEGY_C.lookback,
+        gate_note="Backtest gate: not applicable (LLM strategy, design §1 item 5)",
+        gate_applicable=False,
     ),
 )
 
@@ -254,7 +282,14 @@ def spec_digest(s: Mapping[str, Any]) -> str:
 
 
 def backtest_gate(e: RosterEntry) -> dict[str, Any]:
-    """Contract C2 ``params.backtest_gate``: no roster entry has passed a backtest gate."""
+    """Contract C2 ``params.backtest_gate``: no roster entry has passed a backtest gate.
+
+    An entry the gate does not apply to (C: design §1 item 5, handover D9) also says
+    ``"applicable": False``; it still counts as not passed. The applicable entries' dict is
+    exactly ``{"passed": False, "note": ...}``, as before C existed.
+    """
+    if not e.gate_applicable:
+        return {"passed": False, "applicable": False, "note": e.gate_note}
     return {"passed": False, "note": e.gate_note}
 
 

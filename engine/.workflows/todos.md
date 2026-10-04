@@ -2,7 +2,7 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 10:13:00
+**Last Updated**: 2026-10-04 18:21:00
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 48
+- Completed: 53
 
 ---
 
@@ -50,6 +50,98 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-QRXI** Phase 4: `veto` command
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/commands/veto.py` (K6, incl. the H1 guard) + `engine/tests/test_veto_command.py` (27 tests; PG + fake Finnhub/LLM injected through `execute(conn, *, now, dry_run, finnhub=..., llm=...)` factories). Does not touch: `paper.py`, `paper_check.py`, store (calls K3 only), `test_paper_command.py` (imports its helpers), workflow, docs. Exit: tests for each acceptance-3 failure (no LLM config, timeout/HTTP error, unparsable, Finnhub error, no Finnhub key, model mismatch, consecutive-failure stop); look-ahead (news at/after start never in the prompt or stored; bars dated ≥ session never change candidates); idempotent re-run makes zero client calls and writes nothing; **after Paper decided the session (late-verdict retry) no client call, no row, and C's `paper_check` stays ok; Paper deciding during the checks → the write transaction writes nothing**; failed/missing bars run → exit 1, nothing written; `--dry-run` writes nothing; no secret in rows or logs; LLM options are `float(params.temperature)`, `params.thinking`, `params.max_tokens`.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 4 of 7)
+  - **Satisfies**: R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
+  - **Depends on**: P1-ENG-4I4B, P1-ENG-2548
+  - **Plan**: `.workflows/plan/P1-ENG-QRXI.md`
+  - **Completed**: 2026-10-04 18:21
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/commands/veto.py, engine/tests/test_veto_command.py
+  - **Drift**: none — both files created verbatim from the phase plan's code blocks
+  - **Decided**:
+    - readme-updater -> skipped; engine/package_readme.md is owned by phase 7 (rung 1: plan invariant 9, file ownership). Same decision phase 3 recorded
+    - commit scope -> only this phase's files + bookkeeping; the shared worktree holds uncommitted peer edits from phases 5 and 6 (rung 1: invariant 9)
+    - plan index orchestration/strategy-c-news-veto/PLAN.md edited in place on the main checkout (Status line), not committed from this worktree (completion-handler)
+  - **Verified**: test_veto_command.py 27 passed; full engine suite 2159 passed, 0 skipped; ruff clean; web vitest 83 passed + tsc clean
+  - **Next**: P1-ROOT-ZEOM (phase 7) stays blocked: phase 5 is complete but P1-WEB-8YO3 (phase 6) is still in progress (completion-handler)
+
+- [x] **P1-ENG-IIZE** Phase 5: `paper`, `paper_check`, `explain` decide and replay C
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `commands/paper.py` (K7: `_bracket_strategy`, `_start`, `_step_bracket`), `commands/paper_check.py` (K7: `_expected(conn, ...)`); new `engine/tests/test_paper_c.py` (14 tests, verdict rows via `store.write_vetoes`). Does not touch: `paper/*` cores, `replay.py`, store, `veto.py`, `explain.py`, `test_paper_command.py`, `test_paper_check.py` / `test_paper_store.py` (phase 2's edits stand), web. Exit: C starts on its first night with its own `paper_start` while the other four keep theirs; ≥ 5 synthetic nights → `paper_check` ok for all five; the replay really reads stored verdicts (flipping one → C mismatch); all-allow C orders == A orders; veto/failed/missing → no C order for that symbol and `paper` exit 0; catch-up night with verdicts only for the newest session; re-run writes nothing; the four existing strategies' rows identical with and without C; explain fills C's pending orders.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 5 of 7)
+  - **Satisfies**: R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
+  - **Depends on**: P1-ENG-4I4B
+  - **Plan**: `.workflows/plan/P1-ENG-IIZE.md`
+  - **Completed**: 2026-10-04 18:19
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/commands/paper.py, engine/src/seer_engine/commands/paper_check.py, engine/tests/test_paper_c.py
+  - **Drift**: none — plan applied verbatim; code matched the quoted lines
+  - **Decided**:
+    - readme-updater for phase 5 -> skipped; engine/package_readme.md is owned by phase 7 only (rung 1: invariant 9) (completion-handler)
+    - plan index not ticked here; PLAN.md lives on main and is updated by swarm coordinator orch-strategy-c-news-veto when it records the phase (completion-handler)
+  - **Verified**: full engine suite 2132 passed, 0 skipped; ruff clean; web vitest 83 passed + tsc clean
+  - **Next**: P1-ROOT-ZEOM (phase 7) stays blocked: it still depends on P1-ENG-QRXI (phase 4) and P1-WEB-8YO3 (phase 6), both still in progress (completion-handler)
+
+- [x] **P1-ENG-2548** Phase 3: Finnhub client and LLM call options
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/finnhub.py` (K5) + `engine/tests/test_finnhub.py` (fake transport/clock); `llm.py` keyword options (K5) + `test_llm.py` additions (body byte-identical without keywords; with them `temperature`, `thinking`, `max_tokens` present). Does not touch: commands (`explain` keeps calling `complete(system, prompt)`), store, web. Exit: spacing ≥ 1.0 s between any two requests, retries included; key only in a header and scrubbed from errors, logs and repr; one retry on connection error/timeout/429/5xx (Retry-After capped at 60 s), none on other 4xx; earnings earliest-in-window; tests green.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 3 of 7)
+  - **Satisfies**: R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
+  - **Depends on**: P1-ENG-KIBJ
+  - **Plan**: `.workflows/plan/P1-ENG-2548.md`
+  - **Completed**: 2026-10-04 18:10
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/finnhub.py, engine/src/seer_engine/llm.py, engine/tests/test_finnhub.py, engine/tests/test_llm.py
+  - **Decided**:
+    - readme-updater for phase 3 -> skipped; engine/package_readme.md is owned by phase 7 only (rung 1: invariant 9) (completion-handler)
+  - **Verified**: targeted test_finnhub/test_llm/test_strategy_purity/test_massive/test_http 85 passed (matches plan); full engine suite on HEAD + these 4 files 2079 passed, 0 skipped; ruff clean; web vitest 65 passed + tsc clean
+  - **Next**: P1-ENG-QRXI (phase 4) unblocked: both its dependencies (P1-ENG-4I4B, P1-ENG-2548) are complete (completion-handler)
+
+- [x] **P1-ENG-4I4B** Phase 2: Migration 004, roster entry C, verdict store
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `db/migrations/004_news_veto.sql` (K2, byte for byte); `paper/roster.py` (K4); `paper/store.py` (K3); `demo.py` (`news_vetoes` in `DEMO_TABLES`); tests `test_migrate.py` (003 tests pinned to a schema at 003; 004 fresh, post-003, restyle, idempotent, keys), `test_paper_roster.py` (C pin `6cea6cb8…b762`, display fields equal 004's row, the four pins unchanged, C's gate dict), `test_demo.py`, new `test_paper_store_vetoes.py`, and the one-line `"C"` edits in `test_paper_store.py:58` and `test_paper_check.py:51` (owned here so the phase is green alone). Does not touch: commands, workflows, web, docs. Exit: full engine suite green with 0 skipped; the four existing digests and gate dicts unchanged; `004` applies on a schema at 003 and is a no-op twice; C's pin passes (if it fails for C only, re-pin from the printed digest: C has never been frozen).
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 2 of 7)
+  - **Satisfies**: R1 — Engine, pure: C strategy object, roster entry `C` with frozen spec (D5), prompt + JSON verdict parser; R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
+  - **Depends on**: P1-ENG-KIBJ
+  - **Plan**: `.workflows/plan/P1-ENG-4I4B.md`
+  - **Completed**: 2026-10-04 18:07
+  - **Method**: /do
+  - **Files**: db/migrations/004_news_veto.sql, engine/src/seer_engine/paper/roster.py, engine/src/seer_engine/paper/store.py, engine/src/seer_engine/demo.py, engine/tests/test_migrate.py, engine/tests/test_paper_roster.py, engine/tests/test_demo.py, engine/tests/test_paper_store_vetoes.py, engine/tests/test_paper_store.py, engine/tests/test_paper_check.py
+  - **Decided**:
+    - readme-updater for phase 2 -> skipped; engine/package_readme.md is owned by phase 7 only (rung 1: invariant 9) (completion-handler)
+  - **Verified**: ruff clean; full engine suite 2118 passed, 0 skipped (319 s); web vitest 65 passed + tsc clean; 004 byte-identical to K2; C digest 6cea6cb8...b762 matches pin, four existing digests unchanged
+  - **Next**: P1-ENG-IIZE (phase 5) and P1-WEB-8YO3 (phase 6) unblocked: both depend only on phase 2. P1-ENG-QRXI (phase 4) still waits on P1-ENG-2548 (phase 3) (completion-handler)
+
+- [x] **P1-ENG-KIBJ** Phase 1: Pure C: strategy object, prompt, parser
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/strategies/c.py` (K1, entire); `engine/tests/test_strategy_c.py`. Does not touch: `strategies/a.py`, `strategies/__init__.py` (no re-export), roster, store, any command, web. Exit: with every candidate allowed, `NewsVeto.picks == candidates == STRATEGY_A.picks[:10]`; vetoed/failed/missing symbols removed, order kept; ranks > 10 never returned; `picks_prepared(prepare(H)) == picks(H cut)`; `run_rules(DESIGN_V0)` over a synthetic market with an all-allow map equals A's run where A never needs rank > 10; `select_headlines` drops items at/after the cutoff; `parse_verdict` table of cases; `user_prompt` golden text; purity green; prompt texts have no trailing newline and `as_dict` has exactly the 19 keys K1 lists (C's pin depends on them).
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 1 of 7)
+  - **Satisfies**: R1 — Engine, pure: C strategy object, roster entry `C` with frozen spec (D5), prompt + JSON verdict parser
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-KIBJ.md`
+  - **Completed**: 2026-10-04 17:57
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/strategies/c.py, engine/tests/test_strategy_c.py
+  - **Decided**:
+    - readme-updater for phase 1 -> skipped; engine/package_readme.md is owned by phase 7 only (rung 1: invariant 9)
+    - package for phases 1-5 tasks -> engine (ENG), phase 6 -> web, phase 7 -> root (rung 6: precedent of earlier plan sets)
+    - web/node_modules missing in worktree -> ran npm ci (no tracked file changed) so invariant 1's vitest/tsc could run
+  - **Verified**: test_strategy_c + test_strategy_purity 62 passed; full engine suite 2031 passed, 0 skipped; ruff clean; web vitest 65 passed, tsc clean
+  - **Next**: P1-ENG-4I4B (phase 2) and P1-ENG-2548 (phase 3) unblocked: both depend only on phase 1 (completion-handler)
+
 - [x] **P1-ENG-WBI7** Phase 8: `paper_check` replay check
   - **Difficulty**: HARD
   - **Type**: Feature

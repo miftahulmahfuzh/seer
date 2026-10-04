@@ -149,11 +149,11 @@
       "note": null,
       "package": "engine/paper",
       "plan": ".workflows/plan/paper-trading-ship/phase-8.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T03:09:50+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
+      "status": "running",
       "task_id": null,
       "title": "paper_check` replay check"
     },
@@ -217,21 +217,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "f034d61",
       "depends_on": [
         11
       ],
       "difficulty": "HARD",
       "n": 12,
-      "note": null,
+      "note": "manual render skipped: demo seed would write into prod Neon",
       "package": "web/app",
       "plan": ".workflows/plan/paper-trading-ship/phase-12.md",
-      "reported_at": "2026-10-04T03:07:04+00:00",
+      "reported_at": "2026-10-04T03:09:49+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-DX8D",
       "title": "Web: Leaderboard, monthly table, checklist"
     },
     {
@@ -239,6 +239,16 @@
       "commit": null,
       "depends_on": [
         1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
         12
       ],
       "difficulty": "NORMAL",
@@ -259,7 +269,7 @@
   "plan": "/home/miftah/.worktrees/seer/paper-trading-ship/.workflows/orchestration/paper-trading-ship/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "paper-trading-ship",
-  "updated": "2026-10-04T03:07:04+00:00",
-  "verified_at": "2026-10-04T03:07:04+00:00",
+  "updated": "2026-10-04T03:09:50+00:00",
+  "verified_at": "2026-10-04T03:09:50+00:00",
   "worktree": "/home/miftah/.worktrees/seer/paper-trading-ship"
 }

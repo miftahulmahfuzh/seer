@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/strategy-c-news-veto`
 **Branch:** `feature/strategy-c-news-veto` (base: `HEAD` = local `main` @ `d9cecce`)
 **Phases:** 7
-**Status:** reconciled
+**Status:** phase 3/7 complete
 **Coordinator:** —
 
 ---
@@ -386,13 +386,13 @@ RosterEntry(
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Pure C: strategy object, prompt, parser | R1 | `engine/strategies` | 2 | — | NORMAL | `.workflows/plan/strategy-c-news-veto/phase-1.md` | — | — |
-| 2 | Migration 004, roster entry C, verdict store | R1, R2 | `db`, `engine/paper` | 10 | 1 | NORMAL | `.workflows/plan/strategy-c-news-veto/phase-2.md` | — | — |
-| 3 | Finnhub client and LLM call options | R2 | `engine` | 4 | 1 | NORMAL | `.workflows/plan/strategy-c-news-veto/phase-3.md` | — | — |
-| 4 | `veto` command | R2 | `engine/commands` | 2 | 2, 3 | HARD | `.workflows/plan/strategy-c-news-veto/phase-4.md` | — | — |
-| 5 | `paper`, `paper_check`, `explain` decide and replay C | R2 | `engine/commands` | 3 | 2 | HARD | `.workflows/plan/strategy-c-news-veto/phase-5.md` | — | — |
-| 6 | Web: C everywhere, Vetoed tonight, D9 row, demo seed | R4 | `web` | 17 | 2 | HARD | `.workflows/plan/strategy-c-news-veto/phase-6.md` | — | — |
-| 7 | Ship: Veto workflow step, live smoke, docs | R3, R5 | repo | 5 | 4, 5, 6 | NORMAL | `.workflows/plan/strategy-c-news-veto/phase-7.md` | — | — |
+| 1 | Pure C: strategy object, prompt, parser | R1 | `engine/strategies` | 2 | — | NORMAL | `.workflows/plan/strategy-c-news-veto/phase-1.md` | P1-ENG-KIBJ | — |
+| 2 | Migration 004, roster entry C, verdict store | R1, R2 | `db`, `engine/paper` | 10 | 1 | NORMAL | `.workflows/plan/strategy-c-news-veto/phase-2.md` | P1-ENG-4I4B | — |
+| 3 | Finnhub client and LLM call options | R2 | `engine` | 4 | 1 | NORMAL | `.workflows/plan/strategy-c-news-veto/phase-3.md` | P1-ENG-2548 | — |
+| 4 | `veto` command | R2 | `engine/commands` | 2 | 2, 3 | HARD | `.workflows/plan/strategy-c-news-veto/phase-4.md` | P1-ENG-QRXI | — |
+| 5 | `paper`, `paper_check`, `explain` decide and replay C | R2 | `engine/commands` | 3 | 2 | HARD | `.workflows/plan/strategy-c-news-veto/phase-5.md` | P1-ENG-IIZE | — |
+| 6 | Web: C everywhere, Vetoed tonight, D9 row, demo seed | R4 | `web` | 17 | 2 | HARD | `.workflows/plan/strategy-c-news-veto/phase-6.md` | P1-WEB-8YO3 | — |
+| 7 | Ship: Veto workflow step, live smoke, docs | R3, R5 | repo | 5 | 4, 5, 6 | NORMAL | `.workflows/plan/strategy-c-news-veto/phase-7.md` | P1-ROOT-ZEOM | — |
 
 Phases 3, 5 and 6 can run in parallel after their dependencies; 4 needs 2 and 3. Every dependency points
 backward. File counts are each plan's Files table (phase 7's uncommitted scratch smoke script excluded).

@@ -43,21 +43,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "a3d80866f8c1c9c23e54abde117d1397a67c5f93",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "finnhub.Client (news+earnings, 1s pacing, 1 retry, key header-only/scrubbed) + llm.complete(temperature,thinking,max_tokens) keywords; legacy body byte-identical",
       "package": "engine",
       "plan": ".workflows/plan/strategy-c-news-veto/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T11:11:09+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-2548",
       "title": "Finnhub client and LLM call options"
     },
     {
@@ -144,7 +144,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-c-news-veto/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-c-news-veto",
-  "updated": "2026-10-04T11:08:57+00:00",
-  "verified_at": "2026-10-04T11:08:57+00:00",
+  "updated": "2026-10-04T11:11:24+00:00",
+  "verified_at": "2026-10-04T11:11:24+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-c-news-veto"
 }

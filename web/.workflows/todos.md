@@ -2,19 +2,19 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-10-04 22:02:40
-**Total Active Tasks**: 4
+**Last Updated**: 2026-10-04 22:10:00
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 4
+- P1 High: 3
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 4
-- Completed: 5
+- Blocked: 0
+- Completed: 6
 
 ---
 
@@ -23,20 +23,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-WEB-5767** Phase 2: Web data layer for the snapshot
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns new `web/lib/sera/` (relative imports only): `types.ts` (contract types), `lab.ts` (loads `../../data/lab.json`; `methodById`, `trialsOf`, `insightsOf`, `childrenOf`), pure `derive.ts` (per-trial gate checks from the engine's `failed`, misses, closest-to-eligible, best variant per method, funnel counts, progress over trial number, family aggregates, parent/child links, rebased SPY TR, drawdown series, calendar-year returns), `glossary.ts`, escape-first `markdown.ts`, test-only `fixture.ts` (reuses `web/lib/format.ts`), and a `*.test.ts` for each. Does not touch pages, components, engine. Exit: tsc + vitest green; every derivation unit-tested on a fixture snapshot; `lab.ts` type-checks against the real `web/data/lab.json`.
-  - **Status**: open
-  - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 2 of 7)
-  - **Satisfies**: R3 — Show every experiment, as detailed as possible, kept current with no human step; R5 — Concise, non-technical explanations, with analysis and opinion on every method; R7 — As comprehensive as possible (cross-cutting)
-  - **Depends on**: P1-ENG-6QQA
-  - **Plan**: `.workflows/plan/P1-WEB-5767.md`
 - [ ] **P1-WEB-RL9Z** Phase 4: Overview page
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `web/app/sera/page.tsx` (calls `requireSera('/sera')`), `overview.module.css`, `overview.ts` (+test; pure shaping into phase 3's chart props). Sections: State of the search (latest `synthesis` insight, KPI tiles), Where every try landed (max DD vs CAGR-minus-SPY scatter with pass zone), Which hurdles are hardest (funnel bars), Are we getting closer? (progress lines), The luck bar (DSR vs N, 0.95 line), Families explored, Latest methods. Does not touch shell, chart kit, lib. Exit: tsc + vitest green; `next build` compiles the route; no hard-coded gate number.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 4 of 7)
   - **Satisfies**: R1 — Optimize the UI for desktop only (for now); R4 — Draw all the important graphs and diagrams; R5 — Concise, non-technical explanations, with analysis and opinion on every method; R7 — As comprehensive as possible (cross-cutting)
   - **Depends on**: P1-WEB-5767, P1-WEB-EQ4I
@@ -45,7 +36,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `web/app/sera/methods/page.tsx` + `methods.module.css`, `web/app/sera/methods/[id]/page.tsx` + `method.module.css`, `view.ts` (+test); both pages call `requireSera(<own path>)`. List: every method with status, family, source, best variant (CAGR vs SPY, max DD, PF, trades, DSR, n/6), verdict, icon-only `?show=all|lab|historical|alive` filter. Detail: header with parent/children, hypothesis, expected failure, verdict, variants table with per-condition marks, growth-of-1 vs rebased SPY TR, underwater drawdown, year-by-year bars, variants vs gate, rendered analysis markdown, related insights, full per-trial technical detail; `generateStaticParams` over all methods, `notFound()` for unknown ids. Does not touch shell, chart kit, lib. Exit: tsc + vitest green; `next build` compiles both routes; every method id resolves; unknown id renders the Sera not-found page.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 5 of 7)
   - **Satisfies**: R1 — Optimize the UI for desktop only (for now); R3 — Show every experiment, as detailed as possible, kept current with no human step; R4 — Draw all the important graphs and diagrams; R5 — Concise, non-technical explanations, with analysis and opinion on every method; R7 — As comprehensive as possible (cross-cutting)
   - **Depends on**: P1-WEB-5767, P1-WEB-EQ4I
@@ -54,7 +45,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `web/app/sera/journal/page.tsx`, `web/app/sera/ideas/page.tsx`, `web/app/sera/how/page.tsx` (one CSS module + tested `view.ts` each; each calls `requireSera(<own path>)`) and `web/components/sera/diagrams/` (`geometry.ts` +test, Pipeline, Windows). Journal: insights grouped by plain headings per kind (synthesis first), kind filter, newest first, method links. Ideas: `idea` backlog, blocked-on-data as a data wishlist, `ideasSeen` reading list. How it works: pipeline and time-windows diagrams, each hurdle with its threshold from `snapshot.gate`, honesty rules, data the lab has/lacks, glossary. Does not touch shell, chart kit, lib, other pages. Exit: tsc + vitest green; the three routes compile in `next build`.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 6 of 7)
   - **Satisfies**: R1 — Optimize the UI for desktop only (for now); R4 — Draw all the important graphs and diagrams; R5 — Concise, non-technical explanations, with analysis and opinion on every method; R6 — Insights from every exploration; food for thought on features and data sources; R7 — As comprehensive as possible (cross-cutting)
   - **Depends on**: P1-WEB-5767, P1-WEB-EQ4I
@@ -72,6 +63,18 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ## Completed Tasks
 
+- [x] **P1-WEB-5767** Phase 2: Web data layer for the snapshot
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `web/lib/sera/` (relative imports only): `types.ts` (contract types), `lab.ts` (loads `../../data/lab.json`; `methodById`, `trialsOf`, `insightsOf`, `childrenOf`), pure `derive.ts` (per-trial gate checks from the engine's `failed`, misses, closest-to-eligible, best variant per method, funnel counts, progress over trial number, family aggregates, parent/child links, rebased SPY TR, drawdown series, calendar-year returns), `glossary.ts`, escape-first `markdown.ts`, test-only `fixture.ts` (reuses `web/lib/format.ts`), and a `*.test.ts` for each. Does not touch pages, components, engine. Exit: tsc + vitest green; every derivation unit-tested on a fixture snapshot; `lab.ts` type-checks against the real `web/data/lab.json`.
+  - **Status**: done
+  - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 2 of 7)
+  - **Satisfies**: R3 — Show every experiment, as detailed as possible, kept current with no human step; R5 — Concise, non-technical explanations, with analysis and opinion on every method; R7 — As comprehensive as possible (cross-cutting)
+  - **Depends on**: P1-ENG-6QQA
+  - **Plan**: `.workflows/plan/P1-WEB-5767.md`
+  - **Completed**: 2026-10-04 22:10
+  - **Method**: /do
+  - **Files**: web/lib/sera/types.ts, web/lib/sera/lab.ts, web/lib/sera/derive.ts, web/lib/sera/glossary.ts, web/lib/sera/markdown.ts, web/lib/sera/fixture.ts, web/lib/sera/derive.test.ts, web/lib/sera/glossary.test.ts, web/lib/sera/markdown.test.ts, web/lib/sera/lab.test.ts
 - [x] **P1-WEB-EQ4I** Phase 3: Sera shell, access gate, chart kit
   - **Difficulty**: HARD
   - **Type**: Feature

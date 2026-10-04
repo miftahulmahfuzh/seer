@@ -17,7 +17,7 @@ write (`action_dismissals`).
 - One data layer (`lib/data.ts`) that turns rows of all three engines (`bracket`, `book`, `benchmark`) into typed view models
 - Pure, DB-free logic that tests run without a connection: metrics and the go-live checklist (`lib/metrics.ts`), month-by-month paper performance (`lib/monthly.ts`), strategy row helpers (`lib/strategy.ts`), slot letters and card colours (`lib/slots.ts`), session freshness (`lib/session.ts`), number/date formatting (`lib/format.ts`)
 - Four pages: Today, Positions, History, Leaderboard
-- Sera (`/sera`), the method lab section: gated to one account (`lib/sera/`), its own desktop shell and rail (`app/sera/layout.tsx`, `components/sera/`), and a dependency-free SVG chart kit (`components/sera/charts/`). Shell only so far; no `page.tsx` under `app/sera/` yet
+- Sera (`/sera`), the method lab section: gated to one account (`lib/sera/`), its own desktop shell and rail (`app/sera/layout.tsx`, `components/sera/`), a dependency-free SVG chart kit (`components/sera/charts/`), and a pure data layer over the bundled lab snapshot `data/lab.json` (`lib/sera/types.ts`, `lab.ts`, `derive.ts`, `glossary.ts`, `markdown.ts`). Shell only so far; no `page.tsx` under `app/sera/` yet
 - Shared roster UI (`components/StrategySwitch.tsx`, `components/PaperChip.tsx`, `components/roster.ts`): icon-only strategy switching by `?s=` and the paper marker on research strategies' holdings, orders and trades
 - Migrations runner shared with the engine (`scripts/migrate.mjs`) and a demo seeder (`scripts/seed-demo.mjs`)
 
@@ -80,6 +80,12 @@ web/
     allow.ts                isAllowed, safeNext                                    (pure)
     sera/access.ts          SERA_EMAIL, isSeraUser                                 (pure)
     sera/gate.ts            requireSera(next) (server only)
+    sera/types.ts           LabSnapshot / LabMethod / LabTrial / LabInsight: the data/lab.json contract
+    sera/lab.ts             lab snapshot + methodById, trialsOf, insightsOf, childrenOf (server only)
+    sera/derive.ts          gate checks, misses, closest, bestVariant, funnel, progress, families, SPY TR, drawdown, years (pure)
+    sera/glossary.ts        GLOSSARY plain-language terms, status / insight / source labels  (pure)
+    sera/markdown.ts        escape-first markdown -> HTML for lab analysis text            (pure)
+    sera/fixture.ts         GATE, trial(), method() builders (tests only)
     *.test.ts               vitest suites for every pure module
   scripts/
     migrate.mjs             applies ../db/migrations/*.sql once each (schema_migrations)
@@ -246,6 +252,12 @@ function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null befo
 - `lib/allow.ts`: `isAllowed(email, allowed)`, case/space-insensitive exact match. `safeNext(next, fallback = '/')`: returns `next` (first value if an array) only when it is an internal path: starts with `/`, not `//` or `/\`, no control characters or backslashes; else `fallback`. Sign-in uses it for its post-login redirect.
 - `lib/sera/access.ts`: `SERA_EMAIL = 'mahfuzh74@gmail.com'`; `isSeraUser(email)` trimmed, case-insensitive equality with it.
 - `lib/sera/gate.ts`: `requireSera(next = '/sera')`: signed out -> `redirect('/signin?next=…')`; signed in but not `ALLOWED_EMAIL` or not `SERA_EMAIL` -> `notFound()` (the section is not revealed); else returns the user. Called by `app/sera/layout.tsx`.
+- `lib/sera/types.ts`: the `data/lab.json` contract (`LabSnapshot` with `gate`, `benchmark`, `methods`, `trials`, `insights`, `seen`), derived aliases (`LabStatus`, `InsightKind`, `SourceKind`, `Gate`, `Benchmark`, `Point = [date, value]`) and the `METHOD_STATUSES` / `INSIGHT_KINDS` / `SOURCE_KINDS` lists. Must match the engine's `lab stage` export.
+- `lib/sera/lab.ts`: `lab` (the JSON imported at build time; server components only, it is large), `methodById(id)`, `trialsOf(methodId)` (by n), `insightsOf(methodId)` (by id), `childrenOf(methodId)` (by id).
+- `lib/sera/derive.ts` (pure): six hurdles `CONDITION_KEYS` (`spy, drawdown, pf, trades, owner, dsr`) with `CONDITION_LABEL` / `FAILURE_LABEL`; `conditionOk` (null = not measured), `gateChecks(trial, gate)`, `conditionsPassed`, `misses`, `excessCagr`; over dev-window trials: `closest(trials, k)` (most hurdles, then MAR, then earliest), `bestVariant` (fewest misses, falls back to non-dev trials), `funnel`, `progress` (running best); `families(methods, trials)` aggregates; `trialsByMethod`; `spyForWindow(trial, benchmark)` rebases SPY TR to 1.0 at the trial start on its curve dates; `drawdownSeries(curve)`, `yearlyReturns(curve)` (calendar years).
+- `lib/sera/glossary.ts` (pure): `GLOSSARY` / `GLOSSARY_ORDER` plain-language definitions, `CONDITION_TERM`, `STATUS_LABEL` (label, meaning, tone), `INSIGHT_KIND_LABEL`, `SOURCE_KIND_LABEL`.
+- `lib/sera/markdown.ts` (pure): `escapeHtml`, `renderInline`, `renderMarkdown`. Escapes all source first, then adds only headings (`#`..`###` -> h3..h5), paragraphs, bold/italic/code, lists, pipe tables and http(s) links; raw HTML always renders as text.
+- `lib/sera/fixture.ts`: test builders `GATE`, `trial(over)`, `method(over)`; not for runtime code.
 - `components/Nav.tsx`: `Nav({ showSera })`; the `(app)` layout passes `isSeraUser(user.email)`, which adds a `Telescope` link to `/sera` at the foot of the desktop rail only (no mobile entry).
 - `components/tooltip.ts`: short tips stay one-line pills; long tips wrap in a box (max 340px); a `\n` in the text forces a line break (`pre-line`).
 - `components/sera/charts/`: server-renderable inline-SVG charts, no chart library. `LineChart` (series of `[x, y|null, tip?]` points, numeric or date x, reference lines), `ScatterChart` (points plus shaded regions), `BarChart` (groups; `barGroups` lifts a flat list), `Legend` (`line|dash|dot|ring|zone` shapes). Point and bar tooltips use the shared `data-tip` layer. `scale.ts` is pure and unit-tested.
@@ -258,6 +270,7 @@ function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null befo
 engine (Python, nightly) -> Neon tables -> lib/data.ts (SQL, row -> view model)
                                               |-> pure lib/* (metrics, monthly, strategy, slots, format)
                                               -> server components in app/(app)/* -> HTML
+engine `lab stage` -> web/data/lab.json (committed) -> lib/sera/lab.ts -> pure lib/sera/derive.ts -> /sera server components
 user "Mark as done" -> actions.dismiss -> data.dismissAction -> action_dismissals
 ```
 

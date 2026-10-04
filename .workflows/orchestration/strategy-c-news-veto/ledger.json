@@ -1,0 +1,149 @@
+{
+  "branch": "feature/strategy-c-news-veto",
+  "coordinator": "orch-strategy-c-news-veto",
+  "coordinator_session_id": "0e694a6e-c080-4da8-baae-1beaa72410a3",
+  "created": "2026-10-04T10:50:05+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 1,
+      "note": null,
+      "package": "engine/strategies",
+      "plan": ".workflows/plan/strategy-c-news-veto/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Pure C: strategy object, prompt, parser"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 2,
+      "note": null,
+      "package": "db`, `engine/paper",
+      "plan": ".workflows/plan/strategy-c-news-veto/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Migration 004, roster entry C, verdict store"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "engine",
+      "plan": ".workflows/plan/strategy-c-news-veto/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Finnhub client and LLM call options"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2,
+        3
+      ],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": null,
+      "package": "engine/commands",
+      "plan": ".workflows/plan/strategy-c-news-veto/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "veto` command"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2
+      ],
+      "difficulty": "HARD",
+      "n": 5,
+      "note": null,
+      "package": "engine/commands",
+      "plan": ".workflows/plan/strategy-c-news-veto/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "paper`, `paper_check`, `explain` decide and replay C"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2
+      ],
+      "difficulty": "HARD",
+      "n": 6,
+      "note": null,
+      "package": "web",
+      "plan": ".workflows/plan/strategy-c-news-veto/phase-6.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Web: C everywhere, Vetoed tonight, D9 row, demo seed"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        4,
+        5,
+        6
+      ],
+      "difficulty": "NORMAL",
+      "n": 7,
+      "note": null,
+      "package": "repo",
+      "plan": ".workflows/plan/strategy-c-news-veto/phase-7.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3",
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Ship: Veto workflow step, live smoke, docs"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/strategy-c-news-veto/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "strategy-c-news-veto",
+  "updated": "2026-10-04T10:50:05+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/strategy-c-news-veto"
+}

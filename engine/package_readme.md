@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (src layout: `engine/src/seer_engine`)
-**Last Updated**: 2026-10-04 (P7a, phase 13 of `TRADE_RULES_DEV_SEARCH_PLAN.md`: `TradeRules` and the book engine, allocators and families F1–F11, the research store, the dev runner/report/registry, `research_store` and `backtest_dev`, the committed dev report and P7b pre-registration)
+**Last Updated**: 2026-10-04 (P4 paper-only, phase 13 of `PAPER_TRADING_SHIP_PLAN.md`: migration 003, the `paper/` package, the book split rule, Massive dividends, the `paper`, `paper_check` and `explain` commands, ruff lint in CI)
 
 ## Overview
 
@@ -27,6 +27,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - The Strategy A rework (P3b): `strategies.a2` (Strategy A's pre-registered variants V0–V3), an anchored yearly walk-forward (`backtest/walkforward.py`) that drives one portfolio whose params change by year, its report (`backtest/wf_report.py`) and the `backtest_wf` command
 - Strategy B (P6a): `strategies.b` (an ML cross-sectional ranker on 15 ranked features and 3 SPY features, keeping A's bracket and passing on nights with no positive prediction), `strategies.b_model` (fixed-hyperparameter gradient-boosted trees, plus a ridge for information), a vectorized net-of-cost bracket labeler (`backtest/labels.py`), the B walk-forward over P3b's folds with a label purge (`backtest/b_walkforward.py`), its report (`backtest/b_report.py`), and the `backtest_b` command
 - Trade rules as a value and a dev-window strategy search (P7a): `sim.rules` (`TradeRules`, with `DESIGN_V0` reproducing design §5 exactly) and a second pure engine, `sim.book` (signal exits, rebalancing, dividends, fractional shares, open entries, idle instruments); the `Allocator` protocol and the families F1–F11 (`strategies/allocator.py`, `f_index.py`, `f_rotation.py`, `f_factor.py`, `f_swing.py`); `backtest/book_runner.py`; a local, gitignored research store of pre-2015 history (`research.py`, `research_store` command); and a pre-registered registry run only on the development window (≤ 2015-10-16) by `backtest/dev.py`, `dev_report.py`, `registry.py` and the `backtest_dev` command, which writes the dev report and the P7b pre-registration
+- Nightly paper trading (P4, paper-only by the owner's option (b), 2026-10-04): a frozen roster of four paper portfolios (`SPY` the champion and benchmark, `A`, `F4-MOM12-N20-TREND`, `F1-SPY-SMA200-M`) stepped one session at a time by pure night functions (`paper/bracket.py`, `paper/book.py`, `paper/benchmark.py`) that mirror the backtest runners' loop bodies; persisted in migration 003's tables by `paper/store.py`; driven by the `paper` command after `nightly`; proven equal to a one-shot `run_rules` / `buy_and_hold` replay by `paper_check`; optionally explained by an LLM (`explain`). No real-money path exists, and design §1 is unchanged
 
 ## Layout
 
@@ -50,6 +51,8 @@ engine/
     yahoo.py                yfinance download + frame parsing, BRK.B <-> BRK-B (phase 3)
     runs.py                 start_run / finish_run / fail_run
     research.py             local research store: build_store() / load_store(), DEV_END guard (impure; P7a)
+    dividends.py            Massive cash dividends (CD + SC) per ex-date, upsert into `dividends` (P4)
+    llm.py                  optional Anthropic-compatible Messages call for `explain`; never raises past it (P4)
     sim/                    fill simulator: pure, deterministic, Decimal-only (P2)
       __init__.py           public surface; import everything from seer_engine.sim
       model.py              constants, money helpers, Order, Portfolio, Event, Snapshot, StepResult
@@ -57,7 +60,15 @@ engine/
       sizing.py             Pick, Rejection, SizingResult, size_picks()
       split_adjust.py       apply_split()
       rules.py              TradeRules, DESIGN_V0, V0_BOOK, the presets, is_decision_session (P7a)
-      book.py               the book engine: Target, Book, Position, Fill, Trade, step_book(), close_book_unpriced() (P7a)
+      book.py               the book engine: Target, Book, Position, Fill, Trade, step_book(), close_book_unpriced() (P7a); apply_book_split(), BookSplit (P4)
+    paper/                  nightly paper trading (P4); every module but store.py is pure
+      __init__.py           docstring only
+      roster.py             the frozen roster: four entries, canonical spec text, digest, backtest_gate
+      bracket.py            settle_bracket(), decide_bracket(): run_backtest's loop body for one session
+      book.py               settle_book(), decide_book(): run_book's loop body for one session
+      benchmark.py          BenchmarkState, start_benchmark(), split_benchmark(), step_benchmark(): buy_and_hold for one session
+      replay.py             the pure comparison behind paper_check
+      store.py              load/save paper state, windowed market, splits and dividends queries (impure)
     strategies/             strategy layer: pure; float64 indicators, Decimal picks (P3)
       __init__.py           re-exports the public names of base, a, a2 and b (never b_model, so importing the package does not load scikit-learn)
       base.py               History, history_from_bars(), Strategy protocol
@@ -98,6 +109,10 @@ engine/
       backtest_b.py         `backtest_b` command (P6a)
       research_store.py     `research_store` command (P7a)
       backtest_dev.py       `backtest_dev` command (P7a)
+      nightly.py            `nightly` command (P1; P4 adds dividends and held paper symbols)
+      paper.py              `paper` command (P4)
+      paper_check.py        `paper_check` command (P4)
+      explain.py            `explain` command (P4)
   tests/                    pytest; DB tests need PG_TEST_URL
   data/spy_dividends.csv    SPY dividends (ex_date, amount_usd), vendored from yfinance (see data/SOURCES.md)
   .cache/                   gitignored; bars-<max date>-<rows>.pkl written by the backtest loader
@@ -105,6 +120,7 @@ engine/
 docs/backtests/             committed reports: <end>-strategy-a{.md,-equity.csv,-equity.svg} (P3); <end>-strategy-a2-walkforward{.md,-equity.csv,-equity.svg,-variants.svg,-grid.csv} (P3b); <end>-strategy-b-walkforward{.md,-equity.csv,-equity.svg} (P6a); <run date>-p7a-dev-exploration{.md,-rows.csv,-curves.csv,-frontier.svg} (P7a)
 docs/plans/                 <run date>-p7b-preregistration.md: the P7b finalists (or "none eligible"), written by backtest_dev (P7a)
 db/migrations/002_engine.sql  (outside the package, owned by it)
+db/migrations/003_paper.sql   (outside the package; paper state, book tables, dividends, roster rows; P4)
 ```
 
 ## CLI
@@ -356,6 +372,38 @@ reads only the research store. **No Neon, no network.**
 - **One run per registry state.** Appending a candidate (D6) means a new commit before its run, and
   every try is reported.
 
+### `paper` (P4)
+
+```
+usage: seer_engine paper [-h] [--dry-run] [-v] [--now ISO8601]
+```
+
+The nightly paper step for the frozen roster (`docs/runbooks/paper-trading.md`).
+
+- **Precondition**: the real `runs` row for `run_dates(now).session_date` has `status = success`. Otherwise nothing is written and it exits 1 (design §8: a failed bars run means no paper step).
+- **First night**: writes each roster row's frozen spec (`params`) and `paper_start = session_date`, `paper_state` (initial cash 20,000,000 IDR at the latest FX on or before `data_date`), day-0 snapshots at `data_date`, and the first decisions.
+- **Every night**: steps every session after `paper_state.last_session` through `data_date` for every strategy, then decides `session_date`. See Usage, "Paper: one night".
+- **Idempotent** per (strategy, session): a re-run for a session already done writes nothing.
+- **One transaction** for the whole night plus `runs.paper_status`. A failure rolls back everything and records `paper_status = failed`.
+- **Frozen spec**: a started strategy whose stored digest differs from `paper/roster.py` fails the night as `store.SpecMismatch` (rolled back, `paper_status = failed`, exit 1). A `paper_start` with no `paper_state` is refused the same way until the clock is reset.
+- **Exit codes**: 0 = stepped and decided, or already done (no-op); 1 = no successful bars run for the session (nothing written), or the night failed (rolled back, `paper_status = failed`, `paper_error` set); 2 = missing setting (`DATABASE_URL_UNPOOLED`).
+
+### `paper_check` (P4)
+
+```
+usage: seer_engine paper_check [-h] [--dry-run] [-v] [--require-sessions N]
+```
+
+The read-only replay check (D7). See Usage, "Paper: replay check". "Not started" (no `paper_start`) is a pass. A strategy touched by an applied split is reported `split-affected`, not failed. `--require-sessions N` is the v0.1.0 release check. Exit codes: 0 = every started strategy `ok` or `split-affected` (or none started); 1 = a mismatch, or `--require-sessions N` unmet (`not-started` counts as 0); 2 = missing setting.
+
+### `explain` (P4)
+
+```
+usage: seer_engine explain [-h] [--dry-run] [-v]
+```
+
+Optional LLM explanations (D9) for new paper entries without one: `orders.explanation` for A's new pending orders, `book_targets.explanation` for new entries of the latest decision. Missing or empty `LLM_*` settings, or any LLM error, leave the text NULL and exit 0. Paper correctness never depends on it. Exit 1 only on a database error; 2 when `LLM_*` is set but `DATABASE_URL_UNPOOLED` is missing.
+
 ## Exported API
 
 ### config
@@ -440,6 +488,7 @@ This is the only module that knows Yahoo's ticker spelling. Prices come from yfi
 - `finish_run(conn, run_id)`: sets `success` and `finished_at = clock_timestamp()`.
 - `fail_run(conn, run_id, error)`: sets `failed` with a redacted error cut to 2000 characters.
 - Both final setters raise `LookupError` when `run_id` is not a real (non-demo) run.
+- P4: `start_paper(conn, run_id)`, `finish_paper(conn, run_id)`, `fail_paper(conn, run_id, error)` (error redacted, cut to 2000 characters); each raises `LookupError` for an unknown or demo run. `paper` sets `running` in a short transaction of its own, then `success` inside the night's transaction; a failure rolls the night back and sets `failed` with a redacted `paper_error` in its own transaction.
 
 ### universe (read side only; phase 2 writes the table)
 
@@ -454,7 +503,7 @@ Membership intervals are `[start_date, end_date)`, where `end_date` is exclusive
 
 Demo bars and FX rows look exactly like real ones, so the trigger is that a `runs` row with `is_demo` exists. While one exists, every row in the demo-owned tables is treated as demo data.
 
-- `DEMO_TABLES = ("action_dismissals", "orders", "equity_snapshots", "bars", "fx_rates", "runs")`. `strategies` is kept on purpose.
+- `DEMO_TABLES = ("action_dismissals", "orders", "equity_snapshots", "paper_state", "book_positions", "book_targets", "book_fills", "book_trades", "bars", "fx_rates", "runs")`. `strategies` is kept on purpose. A purge also resets `strategies.paper_start` and `params` (the demo seed's paper clock; `RESET_PAPER_CLOCK`), so the first real `paper` run starts cleanly; `dividends` is never purged.
 - `has_demo(conn) -> bool`
 - `purge_demo(conn) -> bool`: `TRUNCATE <DEMO_TABLES> RESTART IDENTITY` when demo data exists. Does not commit.
 - `purge_demo_if_needed(conn, dry_run) -> bool`: runs `purge_demo` in its own `db.transaction`. Under `dry_run` the purge runs, is rolled back and logs "would purge". The return value still says whether it purged or would have.
@@ -1244,6 +1293,82 @@ The best MAR was `F4-MOM12-N20-TREND` (F4): CAGR +16.2% against +7.9% for total-
 `docs/backtests/2026-10-04-p7a-dev-exploration.md` and its frontier chart. P7b does not run; the
 pre-registration file records "none eligible".
 
+### paper (P4)
+
+`seer_engine.paper` is nightly paper trading. Every module but `store.py` is pure (no psycopg,
+requests, yfinance, clock or randomness), `Decimal`-only for money, and covered by the purity tests.
+Each night function steps exactly one session the way a runner's loop body does, and its tests prove
+that looping it equals the runner (`run_backtest`, `run_book`, `buy_and_hold`) over hundreds of
+synthetic sessions.
+
+- **`paper.roster`**: the frozen roster (D1, D4).
+  - `BENCHMARK_ID = "SPY"`, `F4_ID = "F4-MOM12-N20-TREND"`, `F1_ID = "F1-SPY-SMA200-M"`.
+  - `RosterEntry` (frozen dataclass), one paper portfolio: `id, name, sub, icon, is_champion, is_benchmark, sort` (equal to migration 003's rows), `engine: Engine`, `rules: TradeRules | None`, `obj: Strategy | Allocator | None`, `object_name`, `params`, `registry_id: str | None`, `lookback: int`, `gate_note: str`.
+  - `ROSTER: tuple[RosterEntry, ...]` (SPY, A, F4, F1), `ROSTER_IDS`, `MAX_LOOKBACK_BARS = max(e.lookback for e in ROSTER)`.
+  - `entry(strategy_id) -> RosterEntry`: the roster entry; `KeyError` when it is not on the roster.
+  - `rules_dict(rules: TradeRules) -> dict[str, str | None]`: every `TradeRules` field, in field order, as plain strings.
+  - `spec(e) -> dict[str, Any]`: the frozen spec (C2 `params.spec`), JSON-ready, strings and nulls only.
+  - `spec_text(s) -> str`: the canonical text of a spec: JSON with sorted keys, no whitespace, ASCII only.
+  - `spec_digest(s) -> str`: sha256 (hex) of `spec_text(s)` in UTF-8. The four digests are pinned in `tests/test_paper_roster.py`.
+  - `backtest_gate(e) -> dict[str, Any]`: C2 `params.backtest_gate`, `passed` false for every entry, with `e.gate_note`.
+  - `strategy_params(e) -> dict[str, Any]`: the whole `strategies.params` jsonb (`spec`, `digest`, `backtest_gate`), as `paper` writes it.
+- **`paper.bracket`**:
+  - `BracketNight(session, portfolio, events, snapshot)`: one settled session of a bracket strategy.
+  - `settle_bracket(pf, session, bars, splits, last_bar_date) -> BracketNight`: settle `session` exactly like one `run_backtest` iteration (`apply_split` per applied split, `sim.step`, `close_unpriced` for symbols whose bars ended, snapshot replaced).
+  - `decide_bracket(pf, strategy, params, history, members, data_date) -> SizingResult`: the pending orders for `next_session(data_date)`: `strategy.picks` on `history` cut at `data_date`, then `size_picks`.
+- **`paper.book`**:
+  - `BookNight(session, book, targets, splits, fills, trades, dividends, rejected, forced, snapshot)`: one settled session of a book strategy.
+  - `decide_book(market, allocator, params, rules, data_date, held) -> tuple[tuple[Target, ...] | None, bool]`: the targets for `next_session(data_date)` (`None` when it is not a decision session) and whether the idle residual was appended. `backtest.book_runner._with_idle` is reused by import.
+  - `settle_book(book, session, bars, targets, idle_added, rules, dividends, splits, last_bar_date) -> BookNight`: `sim.apply_book_split` per applied split (targets rescaled too), `sim.step_book`, `close_book_unpriced` for gone positions, snapshot replaced.
+- **`paper.benchmark`**: `buy_and_hold` one session at a time. Whole shares at the first session's open; dividends with an ex-date after the start credited on the ex-date and reinvested at that close; marked at every close.
+  - `SPY = "SPY"`; `BenchmarkState(start, cash, equity, position: Position | None, last_session)`.
+  - `start_benchmark(cash0, start) -> BenchmarkState`: the benchmark the night before `start`: `q(cash0)` in cash, nothing held.
+  - `split_benchmark(state, factor, session) -> tuple[BenchmarkState, Decimal]`: rewrite the SPY holding in post-split units (floor shares, cash in lieu returned, prices ÷ the exact factor).
+  - `step_benchmark(state, session, bar, dividend, *, split=None) -> tuple[BenchmarkState, Snapshot, tuple[Fill, ...]]`: step through `session` (which must be `next_session(state.last_session)`); a `split` runs `split_benchmark` first.
+- **`paper.replay`**: the pure comparison behind `paper_check`.
+  - `Engine`, `Status = "ok" | "mismatch" | "split-affected" | "not-started"`; field tuples `SNAPSHOT_FIELDS`, `ORDER_FIELDS`, `POSITION_FIELDS`, `FILL_FIELDS`, `TRADE_FIELDS`, `TARGET_FIELDS`, `HOLDING_FIELDS`; `MAX_SHOWN = 10`.
+  - `Holding(symbol, shares, mark)`: the benchmark's holding as `book_positions` stores it. `PaperHead(strategy_id, engine, paper_start, last_session, usd_idr)`: what the replay needs from a started strategy. `Records(...)`: one strategy's paper record, stored or expected (cash, equity, pending, snapshots, orders and marks, positions, fills, trades, targets, holdings). `Difference(where, text)`. `CheckResult(strategy_id, status, sessions, paper_start, last_session, differences, total_differences, splits)`.
+  - `sessions_stepped(paper_start, last_session) -> int`; `last_close(market, symbol, on) -> Decimal`; `held_before(fills, session) -> frozenset[str]`.
+  - `expected_bracket(market, strategy, params, head) -> Records` (`run_rules(DESIGN_V0)` plus the next decision); `expected_book(market, allocator, params, rules, head, dividends) -> Records` (`run_rules(rules)` plus every decision); `expected_benchmark(market, head, dividends) -> Records`.
+  - `compare(engine, stored, expected) -> tuple[Difference, ...]`: every stored value that differs, snapshots first, `paper_state` last. `split_exposure(engine, paper_start, records, splits)`: the applied splits that hit a held or pending symbol. `judge(head, stored, expected, splits) -> CheckResult`; `not_started(strategy_id)`; `broken(strategy_id, where, message, *, paper_start=None, last_session=None)`.
+  - `failures(results, require_sessions) -> tuple[str, ...]`; `exit_code(results, require_sessions) -> int` (1 when `failures` is non-empty); `render(results) -> tuple[str, ...]`.
+- **`paper.store`** (impure; nothing commits, `paper` runs a night in one transaction):
+  - `BENCHMARK_ID = "SPY"`, `MARKET_WINDOW_DAYS = 550` (the only window constant), `PRICE_QUANTUM`, `DIVIDEND_QUANTUM`. `StoreError(RuntimeError)`; `SpecMismatch(StoreError)`: a frozen strategy's stored digest differs from the code's.
+  - Roster rows: `StrategyRow(id, name, engine, rules_id, is_champion, is_benchmark, sort, paper_start, params)`; `read_strategies(conn)`, `read_strategy(conn, strategy_id)`; `freeze_spec(conn, strategy_id, *, spec, digest, backtest_gate, paper_start)` (writes once); `check_digest(row, digest)` (raises `SpecMismatch`).
+  - State: `PaperState(strategy_id, last_session, cash_usd, equity_usd, initial_cash_usd, usd_idr, pending_session, pending_decision)`; `read_paper_state(conn, strategy_id)`; `init_paper_state(conn, strategy_id, *, paper_start, cash0, usd_idr) -> PaperState` (day 0: `last_session = prev_session(paper_start)` plus the day-0 snapshot); `write_paper_state(conn, strategy_id, *, cash, equity, last_session)`; `write_pending(conn, strategy_id, session, *, decision)`; `upsert_snapshot(conn, strategy_id, snapshot)`; `read_snapshots(conn, strategy_id)`.
+  - Bracket: `load_portfolio(conn, strategy_id) -> Portfolio`; `insert_pending_orders(conn, strategy_id, placed, companies=None) -> int`; `save_bracket_night(conn, strategy_id, portfolio, events, snapshot)`; `read_orders(conn, strategy_id) -> tuple[tuple[Order, Decimal | None], ...]`.
+  - Book: `LoadedBook(book, pending_session, targets, idle_added)`; `load_book(conn, strategy_id, *, idle_symbol=None) -> LoadedBook`; `save_book_night(conn, strategy_id, book, fills, trades, snapshot, *, executed_targets=None)`; `save_book_decision(conn, strategy_id, session, targets)` (an empty decision writes no row); `read_book_positions`, `read_book_targets(conn, strategy_id, session)`, `read_book_fills`, `read_book_trades`.
+  - Benchmark: `load_benchmark(conn, strategy_id="SPY") -> BenchmarkState`; `save_benchmark_night(conn, strategy_id, state, snapshot, fills)`.
+  - Market: `dividends_on(conn, session, symbols)`, `dividends_between(conn, start, end)` (`book_runner.DividendMap` shape); `applied_splits_on(conn, session) -> tuple[tuple[str, Decimal], ...]`, `applied_splits_between(conn, start, end)`; `market_window_since(data_date) -> date`; `load_market_window(conn, since) -> Market` (bars via `backtest.io.read_bars_frame(conn, since=...)`, every membership interval, FX).
+
+### dividends (P4)
+
+- `AMOUNT_QUANTUM = Decimal("0.000001")`, `CASH_TYPES = frozenset({"CD", "SC"})`, `CURRENCY = "USD"`.
+- `Dividend(symbol, ex_date, amount)`.
+- `quantize_amount(value) -> Decimal`: rounded half-up to 6 decimals (`numeric(14,6)`).
+- `parse_massive(raw) -> Dividend | None`: one Massive `/v3/reference/dividends` row, or None for a valid row Seer does not credit (other types or currencies).
+- `totals(items) -> list[Dividend]`: one per (symbol, ex_date), the exact sum quantized half-up to 6 dp.
+- `adjust_for_splits(items, split_items) -> list[Dividend]`: put freshly fetched dividends into the units of the bars fetched with them.
+- `upsert_dividends(conn, items) -> int`: insert new dividends and update changed ones; returns how many rows changed.
+
+### llm (P4)
+
+- `ANTHROPIC_VERSION = "2023-06-01"`, `DEFAULT_TIMEOUT_S = 20.0`, `DEFAULT_RETRIES = 1`, `DEFAULT_BACKOFF_S = 2.0`, `DEFAULT_MAX_TOKENS = 400`, `MAX_ERROR_BODY = 200`.
+- `LlmError(RuntimeError)`: a request failed after retries, or the reply held no text.
+- `LlmConfig(base_url, api_key, model)` (`api_key` excluded from `repr`); `load_config() -> LlmConfig | None`: None when any of `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` is unset or empty.
+- `messages_url(base_url) -> str`: the Messages endpoint for `base_url`. `scrub(text, secret) -> str`: key/token query parameters and every occurrence of `secret` redacted.
+- `Client(cfg, *, transport=None, timeout=20.0, retries=1, backoff=2.0, max_tokens=400, sleep=time.sleep)`; `Client.complete(system, prompt) -> str`. The key goes out as both `x-api-key` and `Authorization: Bearer` (z.ai compatibility). `explain` catches every `LlmError`, so it never raises past it.
+
+### P4 additions to existing modules
+
+- `massive.Client.dividends(d)` (and the `MassiveSource` protocol): one call per fetched session, `/v3/reference/dividends?ex_dividend_date=D` (the free tier served 513 rows for 2026-09-18 in one page); USD cash dividends of types CD and SC, following `next_url`.
+- `splits.apply_splits` also rewrites `dividends` before the execution date: `round(amount * split_from / split_to, 6)`.
+- `commands/nightly.py`: fetches and stores dividends for every missing session in its one transaction, and adds paper-held symbols (`universe.paper_symbols(conn, d)`) to each session's wanted set, so a position keeps its bars after its symbol leaves the index.
+- `universe.paper_symbols(conn, d) -> set[str]`: symbols paper state still needs a bar for on session `d`: pending or open `orders`, every `book_positions` row (the SPY benchmark holding included), and `book_targets` decided for `d` or later.
+- `runs`: `start_paper(conn, run_id)`, `finish_paper(conn, run_id)` and `fail_paper(conn, run_id, error)` set `paper_status`, `paper_error` (redacted, cut like `error`) and `paper_finished_at` on the real run row.
+- `sim.apply_book_split(book, symbol, factor, session, rules, targets=None) -> BookSplit` (`sim/book.py`, exported from `seer_engine.sim`): the book engine's split rule. Shares × factor (floored for whole-share rules); cash in lieu credited to cash and the position's `income_usd`; stop, take, mark and entry price ÷ the exact factor; floor-to-zero closes as `forced` at the old mark; pending targets for the symbol rescaled. `BookSplit(book, targets, in_lieu, trade, fills)`. Called only for splits recorded with `applied = true`.
+- `backtest.io.read_bars_frame(conn, *, since=None)`: `since` limits the `COPY` to `date >= since`. The default is unchanged, so every existing caller and `load_market` are byte-identical.
+
 ## Migration 002 (`db/migrations/002_engine.sql`)
 
 This migration is additive only. It is written by the engine, and web does not read these tables.
@@ -1252,6 +1377,21 @@ This migration is additive only. It is written by the engine, and web does not r
 - `split_adjustments(symbol, execution_date, split_from > 0, split_to > 0, applied, recorded_at)`, with PK `(symbol, execution_date)`.
 - `backfill_log(symbol PK, status IN ('ok','empty','failed'), first_date, last_date, rows, error, updated_at)`.
 - `runs_real_session_uidx`: a unique index on `runs(session_date) WHERE NOT is_demo`, which allows at most one real run per session.
+
+## Migration 003 (`db/migrations/003_paper.sql`, P4)
+
+Additive only: new columns are nullable or defaulted, `orders` keeps every type and constraint.
+
+- `strategies` gains `engine` (`bracket` | `book` | `benchmark`), `rules_id` (`design-v0`, `monthly-hold`, NULL for SPY) and `paper_start` (the first paper session; NULL until `paper` starts it). `params` holds the frozen spec, its digest and `backtest_gate`.
+- `orders` gains `mark` (an open order's last close, in the order's own pre-split units).
+- `runs` gains `paper_status` (`running` | `success` | `failed`), `paper_error` and `paper_finished_at`.
+- `paper_state(strategy_id PK, last_session, cash_usd, equity_usd, initial_cash_usd, usd_idr, pending_session, pending_decision, updated_at)`: one row per paper strategy.
+- `book_positions(strategy_id, symbol)` PK: `sim.book.Position` (fractional-capable `shares`, `mark`, entry date and price, `days_held`, episode `cost_usd` / `income_usd`, stop, take, `exit_pending`). The SPY benchmark's holding is a row here too.
+- `book_targets(strategy_id, session_date, symbol)` PK, unique rank: a book strategy's ranked decision for one session, kept after execution, with `explanation`.
+- `book_fills` (`seq` within a session, side, reason `entry`…`forced`) and `book_trades` (closed holding episodes, `idle` flag, exit reasons `signal`, `time`, `gap`, `tp`, `sl`, `forced`; index on `(strategy_id, exit_date)`).
+- `dividends(symbol, ex_date)` PK, `amount` > 0: Massive cash dividends (CD + SC summed), in bars' units; `splits.apply_splits` rewrites them with the bars.
+- Data: the four roster display rows (upsert; `SPY` is the only champion and the benchmark), and `B`/`C` deleted only when no `orders` or `equity_snapshots` row references them.
+- Applied to Neon on 2026-10-04 (runbook ship check).
 
 ## Data Flow
 
@@ -1273,7 +1413,7 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 - `python-dotenv>=1.0`: parses `.env.local`. The file is parsed, never `source`d, because it contains an unquoted `&`.
 - `yfinance>=1.0`: used only by `yahoo.py` (phase 3 backfill, and P7a's research store through its dividends-aware download with `actions=True`), imported lazily.
 - `scikit-learn>=1.9,<1.10` (P6a): Strategy B's `HistGradientBoostingRegressor`, used only by `strategies.b_model`. The minor version is pinned, because a frozen model is a pickle of its estimator, and `b_model`'s digest reads the fitted trees' private node arrays. It brings `threadpoolctl` (used to cap the threads in the determinism probe), `joblib` and `scipy`. `cli.discover` imports every command, so `backtest_b` makes every command load scikit-learn at startup (about 0.5–1 s); `import seer_engine.strategies` alone does not.
-- dev: `pytest>=8`.
+- dev: `pytest>=8`, `ruff>=0.16,<0.17` (lint config in `[tool.ruff]`: `py311`, selects `E9` and `F`, ignores `F401`).
 
 ### Internal module graph
 - `cli` imports `config` and `commands`. `commands.migrate` imports `config` and `db`.
@@ -1305,6 +1445,9 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 - P4 stays blocked: the P6a gate failed, `STRATEGY_B_FROZEN` is `None`, and no model artifact is committed. Nothing may deploy Strategy A, A2 or B. B's one round has failed on this data. The owner chooses among the report's options (b), (c) and (d).
 - P4 stays blocked through P7a: no registry candidate was eligible on the dev window, so P7b does not run, and nothing in `strategies/` or `backtest/registry.py` may be deployed. The owner decides next with the dev frontier.
 - Nothing in `web/` imports the engine. The two share only the database schema and `schema_migrations`.
+- P4 runs **paper-only** (owner option (b), 2026-10-04): `commands/paper.py` steps the frozen roster (`paper/roster.py`: `SPY`, `A` with `STRATEGY_A_PARAMS`, `F4-MOM12-N20-TREND` and `F1-SPY-SMA200-M` from `backtest/registry.py`, read-only) through the same `sim` and strategy/allocator code the backtests ran. Nothing is a real-money recommendation: SPY is the champion, and `strategies.params.backtest_gate.passed` is false for every entry.
+- `web/lib/data.ts` reads `paper_state`, `book_positions`, `book_targets`, `book_trades`, `orders`, `equity_snapshots`, `runs.paper_*` and `strategies.params`/`paper_start` (read-only). The web never imports the engine; the schema in migration 003 is the contract.
+- `.github/workflows/nightly.yml` runs `migrate` → `nightly` → `paper` → `paper_check` → `explain`; `.github/workflows/engine-ci.yml` runs `ruff check engine` (rules in `pyproject.toml`) before pytest.
 
 ## Concurrency
 
@@ -1351,6 +1494,15 @@ The temp tables `_seer_bars_in` and `_seer_fx_in` are scoped to a session (`ON C
   - `research_store --verify` (sha256 of every file, the `DEV_END` scan and the three data checks, no network): 4.3 s.
   - `backtest_dev`: store load 2.11 s; 54 candidates, sequentially, from 0.07 s to 5.26 s each, each allocator's one-time feature preparation included in its first candidate (median 0.43 s; slowest `F9-SPY200D50-SWING50`); 45.2 s for all 54 including the survivorship table and SPY curves; rendering and writing the five files under 1 s (not logged separately; read from the log timestamps).
   - Whole command: 0:51 for the committed run, 0:49 for the identical re-run; peak RSS 847 MB. Well under D13's 60-minute threshold, so there is no process pool.
+- Paper (P4), measured on Neon on 2026-10-04 from WSL2, Python 3.11, with the real data (bars through
+  2026-10-02), as a rolled-back first night (`--dry-run -v paper`, four strategies started, 0 sessions stepped):
+  - Windowed bars load: 247,310 bars since 2025-03-31 in 1.69 s (`store.load_market_window`, timed separately; inside the command the window, splits and dividends took about 5 s). The plan's probe: `COPY … WHERE date >= '2025-06-01'`
+    219,575 rows in 2.34 s; `>= '2024-10-01'` 326,410 rows in 2.73 s. There is no pickle cache.
+  - Whole command: 6.94 s wall, peak RSS 238 MB. That is well inside the nightly job's 45-minute timeout.
+  - `paper_check` before any session: 1.38 s wall. Its cost grows with the paper window, one
+    `run_rules` per strategy over `[paper_start, last_session]`.
+  - Migration 003 left the database at 186 MB (186 MB before; bars are 177 MB of it). The paper tables
+    grow by kilobytes per month.
 - There is no benchmark coverage for the DB writers.
 
 ## Usage
@@ -1420,46 +1572,39 @@ for session in dates.sessions(start, end):
         snapshots[-1] = Snapshot(session, pf.cash, pf.equity)
 ```
 
-### Simulator: P4 nightly
+### Paper: one night (P4)
 
-One strategy, one night: `rd = dates.run_dates()`. The session to settle is `rd.data_date`, and the picks are for `rd.session_date`.
+The night as `commands/paper.py` runs it, after `nightly` has succeeded for `rd.session_date`.
+Every arrow below is a call into code the backtests also run.
 
-```python
-pf = load_portfolio(conn, strategy_id)
-# Portfolio(cash, equity) from the last equity_snapshots row; orders = rows with status
-# pending/open, sorted by slot; marks = last close per open symbol; last_session = last snapshot date.
-# The marks must be in the same (pre-split) units as the orders: take them from closes as they were
-# before splits.apply rescaled history, or apply_split would rescale an already-adjusted mark.
-for split in splits_executing_on(conn, rd.data_date):        # recorded by splits.apply this run
-    pf, split_events = apply_split(pf, split.symbol, split.factor, rd.data_date)
-    persist_events(conn, strategy_id, split_events)            # UPDATE orders prices/shares; cash in lieu
-result = step(pf, rd.data_date, bars_on(conn, rd.data_date, pf.held_symbols()))
-persist_events(conn, strategy_id, result.events)              # fill/exit/expire -> UPDATE orders
-persist_snapshot(conn, strategy_id, result.snapshot)          # equity_snapshots (strategy_id, date)
-sized = size_picks(result.portfolio, ranked_picks, rd.session_date)
-insert_orders(conn, strategy_id, sized.placed)                # status 'pending', slot 1..4
+1. `rd = dates.run_dates(now)`; refuse (exit 1, nothing written) unless the real `runs` row for `rd.session_date` is `success`.
+2. `plan_night(roster.ROSTER, rows, states, rd)` reads the roster rows (`store.read_strategies`) and every strategy's `store.read_paper_state`, checks each frozen digest (`store.check_digest`) and decides which entries start and which step. Nothing to do: exit 0.
+3. `runs.start_paper` (its own short transaction). Then, in one transaction: the windowed market (`store.load_market_window(conn, since)` with `since = store.market_window_since(earliest)`, 550 calendar days before the earliest session to step), the applied splits per session (`store.applied_splits_on`) and the dividends (`store.dividends_between`). Each session S is computed on `night_view(market, S, later_factors(...))`: the market as it stood on S's night, later bars and FX hidden, splits executed after S undone on bars and dividends.
+4. First night only (`_start`): `store.freeze_spec` writes each frozen spec (`roster.strategy_params(e)`) and `paper_start = rd.session_date`; `store.init_paper_state` writes `paper_state` (initial cash `initial_cash_usd(INITIAL_IDR, the latest fx_rates rate ≤ rd.data_date)`) and the day-0 snapshot at `rd.data_date`; then the decision for `paper_start`.
+5. For every session S after `paper_state.last_session` through `rd.data_date`, per strategy:
+   - A: `paper.bracket.settle_bracket(pf, S, bars, splits, last_bar_date)`, which is `apply_split` per applied split, then `sim.step`, then `close_unpriced`, with the snapshot replaced; `store.save_bracket_night`; then `decide_bracket(pf, e.obj, e.params, history, members, S)` → `store.insert_pending_orders`, `store.write_pending`;
+   - F4, F1: `paper.book.settle_book(book, S, bars, targets, idle_added, rules, dividends, splits, last_bar_date)`, which is `sim.apply_book_split` per applied split, then `sim.step_book`, then `close_book_unpriced`; `store.save_book_night(..., executed_targets=)`; then `decide_book(view, e.obj, e.params, rules, S, held)` → `store.save_book_decision` (targets, or `None` when the next session is not a month's first);
+   - SPY: `paper.benchmark.step_benchmark(state, S, bar, dividend, split=<applied SPY split on S or None>)`, the `buy_and_hold` rules; `store.save_benchmark_night`, `store.write_pending`.
+6. `runs.finish_paper` sets `runs.paper_status = success` inside the same transaction, so a failure rolls back everything; `runs.fail_paper` then records `paper_status = failed` and the redacted error in its own transaction (exit 1).
+
+Run it:
+
+```
+cd <repo or worktree root>
+SEER_ENV_FILE=/home/miftah/seer/.env.local engine/.venv/bin/python -m seer_engine --dry-run -v paper   # rolled back
+SEER_ENV_FILE=/home/miftah/seer/.env.local engine/.venv/bin/python -m seer_engine -v paper_check
 ```
 
-`Event.order` maps 1:1 onto `orders` columns. Its row key is `(strategy_id, order.session_date, order.symbol)`. Everything runs inside one `db.transaction`, so a failed night leaves nothing half-written.
+The real night runs only in `nightly.yml` (Paper → Paper check → Explain).
 
-### Strategy: P4 nightly picks
+### Paper: replay check (P4)
 
-```python
-from seer_engine import dates
-from seer_engine.sim import size_picks
-from seer_engine.strategies.a import STRATEGY_A, STRATEGY_A_PARAMS
-from seer_engine.strategies.base import history_from_bars
-
-rd = dates.run_dates()
-# At least STRATEGY_A.lookback (200) bars per symbol, ending at rd.data_date; more is fine.
-history = {s: history_from_bars(s, bars) for s, bars in last_bars_by_symbol(conn, rd.data_date).items()}
-members = universe.members_on(conn, rd.data_date)
-picks = STRATEGY_A.picks(history, members, rd.data_date, STRATEGY_A_PARAMS)  # ranked, deepest RSI first
-sized = size_picks(result.portfolio, picks, rd.session_date)                  # after settling data_date
-```
-
-These are the same functions and parameters the committed backtest ran, so a night's picks are the
-backtest's picks for that date given the same bars.
+`paper_check` re-runs `backtest.book_runner.run_rules` (A, F4, F1) and the `buy_and_hold` rules
+(SPY) over `[paper_start, last_session]` on the same windowed market, with `paper_state.usd_idr`, and
+compares them with the stored state through `paper.replay` (pure: `expected_bracket`,
+`expected_book`, `expected_benchmark`, `compare`, `judge`): every snapshot, order, fill, closed trade,
+stored decision and open position. `--require-sessions N` also demands ≥ N stepped sessions per
+strategy. That is the v0.1.0 release check.
 
 ### Backtest: run and read the report
 
@@ -1538,6 +1683,11 @@ which writes nothing. A committed report always comes from a full run over a cle
 - **The dev window is law.** Every dev entry point raises `backtest.dev.DevWindowError` for a session after 2015-10-16, and `research.load_store` rejects a store holding a later row. Never add a flag, a default or a store that gets past either guard. P7b runs the pre-registered finalists on the test window under its own handover.
 - **The registry is append-only.** `tests/test_registry.py` pins every `(id, digest)`. A new candidate is appended and pinned in its own commit, before its dev run (D6). Editing an entry after its result exists is not allowed, even to fix a "typo": append a new id instead, and it counts as a trial.
 - `backtest_dev` refuses a full run (exit 2) while `backtest/registry.py` has uncommitted changes. `--only` skips that check and writes nothing; its numbers are a smoke test, never a result.
+- **Paper state stays in the units it was sized in.** Never rebuild a mark or a price of a live paper order or position from `bars`: `nightly` rewrites history backwards on a split, and `apply_split` / `apply_book_split` would then rescale it twice. Marks are stored (`orders.mark`, `book_positions.mark`).
+- **A roster entry is frozen.** `paper` fails the night (`store.SpecMismatch`, rolled back, `runs.paper_status = failed`) when a started strategy's stored spec digest differs from `paper/roster.py`'s. Change a strategy by adding a new id (its own `paper_start`), never by editing a started one or deleting its rows.
+- `paper` runs only after a successful bars run for the same session, and only in the `seer-db-writer` concurrency group. Never run a real (non-`--dry-run`) `paper` locally against Neon while the scheduled job may run, and never before the code is on `main` (D11: no back-dated paper days).
+- `paper_check` reports a strategy `split-affected` (not failed) once an applied split touched a symbol it held or had pending: whole-share rounding before and after a split cannot match a replay over adjusted bars.
+- `explain` must never decide anything: it writes text only, and a failure leaves NULL.
 
 ## Notes
 
@@ -1564,3 +1714,10 @@ research store, the dev runner, report and registry, the `research_store` and `b
 commands, and the committed dev report and P7b pre-registration) were added on 2026-10-04. Their
 design, invariants and decisions are in `TRADE_RULES_DEV_SEARCH_PLAN.md` and
 `docs/handover/2026-10-03-trade-rules-revision.md`.
+
+The P4 sections (`paper/*`, the `paper`, `paper_check` and `explain` commands, `dividends`, `llm`,
+the book split rule, migration 003, the P4 additions to `massive`, `splits`, `nightly`, `universe`,
+`runs`, `demo` and `backtest.io`, and the real nightly flow under Usage) were added on 2026-10-04.
+P4 runs paper-only by the owner's option (b) of 2026-10-04: no real-money recommendations, design §1
+unchanged. Design, invariants and decisions: `PAPER_TRADING_SHIP_PLAN.md` and
+`docs/handover/2026-10-04-paper-trading-ship.md`; operations: `docs/runbooks/paper-trading.md`.

@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/paper-trading-ship`
 **Branch:** `feature/paper-trading-ship` (base: `HEAD` = `origin/main` @ `844e4d7`)
 **Phases:** 13
-**Status:** phase 12/13 complete (phases 1–12 complete; 13 remaining)
+**Status:** complete (phases 1–13 complete)
 **Coordinator:** —
 
 ---

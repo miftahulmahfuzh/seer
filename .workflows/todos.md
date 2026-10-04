@@ -2,19 +2,19 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-04 10:13:00
-**Total Active Tasks**: 1
+**Last Updated**: 2026-10-04 10:22:05
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 1
+- Completed: 2
 
 ---
 
@@ -23,15 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ROOT-FOK3** Phase 13: Ship: CI lint, workflow, Neon, Vercel, docs
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `.github/workflows/engine-ci.yml` (ruff `select = ["E9", "F"]`, `ignore = ["F401"]` + `tsc --noEmit`), `engine/pyproject.toml` (ruff config, `ruff>=0.16,<0.17` dev dep), `.github/workflows/nightly.yml` ("Paper check" and "Explain" steps; `timeout-minutes` 30 → 45), applying `003` to Neon and a `paper --dry-run` against Neon, a **preview** `vercel deploy` of the worktree tree (production deploys from `main` on merge through the Git integration; seertrade.site is already live), `docs/runbooks/paper-trading.md` (operations + owner steps: LLM secrets, Google OAuth, Vercel env if missing, Add to Home Screen; no DNS step + the release checklist), `docs/runbooks/data-pipeline.md`, `docs/ROADMAP.md` (P0, P4 paper-only entry, P5, v0.1.0), `engine/package_readme.md` sections. Does not touch: source behavior. The README and the `v0.1.0` release are **not** in this phase (see After landing). Exit: CI commands pass locally; Neon at migration 003; dry-run paper on Neon succeeds; preview deploy URL and production URL recorded, remaining owner steps named in the runbook; docs updated.
-  - **Status**: open
-  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 13 of 13)
-  - **Satisfies**: R6 — Ship: CI lint (P0), Vercel deploy, owner-step runbook, README + `v0.1.0` at release; R7 — Docs: engine readme, ROADMAP, paper runbook
-  - **Depends on**: P1-ENG-N6UC, P1-ENG-HCYN, P1-ENG-79OL, P1-ENG-1BVI, P1-ENG-X99Y, P1-ENG-AYRQ, P1-ENG-0ZLD, P1-ENG-WBI7, P1-ENG-YEW4, P1-WEB-Y9MV, P1-WEB-0AHX, P1-WEB-DX8D
-  - **Plan**: `.workflows/plan/P1-ROOT-FOK3.md`
 
 ### [P2] Medium
 
@@ -44,6 +35,22 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-FOK3** Phase 13: Ship: CI lint, workflow, Neon, Vercel, docs
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `.github/workflows/engine-ci.yml` (ruff `select = ["E9", "F"]`, `ignore = ["F401"]` + `tsc --noEmit`), `engine/pyproject.toml` (ruff config, `ruff>=0.16,<0.17` dev dep), `.github/workflows/nightly.yml` ("Paper check" and "Explain" steps; `timeout-minutes` 30 → 45), applying `003` to Neon and a `paper --dry-run` against Neon, a **preview** `vercel deploy` of the worktree tree (production deploys from `main` on merge through the Git integration; seertrade.site is already live), `docs/runbooks/paper-trading.md` (operations + owner steps: LLM secrets, Google OAuth, Vercel env if missing, Add to Home Screen; no DNS step + the release checklist), `docs/runbooks/data-pipeline.md`, `docs/ROADMAP.md` (P0, P4 paper-only entry, P5, v0.1.0), `engine/package_readme.md` sections. Does not touch: source behavior. The README and the `v0.1.0` release are **not** in this phase (see After landing). Exit: CI commands pass locally; Neon at migration 003; dry-run paper on Neon succeeds; preview deploy URL and production URL recorded, remaining owner steps named in the runbook; docs updated.
+  - **Status**: completed
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 13 of 13)
+  - **Satisfies**: R6 — Ship: CI lint (P0), Vercel deploy, owner-step runbook, README + `v0.1.0` at release; R7 — Docs: engine readme, ROADMAP, paper runbook
+  - **Depends on**: P1-ENG-N6UC, P1-ENG-HCYN, P1-ENG-79OL, P1-ENG-1BVI, P1-ENG-X99Y, P1-ENG-AYRQ, P1-ENG-0ZLD, P1-ENG-WBI7, P1-ENG-YEW4, P1-WEB-Y9MV, P1-WEB-0AHX, P1-WEB-DX8D
+  - **Plan**: `.workflows/plan/P1-ROOT-FOK3.md`
+  - **Completed**: 2026-10-04 10:22
+  - **Method**: /do
+  - **Files**: engine/pyproject.toml, .github/workflows/engine-ci.yml, .github/workflows/nightly.yml, docs/runbooks/paper-trading.md, docs/runbooks/data-pipeline.md, docs/ROADMAP.md, engine/package_readme.md
+  - **Drift**:
+    - paper -v logs only each strategy's start on a first night (no per-decision lines); the runbook ship check records that honestly instead of the plan's expected 'A sized picks / not a decision session' log lines. No source change.
+    - Web suite is 9 files / 65 tests (plan's token example was illustrative).
 
 - [x] **P1-ROOT-2QEA** Phase 5: Workflows, seed guard, runbook, live run on Neon
   - **Difficulty**: NORMAL

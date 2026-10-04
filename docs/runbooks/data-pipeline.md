@@ -13,10 +13,13 @@ split-adjusted daily bars for every symbol that was ever a member since 2015-01-
 from yfinance, and USD/IDR history from Frankfurter. Each symbol's outcome is recorded in
 `backfill_log`, so the backfill can resume. `nightly` runs after every US session. It computes
 `data_date`/`session_date` from the NYSE calendar, fetches the missing sessions from Massive
-grouped-daily (universe ∪ SPY only), applies new splits once (`split_adjustments`), records the
+grouped-daily (universe ∪ SPY, plus any symbol held or pending in paper state), applies new
+splits once (`split_adjustments`), records each session's cash dividends (`dividends`), records the
 FX rate, and finishes one `runs` row per session, all in one transaction. A failure marks the
 run `failed` and writes no bars. Every write command first deletes the demo rows in its own
 transaction, once. GitHub Actions supplies the schedule; Vercel only reads.
+
+Paper trading (P4) runs after `nightly` in the same job: see [paper-trading.md](paper-trading.md).
 
 ## Commands
 
@@ -35,7 +38,7 @@ check below goes through Python.
 | `… backfill --retry-failed` | retry symbols logged `failed`/`empty` (never touches `ok`) | same |
 | `… backfill --end YYYY-MM-DD` / `--batch-size N` | pin the last date (keep it fixed across resume passes on different days) / symbols per yfinance call (default 40) | same |
 | `… backfill --fx-only` / `--skip-fx` | only / everything but the FX history | same |
-| `… -m seer_engine nightly` | the nightly run for "now"; no-op if that session already succeeded | `bars`, `split_adjustments`, `fx_rates`, `runs` |
+| `… -m seer_engine nightly` | the nightly run for "now"; no-op if that session already succeeded | `bars`, `split_adjustments`, `dividends`, `fx_rates`, `runs` |
 | `… nightly --now 2026-10-05T23:00:00Z` | replay the nightly as of a given UTC instant (format: `nightly --help`) | same |
 
 Global flags go **before** the command: `--dry-run` does every read and computes every write,
@@ -67,6 +70,8 @@ Exit codes:
   (`prev close` vs the first fetched open) decides, and smaller factors (stock dividends such as
   21:20) are applied because the stored history predates them by construction.
 - Only splits of universe ∪ SPY symbols, or of symbols that already have bars, are recorded.
+- Stored `dividends` rows with an ex-date before a split's execution date are rewritten with the
+  bars (`amount × split_from / split_to`, 6 decimals), so dividends stay in the bars' units.
 - Re-running `backfill --symbols X` after a split overwrites X's history with yfinance's newly
   adjusted values, which are consistent with what the nightly applied.
 

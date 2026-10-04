@@ -98,7 +98,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "0db383a",
       "depends_on": [
         1,
         3,
@@ -106,15 +106,15 @@
       ],
       "difficulty": "HARD",
       "n": 6,
-      "note": null,
+      "note": "paper/store.py (C4) + read_bars_frame(since=); 26 PG tests; no decisions",
       "package": "engine/paper",
       "plan": ".workflows/plan/paper-trading-ship/phase-6.md",
-      "reported_at": "2026-10-04T02:56:07+00:00",
+      "reported_at": "2026-10-04T02:59:56+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-AYRQ",
       "title": "Paper store (load and save state)"
     },
     {
@@ -134,7 +134,7 @@
         "R1",
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "paper` command and workflow step"
     },
@@ -207,7 +207,7 @@
       "note": null,
       "package": "web/app",
       "plan": ".workflows/plan/paper-trading-ship/phase-11.md",
-      "reported_at": "2026-10-04T02:56:07+00:00",
+      "reported_at": "2026-10-04T02:59:57+00:00",
       "satisfies": [
         "R4"
       ],
@@ -259,7 +259,7 @@
   "plan": "/home/miftah/.worktrees/seer/paper-trading-ship/.workflows/orchestration/paper-trading-ship/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "paper-trading-ship",
-  "updated": "2026-10-04T02:56:07+00:00",
-  "verified_at": "2026-10-04T02:56:07+00:00",
+  "updated": "2026-10-04T02:59:57+00:00",
+  "verified_at": "2026-10-04T02:59:57+00:00",
   "worktree": "/home/miftah/.worktrees/seer/paper-trading-ship"
 }

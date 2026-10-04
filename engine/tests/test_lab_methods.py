@@ -104,9 +104,11 @@ def test_allocator_ids_are_unique_across_methods():
 
 
 def test_a_method_that_ran_is_frozen():
-    if not store.DB_PATH.exists():
+    # The committed database, not SEER_LAB_DB: in a sera worktree the shared database already
+    # holds sibling methods whose files this tree does not have yet.
+    if not store.COMMITTED_DB.exists():
         pytest.skip("no lab database")
-    conn = sqlite3.connect(f"file:{store.DB_PATH}?mode=ro", uri=True)
+    conn = sqlite3.connect(f"file:{store.COMMITTED_DB}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     try:
         ran = conn.execute("SELECT id, source_sha FROM methods WHERE id GLOB 'M*' AND source_sha IS NOT NULL").fetchall()

@@ -163,9 +163,11 @@ def run_method(
         )
 
     dev.run_registry(data.market, data.dividends, data.spy_dividends, method.candidates, on_result=on_result)
-    ran = trial_rows(conn, method, results, fingerprint=data.fingerprint, git_sha=git_sha)
-    status = "dev-eligible" if any(r.trial.eligible for r in ran) else "rejected"
+    store.begin_immediate(conn)  # lab-wide N and the inserts, atomic against parallel sessions
     with conn:
+        preflight(conn, method, path, require_commit=False)  # a parallel session may have won a race
+        ran = trial_rows(conn, method, results, fingerprint=data.fingerprint, git_sha=git_sha)
+        status = "dev-eligible" if any(r.trial.eligible for r in ran) else "rejected"
         if store.get_method(conn, method.id) is None:
             store.add_method(
                 conn,

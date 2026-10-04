@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import sqlite3
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, fields
@@ -31,7 +32,10 @@ from typing import Any
 
 from seer_engine import config
 
-DB_PATH = config.REPO_ROOT / "lab" / "lab.sqlite"
+COMMITTED_DB = config.REPO_ROOT / "lab" / "lab.sqlite"
+# Parallel explorer sessions (sera-the-explorer) run in worktrees and share the main checkout's
+# database through SEER_LAB_DB; only the coordinator commits it.
+DB_PATH = Path(os.environ.get("SEER_LAB_DB") or COMMITTED_DB)
 XLSX_PATH = config.REPO_ROOT / "lab" / "lab.xlsx"  # gitignored
 SCHEMA_VERSION = "1"
 
@@ -61,6 +65,7 @@ TRANSITIONS: tuple[tuple[str, str], ...] = (
     ("test-passed", "paper"),
 )
 WINDOWS: tuple[str, ...] = ("dev", "test")
+INSIGHT_KINDS: tuple[str, ...] = ("observation", "hypothesis", "data-wish", "feature-wish", "risk")
 DSR_MIN = 0.95  # lab eligibility on the dev window, on top of the five P7a D8 conditions
 DSR_LABEL = "DSR >= 0.95"
 
@@ -141,6 +146,21 @@ CREATE TABLE IF NOT EXISTS ideas_seen (
     added     TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS insights (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind      TEXT NOT NULL CHECK (kind IN ({_quoted(INSIGHT_KINDS)})),
+    title     TEXT NOT NULL CHECK (length(trim(title)) > 0),
+    body      TEXT NOT NULL CHECK (length(trim(body)) > 0),
+    method_id TEXT REFERENCES methods(id),
+    added     TEXT NOT NULL
+);
+
+CREATE TRIGGER IF NOT EXISTS insights_no_update BEFORE UPDATE ON insights
+BEGIN SELECT RAISE(ABORT, 'insights are append-only: add a newer one instead'); END;
+
+CREATE TRIGGER IF NOT EXISTS insights_no_delete BEFORE DELETE ON insights
+BEGIN SELECT RAISE(ABORT, 'insights are append-only'); END;
+
 CREATE TRIGGER IF NOT EXISTS trials_no_update BEFORE UPDATE ON trials
 BEGIN SELECT RAISE(ABORT, 'trials are append-only: a trial row is never updated'); END;
 
@@ -184,7 +204,7 @@ def connect(path: Path = DB_PATH) -> sqlite3.Connection:
     """Open (creating when missing) the lab database with the schema, triggers and transitions."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, timeout=120)  # parallel explorer sessions share one file
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = DELETE")
@@ -198,6 +218,13 @@ def connect(path: Path = DB_PATH) -> sqlite3.Connection:
 
 
 # --------------------------------------------------------------------------- methods
+
+
+def begin_immediate(conn: sqlite3.Connection) -> None:
+    """Take the write lock now, so a read-then-write (next id, lab-wide N) is atomic across sessions."""
+    if conn.in_transaction:
+        conn.commit()
+    conn.execute("BEGIN IMMEDIATE")
 
 
 def get_method(conn: sqlite3.Connection, method_id: str) -> sqlite3.Row | None:
@@ -387,6 +414,24 @@ def seen(conn: sqlite3.Connection, pattern: str) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+# --------------------------------------------------------------------------- insights
+
+
+def add_insight(conn: sqlite3.Connection, *, kind: str, title: str, body: str,
+                method_id: str | None = None) -> int:
+    """Append one entry to the lab journal: an observation across methods, a hypothesis worth
+    testing, data or a feature the lab lacks, or a risk. The food-for-thought record."""
+    if kind not in INSIGHT_KINDS:
+        raise LabError(f"insight kind must be one of {INSIGHT_KINDS}, got {kind!r}")
+    if method_id is not None and get_method(conn, method_id) is None:
+        raise LabError(f"no method {method_id}")
+    cur = conn.execute(
+        "INSERT INTO insights (kind, title, body, method_id, added) VALUES (?, ?, ?, ?, ?)",
+        (kind, title.strip(), body.strip(), method_id, now_iso()),
+    )
+    return int(cur.lastrowid)
+
+
 # --------------------------------------------------------------------------- export
 
 
@@ -421,6 +466,7 @@ def export_xlsx(conn: sqlite3.Connection, path: Path = XLSX_PATH) -> Path:
         ("methods", "SELECT * FROM methods ORDER BY id"),
         ("trials", f"SELECT {trial_cols} FROM trials t ORDER BY t.n"),
         ("ideas_seen", "SELECT * FROM ideas_seen ORDER BY key"),
+        ("insights", "SELECT * FROM insights ORDER BY id"),
     )
     for title, sql in sheets:
         ws = wb.create_sheet(title)
@@ -443,6 +489,7 @@ def summary_rows(conn: sqlite3.Connection) -> list[tuple[str, Any]]:
         ("dev trials (N for the DSR)", dev_trial_count(conn)),
         ("test-window looks used", test_looks(conn)),
         ("methods", int(conn.execute("SELECT count(*) FROM methods").fetchone()[0])),
+        ("insights", int(conn.execute("SELECT count(*) FROM insights").fetchone()[0])),
     ]
     out += [(f"methods {r[0]}", r[1]) for r in by_status]
     return out

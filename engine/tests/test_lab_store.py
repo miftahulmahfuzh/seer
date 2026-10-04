@@ -146,6 +146,33 @@ def test_export_writes_every_sheet(conn, tmp_path):
     seed(conn)
     path = store.export_xlsx(conn, tmp_path / "lab.xlsx")
     wb = load_workbook(path)
-    assert wb.sheetnames == ["summary", "leaderboard", "methods", "trials", "ideas_seen"]
+    assert wb.sheetnames == ["summary", "leaderboard", "methods", "trials", "ideas_seen", "insights"]
     assert wb["leaderboard"].max_row == 55
     assert wb["leaderboard"]["B2"].value == "F4-MOM12-N20-TREND"
+
+
+def test_insights_are_an_append_only_journal(conn):
+    _method(conn)
+    with conn:
+        n = store.add_insight(conn, kind="data-wish", title="Fundamentals", body="Quarterly earnings would unlock value/quality.", method_id="M0001")
+    assert n == 1
+    with pytest.raises(store.LabError):
+        store.add_insight(conn, kind="rumor", title="t", body="b")
+    with pytest.raises(store.LabError):
+        store.add_insight(conn, kind="risk", title="t", body="b", method_id="M0404")
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+        conn.execute("UPDATE insights SET body = 'x'")
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+        conn.execute("DELETE FROM insights")
+
+
+def test_begin_immediate_makes_id_allocation_atomic(tmp_path):
+    a = store.connect(tmp_path / "lab.sqlite")
+    b = store.connect(tmp_path / "lab.sqlite")
+    b.execute("PRAGMA busy_timeout = 0")
+    store.begin_immediate(a)
+    with pytest.raises(sqlite3.OperationalError, match="locked"):
+        store.begin_immediate(b)
+    a.rollback()
+    store.begin_immediate(b)
+    b.rollback()

@@ -32,3 +32,6 @@ web/scripts/.icon/preview.png
 
 # method lab workbook (python -m seer_engine lab export)
 lab/lab.xlsx
+
+# sera-the-explorer scrollback of finished child sessions
+.workflows/sera/

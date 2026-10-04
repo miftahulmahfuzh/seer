@@ -8,9 +8,14 @@
     lab block M0007 --on "what data"       an idea the store cannot test
     lab drop M0007 --why "..."             an idea dropped before running
     lab seen KEY [--method M] [--note N] | lab seen --find TEXT
+    lab insight --kind K --title T (--body B | --file F) [--method M]   the lab journal
+    lab stage                       git-add the database under its write lock (a consistent copy)
     lab next-id                     the next free method id
     lab export [--out F]            the lab as an xlsx workbook (gitignored)
     lab seed                        one-time import of the pre-lab record
+
+Parallel sessions (sera-the-explorer) share one database: SEER_LAB_DB sets --db and
+SEER_RESEARCH_STORE sets --store.
 
 Exit 0 on success; 2 when the lab's rules refuse the request; 1 on any other error.
 """
@@ -19,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -42,7 +48,7 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
 
     s = sub.add_parser("run", help="run a committed method on the dev window")
     s.add_argument("method")
-    s.add_argument("--store", type=Path, default=research.STORE_DIR)
+    s.add_argument("--store", type=Path, default=Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR))
 
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
@@ -71,6 +77,14 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s.add_argument("--note", default="")
     s.add_argument("--find", default=None)
 
+    s = sub.add_parser("insight", help="append to the lab journal (food for thought)")
+    s.add_argument("--kind", required=True, choices=store.INSIGHT_KINDS)
+    s.add_argument("--title", required=True)
+    s.add_argument("--body", default=None)
+    s.add_argument("--file", type=Path, default=None)
+    s.add_argument("--method", default=None)
+
+    sub.add_parser("stage", help="git-add the database while holding its write lock")
     sub.add_parser("next-id", help="the next free method id")
     s = sub.add_parser("export", help="write the lab as an xlsx workbook")
     s.add_argument("--out", type=Path, default=store.XLSX_PATH)
@@ -137,6 +151,10 @@ def _status(conn, args) -> int:
                 extra = f" [needs: {m['blocked_on']}]" if m["blocked_on"] else ""
                 out.append(f"  {m['id']} {m['name']} ({m['family']}, {m['source_kind']}){extra}")
     out.append("")
+    out.append("Latest insights:")
+    for i in conn.execute("SELECT * FROM insights ORDER BY id DESC LIMIT 8"):
+        out.append(f"  [{i['kind']}] {i['title']}" + (f" ({i['method_id']})" if i["method_id"] else ""))
+    out.append("")
     out.append("Latest verdicts:")
     for m in conn.execute(
         "SELECT * FROM methods WHERE verdict <> '' AND id GLOB 'M*' ORDER BY updated DESC LIMIT 8"
@@ -202,8 +220,9 @@ def _run(conn, args) -> int:
 
 
 def _idea(conn, args) -> int:
-    mid = store.next_method_id(conn)
+    store.begin_immediate(conn)  # the next id and its insert, atomic against parallel sessions
     with conn:
+        mid = store.next_method_id(conn)
         store.add_method(
             conn, id=mid, name=args.name, family=args.family, source_kind=args.source_kind,
             source_ref=args.source_ref, hypothesis=args.hypothesis, parent_id=args.parent,
@@ -248,6 +267,33 @@ def _seen(conn, args) -> int:
     return 0
 
 
+def _insight(conn, args) -> int:
+    if (args.body is None) == (args.file is None):
+        raise store.LabError("give exactly one of --body or --file")
+    body = args.body if args.body is not None else Path(args.file).read_text(encoding="utf-8")
+    with conn:
+        n = store.add_insight(conn, kind=args.kind, title=args.title, body=body, method_id=args.method)
+    print(n)
+    return 0
+
+
+def _stage(conn, args) -> int:
+    """``git add`` the database file while holding an exclusive lock, so a parallel session's
+    half-written transaction can never be what gets committed."""
+    import subprocess
+
+    path = Path(args.db).resolve()
+    conn.execute("BEGIN EXCLUSIVE")
+    try:
+        out = subprocess.run(["git", "add", "--", path.name], cwd=path.parent, capture_output=True, text=True)
+    finally:
+        conn.rollback()
+    if out.returncode != 0:
+        raise store.LabError(f"git add {path} failed: {out.stderr.strip()}")
+    print(f"staged {path}")
+    return 0
+
+
 def _next_id(conn, args) -> int:
     print(store.next_method_id(conn))
     return 0
@@ -276,6 +322,8 @@ _HANDLERS = {
     "block": _block,
     "drop": _drop,
     "seen": _seen,
+    "insight": _insight,
+    "stage": _stage,
     "next-id": _next_id,
     "export": _export,
     "seed": _seed,

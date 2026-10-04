@@ -95,3 +95,19 @@ Build: (1) store, (2) `Method` + discovery + ids + contract test, (3) `lab` CLI
 (`run`/`status`/`note`/`idea`/`export`), (4) seed import and committed DB, (5) `SKILL.md`,
 (6) a first real run. `lab test` and the test-window store are specified here and built on first
 promotion.
+
+## 6. Revision 2026-10-04 (owner): no human in the loop, Sera, the journal
+
+- **No human in the loop.** Both skills decide everything themselves and never ask: idea,
+  variants, promotion (they build `lab test` and the test-window store on first need) and, on a
+  test pass, a paper-roster entry with its own clock. Assumptions are written into the analysis.
+  Design §1 and the no-real-money rule are unchanged.
+- **`/sera-the-explorer <num-methods>`** coordinates up to 4 explore sessions at once, each in its
+  own worktree (`explore/MNNNN`) and tmux window via `swarm.py launch`. It reserves diverse ideas
+  as `idea` rows, refills slots as children finish, verifies each child, promotes serially,
+  cleans up and writes a batch synthesis. Children share the main checkout's database through
+  `SEER_LAB_DB` and commit only their method files; only Sera commits `lab/lab.sqlite`, through
+  `lab stage` (git add under the write lock). `BEGIN IMMEDIATE` makes id allocation and the
+  lab-wide N atomic across sessions.
+- **`insights`**: an append-only journal (`observation`, `hypothesis`, `data-wish`,
+  `feature-wish`, `risk`), the food-for-thought record that seertrade.site/sera shows.

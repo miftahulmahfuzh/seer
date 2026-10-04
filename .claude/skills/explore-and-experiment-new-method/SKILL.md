@@ -1,102 +1,142 @@
 ---
 name: explore-and-experiment-new-method
-description: Use when asked to explore, research, try or experiment with a new trading strategy or method for Seer — "/explore-and-experiment-new-method", "try another strategy", "find something that beats SPY", "keep searching", a /loop of exploration runs — or when a lab method needs analysis, promotion or a follow-up variation.
+description: Use when asked to explore, research, try or experiment with a new trading strategy or method for Seer — "/explore-and-experiment-new-method", "try another strategy", "find something that beats SPY", "keep searching", a /loop of exploration runs, a sera-the-explorer child session handed `--method MNNNN` — or when a lab method needs analysis, promotion or a follow-up variation.
 ---
 
 # Explore and experiment with a new method
 
-**Iron rule: we never stop trying, we never give up.** Each run explores **one idea** end to
-end, records every trial in the lab, and leaves at least one next idea queued. A failed method
-is still a result. A run that leaves nothing queued is the only real failure.
+Three iron rules. Breaking the letter of a rule breaks its spirit too.
 
-**Second rule: we never fool ourselves.** Trying thousands of methods guarantees some lucky
-winners. The lab counts every trial (N) and deflates each result by it. The test window
-(2015-10-19 → today) is spent one counted look at a time. Breaking the letter of these rules
-also breaks their spirit.
+1. **We never stop trying, we never give up.** Each run explores **one idea** end to end,
+   records every trial, writes what it learned, and leaves at least one next idea queued. A
+   failed method is a result. A run that queues nothing is the only real failure.
+2. **No human in the loop.** Decide everything yourself and assume where you have to. Never use
+   `AskUserQuestion`, never end a turn on a question, never wait for approval: not for the idea,
+   the variants, a failing check, a promotion or a paper-roster entry. Write down what you
+   assumed, in the analysis or the commit message. The only allowed stop is a terminal one, such
+   as missing tooling that cannot be built or a permission you don't have. Report it and end;
+   never hold a prompt open.
+3. **We never fool ourselves.** The lab counts every trial (N) and deflates each result by it.
+   The test window (2015-10-19 → today) is spent one counted look at a time. Design §1 never moves.
 
 Design: `docs/plans/2026-10-04-method-lab-design.md`. CLI: `python -m seer_engine lab --help`.
-Run everything from `engine/` with `.venv/bin/python -m seer_engine lab ...`.
+
+## Two modes
+
+| | Solo (`/explore-and-experiment-new-method`) | Child (`… --method MNNNN --coordinator NAME`) |
+|---|---|---|
+| started by | the user or `/loop` | `/sera-the-explorer`, in its own worktree and tmux window |
+| idea | you choose it | already reserved as an `idea` row `MNNNN`; refine it, keep its id |
+| python | `engine/.venv/bin/python` | `PYTHONPATH=$PWD/engine/src /home/miftah/seer/engine/.venv/bin/python` (a worktree has no venv) |
+| database | `lab/lab.sqlite` in this checkout | the shared one: `export SEER_LAB_DB=/home/miftah/seer/lab/lab.sqlite SEER_RESEARCH_STORE=/home/miftah/seer/engine/.research` |
+| commits | method file, then `lab/lab.sqlite`, to `main` | method file only; **never commit `lab/lab.sqlite`** (the coordinator does) |
+| promotion | do it yourself (below) | `lab` marks it `dev-eligible`; report it, and the coordinator promotes |
+| end | short report to the user | report to the coordinator (below), then stop |
+
+Run every command from the checkout root (`engine/` for pytest). In child mode, `export` both
+variables first in every shell.
 
 ## One run
 
-1. **Preflight.** `main` clean and pulled; `engine/.venv` exists; `engine/.research/` exists
-   (if missing: `python -m seer_engine research_store`, which takes a few minutes). One run at a time.
-2. **Read the lab.** Run `lab status`, which shows N, test looks used, families, near misses,
-   backlog and blocked ideas. Run `lab show <id>` on anything relevant.
-3. **Choose one idea.** Pick whichever is most promising:
-   - **variation**: attack the most common failure among the near misses (today: max DD > 15%).
+1. **Preflight.** Solo: if `main` has unrelated uncommitted changes, don't touch them; commit
+   only your own paths. Pull. If `engine/.research/` is missing, build it
+   (`python -m seer_engine research_store`, a few minutes).
+2. **Read the lab.** `lab status` shows N, test looks, families, the trials closest to eligible,
+   backlog, blocked ideas and the latest insights. Use `lab show <id>` for detail.
+3. **Choose one idea** (child: it was chosen; start from the reserved row's name and hypothesis).
+   Solo: pick the most promising of:
+   - **variation**: attack the most common failure among the closest-to-eligible trials.
      `source_kind="variation"`, `parent_id` set.
-   - **web**: SSRN, arXiv q-fin, Quantpedia, Alpha Architect, quant blogs, GitHub. Use the
-     WebSearch/WebFetch tools.
+   - **web**: SSRN, arXiv q-fin, Quantpedia, Alpha Architect, quant blogs, GitHub
+     (WebSearch/WebFetch).
    - **knowledge**: what you already know.
-   - **backlog**: an `idea` row from `lab status`. Reuse its id.
+   - **backlog**: an `idea` row. Reuse its id.
 
-   Before committing to it:
-   - `lab seen --find <words>`: if the idea was already explored, pick another, or make a real
-     variation of it.
-   - **Testable?** The store has daily OHLCV (1993–2015-10-16, ~539 stocks plus ETFs, no
-     delisted names), cash dividends, and point-in-time S&P 500 / Nasdaq-100 membership. It has
-     no fundamentals, intraday bars, options, short interest or sentiment. If the idea needs one
-     of those: `lab idea ...` then `lab block <id> --on "<data>"`, and choose another idea. Blocked
-     ideas still count as exploring.
-   - **Executable?** Gotrade means long only, whole shares, regular session. Leverage, shorting,
-     non-default ETFs and fractional shares need owner inputs and can never be eligible. Test
-     them only as evidence.
-4. **Write the method file** `engine/src/seer_engine/lab/methods/mNNNN_<slug>.py`. The id comes
-   from `lab next-id`, or from the backlog row. Copy `method_template.py` from this skill's folder. Rules:
-   - 1–6 fixed variants. Write `hypothesis` and `expected_failure` **now**, before any result.
-   - New logic is an `Allocator` (see `strategies/allocator.py`; reuse `f_factor`, `f_index`,
-     `f_rotation`, `f_swing`, `allocator.VOLTARGET`/`BLEND` where you can). Its `id` must be
-     unique (use the method id, e.g. `"M0007"`). Pick `TradeRules` presets from `sim/rules.py`.
-   - Pure: no clock, randomness, files, network or printing. Only reads bars dated ≤ `data_date`.
-   - Set `seen_keys` (e.g. `("url:https://…", "concept:dual-momentum-sectors")`).
-5. **Test, then commit.** Run `.venv/bin/python -m pytest -q tests/test_lab_methods.py` and
-   `ruff check`. The contract test catches look-ahead. Then commit **only** the method file and
-   push. That commit is the pre-registration.
-6. **Run.** `lab run MNNNN`. Stock-universe methods take minutes; leave them running.
-7. **Analyze honestly.** Write the analysis to a scratch file and record it with
-   `lab note MNNNN --file F --verdict "<one line>"`. Cover:
-   - the result vs total-return SPY, and which conditions failed and by how much
-   - DSR and N
-   - the worst year and when the drawdown happened
-   - why: the mechanism, not just the numbers
-   - whether the hypothesis held, and whether the expected failure happened
-   - a comparison with the parent or near misses
-8. **Queue at least one next idea.** `lab idea --name … --family … --source-kind … --hypothesis …`
-   (plus `--parent` for a variation). It should come from what this result taught.
-9. **Promotion.** Only if `lab run` printed an ELIGIBLE trial (status `dev-eligible`), go to
-   **Promotion** below.
-10. **Commit + push** `lab/lab.sqlite` together with anything new. Then report to the user in a
-    few lines: the idea, the result table vs SPY, the verdict, the next idea, N, and test looks used.
+   Then check:
+   - `lab seen --find <words>`. If it was already explored, pick another idea or make a real variation.
+   - **Testable?** The store has daily OHLCV for 1993 → 2015-10-16 (~539 stocks plus ETFs,
+     no delisted names), cash dividends, and point-in-time S&P 500 / Nasdaq-100 membership. No
+     fundamentals, intraday, options, short interest or sentiment. If it isn't testable:
+     `lab block <id> --on "<data>"` plus a `data-wish` insight. Solo: choose another idea.
+     Child: report `blocked`.
+   - **Executable?** Gotrade means long only, whole shares, regular session. Leverage, shorting
+     and non-default ETFs need owner inputs and are never eligible. Test them only as evidence.
+4. **Write** `engine/src/seer_engine/lab/methods/mNNNN_<slug>.py` from `method_template.py`
+   (this folder). Solo: the id comes from `lab next-id`, or from the backlog row.
+   - 1–6 fixed variants. `hypothesis` and `expected_failure` are written **now**, before any result.
+   - New logic is an `Allocator` with `id = "MNNNN"`. Reuse `f_factor`, `f_index`,
+     `f_rotation`, `f_swing`, `allocator.VOLTARGET`/`BLEND` where you can.
+     `TradeRules` presets live in `sim/rules.py`.
+   - Pure. Reads only bars dated ≤ `data_date`. Set `seen_keys`.
+5. **Test, then commit** only the method file. Run `pytest -q tests/test_lab_methods.py` and
+   `ruff check src tests`. If the contract test fails, fix the method; never weaken the test.
+   The commit is the pre-registration. Push it to `main`: child: `git fetch origin && git rebase
+   origin/main && git push origin HEAD:main`; solo: `git push`.
+6. **Run** `lab run MNNNN`. It takes seconds to minutes. Use `run_in_background` and wait for it.
+7. **Analyze honestly** in a scratch file, then `lab note MNNNN --file F --verdict "<one line>"`.
+   The page at seertrade.site/sera shows this to the owner, so write plainly. Cover:
+   - result vs total-return SPY, and which conditions failed and by how much
+   - DSR at N
+   - worst year and when the drawdown hit
+   - **why**: the mechanism, not just the numbers
+   - whether the hypothesis held and whether the expected failure happened
+   - comparison with the parent or near misses
+   - your **opinion**: is this direction worth more trials?
+8. **Journal at least one insight**: `lab insight --kind observation|hypothesis|data-wish|feature-wish|risk
+   --title … --body … --method MNNNN`. Useful kinds: what this taught about markets, data you
+   wish the lab had, a feature that would make the search better, a risk you noticed.
+9. **Queue at least one next idea**: `lab idea --name … --family … --source-kind … --hypothesis …`
+   (plus `--parent`), drawn from what this result taught.
+10. **Promotion** if `lab run` printed an ELIGIBLE trial: solo, see **Promotion** below; child, report it.
+11. **Finish.**
+    - Solo: commit and push `lab/lab.sqlite` with anything new, then give a short report: idea, result vs SPY, verdict, insight, next idea, N, test looks.
+    - Child: make sure your method file is on `origin/main`. Then
+      `SendMessage` to the coordinator (re-read `ListAgents` first):
+      `DONE MNNNN <rejected|dev-eligible|blocked> — <verdict>; next: M00xx`. If the coordinator
+      is gone, the database already holds everything, so just stop. Never commit `lab/lab.sqlite`.
 
-## Promotion (only when dev-eligible)
+## Promotion (dev-eligible): autonomous, one counted look
 
-`lab test` and the test-window store do not exist yet; they get built on the first promotion.
-**Stop and tell the user**, then build them under the design §3 rules:
-- Pre-register the best eligible variant (by MAR, one per method) in `docs/lab/prereg/MNNNN.md`.
-  Commit and push it before any test number exists.
-- One look per configuration, enforced by `UNIQUE(config_digest, window)`.
-- The gate on the test window is the same five conditions.
-- On a pass, stop: a paper roster entry is the owner's decision. Design §1 never moves.
+Nobody approves this; you do it. If `lab test` and the test-window store don't exist yet, build
+them first (with tests), following design §3:
+- **Test store:** `engine/.research-test/`, gitignored, sessions 2015-10-19 → the latest
+  session, built the way `research.build_store` builds the dev store (same files, manifest and
+  checks).
+- **`lab test <candidate>`:** refuses unless a pre-registration file exists and is committed.
+  Runs once. Records a `test` trial, which `UNIQUE(config_digest, window)` makes the only one.
+  Sets the method to `test-passed` or `test-failed`.
+
+Then:
+1. Pre-register the best eligible variant by MAR, one per method, in `docs/lab/prereg/MNNNN.md`:
+   id, digest, gate, window, date. Commit and push it before any test number exists.
+2. Run `lab test`.
+3. Write the analysis and verdict.
+4. **Pass:** add it to the paper roster under a new id with its own clock, following
+   `docs/runbooks/paper-trading.md` and the existing roster code. Set the method to `paper`.
+   Commit, push, verify. **Real money stays out of scope:** design §1 needs ≥ 3 months and
+   ≥ 100 closed trades of forward paper first.
+5. **Fail:** `test-failed` is final. Queue a variation if the evidence supports one.
 
 ## Never
 
 | Temptation | Rule |
 |---|---|
-| "One param tweak and it passes" | Tweaks after seeing a result are a **new variation method**: new file, new trials, N grows. Never edit a method that has run (a test pins its sha). |
-| "Re-run it, the store changed" | A config runs once per window. Rename tricks fail: digests ignore the id. |
-| "Peek at 2016–2026 to sanity-check" | No. The test window is only reached through Promotion. Never edit `DEV_END`. |
-| "Delete that embarrassing trial" | Trials are append-only (triggers). Every try is reported. |
-| "Max DD 16% is basically 15%" | Design §1 is fixed. Never edit §1/§5, `tuning` thresholds, the paper roster or the P7a registry. |
-| "Nothing worked, stop here" | Queue the next idea. Record blocked ideas. Never end a run with an empty backlog. |
-| "Run three ideas in one go" | One idea per run. For nonstop work: `/loop /explore-and-experiment-new-method`. |
+| "I should check with the owner first" | You don't. Decide, write the assumption down, continue. |
+| "One param tweak and it passes" | A tweak after a result is a **new variation method** with new trials. Never edit a method that has run (a test pins its sha). |
+| "Re-run it, the store changed" | A configuration runs once per window. Renaming doesn't help: digests ignore the id. |
+| "Peek at 2016–2026" | Only through Promotion. Never edit `DEV_END`. |
+| "Delete that embarrassing trial" | Trials and insights are append-only (triggers). |
+| "Max DD 16% is basically 15%" | Design §1 is fixed. Never edit §1/§5, `tuning` thresholds or the P7a registry. |
+| "Nothing worked, stop here" | Journal the insight and queue the next idea. |
+| "Child: commit lab.sqlite too" | Never. A binary file committed by two sessions is a conflict nobody can merge. |
 
 ## Quick reference
 
 ```
 lab status | lab show M0007 | lab next-id | lab seen --find momentum
-lab run M0007                     # committed method file required
-lab note M0007 --file /tmp/a.md --verdict "Fails max DD (21%); trend filter too slow in 2008"
+lab run M0007                     # needs a committed method file
+lab note M0007 --file /tmp/a.md --verdict "..."
+lab insight --kind data-wish --title "Quarterly fundamentals" --body "..." --method M0007
 lab idea --name "..." --family ... --source-kind variation --parent M0007 --hypothesis "..."
 lab block M0012 --on "quarterly fundamentals"   lab drop M0013 --why "duplicate of M0004"
 lab export                        # lab/lab.xlsx (gitignored)

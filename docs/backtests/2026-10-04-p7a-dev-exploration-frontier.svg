@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" width="960" height="560" role="img" aria-labelledby="title desc" font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+<title id="title">Return against drawdown, 54 candidates, development window to 2015-10-16</title>
+<desc id="desc">Scatter of CAGR against max drawdown for every P7a candidate on the development window, with total-return SPY and the 15% drawdown limit marked. The values are in the rows CSV next to this file.</desc>
+<style>.bg{fill:#fcfcfb}.t1{fill:#0b0b0b}.t2{fill:#52514e}.grid{stroke:#e6e5e0;stroke-width:1}.axis{stroke:#a3a29c;stroke-width:1}.lim{stroke:#c0392b;stroke-width:1.5;stroke-dasharray:6 4}.pt{fill:#a3a29c}.el{fill:#2a78d6}.fi{fill:#1baf7a;stroke:#0b0b0b;stroke-width:1}.spy{fill:#eb6834}@media (prefers-color-scheme: dark){.bg{fill:#1a1a19}.t1{fill:#ffffff}.t2{fill:#c3c2b7}.grid{stroke:#33322f}.axis{stroke:#6b6a64}.lim{stroke:#e5675a}.pt{fill:#6b6a64}.el{fill:#3987e5}.fi{fill:#199e70;stroke:#ffffff}.spy{fill:#d95926}}</style>
+<rect class="bg" x="0" y="0" width="960" height="560"/>
+<text class="t1" x="80" y="24" font-size="16" font-weight="600">Return against drawdown, 54 candidates, development window to 2015-10-16</text>
+<text class="t2" x="80" y="42" font-size="12">54 of 54 plotted, each on its own window; SPY total-return on 1993-02-01 → 2015-10-16.</text>
+<circle class="pt" cx="85" cy="62" r="5"/>
+<text class="t2" x="95" y="66" font-size="12">candidate</text>
+<circle class="el" cx="245" cy="62" r="5"/>
+<text class="t2" x="255" y="66" font-size="12">eligible, not kept</text>
+<circle class="fi" cx="405" cy="62" r="5"/>
+<text class="t2" x="415" y="66" font-size="12">finalist</text>
+<path class="spy" d="M565,56 L571,62 L565,68 L559,62 Z"/>
+<text class="t2" x="577" y="66" font-size="12">SPY total-return</text>
+<line class="grid" x1="80" y1="500.0" x2="900" y2="500.0"/>
+<text class="t2" x="72" y="504.0" font-size="11" text-anchor="end">-5%</text>
+<line class="grid" x1="80" y1="431.7" x2="900" y2="431.7"/>
+<text class="t2" x="72" y="435.7" font-size="11" text-anchor="end">0%</text>
+<line class="grid" x1="80" y1="363.3" x2="900" y2="363.3"/>
+<text class="t2" x="72" y="367.3" font-size="11" text-anchor="end">5%</text>
+<line class="grid" x1="80" y1="295.0" x2="900" y2="295.0"/>
+<text class="t2" x="72" y="299.0" font-size="11" text-anchor="end">10%</text>
+<line class="grid" x1="80" y1="226.7" x2="900" y2="226.7"/>
+<text class="t2" x="72" y="230.7" font-size="11" text-anchor="end">15%</text>
+<line class="grid" x1="80" y1="158.3" x2="900" y2="158.3"/>
+<text class="t2" x="72" y="162.3" font-size="11" text-anchor="end">20%</text>
+<line class="grid" x1="80" y1="90.0" x2="900" y2="90.0"/>
+<text class="t2" x="72" y="94.0" font-size="11" text-anchor="end">25%</text>
+<line class="grid" x1="80.0" y1="90" x2="80.0" y2="500"/>
+<text class="t2" x="80.0" y="518" font-size="11" text-anchor="middle">0%</text>
+<line class="grid" x1="285.0" y1="90" x2="285.0" y2="500"/>
+<text class="t2" x="285.0" y="518" font-size="11" text-anchor="middle">20%</text>
+<line class="grid" x1="490.0" y1="90" x2="490.0" y2="500"/>
+<text class="t2" x="490.0" y="518" font-size="11" text-anchor="middle">40%</text>
+<line class="grid" x1="695.0" y1="90" x2="695.0" y2="500"/>
+<text class="t2" x="695.0" y="518" font-size="11" text-anchor="middle">60%</text>
+<line class="grid" x1="900.0" y1="90" x2="900.0" y2="500"/>
+<text class="t2" x="900.0" y="518" font-size="11" text-anchor="middle">80%</text>
+<line class="axis" x1="80" y1="500" x2="900" y2="500"/>
+<line class="axis" x1="80" y1="90" x2="80" y2="500"/>
+<line class="axis" x1="80" y1="431.7" x2="900" y2="431.7"/>
+<line class="lim" x1="233.7" y1="90" x2="233.7" y2="500"/>
+<text class="t2" x="237.7" y="102" font-size="11">max drawdown 15% (design §1)</text>
+<text class="t2" x="490.0" y="540" font-size="12" text-anchor="middle">Max drawdown</text>
+<text class="t2" x="24" y="295.0" font-size="12" text-anchor="middle" transform="rotate(-90 24 295.0)">CAGR</text>
+<circle class="pt" cx="641.9" cy="309.9" r="4"><title>REF-SPY-HOLD: CAGR +8.9%, max drawdown 54.8%</title></circle>
+<circle class="pt" cx="414.0" cy="389.0" r="4"><title>REF-A-V0: CAGR +3.1%, max drawdown 32.6%</title></circle>
+<circle class="pt" cx="388.0" cy="337.8" r="4"><title>F1-SPY-SMA200-D: CAGR +6.9%, max drawdown 30.0%</title></circle>
+<circle class="pt" cx="272.2" cy="297.9" r="4"><title>F1-SPY-SMA200-M: CAGR +9.8%, max drawdown 18.7%</title></circle>
+<circle class="pt" cx="613.0" cy="385.8" r="4"><title>F1-SPY-SMA100-D: CAGR +3.4%, max drawdown 52.0%</title></circle>
+<circle class="pt" cx="493.5" cy="403.0" r="4"><title>F1-SPY-SMA50-D: CAGR +2.1%, max drawdown 40.3%</title></circle>
+<circle class="pt" cx="273.9" cy="305.0" r="4"><title>F1-SPY-10MSMA-M: CAGR +9.3%, max drawdown 18.9%</title></circle>
+<circle class="pt" cx="289.7" cy="306.5" r="4"><title>F1-SPY-ABS12-M: CAGR +9.2%, max drawdown 20.5%</title></circle>
+<circle class="pt" cx="388.0" cy="340.0" r="4"><title>F1-SPY-SMA200-D-TBILL: CAGR +6.7%, max drawdown 30.0%</title></circle>
+<circle class="pt" cx="612.0" cy="389.0" r="4"><title>F1-QQQ-SMA200-D: CAGR +3.1%, max drawdown 51.9%</title></circle>
+<circle class="pt" cx="513.7" cy="361.3" r="4"><title>F1-QQQ-SMA200-M: CAGR +5.1%, max drawdown 42.3%</title></circle>
+<circle class="pt" cx="651.0" cy="364.8" r="4"><title>F1-QQQ-SMA100-D: CAGR +4.9%, max drawdown 55.7%</title></circle>
+<circle class="pt" cx="631.8" cy="379.4" r="4"><title>F1-QQQ-SPYSIG-D: CAGR +3.8%, max drawdown 53.8%</title></circle>
+<circle class="pt" cx="509.9" cy="378.0" r="4"><title>F1-QQQ-10MSMA-M: CAGR +3.9%, max drawdown 41.9%</title></circle>
+<circle class="pt" cx="286.6" cy="358.9" r="4"><title>F1-SPY-VT12-W: CAGR +5.3%, max drawdown 20.2%</title></circle>
+<circle class="pt" cx="312.9" cy="371.3" r="4"><title>F1-QQQ-VT15-W: CAGR +4.4%, max drawdown 22.7%</title></circle>
+<circle class="pt" cx="444.8" cy="283.4" r="4"><title>F10-SSO-SMA200-D: CAGR +10.9%, max drawdown 35.6%</title></circle>
+<circle class="pt" cx="476.0" cy="269.5" r="4"><title>F10-QLD-SMA200-D: CAGR +11.9%, max drawdown 38.6%</title></circle>
+<circle class="pt" cx="418.5" cy="246.2" r="4"><title>F10-SSO-10MSMA-M: CAGR +13.6%, max drawdown 33.0%</title></circle>
+<circle class="pt" cx="346.0" cy="419.2" r="4"><title>F11-SPY-TOM: CAGR +0.9%, max drawdown 25.9%</title></circle>
+<circle class="pt" cx="267.3" cy="418.1" r="4"><title>F11-SPY-TOM-TREND: CAGR +1.0%, max drawdown 18.3%</title></circle>
+<circle class="pt" cx="255.5" cy="433.9" r="4"><title>F11-QQQ-TOM-TREND: CAGR −0.2%, max drawdown 17.1%</title></circle>
+<circle class="pt" cx="526.8" cy="370.9" r="4"><title>F2-SPYQQQ-12M: CAGR +4.4%, max drawdown 43.6%</title></circle>
+<circle class="pt" cx="475.4" cy="316.5" r="4"><title>F2-SPYQQQ-6M: CAGR +8.4%, max drawdown 38.6%</title></circle>
+<circle class="pt" cx="592.2" cy="305.8" r="4"><title>F2-SPYQQQ-3M: CAGR +9.2%, max drawdown 50.0%</title></circle>
+<circle class="pt" cx="311.4" cy="278.4" r="4"><title>F2-SPYQQQ-12M-IEF: CAGR +11.2%, max drawdown 22.6%</title></circle>
+<circle class="pt" cx="308.3" cy="301.3" r="4"><title>F2-GEM-SPYEFA-IEF: CAGR +9.5%, max drawdown 22.3%</title></circle>
+<circle class="pt" cx="346.2" cy="352.8" r="4"><title>F3-SEC-TOP3-6M: CAGR +5.8%, max drawdown 26.0%</title></circle>
+<circle class="pt" cx="427.1" cy="348.4" r="4"><title>F3-SEC-TOP3-12M: CAGR +6.1%, max drawdown 33.9%</title></circle>
+<circle class="pt" cx="478.8" cy="386.9" r="4"><title>F3-SEC-TOP2-3M: CAGR +3.3%, max drawdown 38.9%</title></circle>
+<circle class="pt" cx="280.0" cy="316.3" r="4"><title>F3-SEC-TOP3-6M-TREND: CAGR +8.4%, max drawdown 19.5%</title></circle>
+<circle class="pt" cx="340.4" cy="314.3" r="4"><title>F3-SEC-TOP3-6M-IEF: CAGR +8.6%, max drawdown 25.4%</title></circle>
+<circle class="pt" cx="774.8" cy="260.3" r="4"><title>F4-MOM12-N10: CAGR +12.5%, max drawdown 67.8%</title></circle>
+<circle class="pt" cx="369.1" cy="185.9" r="4"><title>F4-MOM12-N10-TREND: CAGR +18.0%, max drawdown 28.2%</title></circle>
+<circle class="pt" cx="308.0" cy="209.7" r="4"><title>F4-MOM12-N20-TREND: CAGR +16.2%, max drawdown 22.2%</title></circle>
+<circle class="pt" cx="418.0" cy="193.1" r="4"><title>F4-MOM12-N5-TREND: CAGR +17.5%, max drawdown 33.0%</title></circle>
+<circle class="pt" cx="391.9" cy="155.6" r="4"><title>F4-MOM6-N10-TREND: CAGR +20.2%, max drawdown 30.4%</title></circle>
+<circle class="pt" cx="363.6" cy="194.3" r="4"><title>F4-MOM12-N10-TREND-IVOL: CAGR +17.4%, max drawdown 27.7%</title></circle>
+<circle class="pt" cx="496.1" cy="267.8" r="4"><title>F4-MOM12-N10-TREND-W: CAGR +12.0%, max drawdown 40.6%</title></circle>
+<circle class="pt" cx="446.1" cy="320.9" r="4"><title>F5-LV60-N20: CAGR +8.1%, max drawdown 35.7%</title></circle>
+<circle class="pt" cx="402.0" cy="328.3" r="4"><title>F5-LV60-N20-TREND: CAGR +7.6%, max drawdown 31.4%</title></circle>
+<circle class="pt" cx="408.9" cy="328.8" r="4"><title>F5-LV252-N20-TREND: CAGR +7.5%, max drawdown 32.1%</title></circle>
+<circle class="pt" cx="378.1" cy="308.5" r="4"><title>F6-ML-P50-N10-TREND: CAGR +9.0%, max drawdown 29.1%</title></circle>
+<circle class="pt" cx="316.1" cy="302.0" r="4"><title>F6-ML-P50-N20-TREND: CAGR +9.5%, max drawdown 23.0%</title></circle>
+<circle class="pt" cx="266.0" cy="350.6" r="4"><title>F6-ML-P50-N10-VT12: CAGR +5.9%, max drawdown 18.1%</title></circle>
+<circle class="pt" cx="362.2" cy="257.1" r="4"><title>F7-RSI2-T20-DIP: CAGR +12.8%, max drawdown 27.5%</title></circle>
+<circle class="pt" cx="381.0" cy="255.4" r="4"><title>F7-RSI2-T10-DIP: CAGR +12.9%, max drawdown 29.4%</title></circle>
+<circle class="pt" cx="573.5" cy="345.4" r="4"><title>F7-RSI2-T20-CLOSE: CAGR +6.3%, max drawdown 48.1%</title></circle>
+<circle class="pt" cx="457.8" cy="253.4" r="4"><title>F7-RSI2-T20-OPEN: CAGR +13.0%, max drawdown 36.9%</title></circle>
+<circle class="pt" cx="339.9" cy="305.2" r="4"><title>F7-RSI2-T20-N8: CAGR +9.3%, max drawdown 25.4%</title></circle>
+<circle class="pt" cx="336.0" cy="307.7" r="4"><title>F7-RSI2-T20-TREND: CAGR +9.1%, max drawdown 25.0%</title></circle>
+<circle class="pt" cx="473.2" cy="210.7" r="4"><title>F7-RSI2-T20-NOSTOP: CAGR +16.2%, max drawdown 38.4%</title></circle>
+<circle class="pt" cx="277.2" cy="264.7" r="4"><title>F9-SPY200M70-MOM30: CAGR +12.2%, max drawdown 19.2%</title></circle>
+<circle class="pt" cx="271.2" cy="301.9" r="4"><title>F9-SPY200D50-SWING50: CAGR +9.5%, max drawdown 18.7%</title></circle>
+<path class="spy" d="M643.6,302.9 L650.6,309.9 L643.6,316.9 L636.6,309.9 Z"><title>SPY total-return: CAGR +8.9%, max drawdown 55.0%</title></path>
+<text class="t1" x="653.6" y="313.9" font-size="11">SPY total-return</text>
+</svg>

@@ -1,0 +1,170 @@
+{
+  "branch": "feature/sera-lab-site",
+  "coordinator": "orch-sera-lab-site",
+  "coordinator_session_id": "8e8dbba4-2b74-43d1-af75-547aa7f319fa",
+  "created": "2026-10-04T15:00:08+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 1,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/sera-lab-site/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3",
+        "R6",
+        "R7"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Lab snapshot export + synthesis kind"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 2,
+      "note": null,
+      "package": "web/lib/sera",
+      "plan": ".workflows/plan/sera-lab-site/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3",
+        "R5",
+        "R7"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Web data layer for the snapshot"
+    },
+    {
+      "card": null,
+      "commit": "b1adc6a",
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 3,
+      "note": "gate+shell+chart kit, no drift; used p1-minted TaskID (race), pathspec-only commit in shared worktree",
+      "package": "web/app/sera`, `web/components/sera",
+      "plan": ".workflows/plan/sera-lab-site/phase-3.md",
+      "reported_at": "2026-10-04T15:05:31+00:00",
+      "satisfies": [
+        "R1",
+        "R2",
+        "R4",
+        "R7"
+      ],
+      "status": "done",
+      "task_id": "P1-WEB-EQ4I",
+      "title": "Sera shell, access gate, chart kit"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2,
+        3
+      ],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": null,
+      "package": "web/app/sera` (page.tsx)",
+      "plan": ".workflows/plan/sera-lab-site/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R4",
+        "R5",
+        "R7"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Overview page"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2,
+        3
+      ],
+      "difficulty": "HARD",
+      "n": 5,
+      "note": null,
+      "package": "web/app/sera/methods",
+      "plan": ".workflows/plan/sera-lab-site/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R3",
+        "R4",
+        "R5",
+        "R7"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Methods list + method detail"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2,
+        3
+      ],
+      "difficulty": "HARD",
+      "n": 6,
+      "note": null,
+      "package": "web/app/sera/{journal,ideas,how}",
+      "plan": ".workflows/plan/sera-lab-site/phase-6.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R4",
+        "R5",
+        "R6",
+        "R7"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Journal, Ideas, How it works"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        4,
+        5,
+        6
+      ],
+      "difficulty": "EASY",
+      "n": 7,
+      "note": null,
+      "package": ".github`, `.claude/skills`, `docs`, `web",
+      "plan": ".workflows/plan/sera-lab-site/phase-7.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3",
+        "R5",
+        "R6",
+        "R7"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Keep it current: CI, skills, docs"
+    }
+  ],
+  "plan": "/home/miftah/.worktrees/seer/sera-lab-site/.workflows/orchestration/sera-lab-site/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "sera-lab-site",
+  "updated": "2026-10-04T15:05:44+00:00",
+  "verified_at": "2026-10-04T15:05:44+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/sera-lab-site"
+}

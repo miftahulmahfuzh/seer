@@ -89,17 +89,17 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "477a0d37d509d9193281a62f8a996be0c6d877b0",
       "depends_on": [
         2,
         3
       ],
       "difficulty": "HARD",
       "n": 5,
-      "note": null,
+      "note": "methods list (?show= filter) + method detail pages; tsc/vitest 244/next build green; no decisions",
       "package": "web/app/sera/methods",
       "plan": ".workflows/plan/sera-lab-site/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T15:14:25+00:00",
       "satisfies": [
         "R1",
         "R3",
@@ -107,8 +107,8 @@
         "R5",
         "R7"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-9ANC",
       "title": "Methods list + method detail"
     },
     {
@@ -164,7 +164,7 @@
   "plan": "/home/miftah/.worktrees/seer/sera-lab-site/.workflows/orchestration/sera-lab-site/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-lab-site",
-  "updated": "2026-10-04T15:14:04+00:00",
+  "updated": "2026-10-04T15:14:25+00:00",
   "verified_at": "2026-10-04T15:14:04+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-lab-site"
 }

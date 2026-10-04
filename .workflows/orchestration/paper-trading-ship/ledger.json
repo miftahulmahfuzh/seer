@@ -140,21 +140,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "7ce6dd1",
       "depends_on": [
         7
       ],
       "difficulty": "HARD",
       "n": 8,
-      "note": null,
+      "note": "paper/replay.py + commands/paper_check.py; 64 new tests; no decisions",
       "package": "engine/paper",
       "plan": ".workflows/plan/paper-trading-ship/phase-8.md",
-      "reported_at": "2026-10-04T03:09:50+00:00",
+      "reported_at": "2026-10-04T03:14:21+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-WBI7",
       "title": "paper_check` replay check"
     },
     {
@@ -261,7 +261,7 @@
         "R6",
         "R7"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Ship: CI lint, workflow, Neon, Vercel, docs"
     }
@@ -269,7 +269,7 @@
   "plan": "/home/miftah/.worktrees/seer/paper-trading-ship/.workflows/orchestration/paper-trading-ship/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "paper-trading-ship",
-  "updated": "2026-10-04T03:09:50+00:00",
+  "updated": "2026-10-04T03:14:21+00:00",
   "verified_at": "2026-10-04T03:09:50+00:00",
   "worktree": "/home/miftah/.worktrees/seer/paper-trading-ship"
 }

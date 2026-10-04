@@ -2,8 +2,8 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-10-04 09:49:58
-**Total Active Tasks**: 2
+**Last Updated**: 2026-10-04 09:58:00
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
@@ -13,8 +13,8 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 1
+- Blocked: 0
+- Completed: 2
 
 ---
 
@@ -23,21 +23,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-WEB-0AHX** Phase 11: Web: Today, Positions, History
-  - **Difficulty**: HARD
-  - **Type**: Update
-  - **Context**: Owns `app/(app)/page.tsx` + `today.module.css` (SPY-champion no-buys state; stale/failed still first), `positions/*` (strategy switcher, paper chip, bracket/book/benchmark cards by `Holding.kind`, `pendingOrders` sheet, paper-step warning), `history/*` (roster-driven filters, book exit reasons signal/forced, paper chip, `Trade.key`), new shared `components/StrategySwitch.tsx` (icon-only links, `?s=`, `href`/`label` props), `components/PaperChip.tsx`, and `components/roster.ts` (only `strategyIcon`, `selectStrategy`, `sharesLabel`: short labels and the paper flag stay phase 10's). The three pages are replaced whole, starting from phase 10 Step 10's versions. Does not touch: leaderboard, `web/lib/*` (consumes phase 10's API; a missing field is added in phase 10's plan, not here). Exit: vitest + `tsc --noEmit` green; screens render on demo data at 414 pt and desktop, light and dark.
-  - **Status**: open
-  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 11 of 13)
-  - **Satisfies**: R4 — Web: Today SPY-champion state, paper labels, book positions/trades, monthly table, leaderboard incl. book strategies, checklist honesty, no 4-slot assumption
-  - **Depends on**: P1-WEB-Y9MV
-  - **Plan**: `.workflows/plan/P1-WEB-0AHX.md`
-
 - [ ] **P1-WEB-DX8D** Phase 12: Web: Leaderboard, monthly table, checklist
   - **Difficulty**: HARD
   - **Type**: Update
   - **Context**: Owns `app/(app)/leaderboard/page.tsx` + `leaderboard.module.css` + `view.ts`/`view.test.ts` (leaderboard-only helpers: looks, best research, score line, month rows over phase 10's `MonthlyTable`): roster-driven colors/cards (no hardcoded A/B/C), SPY crown, checklist per research strategy via phase 11's `StrategySwitch`/`selectStrategy`/`strategyIcon` with `checklist(m, spy, gate)` and an honest score line, "Month by month" sheet from `monthly(id, run.sessionDate)` (Return, SPY, Trades, Worst drop; since-start row; partial-month marker). Does not touch: other screens, `web/lib/*`. Exit: as phase 11, on the Leaderboard.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 12 of 13)
   - **Satisfies**: R4 — Web: Today SPY-champion state, paper labels, book positions/trades, monthly table, leaderboard incl. book strategies, checklist honesty, no 4-slot assumption
   - **Depends on**: P1-WEB-0AHX
@@ -54,6 +44,19 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-0AHX** Phase 11: Web: Today, Positions, History
+  - **Difficulty**: HARD
+  - **Type**: Update
+  - **Context**: Owns `app/(app)/page.tsx` + `today.module.css` (SPY-champion no-buys state; stale/failed still first), `positions/*` (strategy switcher, paper chip, bracket/book/benchmark cards by `Holding.kind`, `pendingOrders` sheet, paper-step warning), `history/*` (roster-driven filters, book exit reasons signal/forced, paper chip, `Trade.key`), new shared `components/StrategySwitch.tsx` (icon-only links, `?s=`, `href`/`label` props), `components/PaperChip.tsx`, and `components/roster.ts` (only `strategyIcon`, `selectStrategy`, `sharesLabel`: short labels and the paper flag stay phase 10's). The three pages are replaced whole, starting from phase 10 Step 10's versions. Does not touch: leaderboard, `web/lib/*` (consumes phase 10's API; a missing field is added in phase 10's plan, not here). Exit: vitest + `tsc --noEmit` green; screens render on demo data at 414 pt and desktop, light and dark.
+  - **Status**: done
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 11 of 13)
+  - **Satisfies**: R4 — Web: Today SPY-champion state, paper labels, book positions/trades, monthly table, leaderboard incl. book strategies, checklist honesty, no 4-slot assumption
+  - **Depends on**: P1-WEB-Y9MV
+  - **Plan**: `.workflows/plan/P1-WEB-0AHX.md`
+  - **Completed**: 2026-10-04 09:58
+  - **Method**: /do
+  - **Files**: web/components/roster.ts, web/components/roster.test.ts, web/components/StrategySwitch.tsx, web/components/StrategySwitch.module.css, web/components/PaperChip.tsx, web/components/PaperChip.module.css, web/app/(app)/page.tsx, web/app/(app)/today.module.css, web/app/(app)/positions/page.tsx, web/app/(app)/positions/positions.module.css, web/app/(app)/history/page.tsx, web/app/(app)/history/history.module.css
 
 - [x] **P1-WEB-Y9MV** Phase 10: Web data layer, monthly math, demo seed
   - **Difficulty**: HARD

@@ -1,7 +1,7 @@
 # Package: seer-web
 
 **Location**: `web` (Next.js app router; package name `seer-web`, private)
-**Last Updated**: 2026-10-04 (P1-WEB-Y9MV, paper-trading-ship: the data layer reads all three engines, pure `monthly.ts` and `strategy.ts`, the sixth go-live rule, demo seed in the paper shape)
+**Last Updated**: 2026-10-04 (P1-WEB-0AHX, paper-trading-ship phase 11: Today's SPY-champion no-buys state, Positions strategy switcher with bracket/book/benchmark cards and paper orders, History roster filters and book exit reasons; shared `StrategySwitch`, `PaperChip`, `roster.ts`)
 
 ## Overview
 
@@ -17,6 +17,7 @@ write (`action_dismissals`).
 - One data layer (`lib/data.ts`) that turns rows of all three engines (`bracket`, `book`, `benchmark`) into typed view models
 - Pure, DB-free logic that tests run without a connection: metrics and the go-live checklist (`lib/metrics.ts`), month-by-month paper performance (`lib/monthly.ts`), strategy row helpers (`lib/strategy.ts`), slot letters and card colours (`lib/slots.ts`), session freshness (`lib/session.ts`), number/date formatting (`lib/format.ts`)
 - Four pages: Today, Positions, History, Leaderboard
+- Shared roster UI (`components/StrategySwitch.tsx`, `components/PaperChip.tsx`, `components/roster.ts`): icon-only strategy switching by `?s=` and the paper marker on research strategies' holdings, orders and trades
 - Migrations runner shared with the engine (`scripts/migrate.mjs`) and a demo seeder (`scripts/seed-demo.mjs`)
 
 ## Layout
@@ -33,11 +34,15 @@ web/
     (app)/
       layout.tsx            signed-in shell
       actions.ts            server action dismiss(formData)
-      page.tsx              Today: champion's picks for the session + day-5 bracket actions
-      positions/page.tsx    champion's open holdings with stop/target track
-      history/page.tsx      closed trades, filter by strategy and win/loss
+      page.tsx              Today: champion's picks + day-5 bracket actions; no-buys state for a SPY/non-bracket champion
+      positions/page.tsx    any strategy's holdings (?s=), cards by Holding.kind, next-session paper orders, paper-step warning
+      history/page.tsx      closed trades of both engines, filter by research strategy (?s=) and win/loss (?o=)
       leaderboard/page.tsx  equity curves, metrics, go-live checklist
   components/               AppHeader, Nav, CopyButton, RefreshButton, WhyToggle, TooltipLayer, tooltip
+    StrategySwitch.tsx      icon-only roster switcher (Links), ALL sentinel           (server component)
+    PaperChip.tsx           "Paper" data label with tooltip, sm | md
+    roster.ts               strategyIcon, selectStrategy, sharesLabel                (pure)
+    roster.test.ts          vitest suite for roster.ts
   lib/
     db.ts                   sql = neon(DATABASE_URL)
     data.ts                 all DB reads (server only)
@@ -137,6 +142,30 @@ Functions:
 - `monthly(strategyId, sessionDate): Promise<MonthlyTable>`: loads the strategy's and the benchmark's snapshots and its exit dates, then delegates to `monthlyTable`.
 - `dismissAction(orderId)`: the only write; idempotent insert into `action_dismissals`.
 
+### components/roster.ts (pure)
+
+```ts
+function strategyIcon(name: string): LucideIcon;   // strategies.icon (kebab-case) -> Lucide icon
+function selectStrategy<T extends { id: string; isBenchmark: boolean }>(roster: T[], requested: string | undefined): T | null;
+function sharesLabel(n: number): string;          // 1 -> '1 share', 2.50004 -> '2.5 shares'
+```
+
+- `strategyIcon`: known names `landmark` (SPY), `sigma` (A), `trending-up` (F4), `shield` (F1), plus `brain-circuit` and `gavel` for old demo rows; unknown falls back to `Sigma`.
+- `selectStrategy`: the requested id when it is on the roster, else the first non-benchmark strategy, else the first row, else null.
+- `sharesLabel`: rounds to 4 dp (book shares are fractional); singular only at exactly 1.
+- Short labels and the paper flag are not here: they are `Strategy.short` and `Strategy.isPaper` from `lib/data.ts`.
+
+### components/StrategySwitch.tsx, components/PaperChip.tsx
+
+```tsx
+const ALL = 'all';
+<StrategySwitch strategies={{ id, name, icon }[]} current={string} href={(id) => string} label={string} allTip?={string} />
+<PaperChip size?={'sm' | 'md'} />
+```
+
+- `StrategySwitch`: a `<nav aria-label={label}>` of `next/link` icon buttons (`replace`, `scroll={false}`), one per roster row with `strategyIcon(icon)`, tooltip and `aria-label` = its name, `aria-current` on `current`. `allTip` adds a leading `ListFilter` button whose id is `ALL`. Server component because `href` is a function prop; callers build hrefs so other query params survive.
+- `PaperChip`: a non-interactive span (FlaskConical + "Paper", dashed) with the tooltip "Paper trade: simulated, no real money" (D3).
+
 ### Other modules
 
 - `lib/session.ts`: `nextUsSession(now)`, `isStale(latestSessionDate, now)`, `wibDate(now)`. Weekends only; holidays are the engine's job.
@@ -159,9 +188,9 @@ parallel (`Promise.all`). Dates are selected as `::text` and sliced to `YYYY-MM-
 timezone never shifts them.
 
 Page consumers:
-- Today: `champion`, `picks`, `positions`, `runStatus`; actions are holdings with an `orderId`, a `maxDays` and `day >= maxDays`, not dismissed.
-- Positions: `champion`, `positions`, `runStatus`; stop/target track falls back to entry/current when a book holding has no `sl`/`tp`; cards keyed by `Holding.key`.
-- History: `closedTrades`, `runStatus`.
+- Today: `champion`, `runStatus`, then `picks` and `positions` only for a picks champion (not benchmark, engine `bracket`); actions are holdings with an `orderId`, a `maxDays` and `day >= maxDays`, not dismissed. Any other champion (SPY under D2) shows the no-buys sheet: "Seer recommends no buys", research strategies trade on paper only and their orders live in Positions.
+- Positions: `strategies`, `runStatus`, then `positions(strat)` and `pendingOrders(strat)` for `selectStrategy(roster, ?s)`. Pending orders are skipped (empty `Pending`) for the benchmark and while the run is stale. Holdings split by `Holding.kind` into `BracketCard` (stop/target range, days), `BookCard` (weight, stop/target only when set) and `BenchmarkCard`; cards keyed by `Holding.key`. The orders sheet lists bracket orders by slot or book targets by rank with weight; empty-state copy depends on engine and `Pending.decision`. A paper-step warning shows when `paperStatus !== 'success'` (failed / running / not yet run). `PaperChip` and a "on paper since" line mark `isPaper` strategies.
+- History: `strategies`, `closedTrades`, `runStatus`. Filters are `StrategySwitch` over non-benchmark strategies with an `ALL` button (`?s=`, unknown ids read as all) and win/loss icon buttons (`?o=`); defaults are dropped from the URL. Exit-reason icons cover `tp`, `sl`, `time`, `gap`, `signal` (rules said sell, sold at the open) and `forced` (forced close, no more prices), with a fallback for unknown reasons. Rows keyed by `Trade.key`; each shows the strategy tag (`strategyShort`) and a small `PaperChip` when the strategy is paper or missing from the roster.
 - Leaderboard: `leaderboard`, `runStatus`; checklist is `checklist(champ.metrics, spy.totalReturn, champ.strategy.gate)`, scored out of six.
 
 ## Dependencies
@@ -190,7 +219,7 @@ window lacks two month starts.
 - `DATABASE_URL` (app, pooled HTTP), `DATABASE_URL_UNPOOLED` (scripts), `ALLOWED_EMAIL`, NextAuth Google credentials. Scripts read `web/.env.local` via `node --env-file`.
 - `npm run db:migrate`: apply new migrations in name order, one transaction each.
 - `npm run db:seed-demo [-- --dry-run]`: builds a 66-session demo (day 0 + paper start, at least three calendar months) ending at the last completed session, flagged `is_demo`. Roster: SPY (champion, buy and hold), A (bracket), F4-MOM12-N20-TREND and F1-SPY-SMA200-M (monthly book strategies, deciding on each month's first session). Writes strategies (with `engine`, `rules_id`, `paper_start`, `params.backtest_gate`), runs (with paper status), fx, bars, orders, equity snapshots, `paper_state`, `book_positions`, `book_targets`, `book_trades`. `--dry-run` builds every row and prints counts without connecting.
-- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `monthly`, `slots`, `session`, `format`, `allow`).
+- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `monthly`, `slots`, `session`, `format`, `allow`) and `components/roster`.
 
 ## Gotchas
 
@@ -200,7 +229,9 @@ window lacks two month starts.
 - The gate defaults to not passed, so the checklist reads 5/6 at best until the engine's `paper` command writes `backtest_gate.passed = true`.
 - `runStatus` mixes two runs: freshness from the latest successful run, `latestStatus`/`paperStatus` from the most recent run of any outcome.
 - Leaderboard win rate and trade counts only use the strategy's own engine's trade table; SPY has no trades.
-- Seer ships paper-only (2026-10-04): `isPaper` strategies are research, never a buy recommendation.
+- Seer ships paper-only (2026-10-04): `isPaper` strategies are research, never a buy recommendation. Today never shows their orders; Positions and History mark them with `PaperChip`.
+- Positions defaults to the first research strategy, not the champion: with SPY as champion, `selectStrategy` skips the benchmark unless `?s=` asks for it.
+- `StrategySwitch` takes `href` as a function, so it must stay a server component (functions cannot cross into a client component).
 
 ## Notes
 

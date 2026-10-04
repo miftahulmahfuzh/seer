@@ -17,8 +17,8 @@ export const dynamic = 'force-dynamic';
 
 // [icon, tooltip, legend label]
 const REASON: Record<string, [LucideIcon, string, string]> = {
-  tp: [Target, 'Take profit hit', 'Take profit'],
-  sl: [OctagonX, 'Stop loss hit', 'Stop loss'],
+  tp: [Target, 'Take profit hit', 'Target'],
+  sl: [OctagonX, 'Stop loss hit', 'Stop'],
   time: [Hourglass, 'Time exit, day 5', 'Day 5'],
   gap: [SkipForward, 'Gapped past stop at open', 'Gap'],
   signal: [ArrowRightLeft, 'Rules said sell, sold at the open', 'Signal'],
@@ -77,8 +77,8 @@ export default async function History({ searchParams }: { searchParams: Promise<
             <div className={s.stat}><span className={`num ${s.mid}`}>{rows.length - wins}</span><span className={s.sub}>Lost</span></div>
           </div>
           <div className={s.key}>
-            {Object.entries(REASON).map(([k, [Icon, , label]]) => (
-              <span key={k}><Icon size={15} />{label}</span>
+            {Object.entries(REASON).map(([k, [Icon, tip, label]]) => (
+              <span key={k} data-tip={tip}><Icon size={15} />{label}</span>
             ))}
           </div>
         </section>

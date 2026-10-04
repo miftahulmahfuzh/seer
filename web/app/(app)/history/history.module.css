@@ -10,8 +10,16 @@
 .big { font-size: 52px; line-height: 0.95; letter-spacing: -0.04em; }
 .mid { font-size: 26px; }
 .sub { font-size: 15px; }
-.key { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 14px; color: var(--ink-2); }
-.key span { display: flex; align-items: center; gap: 5px; }
+.key {
+  /* One row on any phone: text, icons and gaps all scale with the row width (~12px at 327px). */
+  container-type: inline-size;
+  display: flex; justify-content: space-between; color: var(--ink-2);
+}
+.key span {
+  display: flex; align-items: center; gap: 0.3em; white-space: nowrap;
+  font-size: clamp(10px, 3.7cqw, 14px);
+}
+.key svg { width: 1.1em; height: 1.1em; flex: none; }
 
 .list { padding: 16px 22px var(--nav-clear); gap: 0; flex: 1; }
 .none { padding: 32px 0; text-align: center; font-size: 17px; color: var(--ink-2); }
@@ -38,7 +46,7 @@
   }
   .filters { order: 2; gap: 14px; container-type: normal; }
   .filters > * { --seg-btn: 42px; }
-  .key { order: 3; width: 100%; }
+  .key { order: 3; width: 100%; justify-content: flex-start; gap: 18px; }
   .list {
     margin-top: 12px; border-radius: 40px; padding: 8px 30px 20px;
     display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; align-content: start;

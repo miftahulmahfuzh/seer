@@ -1,7 +1,7 @@
 # Package: seer-web
 
 **Location**: `web` (Next.js app router; package name `seer-web`, private)
-**Last Updated**: 2026-10-04 (P1-WEB-0AHX, paper-trading-ship phase 11: Today's SPY-champion no-buys state, Positions strategy switcher with bracket/book/benchmark cards and paper orders, History roster filters and book exit reasons; shared `StrategySwitch`, `PaperChip`, `roster.ts`)
+**Last Updated**: 2026-10-04 (P1-WEB-DX8D, paper-trading-ship phase 12: roster-driven Leaderboard with SPY crown, per-research-strategy six-item checklist via `StrategySwitch` with an honest score line, and a "Month by month" sheet; helpers in `leaderboard/view.ts`)
 
 ## Overview
 
@@ -37,7 +37,9 @@ web/
       page.tsx              Today: champion's picks + day-5 bracket actions; no-buys state for a SPY/non-bracket champion
       positions/page.tsx    any strategy's holdings (?s=), cards by Holding.kind, next-session paper orders, paper-step warning
       history/page.tsx      closed trades of both engines, filter by research strategy (?s=) and win/loss (?o=)
-      leaderboard/page.tsx  equity curves, metrics, go-live checklist
+      leaderboard/page.tsx  roster-driven equity curves, champion crown, per-strategy go-live checklist (?s=), month-by-month sheet
+      leaderboard/view.ts   looks, researchOf, bestResearch, scoreOf, monthLines, sinceStartLine  (pure)
+      leaderboard/view.test.ts  vitest suite for view.ts
   components/               AppHeader, Nav, CopyButton, RefreshButton, WhyToggle, TooltipLayer, tooltip
     StrategySwitch.tsx      icon-only roster switcher (Links), ALL sentinel           (server component)
     PaperChip.tsx           "Paper" data label with tooltip, sm | md
@@ -166,6 +168,29 @@ const ALL = 'all';
 - `StrategySwitch`: a `<nav aria-label={label}>` of `next/link` icon buttons (`replace`, `scroll={false}`), one per roster row with `strategyIcon(icon)`, tooltip and `aria-label` = its name, `aria-current` on `current`. `allTip` adds a leading `ListFilter` button whose id is `ALL`. Server component because `href` is a function prop; callers build hrefs so other query params survive.
 - `PaperChip`: a non-interactive span (FlaskConical + "Paper", dashed) with the tooltip "Paper trade: simulated, no real money" (D3).
 
+### app/(app)/leaderboard/view.ts (pure)
+
+```ts
+type RosterIn = { id: string; isChampion: boolean; isBenchmark: boolean };
+type Look = { bg: string; line: string; width: number; dotted: boolean };
+function looks(roster: RosterIn[]): Map<string, Look>;
+const LOOK_FALLBACK: Look;
+function researchOf<T extends RosterIn>(roster: T[]): T[];          // non-benchmark rows
+function bestResearch<T>(rows: { strategy: T; metrics: { totalReturn: number | null } }[]): { strategy: T; ret: number } | null;
+const CHECKS = 6;
+type Score = { passed: number; total: number; ready: boolean; lines: [string, string] };
+function scoreOf(items: { ok: boolean }[], gatePassed: boolean): Score;
+type MonthLine = { key; label; partial: boolean; ret: { text; tone: '' | 'pos' | 'neg' }; spy; trades; drop };
+function monthLabel(ym: string): string;                            // '2026-10' -> 'Oct 2026'
+function monthLines(t: MonthlyTable): MonthLine[];                  // newest first
+function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null before the first paper session
+```
+
+- `looks`: research strategies take the design's sheet/line pairs (`CARD_BGS` lav/sky/stone, `LINES`) in roster order, cycling sheets past three; the champion's line is thicker (2.75). The benchmark is a dotted `--ink-3` line on a plain sheet. No hardcoded A/B/C ids.
+- `bestResearch`: highest `totalReturn` among non-benchmark rows that have one.
+- `scoreOf`: `ready` only when exactly six items are given and all pass; lines are "All six pass. / Ready for real money", else "Paper trading until / all six pass" when the gate passed, else "Paper only. / Backtest gate not passed".
+- `monthLines` / `sinceStartLine`: format `lib/monthly.ts`'s `MonthlyTable` (Return toned pos/neg, SPY, Trades, Worst drop; `—` for nulls); the since-start row is labelled `Since <monthDay(from)>`.
+
 ### Other modules
 
 - `lib/session.ts`: `nextUsSession(now)`, `isStale(latestSessionDate, now)`, `wibDate(now)`. Weekends only; holidays are the engine's job.
@@ -191,7 +216,7 @@ Page consumers:
 - Today: `champion`, `runStatus`, then `picks` and `positions` only for a picks champion (not benchmark, engine `bracket`); actions are holdings with an `orderId`, a `maxDays` and `day >= maxDays`, not dismissed. Any other champion (SPY under D2) shows the no-buys sheet: "Seer recommends no buys", research strategies trade on paper only and their orders live in Positions.
 - Positions: `strategies`, `runStatus`, then `positions(strat)` and `pendingOrders(strat)` for `selectStrategy(roster, ?s)`. Pending orders are skipped (empty `Pending`) for the benchmark and while the run is stale. Holdings split by `Holding.kind` into `BracketCard` (stop/target range, days), `BookCard` (weight, stop/target only when set) and `BenchmarkCard`; cards keyed by `Holding.key`. The orders sheet lists bracket orders by slot or book targets by rank with weight; empty-state copy depends on engine and `Pending.decision`. A paper-step warning shows when `paperStatus !== 'success'` (failed / running / not yet run). `PaperChip` and a "on paper since" line mark `isPaper` strategies.
 - History: `strategies`, `closedTrades`, `runStatus`. Filters are `StrategySwitch` over non-benchmark strategies with an `ALL` button (`?s=`, unknown ids read as all) and win/loss icon buttons (`?o=`); defaults are dropped from the URL. Exit-reason icons cover `tp`, `sl`, `time`, `gap`, `signal` (rules said sell, sold at the open) and `forced` (forced close, no more prices), with a fallback for unknown reasons. Rows keyed by `Trade.key`; each shows the strategy tag (`strategyShort`) and a small `PaperChip` when the strategy is paper or missing from the roster.
-- Leaderboard: `leaderboard`, `runStatus`; checklist is `checklist(champ.metrics, spy.totalReturn, champ.strategy.gate)`, scored out of six.
+- Leaderboard: `leaderboard`, `runStatus`, then `monthly(pick.id, run.sessionDate)`. Every card, chart line and legend entry comes from the roster via `looks`. The big figure is the champion (crowned; SPY today); the second figure is the best research strategy on paper while the champion is the benchmark, else SPY. The checklist and month sheet follow `pick = selectStrategy(researchOf(roster), ?s)`; a `StrategySwitch` over research strategies shows when there are two or more (SPY is not selectable here, it is the SPY column). Checklist is `checklist(pick.metrics, spy.totalReturn, pick.strategy.gate)` scored by `scoreOf`; the gate's `note` prints under it. "Month by month" lists the since-start row then months newest first, with a `CircleDashed` partial-month marker while the next session is in that month.
 
 ## Dependencies
 
@@ -219,7 +244,7 @@ window lacks two month starts.
 - `DATABASE_URL` (app, pooled HTTP), `DATABASE_URL_UNPOOLED` (scripts), `ALLOWED_EMAIL`, NextAuth Google credentials. Scripts read `web/.env.local` via `node --env-file`.
 - `npm run db:migrate`: apply new migrations in name order, one transaction each.
 - `npm run db:seed-demo [-- --dry-run]`: builds a 66-session demo (day 0 + paper start, at least three calendar months) ending at the last completed session, flagged `is_demo`. Roster: SPY (champion, buy and hold), A (bracket), F4-MOM12-N20-TREND and F1-SPY-SMA200-M (monthly book strategies, deciding on each month's first session). Writes strategies (with `engine`, `rules_id`, `paper_start`, `params.backtest_gate`), runs (with paper status), fx, bars, orders, equity snapshots, `paper_state`, `book_positions`, `book_targets`, `book_trades`. `--dry-run` builds every row and prints counts without connecting.
-- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `monthly`, `slots`, `session`, `format`, `allow`) and `components/roster`.
+- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `monthly`, `slots`, `session`, `format`, `allow`), `components/roster` and `app/(app)/leaderboard/view`.
 
 ## Gotchas
 
@@ -229,6 +254,7 @@ window lacks two month starts.
 - The gate defaults to not passed, so the checklist reads 5/6 at best until the engine's `paper` command writes `backtest_gate.passed = true`.
 - `runStatus` mixes two runs: freshness from the latest successful run, `latestStatus`/`paperStatus` from the most recent run of any outcome.
 - Leaderboard win rate and trade counts only use the strategy's own engine's trade table; SPY has no trades.
+- The Leaderboard never says "Ready for real money" unless all six checklist items pass (`scoreOf`); a missing gate yields no items and a 0/6 "Paper only" line.
 - Seer ships paper-only (2026-10-04): `isPaper` strategies are research, never a buy recommendation. Today never shows their orders; Positions and History mark them with `PaperChip`.
 - Positions defaults to the first research strategy, not the champion: with SPY as champion, `selectStrategy` skips the benchmark unless `?s=` asks for it.
 - `StrategySwitch` takes `href` as a function, so it must stay a server component (functions cannot cross into a client component).

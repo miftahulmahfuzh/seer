@@ -1,29 +1,66 @@
-import { BrainCircuit, Check, Crown, Gavel, Landmark, Sigma, X, type LucideIcon } from 'lucide-react';
+import { Check, CircleDashed, Crown, X } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { AppHeader } from '@/components/AppHeader';
-import { leaderboard, runStatus, type Board } from '@/lib/data';
+import { PaperChip } from '@/components/PaperChip';
+import { selectStrategy, strategyIcon } from '@/components/roster';
+import { StrategySwitch } from '@/components/StrategySwitch';
+import { leaderboard, monthly, runStatus, type Board } from '@/lib/data';
 import { monthDay, monthName, shortDate, signedPct } from '@/lib/format';
 import { checklist } from '@/lib/metrics';
 import { wibDate } from '@/lib/session';
+import {
+  bestResearch, LOOK_FALLBACK, looks, monthLines, researchOf, scoreOf, sinceStartLine,
+  type Look, type MonthLine,
+} from './view';
 import s from './leaderboard.module.css';
 
 export const dynamic = 'force-dynamic';
 
-const ICONS: Record<string, LucideIcon> = { sigma: Sigma, 'brain-circuit': BrainCircuit, gavel: Gavel, landmark: Landmark };
-const CARD_BG: Record<string, string> = { A: 'bg-lav', B: 'bg-sky', C: 'bg-stone' };
-const LINE: Record<string, string> = { B: 'var(--line-b)', C: 'var(--line-c)' };
-
 const W = 340, H = 170;
 
-export default async function Leaderboard() {
+type Search = { s?: string };
+
+export default async function Leaderboard({ searchParams }: { searchParams: Promise<Search> }) {
   const now = new Date();
+  const q = await searchParams;
   const [board, run] = await Promise.all([leaderboard(), runStatus(now)]);
+
+  const roster = board.rows.map(r => r.strategy);
+  const lookMap = looks(roster);
+  const lookOf = (id: string): Look => lookMap.get(id) ?? LOOK_FALLBACK;
+  const research = researchOf(roster);
   const champ = board.rows.find(r => r.strategy.isChampion);
   const spy = board.rows.find(r => r.strategy.isBenchmark);
-  const items = champ ? checklist(champ.metrics, spy?.metrics.totalReturn ?? null, champ.strategy.gate) : [];
-  const passed = items.filter(i => i.ok).length;
+  const spyRet = spy?.metrics.totalReturn ?? null;
+  const best = bestResearch(board.rows);
+
+  // Research only: SPY is in every month row's SPY column, so it is not selectable here.
+  const pick = selectStrategy(research, q.s);
+  const pickRow = pick ? board.rows.find(r => r.strategy.id === pick.id) : undefined;
+  const gate = pickRow?.strategy.gate ?? null;
+  const items = pickRow && gate ? checklist(pickRow.metrics, spyRet, gate) : [];
+  const score = scoreOf(items, gate?.passed === true);
+  // The latest month is partial while the engine's next session (runStatus().sessionDate) is in it.
+  const table = pick ? await monthly(pick.id, run.sessionDate) : null;
+  const since = table ? sinceStartLine(table) : null;
+  const months = table ? monthLines(table) : [];
+
+  // Forward test runs from the earliest paper snapshot (every roster entry starts the same day).
   const period = board.from && board.to ? `${monthDay(board.from)} – ${monthDay(board.to)}` : 'Not started';
-  const chart = buildChart(board);
+  const chart = buildChart(board, lookOf);
   const ret = (v: number | null) => (v === null ? '—' : signedPct(v, 1));
+  const tone = (v: number | null) => (v === null ? '' : v < 0 ? 'neg' : 'pos');
+  const champRet = champ?.metrics.totalReturn ?? null;
+
+  // Big figure = the champion (SPY today, D2). Second figure = the best research strategy on paper
+  // while the champion is the benchmark; otherwise SPY, as in the design.
+  const second = champ?.strategy.isBenchmark
+    ? {
+        value: best ? ret(best.ret) : '—',
+        mobile: best ? `Best · ${best.strategy.short}` : 'Paper',
+        desk: best ? `${best.strategy.name}, best on paper` : 'No paper results yet',
+      }
+    : { value: ret(spyRet), mobile: 'SPY', desk: 'SPY' };
 
   const chartSheet = (
     <section className={`sheet bg-sheet ${s.chartSheet}`}>
@@ -34,13 +71,25 @@ export default async function Leaderboard() {
       <div className={`${s.headline} ${s.pad}`}>
         <div className={s.stats}>
           <div className={s.stat}>
-            <span className={`num ${s.big} ${(champ?.metrics.totalReturn ?? 0) < 0 ? 'neg' : 'pos'}`}>{ret(champ?.metrics.totalReturn ?? null)}</span>
-            <span className={s.statLabel}><Crown size={14} /><span>{champ?.strategy.name ?? 'No champion'}<span className="desk-only">, champion</span></span></span>
+            <span className={`num ${s.big} ${tone(champRet)}`}>{ret(champRet)}</span>
+            <span className={s.statLabel}>
+              <Crown size={14} />
+              <span>{champ?.strategy.name ?? 'No champion'}<span className="desk-only">, champion</span></span>
+            </span>
           </div>
-          <div className={s.stat}><span className={`num ${s.mid}`}>{ret(spy?.metrics.totalReturn ?? null)}</span><span className={s.statLabel}>SPY</span></div>
-          <div className={`${s.stat} mobile-only`}><span className={`num ${s.mid}`}>{champ?.curve.length ?? 0}</span><span className={s.statLabel}>Sessions</span></div>
+          <div className={s.stat}>
+            <span className={`num ${s.mid}`}>{second.value}</span>
+            <span className={s.statLabel}>
+              <span className="mobile-only">{second.mobile}</span>
+              <span className="desk-only">{second.desk}</span>
+            </span>
+          </div>
+          <div className={`${s.stat} mobile-only`}>
+            <span className={`num ${s.mid}`}>{champ?.curve.length ?? 0}</span>
+            <span className={s.statLabel}>Sessions</span>
+          </div>
         </div>
-        <Legend rows={board.rows} className="desk-only" short />
+        <Legend rows={board.rows} lookOf={lookOf} className="desk-only" short />
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={s.chart} role="img"
         aria-label="Equity curves of each strategy against SPY">
@@ -52,26 +101,65 @@ export default async function Leaderboard() {
         ))}
       </svg>
       <div className={`${s.axis} ${s.pad}`}>{chart.labels.map((l, i) => <span key={i}>{l}</span>)}</div>
-      <Legend rows={board.rows} className={`${s.pad} mobile-only`} />
+      <Legend rows={board.rows} lookOf={lookOf} className={`${s.pad} mobile-only`} />
     </section>
   );
 
   const checklistSheet = (
     <section className={`sheet over bg-butter ${s.check}`}>
-      <span className="eyebrow">Go-live checklist · {champ?.strategy.id ?? '—'}</span>
+      {pick && research.length > 1 && (
+        <div className={s.switch}>
+          <StrategySwitch strategies={research} current={pick.id}
+            href={id => `/leaderboard?s=${encodeURIComponent(id)}`} label="Strategy" />
+        </div>
+      )}
+      <span className="eyebrow">Go-live checklist · {pick ? pick.short : '—'}</span>
       <div className={s.score}>
-        <span className={s.scoreNum}>{passed}/{items.length || 6}</span>
-        <span className={s.scoreText}>{items.length > 0 && passed === items.length ? <>All six pass.<br />Ready for real money</> : <>Paper trading until<br />all six pass</>}</span>
+        <span className={`num ${s.scoreNum}`}>{score.passed}/{score.total}</span>
+        <span className={s.scoreText}>{score.lines[0]}<br />{score.lines[1]}</span>
       </div>
       {items.map(c => (
         <div key={c.label} className={s.item}>
           {c.ok
-            ? <span className={s.ok} aria-label="Passed"><Check size={18} strokeWidth={2.25} /></span>
-            : <span className={s.no} aria-label="Not yet"><X size={18} strokeWidth={2.25} /></span>}
+            ? <span className={s.ok} role="img" aria-label="Passed"><Check size={18} strokeWidth={2.25} /></span>
+            : <span className={s.no} role="img" aria-label="Not yet"><X size={18} strokeWidth={2.25} /></span>}
           <span className={s.itemLabel}>{c.label}</span>
           <span className={`chip num ${s.itemVal}`}>{c.val}</span>
         </div>
       ))}
+      {gate?.note && <p className={s.note}>{gate.note}</p>}
+    </section>
+  );
+
+  const monthsSheet = (
+    <section className={`sheet over ${pick ? lookOf(pick.id).bg : 'bg-sheet'} ${s.months}`} aria-labelledby="months-title">
+      <div className={s.between}>
+        <h2 id="months-title" className="eyebrow">Month by month · {pick ? pick.short : '—'}</h2>
+        {pick && <PaperChip />}
+      </div>
+      {pick && since ? (
+        <table className={s.table}>
+          <thead>
+            <tr>
+              <th scope="col">Month</th>
+              <th scope="col">Return</th>
+              <th scope="col">SPY</th>
+              <th scope="col">Trades</th>
+              <th scope="col">Worst drop</th>
+            </tr>
+          </thead>
+          <tbody>
+            <MonthRow line={since} total />
+            {months.map(m => <MonthRow key={m.key} line={m} />)}
+          </tbody>
+        </table>
+      ) : (
+        <div className={s.none}>{pick ? 'No paper sessions yet.' : 'No paper strategy on the roster.'}</div>
+      )}
+      <div className={s.key}>
+        <span><CircleDashed size={15} />Partial month</span>
+        <span>One month is mostly luck</span>
+      </div>
     </section>
   );
 
@@ -81,21 +169,26 @@ export default async function Leaderboard() {
         deskAside={<span className="pill-outline" style={{ height: 52, fontSize: 16, color: 'var(--ink)' }}>Forward test · {period}</span>} />
       <div className="stack">
         <div className={s.top}>{chartSheet}{checklistSheet}</div>
-        <div className={s.cards}>
+        {monthsSheet}
+        <div className={s.cards} style={{ '--cols': Math.min(Math.max(board.rows.length, 1), 4) } as CSSProperties}>
           {board.rows.map(({ strategy: st, metrics: m }) => {
-            const Icon = ICONS[st.icon] ?? Sigma;
+            const Icon = strategyIcon(st.icon);
             const dash = (v: string) => (st.isBenchmark ? '—' : v);
             return (
-              <article key={st.id} className={`sheet over ${CARD_BG[st.id] ?? 'bg-sheet'} ${s.card}`}>
+              <article key={st.id} className={`sheet over ${lookOf(st.id).bg} ${s.card}`}>
                 <div className={s.cardHead}>
                   <div className={s.cardName}>
-                    <span className={s.name}>{st.name}{st.isChampion && <span data-tip="Champion" className={s.crown}><Crown size={20} /></span>}</span>
+                    <span className={s.name}>
+                      {st.name}
+                      {st.isChampion && <span data-tip="Champion" aria-label="Champion" role="img" className={s.crown}><Crown size={20} /></span>}
+                      {!st.isBenchmark && <PaperChip />}
+                    </span>
                     <span className={s.cardSub}>{st.sub}</span>
                   </div>
                   <span className={s.icon}><Icon size={22} strokeWidth={1.6} /></span>
                 </div>
                 <div className={s.metrics}>
-                  <div className={s.metric}><span className={`num ${s.ret} ${(m.totalReturn ?? 0) < 0 ? 'neg' : 'pos'}`}>{ret(m.totalReturn)}</span><span className={s.mLabel}><span className="mobile-only">Return</span><span className="desk-only">Total return</span></span></div>
+                  <div className={s.metric}><span className={`num ${s.ret} ${tone(m.totalReturn)}`}>{ret(m.totalReturn)}</span><span className={s.mLabel}><span className="mobile-only">Return</span><span className="desk-only">Total return</span></span></div>
                   <div className={s.metric}><span className="num">{dash(m.winRate === null ? '—' : Math.round(m.winRate * 100) + '%')}</span><span className={s.mLabel}>Win rate</span></div>
                   <div className={s.metric}><span className="num">{dash(m.profitFactor === null ? '—' : m.profitFactor === Infinity ? '∞' : m.profitFactor.toFixed(2))}</span><span className={s.mLabel}><span className="mobile-only">Profit f.</span><span className="desk-only">Profit factor</span></span></div>
                   <div className={s.metric}><span className="num">{m.maxDrawdown === null ? '—' : (m.maxDrawdown * 100).toFixed(1) + '%'}</span><span className={s.mLabel}><span className="mobile-only">Max DD</span><span className="desk-only">Max drawdown</span></span></div>
@@ -111,29 +204,55 @@ export default async function Leaderboard() {
   );
 }
 
-function Legend({ rows, className, short }: { rows: Board['rows']; className: string; short?: boolean }) {
+function MonthRow({ line, total }: { line: MonthLine; total?: boolean }) {
+  return (
+    <tr className={total ? s.total : undefined}>
+      <th scope="row">
+        <span className={s.monthLabel}>
+          {line.label}
+          {line.partial && (
+            <span className={s.partial} role="img" aria-label="Partial month" data-tip="Partial month">
+              <CircleDashed size={14} />
+            </span>
+          )}
+        </span>
+      </th>
+      <td className={`num ${line.ret.tone}`}>{line.ret.text}</td>
+      <td className="num">{line.spy}</td>
+      <td className="num">{line.trades}</td>
+      <td className="num">{line.drop}</td>
+    </tr>
+  );
+}
+
+function Legend({ rows, lookOf, className, short }: {
+  rows: Board['rows']; lookOf: (id: string) => Look; className: string; short?: boolean;
+}) {
   return (
     <div className={`${s.legend} ${className}`}>
-      {rows.map(({ strategy: st }) => (
-        <span key={st.id} className={s.legendItem}>
-          {st.isBenchmark
-            ? <span className={s.swatchDot} />
-            : <span className={s.swatch} style={{ background: st.isChampion ? 'var(--ink)' : LINE[st.id] ?? 'var(--ink-2)' }} />}
-          {short ? st.id : st.isBenchmark ? 'SPY' : `${st.id} ${st.name.split('·')[1]?.trim() ?? ''}`}
-        </span>
-      ))}
+      {rows.map(({ strategy: st }) => {
+        const look = lookOf(st.id);
+        return (
+          <span key={st.id} className={s.legendItem}>
+            {look.dotted
+              ? <span className={s.swatchDot} />
+              : <span className={s.swatch} style={{ background: look.line }} />}
+            {short ? st.short : st.name}
+          </span>
+        );
+      })}
     </div>
   );
 }
 
-function buildChart(board: Board) {
+function buildChart(board: Board, lookOf: (id: string) => Look) {
   const dates = [...new Set(board.rows.flatMap(r => r.curve.map(c => c.date)))].sort();
   const xi = new Map(dates.map((d, i) => [d, i]));
   const series = board.rows.filter(r => r.curve.length > 1).map(r => ({
     row: r,
     pts: r.curve.map(c => ({ x: xi.get(c.date)!, v: (c.equity / r.curve[0].equity - 1) * 100 })),
   }));
-  const all = series.flatMap(s => s.pts.map(p => p.v)).concat(0);
+  const all = series.flatMap(sr => sr.pts.map(p => p.v)).concat(0);
   const lo = Math.min(...all), hi = Math.max(...all);
   const span = hi - lo || 1;
   const y = (v: number) => +(H - 10 - ((v - lo) / span) * (H - 24)).toFixed(1);
@@ -141,13 +260,16 @@ function buildChart(board: Board) {
 
   // Champion last so it draws on top.
   const ordered = [...series].sort((a, b) => Number(a.row.strategy.isChampion) - Number(b.row.strategy.isChampion));
-  const lines = ordered.map(({ row, pts }) => ({
-    id: row.strategy.id,
-    d: pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.x)} ${y(p.v)}`).join(' '),
-    color: row.strategy.isChampion ? 'var(--ink)' : row.strategy.isBenchmark ? 'var(--ink-3)' : LINE[row.strategy.id] ?? 'var(--ink-2)',
-    width: row.strategy.isChampion ? 2.75 : row.strategy.isBenchmark ? 1.75 : 2,
-    dotted: row.strategy.isBenchmark,
-  }));
+  const lines = ordered.map(({ row, pts }) => {
+    const look = lookOf(row.strategy.id);
+    return {
+      id: row.strategy.id,
+      d: pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.x)} ${y(p.v)}`).join(' '),
+      color: look.line,
+      width: look.width,
+      dotted: look.dotted,
+    };
+  });
 
   const labels: string[] = [];
   if (dates.length) {

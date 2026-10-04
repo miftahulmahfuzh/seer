@@ -2,19 +2,19 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-10-04 09:58:00
-**Total Active Tasks**: 1
+**Last Updated**: 2026-10-04 10:07:00
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 2
+- Completed: 3
 
 ---
 
@@ -23,15 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-WEB-DX8D** Phase 12: Web: Leaderboard, monthly table, checklist
-  - **Difficulty**: HARD
-  - **Type**: Update
-  - **Context**: Owns `app/(app)/leaderboard/page.tsx` + `leaderboard.module.css` + `view.ts`/`view.test.ts` (leaderboard-only helpers: looks, best research, score line, month rows over phase 10's `MonthlyTable`): roster-driven colors/cards (no hardcoded A/B/C), SPY crown, checklist per research strategy via phase 11's `StrategySwitch`/`selectStrategy`/`strategyIcon` with `checklist(m, spy, gate)` and an honest score line, "Month by month" sheet from `monthly(id, run.sessionDate)` (Return, SPY, Trades, Worst drop; since-start row; partial-month marker). Does not touch: other screens, `web/lib/*`. Exit: as phase 11, on the Leaderboard.
-  - **Status**: open
-  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 12 of 13)
-  - **Satisfies**: R4 — Web: Today SPY-champion state, paper labels, book positions/trades, monthly table, leaderboard incl. book strategies, checklist honesty, no 4-slot assumption
-  - **Depends on**: P1-WEB-0AHX
-  - **Plan**: `.workflows/plan/P1-WEB-DX8D.md`
 
 ### [P2] Medium
 
@@ -44,6 +35,21 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-DX8D** Phase 12: Web: Leaderboard, monthly table, checklist
+  - **Difficulty**: HARD
+  - **Type**: Update
+  - **Context**: Owns `app/(app)/leaderboard/page.tsx` + `leaderboard.module.css` + `view.ts`/`view.test.ts` (leaderboard-only helpers: looks, best research, score line, month rows over phase 10's `MonthlyTable`): roster-driven colors/cards (no hardcoded A/B/C), SPY crown, checklist per research strategy via phase 11's `StrategySwitch`/`selectStrategy`/`strategyIcon` with `checklist(m, spy, gate)` and an honest score line, "Month by month" sheet from `monthly(id, run.sessionDate)` (Return, SPY, Trades, Worst drop; since-start row; partial-month marker). Does not touch: other screens, `web/lib/*`. Exit: as phase 11, on the Leaderboard.
+  - **Status**: done
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 12 of 13)
+  - **Satisfies**: R4 — Web: Today SPY-champion state, paper labels, book positions/trades, monthly table, leaderboard incl. book strategies, checklist honesty, no 4-slot assumption
+  - **Depends on**: P1-WEB-0AHX
+  - **Plan**: `.workflows/plan/P1-WEB-DX8D.md`
+  - **Completed**: 2026-10-04 10:07
+  - **Method**: /do
+  - **Files**: web/app/(app)/leaderboard/view.ts, web/app/(app)/leaderboard/view.test.ts, web/app/(app)/leaderboard/page.tsx, web/app/(app)/leaderboard/leaderboard.module.css
+  - **Drift**: none — phase 10/11 exports matched Requires A1–A6 exactly; plan code blocks applied verbatim
+  - **Decided**: Manual render check (plan Verification 'Manual check' 1–7) skipped → web reads via @neondatabase/serverless neon() HTTP driver, so a local render needs the live Neon DB and `db:seed-demo` would write demo rows into it; not seeding production. Exit criteria tsc/vitest verified; view.ts scoreOf tests enforce 'never Ready for real money unless all six pass' (tie-break: reversible option / narrower blast radius)
 
 - [x] **P1-WEB-0AHX** Phase 11: Web: Today, Positions, History
   - **Difficulty**: HARD

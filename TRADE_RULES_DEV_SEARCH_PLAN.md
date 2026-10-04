@@ -1190,6 +1190,7 @@ suite is green with 0 skipped (1694, plus only Bug-protocol tests). CI is green.
 | F7 prepared path for non-default periods | `targets_prepared` uses the vectorized columns only for the default periods (every registry row); other periods run the single-window path on `prepared.history`, so P4 identity holds for every params value | 3: the plans' code blocks (phase 8; `prepare` takes no params) |
 | Phase 12's run-time estimate (D13) | A class mean of per-candidate wall times (each including its allocator's first prepare) over the `--only` smoke; a pool only above 60 min, and then fixed-order with rows pinned equal to the sequential path | 4: handover D13 |
 | Idle position passed to allocators (D-J) | `run_book` hands allocators `held = book.held() − {rules.idle_symbol}`: the idle position is the runner's residual, never a family's. `ResearchData.unserved` and the `data_dir` keyword on `build_store`/`load_store` are accepted additions to the contract | 6: convention (phase 8's handoff; the runner owns the residual weight) |
+| R1 real-data `cmp` outcome (phase 13, 2026-10-04) | **Ran.** Neon bars fingerprint (1,817,429, 2026-10-02), unchanged before and after; `backtest`, `backtest_wf` and `backtest_b` with `--out` in scratch and `--cache-dir /home/miftah/seer/engine/.cache`: all 11 `docs/backtests/2026-10-02-*` files `cmp`-equal | 1: acceptance R1 |
 
 ## Open Questions
 

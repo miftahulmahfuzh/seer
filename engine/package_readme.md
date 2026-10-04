@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (src layout: `engine/src/seer_engine`)
-**Last Updated**: 2026-10-03 (Strategy B P6a, phase 7 of `STRATEGY_B_RANKER_PLAN.md`: `strategies.b`, `b_model`, labeler, B walk-forward, `backtest_b` command, committed P6a report)
+**Last Updated**: 2026-10-04 (P7a, phase 13 of `TRADE_RULES_DEV_SEARCH_PLAN.md`: `TradeRules` and the book engine, allocators and families F1–F11, the research store, the dev runner/report/registry, `research_store` and `backtest_dev`, the committed dev report and P7b pre-registration)
 
 ## Overview
 
@@ -26,6 +26,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - The 10-year backtest (`backtest/`, `backtest` command): point-in-time market, the session loop around the simulator, SPY benchmarks, metrics identical to the web's, the in-sample grid, the out-of-sample gate and the committed report
 - The Strategy A rework (P3b): `strategies.a2` (Strategy A's pre-registered variants V0–V3), an anchored yearly walk-forward (`backtest/walkforward.py`) that drives one portfolio whose params change by year, its report (`backtest/wf_report.py`) and the `backtest_wf` command
 - Strategy B (P6a): `strategies.b` (an ML cross-sectional ranker on 15 ranked features and 3 SPY features, keeping A's bracket and passing on nights with no positive prediction), `strategies.b_model` (fixed-hyperparameter gradient-boosted trees, plus a ridge for information), a vectorized net-of-cost bracket labeler (`backtest/labels.py`), the B walk-forward over P3b's folds with a label purge (`backtest/b_walkforward.py`), its report (`backtest/b_report.py`), and the `backtest_b` command
+- Trade rules as a value and a dev-window strategy search (P7a): `sim.rules` (`TradeRules`, with `DESIGN_V0` reproducing design §5 exactly) and a second pure engine, `sim.book` (signal exits, rebalancing, dividends, fractional shares, open entries, idle instruments); the `Allocator` protocol and the families F1–F11 (`strategies/allocator.py`, `f_index.py`, `f_rotation.py`, `f_factor.py`, `f_swing.py`); `backtest/book_runner.py`; a local, gitignored research store of pre-2015 history (`research.py`, `research_store` command); and a pre-registered registry run only on the development window (≤ 2015-10-16) by `backtest/dev.py`, `dev_report.py`, `registry.py` and the `backtest_dev` command, which writes the dev report and the P7b pre-registration
 
 ## Layout
 
@@ -48,12 +49,15 @@ engine/
     fx.py                   Frankfurter USD/IDR fetch, upsert_fx()
     yahoo.py                yfinance download + frame parsing, BRK.B <-> BRK-B (phase 3)
     runs.py                 start_run / finish_run / fail_run
+    research.py             local research store: build_store() / load_store(), DEV_END guard (impure; P7a)
     sim/                    fill simulator: pure, deterministic, Decimal-only (P2)
       __init__.py           public surface; import everything from seer_engine.sim
       model.py              constants, money helpers, Order, Portfolio, Event, Snapshot, StepResult
       lifecycle.py          step(), close_unpriced()
       sizing.py             Pick, Rejection, SizingResult, size_picks()
       split_adjust.py       apply_split()
+      rules.py              TradeRules, DESIGN_V0, V0_BOOK, the presets, is_decision_session (P7a)
+      book.py               the book engine: Target, Book, Position, Fill, Trade, step_book(), close_book_unpriced() (P7a)
     strategies/             strategy layer: pure; float64 indicators, Decimal picks (P3)
       __init__.py           re-exports the public names of base, a, a2 and b (never b_model, so importing the package does not load scikit-learn)
       base.py               History, history_from_bars(), Strategy protocol
@@ -62,6 +66,11 @@ engine/
       a2.py                 Strategy A2 (P3b): A2Params, VARIANTS V0-V3, regime_on, STRATEGY_A2_PARAMS, StrategyA2
       b_model.py            Strategy B's model (P6a): fit_tree / fit_ridge, BModel (digest identity), importance, dumps / loads
       b.py                  Strategy B (P6a): 18 features, rank01, candidates, BParams, picks > 0, FrozenModel, STRATEGY_B_FROZEN, StrategyB
+      allocator.py          Allocator protocol (target weights), target_from_close, month_end_closes, PICKS / BLEND / VOLTARGET (P7a)
+      f_index.py            F1/F10 TIMING (trend-timed index), F11 CALENDAR (turn of month) (P7a)
+      f_rotation.py         F2/F3 ROTATION (dual momentum, sector rotation) (P7a)
+      f_factor.py           F4/F5/F6 FACTOR (momentum, low vol, momentum + low vol) on index members (P7a)
+      f_swing.py            F7 SWING (longer-horizon RSI(2) mean reversion, signal exits) (P7a)
     backtest/               10-year backtest (P3) and walk-forward (P3b, P6a); every module but io.py is pure
       __init__.py           docstring only
       market.py             Membership, Market: bars, universe and FX in memory
@@ -75,8 +84,11 @@ engine/
       labels.py             vectorized bracket labeler: net-of-cost label and resolution date per order (P6a)
       b_walkforward.py      candidate table, purge, per-fold fits, probe, B / B-linear runs, calibration, gate_p6a() (P6a)
       b_report.py           BReport, machine lines, Markdown, equity CSV, SVG (P6a)
-      book_runner.py        run_book() / BookResult, run_rules() dispatch, run_stats() / RunStats (P7a)
-      io.py                 Neon loader + bar cache, dividends CSV, report writers write_report() / write_wf_report() / write_b_report(), write_model_artifact() (impure)
+      book_runner.py        run_book(), run_rules() (DESIGN_V0 -> run_backtest unchanged), BookResult, RunStats, run_stats() (P7a)
+      dev.py                DEV_END guard, Candidate, candidate_window(), run_registry(), D8 finalists(), deflated_sharpe() (P7a)
+      dev_report.py         DevReport, Markdown, rows/curves CSVs, frontier SVG, P7b pre-registration (P7a)
+      registry.py           REGISTRY: the append-only candidate registry (P7a)
+      io.py                 Neon loader + bar cache, dividends CSV, report writers write_report() / write_wf_report() / write_b_report() / write_dev_report(), write_model_artifact() (impure)
     commands/
       __init__.py           command-module contract
       migrate.py            `migrate` command
@@ -84,10 +96,14 @@ engine/
       backtest.py           `backtest` command (P3)
       backtest_wf.py        `backtest_wf` command (P3b)
       backtest_b.py         `backtest_b` command (P6a)
+      research_store.py     `research_store` command (P7a)
+      backtest_dev.py       `backtest_dev` command (P7a)
   tests/                    pytest; DB tests need PG_TEST_URL
   data/spy_dividends.csv    SPY dividends (ex_date, amount_usd), vendored from yfinance (see data/SOURCES.md)
   .cache/                   gitignored; bars-<max date>-<rows>.pkl written by the backtest loader
-docs/backtests/             committed reports: <end>-strategy-a{.md,-equity.csv,-equity.svg} (P3); <end>-strategy-a2-walkforward{.md,-equity.csv,-equity.svg,-variants.svg,-grid.csv} (P3b); <end>-strategy-b-walkforward{.md,-equity.csv,-equity.svg} (P6a)
+  .research/                gitignored; the P7a research store: bars.csv, dividends.csv, fx.csv, unserved.csv, manifest.json (research_store)
+docs/backtests/             committed reports: <end>-strategy-a{.md,-equity.csv,-equity.svg} (P3); <end>-strategy-a2-walkforward{.md,-equity.csv,-equity.svg,-variants.svg,-grid.csv} (P3b); <end>-strategy-b-walkforward{.md,-equity.csv,-equity.svg} (P6a); <run date>-p7a-dev-exploration{.md,-rows.csv,-curves.csv,-frontier.svg} (P7a)
+docs/plans/                 <run date>-p7b-preregistration.md: the P7b finalists (or "none eligible"), written by backtest_dev (P7a)
 db/migrations/002_engine.sql  (outside the package, owned by it)
 ```
 
@@ -273,6 +289,72 @@ passing run's artifact) are written as usual.
 - **One round.** The committed run is B's single round on this data. Re-running it on newer data
   re-measures the same pre-registered procedure. Changing a feature, the label, a hyperparameter or
   the pick rule after seeing results is not allowed.
+
+### `research_store` (P7a)
+
+```
+python -m seer_engine research_store [--dry-run] [-v] [--store STORE] [--batch-size BATCH_SIZE] [--verify]
+```
+
+This builds the local research store (D5). It covers pre-2015 bars for every S&P 500 member since
+1996 and Nasdaq-100 member since 2007 that yfinance can serve, plus the 21 research ETFs, cash
+dividends from the start, and Frankfurter USD/IDR. It **never connects to Neon** and needs no
+database setting.
+
+- **`--store`** defaults to `engine/.research` (gitignored), and **`--batch-size`** to 40 symbols
+  per yfinance request.
+- **The build** is throttled with backoff and runs all-or-nothing: temp files first, then a rename.
+  The same downloads give byte-identical files and the same fingerprint. Nothing dated after
+  2015-10-16 is kept.
+- **`--verify`** uses no network. It loads the store, checks every file's sha256 against
+  `manifest.json` and that no row is after 2015-10-16, runs three data checks (SPY has a bar on
+  every NYSE session 1993-02-01 → 2015-10-16; SPY's 2015 dividends equal the vendored
+  `data/spy_dividends.csv`; AAPL's 2012 dividends are on the split-adjusted price scale), and
+  prints the fingerprint and the counts. It is the check to run before any dev run.
+- **`--dry-run`** builds into a temporary directory, verifies it, and discards it.
+- **Logs:** batches, unserved symbols, counts, and the fingerprint.
+- **Exit codes:** 0 when the store is built (or loaded) and all three checks pass; 1 when the build
+  fails (nothing is written, any previous store is kept) or a check fails; 2 when the store is
+  missing or invalid (a tampered file, or a row after `DEV_END`).
+
+### `backtest_dev` (P7a)
+
+```
+python -m seer_engine backtest_dev [--dry-run] [-v] [--store DIR] [--out DIR] [--plans DIR] [--run-date YYYY-MM-DD] [--only ID [ID ...]]
+```
+
+This runs every candidate in `backtest/registry.py` on the **development window only** (each
+candidate's own start → 2015-10-16) and writes the P7a report set and the P7b pre-registration. It
+reads only the research store. **No Neon, no network.**
+
+- **Defaults are the committed run:** `--store engine/.research`, `--out docs/backtests` and
+  `--plans docs/plans`. `--run-date` defaults to today, and it appears in file names only.
+- **No `--end` exists.** Every entry point rejects a session after 2015-10-16 (`DevWindowError`),
+  and the store holds no later row (D9).
+- **Pre-registration guard:** the command exits 2 while `backtest/registry.py` has uncommitted
+  changes (or is untracked), so every committed report comes from a committed registry (D6).
+  `--only ID ...` skips the guard for smoke runs: it runs those candidates in registry order,
+  renders the files in memory, logs an estimate of the full run's time, and **writes nothing**.
+- **`--dry-run`** changes nothing: the command never touches the database, and a full run still
+  writes its report files.
+- **Steps:**
+  1. Load and verify the store.
+  2. Run every candidate, sequentially, in registry order.
+  3. Compute D8 and the deflated Sharpe.
+  4. Render all five files, then write them.
+- **Output:** `<out>/<run date>-p7a-dev-exploration.md`, `-rows.csv`, `-curves.csv` and
+  `-frontier.svg`, plus `<plans>/<run date>-p7b-preregistration.md`. A re-run with the same
+  `--run-date` overwrites them byte-identically.
+- **Logs:** the store fingerprint, one line per candidate (its result, failed D8 conditions and
+  wall time), and the finalist ids or "none eligible". Wall times appear in logs only, never in a
+  file.
+- **Exit codes:**
+  - 0 whether or not any candidate is eligible, because "none eligible" is a result.
+  - 1 on an error.
+  - 2 on a precondition: a dirty registry, an unknown `--only` id, a missing or invalid store, or
+    `research.DEV_END` differing from `backtest.dev.DEV_END`.
+- **One run per registry state.** Appending a candidate (D6) means a new commit before its run, and
+  every try is reported.
 
 ## Exported API
 
@@ -879,6 +961,206 @@ B's one round has failed on this data. B is not reworked on it, no model is froz
 the losers it never saw are exactly the ones it would have needed to learn to avoid. The report says
 so.
 
+### sim: trade rules and the book engine (P7a)
+
+Design §5 is now a value. `sim.model`, `sim.lifecycle`, `sim.sizing` and `sim.split_adjust` are not
+edited. `DESIGN_V0` runs go through the unchanged `size_picks` + `step` path, through
+`backtest.book_runner.run_rules` → `runner.run_backtest`. So the A, A2 and B reports re-render
+byte-identically: re-running `backtest`, `backtest_wf` and `backtest_b` on the unchanged Neon data (1,817,429 bar rows through 2026-10-02): all 11 `docs/backtests/2026-10-02-*` files `cmp`-equal (phase 13, 2026-10-04). Every other rule set runs on a second pure engine, `sim.book`.
+Both new modules are pure and `Decimal`-only, and `test_sim_purity.py` covers them. Import everything
+from `seer_engine.sim`.
+
+**`sim.rules`:**
+- Constants:
+  - `OPEN_LIMIT_BAND = Decimal("0.02")`;
+  - `RESIZE_BAND = Decimal("0.01")`;
+  - `SHARE_QUANTUM = Decimal("0.0001")`;
+  - `DEFAULT_ETFS = {"SPY", "QQQ"}`, the owner-input default;
+  - `LEVERAGED_ETFS = {"SSO", "QLD", "UPRO", "TQQQ"}`.
+- `TradeRules` is a frozen value. `__post_init__` validates types (`TypeError`), ints ≥ 1,
+  `cost_rate` in [0, 0.05) and a kebab-case `id` (`ValueError`).
+
+| Field | Default | Meaning |
+|---|---|---|
+| `id` | — | kebab-case, unique per preset |
+| `engine` | — | `"bracket_v0"` only for `DESIGN_V0` (`ValueError` otherwise, both ways); `"book"` for everything else |
+| `cadence` | `"daily"` | decision sessions: every session (`daily`); the first NYSE session of each ISO week (`weekly`); or the first of each calendar month (`monthly`) |
+| `entry` | `"limit"` | `limit`: the target's limit price (a new target with no limit price is bought like `open_limit`); `open_limit`: a buy limit at last close × 1.02 (a limit order, so executable by default); `open`: market-on-open (owner input) |
+| `max_positions` | `None` | a cap on non-idle positions (4 only for §5 parity) |
+| `time_stop` | `None` | sell at the next open once `days_held >= time_stop` |
+| `resize` | `False` | on decision sessions, trade held targets back to weight when the change is ≥ `RESIZE_BAND` × equity |
+| `fractional` | `False` | shares quantized down to `SHARE_QUANTUM` (owner input) |
+| `dividends` | `True` | credit cash dividends on the ex-date (D11) |
+| `idle_symbol` | `None` | the residual weight (1 − Σ targets) held in this instrument on decision sessions; 0% while it has no bar (BIL before 2007) |
+| `cost_rate` | `0.001` | per side; any other value is an owner input |
+
+- Presets (`PRESETS` holds every row below except `V0_BOOK`; ids are unique):
+
+| Preset | id | Engine | Cadence | Entry | Other |
+|---|---|---|---|---|---|
+| `DESIGN_V0` | `design-v0` | bracket_v0 | daily | limit | 4 positions, time stop 5, whole shares, no dividends: design §5 exactly (= `SLOTS`, `TIME_STOP_DAYS`, `COST_RATE`, tested) |
+| `V0_BOOK` | `v0-book` | book | daily | limit | `DESIGN_V0` replayed by the book engine; parity tests only, never in the registry |
+| `MONTHLY_HOLD` | `monthly-hold` | book | monthly | open_limit | resize |
+| `MONTHLY_HOLD_TBILL` | `monthly-hold-tbill` | book | monthly | open_limit | resize, idle in BIL |
+| `WEEKLY_HOLD` | `weekly-hold` | book | weekly | open_limit | resize |
+| `DAILY_SWITCH` | `daily-switch` | book | daily | open_limit | no resize |
+| `DAILY_SWITCH_TBILL` | `daily-switch-tbill` | book | daily | open_limit | idle in BIL |
+| `SWING_T10` | `swing-t10` | book | daily | limit | time stop 10 |
+| `SWING_T20` | `swing-t20` | book | daily | limit | time stop 20 |
+| `SWING_T20_OPEN` | `swing-t20-open` | book | daily | open_limit | time stop 20 |
+
+- `is_decision_session(rules, session) -> bool`. It raises `ValueError` for a non-session.
+- `rule_owner_inputs(rules) -> tuple[str, ...]`. The result is sorted and drawn from
+  `market-on-open`, `fractional`, `etf:<idle symbol>` (outside `DEFAULT_ETFS`) and `fee`.
+- `describe_rules(rules) -> tuple[str, ...]`: one fixed plain-English line per lever. The reports
+  and the pre-registration's §5 text use it.
+
+**`sim.book`** (`WEIGHT_QUANTUM = Decimal("0.000001")`):
+- `Target(symbol, weight, last, limit=None, stop=None, take=None)`: one instrument wanted after the
+  next open, in rank order.
+  - `0 < weight ≤ 1`, a multiple of `WEIGHT_QUANTUM`.
+  - The prices are 4 dp, with `stop < limit (or last) < take`.
+  - A float anywhere is a `TypeError`.
+- `to_weight(x)` quantizes down to `WEIGHT_QUANTUM`. `equal_weight(n)`.
+- `Position(symbol, shares, mark, entry_date, entry_price, days_held, cost_usd, income_usd, stop, take, exit_pending=False)`:
+  one holding episode. `exit_pending` marks a signal exit decided while the symbol had no bar.
+- `Book(cash, equity, positions=(), last_session=None)`, with `held()` and `position(symbol)`.
+  `new_book(cash_usd)`.
+- `Fill(session_date, symbol, side, shares, price, cash_usd, cost_usd, reason)`. The reason is one
+  of `entry`, `add`, `trim`, `signal`, `time`, `gap`, `tp`, `sl` or `forced`.
+- `Trade(symbol, entry_date, exit_date, entry_price, exit_price, days_held, cost_usd, income_usd, pnl_usd, exit_reason, idle)`:
+  one closed episode (shares 0 → > 0 → 0).
+  - Dividends are inside `income_usd`.
+  - `pnl_usd = income_usd − cost_usd` reconciles with cash exactly.
+  - Trims and adds do not create trades.
+  - Idle-instrument episodes (`idle=True`) are excluded from trade statistics.
+- `BookSnapshot(date, cash_usd, equity_usd, invested_usd)`: `invested_usd` counts non-idle
+  positions only, so exposure = invested ÷ equity.
+- `step_book(book, session, bars, targets, rules, dividends={}, idle_symbol_ok=False) -> BookStep(book, fills, trades, dividends, rejected, snapshot)`:
+  - `targets=None`: not a decision session.
+  - `targets=()`: a decision session wanting nothing, so every non-idle position is signal-exited.
+  - Σ weight ≤ 1 is checked only when `rules.max_positions is None` (D-A).
+  - Order:
+    1. Dividends on the ex-date for positions held before S.
+    2. Open exits, in symbol order: time stop, then a gap through the stop or the take, then a
+       signal exit (a dropped target or `exit_pending`). A position sold this way does not re-enter
+       on S.
+    3. Trims (`resize`, or the idle symbol) beyond `RESIZE_BAND`.
+    4. Buys in rank order, idle last.
+       - `max_positions` → `no_slot`.
+       - Sizing price: the target's limit, or last × 1.02 (`open_limit`, `open`, and a
+         limit-less new target under `limit`). A held target without a limit is never added to.
+       - Budget: `min(equity × weight, cash + planned night sells − committed)`.
+       - Whole or fractional shares → `too_small`.
+       - Fill: strict `low < limit` at `min(open, limit)`, or at the open for `open`. Otherwise
+         `unfilled` or `no_bar`.
+       - A fill-time cash guard → `cash`.
+    5. Intraday stop then take, for positions held before S.
+    6. `days_held + 1` and marks.
+    7. The snapshot.
+  - Buy cash is `q(p × n × (1 + c))`. Sell proceeds are `q(p × n × (1 − c))`.
+- `close_book_unpriced(book, symbols, rules) -> (book, fills, trades)` sells at the mark with reason
+  `forced`, mirroring `sim.close_unpriced`.
+- **Parity:** `run_book(PICKS(A), V0_BOOK)` reproduces `run_backtest(STRATEGY_A)` exactly: equal
+  snapshots and equal closed trades on seeded synthetic markets (`tests/test_book_runner.py`).
+
+### strategies: allocators and the P7a families
+
+The new modules are pure and flat in `strategies/`, so the purity glob covers them.
+`strategies/__init__.py` is unchanged: import from the modules.
+
+- **`strategies.allocator`**:
+  - The `Allocator` protocol: `id`, `lookback(params)`, `symbols(params)` (fixed symbols it reads),
+    `holds(params)` (fixed symbols it may hold), `uses_members(params)`,
+    `targets(history, members, data_date, held, params)`, `prepare(history)` and
+    `targets_prepared(prepared, members, data_date, held, params)`.
+  - **Contract (P4 identity):**
+    - `targets_prepared(prepare(H), …) == targets({s: h.upto(d)}, …)` for every date, holding and
+      params;
+    - it reads only bars dated ≤ `data_date`;
+    - targets are in rank order, with unique symbols and Σ weight ≤ 1 (except `PICKS`, whose §5
+      picks may weigh more: the engine's `max_positions` cap picks the entrants, and `step_book`
+      checks Σ ≤ 1 only when there is no cap);
+    - a symbol with no bar on `data_date` is never a new target;
+    - `held` lets a family keep a position, and the engine signal-exits any held symbol the family
+      drops. The book runner passes `held` without the idle symbol (D-J).
+
+    `tests/allocatorkit.py` checks this contract for every family.
+  - `target_from_close(symbol, close, weight, *, limit=None, stop=None, take=None)` and
+    `month_end_closes(h, data_date)`.
+  - Adapters and overlays:
+    - `PICKS` (`PicksParams(strategy, params, slots=4)`): any bracket `Strategy` as an allocator;
+      used for the V0 parity.
+    - `BLEND` (`BlendParams(parts)`, each `BlendPart(allocator, params, share)`): F9, core plus
+      satellite.
+    - `VOLTARGET` (`VolTargetParams(inner, inner_params, signal="SPY", target_vol=0.12, n=20)`):
+      L11, which scales the inner weights by `min(1, target ÷ realized vol)`.
+  - `prepare(history)` takes no params, so one prepared value per allocator id serves every
+    candidate (`LazyPrepared` for `PICKS`, `BLEND` and `VOLTARGET`; D-D).
+- **`strategies.indicators.return_window(close, n, skip=0)`** (additive):
+  `c[:, -1-skip] / c[:, -1-n] − 1`. It follows the same bit-identity rule as the existing windows.
+- **Families.** Each family is one singleton plus a frozen params dataclass with
+  `as_dict() -> dict[str, str]` in a fixed key order. `Candidate.family` carries the catalogue
+  label.
+
+| Module | Singleton (allocator id) | Params | Catalogue | Idea |
+|---|---|---|---|---|
+| `f_index` | `TIMING` (`F1`) | `TimingParams(hold, signal, rule, n=200)`; rule `sma` / `month_sma` / `abs_mom` / `always` | F1, F10 | hold an index ETF (or a 2× ETF, owner input) only while its signal is above trend |
+| `f_index` | `CALENDAR` (`F11`) | `CalendarParams(hold, days_before=1, days_after=3, trend=None)` | F11 | turn of the month, optionally only above trend |
+| `f_rotation` | `ROTATION` (`ROT`) | `RotationParams(universe, lookback, top, absolute=True, fallback=None, trend=None)` | F2, F3 | dual momentum and sector rotation, with an absolute filter and an optional bond fallback |
+| `f_factor` | `FACTOR` (`FAC`) | `FactorParams(rank, top=10, mom_n=252, mom_skip=21, vol_n=60, pool=50, sizing="equal", min_dollar_volume=2e7, min_price=5, trend=("SPY", 200))` | F4, F5, F6 | 12-1 momentum, low volatility, or momentum among calmer names, on point-in-time index members (SPY excluded) |
+| `f_swing` | `SWING` (`F7`) | `SwingParams(slots=4, rsi_n=2, rsi_max=10, sma_n=200, entry="dip", limit_atr=0.5, stop_atr=2.5, take_atr=None, exit_sma=5, exit_rsi=None, min_dollar_volume=2e7, market_trend=None)` | F7 | A's oversold-in-an-uptrend idea with a longer horizon, signal exits and no TP (D12: a new candidate, never A re-run) |
+| `allocator` | `BLEND` | `BlendParams` | F9 | a timed SPY core plus a momentum or swing satellite |
+
+F8 (a learned ranker at a longer horizon) and F12 (earnings drift) are not in the first registry
+(index Decisions). Either may be appended under D6.
+
+### research store (P7a)
+
+`seer_engine.research` is an **impure** edge: yfinance, Frankfurter and files. It is never Neon (D5).
+The store is local and gitignored, in `engine/.research/`.
+
+- Constants:
+  - `DEV_END = date(2015, 10, 16)`, `MEMBERSHIP_START` and `FX_START`, each equal to
+    `backtest.dev`'s (tested);
+  - `STORE_START = date(1993, 1, 29)`;
+  - `STORE_DIR`;
+  - `RESEARCH_ETFS`: 21 ETFs (BIL, DIA, EFA, GLD, IEF, IWM, QLD, QQQ, SHY, SPY, SSO, TLT and the 9
+    sector SPDRs);
+  - `SECTOR_ETFS`, equal to `backtest.registry.SECTOR_ETFS` (tested).
+- Files. All are LF text, sorted and deterministic, with prices at 4 dp like `bars`:
+
+| File | Columns | Notes |
+|---|---|---|
+| `bars.csv` | `symbol,date,open,high,low,close,volume` | split-adjusted, not dividend-adjusted (`auto_adjust=False`), dates ≤ `DEV_END` |
+| `dividends.csv` | `symbol,ex_date,amount` | cash dividends from `actions=True`, ≤ 6 dp |
+| `fx.csv` | `date,usd_idr` | Frankfurter from 1999-01-04 |
+| `unserved.csv` | `symbol,reason` | members overlapping [1996-01-02, `DEV_END`] that yfinance could not serve |
+| `manifest.json` | — | counts, a sha256 per file, and `fingerprint` (the sha256 of the sorted `name:sha` lines); no timestamps |
+
+- `build_store(store_dir, *, downloader=None, fetch_fx=None, sleep=time.sleep, batch_size=40, data_dir=None)`:
+  - the symbols are `RESEARCH_ETFS` plus every `compute_universe()` member overlapping
+    [1996-01-02, `DEV_END`];
+  - downloads are throttled and batched, with rate-limit backoff like `backfill`;
+  - rows after `DEV_END` are dropped defensively;
+  - it writes every file to a temp dir and then renames it, so the build is all-or-nothing
+    (`ResearchStoreError` on failure);
+  - it returns the manifest.
+- `load_store(store_dir, *, data_dir=None) -> ResearchData(market, dividends, spy_dividends, fingerprint, manifest, unserved)`:
+  - it verifies every sha256 and rejects any row dated after `DEV_END` (`ValueError`, also for a
+    missing store). That is the data-level guard of D9.
+  - Its `Market` takes membership from `membership.compute_universe()` through
+    `io.merge_intervals`, offline.
+- `run_checks(data, vendored)`: the three data checks `research_store --verify` prints.
+
+**The committed store** (built in phase 4, verified in phase 13): fingerprint `5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a`.
+- 2,490,793 bar rows; 539 of 1,061 symbols served, and 522 members unserved.
+- 28,206 dividend rows and 4,300 FX rows.
+
+yfinance has no delisted tickers, so the dev window's survivorship gap is far larger than the 115
+members since 2015, and single-stock dev results are optimistic (D4). The report counts the gap year
+by year (41.4% of member-sessions over 1996–2015 have no bar). ETF-only candidates have no such bias.
+
 ### backtest book runner (P7a)
 
 `backtest/book_runner.py` is pure (covered by `tests/test_strategy_purity.py`); tests in
@@ -905,6 +1187,62 @@ so.
   `exposure`, annualized `turnover`, `costs_usd`, `gross_pnl_usd`, `cost_drag`, `dividends_usd`,
   `daily_returns`, `sharpe` (population stdev, x sqrt(252)), `year_returns` and `worst_year`.
   Floats exist only here, summed left to right as in `backtest.metrics`.
+
+### backtest: dev runner, report and registry (P7a)
+
+These add to P3, P3b and P6a without changing them, on top of the book runner above. Every module
+here is pure, and the purity glob covers it; the one writer is `backtest.io.write_dev_report`.
+
+- **`backtest.dev`**:
+  - Constants: `DEV_END = 2015-10-16`, `MEMBERSHIP_START = 1996-01-02`, `FX_START = 1999-01-04`
+    and `MAX_CANDIDATES = 60`.
+  - `check_dev_session(d)` raises `DevWindowError` (a `ValueError`) after `DEV_END`. Every public
+    entry point calls it before anything else.
+  - `Candidate(id, family, rules, allocator, params, rationale, added, owner_inputs)`.
+    `candidate_owner_inputs(c)` returns `rule_owner_inputs` plus every held ETF outside
+    `DEFAULT_ETFS`, plus `leverage` for a held leveraged ETF. An empty tuple means executable under
+    the conservative defaults.
+  - `candidate_window(market, c) -> (start, DEV_END)`. The start is the first session where every
+    instrument the candidate reads, and SPY, has its lookback. A member family also starts no
+    earlier than `MEMBERSHIP_START`.
+  - `run_candidate(market, dividends, spy_dividends, c, *, prepared=None)` and
+    `run_registry(market, dividends, spy_dividends, registry, *, on_result=None)` run sequentially,
+    in registry order, with one prepared value per allocator id. Starting cash is
+    `initial_cash_usd(20,000,000 IDR, usd_idr_on(max(start, FX_START)))`; a window starting before
+    `FX_START` runs on a market copy whose `fx` is that single rate (D-C). FX before 1999 affects
+    only that conversion, never a decision.
+  - `DevRow` holds the stats and both SPY curves on the candidate's own window and cash. SPY's
+    dividends come from the store.
+  - `finalists(rows)` is D8:
+    - **eligible** means beating SPY TR, max DD ≤ 15%, PF ≥ 1.3, ≥ 100 closed trades, and no owner
+      input;
+    - the eligible rows are ranked by MAR (CAGR ÷ max DD), ties by id;
+    - the top 3 are kept, at most one per family.
+  - `deflated_sharpe(sharpe_daily, n_trials, var_trials, t, skew, kurt)` follows Bailey & López de
+    Prado (2014).
+- **`backtest.dev_report`**:
+  - `DevReport` and `report_stem(run_date)` (`<run date>-p7a-dev-exploration`);
+  - `preregistration_name(run_date)` (`<run date>-p7b-preregistration.md`);
+  - `render_markdown`, `rows_csv`, `curves_csv`, `frontier_svg` and `render_preregistration`.
+  - The run date appears in file names only, so a re-run is byte-identical. Two renders are
+    byte-equal.
+- **`backtest.registry`**:
+  - `REGISTRY` holds 54 candidates across 11 families. 11 of them carry owner inputs and cannot be
+    finalists until the owner confirms.
+  - `candidate_digest(c)`.
+  - `tests/test_registry.py` pins every `(id, digest)`, so the tuple only grows (D6).
+- **`backtest.io.write_dev_report(out_dir, plans_dir, report) -> list[Path]`** renders all five
+  files (`dev_report_files`) before writing any.
+
+**Committed result** (research store `5451195fd552`, dev window ≤ 2015-10-16, registry at
+`b2ec090`): 54 candidates tried, 0 eligible under D8.
+
+None eligible: of 54 candidates, 35 beat total-return SPY on their own windows, 0 kept max DD ≤ 15%,
+40 reached PF ≥ 1.3, 33 made ≥ 100 closed trades and 43 needed no owner input; none met all five.
+The best MAR was `F4-MOM12-N20-TREND` (F4): CAGR +16.2% against +7.9% for total-return SPY, max DD
+22.2%, PF 2.27, 1,154 trades, MAR 0.73; it failed on max DD ≤ 15%. See
+`docs/backtests/2026-10-04-p7a-dev-exploration.md` and its frontier chart. P7b does not run; the
+pre-registration file records "none eligible".
 
 ## Migration 002 (`db/migrations/002_engine.sql`)
 
@@ -933,7 +1271,7 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 - `numpy>=2`: indicator math and the float64 arrays in `strategies.base.History` (declared in P3; it was already installed through pandas).
 - `requests>=2.32`: HTTP, through one module-level `Session` in `http.py`.
 - `python-dotenv>=1.0`: parses `.env.local`. The file is parsed, never `source`d, because it contains an unquoted `&`.
-- `yfinance>=1.0`: used only by `yahoo.py` (phase 3 backfill), imported lazily inside `yf_download`.
+- `yfinance>=1.0`: used only by `yahoo.py` (phase 3 backfill, and P7a's research store through its dividends-aware download with `actions=True`), imported lazily.
 - `scikit-learn>=1.9,<1.10` (P6a): Strategy B's `HistGradientBoostingRegressor`, used only by `strategies.b_model`. The minor version is pinned, because a frozen model is a pickle of its estimator, and `b_model`'s digest reads the fitted trees' private node arrays. It brings `threadpoolctl` (used to cap the threads in the determinism probe), `joblib` and `scipy`. `cli.discover` imports every command, so `backtest_b` makes every command load scikit-learn at startup (about 0.5–1 s); `import seer_engine.strategies` alone does not.
 - dev: `pytest>=8`.
 
@@ -951,6 +1289,10 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 - `strategies.b_model` imports numpy, scikit-learn (`HistGradientBoostingRegressor`), `threadpoolctl`, `pickle` and `hashlib`, and nothing from the engine. scikit-learn loads none of psycopg, requests or yfinance, so the module stays pure. `strategies.b` imports numpy, `sim` (`Pick`), `strategies.a` (`_bracket`, `Features`, `DESIGN_PARAMS`), `strategies.base` and `strategies.indicators`. It never imports `b_model`, so `import seer_engine.strategies` does not load scikit-learn, and never `universe` (psycopg), so `SPY_SYMBOL` repeats `universe.BENCHMARK` and a test asserts they are equal.
 - `backtest.labels` imports numpy, `dates`, `sim.model` (`TIME_STOP_DAYS`) and `strategies.base`; its `COST` repeats `sim.COST_RATE` as a float, and a test pins them equal. `backtest.b_walkforward` imports numpy, `dates`, `strategies.b`, `strategies.b_model`, `backtest.labels`, `runner`, `metrics`, `market`, `tuning` (`Verdict`) and `walkforward` (`Fold` and the private `_check_folds`, `_day`, `_session`, `_join`, `_GATE_NAMES`, read-only). `backtest.b_report` imports `backtest.report`'s and `wf_report`'s helpers (read-only), `dates`, `strategies.a`, `strategies.b`, `strategies.b_model` (constants), and `backtest.b_walkforward`, `labels`, `metrics`, `runner`, `tuning`, `benchmark` and `walkforward`. None of them imports `bars`, `db`, `http` or `config`.
 - `backtest.io` also imports `b_report` and `strategies.b_model` (for `write_b_report` and `write_model_artifact`). `commands.backtest_b` imports `config`, `db`, numpy, `backtest.io`, `b_walkforward`, `b_report`, `walkforward`, `benchmark`, `market`, `metrics`, `runner`, `commands.backtest_wf` (`resolve`, `tune_all`, `run_walk_forward`, `BacktestWfError`), `commands.backtest` (`never_fetched_members`), `strategies.a2`, `strategies.b` and `strategies.b_model`.
+- `sim.rules` imports `dates` only (its agreement with `sim.model`'s constants is a test). `sim.book` imports `dates`, `prices` (`Bar`), `sim.model` (`q`) and `sim.rules`. Neither imports `sim.lifecycle` or `sim.sizing`, and nothing in `sim` imports `bars`, `db` or `http`.
+- `strategies.allocator` imports numpy, `dates`, `prices`, `sim` (`Pick`, `q`), `sim.book`, `strategies.base` and `strategies.indicators`. `strategies.f_index`, `f_rotation`, `f_factor` and `f_swing` import numpy, `strategies.allocator` (`target_from_close`, and `month_end_closes` in `f_index`), `strategies.base`, `strategies.indicators` and `sim` / `sim.book`, plus `dates` (`f_index`) or `prices` (`f_rotation`, `f_swing`); none imports another family or `universe`.
+- `backtest.book_runner` imports `dates`, `market`, `metrics`, `runner` (`run_backtest`, `RunResult`, `INITIAL_IDR`, read-only), `sim.book`, `sim.model`, `sim.rules`, `strategies.allocator` and `strategies.base`. `backtest.dev` imports `dates`, `tuning`, `benchmark`, `book_runner`, `market`, `metrics`, `runner` (`RunResult`), `sim.rules`, `strategies.allocator` and `strategies.base`. `backtest.dev_report` imports `benchmark`, `dev`, `metrics`, `report`'s helpers (read-only), `runner` (`INITIAL_IDR`, `YearGap`), `tuning` (thresholds), `sim.rules` and `strategies.allocator`. `backtest.registry` imports `dev`, `sim.rules`, `strategies.a` (`STRATEGY_A`, for `REF-A-V0`), `strategies.allocator`, `strategies.base` and every family module. None of them imports `bars`, `db`, `http` or `config`.
+- `research` (impure) imports `config`, `dates`, `fx`, `membership`, `yahoo` (the dividends-aware download), `prices`, `backtest.benchmark`, `backtest.io` (`histories_from_frame`, `merge_intervals`) and `backtest.market`; it never imports `db`. `commands.research_store` imports `research` and `backtest.io` (the vendored SPY dividends for `--verify`). `backtest.io` also imports `dev_report` (for `dev_report_files` and `write_dev_report`). `commands.backtest_dev` imports `config`, `research`, `backtest.dev`, `dev_report`, `registry`, `backtest.io`, `benchmark`, `market`, `metrics`, `runner` and `sim`, and `subprocess` for the `git status` registry check.
 ### Standard library
 `argparse`, `importlib`/`pkgutil` (command discovery), `logging`, `contextlib`, `dataclasses`, `decimal`, `functools.lru_cache`, `re`, `time`.
 
@@ -961,6 +1303,7 @@ Phase 1 provides the building blocks. Write commands in later phases use them in
 - P4 (nightly) will call `strategies.a.STRATEGY_A.picks(...)` with `STRATEGY_A_PARAMS` and write `STRATEGY_A_PARAMS.as_dict()` to `strategies.params`. P6 adds strategies B and C beside `a.py`, implementing the same `Strategy` protocol.
 - P4 is blocked: the P3b gate failed, and `STRATEGY_A2_PARAMS` is `None`. Nothing may deploy Strategy A or A2. P6's Strategy B can reuse `backtest.walkforward` (handover §8 option (a)), if the owner chooses it.
 - P4 stays blocked: the P6a gate failed, `STRATEGY_B_FROZEN` is `None`, and no model artifact is committed. Nothing may deploy Strategy A, A2 or B. B's one round has failed on this data. The owner chooses among the report's options (b), (c) and (d).
+- P4 stays blocked through P7a: no registry candidate was eligible on the dev window, so P7b does not run, and nothing in `strategies/` or `backtest/registry.py` may be deployed. The owner decides next with the dev frontier.
 - Nothing in `web/` imports the engine. The two share only the database schema and `schema_migrations`.
 
 ## Concurrency
@@ -1004,6 +1347,10 @@ The temp tables `_seer_bars_in` and `_seer_fx_in` are scoped to a session (`ON C
   - Fits: 9 tree fits in 30.5 s and 9 ridge fits in 2.1 s, sequential, in fold order (up to 1,207,705 rows × 18 features in the last fold). The determinism probe (the last fold's tree refit at 1 thread and at the default) took 13.1 s.
   - The B and B-linear walk-forward runs (2018-01-02 → 2026-10-02): 17.1 s and 4.7 s; the SPY curves 0.02 s. The A2 information curve, recomputed through `backtest_wf`'s pipeline (D12): 242.6 s, about 73% of the command. Survivorship, passed nights and both calibrations: 3.5 s.
   - Whole command: 5:47 for the first run, 5:53 for the re-run (cache hits both); peak RSS 1,548 MB (the candidate table and the per-fold training matrices).
+- Dev search (P7a), measured on the research store `5451195fd552` (2,490,793 bar rows, 539 symbols, through 2015-10-16; 130 MB on disk), WSL2, Python 3.11:
+  - `research_store --verify` (sha256 of every file, the `DEV_END` scan and the three data checks, no network): 4.3 s.
+  - `backtest_dev`: store load 2.11 s; 54 candidates, sequentially, from 0.07 s to 5.26 s each, each allocator's one-time feature preparation included in its first candidate (median 0.43 s; slowest `F9-SPY200D50-SWING50`); 45.2 s for all 54 including the survivorship table and SPY curves; rendering and writing the five files under 1 s (not logged separately; read from the log timestamps).
+  - Whole command: 0:51 for the committed run, 0:49 for the identical re-run; peak RSS 847 MB. Well under D13's 60-minute threshold, so there is no process pool.
 - There is no benchmark coverage for the DB writers.
 
 ## Usage
@@ -1162,6 +1509,24 @@ Then read `docs/backtests/<data end>-strategy-b-walkforward.md`. Its `p6a-gate:`
 A newer report with a different outcome or model fails the test until the constant and the artifact
 follow it. Committing a newer report is a re-measurement on new data, not a new round.
 
+### Research store and the dev search (P7a)
+
+```
+cd <repo or worktree root>
+engine/.venv/bin/python -m seer_engine research_store            # build engine/.research (network; 30-60 min)
+engine/.venv/bin/python -m seer_engine research_store --verify   # no network: sha256s, DEV_END guard, data checks, fingerprint
+engine/.venv/bin/python -m seer_engine backtest_dev              # every REGISTRY candidate, dev window only (~1 min)
+```
+
+Neither command needs `SEER_ENV_FILE`: neither reads Neon. Then read
+`docs/backtests/<run date>-p7a-dev-exploration.md` and `docs/plans/<run date>-p7b-preregistration.md`.
+The report's store fingerprint must equal `research_store --verify`'s, and its registry digest must
+equal `sha256sum engine/src/seer_engine/backtest/registry.py` at the committed registry.
+
+To add a candidate (D6): append it to `REGISTRY`, pin its `(id, digest)` in `tests/test_registry.py`,
+and commit both **before** running it. A smoke run of one candidate is `backtest_dev --only <ID>`,
+which writes nothing. A committed report always comes from a full run over a clean registry.
+
 ### Gotchas
 - Do not use `with psycopg.connect(...) as conn`, because it commits on exit and defeats `--dry-run`. Use `contextlib.closing` instead.
 - Every write must be inside `db.transaction(conn, dry_run)`. The helpers never commit, so a write outside it is lost or left open.
@@ -1170,6 +1535,9 @@ follow it. Committing a newer report is a re-measurement on new data, not a new 
 - Convert symbols to Yahoo's dash form (`BRK-B`) only inside the Yahoo adapter (phase 3). Tables always store `BRK.B`.
 - `universe.end_date` is exclusive.
 - Under `--dry-run`, `migrate` reports the files it would apply, but leaves no `schema_migrations` table behind.
+- **The dev window is law.** Every dev entry point raises `backtest.dev.DevWindowError` for a session after 2015-10-16, and `research.load_store` rejects a store holding a later row. Never add a flag, a default or a store that gets past either guard. P7b runs the pre-registered finalists on the test window under its own handover.
+- **The registry is append-only.** `tests/test_registry.py` pins every `(id, digest)`. A new candidate is appended and pinned in its own commit, before its dev run (D6). Editing an entry after its result exists is not allowed, even to fix a "typo": append a new id instead, and it counts as a trial.
+- `backtest_dev` refuses a full run (exit 2) while `backtest/registry.py` has uncommitted changes. `--only` skips that check and writes nothing; its numbers are a smoke test, never a result.
 
 ## Notes
 
@@ -1190,3 +1558,9 @@ The P6a sections (`strategies.b_model`, `strategies.b`, the labeler, the B walk-
 modules, the `backtest_b` command and the committed P6a report) were added on 2026-10-03. Their
 design, invariants and decisions are in `STRATEGY_B_RANKER_PLAN.md` and
 `docs/handover/2026-10-03-strategy-b-ranker.md`.
+
+The P7a sections (`sim.rules`, `sim.book`, the allocators and families F1–F11, the book runner, the
+research store, the dev runner, report and registry, the `research_store` and `backtest_dev`
+commands, and the committed dev report and P7b pre-registration) were added on 2026-10-04. Their
+design, invariants and decisions are in `TRADE_RULES_DEV_SEARCH_PLAN.md` and
+`docs/handover/2026-10-03-trade-rules-revision.md`.

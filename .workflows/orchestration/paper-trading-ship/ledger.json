@@ -3,6 +3,12 @@
   "coordinator": "orch-paper-trading-ship",
   "coordinator_session_id": "27121cf8-f1e7-4b77-918f-b9409950e88c",
   "created": "2026-10-04T02:28:58+00:00",
+  "landed": {
+    "at": "2026-10-04T03:24:30+00:00",
+    "base": "main",
+    "commit": "320c28709a81f6ae71d55d1bae629d8c5d7435c9",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -236,7 +242,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "1f92202",
       "depends_on": [
         1,
         2,
@@ -253,23 +259,23 @@
       ],
       "difficulty": "NORMAL",
       "n": 13,
-      "note": null,
+      "note": "Neon migrated to 003 by phase 13; Vercel preview only",
       "package": "repo",
       "plan": ".workflows/plan/paper-trading-ship/phase-13.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T03:23:49+00:00",
       "satisfies": [
         "R6",
         "R7"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-FOK3",
       "title": "Ship: CI lint, workflow, Neon, Vercel, docs"
     }
   ],
   "plan": "/home/miftah/.worktrees/seer/paper-trading-ship/.workflows/orchestration/paper-trading-ship/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "paper-trading-ship",
-  "updated": "2026-10-04T03:14:21+00:00",
+  "updated": "2026-10-04T03:24:30+00:00",
   "verified_at": "2026-10-04T03:09:50+00:00",
   "worktree": "/home/miftah/.worktrees/seer/paper-trading-ship"
 }

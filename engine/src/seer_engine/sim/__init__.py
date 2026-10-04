@@ -8,7 +8,8 @@ Per session S: ``apply_split`` (only if a split executes on S) -> ``step(S)`` ->
 events and snapshot -> ``size_picks(..., next session)``. See engine/package_readme.md.
 
 P7a adds trade rules as a value (``sim.rules``: ``TradeRules``, ``DESIGN_V0`` and the presets)
-and the book engine every non-default rule set runs on (``sim.book``: ``step_book``).
+and the book engine every non-default rule set runs on (``sim.book``: ``step_book``, and
+``apply_book_split`` for splits on live book positions).
 ``DESIGN_V0`` keeps running on ``size_picks`` + ``step`` above, unchanged.
 """
 
@@ -16,11 +17,13 @@ from seer_engine.sim.book import (
     WEIGHT_QUANTUM,
     Book,
     BookSnapshot,
+    BookSplit,
     BookStep,
     Fill,
     Position,
     Target,
     Trade,
+    apply_book_split,
     close_book_unpriced,
     equal_weight,
     new_book,
@@ -94,6 +97,7 @@ __all__ = [
     "WEIGHT_QUANTUM",
     "Book",
     "BookSnapshot",
+    "BookSplit",
     "BookStep",
     "Event",
     "EventKind",
@@ -112,6 +116,7 @@ __all__ = [
     "Target",
     "Trade",
     "TradeRules",
+    "apply_book_split",
     "apply_split",
     "buy_cost",
     "close_book_unpriced",

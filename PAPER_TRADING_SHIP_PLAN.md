@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/paper-trading-ship`
 **Branch:** `feature/paper-trading-ship` (base: `HEAD` = `origin/main` @ `844e4d7`)
 **Phases:** 13
-**Status:** planned
+**Status:** phase 1/13 complete
 **Coordinator:** —
 
 ---
@@ -243,19 +243,19 @@ the runner over many sessions by that phase's tests.
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Migration 003 and the frozen roster | R2 | `db`, `engine/paper` | 8 | — | NORMAL | `.workflows/plan/paper-trading-ship/phase-1.md` | — | — |
-| 2 | Book-engine split rule | R1 | `engine/sim` | 3 | — | NORMAL | `.workflows/plan/paper-trading-ship/phase-2.md` | — | — |
-| 3 | Bracket and benchmark night cores | R1 | `engine/paper` | 4 | 1 | HARD | `.workflows/plan/paper-trading-ship/phase-3.md` | — | — |
-| 4 | Book night core | R1 | `engine/paper` | 2 | 1, 2 | HARD | `.workflows/plan/paper-trading-ship/phase-4.md` | — | — |
-| 5 | Dividends and held-symbol bars in `nightly` | R1 | `engine` | 10 | 1 | NORMAL | `.workflows/plan/paper-trading-ship/phase-5.md` | — | — |
-| 6 | Paper store (load and save state) | R1 | `engine/paper` | 3 | 1, 3, 4 | HARD | `.workflows/plan/paper-trading-ship/phase-6.md` | — | — |
-| 7 | `paper` command and workflow step | R1, R3 | `engine/commands` | 5 | 5, 6 | HARD | `.workflows/plan/paper-trading-ship/phase-7.md` | — | — |
-| 8 | `paper_check` replay check | R3 | `engine/paper` | 4 | 7 | HARD | `.workflows/plan/paper-trading-ship/phase-8.md` | — | — |
-| 9 | `explain`: optional LLM explanations | R5 | `engine` | 4 | 1 | NORMAL | `.workflows/plan/paper-trading-ship/phase-9.md` | — | — |
-| 10 | Web data layer, monthly math, demo seed | R4, R2 | `web/lib` | 13 | 1 | HARD | `.workflows/plan/paper-trading-ship/phase-10.md` | — | — |
-| 11 | Web: Today, Positions, History | R4 | `web/app` | 12 | 10 | HARD | `.workflows/plan/paper-trading-ship/phase-11.md` | — | — |
-| 12 | Web: Leaderboard, monthly table, checklist | R4 | `web/app` | 4 | 11 | HARD | `.workflows/plan/paper-trading-ship/phase-12.md` | — | — |
-| 13 | Ship: CI lint, workflow, Neon, Vercel, docs | R6, R7 | repo | 7 | 1–12 | NORMAL | `.workflows/plan/paper-trading-ship/phase-13.md` | — | — |
+| 1 | Migration 003 and the frozen roster | R2 | `db`, `engine/paper` | 8 | — | NORMAL | `.workflows/plan/paper-trading-ship/phase-1.md` | P1-ENG-N6UC | — |
+| 2 | Book-engine split rule | R1 | `engine/sim` | 3 | — | NORMAL | `.workflows/plan/paper-trading-ship/phase-2.md` | P1-ENG-HCYN | — |
+| 3 | Bracket and benchmark night cores | R1 | `engine/paper` | 4 | 1 | HARD | `.workflows/plan/paper-trading-ship/phase-3.md` | P1-ENG-79OL | — |
+| 4 | Book night core | R1 | `engine/paper` | 2 | 1, 2 | HARD | `.workflows/plan/paper-trading-ship/phase-4.md` | P1-ENG-1BVI | — |
+| 5 | Dividends and held-symbol bars in `nightly` | R1 | `engine` | 10 | 1 | NORMAL | `.workflows/plan/paper-trading-ship/phase-5.md` | P1-ENG-X99Y | — |
+| 6 | Paper store (load and save state) | R1 | `engine/paper` | 3 | 1, 3, 4 | HARD | `.workflows/plan/paper-trading-ship/phase-6.md` | P1-ENG-AYRQ | — |
+| 7 | `paper` command and workflow step | R1, R3 | `engine/commands` | 5 | 5, 6 | HARD | `.workflows/plan/paper-trading-ship/phase-7.md` | P1-ENG-0ZLD | — |
+| 8 | `paper_check` replay check | R3 | `engine/paper` | 4 | 7 | HARD | `.workflows/plan/paper-trading-ship/phase-8.md` | P1-ENG-WBI7 | — |
+| 9 | `explain`: optional LLM explanations | R5 | `engine` | 4 | 1 | NORMAL | `.workflows/plan/paper-trading-ship/phase-9.md` | P1-ENG-YEW4 | — |
+| 10 | Web data layer, monthly math, demo seed | R4, R2 | `web/lib` | 13 | 1 | HARD | `.workflows/plan/paper-trading-ship/phase-10.md` | P1-WEB-Y9MV | — |
+| 11 | Web: Today, Positions, History | R4 | `web/app` | 12 | 10 | HARD | `.workflows/plan/paper-trading-ship/phase-11.md` | P1-WEB-0AHX | — |
+| 12 | Web: Leaderboard, monthly table, checklist | R4 | `web/app` | 4 | 11 | HARD | `.workflows/plan/paper-trading-ship/phase-12.md` | P1-WEB-DX8D | — |
+| 13 | Ship: CI lint, workflow, Neon, Vercel, docs | R6, R7 | repo | 7 | 1–12 | NORMAL | `.workflows/plan/paper-trading-ship/phase-13.md` | P1-ROOT-FOK3 | — |
 
 ### Phase 1 — Migration 003 and the frozen roster
 **Satisfies:** R2

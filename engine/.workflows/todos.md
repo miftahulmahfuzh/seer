@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 07:37:02
-**Total Active Tasks**: 1
+**Last Updated**: 2026-10-04 09:36:00
+**Total Active Tasks**: 9
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 4
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 0
-- Completed: 39
+- Blocked: 7
+- Completed: 40
 
 ---
 
@@ -39,6 +39,76 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
+- [ ] **P1-ENG-79OL** Phase 3: Bracket and benchmark night cores
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `paper/bracket.py`, `paper/benchmark.py` (C3, incl. `split_benchmark` and `step_benchmark(..., split=)`); tests proving `settle_bracket`+`decide_bracket` looped over ≥ 300 synthetic sessions equal `run_backtest` (snapshots, events, closed, open), `step_benchmark` looped equals `buy_and_hold` with dividends; split on a pending and on an open bracket order; no look-ahead. Does not touch: `sim/*`, runners, `paper/book.py`, DB. Exit: equality tests green; purity green.
+  - **Status**: open
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 3 of 13)
+  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
+  - **Depends on**: P1-ENG-N6UC
+  - **Plan**: `.workflows/plan/P1-ENG-79OL.md`
+
+- [ ] **P1-ENG-1BVI** Phase 4: Book night core
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `paper/book.py` (C3); tests proving `decide_book`+`settle_book` looped equal `run_book` for `MONTHLY_HOLD` with FACTOR and TIMING on synthetic markets (incl. dividends and a forced close), split on a held position and on pending targets, no look-ahead. Does not touch: `sim/*` (uses phase 2's `apply_book_split`), runners, DB. Exit: equality tests green; purity green.
+  - **Status**: blocked
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 4 of 13)
+  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
+  - **Depends on**: P1-ENG-N6UC, P1-ENG-HCYN
+  - **Plan**: `.workflows/plan/P1-ENG-1BVI.md`
+
+- [ ] **P1-ENG-X99Y** Phase 5: Dividends and held-symbol bars in `nightly`
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns `massive.Client.dividends(d)` (+ `MassiveSource` protocol); new `dividends.py` (parse CD+SC, sum per symbol/ex-date, upsert into `dividends`); `splits.apply_splits` also rewrites `dividends` before the execution date (`round(amount * from / to, 6)`); `nightly` fetches dividends per missing session in the same transaction and adds paper-held symbols (`universe.paper_symbols(conn, d)`: open/pending `orders`, `book_positions`, `book_targets` for sessions ≥ the session) to each session's wanted set; tests (`test_massive`, `test_nightly`, `test_splits`, new `test_dividends`). Does not touch: `paper/*`, workflows, web. Exit: fake-client tests for dividends, split rewrite of dividends, held symbol outside the universe still fetched; nightly stays one transaction.
+  - **Status**: open
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 5 of 13)
+  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
+  - **Depends on**: P1-ENG-N6UC
+  - **Plan**: `.workflows/plan/P1-ENG-X99Y.md`
+
+- [ ] **P1-ENG-AYRQ** Phase 6: Paper store (load and save state)
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `paper/store.py` (C4, the API listed there; `MARKET_WINDOW_DAYS = 550` is the only window constant in the set); `backtest/io.read_bars_frame(conn, *, since=None)` (default unchanged); PG round-trip tests for every engine's state, targets, fills, trades, snapshots, splits and dividends queries; windowed market load. Does not touch: commands, workflows, web, runners. Exit: save→load round trips are exact (Decimal, dates, ordering); `load_market` unchanged.
+  - **Status**: blocked
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 6 of 13)
+  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
+  - **Depends on**: P1-ENG-N6UC, P1-ENG-79OL, P1-ENG-1BVI
+  - **Plan**: `.workflows/plan/P1-ENG-AYRQ.md`
+
+- [ ] **P1-ENG-0ZLD** Phase 7: `paper` command and workflow step
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `commands/paper.py` (calls only phase 1's roster API and phase 6's store API; the window is `store.market_window_since`; catch-up uses `night_view` for bars/FX and undoes later splits on dividends too; passes an applied SPY split to `step_benchmark(split=)`); `runs.py` paper status helpers; `.github/workflows/nightly.yml` "Paper" step after "Nightly"; PG integration tests with synthetic bars: init (paper_start = session_date, day-0 snapshot), ≥ 5 consecutive nights, idempotent re-run writes nothing, a failure leaves no partial state and marks `paper_status = failed`, failed/missing bars run → no paper step, no look-ahead (changing bars dated ≥ S leaves S's decisions unchanged), frozen-spec mismatch refused (`SpecMismatch`). Does not touch: `nightly.py`, `paper/*` cores and store (only calls them), `demo.py`, the job's `timeout-minutes`, web, docs. Exit: tests green; `--dry-run` writes nothing.
+  - **Status**: blocked
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 7 of 13)
+  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark); R3 — Replay check (D7) + design §8 failure handling
+  - **Depends on**: P1-ENG-X99Y, P1-ENG-AYRQ
+  - **Plan**: `.workflows/plan/P1-ENG-0ZLD.md`
+
+- [ ] **P1-ENG-WBI7** Phase 8: `paper_check` replay check
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `paper/replay.py` (pure comparison), `commands/paper_check.py`; tests: after ≥ 5 nights of `paper` on synthetic data the check passes; a tampered snapshot/trade/position fails; a split on a held symbol reports "split-affected" without failing; `--require-sessions`. Does not touch: `commands/paper.py`, workflows (phase 13 adds the step), web. Exit: tests green.
+  - **Status**: blocked
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 8 of 13)
+  - **Satisfies**: R3 — Replay check (D7) + design §8 failure handling
+  - **Depends on**: P1-ENG-0ZLD
+  - **Plan**: `.workflows/plan/P1-ENG-WBI7.md`
+
+- [ ] **P1-ENG-YEW4** Phase 9: `explain`: optional LLM explanations
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `llm.py` (Anthropic-compatible Messages call over `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`; the key is sent as both `x-api-key` and `Authorization: Bearer` for z.ai compatibility; timeouts, redaction), `commands/explain.py` (fills `orders.explanation` for new pending A orders and `book_targets.explanation` for new entries of the latest decision; missing config or any LLM failure → leaves NULL, exit 0, logs); tests with a fake transport. Does not touch: `paper` command, workflows (phase 13), web. Exit: tests green; never raises on LLM failure.
+  - **Status**: open
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 9 of 13)
+  - **Satisfies**: R5 — Optional LLM explanations (D9)
+  - **Depends on**: P1-ENG-N6UC
+  - **Plan**: `.workflows/plan/P1-ENG-YEW4.md`
+
 ### [P2] Medium
 
 ### [P3] Low
@@ -50,6 +120,38 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-N6UC** Phase 1: Migration 003 and the frozen roster
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `db/migrations/003_paper.sql` (C1); `engine/src/seer_engine/paper/__init__.py` (docstring only, no re-exports); `engine/src/seer_engine/paper/roster.py` (pure: `RosterEntry` with display fields, engine, `obj`, `params`, `rules`, `lookback`, `gate_note`; `ROSTER`, `ROSTER_IDS`, `MAX_LOOKBACK_BARS` = 253, `entry`, `spec`, `spec_text`, `spec_digest`, `backtest_gate`, `strategy_params`); purity-test coverage for `paper/*.py` except `store.py`; `demo.DEMO_TABLES` gains the five paper state tables and `purge_demo` also resets `strategies.paper_start`/`params` (the demo seed's paper clock); tests (`test_migrate`, new `test_paper_roster.py`, `test_demo`). Does not touch: any other engine module, the web, workflows, docs. Exit: `migrate` applies 003 on a fresh schema and is a no-op twice; roster display fields equal the migration's INSERT; digests pinned in a test; a demo purge empties the paper tables, keeps `dividends`, and resets the roster rows' `paper_start`/`params`.
+  - **Status**: completed
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 1 of 13)
+  - **Satisfies**: R2 — Migration `003` (D6) + roster `strategies` rows with `paper_start` and frozen spec (D4); demo seed in the new shape
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-N6UC.md`
+  - **Completed**: 2026-10-04 09:36
+  - **Method**: /do
+  - **Files**: db/migrations/003_paper.sql, engine/src/seer_engine/paper/__init__.py, engine/src/seer_engine/paper/roster.py, engine/src/seer_engine/demo.py, engine/tests/test_strategy_purity.py, engine/tests/test_demo.py, engine/tests/test_migrate.py, engine/tests/test_paper_roster.py
+  - **Decided**:
+    - Package mapping for TaskIDs: db/engine/* → engine (ENG), web/* → web (WEB, todos initialized), repo → root (ROOT) (rung 6: existing convention)
+    - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 13 per the plan index invariant 8
+
+- [x] **P1-ENG-HCYN** Phase 2: Book-engine split rule
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `sim/book.py` `apply_book_split` + `BookSplit`; export in `sim/__init__.py`; tests in a new `tests/test_sim_book_split.py`. Does not touch: `step_book` behavior, `sim/split_adjust.py`, anything outside `sim`. Exit: whole-share and fractional rules, cash in lieu (credited to cash and `income_usd`), floor-to-zero → `forced` Trade, prices/targets rescaled by the exact fraction, reverse splits, purity.
+  - **Status**: completed
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 2 of 13)
+  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-HCYN.md`
+  - **Completed**: 2026-10-04 09:35
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/sim/book.py, engine/src/seer_engine/sim/__init__.py, engine/tests/test_sim_book_split.py
+  - **Decided**:
+    - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which minted all 13 TaskIDs (phase 2 = P1-ENG-HCYN) (tie-break: narrower blast radius, avoid racing a peer on todos.md; same precedent as STRATEGY_B_RANKER set)
+    - readme-updater -> skipped; engine/package_readme.md is owned by phase 13 only (rung 1: invariant 8)
+
 - [x] **P1-ENG-904W** Phase 13: The real dev run, report, pre-registration, V0 `cmp`, docs
   - **Difficulty**: NORMAL
   - **Type**: Feature

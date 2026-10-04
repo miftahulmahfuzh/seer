@@ -82,21 +82,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "0ab0c513645a7e68f7556205ba0182173b31fe0d",
       "depends_on": [
         2
       ],
       "difficulty": "HARD",
       "n": 5,
-      "note": null,
+      "note": "paper/paper_check decide+replay C via _bracket_strategy from stored verdicts; 2132 passed 0 skipped; no readme (phase 7 owns it)",
       "package": "engine/commands",
       "plan": ".workflows/plan/strategy-c-news-veto/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T11:20:23+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-IIZE",
       "title": "paper`, `paper_check`, `explain` decide and replay C"
     },
     {
@@ -144,7 +144,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-c-news-veto/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-c-news-veto",
-  "updated": "2026-10-04T11:11:24+00:00",
-  "verified_at": "2026-10-04T11:11:24+00:00",
+  "updated": "2026-10-04T11:20:38+00:00",
+  "verified_at": "2026-10-04T11:20:38+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-c-news-veto"
 }

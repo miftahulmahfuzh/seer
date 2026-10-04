@@ -101,21 +101,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "e31cb5d",
       "depends_on": [
         2
       ],
       "difficulty": "HARD",
       "n": 6,
-      "note": null,
+      "note": "web: C in roster views, Vetoed tonight, D9 Not-applicable row, demo seed w/ 6 verdicts; vitest 83/83, tsc clean; no decisions",
       "package": "web",
       "plan": ".workflows/plan/strategy-c-news-veto/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T11:25:30+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-8YO3",
       "title": "Web: C everywhere, Vetoed tonight, D9 row, demo seed"
     },
     {
@@ -144,7 +144,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-c-news-veto/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-c-news-veto",
-  "updated": "2026-10-04T11:22:11+00:00",
+  "updated": "2026-10-04T11:25:30+00:00",
   "verified_at": "2026-10-04T11:20:38+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-c-news-veto"
 }

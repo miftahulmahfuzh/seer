@@ -23,7 +23,7 @@ export default async function Today() {
     showPicks ? getPicks(champ.id, run.sessionDate!) : Promise.resolve([] as Pick[]),
     champ ? getPositions(champ.id) : Promise.resolve([]),
   ]);
-  const actions = open.filter(p => p.day >= 5 && !p.dismissed);
+  const actions = open.filter(p => p.orderId !== null && p.maxDays !== null && p.day >= p.maxDays && !p.dismissed);
   const filled = new Set(picks.map(p => p.slot));
   const emptySlots = [1, 2, 3, 4].filter(n => !filled.has(n));
   const session = run.sessionDate ? shortDate(run.sessionDate) : '—';
@@ -84,12 +84,12 @@ export default async function Today() {
         ) : (
           <div className={s.board}>
             {actions.map(a => (
-              <section key={a.id} className={`sheet over bg-coral ${s.action}`}>
+              <section key={a.key} className={`sheet over bg-coral ${s.action}`}>
                 <span className="eyebrow">Action needed</span>
                 <div className={s.actionRow}>
                   <span className={s.actionText}><b>{a.symbol}</b>: day {a.day} of 5. Cancel bracket and sell at market.</span>
                   <form action={dismiss}>
-                    <input type="hidden" name="orderId" value={a.id} />
+                    <input type="hidden" name="orderId" value={a.orderId ?? ''} />
                     <button type="submit" className={`icon-btn ${s.onCoral}`} data-tip="Mark as done" aria-label="Mark as done">
                       <Check size={22} />
                     </button>

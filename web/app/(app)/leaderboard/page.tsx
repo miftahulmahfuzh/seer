@@ -19,7 +19,7 @@ export default async function Leaderboard() {
   const [board, run] = await Promise.all([leaderboard(), runStatus(now)]);
   const champ = board.rows.find(r => r.strategy.isChampion);
   const spy = board.rows.find(r => r.strategy.isBenchmark);
-  const items = champ ? checklist(champ.metrics, spy?.metrics.totalReturn ?? null) : [];
+  const items = champ ? checklist(champ.metrics, spy?.metrics.totalReturn ?? null, champ.strategy.gate) : [];
   const passed = items.filter(i => i.ok).length;
   const period = board.from && board.to ? `${monthDay(board.from)} – ${monthDay(board.to)}` : 'Not started';
   const chart = buildChart(board);
@@ -60,8 +60,8 @@ export default async function Leaderboard() {
     <section className={`sheet over bg-butter ${s.check}`}>
       <span className="eyebrow">Go-live checklist · {champ?.strategy.id ?? '—'}</span>
       <div className={s.score}>
-        <span className={s.scoreNum}>{passed}/{items.length || 5}</span>
-        <span className={s.scoreText}>{passed === 5 ? <>All five pass.<br />Ready for real money</> : <>Paper trading until<br />all five pass</>}</span>
+        <span className={s.scoreNum}>{passed}/{items.length || 6}</span>
+        <span className={s.scoreText}>{items.length > 0 && passed === items.length ? <>All six pass.<br />Ready for real money</> : <>Paper trading until<br />all six pass</>}</span>
       </div>
       {items.map(c => (
         <div key={c.label} className={s.item}>

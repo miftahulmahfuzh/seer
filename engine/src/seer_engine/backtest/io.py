@@ -54,6 +54,10 @@ BARS_COPY_SQL = (
     "COPY (SELECT symbol, date, open, high, low, close, volume FROM bars "
     "ORDER BY symbol, date) TO STDOUT"
 )
+BARS_COPY_SINCE_SQL = (
+    "COPY (SELECT symbol, date, open, high, low, close, volume FROM bars "
+    "WHERE date >= %s ORDER BY symbol, date) TO STDOUT"
+)
 CACHE_GLOB = "bars-*.pkl"
 
 Interval = tuple[str, date, date | None]
@@ -114,16 +118,21 @@ def cache_path(cache_dir: Path, rows: int, max_date: date) -> Path:
     return Path(cache_dir) / f"bars-{max_date.isoformat()}-{rows}.pkl"
 
 
-def read_bars_frame(conn: psycopg.Connection) -> pd.DataFrame:
-    """Every bar, ordered by (symbol, date), via one streamed COPY ... TO STDOUT.
+def read_bars_frame(conn: psycopg.Connection, *, since: date | None = None) -> pd.DataFrame:
+    """Every bar (or, with ``since``, every bar dated on or after it), ordered by (symbol, date),
+    via one streamed COPY ... TO STDOUT.
 
     Columns: symbol (str), date (datetime64), open/high/low/close (float64, correctly
-    rounded from the numeric text), volume (int64).
+    rounded from the numeric text), volume (int64). ``since`` None (the default) runs
+    ``BARS_COPY_SQL`` exactly as before; a date runs ``BARS_COPY_SINCE_SQL`` with it bound.
     """
+    if since is not None and (isinstance(since, datetime) or not isinstance(since, date)):
+        raise TypeError(f"since must be a date or None, got {type(since).__name__}")
     buf = BytesIO()
     with conn.cursor() as cur:
         cur.execute("SET LOCAL datestyle TO 'ISO, YMD'")
-        with cur.copy(BARS_COPY_SQL) as copy:
+        copy_cm = cur.copy(BARS_COPY_SQL) if since is None else cur.copy(BARS_COPY_SINCE_SQL, (since,))
+        with copy_cm as copy:
             for chunk in copy:
                 buf.write(chunk)
     if buf.tell() == 0:

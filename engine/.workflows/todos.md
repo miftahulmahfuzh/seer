@@ -2,8 +2,8 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 10:05:00
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-04 09:58:51
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
@@ -13,8 +13,8 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 2
-- Completed: 45
+- Blocked: 1
+- Completed: 46
 
 ---
 
@@ -39,21 +39,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
-- [ ] **P1-ENG-AYRQ** Phase 6: Paper store (load and save state)
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `paper/store.py` (C4, the API listed there; `MARKET_WINDOW_DAYS = 550` is the only window constant in the set); `backtest/io.read_bars_frame(conn, *, since=None)` (default unchanged); PG round-trip tests for every engine's state, targets, fills, trades, snapshots, splits and dividends queries; windowed market load. Does not touch: commands, workflows, web, runners. Exit: save→load round trips are exact (Decimal, dates, ordering); `load_market` unchanged.
-  - **Status**: open
-  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 6 of 13)
-  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
-  - **Depends on**: P1-ENG-N6UC, P1-ENG-79OL, P1-ENG-1BVI
-  - **Plan**: `.workflows/plan/P1-ENG-AYRQ.md`
-
 - [ ] **P1-ENG-0ZLD** Phase 7: `paper` command and workflow step
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `commands/paper.py` (calls only phase 1's roster API and phase 6's store API; the window is `store.market_window_since`; catch-up uses `night_view` for bars/FX and undoes later splits on dividends too; passes an applied SPY split to `step_benchmark(split=)`); `runs.py` paper status helpers; `.github/workflows/nightly.yml` "Paper" step after "Nightly"; PG integration tests with synthetic bars: init (paper_start = session_date, day-0 snapshot), ≥ 5 consecutive nights, idempotent re-run writes nothing, a failure leaves no partial state and marks `paper_status = failed`, failed/missing bars run → no paper step, no look-ahead (changing bars dated ≥ S leaves S's decisions unchanged), frozen-spec mismatch refused (`SpecMismatch`). Does not touch: `nightly.py`, `paper/*` cores and store (only calls them), `demo.py`, the job's `timeout-minutes`, web, docs. Exit: tests green; `--dry-run` writes nothing.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 7 of 13)
   - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark); R3 — Replay check (D7) + design §8 failure handling
   - **Depends on**: P1-ENG-X99Y, P1-ENG-AYRQ
@@ -80,6 +70,21 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-AYRQ** Phase 6: Paper store (load and save state)
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `paper/store.py` (C4, the API listed there; `MARKET_WINDOW_DAYS = 550` is the only window constant in the set); `backtest/io.read_bars_frame(conn, *, since=None)` (default unchanged); PG round-trip tests for every engine's state, targets, fills, trades, snapshots, splits and dividends queries; windowed market load. Does not touch: commands, workflows, web, runners. Exit: save→load round trips are exact (Decimal, dates, ordering); `load_market` unchanged.
+  - **Status**: completed
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 6 of 13)
+  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
+  - **Depends on**: P1-ENG-N6UC, P1-ENG-79OL, P1-ENG-1BVI
+  - **Plan**: `.workflows/plan/P1-ENG-AYRQ.md`
+  - **Completed**: 2026-10-04 09:58
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/io.py, engine/src/seer_engine/paper/store.py, engine/tests/test_paper_store.py
+  - **Verified**: focused 41 passed; full engine suite 1891 passed, 0 skipped; web vitest 49 passed
+  - **Next**: P1-ENG-0ZLD (phase 7) unblocked: P1-ENG-X99Y and P1-ENG-AYRQ both complete (completion-handler)
+
 - [x] **P1-ENG-1BVI** Phase 4: Book night core
   - **Difficulty**: HARD
   - **Type**: Feature

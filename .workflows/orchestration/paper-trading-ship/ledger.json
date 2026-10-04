@@ -59,22 +59,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "9ec2176",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "paper/book.py decide_book/settle_book + 29 tests; equals run_book (FACTOR/TIMING/FIXED); no plan deviations",
       "package": "engine/paper",
       "plan": ".workflows/plan/paper-trading-ship/phase-4.md",
-      "reported_at": "2026-10-04T02:52:00+00:00",
+      "reported_at": "2026-10-04T02:52:39+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-1BVI",
       "title": "Book night core"
     },
     {
@@ -113,7 +113,7 @@
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Paper store (load and save state)"
     },
@@ -168,7 +168,7 @@
       "note": null,
       "package": "engine",
       "plan": ".workflows/plan/paper-trading-ship/phase-9.md",
-      "reported_at": "2026-10-04T02:52:00+00:00",
+      "reported_at": "2026-10-04T02:52:43+00:00",
       "satisfies": [
         "R5"
       ],
@@ -178,22 +178,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "2650f64",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 10,
-      "note": null,
+      "note": "web data layer for all engines (Holding, pendingOrders, monthly, checklist gate item 6), demo seed paper shape; tsc+44 vitest green; no ladder decisions",
       "package": "web/lib",
       "plan": ".workflows/plan/paper-trading-ship/phase-10.md",
-      "reported_at": "2026-10-04T02:52:00+00:00",
+      "reported_at": "2026-10-04T02:52:49+00:00",
       "satisfies": [
         "R4",
         "R2"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-Y9MV",
       "title": "Web data layer, monthly math, demo seed"
     },
     {
@@ -259,7 +259,7 @@
   "plan": "/home/miftah/.worktrees/seer/paper-trading-ship/.workflows/orchestration/paper-trading-ship/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "paper-trading-ship",
-  "updated": "2026-10-04T02:52:04+00:00",
-  "verified_at": "2026-10-04T02:51:54+00:00",
+  "updated": "2026-10-04T02:52:49+00:00",
+  "verified_at": "2026-10-04T02:52:39+00:00",
   "worktree": "/home/miftah/.worktrees/seer/paper-trading-ship"
 }

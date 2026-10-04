@@ -18,7 +18,8 @@ PAPER_TABLES = ("paper_state", "book_positions", "book_targets", "book_fills", "
 def _seed(conn, *, demo: bool) -> None:
     """A slice of what web/scripts/seed-demo.mjs writes, plus one real dividend.
 
-    The roster's ``strategies`` rows come from migration 003 (the ``pg`` fixture applies it).
+    The roster's ``strategies`` rows come from migrations 003 and 004 (the ``pg`` fixture
+    applies them).
     """
     conn.execute(
         "INSERT INTO runs (status, data_date, session_date, is_demo, finished_at) "
@@ -64,6 +65,12 @@ def _seed(conn, *, demo: bool) -> None:
         "VALUES (%s, 'AAPL', %s, %s, 200, 210, 20, 0.41, 0, 9.59, 'signal')",
         (F4, date(2026, 9, 1), D),
     )
+    conn.execute(
+        "INSERT INTO news_vetoes (strategy_id, session_date, rank, symbol, verdict, reason, model, "
+        "prompt_version, decided_at) VALUES ('C', %s, 1, 'NVDA', 'veto', 'Earnings inside the window.', "
+        "'glm-5.3', 'c-veto-v1', '2026-10-02 23:30+00')",
+        (S,),
+    )
     conn.execute("INSERT INTO dividends (symbol, ex_date, amount) VALUES ('SPY', %s, 1.888834)", (D,))
     # The demo seed's paper clock on the roster rows (web/scripts/seed-demo.mjs writes both columns).
     conn.execute(
@@ -85,6 +92,7 @@ def _counts(conn) -> dict[str, int]:
 
 def test_demo_tables_cover_the_paper_tables_and_not_dividends():
     assert set(PAPER_TABLES) <= set(DEMO_TABLES)
+    assert "news_vetoes" in DEMO_TABLES
     assert "dividends" not in DEMO_TABLES
     assert "strategies" not in DEMO_TABLES
     assert len(set(DEMO_TABLES)) == len(DEMO_TABLES)
@@ -132,6 +140,7 @@ def test_purge_if_needed_commits_in_its_own_transaction(pg, pg_schema):
     with psycopg.connect(pg_schema.url) as other:
         assert other.execute("SELECT count(*) FROM runs").fetchone()[0] == 0
         assert other.execute("SELECT count(*) FROM paper_state").fetchone()[0] == 0
+        assert other.execute("SELECT count(*) FROM news_vetoes").fetchone()[0] == 0
         assert other.execute("SELECT count(*) FROM strategies").fetchone()[0] == len(ROSTER)
         assert other.execute("SELECT count(*) FROM dividends").fetchone()[0] == 1
         assert other.execute("SELECT count(*) FROM strategies WHERE paper_start IS NOT NULL").fetchone()[0] == 0

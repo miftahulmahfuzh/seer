@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 17:57:16
-**Total Active Tasks**: 4
+**Last Updated**: 2026-10-04 18:07:31
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 4
+- P1 High: 3
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 2
-- Completed: 49
+- Blocked: 1
+- Completed: 50
 
 ---
 
@@ -38,15 +38,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Decided**:
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
-- [ ] **P1-ENG-4I4B** Phase 2: Migration 004, roster entry C, verdict store
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `db/migrations/004_news_veto.sql` (K2, byte for byte); `paper/roster.py` (K4); `paper/store.py` (K3); `demo.py` (`news_vetoes` in `DEMO_TABLES`); tests `test_migrate.py` (003 tests pinned to a schema at 003; 004 fresh, post-003, restyle, idempotent, keys), `test_paper_roster.py` (C pin `6cea6cb8…b762`, display fields equal 004's row, the four pins unchanged, C's gate dict), `test_demo.py`, new `test_paper_store_vetoes.py`, and the one-line `"C"` edits in `test_paper_store.py:58` and `test_paper_check.py:51` (owned here so the phase is green alone). Does not touch: commands, workflows, web, docs. Exit: full engine suite green with 0 skipped; the four existing digests and gate dicts unchanged; `004` applies on a schema at 003 and is a no-op twice; C's pin passes (if it fails for C only, re-pin from the printed digest: C has never been frozen).
-  - **Status**: open
-  - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 2 of 7)
-  - **Satisfies**: R1 — Engine, pure: C strategy object, roster entry `C` with frozen spec (D5), prompt + JSON verdict parser; R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
-  - **Depends on**: P1-ENG-KIBJ
-  - **Plan**: `.workflows/plan/P1-ENG-4I4B.md`
 - [ ] **P1-ENG-2548** Phase 3: Finnhub client and LLM call options
   - **Difficulty**: NORMAL
   - **Type**: Feature
@@ -69,7 +60,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `commands/paper.py` (K7: `_bracket_strategy`, `_start`, `_step_bracket`), `commands/paper_check.py` (K7: `_expected(conn, ...)`); new `engine/tests/test_paper_c.py` (14 tests, verdict rows via `store.write_vetoes`). Does not touch: `paper/*` cores, `replay.py`, store, `veto.py`, `explain.py`, `test_paper_command.py`, `test_paper_check.py` / `test_paper_store.py` (phase 2's edits stand), web. Exit: C starts on its first night with its own `paper_start` while the other four keep theirs; ≥ 5 synthetic nights → `paper_check` ok for all five; the replay really reads stored verdicts (flipping one → C mismatch); all-allow C orders == A orders; veto/failed/missing → no C order for that symbol and `paper` exit 0; catch-up night with verdicts only for the newest session; re-run writes nothing; the four existing strategies' rows identical with and without C; explain fills C's pending orders.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 5 of 7)
   - **Satisfies**: R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
   - **Depends on**: P1-ENG-4I4B
@@ -86,6 +77,23 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-4I4B** Phase 2: Migration 004, roster entry C, verdict store
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `db/migrations/004_news_veto.sql` (K2, byte for byte); `paper/roster.py` (K4); `paper/store.py` (K3); `demo.py` (`news_vetoes` in `DEMO_TABLES`); tests `test_migrate.py` (003 tests pinned to a schema at 003; 004 fresh, post-003, restyle, idempotent, keys), `test_paper_roster.py` (C pin `6cea6cb8…b762`, display fields equal 004's row, the four pins unchanged, C's gate dict), `test_demo.py`, new `test_paper_store_vetoes.py`, and the one-line `"C"` edits in `test_paper_store.py:58` and `test_paper_check.py:51` (owned here so the phase is green alone). Does not touch: commands, workflows, web, docs. Exit: full engine suite green with 0 skipped; the four existing digests and gate dicts unchanged; `004` applies on a schema at 003 and is a no-op twice; C's pin passes (if it fails for C only, re-pin from the printed digest: C has never been frozen).
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 2 of 7)
+  - **Satisfies**: R1 — Engine, pure: C strategy object, roster entry `C` with frozen spec (D5), prompt + JSON verdict parser; R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
+  - **Depends on**: P1-ENG-KIBJ
+  - **Plan**: `.workflows/plan/P1-ENG-4I4B.md`
+  - **Completed**: 2026-10-04 18:07
+  - **Method**: /do
+  - **Files**: db/migrations/004_news_veto.sql, engine/src/seer_engine/paper/roster.py, engine/src/seer_engine/paper/store.py, engine/src/seer_engine/demo.py, engine/tests/test_migrate.py, engine/tests/test_paper_roster.py, engine/tests/test_demo.py, engine/tests/test_paper_store_vetoes.py, engine/tests/test_paper_store.py, engine/tests/test_paper_check.py
+  - **Decided**:
+    - readme-updater for phase 2 -> skipped; engine/package_readme.md is owned by phase 7 only (rung 1: invariant 9) (completion-handler)
+  - **Verified**: ruff clean; full engine suite 2118 passed, 0 skipped (319 s); web vitest 65 passed + tsc clean; 004 byte-identical to K2; C digest 6cea6cb8...b762 matches pin, four existing digests unchanged
+  - **Next**: P1-ENG-IIZE (phase 5) and P1-WEB-8YO3 (phase 6) unblocked: both depend only on phase 2. P1-ENG-QRXI (phase 4) still waits on P1-ENG-2548 (phase 3) (completion-handler)
+
 - [x] **P1-ENG-KIBJ** Phase 1: Pure C: strategy object, prompt, parser
   - **Difficulty**: NORMAL
   - **Type**: Feature

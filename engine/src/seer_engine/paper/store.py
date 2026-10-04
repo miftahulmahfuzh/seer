@@ -14,6 +14,8 @@ over values; this module turns those values into rows of the migration-003 table
 - Benchmark (SPY): ``paper_state`` plus one ``book_positions`` row, stepped by
   ``paper.benchmark``.
 - Every engine writes ``equity_snapshots``.
+- Strategy C's news check (migration 004): ``news_vetoes`` rows, written once per session by
+  ``veto`` and read by ``paper`` / ``paper_check`` as the verdicts C decides and replays from.
 - Inputs read at night: dividends by ex-date, splits applied on a session, and the windowed
   ``Market`` (bars since a date, membership, fx).
 
@@ -44,6 +46,7 @@ from seer_engine.paper.benchmark import BenchmarkState
 from seer_engine.sim.book import WEIGHT_QUANTUM, Book, BookSnapshot, Fill, Position, Target, Trade
 from seer_engine.sim.model import Event, Order, Portfolio, Snapshot
 from seer_engine.sim.rules import SHARE_QUANTUM
+from seer_engine.strategies.c import VERDICTS, allowed_map
 
 BENCHMARK_ID = "SPY"
 MARKET_WINDOW_DAYS = 550  # calendar days of bars loaded per night (plan Decisions: "history at night")
@@ -1030,3 +1033,149 @@ def load_market_window(conn: psycopg.Connection, since: date) -> Market:
     frame = bio.read_bars_frame(conn, since=since)
     history = bio.histories_from_frame(frame)
     return Market(history=history, membership=Membership(intervals=bio.read_intervals(conn)), fx=bio.read_fx(conn))
+
+
+# --------------------------------------------------------------------------- news vetoes (strategy C)
+
+
+@dataclass(frozen=True, slots=True)
+class NewsVerdict:
+    """One ``news_vetoes`` row: the news check of one candidate for one session (migration 004).
+
+    ``headlines`` are the lean items the LLM saw, newest first: ``{"id": int, "datetime":
+    "YYYY-MM-DDTHH:MM:SSZ", "source": str, "headline": str}`` (no summaries). ``decided_at`` is
+    the ``veto`` run's start, tz-aware: the news cutoff.
+    """
+
+    rank: int
+    symbol: str
+    verdict: str  # one of strategies.c.VERDICTS
+    reason: str
+    model: str | None
+    prompt_version: str
+    headlines: tuple[Mapping[str, Any], ...]
+    earnings_date: date | None
+    decided_at: datetime
+
+
+_VETO_COLUMNS = "rank, symbol, verdict, reason, model, prompt_version, headlines, earnings_date, decided_at"
+
+
+def _check_verdicts(verdicts: Sequence[NewsVerdict]) -> None:
+    """TypeError/ValueError unless ``verdicts`` is a complete, well-formed night for one session."""
+    for v in verdicts:
+        if not isinstance(v, NewsVerdict):
+            raise TypeError(f"verdicts must be NewsVerdict, got {type(v).__name__}")
+        if isinstance(v.rank, bool) or not isinstance(v.rank, int):
+            raise TypeError(f"rank must be an int, got {type(v.rank).__name__}")
+        if not isinstance(v.symbol, str) or not v.symbol:
+            raise ValueError(f"rank {v.rank}: symbol must be a non-empty str")
+        if v.verdict not in VERDICTS:
+            raise ValueError(f"{v.symbol}: verdict {v.verdict!r} is not one of {VERDICTS}")
+        if not isinstance(v.reason, str):
+            raise TypeError(f"{v.symbol}: reason must be a str, got {type(v.reason).__name__}")
+        if v.model is not None and not isinstance(v.model, str):
+            raise TypeError(f"{v.symbol}: model must be a str or None, got {type(v.model).__name__}")
+        if not isinstance(v.prompt_version, str) or not v.prompt_version:
+            raise ValueError(f"{v.symbol}: prompt_version must be a non-empty str")
+        if not all(isinstance(h, Mapping) for h in v.headlines):
+            raise TypeError(f"{v.symbol}: every headline must be a mapping")
+        if v.earnings_date is not None:
+            _date(f"{v.symbol}: earnings_date", v.earnings_date)
+        if not isinstance(v.decided_at, datetime) or v.decided_at.utcoffset() is None:
+            raise ValueError(f"{v.symbol}: decided_at must be a tz-aware datetime")
+    ranks = sorted(v.rank for v in verdicts)
+    if ranks != list(range(1, len(verdicts) + 1)):
+        raise ValueError(f"ranks must be 1..{len(verdicts)} with no gap or repeat, got {ranks}")
+    symbols = [v.symbol for v in verdicts]
+    if len(set(symbols)) != len(symbols):
+        raise ValueError(f"symbols must be unique, got {symbols}")
+
+
+def has_vetoes(conn: psycopg.Connection, strategy_id: str, session: date) -> bool:
+    """True when ``news_vetoes`` holds any row for (``strategy_id``, ``session``): the news
+    check for that session already ran."""
+    _date("session", session)
+    row = conn.execute(
+        "SELECT EXISTS (SELECT 1 FROM news_vetoes WHERE strategy_id = %s AND session_date = %s)",
+        (strategy_id, session),
+    ).fetchone()
+    return bool(row[0])
+
+
+def write_vetoes(
+    conn: psycopg.Connection, strategy_id: str, session: date, verdicts: Sequence[NewsVerdict]
+) -> int:
+    """Insert one ``news_vetoes`` row per verdict for ``session``; returns the rows written.
+
+    Plain INSERTs: a row already stored for (strategy, session, symbol) or (strategy, session,
+    rank) is a database error, so the caller checks :func:`has_vetoes` first in the same
+    transaction. Validates first and writes nothing on a bad input: ranks 1..n without gaps or
+    repeats, unique symbols, ``verdict`` in ``strategies.c.VERDICTS``, tz-aware ``decided_at``.
+    An empty ``verdicts`` writes nothing and returns 0.
+    """
+    _session("session", session)
+    verdicts = tuple(verdicts)
+    _check_verdicts(verdicts)
+    if not verdicts:
+        return 0
+    with conn.cursor() as cur:
+        cur.executemany(
+            f"INSERT INTO news_vetoes (strategy_id, session_date, {_VETO_COLUMNS}) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            [
+                (
+                    strategy_id,
+                    session,
+                    v.rank,
+                    v.symbol,
+                    v.verdict,
+                    v.reason,
+                    v.model,
+                    v.prompt_version,
+                    Jsonb([dict(h) for h in v.headlines]),
+                    v.earnings_date,
+                    v.decided_at,
+                )
+                for v in sorted(verdicts, key=lambda v: v.rank)
+            ],
+        )
+    return len(verdicts)
+
+
+def read_vetoes(conn: psycopg.Connection, strategy_id: str, session: date) -> tuple[NewsVerdict, ...]:
+    """Every stored verdict of (``strategy_id``, ``session``), by rank; empty when none."""
+    _date("session", session)
+    rows = conn.execute(
+        f"SELECT {_VETO_COLUMNS} FROM news_vetoes WHERE strategy_id = %s AND session_date = %s ORDER BY rank",
+        (strategy_id, session),
+    ).fetchall()
+    return tuple(
+        NewsVerdict(
+            rank=int(rank),
+            symbol=symbol,
+            verdict=verdict,
+            reason=reason,
+            model=model,
+            prompt_version=prompt_version,
+            headlines=tuple(dict(h) for h in (headlines or [])),
+            earnings_date=earnings_date,
+            decided_at=decided_at,
+        )
+        for rank, symbol, verdict, reason, model, prompt_version, headlines, earnings_date, decided_at in rows
+    )
+
+
+def allowed_between(conn: psycopg.Connection, strategy_id: str, start: date, end: date) -> dict[date, frozenset[str]]:
+    """``{session: symbols whose stored verdict is "allow"}`` for sessions ``start..end``
+    inclusive, via ``strategies.c.allowed_map``. A session with no allowed symbol (all vetoed,
+    all failed, or no rows: C sits it out) may be absent, so callers look up with
+    ``.get(session, frozenset())``. Empty when ``start > end``."""
+    _date("start", start)
+    _date("end", end)
+    rows = conn.execute(
+        "SELECT session_date, symbol, verdict FROM news_vetoes "
+        "WHERE strategy_id = %s AND session_date BETWEEN %s AND %s ORDER BY session_date, rank",
+        (strategy_id, start, end),
+    ).fetchall()
+    return allowed_map((d, s, v) for d, s, v in rows)

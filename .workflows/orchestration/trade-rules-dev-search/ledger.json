@@ -247,31 +247,31 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "f4e61bf",
       "depends_on": [
         12
       ],
       "difficulty": "NORMAL",
       "n": 13,
-      "note": null,
+      "note": "dev run 7a24b84: 0/54 eligible (DD<=15% binding), 35 beat SPY TR; best MAR F4-MOM12-N20-TREND CAGR 16.2% vs 7.9%, DD 22.2%; re-run cmp byte-identical; R1 real-data cmp 11/11; CI green e273531",
       "package": "docs",
       "plan": ".workflows/plan/trade-rules-dev-search/phase-13.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T00:38:24+00:00",
       "satisfies": [
         "R1",
         "R6",
         "R7",
         "R9"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-904W",
       "title": "The real dev run, report, pre-registration, V0 `cmp`, docs"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/trade-rules-dev-search/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trade-rules-dev-search",
-  "updated": "2026-10-03T23:59:22+00:00",
+  "updated": "2026-10-04T00:38:24+00:00",
   "verified_at": "2026-10-03T14:04:32+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trade-rules-dev-search"
 }

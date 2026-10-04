@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/trade-rules-dev-search`
 **Branch:** `feature/trade-rules-dev-search` (base: `origin/main` @ `2546a92`)
 **Phases:** 13
-**Status:** phase 12/13 complete (phases 1–12 done)
+**Status:** phase 13/13 complete (all phases done)
 **Coordinator:** —
 
 ---
@@ -929,7 +929,7 @@ is the registered behaviour and the docs report it.
 | 10 ✓ | Dev report and pre-registration renderers | R6, R7, R8 | `backtest` | 2 | 9 | HARD | `.workflows/plan/trade-rules-dev-search/phase-10.md` | P1-ENG-PLRV | — |
 | 11 ✓ | The candidate registry (54 entries, append-only test) | R5 | `backtest` | 2 | 5, 6, 7, 8, 9 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-11.md` | P1-ENG-078U | — |
 | 12 ✓ | `backtest_dev` command, io writer, runtime on the real store | R4, R6, R8 | `commands`, `backtest` | 3 | 4, 10, 11 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-12.md` | P1-ENG-ZWP9 | — |
-| 13 | The real dev run, report, pre-registration, V0 `cmp`, docs | R1, R6, R7, R9 | `docs` | 8 | 12 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-13.md` | P1-ENG-904W | — |
+| 13 ✓ | The real dev run, report, pre-registration, V0 `cmp`, docs | R1, R6, R7, R9 | `docs` | 8 | 12 | NORMAL | `.workflows/plan/trade-rules-dev-search/phase-13.md` | P1-ENG-904W | — |
 
 Concurrency: phases 1 and 4 start together; after phase 2, phases 3, 5, 6, 7 and 8 run
 concurrently; 9 follows 3; 10 follows 9; 11 waits for 5–9; 12 for 4, 10 and 11; 13 for 12. Every
@@ -1190,6 +1190,7 @@ suite is green with 0 skipped (1694, plus only Bug-protocol tests). CI is green.
 | F7 prepared path for non-default periods | `targets_prepared` uses the vectorized columns only for the default periods (every registry row); other periods run the single-window path on `prepared.history`, so P4 identity holds for every params value | 3: the plans' code blocks (phase 8; `prepare` takes no params) |
 | Phase 12's run-time estimate (D13) | A class mean of per-candidate wall times (each including its allocator's first prepare) over the `--only` smoke; a pool only above 60 min, and then fixed-order with rows pinned equal to the sequential path | 4: handover D13 |
 | Idle position passed to allocators (D-J) | `run_book` hands allocators `held = book.held() − {rules.idle_symbol}`: the idle position is the runner's residual, never a family's. `ResearchData.unserved` and the `data_dir` keyword on `build_store`/`load_store` are accepted additions to the contract | 6: convention (phase 8's handoff; the runner owns the residual weight) |
+| R1 real-data `cmp` outcome (phase 13, 2026-10-04) | **Ran.** Neon bars fingerprint (1,817,429, 2026-10-02), unchanged before and after; `backtest`, `backtest_wf` and `backtest_b` with `--out` in scratch and `--cache-dir /home/miftah/seer/engine/.cache`: all 11 `docs/backtests/2026-10-02-*` files `cmp`-equal | 1: acceptance R1 |
 
 ## Open Questions
 

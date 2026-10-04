@@ -6,21 +6,21 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "ca1756d",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": null,
+      "note": "lab export-json + lab stage writes web/data/lab.json (399157 B, matches committed DB); lab.sqlite at schema v2 (synthesis kind); P1-WEB-5767 unblocked @87a63b9; Step 3 created all 7 tasks",
       "package": "engine/lab",
       "plan": ".workflows/plan/sera-lab-site/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T15:08:41+00:00",
       "satisfies": [
         "R3",
         "R6",
         "R7"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-6QQA",
       "title": "Lab snapshot export + synthesis kind"
     },
     {
@@ -40,7 +40,7 @@
         "R5",
         "R7"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Web data layer for the snapshot"
     },
@@ -164,7 +164,7 @@
   "plan": "/home/miftah/.worktrees/seer/sera-lab-site/.workflows/orchestration/sera-lab-site/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-lab-site",
-  "updated": "2026-10-04T15:05:44+00:00",
+  "updated": "2026-10-04T15:08:57+00:00",
   "verified_at": "2026-10-04T15:05:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-lab-site"
 }

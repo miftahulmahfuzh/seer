@@ -3,6 +3,12 @@
   "coordinator": "orch-sera-lab-site",
   "coordinator_session_id": "8e8dbba4-2b74-43d1-af75-547aa7f319fa",
   "created": "2026-10-04T15:00:08+00:00",
+  "landed": {
+    "at": "2026-10-04T15:31:32+00:00",
+    "base": "main",
+    "commit": "4c392c31959821b6abddfb4fa7645b2e53a7509c",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -164,7 +170,7 @@
   "plan": "/home/miftah/.worktrees/seer/sera-lab-site/.workflows/orchestration/sera-lab-site/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-lab-site",
-  "updated": "2026-10-04T15:30:57+00:00",
+  "updated": "2026-10-04T15:31:32+00:00",
   "verified_at": "2026-10-04T15:14:04+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-lab-site"
 }

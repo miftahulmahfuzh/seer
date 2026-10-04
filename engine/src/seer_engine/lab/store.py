@@ -14,6 +14,14 @@ Tables:
   and DELETE. ``UNIQUE(config_digest, window)``: a configuration runs at most once on the dev
   window and gets at most one look at the test window.
 - ``ideas_seen``: dedupe keys (``url:…``, ``concept:…``) of sources already explored.
+- ``insights``: the lab journal (observations, hypotheses, data and feature wishes, risks, and
+  batch syntheses). Triggers refuse every UPDATE and DELETE.
+
+Schema versions (``meta.schema_version``): 1 is the first lab; 2 adds the ``synthesis`` insight
+kind. ``connect`` migrates an older database in place; ``connect_readonly`` never does.
+
+``snapshot`` / ``snapshot_json`` turn a database (v1 or v2) into the web's ``web/data/lab.json``
+(seertrade.site/sera). ``lab stage`` writes it next to the database and stages both.
 
 ``journal_mode`` stays DELETE, so the committed file is the whole database (no ``-wal``).
 """
@@ -37,7 +45,7 @@ COMMITTED_DB = config.REPO_ROOT / "lab" / "lab.sqlite"
 # database through SEER_LAB_DB; only the coordinator commits it.
 DB_PATH = Path(os.environ.get("SEER_LAB_DB") or COMMITTED_DB)
 XLSX_PATH = config.REPO_ROOT / "lab" / "lab.xlsx"  # gitignored
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"  # 2: the synthesis insight kind (see _migrate)
 
 SOURCE_KINDS: tuple[str, ...] = ("paper", "blog", "github", "knowledge", "variation", "seed")
 STATUSES: tuple[str, ...] = (
@@ -65,7 +73,9 @@ TRANSITIONS: tuple[tuple[str, str], ...] = (
     ("test-passed", "paper"),
 )
 WINDOWS: tuple[str, ...] = ("dev", "test")
-INSIGHT_KINDS: tuple[str, ...] = ("observation", "hypothesis", "data-wish", "feature-wish", "risk")
+INSIGHT_KINDS: tuple[str, ...] = (
+    "observation", "hypothesis", "data-wish", "feature-wish", "risk", "synthesis",
+)
 DSR_MIN = 0.95  # lab eligibility on the dev window, on top of the five P7a D8 conditions
 DSR_LABEL = "DSR >= 0.95"
 
@@ -73,6 +83,23 @@ DSR_LABEL = "DSR >= 0.95"
 def _quoted(values: Iterable[str]) -> str:
     return ", ".join(f"'{v}'" for v in values)
 
+
+# The insights table and its two triggers, one statement each. ``_SCHEMA`` creates them on a new
+# database; ``_migrate`` recreates them when it rebuilds a v1 table (SQLite cannot alter a CHECK).
+_INSIGHTS_TABLE = f"""CREATE TABLE IF NOT EXISTS insights (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind      TEXT NOT NULL CHECK (kind IN ({_quoted(INSIGHT_KINDS)})),
+    title     TEXT NOT NULL CHECK (length(trim(title)) > 0),
+    body      TEXT NOT NULL CHECK (length(trim(body)) > 0),
+    method_id TEXT REFERENCES methods(id),
+    added     TEXT NOT NULL
+)"""
+_INSIGHTS_TRIGGERS: tuple[str, ...] = (
+    """CREATE TRIGGER IF NOT EXISTS insights_no_update BEFORE UPDATE ON insights
+BEGIN SELECT RAISE(ABORT, 'insights are append-only: add a newer one instead'); END""",
+    """CREATE TRIGGER IF NOT EXISTS insights_no_delete BEFORE DELETE ON insights
+BEGIN SELECT RAISE(ABORT, 'insights are append-only'); END""",
+)
 
 _SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS meta (
@@ -146,20 +173,11 @@ CREATE TABLE IF NOT EXISTS ideas_seen (
     added     TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS insights (
-    id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    kind      TEXT NOT NULL CHECK (kind IN ({_quoted(INSIGHT_KINDS)})),
-    title     TEXT NOT NULL CHECK (length(trim(title)) > 0),
-    body      TEXT NOT NULL CHECK (length(trim(body)) > 0),
-    method_id TEXT REFERENCES methods(id),
-    added     TEXT NOT NULL
-);
+{_INSIGHTS_TABLE};
 
-CREATE TRIGGER IF NOT EXISTS insights_no_update BEFORE UPDATE ON insights
-BEGIN SELECT RAISE(ABORT, 'insights are append-only: add a newer one instead'); END;
+{_INSIGHTS_TRIGGERS[0]};
 
-CREATE TRIGGER IF NOT EXISTS insights_no_delete BEFORE DELETE ON insights
-BEGIN SELECT RAISE(ABORT, 'insights are append-only'); END;
+{_INSIGHTS_TRIGGERS[1]};
 
 CREATE TRIGGER IF NOT EXISTS trials_no_update BEFORE UPDATE ON trials
 BEGIN SELECT RAISE(ABORT, 'trials are append-only: a trial row is never updated'); END;
@@ -201,20 +219,88 @@ def now_iso() -> str:
 
 
 def connect(path: Path = DB_PATH) -> sqlite3.Connection:
-    """Open (creating when missing) the lab database with the schema, triggers and transitions."""
+    """Open (creating when missing) the lab database with the schema, triggers and transitions,
+    migrating an older database to ``SCHEMA_VERSION`` first."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path, timeout=120)  # parallel explorer sessions share one file
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = DELETE")
-    with conn:
-        conn.executescript(_SCHEMA)
-        conn.executemany("INSERT OR IGNORE INTO transitions (src, dst) VALUES (?, ?)", TRANSITIONS)
-        conn.execute(
-            "INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', ?)", (SCHEMA_VERSION,)
-        )
+    try:
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA journal_mode = DELETE")
+        with conn:
+            conn.executescript(_SCHEMA)
+            conn.executemany("INSERT OR IGNORE INTO transitions (src, dst) VALUES (?, ?)", TRANSITIONS)
+            conn.execute(
+                "INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', ?)", (SCHEMA_VERSION,)
+            )
+        _migrate(conn)
+    except BaseException:
+        conn.close()
+        raise
     return conn
+
+
+def connect_readonly(path: Path = COMMITTED_DB) -> sqlite3.Connection:
+    """Open an existing lab database read-only, exactly as it is: no schema, no migration, no
+    write (``mode=ro``). For the snapshot sync guard, which must not touch the committed file."""
+    path = Path(path).resolve()
+    if not path.is_file():
+        raise LabError(f"no lab database at {path}")
+    conn = sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def schema_version(conn: sqlite3.Connection) -> str | None:
+    row = conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
+    return None if row is None else str(row[0])
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Bring an older database up to ``SCHEMA_VERSION`` in one transaction under the write lock.
+
+    v1 -> v2 adds the ``synthesis`` insight kind. SQLite cannot alter a CHECK, so ``insights`` is
+    rebuilt: the v1 table is renamed aside, the v2 table is created from ``_INSIGHTS_TABLE``,
+    every row is copied with its id, the AUTOINCREMENT counter is carried over, the v1 table is
+    dropped (which drops its triggers and fires none), and the two append-only triggers are
+    created on the new table. The triggers come last: while the v1 table exists its triggers
+    hold their names, and ``CREATE TRIGGER IF NOT EXISTS`` would silently skip them.
+
+    Parallel sessions may connect at once, so the version is read again after
+    ``BEGIN IMMEDIATE``: only the first one migrates, the others find v2 and do nothing.
+    """
+    if schema_version(conn) == SCHEMA_VERSION:
+        return
+    begin_immediate(conn)
+    try:
+        version = schema_version(conn)
+        if version == "1":
+            seq = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = 'insights'").fetchone()
+            conn.execute("ALTER TABLE insights RENAME TO insights_v1")
+            conn.execute(_INSIGHTS_TABLE)
+            conn.execute(
+                "INSERT INTO insights (id, kind, title, body, method_id, added) "
+                "SELECT id, kind, title, body, method_id, added FROM insights_v1 ORDER BY id"
+            )
+            conn.execute("DROP TABLE insights_v1")
+            if seq is not None:
+                cur = conn.execute(
+                    "UPDATE sqlite_sequence SET seq = max(seq, ?) WHERE name = 'insights'", (seq[0],)
+                )
+                if cur.rowcount == 0:
+                    conn.execute("INSERT INTO sqlite_sequence (name, seq) VALUES ('insights', ?)", (seq[0],))
+            for trigger in _INSIGHTS_TRIGGERS:
+                conn.execute(trigger)
+            conn.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (SCHEMA_VERSION,))
+        elif version != SCHEMA_VERSION:
+            raise LabError(
+                f"lab database schema version {version!r} is unknown to this code (expects {SCHEMA_VERSION})"
+            )
+        conn.commit()
+    except BaseException:
+        conn.rollback()
+        raise
 
 
 # --------------------------------------------------------------------------- methods
@@ -420,7 +506,8 @@ def seen(conn: sqlite3.Connection, pattern: str) -> list[sqlite3.Row]:
 def add_insight(conn: sqlite3.Connection, *, kind: str, title: str, body: str,
                 method_id: str | None = None) -> int:
     """Append one entry to the lab journal: an observation across methods, a hypothesis worth
-    testing, data or a feature the lab lacks, or a risk. The food-for-thought record."""
+    testing, data or a feature the lab lacks, a risk, or a batch synthesis (the state of the
+    search after a batch of methods). The food-for-thought record, shown at seertrade.site/sera."""
     if kind not in INSIGHT_KINDS:
         raise LabError(f"insight kind must be one of {INSIGHT_KINDS}, got {kind!r}")
     if method_id is not None and get_method(conn, method_id) is None:
@@ -501,3 +588,196 @@ def curve_json(curve: Iterable[tuple[date, float]]) -> str:
 
 def as_mapping(row: sqlite3.Row) -> Mapping[str, Any]:
     return {k: row[k] for k in row.keys()}
+
+
+# --------------------------------------------------------------------------- web snapshot
+
+SNAPSHOT_VERSION = 1
+EXPECTED_FAILURE_SEP = "\n\nExpected failure: "  # how lab ideas write their hypothesis
+
+
+def snapshot_path(db: Path) -> Path:
+    """The web snapshot of a database: ``<repo>/web/data/lab.json`` for ``<repo>/lab/lab.sqlite``.
+
+    Derived from the database's own checkout, not from this code's: a worktree session with
+    ``SEER_LAB_DB`` pointing at the main checkout writes the snapshot into that checkout, next to
+    the database it exports, and ``lab stage`` stages both there."""
+    return Path(db).resolve().parent.parent / "web" / "data" / "lab.json"
+
+
+def _num(x: Any) -> float | None:
+    """A JSON-safe number: None and non-finite values become None, the rest rounds to 6 dp."""
+    if x is None:
+        return None
+    x = float(x)
+    return round(x, 6) if math.isfinite(x) else None
+
+
+def _dicts(conn: sqlite3.Connection, sql: str) -> list[dict[str, Any]]:
+    """Rows as dicts, whatever the connection's row_factory."""
+    cur = conn.execute(sql)
+    names = [d[0] for d in cur.description]
+    return [dict(zip(names, row)) for row in cur.fetchall()]
+
+
+def _snapshot_method(m: Mapping[str, Any]) -> dict[str, Any]:
+    hypothesis, sep, expected = m["hypothesis"].partition(EXPECTED_FAILURE_SEP)
+    return {
+        "id": m["id"],
+        "name": m["name"],
+        "family": m["family"],
+        "parentId": m["parent_id"],
+        "sourceKind": m["source_kind"],
+        "sourceRef": m["source_ref"],
+        "hypothesis": hypothesis,
+        "expectedFailure": expected if sep else None,
+        "status": m["status"],
+        "analysis": m["analysis"],
+        "verdict": m["verdict"],
+        "blockedOn": m["blocked_on"],
+        "created": m["created"],
+        "updated": m["updated"],
+        "historical": m["id"].startswith("H-"),
+    }
+
+
+def _snapshot_curve(text: str) -> list[list[Any]]:
+    out: list[list[Any]] = []
+    for day, value in json.loads(text):
+        v = _num(value)
+        if v is not None:
+            out.append([str(day), v])
+    return out
+
+
+def _snapshot_trial(t: Mapping[str, Any]) -> dict[str, Any]:
+    pf = t["profit_factor"]
+    return {
+        "n": int(t["n"]),
+        "methodId": t["method_id"],
+        "candidateId": t["candidate_id"],
+        "rulesId": t["rules_id"],
+        "allocatorId": t["allocator_id"],
+        "configText": t["config_text"],
+        "window": t["window"],
+        "start": t["start"],
+        "end": t["end"],
+        "gitSha": t["git_sha"],
+        "runAt": t["run_at"],
+        "totalReturn": _num(t["total_return"]),
+        "cagr": _num(t["cagr"]),
+        "maxDrawdown": _num(t["max_drawdown"]),
+        "profitFactor": _num(pf),
+        "pfInfinite": pf is not None and float(pf) == math.inf,
+        "trades": int(t["trades"]),
+        "sharpe": _num(t["sharpe"]),
+        "exposure": _num(t["exposure"]),
+        "turnover": _num(t["turnover"]),
+        "worstYear": None if t["worst_year"] is None else int(t["worst_year"]),
+        "worstYearReturn": _num(t["worst_year_return"]),
+        "spyTrReturn": _num(t["spy_tr_return"]),
+        "spyTrCagr": _num(t["spy_tr_cagr"]),
+        "mar": _num(t["mar"]),
+        "failed": [f for f in t["failed"].split("; ") if f],
+        "eligible": bool(t["eligible"]),
+        "dsr": _num(t["dsr"]),
+        "nTrialsAtRun": int(t["n_trials_at_run"]),
+        "curve": _snapshot_curve(t["curve_json"]),
+    }
+
+
+def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
+    """The whole lab as the web's ``LabSnapshot`` (SERA_LAB_SITE_PLAN.md Interface Contract).
+
+    Deterministic: the same database gives the same value; there is no wall-clock time in it
+    (``asOf`` is the latest timestamp found in the data, "" for an empty lab). Reads only what
+    schema v1 and v2 share and never touches ``meta``, so it works on a read-only connection to
+    a database that has not been migrated. Gate and data facts come from the engine's constants.
+    """
+    from seer_engine import dates, research
+    from seer_engine.backtest import dev, tuning
+    from seer_engine.lab import seed
+
+    def count(sql: str) -> int:
+        return int(conn.execute(sql).fetchone()[0])
+
+    by_status: dict[str, int] = dict.fromkeys(STATUSES, 0)
+    for status, n in conn.execute("SELECT status, count(*) FROM methods GROUP BY status ORDER BY status"):
+        by_status[str(status)] = int(n)
+    as_of = conn.execute(
+        "SELECT max(ts) FROM (SELECT max(updated) AS ts FROM methods UNION ALL "
+        "SELECT max(run_at) FROM trials UNION ALL SELECT max(added) FROM insights UNION ALL "
+        "SELECT max(added) FROM ideas_seen)"
+    ).fetchone()[0]
+    bench = seed.benchmark_curves()
+    return {
+        "version": SNAPSHOT_VERSION,
+        "asOf": as_of or "",
+        "gate": {
+            "maxDrawdown": tuning.MAX_DRAWDOWN,
+            "minProfitFactor": tuning.MIN_PROFIT_FACTOR,
+            "minTrades": dev._MIN_TRADES,
+            "dsrMin": DSR_MIN,
+            "devStart": research.STORE_START.isoformat(),
+            "devEnd": dev.DEV_END.isoformat(),
+            "testStart": dates.next_session(dev.DEV_END).isoformat(),
+        },
+        "data": {
+            "storeStart": research.STORE_START.isoformat(),
+            "membershipStart": dev.MEMBERSHIP_START.isoformat(),
+            "fxStart": dev.FX_START.isoformat(),
+            "fingerprints": [
+                str(r[0]) for r in conn.execute(
+                    "SELECT DISTINCT store_fingerprint FROM trials ORDER BY store_fingerprint"
+                )
+            ],
+            "barRows": seed.P7A_BAR_ROWS,
+            "symbolsRequested": seed.P7A_SYMBOLS_REQUESTED,
+            "symbolsServed": seed.P7A_SYMBOLS_SERVED,
+            "dividendRows": seed.P7A_DIVIDEND_ROWS,
+        },
+        "summary": {
+            "devTrials": count("SELECT count(*) FROM trials WHERE window = 'dev'"),
+            "testLooks": count("SELECT count(*) FROM trials WHERE window = 'test'"),
+            "methods": count("SELECT count(*) FROM methods"),
+            "labMethods": count("SELECT count(*) FROM methods WHERE id GLOB 'M*'"),
+            "historicalMethods": count("SELECT count(*) FROM methods WHERE id GLOB 'H-*'"),
+            "insights": count("SELECT count(*) FROM insights"),
+            "byStatus": by_status,
+        },
+        "benchmark": {
+            "spyTr": [[d, v] for d, v in bench["spy_tr"]],
+            "spyPrice": [[d, v] for d, v in bench["spy_price"]],
+        },
+        "methods": [_snapshot_method(m) for m in _dicts(conn, "SELECT * FROM methods ORDER BY id")],
+        "trials": [_snapshot_trial(t) for t in _dicts(conn, "SELECT * FROM trials ORDER BY n")],
+        "insights": [
+            {"id": int(i["id"]), "kind": i["kind"], "title": i["title"], "body": i["body"],
+             "methodId": i["method_id"], "added": i["added"]}
+            for i in _dicts(conn, "SELECT * FROM insights ORDER BY id")
+        ],
+        "ideasSeen": [
+            {"key": s["key"], "methodId": s["method_id"], "note": s["note"], "added": s["added"]}
+            for s in _dicts(conn, "SELECT * FROM ideas_seen ORDER BY key")
+        ],
+    }
+
+
+def snapshot_json(conn: sqlite3.Connection) -> str:
+    """``snapshot`` as the exact bytes of ``web/data/lab.json``: compact, key order as built,
+    UTF-8 kept, one trailing newline. ``allow_nan=False``: a stray NaN/inf fails loudly."""
+    return json.dumps(snapshot(conn), ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n"
+
+
+def write_snapshot(conn: sqlite3.Connection, path: Path) -> bool:
+    """Write ``snapshot_json(conn)`` to ``path`` (temp file + atomic replace). False when the
+    file already held exactly that, in which case it is left untouched."""
+    data = snapshot_json(conn).encode("utf-8")
+    path = Path(path)
+    if path.is_file() and path.read_bytes() == data:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_bytes(data)
+    os.replace(tmp, path)
+    return True

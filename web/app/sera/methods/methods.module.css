@@ -1,0 +1,78 @@
+/* /sera/methods: a wide, table-like sheet. Seer v2 tokens only. Desktop is the designed layout;
+   below 1024px the table scrolls sideways inside its sheet. */
+.sheet { gap: 20px; }
+
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.counts { display: flex; flex-wrap: wrap; gap: 8px; color: var(--ink-2); }
+.counts .num { color: var(--ink); font-weight: 500; }
+
+.empty { padding: 12px 0; font-size: 16px; color: var(--ink-2); }
+
+.tableWrap { overflow-x: auto; margin: 0 -8px; }
+.table { width: 100%; min-width: 1200px; border-collapse: collapse; table-layout: fixed; font-size: 15px; }
+.table th, .table td {
+  padding: 13px 8px; text-align: left; font-weight: 400; vertical-align: middle;
+  border-bottom: 1px solid var(--hair);
+}
+.table thead th {
+  padding-top: 0; padding-bottom: 10px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ink-2); vertical-align: bottom;
+}
+.table tbody tr:last-child td { border-bottom: 0; }
+.r { text-align: right !important; }
+
+.cStatus { width: 150px; }
+.cMethod { width: 24%; }
+.cSource { width: 150px; }
+.cCagr { width: 142px; }
+.cNum { width: 74px; }
+.cDots { width: 112px; }
+.cVerdict { width: auto; }
+.cGo { width: 34px; }
+
+/* Whole row is a link: the name link's ::after covers the row; the source link sits above it. */
+.row { position: relative; transition: background 0.12s; }
+.row:hover { background: var(--stone); }
+.row:focus-within { outline: 2px solid var(--coral); outline-offset: -2px; }
+.row td:first-child { border-radius: 18px 0 0 18px; }
+.row td:last-child { border-radius: 0 18px 18px 0; }
+
+.nameLink { display: flex; flex-direction: column; gap: 1px; color: var(--ink); outline: none; }
+.nameLink::after { content: ''; position: absolute; inset: 0; }
+.id { font-size: 12px; letter-spacing: 0.06em; color: var(--ink-3); }
+.name { font-size: 16px; font-weight: 500; line-height: 1.25; letter-spacing: -0.01em; }
+.family { display: block; margin-top: 2px; font-size: 13px; color: var(--ink-2); }
+
+.source, .sourceLink { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; font-size: 14px; color: var(--ink-2); }
+.sourceText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sourceLink { position: relative; z-index: 1; color: var(--ink); text-decoration: underline; text-decoration-color: var(--outline); text-underline-offset: 3px; }
+.sourceLink:hover { text-decoration-color: var(--ink); }
+.sourceLink:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; border-radius: 6px; }
+
+.vs { font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+.untested { color: var(--ink-3); font-size: 14px; }
+
+/* Status chip by STATUS_LABEL tone. */
+.status { height: 28px; padding: 0 11px; font-size: 13px; background: var(--stone); color: var(--ink-2); }
+.status[data-tone='bad'] { background: var(--stone); color: var(--ink-2); }
+.status[data-tone='wait'] { background: transparent; border: 1.5px dashed var(--outline); color: var(--ink-2); }
+.status[data-tone='neutral'] { background: var(--butter); color: var(--ink); }
+.status[data-tone='good'] { background: var(--ink); color: var(--sheet); }
+
+.dots { display: inline-flex; align-items: center; gap: 4px; }
+.dotOn, .dotOff, .dotNa { width: 9px; height: 9px; border-radius: 999px; flex: none; }
+.dotOn { background: var(--ink); }
+.dotOff { border: 1.5px solid var(--outline); }
+.dotNa { border: 1.5px dashed var(--ink-3); }
+.dotsN { margin-left: 6px; font-size: 13px; color: var(--ink-2); }
+
+.verdict {
+  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 14px; line-height: 1.35; color: var(--ink-2);
+}
+.go { color: var(--ink-3); text-align: right; }
+.row:hover .go { color: var(--ink); }
+
+@media (min-width: 1024px) {
+  .sheet { padding: 28px 30px 30px; border-radius: 40px; }
+}

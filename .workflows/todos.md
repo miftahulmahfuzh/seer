@@ -2,7 +2,7 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-04 18:36:00
+**Last Updated**: 2026-10-04 22:29:24
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 3
+- Completed: 4
 
 ---
 
@@ -35,6 +35,21 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-MO5N** Phase 7: Keep it current: CI, skills, docs
+  - **Difficulty**: EASY
+  - **Type**: Feature
+  - **Context**: Owns `.github/workflows/engine-ci.yml` (`lab/**` in both path filters), `.claude/skills/explore-and-experiment-new-method/SKILL.md` (solo mode commits through `lab stage`, full pytest after staging, plain-language analysis with explicit `My opinion:`), `.claude/skills/sera-the-explorer/SKILL.md` (every `lab stage` commit includes `web/data/lab.json`, preflight tests after staging, batch synthesis via `--kind synthesis`), `docs/ROADMAP.md` (P8 entry for the method lab and Sera), `web/package_readme.md` (Sera section matching the reconciled tree). Does not touch code. Exit: docs accurate to the merged code; CI green.
+  - **Status**: completed
+  - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 7 of 7)
+  - **Satisfies**: R3 — Show every experiment, as detailed as possible, kept current with no human step; R5 — Concise, non-technical explanations, with analysis and opinion on every method; R6 — Insights from every exploration; food for thought on features and data sources; R7 — As comprehensive as possible (cross-cutting)
+  - **Depends on**: P1-ENG-6QQA, P1-WEB-RL9Z, P1-WEB-9ANC, P1-WEB-08WD
+  - **Plan**: `.workflows/plan/P1-ROOT-MO5N.md`
+  - **Completed**: 2026-10-04 22:29
+  - **Method**: /do
+  - **Files**: .github/workflows/engine-ci.yml, .claude/skills/explore-and-experiment-new-method/SKILL.md, .claude/skills/sera-the-explorer/SKILL.md, docs/ROADMAP.md, web/package_readme.md
+  - **Drift**: web/package_readme.md had already been updated by phases 2-6's readme-updater, so Step 7's layout/test-line blocks were not pasted verbatim (they would duplicate). Followed intent: added the missing Overview page.tsx/overview.ts and data/lab.json to the layout, the Overview sentence, a new '## Sera (/sera)' section (routes, access gate, data source and how it stays current), the Sera config line, the vitest line now says sera/*, and three gotchas (generated lab.json, relative imports, escape-first markdown).
+  - **Decided**: Plan text 'He is not a quant' (explore skill step 7) -> reworded to 'and is not a quant' (no pronoun), since the owner's pronouns are not stated (rung 6: convention)
 
 - [x] **P1-ROOT-ZEOM** Phase 7: Ship: Veto workflow step, live smoke, docs
   - **Difficulty**: NORMAL

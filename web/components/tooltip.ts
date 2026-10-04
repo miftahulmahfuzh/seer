@@ -14,12 +14,18 @@ export function showTip(el: Element, text?: string) {
   }
   clearTimeout(hideTimer);
   const cs = getComputedStyle(el);
+  // Short captions stay one-line pills. Longer ones (Sera's glossary terms, chart points) wrap in a
+  // rounded box; a '\n' in the text forces a line break.
+  const multi = t.includes('\n');
+  const long = multi || t.length > 48;
   Object.assign(tip.style, {
     position: 'fixed', zIndex: '9999', pointerEvents: 'none', left: '0px', top: '0px',
     background: cs.getPropertyValue('--ink').trim() || '#1d1c1a',
     color: cs.getPropertyValue('--sheet').trim() || '#ffffff',
-    font: '500 13px/1.2 var(--font-outfit), system-ui, sans-serif', letterSpacing: '0.01em',
-    padding: '9px 14px', borderRadius: '999px', whiteSpace: 'nowrap', opacity: '1', transition: 'opacity .12s',
+    font: `500 13px/${long ? '1.4' : '1.2'} var(--font-outfit), system-ui, sans-serif`, letterSpacing: '0.01em',
+    padding: long ? '10px 14px' : '9px 14px', borderRadius: long ? '16px' : '999px',
+    whiteSpace: multi ? 'pre-line' : long ? 'normal' : 'nowrap', maxWidth: long ? '340px' : 'none',
+    opacity: '1', transition: 'opacity .12s',
   });
   tip.textContent = t;
   // Inside a [data-tip-anchor] (the mobile tab bar) the caption clears the whole container, not just the tab.

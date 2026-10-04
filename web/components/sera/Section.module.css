@@ -1,0 +1,21 @@
+/* Overrides the mobile .sheet padding (globals.css) with desktop spacing. */
+.section { padding: 36px 40px 40px; gap: 24px; min-width: 0; }
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.titles { display: flex; flex-direction: column; gap: 8px; min-width: 0; max-width: 820px; }
+.eyebrow { color: var(--ink-2); }
+.title { font-size: 30px; line-height: 1.1; letter-spacing: -0.025em; }
+.caption { font-size: 17px; line-height: 1.5; color: var(--ink-2); }
+.aside { flex: none; display: flex; align-items: center; gap: 10px; }
+
+.grid {
+  display: grid;
+  grid-template-columns: var(--cols, repeat(2, minmax(0, 1fr)));
+  gap: 16px;
+  align-items: stretch;
+}
+
+@media (max-width: 1023.98px) {
+  .section { padding: 28px 22px 32px; }
+  .head { flex-direction: column; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+}

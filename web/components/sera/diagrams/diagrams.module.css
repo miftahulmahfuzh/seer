@@ -1,0 +1,34 @@
+/* Hand-built SVG diagrams for /sera/how. Seer v2 tokens only; text inherits Outfit from body. */
+.svg { display: block; width: 100%; height: auto; overflow: visible; font-family: inherit; }
+
+/* Pipeline */
+.box { fill: var(--stone); }
+.boxFinal { fill: var(--butter); }
+.step { fill: var(--ink-3); font-size: 12px; letter-spacing: 0.12em; }
+.title { fill: var(--ink); font-size: 15px; font-weight: 500; }
+.detail { fill: var(--ink-2); font-size: 12px; }
+.count { fill: var(--sheet); }
+.countText { fill: var(--ink); font-size: 13px; font-variant-numeric: tabular-nums; }
+.arrow { stroke: var(--ink-2); stroke-width: 1.5; fill: none; }
+.arrowHead { fill: var(--ink-2); }
+.failArrow { stroke: var(--neg); stroke-width: 1.5; stroke-dasharray: 4 4; fill: none; }
+.failHead { fill: var(--neg); }
+.lane { fill: none; stroke: var(--neg); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.laneText { fill: var(--neg); font-size: 14px; }
+
+/* Windows */
+.devBand { fill: var(--lav); }
+.testBand { fill: var(--butter); }
+.paperBand { fill: var(--sky); }
+.bandTitle { fill: var(--ink); font-size: 15px; font-weight: 500; }
+.bandText { fill: var(--ink-2); font-size: 12.5px; }
+.muted { fill: var(--ink-3); font-size: 13px; }
+.bear { fill: var(--neg); opacity: 0.12; }
+.bearTitle { fill: var(--neg); font-size: 12.5px; font-weight: 500; }
+.bearText { fill: var(--neg); font-size: 12px; }
+.split { stroke: var(--ink); stroke-width: 1.25; stroke-dasharray: 3 4; }
+.splitText { fill: var(--ink); font-size: 12.5px; }
+.axis { stroke: var(--outline); stroke-width: 1; }
+.tick { stroke: var(--outline); stroke-width: 1; }
+.tickText { fill: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; }
+.today { stroke: var(--ink-2); stroke-width: 1.25; }

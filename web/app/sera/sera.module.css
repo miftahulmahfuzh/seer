@@ -1,0 +1,20 @@
+.shell { min-height: 100dvh; display: flex; }
+
+.main { flex: 1; min-width: 0; padding: 0 40px 56px 12px; }
+
+/* The content column: wide but bounded, so charts stay readable on big monitors. */
+.column {
+  width: 100%;
+  max-width: 1360px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.notFound { padding-top: 40px; }
+
+@media (max-width: 1023.98px) {
+  .shell { flex-direction: column; }
+  .main { padding: 0 16px 40px; }
+}

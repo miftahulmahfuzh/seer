@@ -1,13 +1,18 @@
 import { ChevronRight, UserX } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { currentUser, signIn } from '@/auth';
+import { safeNext } from '@/lib/allow';
 import s from './signin.module.css';
 
 const WORDS = ['Strategic', 'Econometric', 'Ensemble', 'Resolver', 'Patience', 'Discipline', 'Risk', 'Limits', 'Targets', 'Stops', 'Signal'];
 
-export default async function SignIn({ searchParams }: { searchParams: Promise<{ denied?: string; error?: string }> }) {
-  if (await currentUser()) redirect('/');
-  const { denied, error } = await searchParams;
+type Search = { denied?: string; error?: string; next?: string | string[] };
+
+export default async function SignIn({ searchParams }: { searchParams: Promise<Search> }) {
+  const { denied, error, next } = await searchParams;
+  // Where to land after sign-in: an internal path only (e.g. /sera from the Sera gate), else Today.
+  const dest = safeNext(next);
+  if (await currentUser()) redirect(dest);
   const refused = denied !== undefined || error === 'AccessDenied';
 
   return (
@@ -30,7 +35,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
             </div>
           </div>
         )}
-        <form action={async () => { 'use server'; await signIn('google', { redirectTo: '/' }); }}>
+        <form action={async () => { 'use server'; await signIn('google', { redirectTo: dest }); }}>
           <button type="submit" className={s.google} data-tip="Sign in with Google" aria-label="Sign in with Google">
             <span className={s.gdot}>
               <svg width="26" height="26" viewBox="0 0 48 48" aria-hidden="true">

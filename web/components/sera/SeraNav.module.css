@@ -1,0 +1,59 @@
+/* Same rail as Seer's Nav (Nav.module.css), always shown: Sera is desktop-first, not desktop-only. */
+.rail {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  flex: none;
+  width: 104px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 0;
+  gap: 28px;
+}
+
+.wordmark { font-size: 24px; font-weight: 500; letter-spacing: -0.05em; }
+.dot { color: var(--coral); }
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 999px;
+  background: var(--bar);
+}
+
+.tab, .active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  min-width: 52px;
+  border-radius: 999px;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transition: background 0.12s;
+}
+.tab { color: var(--bar-ink); }
+.tab:hover { background: rgba(255, 255, 255, 0.1); }
+.active { background: var(--coral); color: var(--on-coral); }
+.tab:focus-visible, .active:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+
+.back { margin-top: auto; }
+
+/* Below 1024 px: a top bar, not designed further (plan: desktop only for now). */
+@media (max-width: 1023.98px) {
+  .rail {
+    z-index: 40;
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    padding: calc(10px + var(--safe-top)) 16px 10px;
+    gap: 16px;
+    background: var(--bg);
+  }
+  .tabs { flex-direction: row; padding: 5px; }
+  .tab, .active { height: 44px; min-width: 44px; }
+  .back { margin-top: 0; margin-left: auto; }
+}

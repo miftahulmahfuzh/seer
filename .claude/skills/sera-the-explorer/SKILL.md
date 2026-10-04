@@ -31,15 +31,21 @@ LOGS=$REPO/.workflows/sera/<run-id>/           # gitignored scrollback of finish
 ```
 
 Only Sera commits `lab/lab.sqlite`, and always through `lab stage`, which takes the write lock
-so a child's half-written transaction is never committed. Children commit only their method
-files, straight to `main`. These are distinct new files, so a rebase never conflicts.
+so a child's half-written transaction is never committed. Under the same lock it regenerates
+`web/data/lab.json`, the snapshot seertrade.site/sera is built from, and stages both files.
+**Every `lab stage` commit includes `web/data/lab.json`.** CI fails a database commit without it,
+and Vercel redeploys the site from each push. Children commit only their method files,
+straight to `main`. These are distinct new files, so a rebase never conflicts.
 
 ## The run
 
 1. **Name yourself.** Use `sera-<YYYYMMDD-HHMM>` as both run id and name:
    `python3 ~/.claude/skills/task/session.py rename sera-<stamp> --no-widen`. Never let that block.
 2. **Preflight** in `$REPO`: `git pull --rebase --autostash`. Lab tests green
-   (`cd engine && .venv/bin/python -m pytest -q tests/test_lab_*.py`). `engine/.research/`
+   (`cd engine && .venv/bin/python -m pytest -q tests/test_lab_*.py`). The snapshot check in
+   `test_lab_snapshot.py` fails whenever `lab/lab.sqlite` changed without `lab stage` (for example
+   after an interrupted batch). If that is the only failure, run `lab stage`, commit both files,
+   push, and run the tests again. Always test after staging, never before. `engine/.research/`
    present (build it if not). Then check `$TMUX`. If there is **no tmux**, don't stop: run the
    explore skill **solo, sequentially**, num-methods times in this session, then do step 7.
 3. **Choose the first slate** of `min(4, num-methods)` ideas from `lab status`, recent insights
@@ -50,7 +56,7 @@ files, straight to `main`. These are distinct new files, so a rebase never confl
      already in `lab seen`.
    - **Reserve** each new idea with `lab idea …`, which prints its id. A backlog row keeps its id.
      The hypothesis can be a draft; the child sharpens it before its pre-registration commit.
-   - Then `lab stage` + commit + push ("lab: sera <stamp> reserves M00xx, M00yy").
+   - Then `lab stage` + commit (`lab/lab.sqlite` and `web/data/lab.json`) + push ("lab: sera <stamp> reserves M00xx, M00yy").
 4. **Launch each reserved idea:**
    ```bash
    git -C $REPO fetch origin main -q
@@ -74,18 +80,21 @@ files, straight to `main`. These are distinct new files, so a rebase never confl
      - Save the scrollback: `tmux capture-pane -p -S - -t <window> > $LOGS/explore-MNNNN.log`.
      - Kill the window, but only if it is still named `explore-MNNNN`.
      - `git worktree remove --force $WT`, then `git branch -D explore/MNNNN` (only once its method file is on `origin/main`).
-   - `lab stage` + commit + push the database ("lab: M00xx <verdict>").
+   - `lab stage` + commit + push the database and its snapshot, `lab/lab.sqlite` and `web/data/lab.json` ("lab: M00xx <verdict>").
 6. **Refill.** While launched < num-methods, pick the next idea for the free slot from the
    **current** lab, so later ideas learn from earlier results (the children's queued ideas
    included), then reserve and launch. Never let a slot sit idle while ideas remain.
 7. **Synthesize** when num-methods children are closed out. Add **one batch insight**
-   (`lab insight --kind observation --title "Sera <stamp>: <theme>" --body …`) covering:
+   (`lab insight --kind synthesis --title "Sera <stamp>: <theme>" --body …`). The newest
+   synthesis is the headline of seertrade.site/sera, the first thing the owner reads, so write it
+   plainly, in everyday words. Cover:
    - what the batch taught across methods
    - which directions look alive and which look dead
    - what data or features would unlock the most
    - what the next batch should try
 
-   Then `lab stage`, commit, push. End with a short report:
+   Then `lab stage`, commit (`lab/lab.sqlite` and `web/data/lab.json`), push. The site picks the
+   synthesis up from that push with no other step. End with a short report:
    - a table of method, verdict, CAGR vs SPY, max DD, PF, trades, DSR
    - the synthesis
    - N and test looks used
@@ -98,7 +107,7 @@ files, straight to `main`. These are distinct new files, so a rebase never confl
 |---|---|
 | "Ask the owner which ideas to try" | Sera chooses. That is the job. |
 | "Two children on momentum variants, they're promising" | One per family per slate. Diversity beats depth inside a batch. |
-| "`git add lab/lab.sqlite`" | Always `lab stage`. A child may be mid-write. |
+| "`git add lab/lab.sqlite`" | Always `lab stage`. A child may be mid-write, and only `lab stage` keeps `web/data/lab.json` in sync. |
 | "A child failed, pause the batch" | Never. Close it out, record it, refill the slot. |
 | "Kill that window, it looks done" | Verify first, capture the scrollback, check the name. |
 | "Promote in parallel" | Promotions are serial and done by Sera. Each spends one counted test-window look. |

@@ -1,0 +1,55 @@
+/* Sera chart kit. Colours are Seer v2 tokens. --chart-halo (set by Section to its background) rings
+   labels and points so they stay legible where they cross lines. */
+.figure { margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.legendSlot { display: flex; justify-content: flex-end; }
+.svg { display: block; width: 100%; height: auto; overflow: visible; font-family: inherit; }
+
+.grid { stroke: var(--hair); stroke-width: 1; }
+.axisLine { stroke: var(--outline); stroke-width: 1.25; }
+.tick { fill: var(--ink-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+.axisTitle { fill: var(--ink-3); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
+.empty { fill: var(--ink-3); font-size: 16px; }
+
+.refLabel, .endLabel, .pointLabel, .valueLabel, .regionLabel {
+  paint-order: stroke;
+  stroke: var(--chart-halo, var(--sheet));
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.refLabel { font-size: 12.5px; font-weight: 500; }
+.endLabel { font-size: 13px; font-weight: 500; }
+.pointLabel { fill: var(--ink); font-size: 12.5px; font-weight: 500; }
+.valueLabel { fill: var(--ink); font-size: 13px; font-variant-numeric: tabular-nums; }
+.regionLabel { fill: var(--ink-2); font-size: 13px; font-weight: 500; letter-spacing: 0.02em; }
+.barLabel { fill: var(--ink); font-size: 14px; }
+
+/* Invisible wide strokes that carry a line's data-tip. */
+.hit { fill: none; stroke: transparent; stroke-width: 14px; pointer-events: stroke; }
+.hitLine { stroke: transparent; stroke-width: 12px; pointer-events: stroke; }
+
+.dot { stroke: var(--chart-halo, var(--sheet)); stroke-width: 1.5px; }
+.point { transition: stroke-width 0.12s; }
+.point:hover, .link:focus-visible .point { stroke: var(--ink) !important; stroke-width: 2.5px !important; }
+.bar { transition: opacity 0.12s; }
+.bar:hover, .link:focus-visible .bar { opacity: 0.78; }
+.link { cursor: pointer; }
+.link:focus-visible { outline: none; }
+
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.legendItem { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.legendItem[data-tip] { cursor: help; }
+.swatch { flex: none; display: inline-block; }
+.sw_line { width: 18px; height: 3px; border-radius: 9px; }
+.sw_dash { width: 18px; height: 0; border-top: 2.5px dashed; }
+.sw_dot { width: 10px; height: 10px; border-radius: 999px; }
+.sw_ring { width: 11px; height: 11px; border-radius: 999px; border: 2px solid; }
+.sw_zone { width: 16px; height: 12px; border-radius: 4px; }

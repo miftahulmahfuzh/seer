@@ -28,6 +28,12 @@ P7A_GIT_SHA = "b2ec090"  # the commit that registered entries 1-54
 P7A_FINGERPRINT = "5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a"
 P7A_RUN_AT = "2026-10-04T00:00:00+00:00"
 P7A_REPORT = "docs/backtests/2026-10-04-p7a-dev-exploration.md"
+# The P7a research store behind fingerprint P7A_FINGERPRINT (P7A_REPORT, "Data"): shown on
+# seertrade.site/sera through store.snapshot. The store itself is local and gitignored.
+P7A_BAR_ROWS = 2_490_793
+P7A_SYMBOLS_REQUESTED = 1_061
+P7A_SYMBOLS_SERVED = 539
+P7A_DIVIDEND_ROWS = 28_206
 
 P7A_FAMILIES: dict[str, tuple[str, str]] = {
     "REF": ("P7a references (SPY hold, A on design-v0)", "Sanity references: SPY held with dividends; A's idea on fresh data"),
@@ -69,6 +75,19 @@ def _curves() -> dict[str, list[list[object]]]:
                 if key in ("date", "spy_price", "spy_tr") or value == "":
                     continue
                 out.setdefault(key, []).append([rec["date"], float(value)])
+    return out
+
+
+def benchmark_curves() -> dict[str, list[tuple[str, float]]]:
+    """SPY's month-end growth of 1 over the dev window, from the committed P7a curves file:
+    ``spy_tr`` (dividends reinvested) and ``spy_price`` (price only), 1993-01-29 = 1.0 through
+    2015-10-16, rounded to 6 dp. Trials store only SPY's totals; the web draws this line."""
+    out: dict[str, list[tuple[str, float]]] = {"spy_tr": [], "spy_price": []}
+    with P7A_CURVES.open(encoding="utf-8", newline="") as f:
+        for rec in csv.DictReader(f):
+            for key, points in out.items():
+                if rec[key] != "":
+                    points.append((rec["date"], round(float(rec[key]), 6)))
     return out
 
 

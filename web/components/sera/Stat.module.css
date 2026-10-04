@@ -1,0 +1,7 @@
+.stat { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.stat[data-tip] { cursor: help; }
+.stat:focus-visible { outline: 2px solid var(--coral); outline-offset: 4px; border-radius: 12px; }
+.value { font-size: 52px; line-height: 0.95; letter-spacing: -0.04em; white-space: nowrap; }
+.md { font-size: 34px; letter-spacing: -0.03em; }
+.label { font-size: 15px; line-height: 1.35; color: var(--ink); }
+.sub { font-size: 14px; line-height: 1.4; color: var(--ink-2); }

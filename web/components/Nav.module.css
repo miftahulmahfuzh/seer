@@ -65,3 +65,6 @@
   font-weight: 500;
   letter-spacing: -0.05em;
 }
+
+/* Desktop rail only: the way into Sera, at the foot of the rail, for the Sera account. */
+.sera { margin-top: auto; }

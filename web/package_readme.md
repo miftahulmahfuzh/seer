@@ -1,7 +1,7 @@
 # Package: seer-web
 
 **Location**: `web` (Next.js app router; package name `seer-web`, private)
-**Last Updated**: 2026-10-04 (P1-WEB-DX8D, paper-trading-ship phase 12: roster-driven Leaderboard with SPY crown, per-research-strategy six-item checklist via `StrategySwitch` with an honest score line, and a "Month by month" sheet; helpers in `leaderboard/view.ts`)
+**Last Updated**: 2026-10-04 (P1-WEB-EQ4I, sera-lab-site phase 3: `/sera` access gate, desktop Sera shell, SVG chart kit; no `/sera` pages yet, they land in phases 4-6)
 
 ## Overview
 
@@ -17,6 +17,7 @@ write (`action_dismissals`).
 - One data layer (`lib/data.ts`) that turns rows of all three engines (`bracket`, `book`, `benchmark`) into typed view models
 - Pure, DB-free logic that tests run without a connection: metrics and the go-live checklist (`lib/metrics.ts`), month-by-month paper performance (`lib/monthly.ts`), strategy row helpers (`lib/strategy.ts`), slot letters and card colours (`lib/slots.ts`), session freshness (`lib/session.ts`), number/date formatting (`lib/format.ts`)
 - Four pages: Today, Positions, History, Leaderboard
+- Sera (`/sera`), the method lab section: gated to one account (`lib/sera/`), its own desktop shell and rail (`app/sera/layout.tsx`, `components/sera/`), and a dependency-free SVG chart kit (`components/sera/charts/`). Shell only so far; no `page.tsx` under `app/sera/` yet
 - Shared roster UI (`components/StrategySwitch.tsx`, `components/PaperChip.tsx`, `components/roster.ts`): icon-only strategy switching by `?s=` and the paper marker on research strategies' holdings, orders and trades
 - Migrations runner shared with the engine (`scripts/migrate.mjs`) and a demo seeder (`scripts/seed-demo.mjs`)
 
@@ -35,7 +36,7 @@ web/
     layout.tsx, globals.css, manifest.ts
     icon.png                favicon: the same eye as a rounded tile (scripts/make-icon.mjs)
     apple-icon.png          home-screen icon: Eye of Horus, Sigma pupil, on coral (scripts/make-icon.mjs)
-    signin/                 sign-in / denied page; splash art is the mirrored eye (public/splash-eye.png) masked in --splash-star
+    signin/                 sign-in / denied page; splash art is the mirrored eye (public/splash-eye.png) masked in --splash-star; honours ?next= via safeNext
     api/auth/               NextAuth route handlers
     (app)/
       layout.tsx            signed-in shell
@@ -46,11 +47,26 @@ web/
       leaderboard/page.tsx  roster-driven equity curves, champion crown, per-strategy go-live checklist (?s=), month-by-month sheet
       leaderboard/view.ts   looks, researchOf, bestResearch, scoreOf, monthLines, sinceStartLine  (pure)
       leaderboard/view.test.ts  vitest suite for view.ts
+    sera/
+      layout.tsx            requireSera(), then SeraNav rail + centred column (max 1360px); stacks below 1024px
+      not-found.tsx         in-shell 404 (Section + back-to-overview icon link)
+      sera.module.css
   components/               AppHeader (eye mark left of the titles, mobile only), Nav, CopyButton, RefreshButton, WhyToggle, TooltipLayer, tooltip
     StrategySwitch.tsx      icon-only roster switcher (Links), ALL sentinel           (server component)
     PaperChip.tsx           "Paper" data label with tooltip, sm | md
     roster.ts               strategyIcon, selectStrategy, sharesLabel                (pure)
     roster.test.ts          vitest suite for roster.ts
+    sera/
+      SeraNav.tsx           (client) icon-only rail: Overview, Methods, Journal, Ideas, How it works (/sera/*), Back to Seer
+      PageHeader.tsx        eyebrow, title, lede, asOf, aside
+      Section.tsx           Section (eyebrow/title/caption, bg sheet|lav|butter|sky|stone|coral, aside), SectionGrid
+      Stat.tsx              big figure + label, tone, tip, sub, size
+      Term.tsx              glossary term with a wrapping definition tooltip
+      charts/
+        scale.ts            pure scales, nice ticks, year ticks, paths, label spreading, formatters, CHART_COLORS
+        parts.tsx           HRef / VRef reference lines
+        LineChart.tsx, ScatterChart.tsx, BarChart.tsx (+ barGroups), Legend.tsx (+ legendFromSeries)
+        scale.test.ts, charts.test.tsx
   lib/
     db.ts                   sql = neon(DATABASE_URL)
     data.ts                 all DB reads (server only)
@@ -61,7 +77,9 @@ web/
     slots.ts                slot letters/sheets, slotCount, cardBg                 (pure)
     session.ts              nextUsSession, isStale, wibDate                        (pure)
     format.ts               money/usd/rp/pct and date formatters                   (pure)
-    allow.ts                isAllowed                                              (pure)
+    allow.ts                isAllowed, safeNext                                    (pure)
+    sera/access.ts          SERA_EMAIL, isSeraUser                                 (pure)
+    sera/gate.ts            requireSera(next) (server only)
     *.test.ts               vitest suites for every pure module
   scripts/
     migrate.mjs             applies ../db/migrations/*.sql once each (schema_migrations)
@@ -225,7 +243,12 @@ function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null befo
 
 - `lib/session.ts`: `nextUsSession(now)`, `isStale(latestSessionDate, now)`, `wibDate(now)`. Weekends only; holidays are the engine's job.
 - `lib/format.ts`: `money, usd, signedUsd, rp, signedRp, pct, signedPct, shortDate, monthDay, monthName` (true minus sign, IDR rounded to Rp 1,000, dates parsed at UTC noon).
-- `lib/allow.ts`: `isAllowed(email, allowed)`, case/space-insensitive exact match.
+- `lib/allow.ts`: `isAllowed(email, allowed)`, case/space-insensitive exact match. `safeNext(next, fallback = '/')`: returns `next` (first value if an array) only when it is an internal path: starts with `/`, not `//` or `/\`, no control characters or backslashes; else `fallback`. Sign-in uses it for its post-login redirect.
+- `lib/sera/access.ts`: `SERA_EMAIL = 'mahfuzh74@gmail.com'`; `isSeraUser(email)` trimmed, case-insensitive equality with it.
+- `lib/sera/gate.ts`: `requireSera(next = '/sera')`: signed out -> `redirect('/signin?next=…')`; signed in but not `ALLOWED_EMAIL` or not `SERA_EMAIL` -> `notFound()` (the section is not revealed); else returns the user. Called by `app/sera/layout.tsx`.
+- `components/Nav.tsx`: `Nav({ showSera })`; the `(app)` layout passes `isSeraUser(user.email)`, which adds a `Telescope` link to `/sera` at the foot of the desktop rail only (no mobile entry).
+- `components/tooltip.ts`: short tips stay one-line pills; long tips wrap in a box (max 340px); a `\n` in the text forces a line break (`pre-line`).
+- `components/sera/charts/`: server-renderable inline-SVG charts, no chart library. `LineChart` (series of `[x, y|null, tip?]` points, numeric or date x, reference lines), `ScatterChart` (points plus shaded regions), `BarChart` (groups; `barGroups` lifts a flat list), `Legend` (`line|dash|dot|ring|zone` shapes). Point and bar tooltips use the shared `data-tip` layer. `scale.ts` is pure and unit-tested.
 - `auth.ts`: `handlers, auth, signIn, signOut`, `currentUser()`.
 - `app/(app)/actions.ts`: server action `dismiss(formData)` (auth check, validates `orderId`, revalidates `/`).
 
@@ -274,7 +297,7 @@ window lacks two month starts.
 - `DATABASE_URL` (app, pooled HTTP), `DATABASE_URL_UNPOOLED` (scripts), `ALLOWED_EMAIL`, NextAuth Google credentials. Scripts read `web/.env.local` via `node --env-file`.
 - `npm run db:migrate`: apply new migrations in name order, one transaction each.
 - `npm run db:seed-demo [-- --dry-run]`: builds a 66-session demo (day 0 + paper start, at least three calendar months) ending at the last completed session, flagged `is_demo`. Roster: SPY (champion, buy and hold), A (bracket), F4-MOM12-N20-TREND and F1-SPY-SMA200-M (monthly book strategies, deciding on each month's first session), and C (bracket, its own younger clock, gate `applicable: false`). Needs migration 004 applied first. Writes strategies (with `engine`, `rules_id`, `paper_start`, `params.backtest_gate`), runs (with paper status), fx, bars, orders, equity snapshots, `paper_state`, `book_positions`, `book_targets`, `book_trades`, and six `news_vetoes` rows for C's pending session. `--dry-run` builds every row and prints counts without connecting.
-- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`), `components/roster` and `app/(app)/leaderboard/view`.
+- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`, `sera/access`), `components/roster`, `components/sera/charts` and `app/(app)/leaderboard/view`.
 
 ## Gotchas
 
@@ -290,6 +313,8 @@ window lacks two month starts.
 - Seer ships paper-only (2026-10-04): `isPaper` strategies are research, never a buy recommendation. Today never shows their orders; Positions and History mark them with `PaperChip`.
 - Positions defaults to the first research strategy, not the champion: with SPY as champion, `selectStrategy` skips the benchmark unless `?s=` asks for it.
 - `StrategySwitch` takes `href` as a function, so it must stay a server component (functions cannot cross into a client component).
+- Sera access is two locks: sign-in still needs `ALLOWED_EMAIL`, and `/sera` additionally needs `SERA_EMAIL` (hard-coded). Any other signed-in account gets a 404, not a denial page, by design.
+- `SeraNav` links to `/sera/methods`, `/sera/journal`, `/sera/ideas` and `/sera/how`, which do not exist until phases 4-6; until then they 404 inside the shell.
 
 ## Notes
 

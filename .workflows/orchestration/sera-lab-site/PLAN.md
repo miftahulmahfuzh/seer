@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/sera-lab-site`
 **Branch:** `feature/sera-lab-site` (base: `origin/main` @ `c138b08`)
 **Phases:** 7
-**Status:** planned
+**Status:** phase 3/7 complete
 **Coordinator:** —
 
 ---
@@ -108,13 +108,13 @@ Failure labels inside `failed` are exactly: `beats SPY TR`, `max DD <= 15%`, `PF
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Lab snapshot export + synthesis kind | R3, R6, R7 | `engine/lab` | 6 | — | NORMAL | `.workflows/plan/sera-lab-site/phase-1.md` | — | — |
-| 2 | Web data layer for the snapshot | R3, R5, R7 | `web/lib/sera` | 10 | 1 | NORMAL | `.workflows/plan/sera-lab-site/phase-2.md` | — | — |
-| 3 | Sera shell, access gate, chart kit | R1, R2, R4, R7 | `web/app/sera`, `web/components/sera` | 32 | — | HARD | `.workflows/plan/sera-lab-site/phase-3.md` | — | — |
-| 4 | Overview page | R1, R4, R5, R7 | `web/app/sera` (page.tsx) | 4 | 2, 3 | HARD | `.workflows/plan/sera-lab-site/phase-4.md` | — | — |
-| 5 | Methods list + method detail | R1, R3, R4, R5, R7 | `web/app/sera/methods` | 6 | 2, 3 | HARD | `.workflows/plan/sera-lab-site/phase-5.md` | — | — |
-| 6 | Journal, Ideas, How it works | R1, R4, R5, R6, R7 | `web/app/sera/{journal,ideas,how}` | 17 | 2, 3 | HARD | `.workflows/plan/sera-lab-site/phase-6.md` | — | — |
-| 7 | Keep it current: CI, skills, docs | R3, R5, R6, R7 | `.github`, `.claude/skills`, `docs`, `web` | 5 | 1, 4, 5, 6 | EASY | `.workflows/plan/sera-lab-site/phase-7.md` | — | — |
+| 1 | Lab snapshot export + synthesis kind | R3, R6, R7 | `engine/lab` | 6 | — | NORMAL | `.workflows/plan/sera-lab-site/phase-1.md` | P1-ENG-6QQA | — |
+| 2 | Web data layer for the snapshot | R3, R5, R7 | `web/lib/sera` | 10 | 1 | NORMAL | `.workflows/plan/sera-lab-site/phase-2.md` | P1-WEB-5767 | — |
+| 3 | ✓ Sera shell, access gate, chart kit | R1, R2, R4, R7 | `web/app/sera`, `web/components/sera` | 32 | — | HARD | `.workflows/plan/sera-lab-site/phase-3.md` | P1-WEB-EQ4I | — |
+| 4 | Overview page | R1, R4, R5, R7 | `web/app/sera` (page.tsx) | 4 | 2, 3 | HARD | `.workflows/plan/sera-lab-site/phase-4.md` | P1-WEB-RL9Z | — |
+| 5 | Methods list + method detail | R1, R3, R4, R5, R7 | `web/app/sera/methods` | 6 | 2, 3 | HARD | `.workflows/plan/sera-lab-site/phase-5.md` | P1-WEB-9ANC | — |
+| 6 | Journal, Ideas, How it works | R1, R4, R5, R6, R7 | `web/app/sera/{journal,ideas,how}` | 17 | 2, 3 | HARD | `.workflows/plan/sera-lab-site/phase-6.md` | P1-WEB-08WD | — |
+| 7 | Keep it current: CI, skills, docs | R3, R5, R6, R7 | `.github`, `.claude/skills`, `docs`, `web` | 5 | 1, 4, 5, 6 | EASY | `.workflows/plan/sera-lab-site/phase-7.md` | P1-ROOT-MO5N | — |
 
 **Common setup.** Web phases: `cd /home/miftah/.worktrees/seer/sera-lab-site/web && npm ci` (the lockfile is identical to main's; never symlink main's `node_modules`, because `next build` rejects it). Engine commands in the worktree: `env -u SEER_LAB_DB PYTHONPATH=/home/miftah/.worktrees/seer/sera-lab-site/engine/src /home/miftah/seer/engine/.venv/bin/python -m …` (a worktree has no venv; `SEER_LAB_DB` must be unset).
 

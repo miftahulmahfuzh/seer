@@ -67,7 +67,7 @@ _MIN_TRADES = 100  # design §1 go-live item 2
 _MAX_FINALISTS = 3  # handover D8
 _EULER_GAMMA = 0.5772156649  # Euler-Mascheroni, as Bailey & López de Prado state it
 _ID = re.compile(r"[A-Z0-9]+(-[A-Z0-9]+)*")
-_FAMILY = re.compile(r"F([1-9]|1[01])|REF")
+_FAMILY = re.compile(r"F([1-9]|1[01])|REF|M\d{4}")  # M0001…: method lab families
 
 
 class DevWindowError(ValueError):
@@ -147,7 +147,7 @@ class Candidate:
         if not isinstance(self.id, str) or _ID.fullmatch(self.id) is None:
             raise ValueError(f"candidate id must match {_ID.pattern}, got {self.id!r}")
         if not isinstance(self.family, str) or _FAMILY.fullmatch(self.family) is None:
-            raise ValueError(f"{self.id}: family must be F1..F11 or REF, got {self.family!r}")
+            raise ValueError(f"{self.id}: family must be F1..F11, REF or a lab method id, got {self.family!r}")
         if not isinstance(self.rules, TradeRules):
             raise TypeError(f"{self.id}: rules must be a TradeRules, got {type(self.rules).__name__}")
         if self.rules.engine == "bracket_v0":

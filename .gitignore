@@ -29,3 +29,6 @@ engine/.research.old/
 # home-screen icon candidates (scripts/gen_app_icon.py) and compositor preview
 web/scripts/.icon/_candidates/
 web/scripts/.icon/preview.png
+
+# method lab workbook (python -m seer_engine lab export)
+lab/lab.xlsx

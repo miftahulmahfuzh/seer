@@ -3,6 +3,12 @@
   "coordinator": "orch-strategy-c-news-veto",
   "coordinator_session_id": "0e694a6e-c080-4da8-baae-1beaa72410a3",
   "created": "2026-10-04T10:50:05+00:00",
+  "landed": {
+    "at": "2026-10-04T11:39:08+00:00",
+    "base": "main",
+    "commit": "fc29a30eb43dc7ec5716555295f6577c0756c02e",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -144,7 +150,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-c-news-veto/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-c-news-veto",
-  "updated": "2026-10-04T11:37:30+00:00",
+  "updated": "2026-10-04T11:39:08+00:00",
   "verified_at": "2026-10-04T11:20:38+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-c-news-veto"
 }

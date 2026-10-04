@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 09:36:00
-**Total Active Tasks**: 7
+**Last Updated**: 2026-10-04 09:49:40
+**Total Active Tasks**: 6
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 4
+- P1 High: 3
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 3
-- Completed: 41
+- Completed: 42
 
 ---
 
@@ -99,16 +99,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Depends on**: P1-ENG-0ZLD
   - **Plan**: `.workflows/plan/P1-ENG-WBI7.md`
 
-- [ ] **P1-ENG-YEW4** Phase 9: `explain`: optional LLM explanations
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `llm.py` (Anthropic-compatible Messages call over `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`; the key is sent as both `x-api-key` and `Authorization: Bearer` for z.ai compatibility; timeouts, redaction), `commands/explain.py` (fills `orders.explanation` for new pending A orders and `book_targets.explanation` for new entries of the latest decision; missing config or any LLM failure → leaves NULL, exit 0, logs); tests with a fake transport. Does not touch: `paper` command, workflows (phase 13), web. Exit: tests green; never raises on LLM failure.
-  - **Status**: open
-  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 9 of 13)
-  - **Satisfies**: R5 — Optional LLM explanations (D9)
-  - **Depends on**: P1-ENG-N6UC
-  - **Plan**: `.workflows/plan/P1-ENG-YEW4.md`
-
 ### [P2] Medium
 
 ### [P3] Low
@@ -120,6 +110,21 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-YEW4** Phase 9: `explain`: optional LLM explanations
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `llm.py` (Anthropic-compatible Messages call over `LLM_BASE_URL`/`LLM_API_KEY`/`LLM_MODEL`; the key is sent as both `x-api-key` and `Authorization: Bearer` for z.ai compatibility; timeouts, redaction), `commands/explain.py` (fills `orders.explanation` for new pending A orders and `book_targets.explanation` for new entries of the latest decision; missing config or any LLM failure → leaves NULL, exit 0, logs); tests with a fake transport. Does not touch: `paper` command, workflows (phase 13), web. Exit: tests green; never raises on LLM failure.
+  - **Status**: completed
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 9 of 13)
+  - **Satisfies**: R5 — Optional LLM explanations (D9)
+  - **Depends on**: P1-ENG-N6UC
+  - **Plan**: `.workflows/plan/P1-ENG-YEW4.md`
+  - **Completed**: 2026-10-04 09:49
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/llm.py, engine/src/seer_engine/commands/explain.py, engine/tests/test_llm.py, engine/tests/test_explain.py
+  - **Decided**:
+    - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 13 per the plan index invariant 8
+
 - [x] **P1-ENG-N6UC** Phase 1: Migration 003 and the frozen roster
   - **Difficulty**: NORMAL
   - **Type**: Feature

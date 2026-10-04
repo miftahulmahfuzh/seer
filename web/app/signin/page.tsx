@@ -14,11 +14,7 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
     <main className={s.splash}>
       <div className={s.art} aria-hidden="true">
         <div className={s.words}>{WORDS.map(w => <span key={w}>{w}</span>)}</div>
-        <svg viewBox="0 0 414 896" className={s.star}>
-          <path d="M120 300 Q120 600 400 600 Q120 600 120 900 Q120 600 -160 600 Q120 600 120 300 Z" fill="var(--splash-star)" />
-          <line x1="120" x2="120" y1="300" y2="896" stroke="var(--splash)" strokeWidth="1" />
-          <line x1="0" x2="400" y1="600" y2="600" stroke="var(--splash)" strokeWidth="1" />
-        </svg>
+        <div className={s.eye} />
         <span className={s.mark}>Seer.</span>
       </div>
       <h1 className={s.srOnly}>Seer sign-in</h1>

@@ -27,7 +27,19 @@
   color: var(--splash-words);
 }
 
-.star { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* The eye (scripts/make-icon.mjs → public/splash-eye.png) as a mask, so it takes --splash-star in
+   either scheme. Mirrored there, so the pocket under its left end holds the mark; its spiral sweeps off
+   the right edge the way the star bled off the left. */
+.eye {
+  position: absolute;
+  left: 20px;
+  top: 340px;
+  width: 520px;
+  aspect-ratio: 1061 / 798;
+  background: var(--splash-star);
+  -webkit-mask: url(/splash-eye.png) center / contain no-repeat;
+  mask: url(/splash-eye.png) center / contain no-repeat;
+}
 
 .mark {
   position: absolute;

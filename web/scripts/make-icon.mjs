@@ -152,15 +152,17 @@ for (let y = 0; y < bh; y++)
 const eye = await sharp(rgba, { raw: { width: bw, height: bh, channels: 4 } }).resize(ew, eh, { kernel: 'lanczos3' }).png().toBuffer();
 
 // The Sigma, centred in the opening, as tall as the opening allows. Lucide's glyph spans y 4..20.
-const sCx = ox + (cx - x0) * scale, sCy = oy + ((openTop + openBot) / 2 - y0) * scale;
-const sH = (openBot - openTop) * scale * SIGMA_FILL;
-const unit = sH / 16;
-const sigma = Buffer.from(
-  `<svg xmlns="http://www.w3.org/2000/svg" width="${PX}" height="${PX}" viewBox="0 0 ${PX} ${PX}">` +
-    `<g transform="translate(${sCx - 12 * unit} ${sCy - 12 * unit}) scale(${unit})">` +
-    `<path d="${SIGMA}" fill="none" stroke="${INK}" stroke-width="${SIGMA_STROKE}" stroke-linecap="round" stroke-linejoin="round"/>` +
-    `</g></svg>`,
-);
+const sigmaSvg = (W, H, x, y, height, colour) => {
+  const unit = height / 16;
+  return Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
+      `<g transform="translate(${x - 12 * unit} ${y - 12 * unit}) scale(${unit})">` +
+      `<path d="${SIGMA}" fill="none" stroke="${colour}" stroke-width="${SIGMA_STROKE}" stroke-linecap="round" stroke-linejoin="round"/>` +
+      `</g></svg>`,
+  );
+};
+const openMid = (openTop + openBot) / 2 - y0; // the opening's centre row, in the trimmed box
+const sigma = sigmaSvg(PX, PX, ox + (cx - x0) * scale, oy + openMid * scale, (openBot - openTop) * scale * SIGMA_FILL, INK);
 
 // RGB, never RGBA: iOS composites a transparent apple-touch-icon onto black.
 const master = await sharp({ create: { width: PX, height: PX, channels: 3, background: GROUND } })
@@ -195,3 +197,21 @@ await sharp(master)
   .png({ compressionLevel: 9 })
   .toFile(join(WEB, 'app/icon.png'));
 console.log(`wrote app/icon.png ${FAV}² (rounded favicon)`);
+
+// The splash: the eye as an alpha mask, painted by CSS in --splash-star so it follows the colour
+// scheme. Mirrored, so the spiral hangs right and the pocket under the eye's left end is empty for
+// the "Seer." mark; the Sigma is drawn after the flip so it stays the right way round. Rendered at
+// 1.5x the source because the splash draws it ~470px wide on a 3x screen.
+const K = 1.5;
+const mw = Math.round(bw * K), mh = Math.round(bh * K);
+const white = Buffer.alloc(bw * bh * 4, 255);
+for (let i = 0; i < bw * bh; i++) white[i * 4 + 3] = rgba[i * 4 + 3];
+const flipped = await sharp(white, { raw: { width: bw, height: bh, channels: 4 } }).flop().resize(mw, mh, { kernel: 'lanczos3' }).png().toBuffer();
+await sharp({ create: { width: mw, height: mh, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 0 } } })
+  .composite([
+    { input: flipped, left: 0, top: 0 },
+    { input: sigmaSvg(mw, mh, (x1 - cx) * K, openMid * K, (openBot - openTop) * K * SIGMA_FILL, '#fff'), left: 0, top: 0 },
+  ])
+  .png({ compressionLevel: 9 })
+  .toFile(join(WEB, 'public/splash-eye.png'));
+console.log(`wrote public/splash-eye.png ${mw}x${mh} (splash mask, mirrored) · aspect ${(mw / mh).toFixed(4)}`);

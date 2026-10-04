@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 10:06:03
-**Total Active Tasks**: 1
+**Last Updated**: 2026-10-04 10:13:00
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 47
+- Completed: 48
 
 ---
 
@@ -39,16 +39,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
-- [ ] **P1-ENG-WBI7** Phase 8: `paper_check` replay check
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `paper/replay.py` (pure comparison), `commands/paper_check.py`; tests: after ≥ 5 nights of `paper` on synthetic data the check passes; a tampered snapshot/trade/position fails; a split on a held symbol reports "split-affected" without failing; `--require-sessions`. Does not touch: `commands/paper.py`, workflows (phase 13 adds the step), web. Exit: tests green.
-  - **Status**: open
-  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 8 of 13)
-  - **Satisfies**: R3 — Replay check (D7) + design §8 failure handling
-  - **Depends on**: P1-ENG-0ZLD
-  - **Plan**: `.workflows/plan/P1-ENG-WBI7.md`
-
 ### [P2] Medium
 
 ### [P3] Low
@@ -60,6 +50,23 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-WBI7** Phase 8: `paper_check` replay check
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `paper/replay.py` (pure comparison), `commands/paper_check.py`; tests: after ≥ 5 nights of `paper` on synthetic data the check passes; a tampered snapshot/trade/position fails; a split on a held symbol reports "split-affected" without failing; `--require-sessions`. Does not touch: `commands/paper.py`, workflows (phase 13 adds the step), web. Exit: tests green.
+  - **Status**: completed
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 8 of 13)
+  - **Satisfies**: R3 — Replay check (D7) + design §8 failure handling
+  - **Depends on**: P1-ENG-0ZLD
+  - **Plan**: `.workflows/plan/P1-ENG-WBI7.md`
+  - **Completed**: 2026-10-04 10:13
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/paper/replay.py, engine/src/seer_engine/commands/paper_check.py, engine/tests/test_paper_replay.py, engine/tests/test_paper_check.py
+  - **Decided**:
+    - readme-updater -> skipped; engine/package_readme.md is owned by phase 13 only (plan invariant 8)
+  - **Verified**: paper_check --help ok; focused 64 passed (39 + 25); full engine suite 1972 passed, 0 skipped; web vitest 65 passed
+  - **Next**: P1-ROOT-FOK3 (phase 13) unblocked: phases 1-12 all complete (completion-handler)
+
 - [x] **P1-ENG-0ZLD** Phase 7: `paper` command and workflow step
   - **Difficulty**: HARD
   - **Type**: Feature

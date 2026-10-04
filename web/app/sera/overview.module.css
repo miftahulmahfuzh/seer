@@ -1,0 +1,76 @@
+/* Overview: one column below 1024px (readable, not designed); a 12-column sheet grid on desktop. */
+.grid { display: flex; flex-direction: column; gap: 12px; }
+
+.state, .landing, .hurdles, .closer, .luck, .families, .latest { min-width: 0; }
+
+.stateBody { display: flex; flex-direction: column; gap: 24px; }
+
+.story { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.storyMeta { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+
+.prose { font-size: 17px; line-height: 1.5; color: var(--ink); }
+.prose p { margin: 0 0 10px; }
+.prose p:last-child { margin-bottom: 0; }
+.prose h1, .prose h2, .prose h3, .prose h4 { margin: 14px 0 6px; font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+.prose ul, .prose ol { margin: 0 0 10px; padding-left: 20px; }
+.prose li { margin: 2px 0; }
+.prose strong { font-weight: 500; }
+.prose code { font-size: 15px; padding: 1px 6px; border-radius: 8px; background: var(--stone); }
+.prose a { text-decoration: underline; text-decoration-color: var(--outline); text-underline-offset: 3px; }
+.prose table { width: 100%; border-collapse: collapse; font-size: 15px; margin: 6px 0 10px; }
+.prose th, .prose td { padding: 6px 8px 6px 0; text-align: left; border-bottom: 1px solid var(--hair); font-weight: 400; }
+.prose th { color: var(--ink-2); font-size: 13px; }
+
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 24px; align-content: start; }
+
+.twin { display: flex; flex-direction: column; gap: 18px; }
+.mini { margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.miniLabel { font-size: 15px; color: var(--ink-2); }
+
+.empty { padding: 8px 0; font-size: 16px; line-height: 1.4; color: var(--ink-2); }
+
+.cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.card {
+  min-width: 0;
+  border-radius: 28px;
+  padding: 18px 18px 20px 22px;
+  background: var(--stone);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cardHead { display: flex; align-items: center; gap: 10px; }
+.cardId { flex: 1; min-width: 0; font-size: 14px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.cardLink { flex: none; }
+.cardName { font-size: 20px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.2; }
+.cardVerdict { font-size: 15px; line-height: 1.4; color: var(--ink); }
+.cardIdea { font-size: 15px; line-height: 1.4; color: var(--ink-2); font-style: italic; }
+.cardMeta { margin-top: auto; padding-top: 4px; font-size: 13px; color: var(--ink-3); }
+
+/* Status chips: one quiet fill per stage of the pipeline. */
+.status { height: 30px; padding: 0 12px; font-size: 14px; background: var(--chip-solid); }
+.status[data-status='idea'], .status[data-status='registered'] { background: var(--lav); }
+.status[data-status='rejected'], .status[data-status='test-failed'] { background: var(--sheet); color: var(--ink-2); }
+.status[data-status='blocked-data'] { background: var(--sky); }
+.status[data-status='dev-eligible'], .status[data-status='promoted'] { background: var(--butter); }
+.status[data-status='test-passed'], .status[data-status='paper'] { background: var(--coral); color: var(--on-coral); }
+
+@media (min-width: 1024px) {
+  .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+
+  .state { grid-column: span 12; }
+  .landing { grid-column: span 8; }
+  .hurdles { grid-column: span 4; }
+  .closer { grid-column: span 6; }
+  .luck { grid-column: span 6; }
+  .families { grid-column: span 5; }
+  .latest { grid-column: span 7; }
+
+  .stateBody { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 36px; align-items: start; }
+  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1360px) {
+  .prose { font-size: 18px; }
+}

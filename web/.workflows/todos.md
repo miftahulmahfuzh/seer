@@ -2,19 +2,19 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-10-04 22:10:00
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-04 22:13:10
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 6
+- Completed: 8
 
 ---
 
@@ -23,24 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-WEB-RL9Z** Phase 4: Overview page
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `web/app/sera/page.tsx` (calls `requireSera('/sera')`), `overview.module.css`, `overview.ts` (+test; pure shaping into phase 3's chart props). Sections: State of the search (latest `synthesis` insight, KPI tiles), Where every try landed (max DD vs CAGR-minus-SPY scatter with pass zone), Which hurdles are hardest (funnel bars), Are we getting closer? (progress lines), The luck bar (DSR vs N, 0.95 line), Families explored, Latest methods. Does not touch shell, chart kit, lib. Exit: tsc + vitest green; `next build` compiles the route; no hard-coded gate number.
-  - **Status**: open
-  - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 4 of 7)
-  - **Satisfies**: R1 — Optimize the UI for desktop only (for now); R4 — Draw all the important graphs and diagrams; R5 — Concise, non-technical explanations, with analysis and opinion on every method; R7 — As comprehensive as possible (cross-cutting)
-  - **Depends on**: P1-WEB-5767, P1-WEB-EQ4I
-  - **Plan**: `.workflows/plan/P1-WEB-RL9Z.md`
-- [ ] **P1-WEB-9ANC** Phase 5: Methods list + method detail
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `web/app/sera/methods/page.tsx` + `methods.module.css`, `web/app/sera/methods/[id]/page.tsx` + `method.module.css`, `view.ts` (+test); both pages call `requireSera(<own path>)`. List: every method with status, family, source, best variant (CAGR vs SPY, max DD, PF, trades, DSR, n/6), verdict, icon-only `?show=all|lab|historical|alive` filter. Detail: header with parent/children, hypothesis, expected failure, verdict, variants table with per-condition marks, growth-of-1 vs rebased SPY TR, underwater drawdown, year-by-year bars, variants vs gate, rendered analysis markdown, related insights, full per-trial technical detail; `generateStaticParams` over all methods, `notFound()` for unknown ids. Does not touch shell, chart kit, lib. Exit: tsc + vitest green; `next build` compiles both routes; every method id resolves; unknown id renders the Sera not-found page.
-  - **Status**: open
-  - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 5 of 7)
-  - **Satisfies**: R1 — Optimize the UI for desktop only (for now); R3 — Show every experiment, as detailed as possible, kept current with no human step; R4 — Draw all the important graphs and diagrams; R5 — Concise, non-technical explanations, with analysis and opinion on every method; R7 — As comprehensive as possible (cross-cutting)
-  - **Depends on**: P1-WEB-5767, P1-WEB-EQ4I
-  - **Plan**: `.workflows/plan/P1-WEB-9ANC.md`
 - [ ] **P1-WEB-08WD** Phase 6: Journal, Ideas, How it works
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -146,6 +128,30 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Completed**: 2026-10-04 09:49
   - **Method**: /do
   - **Files**: web/lib/strategy.ts, web/lib/strategy.test.ts, web/lib/metrics.ts, web/lib/metrics.test.ts, web/lib/monthly.ts, web/lib/monthly.test.ts, web/lib/slots.ts, web/lib/slots.test.ts, web/lib/data.ts, web/scripts/seed-demo.mjs, web/app/(app)/page.tsx, web/app/(app)/positions/page.tsx, web/app/(app)/leaderboard/page.tsx
+- [x] **P1-WEB-RL9Z** Phase 4: Overview page
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `web/app/sera/page.tsx` (calls `requireSera('/sera')`), `overview.module.css`, `overview.ts` (+test; pure shaping into phase 3's chart props). Sections: State of the search (latest `synthesis` insight, KPI tiles), Where every try landed (max DD vs CAGR-minus-SPY scatter with pass zone), Which hurdles are hardest (funnel bars), Are we getting closer? (progress lines), The luck bar (DSR vs N, 0.95 line), Families explored, Latest methods. Does not touch shell, chart kit, lib. Exit: tsc + vitest green; `next build` compiles the route; no hard-coded gate number.
+  - **Status**: done
+  - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 4 of 7)
+  - **Satisfies**: R1 — Optimize the UI for desktop only (for now); R4 — Draw all the important graphs and diagrams; R5 — Concise, non-technical explanations, with analysis and opinion on every method; R7 — As comprehensive as possible (cross-cutting)
+  - **Depends on**: P1-WEB-5767, P1-WEB-EQ4I
+  - **Plan**: `.workflows/plan/P1-WEB-RL9Z.md`
+  - **Completed**: 2026-10-04 22:12
+  - **Method**: /do
+  - **Files**: web/app/sera/overview.ts, web/app/sera/overview.test.ts, web/app/sera/page.tsx, web/app/sera/overview.module.css
+- [x] **P1-WEB-9ANC** Phase 5: Methods list + method detail
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `web/app/sera/methods/page.tsx` + `methods.module.css`, `web/app/sera/methods/[id]/page.tsx` + `method.module.css`, `view.ts` (+test); both pages call `requireSera(<own path>)`. List: every method with status, family, source, best variant (CAGR vs SPY, max DD, PF, trades, DSR, n/6), verdict, icon-only `?show=all|lab|historical|alive` filter. Detail: header with parent/children, hypothesis, expected failure, verdict, variants table with per-condition marks, growth-of-1 vs rebased SPY TR, underwater drawdown, year-by-year bars, variants vs gate, rendered analysis markdown, related insights, full per-trial technical detail; `generateStaticParams` over all methods, `notFound()` for unknown ids. Does not touch shell, chart kit, lib. Exit: tsc + vitest green; `next build` compiles both routes; every method id resolves; unknown id renders the Sera not-found page.
+  - **Status**: done
+  - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 5 of 7)
+  - **Satisfies**: R1 — Optimize the UI for desktop only (for now); R3 — Show every experiment, as detailed as possible, kept current with no human step; R4 — Draw all the important graphs and diagrams; R5 — Concise, non-technical explanations, with analysis and opinion on every method; R7 — As comprehensive as possible (cross-cutting)
+  - **Depends on**: P1-WEB-5767, P1-WEB-EQ4I
+  - **Plan**: `.workflows/plan/P1-WEB-9ANC.md`
+  - **Completed**: 2026-10-04 22:13
+  - **Method**: /do
+  - **Files**: web/app/sera/methods/view.ts, web/app/sera/methods/view.test.ts, web/app/sera/methods/page.tsx, web/app/sera/methods/methods.module.css, web/app/sera/methods/[id]/page.tsx, web/app/sera/methods/[id]/method.module.css
 
 ---
 

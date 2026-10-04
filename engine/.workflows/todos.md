@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 18:19:27
-**Total Active Tasks**: 1
+**Last Updated**: 2026-10-04 18:21:00
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 52
+- Completed: 53
 
 ---
 
@@ -38,15 +38,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Decided**:
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
-- [ ] **P1-ENG-QRXI** Phase 4: `veto` command
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `engine/src/seer_engine/commands/veto.py` (K6, incl. the H1 guard) + `engine/tests/test_veto_command.py` (27 tests; PG + fake Finnhub/LLM injected through `execute(conn, *, now, dry_run, finnhub=..., llm=...)` factories). Does not touch: `paper.py`, `paper_check.py`, store (calls K3 only), `test_paper_command.py` (imports its helpers), workflow, docs. Exit: tests for each acceptance-3 failure (no LLM config, timeout/HTTP error, unparsable, Finnhub error, no Finnhub key, model mismatch, consecutive-failure stop); look-ahead (news at/after start never in the prompt or stored; bars dated ≥ session never change candidates); idempotent re-run makes zero client calls and writes nothing; **after Paper decided the session (late-verdict retry) no client call, no row, and C's `paper_check` stays ok; Paper deciding during the checks → the write transaction writes nothing**; failed/missing bars run → exit 1, nothing written; `--dry-run` writes nothing; no secret in rows or logs; LLM options are `float(params.temperature)`, `params.thinking`, `params.max_tokens`.
-  - **Status**: open
-  - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 4 of 7)
-  - **Satisfies**: R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
-  - **Depends on**: P1-ENG-4I4B, P1-ENG-2548
-  - **Plan**: `.workflows/plan/P1-ENG-QRXI.md`
 
 ### [P2] Medium
 
@@ -59,6 +50,26 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-QRXI** Phase 4: `veto` command
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/commands/veto.py` (K6, incl. the H1 guard) + `engine/tests/test_veto_command.py` (27 tests; PG + fake Finnhub/LLM injected through `execute(conn, *, now, dry_run, finnhub=..., llm=...)` factories). Does not touch: `paper.py`, `paper_check.py`, store (calls K3 only), `test_paper_command.py` (imports its helpers), workflow, docs. Exit: tests for each acceptance-3 failure (no LLM config, timeout/HTTP error, unparsable, Finnhub error, no Finnhub key, model mismatch, consecutive-failure stop); look-ahead (news at/after start never in the prompt or stored; bars dated ≥ session never change candidates); idempotent re-run makes zero client calls and writes nothing; **after Paper decided the session (late-verdict retry) no client call, no row, and C's `paper_check` stays ok; Paper deciding during the checks → the write transaction writes nothing**; failed/missing bars run → exit 1, nothing written; `--dry-run` writes nothing; no secret in rows or logs; LLM options are `float(params.temperature)`, `params.thinking`, `params.max_tokens`.
+  - **Status**: completed
+  - **Plan Set**: `STRATEGY_C_NEWS_VETO_PLAN.md` (phase 4 of 7)
+  - **Satisfies**: R2 — Engine, impure: Finnhub client, `veto` command (D6), migration `004` (D7), verdict store, `paper` deciding C, `paper_check` replaying C (D8), `explain` covering C
+  - **Depends on**: P1-ENG-4I4B, P1-ENG-2548
+  - **Plan**: `.workflows/plan/P1-ENG-QRXI.md`
+  - **Completed**: 2026-10-04 18:21
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/commands/veto.py, engine/tests/test_veto_command.py
+  - **Drift**: none — both files created verbatim from the phase plan's code blocks
+  - **Decided**:
+    - readme-updater -> skipped; engine/package_readme.md is owned by phase 7 (rung 1: plan invariant 9, file ownership). Same decision phase 3 recorded
+    - commit scope -> only this phase's files + bookkeeping; the shared worktree holds uncommitted peer edits from phases 5 and 6 (rung 1: invariant 9)
+    - plan index orchestration/strategy-c-news-veto/PLAN.md edited in place on the main checkout (Status line), not committed from this worktree (completion-handler)
+  - **Verified**: test_veto_command.py 27 passed; full engine suite 2159 passed, 0 skipped; ruff clean; web vitest 83 passed + tsc clean
+  - **Next**: P1-ROOT-ZEOM (phase 7) stays blocked: phase 5 is complete but P1-WEB-8YO3 (phase 6) is still in progress (completion-handler)
+
 - [x] **P1-ENG-IIZE** Phase 5: `paper`, `paper_check`, `explain` decide and replay C
   - **Difficulty**: HARD
   - **Type**: Feature

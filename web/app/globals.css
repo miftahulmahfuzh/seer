@@ -123,6 +123,17 @@ h1, h2 { margin: 0; font-weight: 400; }
 .icon-btn.soft:hover { background: var(--chip-solid); }
 .icon-btn.inverted, .icon-btn[aria-current='true'] { border-color: var(--ink); background: var(--ink); color: var(--sheet); }
 
+/* Segmented pill: one rounded track holding a filter group's borderless icon buttons. */
+.seg {
+  display: flex;
+  flex: none;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--stone);
+}
+.seg > .icon-btn { width: var(--seg-btn, 40px); height: var(--seg-btn, 40px); border: 0; }
+.seg > .icon-btn:not([aria-current='true']):hover { background: var(--hair); }
+
 .chip {
   height: 34px;
   padding: 0 14px;

@@ -3,6 +3,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import { AppHeader } from '@/components/AppHeader';
 import { PaperChip } from '@/components/PaperChip';
 import { strategyIcon } from '@/components/roster';
@@ -57,12 +58,13 @@ export default async function History({ searchParams }: { searchParams: Promise<
       <AppHeader date={shortDate(wibDate(now))} title="History" demo={run.isDemo} />
       <div className="stack">
         <section className={`sheet bg-sheet ${s.summary}`}>
-          <div className={s.filters}>
+          {/* --n: buttons across both pills, so every button shares one size and the row never wraps. */}
+          <div className={s.filters} style={{ '--n': research.length + 1 + OUT_BTNS.length } as CSSProperties}>
             <StrategySwitch strategies={research} current={strat} href={id => href({ s: id })}
-              label="Strategy filter" allTip="All strategies" />
-            <div className={s.group} role="group" aria-label="Outcome filter">
+              label="Strategy filter" allTip="All strategies" seg />
+            <div className="seg" role="group" aria-label="Outcome filter">
               {OUT_BTNS.map(([v, Icon, tip]) => (
-                <Link key={v} href={href({ o: v })} replace scroll={false} className="icon-btn md"
+                <Link key={v} href={href({ o: v })} replace scroll={false} className="icon-btn"
                   data-tip={tip} aria-label={tip} aria-current={outcome === v ? 'true' : undefined}>
                   <Icon size={19} strokeWidth={outcome === v ? 2 : 1.5} />
                 </Link>

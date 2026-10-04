@@ -1,6 +1,10 @@
 .summary { padding-bottom: 64px; gap: 20px; }
-.filters { display: flex; justify-content: space-between; gap: 8px; }
-.group { display: flex; gap: 6px; }
+.filters {
+  /* Size each pill button from the row width: 20px = the 8px gap + two pills' 6px padding. */
+  container-type: inline-size;
+  display: flex; justify-content: space-between; gap: 8px;
+}
+.filters > * { --seg-btn: clamp(30px, calc((100cqw - 20px) / var(--n)), 42px); }
 .stats { display: flex; align-items: flex-end; gap: 26px; }
 .stat { display: flex; flex-direction: column; gap: 2px; }
 .big { font-size: 52px; line-height: 0.95; letter-spacing: -0.04em; }
@@ -32,7 +36,8 @@
     border-radius: 40px; padding: 28px 30px; flex-direction: row; align-items: center;
     justify-content: space-between; flex-wrap: wrap; gap: 20px 32px;
   }
-  .filters { order: 2; gap: 18px; }
+  .filters { order: 2; gap: 14px; container-type: normal; }
+  .filters > * { --seg-btn: 42px; }
   .key { order: 3; width: 100%; }
   .list {
     margin-top: 12px; border-radius: 40px; padding: 8px 30px 20px;

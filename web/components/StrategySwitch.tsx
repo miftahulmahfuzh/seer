@@ -16,6 +16,8 @@ type Props = {
   label: string;
   /** When set, a leading ListFilter button with id ALL and this tooltip. */
   allTip?: string;
+  /** Draw as a `.seg` pill track instead of loose wrapping circles. */
+  seg?: boolean;
 };
 
 /**
@@ -23,13 +25,13 @@ type Props = {
  * tooltip and aria-label = its name, aria-current on the selected one.
  * Server component: `href` is a function prop.
  */
-export function StrategySwitch({ strategies, current, href, label, allTip }: Props) {
+export function StrategySwitch({ strategies, current, href, label, allTip, seg }: Props) {
   const items = [
     ...(allTip ? [{ id: ALL, tip: allTip, Icon: ListFilter }] : []),
     ...strategies.map(st => ({ id: st.id, tip: st.name, Icon: strategyIcon(st.icon) })),
   ];
   return (
-    <nav className={s.group} aria-label={label}>
+    <nav className={seg ? 'seg' : s.group} aria-label={label}>
       {items.map(({ id, tip, Icon }) => {
         const on = current === id;
         return (

@@ -66,25 +66,25 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "b935e6e",
       "depends_on": [
         2,
         3
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "Overview page /sera: 7 sections, overview.ts +18 tests; commit also carried phase 5 todos/PLAN bookkeeping (its code not yet in)",
       "package": "web/app/sera` (page.tsx)",
       "plan": ".workflows/plan/sera-lab-site/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T15:13:51+00:00",
       "satisfies": [
         "R1",
         "R4",
         "R5",
         "R7"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-RL9Z",
       "title": "Overview page"
     },
     {
@@ -107,7 +107,7 @@
         "R5",
         "R7"
       ],
-      "status": "spawned",
+      "status": "pending",
       "task_id": null,
       "title": "Methods list + method detail"
     },
@@ -131,7 +131,7 @@
         "R6",
         "R7"
       ],
-      "status": "spawned",
+      "status": "pending",
       "task_id": null,
       "title": "Journal, Ideas, How it works"
     },
@@ -164,7 +164,7 @@
   "plan": "/home/miftah/.worktrees/seer/sera-lab-site/.workflows/orchestration/sera-lab-site/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-lab-site",
-  "updated": "2026-10-04T15:11:46+00:00",
-  "verified_at": "2026-10-04T15:05:44+00:00",
+  "updated": "2026-10-04T15:14:04+00:00",
+  "verified_at": "2026-10-04T15:14:04+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-lab-site"
 }

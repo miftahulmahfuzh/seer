@@ -137,7 +137,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "295fbac",
       "depends_on": [
         1,
         4,
@@ -146,25 +146,25 @@
       ],
       "difficulty": "EASY",
       "n": 7,
-      "note": null,
+      "note": "CI lab/** filter; skills commit via lab stage (+ web/data/lab.json), synthesis kind, My opinion:; ROADMAP P8; readme Sera section; pronoun-free 'not a quant'. Earlier 0ffa1b2 entry was an error, superseded",
       "package": ".github`, `.claude/skills`, `docs`, `web",
       "plan": ".workflows/plan/sera-lab-site/phase-7.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T15:30:57+00:00",
       "satisfies": [
         "R3",
         "R5",
         "R6",
         "R7"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-MO5N",
       "title": "Keep it current: CI, skills, docs"
     }
   ],
   "plan": "/home/miftah/.worktrees/seer/sera-lab-site/.workflows/orchestration/sera-lab-site/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-lab-site",
-  "updated": "2026-10-04T15:24:26+00:00",
+  "updated": "2026-10-04T15:30:57+00:00",
   "verified_at": "2026-10-04T15:14:04+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-lab-site"
 }

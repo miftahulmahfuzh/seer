@@ -120,7 +120,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "a305edbfb2fa741c9f7a04228d8ab0ffd2bce6a3",
       "depends_on": [
         4,
         5,
@@ -128,23 +128,23 @@
       ],
       "difficulty": "NORMAL",
       "n": 7,
-      "note": null,
+      "note": "Veto step in nightly.yml + docs; smoke 8 allow/2 veto/0 failed, 45s; company-news timing label corrected to measured (spacing passed during LLM call) per rung 6",
       "package": "repo",
       "plan": ".workflows/plan/strategy-c-news-veto/phase-7.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T11:37:30+00:00",
       "satisfies": [
         "R3",
         "R5"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-ZEOM",
       "title": "Ship: Veto workflow step, live smoke, docs"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/strategy-c-news-veto/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "strategy-c-news-veto",
-  "updated": "2026-10-04T11:25:30+00:00",
+  "updated": "2026-10-04T11:37:30+00:00",
   "verified_at": "2026-10-04T11:20:38+00:00",
   "worktree": "/home/miftah/.worktrees/seer/strategy-c-news-veto"
 }

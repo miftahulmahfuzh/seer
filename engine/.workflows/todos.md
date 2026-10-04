@@ -2,8 +2,8 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 09:55:00
-**Total Active Tasks**: 4
+**Last Updated**: 2026-10-04 10:05:00
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
@@ -13,8 +13,8 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 3
-- Completed: 44
+- Blocked: 2
+- Completed: 45
 
 ---
 
@@ -39,21 +39,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
-- [ ] **P1-ENG-1BVI** Phase 4: Book night core
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `paper/book.py` (C3); tests proving `decide_book`+`settle_book` looped equal `run_book` for `MONTHLY_HOLD` with FACTOR and TIMING on synthetic markets (incl. dividends and a forced close), split on a held position and on pending targets, no look-ahead. Does not touch: `sim/*` (uses phase 2's `apply_book_split`), runners, DB. Exit: equality tests green; purity green.
-  - **Status**: open
-  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 4 of 13)
-  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
-  - **Depends on**: P1-ENG-N6UC, P1-ENG-HCYN
-  - **Plan**: `.workflows/plan/P1-ENG-1BVI.md`
-
 - [ ] **P1-ENG-AYRQ** Phase 6: Paper store (load and save state)
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `paper/store.py` (C4, the API listed there; `MARKET_WINDOW_DAYS = 550` is the only window constant in the set); `backtest/io.read_bars_frame(conn, *, since=None)` (default unchanged); PG round-trip tests for every engine's state, targets, fills, trades, snapshots, splits and dividends queries; windowed market load. Does not touch: commands, workflows, web, runners. Exit: save→load round trips are exact (Decimal, dates, ordering); `load_market` unchanged.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 6 of 13)
   - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
   - **Depends on**: P1-ENG-N6UC, P1-ENG-79OL, P1-ENG-1BVI
@@ -90,6 +80,24 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-1BVI** Phase 4: Book night core
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `paper/book.py` (C3); tests proving `decide_book`+`settle_book` looped equal `run_book` for `MONTHLY_HOLD` with FACTOR and TIMING on synthetic markets (incl. dividends and a forced close), split on a held position and on pending targets, no look-ahead. Does not touch: `sim/*` (uses phase 2's `apply_book_split`), runners, DB. Exit: equality tests green; purity green.
+  - **Status**: completed
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 4 of 13)
+  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark)
+  - **Depends on**: P1-ENG-N6UC, P1-ENG-HCYN
+  - **Plan**: `.workflows/plan/P1-ENG-1BVI.md`
+  - **Completed**: 2026-10-04 10:05
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/paper/book.py, engine/tests/test_paper_book.py
+  - **Decided**:
+    - Step 3 task creation -> skipped; phase 1's session already minted all 13 TaskIDs (phase 4 = P1-ENG-1BVI) (re-run detection per /implement Step 3)
+    - readme-updater -> skip; engine/package_readme.md is owned by phase 13 only (rung 1: plan invariant 8)
+  - **Verified**: focused 29 passed; purity 9 passed; full engine suite 1865 passed, 0 skipped; web vitest 44 passed
+  - **Next**: P1-ENG-AYRQ (phase 6) unblocked: P1-ENG-N6UC, P1-ENG-79OL and P1-ENG-1BVI all complete (completion-handler)
+
 - [x] **P1-ENG-79OL** Phase 3: Bracket and benchmark night cores
   - **Difficulty**: HARD
   - **Type**: Feature

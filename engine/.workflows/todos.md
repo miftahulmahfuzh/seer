@@ -2,8 +2,8 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 09:58:51
-**Total Active Tasks**: 2
+**Last Updated**: 2026-10-04 10:06:03
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
@@ -13,8 +13,8 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 46
+- Blocked: 0
+- Completed: 47
 
 ---
 
@@ -39,21 +39,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
-- [ ] **P1-ENG-0ZLD** Phase 7: `paper` command and workflow step
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `commands/paper.py` (calls only phase 1's roster API and phase 6's store API; the window is `store.market_window_since`; catch-up uses `night_view` for bars/FX and undoes later splits on dividends too; passes an applied SPY split to `step_benchmark(split=)`); `runs.py` paper status helpers; `.github/workflows/nightly.yml` "Paper" step after "Nightly"; PG integration tests with synthetic bars: init (paper_start = session_date, day-0 snapshot), ≥ 5 consecutive nights, idempotent re-run writes nothing, a failure leaves no partial state and marks `paper_status = failed`, failed/missing bars run → no paper step, no look-ahead (changing bars dated ≥ S leaves S's decisions unchanged), frozen-spec mismatch refused (`SpecMismatch`). Does not touch: `nightly.py`, `paper/*` cores and store (only calls them), `demo.py`, the job's `timeout-minutes`, web, docs. Exit: tests green; `--dry-run` writes nothing.
-  - **Status**: open
-  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 7 of 13)
-  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark); R3 — Replay check (D7) + design §8 failure handling
-  - **Depends on**: P1-ENG-X99Y, P1-ENG-AYRQ
-  - **Plan**: `.workflows/plan/P1-ENG-0ZLD.md`
-
 - [ ] **P1-ENG-WBI7** Phase 8: `paper_check` replay check
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `paper/replay.py` (pure comparison), `commands/paper_check.py`; tests: after ≥ 5 nights of `paper` on synthetic data the check passes; a tampered snapshot/trade/position fails; a split on a held symbol reports "split-affected" without failing; `--require-sessions`. Does not touch: `commands/paper.py`, workflows (phase 13 adds the step), web. Exit: tests green.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 8 of 13)
   - **Satisfies**: R3 — Replay check (D7) + design §8 failure handling
   - **Depends on**: P1-ENG-0ZLD
@@ -70,6 +60,21 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-0ZLD** Phase 7: `paper` command and workflow step
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `commands/paper.py` (calls only phase 1's roster API and phase 6's store API; the window is `store.market_window_since`; catch-up uses `night_view` for bars/FX and undoes later splits on dividends too; passes an applied SPY split to `step_benchmark(split=)`); `runs.py` paper status helpers; `.github/workflows/nightly.yml` "Paper" step after "Nightly"; PG integration tests with synthetic bars: init (paper_start = session_date, day-0 snapshot), ≥ 5 consecutive nights, idempotent re-run writes nothing, a failure leaves no partial state and marks `paper_status = failed`, failed/missing bars run → no paper step, no look-ahead (changing bars dated ≥ S leaves S's decisions unchanged), frozen-spec mismatch refused (`SpecMismatch`). Does not touch: `nightly.py`, `paper/*` cores and store (only calls them), `demo.py`, the job's `timeout-minutes`, web, docs. Exit: tests green; `--dry-run` writes nothing.
+  - **Status**: completed
+  - **Plan Set**: `PAPER_TRADING_SHIP_PLAN.md` (phase 7 of 13)
+  - **Satisfies**: R1 — Engine paper step: pure core + impure command, per roster strategy per new session (state, splits, settle, dividends, force-close, decide, persist, SPY benchmark); R3 — Replay check (D7) + design §8 failure handling
+  - **Depends on**: P1-ENG-X99Y, P1-ENG-AYRQ
+  - **Plan**: `.workflows/plan/P1-ENG-0ZLD.md`
+  - **Completed**: 2026-10-04 10:06
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/commands/paper.py, engine/src/seer_engine/runs.py, engine/tests/test_paper_command.py, engine/tests/test_runs.py, .github/workflows/nightly.yml
+  - **Verified**: focused 25 passed; full engine suite 1908 passed, 0 skipped; web vitest 65 passed; nightly.yml parses with Paper step after Nightly
+  - **Next**: P1-ENG-WBI7 (phase 8) unblocked (completion-handler)
+
 - [x] **P1-ENG-AYRQ** Phase 6: Paper store (load and save state)
   - **Difficulty**: HARD
   - **Type**: Feature

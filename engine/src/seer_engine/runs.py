@@ -5,6 +5,9 @@ None of these functions commit; the caller's db.transaction() decides.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import date
+
 import psycopg
 
 from seer_engine.dates import RunDates
@@ -60,3 +63,74 @@ def finish_run(conn: psycopg.Connection, run_id: int) -> None:
 def fail_run(conn: psycopg.Connection, run_id: int, error: str) -> None:
     """Mark the run failed with ``error`` (secrets redacted, cut to 2000 characters)."""
     _set_final(conn, run_id, "failed", redact(error)[:MAX_ERROR_CHARS])
+
+
+@dataclass(frozen=True, slots=True)
+class RealRun:
+    """The real (non-demo) ``runs`` row of one session, as the paper step reads it."""
+
+    id: int
+    status: str
+    data_date: date | None
+    session_date: date
+    paper_status: str | None
+
+
+def real_run(conn: psycopg.Connection, session_date: date) -> RealRun | None:
+    """The real run row for ``session_date``, or None when there is none (demo rows never count)."""
+    row = conn.execute(
+        """
+        SELECT id, status, data_date, session_date, paper_status
+        FROM runs
+        WHERE session_date = %(session_date)s AND NOT is_demo
+        """,
+        {"session_date": session_date},
+    ).fetchone()
+    if row is None:
+        return None
+    return RealRun(
+        id=int(row[0]),
+        status=str(row[1]),
+        data_date=row[2],
+        session_date=row[3],
+        paper_status=None if row[4] is None else str(row[4]),
+    )
+
+
+_PAPER_RUNNING_SQL = """
+    UPDATE runs
+    SET paper_status = 'running', paper_error = NULL, paper_finished_at = NULL
+    WHERE id = %(id)s AND NOT is_demo
+"""
+
+_PAPER_FINAL_SQL = """
+    UPDATE runs
+    SET paper_status = %(status)s, paper_error = %(error)s, paper_finished_at = clock_timestamp()
+    WHERE id = %(id)s AND NOT is_demo
+"""
+
+
+def _set_paper(conn: psycopg.Connection, sql: str, params: dict[str, object]) -> None:
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        if cur.rowcount != 1:
+            raise LookupError(f"no real run with id {params['id']}")
+
+
+def start_paper(conn: psycopg.Connection, run_id: int) -> None:
+    """Mark the run's paper step running (error and finished_at cleared)."""
+    _set_paper(conn, _PAPER_RUNNING_SQL, {"id": run_id})
+
+
+def finish_paper(conn: psycopg.Connection, run_id: int) -> None:
+    """Mark the run's paper step successful."""
+    _set_paper(conn, _PAPER_FINAL_SQL, {"id": run_id, "status": "success", "error": None})
+
+
+def fail_paper(conn: psycopg.Connection, run_id: int, error: str) -> None:
+    """Mark the run's paper step failed with ``error`` (secrets redacted, cut to 2000 characters)."""
+    _set_paper(
+        conn,
+        _PAPER_FINAL_SQL,
+        {"id": run_id, "status": "failed", "error": redact(error)[:MAX_ERROR_CHARS]},
+    )

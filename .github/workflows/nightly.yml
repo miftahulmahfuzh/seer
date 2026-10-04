@@ -63,3 +63,9 @@ jobs:
           flags=(-v)
           if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
           python -m seer_engine "${flags[@]}" nightly
+
+      - name: Paper
+        run: |
+          flags=(-v)
+          if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
+          python -m seer_engine "${flags[@]}" paper

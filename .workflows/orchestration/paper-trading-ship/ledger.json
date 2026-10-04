@@ -40,21 +40,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "66ca651",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 3,
-      "note": null,
+      "note": "paper/bracket.py + paper/benchmark.py as planned; equality vs run_backtest/buy_and_hold green; todos/index ticks left uncommitted (shared with phase 5 edits)",
       "package": "engine/paper",
       "plan": ".workflows/plan/paper-trading-ship/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T02:51:54+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-79OL",
       "title": "Bracket and benchmark night cores"
     },
     {
@@ -69,31 +69,31 @@
       "note": null,
       "package": "engine/paper",
       "plan": ".workflows/plan/paper-trading-ship/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T02:52:00+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "spawned",
+      "status": "running",
       "task_id": null,
       "title": "Book night core"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "249adda",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 5,
-      "note": null,
+      "note": "drift: test_universe_queries appended at EOF",
       "package": "engine",
       "plan": ".workflows/plan/paper-trading-ship/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T02:52:04+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-X99Y",
       "title": "Dividends and held-symbol bars in `nightly"
     },
     {
@@ -168,11 +168,11 @@
       "note": null,
       "package": "engine",
       "plan": ".workflows/plan/paper-trading-ship/phase-9.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T02:52:00+00:00",
       "satisfies": [
         "R5"
       ],
-      "status": "spawned",
+      "status": "running",
       "task_id": null,
       "title": "explain`: optional LLM explanations"
     },
@@ -187,12 +187,12 @@
       "note": null,
       "package": "web/lib",
       "plan": ".workflows/plan/paper-trading-ship/phase-10.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T02:52:00+00:00",
       "satisfies": [
         "R4",
         "R2"
       ],
-      "status": "spawned",
+      "status": "running",
       "task_id": null,
       "title": "Web data layer, monthly math, demo seed"
     },
@@ -259,7 +259,7 @@
   "plan": "/home/miftah/.worktrees/seer/paper-trading-ship/.workflows/orchestration/paper-trading-ship/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "paper-trading-ship",
-  "updated": "2026-10-04T02:42:59+00:00",
-  "verified_at": "2026-10-04T02:37:21+00:00",
+  "updated": "2026-10-04T02:52:04+00:00",
+  "verified_at": "2026-10-04T02:51:54+00:00",
   "worktree": "/home/miftah/.worktrees/seer/paper-trading-ship"
 }

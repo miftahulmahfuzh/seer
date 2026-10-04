@@ -6,8 +6,9 @@ from decimal import Decimal
 import pytest
 from psycopg.rows import tuple_row
 
-from seer_engine import bars, db, universe
+from seer_engine import bars, db, dividends, universe
 from seer_engine.commands import nightly
+from seer_engine.dividends import Dividend
 from seer_engine.massive import MassiveError
 from seer_engine.splits import Split
 
@@ -28,12 +29,16 @@ def fx_ok():
 
 
 class FakeMassive:
-    """grouped_data: {date: {symbol: (o, h, l, c, v)}}; splits_data: {date: [Split]}."""
+    """grouped_data: {date: {symbol: (o, h, l, c, v)}}; splits_data: {date: [Split]};
+    dividends_data: {date: [Dividend]} (one per Massive row, not summed); dividends_fail raises
+    from dividends() only."""
 
-    def __init__(self, grouped_data=None, splits_data=None, fail=None):
+    def __init__(self, grouped_data=None, splits_data=None, fail=None, dividends_data=None, dividends_fail=None):
         self.grouped_data = grouped_data or {}
         self.splits_data = splits_data or {}
+        self.dividends_data = dividends_data or {}
         self.fail = fail
+        self.dividends_fail = dividends_fail
         self.calls = []
 
     def grouped(self, d):
@@ -48,6 +53,12 @@ class FakeMassive:
     def splits(self, d):
         self.calls.append(("splits", d))
         return list(self.splits_data.get(d, []))
+
+    def dividends(self, d):
+        self.calls.append(("dividends", d))
+        if self.dividends_fail is not None:
+            raise self.dividends_fail
+        return list(self.dividends_data.get(d, []))
 
 
 def day(symbols=UNIVERSE, price=100.0, extra=()):
@@ -88,6 +99,7 @@ def bars_on(conn, d):
 
 CHECKSUM_TABLES = {
     "bars": "x.symbol, x.date",
+    "dividends": "x.symbol, x.ex_date",
     "fx_rates": "x.date",
     "runs": "x.id",
     "split_adjustments": "x.symbol, x.execution_date",
@@ -116,7 +128,7 @@ def test_friday_run_writes_bars_fx_and_success_run(pg, fixed_universe):
     assert (status, data_date, session_date, error) == ("success", D_FRI, MON_AFTER, None)
     assert sorted(r[0] for r in bars_on(pg, D_FRI)) == sorted(UNIVERSE)  # ZZZZ not stored
     assert q(pg, "SELECT date, usd_idr FROM fx_rates") == [FX]
-    assert fake.calls == [("grouped", D_FRI), ("splits", D_FRI)]
+    assert fake.calls == [("grouped", D_FRI), ("splits", D_FRI), ("dividends", D_FRI)]
 
 
 def test_same_now_twice_leaves_identical_tables(pg, fixed_universe):
@@ -222,11 +234,15 @@ def test_empty_universe_fails(pg, monkeypatch):
 def test_dry_run_writes_nothing(pg, fixed_universe):
     seed(pg, D_THU)
     before = checksums(pg)
-    fake = FakeMassive({D_FRI: day()}, {D_FRI: [Split("NVDA", D_FRI, Decimal(1), Decimal(10))]})
+    fake = FakeMassive(
+        {D_FRI: day()},
+        {D_FRI: [Split("NVDA", D_FRI, Decimal(1), Decimal(10))]},
+        dividends_data={D_FRI: [Dividend("SPY", D_FRI, Decimal("1.888834"))]},
+    )
     assert go(pg, fake, dry_run=True) == 0
     assert checksums(pg) == before
     assert real_runs(pg) == []
-    assert fake.calls == [("grouped", D_FRI), ("splits", D_FRI)]
+    assert fake.calls == [("grouped", D_FRI), ("splits", D_FRI), ("dividends", D_FRI)]
 
 
 def test_dry_run_failure_writes_nothing(pg, fixed_universe):
@@ -295,6 +311,142 @@ def test_bars_already_current_still_records_fx_and_finishes(pg, fixed_universe):
     assert fake.calls == []
     assert real_runs(pg)[0][1] == "success"
     assert q(pg, "SELECT date FROM fx_rates") == [(D_FRI,)]
+
+
+# ---- dividends and paper-held symbols ----
+
+def stored_dividends(conn):
+    return q(conn, "SELECT symbol, ex_date, amount FROM dividends ORDER BY symbol, ex_date")
+
+
+def hold(conn, symbol, *, strategy="T1", target_session=None):
+    """Paper state holding `symbol`: a book position, or a book target for `target_session`."""
+    with db.transaction(conn, False):
+        conn.execute(
+            "INSERT INTO strategies (id, name, sub, icon) VALUES (%s, %s, '', 'sigma') ON CONFLICT (id) DO NOTHING",
+            (strategy, strategy),
+        )
+        if target_session is None:
+            conn.execute(
+                "INSERT INTO book_positions (strategy_id, symbol, shares, mark, entry_date, entry_price, "
+                "days_held, cost_usd, income_usd) VALUES (%s, %s, 10, 50, %s, 50, 1, 0, 0)",
+                (strategy, symbol, D_THU),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO book_targets (strategy_id, session_date, rank, symbol, weight, last_price) "
+                "VALUES (%s, %s, 1, %s, 1, 50)",
+                (strategy, target_session, symbol),
+            )
+
+
+GONE_BAR = ("GONE", (50.0, 51.0, 49.0, 50.5, 1000.0))
+
+
+def test_dividends_for_tracked_symbols_are_summed_and_written_with_the_bars(pg, fixed_universe):
+    seed(pg, D_THU)
+    fake = FakeMassive(
+        {D_FRI: day()},
+        dividends_data={
+            D_FRI: [
+                Dividend("SPY", D_FRI, Decimal("1.888834")),
+                Dividend("AAPL", D_FRI, Decimal("0.26")),
+                Dividend("AAPL", D_FRI, Decimal("0.01")),  # an SC row on the same ex-date
+                Dividend("ZZZZ", D_FRI, Decimal("0.5")),  # not tracked: dropped
+            ]
+        },
+    )
+    assert go(pg, fake) == 0
+    assert stored_dividends(pg) == [("AAPL", D_FRI, Decimal("0.270000")), ("SPY", D_FRI, Decimal("1.888834"))]
+    assert real_runs(pg)[0][1] == "success"
+    before = checksums(pg)
+    assert go(pg, fake) == 0  # same session again: no-op
+    assert checksums(pg) == before
+
+
+def test_dividends_fetched_for_every_session_of_a_gap(pg, fixed_universe):
+    seed(pg, D0)
+    fake = FakeMassive(
+        {D_WED: day(), D_THU: day(), D_FRI: day()},
+        dividends_data={D_THU: [Dividend("MSFT", D_THU, Decimal("0.83"))]},
+    )
+    assert go(pg, fake) == 0
+    assert [c for c in fake.calls if c[0] == "dividends"] == [("dividends", D_WED), ("dividends", D_THU), ("dividends", D_FRI)]
+    assert stored_dividends(pg) == [("MSFT", D_THU, Decimal("0.830000"))]
+
+
+def test_dividend_inside_gap_before_a_split_is_stored_in_post_split_units(pg, fixed_universe):
+    others = [s for s in UNIVERSE if s != "NVDA"]
+    seed(pg, D0, symbols=others)
+    with db.transaction(pg, False):
+        bars.upsert_bars(pg, [bars.make_bar("NVDA", D0, 1200, 1200, 1200, 1200, 1000)])
+        dividends.upsert_dividends(pg, [Dividend("NVDA", D0, Decimal("1.000000"))])
+    nvda = ("NVDA", (120.0, 121.0, 119.0, 120.5, 10_000.0))
+    fake = FakeMassive(
+        {D_WED: day(extra=[nvda]), D_THU: day(extra=[nvda]), D_FRI: day(extra=[nvda])},
+        {D_THU: [Split("NVDA", D_THU, Decimal(1), Decimal(10))]},
+        dividends_data={D_WED: [Dividend("NVDA", D_WED, Decimal("1.0"))]},
+    )
+    assert go(pg, fake) == 0
+    assert stored_dividends(pg) == [
+        ("NVDA", D0, Decimal("0.100000")),  # stored before: rewritten by apply_splits
+        ("NVDA", D_WED, Decimal("0.100000")),  # fetched in the gap: adjusted in memory, not twice
+    ]
+
+
+def test_paper_held_symbol_outside_universe_gets_bars_and_dividends(pg, fixed_universe):
+    seed(pg, D_THU)
+    hold(pg, "GONE")
+    hold(pg, "SOON", target_session=D_FRI)  # decided for the session being fetched
+    hold(pg, "PAST", target_session=D_THU)  # an executed decision: not needed any more
+    fake = FakeMassive(
+        {D_FRI: day(extra=[GONE_BAR, ("SOON", (20.0, 21.0, 19.0, 20.5, 500.0)), ("PAST", (9.0, 9.0, 9.0, 9.0, 1.0))])},
+        dividends_data={D_FRI: [Dividend("GONE", D_FRI, Decimal("0.4")), Dividend("PAST", D_FRI, Decimal("0.1"))]},
+    )
+    assert go(pg, fake) == 0
+    stored = {r[0] for r in bars_on(pg, D_FRI)}
+    assert stored == set(UNIVERSE) | {"GONE", "SOON"}  # not PAST, not ZZZZ
+    assert stored_dividends(pg) == [("GONE", D_FRI, Decimal("0.400000"))]
+
+
+def test_absent_paper_symbol_warns_and_does_not_count_toward_coverage(pg, fixed_universe, caplog):
+    seed(pg, D_THU)
+    for s in ("GONE1", "GONE2", "GONE3"):
+        hold(pg, s)
+    rows = day([s for s in UNIVERSE if s != "AVGO"])  # universe 9/10 = 90%; 3 held symbols all absent
+    caplog.set_level(logging.WARNING)
+    assert go(pg, FakeMassive({D_FRI: rows})) == 0
+    assert "paper-held symbol(s) outside the universe absent" in caplog.text
+    assert "GONE1, GONE2, GONE3" in caplog.text
+    assert real_runs(pg)[0][1] == "success"
+
+
+def test_dividends_failure_marks_run_failed_and_writes_nothing(pg, fixed_universe):
+    seed(pg, D_THU)
+    hold(pg, "GONE")
+    before = checksums(pg)
+    fake = FakeMassive({D_FRI: day(extra=[GONE_BAR])}, dividends_fail=MassiveError("dividends 2026-10-02: status 'ERROR'"))
+    assert go(pg, fake) == 1
+    [(_, status, _, _, error)] = real_runs(pg)
+    assert status == "failed" and "dividends" in error
+    assert bars_on(pg, D_FRI) == []
+    assert stored_dividends(pg) == []
+    assert q(pg, "SELECT count(*) FROM fx_rates") == [(0,)]
+    after = checksums(pg)
+    assert {k: v for k, v in after.items() if k != "runs"} == {k: v for k, v in before.items() if k != "runs"}
+
+
+def test_fx_failure_after_dividends_fetched_writes_no_dividends(pg, fixed_universe):
+    seed(pg, D_THU)
+
+    def fx_down():
+        raise RuntimeError("frankfurter down")
+
+    fake = FakeMassive({D_FRI: day()}, dividends_data={D_FRI: [Dividend("SPY", D_FRI, Decimal("1.888834"))]})
+    assert nightly.execute(pg, now=FRI_NIGHT, client=fake, fetch_fx=fx_down) == 1
+    assert real_runs(pg)[0][1] == "failed"
+    assert stored_dividends(pg) == []
+    assert bars_on(pg, D_FRI) == []
 
 
 # ---- CLI surface ----

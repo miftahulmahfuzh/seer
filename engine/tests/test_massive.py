@@ -150,9 +150,10 @@ def test_splits_parses_and_follows_next_url():
 
 def test_key_never_logged(caplog):
     caplog.set_level(logging.DEBUG)
-    c, _ = make_client(FakeHttp([GROUPED_OK, {"status": "OK", "results": []}]))
+    c, _ = make_client(FakeHttp([GROUPED_OK, {"status": "OK", "results": []}, {"status": "OK", "results": []}]))
     c.grouped(D)
     c.splits(D)
+    c.dividends(D)
     assert KEY not in caplog.text
     assert "massive GET" in caplog.text
 
@@ -160,3 +161,74 @@ def test_key_never_logged(caplog):
 def test_empty_key_rejected():
     with pytest.raises(ValueError):
         Client("")
+
+
+D_EX = date(2026, 9, 18)
+
+
+def div_row(ticker, amount, kind="CD", currency="USD", ex="2026-09-18", **extra):
+    return {
+        "ticker": ticker,
+        "cash_amount": amount,
+        "currency": currency,
+        "dividend_type": kind,
+        "ex_dividend_date": ex,
+        **extra,
+    }
+
+
+def test_dividends_keep_usd_cash_rows_and_follow_next_url():
+    page1 = {
+        "status": "OK",
+        "results": [
+            div_row("SPY", 1.888834, id="E1"),
+            div_row("XYZ", 0.5, kind="LT", id="E2"),
+            div_row("ABC", 0.3, currency="CAD", id="E3"),
+            div_row("SPY", 1.888834, id="E1"),  # same Massive id again: kept once
+        ],
+        "next_url": "https://api.massive.com/v3/reference/dividends?cursor=abc",
+    }
+    page2 = {
+        "status": "OK",
+        "results": [
+            div_row("AAPL", 0.26, id="E4"),
+            div_row("AAPL", 0.01, kind="SC", id="E5"),
+            {"ticker": "BROKEN", "dividend_type": "CD", "currency": "USD", "ex_dividend_date": "2026-09-18"},
+            div_row("LATER", 0.1, ex="2026-09-19", id="E6"),
+        ],
+    }
+    http_ = FakeHttp([page1, page2])
+    c, clock = make_client(http_)
+    out = c.dividends(D_EX)
+    assert [(x.symbol, x.ex_date, x.amount) for x in out] == [
+        ("SPY", D_EX, Decimal("1.888834")),
+        ("AAPL", D_EX, Decimal("0.26")),
+        ("AAPL", D_EX, Decimal("0.01")),
+    ]
+    assert http_.requests[0][0] == "https://api.massive.com/v3/reference/dividends"
+    assert http_.requests[0][1] == {"ex_dividend_date": "2026-09-18", "limit": 1000, "apiKey": KEY}
+    assert http_.requests[0][2] == {"retries": massive.RETRIES, "backoff": massive.BACKOFF}
+    assert http_.requests[1][0] == "https://api.massive.com/v3/reference/dividends?cursor=abc"
+    assert http_.requests[1][1] == {"apiKey": KEY}
+    assert clock.sleeps == [pytest.approx(massive.MIN_INTERVAL)]
+
+
+def test_dividends_without_results_is_empty():
+    c, _ = make_client(FakeHttp([{"status": "OK"}]))
+    assert c.dividends(D_EX) == []
+
+
+def test_dividends_bad_status_raises():
+    c, _ = make_client(FakeHttp([{"status": "NOT_AUTHORIZED", "message": "plan does not include dividends"}]))
+    with pytest.raises(MassiveError, match="dividends 2026-09-18"):
+        c.dividends(D_EX)
+
+
+def test_dividends_page_limit(monkeypatch):
+    monkeypatch.setattr(massive, "MAX_PAGES", 2)
+    page = {"status": "OK", "results": [], "next_url": "https://api.massive.com/v3/reference/dividends?cursor=x"}
+    http_ = FakeHttp([page, page])
+    c, _ = make_client(http_)
+    with pytest.raises(MassiveError, match="more than 2 pages"):
+        c.dividends(D_EX)
+    assert len(http_.requests) == 2

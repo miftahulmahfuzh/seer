@@ -2,10 +2,11 @@
 
 Design: [docs/plans/2026-10-03-seer-design.md](plans/2026-10-03-seer-design.md)
 
-v0.1.0 goal: **Strategy A forward paper trading live every night, visible on the phone.**
-Real money is out of scope until the go-live checklist is fully green.
+v0.1.0 goal: **Seer's frozen paper roster (SPY champion, A, F4, F1) trading on paper every night,
+shown month by month next to SPY, on the phone.** Paper only (owner option (b), 2026-10-04): real
+money is out of scope; design §1 is unchanged, and no strategy has passed a backtest gate.
 
-## P0 — Foundations · mostly done 2026-10-03 (CI still open)
+## P0 — Foundations · done 2026-10-04 (CI: `ruff check` + engine pytest, `tsc --noEmit` + web vitest on every push)
 - Repo layout: `web/` (Next.js), `engine/` (Python), `.github/workflows/`
 - `.gitignore`, `.env.example`; rotate any secrets that were ever exposed
 - Neon schema + migrations (tables from design §7)
@@ -70,18 +71,22 @@ Real money is out of scope until the go-live checklist is fully green.
   - a §1 discussion, with the frontier as the evidence of what drawdown was reachable at a SPY-beating return;
   - new ideas appended to the registry under D6 (each committed before its dev run, every try reported) in a new handover; the answers to the owner-input questions (ETFs, fractional shares, market-on-open, fees, leverage, T-bills) may make more candidates eligible
 
-## P4 — Nightly forward paper trading
-- GitHub Actions cron ~06:00 WIB: fetch → settle → pick → snapshot → run log
-- LLM explanation per pick (GLM via z.ai); failure-tolerant
-- Stale-data and failed-run handling
-- **Done when:** 5 consecutive trading days run unattended with correct settlement
+## P4 — Nightly forward paper trading · paper-only (owner option (b), 2026-10-04); no real-money recommendations; §1 unchanged · code landed 2026-10-04; the clock starts with the first scheduled nightly after the merge ([runbook](runbooks/paper-trading.md))
+- Spec: [handover](handover/2026-10-04-paper-trading-ship.md). Plan: `PAPER_TRADING_SHIP_PLAN.md` (13 phases)
+- Roster, frozen before any result (D1, D4): `SPY` (buy and hold, dividends reinvested; the champion), `A` (`STRATEGY_A_PARAMS`, design-v0 brackets), `F4-MOM12-N20-TREND` and `F1-SPY-SMA200-M` (P7a registry, monthly-hold book rules). Each starts from 20,000,000 IDR on the same first paper day; a changed strategy gets a new id and its own clock
+- What landed: migration 003 (`paper_state`, `book_positions`, `book_targets`, `book_fills`, `book_trades`, `dividends`, roster rows with SPY as champion); pure night functions in `engine/src/seer_engine/paper/` that mirror the runner loop bodies (bracket, book, benchmark), plus a book-engine split rule; Massive dividends and held-symbol bars in `nightly`; the `paper` command (one transaction per night, idempotent per session, `runs.paper_status`); the `paper_check` replay check against `run_rules` / `buy_and_hold`; optional `explain` (LLM); nightly steps Paper → Paper check → Explain; the web: SPY-champion Today with no buys, paper labels, book positions and trades, Month by month, an honest six-row go-live checklist
+- Neon at migration 003 since 2026-10-04; a rolled-back night on real data succeeded ([runbook ship check](runbooks/paper-trading.md#ship-check--2026-10-04))
+- No look-ahead: decisions for session S read data through `prev_session(S)` only; stale data or a failed bars run means no paper step and the "do not trade" screen
+- **Done when:** 5 consecutive trading days run unattended with correct settlement, proven by `paper_check --require-sessions 5` on Neon and checked in the run logs and the app. Pending: needs 5 live sessions after the merge
 
-## P5 — Web app · done 2026-10-03 on demo data (seed: `npm run db:seed-demo`); awaiting seertrade.site DNS
+## P5 — Web app · done 2026-10-03 on demo data; live at [seertrade.site](https://seertrade.site) (Vercel Git integration: every push to `main` deploys production; domain verified 2026-10-04: `/` 307 → `/signin`, manifest and auth providers 200); paper views land with P4
 - Implement the Claude Design output: Sign-in, Today, Positions, Leaderboard, History
 - Auth.js, Google only, single `ALLOWED_EMAIL`
 - PWA manifest + apple-touch-icon; Lucide icon-only buttons
-- Deploy to Vercel, connect seertrade.site
-- **Done when:** usable from the XS Max home screen; picks copyable into Gotrade
+- Deploy to Vercel, connect seertrade.site: done. The paper-trading build was proven as a preview deploy on 2026-10-04 and reaches production with the merge
+- Paper-only additions (P4 set): Today shows "SPY buy-and-hold is the champion; Seer recommends no buys"; research orders and positions labelled paper; Month by month on the Leaderboard; checklist row "Backtest gate passed"
+- Owner checks left ([runbook](runbooks/paper-trading.md#owner-steps)): the Google OAuth redirect URI for seertrade.site and a sign-in from the XS Max, Add to Home Screen, and the optional `LLM_*` repo secrets
+- **Done when:** usable from the XS Max home screen; picks copyable into Gotrade (for the paper-only ship: the paper views readable on the phone)
 
 ## P6 — Challengers
 - Strategy B (ML ranker), walk-forward backtest, then forward paper
@@ -89,9 +94,13 @@ Real money is out of scope until the go-live checklist is fully green.
 - Leaderboard + champion selection + go-live checklist
 - **Done when:** A, B, C each have independent paper portfolios on the leaderboard
 
-## v0.1.0 release
-P0–P5 done (P6 may trail into v0.2.0). The 3-month forward clock starts on the first
-live paper day.
+## v0.1.0 release · pending the 5-night check
+Paper-only (owner option (b), 2026-10-04): P0, P1, P2 and P5 done; P4 code landed and running on paper.
+Release when P4's "Done when" holds: ≥ 5 consecutive paper sessions, `paper_check --require-sessions 5`
+green on Neon. Then the README, then `gh release create v0.1.0`
+([release checklist](runbooks/paper-trading.md#release-checklist-v010)). P6 may trail into v0.2.0.
+The 3-month forward clock of design §1 starts on the first live paper day, but it unlocks nothing
+by itself: no roster strategy has passed a backtest gate.
 
 ## Later (v0.2+)
 - Real-trade journal: log actual Gotrade fills against Seer picks, real vs paper slippage

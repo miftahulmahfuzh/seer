@@ -46,3 +46,23 @@ def all_symbols(conn: psycopg.Connection, since: date) -> list[str]:
         {"since": since},
     ).fetchall()
     return sorted({r[0] for r in rows} | {BENCHMARK})
+
+
+def paper_symbols(conn: psycopg.Connection, d: date) -> set[str]:
+    """Symbols paper state still needs a bar for on session ``d`` (tables from migration 003).
+
+    Bracket orders that are pending or open, every open book position (book strategies and the
+    SPY benchmark holding), and book targets decided for session ``d`` or later. ``nightly`` adds
+    these to the universe set so a held symbol that left the index keeps getting bars.
+    """
+    rows = conn.execute(
+        """
+        SELECT symbol FROM orders WHERE status IN ('pending', 'open')
+        UNION
+        SELECT symbol FROM book_positions
+        UNION
+        SELECT symbol FROM book_targets WHERE session_date >= %(d)s
+        """,
+        {"d": d},
+    ).fetchall()
+    return {r[0] for r in rows}

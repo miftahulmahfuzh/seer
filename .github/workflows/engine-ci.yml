@@ -56,6 +56,10 @@ jobs:
       - name: Install engine
         run: python -m pip install -e 'engine[dev]'
 
+      - name: Lint engine
+        # Rules live in engine/pyproject.toml [tool.ruff.lint]: bugs only (E9, F minus F401).
+        run: python -m ruff check engine
+
       - name: Test engine (DB tests must run, not skip)
         shell: bash
         run: |
@@ -84,6 +88,9 @@ jobs:
 
       - name: Install web
         run: npm ci --no-audit --no-fund
+
+      - name: Typecheck web
+        run: npx tsc --noEmit
 
       - name: Test web
         run: npx vitest run

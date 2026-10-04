@@ -1,11 +1,14 @@
-"""nightly: append the newest session(s) from Massive, apply splits, record USD/IDR, write the run.
+"""nightly: append the newest session(s) from Massive, apply splits, record dividends and USD/IDR, write the run.
 
-Flow (all bars, splits, FX and the run's success land in ONE transaction):
+Flow (all bars, splits, dividends, FX and the run's success land in ONE transaction):
   1. purge demo data if a demo run exists (own transaction; rolled back under --dry-run)
   2. rd = run_dates(now); start_run -> None means this session already succeeded -> exit 0, no writes
   3. missing sessions = after SPY's latest bar .. rd.data_date (at most MAX_GAP)
-  4. fetch everything into memory (grouped daily + splits per session, latest FX); no DB writes
-  5. one transaction: apply splits to pre-existing history, upsert bars, upsert FX, finish_run
+  4. fetch everything into memory (grouped daily + splits + cash dividends per session, latest FX);
+     no DB writes. Each session's wanted set is the universe set plus the symbols paper state
+     holds or has pending; coverage is checked over the universe set only
+  5. one transaction: apply splits to pre-existing history (bars and dividends), upsert bars,
+     upsert dividends, upsert FX, finish_run
   6. any exception after start_run: rollback, fail_run(error) in its own transaction, exit 1
 """
 from __future__ import annotations
@@ -19,13 +22,14 @@ from decimal import Decimal
 
 import psycopg
 
-from seer_engine import bars, config, dates, db, demo, fx, http, massive, runs, splits, universe
+from seer_engine import bars, config, dates, db, demo, dividends, fx, http, massive, runs, splits, universe
 from seer_engine.bars import Bar
+from seer_engine.dividends import Dividend
 from seer_engine.splits import Split
 
 log = logging.getLogger(__name__)
 
-HELP = "Fetch the latest session's bars (Massive), splits and USD/IDR; write one runs row"
+HELP = "Fetch the latest session's bars (Massive), splits, cash dividends and USD/IDR; write one runs row"
 
 MAX_GAP = 30
 MIN_COVERAGE = 0.90
@@ -45,6 +49,7 @@ class Fetched:
     splits: list[Split]
     first_opens: dict[str, Decimal]
     fx_row: tuple[date, Decimal]
+    dividends: list[Dividend]
 
 
 def _parse_now(value: str) -> datetime:
@@ -152,6 +157,7 @@ def _fetch(
                 f"run `backfill --start {missing[0]}` first"
             )
         wanted = {d: set(universe.symbols_for_bars(conn, d)) for d in missing}
+        held = {d: universe.paper_symbols(conn, d) for d in missing}
     finally:
         conn.rollback()
 
@@ -167,6 +173,7 @@ def _fetch(
     bars_by_session: dict[date, list[Bar]] = {}
     first_opens: dict[str, Decimal] = {}
     fetched_splits: list[Split] = []
+    fetched_dividends: list[Dividend] = []
     for d in missing:
         got = client.grouped(d)
         want = wanted[d]
@@ -187,16 +194,30 @@ def _fetch(
                 len(absent),
                 ", ".join(absent),
             )
-        session_bars = [got[s] for s in present]
+        # Paper-held symbols outside the universe set: stored when present, never counted in the
+        # coverage above. Absent ones only warn: the paper step force-closes a position whose
+        # bars ended, as the runners do.
+        extra = held[d] - want
+        extra_present = sorted(extra & got.keys())
+        extra_absent = sorted(extra - got.keys())
+        if extra_absent:
+            log.warning(
+                "%s: %d paper-held symbol(s) outside the universe absent from grouped daily: %s",
+                d,
+                len(extra_absent),
+                ", ".join(extra_absent),
+            )
+        session_bars = [got[s] for s in sorted(set(present) | set(extra_present))]
         bars_by_session[d] = session_bars
         for b in session_bars:
             first_opens.setdefault(b.symbol, b.open)
         fetched_splits.extend(client.splits(d))
+        fetched_dividends.extend(client.dividends(d))
 
     fx_row = fetch_fx()
 
     split_symbols = {s.symbol for s in fetched_splits}
-    tracked = set().union(*wanted.values()) if wanted else set()
+    tracked = set().union(*wanted.values(), *held.values()) if missing else set()
     try:
         with_bars = splits.symbols_with_bars(conn, split_symbols - tracked)
     finally:
@@ -205,12 +226,21 @@ def _fetch(
     if fetched_splits:
         log.info("splits: %d fetched, %d relevant", len(fetched_splits), len(relevant))
 
+    dividend_symbols = tracked | {universe.BENCHMARK}
+    cash = dividends.adjust_for_splits(
+        dividends.totals(x for x in fetched_dividends if x.symbol in dividend_symbols),
+        relevant,
+    )
+    if fetched_dividends:
+        log.info("dividends: %d cash row(s) fetched, %d tracked (symbol, ex-date)", len(fetched_dividends), len(cash))
+
     return Fetched(
         sessions=list(missing),
         bars_by_session=bars_by_session,
         splits=relevant,
         first_opens=first_opens,
         fx_row=fx_row,
+        dividends=cash,
     )
 
 
@@ -229,23 +259,28 @@ def _write(
             dry_id = runs.start_run(conn, rd)
             if dry_id is not None:
                 run_id = dry_id
+        # Splits first: they rewrite pre-existing bars and dividends only. The fetched bars and
+        # dividends below are already in post-split units and must not be rewritten again.
         outcomes = splits.apply_splits(conn, f.splits, f.first_opens)
         changed = 0
         for d in f.sessions:
             changed += bars.upsert_bars(conn, f.bars_by_session[d])
+        dividends_changed = dividends.upsert_dividends(conn, f.dividends)
         fx_changed = fx.upsert_fx(conn, [f.fx_row])
         runs.finish_run(conn, run_id)
         total = sum(len(f.bars_by_session[d]) for d in f.sessions)
         applied = sum(1 for o in outcomes if o.applied)
         log.info(
             "%s %d bars (%d changed) over %d session(s), %d split(s) recorded (%d applied), "
-            "fx %s=%s (%d changed), run %s success",
+            "%d dividend(s) (%d changed), fx %s=%s (%d changed), run %s success",
             "dry-run: would write" if dry_run else "wrote",
             total,
             changed,
             len(f.sessions),
             sum(1 for o in outcomes if o.recorded),
             applied,
+            len(f.dividends),
+            dividends_changed,
             f.fx_row[0],
             f.fx_row[1],
             fx_changed,

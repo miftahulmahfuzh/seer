@@ -23,7 +23,9 @@ concurrency:
 jobs:
   nightly:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 45, not 30: nightly makes 3 Massive calls per missing session (bars, splits, dividends) at
+    # 12.5 s spacing, then Paper, Paper check and Explain run in the same job.
+    timeout-minutes: 45
     env:
       DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
       MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
@@ -63,3 +65,34 @@ jobs:
           flags=(-v)
           if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
           python -m seer_engine "${flags[@]}" nightly
+
+      - name: Paper
+        run: |
+          flags=(-v)
+          if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
+          python -m seer_engine "${flags[@]}" paper
+
+      # Replay check (D7): the stored paper state must equal a one-shot run_rules / buy_and_hold
+      # replay. Read-only. A mismatch turns the run red (GitHub emails); paper state is already
+      # committed and the next night still runs. See docs/runbooks/paper-trading.md.
+      - name: Paper check
+        id: paper_check
+        run: |
+          flags=(-v)
+          if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
+          python -m seer_engine "${flags[@]}" paper_check
+
+      # Optional LLM explanations (D9). Never fails the night: missing secrets or any LLM error
+      # leave the text NULL ("unavailable" in the app). Runs after a red Paper check too, but
+      # not after a failed Nightly or Paper.
+      - name: Explain
+        if: ${{ success() || steps.paper_check.outcome == 'failure' }}
+        continue-on-error: true
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+        run: |
+          flags=(-v)
+          if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
+          python -m seer_engine "${flags[@]}" explain

@@ -1,0 +1,12 @@
+.md, .sm {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  border: 1.5px dashed var(--ink-3);
+  border-radius: 999px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.md { height: 34px; padding: 0 13px; gap: 6px; font-size: 15px; }
+.sm { height: 24px; padding: 0 8px; gap: 4px; font-size: 12px; }

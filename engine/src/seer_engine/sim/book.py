@@ -33,6 +33,10 @@ One session, in this exact order (all money ``Decimal``; ``q`` at every product;
 Under ``V0_BOOK`` with every held symbol re-targeted and §5 brackets for new picks, this is
 ``sim.size_picks`` + ``sim.step`` exactly (the phase-3 parity test).
 
+Splits (paper trading): ``apply_book_split`` rewrites a held position and the persisted targets
+for a symbol in post-split units before the split's execution session is stepped, mirroring
+``sim.apply_split`` (exact-fraction ratio, floored shares, cash in lieu, floor-to-zero forced close).
+
 Pure: no clock, no I/O, no randomness. Floats are refused at every boundary.
 """
 
@@ -43,6 +47,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from decimal import ROUND_DOWN, ROUND_FLOOR, Decimal
+from fractions import Fraction
 from types import MappingProxyType
 from typing import Literal
 
@@ -50,6 +55,7 @@ from seer_engine import dates
 from seer_engine.prices import Bar
 from seer_engine.sim.model import q
 from seer_engine.sim.rules import OPEN_LIMIT_BAND, RESIZE_BAND, SHARE_QUANTUM, TradeRules
+from seer_engine.sim.split_adjust import _q_exact, _rescale_price, _split_ratio
 
 WEIGHT_QUANTUM = Decimal("0.000001")
 
@@ -295,6 +301,24 @@ class BookStep:
     dividends: tuple[tuple[str, Decimal], ...]
     rejected: tuple[tuple[str, RejectReason], ...]
     snapshot: BookSnapshot
+
+
+@dataclass(frozen=True, slots=True)
+class BookSplit:
+    """What ``apply_book_split`` did to one symbol on its execution session.
+
+    ``book``: the book in post-split units (``last_session`` unchanged). ``targets``: the
+    targets passed in with the symbol's prices rescaled (None when None was passed).
+    ``in_lieu``: cash paid for the fractional remainder (the whole payout on a floor-to-zero),
+    already in ``book.cash`` and in the position's ``income_usd``. ``trade``/``fills``: the
+    forced close when the position floored to zero shares, else None / ().
+    """
+
+    book: Book
+    targets: tuple[Target, ...] | None
+    in_lieu: Decimal
+    trade: Trade | None
+    fills: tuple[Fill, ...]
 
 
 def new_book(cash_usd: Decimal) -> Book:
@@ -759,3 +783,167 @@ def close_book_unpriced(
     positions = tuple(keep)
     equity, _ = _valuation(cash, positions, rules.idle_symbol)
     return Book(cash=cash, equity=equity, positions=positions, last_session=when), tuple(fills), tuple(trades)
+
+
+# --------------------------------------------------------------------------- splits
+
+_SHARE_QUANTA_PER_UNIT = Fraction(1) / Fraction(SHARE_QUANTUM)  # 10_000
+
+
+def _split_position_shares(shares: Decimal, ratio: Fraction, fractional: bool) -> tuple[Decimal, Fraction]:
+    """``shares × ratio`` floored to whole shares (or to ``SHARE_QUANTUM`` when ``fractional``),
+    and the exact remainder in post-split shares."""
+    total = Fraction(shares) * ratio
+    if fractional:
+        scaled = total * _SHARE_QUANTA_PER_UNIT
+        kept = Decimal(scaled.numerator // scaled.denominator) * SHARE_QUANTUM
+    else:
+        kept = Decimal(total.numerator // total.denominator)
+    return kept, total - Fraction(kept)
+
+
+def _rescale_optional(price: Decimal | None, ratio: Fraction) -> Decimal | None:
+    return None if price is None else _rescale_price(price, ratio)
+
+
+def _rescale_target(t: Target, ratio: Fraction) -> Target:
+    """``t`` in post-split units, weight unchanged. ValueError (from ``Target``) when 4 dp cannot
+    hold a rescaled price or the rescaled stop/take no longer bracket the reference price."""
+    return Target(
+        symbol=t.symbol,
+        weight=t.weight,
+        last=_rescale_price(t.last, ratio),
+        limit=_rescale_optional(t.limit, ratio),
+        stop=_rescale_optional(t.stop, ratio),
+        take=_rescale_optional(t.take, ratio),
+    )
+
+
+def apply_book_split(
+    book: Book,
+    symbol: str,
+    factor: Decimal,
+    session: date,
+    rules: TradeRules,
+    targets: tuple[Target, ...] | None = None,
+) -> BookSplit:
+    """Rewrite ``symbol``'s position (and its targets) in post-split units for a split executing
+    on ``session`` (mirrors ``sim.apply_split`` for the book engine).
+
+    ``factor`` is ``split_to / split_from`` (``seer_engine.splits.Split.factor``), read as an
+    exact fraction ``r``. The position's shares become ``floor(shares × r)`` (whole shares, or
+    multiples of ``SHARE_QUANTUM`` under ``rules.fractional``); mark, entry price, stop and take
+    become ``q(p / r)``; the remainder is paid as cash in lieu ``q(remainder × new mark)``, with
+    no cost, into ``cash`` and the position's ``income_usd``. A position that floors to 0 shares
+    is closed: a "forced" ``Trade`` and sell ``Fill`` dated ``session`` at the old mark, whose
+    income includes the in-lieu cash (fill ``cash_usd`` = the in-lieu cash, ``cost_usd`` 0). The
+    book's equity is recomputed; ``last_session`` is unchanged. Each target for ``symbol`` gets
+    last, limit, stop and take rescaled, weight unchanged; other targets are kept as they are.
+    Nothing references ``symbol``: the book and targets come back as the same objects.
+
+    Call it after ``last_session``'s step and before stepping ``session``, once per applied split.
+    TypeError on a wrong type (a float factor included); ValueError when ``factor`` is not a split
+    ratio, ``rules.engine`` is not "book", ``session`` is not an NYSE session after
+    ``book.last_session``, or a rescaled price cannot be held at 4 dp.
+    """
+    if not isinstance(book, Book):
+        raise TypeError(f"book must be a Book, got {type(book).__name__}")
+    if not isinstance(symbol, str):
+        raise TypeError(f"symbol must be a str, got {type(symbol).__name__}")
+    if not symbol:
+        raise ValueError("empty symbol")
+    ratio = _split_ratio(factor)
+    _date("session", session)
+    if not dates.is_session(session):
+        raise ValueError(f"{session} is not an NYSE session")
+    if book.last_session is not None and session <= book.last_session:
+        raise ValueError(f"split session {session} must be after the last session stepped ({book.last_session})")
+    if not isinstance(rules, TradeRules):
+        raise TypeError(f"rules must be a TradeRules, got {type(rules).__name__}")
+    if rules.engine != "book":
+        raise ValueError(f"apply_book_split runs engine 'book' rules only, got {rules.engine!r} ({rules.id})")
+    if targets is not None:
+        if not isinstance(targets, tuple):
+            raise TypeError(f"targets must be a tuple or None, got {type(targets).__name__}")
+        for t in targets:
+            if not isinstance(t, Target):
+                raise TypeError(f"targets must hold Target values, got {type(t).__name__}")
+
+    new_targets = targets
+    if targets is not None and any(t.symbol == symbol for t in targets):
+        new_targets = tuple(_rescale_target(t, ratio) if t.symbol == symbol else t for t in targets)
+
+    p = book.position(symbol)
+    if p is None:
+        return BookSplit(book=book, targets=new_targets, in_lieu=_ZERO, trade=None, fills=())
+
+    mark = _rescale_price(p.mark, ratio)
+    if mark <= 0:
+        raise ValueError(f"{symbol}: a split of ratio {ratio} leaves a mark ({p.mark} -> {mark}) that 4 dp cannot hold")
+    shares, remainder = _split_position_shares(p.shares, ratio, rules.fractional)
+    in_lieu = _q_exact(remainder * Fraction(mark))
+    cash = book.cash + in_lieu
+    income = p.income_usd + in_lieu
+
+    trade: Trade | None = None
+    fills: tuple[Fill, ...] = ()
+    if shares <= 0:
+        exit_price = p.mark
+        fills = (
+            Fill(
+                session_date=session,
+                symbol=symbol,
+                side="sell",
+                shares=p.shares,
+                price=exit_price,
+                cash_usd=in_lieu,
+                cost_usd=_ZERO,
+                reason="forced",
+            ),
+        )
+        trade = Trade(
+            symbol=symbol,
+            entry_date=p.entry_date,
+            exit_date=session,
+            entry_price=p.entry_price,
+            exit_price=exit_price,
+            days_held=p.days_held,
+            cost_usd=p.cost_usd,
+            income_usd=income,
+            pnl_usd=income - p.cost_usd,
+            exit_reason="forced",
+            idle=symbol == rules.idle_symbol,
+        )
+        positions = tuple(x for x in book.positions if x.symbol != symbol)
+    else:
+        entry_price = _rescale_price(p.entry_price, ratio)
+        stop = _rescale_optional(p.stop, ratio)
+        take = _rescale_optional(p.take, ratio)
+        if (
+            entry_price <= 0
+            or (stop is not None and stop <= 0)
+            or (take is not None and take <= 0)
+            or (stop is not None and take is not None and stop >= take)
+        ):
+            raise ValueError(
+                f"{symbol}: a split of ratio {ratio} leaves prices that 4 dp cannot hold "
+                f"(mark {mark}, entry {entry_price}, stop {stop}, take {take})"
+            )
+        adjusted = replace(
+            p,
+            shares=shares,
+            mark=mark,
+            entry_price=entry_price,
+            stop=stop,
+            take=take,
+            income_usd=income,
+        )
+        positions = tuple(adjusted if x.symbol == symbol else x for x in book.positions)
+    equity, _ = _valuation(cash, positions, rules.idle_symbol)
+    return BookSplit(
+        book=Book(cash=cash, equity=equity, positions=positions, last_session=book.last_session),
+        targets=new_targets,
+        in_lieu=in_lieu,
+        trade=trade,
+        fills=fills,
+    )

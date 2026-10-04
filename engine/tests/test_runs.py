@@ -8,7 +8,17 @@ import psycopg
 import pytest
 
 from seer_engine.dates import RunDates
-from seer_engine.runs import MAX_ERROR_CHARS, fail_run, finish_run, start_run
+from seer_engine.runs import (
+    MAX_ERROR_CHARS,
+    RealRun,
+    fail_paper,
+    fail_run,
+    finish_paper,
+    finish_run,
+    real_run,
+    start_paper,
+    start_run,
+)
 
 RD = RunDates(data_date=date(2026, 10, 2), session_date=date(2026, 10, 5))
 
@@ -90,3 +100,49 @@ def test_finish_unknown_run_raises(pg):
         finish_run(pg, 999_999)
     with pytest.raises(LookupError):
         fail_run(pg, 999_999, "x")
+
+
+def _paper(conn, run_id):
+    return conn.execute(
+        "SELECT paper_status, paper_error, paper_finished_at FROM runs WHERE id = %s", (run_id,)
+    ).fetchone()
+
+
+def test_paper_status_lifecycle(pg):
+    run_id = start_run(pg, RD)
+    finish_run(pg, run_id)
+    assert real_run(pg, RD.session_date) == RealRun(run_id, "success", RD.data_date, RD.session_date, None)
+    start_paper(pg, run_id)
+    assert _paper(pg, run_id) == ("running", None, None)
+    finish_paper(pg, run_id)
+    status, error, finished_at = _paper(pg, run_id)
+    assert status == "success" and error is None and finished_at is not None
+    assert real_run(pg, RD.session_date).paper_status == "success"
+    start_paper(pg, run_id)  # a re-run clears the previous outcome
+    assert _paper(pg, run_id) == ("running", None, None)
+
+
+def test_fail_paper_truncates_and_redacts(pg):
+    run_id = start_run(pg, RD)
+    fail_paper(pg, run_id, "token=sekret " + "x" * 5000)
+    status, error, finished_at = _paper(pg, run_id)
+    assert status == "failed" and finished_at is not None
+    assert len(error) == MAX_ERROR_CHARS and "sekret" not in error
+
+
+def test_real_run_ignores_demo_rows(pg):
+    assert real_run(pg, RD.session_date) is None
+    pg.execute(
+        "INSERT INTO runs (status, data_date, session_date, is_demo) VALUES ('success', %s, %s, true)",
+        (RD.data_date, RD.session_date),
+    )
+    assert real_run(pg, RD.session_date) is None
+
+
+def test_paper_helpers_on_unknown_run_raise(pg):
+    with pytest.raises(LookupError):
+        start_paper(pg, 999_999)
+    with pytest.raises(LookupError):
+        finish_paper(pg, 999_999)
+    with pytest.raises(LookupError):
+        fail_paper(pg, 999_999, "x")

@@ -24,6 +24,10 @@
   gap: 6px; padding: 44px 26px 160px; min-height: 540px;
   font-size: 56px; line-height: 0.95; letter-spacing: -0.045em;
 }
+.noneSub {
+  margin-top: auto; padding-top: 28px; max-width: 34ch;
+  font-size: 16px; line-height: 1.45; letter-spacing: 0; color: var(--ink-2); text-wrap: pretty;
+}
 
 /* ---- Board: stacked on mobile, one big sheet with a grid on desktop ---- */
 .board, .grid { display: contents; }

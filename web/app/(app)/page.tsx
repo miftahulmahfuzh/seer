@@ -3,7 +3,10 @@ import { AppHeader } from '@/components/AppHeader';
 import { CopyButton } from '@/components/CopyButton';
 import { RefreshButton } from '@/components/RefreshButton';
 import { WhyToggle } from '@/components/WhyToggle';
-import { champion, picks as getPicks, positions as getPositions, runStatus, type Pick } from '@/lib/data';
+import {
+  champion, picks as getPicks, positions as getPositions, runStatus,
+  type Holding, type Pick, type Strategy,
+} from '@/lib/data';
 import { money, monthDay, rp, shortDate, signedRp, signedUsd, usd } from '@/lib/format';
 import { wibDate } from '@/lib/session';
 import { SLOT_BG, SLOT_LETTERS, slotBg, slotLetter } from '@/lib/slots';
@@ -15,26 +18,37 @@ export const dynamic = 'force-dynamic';
 const ORDINAL = ['first', 'second', 'third', 'fourth'];
 const WIB_TIME = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' });
 
+/** Only a bracket champion that is not the benchmark makes buy picks. With SPY as champion (D2), none does. */
+const picksChampion = (c: Strategy | null): Strategy | null =>
+  c && !c.isBenchmark && c.engine === 'bracket' ? c : null;
+
+const champLabel = (c: Strategy | null) =>
+  !c ? 'No champion yet' : c.isBenchmark ? `${c.name} · ${c.sub}` : `Strategy ${c.id} · ${c.sub}`;
+
+const noBuysTitle = (c: Strategy | null) =>
+  !c ? 'No champion yet.' : c.isBenchmark ? `${c.name} buy-and-hold is the champion.` : `${c.name} is the champion.`;
+
 export default async function Today() {
   const now = new Date();
   const [champ, run] = await Promise.all([champion(), runStatus(now)]);
-  const showPicks = !!champ && !!run.sessionDate && !run.stale;
+  const pc = picksChampion(champ);
   const [picks, open] = await Promise.all([
-    showPicks ? getPicks(champ.id, run.sessionDate!) : Promise.resolve([] as Pick[]),
-    champ ? getPositions(champ.id) : Promise.resolve([]),
+    pc && run.sessionDate && !run.stale ? getPicks(pc.id, run.sessionDate) : Promise.resolve([] as Pick[]),
+    pc ? getPositions(pc.id) : Promise.resolve([] as Holding[]),
   ]);
-  const actions = open.filter(p => p.day >= 5 && !p.dismissed);
+  // Phase 10's guard, kept: only a bracket holding with an order id and a time exit has a day-5 action.
+  const actions = open.filter(p => p.orderId !== null && p.maxDays !== null && p.day >= p.maxDays && !p.dismissed);
   const filled = new Set(picks.map(p => p.slot));
   const emptySlots = [1, 2, 3, 4].filter(n => !filled.has(n));
   const session = run.sessionDate ? shortDate(run.sessionDate) : '—';
-  const stratLabel = champ ? `Strategy ${champ.id} · ${champ.sub}` : 'No champion yet';
+  const stratLabel = champLabel(champ);
 
   return (
     <>
       <AppHeader
         date={shortDate(wibDate(now))}
         title="Today"
-        deskTitle={run.stale ? 'Today' : `Picks for US session ${session}`}
+        deskTitle={run.stale ? 'Today' : pc ? `Picks for US session ${session}` : `US session ${session}`}
         deskAside={<span className="pill-outline" style={{ height: 52, fontSize: 16, color: 'var(--ink)' }}><Crown size={16} />{stratLabel}</span>}
         demo={run.isDemo}
       />
@@ -48,14 +62,16 @@ export default async function Today() {
           <div className={s.between} style={{ alignItems: 'flex-end' }}>
             <div className={s.count}>
               <span className={s.countNum}>{run.stale ? '—' : picks.length}</span>
-              <span className={s.countLabel}>Picks tonight</span>
+              <span className={s.countLabel}>{pc ? 'Picks tonight' : 'Buys tonight'}</span>
             </div>
             <div className={s.slotsCol}>
-              <div className="slot-dots" aria-label={`${picks.length} of 4 slots filled`}>
-                {SLOT_LETTERS.map((l, i) => (
-                  <span key={i} className={`slot-dot ${filled.has(i + 1) ? SLOT_BG[i] : 'empty'}`}>{l}</span>
-                ))}
-              </div>
+              {pc && (
+                <div className="slot-dots" aria-label={`${picks.length} of 4 slots filled`}>
+                  {SLOT_LETTERS.map((l, i) => (
+                    <span key={i} className={`slot-dot ${filled.has(i + 1) ? SLOT_BG[i] : 'empty'}`}>{l}</span>
+                  ))}
+                </div>
+              )}
               <span className={s.strat}><Crown size={15} />{stratLabel}</span>
             </div>
           </div>
@@ -76,6 +92,14 @@ export default async function Today() {
                 : 'The nightly engine has not completed a run yet. Picks stay hidden until it does.'}
             </span>
           </section>
+        ) : !pc ? (
+          <section className={`sheet over bg-stone ${s.none}`}>
+            <span>{noBuysTitle(champ)}</span>
+            <span style={{ color: 'var(--ink-3)' }}>Seer recommends no buys.</span>
+            <span className={s.noneSub}>
+              Research strategies trade on paper only, with no real money. Their orders are in Positions, never here.
+            </span>
+          </section>
         ) : picks.length === 0 ? (
           <section className={`sheet over bg-stone ${s.none}`}>
             <span>No setups today.</span>
@@ -84,12 +108,12 @@ export default async function Today() {
         ) : (
           <div className={s.board}>
             {actions.map(a => (
-              <section key={a.id} className={`sheet over bg-coral ${s.action}`}>
+              <section key={a.key} className={`sheet over bg-coral ${s.action}`}>
                 <span className="eyebrow">Action needed</span>
                 <div className={s.actionRow}>
-                  <span className={s.actionText}><b>{a.symbol}</b>: day {a.day} of 5. Cancel bracket and sell at market.</span>
+                  <span className={s.actionText}><b>{a.symbol}</b>: day {a.day} of {a.maxDays}. Cancel bracket and sell at market.</span>
                   <form action={dismiss}>
-                    <input type="hidden" name="orderId" value={a.id} />
+                    <input type="hidden" name="orderId" value={a.orderId ?? ''} />
                     <button type="submit" className={`icon-btn ${s.onCoral}`} data-tip="Mark as done" aria-label="Mark as done">
                       <Check size={22} />
                     </button>

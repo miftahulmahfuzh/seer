@@ -114,6 +114,19 @@ def _status(conn, args) -> int:
             f"{fmt_signed_pct(r['spy_tr_cagr'])}  maxDD {fmt_pct(r['max_drawdown'])}  PF {fmt_pf(r['profit_factor'])}  "
             f"trades {r['trades']}  DSR {fmt_num(r['dsr'], 3)}  failed: {r['failed'] or '-'}"
         )
+    out.append("")
+    out.append("Closest to eligible (fewest failed go-live conditions, DSR aside, then MAR):")
+    rows = conn.execute("SELECT * FROM trials WHERE window = 'dev' AND mar IS NOT NULL").fetchall()
+
+    def misses(r) -> list[str]:
+        return [f for f in r["failed"].split("; ") if f and f != store.DSR_LABEL]
+
+    for r in sorted(rows, key=lambda r: (len(misses(r)), -r["mar"], r["n"]))[:8]:
+        out.append(
+            f"  {r['candidate_id']:<28} misses {len(misses(r))}: {'; '.join(misses(r)) or '-'}  "
+            f"CAGR {fmt_signed_pct(r['cagr'])} vs {fmt_signed_pct(r['spy_tr_cagr'])}  maxDD "
+            f"{fmt_pct(r['max_drawdown'])}  PF {fmt_pf(r['profit_factor'])}  trades {r['trades']}  DSR {fmt_num(r['dsr'], 3)}"
+        )
     for title, status in (("Backlog (idea)", "idea"), ("Blocked on data", "blocked-data"),
                           ("Dev-eligible / promoted", "dev-eligible"), ("Promoted", "promoted")):
         rows = conn.execute("SELECT * FROM methods WHERE status = ? ORDER BY id", (status,)).fetchall()

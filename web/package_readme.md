@@ -51,6 +51,8 @@ web/
       layout.tsx            requireSera(), then SeraNav rail + centred column (max 1360px); stacks below 1024px
       not-found.tsx         in-shell 404 (Section + back-to-overview icon link)
       sera.module.css
+      methods/page.tsx      /sera/methods list (view.ts pure helpers + view.test.ts)
+      methods/[id]/page.tsx /sera/methods/[id] method detail
   components/               AppHeader (eye mark left of the titles, mobile only), Nav, CopyButton, RefreshButton, WhyToggle, TooltipLayer, tooltip
     StrategySwitch.tsx      icon-only roster switcher (Links), ALL sentinel           (server component)
     PaperChip.tsx           "Paper" data label with tooltip, sm | md

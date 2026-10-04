@@ -1,0 +1,127 @@
+/* /sera/methods/[id]. Seer v2 tokens only. Desktop is the designed layout; below 1024px the
+   two-up grids stack and wide tables scroll inside their sheet. */
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.metaLink { color: var(--ink); background: var(--chip-solid); transition: background 0.12s, color 0.12s; }
+.metaLink:hover { background: var(--ink); color: var(--sheet); }
+.metaLink:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.statusChip { background: var(--stone); color: var(--ink-2); }
+.statusChip[data-tone='wait'] { background: transparent; border: 1.5px dashed var(--outline); }
+.statusChip[data-tone='neutral'] { background: var(--butter); color: var(--ink); }
+.statusChip[data-tone='good'] { background: var(--ink); color: var(--sheet); }
+
+.twoUp { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px; }
+.textSheet, .chartSheet, .proseSheet { margin-bottom: 12px; gap: 14px; }
+.twoUp > * { margin-bottom: 0; }
+
+.body { font-size: 17px; line-height: 1.55; max-width: 72ch; }
+.cite { font-size: 14px; line-height: 1.4; color: var(--ink-2); }
+.muted { font-size: 16px; color: var(--ink-2); }
+
+/* Did it work? and condition marks */
+.worked { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.workedItem { display: flex; align-items: center; gap: 12px; font-size: 16px; line-height: 1.35; }
+.ok, .no, .na {
+  flex: none; width: 26px; height: 26px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ok { background: var(--ink); color: var(--sheet); }
+.no { border: 1.5px solid var(--ink); color: var(--ink); }
+.na { color: var(--ink-3); }
+
+/* Variants table */
+.tableWrap { overflow-x: auto; margin: 0 -6px; }
+.table { width: 100%; min-width: 1240px; border-collapse: collapse; font-size: 14px; }
+.table th, .table td {
+  padding: 10px 6px; text-align: left; font-weight: 400; white-space: nowrap; vertical-align: middle;
+  border-bottom: 1px solid var(--hair);
+}
+.table thead th {
+  padding-top: 0; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2);
+  white-space: normal; vertical-align: bottom;
+}
+.table tbody tr:last-child th, .table tbody tr:last-child td { border-bottom: 0; }
+.r { text-align: right !important; }
+.c { text-align: center !important; width: 72px; }
+.c .ok, .c .no, .c .na { width: 22px; height: 22px; }
+.variant { font-weight: 500; }
+.vs { font-size: 12px; color: var(--ink-2); }
+.bestRow { background: var(--butter); }
+.bestRow th:first-child { border-radius: 14px 0 0 14px; }
+.bestRow td:last-child { border-radius: 0 14px 14px 0; }
+.window {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px;
+  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; background: var(--stone); color: var(--ink-2);
+}
+.window[data-window='test'] { background: var(--ink); color: var(--sheet); }
+
+/* Markdown prose (escape-first HTML from lib/sera/markdown; headings arrive as h3/h4/h5) */
+.proseSheet { gap: 16px; }
+.prose { font-size: 16px; line-height: 1.6; color: var(--ink); max-width: 78ch; }
+.prose > * + * { margin-top: 0.85em; }
+.prose h3, .prose h4, .prose h5 { margin: 1.4em 0 0.4em; font-weight: 500; letter-spacing: -0.01em; line-height: 1.25; }
+.prose h3 { font-size: 21px; }
+.prose h4 { font-size: 18px; }
+.prose h5 { font-size: 16px; }
+.prose > :first-child { margin-top: 0; }
+.prose p { margin: 0; }
+.prose strong { font-weight: 600; }
+.prose em { font-style: italic; }
+.prose a { text-decoration: underline; text-decoration-color: var(--outline); text-underline-offset: 3px; }
+.prose a:hover { text-decoration-color: var(--ink); }
+.prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88em;
+  padding: 1px 6px; border-radius: 6px; background: var(--stone);
+}
+.prose ul, .prose ol { margin: 0; padding-left: 1.3em; }
+.prose li + li { margin-top: 0.3em; }
+.prose table {
+  display: block; overflow-x: auto; max-width: 100%; border-collapse: collapse;
+  font-size: 14px; font-variant-numeric: tabular-nums;
+}
+.prose th, .prose td { padding: 7px 10px; border-bottom: 1px solid var(--hair); text-align: left; white-space: nowrap; }
+.prose thead th { font-size: 12px; color: var(--ink-2); font-weight: 400; }
+.prose td[align='right'], .prose th[align='right'],
+.prose td[style*='right'], .prose th[style*='right'] { text-align: right; }
+
+/* Insights */
+.insights { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.insight { padding-bottom: 16px; border-bottom: 1px solid var(--hair); display: grid; gap: 8px; }
+.insight:last-child { padding-bottom: 0; border-bottom: 0; }
+.insightHead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.kindChip { height: 28px; padding: 0 11px; font-size: 13px; background: var(--stone); }
+.insightTitle { flex: 1; min-width: 0; font-size: 17px; font-weight: 500; }
+.insightDate { font-size: 13px; color: var(--ink-2); }
+
+/* Technical detail: styled details/summary disclosure */
+.techList { display: grid; gap: 8px; }
+.tech { border-radius: 22px; background: var(--stone); }
+.techSummary {
+  list-style: none; display: flex; align-items: center; gap: 12px; padding: 10px 16px 10px 10px;
+  cursor: pointer; border-radius: 22px; user-select: none;
+}
+.techSummary::-webkit-details-marker { display: none; }
+.techSummary::marker { content: ''; }
+.techSummary:hover { background: var(--hair); }
+.techSummary:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.techChevron {
+  flex: none; width: 34px; height: 34px; border-radius: 999px; background: var(--sheet);
+  display: inline-flex; align-items: center; justify-content: center; transition: transform 0.15s;
+}
+.tech[open] .techChevron { transform: rotate(90deg); }
+.techName { font-size: 15px; font-weight: 500; }
+.techSub { font-size: 13px; color: var(--ink-2); }
+.techBody { padding: 4px 18px 18px; display: grid; gap: 14px; }
+.techGrid { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 24px; }
+.techRow { display: grid; gap: 2px; }
+.techRow dt { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); }
+.techRow dd { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+.config {
+  margin: 0; padding: 14px 16px; border-radius: 16px; background: var(--sheet); color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; line-height: 1.5;
+  white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto;
+}
+
+@media (min-width: 1024px) {
+  .twoUp { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .textSheet, .chartSheet, .proseSheet { padding: 28px 30px 30px; border-radius: 40px; }
+}

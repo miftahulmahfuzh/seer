@@ -119,23 +119,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "f4e605a",
       "depends_on": [
         5,
         6
       ],
       "difficulty": "HARD",
       "n": 7,
-      "note": null,
+      "note": "paper command + runs paper_status helpers + nightly.yml Paper step; 1908 engine tests green",
       "package": "engine/commands",
       "plan": ".workflows/plan/paper-trading-ship/phase-7.md",
-      "reported_at": "2026-10-04T03:02:01+00:00",
+      "reported_at": "2026-10-04T03:07:04+00:00",
       "satisfies": [
         "R1",
         "R3"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-0ZLD",
       "title": "paper` command and workflow step"
     },
     {
@@ -153,7 +153,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "paper_check` replay check"
     },
@@ -226,11 +226,11 @@
       "note": null,
       "package": "web/app",
       "plan": ".workflows/plan/paper-trading-ship/phase-12.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T03:07:04+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "spawned",
+      "status": "running",
       "task_id": null,
       "title": "Web: Leaderboard, monthly table, checklist"
     },
@@ -259,7 +259,7 @@
   "plan": "/home/miftah/.worktrees/seer/paper-trading-ship/.workflows/orchestration/paper-trading-ship/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "paper-trading-ship",
-  "updated": "2026-10-04T03:02:01+00:00",
-  "verified_at": "2026-10-04T03:02:01+00:00",
+  "updated": "2026-10-04T03:07:04+00:00",
+  "verified_at": "2026-10-04T03:07:04+00:00",
   "worktree": "/home/miftah/.worktrees/seer/paper-trading-ship"
 }

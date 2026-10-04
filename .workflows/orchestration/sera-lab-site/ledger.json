@@ -113,17 +113,17 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "8602db24893ada000da211fe9c8d7e65d7086903",
       "depends_on": [
         2,
         3
       ],
       "difficulty": "HARD",
       "n": 6,
-      "note": null,
+      "note": "journal, ideas, how-it-works pages + Pipeline/Windows diagrams; plan applied verbatim, no drift",
       "package": "web/app/sera/{journal,ideas,how}",
       "plan": ".workflows/plan/sera-lab-site/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T15:24:08+00:00",
       "satisfies": [
         "R1",
         "R4",
@@ -131,8 +131,8 @@
         "R6",
         "R7"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-08WD",
       "title": "Journal, Ideas, How it works"
     },
     {
@@ -156,7 +156,7 @@
         "R6",
         "R7"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Keep it current: CI, skills, docs"
     }
@@ -164,7 +164,7 @@
   "plan": "/home/miftah/.worktrees/seer/sera-lab-site/.workflows/orchestration/sera-lab-site/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-lab-site",
-  "updated": "2026-10-04T15:14:25+00:00",
+  "updated": "2026-10-04T15:24:26+00:00",
   "verified_at": "2026-10-04T15:14:04+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-lab-site"
 }

@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "aba0bcc",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": null,
+      "note": "migration 003 + frozen roster (digests pinned); TaskIDs minted for all 13 phases; package_readme untouched (phase 13 owns it)",
       "package": "db`, `engine/paper",
       "plan": ".workflows/plan/paper-trading-ship/phase-1.md",
-      "reported_at": "2026-10-04T02:37:27+00:00",
+      "reported_at": "2026-10-04T02:42:39+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-N6UC",
       "title": "Migration 003 and the frozen roster"
     },
     {
@@ -53,7 +53,7 @@
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Bracket and benchmark night cores"
     },
@@ -73,7 +73,7 @@
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Book night core"
     },
@@ -92,7 +92,7 @@
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Dividends and held-symbol bars in `nightly"
     },
@@ -172,7 +172,7 @@
       "satisfies": [
         "R5"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "explain`: optional LLM explanations"
     },
@@ -192,7 +192,7 @@
         "R4",
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Web data layer, monthly math, demo seed"
     },
@@ -259,7 +259,7 @@
   "plan": "/home/miftah/.worktrees/seer/paper-trading-ship/.workflows/orchestration/paper-trading-ship/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "paper-trading-ship",
-  "updated": "2026-10-04T02:37:27+00:00",
+  "updated": "2026-10-04T02:42:59+00:00",
   "verified_at": "2026-10-04T02:37:21+00:00",
   "worktree": "/home/miftah/.worktrees/seer/paper-trading-ship"
 }

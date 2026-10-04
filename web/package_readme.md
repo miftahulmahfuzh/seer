@@ -27,8 +27,13 @@ web/
   package.json              scripts: dev, build, start, test (vitest), db:migrate, db:seed-demo
   next.config.ts, tsconfig.json, vercel.json (region sin1)
   auth.ts                   NextAuth (Google, JWT sessions), currentUser()
+  scripts/
+    gen_app_icon.py         OpenRouter (OPENROUTER_API_KEY in .env.local) draws eye candidates; spends money
+    make-icon.mjs           erases the drawn pupil, adds the Lucide Sigma, writes apple-icon.png + public/icons/*
+    .icon/eye.png           the promoted candidate make-icon.mjs reads
   app/
-    layout.tsx, globals.css, manifest.ts, icon.svg, apple-icon.tsx
+    layout.tsx, globals.css, manifest.ts, icon.svg (favicon star)
+    apple-icon.png          home-screen icon: Eye of Horus, Sigma pupil, on coral (scripts/make-icon.mjs)
     signin/                 sign-in / denied page
     api/auth/               NextAuth route handlers
     (app)/

@@ -48,8 +48,9 @@ web/
   lib/
     db.ts                   sql = neon(DATABASE_URL)
     data.ts                 all DB reads (server only)
-    strategy.ts             Engine, Gate, engineOf, parseGate, shortLabel        (pure)
-    metrics.ts              Snapshot, Metrics, strategyMetrics, checklist          (pure)
+    strategy.ts             Engine, Gate, engineOf, parseGate, shortLabel, checksNews (pure)
+    metrics.ts              Snapshot, Metrics, strategyMetrics, gateItem, checklist (pure)
+    vetoes.ts               Verdict, Veto, parseVerdict, vetoSheet, checkedLine, headlinesLabel, noCheckLine (pure; P6)
     monthly.ts              monthlyTable, monthOf                                  (pure)
     slots.ts                slot letters/sheets, slotCount, cardBg                 (pure)
     session.ts              nextUsSession, isStale, wibDate                        (pure)
@@ -67,14 +68,16 @@ web/
 
 ```ts
 type Engine = 'bracket' | 'book' | 'benchmark';
-type Gate = { passed: boolean; note: string | null };
+type Gate = { passed: boolean; applicable: boolean; note: string | null };
 function engineOf(engine: unknown, isBenchmark: boolean): Engine;
 function parseGate(raw: unknown): Gate;
 function shortLabel(name: string, id: string): string;
+function checksNews(id: string, specObject: unknown): boolean;
 ```
 
 - `engineOf`: the `strategies.engine` column (migration 003). Unknown or missing (pre-003 rows) falls back to `benchmark` when `is_benchmark`, else `bracket`.
-- `parseGate`: reads `strategies.params->'backtest_gate'` (contract C2). Missing, malformed, or anything other than `passed === true` reads as not passed; a blank note becomes `null`. A pass is never assumed.
+- `parseGate`: reads `strategies.params->'backtest_gate'` (contract C2). Missing, malformed, or anything other than `passed === true` reads as not passed; a blank note becomes `null`. A pass is never assumed. `applicable` is false only for an explicit `applicable: false` (Strategy C, an LLM strategy: design §1 item 5, handover D9), and a not-applicable gate always reads `passed: false`.
+- `checksNews`: true for a strategy that runs the nightly news check (C): its spec `object` is `STRATEGY_C`, or its id is `C` before `paper` wrote a spec.
 - `shortLabel`: the part of the name before the middle dot (`'F4 · Momentum'` -> `'F4'`); the id when that part is empty.
 
 ### lib/metrics.ts (pure)
@@ -84,11 +87,12 @@ type Snapshot = { date: string; equity: number };
 type Metrics = { totalReturn; winRate; profitFactor; maxDrawdown: number | null; trades: number; months: number };
 function strategyMetrics(snaps: Snapshot[], pnls: number[]): Metrics;
 type CheckItem = { label: string; val: string; ok: boolean; note?: string };
+function gateItem(gate: Gate): CheckItem;
 function checklist(m: Metrics, spyReturn: number | null, gate: Gate): CheckItem[];
 ```
 
 - `strategyMetrics`: total return first-to-last snapshot, win rate and profit factor over closed-trade P/L (`Infinity` with no losses), max drawdown over the curve, months = days / 30.44. Expects snapshots in date order. Definitions are identical to the engine's backtest metrics.
-- `checklist`: design §1 go-live rules, **six** items, all must hold: >= 3 months forward, >= 100 trades, beats SPY, profit factor >= 1.3, max drawdown <= 15%, and **Backtest gate passed** (from `gate`; carries `note` when the roster gives one). The gate parameter is required.
+- `checklist`: design §1 go-live rules, **six** items, all must hold: >= 3 months forward, >= 100 trades, beats SPY, profit factor >= 1.3, max drawdown <= 15%, and **Backtest gate passed** (from `gate`; carries `note` when the roster gives one). The gate parameter is required. Row 6 is `gateItem(gate)`: for a not-applicable gate it reads `{ label: 'Backtest gate', val: 'Not applicable', ok: false }` (plus the note), so such a strategy never passes all six.
 
 ### lib/monthly.ts (pure)
 
@@ -120,10 +124,26 @@ slotCount(engine: Engine): number;                           // 4 for bracket, 0
 cardBg(slot: number | null, index: number): string;          // slot's sheet, else cycled by 0-based list index
 ```
 
+### lib/vetoes.ts (pure, P6)
+
+```ts
+type Verdict = 'allow' | 'veto' | 'failed';
+type Veto = { rank: number; symbol: string; verdict: Verdict; reason: string; headlineCount: number; earningsDate: string | null; decidedAt: string };
+function parseVerdict(v: unknown): Verdict;                 // anything unknown -> 'failed'
+type VetoSheet = { state: 'missing' } | { state: 'failed'; checked; reason } | { state: 'listed'; checked; allowed; rows: Veto[] };
+function vetoSheet(rows: Veto[]): VetoSheet;
+const checkedLine: (checked: number, allowed: number) => string;   // '8 checked · 5 allowed'
+const headlinesLabel: (k: number) => string;                       // 'No headlines' | '1 headline' | '12 headlines'
+const noCheckLine: (day: string, short: string) => string;
+```
+
+- `vetoSheet`: no rows → `missing`; every row `failed` with one shared reason → `failed` (shown once); else the `veto` and `failed` rows by rank with the counts.
+- `noCheckLine`: the `missing` state's line, "No news check for {day}: A had no candidates, or the check did not run. {short} buys nothing this session." `veto` writes no rows on a night A has no candidates, so the app cannot tell that from a check that did not run, and says so.
+
 ### lib/data.ts (server only; every function queries Neon)
 
 Types:
-- `Strategy`: `id, name, sub, icon, isChampion, isBenchmark, engine, rulesId, paperStart, gate, isPaper, short`. `isPaper` = neither champion nor benchmark (research strategy, never a buy recommendation). `paperStart` is null until the engine's `paper` command starts the clock.
+- `Strategy`: `id, name, sub, icon, isChampion, isBenchmark, engine, rulesId, paperStart, gate, isPaper, short, checksNews`. `isPaper` = neither champion nor benchmark (research strategy, never a buy recommendation). `paperStart` is null until the engine's `paper` command starts the clock. `checksNews` (P6) marks C, whose Positions view reads its verdicts.
 - `RunStatus`: `sessionDate, dataDate, finishedAt, isDemo, stale, usdIdr` from the latest **successful** run (IDR falls back to 16500), plus `latestStatus, paperStatus, paperError, paperFinishedAt` from the most recent run whatever its outcome. `RunState = 'running' | 'success' | 'failed'`.
 - `Pick`: a champion's pending bracket order for Today (unchanged shape).
 - `Holding` (replaces the old `Position`): one open holding of any engine. `key` is unique across engines (`'o:<orders.id>'` or `'b:<strategy>:<symbol>'`); `kind: Engine`; bracket-only `orderId`, `slot`; `tp`/`sl` nullable (book sets them only when its rules do); `maxDays` is 5 for bracket, null otherwise; `weight` = value / last equity; `pnl`/`pnlPct` for book include fees and dividends (`value + income - cost`); `dismissed` (bracket day-5 action done); `exitPending` (book sell decided for the next open).
@@ -139,6 +159,7 @@ Functions:
 - `picks(strategyId, sessionDate): Promise<Pick[]>`: pending bracket orders for one session.
 - `positions(strategyId): Promise<Holding[]>`: bracket orders (days held desc, slot) then book positions (value desc). Equity for `weight` comes from `paper_state`, else the latest snapshot.
 - `pendingOrders(strategyId): Promise<Pending>`.
+- `vetoes(strategyId, sessionDate): Promise<Veto[]>` (P6): every `news_vetoes` row for that strategy and session, by rank (`headlineCount = jsonb_array_length(headlines)`). Called only for `checksNews` strategies: their roster row and the table both come from migration 004.
 - `closedTrades(strategyId | null, 'win' | 'loss' | null): Promise<Trade[]>`: closed orders UNION non-idle book trades, newest first, max 300.
 - `leaderboard(): Promise<Board>`: each strategy's metrics over all its snapshots (day 0 included) and only **its own engine's** closed trades (bracket -> orders, book -> book_trades, benchmark -> none).
 - `monthly(strategyId, sessionDate): Promise<MonthlyTable>`: loads the strategy's and the benchmark's snapshots and its exit dates, then delegates to `monthlyTable`.
@@ -152,7 +173,7 @@ function selectStrategy<T extends { id: string; isBenchmark: boolean }>(roster: 
 function sharesLabel(n: number): string;          // 1 -> '1 share', 2.50004 -> '2.5 shares'
 ```
 
-- `strategyIcon`: known names `landmark` (SPY), `sigma` (A), `trending-up` (F4), `shield` (F1), plus `brain-circuit` and `gavel` for old demo rows; unknown falls back to `Sigma`.
+- `strategyIcon`: known names `landmark` (SPY), `sigma` (A), `trending-up` (F4), `shield` (F1), `gavel` (C, migration 004), plus `brain-circuit` for old demo rows; unknown falls back to `Sigma`.
 - `selectStrategy`: the requested id when it is on the roster, else the first non-benchmark strategy, else the first row, else null.
 - `sharesLabel`: rounds to 4 dp (book shares are fractional); singular only at exactly 1.
 - Short labels and the paper flag are not here: they are `Strategy.short` and `Strategy.isPaper` from `lib/data.ts`.
@@ -179,16 +200,19 @@ function researchOf<T extends RosterIn>(roster: T[]): T[];          // non-bench
 function bestResearch<T>(rows: { strategy: T; metrics: { totalReturn: number | null } }[]): { strategy: T; ret: number } | null;
 const CHECKS = 6;
 type Score = { passed: number; total: number; ready: boolean; lines: [string, string] };
-function scoreOf(items: { ok: boolean }[], gatePassed: boolean): Score;
+type GateIn = { passed: boolean; applicable: boolean };
+const NO_GATE: GateIn;                                              // not passed, applicable
+function scoreOf(items: { ok: boolean }[], gate: GateIn): Score;
+function monthsBg(look: Look): string;                              // butter -> stone (months sheet)
 type MonthLine = { key; label; partial: boolean; ret: { text; tone: '' | 'pos' | 'neg' }; spy; trades; drop };
 function monthLabel(ym: string): string;                            // '2026-10' -> 'Oct 2026'
 function monthLines(t: MonthlyTable): MonthLine[];                  // newest first
 function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null before the first paper session
 ```
 
-- `looks`: research strategies take the design's sheet/line pairs (`CARD_BGS` lav/sky/stone, `LINES`) in roster order, cycling sheets past three; the champion's line is thicker (2.75). The benchmark is a dotted `--ink-3` line on a plain sheet. No hardcoded A/B/C ids.
+- `looks`: research strategies take the design's sheet/line pairs (`CARD_BGS` lav/sky/stone/butter, `LINES` ink/line-b/line-c/coral) in roster order, cycling sheets past four; the champion's line is thicker (2.75). The benchmark is a dotted `--ink-3` line on a plain sheet. No hardcoded A/B/C ids.
 - `bestResearch`: highest `totalReturn` among non-benchmark rows that have one.
-- `scoreOf`: `ready` only when exactly six items are given and all pass; lines are "All six pass. / Ready for real money", else "Paper trading until / all six pass" when the gate passed, else "Paper only. / Backtest gate not passed".
+- `scoreOf`: `ready` only when exactly six items are given and all pass; lines are "All six pass. / Ready for real money", else "Paper trading until / all six pass" when the gate passed, else "Paper only. / Backtest gate not passed". A not-applicable gate (C) is never ready and reads "Paper only. No backtest gate. / Real money needs an owner decision" (handover D9).
 - `monthLines` / `sinceStartLine`: format `lib/monthly.ts`'s `MonthlyTable` (Return toned pos/neg, SPY, Trades, Worst drop; `—` for nulls); the since-start row is labelled `Since <monthDay(from)>`.
 
 ### Other modules
@@ -214,7 +238,7 @@ timezone never shifts them.
 
 Page consumers:
 - Today: `champion`, `runStatus`, then `picks` and `positions` only for a picks champion (not benchmark, engine `bracket`); actions are holdings with an `orderId`, a `maxDays` and `day >= maxDays`, not dismissed. Any other champion (SPY under D2) shows the no-buys sheet: "Seer recommends no buys", research strategies trade on paper only and their orders live in Positions.
-- Positions: `strategies`, `runStatus`, then `positions(strat)` and `pendingOrders(strat)` for `selectStrategy(roster, ?s)`. Pending orders are skipped (empty `Pending`) for the benchmark and while the run is stale. Holdings split by `Holding.kind` into `BracketCard` (stop/target range, days), `BookCard` (weight, stop/target only when set) and `BenchmarkCard`; cards keyed by `Holding.key`. The orders sheet lists bracket orders by slot or book targets by rank with weight; empty-state copy depends on engine and `Pending.decision`. A paper-step warning shows when `paperStatus !== 'success'` (failed / running / not yet run). `PaperChip` and a "on paper since" line mark `isPaper` strategies.
+- Positions: `strategies`, `runStatus`, then `positions(strat)` and `pendingOrders(strat)` for `selectStrategy(roster, ?s)`. Pending orders are skipped (empty `Pending`) for the benchmark and while the run is stale. Holdings split by `Holding.kind` into `BracketCard` (stop/target range, days), `BookCard` (weight, stop/target only when set) and `BenchmarkCard`; cards keyed by `Holding.key`. The orders sheet lists bracket orders by slot or book targets by rank with weight; empty-state copy depends on engine and `Pending.decision`. A paper-step warning shows when `paperStatus !== 'success'` (failed / running / not yet run). `PaperChip` and a "on paper since" line mark `isPaper` strategies. For a `checksNews` bracket strategy (C) with a pending session it also calls `vetoes(strat, session)` and renders `vetoSheet` as a stone "Vetoed tonight" sheet; each vetoed/failed row reuses `WhyToggle` (new optional `label`/`missing` props) as "Why vetoed" / "Why it failed".
 - History: `strategies`, `closedTrades`, `runStatus`. Filters are `StrategySwitch` over non-benchmark strategies with an `ALL` button (`?s=`, unknown ids read as all) and win/loss icon buttons (`?o=`); defaults are dropped from the URL. Exit-reason icons cover `tp`, `sl`, `time`, `gap`, `signal` (rules said sell, sold at the open) and `forced` (forced close, no more prices), with a fallback for unknown reasons. Rows keyed by `Trade.key`; each shows the strategy tag (`strategyShort`) and a small `PaperChip` when the strategy is paper or missing from the roster.
 - Leaderboard: `leaderboard`, `runStatus`, then `monthly(pick.id, run.sessionDate)`. Every card, chart line and legend entry comes from the roster via `looks`. The big figure is the champion (crowned; SPY today); the second figure is the best research strategy on paper while the champion is the benchmark, else SPY. The checklist and month sheet follow `pick = selectStrategy(researchOf(roster), ?s)`; a `StrategySwitch` over research strategies shows when there are two or more (SPY is not selectable here, it is the SPY column). Checklist is `checklist(pick.metrics, spy.totalReturn, pick.strategy.gate)` scored by `scoreOf`; the gate's `note` prints under it. "Month by month" lists the since-start row then months newest first, with a `CircleDashed` partial-month marker while the next session is in that month.
 
@@ -243,8 +267,8 @@ window lacks two month starts.
 
 - `DATABASE_URL` (app, pooled HTTP), `DATABASE_URL_UNPOOLED` (scripts), `ALLOWED_EMAIL`, NextAuth Google credentials. Scripts read `web/.env.local` via `node --env-file`.
 - `npm run db:migrate`: apply new migrations in name order, one transaction each.
-- `npm run db:seed-demo [-- --dry-run]`: builds a 66-session demo (day 0 + paper start, at least three calendar months) ending at the last completed session, flagged `is_demo`. Roster: SPY (champion, buy and hold), A (bracket), F4-MOM12-N20-TREND and F1-SPY-SMA200-M (monthly book strategies, deciding on each month's first session). Writes strategies (with `engine`, `rules_id`, `paper_start`, `params.backtest_gate`), runs (with paper status), fx, bars, orders, equity snapshots, `paper_state`, `book_positions`, `book_targets`, `book_trades`. `--dry-run` builds every row and prints counts without connecting.
-- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `monthly`, `slots`, `session`, `format`, `allow`), `components/roster` and `app/(app)/leaderboard/view`.
+- `npm run db:seed-demo [-- --dry-run]`: builds a 66-session demo (day 0 + paper start, at least three calendar months) ending at the last completed session, flagged `is_demo`. Roster: SPY (champion, buy and hold), A (bracket), F4-MOM12-N20-TREND and F1-SPY-SMA200-M (monthly book strategies, deciding on each month's first session), and C (bracket, its own younger clock, gate `applicable: false`). Needs migration 004 applied first. Writes strategies (with `engine`, `rules_id`, `paper_start`, `params.backtest_gate`), runs (with paper status), fx, bars, orders, equity snapshots, `paper_state`, `book_positions`, `book_targets`, `book_trades`, and six `news_vetoes` rows for C's pending session. `--dry-run` builds every row and prints counts without connecting.
+- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`), `components/roster` and `app/(app)/leaderboard/view`.
 
 ## Gotchas
 
@@ -252,6 +276,8 @@ window lacks two month starts.
 - Only bracket holdings have `orderId`, `slot` and `maxDays`; book `tp`/`sl` may be null. Do not assume a stop/target range exists.
 - `slotCount` is 0 for book and benchmark strategies: only bracket strategies fill the S-E-E-R slots.
 - The gate defaults to not passed, so the checklist reads 5/6 at best until the engine's `paper` command writes `backtest_gate.passed = true`.
+- C's gate is `applicable: false`: its checklist reads 5/6 at best forever, and the score line says real money needs an owner decision (D9).
+- Positions for C shows "Vetoed tonight" for the pending session. No rows there means A had no candidates or the news check did not run; the app cannot tell which (`noCheckLine`).
 - `runStatus` mixes two runs: freshness from the latest successful run, `latestStatus`/`paperStatus` from the most recent run of any outcome.
 - Leaderboard win rate and trade counts only use the strategy's own engine's trade table; SPY has no trades.
 - The Leaderboard never says "Ready for real money" unless all six checklist items pass (`scoreOf`); a missing gate yields no items and a 0/6 "Paper only" line.

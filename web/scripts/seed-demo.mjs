@@ -1,8 +1,10 @@
-// Fills Neon with demo data in the paper-trading shape (migration 003), flagged is_demo so the
-// UI warns "Demo data". Dates are relative to now so the demo is never stale.
+// Fills Neon with demo data in the paper-trading shape (migrations 003 and 004), flagged is_demo so
+// the UI warns "Demo data". Dates are relative to now so the demo is never stale.
 // Roster: SPY (champion, buy and hold), A (bracket), F4-MOM12-N20-TREND and F1-SPY-SMA200-M
-// (monthly book strategies). 66 sessions ending at the last completed session: day 0 is the
-// first, paper start the second, so the demo spans at least three calendar months.
+// (monthly book strategies), C (bracket: A's picks minus the news check's vetoes, on its own
+// younger clock). 66 sessions ending at the last completed session: day 0 is the first, paper
+// start the second, so the demo spans at least three calendar months. C starts 28 sessions ago.
+// Needs migration 004 (news_vetoes, the C row's columns) applied first.
 // Refuses to run once the real engine has written a run, backfilled bars or started paper trading.
 // `--dry-run` builds every row and prints the counts without connecting.
 import { Pool, neonConfig } from '@neondatabase/serverless';
@@ -34,6 +36,9 @@ const LAST = sessions.length - 1;
 const back = n => sessions[LAST - n]; // n sessions before dataDate
 const DAY0 = sessions[0]; // initial cash snapshot (the session before paper start)
 const PAPER_START = sessions[1];
+// C has its own clock (handover D1): it started after the others.
+const C_DAY0 = LAST - 28;
+const C_PAPER_START = sessions[C_DAY0 + 1];
 
 // Monthly book strategies decide on the first session of a month (MONTHLY_HOLD).
 const decisions = sessions.map((_, i) => i).filter(i => i >= 1 && monthOf(sessions[i]) !== monthOf(sessions[i - 1]));
@@ -46,25 +51,29 @@ const pendingDecision = monthOf(session) !== monthOf(dataDate);
 let seed = 7;
 const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 
-// --- roster (display rows as in migration 003; params as the `paper` command writes them) ---
+// --- roster (display rows as in migrations 003 and 004; params as the `paper` command writes them) ---
 const gate = note => ({ passed: false, note });
 const strategies = [
   { id: 'SPY', name: 'SPY', sub: 'S&P 500, buy and hold', icon: 'landmark', champion: true, benchmark: true, sort: 1,
-    engine: 'benchmark', rulesId: null,
+    engine: 'benchmark', rulesId: null, paperStart: PAPER_START,
     params: { demo: true, spec: { engine: 'benchmark', symbol: 'SPY' }, digest: null,
       backtest_gate: gate('Benchmark, not a strategy: it has no backtest gate and is never a Seer pick') } },
   { id: 'A', name: 'A · Quant', sub: 'Mean reversion, 5-day brackets', icon: 'sigma', champion: false, benchmark: false, sort: 2,
-    engine: 'bracket', rulesId: 'design-v0',
+    engine: 'bracket', rulesId: 'design-v0', paperStart: PAPER_START,
     params: { demo: true, spec: { engine: 'bracket', object: 'STRATEGY_A', rules_id: 'design-v0' }, digest: null,
       backtest_gate: gate('P3 gate failed out of sample (2022-01-03..2026-10-02): -15.0% vs SPY TR +71.9%, PF 0.92, max DD 33.3%') } },
   { id: 'F4-MOM12-N20-TREND', name: 'F4 · Momentum', sub: 'Top 20 by 12-1 momentum, monthly', icon: 'trending-up', champion: false, benchmark: false, sort: 3,
-    engine: 'book', rulesId: 'monthly-hold',
+    engine: 'book', rulesId: 'monthly-hold', paperStart: PAPER_START,
     params: { demo: true, spec: { engine: 'book', object: 'FACTOR', registry_id: 'F4-MOM12-N20-TREND', rules_id: 'monthly-hold' }, digest: null,
       backtest_gate: gate('P7a dev window only; failed max DD <= 15% (22.2%)') } },
   { id: 'F1-SPY-SMA200-M', name: 'F1 · Trend', sub: 'SPY above its 200-day average, monthly', icon: 'shield', champion: false, benchmark: false, sort: 4,
-    engine: 'book', rulesId: 'monthly-hold',
+    engine: 'book', rulesId: 'monthly-hold', paperStart: PAPER_START,
     params: { demo: true, spec: { engine: 'book', object: 'TIMING', registry_id: 'F1-SPY-SMA200-M', rules_id: 'monthly-hold' }, digest: null,
       backtest_gate: gate('P7a dev window only; failed max DD <= 15% (18.7%) and >= 100 trades (11)') } },
+  { id: 'C', name: 'C · News veto', sub: 'A\'s picks, LLM can veto on news', icon: 'gavel', champion: false, benchmark: false, sort: 5,
+    engine: 'bracket', rulesId: 'design-v0', paperStart: C_PAPER_START,
+    params: { demo: true, spec: { engine: 'bracket', object: 'STRATEGY_C', rules_id: 'design-v0' }, digest: null,
+      backtest_gate: { passed: false, applicable: false, note: 'Backtest gate: not applicable (LLM strategy, design §1 item 5)' } } },
 ];
 
 // --- SPY closes, one per session ---------------------------------------------
@@ -164,7 +173,8 @@ const curve = (target, vol, from = 1) => {
   paperState.push([id, r4(E - invested), E, pendingDecision]);
 }
 
-// --- A: bracket orders ---------------------------------------------------------
+// --- bracket portfolios (A, C): pending picks, open orders, closed trades -------------
+// Pending picks: [slot, symbol, company, last, limit, tp, sl, shares, explanation]
 const picks = [
   [1, 'GE', 'GE Aerospace', 273.18, 271.40, 278.90, 260.15, 1,
     'GE fell three days in a row and now sits below its usual range, while its longer trend is still up. Strategy A buys short dips like this when they have usually recovered within a week. The limit is a little under the last price, so it only buys if the price dips further at the open.'],
@@ -193,10 +203,9 @@ const POOL = [['AAPL', 'Apple', 231], ['META', 'Meta Platforms', 610], ['GOOGL',
 const company = Object.fromEntries([...POOL.map(([s, c]) => [s, c]),
   ['MSFT', 'Microsoft'], ['JPM', 'JPMorgan Chase'], ['HD', 'Home Depot'], ['COST', 'Costco']]);
 
-// Closed trades: exits within the paper window (fills at least three sessions after paper start).
-const closed = named.map(([sym, en, ex, sh, reason, ago]) => ({ sym, en, ex, sh, reason, exitDate: back(ago) }));
-{
-  const [n, w, pf] = [38, 0.53, 1.12];
+// Closed trades up to `n`, random from POOL, exiting `agoFrom`..`agoFrom + agoSpan - 1` sessions ago
+// (fills three sessions earlier, so inside the strategy's own paper window).
+const fillClosed = (closed, n, w, pf, agoFrom, agoSpan) => {
   const cost = 0.002, avgWin = 0.022; // round-trip cost; losses sized so the net profit factor ≈ target
   const avgLoss = (w * (avgWin - cost)) / ((1 - w) * pf) - cost;
   for (let i = closed.length; i < n; i++) {
@@ -205,17 +214,70 @@ const closed = named.map(([sym, en, ex, sh, reason, ago]) => ({ sym, en, ex, sh,
     const en = r2(base * (0.9 + rnd() * 0.2));
     const move = (win ? avgWin : -avgLoss) * (0.6 + rnd() * 0.8);
     const reason = win ? (rnd() < 0.8 ? 'tp' : 'time') : (rnd() < 0.7 ? 'sl' : rnd() < 0.5 ? 'time' : 'gap');
-    closed.push({ sym, en, ex: r2(en * (1 + move)), sh: Math.max(1, Math.floor(300 / en)), reason, exitDate: back(7 + Math.floor(rnd() * 52)) });
+    closed.push({ sym, en, ex: r2(en * (1 + move)), sh: Math.max(1, Math.floor(300 / en)), reason, exitDate: back(agoFrom + Math.floor(rnd() * agoSpan)) });
   }
-}
-{
-  const eq = curve(0.021, 3.3);
-  const held = open.reduce((a, [, , sh, , cur]) => a + sh * cur, 0);
-  eq.forEach((e, i) => snapshots.push(['A', sessions[i], i === 0 ? e : r4(e - (i === LAST ? held : 0)), e]));
-  paperState.push(['A', r4(eq[LAST] - held), eq[LAST], false]);
-}
+  return closed;
+};
 
-const rows = { strategies, snapshots, paperState, bookPositions, bookTargets, bookTrades, picks, open, closed };
+// A: exits within the paper window (fills at least three sessions after paper start).
+const closed = fillClosed(named.map(([sym, en, ex, sh, reason, ago]) => ({ sym, en, ex, sh, reason, exitDate: back(ago) })), 38, 0.53, 1.12, 7, 52);
+// Snapshots and paper_state of a bracket strategy: equity curve from `day0`, open orders marked at the last close.
+const bracketBook = (id, target, vol, day0, openRows) => {
+  const eq = curve(target, vol, day0);
+  const held = openRows.reduce((a, [, , sh, , cur]) => a + sh * cur, 0);
+  eq.forEach((e, i) => { if (i >= day0) snapshots.push([id, sessions[i], i === day0 ? e : r4(e - (i === LAST ? held : 0)), e]); });
+  paperState.push([id, r4(eq[LAST] - held), eq[LAST], false]);
+};
+bracketBook('A', 0.021, 3.3, 0, open);
+
+// --- C: A's picks minus the news check's vetoes (handover D2) --------------------
+// Tonight's checks for `session`, A's ranked list: LRCX vetoed (earnings in the window), MU failed
+// (LLM timeout: no trade, design §8), WBD vetoed (buyout talks). GE and CSCO fill C's two free
+// slots; PANW is allowed but C has no slot left.
+const cPicks = [
+  [1, 'GE', 'GE Aerospace', 273.18, 271.40, 278.90, 260.15, 1,
+    'Strategy C takes the same GE dip as Strategy A. The news check read six recent headlines, all routine contract and product news with no earnings date in the next five sessions, so it let the pick through.'],
+  [2, 'CSCO', 'Cisco Systems', 67.42, 66.85, 68.30, 64.70, 4,
+    'Cisco slipped to the bottom of its two-week range, the same setup Strategy A sees. Its recent news is product launches and analyst notes without a rating change, so the news check allowed it.'],
+];
+// [symbol, company, shares, entry, current, tp, sl, days held]
+const cOpen = [
+  ['AMZN', 'Amazon', 2, 221.50, 218.10, 228.90, 212.40, 3],
+  ['PG', 'Procter & Gamble', 2, 165.20, 167.05, 169.40, 160.10, 2],
+];
+const cClosed = fillClosed([], 14, 0.55, 1.2, 1, 22);
+bracketBook('C', 0.012, 2.6, C_DAY0, cOpen);
+
+const brackets = [
+  { id: 'A', picks, open, closed },
+  { id: 'C', picks: cPicks, open: cOpen, closed: cClosed },
+];
+
+// news_vetoes rows for C's pending session: [rank, symbol, company, verdict, reason, headline count, earnings date]
+const VETO_DECIDED = new Date(Date.now() - 4 * 60_000); // the veto step runs after `nightly`, before `paper`
+const thirdSession = nextWeekday(nextWeekday(session, 1), 1);
+const VETO_CHECKS = [
+  [1, 'GE', 'GE Aerospace', 'allow', 'Headlines are routine contract and product news with no event risk in the next five sessions.', 6, null],
+  [2, 'LRCX', 'Lam Research', 'veto', `Lam Research reports quarterly earnings on ${thirdSession}, inside the holding window.`, 9, thirdSession],
+  [3, 'CSCO', 'Cisco Systems', 'allow', 'Product launches and analyst notes only; no downgrade, legal or earnings news.', 4, null],
+  [4, 'MU', 'Micron Technology', 'failed', 'LLM request failed: timed out after 30s', 11, null],
+  [5, 'PANW', 'Palo Alto Networks', 'allow', 'Recent coverage is general sector commentary with no company-specific event.', 3, null],
+  [6, 'WBD', 'Warner Bros. Discovery', 'veto', 'Reports of buyout talks with a rival studio are merger news inside the holding window.', 14, null],
+];
+const SOURCES = ['Reuters', 'Benzinga', 'Yahoo', 'MarketWatch'];
+const newsVetoes = VETO_CHECKS.map(([rank, sym, name, verdict, reason, k, earnings]) => [
+  'C', session, rank, sym, verdict, reason, 'glm-5.3', 'c-veto-v1',
+  JSON.stringify(Array.from({ length: k }, (_, j) => ({
+    id: 900000 + rank * 100 + j,
+    datetime: new Date(VETO_DECIDED.getTime() - (j + 1) * 3 * 3_600_000).toISOString().slice(0, 19) + 'Z',
+    source: SOURCES[j % SOURCES.length],
+    headline: `${name}: demo headline ${j + 1}`,
+  }))),
+  earnings, VETO_DECIDED.toISOString(),
+]);
+
+const rows = { strategies, snapshots, paperState, bookPositions, bookTargets, bookTrades, picks, open, closed,
+  cPicks, cOpen, cClosed, newsVetoes };
 
 if (DRY_RUN) {
   const months = [...new Set(sessions.map(monthOf))];
@@ -239,41 +301,48 @@ try {
 
   await c.query('BEGIN');
   await c.query(`TRUNCATE action_dismissals, orders, equity_snapshots, bars, fx_rates, runs, paper_state, book_positions,
-    book_targets, book_fills, book_trades, dividends, strategies RESTART IDENTITY CASCADE`);
+    book_targets, book_fills, book_trades, dividends, news_vetoes, strategies RESTART IDENTITY CASCADE`);
 
   for (const s of strategies)
     await c.query(`INSERT INTO strategies (id, name, sub, icon, is_champion, is_benchmark, sort, engine, rules_id, paper_start, params)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-    [s.id, s.name, s.sub, s.icon, s.champion, s.benchmark, s.sort, s.engine, s.rulesId, PAPER_START, JSON.stringify(s.params)]);
+    [s.id, s.name, s.sub, s.icon, s.champion, s.benchmark, s.sort, s.engine, s.rulesId, s.paperStart, JSON.stringify(s.params)]);
 
   await c.query(`INSERT INTO runs (started_at, finished_at, status, data_date, session_date, is_demo, paper_status, paper_finished_at)
     VALUES (now() - interval '5 minutes', now() - interval '2 minutes', 'success', $1, $2, true, 'success', now())`, [dataDate, session]);
   await c.query('INSERT INTO fx_rates (date, usd_idr) VALUES ($1, $2)', [dataDate, RATE]);
 
-  for (const [slot, sym, name, last, lim, tp, sl, sh, why] of picks) {
-    await c.query(`INSERT INTO orders (strategy_id, session_date, slot, symbol, company, last_price, limit_price, tp_price, sl_price, shares, explanation, status)
-      VALUES ('A',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending')`, [session, slot, sym, name, last, lim, tp, sl, sh, why]);
-    await c.query('INSERT INTO bars VALUES ($1,$2,$3,$3,$3,$3,1000000)', [sym, dataDate, last]);
-  }
+  const bar = (sym, close) => c.query('INSERT INTO bars VALUES ($1,$2,$3,$3,$3,$3,1000000) ON CONFLICT DO NOTHING', [sym, dataDate, close]);
+  for (const b of brackets) {
+    for (const [slot, sym, name, last, lim, tp, sl, sh, why] of b.picks) {
+      await c.query(`INSERT INTO orders (strategy_id, session_date, slot, symbol, company, last_price, limit_price, tp_price, sl_price, shares, explanation, status)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending')`, [b.id, session, slot, sym, name, last, lim, tp, sl, sh, why]);
+      await bar(sym, last);
+    }
 
-  for (const [i, [sym, name, sh, entry, cur, tp, sl, days]] of open.entries()) {
-    const fill = back(days - 1);
-    await c.query(`INSERT INTO orders (strategy_id, session_date, slot, symbol, company, last_price, limit_price, tp_price, sl_price, shares, status, fill_date, fill_price, days_held, mark)
-      VALUES ('A',$1,$2,$3,$4,$5,$5,$6,$7,$8,'open',$1,$5,$9,$10)`, [fill, i + 1, sym, name, entry, tp, sl, sh, days, cur]);
-    await c.query('INSERT INTO bars VALUES ($1,$2,$3,$3,$3,$3,1000000)', [sym, dataDate, cur]);
-  }
-  await c.query('INSERT INTO bars VALUES ($1,$2,$3,$3,$3,$3,1000000)', ['SPY', dataDate, spy[LAST]]);
+    for (const [i, [sym, name, sh, entry, cur, tp, sl, days]] of b.open.entries()) {
+      const fill = back(days - 1);
+      await c.query(`INSERT INTO orders (strategy_id, session_date, slot, symbol, company, last_price, limit_price, tp_price, sl_price, shares, status, fill_date, fill_price, days_held, mark)
+        VALUES ($1,$2,$3,$4,$5,$6,$6,$7,$8,$9,'open',$2,$6,$10,$11)`, [b.id, fill, i + 1, sym, name, entry, tp, sl, sh, days, cur]);
+      await bar(sym, cur);
+    }
 
-  for (const t of closed) {
-    const pnl = (t.ex - t.en) * t.sh - FEE * (t.ex + t.en) * t.sh;
-    const filled = nextWeekday(t.exitDate, -3);
-    const tp = t.reason === 'tp' ? t.ex : r2(t.en * 1.025);
-    const sl = t.reason === 'sl' ? t.ex : r2(t.en * 0.96);
-    await c.query(`INSERT INTO orders (strategy_id, session_date, slot, symbol, company, last_price, limit_price, tp_price, sl_price, shares, status,
-        fill_date, fill_price, days_held, exit_date, exit_price, exit_reason, pnl_usd)
-      VALUES ('A',$1,1,$2,$3,$4,$4,$5,$6,$7,'closed',$1,$4,3,$8,$9,$10,$11) ON CONFLICT DO NOTHING`,
-    [filled, t.sym, company[t.sym], t.en, tp, sl, t.sh, t.exitDate, t.ex, t.reason, pnl.toFixed(4)]);
+    for (const t of b.closed) {
+      const pnl = (t.ex - t.en) * t.sh - FEE * (t.ex + t.en) * t.sh;
+      const filled = nextWeekday(t.exitDate, -3);
+      const tp = t.reason === 'tp' ? t.ex : r2(t.en * 1.025);
+      const sl = t.reason === 'sl' ? t.ex : r2(t.en * 0.96);
+      await c.query(`INSERT INTO orders (strategy_id, session_date, slot, symbol, company, last_price, limit_price, tp_price, sl_price, shares, status,
+          fill_date, fill_price, days_held, exit_date, exit_price, exit_reason, pnl_usd)
+        VALUES ($1,$2,1,$3,$4,$5,$5,$6,$7,$8,'closed',$2,$5,3,$9,$10,$11,$12) ON CONFLICT DO NOTHING`,
+      [b.id, filled, t.sym, company[t.sym], t.en, tp, sl, t.sh, t.exitDate, t.ex, t.reason, pnl.toFixed(4)]);
+    }
   }
+  await bar('SPY', spy[LAST]);
+
+  for (const r of newsVetoes)
+    await c.query(`INSERT INTO news_vetoes (strategy_id, session_date, rank, symbol, verdict, reason, model, prompt_version, headlines,
+        earnings_date, decided_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, r);
 
   for (const r of snapshots) await c.query('INSERT INTO equity_snapshots (strategy_id, date, cash_usd, equity_usd) VALUES ($1,$2,$3,$4)', r);
 
@@ -297,7 +366,8 @@ try {
   const counts = await c.query(`SELECT 'orders ' || status AS what, count(*)::int AS n FROM orders GROUP BY status
     UNION ALL SELECT 'book_positions', count(*)::int FROM book_positions
     UNION ALL SELECT 'book_trades', count(*)::int FROM book_trades
-    UNION ALL SELECT 'equity_snapshots', count(*)::int FROM equity_snapshots ORDER BY what`);
+    UNION ALL SELECT 'equity_snapshots', count(*)::int FROM equity_snapshots
+    UNION ALL SELECT 'news_vetoes', count(*)::int FROM news_vetoes ORDER BY what`);
   console.log(`demo seeded: paper start ${PAPER_START}, session ${session}, data ${dataDate}`, counts.rows);
 } catch (e) {
   await c.query('ROLLBACK').catch(() => {});

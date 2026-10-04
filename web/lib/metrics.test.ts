@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { checklist, strategyMetrics } from './metrics';
+import { checklist, gateItem, strategyMetrics } from './metrics';
 
 const snaps = (vals: number[]) =>
   vals.map((equity, i) => ({ date: new Date(Date.UTC(2026, 6, 1 + i)).toISOString().slice(0, 10), equity }));
 
-const FAILED = { passed: false, note: 'P7a dev window only; failed max DD <= 15% (22.2%)' };
-const PASSED = { passed: true, note: null };
+const FAILED = { passed: false, applicable: true, note: 'P7a dev window only; failed max DD <= 15% (22.2%)' };
+const PASSED = { passed: true, applicable: true, note: null };
+const NOT_APPLICABLE = { passed: false, applicable: false, note: 'Backtest gate: not applicable (LLM strategy, design §1 item 5)' };
 
 describe('strategyMetrics', () => {
   it('computes return, win rate, profit factor, drawdown and trade count', () => {
@@ -48,6 +49,21 @@ describe('checklist', () => {
     expect(items).toHaveLength(6);
     expect(items[5]).toEqual({ label: 'Backtest gate passed', val: 'Not passed', ok: false, note: FAILED.note });
     expect(checklist(base, 0.046, PASSED)[5]).toEqual({ label: 'Backtest gate passed', val: 'Passed', ok: true });
+  });
+
+  it('reads "Not applicable" for C and never counts it as passed (handover D9)', () => {
+    const items = checklist(base, 0.046, NOT_APPLICABLE);
+    expect(items).toHaveLength(6);
+    expect(items[5]).toEqual({ label: 'Backtest gate', val: 'Not applicable', ok: false, note: NOT_APPLICABLE.note });
+    // Even every forward metric passing leaves C at five of six.
+    const allForward = checklist({ ...base, trades: 120 }, 0.046, NOT_APPLICABLE);
+    expect(allForward.filter(i => i.ok)).toHaveLength(5);
+    expect(allForward.every(i => i.ok)).toBe(false);
+  });
+
+  it('builds the sixth rule on its own', () => {
+    expect(gateItem({ passed: false, applicable: false, note: null })).toEqual({ label: 'Backtest gate', val: 'Not applicable', ok: false });
+    expect(gateItem(PASSED)).toEqual({ label: 'Backtest gate passed', val: 'Passed', ok: true });
   });
 
   it('passes only when all six hold', () => {

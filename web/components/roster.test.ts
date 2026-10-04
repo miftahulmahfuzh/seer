@@ -1,4 +1,4 @@
-import { Landmark, Shield, Sigma, TrendingUp } from 'lucide-react';
+import { Gavel, Landmark, Shield, Sigma, TrendingUp } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 import { selectStrategy, sharesLabel, strategyIcon } from './roster';
 
@@ -7,12 +7,14 @@ const roster = [
   { id: 'A', name: 'A · Quant', isChampion: false, isBenchmark: false },
   { id: 'F4-MOM12-N20-TREND', name: 'F4 · Momentum', isChampion: false, isBenchmark: false },
   { id: 'F1-SPY-SMA200-M', name: 'F1 · Trend', isChampion: false, isBenchmark: false },
+  { id: 'C', name: 'C · News veto', isChampion: false, isBenchmark: false },
 ];
 
 describe('selectStrategy', () => {
   it('returns the requested strategy when it is on the roster', () => {
     expect(selectStrategy(roster, 'F1-SPY-SMA200-M')?.id).toBe('F1-SPY-SMA200-M');
     expect(selectStrategy(roster, 'SPY')?.id).toBe('SPY');
+    expect(selectStrategy(roster, 'C')?.id).toBe('C');
   });
   it('defaults to the first research strategy', () => {
     expect(selectStrategy(roster, undefined)?.id).toBe('A');
@@ -29,6 +31,8 @@ describe('strategyIcon', () => {
     expect(strategyIcon('landmark')).toBe(Landmark);
     expect(strategyIcon('trending-up')).toBe(TrendingUp);
     expect(strategyIcon('shield')).toBe(Shield);
+    expect(strategyIcon('gavel')).toBe(Gavel);
+    expect(strategyIcon('sigma')).toBe(Sigma);
     expect(strategyIcon('nope')).toBe(Sigma);
   });
 });

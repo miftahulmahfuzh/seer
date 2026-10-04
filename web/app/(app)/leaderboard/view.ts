@@ -8,9 +8,13 @@ import type { MonthlyTable } from '../../../lib/monthly';
 /** The roster fields these helpers read (a structural subset of lib/data's Strategy). */
 export type RosterIn = { id: string; isChampion: boolean; isBenchmark: boolean };
 
-/** Research strategies take the design's A/B/C sheet and line pairs in roster order. */
-export const CARD_BGS = ['bg-lav', 'bg-sky', 'bg-stone'] as const;
-export const LINES = ['var(--ink)', 'var(--line-b)', 'var(--line-c)'] as const;
+/**
+ * Research strategies take the design's sheet and line pairs in roster order: the A/B/C pairs, then
+ * butter (the fourth sheet of the design's slot palette) with the coral accent line, so a fourth
+ * research strategy (C · News veto) never reuses the first one's look.
+ */
+export const CARD_BGS = ['bg-lav', 'bg-sky', 'bg-stone', 'bg-butter'] as const;
+export const LINES = ['var(--ink)', 'var(--line-b)', 'var(--line-c)', 'var(--coral)'] as const;
 
 export type Look = { bg: string; line: string; width: number; dotted: boolean };
 
@@ -36,6 +40,12 @@ export function looks(roster: RosterIn[]): Map<string, Look> {
   return out;
 }
 
+/**
+ * The month-by-month sheet's tint: the strategy's card sheet, except butter, which on mobile would
+ * merge into the butter checklist sheet stacked right above it; that one takes stone instead.
+ */
+export const monthsBg = (look: Look): string => (look.bg === 'bg-butter' ? 'bg-stone' : look.bg);
+
 export const researchOf = <T extends RosterIn>(roster: T[]): T[] => roster.filter(st => !st.isBenchmark);
 
 /** Highest total return among research strategies that have one. */
@@ -56,15 +66,27 @@ export const CHECKS = 6;
 
 export type Score = { passed: number; total: number; ready: boolean; lines: [string, string] };
 
-/** The checklist score and its two-line verdict. Never "Ready for real money" unless all six pass. */
-export function scoreOf(items: { ok: boolean }[], gatePassed: boolean): Score {
+/** The gate fields the score reads (a structural subset of lib/strategy's Gate). */
+export type GateIn = { passed: boolean; applicable: boolean };
+
+/** A strategy with no checklist yet: not passed, applicable. */
+export const NO_GATE: GateIn = { passed: false, applicable: true };
+
+/**
+ * The checklist score and its two-line verdict. Never "Ready for real money" unless all six pass,
+ * and never for a strategy whose backtest item is not applicable (C, handover D9): real money for
+ * it would need an explicit owner decision even if the five forward rules pass.
+ */
+export function scoreOf(items: { ok: boolean }[], gate: GateIn): Score {
   const passed = items.filter(i => i.ok).length;
-  const ready = items.length === CHECKS && passed === CHECKS;
-  const lines: [string, string] = ready
-    ? ['All six pass.', 'Ready for real money']
-    : gatePassed
-      ? ['Paper trading until', 'all six pass']
-      : ['Paper only.', 'Backtest gate not passed'];
+  const ready = gate.applicable && items.length === CHECKS && passed === CHECKS;
+  const lines: [string, string] = !gate.applicable
+    ? ['Paper only. No backtest gate.', 'Real money needs an owner decision']
+    : ready
+      ? ['All six pass.', 'Ready for real money']
+      : gate.passed
+        ? ['Paper trading until', 'all six pass']
+        : ['Paper only.', 'Backtest gate not passed'];
   return { passed, total: CHECKS, ready, lines };
 }
 

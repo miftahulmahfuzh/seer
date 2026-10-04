@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/strategy-c-news-veto`
 **Branch:** `feature/strategy-c-news-veto` (base: `HEAD` = local `main` @ `d9cecce`)
 **Phases:** 7
-**Status:** phase 2/7 complete
+**Status:** phase 6/7 complete (phases 1–6 done; 7 unblocked)
 **Coordinator:** —
 
 ---

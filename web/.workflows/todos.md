@@ -27,7 +27,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns new `web/lib/sera/` (relative imports only): `types.ts` (contract types), `lab.ts` (loads `../../data/lab.json`; `methodById`, `trialsOf`, `insightsOf`, `childrenOf`), pure `derive.ts` (per-trial gate checks from the engine's `failed`, misses, closest-to-eligible, best variant per method, funnel counts, progress over trial number, family aggregates, parent/child links, rebased SPY TR, drawdown series, calendar-year returns), `glossary.ts`, escape-first `markdown.ts`, test-only `fixture.ts` (reuses `web/lib/format.ts`), and a `*.test.ts` for each. Does not touch pages, components, engine. Exit: tsc + vitest green; every derivation unit-tested on a fixture snapshot; `lab.ts` type-checks against the real `web/data/lab.json`.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `SERA_LAB_SITE_PLAN.md` (phase 2 of 7)
   - **Satisfies**: R3 — Show every experiment, as detailed as possible, kept current with no human step; R5 — Concise, non-technical explanations, with analysis and opinion on every method; R7 — As comprehensive as possible (cross-cutting)
   - **Depends on**: P1-ENG-6QQA

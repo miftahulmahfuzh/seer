@@ -25,23 +25,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "b418182443a07d3fb255250383a7bc72d3ee1e80",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "web/lib/sera data layer (types, lab, derive, glossary, markdown, fixture + 4 tests); tsc clean, vitest 162/162",
       "package": "web/lib/sera",
       "plan": ".workflows/plan/sera-lab-site/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-04T15:11:32+00:00",
       "satisfies": [
         "R3",
         "R5",
         "R7"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-5767",
       "title": "Web data layer for the snapshot"
     },
     {
@@ -83,7 +83,7 @@
         "R5",
         "R7"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Overview page"
     },
@@ -107,7 +107,7 @@
         "R5",
         "R7"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Methods list + method detail"
     },
@@ -131,7 +131,7 @@
         "R6",
         "R7"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Journal, Ideas, How it works"
     },
@@ -164,7 +164,7 @@
   "plan": "/home/miftah/.worktrees/seer/sera-lab-site/.workflows/orchestration/sera-lab-site/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-lab-site",
-  "updated": "2026-10-04T15:08:57+00:00",
+  "updated": "2026-10-04T15:11:46+00:00",
   "verified_at": "2026-10-04T15:05:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-lab-site"
 }

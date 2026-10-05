@@ -1,6 +1,8 @@
 /* /sera/methods/[id]. Seer v2 tokens only. Desktop is the designed layout; below 1024px the
    two-up grids stack and wide tables scroll inside their sheet. */
-.meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+/* Boxes sit 12px apart both ways, like the other Sera pages. */
+.page { display: flex; flex-direction: column; gap: 12px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .metaLink { color: var(--ink); background: var(--chip-solid); transition: background 0.12s, color 0.12s; }
 .metaLink:hover { background: var(--ink); color: var(--sheet); }
 .metaLink:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
@@ -9,9 +11,8 @@
 .statusChip[data-tone='neutral'] { background: var(--butter); color: var(--ink); }
 .statusChip[data-tone='good'] { background: var(--ink); color: var(--sheet); }
 
-.twoUp { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px; }
-.textSheet, .chartSheet, .proseSheet { margin-bottom: 12px; gap: 14px; }
-.twoUp > * { margin-bottom: 0; }
+.twoUp { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.textSheet, .chartSheet, .proseSheet { gap: 14px; }
 
 .body { font-size: 17px; line-height: 1.55; max-width: 72ch; }
 .cite { font-size: 14px; line-height: 1.4; color: var(--ink-2); }

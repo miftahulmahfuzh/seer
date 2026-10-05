@@ -34,6 +34,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import psycopg
@@ -1021,18 +1022,45 @@ def market_window_since(data_date: date) -> date:
     return _date("data_date", data_date) - timedelta(days=MARKET_WINDOW_DAYS)
 
 
-def load_market_window(conn: psycopg.Connection, since: date) -> Market:
+def load_market_window(
+    conn: psycopg.Connection, since: date, *, cache_dir: Path = bio.CACHE_DIR
+) -> Market:
     """A ``Market`` of every bar dated on or after ``since``, every membership interval (both
-    indices merged, as ``io.load_market``) and every fx row, read inside the caller's
-    transaction (no cache, no commit, no rollback).
+    indices merged, as ``io.load_market``), every fx row and the point-in-time fundamental
+    panel, read inside the caller's transaction (no commit, no rollback).
 
     For a symbol whose bars cover the whole window, its ``History`` equals ``io.load_market``'s
     cut to dates ``>= since``. ``backtest.io.LoadError`` when no bar is dated on or after ``since``.
+
+    **The panel is NOT windowed and is cached, unlike the bars.** Both follow from what the
+    facts are: ``panel.as_of(symbol, t)`` returns the latest fact with ``filed <= t``, and SUE
+    needs ``sue.MIN_QUARTERS`` quarters of diluted EPS behind ``t``, so a window short enough
+    to be worth cutting would silently drop the history the factors read. It is cheap to load
+    whole -- facts are a fraction of the bars -- and ``io.load_panel``'s pickle is keyed by
+    ``(count(*), max(filed))`` over the ``fundamental_facts`` x ``ticker_cik`` join, so it
+    invalidates itself on any ingest or re-vendoring.
+
+    Delegating to ``io.load_panel`` rather than reading facts here is deliberate: it already
+    returns ``EMPTY_FUNDAMENTALS`` when either table is missing or the join is empty -- the
+    state of a database that has not applied ``005_fundamentals.sql``, and of production, whose
+    ``fundamental_facts`` is deliberately truncated because train/eval reads a local Postgres
+    instead (see the runbook's "Train/eval on a local database"). A second implementation here
+    would be a fifth copy of a contract that has already drifted four times.
+
+    Until this existed, every ``Market`` the paper night built silently carried ``EMPTY_PANEL``:
+    this function constructed ``Market`` without the field, so a ``MarketAware`` allocator in
+    ``paper/roster.py`` would have ranked nobody and reported no error. ``FND`` is not in the
+    roster yet, which is the only reason that was latent rather than a live bug.
     """
     _date("since", since)
     frame = bio.read_bars_frame(conn, since=since)
     history = bio.histories_from_frame(frame)
-    return Market(history=history, membership=Membership(intervals=bio.read_intervals(conn)), fx=bio.read_fx(conn))
+    return Market(
+        history=history,
+        membership=Membership(intervals=bio.read_intervals(conn)),
+        fx=bio.read_fx(conn),
+        fundamentals=bio.load_panel(conn, cache_dir=cache_dir),
+    )
 
 
 # --------------------------------------------------------------------------- news vetoes (strategy C)

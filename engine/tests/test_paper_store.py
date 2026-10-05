@@ -13,6 +13,7 @@ import pytest
 
 from seer_engine import bars, dates, db, fx
 from seer_engine.backtest import io as bio
+from seer_engine.fundamentals import EMPTY_PANEL
 from seer_engine.paper import store
 from seer_engine.paper.benchmark import BenchmarkState
 from seer_engine.prices import Bar
@@ -512,3 +513,81 @@ def test_read_bars_frame_default_statement_is_unchanged_and_since_filters(pg, mo
     pg.rollback()
     with pytest.raises(bio.LoadError):
         bio.read_bars_frame(pg, since=date(2027, 1, 4))
+
+
+_CIK_AAA = 1000000001
+
+
+def _seed_facts_for_aaa(conn):
+    """One filer behind ``AAA`` and two annual facts for it, so the panel is NON-EMPTY.
+
+    This matters more than it looks. An earlier version of the test below compared the
+    window's panel against ``io.load_market``'s without seeding anything, so both sides were
+    ``EMPTY_PANEL`` and the assertion was ``0 == 0`` -- it passed with the fix reverted. The
+    panel's symbols come from ``ticker_cik``, not from ``bars``, so the map row is the half
+    that makes the panel non-empty.
+    """
+    # Committed via db.transaction, as test_market_fundamentals.py's seed helpers do: an open
+    # transaction makes load_market refuse the connection (io.py:143 wants IDLE).
+    with db.transaction(conn, False), conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO ticker_cik (symbol, cik, start_date, end_date, company, source, note) "
+            "VALUES ('AAA', %s, '2020-01-02', NULL, 'Triple A Inc.', 'manual', NULL)",
+            (_CIK_AAA,),
+        )
+        cur.executemany(
+            "INSERT INTO fundamental_facts "
+            "(cik, taxonomy, tag, unit, period_start, period_end, val, accn, fy, fp, form, filed) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            [
+                # Assets is a balance-sheet STOCK, so it is tagged instantaneous:
+                # period_start == period_end, which is how 005_fundamentals.sql encodes it.
+                # Seeding it as a duration makes the ladder refuse it and Snapshot.assets NaN.
+                (_CIK_AAA, "us-gaap", "Assets", "USD", date(2025, 12, 31), date(2025, 12, 31),
+                 1000.0, "acc-1", 2025, "FY", "10-K", date(2026, 2, 20)),
+                (_CIK_AAA, "us-gaap", "StockholdersEquity", "USD", date(2025, 12, 31),
+                 date(2025, 12, 31), 400.0, "acc-1", 2025, "FY", "10-K", date(2026, 2, 20)),
+            ],
+        )
+
+
+def test_market_window_carries_the_fundamental_panel_not_an_empty_one(pg, tmp_path):
+    """The paper night's ``Market`` must carry the panel, not default to ``EMPTY_PANEL``.
+
+    ``load_market_window`` built ``Market(history=..., membership=..., fx=...)`` with no
+    ``fundamentals`` argument, so every paper night silently got ``EMPTY_PANEL`` from the
+    dataclass default and a ``MarketAware`` allocator would have ranked nobody and reported
+    no error. Latent only because ``FND`` is not in ``paper/roster.py``.
+    """
+    since = _seed_market(pg)
+    _seed_facts_for_aaa(pg)
+    window = store.load_market_window(pg, since, cache_dir=tmp_path)
+    assert window.fundamentals is not EMPTY_PANEL, "the night got the shared empty panel"
+    assert "AAA" in window.fundamentals.symbols
+    snap = window.fundamentals.as_of("AAA", date(2026, 6, 1))
+    assert snap is not None and snap.observations, "the panel carries no usable observations"
+    assert snap.assets == 1000.0 and snap.equity == 400.0
+    pg.rollback()
+
+
+def test_market_window_panel_equals_the_full_loads_panel(pg, tmp_path):
+    """Windowing the bars must not window the facts: SUE reads quarters behind ``t``."""
+    since = _seed_market(pg)
+    _seed_facts_for_aaa(pg)
+    full, _ = bio.load_market(pg, cache_dir=tmp_path)
+    window = store.load_market_window(pg, since, cache_dir=tmp_path)
+    assert sorted(window.fundamentals.symbols) == sorted(full.fundamentals.symbols)
+    assert window.fundamentals.as_of("AAA", date(2026, 6, 1)).observations == \
+        full.fundamentals.as_of("AAA", date(2026, 6, 1)).observations
+    pg.rollback()
+
+
+def test_market_window_panel_is_empty_when_no_facts_are_stored(pg, tmp_path):
+    """Production's state: 005 applied, ``fundamental_facts`` deliberately truncated because
+    train/eval reads a local Postgres instead. The night must still load.
+    """
+    since = _seed_market(pg)
+    window = store.load_market_window(pg, since, cache_dir=tmp_path)
+    assert window.fundamentals is EMPTY_PANEL
+    assert list(window.history) == ["AAA", "NEW", "SPY"]
+    pg.rollback()

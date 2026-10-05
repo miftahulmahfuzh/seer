@@ -10,14 +10,14 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "Session impl-roster-promotion-pipeline-p1 alive and busy in tmux @34. verify --apply downgraded spawned->pending on commit-absence alone; that is mid-build, not abandonment. Do NOT re-spawn while @34 is live.",
       "package": "db`, `engine/src/seer_engine/paper",
       "plan": ".workflows/plan/roster-promotion-pipeline/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T11:04:12+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "running",
       "task_id": null,
       "title": "The roster becomes data: `status`, `paper_end`, and a name\u2192object resolver"
     },
@@ -42,19 +42,19 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "3d69a20",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 3,
-      "note": null,
+      "note": "LAND-TIME DEBT: engine/package_readme.md has no line for the new 'compare' subcommand; readme-updater was skipped to stay inside the commit pathspec and no phase owns the readme. Coordinator to fix at Step 5. PINNED CONTRACT for phase 4's TS port: MIN_COMMON_SESSIONS=63, MIN_RANKED=2, Sharpe only (no Calmar, no configurable rank key), _select drop-worst-overlap, as_json keys {minSessions,window,rows}/{strategyId,status,rank,reason,window,inception}/{start,end,sessions,totalReturn,cagr,maxDrawdown,sharpe}; 'compare --json' is the oracle. compare.py is status- and benchmark-blind per D9 -- exclusion is the caller's. Phase decisions: created only its own task in Step 3 (six-at-once races duplicate TaskIDs); wrote all 39 enumerated tests over the plan's stale '35' summary (rung 3, enumerated table is the spec).",
       "package": "engine/src/seer_engine/{paper,commands}",
       "plan": ".workflows/plan/roster-promotion-pipeline/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T11:04:18+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-7V3C",
       "title": "Common-window, risk-adjusted comparison over `equity_snapshots"
     },
     {
@@ -120,6 +120,7 @@
   "plan": "/home/miftah/.worktrees/seer/roster-promotion-pipeline/ROSTER_PROMOTION_PIPELINE_PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "roster-promotion-pipeline",
-  "updated": "2026-10-05T10:46:37+00:00",
+  "updated": "2026-10-05T11:04:18+00:00",
+  "verified_at": "2026-10-05T11:03:48+00:00",
   "worktree": "/home/miftah/.worktrees/seer/roster-promotion-pipeline"
 }

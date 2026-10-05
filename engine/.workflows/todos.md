@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-05
-**Total Active Tasks**: 2
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 68
+- Blocked: 0
+- Completed: 69
 
 ---
 
@@ -368,20 +368,37 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Completion: the plan index's phase-2 row ticked and its `**Status:**` advanced to `phases 1, 2, 3, 4 of 6 complete`. This REVERSES phase 1's recorded decision to leave both alone, because the premise of that decision no longer holds: the index as it stands already carries ✅ on rows 1, 3 and 4 and already names the completed phases on its Status line, so leaving row 2 blank would now misreport the set rather than avoid a conflict (rung 6: the file's own current state outranks a decision its later edits superseded). Edit confined to one table row and one line.
     - Completion: `P1-ENG-Z8MR` (phase 5) unblocked `blocked` -> `open` — both its stated dependencies, `P1-ENG-7KQ2` and `P1-ENG-J5XD`, have now landed. `P1-ENG-H3WF` (phase 6) left `blocked`; it depends on phase 5, which has not.
     - Completion: landing NOT attempted. `swarm.py find --plan ROSTER_PROMOTION_PIPELINE_PLAN.md` returns `swarm: true` with coordinator `orch-roster-promotion-pipeline`, and this is phase 2 of 6 in any case — the merge belongs to the set's coordinator.
-- [ ] **P1-ENG-Z8MR** Phase 5: `promote`: the lab → roster bridge
+- [x] **P1-ENG-Z8MR** Phase 5: `promote`: the lab → roster bridge
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns new `engine/src/seer_engine/commands/promote.py`, `engine/src/seer_engine/lab/store.py` (recording the promotion) and its tests. Does not touch `backtest/registry.py` (D1), the paper night (phase 2 owns it), or `web/`. Exit: `promote --method M --candidate M-X --id <roster-id> [--retire <id>]` inserts a `strategies` row with `status='active'`, `promoted_from='<method id>'`, **the definition columns (`object_name`, `registry_id` NULL, `gate_note`, `gate_applicable`)**, full contract-C2 `params` and no `paper_start`, so the next paper night starts its clock the ordinary way; the row it just wrote is read back and rebuilt through `roster.from_row` **inside the same transaction**, so a row the paper night would refuse never commits; it refuses — each with a named error — to reuse an id that already has a `paper_start` (invariant 3), an allocator the resolver does not name (naming the one `Binding(...)` line to add), a method whose variant is ambiguous, and a candidate whose rules are not a `sim.rules` preset; `--retire <id>` calls `store.retire` (phase 2's, never its own SQL) in the same transaction as the insert, so a swap is atomic and the board never shows five active horsemen or three; the lab database records the promotion against the method — `analysis` grown, one `insights` row — at **any** status, and moves `status` to `paper` only along the `('test-passed','paper')` edge `TRANSITIONS` already has, with `--lab-status-stays` recording without moving (the shape a `rejected` method needs) and `source_sha`, `hypothesis` and `verdict` untouched and no `TRANSITIONS` edge added; a dry-run mode prints every row it would write in both databases and writes nothing; and `backtest/registry.py` is byte-identical to `origin/main` (D1), pinned by a test.
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `ROSTER_PROMOTION_PIPELINE_PLAN.md` (phase 5 of 6)
   - **Satisfies**: R4 — Promote a method found in a `/sera-the-explorer` session onto the main app's leaderboard
   - **Depends on**: P1-ENG-7KQ2, P1-ENG-J5XD
   - **Plan**: `.workflows/plan/P1-ENG-Z8MR.md`
+  - **Completed**: 2026-10-05 19:09
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/commands/promote.py, engine/src/seer_engine/lab/store.py, engine/tests/test_promote_command.py, engine/tests/test_lab_store.py
+  - **Verified**: `python -c 'import seer_engine.commands.promote as m; print(m.HELP)'` ok; `"promote" in cli.discover()` ok; `python -m seer_engine promote --help` ok. Targeted set (test_promote_command, test_lab_store, test_paper_roster, test_registry, test_lab_snapshot, test_cli): 170 passed. Full engine suite WITH `PG_TEST_URL`: **2683 passed, 0 skipped** (inherited 2659 -> delta **+24 passed, +0 skipped**). WITHOUT `PG_TEST_URL`: **2323 passed, 360 skipped** (delta **+14 passed, +10 skipped**). Both deltas are exactly the plan index's declared phase-5 delta, and 2683 total either way — the plan's consistency check holds. `ruff check` passed on all four files. D1 pinned: `git diff origin/main -- engine/src/seer_engine/backtest/registry.py` is EMPTY (byte-identical). Manual dry-run against a local migrated throwaway schema exits 2 with the designed "the roster resolver has no name for <FND> ... Add one entry to RESOLVER" refusal — the correct outcome at the end of THIS phase (phase 6 commits that line); `git status --porcelain lab/lab.sqlite web/data/lab.json` empty afterwards. No existing test changed its result; `test_paper_roster.py`'s five pinned spec digests pass unchanged.
+  - **Drift**:
+    - `lab/store.py` line numbers in the plan were ~13 lines ahead of the tree (`append_analysis` at :376, not :388; file 783 lines, not 796). Anchors were unambiguous; inserted by anchor, not by line number.
+    - The plan's db tests patched `pg.close` to a no-op to keep the fixture connection usable. That DEADLOCKS the suite: the autouse `resolver_entry(monkeypatch)` fixture pulls monkeypatch into the closure first, so monkeypatch's undo runs LAST — after conftest's `pg_schema` teardown has already called the still-patched `close`. The connection survives holding its locks and the schema's `DROP ... CASCADE` blocks forever. Confirmed with `--setup-show` and `pg_stat_activity`. Replaced with a `_Borrowed` connection proxy whose `close()` only rolls back, so the fixture's own `close` is never patched. Every assertion the plan's tests make is preserved.
+  - **Decided**:
+    - `_check_target`'s second raw `SELECT promoted_from` -> read `row.promoted_from` off the `StrategyRow` the same block already fetched (rung 3, the phase plan's code blocks: phase 2's `StrategyRow` carries `promoted_from`, so the extra query is the same value plus a row-factory assumption).
+    - Test named `test_promote_inserts_an_active_row_with_no_paper_start` renamed to `test_a_lab_without_the_method_refuses_before_writing`, which is what it asserts (exit 2 on a fresh lab), plus an added assertion that the roster stayed empty (rung 2, exit criteria: exit criterion 1 is proved by `test_promote_writes_the_row_the_night_expects`; the old name labelled a different test).
+    - The plan's db tests patched `pg.close`, which deadlocked the suite -> `_Borrowed` connection proxy instead (rung 2, exit criteria: criterion 3 and the whole db half are unreachable while the suite hangs).
+    - The plan's manual dry-run check reaches its designed refusal only after a `SELECT max(sort)`, so as written it opens production Neon. Ran it against a freshly migrated local throwaway schema instead (rung 1, invariant 8: no Neon write; the refusal does not depend on which Postgres answers).
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the direct precedent recorded by phases 1, 2 and 3 of this same set in the blocks above, and by all five phases of the previous swarm in this same file). A cross-file block move is the single edit most likely to clobber a peer's concurrent append in a shared worktree.
+    - Completion: no `**Commit**` field (rung 6: phases 1, 2 and 3 above have none either). This file is committed *inside* the phase's own commit, so a field naming that commit's sha cannot exist in it; the sha is reported to the set's coordinator and is one `git log` away.
+    - Completion: the plan index's phase-5 row ticked and its `**Status:**` advanced to `phases 1, 2, 3, 4, 5 of 6 complete`, following phase 2's recorded reversal rather than phase 1's and phase 3's original decision — the index already carries ✅ on rows 1–4 and already names the completed phases on its Status line, so leaving row 5 blank would now misreport the set. Edit confined to one table row and one line.
+    - Completion: `P1-ENG-H3WF` (phase 6) unblocked `blocked` -> `open` — its sole stated dependency, `P1-ENG-Z8MR`, has now landed.
+    - Completion: landing NOT attempted. `swarm.py find --plan ROSTER_PROMOTION_PIPELINE_PLAN.md` returns `swarm: true` with coordinator `orch-roster-promotion-pipeline`; per analyze-orchestrator Step 5 the merge belongs to the set's coordinator, and phase 6 has not run in any case.
 - [ ] **P1-ENG-H3WF** Phase 6: `FND` onto the roster — the first promotion through the new path
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns the `FND` `RESOLVER` entry and `SEED_ROWS` row in `paper/roster.py`, new `db/migrations/007_fnd.sql`, **`paper/book.py` and `paper/replay.py`'s `MarketAware` dispatch**, new `engine/tests/test_paper_fnd.py` plus the widened literals in `test_paper_book.py`, `test_paper_roster.py`, `test_migrate.py` and `test_paper_check.py`, and the "FND joined the roster" section of `docs/runbooks/paper.md`. Does not touch `f_fundamental.py`'s own logic, M0005's lab status/`source_sha`/`trials`, `REGISTRY`, `commands/promote.py` or `web/`. Exit: `FND` is on the roster as `active`, `sort=6`, `engine='book'`, `rules_id='monthly-hold'`, `object_name='FUNDAMENTAL'`, `registry_id IS NULL`, carrying an honest `gate_note` in the style of its neighbours — it has **not** passed a gate and must not claim to; it is added through phase 5's `promote --method M0005 --candidate M0005-ALL --id FND --lab-status-stays`, which also records the promotion in the lab, proving the pipeline rather than bypassing it (D7, D11), with the documented-equivalent SQL as the escape hatch only; `paper.book.decide_book` and `paper.replay.expected_book` dispatch a `MarketAware` allocator through `prepare_for` + `targets_prepared` so `FND` reaches `market.fundamentals` — without which it would hold cash forever while every log line said it decided — and for every allocator that is not `MarketAware` the expression is byte-identical to today's, so the five existing strategies replay bit for bit; the paper night produces orders or an explicit empty decision for `FND` against a `Market` carrying the fundamental panel and `paper_check` replays it as `ok`, never `mismatch`; a `Market` with no panel yields no trades, not wrong trades, asserted by a test at the roster level; `roster.FUNDAMENTAL_PARAMS` equals M0005's `COMPOSITE` by value, pinned by a test, because `roster.py` must never import a lab method and only that equality keeps the promoted row's frozen digest and the roster's recomputed digest the same; the five pre-existing `spec_digest` values are byte-identical and `MAX_LOOKBACK_BARS` is still 253 (`FND`'s lookback is 20); and nothing claims `FND` passed a backtest gate, with the go-live checklist's arithmetic still reading honestly with a fifth research strategy present (`CHECKS = 6` is per strategy; checked).
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `ROSTER_PROMOTION_PIPELINE_PLAN.md` (phase 6 of 6)
   - **Satisfies**: R1 — Include the fundamentals-driven strategy in paper trading — the stated justification for excluding it does not hold, because paper is not real money and the gates bind only the real-money decision
   - **Depends on**: P1-ENG-Z8MR

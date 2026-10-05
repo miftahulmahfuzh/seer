@@ -79,6 +79,10 @@ INSIGHT_KINDS: tuple[str, ...] = (
 DSR_MIN = 0.95  # lab eligibility on the dev window, on top of the five P7a D8 conditions
 DSR_LABEL = "DSR >= 0.95"
 
+# The first words of the analysis section `record_promotion` appends, and its idempotence key:
+# a method whose analysis already names this roster id has been recorded and is not recorded twice.
+PROMOTION_MARKER = "Promoted to the paper roster as "
+
 
 def _quoted(values: Iterable[str]) -> str:
     return ", ".join(f"'{v}'" for v in values)
@@ -386,6 +390,86 @@ def append_analysis(conn: sqlite3.Connection, method_id: str, text: str) -> None
     conn.execute(
         "UPDATE methods SET analysis = ?, updated = ? WHERE id = ?", (new, now_iso(), method_id)
     )
+
+
+def record_promotion(
+    conn: sqlite3.Connection,
+    *,
+    method_id: str,
+    strategy_id: str,
+    candidate_id: str,
+    object_name: str,
+    spec_digest: str,
+    retired_id: str | None = None,
+    move_status: bool = True,
+) -> str:
+    """Record that ``candidate_id`` became paper roster entry ``strategy_id``; return the status.
+
+    The lab is append-only (§1), so a promotion is *added*, never stamped over anything:
+
+    - ``analysis`` grows by one dated section (``methods_analysis_grows`` permits only growth);
+    - one ``insights`` row is appended (the journal table refuses UPDATE and DELETE outright);
+    - ``status`` moves to ``paper`` **only** along the edge ``TRANSITIONS`` already has,
+      ``('test-passed', 'paper')``. A method already at ``paper`` is left alone. From any other
+      status this raises LabError, because there is no edge and inventing one would make the
+      lab's own vocabulary mean less. Pass ``move_status=False`` to record the promotion and
+      leave the status where it is -- the honest shape for a roster that is taking a method the
+      lab has not passed (the roster's admission rule is not the lab's gate: plan Decisions D5).
+
+    ``hypothesis``, ``verdict``, ``parent_id`` and above all ``source_sha`` are never written.
+    No ``trials`` row is inserted: a promotion is not a backtest and must not move the lab's N.
+
+    Idempotent: a method whose ``analysis`` already carries ``PROMOTION_MARKER`` followed by
+    ``strategy_id`` is already recorded, and this writes nothing and returns the current status.
+    That is what lets the command be re-run to repair a half-finished promotion, since the roster
+    (Neon) and the lab (SQLite) cannot share one transaction.
+
+    The caller holds the transaction (``begin_immediate`` / ``with conn``), as every other writer
+    in this module does.
+    """
+    row = get_method(conn, method_id)
+    if row is None:
+        raise LabError(f"no method {method_id}")
+    if not candidate_id.startswith(method_id):
+        raise LabError(f"candidate {candidate_id!r} does not belong to method {method_id}")
+    status = str(row["status"])
+    if PROMOTION_MARKER + f"`{strategy_id}`" in row["analysis"]:
+        return status
+
+    if move_status and status != "paper":
+        if (status, "paper") not in TRANSITIONS:
+            raise LabError(
+                f"{method_id} is {status!r} and the lab's TRANSITIONS have no edge "
+                f"{status!r} -> 'paper'; only 'test-passed' reaches 'paper'. The roster may still "
+                f"take this method -- its admission rule is not the lab's gate -- but say so: "
+                f"re-run with --lab-status-stays, which records the promotion and leaves the "
+                f"status alone."
+            )
+
+    retired = "" if retired_id is None else f", replacing `{retired_id}` (retired the same moment)"
+    body = (
+        f"{PROMOTION_MARKER}`{strategy_id}`{retired}.\n\n"
+        f"Variant: `{candidate_id}`. Roster object: `{object_name}`. "
+        f"Frozen spec digest: `{spec_digest}`.\n\n"
+        f"The roster row is `status='active'` with no `paper_start`: the next paper night freezes "
+        f"the spec and starts its own clock, so the paper record begins at the promotion and "
+        f"claims nothing earlier. `backtest.registry.REGISTRY` was not appended to -- a promoted "
+        f"method reaches the roster through the roster's own resolver, so the lab's "
+        f"multiple-testing count is unchanged by this."
+    )
+    append_analysis(conn, method_id, "# Promotion\n\n" + body)
+    add_insight(
+        conn,
+        kind="observation",
+        title=f"{method_id} promoted to the paper roster as {strategy_id}",
+        body=body,
+        method_id=method_id,
+    )
+    if move_status and status != "paper":
+        update_method(conn, method_id, status="paper")
+        return "paper"
+    return status
+
 
 
 # --------------------------------------------------------------------------- trials

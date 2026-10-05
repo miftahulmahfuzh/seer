@@ -176,3 +176,59 @@ def test_begin_immediate_makes_id_allocation_atomic(tmp_path):
     a.rollback()
     store.begin_immediate(b)
     b.rollback()
+
+
+# ---- promotion (roster-promotion-pipeline phase 5) ----------------------------------------------
+
+
+def _promote(conn, **kw):
+    base = dict(
+        method_id="M0001", strategy_id="FND", candidate_id="M0001-A",
+        object_name="FUNDAMENTAL", spec_digest="d" * 64,
+    )
+    base.update(kw)
+    with conn:
+        return store.record_promotion(conn, **base)
+
+
+def test_record_promotion_appends_analysis_and_an_insight(conn):
+    _method(conn, status="idea")
+    assert _promote(conn, move_status=False) == "idea"
+    row = store.get_method(conn, "M0001")
+    assert store.PROMOTION_MARKER + "`FND`" in row["analysis"]
+    assert "M0001-A" in row["analysis"] and "FUNDAMENTAL" in row["analysis"]
+    assert row["status"] == "idea"
+    insight = conn.execute("SELECT * FROM insights ORDER BY id DESC LIMIT 1").fetchone()
+    assert insight["kind"] == "observation" and insight["method_id"] == "M0001"
+    assert "promoted to the paper roster as FND" in insight["title"]
+
+
+def test_record_promotion_takes_the_edge_transitions_already_has(conn):
+    _method(conn, status="idea")
+    with conn:
+        for nxt in ("registered", "dev-eligible", "promoted", "test-passed"):
+            store.update_method(conn, "M0001", status=nxt)
+    assert _promote(conn) == "paper"
+    assert store.get_method(conn, "M0001")["status"] == "paper"
+
+
+def test_record_promotion_refuses_a_status_with_no_path_to_paper(conn):
+    _method(conn, status="idea")
+    with conn:
+        store.update_method(conn, "M0001", status="rejected")
+    with pytest.raises(store.LabError, match="--lab-status-stays"):
+        _promote(conn)
+    assert store.get_method(conn, "M0001")["status"] == "rejected"
+    assert store.PROMOTION_MARKER not in store.get_method(conn, "M0001")["analysis"]
+
+
+def test_record_promotion_is_idempotent_and_never_touches_source_sha(conn):
+    _method(conn, status="idea")
+    with conn:
+        store.update_method(conn, "M0001", source_sha="a" * 64)
+    _promote(conn, move_status=False)
+    _promote(conn, move_status=False)
+    row = store.get_method(conn, "M0001")
+    assert row["analysis"].count(store.PROMOTION_MARKER) == 1
+    assert conn.execute("SELECT count(*) FROM insights").fetchone()[0] == 1
+    assert row["source_sha"] == "a" * 64

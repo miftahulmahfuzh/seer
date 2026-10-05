@@ -615,9 +615,9 @@ Pure and deterministic: no database, no network, no clock, no randomness, no log
 ### strategies (P3)
 
 Pure, like `sim`: no database, network, clock, randomness or logging, and never `bars`.
-`tests/test_strategy_purity.py` globs every module in `strategies/`, `backtest/` and
-`seer_engine/fundamentals/` (except `backtest/io.py`) and checks this in a subprocess and on the
-AST. P4 calls this code nightly and P6 adds strategies B and C beside `a.py`.
+`tests/test_strategy_purity.py` globs every module in `strategies/`, `backtest/`,
+`fundamentals/` and `paper/` — the two declared impure edges `backtest/io.py` and
+`paper/store.py` excepted — and checks this in a subprocess and on the AST. P4 calls this code nightly and P6 adds strategies B and C beside `a.py`.
 
 **`strategies.base`**
 - `@dataclass(frozen, slots) History(symbol, dates, open, high, low, close, volume)`: one symbol's

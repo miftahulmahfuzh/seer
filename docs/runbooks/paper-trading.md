@@ -555,3 +555,76 @@ touched Neon or the GitHub secrets.
 
 **Remaining owner step:** 1 (the four secrets), before the first scheduled night after the merge.
 C's clock starts that night.
+
+## FND joined the roster (2026-10, roster-promotion-pipeline phase 6)
+
+`FND` — point-in-time SEC fundamental factors, `strategies.f_fundamental.FUNDAMENTAL` with
+`rank="composite", top=20` under `monthly-hold` — is the sixth paper portfolio, written through
+`promote --method M0005 --candidate M0005-ALL --id FND --lab-status-stays` (the command is below).
+It is `status='active'` with no `paper_start`, so the next nightly run starts its clock the
+ordinary way.
+
+```bash
+GATE_NOTE="M0005 dev window only (1996-01-03..2015-10-16, fundamental coverage 0.3151); failed beats SPY TR (+1.8% vs +351.4%), >= 100 trades (15) and DSR >= 0.95 (0.006)"
+
+# 1. See what it would write, in both databases. Writes nothing.
+"$SEER_PY" -m seer_engine --dry-run promote \
+  --method M0005 --candidate M0005-ALL --id FND \
+  --name "FND · Fundamentals" --sub "Top 20 by SEC filing factors, monthly" \
+  --icon book-open --sort 6 --lab-status-stays --gate-note "$GATE_NOTE"
+
+# 2. Write it. No --retire: FND JOINS the roster, it does not replace a horseman.
+"$SEER_PY" -m seer_engine promote \
+  --method M0005 --candidate M0005-ALL --id FND \
+  --name "FND · Fundamentals" --sub "Top 20 by SEC filing factors, monthly" \
+  --icon book-open --sort 6 --lab-status-stays --gate-note "$GATE_NOTE"
+
+# 3. Confirm: active, no paper clock yet, resolvable, and no claim of a gate pass.
+psql "$DATABASE_URL_UNPOOLED" -c \
+  "SELECT id, status, sort, engine, rules_id, object_name, registry_id, gate_applicable, paper_start, promoted_from FROM strategies WHERE id='FND'"
+
+# 4. Commit the lab's record of it (promote appended an analysis section and an insight).
+"$SEER_PY" -m seer_engine lab stage
+```
+
+`--candidate M0005-ALL` is required: M0005 has six variants (VAL, ROE, GP, SUE, ALL, ALL-R) and
+they are different algorithms, so `promote` refuses to guess. `M0005-ALL` is the one whose
+`params` is `FundamentalParams(rank="composite", top=20)` — `roster.FUNDAMENTAL_PARAMS`, and
+**not** the best-performing variant: choosing on the dev-window numbers would be choosing on the
+multiple-testing noise the lab's `trials` table exists to count.
+
+`db/migrations/007_fnd.sql` writes the same row for any database brought up from migrations (CI's
+throwaway schema, a fresh local train database, a rebuilt Neon). The two must agree; phase 1's
+migration-equality test and phase 5's row-rebuild test fail in opposite directions if they drift.
+
+**It has not passed a backtest gate and does not claim to.** Its `gate_note` names the six M0005
+dev-window trials recorded in `lab/lab.sqlite`, all six of which failed, and the dev window's
+0.3151 fundamental coverage. That is the same standing A, F4 and F1 are on. Paper membership has
+never required a gate pass; the gates bind the real-money decision, and the go-live checklist
+(`CHECKS = 6`, per strategy) still reads `Paper only. Backtest gate not passed` for FND.
+
+**`promoted_from` is `'M0005'`, and `M0005` is still `rejected` in the lab.** Those two facts sit
+together on purpose. The column names the method the allocator and parameters came from; it
+asserts no lab transition. `M0005` cannot move: `lab/lab.sqlite`'s `transitions` table has no edge
+out of `rejected`. What the lab *does* carry is the promotion itself — `promote` appends a
+`# Promotion` section to `methods.analysis` and one `insights` row, both permitted at any status
+by the append-only triggers, and `--lab-status-stays` is the flag that says "record it, do not
+move it". So the promotion is findable from either end, and nothing claims a gate the method did
+not pass.
+
+**The night reaches the panel through `MarketAware`.** `FUNDAMENTAL` is the one roster object that
+reads more of the `Market` than its bars, so `paper.book.decide_book` prepares it from the whole
+`Market` (`prepare_for` → `targets_prepared`) and `paper.replay.expected_book` passes the same
+`prepared` to `run_rules`. Every other allocator takes the identical history-only expression it
+always did. If the two halves ever diverge, `paper_check` reports FND `mismatch` on its first
+decision session.
+
+**If FND holds only cash, check the panel before checking the strategy.** `io.load_panel` returns
+`EMPTY_FUNDAMENTALS` when `fundamental_facts` is missing or empty — which is production's
+deliberate state (see the data-pipeline runbook's "Train/eval on a local database"). With no panel
+no symbol is eligible and FND targets nothing. That is the documented contract, not a fault:
+
+    SELECT count(*), max(filed) FROM fundamental_facts;
+
+Zero rows there is the whole explanation. `engine/tests/test_paper_fnd.py` asserts this outcome so
+it can never be mistaken for a deliberate cash position.

@@ -300,7 +300,9 @@ def test_c_starts_on_its_first_night_with_its_own_paper_start(world, monkeypatch
         night(world, d, None)
     monkeypatch.undo()
     land_c(world, c_engine)
-    assert roster.ROSTER[-1].id == C
+    # C is back on the roster. It is no longer the LAST entry -- FND joined at sort 6 in
+    # roster-promotion-pipeline phase 6 -- and what this line checks is that it is on it.
+    assert C in roster.ROSTER_IDS
     for d in NIGHTS[3:]:
         night(world, d, allow_all)
 

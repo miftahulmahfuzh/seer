@@ -48,7 +48,7 @@ DAY0 = date(2026, 10, 23)
 NOV2 = date(2026, 11, 2)
 F4 = "F4-MOM12-N20-TREND"
 F1 = "F1-SPY-SMA200-M"
-ROSTER_IDS = ("SPY", "A", F4, F1, "C")
+ROSTER_IDS = ("SPY", "A", F4, F1, "C", "FND")
 
 
 # ---- the synthetic world -----------------------------------------------------------------------

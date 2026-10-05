@@ -19,8 +19,8 @@ All three are :class:`RosterError`, all three stop the night, and all three name
 and the offending value**. A typo must never quietly drop a portfolio and leave a hole in its
 equity curve, and the message must say which portfolio.
 
-:data:`SEED_ROWS` is the five rows ``db/migrations/003_paper.sql``, ``004_news_veto.sql`` and
-``006_roster.sql`` write, as data; :data:`ROSTER` is ``from_rows(SEED_ROWS)``. The compiled roster
+:data:`SEED_ROWS` is the six rows ``db/migrations/003_paper.sql``, ``004_news_veto.sql``,
+``006_roster.sql`` and ``007_fnd.sql`` write, as data; :data:`ROSTER` is ``from_rows(SEED_ROWS)``. The compiled roster
 and the stored roster therefore travel the *same* builder, and
 ``tests/test_paper_roster.py`` checks both against a migrated database.
 
@@ -36,6 +36,13 @@ and the stored roster therefore travel the *same* builder, and
   allow (strategy-c-news-veto handover D1, D5). The roster object carries no verdicts, so
   it never buys on its own; ``paper`` and ``paper_check`` hand the engine a copy carrying
   the stored verdicts.
+- ``FND``: point-in-time SEC fundamental factors (``strategies.f_fundamental.FUNDAMENTAL`` with
+  ``FUNDAMENTAL_PARAMS``) under ``MONTHLY_HOLD``, the book engine. It is the one roster object
+  that reads more of the ``Market`` than its bars: it satisfies ``allocator.MarketAware``, so
+  ``paper.book.decide_book`` prepares it from the whole ``Market`` and it ranks on
+  ``market.fundamentals``. On a ``Market`` with no panel it targets nothing -- the honest reading
+  of "no filing is known", and the reason a database without ``005_fundamentals.sql`` applied
+  gives an all-cash FND rather than a wrong one.
 
 **The frozen spec (D4).** :func:`spec` is the entry's trial-defining parts as a JSON-ready
 dict of strings: engine, the strategy/allocator object (module-level name and its ``id``),
@@ -52,6 +59,9 @@ retiring a strategy or correcting a note must not move a live digest.
 
 ``backtest_gate`` is a display fact for the go-live checklist (D12), not part of the spec:
 correcting its note does not reset a paper clock. Every entry is ``passed: false`` today.
+``FND`` is on the roster having failed its gate too (six M0005 dev-window trials, all six failed,
+all six recorded in ``lab/lab.sqlite``): passing a gate has never been this roster's admission
+criterion, and the gates bind the real-money decision, not paper membership.
 An entry with ``gate_applicable=False`` (C, an LLM strategy: design §1 item 5, handover D9)
 also says ``applicable: false``; the four quant/benchmark entries' gate dicts are unchanged.
 
@@ -86,6 +96,7 @@ from seer_engine.strategies.allocator import Allocator
 from seer_engine.strategies.base import Strategy
 from seer_engine.strategies.c import STRATEGY_C, STRATEGY_C_PARAMS
 from seer_engine.strategies.f_factor import FACTOR
+from seer_engine.strategies.f_fundamental import FUNDAMENTAL, FundamentalParams
 from seer_engine.strategies.f_index import TIMING
 
 Engine = Literal["bracket", "book", "benchmark"]
@@ -94,6 +105,7 @@ Status = Literal["active", "retired"]
 BENCHMARK_ID = "SPY"
 F4_ID = "F4-MOM12-N20-TREND"
 F1_ID = "F1-SPY-SMA200-M"
+FND_ID = "FND"
 
 #: ``object_name`` of the benchmark: ``backtest.benchmark.buy_and_hold``, which is rules, not an object.
 BENCHMARK_OBJECT = "buy_and_hold"
@@ -191,6 +203,27 @@ class Binding:
     from_registry: bool = False
 
 
+# FND's parameters, written out here rather than imported from
+# ``lab.methods.m0005_fundamental_factors``. They are that module's ``COMPOSITE`` value for value
+# -- the four-factor blend, equal weights, top 20, the shipped liquidity floors, no trend gate --
+# but the lab module must not become an input to a paper spec digest: its ``source_sha`` is frozen
+# in ``lab/lab.sqlite`` and editing it for a lab reason would silently re-digest a started paper
+# strategy. The roster says what it runs, in its own file, as it does for every other entry.
+#
+# WHY composite AND NOT the best of the six. M0005 recorded six dev-window trials; all six failed
+# and M0005-VAL had the highest total return of them. Picking it would be choosing on the
+# multiple-testing noise the lab's ``trials`` table exists to count. ``composite`` is the a-priori
+# blend of the four factor families the method's sources name (Fama-French value, Novy-Marx gross
+# profitability, Bernard-Thomas SUE, return on equity), chosen before the numbers and not by them.
+#
+# It is VALUE-EQUAL to m0005's ``COMPOSITE``, which is what `promote --candidate M0005-ALL` writes
+# the spec from. That equality is pinned by a test (tests/test_paper_fnd.py), because if the two
+# ever drift the promoted row's stored digest and the roster's recomputed digest differ and
+# `store.check_digest` refuses FND's second night with a SpecMismatch. The test is in the test
+# file, where importing the lab module is free; this file must never import it.
+FUNDAMENTAL_PARAMS = FundamentalParams(rank="composite", top=20)
+
+
 #: The one code-side table (D2). **This is the extension point**: a new strategy is a row in
 #: ``strategies`` plus, if its object is not already here, one entry here. Nothing else in this
 #: module changes to add a strategy. Keys are stable forever -- a stored spec names one, so
@@ -202,6 +235,7 @@ RESOLVER: dict[str, Binding] = {
     "STRATEGY_C": Binding(obj=STRATEGY_C, params=STRATEGY_C_PARAMS),
     "FACTOR": Binding(obj=FACTOR, from_registry=True),
     "TIMING": Binding(obj=TIMING, from_registry=True),
+    "FUNDAMENTAL": Binding(obj=FUNDAMENTAL, params=FUNDAMENTAL_PARAMS),
 }
 
 
@@ -491,6 +525,23 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         registry_id=None,
         gate_note="Backtest gate: not applicable (LLM strategy, design §1 item 5)",
         gate_applicable=False,
+    ),
+    RosterRow(
+        id=FND_ID,
+        name="FND · Fundamentals",
+        sub="Top 20 by SEC filing factors, monthly",
+        icon="book-open",
+        is_champion=False,
+        is_benchmark=False,
+        sort=6,
+        engine="book",
+        rules_id="monthly-hold",
+        object_name="FUNDAMENTAL",
+        registry_id=None,
+        gate_note=(
+            "M0005 dev window only (1996-01-03..2015-10-16, fundamental coverage 0.3151); failed "
+            "beats SPY TR (+1.8% vs +351.4%), >= 100 trades (15) and DSR >= 0.95 (0.006)"
+        ),
     ),
 )
 

@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-05
-**Total Active Tasks**: 1
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 69
+- Completed: 70
 
 ---
 
@@ -394,15 +394,33 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Completion: the plan index's phase-5 row ticked and its `**Status:**` advanced to `phases 1, 2, 3, 4, 5 of 6 complete`, following phase 2's recorded reversal rather than phase 1's and phase 3's original decision — the index already carries ✅ on rows 1–4 and already names the completed phases on its Status line, so leaving row 5 blank would now misreport the set. Edit confined to one table row and one line.
     - Completion: `P1-ENG-H3WF` (phase 6) unblocked `blocked` -> `open` — its sole stated dependency, `P1-ENG-Z8MR`, has now landed.
     - Completion: landing NOT attempted. `swarm.py find --plan ROSTER_PROMOTION_PIPELINE_PLAN.md` returns `swarm: true` with coordinator `orch-roster-promotion-pipeline`; per analyze-orchestrator Step 5 the merge belongs to the set's coordinator, and phase 6 has not run in any case.
-- [ ] **P1-ENG-H3WF** Phase 6: `FND` onto the roster — the first promotion through the new path
+- [x] **P1-ENG-H3WF** Phase 6: `FND` onto the roster — the first promotion through the new path
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns the `FND` `RESOLVER` entry and `SEED_ROWS` row in `paper/roster.py`, new `db/migrations/007_fnd.sql`, **`paper/book.py` and `paper/replay.py`'s `MarketAware` dispatch**, new `engine/tests/test_paper_fnd.py` plus the widened literals in `test_paper_book.py`, `test_paper_roster.py`, `test_migrate.py` and `test_paper_check.py`, and the "FND joined the roster" section of `docs/runbooks/paper.md`. Does not touch `f_fundamental.py`'s own logic, M0005's lab status/`source_sha`/`trials`, `REGISTRY`, `commands/promote.py` or `web/`. Exit: `FND` is on the roster as `active`, `sort=6`, `engine='book'`, `rules_id='monthly-hold'`, `object_name='FUNDAMENTAL'`, `registry_id IS NULL`, carrying an honest `gate_note` in the style of its neighbours — it has **not** passed a gate and must not claim to; it is added through phase 5's `promote --method M0005 --candidate M0005-ALL --id FND --lab-status-stays`, which also records the promotion in the lab, proving the pipeline rather than bypassing it (D7, D11), with the documented-equivalent SQL as the escape hatch only; `paper.book.decide_book` and `paper.replay.expected_book` dispatch a `MarketAware` allocator through `prepare_for` + `targets_prepared` so `FND` reaches `market.fundamentals` — without which it would hold cash forever while every log line said it decided — and for every allocator that is not `MarketAware` the expression is byte-identical to today's, so the five existing strategies replay bit for bit; the paper night produces orders or an explicit empty decision for `FND` against a `Market` carrying the fundamental panel and `paper_check` replays it as `ok`, never `mismatch`; a `Market` with no panel yields no trades, not wrong trades, asserted by a test at the roster level; `roster.FUNDAMENTAL_PARAMS` equals M0005's `COMPOSITE` by value, pinned by a test, because `roster.py` must never import a lab method and only that equality keeps the promoted row's frozen digest and the roster's recomputed digest the same; the five pre-existing `spec_digest` values are byte-identical and `MAX_LOOKBACK_BARS` is still 253 (`FND`'s lookback is 20); and nothing claims `FND` passed a backtest gate, with the go-live checklist's arithmetic still reading honestly with a fifth research strategy present (`CHECKS = 6` is per strategy; checked).
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `ROSTER_PROMOTION_PIPELINE_PLAN.md` (phase 6 of 6)
   - **Satisfies**: R1 — Include the fundamentals-driven strategy in paper trading — the stated justification for excluding it does not hold, because paper is not real money and the gates bind only the real-money decision
   - **Depends on**: P1-ENG-Z8MR
   - **Plan**: `.workflows/plan/P1-ENG-H3WF.md`
+  - **Completed**: 2026-10-05 19:51
+  - **Method**: /do
+  - **Files**: db/migrations/007_fnd.sql, docs/runbooks/paper-trading.md, engine/src/seer_engine/paper/book.py, engine/src/seer_engine/paper/replay.py, engine/src/seer_engine/paper/roster.py, engine/tests/test_paper_fnd.py, engine/tests/test_paper_book.py, engine/tests/test_paper_roster.py, engine/tests/test_migrate.py, engine/tests/test_paper_check.py, engine/tests/test_paper_store.py, engine/tests/test_paper_c.py, lab/lab.sqlite, web/data/lab.json
+  - **Verified**: `ruff check engine/src engine/tests` passed. Full engine suite WITH `PG_TEST_URL`: **2700 passed, 0 skipped** (phase 5 inherited 2683 -> delta **+17 passed, +0 skipped**); WITHOUT `PG_TEST_URL`: **2340 passed, 360 skipped** (inherited 2323/360 -> same **+17/+0** delta, because `test_paper_fnd.py` touches no database). The plan declared +16; the 17th is the deliberate night-vs-replay agreement test recorded under Decided. Invariant 2 holds — the five pre-existing `spec_digest`s are byte-identical (SPY `ca309ea7…`, A `37cd89be…`, F4 `6c55c13a…`, F1 `e7fbb32d…`, C `6cea6cb8…`); `FND`'s is `4a9dacc37478bf4d17b3ba35cbebd9e0c3f8759f122c4596f7cd9d076d8ef530`, exactly the plan's pin, and its `spec_text` matches the plan byte for byte. D12 holds: `MAX_LOOKBACK_BARS` is still 253 (`FND`'s lookback is 20). D1 holds: `git diff origin/main -- engine/src/seer_engine/backtest/registry.py` is EMPTY.
+  - **Promotion**: Step 6 ran dry-run then real `promote --method M0005 --candidate M0005-ALL --id FND --name 'FND · Fundamentals' --sub 'Top 20 by SEC filing factors, monthly' --icon book-open --sort 6 --lab-status-stays --gate-note '<the M0005 note>'` against a local schema migrated to 006. Wrote `id=FND`, `status=active`, `sort=6`, `engine=book`, `rules_id=monthly-hold`, `object_name=FUNDAMENTAL`, `registry_id=NULL`, `gate_applicable=t`, `paper_start=NULL`, `promoted_from=M0005`, and `params.digest 4a9dacc3…` — i.e. the frozen digest `promote` computes equals the digest the roster recomputes. Schema dropped afterwards. Lab record: `lab stage` wrote `lab/lab.sqlite` and `web/data/lab.json`; M0005 is still `status='rejected'` with its 64-char `source_sha` and 6 trials untouched; `methods.analysis` grew one `# Promotion` section and `insights` grew one observation row.
+  - **Drift**:
+    - `docs/runbooks/paper.md` does not exist; the runbook is `docs/runbooks/paper-trading.md`. Appended the "FND joined the roster" section there (small drift, plan intent followed).
+    - The plan's `test_paper_fnd.py` fixtures used constructor spellings that have drifted: `Membership` intervals are 3-tuples `(symbol, start, end)` not 4; `stratkit.hist` is `hist(symbol, closes, days=..., volumes=...)` not `hist(symbol, days, closes, volume=...)`; `session_days` is `(n, start)` not `(start, end)`. Adapted per the plan's own implementer note ("the assertions are the contract; the fixture spelling is not").
+    - `rank='composite'` reads all four factors and `fundamental_rows` drops a row whose SUE is NaN, so the panel fixture needed 10 quarters of diluted EPS (`sue.MIN_QUARTERS=9`), not the plan's single annual filing. Also the plan's $100+ closes made every whole-share order `too_small` against a $1,250 book at 1/20 weights; closes lowered to single digits (still over `min_price=5`, dollar volume ~$30–70M, over the $20M floor).
+    - Four more existing tests needed the same literal widening the plan prescribed for three others, and the plan did not list them: `test_paper_roster.py` (the 5-way unpack in `test_each_entry_is_the_named_object_params_and_rules`, two `active(...)` lists, and the `promoted_from`-is-NULL assertion, which `FND`'s row legitimately breaks), `test_migrate.py` (`rows[-1]` is no longer C), `test_paper_store.py` and `test_paper_c.py` (`ROSTER[-1].id == C`). All widened minimally; no assertion weakened.
+  - **Decided**:
+    - Step 6's promotion ran against a freshly migrated LOCAL throwaway schema, not live Neon (rung 1, invariant 9 + the tree): `origin/main`'s `db/migrations` stops at 005, so live Neon has no `object_name`/`status`/`promoted_from` columns for `promote` to write, and main's `RESOLVER` has no `FUNDAMENTAL` key — a live `FND` row would make `roster.from_row` raise `UnknownObject` and stop the WHOLE paper night for all five existing strategies until the set merges. The live write is a post-merge owner step. The lab half (`lab/lab.sqlite`, `web/data/lab.json`) was written for real and is committed.
+    - The plan's exit criteria say "+14 passed" while its delta table says +16; the table is right (13 new tests in `test_paper_fnd.py` + 3 in `test_paper_book.py`) and +14 was stale (rung 3, the plan's own code blocks enumerate the tests).
+    - Added a 14th test, `test_the_night_and_the_replay_decide_fnd_the_same_way`, beyond the plan's set (rung 2, exit criteria: "`paper_check` replays either outcome as `ok`"). With an EMPTY panel both dispatch branches return `()`, so every empty-panel test is vacuous for Step1/Step2 agreement — nothing in the plan's set would have caught a `prepared=` left off `replay.py`. The new test drives `replay.expected_book` directly against a real panel; verified by sabotage (setting `prepared=None` in `replay.py` makes it fail, restoring makes it pass).
+    - `replay.py`'s `MarketAware`/`prepare_for` import merged into the existing `from seer_engine.strategies.allocator import Allocator` line instead of the plan's separate import after `decide_bracket` (rung 6, surrounding code: the module already imports from that path).
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the direct precedent recorded by phases 1, 2, 3 and 5 of this same set in the blocks above, and by all five phases of the previous swarm in this same file). Keeping the set's six phase blocks contiguous is what a reader of this set wants; splitting the last one off alone would scatter it.
+    - Completion: no `**Commit**` field (rung 6: phases 1, 2, 3 and 5 above have none either). This file is committed *inside* the phase's own commit, so a field naming that commit's sha cannot exist in it; the sha is reported to the set's coordinator and is one `git log` away.
+    - Completion: landing NOT attempted, and `next_command` is empty. `swarm.py find --plan ROSTER_PROMOTION_PIPELINE_PLAN.md` returns `swarm: true` with coordinator `orch-roster-promotion-pipeline`; per `analyze-orchestrator` Step 5 the merge of the whole set belongs to that coordinator, and landing it here too is the double-merge that rule exists to prevent. This is the set's last phase, so there is no successor task either.
 
 ### [P2] Medium
 

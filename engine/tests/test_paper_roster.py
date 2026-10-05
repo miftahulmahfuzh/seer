@@ -57,10 +57,12 @@ from seer_engine.strategies.c import (
     USER_TEMPLATE,
 )
 from seer_engine.strategies.f_factor import FACTOR
+from seer_engine.strategies.f_fundamental import FUNDAMENTAL
 from seer_engine.strategies.f_index import TIMING
 
 F4 = "F4-MOM12-N20-TREND"
 F1 = "F1-SPY-SMA200-M"
+FND = "FND"
 
 PINS = {
     "SPY": "ca309ea7f19d0b771f236c63309a2fcf28a82e16048528d738dc329a42d4d198",
@@ -68,6 +70,10 @@ PINS = {
     F4: "6c55c13acc487a6fccbe2c5c0eb91a36e39f3a5444555a0dbfba4ffba5b30deb",
     F1: "e7fbb32d1cc4e11b2d0d9b941ab01ac1a545e49a08c11bf8c70da5c54cad9e2f",
     "C": "6cea6cb8de993f6a3f2d7ef4b48c878654a57df16cab87f72a95e9dd49a1b762",
+    # FND joins the roster in phase 6 of roster-promotion-pipeline. Its spec is composite-rank
+    # fundamentals, top 20, equal sizing, under monthly-hold. The five values above are
+    # unchanged, byte for byte: adding an entry must never re-digest a started strategy.
+    FND: "4a9dacc37478bf4d17b3ba35cbebd9e0c3f8759f122c4596f7cd9d076d8ef530",
 }
 
 FACTOR_PARAMS_AS_DICT = {
@@ -88,8 +94,8 @@ DISPLAY = ("id", "name", "sub", "icon", "is_champion", "is_benchmark", "sort", "
 
 
 def test_the_roster_is_the_handover_entries_in_sort_order():
-    assert ROSTER_IDS == ("SPY", "A", F4, F1, "C")
-    assert [e.sort for e in ROSTER] == [1, 2, 3, 4, 5]
+    assert ROSTER_IDS == ("SPY", "A", F4, F1, "C", FND)
+    assert [e.sort for e in ROSTER] == [1, 2, 3, 4, 5, 6]
     assert "B" not in ROSTER_IDS
 
 
@@ -104,7 +110,7 @@ def test_display_fields_equal_the_migration_rows(pg):
 
 
 def test_each_entry_is_the_named_object_params_and_rules():
-    spy, a, f4, f1, c = (entry(i) for i in ROSTER_IDS)
+    spy, a, f4, f1, c, fnd = (entry(i) for i in ROSTER_IDS)
     assert (spy.engine, spy.obj, spy.rules, spy.rules_id, spy.params) == ("benchmark", None, None, None, None)
     assert a.engine == "bracket"
     assert a.obj is STRATEGY_A and a.params is STRATEGY_A_PARAMS and a.rules is DESIGN_V0
@@ -116,6 +122,10 @@ def test_each_entry_is_the_named_object_params_and_rules():
     assert c.obj is STRATEGY_C and c.params is STRATEGY_C_PARAMS and c.object_name == "STRATEGY_C"
     assert c.registry_id is None
     assert c.params.a is STRATEGY_A_PARAMS
+    # FND is the one entry whose object is neither a registry candidate nor a bracket
+    # strategy: it resolves to FUNDAMENTAL by name with its own params (D1, D2).
+    assert fnd.engine == "book" and fnd.obj is FUNDAMENTAL and fnd.rules == MONTHLY_HOLD
+    assert fnd.object_name == "FUNDAMENTAL" and fnd.registry_id is None
 
 
 def test_book_entries_are_the_registry_entries_unchanged():
@@ -197,7 +207,9 @@ def test_strategy_params_round_trip_through_jsonb(pg):
 
 
 def test_lookbacks():
-    assert {e.id: e.lookback for e in ROSTER} == {"SPY": 1, "A": 200, F4: 253, F1: 200, "C": 200}
+    assert {e.id: e.lookback for e in ROSTER} == {"SPY": 1, "A": 200, F4: 253, F1: 200, "C": 200, FND: 20}
+    # FND's lookback is the 20-bar dollar-volume window: a filing's availability is its `filed`
+    # date, not a bar count. The roster's longest lookback is still F4's 253.
     assert MAX_LOOKBACK_BARS == 253
 
 
@@ -377,7 +389,7 @@ def test_active_drops_retired_entries_and_keeps_order():
     )
     entries = from_rows(rows)
     assert [e.id for e in entries] == list(ROSTER_IDS)  # retired rows are never dropped from the roster
-    assert [e.id for e in active(entries)] == ["SPY", F4, F1, "C"]
+    assert [e.id for e in active(entries)] == ["SPY", F4, F1, "C", FND]
     a = next(e for e in entries if e.id == "A")
     assert (a.status, a.paper_end) == ("retired", date(2026, 10, 2))
 
@@ -413,7 +425,12 @@ def test_the_database_rows_rebuild_the_roster_with_the_pinned_digests(pg):
 def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
     rows = {r.id: r for r in store.read_roster_rows(pg)}
     assert [r.id for r in store.read_roster_rows(pg)] == list(ROSTER_IDS)
-    assert all(r.status == "active" and r.paper_end is None and r.promoted_from is None for r in rows.values())
+    assert all(r.status == "active" and r.paper_end is None for r in rows.values())
+    # promoted_from defaults to NULL for every row 003/004 seeded; FND is the one row written
+    # by a promotion (007_fnd.sql mirrors what `promote --method M0005` writes on the live
+    # database), so it is the one row that names its provenance.
+    assert {r.id for r in rows.values() if r.promoted_from is not None} == {FND}
+    assert rows[FND].promoted_from == "M0005"
     assert (rows["A"].object_name, rows["A"].registry_id, rows["A"].gate_applicable) == ("STRATEGY_A", None, True)
     assert (rows[F4].object_name, rows[F4].registry_id) == ("FACTOR", F4)
     assert rows["C"].gate_applicable is False
@@ -421,7 +438,7 @@ def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
     pg.execute("UPDATE strategies SET status = 'retired', paper_end = %s WHERE id = 'A'", (date(2026, 10, 2),))
     retired = {r.id: r for r in store.read_roster_rows(pg)}["A"]
     assert (retired.status, retired.paper_end) == ("retired", date(2026, 10, 2))
-    assert [e.id for e in active(from_rows(store.read_roster_rows(pg)))] == ["SPY", F4, F1, "C"]
+    assert [e.id for e in active(from_rows(store.read_roster_rows(pg)))] == ["SPY", F4, F1, "C", FND]
     pg.rollback()
 
 

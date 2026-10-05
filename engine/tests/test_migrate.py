@@ -17,6 +17,8 @@ ALL = [p.name for p in migration_files(MIGRATIONS_DIR)]
 PAPER_TABLES = {"paper_state", "book_positions", "book_targets", "book_fills", "book_trades", "dividends"}
 ROSTER_IDS = {"SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M"}
 C_ROW = ("C", "C · News veto", "A's picks, LLM can veto on news", "gavel", False, False, 5, "bracket", "design-v0")
+FND_ROW = ("FND", "FND · Fundamentals", "Top 20 by SEC filing factors, monthly", "book-open",
+           False, False, 6, "book", "monthly-hold")
 
 
 def _tables(conn) -> set[str]:
@@ -285,8 +287,11 @@ def test_004_on_a_fresh_schema_adds_c_last_and_the_news_vetoes_table(pg_empty):
         "SELECT id, name, sub, icon, is_champion, is_benchmark, sort, engine, rules_id, params, paper_start "
         "FROM strategies ORDER BY sort"
     ).fetchall()
-    assert [r[0] for r in rows] == ["SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C"]
-    assert rows[-1] == (*C_ROW, {}, None)
+    assert [r[0] for r in rows] == ["SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND"]
+    # C is 004's last row; 007_fnd.sql appends FND behind it at sort 6.
+    assert rows[4] == (*C_ROW, {}, None)
+    assert rows[-1][:9] == FND_ROW
+    assert rows[-1][9:] == ({}, None)  # no frozen spec and no paper clock until the first night
     assert pg_empty.execute("SELECT id FROM strategies WHERE is_champion").fetchall() == [("SPY",)]
     assert [c for c in _columns(pg_empty) if c[0] == "news_vetoes"] == NEWS_VETOES_COLUMNS
     assert pg_empty.execute("SELECT count(*) FROM news_vetoes").fetchone()[0] == 0

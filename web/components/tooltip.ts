@@ -2,7 +2,7 @@
 // Any element with data-tip. Ported from docs/design/seer-ui.js.
 
 /** Every caption clears itself after this, so one held under the pointer never stays stuck. */
-const AUTO_HIDE_MS = 4000;
+const AUTO_HIDE_MS = 2500;
 
 let tip: HTMLDivElement | null = null;
 let hideTimer: ReturnType<typeof setTimeout> | undefined;
@@ -75,6 +75,9 @@ export function installTooltips(): () => void {
   };
   const move = () => clearTimeout(timer);
   const end = () => { clearTimeout(timer); if (longPressed) hideTip(1400); };
+  // The caption is position: fixed, so on scroll it would stay put while its control moves away.
+  // Capture catches inner scrollers too (scroll does not bubble).
+  const scroll = () => { clearTimeout(timer); hideTip(); };
   const menu = (e: Event) => { if (target(e)) e.preventDefault(); };
   // A long-press only shows the tooltip; it must not also fire the button.
   const click = (e: Event) => {
@@ -87,6 +90,7 @@ export function installTooltips(): () => void {
   document.addEventListener('touchend', end);
   document.addEventListener('contextmenu', menu);
   document.addEventListener('click', click, true);
+  document.addEventListener('scroll', scroll, { capture: true, passive: true });
   return () => {
     document.removeEventListener('mouseover', over);
     document.removeEventListener('touchstart', start);
@@ -94,5 +98,6 @@ export function installTooltips(): () => void {
     document.removeEventListener('touchend', end);
     document.removeEventListener('contextmenu', menu);
     document.removeEventListener('click', click, true);
+    document.removeEventListener('scroll', scroll, { capture: true });
   };
 }

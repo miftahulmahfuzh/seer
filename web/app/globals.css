@@ -68,12 +68,40 @@
 
 * { box-sizing: border-box; }
 
+/* Outfit ships no math operators: U+221E INFINITY, U+2248 ALMOST EQUAL TO, U+2264 LESS-THAN OR
+   EQUAL TO, U+2265 GREATER-THAN OR EQUAL TO are all absent from the upstream font (416 glyphs), so
+   they used to drop through to system-ui mid-sentence at a different weight and baseline. They are
+   not rare here: the hurdle labels ("max DD <= 15%", "DSR >= 0.50"), lib/metrics, derive.ts and the
+   generated strings inside data/lab.json all use them, so this cannot be fixed in the copy alone.
+
+   These two faces are Poppins subset to exactly those four codepoints (620 bytes each, OFL, see
+   POPPINS-OFL.txt). Poppins was picked by measurement: of the geometric sans with the glyphs, its
+   stroke weight is within 4.9% of Outfit's own minus bar and its math axis within 32/1000 em, both
+   closer than DM Sans, Jost or Montserrat. It is listed AFTER Outfit in the stack below, so it can
+   only ever fill a gap Outfit actually has. */
+@font-face {
+  font-family: 'Sera Math';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/sera-math-400.woff2') format('woff2');
+  unicode-range: U+221E, U+2248, U+2264-2265;
+}
+@font-face {
+  font-family: 'Sera Math';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/sera-math-500.woff2') format('woff2');
+  unicode-range: U+221E, U+2248, U+2264-2265;
+}
+
 html, body { margin: 0; }
 
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--font-outfit), system-ui, sans-serif;
+  font-family: var(--font-outfit), 'Sera Math', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior-y: none;

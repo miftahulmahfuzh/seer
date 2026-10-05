@@ -54,6 +54,42 @@ check below goes through Python.
 | `… fundamentals --no-sync-map` | skip mirroring `engine/data/ticker_cik.csv` into the `ticker_cik` table | `fundamental_facts`, `fundamentals_log` |
 | `… -m seer_engine research_store --with-fundamentals` | rebuild the research store **with** a `fundamentals.csv` panel read from the database. Without the flag the store is built exactly as before and the lab sees an empty panel — see "The lab and fundamentals" below | `engine/.research/` |
 
+### Train/eval on a local database, Neon for inference
+
+`research_store` downloads bars and dividends from **yfinance** and FX from **Frankfurter**, so
+the only database read in the whole train/eval pipeline is `fundamental_facts` x `ticker_cik`.
+Pointing that one read at a local Postgres takes Neon out of train/eval entirely -- and keeps
+384 MB of facts off a 0.5 GB production tier. MEASURED 2026-10-05: Neon went 571 MB -> 187 MB.
+
+Nothing in production reads `fundamental_facts`. `paper/store.py:load_market_window` builds its
+`Market` without the field (so it gets `EMPTY_PANEL`) and the web app never queries the table,
+so the facts were only ever staged in Neon to build a local artifact.
+
+`config.env_file()` already supports selecting a different settings file, so this needs no code
+change. `.env.local-train` (gitignored) points `DATABASE_URL_UNPOOLED` at the local container:
+
+```bash
+docker start seer-pg    # postgres:16 on 55432, per "Local test database" below
+SEER_ENV_FILE=.env.local-train engine/.venv/bin/python -m seer_engine migrate
+SEER_ENV_FILE=.env.local-train engine/.venv/bin/python -m seer_engine fundamentals
+SEER_ENV_FILE=.env.local-train engine/.venv/bin/python -m seer_engine research_store --with-fundamentals
+```
+
+Neon stays the default (`.env.local`) for `migrate`, `nightly`, `paper`, `veto` and the web.
+`ticker_cik` is kept in Neon (224 kB) because any future inference slice must join against it;
+`fundamental_facts` and `fundamentals_log` are truncated there. The log is truncated too and
+that matters: a stale log would make a later `fundamentals` run against Neon skip every CIK as
+"already logged".
+
+When `FND` eventually enters paper's live roster, inference WILL need fundamentals -- but only
+the latest annual figures per symbol, which is kilobytes, not the full 1.23M-row history. Note
+also that `paper/store.py:1035` does not pass `fundamentals` to `Market`, so a `MarketAware`
+allocator in paper would silently rank nobody until that site is fixed.
+
+The two laptops share the store rather than each rebuilding it: `/sync-research-store`
+(`push`/`pull`, content-addressed on the manifest fingerprint). Two rebuilds produce two
+different fingerprints, because yfinance answers differently from one day to the next.
+
 Global flags go **before** the command: `--dry-run` does every read and computes every write,
 then rolls back (nothing is written; the demo purge also runs and is rolled back, and is logged
 as "would purge"). `-v` gives debug logs.
@@ -149,7 +185,7 @@ unchanged), and it is the trap. Method **M0005**
 empty one would record six all-cash trials, freeze the method file's `source_sha` and burn the
 method id permanently (`runner.preflight` refuses a second run of any method).
 
-**Before `lab run M0005`, confirm the store actually has the panel:**
+**Before any fundamentals method, confirm the store has the panel:**
 
 ```bash
 python -c "import json,pathlib; print('fundamentals.csv' in json.loads(pathlib.Path('engine/.research/manifest.json').read_text())['files'])"
@@ -157,8 +193,67 @@ python -c "import json,pathlib; print('fundamentals.csv' in json.loads(pathlib.P
 
 If that prints `False`, rebuild first:
 `python -m seer_engine research_store --with-fundamentals` (needs `DATABASE_URL_UNPOOLED`, and
-needs `python -m seer_engine fundamentals` to have run). **Do not run `lab run M0005` until it
-prints `True`.**
+needs `python -m seer_engine fundamentals` to have run).
+
+**That check is necessary and NOT sufficient, and M0005 was spent proving it.** It is binary
+where the risk is continuous: a store can carry a `fundamentals.csv` that covers a sliver of the
+dev window and pass. MEASURED 2026-10-05 -- M0005 ran against a store whose panel covered
+**2015-01-06..2015-10-16, about 9 months of the 19.8-year dev window (4%)**. All six variants
+recorded, all six "failed", and the verdict measured cash-holding, not the factor premia. The
+tell was in the output: 15-32 trades over 19.8 years against a `>= 100` gate, and "worst year
+1996 +0.0%" for a year the book could not have held anything.
+
+**The real gate is COVERAGE.** Before running a fundamentals method, check the fraction of the
+dev window for which the panel can actually rank:
+
+```bash
+python - <<'EOF'
+from datetime import date
+from seer_engine import research
+store = research.load_store(research.STORE_DIR)
+panel = store.market.fundamentals if hasattr(store, "market") else store.fundamentals
+# `as_of` ALWAYS returns a Snapshot -- an empty husk (observations == {}) when no fact is
+# known yet -- so `is not None` counts every symbol in every year and measures nothing.
+# A symbol is rankable only if its snapshot actually carries observations.
+for y in range(1996, 2016, 2):            # sample ACROSS the window, never one date inside it
+    t = date(y, 6, 30)
+    n = sum(1 for sym in panel.symbols
+            if (snap := panel.as_of(sym, t)) is not None and snap.observations)
+    print(f"{t}: {n:4d} of {len(panel.symbols)} symbols rankable")
+EOF
+```
+
+What that reports for the store built 2026-10-05, and it is the shape to expect until one of
+the three fixes below is applied:
+
+```
+1996-06-30 .. 2014-06-30:    0 of 780 rankable   (sampled every 2 years -- all zero)
+2015-01-28 :   25 of 780
+2015-02-28 :  428 of 780
+2015-06-28 :  507 of 780
+2015-10-28 :  521 of 780
+```
+
+Coverage is not thin, it is **zero** for 96% of the window. Note also why the obvious check is
+vacuous: `as_of` ALWAYS returns a `Snapshot`, an empty husk with `observations == {}` when
+nothing is known, so it never returns None. **Presence is never evidence of coverage anywhere in
+this subsystem** -- the fundamentals layer answers every query and encodes "I know nothing yet"
+as empty content. Check content, not presence.
+
+**Why the panel cannot reach back, whatever the ingest does.** Two cuts compose: the ingest
+keeps facts filed on or after 2013-01-01, and the panel is `fundamental_facts` JOINED to
+`ticker_cik` **by date** while every `ticker_cik` interval starts on or after 2015-01-02 (the
+scope is "ever-members since 2015-01-02"). The join therefore drops the ~181k facts filed before
+2015-01-02 and has no row at all to join anything earlier to.
+
+**Structural consequence, and it is not about one method.** This lab's dev window opens in 1996;
+XBRL starts ~2009 and the usable panel starts 2015. **A fundamental-factor method cannot be
+evaluated on the dev window as it stands.** Any future one hits this. The three ways out, none
+free: re-vendor `ticker_cik.csv` with intervals back to each symbol's real first membership
+(buys 2013-2014, still 2.8 of 19.8 years); give fundamentals methods their own shorter dev
+window (breaks comparability with every trial recorded against 1996-2015, and the DSR's N);
+or accept that these premia are testable only on the post-2015 window, which is the held-out
+test window this lab has never used. Pick one before spending another method id.
 
 Tests: `PG_TEST_URL=… engine/.venv/bin/pytest engine/tests -q` (see "Local test database").
 Without `PG_TEST_URL` the DB tests are skipped with a reason.

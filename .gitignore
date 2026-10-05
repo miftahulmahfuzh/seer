@@ -35,3 +35,4 @@ lab/lab.xlsx
 
 # sera-the-explorer scrollback of finished child sessions
 .workflows/sera/
+.env.local-train

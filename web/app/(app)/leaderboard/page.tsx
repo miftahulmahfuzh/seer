@@ -1,16 +1,16 @@
-import { Check, CircleDashed, Crown, X } from 'lucide-react';
-import type { CSSProperties } from 'react';
+import { Archive, Check, CircleDashed, Crown, X } from 'lucide-react';
 import { AppHeader } from '@/components/AppHeader';
 import { PaperChip } from '@/components/PaperChip';
-import { selectStrategy, strategyIcon } from '@/components/roster';
+import { strategyIcon } from '@/components/roster';
 import { StrategySwitch } from '@/components/StrategySwitch';
 import { leaderboard, monthly, runStatus, type Board } from '@/lib/data';
 import { monthDay, monthName, shortDate, signedPct } from '@/lib/format';
 import { checklist } from '@/lib/metrics';
 import { wibDate } from '@/lib/session';
 import {
-  bestResearch, LOOK_FALLBACK, looks, monthLines, monthsBg, NO_GATE, researchOf, scoreOf, sinceStartLine,
-  type Look, type MonthLine,
+  compare, LOOK_FALLBACK, looks, MIN_COMMON_SESSIONS, monthLines, monthsBg, NO_GATE, pickResearch,
+  researchOf, retiredLabel, scoreOf, sinceStartLine, spyOverSpan, windowLine,
+  type CompareRow, type Look, type MonthLine,
 } from './view';
 import s from './leaderboard.module.css';
 
@@ -32,33 +32,48 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
   const champ = board.rows.find(r => r.strategy.isChampion);
   const spy = board.rows.find(r => r.strategy.isBenchmark);
   const spyRet = spy?.metrics.totalReturn ?? null;
-  const best = bestResearch(board.rows);
 
-  // Research only: SPY is in every month row's SPY column, so it is not selectable here.
-  const pick = selectStrategy(research, q.s);
+  // R3: rank over the sessions the compared strategies actually share, never over raw total return
+  // across unequal paper starts (invariant 6). `wline` is what puts that window on the page, and
+  // `cmpOf` is what lets a card say "not ranked" instead of silently dropping out of the order.
+  const cmp = compare(board.rows);
+  const best = cmp.best;
+  const wline = windowLine(cmp);
+  const cmpMap = new Map(cmp.rows.map(r => [r.strategy.id, r]));
+  const cmpOf = (id: string): CompareRow | null => cmpMap.get(id) ?? null;
+
+  // Research only: SPY is in every month row's SPY column, so it is not selectable here. Retired
+  // strategies stay selectable (their record is the point) but are never the default.
+  const pick = pickResearch(research, q.s);
   const pickRow = pick ? board.rows.find(r => r.strategy.id === pick.id) : undefined;
   const gate = pickRow?.strategy.gate ?? null;
-  const items = pickRow && gate ? checklist(pickRow.metrics, spyRet, gate) : [];
+  // "Beats SPY" measures the benchmark over the picked strategy's own span, not over SPY's whole
+  // record: the two need not have started on the same day once the roster is promotable.
+  const pickSpy = pickRow && spy ? spyOverSpan(spy.curve, pickRow.curve) : null;
+  const items = pickRow && gate ? checklist(pickRow.metrics, pickSpy, gate) : [];
   const score = scoreOf(items, gate ?? NO_GATE);
   // The latest month is partial while the engine's next session (runStatus().sessionDate) is in it.
   const table = pick ? await monthly(pick.id, run.sessionDate) : null;
   const since = table ? sinceStartLine(table) : null;
   const months = table ? monthLines(table) : [];
 
-  // Forward test runs from the earliest paper snapshot (every roster entry starts the same day).
+  // Forward test runs from the earliest paper snapshot; strategies promoted later start later, so
+  // this is the board's whole span and NOT the window anything is ranked over (see `wline`).
   const period = board.from && board.to ? `${monthDay(board.from)} – ${monthDay(board.to)}` : 'Not started';
   const chart = buildChart(board, lookOf);
   const ret = (v: number | null) => (v === null ? '—' : signedPct(v, 1));
   const tone = (v: number | null) => (v === null ? '' : v < 0 ? 'neg' : 'pos');
   const champRet = champ?.metrics.totalReturn ?? null;
 
-  // Big figure = the champion (SPY today, D2). Second figure = the best research strategy on paper
-  // while the champion is the benchmark; otherwise SPY, as in the design.
+  // Big figure = the champion (SPY today, D2). Second figure = the best research strategy over the
+  // common window while the champion is the benchmark; otherwise SPY, as in the design. With no
+  // common window there is no "best": a number here without a window would be the very claim R3
+  // exists to stop making.
   const second = champ?.strategy.isBenchmark
     ? {
-        value: best ? ret(best.ret) : '—',
-        mobile: best ? `Best · ${best.strategy.short}` : 'Paper',
-        desk: best ? `${best.strategy.name}, best on paper` : 'No paper results yet',
+        value: best ? ret(best.totalReturn) : '—',
+        mobile: best ? `Best · ${best.strategy.short}` : 'Not ranked',
+        desk: best ? `${best.strategy.name}, best over the common window` : wline.label,
       }
     : { value: ret(spyRet), mobile: 'SPY', desk: 'SPY' };
 
@@ -90,6 +105,10 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
           </div>
         </div>
         <Legend rows={board.rows} lookOf={lookOf} className="desk-only" />
+      </div>
+      <div className={`${s.window} ${s.pad}`}>
+        <span className={s.windowLabel}>{wline.label}</span>
+        <span className={s.windowDetail}>{wline.detail}</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={s.chart} role="img"
         aria-label="Equity curves of each strategy against SPY">
@@ -170,18 +189,34 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
       <div className="stack">
         <div className={s.top}>{chartSheet}{checklistSheet}</div>
         {monthsSheet}
-        <div className={s.cards} style={{ '--cols': Math.min(Math.max(board.rows.length, 1), 5) } as CSSProperties}>
+        <div className={s.cards}>
           {board.rows.map(({ strategy: st, metrics: m }) => {
             const Icon = strategyIcon(st.icon);
             const dash = (v: string) => (st.isBenchmark ? '—' : v);
+            const cr = cmpOf(st.id);
+            const retired = st.status === 'retired';
             return (
-              <article key={st.id} className={`sheet over ${lookOf(st.id).bg} ${s.card}`}>
+              <article key={st.id} data-status={cr?.status ?? 'benchmark'}
+                className={`sheet over ${lookOf(st.id).bg} ${s.card}`}>
                 <div className={s.cardHead}>
                   <div className={s.cardName}>
                     <span className={s.name}>
                       {st.name}
                       {st.isChampion && <span data-tip="Champion" aria-label="Champion" role="img" className={s.crown}><Crown size={20} /></span>}
-                      {!st.isBenchmark && <PaperChip />}
+                      {!st.isBenchmark && !retired && <PaperChip />}
+                      {retired && (
+                        <span className={`chip ${s.retired}`}
+                          data-tip="Retired: it stopped trading and keeps its whole record">
+                          <Archive size={14} strokeWidth={1.75} aria-hidden="true" />
+                          {retiredLabel(st.paperEnd)}
+                        </span>
+                      )}
+                      {cr?.status === 'insufficient' && (
+                        <span className={`chip ${s.unranked}`}
+                          data-tip={`Not ranked: fewer than ${MIN_COMMON_SESSIONS} sessions shared with the others`}>
+                          Not ranked
+                        </span>
+                      )}
                     </span>
                     <span className={s.cardSub}>{st.sub}</span>
                   </div>
@@ -233,8 +268,11 @@ function Legend({ rows, lookOf, className }: {
     <div className={`${s.legend} ${className}`}>
       {rows.map(({ strategy: st }) => {
         const look = lookOf(st.id);
+        const retired = st.status === 'retired';
+        const tip = retired ? `${st.name} · ${retiredLabel(st.paperEnd).toLowerCase()}` : st.name;
         return (
-          <span key={st.id} className={s.legendItem} data-tip={st.name} aria-label={st.name}>
+          <span key={st.id} data-tip={tip} aria-label={tip}
+            className={retired ? `${s.legendItem} ${s.legendRetired}` : s.legendItem}>
             {look.dotted
               ? <span className={s.swatchDot} />
               : <span className={s.swatch} style={{ background: look.line }} />}

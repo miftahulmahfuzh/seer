@@ -16,6 +16,20 @@ const nn = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const ymd = (v: unknown) => String(v).slice(0, 10);
 const ymdOrNull = (v: unknown) => (v === null || v === undefined ? null : ymd(v));
 
+/**
+ * Roster lifecycle (migration 006, phase 1): 'retired' stops trading and keeps the record.
+ * Mirrors the `status` union in `app/(app)/leaderboard/view.ts`'s `RankIn`; the two are
+ * structurally identical on purpose, so `Strategy` satisfies `RankIn` without an import.
+ */
+export type StrategyStatus = 'active' | 'retired';
+
+/**
+ * `strategies.status`. Only the exact string 'retired' retires a row: a missing, null or
+ * malformed value reads as active, never as retired — the same discipline as `parseGate`, where a
+ * pass is never assumed. A bad read must not hide a live strategy from the board.
+ */
+export const parseStatus = (raw: unknown): StrategyStatus => (raw === 'retired' ? 'retired' : 'active');
+
 /** Design §5: a bracket position is closed by the end of its fifth session. */
 export const BRACKET_MAX_DAYS = 5;
 
@@ -32,6 +46,13 @@ export type Strategy = {
   rulesId: string | null;
   /** First paper session; null until the engine's `paper` command starts the clock. */
   paperStart: string | null;
+  /**
+   * 'active' or 'retired' (migration 006). Retirement stops trading and keeps every snapshot,
+   * order and trade: a retired strategy stays on the board, marked, and is never ranked.
+   */
+  status: StrategyStatus;
+  /** Last paper session a retired strategy traded (migration 006); null while it is active. */
+  paperEnd: string | null;
   /** params->'backtest_gate'; { passed: false, applicable: true, note: null } until `paper` writes the frozen spec. */
   gate: Gate;
   /** A research strategy: its orders and positions are paper only and never a buy recommendation. */
@@ -55,6 +76,8 @@ function toStrategy(r: Row): Strategy {
     engine: engineOf(r.engine, isBenchmark),
     rulesId: r.rules_id ?? null,
     paperStart: ymdOrNull(r.paper_start),
+    status: parseStatus(r.status),
+    paperEnd: ymdOrNull(r.paper_end),
     gate: parseGate(r.gate),
     isPaper: !isBenchmark && !isChampion,
     short: shortLabel(r.name, r.id),
@@ -63,8 +86,13 @@ function toStrategy(r: Row): Strategy {
 }
 
 export async function strategies(): Promise<Strategy[]> {
+  // spec_object: the frozen spec wins where it exists, and `object_name` (migration 006) answers
+  // for a strategy that has not been frozen yet — a just-promoted row has `params = '{}'` until
+  // its first paper night, and without the COALESCE it would lose a display fact for a night.
   const rows = await sql`SELECT id, name, sub, icon, is_champion, is_benchmark, engine, rules_id,
-      paper_start::text AS paper_start, params->'backtest_gate' AS gate, params->'spec'->>'object' AS spec_object
+      paper_start::text AS paper_start, paper_end::text AS paper_end, status,
+      params->'backtest_gate' AS gate,
+      COALESCE(params->'spec'->>'object', object_name) AS spec_object
     FROM strategies ORDER BY sort, id`;
   return rows.map(toStrategy);
 }

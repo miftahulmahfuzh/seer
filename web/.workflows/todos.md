@@ -3,18 +3,18 @@
 **Package Path**: `web`
 **Package Code**: WEB
 **Last Updated**: 2026-10-05
-**Total Active Tasks**: 1
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 9
+- Blocked: 0
+- Completed: 10
 
 ---
 
@@ -23,15 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-WEB-C6PK** Phase 4: The leaderboard re-sorts honestly, and shows retired horsemen
-  - **Difficulty**: NORMAL
-  - **Type**: Update
-  - **Context**: Owns `web/lib/data.ts` (project `status`, `paper_end`), `web/app/(app)/leaderboard/{view.ts,page.tsx,leaderboard.module.css}` and `web/app/(app)/leaderboard/view.test.ts`. Does not touch engine code, migrations or `web/lib/sera/*`. Exit: `bestResearch`'s raw-`totalReturn` max is **deleted** and replaced by a faithful TypeScript port of phase 3's `compare` (D10) — same `MIN_COMMON_SESSIONS = 63`, same `MIN_RANKED = 2`, same selection rule, same rank key, same statuses — and the window is **shown in the UI**, not just computed, with no Calmar and no configurable rank key, since a knob is a drift vector between two implementations that must agree; with fewer than 63 shared sessions the page says `No common window yet` and `N of 63 sessions shared by every strategy` and shows **no** "best" figure, which is D8 working rather than a regression; a retired strategy renders with its history intact and a visible retired marker, excluded from the window and from "best" without being hidden (D9); `looks` handles a roster longer than `CARD_BGS`/`LINES` (4) without two strategies colliding on one look and without assuming exactly four research strategies; `web/lib/data.ts` projects `status`, `paper_end` and `COALESCE(params->'spec'->>'object', object_name)`, so a just-promoted row is not missing a display fact for its first night; and `npm test` is **+18** on what the phase inherited, with `npm run build` and `npx tsc --noEmit` passing.
-  - **Status**: blocked
-  - **Plan Set**: `ROSTER_PROMOTION_PIPELINE_PLAN.md` (phase 4 of 6)
-  - **Satisfies**: R3 — A robust pipeline to compare and "re-sort" the horsemen, so a better method can be recognised as better
-  - **Depends on**: P1-ENG-7KQ2, P1-ENG-7V3C
-  - **Plan**: `.workflows/plan/P1-WEB-C6PK.md`
 
 ### [P2] Medium
 
@@ -164,6 +155,22 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Completed**: 2026-10-04 22:30
   - **Method**: /do
   - **Files**: web/components/sera/diagrams/geometry.ts, web/components/sera/diagrams/geometry.test.ts, web/components/sera/diagrams/diagrams.module.css, web/components/sera/diagrams/Pipeline.tsx, web/components/sera/diagrams/Windows.tsx, web/app/sera/journal/view.ts, web/app/sera/journal/view.test.ts, web/app/sera/journal/journal.module.css, web/app/sera/journal/page.tsx, web/app/sera/ideas/view.ts, web/app/sera/ideas/view.test.ts, web/app/sera/ideas/ideas.module.css, web/app/sera/ideas/page.tsx, web/app/sera/how/view.ts, web/app/sera/how/view.test.ts, web/app/sera/how/how.module.css, web/app/sera/how/page.tsx
+
+- [x] **P1-WEB-C6PK** Phase 4: The leaderboard re-sorts honestly, and shows retired horsemen
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns `web/lib/data.ts` (project `status`, `paper_end`), `web/app/(app)/leaderboard/{view.ts,page.tsx,leaderboard.module.css}` and `web/app/(app)/leaderboard/view.test.ts`. Does not touch engine code, migrations or `web/lib/sera/*`. Exit: `bestResearch`'s raw-`totalReturn` max is **deleted** and replaced by a faithful TypeScript port of phase 3's `compare` (D10) — same `MIN_COMMON_SESSIONS = 63`, same `MIN_RANKED = 2`, same selection rule, same rank key, same statuses — and the window is **shown in the UI**, not just computed, with no Calmar and no configurable rank key, since a knob is a drift vector between two implementations that must agree; with fewer than 63 shared sessions the page says `No common window yet` and `N of 63 sessions shared by every strategy` and shows **no** "best" figure, which is D8 working rather than a regression; a retired strategy renders with its history intact and a visible retired marker, excluded from the window and from "best" without being hidden (D9); `looks` handles a roster longer than `CARD_BGS`/`LINES` (4) without two strategies colliding on one look and without assuming exactly four research strategies; `web/lib/data.ts` projects `status`, `paper_end` and `COALESCE(params->'spec'->>'object', object_name)`, so a just-promoted row is not missing a display fact for its first night; and `npm test` is **+18** on what the phase inherited, with `npm run build` and `npx tsc --noEmit` passing.
+  - **Status**: done
+  - **Plan Set**: `ROSTER_PROMOTION_PIPELINE_PLAN.md` (phase 4 of 6)
+  - **Satisfies**: R3 — A robust pipeline to compare and "re-sort" the horsemen, so a better method can be recognised as better
+  - **Depends on**: P1-ENG-7KQ2, P1-ENG-7V3C
+  - **Plan**: `.workflows/plan/P1-WEB-C6PK.md`
+  - **Completed**: 2026-10-05 18:22
+  - **Method**: /do
+  - **Files**: web/lib/data.ts, web/app/(app)/leaderboard/view.ts, web/app/(app)/leaderboard/page.tsx, web/app/(app)/leaderboard/leaderboard.module.css, web/app/(app)/leaderboard/view.test.ts
+  - **Decided**:
+    - Verify the TS port against the Python oracle without breaking the pinned +18/5-file contract -> ran phase 3's `compare.py` on the exact test fixtures in a scratch file, then folded the oracle-derived figures (totalReturn, cagr, maxDrawdown, sharpe, inception) into the EXISTING "ranks over the sessions every compared strategy shares" test instead of keeping a sixth test file (rung 2, the phase's exit criteria, which pin `npm test` at +18 and the Interface Contract's "No new file is created").
+    - The plan's manual browser check (`npm run dev`, `/leaderboard` at 414pt and desktop) -> NOT RUN: this worktree carries no web `.env`, so the app has no database credentials and `npm run dev` cannot reach Neon regardless of this change. The window row is unconditional JSX fed by `windowLine`, whose both branches ("Ranked over ..." and "No common window yet") are pinned by tests (rung 3, the phase plan's code blocks). Flagged for a human pass on a credentialed environment.
 
 ---
 

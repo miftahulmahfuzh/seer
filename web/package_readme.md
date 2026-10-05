@@ -45,8 +45,8 @@ web/
       page.tsx              Today: champion's picks + day-5 bracket actions; no-buys state for a SPY/non-bracket champion
       positions/page.tsx    any strategy's holdings (?s=), cards by Holding.kind, next-session paper orders, paper-step warning
       history/page.tsx      closed trades of both engines, filter by research strategy (?s=) and win/loss (?o=)
-      leaderboard/page.tsx  roster-driven equity curves, champion crown, per-strategy go-live checklist (?s=), month-by-month sheet
-      leaderboard/view.ts   looks, researchOf, bestResearch, scoreOf, monthLines, sinceStartLine  (pure)
+      leaderboard/page.tsx  roster-driven equity curves, champion crown, common-window ranking + window line, retired/not-ranked chips, per-strategy go-live checklist (?s=), month-by-month sheet
+      leaderboard/view.ts   looks, researchOf, compare, windowLine, spyOverSpan, pickResearch, retiredLabel, scoreOf, monthLines, sinceStartLine  (pure)
       leaderboard/view.test.ts  vitest suite for view.ts
     sera/
       layout.tsx            requireSera(), then SeraNav rail + centred column (max 1360px); stacks below 1024px
@@ -188,7 +188,7 @@ const noCheckLine: (day: string, short: string) => string;
 ### lib/data.ts (server only; every function queries Neon)
 
 Types:
-- `Strategy`: `id, name, sub, icon, isChampion, isBenchmark, engine, rulesId, paperStart, gate, isPaper, short, checksNews`. `isPaper` = neither champion nor benchmark (research strategy, never a buy recommendation). `paperStart` is null until the engine's `paper` command starts the clock. `checksNews` (P6) marks C, whose Positions view reads its verdicts.
+- `Strategy`: `id, name, sub, icon, isChampion, isBenchmark, engine, rulesId, paperStart, status, paperEnd, gate, isPaper, short, checksNews`. `isPaper` = neither champion nor benchmark (research strategy, never a buy recommendation). `paperStart` is null until the engine's `paper` command starts the clock. `status: StrategyStatus = 'active' | 'retired'` and `paperEnd` (the last paper session a retired strategy traded; null while active) are migration 006's roster lifecycle. `parseStatus` reads **only** the exact string `'retired'` as retired, so a missing, null or malformed value reads as active and a bad read never hides a live strategy. `checksNews` (P6) marks C, whose Positions view reads its verdicts.
 - `RunStatus`: `sessionDate, dataDate, finishedAt, isDemo, stale, usdIdr` from the latest **successful** run (IDR falls back to 16500), plus `latestStatus, paperStatus, paperError, paperFinishedAt` from the most recent run whatever its outcome. `RunState = 'running' | 'success' | 'failed'`.
 - `Pick`: a champion's pending bracket order for Today (unchanged shape).
 - `Holding` (replaces the old `Position`): one open holding of any engine. `key` is unique across engines (`'o:<orders.id>'` or `'b:<strategy>:<symbol>'`); `kind: Engine`; bracket-only `orderId`, `slot`; `tp`/`sl` nullable (book sets them only when its rules do); `maxDays` is 5 for bracket, null otherwise; `weight` = value / last equity; `pnl`/`pnlPct` for book include fees and dividends (`value + income - cost`); `dismissed` (bracket day-5 action done); `exitPending` (book sell decided for the next open).
@@ -199,7 +199,7 @@ Types:
 - `BRACKET_MAX_DAYS = 5` (design §5).
 
 Functions:
-- `strategies(): Promise<Strategy[]>` ordered by `sort, id`; `champion(): Promise<Strategy | null>`.
+- `strategies(): Promise<Strategy[]>` ordered by `sort, id`; `champion(): Promise<Strategy | null>`. It projects `status` and `paper_end` alongside the rest, and takes the spec object from `COALESCE(params->'spec'->>'object', object_name)`: a just-promoted row has `params = '{}'` until its first paper night, so the roster column answers until the spec is frozen and no display fact is lost on the first night.
 - `runStatus(now?): Promise<RunStatus>`.
 - `picks(strategyId, sessionDate): Promise<Pick[]>`: pending bracket orders for one session.
 - `positions(strategyId): Promise<Holding[]>`: bracket orders (days held desc, slot) then book positions (value desc). Equity for `weight` comes from `paper_state`, else the latest snapshot.
@@ -241,8 +241,25 @@ type RosterIn = { id: string; isChampion: boolean; isBenchmark: boolean };
 type Look = { bg: string; line: string; width: number; dotted: boolean };
 function looks(roster: RosterIn[]): Map<string, Look>;
 const LOOK_FALLBACK: Look;
+const LOOK_PERIOD = 20;                                             // lcm(CARD_BGS, LINES)
 function researchOf<T extends RosterIn>(roster: T[]): T[];          // non-benchmark rows
-function bestResearch<T>(rows: { strategy: T; metrics: { totalReturn: number | null } }[]): { strategy: T; ret: number } | null;
+
+type RankIn = RosterIn & { status: 'active' | 'retired' };          // Strategy satisfies it, no import
+const MIN_COMMON_SESSIONS = 63;                                     // == compare.py's
+const MIN_RANKED = 2;                                               // == compare.py's
+type CompareWindow = { from: string; to: string; sessions: number };
+type CompareStatus = 'ranked' | 'insufficient' | 'retired';
+type CompareRow<T> = { strategy: T; status: CompareStatus; sessions: number;
+  totalReturn; cagr; maxDrawdown; sharpe: number | null;            // windowed; null unless 'ranked'
+  inception: number | null };                                       // own whole record, never ranked on
+type Comparison<T> = { window: CompareWindow | null; shared: number;
+  rows: CompareRow<T>[]; ranked: CompareRow<T>[]; best: CompareRow<T> | null };
+function compare<T extends RankIn>(rows: { strategy: T; curve: Snapshot[] }[]): Comparison<T>;
+type WindowLine = { label: string; detail: string };
+function windowLine(c: Comparison): WindowLine;
+function spyOverSpan(spy: Snapshot[], curve: Snapshot[]): number | null;
+function pickResearch<T extends RankIn>(research: T[], requested: string | undefined): T | null;
+const retiredLabel: (paperEnd: string | null) => string;            // 'Retired Dec 2' | 'Retired'
 const CHECKS = 6;
 type Score = { passed: number; total: number; ready: boolean; lines: [string, string] };
 type GateIn = { passed: boolean; applicable: boolean };
@@ -255,8 +272,12 @@ function monthLines(t: MonthlyTable): MonthLine[];                  // newest fi
 function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null before the first paper session
 ```
 
-- `looks`: research strategies take the design's sheet/line pairs (`CARD_BGS` lav/sky/stone/butter, `LINES` ink/line-b/line-c/coral) in roster order, cycling sheets past four; the champion's line is thicker (2.75). The benchmark is a dotted `--ink-3` line on a plain sheet. No hardcoded A/B/C ids.
-- `bestResearch`: highest `totalReturn` among non-benchmark rows that have one.
+- `looks`: research strategies take the design's sheets and lines (`CARD_BGS` lav/sky/stone/butter, `LINES` ink/line-b/line-c/coral/ink-2) in roster order. The roster is variable length — a promotion adds a strategy, a retirement keeps one — so neither array is assumed to cover it: the two cycle **independently** and their lengths are coprime, so the (sheet, line) pair is unique for the first `LOOK_PERIOD = 20` research strategies. The champion's line is thicker (2.75); the benchmark is a dotted `--ink-3` line on a plain sheet. No hardcoded A/B/C ids. The card grid is `auto-fit` (`minmax(180px, 1fr)`), not a capped column count, so a sixth strategy wraps instead of squeezing.
+- `compare`: the only way the page ranks anything — a faithful TypeScript port of the engine's `seer_engine/paper/compare.py`, same set-intersection common window, same greedy drop-the-worst-overlap `_select`, same `MIN_COMMON_SESSIONS = 63` / `MIN_RANKED = 2`, same rank key (annualised Sharpe desc, no-Sharpe last, total return desc, smaller max drawdown, id). It replaced the old raw `max(totalReturn)`, which compared strategies with different `paper_start` dates and so was not a comparison at all. Two filters live **here** rather than in the ported math, which stays status-blind and benchmark-blind like `compare.py`: the benchmark is never compared (it is the yardstick), and a retired strategy is excluded from the window and from `ranked` but never dropped from `rows` — it keeps its card, its inception-to-date figure, its chart line and its month sheet. `window` is null exactly when nothing is ranked; `shared` is presentation only (how many sessions the live board has in common so far) and is never a window.
+- `windowLine`: the sentence that puts the window on the page, so a "best" is never shown without saying over which sessions it was best — `Ranked over <Mon d> – <Mon d>` with `<n> shared sessions · <k> of <m> active strategies compared`, or `No common window yet` / `<shared> of 63 sessions shared by every strategy` when nothing is ranked (and then the page shows no "best" figure at all).
+- `spyOverSpan`: the benchmark's return over exactly the span a strategy's curve covers. The "Beats SPY" checklist row uses this, not SPY's inception-to-date figure, now that strategies need not start on the same day. Null when SPY has no snapshot on a boundary date.
+- `pickResearch` (replaces `selectStrategy` on this page): the requested id when it is on the roster, else the first **active** strategy, else the first row. Retired strategies stay selectable — retirement preserves the record, it does not hide it — but the default never lands on one while a live strategy exists.
+- `retiredLabel`: `'Retired Dec 2'` for the card's `Archive` chip, plain `'Retired'` until `paper_end` is written. A retired card is dimmed (`[data-status='retired']`) and its legend swatch muted; a `status: 'insufficient'` card carries a dashed "Not ranked" chip instead of silently vanishing from the board.
 - `scoreOf`: `ready` only when exactly six items are given and all pass; lines are "All six pass. / Ready for real money", else "Paper trading until / all six pass" when the gate passed, else "Paper only. / Backtest gate not passed". A not-applicable gate (C) is never ready and reads "Paper only. No backtest gate. / Real money needs an owner decision" (handover D9).
 - `monthLines` / `sinceStartLine`: format `lib/monthly.ts`'s `MonthlyTable` (Return toned pos/neg, SPY, Trades, Worst drop; `—` for nulls); the since-start row is labelled `Since <monthDay(from)>`.
 
@@ -301,7 +322,7 @@ Page consumers:
 - Today: `champion`, `runStatus`, then `picks` and `positions` only for a picks champion (not benchmark, engine `bracket`); actions are holdings with an `orderId`, a `maxDays` and `day >= maxDays`, not dismissed. Any other champion (SPY under D2) shows the no-buys sheet: "Seer recommends no buys", research strategies trade on paper only and their orders live in Positions.
 - Positions: `strategies`, `runStatus`, then `positions(strat)` and `pendingOrders(strat)` for `selectStrategy(roster, ?s)`. Pending orders are skipped (empty `Pending`) for the benchmark and while the run is stale. Holdings split by `Holding.kind` into `BracketCard` (stop/target range, days), `BookCard` (weight, stop/target only when set) and `BenchmarkCard`; cards keyed by `Holding.key`. The orders sheet lists bracket orders by slot or book targets by rank with weight; empty-state copy depends on engine and `Pending.decision`. A paper-step warning shows when `paperStatus !== 'success'` (failed / running / not yet run). `PaperChip` and a "on paper since" line mark `isPaper` strategies. For a `checksNews` bracket strategy (C) with a pending session it also calls `vetoes(strat, session)` and renders `vetoSheet` as a stone "Vetoed tonight" sheet; each vetoed/failed row reuses `WhyToggle` (new optional `label`/`missing` props) as "Why vetoed" / "Why it failed".
 - History: `strategies`, `closedTrades`, `runStatus`. Filters are `StrategySwitch` over non-benchmark strategies with an `ALL` button (`?s=`, unknown ids read as all) and win/loss icon buttons (`?o=`); defaults are dropped from the URL. Exit-reason icons cover `tp`, `sl`, `time`, `gap`, `signal` (rules said sell, sold at the open) and `forced` (forced close, no more prices), with a fallback for unknown reasons. Rows keyed by `Trade.key`; each shows the strategy tag (`strategyShort`) and a small `PaperChip` when the strategy is paper or missing from the roster.
-- Leaderboard: `leaderboard`, `runStatus`, then `monthly(pick.id, run.sessionDate)`. Every card, chart line and legend entry comes from the roster via `looks`. The big figure is the champion (crowned; SPY today); the second figure is the best research strategy on paper while the champion is the benchmark, else SPY. The checklist and month sheet follow `pick = selectStrategy(researchOf(roster), ?s)`; a `StrategySwitch` over research strategies shows when there are two or more (SPY is not selectable here, it is the SPY column). Checklist is `checklist(pick.metrics, spy.totalReturn, pick.strategy.gate)` scored by `scoreOf`; the gate's `note` prints under it. "Month by month" lists the since-start row then months newest first, with a `CircleDashed` partial-month marker while the next session is in that month.
+- Leaderboard: `leaderboard`, `runStatus`, then `monthly(pick.id, run.sessionDate)`. Every card, chart line and legend entry comes from the roster via `looks`. The big figure is the champion (crowned; SPY today); the second figure is `compare(board.rows).best` — the best research strategy **over the common window** — while the champion is the benchmark, else SPY; with no common window there is no second figure, only `windowLine`'s label. `windowLine` prints under the chart. The checklist and month sheet follow `pick = pickResearch(researchOf(roster), ?s)`; a `StrategySwitch` over research strategies shows when there are two or more (SPY is not selectable here, it is the SPY column). Checklist is `checklist(pick.metrics, spyOverSpan(spy.curve, pick.curve), pick.strategy.gate)` scored by `scoreOf`; the gate's `note` prints under it. "Month by month" lists the since-start row then months newest first, with a `CircleDashed` partial-month marker while the next session is in that month.
 
 ## Sera (/sera)
 
@@ -394,6 +415,8 @@ window lacks two month starts.
 - `runStatus` mixes two runs: freshness from the latest successful run, `latestStatus`/`paperStatus` from the most recent run of any outcome.
 - Leaderboard win rate and trade counts only use the strategy's own engine's trade table; SPY has no trades.
 - The Leaderboard never says "Ready for real money" unless all six checklist items pass (`scoreOf`); a missing gate yields no items and a 0/6 "Paper only" line.
+- The Leaderboard never ranks on raw total return: with promotable strategies the paper starts differ, so `compare` ranks only over the sessions the live strategies share and `windowLine` always says which. `MIN_COMMON_SESSIONS` / `MIN_RANKED` and the rank key must stay equal to `engine/src/seer_engine/paper/compare.py`'s — the port is only honest while it tracks the engine.
+- A retired strategy is excluded, not hidden: it keeps every snapshot, its card, its chart line and its month sheet, and is dropped only from the window and from "best", so a retirement can never shorten the living strategies' comparison.
 - Seer ships paper-only (2026-10-04): `isPaper` strategies are research, never a buy recommendation. Today never shows their orders; Positions and History mark them with `PaperChip`.
 - Positions defaults to the first research strategy, not the champion: with SPY as champion, `selectStrategy` skips the benchmark unless `?s=` asks for it.
 - `StrategySwitch` takes `href` as a function, so it must stay a server component (functions cannot cross into a client component).

@@ -1,6 +1,5 @@
 import { Archive, Check, CircleDashed, Crown, X } from 'lucide-react';
 import { AppHeader } from '@/components/AppHeader';
-import { PaperChip } from '@/components/PaperChip';
 import { strategyIcon } from '@/components/roster';
 import { StrategySwitch } from '@/components/StrategySwitch';
 import { leaderboard, monthly, runStatus, type Board } from '@/lib/data';
@@ -152,10 +151,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
 
   const monthsSheet = (
     <section className={`sheet over ${pick ? monthsBg(lookOf(pick.id)) : 'bg-sheet'} ${s.months}`} aria-labelledby="months-title">
-      <div className={s.between}>
-        <h2 id="months-title" className="eyebrow">Month by month · {pick ? pick.short : '—'}</h2>
-        {pick && <PaperChip />}
-      </div>
+      <h2 id="months-title" className="eyebrow">Month by month · {pick ? pick.name : '—'}</h2>
       {pick && since ? (
         <table className={s.table}>
           <thead>

@@ -29,14 +29,14 @@
       ],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "Session impl-roster-promotion-pipeline-p2 alive and busy in tmux @37. verify --apply downgrades spawned->pending on commit-absence alone; mid-build, not abandonment. Do NOT re-spawn while @37 is live.",
       "package": "engine/src/seer_engine/{paper,commands}",
       "plan": ".workflows/plan/roster-promotion-pipeline/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T11:29:59+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
+      "status": "running",
       "task_id": null,
       "title": "Retire and activate: the paper night honours roster lifecycle"
     },
@@ -59,22 +59,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "7f2241d",
       "depends_on": [
         1,
         3
       ],
       "difficulty": "NORMAL",
       "n": 4,
-      "note": null,
+      "note": "Oracle-verified port: ran as_json(compare(...)) from landed compare.py on identical fixtures; port reproduces totalReturn/maxDrawdown/Sharpe/inception to 1e-12, CAGR to 1e-9; tie-break path exercised not bypassed. Pinned contract honoured in full (63/2/Sharpe-only/_select/no knob). web 247->265 = +18 tests, +0 files, exactly the pinned target; tsc clean; build green 16 routes. Engine delta deliberately NOT measured -- phase 2's uncommitted edits were live in the shared worktree, so any pytest number would have measured phase 2's work. Commit carries zero engine/ paths (verified by coordinator). DECISIONS: (1) folded oracle figures into the EXISTING compare test and deleted the scratch file -- rung 2, exit criteria pin npm test at +18 and Interface Contract says 'No new file is created'. (2) LAND-TIME DEBT: the plan's manual browser check (npm run dev, /leaderboard at 414pt + desktop, light+dark) was NOT RUN -- this worktree carries no web .env so npm run dev fails on missing Neon credentials, independent of the change. Both branches of windowLine are test-pinned but the plan says 'if no such line is visible the phase is not done'. Needs a human pass on a credentialed environment before the set is called visually verified.",
       "package": "web",
       "plan": ".workflows/plan/roster-promotion-pipeline/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T11:29:59+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-C6PK",
       "title": "The leaderboard re-sorts honestly, and shows retired horsemen"
     },
     {
@@ -120,7 +120,7 @@
   "plan": "/home/miftah/.worktrees/seer/roster-promotion-pipeline/ROSTER_PROMOTION_PIPELINE_PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "roster-promotion-pipeline",
-  "updated": "2026-10-05T11:14:36+00:00",
-  "verified_at": "2026-10-05T11:03:48+00:00",
+  "updated": "2026-10-05T11:29:59+00:00",
+  "verified_at": "2026-10-05T11:29:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/roster-promotion-pipeline"
 }

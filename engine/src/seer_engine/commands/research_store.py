@@ -10,15 +10,20 @@ the unserved members per year.
 Never touches Neon and needs no DATABASE_URL.
 
     python -m seer_engine research_store [--store DIR] [--batch-size N] [--verify]
-                                        [--with-fundamentals]
+                                        [--coverage] [--with-fundamentals]
 
-``--verify`` loads an existing store only (no network). ``--with-fundamentals`` additionally
+``--verify`` loads an existing store only (no network). ``--coverage`` also loads an existing
+store only and measures what its fundamental panel can rank across the dev window
+(``fundamentals.coverage``): a per-year table and one fraction, printed whatever the number is.
+It needs no network and no database, and it wins when both it and ``--verify`` are given. It
+exits 0 when the fraction is at or above ``coverage.MIN_DEV_COVERAGE`` and 1 when it is below --
+the same convention ``--verify`` uses for a failed check. ``--with-fundamentals`` additionally
 reads the SEC point-in-time fact panel from the database (``DATABASE_URL_UNPOOLED``, the one
 place in this command that needs it) and writes it as the store's optional fifth file, so
 ``lab run`` sees a non-empty ``Market.fundamentals``; without the flag the store carries no
 fundamentals and the lab ranks on bars alone, silently. The global ``--dry-run`` builds into a
-temporary directory and discards it. Exit codes: 0 ok; 1 build failed or a check failed;
-2 the store is missing or invalid.
+temporary directory and discards it. Exit codes: 0 ok; 1 build failed, a check failed or
+coverage is below the floor; 2 the store is missing or invalid.
 """
 
 from __future__ import annotations
@@ -31,7 +36,7 @@ from pathlib import Path
 
 from seer_engine import research
 from seer_engine.backtest import io as bt_io
-from seer_engine.fundamentals import Fact
+from seer_engine.fundamentals import Fact, coverage
 
 log = logging.getLogger(__name__)
 
@@ -70,6 +75,14 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
         help="load and check an existing store only (no network)",
     )
     p.add_argument(
+        "--coverage",
+        action="store_true",
+        help=(
+            "load an existing store and measure what its fundamental panel can rank over the "
+            "dev window (no network, no database); exit 1 when it is below the lab's floor"
+        ),
+    )
+    p.add_argument(
         "--with-fundamentals",
         action="store_true",
         help=(
@@ -81,6 +94,8 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
 
 def run(args: argparse.Namespace) -> int:
     store = Path(args.store)
+    if getattr(args, "coverage", False):
+        return _coverage(store)
     if args.verify:
         return _verify(store, note="")
     facts = _read_facts() if getattr(args, "with_fundamentals", False) else None
@@ -126,6 +141,29 @@ def _verify(store: Path, *, note: str) -> int:
     checks = research.run_checks(data, bt_io.read_dividends())
     print(format_summary(store, data, checks, note=note))
     return 0 if all(c.ok for c in checks) else 1
+
+
+def _coverage(store: Path) -> int:
+    """``--coverage``: load the store and measure what its panel can rank. No network, no database.
+
+    Deliberately does **not** run ``research.run_checks``: this mode answers one question and
+    answers it cheaply. It is the replacement for the copy-paste snippet in
+    ``docs/runbooks/data-pipeline.md``, and the reason M0005's successor cannot be run blind.
+
+    Exit 0 when the measured fraction is at or above ``coverage.MIN_DEV_COVERAGE``, 1 when it is
+    below (``--verify``'s convention for a failed check), 2 when the store will not load. The
+    number is printed either way: this command reports, it never hides.
+    """
+    try:
+        data = research.load_store(store)
+    except ValueError as exc:
+        log.error("research_store: %s", exc)
+        return 2
+    cov = coverage.measure(data.market.fundamentals)
+    print(f"research store {store}")
+    print(f"  fingerprint: {data.fingerprint}")
+    print(coverage.format_report(cov))
+    return 0 if cov.fraction >= coverage.MIN_DEV_COVERAGE else 1
 
 
 def format_summary(

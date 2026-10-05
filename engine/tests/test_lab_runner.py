@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
 from labkit import smoke_data
 
 from seer_engine.backtest.dev import Candidate
+from seer_engine.backtest.market import Market
+from seer_engine.fundamentals import Fact, FundamentalPanel, coverage
 from seer_engine.lab import runner, store
 from seer_engine.lab.method import Method, config_digest
 from seer_engine.lab.seed import seed
 from seer_engine.sim.rules import DAILY_SWITCH, MONTHLY_HOLD
+from seer_engine.strategies.f_fundamental import FUNDAMENTAL, FundamentalParams
 from seer_engine.strategies.f_index import TIMING, TimingParams
 from seer_engine.strategies.f_rotation import ROTATION, RotationParams
 
@@ -113,3 +117,102 @@ def test_method_validation():
                                           absolute=True, fallback=None, trend=None),
                     rationale="r", added=_cand("M0001-A", "M0001").added, owner_inputs=())
     assert config_digest(rot) != config_digest(_cand("M0001-A", "M0001"))
+
+
+# ---- the post-load coverage refusal (phase 1 of fundamental-panel-coverage) -------------------
+
+
+def _fund_cand(cid: str, family: str, rank: str = "value") -> Candidate:
+    """One ``FUNDAMENTAL`` variant: the only allocator in the tree that is ``MarketAware``."""
+    return Candidate(
+        id=cid, family=family, rules=MONTHLY_HOLD, allocator=FUNDAMENTAL,
+        params=FundamentalParams(rank=rank, top=20),
+        rationale="fundamental variant for the coverage gate", added=date(2026, 10, 5),
+        owner_inputs=(),
+    )
+
+
+def _dense_panel(n: int = 25) -> FundamentalPanel:
+    """A panel that can rank ``n`` symbols on every monthly sample of the dev window."""
+    filings = [date(1995, 1, 2) + timedelta(days=365 * k) for k in range(22)]
+    facts = [
+        Fact(symbol=f"S{i:02d}", taxonomy="us-gaap", tag="Assets", unit="USD", period_start=None,
+             period_end=d, val=1.0e9 + i, accn=f"0000000000-{k:02d}-{i:06d}", form="10-K",
+             fy=d.year, fp="FY", filed=d)
+        for i in range(n)
+        for k, d in enumerate(filings)
+    ]
+    return FundamentalPanel.from_facts(facts)
+
+
+def _with_panel(data, panel: FundamentalPanel):
+    """``data`` with ``panel`` on its market. The module-scoped ``data`` fixture is not mutated."""
+    market = Market(
+        history=data.market.history,
+        membership=data.market.membership,
+        fx=data.market.fx,
+        fundamentals=panel,
+    )
+    return dataclasses.replace(data, market=market)
+
+
+def test_only_a_market_aware_allocator_is_gated():
+    m = _method("M0010", cands=(_fund_cand("M0010-VAL", "M0010"), _cand("M0010-T", "M0010")))
+    assert runner.market_aware_candidates(m) == ("M0010-VAL",)
+    assert runner.market_aware_candidates(_method()) == ()
+
+
+def test_a_price_only_method_is_never_refused(data):
+    """M0001 and M0004 rank on bars; the smoke market carries EMPTY_PANEL and must stay runnable."""
+    assert len(data.market.fundamentals) == 0
+    assert runner.preflight_data(data, _method()) is None
+
+
+def test_a_market_aware_method_is_refused_against_a_panel_that_cannot_rank(data):
+    m = _method("M0011", cands=(_fund_cand("M0011-VAL", "M0011"),))
+    with pytest.raises(store.LabError, match="M0011-VAL") as exc:
+        runner.preflight_data(data, m)
+    text = str(exc.value)
+    assert "0.0%" in text
+    assert "--allow-coverage" in text
+    assert "BELOW" in text  # the per-year table travels with the refusal
+
+
+def test_allow_coverage_lifts_the_refusal_and_still_measures(data):
+    m = _method("M0012", cands=(_fund_cand("M0012-VAL", "M0012"),))
+    cov = runner.preflight_data(data, m, min_coverage=0.0)
+    assert cov is not None
+    assert cov.fraction == 0.0
+    assert cov.top == coverage.DEFAULT_TOP
+    assert cov.max_stale_days == coverage.default_max_stale_days()
+    assert "BELOW" in coverage.format_report(cov, floor=coverage.MIN_DEV_COVERAGE)
+
+
+def test_a_market_aware_method_runs_when_the_panel_can_rank(data):
+    rich = _with_panel(data, _dense_panel())
+    m = _method("M0013", cands=(_fund_cand("M0013-VAL", "M0013"),))
+    cov = runner.preflight_data(rich, m)
+    assert cov is not None
+    assert cov.fraction == 1.0
+    assert cov.symbols == 25
+
+
+def test_the_gate_measures_content_not_presence(data):
+    """A panel of 50 symbols whose every fact is filed after the dev window covers nothing."""
+    late = FundamentalPanel.from_facts([
+        Fact(symbol=f"L{i:02d}", taxonomy="us-gaap", tag="Assets", unit="USD", period_start=None,
+             period_end=date(2015, 11, 2), val=1.0e9, accn=f"0000000000-15-{i:06d}", form="10-K",
+             fy=2015, fp="FY", filed=date(2015, 11, 2))
+        for i in range(50)
+    ])
+    thin = _with_panel(data, late)
+    assert len(thin.market.fundamentals) == 50  # the panel is not empty
+    m = _method("M0014", cands=(_fund_cand("M0014-VAL", "M0014"),))
+    with pytest.raises(store.LabError, match="0.0%"):
+        runner.preflight_data(thin, m)
+
+
+def test_run_method_itself_does_not_gate(conn, data):
+    """The gate lives in ``commands/lab._run``; ``run_method`` stays callable from a test."""
+    ran = runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False)
+    assert len(ran) == 2

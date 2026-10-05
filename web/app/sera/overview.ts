@@ -247,7 +247,7 @@ export function hurdles(snap: LabSnapshot): Hurdles {
         key: r.key,
         value: r.passing,
         color: HURDLE_COLOR,
-        valueText: `${r.passing} of ${r.measured}`,
+        valueText: String(r.passing),
         tip:
           r.measured < r.total
             ? `${r.passing} of the ${r.measured} tries it was checked on pass “${r.label}” (${r.total - r.measured} older tries predate it)`

@@ -47,14 +47,19 @@
 .cardIdea { font-size: 15px; line-height: 1.4; color: var(--ink-2); font-style: italic; }
 .cardMeta { margin-top: auto; padding-top: 4px; font-size: 13px; color: var(--ink-3); }
 
-/* Hurdles + Families: HTML bar rows that grow to fill the sheet (label | track with bar and value). */
+/* Hurdles + Families: one grid of bar rows (label | track with bar and value) that grows to fill the sheet. */
 .hurdles > .fillChart, .families > .fillChart { flex: 1; }
-.fillChart { display: flex; flex-direction: column; min-height: 0; }
-.fillRows { list-style: none; margin: 0; padding: 0; flex: 1; display: flex; flex-direction: column; }
-.fillRow, .fillAxis { display: grid; grid-template-columns: var(--fill-label) minmax(0, 1fr); column-gap: 14px; }
-.fillRow { flex: 1 1 0; min-height: 36px; align-items: center; }
-.fillLabel { font-size: 15px; color: var(--ink); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.fillTrack { position: relative; align-self: stretch; margin-right: var(--fill-value); border-left: 1.25px solid var(--outline); }
+.fillChart {
+  align-self: stretch;
+  width: 100%;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: center;
+}
+.fillLabel { font-size: 13px; color: var(--ink); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fillTrack, .fillTicks { position: relative; margin-right: var(--fill-value); font-size: 13px; }
+.fillTrack { align-self: stretch; border-left: 1.25px solid var(--outline); }
 .fillGrid { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--hair); }
 .fillBar {
   position: absolute;
@@ -69,15 +74,14 @@
 .fillValue {
   position: absolute;
   top: 50%;
-  transform: translate(8px, -50%);
+  transform: translate(6px, -50%);
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
-.fillAxis { padding-top: 8px; }
-.fillTicks { position: relative; height: 18px; margin-right: var(--fill-value); }
-.fillTick { position: absolute; transform: translateX(-50%); font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.fillTicks { align-self: start; height: 26px; }
+.fillTick { position: absolute; top: 8px; transform: translateX(-50%); font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 
 /* Status chips: one quiet fill per stage of the pipeline. */
 .status { height: 30px; padding: 0 12px; font-size: 14px; background: var(--chip-solid); }

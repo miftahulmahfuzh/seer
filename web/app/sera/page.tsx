@@ -1,7 +1,7 @@
 import { ArrowUpRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import type { CSSProperties, ReactNode } from 'react';
+import { type CSSProperties, Fragment, type ReactNode } from 'react';
 import type { BarGroup } from '@/components/sera/charts/BarChart';
 import { Legend } from '@/components/sera/charts/Legend';
 import { LineChart } from '@/components/sera/charts/LineChart';
@@ -316,8 +316,8 @@ export default async function SeraOverview() {
 }
 
 /**
- * Horizontal bars as HTML rows, not an SVG: the rows stretch to fill whatever height the sheet gets
- * from its neighbour, and a label column sized to the longest label keeps every bar starting at the same x.
+ * Horizontal bars as one HTML grid, not an SVG: the rows stretch to fill whatever height the sheet gets
+ * from its neighbour, and the label column is as wide as the longest label, so every bar starts at the same x.
  */
 function FillBars({ groups, domain, ariaLabel, empty }: { groups: readonly BarGroup[]; domain: Domain; ariaLabel: string; empty: string }) {
   if (!groups.length) return <p className={s.empty}>{empty}</p>;
@@ -327,33 +327,29 @@ function FillBars({ groups, domain, ariaLabel, empty }: { groups: readonly BarGr
   const pct = (v: number) => `${(Math.min(v, hi) / hi) * 100}%`;
   const textOf = (g: BarGroup) => g.items[0]?.valueText ?? fmt(g.items[0]?.value ?? 0);
   const style = {
-    '--fill-label': `${Math.max(...groups.map(g => g.label.length)) + 1}ch`,
-    '--fill-value': `${Math.max(...groups.map(g => textOf(g).length)) + 2}ch`,
+    gridTemplateRows: `repeat(${groups.length}, minmax(32px, 1fr)) auto`,
+    '--fill-value': `${Math.max(...groups.map(g => textOf(g).length)) + 1.5}ch`,
   } as CSSProperties;
   return (
     <div className={s.fillChart} style={style} role="img" aria-label={ariaLabel}>
-      <ul className={s.fillRows}>
-        {groups.map(g => {
-          const it = g.items[0];
-          const v = it?.value ?? 0;
-          return (
-            <li key={g.id} className={s.fillRow}>
-              <span className={s.fillLabel} data-tip={g.tip}>{g.label}</span>
-              <span className={s.fillTrack}>
-                {ticks.map(t => <span key={t.value} className={s.fillGrid} style={{ left: pct(t.value) }} />)}
-                <span className={s.fillBar} style={{ width: pct(v), background: it?.color }} data-tip={it?.tip} />
-                <span className={s.fillValue} style={{ left: pct(v) }}>{textOf(g)}</span>
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-      <div className={s.fillAxis} aria-hidden>
-        <span />
-        <span className={s.fillTicks}>
-          {ticks.map(t => <span key={t.value} className={s.fillTick} style={{ left: pct(t.value) }}>{t.label}</span>)}
-        </span>
-      </div>
+      {groups.map(g => {
+        const it = g.items[0];
+        const v = it?.value ?? 0;
+        return (
+          <Fragment key={g.id}>
+            <span className={s.fillLabel} data-tip={g.tip}>{g.label}</span>
+            <span className={s.fillTrack}>
+              {ticks.map(t => <span key={t.value} className={s.fillGrid} style={{ left: pct(t.value) }} />)}
+              <span className={s.fillBar} style={{ width: pct(v), background: it?.color }} data-tip={it?.tip} />
+              <span className={s.fillValue} style={{ left: pct(v) }}>{textOf(g)}</span>
+            </span>
+          </Fragment>
+        );
+      })}
+      <span aria-hidden />
+      <span className={s.fillTicks} aria-hidden>
+        {ticks.map(t => <span key={t.value} className={s.fillTick} style={{ left: pct(t.value) }}>{t.label}</span>)}
+      </span>
     </div>
   );
 }

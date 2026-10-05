@@ -224,9 +224,9 @@ describe('hurdles', () => {
     expect(h.groups.map(g => g.id)).toEqual(['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr']);
     expect(h.domain).toEqual([0, 4]);
     expect(h.total).toBe(4);
-    expect(h.groups[4].items[0]).toMatchObject({ value: 4, valueText: '4 of 4' });
+    expect(h.groups[4].items[0]).toMatchObject({ value: 4, valueText: '4' });
     // The luck check was measured on the two lab tries only.
-    expect(h.groups[5].items[0]).toMatchObject({ value: 1, valueText: '1 of 2' });
+    expect(h.groups[5].items[0]).toMatchObject({ value: 1, valueText: '1' });
     expect(h.groups[5].items[0].tip).toContain('older tries predate it');
     expect(h.hardest).toBe('Beats SPY');
   });

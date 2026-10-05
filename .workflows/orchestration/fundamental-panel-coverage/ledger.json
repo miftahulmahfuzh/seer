@@ -34,7 +34,7 @@
       "satisfies": [
         "R1"
       ],
-      "status": "running",
+      "status": "pending",
       "task_id": null,
       "title": "Fix A: re-vendor `ticker_cik.csv` back to real 2009 membership, with the `EARLY` start screen"
     },
@@ -59,21 +59,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "3f9b549",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 4,
-      "note": null,
+      "note": "Phase 4 landed 3f9b549, verified by coordinator: ancestor of branch, pushed, 4 files / 413 insertions / 8 deletions, none of phase 2's. C1 CONTRACT HELD - git show on commands/research_store.py has ZERO deletion lines; committed branch order is guards -> --coverage (:128) -> --verify (:131) -> --refresh-fundamentals -> build, with the refresh/read-only guard at :119-124 returning exit 2. research.refresh_fundamentals(store_dir, facts, *, data_dir=None) rewrites only fundamentals.csv; bars.csv, dividends.csv, fx.csv, unserved.csv carried byte for byte, manifest re-sealed from verified counts, swapped via build_store's .tmp/.old discipline. --dry-run refreshes a copy in a temp dir. No store, database, network touched - phase 5 owns the real run. Tests +13 exactly (test_research_store.py collected 34 -> 47; 10 functions, one parametrized x4); suite 2242 -> 2255 passed, 332 skipped, the same 6 test_cik.py failures before and after (phase 2's in-flight tree, untouched). Decisions, all on the ladder: (1) explicit pathspec staging only - rung 6 plus narrower blast radius; (2) readme-updater NOT dispatched and package_readme.md NOT written, it is phase 5's - rung 2/3, its plan's 'Leaves alone' and phase 5's Owns; (3) PLAN.md Status/phase table left alone and P1-ENG-M3HE left blocked rather than unblocked, since phases 2 and 3 have not landed and a linear 'phase 4 complete' would misreport a set finishing out of order - rung 2. TOOLING BUG FOUND, propagate to phases 3 and 5: swarm.py find --plan on the ADOPTED copy (engine/.workflows/plan/P1-ENG-*.md), which is what /implement Step 4b tells a session to pass, returns {swarm: false}. Only the SOURCE path .workflows/plan/fundamental-panel-coverage/phase-N.md resolves. A session following Step 4b literally concludes it belongs to no swarm and silently skips reporting to the coordinator.",
       "package": "engine/src/seer_engine` (research)",
       "plan": ".workflows/plan/fundamental-panel-coverage/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T07:53:22+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-K8RV",
       "title": "Refresh the store's panel without re-downloading bars"
     },
     {
@@ -103,7 +103,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/fundamental-panel-coverage/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "fundamental-panel-coverage",
-  "updated": "2026-10-05T07:36:44+00:00",
-  "verified_at": "2026-10-05T07:36:22+00:00",
+  "updated": "2026-10-05T07:53:22+00:00",
+  "verified_at": "2026-10-05T07:53:22+00:00",
   "worktree": "/home/miftah/.worktrees/seer/fundamental-panel-coverage"
 }

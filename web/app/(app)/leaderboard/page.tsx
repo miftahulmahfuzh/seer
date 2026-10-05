@@ -131,7 +131,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
             href={id => `/leaderboard?s=${encodeURIComponent(id)}`} label="Strategy" />
         </div>
       )}
-      <span className="eyebrow">Go-live checklist · {pick ? pick.short : '—'}</span>
+      <span className="eyebrow">Go-live checklist · {pick ? pick.name : '—'}</span>
       <div className={s.score}>
         <span className={`num ${s.scoreNum}`}>{score.passed}/{score.total}</span>
         <span className={s.scoreText}>{score.lines[0]}<br />{score.lines[1]}</span>

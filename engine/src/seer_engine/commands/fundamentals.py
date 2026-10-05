@@ -1,7 +1,7 @@
 """fundamentals -- resumable ingest of SEC EDGAR XBRL company facts (Gap B).
 
 One ``data.sec.gov`` ``companyfacts`` call per CIK, resolved from the vendored dated
-ticker->CIK map, for every S&P 500 / Nasdaq-100 ever-member since 2015-01-02. Symbols are
+ticker->CIK map, for every S&P 500 / Nasdaq-100 ever-member since 2009-01-01. Symbols are
 processed in batches and **each batch is written in its own transaction together with its
 ``fundamentals_log`` rows**, so a crash loses at most one batch and a re-run resumes where
 it stopped -- the shape ``backfill`` uses.
@@ -12,6 +12,15 @@ double-count its rows; and one ticker maps to several CIKs over time, so a symbo
 row would carry two companies' outcomes. ``plan_jobs`` resolves every in-scope symbol, groups
 by CIK and skips the CIKs already logged; ``CikResult.per_symbol`` fans the outcome back out
 so the summary and the exit code stay per symbol.
+
+Resuming is keyed on the log, so **widening a floor is not something a flag can express**:
+``--retry-failed`` re-attempts ``failed`` and ``empty`` filers only, and a filer logged ``ok``
+under a narrower ``--since-filed`` is skipped with its older facts still missing. The supported
+way to re-fetch everything is ``--symbols`` with the whole member set: ``plan_jobs`` ignores the
+log outright when it is given, so every resolved CIK is fetched without a row being deleted
+anywhere. The facts upsert is idempotent, so a filer whose facts are unchanged still writes zero
+rows, and re-running is always safe. Do NOT empty ``fundamentals_log`` to achieve this: it
+destroys the resume ledger for a result ``--symbols`` reaches without destroying anything.
 
 No dependency on ``bars``. 133 of the ever-members have no price history at all and they are
 precisely the names this pipeline exists to cover, so nothing here reads ``bars``, joins
@@ -24,11 +33,17 @@ here derives anything: the concept ladder and the ``filed <= t`` selection are p
 ``seer_engine.fundamentals``.
 
 Storage. ``companyfacts`` for a large filer holds tens of thousands of facts across hundreds
-of tags; Neon's free tier is 0.5 GB and ``bars`` already takes 177 MB. So the ingest keeps
-only the taxonomy/tag pairs in ``ladder.LADDER_TAGS`` (phase 5 owns the list) and only facts
-with ``filed >= --since-filed``.
-Widening either is a deliberate decision that costs a re-ingest, which is why both are
-visible constants and the summary prints ``pg_total_relation_size('fundamental_facts')``.
+of tags, so the ingest keeps only the taxonomy/tag pairs in ``ladder.LADDER_TAGS`` (phase 5
+owns the list) and only facts with ``filed >= --since-filed``. Narrowing either is a deliberate
+decision that costs a re-ingest, which is why both are visible constants and the summary prints
+``pg_total_relation_size('fundamental_facts')``.
+
+**These facts do not live on Neon.** Every write goes to the database ``.env.local-train``
+names, because the only database read in the whole train/eval pipeline is ``fundamental_facts``
+x ``ticker_cik`` and pointing that one read at a local Postgres takes Neon out of train/eval
+entirely. Neon's ``fundamental_facts`` and ``fundamentals_log`` are deliberately truncated, so
+the 0.5 GB free tier no longer bounds the filed floor; the only remaining bound on
+``--since-filed`` is when XBRL began, and that is 2009.
 
 Fair access is the SEC client's job, not this module's: ``sec.Client`` paces itself to
 <= 10 req/s from the end of the previous call and sends the contact ``User-Agent``. This
@@ -60,11 +75,30 @@ log = logging.getLogger(__name__)
 
 HELP = "Load SEC EDGAR XBRL company facts for every index ever-member; resumable."
 
-DEFAULT_SINCE = date(2015, 1, 2)
-# Facts filed before this are never usable: the backtest window opens at DEFAULT_SINCE and
-# SUE needs EPS_{q-4} plus a year of surprises to scale by, so two years of lead is enough.
-# Dropping 2009-2012 roughly halves the row count on a 0.5 GB database.
-DEFAULT_SINCE_FILED = date(2013, 1, 1)
+DEFAULT_SINCE = date(2009, 1, 1)
+# 2009-01-01 at both ends, and it is the earliest floor worth having: XBRL did not exist
+# before roughly FY2009, so there is nothing earlier to fetch at any price or from any vendor.
+#
+# THE TWO FLOORS MOVE TOGETHER, ALWAYS. `--since` picks WHICH members are ingested
+# (_WINDOWS_SQL over the `universe` table) and bounds the window resolve_window_ciks resolves
+# CIKs over; `--since-filed` picks WHICH of a fetched filer's facts are kept. A member admitted
+# from 2009 whose facts are dropped below 2013 buys nothing, and a fact kept from 2009 for a
+# member only admitted from 2015 is never fetched at all, because the member is out of scope.
+# `options_from_args` enforces since_filed <= since, which 2009-01-01 <= 2009-01-01 satisfies.
+#
+# Lowering the filed floor costs no extra request: `companyfacts` returns a filer's whole
+# history in one response whatever the floor, so the earlier 2013 cutoff was discarding rows
+# that had already been downloaded. What it buys is the panel. The panel's load joins
+# `fundamental_facts` to `ticker_cik` ON `filed >= start_date AND filed < end_date`
+# (backtest/io.py:93-98), so a fact filed before the map's start_date for that symbol never
+# reaches the panel at all -- which is why the filed floor and the vendored map's floor have
+# to agree, and why 181,491 facts filed in 2013-2014 were stored and invisible.
+#
+# Coverage in 2009-2010 is partial and size-biased: XBRL phased in by filer size, large
+# accelerated filers from roughly FY2009 and all filers by FY2011. Do not assume those years
+# are as thick as 2013 onwards; the measured per-year counts are in
+# docs/plans/2026-10-05-fundamental-panel-coverage.md section 3.
+DEFAULT_SINCE_FILED = date(2009, 1, 1)
 DEFAULT_BATCH_SIZE = 20
 ERROR_MAX_LEN = 500
 
@@ -211,15 +245,19 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
         "--since",
         type=_iso_date,
         default=DEFAULT_SINCE,
-        help=f"ingest every member on or after this date (default {DEFAULT_SINCE.isoformat()})",
+        help=(
+            "ingest every member on or after this date; this selects the MEMBER SET, not the "
+            f"facts (default {DEFAULT_SINCE.isoformat()}; must be >= --since-filed)"
+        ),
     )
     p.add_argument(
         "--since-filed",
         type=_iso_date,
         default=DEFAULT_SINCE_FILED,
         help=(
-            "drop facts filed before this date "
-            f"(default {DEFAULT_SINCE_FILED.isoformat()}; widening costs a re-ingest)"
+            "drop facts filed before this date; this selects the FACTS of a fetched filer "
+            f"(default {DEFAULT_SINCE_FILED.isoformat()}, which is where XBRL begins -- there "
+            "is nothing earlier to widen to; narrowing it costs a re-ingest to undo)"
         ),
     )
     p.add_argument(
@@ -231,7 +269,10 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--retry-failed",
         action="store_true",
-        help="also re-attempt symbols logged as failed or empty",
+        help=(
+            "also re-attempt symbols logged as failed or empty; a filer logged ok is still "
+            "skipped, so widening --since-filed needs --symbols, which ignores the log"
+        ),
     )
     p.add_argument(
         "--batch-size",

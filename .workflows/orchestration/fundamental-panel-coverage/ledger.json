@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "df6e0ab",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": null,
+      "note": "Decided without asking (phase 1, all four verified by coordinator against the index): (1) This session minted all five TaskIDs - rung 6, recorded precedent in engine/.workflows/todos.md from the STRATEGY_B_RANKER swarm. A peer minted a rival set (JUE0/WQI8/6U02/RLMS/27JI) a minute earlier; it was orphaned with no todos entry and no index row, and p1 left it on disk rather than delete a live peer's output - the peer has since cleaned it up. The committed index carries p1's set. (2) Committed from main context, not pusher - rung 6, same file's shared-worktree ruling. (3) readme-updater skipped, engine/package_readme.md is phase 5's - rung 4, index Scope plus phase 1's 'Leaves alone'. (4) Phases 2-5 left to claim their own todos entries rather than pre-flipped - rung 6, matching how p2 claimed its own. MEASURED coverage 0.0378 exactly per C4a: monthly / top=20 / max_stale_days=400 / 1996-01-02..2015-10-02, 238 samples, 780 panel symbols, 1996-2014 every row 0/12, 2015 covers 9 of 10 with 519 rankable at best, exit 1. Quoted as an UPPER BOUND per C8; the 4% and 2.5% figures retired by name. Tests +27 (20 new test_fundamentals_coverage.py, 7 added test_lab_runner.py); suite 2242 passed/332 skipped, 2574 passed/0 skipped with PG_TEST_URL. C1 HANDOFF FOR PHASE 4: research_store.run() as committed in df6e0ab is FINAL - body is guards -> --coverage -> --verify -> build, --coverage first so it wins when both read-only flags are given; --coverage is getattr(args,'coverage',False); _coverage(store) sits between _verify and format_summary; flag registered directly after --verify, so phase 4's slot after --with-fundamentals does not collide. Phase 4 inserts --refresh-fundamentals between --verify and build. lab run was NOT executed.",
       "package": "engine/src/seer_engine/fundamentals`, `commands`, `lab",
       "plan": ".workflows/plan/fundamental-panel-coverage/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T07:36:44+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-TJ4M",
       "title": "The coverage gate: a pure measure, a CLI surface, a `lab run` refusal"
     },
     {
@@ -27,10 +27,10 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 2,
-      "note": "Decided without asking (phase 2, confirmed by coordinator): (1) step 8b prose says four new test_cik.py tests, Interface Contract names five -> FIVE. Rung 1: a stated invariant, invariant 1 pins P2 at +5. Matches Decisions row C10. (2) Commit by explicit pathspec, the five Owns files only, never add -A/-a -> phase 1 is building concurrently in the SAME worktree on the SAME branch; file-disjoint is not commit-disjoint. Rung 4: the index's phase table note 'Phase 1 and phase 2 share no file and no package'. Reached independently by p2 and by the coordinator. Status at 14:30: not blocked, waiting on cold-cache SEC/Massive fetch PID 942195 (913 ever-members confirmed, 123 to name-matching, Massive delisted page 5/~24 at 12.5s/page free-tier pacing, then ~900 SEC submissions JSONs at 0.15s pacing). ETA 15-25 min to first SCREEN/EARLY list. Step 7d backstop already ran offline: exactly 37 hull-gap stretches with the plan's predicted leaders (CIEN 5894, Q 5330, FLEX 4928, STLD 4749, DELL 3982, CEG 3613, SNDK 3487) - the plan's measurements hold against the current tree.",
+      "note": "Phase 2 IS LIVE (session impl-fundamental-panel-coverage-p2, tmux @21) - do NOT respawn. verify derives 'pending' only because it has no commit yet; it is mid-audit, not abandoned. Pass 1 exited 1 at 14:30:44 with UNRESOLVED(28) and wrote no CSV (invariant 3 working as designed); p2 resolved all 28 by hand and pass-2 generator PID 983958 is running the ~900 SEC submissions fetch.",
       "package": "engine/scripts`, `engine/data`, `seer_engine.cik",
       "plan": ".workflows/plan/fundamental-panel-coverage/phase-2.md",
-      "reported_at": "2026-10-05T07:26:03+00:00",
+      "reported_at": "2026-10-05T07:36:44+00:00",
       "satisfies": [
         "R1"
       ],
@@ -72,7 +72,7 @@
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Refresh the store's panel without re-downloading bars"
     },
@@ -103,7 +103,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/fundamental-panel-coverage/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "fundamental-panel-coverage",
-  "updated": "2026-10-05T07:26:03+00:00",
-  "verified_at": "2026-10-05T07:24:57+00:00",
+  "updated": "2026-10-05T07:36:44+00:00",
+  "verified_at": "2026-10-05T07:36:22+00:00",
   "worktree": "/home/miftah/.worktrees/seer/fundamental-panel-coverage"
 }

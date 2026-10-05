@@ -3,6 +3,12 @@
   "coordinator": "orch-fundamental-panel-coverage",
   "coordinator_session_id": "16ed6cbd-0ab7-4869-8cf0-ba75aef23e0c",
   "created": "2026-10-05T07:17:46+00:00",
+  "landed": {
+    "at": "2026-10-05T09:31:45+00:00",
+    "base": "main",
+    "commit": "3ca3ad0e73518728011e1d651d524335a1f7ba6c",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -78,7 +84,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "5967012",
       "depends_on": [
         1,
         2,
@@ -87,23 +93,23 @@
       ],
       "difficulty": "NORMAL",
       "n": 5,
-      "note": null,
+      "note": "Phase 5 landed 5967012, verified by coordinator from git: ancestor, pushed, 4 doc files, origin/main untouched at 0517e53, and the M0005 docstring confirmed UNTOUCHED by an empty diff against base 2dad9ff (the claimed rung-1 revert was real). THE MEASURED RESULT, all upper bounds per C8: pre-fix store e597367b 0.0378 (9/238 monthly samples, reproducing phase 1 exactly); Fix A alone 0.1387 (33/238); Fix A + Fix B on store 399d0d25 0.3151 (75/238), 869 panel symbols, first date able to rank 20 names 2009-08-02. Still FAR BELOW the 0.80 floor, so lab run would refuse a MarketAware method on this store and that refusal is correct. 13 of the dev window's 19 years are permanently uncoverable from EDGAR; the >=100 trades gate stays unreachable on this dev window; the test-window decision is unmade and out of scope. STORE: e597367b -> 399d0d254c7a90b8cdb49f7ce598269087d38730f795cae90453eeb580b07cf8, 1,213,303 facts written, 2,490,793 bar rows carried; sha256sum -c confirms bars/dividends/fx/unserved byte-identical, so phase 4's contract held. C4b followed exactly: pushed --keep 0 (45.2 MB, pruned: []), e597367b CONFIRMED still listed afterwards, local backup at /home/miftah/.seer-store-backup-e597367b (227 MB). R5/6.1 closed by VERIFICATION with no code: exactly three Market( sites in engine/src all passing fundamentals= (backtest/io.py:156, paper/store.py:1058, research.py:682 - not :583, phase 4 inserted above it); the three tests at test_paper_store.py:554/:573/:585 pass with PG_TEST_URL. Suite +0: 2261 passed / 332 skipped; 2593 passed / 0 failed / 0 skipped with PG_TEST_URL. ONE EXIT CLAUSE NOT MET, reported as not achievable rather than done: Step 10's rewrite of m0005_fundamental_factors.py's 'READ THIS BEFORE RUNNING' docstring. The edit was made and test_lab_methods.py::test_a_method_that_ran_is_frozen failed - it compares source_sha(path) against the committed lab database and a docstring edit moves it (dd9344c7 -> 1422f4b7). REVERTED on rung 1 (invariant 1: no existing test may change its result), which is also what Step 10's own contingency prescribed. Fixing the warning inside the file would mean minting a variation method, which hard boundary 2 forbids. The retired python -c one-liner is gone from the runbook but STILL STANDS in that docstring; the runbook now says so explicitly and names itself as the current instruction. HANDOFF: whoever mints the source_kind='variation', parent_id='M0005' re-test writes the corrected preamble into the new file. Other decisions: readme-updater not dispatched (rung 2/3, phase 5 owns package_readme.md and it carries only figures this phase ran, invariant 10); runbook :12 and :45 left at 2015-01-02 per C7ii since their subject is BARS, only :15 and :51 moved to 2009-01-01 / 913 symbols; :151-175 recipe now a pointer to SOURCES.md with no restated counts; the phase plan's Runtime preamble had a corrupt export SEER_PY=/home/miftah/seer/$SEER_PY and the index's correct value was used (rung 1). Invariant 9 respected throughout - phase 3's facts-by-filed-year is never called coverage. No lab run, no method id or variation minted, test window untouched, Neon never contacted.",
       "package": "docs`, `engine` (docs only)",
       "plan": ".workflows/plan/fundamental-panel-coverage/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T09:27:51+00:00",
       "satisfies": [
         "R4",
         "R5"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-M3HE",
       "title": "Measure, report honestly, and retire the runbook snippet"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/fundamental-panel-coverage/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "fundamental-panel-coverage",
-  "updated": "2026-10-05T09:01:25+00:00",
+  "updated": "2026-10-05T09:31:45+00:00",
   "verified_at": "2026-10-05T07:53:22+00:00",
   "worktree": "/home/miftah/.worktrees/seer/fundamental-panel-coverage"
 }

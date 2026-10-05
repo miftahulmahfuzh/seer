@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-05 11:00
-**Total Active Tasks**: 1
+**Last Updated**: 2026-10-05 14:35
+**Total Active Tasks**: 4
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 4
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 0
-- Completed: 60
+- Blocked: 3
+- Completed: 61
 
 ---
 
@@ -23,6 +23,62 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [x] **P1-ENG-TJ4M** Phase 1: The coverage gate: a pure measure, a CLI surface, a `lab run` refusal
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns a new pure `engine/src/seer_engine/fundamentals/coverage.py` (no database, network, clock or randomness — `tests/test_strategy_purity.py` territory) exporting the measure and its constants, its export from `fundamentals/__init__.py`, a `--coverage` mode on `commands/research_store.py` that loads the store and prints the per-year table plus one fraction, a post-load refusal in `lab/runner.py` wired into `commands/lab.py:_run` between `load_store` and `run_method` with an `--allow-coverage FLOAT` escape, and tests in a new `engine/tests/test_fundamentals_coverage.py` plus additions to `engine/tests/test_lab_runner.py`. Does not touch `cik.py`, `build_ticker_cik.py`, `ticker_cik.csv`, `commands/fundamentals.py`, `research.py`'s build or seal path, any `docs/` file or any database; it must work against the current 2.5%-coverage store and its tests must not depend on a store on disk. The measure answers "on how many sampled dev-window dates can the panel rank at least `top` symbols?", counting a symbol only when `panel.as_of(sym, t)` has non-empty `observations` and its newest `filed` is within `max_stale_days` of `t`; `lab run` refuses below `MIN_DEV_COVERAGE = 0.80` when the method has a `MarketAware` allocator, and a price-only method is never refused. Exit: `python -m seer_engine research_store --coverage --store "$SEER_STORE"` prints, for the 2026-10-05 store, a table whose 1996–2014 rows are 0 and whose 2015 row is non-zero and a fraction of `0.0378` — under this set's one definition (monthly sample of 1996-01-02 .. 2015-10-16, 238 dates, `top = 20`, `max_stale_days = 400`, content checked through `Snapshot.observations`) and reported as an upper bound because the measure reads no bars; a unit test asserts 0.0 for a panel whose facts all postdate the window, 1.0 for one that covers it, and that an empty-`observations` `Snapshot` counts as not rankable; a `lab run` test asserts the refusal fires for a `MarketAware` method on a thin panel, does not fire for a price-only method, and is lifted by `--allow-coverage`. Suite green at +27.
+  - **Status**: completed
+  - **Plan Set**: `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` (phase 1 of 5)
+  - **Satisfies**: R3 — The coverage gate (§6.2): the check moves out of the runbook and into the engine, so no future method runs against a panel that cannot rank
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-TJ4M.md`
+  - **Completed**: 2026-10-05 14:35
+  - **Method**: /implement
+  - **Commit**: df6e0ab
+  - **Files**: engine/src/seer_engine/fundamentals/coverage.py, engine/src/seer_engine/fundamentals/__init__.py, engine/src/seer_engine/commands/research_store.py, engine/src/seer_engine/commands/lab.py, engine/src/seer_engine/lab/runner.py, engine/tests/test_fundamentals_coverage.py, engine/tests/test_lab_runner.py
+  - **Measured**: 0.0378 on the 2026-10-05 store (fingerprint e597367b…), monthly / top=20 / max_stale_days=400 / 1996-01-02..2015-10-02, 238 samples; 1996–2014 all 0/12, 2015 covers 9 of 10 with 519 rankable at best. An UPPER BOUND — the measure reads no bars, so membership, min_price and min_dollar_volume are unapplied. The 4% (doc §4 span estimate) and 2.5% (semiannual) figures are retired by name.
+  - **Decided**:
+    - Step 3 task creation in a concurrent swarm -> this session (phase 1) created all five tasks; peers skip it (rung 6: the recorded precedent in this file from the STRATEGY_B_RANKER swarm). A peer minted a rival ID set (JUE0/WQI8/6U02/RLMS/27JI) a minute earlier; those plan copies are orphaned — no todos entry, no index row — and were left on disk for their session to clean up (tie-break: reversible option)
+    - Committed by explicit pathspec from the main context, not via pusher (rung 6: the shared-worktree ruling recorded in this file); `git add -A` would have swept phase 2's in-flight CSV work
+    - readme-updater skipped: `engine/package_readme.md` is phase 5's (rung 4: the index Scope and phase 1's "Leaves alone")
+    - Phases 2–5 left for their own sessions to claim rather than pre-flipped (rung 6: phase 2's session claimed its own entry the same way)
+  - **Notes**: `lab run` was NOT executed, by design. The 6 `test_cik.py` failures present in the shared worktree at commit time are phase 2's in-flight edits — its own new tests asserting a `ticker_cik.csv` it has not regenerated yet — and phase 1 touches no file phase 2 touches. Phase 1's delta is +27 (20 new in `test_fundamentals_coverage.py`, 7 added to `test_lab_runner.py`); full suite 2242 passed / 332 skipped, 2574 passed / 0 skipped with `PG_TEST_URL`.
+- [ ] **P1-ENG-QD7X** Phase 2: Fix A: re-vendor `ticker_cik.csv` back to real 2009 membership, with the `EARLY` start screen
+  - **Difficulty**: HARD
+  - **Type**: Update
+  - **Context**: Owns `engine/src/seer_engine/cik.py` (`SINCE` → `date(2009, 1, 1)` and the docstring that explains it), `engine/scripts/build_ticker_cik.py` (the `MANUAL` start sentinel, the new audits, `SCREEN_EXEMPT` additions, the second `EARLY` screen — `periodic_dates`, `EARLY_WINDOW_DAYS` and `EARLY_EXEMPT` — and the measured counts in its module docstring), the regenerated `engine/data/ticker_cik.csv`, `engine/data/SOURCES.md`, and `engine/tests/test_cik.py` (one assertion widened, five tests added). Does not touch `commands/fundamentals.py` (phase 3 owns both ingest floors), `fundamentals/` (phase 1), `research.py` (phase 4), any `docs/` file outside `engine/data`, or the `ticker_cik` table and `005_fundamentals.sql`. `spans()` already derives every start from `max(iv.start_date, SINCE)`, so lowering `SINCE` fixes tiers 1–4 for free; what it does not fix is `MANUAL`, whose ~60 literal `"2015-01-02"` starts become an empty-cell sentinel meaning "the symbol's membership start from `spans()`" while genuinely later starts stay literal and every `end` stays literal and unchanged. 118 symbols enter scope, most delisted before 2015 and resolved by hand against `https://data.sec.gov/submissions/CIK<cik>.json`, with new pre-2015 recycling split into two dated rows rather than merged. Exit: the CSV loads through `cik.load_index()` with 913 symbols; `cik.coverage_gaps(index, compute_universe())` is empty; zero rows carry `source=fuzzy`; zero rows start at 2015-01-02; `NDOI` is still the only `NONE` and still alone; the generator exits 0 with `UNRESOLVED`, `SCREEN` and `EARLY` all empty and every exemption carrying a reason naming what was checked; `RECYCLED`, `SPOT_CHECKS`, `SHARE_CLASSES`, the WestRock and Alphabet tests all pass with their existing expected values; `SOURCES.md`'s row and tier counts match the file. Suite green at +5.
+  - **Status**: in_progress
+  - **Plan Set**: `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` (phase 2 of 5)
+  - **Satisfies**: R1 — Fix A (§2): re-vendor `ticker_cik.csv` with real first-membership intervals, every §2 invariant still enforced by tests
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-QD7X.md`
+- [ ] **P1-ENG-F2BN** Phase 3: Fix B: re-ingest at `--since-filed 2009-01-01` via `--symbols`, and measure 2009–2012
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns `engine/src/seer_engine/commands/fundamentals.py` (`DEFAULT_SINCE` and `DEFAULT_SINCE_FILED` → `date(2009, 1, 1)`, the module docstring's "since 2015-01-02", the two `--since*` help strings, the storage paragraph's arithmetic), `engine/tests/test_fundamentals_command.py`, and the ingest run itself against `.env.local-train`. Does not touch `cik.py` or `ticker_cik.csv` (phase 2), `fundamentals/` (phase 1), `research.py` or `engine/.research/` (phases 4 and 5), Neon, or the `005` migration. The local train database holds 0 `universe` and 0 `bars` rows, so `universe refresh` (no network) must run before the ingest even under `--symbols`, which bypasses `select_symbols` but not `plan_jobs`'s per-symbol `windows`. The decision doc §3's `--retry-failed` does not work — it narrows `done` to `{ok}` and skips all 773 `ok` filers — so the run is `fundamentals --since 2009-01-01 --since-filed 2009-01-01 --symbols <912 symbols>`, which makes `plan_jobs` set `logged = {}` and fetch every resolved CIK without deleting a row anywhere; `--since` moves too, or the member set stays at 795. Budget ~30 minutes for roughly 890 companyfacts calls. The measurement is as much the deliverable as the rows: facts by `filed` year for 2009–2012 against the 2013–2026 baseline, expected partial and size-biased because XBRL phased in by filer size. Exit: `fundamentals_log` holds no unexplained `failed` row and no log row was deleted to get there; a per-year `filed` count for 2009–2026 is recorded in the phase's summary; `fundamental_facts` row count and `pg_total_relation_size` are recorded; the resolved DSN named `localhost:55432` before anything was written. Suite green at +0 (four existing tests edited in place, none added or removed).
+  - **Status**: blocked
+  - **Plan Set**: `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` (phase 3 of 5)
+  - **Satisfies**: R2 — Fix B (§3): re-ingest at `--since-filed 2009-01-01`, and measure how much 2009–2012 XBRL actually exists
+  - **Depends on**: P1-ENG-QD7X
+  - **Plan**: `.workflows/plan/P1-ENG-F2BN.md`
+- [ ] **P1-ENG-K8RV** Phase 4: Refresh the store's panel without re-downloading bars
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/research.py` (a refresh that reuses an existing store's `bars.csv`, `dividends.csv`, `fx.csv` and `unserved.csv` byte for byte, writes a new `fundamentals.csv`, re-seals and swaps), the `--refresh-fundamentals` flag, its two handlers and one additional branch in `run()` on `engine/src/seer_engine/commands/research_store.py`, and `engine/tests/test_research_store.py`. Does not touch `build_store`'s existing download path, `load_store`, `MANIFEST_KEYS`, `_COUNT_KEYS`, the fingerprint algorithm, `fundamentals/` (phase 1), phase 1's `--coverage` flag, its `_coverage` handler and its branch in `run()` — all three must survive this edit unmodified — or `engine/.research/` itself, which phase 5 runs. The branch order in `run()` is guards → `--coverage` → `--verify` → `--refresh-fundamentals` → build, quoted verbatim from phase 1's landed body; neither phase converts `--verify` into a mutually-exclusive argparse group and `--verify` with `--coverage` still resolves to `--coverage`. The phase exists because `build_store` always fetches FX and downloads every symbol's bars, so rebuilding to pick up the new panel would replace all 2,490,793 bar rows and break comparability with the 64 recorded trials; the manifest's counts for copied files are carried over or recomputed from the copied files, never re-derived from a download. Exit: a test builds a store with facts A, refreshes it with facts B, and asserts `bars.csv`, `dividends.csv`, `fx.csv` and `unserved.csv` are byte-identical before and after, that `fundamentals.csv` changed, that the fingerprint changed, that every `_COUNT_KEYS` value is unchanged and that `load_store` accepts the result; a second test asserts the refresh refuses rather than half-writing when the source store is missing or fails verification; the `.tmp`/`.old` swap discipline and the "nothing is written on failure" guarantee hold; phase 1's `--coverage` branch is still reachable and still wins over `--verify`. Suite green at +13.
+  - **Status**: blocked
+  - **Plan Set**: `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` (phase 4 of 5)
+  - **Satisfies**: R4 — Honest reporting (§8.3): the resulting coverage is measured across the whole dev window and written down as it is
+  - **Depends on**: P1-ENG-TJ4M
+  - **Plan**: `.workflows/plan/P1-ENG-K8RV.md`
+- [ ] **P1-ENG-M3HE** Phase 5: Measure, report honestly, and retire the runbook snippet
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns running phase 4's refresh against the real store with phase 3's facts and phase 1's `--coverage` against the result; `docs/runbooks/data-pipeline.md` — the whole file's fundamental-panel surface, `:188-256` (the snippet replaced by the command, the measured numbers replacing the 2026-10-05 ones) and, assigned by reconciliation, `:151-175` and the stale scope lines at `:12,:15,:44,:51`; `docs/plans/2026-10-05-fundamental-panel-coverage.md` §4 (the `~14%` / `~30%` estimates replaced by measurements, the rest untouched); `engine/src/seer_engine/lab/methods/m0005_fundamental_factors.py`'s "READ THIS BEFORE RUNNING" preamble (pointing at the gate instead of a `python -c` one-liner, and saying M0005 is spent); `engine/package_readme.md`; and pushing the refreshed store with `/sync-research-store push`. Does not touch any `engine/src` file outside the one method docstring, `ticker_cik.csv`, the database, or any other `docs/plans/*.md`; it does not run `lab run`, does not mint a variation method and does not touch the test window. R5 is verified rather than re-implemented: `2dad9ff` already made `load_market_window` pass `fundamentals=` and added three tests at `engine/tests/test_paper_store.py:554`, `:573` and `:585`, and this phase confirms all three pass with `PG_TEST_URL` set, that `engine/src` has exactly three `Market(` construction sites all passing `fundamentals=`, and records §6.1 closed. The honesty clause is the deliverable: whatever the number is, the runbook and §4 state it, state that the dev window still opens 13 years before any XBRL exists, and state that the test-window decision remains unmade and out of scope. Exit: the `--coverage` output is pasted into the runbook with its date and the store's new fingerprint and described as an upper bound wherever quoted; §4's table has measured values in the `+ Fix A` and `+ Fix B` rows or the explicit words "not separately measured" and why; the runbook's two copy-paste Python blocks are gone and commands stand in their place; the duplicated re-vendoring recipe is a pointer to `SOURCES.md` and no longer claims "98 of 133"; `grep '2015-01-02' docs/runbooks/data-pipeline.md` returns only lines whose subject is bars; `grep -c '<<'` over the four edited documents returns 0; the store is pushed with `--keep 0`, `e597367b…` is still listed remotely and the push's content hash is recorded; `git status` shows no stray file; suite green at +0 with and without `PG_TEST_URL`.
+  - **Status**: blocked
+  - **Plan Set**: `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` (phase 5 of 5)
+  - **Satisfies**: R4 — Honest reporting (§8.3): the resulting coverage is measured across the whole dev window and written down as it is; R5 — §6.1: `paper/store.py` must not silently build a `Market` with `EMPTY_PANEL`
+  - **Depends on**: P1-ENG-TJ4M, P1-ENG-QD7X, P1-ENG-F2BN, P1-ENG-K8RV
+  - **Plan**: `.workflows/plan/P1-ENG-M3HE.md`
 - [x] **P1-ENG-AHLW** Phase 7: Fundamental factor allocator, lab method, runbook
   - **Difficulty**: NORMAL
   - **Type**: Feature

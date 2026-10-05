@@ -1,9 +1,10 @@
-"""Strategy, backtest and paper core modules are pure (handover §6.8, plan invariant 2;
-paper-trading-ship invariant 4).
+"""Strategy, backtest, fundamentals and paper core modules are pure (handover §6.8, plan
+invariant 2; paper-trading-ship invariant 4; edgar-fundamentals phase 5).
 
-Globs ``seer_engine/strategies/*.py``, ``seer_engine/backtest/*.py`` and
-``seer_engine/paper/*.py`` (every module except the impure edges ``backtest/io.py`` and
-``paper/store.py``), so modules added later are covered without editing this file.
+Globs ``seer_engine/strategies/*.py``, ``seer_engine/backtest/*.py``,
+``seer_engine/fundamentals/*.py`` and ``seer_engine/paper/*.py`` (every module except the impure
+edges ``backtest/io.py`` and ``paper/store.py``), so modules added later are covered without
+editing this file.
 
 - Importing them in a fresh interpreter loads no psycopg, requests or yfinance, and never
   seer_engine.bars (which imports psycopg).
@@ -31,7 +32,7 @@ PKG = Path(seer_engine.__file__).resolve().parent
 
 def _pure_sources() -> list[Path]:
     files = []
-    for package in ("strategies", "backtest", "paper"):
+    for package in ("strategies", "backtest", "fundamentals", "paper"):
         files += [p for p in sorted((PKG / package).glob("*.py")) if (package, p.name) not in IMPURE]
     return files
 
@@ -65,6 +66,10 @@ def test_the_glob_finds_the_strategy_modules():
         "seer_engine.strategies.indicators",
         "seer_engine.strategies.a",
         "seer_engine.backtest",
+        "seer_engine.fundamentals",
+        "seer_engine.fundamentals.ladder",
+        "seer_engine.fundamentals.panel",
+        "seer_engine.fundamentals.sue",
         "seer_engine.paper",
         "seer_engine.paper.roster",
     } <= names

@@ -103,6 +103,12 @@ engine/
       dev_report.py         DevReport, Markdown, rows/curves CSVs, frontier SVG, P7b pre-registration (P7a)
       registry.py           REGISTRY: the append-only candidate registry (P7a)
       io.py                 Neon loader + bar cache, dividends CSV, report writers write_report() / write_wf_report() / write_b_report() / write_dev_report(), write_model_artifact() (impure)
+    fundamentals/           raw SEC XBRL facts -> point-in-time panel: pure, like `strategies` (edgar-fundamentals)
+      __init__.py           public surface; `sue` stays a module, never re-exported
+      ladder.py             LADDER_TAGS, the ingest allowlist the impure ingest command imports; per-metric tag preference order
+      panel.py              Fact, Snapshot, FundamentalPanel.as_of(symbol, t) -> Snapshot (the one read surface), EMPTY_PANEL (what Market.fundamentals defaults to), FACT_COLUMNS (the 12-column projection contract)
+                            filed <= t only, never period_end; tiebreak (filed desc, rung asc, accn desc) per period; restatements preserved, never overwritten; flow metrics annual, not TTM; gross profit reported -> derived (Revenues - CostOfRevenue, same fiscal period end) -> none, never zero, never partial
+      sue.py                standardized unexpected earnings on the seasonal random walk EPS_q - EPS_{q-4}, scaled by the dispersion of prior surprises; MIN_QUARTERS = 9
     commands/
       __init__.py           command-module contract
       migrate.py            `migrate` command
@@ -599,9 +605,9 @@ Pure and deterministic: no database, no network, no clock, no randomness, no log
 ### strategies (P3)
 
 Pure, like `sim`: no database, network, clock, randomness or logging, and never `bars`.
-`tests/test_strategy_purity.py` globs every module in `strategies/` and `backtest/` (except
-`backtest/io.py`) and checks this in a subprocess and on the AST. P4 calls this code nightly and
-P6 adds strategies B and C beside `a.py`.
+`tests/test_strategy_purity.py` globs every module in `strategies/`, `backtest/` and
+`seer_engine/fundamentals/` (except `backtest/io.py`) and checks this in a subprocess and on the
+AST. P4 calls this code nightly and P6 adds strategies B and C beside `a.py`.
 
 **`strategies.base`**
 - `@dataclass(frozen, slots) History(symbol, dates, open, high, low, close, volume)`: one symbol's

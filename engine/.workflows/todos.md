@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-05 09:40:59
-**Total Active Tasks**: 5
+**Last Updated**: 2026-10-05 10:04
+**Total Active Tasks**: 4
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 5
+- P1 High: 4
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 3
-- Completed: 56
+- Completed: 57
 
 ---
 
@@ -41,15 +41,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R1 — ticker → CIK bridge, vendored as `engine/data/ticker_cik.csv`, keyed so a recycled ticker can never resolve to the wrong company; R2 — Bulk ingest of SEC XBRL facts, `filed` as the no-look-ahead boundary, restatements kept queryable; R5 — New resumable `seer_engine` command respecting SEC fair access (User-Agent, 10 req/s)
   - **Depends on**: P1-ENG-R7TL, P1-ENG-FPIL, P1-ENG-0351, P1-ENG-9U93
   - **Plan**: `.workflows/plan/P1-ENG-22VQ.md`
-- [ ] **P1-ENG-9U93** Phase 5: Pure derivation: concept ladder, PIT selection, SUE
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `seer_engine/fundamentals/` (`__init__.py`, `ladder.py`, `panel.py`, `sue.py`), `engine/tests/test_fundamentals_derive.py`, and the additive extension of `engine/tests/test_strategy_purity.py`'s glob to cover the new package — it is the sole owner of that shared test file, which phase 6 must leave byte-identical. It also owns `ladder.LADDER_TAGS`, which phase 4 imports as the ingest allowlist, so a rung added here later costs a full re-ingest and `ladder.py`'s docstring must say so. Does not touch the database, the network, `Market`, any allocator. Exit: the concept ladder reproduces the measured coverage over the 8 sampled filers (revenue 2 variants; net income, assets, equity, OCF, diluted EPS, shares outstanding 1 each; operating income missing for SIVB and PXD; gross profit present only for CELG and WRK, derived as `Revenues − CostOfRevenue` elsewhere with the fallback documented in the module docstring); point-in-time selection returns the latest fact with `filed <= t`, proven by a test on a real restatement; SUE is the seasonal random walk `EPS_q − EPS_{q−4}` scaled by the dispersion of recent surprises, with the minimum history it needs stated and enforced.
-  - **Status**: open
-  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 5 of 7)
-  - **Satisfies**: R3 — Concept ladder over the measured tag variants, gross profit derived with a documented fallback
-  - **Depends on**: P1-ENG-FPIL
-  - **Plan**: `.workflows/plan/P1-ENG-9U93.md`
 - [ ] **P1-ENG-0LUS** Phase 6: `Market.fundamentals` + the `MarketAware` hook
   - **Difficulty**: HARD
   - **Type**: Update
@@ -95,6 +86,23 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-9U93** Phase 5: Pure derivation: concept ladder, PIT selection, SUE
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `seer_engine/fundamentals/` (`__init__.py`, `ladder.py`, `panel.py`, `sue.py`), `engine/tests/test_fundamentals_derive.py`, and the additive extension of `engine/tests/test_strategy_purity.py`'s glob to cover the new package — it is the sole owner of that shared test file, which phase 6 must leave byte-identical. It also owns `ladder.LADDER_TAGS`, which phase 4 imports as the ingest allowlist, so a rung added here later costs a full re-ingest and `ladder.py`'s docstring must say so. Does not touch the database, the network, `Market`, any allocator. Exit: the concept ladder reproduces the measured coverage over the 8 sampled filers (revenue 2 variants; net income, assets, equity, OCF, diluted EPS, shares outstanding 1 each; operating income missing for SIVB and PXD; gross profit present only for CELG and WRK, derived as `Revenues − CostOfRevenue` elsewhere with the fallback documented in the module docstring); point-in-time selection returns the latest fact with `filed <= t`, proven by a test on a real restatement; SUE is the seasonal random walk `EPS_q − EPS_{q−4}` scaled by the dispersion of recent surprises, with the minimum history it needs stated and enforced.
+  - **Status**: completed
+  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 5 of 7)
+  - **Satisfies**: R3 — Concept ladder over the measured tag variants, gross profit derived with a documented fallback
+  - **Depends on**: P1-ENG-FPIL
+  - **Plan**: `.workflows/plan/P1-ENG-9U93.md`
+  - **Completed**: 2026-10-05 10:04
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/fundamentals/__init__.py, engine/src/seer_engine/fundamentals/ladder.py, engine/src/seer_engine/fundamentals/panel.py, engine/src/seer_engine/fundamentals/sue.py, engine/tests/test_fundamentals_derive.py, engine/tests/test_strategy_purity.py
+  - **Drift**:
+    - None. `test_strategy_purity.py` matched the plan exactly at lines 1-6, 34 and 60-72; the glob extension was the three additive edits the plan specified.
+    - The 31 errors in the full-suite run are all `engine/tests/test_cik.py` (FileNotFoundError on the vendored CSV phase 1 has not finished generating). Zero failures, zero non-cik errors; the swarm coordinator ruled in advance that these belong to phase 1.
+  - **Decided**:
+    - `ladder.py`'s docstring said "revising it needs no re-ingest", while the plan's reconciled input contract and the plan index's Phase 5 Owns both require it to state that adding a rung costs a full re-ingest. The docstring now carries both precisely: reordering or dropping rungs among already-ingested tags is free; adding a NEW tag rung is not, because `LADDER_TAGS` is also phase 4's ingest allowlist — and the re-ingest recipe is spelled out. (Rung 4: the plan index's Phase 5 Owns outranks the stale prose inside the code block.)
 - [x] **P1-ENG-FPIL** Phase 2: Schema: `ticker_cik`, `fundamental_facts`, `fundamentals_log`
   - **Difficulty**: EASY
   - **Type**: Feature

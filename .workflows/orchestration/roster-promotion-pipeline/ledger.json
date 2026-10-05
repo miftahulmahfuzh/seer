@@ -79,22 +79,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "3e82eda",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "HARD",
       "n": 5,
-      "note": null,
+      "note": "All three coordinator handoffs followed: --retire calls phase 2's store.retire inside the same db.transaction as the insert; row read back through phase 1's roster.from_row inside that transaction before commit; object_name_of scans 'b.obj is obj' and its refusal names the one Binding(...) line to add. Deliberately did NOT add a freeze_spec status guard -- promote writes rows with no paper_start so the night's ordinary freeze path is correct; a guard would be scope this phase does not own. Suite 2683 passed/0 skipped with PG_TEST_URL (+24). D1 VERIFIED BY COORDINATOR: git diff origin/main -- backtest/registry.py is empty. DECISIONS: (1) PLAN TEST-HARNESS BUG FIXED -- the plan's db tests patch pg.close to a no-op, which DEADLOCKS the suite: autouse resolver_entry(monkeypatch) pulls monkeypatch into the closure first so its undo runs last, after conftest's pg_schema teardown already called the still-patched close; the connection outlives the test holding locks and DROP SCHEMA CASCADE blocks forever. Confirmed via --setup-show and pg_stat_activity. Replaced with a _Borrowed proxy whose close() only rolls back. ANY phase pairing an autouse monkeypatch fixture with the pg fixture and patching close will hit this. (2) INVARIANT 8: the plan's manual dry-run reaches its designed refusal only after a SELECT max(sort), so as written it opens production Neon; ran it against a freshly migrated local throwaway schema and dropped it. Nothing touched Neon. (3) LAND-TIME DOC DEBT (from readme-updater, owned by no phase): engine/package_readme.md has no lab/ coverage at all, and commands/lab.py, compare.py, fundamentals.py, universe.py are missing from its Layout listing.",
       "package": "engine/src/seer_engine/{commands,lab}",
       "plan": ".workflows/plan/roster-promotion-pipeline/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T12:15:53+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-Z8MR",
       "title": "promote`: the lab \u2192 roster bridge"
     },
     {
@@ -112,7 +112,7 @@
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "FND` onto the roster \u2014 the first promotion through the new path"
     }
@@ -120,7 +120,7 @@
   "plan": "/home/miftah/.worktrees/seer/roster-promotion-pipeline/ROSTER_PROMOTION_PIPELINE_PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "roster-promotion-pipeline",
-  "updated": "2026-10-05T11:49:36+00:00",
+  "updated": "2026-10-05T12:15:56+00:00",
   "verified_at": "2026-10-05T11:29:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/roster-promotion-pipeline"
 }

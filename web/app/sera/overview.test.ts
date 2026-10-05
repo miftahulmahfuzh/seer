@@ -196,13 +196,23 @@ describe('state', () => {
     expect(s.story.source).toBe('synthesis');
     expect(s.story.title).toBe('synthesis 2');
   });
-  it('falls back to the newest insight, then to a computed sentence', () => {
-    const one = state(snap({ insights: [insight(1, 'risk', '2026-10-04T10:00:00+00:00'), insight(2, 'observation', '2026-10-04T12:00:00+00:00')] }));
-    expect(one.story.source).toBe('insight');
-    expect(one.story.title).toBe('observation 2');
-    const none = state(snap());
-    expect(none.story.source).toBe('computed');
-    expect(none.story.body).toContain('4 tries across 3 methods');
+  it('never headlines a non-synthesis note: it computes a plain story instead', () => {
+    const s = state(snap({ insights: [insight(1, 'risk', '2026-10-04T10:00:00+00:00'), insight(2, 'observation', '2026-10-04T12:00:00+00:00')] }));
+    expect(s.story.source).toBe('computed');
+    expect(s.story.title).toBe('Where the search stands');
+    expect(s.story.body).toContain('4 tries across 3 methods');
+    expect(s.story.body).not.toMatch(/`/);
+  });
+  it('leads the computed story with a promotion, in plain words', () => {
+    const base = snap();
+    const methods = base.methods.map((m, i) =>
+      i === 0 ? { ...m, analysis: `${m.analysis ?? ''}\n\n# Promotion\n\nPromoted to the paper roster as \`FND\`.\n\nFrozen spec digest: \`4a9d\`.` } : m,
+    );
+    const s = state({ ...base, methods });
+    expect(s.story.title).toBe('A strategy has started paper trading');
+    expect(s.story.body).toContain(`“${methods[0].name}”`);
+    expect(s.story.body).toContain('short name FND');
+    expect(s.story.body).not.toMatch(/digest|`/);
   });
 });
 

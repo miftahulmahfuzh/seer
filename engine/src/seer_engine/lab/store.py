@@ -458,11 +458,19 @@ def record_promotion(
         f"multiple-testing count is unchanged by this."
     )
     append_analysis(conn, method_id, "# Promotion\n\n" + body)
+    # The journal note is read by the owner, not an auditor: plain words, no digests or column names.
+    # The technical record above stays in the method's analysis.
+    replacing = "" if retired_id is None else f", taking the place of {retired_id}"
     add_insight(
         conn,
         kind="observation",
-        title=f"{method_id} promoted to the paper roster as {strategy_id}",
-        body=body,
+        title=f"{row['name']} starts paper trading as {strategy_id}",
+        body=(
+            f"Sera picked this method to trade with pretend money every night, under the short "
+            f"name {strategy_id}{replacing}. Its rules are now locked, and its record starts from "
+            f"its first night on paper, so nothing before that counts. Month by month against SPY "
+            f"is how it earns trust."
+        ),
         method_id=method_id,
     )
     if move_status and status != "paper":

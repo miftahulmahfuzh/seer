@@ -200,7 +200,8 @@ def test_record_promotion_appends_analysis_and_an_insight(conn):
     assert row["status"] == "idea"
     insight = conn.execute("SELECT * FROM insights ORDER BY id DESC LIMIT 1").fetchone()
     assert insight["kind"] == "observation" and insight["method_id"] == "M0001"
-    assert "promoted to the paper roster as FND" in insight["title"]
+    assert "starts paper trading as FND" in insight["title"]
+    assert "`" not in insight["body"] and "digest" not in insight["body"]
 
 
 def test_record_promotion_takes_the_edge_transitions_already_has(conn):

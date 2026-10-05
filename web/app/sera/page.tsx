@@ -53,12 +53,7 @@ export default async function SeraOverview() {
   const test = `${year(g.testStart)}–today`;
   const { state: st, landing: ld, hurdles: hu, closer: cl, luck: lk, families: fa, latest } = v;
 
-  const storyFrom =
-    st.story.source === 'synthesis'
-      ? 'Latest batch summary'
-      : st.story.source === 'insight'
-        ? 'Latest note in the journal'
-        : 'Summary from the numbers';
+  const storyFrom = st.story.source === 'synthesis' ? 'Latest batch summary' : 'Summary from the numbers';
 
   return (
     <>

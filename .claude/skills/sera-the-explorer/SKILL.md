@@ -86,8 +86,9 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
    included), then reserve and launch. Never let a slot sit idle while ideas remain.
 7. **Synthesize** when num-methods children are closed out. Add **one batch insight**
    (`lab insight --kind synthesis --title "Sera <stamp>: <theme>" --body …`). The newest
-   synthesis is the headline of seertrade.site/sera, the first thing the owner reads, so write it
-   plainly, in everyday words. Cover:
+   synthesis is the headline of seertrade.site/sera, the first thing the owner reads, and the owner
+   is not a trader: write it in everyday words, name methods by what they do (not `MNNNN` or
+   candidate ids), and leave out code, hashes, column names and backticks. Cover:
    - what the batch taught across methods
    - which directions look alive and which look dead
    - what data or features would unlock the most

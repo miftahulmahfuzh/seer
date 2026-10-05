@@ -284,7 +284,7 @@ def render_plan(p: Promotion, *, retire_end: date | None, lab_status: str, lab_m
         f"  lab/lab.sqlite, method {p.method_id} (now {lab_status!r})",
         "    methods.analysis  += a dated '# Promotion' section",
         f"    insights          += [observation] "
-        f"'{p.method_id} promoted to the paper roster as {e.id}'",
+        f"'<method name> starts paper trading as {e.id}' (plain words)",
         "    methods.status    "
         + ("test-passed -> paper" if lab_move and lab_status == "test-passed"
            else f"{lab_status} (unchanged)"),

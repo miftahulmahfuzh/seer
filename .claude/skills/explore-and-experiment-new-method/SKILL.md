@@ -97,8 +97,14 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
 8. **Journal at least one insight**: `lab insight --kind observation|hypothesis|data-wish|feature-wish|risk
    --title … --body … --method MNNNN`. Useful kinds: what this taught about markets, data you
    wish the lab had, a feature that would make the search better, a risk you noticed. The owner
-   reads these on seertrade.site/sera (Journal and Ideas) as food for thought. Write them as plainly
-   as the analysis: a title that says the point, and a body that says why it matters and what to do about it.
+   reads these on seertrade.site/sera (Journal and Ideas) as food for thought, and is not a trader.
+   Write for a curious non-trader: a title that says the point, and a body that says what happened,
+   why it matters and what to do about it, in everyday words.
+   - Name methods by what they do ("the earnings-quality picker"), not by `MNNNN` or candidate ids.
+   - No code, file paths, column names, `status='…'`, hashes or digests, and no backticks at all.
+   - Spell out jargon or say it plainly: "worst fall" over "max DD", "gains vs losses" over "PF".
+   - A number earns its place only with its meaning: "lost 13% at its worst, where SPY lost 55%".
+   Ids, digests and mechanics belong in the method's analysis (step 7), which is the audit record.
    (`synthesis` is Sera's batch summary; a single run never uses it.)
 9. **Queue at least one next idea**: `lab idea --name … --family … --source-kind … --hypothesis …`
    (plus `--parent`), drawn from what this result taught.

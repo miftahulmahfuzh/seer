@@ -86,7 +86,7 @@ export type Story = {
   title: string;
   body: string; // markdown
   added: string | null;
-  source: 'synthesis' | 'insight' | 'computed';
+  source: 'synthesis' | 'computed';
 };
 export type Closest = { trial: LabTrial; passed: number; misses: string[] };
 export type BestBeat = { trial: LabTrial; excess: number };
@@ -123,26 +123,59 @@ export function state(snap: LabSnapshot): State {
 
   const eligible = dev.filter(t => t.eligible).length;
 
+  // Only Sera's batch synthesis is written for the owner. Other journal notes can be machine records
+  // (a promotion's spec digest, roster columns), so without a synthesis the headline is computed.
   const synth = newest(snap.insights.filter(i => i.kind === 'synthesis'));
-  const note = newest(snap.insights);
+  const nameOf = (id: string) => snap.methods.find(m => m.id === id)?.name ?? id;
   const story: Story = synth
     ? { title: synth.title, body: synth.body, added: synth.added, source: 'synthesis' }
-    : note
-      ? { title: note.title, body: note.body, added: note.added, source: 'insight' }
-      : computedStory(dev.length, tried.total, eligible, closestRow);
+    : computedStory(dev.length, tried.total, eligible, closestRow, latestPromotion(snap), nameOf);
 
   return { story, tried, tries: dev.length, looks: snap.summary.testLooks, eligible, closest: closestRow, bestBeat };
 }
 
-function computedStory(tries: number, methods: number, eligible: number, near: Closest | null): Story {
+/** Mirrors engine lab/store.py PROMOTION_MARKER, which record_promotion writes into a method's analysis. */
+const PROMOTION_RE = /Promoted to the paper roster as `([^`]+)`/;
+
+export type Promotion = { method: LabMethod; strategyId: string };
+
+/** The most recently updated method the paper roster took, if any. */
+export function latestPromotion(snap: LabSnapshot): Promotion | null {
+  let best: Promotion | null = null;
+  for (const m of snap.methods) {
+    const hit = PROMOTION_RE.exec(m.analysis ?? '');
+    if (hit && (!best || m.updated > best.method.updated)) best = { method: m, strategyId: hit[1] };
+  }
+  return best;
+}
+
+function computedStory(
+  tries: number,
+  methods: number,
+  eligible: number,
+  near: Closest | null,
+  promo: Promotion | null,
+  nameOf: (methodId: string) => string,
+): Story {
+  const lead = promo
+    ? `Sera picked “${promo.method.name}” to trade with pretend money every night, under the short name ` +
+      `${promo.strategyId}. Its rules are now locked, and its record starts from its first night on paper, ` +
+      'so nothing before that counts. Month by month against SPY is how it earns trust.'
+    : null;
   const parts = [`${tries} ${tries === 1 ? 'try' : 'tries'} across ${methods} ${methods === 1 ? 'method' : 'methods'} so far.`];
   parts.push(
     eligible > 0
       ? `${eligible} cleared every hurdle and ${eligible === 1 ? 'waits' : 'wait'} for the one look at fresh data.`
       : 'None has cleared every hurdle yet.',
   );
-  if (near && near.misses.length) parts.push(`Closest: ${near.trial.candidateId}, which missed ${listText(near.misses)}.`);
-  return { title: 'Where the search stands', body: parts.join(' '), added: null, source: 'computed' };
+  if (near && near.misses.length)
+    parts.push(
+      `The closest, “${nameOf(near.trial.methodId)}”, missed the ${listText(near.misses)} ` +
+        `${near.misses.length === 1 ? 'hurdle' : 'hurdles'}.`,
+    );
+  const body = [lead, parts.join(' ')].filter(Boolean).join('\n\n');
+  const title = promo ? 'A strategy has started paper trading' : 'Where the search stands';
+  return { title, body, added: null, source: 'computed' };
 }
 
 // ---- (2) Where every try landed -----------------------------------------------------------------

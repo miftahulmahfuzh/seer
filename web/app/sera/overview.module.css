@@ -8,7 +8,7 @@
 .story { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .storyMeta { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
 
-.prose { font-size: 17px; line-height: 1.5; color: var(--ink); }
+.prose { min-width: 0; font-size: 17px; line-height: 1.5; color: var(--ink); overflow-wrap: anywhere; }
 .prose p { margin: 0 0 10px; }
 .prose p:last-child { margin-bottom: 0; }
 .prose h1, .prose h2, .prose h3, .prose h4 { margin: 14px 0 6px; font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }

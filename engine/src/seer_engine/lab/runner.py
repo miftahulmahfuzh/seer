@@ -24,8 +24,10 @@ from seer_engine import research
 from seer_engine.backtest import dev
 from seer_engine.backtest.dev import DevRow
 from seer_engine.commands.backtest_dev import daily_moments, month_end_curve, registry_problem
+from seer_engine.fundamentals import coverage
 from seer_engine.lab import store
 from seer_engine.lab.method import Method, config_digest, config_text, source_sha
+from seer_engine.strategies.allocator import MarketAware
 
 log = logging.getLogger(__name__)
 
@@ -66,6 +68,57 @@ def preflight(conn: sqlite3.Connection, method: Method, path: Path, *, require_c
                 (config_digest(c),),
             ).fetchone()
             raise store.LabError(f"{c.id} repeats {hit[0]}, which already ran on the dev window")
+
+
+def market_aware_candidates(method: Method) -> tuple[str, ...]:
+    """The ids of ``method``'s candidates whose allocator reads the whole ``Market``, in order.
+
+    ``strategies.allocator.MarketAware`` is ``runtime_checkable``, so this tests for a
+    ``prepare_market`` attribute and nothing more -- which is exactly the dispatch
+    ``allocator.prepare_for`` makes, and therefore exactly the set of candidates whose ranking
+    can see ``Market.fundamentals``. ``f_fundamental.FUNDAMENTAL`` satisfies it structurally; a
+    price-only allocator such as ``f_index.TIMING`` or ``f_rotation.ROTATION`` does not, and a
+    bracket ``Strategy`` does not either.
+    """
+    return tuple(c.id for c in method.candidates if isinstance(c.allocator, MarketAware))
+
+
+def preflight_data(
+    data: research.ResearchData,
+    method: Method,
+    *,
+    min_coverage: float = coverage.MIN_DEV_COVERAGE,
+) -> coverage.Coverage | None:
+    """The refusal that can only be made once the research store is loaded (``store.LabError``).
+
+    ``preflight`` runs *before* ``research.load_store``, so it cannot see the panel. This is the
+    second checkpoint and it exists for one reason: M0005 was spent on a store whose panel held
+    no fact filed before 2013, over a dev window that opens in 1996, and nothing refused it.
+
+    Returns None for a method with no ``MarketAware`` candidate -- a price-only method ranks on
+    bars and must stay runnable against a store with no panel at all. Otherwise it returns the
+    measurement, so the caller can print it whether or not it cleared the floor, and raises
+    ``store.LabError`` when the measured fraction is below ``min_coverage``.
+
+    ``min_coverage`` is lowered by ``lab run --allow-coverage F``. That is an acknowledgement,
+    not a silencer: the caller prints the table either way.
+    """
+    aware = market_aware_candidates(method)
+    if not aware:
+        return None
+    cov = coverage.measure(data.market.fundamentals)
+    if cov.fraction >= min_coverage:
+        return cov
+    raise store.LabError(
+        f"{method.id}: {', '.join(aware)} rank on Market.fundamentals, and this store's panel "
+        f"can rank at least {cov.top} symbols on only {cov.fraction:.1%} of the dev window "
+        f"({cov.covered_dates} of {len(cov.dates)} monthly samples, {cov.start}..{cov.end}), "
+        f"below the {min_coverage:.0%} floor. Running it would spend the method id on a "
+        f"measurement of the panel rather than of the hypothesis.\n"
+        f"{coverage.format_report(cov, floor=min_coverage)}\n"
+        "Refresh the store's fundamental panel, or re-run with --allow-coverage F to record the "
+        "trials against this panel knowingly."
+    )
 
 
 def _dsr(row: DevRow, n_trials: int, var_trials: float | None) -> float | None:

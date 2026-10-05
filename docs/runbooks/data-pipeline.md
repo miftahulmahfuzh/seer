@@ -12,7 +12,8 @@ vendored point-in-time S&P 500 and Nasdaq-100 histories in `engine/data/` (plus
 split-adjusted daily bars for every symbol that was ever a member since 2015-01-02, plus SPY,
 from yfinance, and USD/IDR history from Frankfurter. Each symbol's outcome is recorded in
 `backfill_log`, so the backfill can resume.
-`fundamentals` loads SEC EDGAR XBRL company facts for every ever-member since 2015-01-02,
+`fundamentals` loads SEC EDGAR XBRL company facts for every ever-member on or after
+2009-01-01 (`seer_engine.cik.SINCE`), 913 symbols,
 resolving each ticker to a CIK through the vendored `engine/data/ticker_cik.csv` (dated, because
 tickers are recycled). Facts are stored raw in `fundamental_facts`, keyed including the
 accession number so a restatement inserts beside the original rather than overwriting it; the
@@ -48,7 +49,7 @@ check below goes through Python.
 | `… backfill --fx-only` / `--skip-fx` | only / everything but the FX history | same |
 | `… -m seer_engine nightly` | the nightly run for "now"; no-op if that session already succeeded | `bars`, `split_adjustments`, `dividends`, `fx_rates`, `runs` |
 | `… nightly --now 2026-10-05T23:00:00Z` | replay the nightly as of a given UTC instant (format: `nightly --help`) | same |
-| `… -m seer_engine fundamentals` | SEC EDGAR company facts for every ever-member since 2015-01-02, resolved through `engine/data/ticker_cik.csv` by **(ticker, date)**; the unit of work is the **CIK**, so a share-class pair (GOOG/GOOGL) is one fetch and one log row; skips every CIK already in `fundamentals_log` (any status), so a re-run resumes | `fundamental_facts`, `fundamentals_log`, `ticker_cik` |
+| `… -m seer_engine fundamentals` | SEC EDGAR company facts for every ever-member on or after 2009-01-01 (`seer_engine.cik.SINCE`), 913 symbols, resolved through `engine/data/ticker_cik.csv` by **(ticker, date)**; the unit of work is the **CIK**, so a share-class pair (GOOG/GOOGL) is one fetch and one log row; skips every CIK already in `fundamentals_log` (any status), so a re-run resumes | `fundamental_facts`, `fundamentals_log`, `ticker_cik` |
 | `… fundamentals --symbols AAPL,MSFT` | load specific symbols (comma-separated, dot form); still deduped to CIKs, but ignores `fundamentals_log` | same |
 | `… fundamentals --retry-failed` | retry CIKs logged `failed`/`empty` (never touches `ok`) | same |
 | `… fundamentals --no-sync-map` | skip mirroring `engine/data/ticker_cik.csv` into the `ticker_cik` table | `fundamental_facts`, `fundamentals_log` |
@@ -155,23 +156,27 @@ Piedmont Lithium, `ALTR` Altair, `LLL` JX Luxventure, `DTV` DTE units. Every row
 carries a validity interval and the loader rejects overlaps for one ticker. The file is data,
 generated once and committed — it is never rebuilt at runtime.
 
-1. Re-vendor as `engine/data/SOURCES.md` describes for this file: the delisted reference gives
-   the company name, SEC's `cik-lookup-data.txt` (about 39 MB, from `www.sec.gov`) maps name →
-   CIK after stripping corporate suffixes. SEC's `company_tickers.json` resolves **0** of the
-   133 delisted names and must not be relied on for them.
-2. The automated pass resolved 98 of 133 (94 exact, 4 fuzzy) when it was built. The residue is
-   mapped by hand, reviewed, and committed as data.
-3. **Read every fuzzy row by hand before committing it.** The shipped file carries *zero* fuzzy
-   rows deliberately: when it was built, the automated name screen matched "Harman
-   International" to AMERICAN INTERNATIONAL INDUSTRIES (`0001073146`) — a different company
-   entirely; the real HAR is `0000800459`. A fuzzy name match is a suggestion, never evidence.
-4. Validate and commit:
-   `engine/.venv/bin/pytest engine/tests/test_cik.py -q` (it checks the header, rejects
-   overlapping intervals and a CIK that is not 10 digits, and asserts each recycled ticker
-   resolves to the company that held it during its membership, not to the current holder).
-5. Update the file's sha256 block in `engine/data/SOURCES.md`.
-6. Re-run `engine/.venv/bin/python -m seer_engine fundamentals --symbols <the changed tickers>`
-   so their facts are reloaded under the corrected CIK.
+The recipe lives in **`engine/data/SOURCES.md`**, under `ticker_cik.csv` — one copy, kept
+current by whoever re-vendors the file, carrying the live row and tier counts, the three refusal
+lists (`UNRESOLVED`, `SCREEN`, `EARLY`), the `MANUAL` empty-start sentinel and the rule that an
+`end_date` is never pushed forward. Do not duplicate it here; a second copy goes stale silently
+and this one did.
+
+Two things that are true whatever the counts say, and are the reason the file is hand-audited:
+
+- **Read every fuzzy row by hand before committing it.** The shipped file carries *zero* fuzzy
+  rows deliberately: the automated name screen once matched "Harman International" to AMERICAN
+  INTERNATIONAL INDUSTRIES (`0001073146`) — a different company entirely; the real HAR is
+  `0000800459`. A fuzzy name match is a suggestion, never evidence.
+- **Validate before committing:** `engine/.venv/bin/pytest engine/tests/test_cik.py -q`. It
+  checks the header, rejects overlapping intervals and a CIK that is not 10 digits, and asserts
+  each recycled ticker resolves to the company that held it during its membership rather than to
+  the current holder.
+
+Then update the sha256 block in `engine/data/SOURCES.md`, and re-ingest the changed tickers'
+facts under their corrected CIKs with
+`engine/.venv/bin/python -m seer_engine fundamentals --symbols <the changed tickers>` —
+`--symbols` ignores `fundamentals_log`, which is what makes it the tool for this.
 
 ### The lab and fundamentals
 
@@ -185,75 +190,167 @@ unchanged), and it is the trap. Method **M0005**
 empty one would record six all-cash trials, freeze the method file's `source_sha` and burn the
 method id permanently (`runner.preflight` refuses a second run of any method).
 
-**Before any fundamentals method, confirm the store has the panel:**
+**Before any fundamentals method, measure the panel's COVERAGE. Do not check for its presence.**
 
 ```bash
-python -c "import json,pathlib; print('fundamentals.csv' in json.loads(pathlib.Path('engine/.research/manifest.json').read_text())['files'])"
+engine/.venv/bin/python -m seer_engine research_store --coverage
 ```
 
-If that prints `False`, rebuild first:
-`python -m seer_engine research_store --with-fundamentals` (needs `DATABASE_URL_UNPOOLED`, and
-needs `python -m seer_engine fundamentals` to have run).
+That prints, for the store at `engine/.research`, how many symbols the panel can actually rank on
+each sampled dev-window date, and one fraction: the share of **monthly** sample dates on which it
+can rank at least `top` names (default 20) from facts filed within `max_stale_days` of the date
+(400, taken from `FundamentalParams`'s own default rather than restated). It is the same
+eligibility gate `strategies/f_fundamental.py` applies, so the number predicts *rankability*
+rather than mere fact-existence.
 
-**That check is necessary and NOT sufficient, and M0005 was spent proving it.** It is binary
-where the risk is continuous: a store can carry a `fundamentals.csv` that covers a sliver of the
-dev window and pass. MEASURED 2026-10-05 -- M0005 ran against a store whose panel covered
-**2015-01-06..2015-10-16, about 9 months of the 19.8-year dev window (4%)**. All six variants
-recorded, all six "failed", and the verdict measured cash-holding, not the factor premia. The
-tell was in the output: 15-32 trades over 19.8 years against a `>= 100` gate, and "worst year
-1996 +0.0%" for a year the book could not have held anything.
+**The number is an upper bound.** The measure is pure: it takes a panel and reads no bars, so it
+applies neither index membership on the date nor `min_price`, twenty sessions of history or
+`min_dollar_volume` — every one of which can only remove symbols. A fraction *below* the floor is
+therefore conclusive (the panel cannot rank); a fraction *above* it is necessary and not
+sufficient. The command's own last output line says so.
 
-**The real gate is COVERAGE.** Before running a fundamentals method, check the fraction of the
-dev window for which the panel can actually rank:
+`lab run` runs the same measure after it loads the store and **refuses** a method whose allocator
+is `MarketAware` when the fraction is below `fundamentals.coverage.MIN_DEV_COVERAGE` (0.80). A
+price-only method is never refused — M0001 and M0004 rank on price and must stay runnable against
+a store with no panel at all. `--allow-coverage F` lowers the floor for one run and prints the
+measured number loudly; it is an acknowledgement, not a bypass, and it does not suppress the
+table.
+
+**The gate this replaced was vacuous, and M0005 was spent proving it.** It asked "does
+`manifest.json` list `fundamentals.csv`" — binary where the risk is continuous: a store carrying
+a panel over a sliver of the dev window passes it. MEASURED 2026-10-05 — M0005 ran against the
+store `e597367b…`, whose panel covered **2015-01-06..2015-10-16, about 9 months of the 19.8-year
+dev window**. All six variants were recorded, all six "failed", and the verdict measured
+cash-holding, not the factor premia. The tell was in the output: 15–32 trades over 19.8 years
+against a `>= 100` gate, and "worst year 1996 +0.0%" for a year the book could not have held
+anything.
+
+**Presence is never evidence of coverage anywhere in this subsystem.** `panel.as_of(symbol, t)`
+**always returns a `Snapshot`** — an empty husk with `observations == {}` when nothing is known —
+so it never returns `None`, and `sum(1 for s in syms if panel.as_of(s, t) is not None)` counts
+every symbol in every year and measures nothing. That is deliberate and defensible: the
+fundamentals layer answers every query and encodes "I know nothing yet" as *empty content*, which
+is what lets `Market` carry `EMPTY_PANEL` and every allocator keep working. The cost is that every
+existence check here is a lie. **Check content, not presence.**
+
+**What the measure reports now.** MEASURED 2026-10-05, store
+`399d0d254c7a90b8cdb49f7ce598269087d38730f795cae90453eeb580b07cf8`, 869 panel symbols — after
+Fix A (`ticker_cik.csv` re-vendored from the clamped 2015-01-02 scope date to each symbol's real
+first-membership interval, 795 → 913 symbols) and Fix B (both ingest floors lowered to
+2009-01-01):
+
+```
+panel coverage 1996-01-02 .. 2015-10-02: 238 monthly samples, 869 symbols in the panel
+  rankable: non-empty observations AND a filing within 400 days; covered: at least 20 rankable symbols
+  year    covered/sampled    most rankable
+  1996        0/12                0
+  1997        0/12                0
+  1998        0/12                0
+  1999        0/12                0
+  2000        0/12                0
+  2001        0/12                0
+  2002        0/12                0
+  2003        0/12                0
+  2004        0/12                0
+  2005        0/12                0
+  2006        0/12                0
+  2007        0/12                0
+  2008        0/12                0
+  2009        5/12              378
+  2010       12/12              526
+  2011       12/12              548
+  2012       12/12              546
+  2013       12/12              548
+  2014       12/12              547
+  2015       10/10              550
+  covered 75 of 238 sampled dates = 0.3151 (BELOW the 0.80 floor)
+  an upper bound: index membership, min_price and min_dollar_volume can only remove symbols
+```
+
+Dev-window coverage, as an **upper bound**: **0.3151** (75 of 238 monthly samples). The first
+sampled date on which the panel can rank 20 names is **2009-08-02**. The same measure run against
+the pre-fix store (`e597367b…`) reports **0.0378** (9 of 238).
+
+Three numbers are in circulation for "coverage" and only one of them is this measure. **This
+one** is monthly sampling, `top = 20`, `max_stale_days = 400`, 1996-01-02 .. 2015-10-02 (238
+samples over the dev window, which ends 2015-10-16), content checked through
+`Snapshot.observations`. The `2.5%` recorded in the 2026-10-05 analysis was a **semiannual**
+sample (1 of 40 dates); the `4%` in `docs/plans/2026-10-05-fundamental-panel-coverage.md` §4 is a
+**span estimate** (nine months of 19.8 years). Both are retired. Do not compare across them.
+
+**What Fix A alone would have reached: 0.1387** (33 of 238) — the same measure over the same
+refreshed panel with facts filtered to `filed >= 2013-01-01`. So the two fixes contribute
+separately: Fix A buys 2013–2014 (which the clamped map had dropped entirely, despite the facts
+being stored), and Fix B buys 2009–2012.
+
+**The real floor is roughly 2011, not 2009, and the early years are large-cap-skewed.** Facts by
+`filed` year after Fix B, against the ~90k/year the 2013-onward baseline holds: 2009 **22,219**
+from 403 filers (~25% of a full year), 2010 **60,550** from 670 (~67%), 2011 **90,505** from 729
+— the first year to reach baseline — and 2012 **99,641** from 738. XBRL phased in by filer size
+(large accelerated filers from roughly FY2009, all filers by FY2011), so 2009–2010 are thin **and
+size-biased by construction**. For a *ranking* method that skew matters more than the raw count:
+a 2009 cross-section is a large-cap cross-section, not the index.
+
+**Fix A unblocked facts that were already stored, and it was hiding wrong answers as well as
+missing ones.** The dated `ticker_cik` join had **zero** panel rows for 2013 and 2014 before the
+re-vendoring and has 74,248 and 74,339 now; the panel went 831,725 rows / 780 symbols to
+1,213,351 / 869. The audit that produced those intervals also found rows that were simply
+**wrong** and that nothing had ever queried: `MFE` pointed at MCAFEE COM CORP (no filings after
+2000), `JNS` at an entity with no periodic filings, `AKS` at a non-filing subsidiary, `WFT` at
+Weatherford Enterra (filings end 1998), and `DIS`, `XRX` and `SNDK` at 2019 holdcos and a 2025
+spinoff — `SNDK` resolving to the 2025 Sandisk spinoff rather than the SanDisk that was in the
+index. Those shipped in `main`; the clamp meant nothing ever queried the range that would expose
+them.
+
+**This does not make a fundamentals method testable on the dev window, and nothing here should be
+read as saying it does.** The dev window opens **1996-01-03**. XBRL does not exist before roughly
+**2009**, so about **thirteen of its nineteen years are permanently uncoverable from EDGAR** — at
+any price, by any amount of work. (Compustat sells point-in-time pre-2009 fundamentals; it is
+expensive, licence-encumbered, carries its own restatement-vintage problems, and is **out of
+scope**.) A book that holds cash for most of the window cannot reach the lab's `>= 100 trades`
+gate, so **that gate remains unreachable for a fundamentals method on this dev window.** Fix A
+and Fix B made the *data* honest; they did not make the *test* valid.
+
+**The test-window decision is UNMADE and out of scope.** The only window on which these premia
+could be tested validly is the post-2015 held-out test window, which this lab has never used
+(`test-window looks used: 0`). It can be spent exactly once, and spending it is a separate
+decision with its own doc. Giving fundamentals methods a shorter dev window of their own is the
+other candidate and is also deferred: it breaks comparability with the 64 trials recorded against
+1996–2015 and changes the DSR's `N`.
+
+**M0005 is `rejected` and its six `config_digest`s are spent.** The hypothesis is untested, not
+refuted. A re-test is a **new** method with `source_kind='variation'` and `parent_id='M0005'`, and
+it must not be minted until the gate above reports a number worth testing.
+
+**`m0005_fundamental_factors.py`'s own "READ THIS BEFORE RUNNING" docstring still prints the
+retired manifest one-liner, and it cannot be corrected.** A method file is frozen once it has
+trials: `test_lab_methods.py::test_a_method_that_ran_is_frozen` compares `source_sha(path)` with
+the sha recorded in the committed lab database, and a docstring edit moves it (measured — the
+edit was made, the test failed, the edit was reverted). Editing the file to fix its own warning
+would therefore mean minting a variation method, which is the very thing the warning says not to
+do. **This section is the current instruction; the docstring in that file is not.**
+
+**Refreshing the panel without re-downloading bars.** `research_store --with-fundamentals` goes
+through `build_store`, which always downloads every symbol's bars first: it would replace all
+2,490,793 bar rows with whatever yfinance answers today and produce a different fingerprint,
+breaking comparability with every recorded trial. Use the fundamentals-only refresh instead:
 
 ```bash
-python - <<'EOF'
-from datetime import date
-from seer_engine import research
-store = research.load_store(research.STORE_DIR)
-panel = store.market.fundamentals if hasattr(store, "market") else store.fundamentals
-# `as_of` ALWAYS returns a Snapshot -- an empty husk (observations == {}) when no fact is
-# known yet -- so `is not None` counts every symbol in every year and measures nothing.
-# A symbol is rankable only if its snapshot actually carries observations.
-for y in range(1996, 2016, 2):            # sample ACROSS the window, never one date inside it
-    t = date(y, 6, 30)
-    n = sum(1 for sym in panel.symbols
-            if (snap := panel.as_of(sym, t)) is not None and snap.observations)
-    print(f"{t}: {n:4d} of {len(panel.symbols)} symbols rankable")
-EOF
+# From the repo root. SEER_ENV_FILE is resolved against your cwd, so run it from there or
+# give it an absolute path -- a relative one that misses falls through to the ambient
+# DATABASE_URL_UNPOOLED, which is Neon.
+SEER_ENV_FILE=.env.local-train \
+  engine/.venv/bin/python -m seer_engine research_store --refresh-fundamentals
+engine/.venv/bin/python -m seer_engine research_store --verify     # the new fingerprint
+engine/.venv/bin/python -m seer_engine research_store --coverage   # the new number
+python3 ~/.claude/skills/sync-research-store/sync_store.py push --keep 0
 ```
 
-What that reports for the store built 2026-10-05, and it is the shape to expect until one of
-the three fixes below is applied:
-
-```
-1996-06-30 .. 2014-06-30:    0 of 780 rankable   (sampled every 2 years -- all zero)
-2015-01-28 :   25 of 780
-2015-02-28 :  428 of 780
-2015-06-28 :  507 of 780
-2015-10-28 :  521 of 780
-```
-
-Coverage is not thin, it is **zero** for 96% of the window. Note also why the obvious check is
-vacuous: `as_of` ALWAYS returns a `Snapshot`, an empty husk with `observations == {}` when
-nothing is known, so it never returns None. **Presence is never evidence of coverage anywhere in
-this subsystem** -- the fundamentals layer answers every query and encodes "I know nothing yet"
-as empty content. Check content, not presence.
-
-**Why the panel cannot reach back, whatever the ingest does.** Two cuts compose: the ingest
-keeps facts filed on or after 2013-01-01, and the panel is `fundamental_facts` JOINED to
-`ticker_cik` **by date** while every `ticker_cik` interval starts on or after 2015-01-02 (the
-scope is "ever-members since 2015-01-02"). The join therefore drops the ~181k facts filed before
-2015-01-02 and has no row at all to join anything earlier to.
-
-**Structural consequence, and it is not about one method.** This lab's dev window opens in 1996;
-XBRL starts ~2009 and the usable panel starts 2015. **A fundamental-factor method cannot be
-evaluated on the dev window as it stands.** Any future one hits this. The three ways out, none
-free: re-vendor `ticker_cik.csv` with intervals back to each symbol's real first membership
-(buys 2013-2014, still 2.8 of 19.8 years); give fundamentals methods their own shorter dev
-window (breaks comparability with every trial recorded against 1996-2015, and the DSR's N);
-or accept that these premia are testable only on the post-2015 window, which is the held-out
-test window this lab has never used. Pick one before spending another method id.
+It copies `bars.csv`, `dividends.csv`, `fx.csv` and `unserved.csv` byte for byte, writes a new
+`fundamentals.csv`, re-seals and swaps atomically; only the panel and the fingerprint change.
+`push --keep 0` matters: a plain `push` prunes to the newest three versions
+(`sync_store.py:294` calls `_prune(tok, keep=args.keep)` with `KEEP_VERSIONS = 3`), and the
+version it drops is the oldest — possibly the one you would roll back to.
 
 Tests: `PG_TEST_URL=… engine/.venv/bin/pytest engine/tests -q` (see "Local test database").
 Without `PG_TEST_URL` the DB tests are skipped with a reason.

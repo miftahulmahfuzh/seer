@@ -21,7 +21,7 @@ from seer_engine import cik as cik_mod
 from seer_engine import sec
 from seer_engine.commands import fundamentals as fcmd
 
-SINCE = date(2015, 1, 2)
+SINCE = date(2009, 1, 1)
 TODAY = date(2026, 10, 5)
 
 Q3_END = date(2015, 9, 30)
@@ -29,7 +29,7 @@ Q4_END = date(2015, 12, 31)
 FILED_Q3 = date(2015, 10, 30)
 FILED_Q4 = date(2016, 2, 26)
 FILED_RESTATED = date(2016, 11, 4)
-FILED_OLD = date(2010, 5, 7)
+FILED_OLD = date(2008, 5, 7)
 
 ACCN_1 = "0000718877-16-000045"
 ACCN_2 = "0000718877-16-000112"
@@ -174,8 +174,10 @@ def parse(argv):
 
 def test_arguments_defaults_and_symbol_normalisation():
     args = parse([])
-    assert args.since == date(2015, 1, 2)
-    assert args.since_filed == date(2013, 1, 1)
+    # One floor, at both ends: the member set and the filed cutoff have to agree or the
+    # dated ticker_cik join silently drops whatever falls between them.
+    assert args.since == date(2009, 1, 1)
+    assert args.since_filed == date(2009, 1, 1)
     assert args.batch_size == 20 and args.symbols is None and args.no_sync_map is False
     args = parse(["--symbols", "brk-b, atvi,ATVI", "--batch-size", "5", "--no-sync-map"])
     assert args.symbols == ["BRK.B", "ATVI"]
@@ -274,7 +276,9 @@ def test_select_facts_keeps_only_allowlisted_tags_filed_in_range():
         fact("Assets"),
         fact("NetIncomeLoss", start=date(2015, 1, 1)),
         fact("AccruedLiabilitiesCurrent"),            # not in LADDER_TAGS
-        fact("Assets", end=date(2010, 3, 31), filed=FILED_OLD),  # before the cutoff
+        # Before the cutoff. FILED_OLD is 2008, not 2010: the floor is 2009-01-01 now, which
+        # is where XBRL begins, so nothing filed on or after it is ever dropped for being old.
+        fact("Assets", end=date(2008, 3, 31), filed=FILED_OLD, fy=2008, fp="Q1"),
     ]
     kept = fcmd.select_facts(facts, fcmd.DEFAULT_SINCE_FILED)
     assert [f.tag for f in kept] == ["Assets", "NetIncomeLoss"]

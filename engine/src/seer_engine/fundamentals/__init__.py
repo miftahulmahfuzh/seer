@@ -6,6 +6,8 @@ Python, so the ladder can be revised without a re-ingest (plan Decisions table).
 
 * ``ladder`` -- which ``us-gaap``/``dei`` tags carry each metric, in preference order, and the
   measured coverage behind that list.
+* ``coverage`` -- can the panel rank? The dev-window coverage measure, its ``MIN_DEV_COVERAGE``
+  floor, and the ``Snapshot.observations`` emptiness test that a non-None ``as_of`` is not.
 * ``panel`` -- ``Fact``, the point-in-time selection rule (``filed <= t``, never ``period_end``),
   ``Snapshot``, and ``FundamentalPanel``, which is what ``Market.fundamentals`` holds.
 * ``sue`` -- standardized unexpected earnings on a seasonal random walk. Imported as a module,
@@ -14,6 +16,23 @@ Python, so the ladder can be revised without a re-ingest (plan Decisions table).
 
 Pure: no database, network, clock or randomness (tests/test_strategy_purity.py).
 """
+
+from seer_engine.fundamentals.coverage import (
+    DEFAULT_TOP,
+    MIN_DEV_COVERAGE,
+    WINDOW_END,
+    WINDOW_START,
+    Coverage,
+    CoverageError,
+    YearCoverage,
+    default_max_stale_days,
+    format_report,
+    is_rankable,
+    measure,
+    monthly_dates,
+    rankable_count,
+    rankable_symbols,
+)
 
 from seer_engine.fundamentals.ladder import (
     ASSETS,
@@ -67,6 +86,7 @@ __all__ = [
     "ASSETS",
     "CONCEPTS",
     "COST_OF_REVENUE",
+    "DEFAULT_TOP",
     "DILUTED_EPS",
     "DILUTED_SHARES",
     "DURATION",
@@ -85,12 +105,17 @@ __all__ = [
     "KIND_QUARTER",
     "LADDER",
     "LADDER_TAGS",
+    "MIN_DEV_COVERAGE",
     "NET_INCOME",
     "OPERATING_CASH_FLOW",
     "OPERATING_INCOME",
     "REVENUE",
     "SHARES_OUTSTANDING",
+    "WINDOW_END",
+    "WINDOW_START",
     "ConceptSpec",
+    "Coverage",
+    "CoverageError",
     "Fact",
     "FundamentalPanel",
     "FundamentalsError",
@@ -98,12 +123,20 @@ __all__ = [
     "Obs",
     "Snapshot",
     "SymbolFundamentals",
+    "YearCoverage",
     "accrual_ratio",
     "book_value_per_share",
     "concepts_for",
+    "default_max_stale_days",
     "fact_from_row",
     "facts_from_rows",
+    "format_report",
     "gross_profitability",
+    "is_rankable",
+    "measure",
+    "monthly_dates",
+    "rankable_count",
+    "rankable_symbols",
     "return_on_assets",
     "return_on_equity",
     "spec",

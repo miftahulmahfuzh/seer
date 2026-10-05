@@ -2,7 +2,10 @@
 
     lab status                      N, test looks, near misses, backlog, blocked ideas
     lab show M0007                  one method and its trials
-    lab run M0007 [--store DIR]     run a committed method on the dev window, record its trials
+    lab run M0007 [--store DIR] [--allow-coverage F]
+                                    run a committed method on the dev window, record its trials;
+                                    a method with a MarketAware allocator is refused when the
+                                    store's fundamental panel covers less than 80% of the window
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
@@ -32,11 +35,22 @@ from pathlib import Path
 from seer_engine import config, research
 from seer_engine.backtest import dev
 from seer_engine.backtest.metrics import fmt_num, fmt_pct, fmt_pf, fmt_signed_pct
+from seer_engine.fundamentals import coverage
 from seer_engine.lab import store
 
 log = logging.getLogger(__name__)
 
 HELP = "The method lab: run, record and review strategy experiments (lab/lab.sqlite)"
+
+
+def _coverage_floor(text: str) -> float:
+    try:
+        value = float(text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"not a number: {text!r}") from exc
+    if not 0.0 <= value <= 1.0:
+        raise argparse.ArgumentTypeError(f"must be a fraction between 0 and 1, got {value}")
+    return value
 
 
 def add_arguments(p: argparse.ArgumentParser) -> None:
@@ -50,6 +64,18 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s = sub.add_parser("run", help="run a committed method on the dev window")
     s.add_argument("method")
     s.add_argument("--store", type=Path, default=Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR))
+    s.add_argument(
+        "--allow-coverage",
+        type=_coverage_floor,
+        default=coverage.MIN_DEV_COVERAGE,
+        metavar="F",
+        help=(
+            f"lower the dev-window panel-coverage floor from {coverage.MIN_DEV_COVERAGE:.2f} to F "
+            "(0..1) for this run. An acknowledgement, not a silencer: the measured fraction and "
+            "the per-year table are printed either way. Only methods with a MarketAware "
+            "allocator are gated at all"
+        ),
+    )
 
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
@@ -215,6 +241,19 @@ def _run(conn, args) -> int:
             "`python -m seer_engine research_store`"
         ) from e
     log.info("research store %s loaded (%.1fs)", data.fingerprint[:12], time.perf_counter() - t0)
+    # The second checkpoint: runner.preflight ran before the store existed and could not see the
+    # panel. Nothing here is reached for a price-only method.
+    floor = float(getattr(args, "allow_coverage", coverage.MIN_DEV_COVERAGE))
+    cov = runner.preflight_data(data, method, min_coverage=floor)
+    if cov is not None:
+        print(coverage.format_report(cov, floor=floor))
+        if floor < coverage.MIN_DEV_COVERAGE:
+            print(
+                f"--allow-coverage {floor:.2f}: {method.id} runs against a panel that can rank on "
+                f"{cov.fraction:.1%} of the dev window, below the "
+                f"{coverage.MIN_DEV_COVERAGE:.0%} floor. These trials measure the panel, not the "
+                "hypothesis, and the method id is spent either way."
+            )
     ran = runner.run_method(conn, method, path, data, git_sha=runner.git_head(config.REPO_ROOT))
     status = store.get_method(conn, method.id)["status"]
     log.info("%s: %d trial(s) recorded, status %s (%.1fs)", method.id, len(ran), status, time.perf_counter() - t0)

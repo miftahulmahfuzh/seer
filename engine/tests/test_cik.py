@@ -288,12 +288,18 @@ def test_coverage_gaps_reports_a_hole_between_two_rows():
 
 
 def test_coverage_gaps_ignores_membership_before_since():
-    ix = index("CA,0000356028,2015-01-02,2018-11-06,\"CA, INC.\",manual,recycled")
+    """The row opens exactly at the floor, so membership before it is not wanted.
+
+    Anchored to ``c.SINCE`` rather than a literal: the floor moved 2015-01-02 -> 2009-01-01 on
+    2026-10-05 and this test is about the clipping, not about the floor's value.
+    """
+    ix = index(f"CA,0000356028,{c.SINCE},2018-11-06,\"CA, INC.\",manual,recycled")
     assert c.coverage_gaps(ix, [iv("CA", "1996-01-02", "2018-11-06")]) == ()
 
 
 def test_coverage_gaps_counts_a_no_filer_row_as_an_answer():
-    ix = index("NDOI,NONE,2015-01-02,2016-07-18,,manual,phantom")
+    """A NONE row is an explicit answer, so it covers. Anchored to ``c.SINCE``; see above."""
+    ix = index(f"NDOI,NONE,{c.SINCE},2016-07-18,,manual,phantom")
     assert c.coverage_gaps(ix, [iv("NDOI", "2007-02-01", "2016-07-18")]) == ()
 
 
@@ -317,7 +323,8 @@ def ever_members() -> frozenset[str]:
 
 
 def test_vendored_file_loads_and_is_big_enough(vendored_index, ever_members):
-    assert len(ever_members) >= 780
+    """913 ever-members at the 2009 floor, measured 2026-10-05; 795 at the retired 2015 one."""
+    assert len(ever_members) >= 900
     assert len(vendored_index) == len(ever_members)
 
 
@@ -422,3 +429,61 @@ def test_vendored_notes_are_present_where_required(vendored_index):
         if not row.note and (row.source in c.NOTE_REQUIRED or row.cik is None)
     ]
     assert missing == []
+
+
+def test_vendored_floor_is_2009_and_no_row_precedes_it():
+    """R1: the map's floor is the first year SEC XBRL company facts exist at all."""
+    assert c.SINCE == D("2009-01-01")
+
+
+def test_vendored_no_row_starts_before_the_floor(vendored_index):
+    early = [
+        (row.symbol, row.start_date)
+        for group in vendored_index.values()
+        for row in group
+        if row.start_date < c.SINCE
+    ]
+    assert early == []
+
+
+def test_vendored_carries_no_row_at_the_retired_2015_clamp(vendored_index):
+    """The old cik.SINCE wrote 525 rows claiming a start that was not the symbol's.
+
+    Measured 2026-10-05: no symbol in the universe has 2015-01-02 as its real first-membership
+    date, so after Fix A the date must not appear as a start_date at all. If a future
+    re-vendoring produces a genuine 2015-01-02 handover, name it here rather than deleting the
+    test -- the point is that the date is never again a default.
+    """
+    clamped = sorted(
+        row.symbol
+        for group in vendored_index.values()
+        for row in group
+        if row.start_date == D("2015-01-02")
+    )
+    assert clamped == []
+
+
+def test_vendored_has_no_fuzzy_row(vendored_index):
+    """SOURCES.md requires it. HAR is why: difflib matched 'Harman International Industries'
+    to 'AMERICAN INTERNATIONAL INDUSTRIES' (0001073146), which filed 4 periodic reports inside
+    the span and so passed the screen. The screen is a net, not a gate.
+    """
+    fuzzy = sorted(
+        row.symbol
+        for group in vendored_index.values()
+        for row in group
+        if row.source == "fuzzy"
+    )
+    assert fuzzy == []
+
+
+def test_vendored_none_row_is_ndoi_and_it_is_alone(vendored_index):
+    """NDOI is a phantom in the Wikipedia-derived ndx_history.csv and the file's only NONE."""
+    none_rows = sorted(
+        row.symbol
+        for group in vendored_index.values()
+        for row in group
+        if row.cik is None
+    )
+    assert none_rows == ["NDOI"]
+    assert len(vendored_index["NDOI"]) == 1

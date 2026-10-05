@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-05 11:00
-**Total Active Tasks**: 1
+**Last Updated**: 2026-10-05 16:24
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 60
+- Completed: 65
 
 ---
 
@@ -23,6 +23,253 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [x] **P1-ENG-TJ4M** Phase 1: The coverage gate: a pure measure, a CLI surface, a `lab run` refusal
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns a new pure `engine/src/seer_engine/fundamentals/coverage.py` (no database, network, clock or randomness — `tests/test_strategy_purity.py` territory) exporting the measure and its constants, its export from `fundamentals/__init__.py`, a `--coverage` mode on `commands/research_store.py` that loads the store and prints the per-year table plus one fraction, a post-load refusal in `lab/runner.py` wired into `commands/lab.py:_run` between `load_store` and `run_method` with an `--allow-coverage FLOAT` escape, and tests in a new `engine/tests/test_fundamentals_coverage.py` plus additions to `engine/tests/test_lab_runner.py`. Does not touch `cik.py`, `build_ticker_cik.py`, `ticker_cik.csv`, `commands/fundamentals.py`, `research.py`'s build or seal path, any `docs/` file or any database; it must work against the current 2.5%-coverage store and its tests must not depend on a store on disk. The measure answers "on how many sampled dev-window dates can the panel rank at least `top` symbols?", counting a symbol only when `panel.as_of(sym, t)` has non-empty `observations` and its newest `filed` is within `max_stale_days` of `t`; `lab run` refuses below `MIN_DEV_COVERAGE = 0.80` when the method has a `MarketAware` allocator, and a price-only method is never refused. Exit: `python -m seer_engine research_store --coverage --store "$SEER_STORE"` prints, for the 2026-10-05 store, a table whose 1996–2014 rows are 0 and whose 2015 row is non-zero and a fraction of `0.0378` — under this set's one definition (monthly sample of 1996-01-02 .. 2015-10-16, 238 dates, `top = 20`, `max_stale_days = 400`, content checked through `Snapshot.observations`) and reported as an upper bound because the measure reads no bars; a unit test asserts 0.0 for a panel whose facts all postdate the window, 1.0 for one that covers it, and that an empty-`observations` `Snapshot` counts as not rankable; a `lab run` test asserts the refusal fires for a `MarketAware` method on a thin panel, does not fire for a price-only method, and is lifted by `--allow-coverage`. Suite green at +27.
+  - **Status**: completed
+  - **Plan Set**: `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` (phase 1 of 5)
+  - **Satisfies**: R3 — The coverage gate (§6.2): the check moves out of the runbook and into the engine, so no future method runs against a panel that cannot rank
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-TJ4M.md`
+  - **Completed**: 2026-10-05 14:35
+  - **Method**: /implement
+  - **Commit**: df6e0ab
+  - **Files**: engine/src/seer_engine/fundamentals/coverage.py, engine/src/seer_engine/fundamentals/__init__.py, engine/src/seer_engine/commands/research_store.py, engine/src/seer_engine/commands/lab.py, engine/src/seer_engine/lab/runner.py, engine/tests/test_fundamentals_coverage.py, engine/tests/test_lab_runner.py
+  - **Measured**: 0.0378 on the 2026-10-05 store (fingerprint e597367b…), monthly / top=20 / max_stale_days=400 / 1996-01-02..2015-10-02, 238 samples; 1996–2014 all 0/12, 2015 covers 9 of 10 with 519 rankable at best. An UPPER BOUND — the measure reads no bars, so membership, min_price and min_dollar_volume are unapplied. The 4% (doc §4 span estimate) and 2.5% (semiannual) figures are retired by name.
+  - **Decided**:
+    - Step 3 task creation in a concurrent swarm -> this session (phase 1) created all five tasks; peers skip it (rung 6: the recorded precedent in this file from the STRATEGY_B_RANKER swarm). A peer minted a rival ID set (JUE0/WQI8/6U02/RLMS/27JI) a minute earlier; those plan copies are orphaned — no todos entry, no index row — and were left on disk for their session to clean up (tie-break: reversible option)
+    - Committed by explicit pathspec from the main context, not via pusher (rung 6: the shared-worktree ruling recorded in this file); `git add -A` would have swept phase 2's in-flight CSV work
+    - readme-updater skipped: `engine/package_readme.md` is phase 5's (rung 4: the index Scope and phase 1's "Leaves alone")
+    - Phases 2–5 left for their own sessions to claim rather than pre-flipped (rung 6: phase 2's session claimed its own entry the same way)
+  - **Notes**: `lab run` was NOT executed, by design. The 6 `test_cik.py` failures present in the shared worktree at commit time are phase 2's in-flight edits — its own new tests asserting a `ticker_cik.csv` it has not regenerated yet — and phase 1 touches no file phase 2 touches. Phase 1's delta is +27 (20 new in `test_fundamentals_coverage.py`, 7 added to `test_lab_runner.py`); full suite 2242 passed / 332 skipped, 2574 passed / 0 skipped with `PG_TEST_URL`.
+- [x] **P1-ENG-QD7X** Phase 2: Fix A: re-vendor `ticker_cik.csv` back to real 2009 membership, with the `EARLY` start screen
+  - **Difficulty**: HARD
+  - **Type**: Update
+  - **Context**: Owns `engine/src/seer_engine/cik.py` (`SINCE` → `date(2009, 1, 1)` and the docstring that explains it), `engine/scripts/build_ticker_cik.py` (the `MANUAL` start sentinel, the new audits, `SCREEN_EXEMPT` additions, the second `EARLY` screen — `periodic_dates`, `EARLY_WINDOW_DAYS` and `EARLY_EXEMPT` — and the measured counts in its module docstring), the regenerated `engine/data/ticker_cik.csv`, `engine/data/SOURCES.md`, and `engine/tests/test_cik.py` (one assertion widened, five tests added). Does not touch `commands/fundamentals.py` (phase 3 owns both ingest floors), `fundamentals/` (phase 1), `research.py` (phase 4), any `docs/` file outside `engine/data`, or the `ticker_cik` table and `005_fundamentals.sql`. `spans()` already derives every start from `max(iv.start_date, SINCE)`, so lowering `SINCE` fixes tiers 1–4 for free; what it does not fix is `MANUAL`, whose ~60 literal `"2015-01-02"` starts become an empty-cell sentinel meaning "the symbol's membership start from `spans()`" while genuinely later starts stay literal and every `end` stays literal and unchanged. 118 symbols enter scope, most delisted before 2015 and resolved by hand against `https://data.sec.gov/submissions/CIK<cik>.json`, with new pre-2015 recycling split into two dated rows rather than merged. Exit: the CSV loads through `cik.load_index()` with 913 symbols; `cik.coverage_gaps(index, compute_universe())` is empty; zero rows carry `source=fuzzy`; zero rows start at 2015-01-02; `NDOI` is still the only `NONE` and still alone; the generator exits 0 with `UNRESOLVED`, `SCREEN` and `EARLY` all empty and every exemption carrying a reason naming what was checked; `RECYCLED`, `SPOT_CHECKS`, `SHARE_CLASSES`, the WestRock and Alphabet tests all pass with their existing expected values; `SOURCES.md`'s row and tier counts match the file. Suite green at +5.
+  - **Status**: completed
+  - **Plan Set**: `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` (phase 2 of 5)
+  - **Satisfies**: R1 — Fix A (§2): re-vendor `ticker_cik.csv` with real first-membership intervals, every §2 invariant still enforced by tests
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-QD7X.md`
+  - **Completed**: 2026-10-05 — commit `85f6bfd`
+  - **Result**: `ticker_cik.csv` 798 rows/795 symbols -> 944/913. 0 rows at the retired
+    2015-01-02 clamp (525 removed), 540 at the 2009 floor, 0 before it, 0 `fuzzy`, `NDOI`
+    still the only `NONE` and alone, `coverage_gaps` empty, `K` -> 0000055067. The new
+    `EARLY` screen (450 days from the span's start) flagged 56 rows `SCREEN` cannot see,
+    including pre-existing errors: `DIS` and `XRX` were mapped to their 2019 holdcos and
+    `SNDK` to the 2025 spinoff. 69 symbols hand-audited in all; `MANUAL` 70 -> 152 symbols /
+    183 rows, every CIK read off data.sec.gov/submissions. Generator exits 0 and a re-run is
+    byte-identical. Suite 2261 passed / 332 skipped (delta +5); 2593 passed with
+    `PG_TEST_URL`. All 11 `SCREEN_EXEMPT` reasons intact; no `end_date` pushed forward; no
+    database or network write.
+  - **Decisions**: five tests not four (inv 1/C9); successor handovers split at the
+    successor's first periodic filing, measured (inv 2+10); membership-gap symbols split at
+    real membership boundaries, hole left uncovered (the plan's own `Q` block); hull opening
+    before the ticker existed -> `EARLY_EXEMPT`, not a `membership_overrides.csv` fix (C7i) —
+    `CCEP`, `DXC`, `LMCK`, `PSKY`, `VTRS`; `CCE` single row -> split, its old
+    "NOT 0000804055" note held only at the 2015 floor (inv 2); two `coverage_gaps` unit tests
+    re-anchored from a literal 2015-01-02 to `c.SINCE`, assertions unchanged and both still
+    pass (inv 1); `BNI`'s fuzzy match hand-read and promoted to `manual` (inv 3).
+  - **Note**: C7i predicted `DXC` passes both screens; it does not — `EARLY` flags it. Kept
+    out of scope as C7i directs and exempted with the reason.
+- [x] **P1-ENG-F2BN** Phase 3: Fix B: re-ingest at `--since-filed 2009-01-01` via `--symbols`, and measure 2009–2012
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns `engine/src/seer_engine/commands/fundamentals.py` (`DEFAULT_SINCE` and `DEFAULT_SINCE_FILED` → `date(2009, 1, 1)`, the module docstring's "since 2015-01-02", the two `--since*` help strings, the storage paragraph's arithmetic), `engine/tests/test_fundamentals_command.py`, and the ingest run itself against `.env.local-train`. Does not touch `cik.py` or `ticker_cik.csv` (phase 2), `fundamentals/` (phase 1), `research.py` or `engine/.research/` (phases 4 and 5), Neon, or the `005` migration. The local train database holds 0 `universe` and 0 `bars` rows, so `universe refresh` (no network) must run before the ingest even under `--symbols`, which bypasses `select_symbols` but not `plan_jobs`'s per-symbol `windows`. The decision doc §3's `--retry-failed` does not work — it narrows `done` to `{ok}` and skips all 773 `ok` filers — so the run is `fundamentals --since 2009-01-01 --since-filed 2009-01-01 --symbols <912 symbols>`, which makes `plan_jobs` set `logged = {}` and fetch every resolved CIK without deleting a row anywhere; `--since` moves too, or the member set stays at 795. Budget ~30 minutes for roughly 890 companyfacts calls. The measurement is as much the deliverable as the rows: facts by `filed` year for 2009–2012 against the 2013–2026 baseline, expected partial and size-biased because XBRL phased in by filer size. Exit: `fundamentals_log` holds no unexplained `failed` row and no log row was deleted to get there; a per-year `filed` count for 2009–2026 is recorded in the phase's summary; `fundamental_facts` row count and `pg_total_relation_size` are recorded; the resolved DSN named `localhost:55432` before anything was written. Suite green at +0 (four existing tests edited in place, none added or removed).
+  - **Status**: completed
+  - **Plan Set**: `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` (phase 3 of 5)
+  - **Satisfies**: R2 — Fix B (§3): re-ingest at `--since-filed 2009-01-01`, and measure how much 2009–2012 XBRL actually exists
+  - **Depends on**: P1-ENG-QD7X
+  - **Plan**: `.workflows/plan/P1-ENG-F2BN.md`
+  - **Completed**: 2026-10-05 16:05
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/commands/fundamentals.py, engine/tests/test_fundamentals_command.py
+  - **Drift**: None. The plan's quoted line numbers and code blocks matched the tree exactly; all
+    four regions (module docstring, the `DEFAULT_SINCE`/`DEFAULT_SINCE_FILED` block,
+    `add_arguments`, four test edits) applied verbatim.
+  - **Decided**:
+    - The Verification section's grep expects no `2015-01-02` anywhere in
+      `commands/fundamentals.py`, but `resolve_cik`'s docstring uses it as a recycled-ticker
+      illustration (`CA on 2015-01-02 is CA Inc. and not the Xtrackers ETF`) -> kept it
+      unchanged (rung 3: the phase plan's code blocks and its Files table enumerate exactly
+      four changing regions and `resolve_cik` is not among them; the grep is prose shorthand
+      for "no floor still says 2015/2013")
+    - `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` left untouched, `**Status:** reconciled` not
+      advanced (rung 6 + rung 4: `swarm.py find` returns `swarm: true` with coordinator
+      `orch-fundamental-panel-coverage`, so the set's tracker is its ledger at
+      `/home/miftah/seer/.workflows/orchestration/fundamental-panel-coverage/ledger.json` and
+      the coordinator writes it; phases 1 and 4 made the same call, and a linear "phase 3/5"
+      would misreport a set that landed 4 before 3)
+    - Completed block left in place under `### [P1] High` rather than moved to
+      `## Completed Tasks` (rung 6: TJ4M, QD7X and K8RV — every landed phase of this set —
+      sit there checked; moving only F2BN would be the inconsistent edit)
+    - `engine/package_readme.md` not written — readme-updater dispatched read-only, to report
+      staleness rather than fix it (rung 2/3: phase 5's `Owns` list names that file, and phase 4
+      of this set took the same ruling an hour ago; any finding is handed to phase 5)
+    - `P1-ENG-M3HE` flipped `blocked` -> `open` (rung 4: its `Depends on` names TJ4M, QD7X,
+      F2BN and K8RV, and with this phase landed all four are complete — it is now genuinely
+      runnable, which phase 4 correctly refused to claim an hour ago)
+    - No `**Commit**` field (rung 2: this phase is one commit carrying code and bookkeeping
+      together, so the sha cannot name itself; phase 1's field came from /implement's separate
+      `chore(todos)` commit)
+  - **Handoff to P1-ENG-M3HE (phase 5, which owns `engine/package_readme.md`)**: readme-updater
+    reviewed it read-only and found **nothing stale from this change** — the readme names
+    neither the 2015-01-02 member floor nor the 2013 filed floor nor any fundamentals
+    row-count figure, and every `2015` in it is a different constant (`:181` is `backfill`'s
+    `DEFAULT_START`, bars; `:29/:328/:345-349/:1353` are `DEV_END = 2015-10-16`;
+    `:239/:247/:289/:838/:885-886/:955/:1062/:1302/:1397` are `tuning.IS_START = 2015-10-19`).
+    It did flag four **pre-existing** gaps, caused by nothing in this phase, that phase 5 may
+    want to fill while it is in the file: (a) the `commands/` tree at `:113-126` has no
+    `fundamentals.py` row though `:109` already cites "the impure ingest command";
+    (b) the Commands table at `:166-171` lists only `migrate`, so `--since`, `--since-filed`,
+    `--retry-failed` and the `--symbols`-ignores-the-log resume semantics are undocumented;
+    (c) the migrations list at `:133-136` stops at `004_news_veto.sql` though `:869` and
+    `:1890` both name `005_fundamentals.sql`; (d) `:8` ("writes the Neon (Postgres) tables")
+    and `:855-870` are now *incomplete* rather than wrong, since `:859`'s "rows come from
+    `fundamental_facts` JOINed to `ticker_cik`" now implies a different database than the
+    overview's Neon framing.
+  - **Measured**: suite 2261 passed / 332 skipped, delta **+0** — exactly the inherited count,
+    four tests edited in place, none added or removed; 2593 passed / 0 skipped / 0 failed with
+    `PG_TEST_URL=postgresql://postgres:pg@localhost:55432/postgres`. The run went to
+    `.env.local-train` / `localhost:55432`; **Neon was untouched throughout**. Route was
+    `--symbols` over the whole 912-symbol member set (Decisions row C6): 927 symbols ok,
+    17 empty, 0 failed, 0 skipped; 915 companyfacts calls (up from 776), 915 `fundamentals_log`
+    rows written, **0 log rows deleted** — `fundamentals_log_pre_fixb` is a read-only 776-row
+    snapshot never restored from. `fundamental_facts` 385 MB -> 471.2 MB,
+    1,228,822 -> 1,589,093 rows over 899 CIKs; 1,589,093 facts kept, 360,271 inserted or changed.
+    M4: 67 facts stored over 36 CIKs carry EDGAR's `filed < period_end` (48 joined, was 28/18) —
+    a filer-side typo class `facts_from_frame` drops and counts, not an error.
+    M5: `fundamentals_log` 899 ok / 16 empty / **0 failed**.
+    M6: `ticker_cik` 943 rows / 912 symbols; `universe` 1544 rows / 1265 symbols (was 0).
+    Full output at `/tmp/seer-fixb/measurement.txt`, ingest log at `/tmp/seer-fixb/ingest-*.log`.
+  - **M1 — facts by `filed` year (stored), vs the `2dad9ff` baseline**:
+    2009 22,219/403 filers (new) · 2010 60,550/670 (new) · 2011 90,505/729 (new) ·
+    2012 99,641/738 (new) · 2013 101,736/739 (base 89,913, +11,823) ·
+    2014 101,580/738 (base 91,578, +10,002) · 2015 101,002/747 (base 91,921, +9,081) ·
+    2016 100,390/730 (base 91,655, +8,735) · 2017 97,841/723 (base 90,595, +7,246) ·
+    2018 99,305/725 (base 92,259, +7,046) · 2019 104,978/720 (base 98,506, +6,472) ·
+    2020 104,064/710 (base 98,431, +5,633) · 2021 96,535/708 (base 91,870, +4,665) ·
+    2022 88,211/701 (base 84,183, +4,028) · 2023 87,068/691 (base 83,277, +3,791) ·
+    2024 87,504/690 (base 83,970, +3,534) · 2025 86,733/685 (base 83,504, +3,229) ·
+    2026 59,231/675 (base 57,160, +2,071). Total **1,589,093** (baseline 1,228,822).
+  - **M3 — what the PANEL sees (the dated `ticker_cik` join), by `filed` year**: baseline was
+    831,725 rows / 780 symbols with **2013 and 2014 absent entirely**. Now
+    2009 21,179/382 · 2010 51,395/525 · 2011 70,642/541 · 2012 73,365/537 · 2013 74,248/539 ·
+    2014 74,339/538 · 2015 73,927/551 · 2016 74,342/554 · 2017 73,607/550 · 2018 74,763/547 ·
+    2019 79,342/538 · 2020 80,135/548 · 2021 75,063/544 · 2022 68,604/542 · 2023 67,726/532 ·
+    2024 67,394/532 · 2025 67,126/532 · 2026 46,154/531. Joined total **1,213,351 rows /
+    869 symbols** (was 831,725 / 780) — **+381,626 rows, +89 symbols**.
+  - **Finding**: **the real floor is roughly 2011, not 2009.** 2009 holds 22,219 facts from 403
+    filers against a 2013 baseline of 89,913 from 773 — about **25%** of a full year; 2010 holds
+    60,550 from 670, about **67%**. 2011 (90,505/729) is the first year to reach the 2013
+    baseline and 2012 (99,641/738) exceeds it. This is the expected shape, not an ingest
+    failure: XBRL phased in by filer size — large accelerated filers from roughly FY2009, all
+    filers by FY2011 — so 2009–2010 are thin **and** large-cap-skewed.
+    **Fix A and Fix B worked together**, and the number that proves it is M3's 2013 and 2014
+    rows: 74,248 and 74,339, both previously **zero**. 181,491 facts that were stored and
+    invisible now reach the panel.
+    **This is not panel coverage.** "Facts by filed year" is not "dates on which the panel can
+    rank 20 symbols" — conflating them is the M0005 bug (invariant 9). Panel coverage is phase
+    1's `--coverage`, measured by phase 5 after phase 4's store refresh. This phase writes no
+    docs file; phase 5 (`P1-ENG-M3HE`) writes this finding into
+    `docs/runbooks/data-pipeline.md` and §4 of
+    `docs/plans/2026-10-05-fundamental-panel-coverage.md`.
+- [x] **P1-ENG-K8RV** Phase 4: Refresh the store's panel without re-downloading bars
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/research.py` (a refresh that reuses an existing store's `bars.csv`, `dividends.csv`, `fx.csv` and `unserved.csv` byte for byte, writes a new `fundamentals.csv`, re-seals and swaps), the `--refresh-fundamentals` flag, its two handlers and one additional branch in `run()` on `engine/src/seer_engine/commands/research_store.py`, and `engine/tests/test_research_store.py`. Does not touch `build_store`'s existing download path, `load_store`, `MANIFEST_KEYS`, `_COUNT_KEYS`, the fingerprint algorithm, `fundamentals/` (phase 1), phase 1's `--coverage` flag, its `_coverage` handler and its branch in `run()` — all three must survive this edit unmodified — or `engine/.research/` itself, which phase 5 runs. The branch order in `run()` is guards → `--coverage` → `--verify` → `--refresh-fundamentals` → build, quoted verbatim from phase 1's landed body; neither phase converts `--verify` into a mutually-exclusive argparse group and `--verify` with `--coverage` still resolves to `--coverage`. The phase exists because `build_store` always fetches FX and downloads every symbol's bars, so rebuilding to pick up the new panel would replace all 2,490,793 bar rows and break comparability with the 64 recorded trials; the manifest's counts for copied files are carried over or recomputed from the copied files, never re-derived from a download. Exit: a test builds a store with facts A, refreshes it with facts B, and asserts `bars.csv`, `dividends.csv`, `fx.csv` and `unserved.csv` are byte-identical before and after, that `fundamentals.csv` changed, that the fingerprint changed, that every `_COUNT_KEYS` value is unchanged and that `load_store` accepts the result; a second test asserts the refresh refuses rather than half-writing when the source store is missing or fails verification; the `.tmp`/`.old` swap discipline and the "nothing is written on failure" guarantee hold; phase 1's `--coverage` branch is still reachable and still wins over `--verify`. Suite green at +13.
+  - **Status**: completed
+  - **Plan Set**: `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` (phase 4 of 5)
+  - **Satisfies**: R4 — Honest reporting (§8.3): the resulting coverage is measured across the whole dev window and written down as it is
+  - **Depends on**: P1-ENG-TJ4M
+  - **Plan**: `.workflows/plan/P1-ENG-K8RV.md`
+  - **Completed**: 2026-10-05 14:50
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/research.py, engine/src/seer_engine/commands/research_store.py, engine/tests/test_research_store.py
+  - **Decided**:
+    - Staging in a worktree shared with phase 2's in-flight edits -> commit by explicit pathspec only, never `git add -A` / `git commit -a` (rung 6: surrounding convention, phase 1 held the same discipline; plus the "narrower blast radius" tie-break)
+    - May readme-updater write `engine/package_readme.md`? -> No, skipped (rung 2/3: phase 4's plan lists it under "Leaves alone (owned by others) — phase 5", and phase 5's `Owns` claims it)
+    - Completed block left in place under `### [P1] High` rather than moved to `## Completed Tasks` (rung 6: phase 1 of this set did the same an hour ago, and TJ4M/AHLW/DKWU all sit there checked; a 10-line move 1000 lines down this file is the largest avoidable conflict surface against the live phase 2 session)
+    - `P1-ENG-M3HE` left `blocked`, not flipped to `open` (rung 4: its `Depends on` names four phases and only TJ4M and K8RV have landed — phase 2 is in_progress, phase 3 blocked. Marking it open would claim it is runnable when it is not)
+    - `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` left untouched (rung 6 + rung 4: the swarm ledger at `.workflows/orchestration/fundamental-panel-coverage/ledger.json` is this set's phase tracker and the coordinator writes it; phase 1 likewise left `**Status:** reconciled` alone, and a linear "phase N/5 complete" would misreport a set completing out of order)
+    - No `**Commit**` field (rung 2: this phase is one commit carrying both code and bookkeeping, so the sha cannot name itself; phase 1's field came from /implement's separate `chore(todos)` commit)
+  - **Notes**: Verified under the set's Runtime preamble (`PYTHONPATH` over main's venv, resolving to the worktree). Full suite 6 failed / 2255 passed / 332 skipped against an inherited baseline of 6 failed / 2242 passed / 332 skipped — **+13**, the planned delta, with the identical 6 pre-existing `test_cik.py` failures (phase 2's in-flight work, not touched by this phase) and no existing test changing its result. With `PG_TEST_URL`: 6 failed / 2587 passed, same 6. `test_research_store.py` collected 34 → 47 = +13 (10 functions, one parametrized ×4). `git diff` shows 0 deletions in both `research.py` and `research_store.py`, so phase 1's `--coverage` flag, `_coverage` handler and `run()` branch are intact. No store on disk, database or network was touched — phase 5 runs the refresh against the real `engine/.research/`.
+- [x] **P1-ENG-M3HE** Phase 5: Measure, report honestly, and retire the runbook snippet
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns running phase 4's refresh against the real store with phase 3's facts and phase 1's `--coverage` against the result; `docs/runbooks/data-pipeline.md` — the whole file's fundamental-panel surface, `:188-256` (the snippet replaced by the command, the measured numbers replacing the 2026-10-05 ones) and, assigned by reconciliation, `:151-175` and the stale scope lines at `:12,:15,:44,:51`; `docs/plans/2026-10-05-fundamental-panel-coverage.md` §4 (the `~14%` / `~30%` estimates replaced by measurements, the rest untouched); `engine/src/seer_engine/lab/methods/m0005_fundamental_factors.py`'s "READ THIS BEFORE RUNNING" preamble (pointing at the gate instead of a `python -c` one-liner, and saying M0005 is spent); `engine/package_readme.md`; and pushing the refreshed store with `/sync-research-store push`. Does not touch any `engine/src` file outside the one method docstring, `ticker_cik.csv`, the database, or any other `docs/plans/*.md`; it does not run `lab run`, does not mint a variation method and does not touch the test window. R5 is verified rather than re-implemented: `2dad9ff` already made `load_market_window` pass `fundamentals=` and added three tests at `engine/tests/test_paper_store.py:554`, `:573` and `:585`, and this phase confirms all three pass with `PG_TEST_URL` set, that `engine/src` has exactly three `Market(` construction sites all passing `fundamentals=`, and records §6.1 closed. The honesty clause is the deliverable: whatever the number is, the runbook and §4 state it, state that the dev window still opens 13 years before any XBRL exists, and state that the test-window decision remains unmade and out of scope. Exit: the `--coverage` output is pasted into the runbook with its date and the store's new fingerprint and described as an upper bound wherever quoted; §4's table has measured values in the `+ Fix A` and `+ Fix B` rows or the explicit words "not separately measured" and why; the runbook's two copy-paste Python blocks are gone and commands stand in their place; the duplicated re-vendoring recipe is a pointer to `SOURCES.md` and no longer claims "98 of 133"; `grep '2015-01-02' docs/runbooks/data-pipeline.md` returns only lines whose subject is bars; `grep -c '<<'` over the four edited documents returns 0; the store is pushed with `--keep 0`, `e597367b…` is still listed remotely and the push's content hash is recorded; `git status` shows no stray file; suite green at +0 with and without `PG_TEST_URL`.
+  - **Status**: completed
+  - **Plan Set**: `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` (phase 5 of 5)
+  - **Satisfies**: R4 — Honest reporting (§8.3): the resulting coverage is measured across the whole dev window and written down as it is; R5 — §6.1: `paper/store.py` must not silently build a `Market` with `EMPTY_PANEL`
+  - **Depends on**: P1-ENG-TJ4M, P1-ENG-QD7X, P1-ENG-F2BN, P1-ENG-K8RV
+  - **Plan**: `.workflows/plan/P1-ENG-M3HE.md`
+  - **Completed**: 2026-10-05 16:24
+  - **Method**: /do
+  - **Files**: docs/runbooks/data-pipeline.md, docs/plans/2026-10-05-fundamental-panel-coverage.md, engine/package_readme.md
+  - **Measured** (every figure below was produced by a command in this session; none estimated):
+    - **THE HEADLINE — dev-window panel coverage 0.3151 (75 of 238 monthly samples), an UPPER
+      BOUND**, by `research_store --coverage` on the refreshed store. Up from **0.0378**
+      (9 of 238) on the pre-fix store `e597367b…` under the identical measure. 869 panel
+      symbols (was 780). First sampled date able to rank 20 names: **2009-08-02**. Still far
+      below the `MIN_DEV_COVERAGE = 0.80` floor — phase 1's gate would refuse a `MarketAware`
+      method on this store, and that refusal is correct.
+    - **Fix A alone: 0.1387** (33 of 238), from re-running the same pure measure over the
+      refreshed panel with facts filtered to `filed >= 2013-01-01`. So Fix A buys 2013–2014 and
+      Fix B buys 2009–2012; §4's `~14%` and `~30%` estimates are both replaced by measurements.
+    - It is an **upper bound every time it is quoted** (Decisions C8): the measure reads no bars,
+      so index membership on the date, `min_price`, twenty sessions of history and
+      `min_dollar_volume` are all unapplied and can only remove symbols. Below the floor is
+      conclusive; above it would be necessary, not sufficient.
+    - **Store refresh** (phase 4's `--refresh-fundamentals`, against the real `engine/.research/`
+      in the main checkout): fingerprint `e597367bb6806d7edc2f9af4033b26c366aae92517207b4e71daad96346fcca3`
+      -> **`399d0d254c7a90b8cdb49f7ce598269087d38730f795cae90453eeb580b07cf8`**. 1,213,303 facts
+      written; 2,490,793 bar rows carried over unchanged; `sha256sum -c` confirmed `bars.csv`,
+      `dividends.csv`, `fx.csv` and `unserved.csv` all byte-identical; `--verify` passes all three
+      data checks.
+    - **Blob push**: `sync_store.py push --keep 0` -> `seer/research-store/399d0d25….tar.gz`,
+      45.2 MB, `"pruned": []`. `e597367b…` confirmed **still listed** remotely afterwards
+      (`current: false`). Local backup kept at `/home/miftah/.seer-store-backup-e597367b`.
+    - **Suite: 2261 passed / 332 skipped, delta +0** off the inherited 2261/332 — exactly the
+      planned delta; no test added, no existing test changing its result. With
+      `PG_TEST_URL=postgresql://postgres:pg@localhost:55432/postgres`: **2593 passed, 0 failed,
+      0 skipped**. Run under the set's Runtime preamble (`PYTHONPATH=$SEER_WT/engine/src` over
+      main's venv, resolving to the worktree; no worktree venv built).
+    - **R5 / §6.1 CLOSED by verification, no code written.** Exactly three `Market(` construction
+      sites in `engine/src`, all passing `fundamentals=`: `backtest/io.py:156`,
+      `paper/store.py:1058`, `research.py:682`. The three tests at
+      `engine/tests/test_paper_store.py:554`, `:573`, `:585` all pass with `PG_TEST_URL` set
+      (3 passed, 26 deselected).
+    - **Siblings' findings carried into the docs** (phases 2 and 3 asked for these): the real
+      floor is ~2011, not 2009 — 2009 holds 22,219 facts / 403 filers (~25% of a full year),
+      2010 60,550 / 670 (~67%), 2011 90,505 / 729 (first year at baseline), 2012 99,641 / 738 —
+      and 2009–2010 are large-cap-skewed because XBRL phased in by filer size, which matters more
+      for a *ranking* method than the raw shortfall. Fix A unblocked facts already stored: 2013
+      and 2014 had **zero** panel rows before and now have 74,248 and 74,339; the panel went
+      831,725 rows / 780 symbols to 1,213,351 / 869. And the clamp was hiding **wrong** answers,
+      not merely missing ones — `MFE`->MCAFEE COM CORP, `JNS`->a non-filer, `AKS`->a non-filing
+      subsidiary, `WFT`->Weatherford Enterra, and `DIS`/`XRX`/`SNDK`->2019 holdcos and a 2025
+      spinoff (phase 2 asked specifically that the `SNDK` case be named; it is).
+    - **The honest reading, written into both documents**: this is better data, not a valid test.
+      The dev window opens 1996-01-03 and XBRL does not exist before roughly 2009, so ~13 of its
+      19 years are permanently uncoverable from EDGAR at any price. The `>= 100 trades` gate stays
+      unreachable for a fundamentals method on this dev window. The test-window decision remains
+      **unmade and out of scope**. No `lab run` was invoked, no method id or variation was minted,
+      the post-2015 test window was not touched, and Neon was never contacted (the DSN proved
+      `localhost:55432` before the one write).
+  - **Drift**:
+    - The phase plan's Runtime preamble has a corrupt line `export SEER_PY=/home/miftah/seer/"$SEER_PY"`. The plan index's own Runtime preamble has the correct `/home/miftah/seer/engine/.venv/bin/python`; used that (rung 1, the index is the reconciled copy).
+    - `research.py`'s `Market(` construction site is at `:682`, not `:583` as the plan's Step 7 quoted — phase 4 inserted code above it. Still exactly three sites in `engine/src`, all passing `fundamentals=`.
+    - `engine/package_readme.md`'s `--with-fundamentals` bullet ends at `:342`, not `:339` as Step 11b quoted. Insertion anchored on text, not line number.
+  - **Decided**:
+    - Step 10 (rewrite the M0005 docstring preamble) applied, then **REVERTED** -> the file is frozen. Rung 1 (invariant 1: no existing test may change its result). `engine/tests/test_lab_methods.py::test_a_method_that_ran_is_frozen` compares `source_sha(path)` against the committed lab database and a docstring edit moves it; the edit was made, the test failed (dd9344c7… -> 1422f4b7…), the edit was reverted and the suite returned to 2261 passed. Step 10's own contingency anticipated this ("If a test pins this file's `source_sha`, stop … and leave the file alone"). The information was instead written into `docs/runbooks/data-pipeline.md`, which now states that the M0005 docstring still prints the retired manifest one-liner, that it cannot be corrected without minting a variation method, and that the runbook section is the current instruction. **One exit-criterion clause ("the manifest one-liner is gone from the M0005 docstring") is therefore NOT met, and is reported as not achievable rather than as done.**
+    - `readme-updater` **not** dispatched. Rung 2/3: phase 5's exit criteria and its Step 11 make `engine/package_readme.md` this phase's own deliverable carrying figures this phase measured; a second writer could restate a figure it did not run (invariant 10).
+    - Runbook `:12` and `:45` left at 2015-01-02. Rung 3: Step 8b-i states explicitly that those lines' subject is BARS (`backfill`'s `DEFAULT_START`), a different constant phase 2 deliberately did not move. Only `:15` and `:51`, whose subject is the fundamentals scope, were changed to 2009-01-01 / 913 symbols.
+    - Local store backup `/home/miftah/.seer-store-backup-e597367b` (227 MB) **KEPT** rather than deleted. Tie-break "take the reversible option" — Step 12 makes deletion optional and keeping it buys a network-free rollback.
+    - Completed block left in place under `### [P1] High` rather than moved to `## Completed Tasks` (rung 6: TJ4M, QD7X, K8RV — every landed phase of this set — plus AHLW and DKWU all sit checked under that heading; moving only phase 5 would scatter one set across two sections).
+    - `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` left untouched (rung 6 + rung 4: the swarm ledger at `.workflows/orchestration/fundamental-panel-coverage/ledger.json` is this set's tracker and the coordinator writes it; phases 1, 3 and 4 all made the same call).
+    - **The set was NOT landed.** `swarm.py find --plan FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` returns `{"swarm": true, "coordinator": "orch-fundamental-panel-coverage"}`; per `analyze-orchestrator.md` Step 5 the merge belongs to that coordinator. No merge to main, no push to main, no branch or worktree deletion.
+  - **Handoff left open**: `engine/src/seer_engine/lab/methods/m0005_fundamental_factors.py`'s docstring still points operators at the retired `python -c` manifest gate and cannot be corrected while the method is frozen. Anyone minting the `source_kind='variation'`, `parent_id='M0005'` re-test should write the corrected preamble into the new file. The runbook now says so explicitly.
 - [x] **P1-ENG-AHLW** Phase 7: Fundamental factor allocator, lab method, runbook
   - **Difficulty**: NORMAL
   - **Type**: Feature

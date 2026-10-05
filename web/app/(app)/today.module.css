@@ -81,7 +81,9 @@
 
 /* ---- Desktop ---- */
 @media (min-width: 1024px) {
-  .alarm, .none { border-radius: 40px; }
+  .alarm { border-radius: 40px; }
+  /* No nav to clear and no stack to fill: the sheet is only as tall as what it says. */
+  .none { border-radius: 40px; min-height: 0; padding: 36px 32px 40px; }
 
   .board {
     display: flex; flex-direction: column; gap: 16px;

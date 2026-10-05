@@ -1,12 +1,20 @@
 // Tooltips for icon-only controls: hover on desktop, long-press on touch.
 // Any element with data-tip. Ported from docs/design/seer-ui.js.
 
+/** Every caption clears itself after this, so one held under the pointer never stays stuck. */
+const AUTO_HIDE_MS = 4000;
+
 let tip: HTMLDivElement | null = null;
 let hideTimer: ReturnType<typeof setTimeout> | undefined;
+let shownFor: Element | null = null;
+let shownText: string | null = null;
 
 export function showTip(el: Element, text?: string) {
   const t = text ?? el.getAttribute('data-tip');
   if (!t) return;
+  // Re-showing the caption already on screen (the pointer crossing onto a child of the same
+  // control) must not restart its countdown. A new caption on the same element still does.
+  if (el === shownFor && t === shownText) return;
   if (!tip) {
     tip = document.createElement('div');
     tip.setAttribute('role', 'tooltip');
@@ -36,11 +44,21 @@ export function showTip(el: Element, text?: string) {
   if (y < 6) y = r.bottom + 8;
   tip.style.left = x + 'px';
   tip.style.top = y + 'px';
+  shownFor = el;
+  shownText = t;
+  hideTip(AUTO_HIDE_MS);
 }
 
 export function hideTip(after = 0) {
   clearTimeout(hideTimer);
-  hideTimer = setTimeout(() => { if (tip) tip.style.opacity = '0'; }, after);
+  // An immediate hide frees the element now, so the next hover re-shows it; a delayed one
+  // (the countdown, a long-press release) only frees it once it has actually gone.
+  if (after === 0) { shownFor = null; shownText = null; }
+  hideTimer = setTimeout(() => {
+    if (tip) tip.style.opacity = '0';
+    shownFor = null;
+    shownText = null;
+  }, after);
 }
 
 /** Installs document listeners once; returns an uninstaller. */

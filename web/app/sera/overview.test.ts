@@ -5,6 +5,7 @@ import {
   countTicks,
   ELIGIBLE_COLOR,
   familyBars,
+  familyLabel,
   HISTORICAL_COLOR,
   hurdles,
   LAB_COLOR,
@@ -264,6 +265,11 @@ describe('families', () => {
     expect(f.groups[0].items[0].value).toBe(2);
     expect(f.domain).toEqual([0, 2]);
     expect(f.groups[0].items[0].tip).toContain('best MAR');
+  });
+
+  it('cuts family labels to 7 characters', () => {
+    expect(familyLabel('p7a-f10')).toBe('p7a-f10');
+    expect(familyLabel('stock-momentum-risk-managed')).toBe('stock..');
   });
 });
 

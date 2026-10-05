@@ -336,6 +336,11 @@ export function luck(snap: LabSnapshot): Luck | null {
 
 export type Families = { groups: BarGroup[]; domain: Domain; count: number };
 
+/** Family labels are cut to 7 characters ('p7a-f10' fits; 'stock-momentum…' -> 'stock..') so the bars line up. */
+export const FAMILY_LABEL_CHARS = 7;
+export const familyLabel = (family: string): string =>
+  family.length <= FAMILY_LABEL_CHARS ? family : `${family.slice(0, FAMILY_LABEL_CHARS - 2)}..`;
+
 export function familyBars(snap: LabSnapshot): Families {
   const rows = families(snap.methods, devTrials(snap))
     .filter(f => f.trials > 0)
@@ -344,7 +349,8 @@ export function familyBars(snap: LabSnapshot): Families {
     const n = f.methodIds.length;
     return {
       id: f.family,
-      label: f.family,
+      label: familyLabel(f.family),
+      tip: familyLabel(f.family) === f.family ? undefined : f.family,
       items: [
         {
           key: f.family,

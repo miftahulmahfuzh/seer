@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { BarChart } from '@/components/sera/charts/BarChart';
 import { Legend } from '@/components/sera/charts/Legend';
 import { LineChart } from '@/components/sera/charts/LineChart';
-import { fmtNumber, fmtPct, fmtSignedPct } from '@/components/sera/charts/scale';
+import { fmtNumber, fmtPct, fmtSignedPct, resolveAxis } from '@/components/sera/charts/scale';
 import { ScatterChart } from '@/components/sera/charts/ScatterChart';
 import { PageHeader } from '@/components/sera/PageHeader';
 import { Section } from '@/components/sera/Section';
@@ -19,6 +19,7 @@ import {
   ABOVE_COLOR,
   dayText,
   ELIGIBLE_COLOR,
+  type Families,
   HISTORICAL_COLOR,
   HURDLES,
   LAB_COLOR,
@@ -276,14 +277,7 @@ export default async function SeraOverview() {
           title={`${fa.count} ${fa.count === 1 ? 'family' : 'families'}`}
           caption="Tries per family of ideas; hover a bar for its best MAR. A long bar with a weak best means the family has been squeezed hard."
         >
-          <BarChart
-            ariaLabel="Tries per method family"
-            groups={fa.groups}
-            orientation="horizontal"
-            domain={fa.domain}
-            format={fmtNumber(0)}
-            width={640}
-          />
+          <FamilyBars families={fa} />
         </Section>
 
         {/* (7) Latest methods */}
@@ -326,5 +320,43 @@ export default async function SeraOverview() {
         </Section>
       </div>
     </>
+  );
+}
+
+/**
+ * Tries per family as HTML rows, not an SVG: the rows stretch to fill whatever height the sheet gets
+ * next to Latest methods, and the short (7-character) labels keep every bar starting at the same x.
+ */
+function FamilyBars({ families }: { families: Families }) {
+  if (!families.groups.length) return <p className={s.empty}>No family has a dev try yet.</p>;
+  const fmt = fmtNumber(0);
+  const { domain, ticks } = resolveAxis(families.domain, { domain: families.domain, format: fmt, count: 4 });
+  const hi = Math.max(1, domain[1]);
+  const pct = (v: number) => `${(Math.min(v, hi) / hi) * 100}%`;
+  return (
+    <div className={s.famChart} role="img" aria-label="Tries per method family">
+      <ul className={s.famRows}>
+        {families.groups.map(g => {
+          const it = g.items[0];
+          const v = it?.value ?? 0;
+          return (
+            <li key={g.id} className={s.famRow}>
+              <span className={s.famLabel} data-tip={g.tip}>{g.label}</span>
+              <span className={s.famTrack}>
+                {ticks.map(t => <span key={t.value} className={s.famGrid} style={{ left: pct(t.value) }} />)}
+                <span className={s.famBar} style={{ width: pct(v), background: it?.color }} data-tip={it?.tip} />
+                <span className={s.famValue} style={{ left: pct(v) }}>{it?.valueText ?? fmt(v)}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <div className={s.famAxis} aria-hidden>
+        <span />
+        <span className={s.famTicks}>
+          {ticks.map(t => <span key={t.value} className={s.famTick} style={{ left: pct(t.value) }}>{t.label}</span>)}
+        </span>
+      </div>
+    </div>
   );
 }

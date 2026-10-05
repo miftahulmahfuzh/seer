@@ -1,4 +1,4 @@
-import { Gauge, Gavel, Landmark, Shield, Sigma } from 'lucide-react';
+import { BookOpen, Gauge, Gavel, Landmark, Shield, Sigma } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 import { selectStrategy, sharesLabel, strategyIcon } from './roster';
 
@@ -33,6 +33,7 @@ describe('strategyIcon', () => {
     expect(strategyIcon('shield')).toBe(Shield);
     expect(strategyIcon('gavel')).toBe(Gavel);
     expect(strategyIcon('sigma')).toBe(Sigma);
+    expect(strategyIcon('book-open')).toBe(BookOpen);
     expect(strategyIcon('nope')).toBe(Sigma);
   });
 });

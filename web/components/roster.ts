@@ -1,7 +1,7 @@
-import { BrainCircuit, Gauge, Gavel, Landmark, Shield, Sigma, type LucideIcon } from 'lucide-react';
+import { BookOpen, BrainCircuit, Gauge, Gavel, Landmark, Shield, Sigma, type LucideIcon } from 'lucide-react';
 
 // The `icon` column of `strategies` names a Lucide icon (kebab-case). Roster: landmark (SPY),
-// sigma (A), trending-up (F4), shield (F1), gavel (C, migration 004); brain-circuit kept for old demo rows.
+// sigma (A), trending-up (F4), shield (F1), gavel (C, migration 004), book-open (FND); brain-circuit kept for old demo rows.
 // F4's stored 'trending-up' draws Gauge: History's "Wins only" filter already uses TrendingUp.
 const ICONS: Record<string, LucideIcon> = {
   landmark: Landmark,
@@ -10,6 +10,7 @@ const ICONS: Record<string, LucideIcon> = {
   shield: Shield,
   'brain-circuit': BrainCircuit,
   gavel: Gavel,
+  'book-open': BookOpen,
 };
 
 /** The Lucide icon a strategies row names; Sigma when the name is unknown. */

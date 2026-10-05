@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-05 14:35
-**Total Active Tasks**: 4
+**Last Updated**: 2026-10-05 14:50
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 4
+- P1 High: 3
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 3
-- Completed: 61
+- Blocked: 2
+- Completed: 62
 
 ---
 
@@ -61,15 +61,26 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R2 — Fix B (§3): re-ingest at `--since-filed 2009-01-01`, and measure how much 2009–2012 XBRL actually exists
   - **Depends on**: P1-ENG-QD7X
   - **Plan**: `.workflows/plan/P1-ENG-F2BN.md`
-- [ ] **P1-ENG-K8RV** Phase 4: Refresh the store's panel without re-downloading bars
+- [x] **P1-ENG-K8RV** Phase 4: Refresh the store's panel without re-downloading bars
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `engine/src/seer_engine/research.py` (a refresh that reuses an existing store's `bars.csv`, `dividends.csv`, `fx.csv` and `unserved.csv` byte for byte, writes a new `fundamentals.csv`, re-seals and swaps), the `--refresh-fundamentals` flag, its two handlers and one additional branch in `run()` on `engine/src/seer_engine/commands/research_store.py`, and `engine/tests/test_research_store.py`. Does not touch `build_store`'s existing download path, `load_store`, `MANIFEST_KEYS`, `_COUNT_KEYS`, the fingerprint algorithm, `fundamentals/` (phase 1), phase 1's `--coverage` flag, its `_coverage` handler and its branch in `run()` — all three must survive this edit unmodified — or `engine/.research/` itself, which phase 5 runs. The branch order in `run()` is guards → `--coverage` → `--verify` → `--refresh-fundamentals` → build, quoted verbatim from phase 1's landed body; neither phase converts `--verify` into a mutually-exclusive argparse group and `--verify` with `--coverage` still resolves to `--coverage`. The phase exists because `build_store` always fetches FX and downloads every symbol's bars, so rebuilding to pick up the new panel would replace all 2,490,793 bar rows and break comparability with the 64 recorded trials; the manifest's counts for copied files are carried over or recomputed from the copied files, never re-derived from a download. Exit: a test builds a store with facts A, refreshes it with facts B, and asserts `bars.csv`, `dividends.csv`, `fx.csv` and `unserved.csv` are byte-identical before and after, that `fundamentals.csv` changed, that the fingerprint changed, that every `_COUNT_KEYS` value is unchanged and that `load_store` accepts the result; a second test asserts the refresh refuses rather than half-writing when the source store is missing or fails verification; the `.tmp`/`.old` swap discipline and the "nothing is written on failure" guarantee hold; phase 1's `--coverage` branch is still reachable and still wins over `--verify`. Suite green at +13.
-  - **Status**: blocked
+  - **Status**: completed
   - **Plan Set**: `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` (phase 4 of 5)
   - **Satisfies**: R4 — Honest reporting (§8.3): the resulting coverage is measured across the whole dev window and written down as it is
   - **Depends on**: P1-ENG-TJ4M
   - **Plan**: `.workflows/plan/P1-ENG-K8RV.md`
+  - **Completed**: 2026-10-05 14:50
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/research.py, engine/src/seer_engine/commands/research_store.py, engine/tests/test_research_store.py
+  - **Decided**:
+    - Staging in a worktree shared with phase 2's in-flight edits -> commit by explicit pathspec only, never `git add -A` / `git commit -a` (rung 6: surrounding convention, phase 1 held the same discipline; plus the "narrower blast radius" tie-break)
+    - May readme-updater write `engine/package_readme.md`? -> No, skipped (rung 2/3: phase 4's plan lists it under "Leaves alone (owned by others) — phase 5", and phase 5's `Owns` claims it)
+    - Completed block left in place under `### [P1] High` rather than moved to `## Completed Tasks` (rung 6: phase 1 of this set did the same an hour ago, and TJ4M/AHLW/DKWU all sit there checked; a 10-line move 1000 lines down this file is the largest avoidable conflict surface against the live phase 2 session)
+    - `P1-ENG-M3HE` left `blocked`, not flipped to `open` (rung 4: its `Depends on` names four phases and only TJ4M and K8RV have landed — phase 2 is in_progress, phase 3 blocked. Marking it open would claim it is runnable when it is not)
+    - `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` left untouched (rung 6 + rung 4: the swarm ledger at `.workflows/orchestration/fundamental-panel-coverage/ledger.json` is this set's phase tracker and the coordinator writes it; phase 1 likewise left `**Status:** reconciled` alone, and a linear "phase N/5 complete" would misreport a set completing out of order)
+    - No `**Commit**` field (rung 2: this phase is one commit carrying both code and bookkeeping, so the sha cannot name itself; phase 1's field came from /implement's separate `chore(todos)` commit)
+  - **Notes**: Verified under the set's Runtime preamble (`PYTHONPATH` over main's venv, resolving to the worktree). Full suite 6 failed / 2255 passed / 332 skipped against an inherited baseline of 6 failed / 2242 passed / 332 skipped — **+13**, the planned delta, with the identical 6 pre-existing `test_cik.py` failures (phase 2's in-flight work, not touched by this phase) and no existing test changing its result. With `PG_TEST_URL`: 6 failed / 2587 passed, same 6. `test_research_store.py` collected 34 → 47 = +13 (10 functions, one parametrized ×4). `git diff` shows 0 deletions in both `research.py` and `research_store.py`, so phase 1's `--coverage` flag, `_coverage` handler and `run()` branch are intact. No store on disk, database or network was touched — phase 5 runs the refresh against the real `engine/.research/`.
 - [ ] **P1-ENG-M3HE** Phase 5: Measure, report honestly, and retire the runbook snippet
   - **Difficulty**: NORMAL
   - **Type**: Update

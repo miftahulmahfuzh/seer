@@ -11,6 +11,7 @@ Never touches Neon and needs no DATABASE_URL.
 
     python -m seer_engine research_store [--store DIR] [--batch-size N] [--verify]
                                         [--coverage] [--with-fundamentals]
+                                        [--refresh-fundamentals]
 
 ``--verify`` loads an existing store only (no network). ``--coverage`` also loads an existing
 store only and measures what its fundamental panel can rank across the dev window
@@ -24,12 +25,24 @@ place in this command that needs it) and writes it as the store's optional fifth
 fundamentals and the lab ranks on bars alone, silently. The global ``--dry-run`` builds into a
 temporary directory and discards it. Exit codes: 0 ok; 1 build failed, a check failed or
 coverage is below the floor; 2 the store is missing or invalid.
+
+``--refresh-fundamentals`` rewrites **only** ``fundamentals.csv`` in an existing store and
+needs no network: ``bars.csv``, ``dividends.csv``, ``fx.csv`` and ``unserved.csv`` are carried
+over byte for byte, so the price history every recorded lab trial was run against survives
+untouched while the panel moves. It reads the facts the same way ``--with-fundamentals`` does
+(``DATABASE_URL_UNPOOLED`` -- point ``SEER_ENV_FILE`` at the train env file, and give it an
+ABSOLUTE path: a relative one is resolved against the cwd and falling through to the ambient
+environment means Neon) and refuses with exit 2 if the store is missing or fails verification.
+The store's fingerprint changes -- a new ``fundamentals.csv`` is new content -- but not one bar
+does. Under ``--dry-run`` it refreshes a copy in a temporary directory and discards it. Not
+combinable with ``--verify`` or ``--coverage``.
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import shutil
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path
@@ -90,14 +103,34 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
             "without it the store carries no panel and the lab ranks on bars alone"
         ),
     )
+    p.add_argument(
+        "--refresh-fundamentals",
+        action="store_true",
+        help=(
+            "rewrite only fundamentals.csv in an existing store, keeping every bar byte for "
+            "byte (needs DATABASE_URL_UNPOOLED); the fingerprint changes, the price history "
+            "does not; not combinable with --verify"
+        ),
+    )
 
 
 def run(args: argparse.Namespace) -> int:
     store = Path(args.store)
+    refresh = bool(getattr(args, "refresh_fundamentals", False))
+    read_only = bool(getattr(args, "coverage", False)) or bool(args.verify)
+    if refresh and read_only:
+        log.error(
+            "research_store: --refresh-fundamentals cannot be combined with --verify or "
+            "--coverage; those two only read a store, --refresh-fundamentals rewrites its "
+            "fundamentals.csv"
+        )
+        return 2
     if getattr(args, "coverage", False):
         return _coverage(store)
     if args.verify:
         return _verify(store, note="")
+    if refresh:
+        return _run_refresh(store, bool(getattr(args, "dry_run", False)))
     facts = _read_facts() if getattr(args, "with_fundamentals", False) else None
     if getattr(args, "dry_run", False):
         with tempfile.TemporaryDirectory(prefix="seer-research-") as tmp:
@@ -129,6 +162,48 @@ def _build(store: Path, batch_size: int, facts: Sequence[Fact] | None) -> int:
     except research.ResearchStoreError as exc:
         log.error("research_store: build failed, nothing written: %s", exc)
         return 1
+    return 0
+
+
+def _run_refresh(store: Path, dry_run: bool) -> int:
+    """``--refresh-fundamentals``: rewrite fundamentals.csv in place, keeping every bar.
+
+    The facts are read **before** the store is opened, so a database failure refuses while the
+    store is still untouched. A dry run copies the whole store into a temporary directory,
+    refreshes the copy and discards it: the real store is never opened for writing, which is
+    what ``--dry-run`` promises everywhere else in this CLI.
+    """
+    if not store.is_dir():
+        log.error(
+            "research_store: %s is not a directory; --refresh-fundamentals needs an existing "
+            "store to refresh",
+            store,
+        )
+        return 2
+    facts = _read_facts()
+    if dry_run:
+        with tempfile.TemporaryDirectory(prefix="seer-research-") as tmp:
+            target = Path(tmp) / "store"
+            shutil.copytree(store, target)
+            code = _refresh(target, facts)
+            if code != 0:
+                return code
+            return _verify(
+                target,
+                note=" (dry run: refreshed a copy in a temporary directory and discarded it)",
+            )
+    code = _refresh(store, facts)
+    if code != 0:
+        return code
+    return _verify(store, note="")
+
+
+def _refresh(store: Path, facts: Sequence[Fact]) -> int:
+    try:
+        research.refresh_fundamentals(store, facts)
+    except research.ResearchStoreError as exc:
+        log.error("research_store: refresh refused, nothing written: %s", exc)
+        return 2
     return 0
 
 

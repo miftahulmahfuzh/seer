@@ -528,6 +528,105 @@ def _swap_in(tmp: Path, store_dir: Path) -> None:
     shutil.rmtree(old, ignore_errors=True)
 
 
+# ---- refresh -------------------------------------------------------------------------------
+
+
+def refresh_fundamentals(
+    store_dir: Path,
+    facts: Sequence[Fact],
+    *,
+    data_dir: Path | None = None,
+) -> dict[str, Any]:
+    """Rewrite an existing store's ``fundamentals.csv`` from ``facts``; return the new manifest.
+
+    This is ``build_store``'s panel half without its download half. ``bars.csv``,
+    ``dividends.csv``, ``fx.csv`` and ``unserved.csv`` are carried over **byte for byte** from
+    the store already at ``store_dir``; only ``fundamentals.csv`` is written anew, the manifest
+    is re-sealed and the directory is swapped in with the same ``.tmp`` / ``.old`` /
+    ``os.replace`` discipline ``build_store`` uses -- so on any failure nothing is written and
+    the store on disk is left exactly as it was.
+
+    Why this exists rather than ``build_store(facts=new_facts)``: ``build_store`` always fetches
+    FX and downloads every symbol's bars from yfinance before it writes anything, and yfinance
+    answers differently day to day. A rebuild would therefore replace every bar row and break
+    comparability with the lab trials already recorded against this store's fingerprint.
+    Copying -- not rebuilding -- is what keeps one comparable price history while the panel
+    moves underneath it.
+
+    The fingerprint **does** change, and that is correct: ``fundamentals.csv`` changed and
+    ``fingerprint_of`` hashes the whole file map. What does not change is a single bar.
+
+    ``facts`` is a plain sequence of ``fundamentals.Fact``, exactly as ``build_store`` takes it
+    -- never a database connection, because this module imports nothing from ``seer_engine.db``
+    (see the module docstring's "Never Neon"). ``commands/research_store.py`` reads them behind
+    ``--refresh-fundamentals`` and passes them in. An empty sequence is legal and writes a
+    header-only ``fundamentals.csv`` (an explicitly empty panel); ``None`` is not, because
+    "refresh with nothing" is ambiguous -- keep the panel, or clear it? -- and the caller must
+    say which.
+
+    The source store is verified with ``load_store`` first: every sha256, the fingerprint, the
+    five ``_COUNT_KEYS`` counts and the D9 date guards. A store that fails any of them is
+    refused with ``ResearchStoreError`` and nothing is written. Refusing to refresh a store that
+    cannot be verified is the point of doing it this way round: a silently half-valid store is
+    exactly the failure this plan set exists to end. A store with **no** ``fundamentals.csv`` at
+    all -- one built before the optional fifth file existed -- is a legal source: it loads with
+    an empty panel, and the refresh legitimately adds the file to it.
+
+    The five ``_COUNT_KEYS`` values are carried over from the verified manifest rather than
+    recomputed, and the two are the same number by construction: ``load_store`` has just
+    compared every one of them against the files this call then copies byte for byte, so
+    recomputing could only restate a check that has already passed. They are never re-derived
+    from a download -- there is no download.
+    """
+    store_dir = Path(store_dir)
+    if facts is None:
+        raise ValueError(
+            "refresh_fundamentals needs a sequence of fundamentals.Fact; pass () to write an "
+            "empty panel"
+        )
+    try:
+        data = load_store(store_dir, data_dir=data_dir)
+    except ValueError as exc:
+        raise ResearchStoreError(
+            f"{store_dir}: refusing to refresh a store that does not verify: {exc}"
+        ) from exc
+    # Keep the manifest, drop the Market: the real store holds 2.49M bar rows and nothing below
+    # needs them -- only the recorded counts and the per-file digests.
+    before = dict(data.manifest)
+    del data
+    counts = {key: int(before[key]) for key in _COUNT_KEYS}
+
+    tmp = store_dir.with_name(store_dir.name + ".tmp")
+    if tmp.exists():
+        shutil.rmtree(tmp)
+    tmp.mkdir()
+    try:
+        for name in DATA_FILES:
+            shutil.copyfile(store_dir / name, tmp / name)
+            copied = file_sha256(tmp / name)
+            if copied != before["files"][name]:
+                raise ResearchStoreError(
+                    f"{name}: the carried-over copy hashes {copied}, the verified store hashes "
+                    f"{before['files'][name]}; the copy is not byte-identical, nothing written"
+                )
+        _write_text(tmp / FUNDAMENTALS_FILE, FUNDAMENTALS_HEADER, fundamentals_lines(facts))
+        manifest = _seal(tmp, counts, extra_files=(FUNDAMENTALS_FILE,))
+        _swap_in(tmp, store_dir)
+    except BaseException:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
+    log.info(
+        "research: store %s panel refreshed: %d facts written, %d bar rows carried over "
+        "unchanged, fingerprint %s -> %s",
+        store_dir,
+        len(facts),
+        counts["bar_rows"],
+        before["fingerprint"],
+        manifest["fingerprint"],
+    )
+    return manifest
+
+
 # ---- load ----------------------------------------------------------------------------------
 
 

@@ -19,6 +19,7 @@ import pytest
 from seer_engine import cli, config, db, research, yahoo
 from seer_engine.backtest.benchmark import Dividend
 from seer_engine.commands import research_store as research_cmd
+from seer_engine.fundamentals import Fact
 
 COLS = ["Open", "High", "Low", "Close", "Adj Close", "Volume", "Dividends", "Stock Splits"]
 
@@ -117,7 +118,7 @@ def members_dir(tmp_path):
     return d
 
 
-def build(store, members_dir, *, fake=None, fetch_fx=fake_fx, sleeps=None, batch_size=40):
+def build(store, members_dir, *, fake=None, fetch_fx=fake_fx, sleeps=None, batch_size=40, facts=None):
     return research.build_store(
         store,
         downloader=fake if fake is not None else FakeYahoo(default_data()),
@@ -125,6 +126,7 @@ def build(store, members_dir, *, fake=None, fetch_fx=fake_fx, sleeps=None, batch
         sleep=sleeps if sleeps is not None else Sleeps(),
         batch_size=batch_size,
         data_dir=members_dir,
+        facts=facts,
     )
 
 
@@ -551,3 +553,221 @@ def test_command_dry_run_keeps_nothing(tmp_path, members_dir, monkeypatch, capsy
     out = capsys.readouterr().out
     assert "dry run: built in a temporary directory and discarded" in out
     assert not store.exists()
+
+
+# ---- refresh (fundamentals only) -----------------------------------------------------------
+
+# Two tiny panels. Facts are plain values -- never a database row -- exactly as build_store and
+# refresh_fundamentals take them. filed <= DEV_END so nothing here is test-window data.
+
+
+def fact(symbol, tag, *, val, filed, accn, period_end=date(2015, 6, 30)):
+    return Fact(
+        symbol=symbol,
+        taxonomy="us-gaap",
+        tag=tag,
+        unit="USD",
+        period_start=None,
+        period_end=period_end,
+        val=val,
+        accn=accn,
+        form="10-Q",
+        fy=2015,
+        fp="Q2",
+        filed=filed,
+    )
+
+
+FACTS_A = (fact("AAA", "Assets", val=1000.0, filed=date(2015, 8, 1), accn="0000-a1"),)
+FACTS_B = (
+    fact("AAA", "Assets", val=1000.0, filed=date(2015, 8, 1), accn="0000-a1"),
+    fact("AAA", "Liabilities", val=400.0, filed=date(2015, 8, 1), accn="0000-a1"),
+    fact("BBB", "Assets", val=2000.0, filed=date(2015, 8, 2), accn="0000-b1"),
+)
+
+
+def test_refresh_fundamentals_keeps_every_bar_and_swaps_the_panel(tmp_path, members_dir):
+    """The whole point of phase 4, in one test.
+
+    Facts A in, facts B over the top: the four carried files are byte-identical, the panel is
+    not, the fingerprint moved, every _COUNT_KEYS value stayed, and load_store accepts the
+    result.
+    """
+    store = tmp_path / "store"
+    before = build(store, members_dir, facts=FACTS_A)
+    before_bytes = {n: (store / n).read_bytes() for n in research.DATA_FILES}
+    before_panel = (store / research.FUNDAMENTALS_FILE).read_bytes()
+
+    after = research.refresh_fundamentals(store, FACTS_B, data_dir=members_dir)
+
+    # the bars, dividends, fx and unserved rows survived byte for byte
+    assert {n: (store / n).read_bytes() for n in research.DATA_FILES} == before_bytes
+    assert {n: after["files"][n] for n in research.DATA_FILES} == {
+        n: before["files"][n] for n in research.DATA_FILES
+    }
+    # the panel did not
+    assert (store / research.FUNDAMENTALS_FILE).read_bytes() != before_panel
+    assert (
+        after["files"][research.FUNDAMENTALS_FILE]
+        != before["files"][research.FUNDAMENTALS_FILE]
+    )
+    # the fingerprint changed, and that is correct
+    assert after["fingerprint"] != before["fingerprint"]
+    assert after["fingerprint"] == research.fingerprint_of(after["files"])
+    # the counts did not, and neither did the window constants or the manifest's shape
+    assert {k: after[k] for k in research._COUNT_KEYS} == {k: before[k] for k in research._COUNT_KEYS}
+    assert after["dev_end"] == before["dev_end"] == "2015-10-16"
+    assert after["store_start"] == before["store_start"] == "1993-01-29"
+    assert set(after) == research.MANIFEST_KEYS
+    assert after == json.loads(read(store, research.MANIFEST_FILE))
+
+    data = research.load_store(store, data_dir=members_dir)
+    assert data.fingerprint == after["fingerprint"]
+    assert data.market.fundamentals.names() == ("AAA", "BBB")
+    assert tuple(data.market.history) == SERVED  # the bars loaded back, unchanged
+    assert not (tmp_path / "store.tmp").exists()
+    assert not (tmp_path / "store.old").exists()
+
+
+def test_refresh_fundamentals_adds_the_fifth_file_to_a_four_file_store(tmp_path, members_dir):
+    """A store built before fundamentals existed is a legal source; the refresh adds the file."""
+    store = tmp_path / "store"
+    before = build(store, members_dir)  # facts=None: four files, no panel
+    assert not (store / research.FUNDAMENTALS_FILE).exists()
+    assert sorted(before["files"]) == sorted(research.DATA_FILES)
+    before_bytes = {n: (store / n).read_bytes() for n in research.DATA_FILES}
+
+    after = research.refresh_fundamentals(store, FACTS_A, data_dir=members_dir)
+
+    assert {n: (store / n).read_bytes() for n in research.DATA_FILES} == before_bytes
+    assert sorted(after["files"]) == sorted([*research.DATA_FILES, research.FUNDAMENTALS_FILE])
+    assert after["fingerprint"] != before["fingerprint"]
+    assert {k: after[k] for k in research._COUNT_KEYS} == {k: before[k] for k in research._COUNT_KEYS}
+    data = research.load_store(store, data_dir=members_dir)
+    assert data.market.fundamentals.names() == ("AAA",)
+
+
+def test_refresh_fundamentals_is_deterministic_and_reversible(tmp_path, members_dir):
+    """A -> B -> A gives back the ORIGINAL manifest, digest for digest.
+
+    The strongest statement available that no byte of the price history moved: equality of the
+    whole manifest covers every per-file sha256, every count and the fingerprint.
+    """
+    store = tmp_path / "store"
+    original = build(store, members_dir, facts=FACTS_A)
+    research.refresh_fundamentals(store, FACTS_B, data_dir=members_dir)
+    back = research.refresh_fundamentals(store, FACTS_A, data_dir=members_dir)
+    assert back == original
+    assert read(store, research.FUNDAMENTALS_FILE) == (
+        "\n".join([research.FUNDAMENTALS_HEADER, *research.fundamentals_lines(FACTS_A)]) + "\n"
+    )
+
+
+def test_refresh_fundamentals_writes_an_explicitly_empty_panel(tmp_path, members_dir):
+    """`()` is legal and means "a panel with no facts"; None is not and says so."""
+    store = tmp_path / "store"
+    build(store, members_dir, facts=FACTS_A)
+    research.refresh_fundamentals(store, (), data_dir=members_dir)
+    assert read(store, research.FUNDAMENTALS_FILE) == research.FUNDAMENTALS_HEADER + "\n"
+    assert research.load_store(store, data_dir=members_dir).market.fundamentals.names() == ()
+    with pytest.raises(ValueError, match="pass [(][)] to write an empty panel"):
+        research.refresh_fundamentals(store, None, data_dir=members_dir)
+
+
+def test_refresh_fundamentals_refuses_a_missing_store(tmp_path):
+    with pytest.raises(research.ResearchStoreError, match="no research store"):
+        research.refresh_fundamentals(tmp_path / "nope", FACTS_A)
+    assert not (tmp_path / "nope").exists()
+    assert not (tmp_path / "nope.tmp").exists()
+
+
+@pytest.mark.parametrize("name", research.DATA_FILES)
+def test_refresh_fundamentals_refuses_a_tampered_store_and_writes_nothing(
+    tmp_path, members_dir, name
+):
+    """A bad sha256 refuses; every file of the store, the old panel included, is left as it was."""
+    store = tmp_path / "store"
+    build(store, members_dir, facts=FACTS_A)
+    with (store / name).open("a", encoding="utf-8", newline="\n") as fh:
+        fh.write("X\n")
+    kept = (*research.DATA_FILES, research.FUNDAMENTALS_FILE, research.MANIFEST_FILE)
+    before = {n: (store / n).read_bytes() for n in kept}
+    with pytest.raises(research.ResearchStoreError, match="does not verify"):
+        research.refresh_fundamentals(store, FACTS_B, data_dir=members_dir)
+    assert {n: (store / n).read_bytes() for n in kept} == before
+    assert not (tmp_path / "store.tmp").exists()
+    assert not (tmp_path / "store.old").exists()
+
+
+def test_refresh_fundamentals_refuses_a_count_mismatch(tmp_path, members_dir):
+    """Hashes can be made to agree; the counts cannot. Both gates refuse before any write."""
+    store = tmp_path / "store"
+    build(store, members_dir, facts=FACTS_A)
+    manifest = json.loads(read(store, research.MANIFEST_FILE))
+    manifest["bar_rows"] = manifest["bar_rows"] + 1
+    (store / research.MANIFEST_FILE).write_text(
+        json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8"
+    )
+    before = {n: (store / n).read_bytes() for n in (*research.DATA_FILES, research.FUNDAMENTALS_FILE)}
+    with pytest.raises(research.ResearchStoreError, match="bar_rows"):
+        research.refresh_fundamentals(store, FACTS_B, data_dir=members_dir)
+    assert {n: (store / n).read_bytes() for n in before} == before
+    assert not (tmp_path / "store.tmp").exists()
+
+
+def test_command_refresh_fundamentals_rewrites_the_panel_and_never_downloads(
+    tmp_path, members_dir, monkeypatch, capsys
+):
+    store = tmp_path / "store"
+    before = build(store, members_dir, facts=FACTS_A)
+    before_bytes = {n: (store / n).read_bytes() for n in research.DATA_FILES}
+    monkeypatch.setattr(research_cmd, "_read_facts", lambda: FACTS_B)
+    monkeypatch.setattr(
+        research,
+        "build_store",
+        lambda *a, **k: pytest.fail("--refresh-fundamentals must never download bars"),
+    )
+    monkeypatch.setattr(
+        research,
+        "refresh_fundamentals",
+        functools.partial(research.refresh_fundamentals, data_dir=members_dir),
+    )
+    code = cli.main(["research_store", "--refresh-fundamentals", "--store", str(store)])
+    out = capsys.readouterr().out
+    assert code == 1  # refreshed fine; the real-data checks fail on fake data, as for --verify
+    after = json.loads(read(store, research.MANIFEST_FILE))
+    assert {n: (store / n).read_bytes() for n in research.DATA_FILES} == before_bytes
+    assert after["fingerprint"] != before["fingerprint"]
+    assert f"fingerprint: {after['fingerprint']}" in out
+    assert "rows: 71 bars, 2 dividends, 2 fx" in out  # the counts are the carried-over ones
+
+
+def test_command_refresh_fundamentals_rejects_read_only_flags_and_a_missing_store(tmp_path, capsys):
+    """Both read-only modes refuse to be combined with the one writing mode (phase 1 + phase 4)."""
+    for flag in ("--verify", "--coverage"):
+        assert cli.main(
+            ["research_store", flag, "--refresh-fundamentals", "--store", str(tmp_path / "s")]
+        ) == 2
+    missing = cli.main(["research_store", "--refresh-fundamentals", "--store", str(tmp_path / "s")])
+    assert missing == 2
+    assert capsys.readouterr().out == ""
+
+
+def test_command_refresh_dry_run_leaves_the_store_untouched(
+    tmp_path, members_dir, monkeypatch, capsys
+):
+    store = tmp_path / "store"
+    build(store, members_dir, facts=FACTS_A)
+    kept = (*research.DATA_FILES, research.FUNDAMENTALS_FILE, research.MANIFEST_FILE)
+    before = {n: (store / n).read_bytes() for n in kept}
+    monkeypatch.setattr(research_cmd, "_read_facts", lambda: FACTS_B)
+    monkeypatch.setattr(
+        research,
+        "refresh_fundamentals",
+        functools.partial(research.refresh_fundamentals, data_dir=members_dir),
+    )
+    cli.main(["--dry-run", "research_store", "--refresh-fundamentals", "--store", str(store)])
+    out = capsys.readouterr().out
+    assert "dry run: refreshed a copy in a temporary directory and discarded it" in out
+    assert {n: (store / n).read_bytes() for n in kept} == before
+    assert not (tmp_path / "store.tmp").exists()

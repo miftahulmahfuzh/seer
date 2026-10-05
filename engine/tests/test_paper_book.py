@@ -393,6 +393,95 @@ def test_decide_book_argument_checks():
         decide_book(market, alloc, None, MONTHLY_HOLD, D("2025-02-28"), "AAA")
 
 
+def test_decide_book_uses_targets_for_an_allocator_that_is_not_market_aware():
+    """The unchanged path. A plain allocator must still be called through `targets`, with the
+    history dict cut at data_date -- not through `targets_prepared`, and not with a Market."""
+    seen: list[tuple] = []
+
+    class Plain:
+        id = "PLN"
+
+        def lookback(self, params): return 1
+        def symbols(self, params): return ()
+        def holds(self, params): return ()
+        def uses_members(self, params): return True
+        def prepare(self, history): return dict(history)
+
+        def targets(self, history, members, data_date, held, params):
+            seen.append(("targets", sorted(history), sorted(members), data_date))
+            return ()
+
+        def targets_prepared(self, prepared, members, data_date, held, params):
+            raise AssertionError("a non-MarketAware allocator must not take the prepared path")
+
+    targets, idle_added = decide_book(wiring_market(), Plain(), None, MONTHLY_HOLD, D("2025-02-28"), frozenset())
+    assert (targets, idle_added) == ((), False)
+    assert [row[0] for row in seen] == ["targets"]
+    assert seen[0][3] == D("2025-02-28")
+
+
+def test_decide_book_uses_targets_prepared_for_a_market_aware_allocator():
+    """The new path. A MarketAware allocator is prepared from the Market and then asked for
+    targets_prepared -- never asked for `targets`, which for FUNDAMENTAL is a fixed empty."""
+    seen: list[tuple] = []
+
+    class Aware:
+        id = "AWR"
+
+        def lookback(self, params): return 1
+        def symbols(self, params): return ()
+        def holds(self, params): return ()
+        def uses_members(self, params): return True
+        def prepare(self, history): return ("prepare", dict(history))
+
+        def prepare_market(self, market):
+            seen.append(("prepare_market", sorted(market.history), market.fundamentals))
+            return ("prepared", market)
+
+        def targets(self, history, members, data_date, held, params):
+            raise AssertionError("a MarketAware allocator must not take the history-only path")
+
+        def targets_prepared(self, prepared, members, data_date, held, params):
+            seen.append(("targets_prepared", prepared[0], data_date))
+            return ()
+
+    market = wiring_market()
+    targets, idle_added = decide_book(market, Aware(), None, MONTHLY_HOLD, D("2025-02-28"), frozenset())
+    assert (targets, idle_added) == ((), False)
+    assert [row[0] for row in seen] == ["prepare_market", "targets_prepared"]
+    assert seen[0][2] is market.fundamentals  # the panel is carried over, not replaced
+    assert seen[1][1] == "prepared"
+
+
+def test_decide_book_cuts_the_history_it_prepares_a_market_aware_allocator_from():
+    """prepare_market sees history cut at data_date, exactly as the plain path's dict is."""
+    seen: list[dict] = []
+
+    class Aware:
+        id = "AWR"
+
+        def lookback(self, params): return 1
+        def symbols(self, params): return ()
+        def holds(self, params): return ()
+        def uses_members(self, params): return True
+        def prepare(self, history): return dict(history)
+
+        def prepare_market(self, market):
+            seen.append({s: h.last_date() for s, h in market.history.items()})
+            return None
+
+        def targets(self, history, members, data_date, held, params):
+            raise AssertionError("unreachable")
+
+        def targets_prepared(self, prepared, members, data_date, held, params):
+            return ()
+
+    data_date = D("2025-02-28")
+    decide_book(wiring_market(), Aware(), None, MONTHLY_HOLD, data_date, frozenset())
+    assert seen and all(d is None or d <= data_date for d in seen[0].values())
+    assert any(d == data_date for d in seen[0].values()), "the cut must keep the data_date bar"
+
+
 # =========================================================================== 4. settle_book
 #
 # Hand-checked on 2025-03-03 (a decision session under MONTHLY_HOLD), MONTHLY_HOLD whole shares.

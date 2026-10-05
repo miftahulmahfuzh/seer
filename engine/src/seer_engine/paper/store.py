@@ -4,7 +4,9 @@ The pure night cores (``paper.bracket``, ``paper.book``, ``paper.benchmark``) st
 over values; this module turns those values into rows of the migration-003 tables and back.
 
 - Roster rows: ``strategies`` read; the frozen spec (C2) and ``paper_start`` written once;
-  the stored digest checked against the code's.
+  the stored digest checked against the code's. The lifecycle columns (006) have exactly two
+  writers here: ``retire`` (``status`` + ``paper_end``, what ``promote --retire`` calls) and
+  ``set_paper_end`` (the night's repair of a hand-written retirement). Retiring deletes nothing.
 - ``paper_state``: one row per paper strategy, the state between nights.
 - Bracket (strategy A): a ``sim.Portfolio`` is ``paper_state`` plus the strategy's live
   ``orders`` rows (pending and open, by slot); open orders' marks live in ``orders.mark``, in
@@ -105,10 +107,22 @@ def _one_row(cur: psycopg.Cursor, what: str) -> None:
 
 @dataclass(frozen=True)
 class StrategyRow:
-    """One ``strategies`` row as the paper command needs it."""
+    """One ``strategies`` row as the paper command needs it.
+
+    Structurally a ``paper.roster.Row``: ``roster.from_rows(read_roster_rows(conn))`` is the
+    whole roster-from-data path, and neither module imports the other (``roster`` is pure;
+    ``tests/test_strategy_purity.py`` globs it).
+
+    ``status``, ``paper_end`` and ``promoted_from`` are migration 006's lifecycle columns;
+    ``object_name``, ``registry_id``, ``gate_note`` and ``gate_applicable`` are its definition
+    columns. They are nullable on rows that are not roster rows, and ``roster.from_row``
+    validates them with a named error rather than defaulting them.
+    """
 
     id: str
     name: str
+    sub: str
+    icon: str
     engine: str | None
     rules_id: str | None
     is_champion: bool
@@ -116,19 +130,48 @@ class StrategyRow:
     sort: int
     paper_start: date | None
     params: Mapping[str, Any]
+    status: str = "active"
+    paper_end: date | None = None
+    promoted_from: str | None = None
+    object_name: str | None = None
+    registry_id: str | None = None
+    gate_note: str | None = None
+    gate_applicable: bool = True
 
 
 _STRATEGY_SQL = (
-    "SELECT id, name, engine, rules_id, is_champion, is_benchmark, sort, paper_start, params "
+    "SELECT id, name, sub, icon, engine, rules_id, is_champion, is_benchmark, sort, paper_start, "
+    "params, status, paper_end, promoted_from, object_name, registry_id, gate_note, gate_applicable "
     "FROM strategies"
 )
 
 
 def _strategy(row: tuple) -> StrategyRow:
-    sid, name, engine, rules_id, champion, benchmark, sort, paper_start, params = row
+    (
+        sid,
+        name,
+        sub,
+        icon,
+        engine,
+        rules_id,
+        champion,
+        benchmark,
+        sort,
+        paper_start,
+        params,
+        status,
+        paper_end,
+        promoted_from,
+        object_name,
+        registry_id,
+        gate_note,
+        gate_applicable,
+    ) = row
     return StrategyRow(
         id=sid,
         name=name,
+        sub=sub,
+        icon=icon,
         engine=engine,
         rules_id=rules_id,
         is_champion=bool(champion),
@@ -136,12 +179,33 @@ def _strategy(row: tuple) -> StrategyRow:
         sort=int(sort),
         paper_start=paper_start,
         params=params if isinstance(params, dict) else {},
+        status=status,
+        paper_end=paper_end,
+        promoted_from=promoted_from,
+        object_name=object_name,
+        registry_id=registry_id,
+        gate_note=gate_note,
+        gate_applicable=bool(gate_applicable),
     )
 
 
 def read_strategies(conn: psycopg.Connection) -> tuple[StrategyRow, ...]:
     """Every ``strategies`` row, by (sort, id)."""
     rows = conn.execute(_STRATEGY_SQL + " ORDER BY sort, id").fetchall()
+    return tuple(_strategy(r) for r in rows)
+
+
+def read_roster_rows(conn: psycopg.Connection) -> tuple[StrategyRow, ...]:
+    """The roster rows -- every ``strategies`` row with an ``engine`` -- by (sort, id).
+
+    ``engine`` is the predicate because it is what the paper night dispatches on and what
+    migration 003 set on exactly the roster's rows; a legacy display row that never traded has
+    none. Retired rows ARE returned: a retired strategy keeps its history and its leaderboard
+    place, and only ``roster.active`` drops it from a night. A row that has an ``engine`` but no
+    usable ``object_name`` is NOT filtered out here -- ``roster.from_row`` raises
+    ``UnknownObject`` for it, which is the point (invariant 9).
+    """
+    rows = conn.execute(_STRATEGY_SQL + " WHERE engine IS NOT NULL ORDER BY sort, id").fetchall()
     return tuple(_strategy(r) for r in rows)
 
 
@@ -197,6 +261,59 @@ def check_digest(row: StrategyRow, digest: str) -> None:
             f"{row.id}: stored spec digest {stored!r} differs from the code's {digest!r}; "
             f"a changed strategy needs a new id"
         )
+
+
+def retire(conn: psycopg.Connection, strategy_id: str) -> date | None:
+    """Retire ``strategy_id``: ``status = 'retired'`` and ``paper_end`` = the last session it
+    actually traded.
+
+    The last session actually traded is ``paper_state.last_session``: once the status is
+    ``retired`` the paper night steps the strategy no further, so that row is final. A strategy
+    that never started (no ``paper_state``) retires with ``paper_end`` NULL.
+
+    Retirement is a status change and a date, **nothing else** (plan invariant 4): no
+    ``equity_snapshots``, ``orders``, ``book_positions``, ``book_targets``, ``book_fills``,
+    ``book_trades`` or ``paper_state`` row is read for anything but the date, and none is written
+    or deleted. The strategy keeps its whole track record and stays on the leaderboard.
+
+    Returns the stamped ``paper_end``. A row that is already retired is left exactly as it is and
+    its stored ``paper_end`` is returned, so an interrupted swap can be re-run; a missing row is a
+    ``StoreError``. The caller's transaction decides (``promote`` retires and inserts the
+    replacement in one transaction, so the board never shows two rosters).
+    """
+    row = read_strategy(conn, strategy_id)
+    if row is None:
+        raise StoreError(f"no strategies row {strategy_id!r}")
+    if row.status == "retired":
+        return row.paper_end
+    state = read_paper_state(conn, strategy_id)
+    paper_end = None if state is None else state.last_session
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE strategies SET status = 'retired', paper_end = %s WHERE id = %s AND status = 'active'",
+            (paper_end, strategy_id),
+        )
+        _one_row(cur, f"retire {strategy_id}")
+    return paper_end
+
+
+def set_paper_end(conn: psycopg.Connection, strategy_id: str, paper_end: date) -> None:
+    """Stamp ``paper_end`` on a retired strategy that has none.
+
+    ``retire`` stamps it already; this is the repair for a retirement taken by hand
+    (``UPDATE strategies SET status = 'retired' ...``, as the plan index's Rollback writes it).
+    The paper night calls it on the first night after such a retirement, inside the night's own
+    transaction. Only a retired row whose ``paper_end`` is still NULL is written; an active row,
+    a missing row or one already stamped is a ``StoreError``, because each of those means the
+    caller's picture of the lifecycle is wrong.
+    """
+    _session("paper_end", paper_end)
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE strategies SET paper_end = %s WHERE id = %s AND status = 'retired' AND paper_end IS NULL",
+            (paper_end, strategy_id),
+        )
+        _one_row(cur, f"paper_end {strategy_id}")
 
 
 # --------------------------------------------------------------------------- paper_state

@@ -233,6 +233,35 @@ def snaps(conn, strategy_id):
     )
 
 
+def lifecycle(conn, strategy_id: str):
+    """``(status, paper_end)`` of one strategies row."""
+    return q(conn, "SELECT status, paper_end FROM strategies WHERE id = %s", (strategy_id,))[0]
+
+
+def retire_by_hand(conn, strategy_id: str) -> None:
+    """Retire without going through ``store.retire``: status only, paper_end left NULL.
+
+    This is the plan index's Rollback-style hand SQL, and the case the night must repair.
+    """
+    with db.transaction(conn, False):
+        conn.execute("UPDATE strategies SET status = 'retired' WHERE id = %s", (strategy_id,))
+
+
+def make_unresolvable(conn, strategy_id: str) -> None:
+    """Break ``strategy_id``'s name->object link in the database.
+
+    The link is ``strategies.object_name`` (migration 006, phase 1) -- a column of its own, not
+    ``params->'spec'->>'object'``, which is NULL until a strategy has been frozen. Setting it to a
+    name ``roster.RESOLVER`` does not know is exactly the typo invariant 9 is about. The test below
+    cannot pass silently if the break does not take: it asserts the night fails.
+    """
+    with db.transaction(conn, False):
+        conn.execute(
+            "UPDATE strategies SET object_name = 'NO_SUCH_OBJECT' WHERE id = %s",
+            (strategy_id,),
+        )
+
+
 # ---- tests -----------------------------------------------------------------------------------
 
 
@@ -402,6 +431,133 @@ def test_dry_run_writes_nothing(world):
     before = everything(world)
     assert go(world, NIGHTS[1], dry_run=True) == 0
     assert everything(world) == before
+
+
+# ---- the roster lifecycle (phase 2) -----------------------------------------------------------
+
+
+def test_a_retired_strategy_is_skipped_and_keeps_its_history(world):
+    from seer_engine.paper import store
+
+    for d in NIGHTS[:3]:
+        assert night(world, d) == 0
+    before_a = {
+        "snaps": snaps(world, "A"),
+        "state": q(world, "SELECT * FROM paper_state WHERE strategy_id = 'A'"),
+        "orders": q(world, "SELECT id FROM orders WHERE strategy_id = 'A' ORDER BY id"),
+    }
+    assert before_a["snaps"] and before_a["state"]
+    last_traded = before_a["state"][0][1]
+
+    with db.transaction(world, False):
+        assert store.retire(world, "A") == last_traded
+    assert lifecycle(world, "A") == ("retired", last_traded)
+
+    assert night(world, NIGHTS[3]) == 0
+    # A wrote nothing more: no snapshot, no order, no paper_state step.
+    assert snaps(world, "A") == before_a["snaps"]
+    assert q(world, "SELECT * FROM paper_state WHERE strategy_id = 'A'") == before_a["state"]
+    assert q(world, "SELECT id FROM orders WHERE strategy_id = 'A' ORDER BY id") == before_a["orders"]
+    assert lifecycle(world, "A") == ("retired", last_traded)
+    # and every active strategy did step.
+    for sid in IDS:
+        if sid == "A":
+            continue
+        assert snaps(world, sid)[-1][0] == dates.run_dates(night_of(NIGHTS[3])).data_date
+    assert paper_run(world, NIGHTS[3])[0][0] == "success"
+
+
+def test_retiring_by_hand_stamps_paper_end_on_the_next_night(world, caplog):
+    import logging
+
+    for d in NIGHTS[:3]:
+        assert night(world, d) == 0
+    [(_, last_traded)] = q(
+        world, "SELECT strategy_id, last_session FROM paper_state WHERE strategy_id = 'A'"
+    )
+    retire_by_hand(world, "A")
+    assert lifecycle(world, "A") == ("retired", None)
+
+    caplog.set_level(logging.INFO, logger="seer_engine.commands.paper")
+    assert night(world, NIGHTS[3]) == 0
+    assert lifecycle(world, "A") == ("retired", last_traded)
+    assert "A: retired; no orders, no equity snapshot, no paper_state step" in caplog.text
+    assert snaps(world, "A")[-1][0] == last_traded  # still no new snapshot
+
+
+def test_a_stamped_retirement_leaves_later_nights_untouched(world):
+    for d in NIGHTS[:3]:
+        assert night(world, d) == 0
+    retire_by_hand(world, "A")
+    assert night(world, NIGHTS[3]) == 0  # stamps paper_end
+    before = everything(world)
+    assert night(world, NIGHTS[3]) == 0  # same night again: nothing left to do
+    assert everything(world) == before
+
+
+def test_a_retired_strategy_is_not_digest_checked_but_an_active_one_still_is(world):
+    for d in NIGHTS[:2]:
+        assert night(world, d) == 0
+    with db.transaction(world, False):
+        world.execute(
+            "UPDATE strategies SET params = jsonb_set(params, '{digest}', '\"0000\"') WHERE id = 'A'"
+        )
+        world.execute(
+            "UPDATE strategies SET params = jsonb_set(params, '{digest}', '\"0000\"') WHERE id = 'C'"
+        )
+    # C retired: its changed digest is never compared, because it takes no decision.
+    retire_by_hand(world, "C")
+    assert night(world, NIGHTS[2]) == 1  # A is still active, so SpecMismatch still stops the night
+    [(status, error, _)] = paper_run(world, NIGHTS[2])
+    assert status == "failed" and "SpecMismatch: A: stored spec digest" in error and "new id" in error
+    # Put A back and the night runs, with C's bad digest still in the row and still unexamined.
+    with db.transaction(world, False):
+        world.execute(
+            "UPDATE strategies SET params = jsonb_set(params, '{digest}', to_jsonb(%s::text)) WHERE id = 'A'",
+            (roster.strategy_params(ENTRIES["A"])["digest"],),
+        )
+    assert go(world, NIGHTS[2]) == 0
+    assert q(world, "SELECT params->>'digest' FROM strategies WHERE id = 'C'") == [("0000",)]
+
+
+def test_an_active_strategy_with_no_paper_start_starts_on_the_next_night(world):
+    # C is retired before the first night, so it never starts; it is reactivated three nights in.
+    retire_by_hand(world, "C")
+    for d in NIGHTS[:3]:
+        assert night(world, d) == 0
+    assert q(world, "SELECT count(*) FROM paper_state WHERE strategy_id = 'C'") == [(0,)]
+    assert q(world, "SELECT paper_start FROM strategies WHERE id = 'C'") == [(None,)]
+
+    with db.transaction(world, False):
+        world.execute("UPDATE strategies SET status = 'active', paper_end = NULL WHERE id = 'C'")
+    assert night(world, NIGHTS[3]) == 0
+
+    start = session_of(NIGHTS[3])
+    day0 = dates.run_dates(night_of(NIGHTS[3])).data_date
+    assert q(world, "SELECT paper_start, params->>'digest' FROM strategies WHERE id = 'C'") == [
+        (start, roster.strategy_params(ENTRIES["C"])["digest"])
+    ]
+    assert q(world, "SELECT last_session, pending_session FROM paper_state WHERE strategy_id = 'C'") == [
+        (day0, start)
+    ]
+    assert [r[0] for r in snaps(world, "C")] == [day0]
+    assert lifecycle(world, "C") == ("active", None)
+
+
+def test_an_unresolvable_roster_entry_stops_the_night_and_is_not_a_skip(world):
+    assert night(world, N0) == 0
+    make_unresolvable(world, "A")
+    before = content(world)
+    assert night(world, NIGHTS[1]) == 1
+    # Nothing of the night landed. `content` and not `everything` for the same reason
+    # `test_changed_frozen_spec_is_refused` uses it: a deliberately failed night DOES write its
+    # `runs` row (paper_status = failed + paper_error), which is the named stop, not a write.
+    assert content(world) == before
+    [(status, error, _)] = paper_run(world, NIGHTS[1])
+    assert status == "failed"
+    assert "A" in error and "NO_SUCH_OBJECT" in error
+    # Invariant 9: a hard named error, never the deliberate skip a retired entry gets.
+    assert "retired" not in error.lower() and "skip" not in error.lower()
 
 
 # ---- pure helpers ----------------------------------------------------------------------------

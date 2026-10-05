@@ -58,7 +58,7 @@ from seer_engine.sim import (
     is_decision_session,
     new_portfolio,
 )
-from seer_engine.strategies.allocator import Allocator
+from seer_engine.strategies.allocator import Allocator, MarketAware, prepare_for
 from seer_engine.strategies.base import Strategy
 
 Engine = Literal["bracket", "book", "benchmark"]
@@ -328,7 +328,24 @@ def expected_book(
     if last < start:
         snapshots: tuple[Snapshot, ...] = (_day0(start, cash0),)
     else:
-        run = run_rules(market, allocator, params, rules, start, last, dividends=dividends, usd_idr=head.usd_idr)
+        # A MarketAware allocator is replayed through run_book's prepared branch, exactly as
+        # paper.book.decide_book decides it; `prepared` stays None for every other allocator so
+        # the five strategies with a paper clock replay byte for byte as before. `market` is
+        # passed uncut here because run_book cuts per session itself and FUNDAMENTAL indexes its
+        # bars by date (History.index_of), never by last row -- the property
+        # allocatorkit.assert_no_lookahead pins.
+        prepared = prepare_for(allocator, market) if isinstance(allocator, MarketAware) else None
+        run = run_rules(
+            market,
+            allocator,
+            params,
+            rules,
+            start,
+            last,
+            prepared=prepared,
+            dividends=dividends,
+            usd_idr=head.usd_idr,
+        )
         if not isinstance(run, BookResult):
             raise TypeError(f"book replay of {head.strategy_id} returned {type(run).__name__}")
         snapshots = tuple(Snapshot(date=s.date, cash_usd=s.cash_usd, equity_usd=s.equity_usd) for s in run.snapshots)

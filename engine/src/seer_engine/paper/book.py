@@ -34,7 +34,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from collections.abc import Set as AbstractSet
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -56,7 +56,7 @@ from seer_engine.sim.book import (
     step_book,
 )
 from seer_engine.sim.rules import TradeRules, is_decision_session, is_rank_session
-from seer_engine.strategies.allocator import Allocator
+from seer_engine.strategies.allocator import Allocator, MarketAware, prepare_for
 
 LastBarDate = Callable[[str], date | None]  # symbol -> its latest bar date known, or None
 
@@ -154,6 +154,15 @@ def decide_book(
     ``rules.idle_symbol``, ``params``; then ``book_runner._with_idle``. ``held`` is the set of
     symbols the book holds at the night of ``data_date`` (``book.held()`` after that session
     settled). Nothing dated after ``data_date`` is read.
+
+    A ``MarketAware`` allocator (``strategies.allocator.MarketAware``: it defines
+    ``prepare_market``) takes ``run_book``'s prepared branch instead --
+    ``targets_prepared(prepare_for(allocator, market_cut_at_data_date), ...)``. It must: such an
+    allocator reads part of the ``Market`` that ``history`` cannot carry, and for ``FUNDAMENTAL``
+    the history-only path is not a worse answer but a fixed empty one (its docstring: with no
+    panel no symbol is eligible, so ``targets`` returns ``()``). The branch is keyed on the
+    protocol and nothing else, so an allocator without ``prepare_market`` runs today's expression
+    unchanged.
     """
     if not isinstance(market, Market):
         raise TypeError(f"market must be a Market, got {type(market).__name__}")
@@ -175,7 +184,22 @@ def decide_book(
     # The idle position is the runner's residual, never a family's (as run_book).
     mine = held_now - {rules.idle_symbol} if rules.idle_symbol is not None else held_now
     history = {s: h.upto(data_date) for s, h in market.history.items()}
-    wanted = allocator.targets(history, members, data_date, mine, params)
+    if isinstance(allocator, MarketAware):
+        # A MarketAware allocator reads more of the Market than its bars (FUNDAMENTAL reads
+        # market.fundamentals), so handing it the history dict alone is not a degraded result,
+        # it is a WRONG one: f_fundamental's history-only path finds every symbol ineligible
+        # and returns (), forever, silently. This is run_book's own dispatch
+        # (backtest/book_runner.py:289) brought to the nightly decision.
+        #
+        # The Market handed over carries `history` -- the same dict the plain path passes, cut
+        # at data_date -- so no bar dated after data_date is reachable on either path. The
+        # panel needs no cut of its own: panel.as_of(symbol, d) answers from facts with
+        # filed <= d and only those, and `filed` IS the no-look-ahead boundary
+        # (005_fundamentals.sql, "filed IS THE ONLY NO-LOOK-AHEAD BOUNDARY").
+        prepared = prepare_for(allocator, replace(market, history=history))
+        wanted = allocator.targets_prepared(prepared, members, data_date, mine, params)
+    else:
+        wanted = allocator.targets(history, members, data_date, mine, params)
     return _with_idle(market, rules, tuple(wanted), data_date)
 
 

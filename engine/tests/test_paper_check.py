@@ -48,7 +48,7 @@ DAY0 = date(2026, 10, 23)
 NOV2 = date(2026, 11, 2)
 F4 = "F4-MOM12-N20-TREND"
 F1 = "F1-SPY-SMA200-M"
-ROSTER_IDS = ("SPY", "A", F4, F1, "C")
+ROSTER_IDS = ("SPY", "A", F4, F1, "C", "FND")
 
 
 # ---- the synthetic world -----------------------------------------------------------------------
@@ -369,6 +369,25 @@ def test_unreadable_stored_row_is_a_mismatch_not_a_crash(stepped):
     assert found["A"].status == "mismatch"
     assert found["A"].differences[0].where == "stored rows"
     assert {found[s].status for s in ("SPY", F4, F1)} == {"ok"}
+
+
+def test_the_replay_passes_over_a_window_containing_a_retirement(world):
+    from seer_engine.paper import store
+
+    for d in NIGHTS[:4]:
+        night(world, d)
+    [(last_traded,)] = q(world, "SELECT last_session FROM paper_state WHERE strategy_id = 'A'")
+    with db.transaction(world, False):
+        assert store.retire(world, "A") == last_traded
+    for d in NIGHTS[4:]:
+        night(world, d)
+
+    found = results(world)
+    assert tuple(found) == ROSTER_IDS  # retired, but still on the board and still checked
+    assert found["A"].status in ("ok", "split-affected"), text(found)
+    assert found["A"].last_session == last_traded
+    assert found["SPY"].last_session == LAST
+    assert paper_check.execute(world) == 0
 
 
 def test_check_needs_an_idle_connection(pg):

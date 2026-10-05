@@ -2,7 +2,8 @@
 
 ``python -m seer_engine paper_check [--require-sessions N]``
 
-For every roster strategy with a paper start, replay it from ``paper_start`` through its last
+For every strategy on the database roster -- retired ones included -- with a paper start, replay
+it from ``paper_start`` through its last
 stepped session on the bars in the database and compare every stored record with the replay
 (``paper.replay``): every ``equity_snapshots`` row from day 0; A's and C's every ``orders`` row and
 open marks; the book strategies' ``book_positions``, ``book_fills`` (in order), ``book_trades`` (in
@@ -92,6 +93,11 @@ def execute(conn: psycopg.Connection, *, require_sessions: int = 0) -> int:
 def check(conn: psycopg.Connection) -> tuple[CheckResult, ...]:
     """One ``CheckResult`` per roster entry, in roster order. Writes nothing.
 
+    The roster is read from the ``strategies`` rows in this same read-only transaction, so the
+    replay checks exactly what the night traded. A retired strategy is replayed like any other:
+    it keeps its ``paper_start``, its ``paper_state`` and every history row, so its record stays
+    verifiable after it stops trading (plan invariant 4).
+
     ``conn`` must have autocommit off and no transaction in progress; the read-only transaction
     this opens is always rolled back.
     """
@@ -99,7 +105,7 @@ def check(conn: psycopg.Connection) -> tuple[CheckResult, ...]:
         raise ValueError("paper_check needs a connection with no transaction in progress")
     try:
         conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
-        return _check(conn, roster.ROSTER)
+        return _check(conn, roster.from_rows(store.read_roster_rows(conn)))
     finally:
         conn.rollback()
 

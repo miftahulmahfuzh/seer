@@ -101,21 +101,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "ed64596",
       "depends_on": [
         2,
         5
       ],
       "difficulty": "HARD",
       "n": 6,
-      "note": null,
+      "note": "Market.fundamentals + MarketAware hook. Code landed in 72c84d6 (swept there by phase 1's pusher); decisions commit ed64596. VERIFIED BY COORDINATOR at ed64596: test_strategy_purity.py byte-identical to b2792d9; test_research_store.py, test_lab_methods.py, test_migrate.py all unchanged; research.py imports neither seer_engine.db nor psycopg; commands/research_store.py names neither (only a docstring stating the rule). Suite 2449 passed/0 failed. Pinned candidate F4-MOM12-N10-TREND byte-identical to origin/main (run-sha 55e3c672...); load_market vs live Neon identical (market-sha fd86875e..., 1817429 rows/663 symbols) with no fundamentals pkl written, proving the to_regclass path. Pre-phase-6 four-file store loads with bit-identical fingerprint 65fd4a71... RATIFIED OVERRIDE (rung 2 beats rung 3): the plan's Step 7 item 8 put db.connect() in commands/research_store.py, which turns test_research_store.py::test_no_neon_and_no_database_url_needed RED - it AST-scans BOTH research.py and the command. That file is shipped code no phase owns and phase 6's exit criterion 6 requires it green. Connection moved one module down to backtest/io.py as read_facts(), which invariant 5 names as THE permitted impure edge. Strictly better than the plan. PHASE 7 MUST CALL bt_io.read_facts(), NOT db.connect(). Four smaller calls: FundamentalPanel is eq=False so panel==panel asserts replaced by per-symbol Fact tuple comparison; stale-pickle test fact re-dated 2016->2017 so max(filed) advances; seeded.rollback() after facts_fingerprint; fundamentals.csv NOT clipped at DEV_END since as_of already enforces filed<=t.",
       "package": "seer_engine.backtest`, `seer_engine.strategies`, `seer_engine.research",
       "plan": ".workflows/plan/edgar-fundamentals/phase-6.md",
-      "reported_at": "2026-10-05T02:33:15+00:00",
+      "reported_at": "2026-10-05T03:52:51+00:00",
       "satisfies": [
         "R6"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ENG-0LUS",
       "title": "Market.fundamentals` + the `MarketAware` hook"
     },
@@ -135,7 +135,7 @@
       "satisfies": [
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": "P1-ENG-AHLW",
       "title": "Fundamental factor allocator, lab method, runbook"
     }
@@ -143,6 +143,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/edgar-fundamentals/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "edgar-fundamentals",
-  "updated": "2026-10-05T03:47:15+00:00",
+  "updated": "2026-10-05T03:52:51+00:00",
   "worktree": "/home/miftah/.worktrees/seer/edgar-fundamentals"
 }

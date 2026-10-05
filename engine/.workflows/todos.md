@@ -23,15 +23,20 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ENG-AHLW** Phase 7: Fundamental factor allocator, lab method, runbook
+- [x] **P1-ENG-AHLW** Phase 7: Fundamental factor allocator, lab method, runbook
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `seer_engine/strategies/f_fundamental.py`, a lab method `seer_engine/lab/methods/m0005_<slug>.py`, the `fundamentals` rows in `docs/runbooks/data-pipeline.md`, `engine/tests/test_f_fundamental.py`, and the one branch added to `engine/tests/test_lab_methods.py:85–93` — no other phase touches that file. Does not touch `f_factor.py`, `seer_engine/fundamentals/*`, `backtest/*`, `strategies/allocator.py`, or `seer_engine/research.py` (phase 6 owns the research store). Exit: the allocator ranks on value, quality, profitability and SUE with eligibility rules in the style of `f_factor`, reading phase 5's annual flows through one `panel.as_of(symbol, t)` call per symbol; it implements phase 6's `MarketAware` by defining `prepare_market` and does not widen `Allocator`; its id (`FND`) is unique across lab methods; the method declares 6 fixed variants, and the SUE-free ones pass a hermetic end-to-end dev-window test over a real `FundamentalPanel` while the SUE-ranking ones (including both composites, since `rank="composite"` reads every factor) are held to the criterion a synthetic annual panel can meet: they rank nobody and raise nothing, because `Snapshot.sue` is NaN without a quarterly EPS series. `lab run M0005` is NOT executed by this phase — `runner.preflight` refuses a second run of any method, so one premature run against a store without fundamentals would record all-cash trials and burn the method id permanently; the warning goes in the method docstring and the runbook, which documents the command, its exit codes and how to re-vendor `ticker_cik.csv`.
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 7 of 7)
   - **Satisfies**: R6 — Factor exposure to the lab: value, quality, profitability, SUE; consensus surprise out of scope
   - **Depends on**: P1-ENG-9U93, P1-ENG-0LUS
   - **Plan**: `.workflows/plan/P1-ENG-AHLW.md`
+  - **Completed**: 2026-10-05 11:20
+  - **Method**: /implement
+  - **Commit**: 81d2256
+  - **Decisions**: quality ranking expectation CCC,DDD,AAA,BBB -> CCC,AAA,DDD,BBB (rung 3, `_row` + `rank_rows`); SUE-ranking test's `fundamental_rows` call corrected to the 5-arg form with a real history (rung 3, Step 1's signature); `NO_FLOOR` min_price 0.0 -> 0.01 (rung 3, `__post_init__` rejects < 0.01 and `test_params_reject_bad_values` pins it); dev-window test 400 -> 460 sessions filtered to <= DEV_END (rung 2, the exit criterion requires the run to end on DEV_END); bookkeeping committed from the main context rather than via pusher (rung 5, the coordinator's shared-worktree ruling after this set's measured sweep incident).
+  - **Notes**: `lab run M0005` was NOT executed, by design — `runner.preflight` refuses a second run of any method. Also fixed `engine/package_readme.md`'s purity-glob sentence (four packages, two impure edges), a stale line two phases flagged and neither owned.
 - [x] **P1-ENG-DKWU** Phase 3: Vectorized bracket labeler
   - **Difficulty**: HARD
   - **Type**: Feature

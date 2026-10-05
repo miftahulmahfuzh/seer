@@ -166,12 +166,12 @@ For `web/`: `cd $SEER_WT/web && npm ci` once, then `npm test` and `npm run build
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | The roster becomes data: `status`, `paper_end`, and a name→object resolver | R2 | `db`, `engine/src/seer_engine/paper` | 4 | — | HARD | `.workflows/plan/roster-promotion-pipeline/phase-1.md` | — | — |
-| 2 | Retire and activate: the paper night honours roster lifecycle | R2 | `engine/src/seer_engine/{paper,commands}` | 6 | 1 | NORMAL | `.workflows/plan/roster-promotion-pipeline/phase-2.md` | — | — |
-| 3 | Common-window, risk-adjusted comparison over `equity_snapshots` | R3 | `engine/src/seer_engine/{paper,commands}` | 3 | — | HARD | `.workflows/plan/roster-promotion-pipeline/phase-3.md` | — | — |
-| 4 | The leaderboard re-sorts honestly, and shows retired horsemen | R3 | `web` | 5 | 1, 3 | NORMAL | `.workflows/plan/roster-promotion-pipeline/phase-4.md` | — | — |
-| 5 | `promote`: the lab → roster bridge | R4 | `engine/src/seer_engine/{commands,lab}` | 4 | 1, 2 | HARD | `.workflows/plan/roster-promotion-pipeline/phase-5.md` | — | — |
-| 6 | `FND` onto the roster — the first promotion through the new path | R1 | `engine/src/seer_engine/paper`, `db`, `docs` | 10 | 5 | HARD | `.workflows/plan/roster-promotion-pipeline/phase-6.md` | — | — |
+| 1 | The roster becomes data: `status`, `paper_end`, and a name→object resolver | R2 | `db`, `engine/src/seer_engine/paper` | 4 | — | HARD | `.workflows/plan/roster-promotion-pipeline/phase-1.md` | P1-ENG-7KQ2 | — |
+| 2 | Retire and activate: the paper night honours roster lifecycle | R2 | `engine/src/seer_engine/{paper,commands}` | 6 | 1 | NORMAL | `.workflows/plan/roster-promotion-pipeline/phase-2.md` | P1-ENG-J5XD | — |
+| 3 | Common-window, risk-adjusted comparison over `equity_snapshots` | R3 | `engine/src/seer_engine/{paper,commands}` | 3 | — | HARD | `.workflows/plan/roster-promotion-pipeline/phase-3.md` | P1-ENG-7V3C | — |
+| 4 | The leaderboard re-sorts honestly, and shows retired horsemen | R3 | `web` | 5 | 1, 3 | NORMAL | `.workflows/plan/roster-promotion-pipeline/phase-4.md` | P1-WEB-C6PK | — |
+| 5 | `promote`: the lab → roster bridge | R4 | `engine/src/seer_engine/{commands,lab}` | 4 | 1, 2 | HARD | `.workflows/plan/roster-promotion-pipeline/phase-5.md` | P1-ENG-Z8MR | — |
+| 6 | `FND` onto the roster — the first promotion through the new path | R1 | `engine/src/seer_engine/paper`, `db`, `docs` | 10 | 5 | HARD | `.workflows/plan/roster-promotion-pipeline/phase-6.md` | P1-ENG-H3WF | — |
 
 Four of those cells moved during reconciliation. Phase 1 is 4 files, not 5 (the migration,
 `roster.py`, `store.py`, `test_paper_roster.py`). Phase 2 is 6, not 4 (three sources, three test

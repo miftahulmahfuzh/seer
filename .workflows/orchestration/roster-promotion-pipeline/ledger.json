@@ -23,21 +23,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "cd561af",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": "Session impl-roster-promotion-pipeline-p2 alive and busy in tmux @37. verify --apply downgrades spawned->pending on commit-absence alone; mid-build, not abandonment. Do NOT re-spawn while @37 is live.",
+      "note": "store.retire/set_paper_end are the ONLY writers of status/paper_end -- phase 5 must call retire, never its own SQL. retire returns stamped paper_end (None if never traded), re-retire is a no-op returning stored date, missing row is StoreError. plan_night sorts active/retired, raises PaperError on unknown status; _night split from _trade so an all-retired roster is a cheap night instead of min([]) on empty. Baseline MEASURED in a throwaway detached worktree at 7f2241d, not inferred: 2648->2659 with PG_TEST_URL (+11/+0 skipped). DECISIONS: (1) unresolvable-entry test switched everything()->content() because a deliberately failed night MUST write its runs row (paper_status=failed+paper_error) per the plan's own Step 4; rung 2/3. (2) IMPORTANT FOR 5 AND 6: monkeypatching roster.ROSTER no longer hides a strategy from a night -- paper and paper_check resolve from the DB. Two test_paper_c.py tests relied on it (one failed, one passed vacuously); translated four_only() to the data layer via new hide_c/land_c helpers that clear+restore strategies.engine, which is what read_roster_rows filters on. That is the mechanism for simulating 'not on the roster yet'. Rung 1 + rung 6. (3) 'ruff format --check' reports 254 engine files would reformat, verified identical at HEAD -- pre-existing, not a gate; only 'ruff check' is enforced and passes. HANDOFFS NOT TAKEN: store.freeze_spec still does not check status (phase 5 decides if promote wants that guard); re-activating is plain SQL, no store.activate added since nothing in this set calls one.",
       "package": "engine/src/seer_engine/{paper,commands}",
       "plan": ".workflows/plan/roster-promotion-pipeline/phase-2.md",
-      "reported_at": "2026-10-05T11:29:59+00:00",
+      "reported_at": "2026-10-05T11:49:31+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-J5XD",
       "title": "Retire and activate: the paper night honours roster lifecycle"
     },
     {
@@ -93,7 +93,7 @@
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "promote`: the lab \u2192 roster bridge"
     },
@@ -120,7 +120,7 @@
   "plan": "/home/miftah/.worktrees/seer/roster-promotion-pipeline/ROSTER_PROMOTION_PIPELINE_PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "roster-promotion-pipeline",
-  "updated": "2026-10-05T11:29:59+00:00",
+  "updated": "2026-10-05T11:49:36+00:00",
   "verified_at": "2026-10-05T11:29:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/roster-promotion-pipeline"
 }

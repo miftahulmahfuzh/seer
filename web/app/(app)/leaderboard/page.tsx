@@ -200,10 +200,11 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
                 className={`sheet over ${lookOf(st.id).bg} ${s.card}`}>
                 <div className={s.cardHead}>
                   <div className={s.cardName}>
+                    {/* One row: the name gives way (ellipsis) before the chips wrap under it. No Paper
+                        chip here: the whole page is paper. */}
                     <span className={s.name}>
-                      {st.name}
+                      <span className={s.nameText}>{st.name}</span>
                       {st.isChampion && <span data-tip="Champion" aria-label="Champion" role="img" className={s.crown}><Crown size={20} /></span>}
-                      {!st.isBenchmark && !retired && <PaperChip />}
                       {retired && (
                         <span className={`chip ${s.retired}`}
                           data-tip="Retired: it stopped trading and keeps its whole record">

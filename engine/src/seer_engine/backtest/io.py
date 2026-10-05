@@ -38,7 +38,12 @@ from seer_engine.backtest.report import (
     render_markdown,
     report_stem,
 )
-from seer_engine.fundamentals import FACT_COLUMNS, Fact, FundamentalPanel as Panel
+from seer_engine.fundamentals import (
+    FACT_COLUMNS,
+    Fact,
+    FundamentalPanel as Panel,
+    FundamentalsError,
+)
 from seer_engine.prices import to_decimal
 from seer_engine.strategies import b_model
 from seer_engine.strategies.base import History
@@ -384,30 +389,56 @@ def facts_from_frame(frame: pd.DataFrame) -> tuple[Fact, ...]:
     this is the one place that turns them back into ``date`` and ``None``. ``filed`` is never
     optional: it is the no-look-ahead boundary, so a row without it is a loader bug, not a
     tolerable gap.
+
+    A row EDGAR itself tagged wrongly **is** a tolerable gap, and is skipped with a count --
+    the same contract ``fundamentals.facts_from_rows`` states for ``skip_invalid=True``:
+    "one bad fact out of a million must not take the whole panel down". MEASURED against the
+    full 1,228,822-row load: 28 rows across 13 CIKs carry ``filed < period_end``, which
+    ``Fact.__post_init__`` rejects and is right to -- CIK 6201 reports shares outstanding for
+    period 2027-07-17 in a filing dated 2026-07-23, a mistyped year at the filer. Raising on
+    them would make ``load_market`` and the research store unusable against real data, so they
+    are dropped and logged rather than allowed to abort the load.
     """
     if len(frame) == 0:
         return ()
     out: list[Fact] = []
+    skipped: list[str] = []
     for row in frame.itertuples(index=False, name=None):
         # FACT_COLUMNS order: ..., val, accn, FORM, FY, FP, filed. Phase 5 owns it.
         symbol, taxonomy, tag, unit, period_start, period_end, val, accn, form, fy, fp, filed = row
         if not filed:
             raise LoadError(f"{symbol} {tag} {accn}: a fact row has no filed date")
-        out.append(
-            Fact(
-                symbol=str(symbol),
-                taxonomy=str(taxonomy),
-                tag=str(tag),
-                unit=str(unit),
-                period_start=date.fromisoformat(period_start) if period_start else None,
-                period_end=date.fromisoformat(period_end),
-                val=float(val),
-                accn=str(accn),
-                fy=int(fy) if fy else None,
-                fp=str(fp) or None,
-                form=str(form),
-                filed=date.fromisoformat(filed),
+        try:
+            out.append(
+                Fact(
+                    symbol=str(symbol),
+                    taxonomy=str(taxonomy),
+                    tag=str(tag),
+                    unit=str(unit),
+                    period_start=date.fromisoformat(period_start) if period_start else None,
+                    period_end=date.fromisoformat(period_end),
+                    val=float(val),
+                    accn=str(accn),
+                    fy=int(fy) if fy else None,
+                    fp=str(fp) or None,
+                    form=str(form),
+                    filed=date.fromisoformat(filed),
+                )
             )
+        except FundamentalsError as exc:
+            # EDGAR's own tagging error, not ours. Drop it the way phase 5's
+            # facts_from_rows(skip_invalid=True) does, and say how many.
+            if len(skipped) < 5:
+                skipped.append(f"{symbol} {tag} {accn}: {exc}")
+            else:
+                skipped.append("")
+    if skipped:
+        shown = [s for s in skipped[:5] if s]
+        log.warning(
+            "fundamentals: skipped %d malformed fact row(s) EDGAR tagged inconsistently; "
+            "first few: %s",
+            len(skipped),
+            "; ".join(shown),
         )
     return tuple(out)
 

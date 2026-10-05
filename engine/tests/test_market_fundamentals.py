@@ -667,3 +667,28 @@ def test_the_optional_file_changes_the_fingerprint_but_not_the_old_store(tmp_pat
     assert set(b.manifest["files"]) - set(a.manifest["files"]) == {research.FUNDAMENTALS_FILE}
     assert set(a.manifest) == set(b.manifest) == research.MANIFEST_KEYS
     assert b.market.fundamentals.names() == ()
+
+
+def test_facts_from_frame_skips_a_row_edgar_tagged_with_filed_before_period_end():
+    """EDGAR's own tagging errors must not abort the whole load.
+
+    ``Fact.__post_init__`` rejects ``filed < period_end`` and is right to: a filing cannot
+    report a period that has not ended. But EDGAR contains such rows -- MEASURED at 28 of
+    1,228,822 across 13 CIKs on the full load, e.g. CIK 6201 reporting shares outstanding
+    for period 2027-07-17 in a filing dated 2026-07-23. Raising would make ``load_market``
+    and the research store unusable against real data, so the boundary drops and counts
+    them, matching ``fundamentals.facts_from_rows(skip_invalid=True)``.
+    """
+    import pandas as pd
+    from seer_engine.backtest import io as bt_io
+    from seer_engine.fundamentals import FACT_COLUMNS
+
+    good = ("AAPL", "us-gaap", "Assets", "USD", "", "2024-06-30", "1000", "a-1", "10-Q",
+            "2024", "Q2", "2024-08-01")
+    bad = ("AAL", "dei", "EntityCommonStockSharesOutstanding", "shares", "", "2027-07-17",
+           "5", "a-2", "10-Q", "2026", "Q2", "2026-07-23")
+    frame = pd.DataFrame([good, bad], columns=list(FACT_COLUMNS))
+
+    facts = bt_io.facts_from_frame(frame)
+    assert len(facts) == 1, "the malformed row should be dropped, not raise"
+    assert facts[0].tag == "Assets"

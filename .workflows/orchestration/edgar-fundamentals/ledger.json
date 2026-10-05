@@ -82,20 +82,20 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "b2792d9",
       "depends_on": [
         2
       ],
       "difficulty": "HARD",
       "n": 5,
-      "note": null,
+      "note": "Pure package fundamentals/ + 39 derivation tests + additive purity glob. Contracts honoured: LADDER_TAGS excludes Liabilities/EarningsPerShareBasic and carries all 3 CostOfRevenue variants; as_of() is the sole read surface, flows ANNUAL; EMPTY_PANEL is a module singleton re-exported from the package. panel.FACT_COLUMNS is the 12-column contract phase 6 imports rather than restates; fact_from_row maps period_start==period_end -> None at that one boundary, matching phase 2's NOT NULL encoding. test_strategy_purity.py is FINAL for the set at b2792d9 - phase 6 must leave it byte-identical. DECISION (rung 4, index Owns outranks stale prose in the code block): ladder.py docstring now distinguishes reordering/dropping rungs among already-ingested tags (free) from adding a NEW tag rung (costs a full re-ingest, since LADDER_TAGS is also phase 4's ingest allowlist).",
       "package": "seer_engine.fundamentals",
       "plan": ".workflows/plan/edgar-fundamentals/phase-5.md",
-      "reported_at": "2026-10-05T02:33:15+00:00",
+      "reported_at": "2026-10-05T03:09:20+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ENG-9U93",
       "title": "Pure derivation: concept ladder, PIT selection, SUE"
     },
@@ -115,7 +115,7 @@
       "satisfies": [
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": "P1-ENG-0LUS",
       "title": "Market.fundamentals` + the `MarketAware` hook"
     },
@@ -143,6 +143,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/edgar-fundamentals/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "edgar-fundamentals",
-  "updated": "2026-10-05T02:43:52+00:00",
+  "updated": "2026-10-05T03:09:20+00:00",
   "worktree": "/home/miftah/.worktrees/seer/edgar-fundamentals"
 }

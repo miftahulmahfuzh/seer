@@ -27,10 +27,10 @@ import pandas as pd
 import psycopg
 from psycopg.pq import TransactionStatus
 
-from seer_engine import config
+from seer_engine import config, db
 from seer_engine.backtest import b_report, dev_report, wf_report
 from seer_engine.backtest.benchmark import Dividend, parse_dividends
-from seer_engine.backtest.market import Market, Membership
+from seer_engine.backtest.market import EMPTY_FUNDAMENTALS, Market, Membership
 from seer_engine.backtest.report import (
     BacktestReport,
     equity_csv,
@@ -38,6 +38,7 @@ from seer_engine.backtest.report import (
     render_markdown,
     report_stem,
 )
+from seer_engine.fundamentals import FACT_COLUMNS, Fact, FundamentalPanel as Panel
 from seer_engine.prices import to_decimal
 from seer_engine.strategies import b_model
 from seer_engine.strategies.base import History
@@ -59,6 +60,52 @@ BARS_COPY_SINCE_SQL = (
     "WHERE date >= %s ORDER BY symbol, date) TO STDOUT"
 )
 CACHE_GLOB = "bars-*.pkl"
+
+FACTS_TABLE = "fundamental_facts"
+MAP_TABLE = "ticker_cik"
+
+# Phase 5 owns the column order; this is its tuple, not a copy of it. If the two ever drifted,
+# facts_from_frame's positional unpack would silently mis-assign form/fy/fp.
+FACTS_COLUMNS = FACT_COLUMNS
+
+# fundamental_facts is keyed by CIK and has NO symbol column (C1): one ticker names several
+# companies over time, so a symbol column would let a recycled ticker smear two filers
+# together. ticker_cik carries the dated bridge and this join is where a fact acquires the
+# symbol phase 5's panel is keyed by. It is a JOIN AGAINST ticker_cik, NEVER against bars:
+# invariant 7 forbids making a bar row a precondition for a fact, and the 133 delisted
+# ever-members have facts and no bars.
+#
+# The join legitimately fans out: a share-class pair (GOOG/GOOGL, FOX/FOXA, NWS/NWSA, UA/UAA,
+# CMCSA/CMCSK, BATRA/BATRK) is one CIK and two symbols, so one fact row becomes two panel rows.
+# That is why facts_fingerprint counts over the same join.
+#
+# period_start = period_end IS the stored encoding of "instantaneous" (C2); it goes out as ''
+# so facts_from_frame turns it back into None, which is what phase 5's Fact means by an
+# instant. Other dates go out as to_char text and nullable columns as coalesce'd text, so the
+# COPY stream never carries a \N for na_filter=False to mistake for the two-character string
+# "\N". The ORDER BY is a total order over the fact identity, so the frame -- and therefore
+# the pickle -- is byte-stable.
+_FACTS_FROM = (
+    "FROM fundamental_facts f "
+    "JOIN ticker_cik m ON m.cik = f.cik "
+    "  AND f.filed >= m.start_date "
+    "  AND (m.end_date IS NULL OR f.filed < m.end_date) "
+)
+FACTS_COPY_SQL = (
+    "COPY (SELECT m.symbol, f.taxonomy, f.tag, f.unit, "
+    "CASE WHEN f.period_start = f.period_end THEN '' "
+    "     ELSE to_char(f.period_start, 'YYYY-MM-DD') END AS period_start, "
+    "to_char(f.period_end, 'YYYY-MM-DD') AS period_end, "
+    "f.val, f.accn, f.form, "
+    "coalesce(f.fy::text, '') AS fy, "
+    "coalesce(f.fp, '') AS fp, "
+    "to_char(f.filed, 'YYYY-MM-DD') AS filed "
+    + _FACTS_FROM
+    + "ORDER BY m.symbol, f.taxonomy, f.tag, f.unit, f.period_end, f.period_start, f.filed, f.accn"
+    ") TO STDOUT"
+)
+FACTS_COUNT_SQL = "SELECT count(*), max(f.filed) " + _FACTS_FROM
+FACTS_CACHE_GLOB = "fundamentals-*.pkl"
 
 Interval = tuple[str, date, date | None]
 
@@ -82,6 +129,10 @@ def load_market(
     cache in ``cache_dir`` when its name matches the table's ``count(*)`` and ``max(date)``
     (``refresh`` forces a re-download); universe and fx are always read fresh (small).
     Raises LoadError when ``bars`` is empty.
+
+    ``fundamental_facts`` is read the same way, into ``market.fundamentals``, and is optional:
+    a missing table or an empty one gives ``EMPTY_FUNDAMENTALS`` and no error, so a database
+    that has not run ``005_fundamentals.sql`` still backs a backtest unchanged.
     """
     if conn.info.transaction_status != TransactionStatus.IDLE:
         raise ValueError("load_market needs a connection with no transaction in progress")
@@ -93,10 +144,16 @@ def load_market(
         frame = _bars_frame(conn, Path(cache_dir), rows, max_date, refresh)
         intervals = read_intervals(conn)
         fx_rows = read_fx(conn)
+        panel = load_panel(conn, cache_dir=Path(cache_dir), refresh=refresh)
     finally:
         conn.rollback()
     history = histories_from_frame(frame)
-    market = Market(history=history, membership=Membership(intervals=intervals), fx=fx_rows)
+    market = Market(
+        history=history,
+        membership=Membership(intervals=intervals),
+        fx=fx_rows,
+        fundamentals=panel,
+    )
     log.info(
         "market: %d bar rows through %s, %d symbols with bars, %d membership intervals, %d fx rows",
         rows,
@@ -187,6 +244,223 @@ def read_fx(conn: psycopg.Connection) -> tuple[tuple[date, Decimal], ...]:
     """Every (date, usd_idr) row, ascending, as 4-dp Decimals."""
     rows = conn.execute("SELECT date, usd_idr FROM fx_rates ORDER BY date").fetchall()
     return tuple((r[0], to_decimal(r[1])) for r in rows)
+
+
+# ---- fundamentals -------------------------------------------------------------------------
+
+
+def load_panel(
+    conn: psycopg.Connection,
+    *,
+    cache_dir: Path = CACHE_DIR,
+    refresh: bool = False,
+) -> Panel:
+    """The point-in-time fact panel from ``fundamental_facts``.
+
+    Runs inside the caller's transaction and never commits or rolls back (``load_market`` owns
+    the ``REPEATABLE READ, READ ONLY`` transaction and its rollback). Returns
+    ``EMPTY_FUNDAMENTALS`` when either ``fundamental_facts`` or ``ticker_cik`` is missing, or
+    when the join yields no rows -- the state of every database that has not applied
+    ``db/migrations/005_fundamentals.sql``, and of one that has applied it but not yet run
+    ``fundamentals``. Otherwise the facts come from the pickle in ``cache_dir`` named for
+    ``(count(*), max(filed))`` over the join, or from one streamed COPY when that pickle is
+    absent or ``refresh`` is set.
+    """
+    rows, max_filed = facts_fingerprint(conn)
+    if rows == 0 or max_filed is None:
+        log.info("fundamentals: no rows; the market gets an empty panel")
+        return EMPTY_FUNDAMENTALS
+    frame = _facts_frame(conn, Path(cache_dir), rows, max_filed, refresh)
+    panel = Panel.from_facts(facts_from_frame(frame))  # FundamentalPanel.from_facts
+    log.info("fundamentals: %d facts filed through %s", rows, max_filed)
+    return panel
+
+
+def read_facts(*, conninfo: str | None = None) -> tuple[Fact, ...]:
+    """Every fact ``load_panel`` would see, as plain values, over a connection opened here.
+
+    This lives in ``io.py`` -- the only module in ``seer_engine.backtest`` that touches the
+    database, and the one ``test_strategy_purity.py`` skips by name -- rather than in
+    ``commands/research_store.py``, which is where the plan first put it.
+    ``test_research_store.py::test_no_neon_and_no_database_url_needed`` AST-scans **both**
+    ``research.py`` and the ``research_store`` command and fails either one that names
+    ``seer_engine.db`` or ``psycopg``; that test is byte-identical shipped code this phase must
+    leave green, so the connection moves one module down instead of into the command. The
+    "Never Neon" invariant it protects is unaffected: ``research.py`` still imports nothing from
+    ``seer_engine.db`` and ``build_store`` still takes a plain sequence of facts.
+
+    Read-only and self-contained: it opens the connection, runs the same
+    ``facts_fingerprint`` + ``read_facts_frame`` + ``facts_from_frame`` trio ``load_panel`` uses
+    -- so the facts it returns equal the panel's by construction -- and always rolls back.
+    Returns () when either table is missing or the join is empty.
+    """
+    with db.connect(conninfo) as conn:  # None -> DATABASE_URL_UNPOOLED
+        try:
+            conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+            rows, max_filed = facts_fingerprint(conn)
+            if rows == 0 or max_filed is None:
+                log.warning(
+                    "fundamentals: the database has no fundamental_facts rows joinable to "
+                    "ticker_cik; run `python -m seer_engine fundamentals` first"
+                )
+                return ()
+            facts = facts_from_frame(read_facts_frame(conn))
+        finally:
+            conn.rollback()
+    log.info("fundamentals: %d facts read from the database, filed through %s", len(facts), max_filed)
+    return facts
+
+
+def facts_fingerprint(conn: psycopg.Connection) -> tuple[int, date | None]:
+    """(count(*), max(filed)) over the ``fundamental_facts`` x ``ticker_cik`` join: the cache key.
+
+    Counted over the **join**, not over ``fundamental_facts`` alone, for two reasons: the join
+    fans a share-class CIK out to two symbols so the joined count is the real panel row count
+    that ``_facts_frame`` checks against, and re-vendoring ``ticker_cik`` must invalidate the
+    pickle even when no fact changed.
+
+    (0, None) when **either** table is missing. The existence test is ``to_regclass``, which
+    returns NULL instead of raising, because an ``UndefinedTable`` error would abort
+    ``load_market``'s read-only transaction and there is no savepoint to recover it from.
+    """
+    for table in (FACTS_TABLE, MAP_TABLE):
+        if conn.execute("SELECT to_regclass(%s)", (table,)).fetchone()[0] is None:
+            return 0, None
+    row = conn.execute(FACTS_COUNT_SQL).fetchone()
+    return int(row[0]), row[1]
+
+
+def facts_cache_path(cache_dir: Path, rows: int, max_filed: date) -> Path:
+    return Path(cache_dir) / f"fundamentals-{max_filed.isoformat()}-{rows}.pkl"
+
+
+def read_facts_frame(conn: psycopg.Connection) -> pd.DataFrame:
+    """Every ``fundamental_facts`` row, in ``FACTS_COPY_SQL`` order, via one streamed COPY.
+
+    Columns: ``FACTS_COLUMNS`` (phase 5's ``FACT_COLUMNS``). Every column is str except ``val``
+    (float64, correctly rounded from the numeric text); ``fy`` and ``fp`` are "" where the
+    column is NULL, and ``period_start`` is "" where it equals ``period_end`` -- the stored
+    encoding of an instantaneous fact (C2). None of the text columns can hold a tab or a
+    newline -- they are SEC tags, units, accession numbers, form types and tickers -- so the
+    TSV needs no escaping pass.
+    """
+    buf = BytesIO()
+    with conn.cursor() as cur:
+        with cur.copy(FACTS_COPY_SQL) as copy:
+            for chunk in copy:
+                buf.write(chunk)
+    if buf.tell() == 0:
+        raise LoadError("COPY of fundamental_facts returned no rows")
+    buf.seek(0)
+    return pd.read_csv(
+        buf,
+        sep="\t",
+        header=None,
+        names=list(FACTS_COLUMNS),
+        dtype={
+            "symbol": str,
+            "taxonomy": str,
+            "tag": str,
+            "unit": str,
+            "period_start": str,
+            "period_end": str,
+            "val": np.float64,
+            "accn": str,
+            "form": str,
+            "fy": str,
+            "fp": str,
+            "filed": str,
+        },
+        na_filter=False,
+        float_precision="round_trip",
+        engine="c",
+    )
+
+
+def facts_from_frame(frame: pd.DataFrame) -> tuple[Fact, ...]:
+    """One ``fundamentals.Fact`` per frame row, in frame order.
+
+    The frame's dates are ISO strings and its NULLs are empty strings (see ``FACTS_COPY_SQL``);
+    this is the one place that turns them back into ``date`` and ``None``. ``filed`` is never
+    optional: it is the no-look-ahead boundary, so a row without it is a loader bug, not a
+    tolerable gap.
+    """
+    if len(frame) == 0:
+        return ()
+    out: list[Fact] = []
+    for row in frame.itertuples(index=False, name=None):
+        # FACT_COLUMNS order: ..., val, accn, FORM, FY, FP, filed. Phase 5 owns it.
+        symbol, taxonomy, tag, unit, period_start, period_end, val, accn, form, fy, fp, filed = row
+        if not filed:
+            raise LoadError(f"{symbol} {tag} {accn}: a fact row has no filed date")
+        out.append(
+            Fact(
+                symbol=str(symbol),
+                taxonomy=str(taxonomy),
+                tag=str(tag),
+                unit=str(unit),
+                period_start=date.fromisoformat(period_start) if period_start else None,
+                period_end=date.fromisoformat(period_end),
+                val=float(val),
+                accn=str(accn),
+                fy=int(fy) if fy else None,
+                fp=str(fp) or None,
+                form=str(form),
+                filed=date.fromisoformat(filed),
+            )
+        )
+    return tuple(out)
+
+
+def _facts_frame(
+    conn: psycopg.Connection, cache_dir: Path, rows: int, max_filed: date, refresh: bool
+) -> pd.DataFrame:
+    path = facts_cache_path(cache_dir, rows, max_filed)
+    if not refresh and path.is_file():
+        cached = _read_facts_cache(path, rows)
+        if cached is not None:
+            log.info("fundamentals cache hit: %s", path)
+            return cached
+    log.info(
+        "fundamentals cache %s: streaming %d rows from the database",
+        "refresh" if refresh else "miss",
+        rows,
+    )
+    frame = read_facts_frame(conn)
+    if len(frame) != rows:
+        raise LoadError(f"COPY returned {len(frame)} fact rows but count(*) said {rows}")
+    _write_facts_cache(path, frame)
+    return frame
+
+
+def _read_facts_cache(path: Path, rows: int) -> pd.DataFrame | None:
+    try:
+        frame = pd.read_pickle(path, compression=None)
+    except Exception as e:  # noqa: BLE001 - a broken cache is re-downloaded, never fatal
+        log.warning(
+            "fundamentals cache %s unreadable (%s: %s); re-downloading", path, type(e).__name__, e
+        )
+        return None
+    if (
+        not isinstance(frame, pd.DataFrame)
+        or len(frame) != rows
+        or tuple(frame.columns) != FACTS_COLUMNS
+    ):
+        log.warning("fundamentals cache %s has the wrong shape; re-downloading", path)
+        return None
+    return frame
+
+
+def _write_facts_cache(path: Path, frame: pd.DataFrame) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    frame.to_pickle(tmp, compression=None)
+    os.replace(tmp, path)
+    log.info("fundamentals cache written: %s", path)
+    for old in sorted(path.parent.glob(FACTS_CACHE_GLOB)):
+        if old != path:
+            old.unlink(missing_ok=True)
+            log.info("removed stale fundamentals cache %s", old.name)
 
 
 # ---- cache ---------------------------------------------------------------------------------

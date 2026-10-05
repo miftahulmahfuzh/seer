@@ -33,7 +33,7 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from decimal import Decimal
 from statistics import NormalDist
@@ -47,7 +47,7 @@ from seer_engine.backtest.market import SPY, Market
 from seer_engine.backtest.metrics import Metrics, curve_metrics
 from seer_engine.backtest.runner import RunResult
 from seer_engine.sim.rules import DEFAULT_ETFS, LEVERAGED_ETFS, TradeRules, rule_owner_inputs
-from seer_engine.strategies.allocator import Allocator
+from seer_engine.strategies.allocator import Allocator, prepare_for
 from seer_engine.strategies.base import Strategy
 
 DEV_END = date(2015, 10, 16)  # last dev session; 2015-10-19 opens the P7b test window
@@ -363,8 +363,9 @@ def _run(
     rate: Decimal = market.usd_idr_on(max(start, FX_START))
     run_market = market
     if start < FX_START:
-        # No USD/IDR before FX_START: the starting cash converts at the FX_START rate.
-        run_market = Market(history=market.history, membership=market.membership, fx=((start, rate),))
+        # No USD/IDR before FX_START: the starting cash converts at the FX_START rate. replace()
+        # carries history, membership and fundamentals over, so a long window keeps the panel.
+        run_market = replace(market, fx=((start, rate),))
     result = run_rules(
         run_market,
         c.allocator,
@@ -419,10 +420,11 @@ def run_registry(
 ) -> tuple[DevRow, ...]:
     """Every candidate, sequentially, in registry order; one row each, in that order.
 
-    ``prepare(market.history)`` runs once per allocator id within this call (a strategy's id
-    for ``DESIGN_V0`` candidates) and is dropped after the last candidate that uses it. Two
-    different objects sharing an id are refused. ``on_result(index, result, row)``, when
-    given, is called after each candidate.
+    ``prepare_for(allocator, market)`` runs once per allocator id within this call (a strategy's
+    id for ``DESIGN_V0`` candidates) and is dropped after the last candidate that uses it: that
+    is ``allocator.prepare_market(market)`` for a ``MarketAware`` allocator and
+    ``allocator.prepare(market.history)`` for every other. Two different objects sharing an id
+    are refused. ``on_result(index, result, row)``, when given, is called after each candidate.
     """
     _check_market(market)
     spy_divs = _check_dividends(dividends, spy_dividends)
@@ -452,7 +454,7 @@ def run_registry(
     for i, c in enumerate(candidates):
         key = c.allocator.id
         if key not in cache:
-            cache[key] = c.allocator.prepare(market.history)
+            cache[key] = prepare_for(c.allocator, market)
         result, row = _run(market, spy, dividends, spy_divs, c, cache[key])
         if last_use[key] == i:
             del cache[key]

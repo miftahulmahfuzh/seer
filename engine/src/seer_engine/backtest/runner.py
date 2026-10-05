@@ -140,7 +140,8 @@ def run_backtest(
 
     ``start`` and ``end`` must be NYSE sessions, ``start <= end``. Starting cash is
     ``initial_cash_usd(initial_idr, market.usd_idr_on(start))``. With ``prepared`` (the value of
-    ``strategy.prepare(market.history)``), picks come from ``strategy.picks_prepared``;
+    ``allocator.prepare_for(strategy, market)`` -- ``strategy.prepare(market.history)`` unless
+    the strategy is ``MarketAware``), picks come from ``strategy.picks_prepared``;
     without it, from ``strategy.picks`` on every history cut at ``data_date``. The strategy
     contract makes both give the same result.
 

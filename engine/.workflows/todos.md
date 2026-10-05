@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-05 10:04
-**Total Active Tasks**: 4
+**Last Updated**: 2026-10-05 11:12
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 4
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 3
-- Completed: 57
+- Blocked: 0
+- Completed: 59
 
 ---
 
@@ -23,38 +23,20 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ENG-R7TL** Phase 1: Vendored ticker→CIK map and loader
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `engine/data/ticker_cik.csv` (generated once and committed), its documentation block in `engine/data/SOURCES.md`, a new `seer_engine/cik.py` loader validating it in the style of `membership.load_aliases`, `engine/scripts/build_ticker_cik.py` (the committed one-off generator, a new directory linted by `ruff check engine`), and `engine/tests/test_cik.py`. Does not touch the database or the `ticker_cik` table (phase 2 declares it, phase 4 writes it), the SEC client, any command, `.env.example`. Exit: the CSV covers every ever-member the scope predicate selects (795 on 2026-10-05; tests derive the set from `membership.symbols_since(...)` and never assert a literal count) with explicit validity intervals; the loader rejects a bad header, an overlapping interval for one ticker, and a CIK that is not 10 digits; a test asserts each of CA, MON, PLL, ALTR, LLL and DTV resolves to the company that held the ticker during its S&P/NDX membership and not to the current holder; Kellanova resolves to `0000055067`, with a test pinning that `0000039899` (TEGNA) is not it.
-  - **Status**: in_progress
-  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 1 of 7)
-  - **Satisfies**: R1 — ticker → CIK bridge, vendored as `engine/data/ticker_cik.csv`, keyed so a recycled ticker can never resolve to the wrong company
-  - **Depends on**: none
-  - **Plan**: `.workflows/plan/P1-ENG-R7TL.md`
 - [ ] **P1-ENG-22VQ** Phase 4: `fundamentals` command — resumable ingest
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `seer_engine/commands/fundamentals.py` and `engine/tests/test_fundamentals_command.py`, including `sync_ticker_cik` — the one writer of the `ticker_cik` table from phase 1's CSV. Does not touch `cli.py` (discovery is automatic), the backtest, `engine/data/*`, `db/migrations/*`, the runbook; it imports the ingest tag allowlist as `fundamentals.ladder.LADDER_TAGS` from phase 5's pure package and derives nothing itself. Exit: `python -m seer_engine fundamentals` loads facts for every ever-member the scope predicate selects (795 on 2026-10-05, SPY excluded), resolved through phase 1's map by date, writing facts and `fundamentals_log` rows in one transaction per batch. The unit of work is the CIK, not the symbol: `plan_jobs` resolves every in-scope symbol, groups by CIK, and skips CIKs already logged, so a share-class pair (GOOG/GOOGL) is one `companyfacts` call, one log row and one `rows` count — but both symbols still appear in the summary via `CikResult.per_symbol()`. `batch_size` counts CIKs; `--symbols` dedupes to CIKs but ignores the log outright; `--retry-failed` re-attempts `failed` and `empty` CIKs; `--dry-run` rolls everything back. `Summary.exit_code` is unchanged from `backfill`'s: 0 when nothing failed, 1 on any failure, 2 on a missing setting or an empty universe — an `empty` filer is not an error. A symbol with no CIK gets no log row at all and is re-evaluated every run; a symbol missing from the map is `failed` by design, so an incomplete CSV exits 1, while a symbol the map marks `NONE` is `empty` and exits 0.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 4 of 7)
   - **Satisfies**: R1 — ticker → CIK bridge, vendored as `engine/data/ticker_cik.csv`, keyed so a recycled ticker can never resolve to the wrong company; R2 — Bulk ingest of SEC XBRL facts, `filed` as the no-look-ahead boundary, restatements kept queryable; R5 — New resumable `seer_engine` command respecting SEC fair access (User-Agent, 10 req/s)
   - **Depends on**: P1-ENG-R7TL, P1-ENG-FPIL, P1-ENG-0351, P1-ENG-9U93
   - **Plan**: `.workflows/plan/P1-ENG-22VQ.md`
-- [ ] **P1-ENG-0LUS** Phase 6: `Market.fundamentals` + the `MarketAware` hook
-  - **Difficulty**: HARD
-  - **Type**: Update
-  - **Context**: Owns the new `fundamentals` field on `Market`, the panel load in `backtest/io.py` (cached by table fingerprint like `bars`, reading `fundamental_facts` joined to `ticker_cik` because facts are CIK-keyed and the panel is symbol-keyed), the `MarketAware` protocol + `prepare_for` helper, the single real call site `dev.py:455`, the two docstrings at `runner.py:143` and `walkforward.py:200`, every other place a `Market` is constructed and would silently drop the new field (`dev.py:367`, `research.py:472`, `paper/replay.py:281`, `commands/paper.py:254`) — including the research store's optional `fundamentals.csv` artifact (`research.py`, `commands/research_store.py` + a new `--with-fundamentals` flag), without which the lab sees an empty panel — and `engine/tests/test_market_fundamentals.py`. Does not touch the existing allocators' behaviour, `Allocator`'s member set (which must not gain `prepare_market`), `test_strategy_purity.py`, `test_lab_methods.py`, `research.DATA_FILES` or `engine/tests/test_research_store.py` — the new store file is optional, carried in `OPTIONAL_DATA_FILES`. Exit: `Market` stays frozen and pure; `load_market` returns a panel and still works against a database with neither `fundamental_facts` nor `ticker_cik`; `isinstance(x, Allocator)` is still True for all eleven existing implementers; `test_strategy_purity.py` is byte-identical to what phase 5 left and so is `test_research_store.py`; a store rebuilt with `--with-fundamentals` carries a panel equal to `io.load_panel(conn)`'s, and a store built before this phase still loads with the same fingerprint `origin/main` computes for it; every existing backtest produces byte-identical output to `origin/main` for one pinned candidate.
-  - **Status**: blocked
-  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 6 of 7)
-  - **Satisfies**: R6 — Factor exposure to the lab: value, quality, profitability, SUE; consensus surprise out of scope
-  - **Depends on**: P1-ENG-FPIL, P1-ENG-9U93
-  - **Plan**: `.workflows/plan/P1-ENG-0LUS.md`
 - [ ] **P1-ENG-AHLW** Phase 7: Fundamental factor allocator, lab method, runbook
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `seer_engine/strategies/f_fundamental.py`, a lab method `seer_engine/lab/methods/m0005_<slug>.py`, the `fundamentals` rows in `docs/runbooks/data-pipeline.md`, `engine/tests/test_f_fundamental.py`, and the one branch added to `engine/tests/test_lab_methods.py:85–93` — no other phase touches that file. Does not touch `f_factor.py`, `seer_engine/fundamentals/*`, `backtest/*`, `strategies/allocator.py`, or `seer_engine/research.py` (phase 6 owns the research store). Exit: the allocator ranks on value, quality, profitability and SUE with eligibility rules in the style of `f_factor`, reading phase 5's annual flows through one `panel.as_of(symbol, t)` call per symbol; it implements phase 6's `MarketAware` by defining `prepare_market` and does not widen `Allocator`; its id (`FND`) is unique across lab methods; the method declares 6 fixed variants, and the SUE-free ones pass a hermetic end-to-end dev-window test over a real `FundamentalPanel` while the SUE-ranking ones (including both composites, since `rank="composite"` reads every factor) are held to the criterion a synthetic annual panel can meet: they rank nobody and raise nothing, because `Snapshot.sue` is NaN without a quarterly EPS series. `lab run M0005` is NOT executed by this phase — `runner.preflight` refuses a second run of any method, so one premature run against a store without fundamentals would record all-cash trials and burn the method id permanently; the warning goes in the method docstring and the runbook, which documents the command, its exit codes and how to re-vendor `ticker_cik.csv`.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 7 of 7)
   - **Satisfies**: R6 — Factor exposure to the lab: value, quality, profitability, SUE; consensus surprise out of scope
   - **Depends on**: P1-ENG-9U93, P1-ENG-0LUS
@@ -86,6 +68,52 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-R7TL** Phase 1: Vendored ticker→CIK map and loader
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/data/ticker_cik.csv` (generated once and committed), its documentation block in `engine/data/SOURCES.md`, a new `seer_engine/cik.py` loader validating it in the style of `membership.load_aliases`, `engine/scripts/build_ticker_cik.py` (the committed one-off generator, a new directory linted by `ruff check engine`), and `engine/tests/test_cik.py`. Does not touch the database or the `ticker_cik` table (phase 2 declares it, phase 4 writes it), the SEC client, any command, `.env.example`. Exit: the CSV covers every ever-member the scope predicate selects (795 on 2026-10-05; tests derive the set from `membership.symbols_since(...)` and never assert a literal count) with explicit validity intervals; the loader rejects a bad header, an overlapping interval for one ticker, and a CIK that is not 10 digits; a test asserts each of CA, MON, PLL, ALTR, LLL and DTV resolves to the company that held the ticker during its S&P/NDX membership and not to the current holder; Kellanova resolves to `0000055067`, with a test pinning that `0000039899` (TEGNA) is not it.
+  - **Status**: completed
+  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 1 of 7)
+  - **Satisfies**: R1 — ticker → CIK bridge, vendored as `engine/data/ticker_cik.csv`, keyed so a recycled ticker can never resolve to the wrong company
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-R7TL.md`
+  - **Completed**: 2026-10-05 11:12
+  - **Method**: /implement
+  - **Files**: engine/data/ticker_cik.csv, engine/data/SOURCES.md, engine/src/seer_engine/cik.py, engine/tests/test_cik.py, engine/scripts/build_ticker_cik.py
+  - **Drift**:
+    - No drift from the plan. Every API it quotes (`membership.Interval`/`normalize_ticker`/`symbols_since`, `http.get_json`'s retries+backoff kwargs, `SOURCES.md` lines 3-5 and its 139-line tail) matched the tree exactly. `cik.py` and `test_cik.py` were extracted verbatim from the plan's code blocks.
+    - Generator needed 3 passes, as the plan predicted. Tiers resolved more than measured: 33 unresolved (plan predicted 93), then the periodic-filing screen caught 37 more.
+  - **Decided**:
+    - `SEC_CONTACT_EMAIL` for the generator -> mahfuzh74@gmail.com (rung 6, surrounding convention: SEC fair access requires a real contact in the User-Agent; the repo's own git config user.email is the in-tree answer). Passed via the environment only, never committed; phase 3 owns the `config.py` setting.
+    - Generator's filing screen now skips `NO_FILER` rows (rung 2: exit criteria require the CSV to cover every ever-member, and the index's Decisions table defines `NONE` as the answer for a symbol with no EDGAR filer; the plan's code block would have crashed fetching `CIKNONE.json`, so it never encoded the path its own Step 3 prose requires).
+    - Added `SCREEN_EXEMPT` to the generator: 11 symbols whose absence of a periodic filing was hand-verified and explained in code (rung 2 + the plan's own "a net, not a gate"). Without it a CORRECT file could never make the generator exit 0. Three recurring reasons: a bank rather than a bank holding company files periodic reports with the FDIC under Exchange Act s12(i), never EDGAR (FRC, SBNY); a short span ends before the next 10-K falls due (SWY 25 days, PETM 10 weeks, FCPT 7 days, VSNT 4 days); a current member's span opened weeks ago (BE, NBIS, P, RDDT, VMRK).
+    - 70 hand-audited `MANUAL` rows, each verified against `data.sec.gov/submissions` with its evidence in the CSV's note column: 9 seeded + 33 that reached no automated tier + 27 the screen caught + HAR.
+    - HAR: the single fuzzy-tier row was WRONG and the screen passed it — `difflib` matched Massive's "Harman International Industries" to "AMERICAN INTERNATIONAL INDUSTRIES" (`0001073146`), an unrelated company that filed 4 periodic reports inside the span. Corrected to `0000800459`. The file now has ZERO fuzzy rows.
+    - Hand-audit recorded in `SOURCES.md` as method + categories + counts, pointing at the CSV's mandatory note column for per-row evidence, rather than duplicating 70 rows into prose (tie-break: one owner per concept — a second copy can only drift).
+    - readme-updater -> skipped for this phase; `engine/package_readme.md` holds phase 6's uncommitted edits and phase 1 ships a vendored data file plus a pure loader, both documented in `engine/data/SOURCES.md`, which phase 1 owns (same precedent as P1-ENG-DKWU).
+- [x] **P1-ENG-0LUS** Phase 6: `Market.fundamentals` + the `MarketAware` hook
+  - **Difficulty**: HARD
+  - **Type**: Update
+  - **Context**: Owns the new `fundamentals` field on `Market`, the panel load in `backtest/io.py` (cached by table fingerprint like `bars`, reading `fundamental_facts` joined to `ticker_cik` because facts are CIK-keyed and the panel is symbol-keyed), the `MarketAware` protocol + `prepare_for` helper, the single real call site `dev.py:455`, the two docstrings at `runner.py:143` and `walkforward.py:200`, every other place a `Market` is constructed and would silently drop the new field (`dev.py:367`, `research.py:472`, `paper/replay.py:281`, `commands/paper.py:254`) — including the research store's optional `fundamentals.csv` artifact (`research.py`, `commands/research_store.py` + a new `--with-fundamentals` flag), without which the lab sees an empty panel — and `engine/tests/test_market_fundamentals.py`. Does not touch the existing allocators' behaviour, `Allocator`'s member set (which must not gain `prepare_market`), `test_strategy_purity.py`, `test_lab_methods.py`, `research.DATA_FILES` or `engine/tests/test_research_store.py` — the new store file is optional, carried in `OPTIONAL_DATA_FILES`. Exit: `Market` stays frozen and pure; `load_market` returns a panel and still works against a database with neither `fundamental_facts` nor `ticker_cik`; `isinstance(x, Allocator)` is still True for all eleven existing implementers; `test_strategy_purity.py` is byte-identical to what phase 5 left and so is `test_research_store.py`; a store rebuilt with `--with-fundamentals` carries a panel equal to `io.load_panel(conn)`'s, and a store built before this phase still loads with the same fingerprint `origin/main` computes for it; every existing backtest produces byte-identical output to `origin/main` for one pinned candidate.
+  - **Status**: completed
+  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 6 of 7)
+  - **Satisfies**: R6 — Factor exposure to the lab: value, quality, profitability, SUE; consensus surprise out of scope
+  - **Depends on**: P1-ENG-FPIL, P1-ENG-9U93
+  - **Plan**: `.workflows/plan/P1-ENG-0LUS.md`
+  - **Completed**: 2026-10-05 10:37
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/market.py, engine/src/seer_engine/backtest/io.py, engine/src/seer_engine/strategies/allocator.py, engine/src/seer_engine/backtest/dev.py, engine/src/seer_engine/backtest/runner.py, engine/src/seer_engine/backtest/walkforward.py, engine/src/seer_engine/research.py, engine/src/seer_engine/commands/research_store.py, engine/src/seer_engine/paper/replay.py, engine/src/seer_engine/commands/paper.py, engine/tests/test_market_fundamentals.py
+  - **Drift**:
+    - `seer_engine.fundamentals.FundamentalPanel` is `@dataclass(frozen=True, eq=False)` by phase 5, so `panel_a == panel_b` is identity, not value equality. The plan's test block asserted panel equality twice. Phase 5 owns that type and this phase must not edit it, so the tests compare the per-symbol `Fact` tuples through a local `panel_facts()` helper instead (`Fact` is a plain frozen dataclass with value equality).
+    - `engine/tests/test_research_store.py::test_no_neon_and_no_database_url_needed` AST-scans BOTH `research.py` AND `commands/research_store.py` and fails either one that names `seer_engine.db` or `psycopg`. The plan's Step 7 item 8 put `db.connect()` inside `commands/research_store.py`, which turned that test RED. That file is byte-identical shipped code with no owner in this plan set, and phase 6's own exit criterion 6 requires it stay untouched and green.
+    - The plan's test block had two self-inconsistent assertions, both corrected: (a) `facts_fingerprint()` leaves an implicit transaction open, so the `load_market()` call right after it raised "needs a connection with no transaction in progress"; (b) the stale-pickle test seeded a new fact filed 2016-04-27, EARLIER than the already-seeded max filed of 2017-03-01, so `max(filed)` never moved and the asserted pickle name was unreachable.
+    - No pre-existing research store exists anywhere on this machine, so the plan's "load `/home/miftah/seer/engine/.research`" check was run instead as a cross-checkout equivalent: a four-file store built by the `origin/main` checkout, then loaded by both checkouts.
+    - The plan's pinned-candidate diff reads a research store that does not exist and whose real build needs hours of yfinance downloads. It was run instead over a deterministic synthetic market generated identically in both checkouts — a real ~19-year `F4-MOM12-N10-TREND` backtest through `dev.run_registry`, i.e. through the exact line this phase changed.
+  - **Decided**:
+    - `FundamentalPanel` is `eq=False` and phase 5 owns it -> compare per-symbol `Fact` tuples rather than panels, and do not add `__eq__` to phase 5's type (rung 2: exit criterion 7's "facts equal to `io.load_panel(conn)`'s … a round-trip assertion" means value equality of the facts, which `Fact` already has)
+    - Where the `--with-fundamentals` database connection lives: the plan said `commands/research_store.py`, but that makes the unowned, byte-identical `test_research_store.py` fail -> moved into `backtest/io.py` as `io.read_facts()`, the tree's declared impure backtest edge that `test_strategy_purity.py` skips by name (rung 2: phase 6's exit criterion 6, "`test_research_store.py` byte-identical and green", outranks rung 3's placement of the call). `research.py` still imports nothing from `seer_engine.db`, so the "Never Neon" invariant the Decisions table protects is intact, and `build_store` still takes a plain facts sequence.
+    - The stale-pickle test's new fact re-dated 2016-04-27 -> 2017-04-27 so that `max(filed)` actually advances (rung 2: the exit criterion is that a NEW fingerprint sweeps the stale pickle; the fix preserves and strengthens the check rather than relaxing it)
+    - `fundamentals.csv` is NOT clipped at `DEV_END` the way bars/dividends/fx are (rung 2: exit criterion 7 requires the store panel equal the database panel; look-ahead is already prevented downstream by phase 5's `as_of(symbol, t)`, which exposes only `filed <= t`)
 - [x] **P1-ENG-9U93** Phase 5: Pure derivation: concept ladder, PIT selection, SUE
   - **Difficulty**: HARD
   - **Type**: Feature

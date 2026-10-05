@@ -55,7 +55,7 @@ from seer_engine.sim.book import (
     close_book_unpriced,
     step_book,
 )
-from seer_engine.sim.rules import TradeRules, is_decision_session
+from seer_engine.sim.rules import TradeRules, is_decision_session, is_rank_session
 from seer_engine.strategies.allocator import Allocator
 
 LastBarDate = Callable[[str], date | None]  # symbol -> its latest bar date known, or None
@@ -143,7 +143,13 @@ def decide_book(
     """The targets for ``next_session(data_date)`` and whether the idle residual was appended.
 
     ``(None, False)`` when that session is not a decision session under ``rules`` (the
-    allocator is not called). Otherwise exactly ``run_book``'s decision: ``allocator.targets``
+    allocator is not called).
+
+    Split-cadence rules (``rules.resize_cadence``) are a ValueError here: a resize-only session
+    needs the LAST RANK SESSION'S basket, and this function is stateless — the paper store does
+    not carry it yet. ``backtest.book_runner.run_book`` does, so backtests and replays of split
+    rules are correct; only the nightly live decision is refused, loudly rather than by silently
+    re-ranking every week. Otherwise exactly ``run_book``'s decision: ``allocator.targets``
     on ``{s: h.upto(data_date)}``, ``market.membership.members_on(data_date)``, ``held`` minus
     ``rules.idle_symbol``, ``params``; then ``book_runner._with_idle``. ``held`` is the set of
     symbols the book holds at the night of ``data_date`` (``book.held()`` after that session
@@ -157,8 +163,14 @@ def decide_book(
     _session("data_date", data_date)
     held_now = _held(held)
     session = dates.next_session(data_date)
+    if rules.resize_cadence is not None:
+        raise ValueError(
+            f"rules {rules.id!r} split rank and resize cadences; paper trading cannot decide them yet "
+            "(the last rank session's basket is not stored). Backtest them with run_book."
+        )
     if not is_decision_session(rules, session):
         return None, False
+    assert is_rank_session(rules, session)  # no resize_cadence above, so every decision is a rank
     members = market.membership.members_on(data_date)
     # The idle position is the runner's residual, never a family's (as run_book).
     mine = held_now - {rules.idle_symbol} if rules.idle_symbol is not None else held_now

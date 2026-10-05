@@ -547,3 +547,14 @@ def test_settle_book_argument_checks():
         settle_book(book, S, {}, None, False, MONTHLY_HOLD, {}, (("AAA", Decimal(2)), ("AAA", Decimal(3))), _always)
     with pytest.raises(ValueError, match="not after"):
         settle_book(book, PREV, {}, None, False, MONTHLY_HOLD, {}, (), _always)
+
+
+def test_decide_book_refuses_a_split_cadence_rule_set():
+    """Paper is stateless: it has no last-rank basket, so it must refuse rather than re-rank weekly."""
+    market = wiring_market()
+    split = replace(MONTHLY_HOLD, id="monthly-rank-weekly-resize", resize_cadence="weekly")
+    for data_date in (D("2025-02-28"), D("2025-03-07"), D("2025-03-04")):  # a rank, a resize, neither
+        with pytest.raises(ValueError, match="paper trading cannot decide them yet"):
+            decide_book(market, Scripted((("AAA", "0.5"),)), None, split, data_date, frozenset())
+    # The unsplit rule set it was built from still decides normally.
+    assert decide_book(market, Scripted((("AAA", "0.5"),)), None, MONTHLY_HOLD, D("2025-02-28"), frozenset())[0]

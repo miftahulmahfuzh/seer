@@ -6,10 +6,16 @@ randomness, logging or file access. Three things live here.
 ``run_book`` drives ``sim.book.step_book`` over every NYSE session S in ``[start, end]``, in the
 same shape as ``runner.run_backtest``:
 
-1. on a decision session (``sim.rules.is_decision_session``) the allocator maps history through
+1. on a rank session (``sim.rules.is_rank_session``) the allocator maps history through
    ``data_date = prev_session(S)``, the members on ``data_date`` and the symbols held at night
    (the idle instrument left out: it is the runner's, never a family's) to target weights; on
    any other session the targets are ``None`` (no signal exits, no entries, no resizes);
+1b. on a resize-only session (``sim.rules.is_resize_session``, only with ``rules.resize_cadence``)
+   the allocator is called the same way, but its answer is used for its TOTAL weight alone: the
+   last rank session's basket is kept and rescaled by ``_rescaled`` (below). Nothing is ranked,
+   entered or signal-exited for being out of rank. A resize session BEFORE the window's first
+   rank session has no basket to re-scale and is not a decision session at all (the allocator is
+   not called), so the run never parks itself in the idle instrument before it has ranked once;
 2. with ``rules.idle_symbol`` set and a bar for it dated ``data_date``, the residual weight
    ``1 - sum(weights)`` is appended as the last target, in that instrument;
 3. ``step_book`` gets S's bars for every held or targeted symbol, and (``rules.dividends`` only)
@@ -54,8 +60,8 @@ from seer_engine.sim.book import (
     to_weight,
 )
 from seer_engine.sim.model import COST_RATE, initial_cash_usd, q
-from seer_engine.sim.rules import TradeRules, is_decision_session
-from seer_engine.strategies.allocator import Allocator
+from seer_engine.sim.rules import TradeRules, is_rank_session, is_resize_session
+from seer_engine.strategies.allocator import Allocator, scale_weight
 from seer_engine.strategies.base import Strategy
 
 DividendMap = Mapping[str, Mapping[date, Decimal]]  # symbol -> {ex_date: cash amount per share}
@@ -103,6 +109,56 @@ def _session(name: str, d: object) -> date:
     if not dates.is_session(d):
         raise ValueError(f"{name} {d} is not an NYSE session")
     return d
+
+
+def _rescaled(
+    market: Market,
+    last_rank: tuple[Target, ...],
+    fresh: tuple[Target, ...],
+    held: frozenset[str],
+    data_date: date,
+    marks: Mapping[str, Decimal],
+) -> tuple[Target, ...]:
+    """The last rank session's basket at today's exposure: the resize-only session's targets.
+
+    Every target of ``last_rank`` whose symbol is still in ``held``, with its weight multiplied by
+    ``k = sum(fresh weights) / sum(last_rank weights)`` and its ``last`` refreshed to the symbol's
+    close on ``data_date`` (falling back to ``marks``, the book's mark, when it has no bar that
+    day). ``limit``, ``stop`` and ``take`` are dropped: a resize session opens no position, so the
+    only one of the three that can matter is ``limit``, and a limit priced at the last rank is
+    stale. Under entry ``"limit"`` that means a resize session trims but never adds.
+
+    ``k`` is the allocator's own exposure move, read off its totals: for an overlay that scales a
+    fixed-width basket (vol targeting) ``k`` is exactly the ratio of the two scales. For an
+    allocator whose basket WIDTH varies, ``k`` conflates "fewer names" with "less exposure" —
+    such an allocator is a poor fit for a split cadence.
+
+    ``k >= 0`` and ``sum(last_rank) >= sum(kept)``, so the result never weighs more than ``fresh``
+    does, and never more than 1. ``()`` when nothing of the basket is still held or the basket
+    weighed nothing: with ``fresh`` empty, every weight floors away and the book goes to the idle
+    instrument (an exposure cut to zero is a re-scale, not a re-rank).
+    """
+    kept = tuple(t for t in last_rank if t.symbol in held)
+    if not kept:
+        return ()
+    rank_total = _ZERO
+    for t in last_rank:
+        rank_total += t.weight
+    if rank_total <= 0:
+        return ()
+    fresh_total = _ZERO
+    for t in fresh:
+        fresh_total += t.weight
+    k = fresh_total / rank_total
+    out: list[Target] = []
+    for t in kept:
+        weight = scale_weight(t.weight, k)
+        if weight is None:
+            continue
+        bar = market.bar(t.symbol, data_date)
+        last = q(bar.close) if bar is not None else marks.get(t.symbol, t.last)
+        out.append(replace(t, weight=weight, last=last, limit=None, stop=None, take=None))
+    return tuple(out)
 
 
 def _with_idle(
@@ -206,6 +262,7 @@ def run_book(
 
     book = new_book(cash0)
     data_date = dates.prev_session(start)
+    last_rank: tuple[Target, ...] | None = None  # the last rank session's targets, pre-idle; None = none yet
     snapshots: list[BookSnapshot] = [
         BookSnapshot(date=data_date, cash_usd=book.cash, equity_usd=book.equity, invested_usd=_ZERO)
     ]
@@ -219,7 +276,9 @@ def run_book(
         held = book.held()
         targets: tuple[Target, ...] | None = None
         idle_added = False
-        if is_decision_session(rules, session):
+        rank = is_rank_session(rules, session)
+        # A resize session before the first rank has no basket to re-scale: it is not a decision.
+        if rank or (last_rank is not None and is_resize_session(rules, session)):
             members = market.membership.members_on(data_date)
             # The idle position is the runner's residual, never a family's (plan index D-J).
             mine = held - {rules.idle_symbol} if rules.idle_symbol is not None else held
@@ -228,7 +287,13 @@ def run_book(
                 wanted = allocator.targets(history, members, data_date, mine, params)
             else:
                 wanted = allocator.targets_prepared(prepared, members, data_date, mine, params)
-            targets, idle_added = _with_idle(market, rules, tuple(wanted), data_date)
+            if rank:
+                last_rank = tuple(wanted)
+                basket = last_rank
+            else:
+                marks = {p.symbol: p.mark for p in book.positions}
+                basket = _rescaled(market, last_rank, tuple(wanted), mine, data_date, marks)
+            targets, idle_added = _with_idle(market, rules, basket, data_date)
 
         symbols = set(held)
         if targets is not None:

@@ -57,6 +57,7 @@ from seer_engine.sim import Event, Snapshot, q
 from seer_engine.sim.book import BookSnapshot, Fill, Target, Trade
 from seer_engine.sim.book import step_book as real_step_book
 from seer_engine.sim.rules import (
+    MONTHLY_RANK_WEEKLY_RESIZE,
     DAILY_SWITCH,
     DAILY_SWITCH_TBILL,
     DESIGN_V0,
@@ -913,3 +914,134 @@ def test_run_stats_degenerate_curves():
 def test_run_stats_type_check():
     with pytest.raises(TypeError, match="RunResult or a BookResult"):
         run_stats(object())
+
+
+# =========================================================================== 3b. the cadence split
+#
+# MONTHLY_RANK_WEEKLY_RESIZE over the wiring window (02-24 .. 03-14): the only month start is
+# 03-03, the week starts are 02-24, 03-03 and 03-10. So 03-03 ranks, 03-10 re-scales, and 02-24
+# is a week start with no basket behind it yet.
+
+M_RANK_W_RESIZE = MONTHLY_RANK_WEEKLY_RESIZE
+M_RANK_D_RESIZE = replace(MONTHLY_HOLD, id="monthly-rank-daily-resize", resize_cadence="daily")
+
+
+def test_split_cadence_ranks_monthly_and_rescales_weekly(steps):
+    alloc = Scripted((("AAA", "0.5"),))
+    run_book(wiring_market(), alloc, None, M_RANK_W_RESIZE, W_START, W_END)
+    # 02-24 is a week start, but nothing has ranked yet: not a decision, the allocator is not called.
+    assert [c.data_date for c in alloc.calls] == [D("2025-02-28"), D("2025-03-07")]
+    assert [c.session for c in steps if c.targets is not None] == [D("2025-03-03"), D("2025-03-10")]
+    assert [c.session for c in steps] == dates.sessions(W_START, W_END)
+
+
+def test_a_resize_session_keeps_the_last_rank_basket_at_todays_exposure(steps):
+    market = wiring_market()
+    alloc = Scripted(table={
+        D("2025-02-28"): (("AAA", "0.4"), ("BBB", "0.4")),  # the rank, total 0.8
+        D("2025-03-07"): (("CCC", "0.2"),),                 # a different basket, total 0.2
+    })
+    run_book(market, alloc, None, M_RANK_W_RESIZE, W_START, W_END)
+    ranked, resized = (c for c in steps if c.targets is not None)
+    assert ranked.session == D("2025-03-03")
+    assert [(t.symbol, t.weight) for t in ranked.targets] == [("AAA", Decimal("0.4")), ("BBB", Decimal("0.4"))]
+    # CCC is NOT ranked in; AAA and BBB are kept and scaled by k = 0.2 / 0.8.
+    assert resized.session == D("2025-03-10")
+    assert [(t.symbol, t.weight) for t in resized.targets] == [("AAA", Decimal("0.1")), ("BBB", Decimal("0.1"))]
+    # Σ after the re-scale is exactly what the allocator wants today, and `last` is today's close.
+    assert sum(t.weight for t in resized.targets) == Decimal("0.2")
+    for t in resized.targets:
+        assert t.last == q(market.bar(t.symbol, D("2025-03-07")).close)
+        assert (t.limit, t.stop, t.take) == (None, None, None)
+
+
+def test_a_resize_session_moves_the_idle_weight_but_never_the_names(steps):
+    alloc = Scripted(table={
+        D("2025-02-28"): (("AAA", "0.4"), ("BBB", "0.4")),
+        D("2025-03-07"): (("AAA", "0.2"), ("BBB", "0.2")),  # the same basket at half the exposure
+    })
+    r = run_book(wiring_market(), alloc, None,
+                 replace(M_RANK_W_RESIZE, id="x", idle_symbol="BIL"), W_START, W_END)
+    ranked, resized = (c for c in steps if c.targets is not None)
+    assert [(t.symbol, t.weight) for t in ranked.targets] == [
+        ("AAA", Decimal("0.4")), ("BBB", Decimal("0.4")), ("BIL", Decimal("0.2"))
+    ]
+    # Exposure halves; the freed weight goes to BIL, which is the point of the split.
+    assert [(t.symbol, t.weight) for t in resized.targets] == [
+        ("AAA", Decimal("0.2")), ("BBB", Decimal("0.2")), ("BIL", Decimal("0.6"))
+    ]
+    assert {f.symbol for f in r.fills if f.session_date == D("2025-03-10") and f.side == "buy"} == {"BIL"}
+
+
+def test_a_resize_session_to_zero_exposure_leaves_the_book(steps):
+    alloc = Scripted(table={D("2025-02-28"): (("AAA", "0.5"),)})  # every later date wants nothing
+    r = run_book(wiring_market(), alloc, None, M_RANK_W_RESIZE, W_START, W_END)
+    resized = [c for c in steps if c.targets is not None][1]
+    assert resized.targets == ()  # k = 0: an exposure cut to nothing is a re-scale, not a re-rank
+    assert [(f.symbol, f.reason) for f in r.fills if f.session_date == D("2025-03-10")] == [("AAA", "signal")]
+
+
+def test_a_split_rule_set_with_no_rank_yet_never_decides(steps):
+    # Daily re-scaling under a monthly rank: still nothing before 03-03, then every session.
+    alloc = Scripted((("AAA", "0.5"),))
+    run_book(wiring_market(), alloc, None, M_RANK_D_RESIZE, W_START, W_END)
+    after_first_rank = [s for s in dates.sessions(W_START, W_END) if s >= D("2025-03-03")]
+    assert [c.session for c in steps if c.targets is not None] == after_first_rank
+    assert [c.data_date for c in alloc.calls] == [dates.prev_session(s) for s in after_first_rank]
+
+
+def test_an_unsplit_rule_set_runs_exactly_as_before():
+    market = wiring_market()
+    spec = (("AAA", "0.4"), ("BBB", "0.4"))
+    before = run_book(market, Scripted(spec), None, MONTHLY_HOLD, W_START, W_END)
+    # The split lever at its default must not perturb the engine at all.
+    assert before == replace(run_book(market, Scripted(spec), None, MONTHLY_HOLD, W_START, W_END), rules=MONTHLY_HOLD)
+    assert before.rules.resize_cadence is None
+
+
+# --------------------------------------------------------------------------- _rescaled, directly
+
+RANK = (
+    Target(symbol="AAA", weight=Decimal("0.4"), last=P("12"), limit=P("12.1"), stop=P("11"), take=P("13")),
+    Target(symbol="BBB", weight=Decimal("0.4"), last=P("24")),
+)
+FRESH_HALF = (Target(symbol="CCC", weight=Decimal("0.4"), last=P("30")),)
+
+
+def test_rescaled_keeps_only_what_is_still_held():
+    market = wiring_market()
+    out = book_runner._rescaled(market, RANK, FRESH_HALF, frozenset({"BBB"}), D("2025-03-07"), {})
+    assert [(t.symbol, t.weight) for t in out] == [("BBB", Decimal("0.2"))]
+    assert book_runner._rescaled(market, RANK, FRESH_HALF, frozenset(), D("2025-03-07"), {}) == ()
+    assert book_runner._rescaled(market, (), FRESH_HALF, frozenset({"AAA"}), D("2025-03-07"), {}) == ()
+
+
+def test_rescaled_drops_the_entry_prices_and_refreshes_last():
+    market = wiring_market()
+    day = D("2025-03-07")
+    out = book_runner._rescaled(market, RANK, RANK, frozenset({"AAA", "BBB"}), day, {})
+    assert [(t.symbol, t.weight) for t in out] == [("AAA", Decimal("0.4")), ("BBB", Decimal("0.4"))]  # k = 1
+    for t in out:
+        assert (t.limit, t.stop, t.take) == (None, None, None)
+        assert t.last == q(market.bar(t.symbol, day).close)
+
+
+def test_rescaled_falls_back_to_the_books_mark_when_a_symbol_has_no_bar_that_day():
+    market = wiring_market(ccc_missing=(D("2025-03-07"),))
+    rank = (Target(symbol="CCC", weight=Decimal("0.5"), last=P("30")),)
+    fresh = (Target(symbol="CCC", weight=Decimal("0.5"), last=P("30")),)
+    held, day = frozenset({"CCC"}), D("2025-03-07")
+    assert book_runner._rescaled(market, rank, fresh, held, day, {"CCC": P("29.5")})[0].last == P("29.5")
+    assert book_runner._rescaled(market, rank, fresh, held, day, {})[0].last == P("30")  # the stale last
+
+
+def test_rescaled_never_weighs_more_than_the_allocator_wants():
+    market, day = wiring_market(), D("2025-03-07")
+    for fresh_total in ("0.1", "0.4", "0.8", "1"):
+        fresh = (Target(symbol="CCC", weight=Decimal(fresh_total), last=P("30")),)
+        out = book_runner._rescaled(market, RANK, fresh, frozenset({"AAA", "BBB"}), day, {})
+        assert sum(t.weight for t in out) == Decimal(fresh_total)
+    # A basket only half still held keeps half the exposure: nothing is re-entered to make it up.
+    out = book_runner._rescaled(market, RANK, (Target(symbol="CCC", weight=Decimal("0.8"), last=P("30")),),
+                                frozenset({"AAA"}), day, {})
+    assert sum(t.weight for t in out) == Decimal("0.4")

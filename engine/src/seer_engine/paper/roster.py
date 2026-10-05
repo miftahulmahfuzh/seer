@@ -51,7 +51,7 @@ from typing import Any, Literal
 from seer_engine.backtest.registry import REGISTRY, candidate_digest
 from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.sim import COST_RATE
-from seer_engine.sim.rules import DESIGN_V0, MONTHLY_HOLD, TradeRules
+from seer_engine.sim.rules import DESIGN_V0, MONTHLY_HOLD, TradeRules, is_pinned_default
 from seer_engine.strategies.a import STRATEGY_A, STRATEGY_A_PARAMS
 from seer_engine.strategies.allocator import Allocator
 from seer_engine.strategies.base import Strategy
@@ -236,8 +236,18 @@ def _rule_value(value: object) -> str | None:
 
 
 def rules_dict(rules: TradeRules) -> dict[str, str | None]:
-    """Every ``TradeRules`` field, in field order, as plain strings."""
-    return {f.name: _rule_value(getattr(rules, f.name)) for f in fields(rules)}
+    """Every ``TradeRules`` field, in field order, as plain strings.
+
+    A lever added after this roster's spec digests were pinned is left out while it holds its
+    no-op value (``sim.rules.LEVERS_SINCE_PINS``), so a roster strategy that does not use the
+    lever keeps the digest already written to its live ``strategies.params`` row. One that uses
+    it needs a new roster id anyway (its own paper clock), and then digests differently.
+    """
+    return {
+        f.name: _rule_value(getattr(rules, f.name))
+        for f in fields(rules)
+        if not is_pinned_default(f.name, getattr(rules, f.name))
+    }
 
 
 def spec(e: RosterEntry) -> dict[str, Any]:

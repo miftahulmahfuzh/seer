@@ -61,7 +61,7 @@ engine/
       lifecycle.py          step(), close_unpriced()
       sizing.py             Pick, Rejection, SizingResult, size_picks()
       split_adjust.py       apply_split()
-      rules.py              TradeRules, DESIGN_V0, V0_BOOK, the presets, is_decision_session (P7a)
+      rules.py              TradeRules, DESIGN_V0, V0_BOOK, the presets, the rank/resize cadence split (P7a)
       book.py               the book engine: Target, Book, Position, Fill, Trade, step_book(), close_book_unpriced() (P7a); apply_book_split(), BookSplit (P4)
     paper/                  nightly paper trading (P4); every module but store.py is pure
       __init__.py           docstring only
@@ -1075,7 +1075,8 @@ from `seer_engine.sim`.
 |---|---|---|
 | `id` | — | kebab-case, unique per preset |
 | `engine` | — | `"bracket_v0"` only for `DESIGN_V0` (`ValueError` otherwise, both ways); `"book"` for everything else |
-| `cadence` | `"daily"` | decision sessions: every session (`daily`); the first NYSE session of each ISO week (`weekly`); or the first of each calendar month (`monthly`) |
+| `cadence` | `"daily"` | the RANK cadence — sessions on which the allocator may choose a new basket: every session (`daily`); the first NYSE session of each ISO week (`weekly`); or the first of each calendar month (`monthly`) |
+| `resize_cadence` | `None` | a faster RESIZE cadence split off `cadence` (`None` = one cadence, every rule set before the split). Must be strictly faster than `cadence` and needs `resize=True`, else `ValueError`. On a resize-only session the last rank's basket is kept and rescaled to today's exposure; nothing is ranked, entered or signal-exited |
 | `entry` | `"limit"` | `limit`: the target's limit price (a new target with no limit price is bought like `open_limit`); `open_limit`: a buy limit at last close × 1.02 (a limit order, so executable by default); `open`: market-on-open (owner input) |
 | `max_positions` | `None` | a cap on non-idle positions (4 only for §5 parity) |
 | `time_stop` | `None` | sell at the next open once `days_held >= time_stop` |
@@ -1099,8 +1100,20 @@ from `seer_engine.sim`.
 | `SWING_T10` | `swing-t10` | book | daily | limit | time stop 10 |
 | `SWING_T20` | `swing-t20` | book | daily | limit | time stop 20 |
 | `SWING_T20_OPEN` | `swing-t20-open` | book | daily | open_limit | time stop 20 |
+| `MONTHLY_RANK_WEEKLY_RESIZE` | `monthly-rank-weekly-resize` | book | monthly rank, weekly resize | open_limit | resize |
+| `MONTHLY_RANK_WEEKLY_RESIZE_TBILL` | `monthly-rank-weekly-resize-tbill` | book | monthly rank, weekly resize | open_limit | resize, idle in BIL |
 
-- `is_decision_session(rules, session) -> bool`. It raises `ValueError` for a non-session.
+- `is_rank_session(rules, session) -> bool`, `is_resize_session(rules, session) -> bool` (a resize-ONLY
+  session: False without a `resize_cadence`, and False when the session also ranks — ranking supersedes),
+  and `is_decision_session(rules, session) -> bool` (either). Without a `resize_cadence`,
+  `is_decision_session` is exactly `is_rank_session`, so every call site that predates the split stays
+  correct. All three raise `ValueError` for a non-session.
+- `LEVERS_SINCE_PINS` / `is_pinned_default(name, value)`: a lever added AFTER the P7a registry, the lab
+  trials and the paper roster were pinned, mapped to the value meaning "as before this lever existed"
+  (`{"resize_cadence": None}`). Every canonical form pinned before the lever leaves such a field out
+  while it holds that value — `backtest.registry._canon` (so no pinned candidate digest moves and no
+  closed lab trial re-digests through `lab.method.config_digest`) and `paper.roster.rules_dict` (so no
+  live paper spec digest moves). A rule set that uses the lever canonicalizes differently.
 - `rule_owner_inputs(rules) -> tuple[str, ...]`. The result is sorted and drawn from
   `market-on-open`, `fractional`, `etf:<idle symbol>` (outside `DEFAULT_ETFS`) and `fee`.
 - `describe_rules(rules) -> tuple[str, ...]`: one fixed plain-English line per lever. The reports
@@ -1259,10 +1272,18 @@ by year (41.4% of member-sessions over 1996–2015 have no bar). ETF-only candid
 
 - **`run_book(market, allocator, params, rules, start, end, *, prepared=None, dividends=..., initial_idr=INITIAL_IDR, usd_idr=None) -> BookResult`**:
   drives an `Allocator` under book `TradeRules` (`rules.engine == "book"`) through `sim.book.step_book`
-  over every NYSE session in `[start, end]`, in `run_backtest`'s shape. On a decision session
-  (`sim.rules.is_decision_session`) the allocator maps history through `data_date = prev_session(S)`
+  over every NYSE session in `[start, end]`, in `run_backtest`'s shape. On a rank session
+  (`sim.rules.is_rank_session`) the allocator maps history through `data_date = prev_session(S)`
   to target weights (via `targets_prepared` when `prepared` is given, else `targets`); other sessions
-  pass `None`. With `rules.idle_symbol` the residual `1 - sum(weights)` goes to that instrument.
+  pass `None`. On a resize-only session (`is_resize_session`, only with `rules.resize_cadence`) the
+  allocator is called the same way but its answer is used for its TOTAL weight alone: `_rescaled`
+  keeps the last rank session's basket, restricted to what is still held, with every weight × `k =
+  Σ(fresh) / Σ(last rank)` and `last` refreshed to today's close (falling back to the book's mark),
+  dropping `limit`/`stop`/`take`. So Σ matches what the allocator wants today while the names are
+  frozen, and the freed weight goes to `idle_symbol` or cash. `k` is exact for an overlay that scales
+  a fixed-width basket (vol targeting); for an allocator whose basket WIDTH varies it conflates
+  "fewer names" with "less exposure". A resize session before the window's first rank has no basket
+  and is not a decision session at all (the allocator is not called). With `rules.idle_symbol` the residual `1 - sum(weights)` goes to that instrument.
   Held-symbol dividends with ex-date S are passed only when `rules.dividends`. Positions with no bar
   on S or later are force-closed (`close_book_unpriced`). `usd_idr` defaults to
   `market.usd_idr_on(start)`. `DESIGN_V0` rules are a ValueError here.
@@ -1348,7 +1369,7 @@ synthetic sessions.
   - `RosterEntry` (frozen dataclass), one paper portfolio: `id, name, sub, icon, is_champion, is_benchmark, sort` (equal to the rows migrations 003 and 004 insert), `engine: Engine`, `rules: TradeRules | None`, `obj: Strategy | Allocator | None`, `object_name`, `params`, `registry_id: str | None`, `lookback: int`, `gate_note: str`, `gate_applicable: bool = True` (P6; false only for `C`).
   - `ROSTER: tuple[RosterEntry, ...]` (SPY, A, F4, F1, C), `ROSTER_IDS`, `MAX_LOOKBACK_BARS = max(e.lookback for e in ROSTER)`. `C` (P6): `C · News veto`, icon `gavel`, sort 5, engine `bracket`, rules `DESIGN_V0`, `obj = STRATEGY_C`, `params = STRATEGY_C_PARAMS`, gate note "Backtest gate: not applicable (LLM strategy, design §1 item 5)".
   - `entry(strategy_id) -> RosterEntry`: the roster entry; `KeyError` when it is not on the roster.
-  - `rules_dict(rules: TradeRules) -> dict[str, str | None]`: every `TradeRules` field, in field order, as plain strings.
+  - `rules_dict(rules: TradeRules) -> dict[str, str | None]`: every `TradeRules` field, in field order, as plain strings — minus a lever still at its pre-pin default (`sim.rules.is_pinned_default`), so a roster strategy that does not use a newly added lever keeps the spec digest already written to its live `strategies.params` row.
   - `spec(e) -> dict[str, Any]`: the frozen spec (C2 `params.spec`), JSON-ready, strings and nulls only.
   - `spec_text(s) -> str`: the canonical text of a spec: JSON with sorted keys, no whitespace, ASCII only.
   - `spec_digest(s) -> str`: sha256 (hex) of `spec_text(s)` in UTF-8. The five digests are pinned in `tests/test_paper_roster.py`; the four P4 digests never change.
@@ -1360,7 +1381,7 @@ synthetic sessions.
   - `decide_bracket(pf, strategy, params, history, members, data_date) -> SizingResult`: the pending orders for `next_session(data_date)`: `strategy.picks` on `history` cut at `data_date`, then `size_picks`.
 - **`paper.book`**:
   - `BookNight(session, book, targets, splits, fills, trades, dividends, rejected, forced, snapshot)`: one settled session of a book strategy.
-  - `decide_book(market, allocator, params, rules, data_date, held) -> tuple[tuple[Target, ...] | None, bool]`: the targets for `next_session(data_date)` (`None` when it is not a decision session) and whether the idle residual was appended. `backtest.book_runner._with_idle` is reused by import.
+  - `decide_book(market, allocator, params, rules, data_date, held) -> tuple[tuple[Target, ...] | None, bool]`: the targets for `next_session(data_date)` (`None` when it is not a decision session) and whether the idle residual was appended. `backtest.book_runner._with_idle` is reused by import. Split-cadence rules (`rules.resize_cadence`) are a `ValueError`: a resize-only session needs the last rank session's basket and this function is stateless, so paper refuses loudly instead of silently re-ranking on the fast clock. Backtests and replays of split rules go through `run_book`, which carries that state, and are correct.
   - `settle_book(book, session, bars, targets, idle_added, rules, dividends, splits, last_bar_date) -> BookNight`: `sim.apply_book_split` per applied split (targets rescaled too), `sim.step_book`, `close_book_unpriced` for gone positions, snapshot replaced.
 - **`paper.benchmark`**: `buy_and_hold` one session at a time. Whole shares at the first session's open; dividends with an ex-date after the start credited on the ex-date and reinvested at that close; marked at every close.
   - `SPY = "SPY"`; `BenchmarkState(start, cash, equity, position: Position | None, last_session)`.

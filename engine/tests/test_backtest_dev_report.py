@@ -565,7 +565,8 @@ def test_preregistration_names_each_finalist_exactly():
     assert "`F1-B`" not in text.split("## Finalists")[1].split("## Test window")[0]
     assert '{\n  "hold": "SPY",\n  "n": "20"\n}' in text
     assert (
-        "TradeRules(id='monthly-hold', engine='book', cadence='monthly', entry='open_limit', max_positions=None, "
+        "TradeRules(id='monthly-hold', engine='book', cadence='monthly', resize_cadence=None, "
+        "entry='open_limit', max_positions=None, "
         "time_stop=None, resize=True, fractional=False, dividends=True, idle_symbol=None, cost_rate=Decimal('0.001'))"
     ) in text
     assert "| cost_rate | 0.001 |" in text and "| idle_symbol | none |" in text

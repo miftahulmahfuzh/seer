@@ -39,6 +39,7 @@ from seer_engine.sim.rules import (
     SWING_T20_OPEN,
     WEEKLY_HOLD,
     TradeRules,
+    is_pinned_default,
 )
 from seer_engine.strategies.a import DESIGN_PARAMS, STRATEGY_A
 from seer_engine.strategies.allocator import (
@@ -320,8 +321,14 @@ def _canon(value: Any) -> str:
     if isinstance(value, (Allocator, Strategy)):
         return f"<{value.id}>"
     if is_dataclass(value) and not isinstance(value, type):
+        # A TradeRules lever added after this registry was pinned drops out while it is at its
+        # no-op value (sim.rules.LEVERS_SINCE_PINS), so every pinned digest below, and every
+        # closed lab trial's config_digest, stays exactly what it was.
+        pinned = isinstance(value, TradeRules)
         inner = ",".join(
-            f"{f.name}={_canon(getattr(value, f.name))}" for f in fields(value) if f.compare
+            f"{f.name}={_canon(getattr(value, f.name))}"
+            for f in fields(value)
+            if f.compare and not (pinned and is_pinned_default(f.name, getattr(value, f.name)))
         )
         return f"{type(value).__name__}({inner})"
     raise TypeError(f"no canonical text for a {type(value).__name__}: {value!r}")

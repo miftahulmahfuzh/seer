@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-05 11:12
-**Total Active Tasks**: 2
+**Last Updated**: 2026-10-05 11:00
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 59
+- Completed: 60
 
 ---
 
@@ -23,15 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ENG-22VQ** Phase 4: `fundamentals` command — resumable ingest
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `seer_engine/commands/fundamentals.py` and `engine/tests/test_fundamentals_command.py`, including `sync_ticker_cik` — the one writer of the `ticker_cik` table from phase 1's CSV. Does not touch `cli.py` (discovery is automatic), the backtest, `engine/data/*`, `db/migrations/*`, the runbook; it imports the ingest tag allowlist as `fundamentals.ladder.LADDER_TAGS` from phase 5's pure package and derives nothing itself. Exit: `python -m seer_engine fundamentals` loads facts for every ever-member the scope predicate selects (795 on 2026-10-05, SPY excluded), resolved through phase 1's map by date, writing facts and `fundamentals_log` rows in one transaction per batch. The unit of work is the CIK, not the symbol: `plan_jobs` resolves every in-scope symbol, groups by CIK, and skips CIKs already logged, so a share-class pair (GOOG/GOOGL) is one `companyfacts` call, one log row and one `rows` count — but both symbols still appear in the summary via `CikResult.per_symbol()`. `batch_size` counts CIKs; `--symbols` dedupes to CIKs but ignores the log outright; `--retry-failed` re-attempts `failed` and `empty` CIKs; `--dry-run` rolls everything back. `Summary.exit_code` is unchanged from `backfill`'s: 0 when nothing failed, 1 on any failure, 2 on a missing setting or an empty universe — an `empty` filer is not an error. A symbol with no CIK gets no log row at all and is re-evaluated every run; a symbol missing from the map is `failed` by design, so an incomplete CSV exits 1, while a symbol the map marks `NONE` is `empty` and exits 0.
-  - **Status**: open
-  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 4 of 7)
-  - **Satisfies**: R1 — ticker → CIK bridge, vendored as `engine/data/ticker_cik.csv`, keyed so a recycled ticker can never resolve to the wrong company; R2 — Bulk ingest of SEC XBRL facts, `filed` as the no-look-ahead boundary, restatements kept queryable; R5 — New resumable `seer_engine` command respecting SEC fair access (User-Agent, 10 req/s)
-  - **Depends on**: P1-ENG-R7TL, P1-ENG-FPIL, P1-ENG-0351, P1-ENG-9U93
-  - **Plan**: `.workflows/plan/P1-ENG-22VQ.md`
 - [ ] **P1-ENG-AHLW** Phase 7: Fundamental factor allocator, lab method, runbook
   - **Difficulty**: NORMAL
   - **Type**: Feature
@@ -68,6 +59,28 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-22VQ** Phase 4: `fundamentals` command — resumable ingest
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `seer_engine/commands/fundamentals.py` and `engine/tests/test_fundamentals_command.py`, including `sync_ticker_cik` — the one writer of the `ticker_cik` table from phase 1's CSV. Does not touch `cli.py` (discovery is automatic), the backtest, `engine/data/*`, `db/migrations/*`, the runbook; it imports the ingest tag allowlist as `fundamentals.ladder.LADDER_TAGS` from phase 5's pure package and derives nothing itself. Exit: `python -m seer_engine fundamentals` loads facts for every ever-member the scope predicate selects (795 on 2026-10-05, SPY excluded), resolved through phase 1's map by date, writing facts and `fundamentals_log` rows in one transaction per batch. The unit of work is the CIK, not the symbol: `plan_jobs` resolves every in-scope symbol, groups by CIK, and skips CIKs already logged, so a share-class pair (GOOG/GOOGL) is one `companyfacts` call, one log row and one `rows` count — but both symbols still appear in the summary via `CikResult.per_symbol()`. `batch_size` counts CIKs; `--symbols` dedupes to CIKs but ignores the log outright; `--retry-failed` re-attempts `failed` and `empty` CIKs; `--dry-run` rolls everything back. `Summary.exit_code` is unchanged from `backfill`'s: 0 when nothing failed, 1 on any failure, 2 on a missing setting or an empty universe — an `empty` filer is not an error. A symbol with no CIK gets no log row at all and is re-evaluated every run; a symbol missing from the map is `failed` by design, so an incomplete CSV exits 1, while a symbol the map marks `NONE` is `empty` and exits 0.
+  - **Status**: completed
+  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 4 of 7)
+  - **Satisfies**: R1 — ticker → CIK bridge, vendored as `engine/data/ticker_cik.csv`, keyed so a recycled ticker can never resolve to the wrong company; R2 — Bulk ingest of SEC XBRL facts, `filed` as the no-look-ahead boundary, restatements kept queryable; R5 — New resumable `seer_engine` command respecting SEC fair access (User-Agent, 10 req/s)
+  - **Depends on**: P1-ENG-R7TL, P1-ENG-FPIL, P1-ENG-0351, P1-ENG-9U93
+  - **Plan**: `.workflows/plan/P1-ENG-22VQ.md`
+  - **Completed**: 2026-10-05 11:00
+  - **Method**: /implement
+  - **Commit**: 886c7ad
+  - **Files**: engine/src/seer_engine/commands/fundamentals.py, engine/tests/test_fundamentals_command.py
+  - **Drift**:
+    - No drift in any cross-phase contract. C1-C8 were each re-verified against the landed code before the first edit: `cik.CikRow` exposes `.symbol`/`.company_name`, `sec.Fact` carries `period_start`/`frame`, `sec.CompanyFacts` wraps `.facts`, `ladder.LADDER_TAGS` is a 19-pair frozenset, `005_fundamentals.sql` has no `frame` column and keys `fundamentals_log` by `cik`. The module and tests came out of the plan's code blocks essentially verbatim.
+    - One plan bug, test-only: Step 11's `seed_universe` calls `conn.executemany`, which psycopg3 `Connection` does not have (only `Cursor` does). Fixed to `with conn.cursor() as cur: cur.executemany(...)`, the shape `test_backtest_io.py:51` already uses.
+    - Live `python -m seer_engine fundamentals` against data.sec.gov was not exercised: this host has no `.env`, so neither `SEC_CONTACT_EMAIL` nor `DATABASE_URL_UNPOOLED` is set, and the coordinator ruled the exit criteria are not gated on a live run. The missing-setting path was verified instead (exit 2). Exit criteria 1-4 and 6 are the operator's first real run, once phases 1 and 4 are both on the branch (C8).
+  - **Decided**:
+    - `run()` reads the contact through `sec.require_contact()` inside `try/except config.ConfigError -> return 2`, not Step 4's bare `config.require("SEC_CONTACT_EMAIL")` (rung 3: C4, a reconciled contract in the same plan, names `sec.require_contact()` as the accessor; rung 6: `commands/nightly.py:76-80` is the identical shape for `MASSIVE_API_KEY`). Behaviour is unchanged either way -- `cli.main` maps `ConfigError` to 2 -- but the error now names the setting before a connection is opened.
+    - Kept Step 7's `except sec.SecNotFound -> STATUS_EMPTY` branch, against the Impact paragraph two lines below it which says SecNotFound "is not special cased here" (rung 3: the step's own code block has the branch, and C4 states 404 -> `empty`). The prose is the stale half.
+    - Committed the two files by literal path from the main context instead of delegating `git add` to a `pusher` subagent (rung 6 / narrower blast radius, on the coordinator's shared-worktree ruling: phase 7's `f_fundamental.py`, `m0005_fundamental_factors.py` and a modified `test_lab_methods.py` were uncommitted in this tree while this phase committed). `git show --stat 886c7ad` confirms exactly 2 files.
+    - `readme-updater` skipped, same precedent as P1-ENG-R7TL and P1-ENG-DKWU: `engine/package_readme.md` is a shared file and phase 7 is live in this worktree, and phase 7 already owns the `fundamentals` rows in `docs/runbooks/data-pipeline.md` (H5), which is where this command's contract is documented.
 - [x] **P1-ENG-R7TL** Phase 1: Vendored ticker→CIK map and loader
   - **Difficulty**: NORMAL
   - **Type**: Feature

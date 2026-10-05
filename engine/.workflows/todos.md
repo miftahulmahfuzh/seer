@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-04 22:20:00
-**Total Active Tasks**: 0
+**Last Updated**: 2026-10-05 11:00
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 54
+- Completed: 60
 
 ---
 
@@ -23,6 +23,20 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [x] **P1-ENG-AHLW** Phase 7: Fundamental factor allocator, lab method, runbook
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `seer_engine/strategies/f_fundamental.py`, a lab method `seer_engine/lab/methods/m0005_<slug>.py`, the `fundamentals` rows in `docs/runbooks/data-pipeline.md`, `engine/tests/test_f_fundamental.py`, and the one branch added to `engine/tests/test_lab_methods.py:85–93` — no other phase touches that file. Does not touch `f_factor.py`, `seer_engine/fundamentals/*`, `backtest/*`, `strategies/allocator.py`, or `seer_engine/research.py` (phase 6 owns the research store). Exit: the allocator ranks on value, quality, profitability and SUE with eligibility rules in the style of `f_factor`, reading phase 5's annual flows through one `panel.as_of(symbol, t)` call per symbol; it implements phase 6's `MarketAware` by defining `prepare_market` and does not widen `Allocator`; its id (`FND`) is unique across lab methods; the method declares 6 fixed variants, and the SUE-free ones pass a hermetic end-to-end dev-window test over a real `FundamentalPanel` while the SUE-ranking ones (including both composites, since `rank="composite"` reads every factor) are held to the criterion a synthetic annual panel can meet: they rank nobody and raise nothing, because `Snapshot.sue` is NaN without a quarterly EPS series. `lab run M0005` is NOT executed by this phase — `runner.preflight` refuses a second run of any method, so one premature run against a store without fundamentals would record all-cash trials and burn the method id permanently; the warning goes in the method docstring and the runbook, which documents the command, its exit codes and how to re-vendor `ticker_cik.csv`.
+  - **Status**: completed
+  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 7 of 7)
+  - **Satisfies**: R6 — Factor exposure to the lab: value, quality, profitability, SUE; consensus surprise out of scope
+  - **Depends on**: P1-ENG-9U93, P1-ENG-0LUS
+  - **Plan**: `.workflows/plan/P1-ENG-AHLW.md`
+  - **Completed**: 2026-10-05 11:20
+  - **Method**: /implement
+  - **Commit**: 81d2256
+  - **Decisions**: quality ranking expectation CCC,DDD,AAA,BBB -> CCC,AAA,DDD,BBB (rung 3, `_row` + `rank_rows`); SUE-ranking test's `fundamental_rows` call corrected to the 5-arg form with a real history (rung 3, Step 1's signature); `NO_FLOOR` min_price 0.0 -> 0.01 (rung 3, `__post_init__` rejects < 0.01 and `test_params_reject_bad_values` pins it); dev-window test 400 -> 460 sessions filtered to <= DEV_END (rung 2, the exit criterion requires the run to end on DEV_END); bookkeeping committed from the main context rather than via pusher (rung 5, the coordinator's shared-worktree ruling after this set's measured sweep incident).
+  - **Notes**: `lab run M0005` was NOT executed, by design — `runner.preflight` refuses a second run of any method. Also fixed `engine/package_readme.md`'s purity-glob sentence (four packages, two impure edges), a stale line two phases flagged and neither owned.
 - [x] **P1-ENG-DKWU** Phase 3: Vectorized bracket labeler
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -50,6 +64,129 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-22VQ** Phase 4: `fundamentals` command — resumable ingest
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `seer_engine/commands/fundamentals.py` and `engine/tests/test_fundamentals_command.py`, including `sync_ticker_cik` — the one writer of the `ticker_cik` table from phase 1's CSV. Does not touch `cli.py` (discovery is automatic), the backtest, `engine/data/*`, `db/migrations/*`, the runbook; it imports the ingest tag allowlist as `fundamentals.ladder.LADDER_TAGS` from phase 5's pure package and derives nothing itself. Exit: `python -m seer_engine fundamentals` loads facts for every ever-member the scope predicate selects (795 on 2026-10-05, SPY excluded), resolved through phase 1's map by date, writing facts and `fundamentals_log` rows in one transaction per batch. The unit of work is the CIK, not the symbol: `plan_jobs` resolves every in-scope symbol, groups by CIK, and skips CIKs already logged, so a share-class pair (GOOG/GOOGL) is one `companyfacts` call, one log row and one `rows` count — but both symbols still appear in the summary via `CikResult.per_symbol()`. `batch_size` counts CIKs; `--symbols` dedupes to CIKs but ignores the log outright; `--retry-failed` re-attempts `failed` and `empty` CIKs; `--dry-run` rolls everything back. `Summary.exit_code` is unchanged from `backfill`'s: 0 when nothing failed, 1 on any failure, 2 on a missing setting or an empty universe — an `empty` filer is not an error. A symbol with no CIK gets no log row at all and is re-evaluated every run; a symbol missing from the map is `failed` by design, so an incomplete CSV exits 1, while a symbol the map marks `NONE` is `empty` and exits 0.
+  - **Status**: completed
+  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 4 of 7)
+  - **Satisfies**: R1 — ticker → CIK bridge, vendored as `engine/data/ticker_cik.csv`, keyed so a recycled ticker can never resolve to the wrong company; R2 — Bulk ingest of SEC XBRL facts, `filed` as the no-look-ahead boundary, restatements kept queryable; R5 — New resumable `seer_engine` command respecting SEC fair access (User-Agent, 10 req/s)
+  - **Depends on**: P1-ENG-R7TL, P1-ENG-FPIL, P1-ENG-0351, P1-ENG-9U93
+  - **Plan**: `.workflows/plan/P1-ENG-22VQ.md`
+  - **Completed**: 2026-10-05 11:00
+  - **Method**: /implement
+  - **Commit**: 886c7ad
+  - **Files**: engine/src/seer_engine/commands/fundamentals.py, engine/tests/test_fundamentals_command.py
+  - **Drift**:
+    - No drift in any cross-phase contract. C1-C8 were each re-verified against the landed code before the first edit: `cik.CikRow` exposes `.symbol`/`.company_name`, `sec.Fact` carries `period_start`/`frame`, `sec.CompanyFacts` wraps `.facts`, `ladder.LADDER_TAGS` is a 19-pair frozenset, `005_fundamentals.sql` has no `frame` column and keys `fundamentals_log` by `cik`. The module and tests came out of the plan's code blocks essentially verbatim.
+    - One plan bug, test-only: Step 11's `seed_universe` calls `conn.executemany`, which psycopg3 `Connection` does not have (only `Cursor` does). Fixed to `with conn.cursor() as cur: cur.executemany(...)`, the shape `test_backtest_io.py:51` already uses.
+    - Live `python -m seer_engine fundamentals` against data.sec.gov was not exercised: this host has no `.env`, so neither `SEC_CONTACT_EMAIL` nor `DATABASE_URL_UNPOOLED` is set, and the coordinator ruled the exit criteria are not gated on a live run. The missing-setting path was verified instead (exit 2). Exit criteria 1-4 and 6 are the operator's first real run, once phases 1 and 4 are both on the branch (C8).
+  - **Decided**:
+    - `run()` reads the contact through `sec.require_contact()` inside `try/except config.ConfigError -> return 2`, not Step 4's bare `config.require("SEC_CONTACT_EMAIL")` (rung 3: C4, a reconciled contract in the same plan, names `sec.require_contact()` as the accessor; rung 6: `commands/nightly.py:76-80` is the identical shape for `MASSIVE_API_KEY`). Behaviour is unchanged either way -- `cli.main` maps `ConfigError` to 2 -- but the error now names the setting before a connection is opened.
+    - Kept Step 7's `except sec.SecNotFound -> STATUS_EMPTY` branch, against the Impact paragraph two lines below it which says SecNotFound "is not special cased here" (rung 3: the step's own code block has the branch, and C4 states 404 -> `empty`). The prose is the stale half.
+    - Committed the two files by literal path from the main context instead of delegating `git add` to a `pusher` subagent (rung 6 / narrower blast radius, on the coordinator's shared-worktree ruling: phase 7's `f_fundamental.py`, `m0005_fundamental_factors.py` and a modified `test_lab_methods.py` were uncommitted in this tree while this phase committed). `git show --stat 886c7ad` confirms exactly 2 files.
+    - `readme-updater` skipped, same precedent as P1-ENG-R7TL and P1-ENG-DKWU: `engine/package_readme.md` is a shared file and phase 7 is live in this worktree, and phase 7 already owns the `fundamentals` rows in `docs/runbooks/data-pipeline.md` (H5), which is where this command's contract is documented.
+- [x] **P1-ENG-R7TL** Phase 1: Vendored ticker→CIK map and loader
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/data/ticker_cik.csv` (generated once and committed), its documentation block in `engine/data/SOURCES.md`, a new `seer_engine/cik.py` loader validating it in the style of `membership.load_aliases`, `engine/scripts/build_ticker_cik.py` (the committed one-off generator, a new directory linted by `ruff check engine`), and `engine/tests/test_cik.py`. Does not touch the database or the `ticker_cik` table (phase 2 declares it, phase 4 writes it), the SEC client, any command, `.env.example`. Exit: the CSV covers every ever-member the scope predicate selects (795 on 2026-10-05; tests derive the set from `membership.symbols_since(...)` and never assert a literal count) with explicit validity intervals; the loader rejects a bad header, an overlapping interval for one ticker, and a CIK that is not 10 digits; a test asserts each of CA, MON, PLL, ALTR, LLL and DTV resolves to the company that held the ticker during its S&P/NDX membership and not to the current holder; Kellanova resolves to `0000055067`, with a test pinning that `0000039899` (TEGNA) is not it.
+  - **Status**: completed
+  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 1 of 7)
+  - **Satisfies**: R1 — ticker → CIK bridge, vendored as `engine/data/ticker_cik.csv`, keyed so a recycled ticker can never resolve to the wrong company
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-R7TL.md`
+  - **Completed**: 2026-10-05 11:12
+  - **Method**: /implement
+  - **Files**: engine/data/ticker_cik.csv, engine/data/SOURCES.md, engine/src/seer_engine/cik.py, engine/tests/test_cik.py, engine/scripts/build_ticker_cik.py
+  - **Drift**:
+    - No drift from the plan. Every API it quotes (`membership.Interval`/`normalize_ticker`/`symbols_since`, `http.get_json`'s retries+backoff kwargs, `SOURCES.md` lines 3-5 and its 139-line tail) matched the tree exactly. `cik.py` and `test_cik.py` were extracted verbatim from the plan's code blocks.
+    - Generator needed 3 passes, as the plan predicted. Tiers resolved more than measured: 33 unresolved (plan predicted 93), then the periodic-filing screen caught 37 more.
+  - **Decided**:
+    - `SEC_CONTACT_EMAIL` for the generator -> mahfuzh74@gmail.com (rung 6, surrounding convention: SEC fair access requires a real contact in the User-Agent; the repo's own git config user.email is the in-tree answer). Passed via the environment only, never committed; phase 3 owns the `config.py` setting.
+    - Generator's filing screen now skips `NO_FILER` rows (rung 2: exit criteria require the CSV to cover every ever-member, and the index's Decisions table defines `NONE` as the answer for a symbol with no EDGAR filer; the plan's code block would have crashed fetching `CIKNONE.json`, so it never encoded the path its own Step 3 prose requires).
+    - Added `SCREEN_EXEMPT` to the generator: 11 symbols whose absence of a periodic filing was hand-verified and explained in code (rung 2 + the plan's own "a net, not a gate"). Without it a CORRECT file could never make the generator exit 0. Three recurring reasons: a bank rather than a bank holding company files periodic reports with the FDIC under Exchange Act s12(i), never EDGAR (FRC, SBNY); a short span ends before the next 10-K falls due (SWY 25 days, PETM 10 weeks, FCPT 7 days, VSNT 4 days); a current member's span opened weeks ago (BE, NBIS, P, RDDT, VMRK).
+    - 70 hand-audited `MANUAL` rows, each verified against `data.sec.gov/submissions` with its evidence in the CSV's note column: 9 seeded + 33 that reached no automated tier + 27 the screen caught + HAR.
+    - HAR: the single fuzzy-tier row was WRONG and the screen passed it — `difflib` matched Massive's "Harman International Industries" to "AMERICAN INTERNATIONAL INDUSTRIES" (`0001073146`), an unrelated company that filed 4 periodic reports inside the span. Corrected to `0000800459`. The file now has ZERO fuzzy rows.
+    - Hand-audit recorded in `SOURCES.md` as method + categories + counts, pointing at the CSV's mandatory note column for per-row evidence, rather than duplicating 70 rows into prose (tie-break: one owner per concept — a second copy can only drift).
+    - readme-updater -> skipped for this phase; `engine/package_readme.md` holds phase 6's uncommitted edits and phase 1 ships a vendored data file plus a pure loader, both documented in `engine/data/SOURCES.md`, which phase 1 owns (same precedent as P1-ENG-DKWU).
+- [x] **P1-ENG-0LUS** Phase 6: `Market.fundamentals` + the `MarketAware` hook
+  - **Difficulty**: HARD
+  - **Type**: Update
+  - **Context**: Owns the new `fundamentals` field on `Market`, the panel load in `backtest/io.py` (cached by table fingerprint like `bars`, reading `fundamental_facts` joined to `ticker_cik` because facts are CIK-keyed and the panel is symbol-keyed), the `MarketAware` protocol + `prepare_for` helper, the single real call site `dev.py:455`, the two docstrings at `runner.py:143` and `walkforward.py:200`, every other place a `Market` is constructed and would silently drop the new field (`dev.py:367`, `research.py:472`, `paper/replay.py:281`, `commands/paper.py:254`) — including the research store's optional `fundamentals.csv` artifact (`research.py`, `commands/research_store.py` + a new `--with-fundamentals` flag), without which the lab sees an empty panel — and `engine/tests/test_market_fundamentals.py`. Does not touch the existing allocators' behaviour, `Allocator`'s member set (which must not gain `prepare_market`), `test_strategy_purity.py`, `test_lab_methods.py`, `research.DATA_FILES` or `engine/tests/test_research_store.py` — the new store file is optional, carried in `OPTIONAL_DATA_FILES`. Exit: `Market` stays frozen and pure; `load_market` returns a panel and still works against a database with neither `fundamental_facts` nor `ticker_cik`; `isinstance(x, Allocator)` is still True for all eleven existing implementers; `test_strategy_purity.py` is byte-identical to what phase 5 left and so is `test_research_store.py`; a store rebuilt with `--with-fundamentals` carries a panel equal to `io.load_panel(conn)`'s, and a store built before this phase still loads with the same fingerprint `origin/main` computes for it; every existing backtest produces byte-identical output to `origin/main` for one pinned candidate.
+  - **Status**: completed
+  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 6 of 7)
+  - **Satisfies**: R6 — Factor exposure to the lab: value, quality, profitability, SUE; consensus surprise out of scope
+  - **Depends on**: P1-ENG-FPIL, P1-ENG-9U93
+  - **Plan**: `.workflows/plan/P1-ENG-0LUS.md`
+  - **Completed**: 2026-10-05 10:37
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/market.py, engine/src/seer_engine/backtest/io.py, engine/src/seer_engine/strategies/allocator.py, engine/src/seer_engine/backtest/dev.py, engine/src/seer_engine/backtest/runner.py, engine/src/seer_engine/backtest/walkforward.py, engine/src/seer_engine/research.py, engine/src/seer_engine/commands/research_store.py, engine/src/seer_engine/paper/replay.py, engine/src/seer_engine/commands/paper.py, engine/tests/test_market_fundamentals.py
+  - **Drift**:
+    - `seer_engine.fundamentals.FundamentalPanel` is `@dataclass(frozen=True, eq=False)` by phase 5, so `panel_a == panel_b` is identity, not value equality. The plan's test block asserted panel equality twice. Phase 5 owns that type and this phase must not edit it, so the tests compare the per-symbol `Fact` tuples through a local `panel_facts()` helper instead (`Fact` is a plain frozen dataclass with value equality).
+    - `engine/tests/test_research_store.py::test_no_neon_and_no_database_url_needed` AST-scans BOTH `research.py` AND `commands/research_store.py` and fails either one that names `seer_engine.db` or `psycopg`. The plan's Step 7 item 8 put `db.connect()` inside `commands/research_store.py`, which turned that test RED. That file is byte-identical shipped code with no owner in this plan set, and phase 6's own exit criterion 6 requires it stay untouched and green.
+    - The plan's test block had two self-inconsistent assertions, both corrected: (a) `facts_fingerprint()` leaves an implicit transaction open, so the `load_market()` call right after it raised "needs a connection with no transaction in progress"; (b) the stale-pickle test seeded a new fact filed 2016-04-27, EARLIER than the already-seeded max filed of 2017-03-01, so `max(filed)` never moved and the asserted pickle name was unreachable.
+    - No pre-existing research store exists anywhere on this machine, so the plan's "load `/home/miftah/seer/engine/.research`" check was run instead as a cross-checkout equivalent: a four-file store built by the `origin/main` checkout, then loaded by both checkouts.
+    - The plan's pinned-candidate diff reads a research store that does not exist and whose real build needs hours of yfinance downloads. It was run instead over a deterministic synthetic market generated identically in both checkouts — a real ~19-year `F4-MOM12-N10-TREND` backtest through `dev.run_registry`, i.e. through the exact line this phase changed.
+  - **Decided**:
+    - `FundamentalPanel` is `eq=False` and phase 5 owns it -> compare per-symbol `Fact` tuples rather than panels, and do not add `__eq__` to phase 5's type (rung 2: exit criterion 7's "facts equal to `io.load_panel(conn)`'s … a round-trip assertion" means value equality of the facts, which `Fact` already has)
+    - Where the `--with-fundamentals` database connection lives: the plan said `commands/research_store.py`, but that makes the unowned, byte-identical `test_research_store.py` fail -> moved into `backtest/io.py` as `io.read_facts()`, the tree's declared impure backtest edge that `test_strategy_purity.py` skips by name (rung 2: phase 6's exit criterion 6, "`test_research_store.py` byte-identical and green", outranks rung 3's placement of the call). `research.py` still imports nothing from `seer_engine.db`, so the "Never Neon" invariant the Decisions table protects is intact, and `build_store` still takes a plain facts sequence.
+    - The stale-pickle test's new fact re-dated 2016-04-27 -> 2017-04-27 so that `max(filed)` actually advances (rung 2: the exit criterion is that a NEW fingerprint sweeps the stale pickle; the fix preserves and strengthens the check rather than relaxing it)
+    - `fundamentals.csv` is NOT clipped at `DEV_END` the way bars/dividends/fx are (rung 2: exit criterion 7 requires the store panel equal the database panel; look-ahead is already prevented downstream by phase 5's `as_of(symbol, t)`, which exposes only `filed <= t`)
+- [x] **P1-ENG-9U93** Phase 5: Pure derivation: concept ladder, PIT selection, SUE
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `seer_engine/fundamentals/` (`__init__.py`, `ladder.py`, `panel.py`, `sue.py`), `engine/tests/test_fundamentals_derive.py`, and the additive extension of `engine/tests/test_strategy_purity.py`'s glob to cover the new package — it is the sole owner of that shared test file, which phase 6 must leave byte-identical. It also owns `ladder.LADDER_TAGS`, which phase 4 imports as the ingest allowlist, so a rung added here later costs a full re-ingest and `ladder.py`'s docstring must say so. Does not touch the database, the network, `Market`, any allocator. Exit: the concept ladder reproduces the measured coverage over the 8 sampled filers (revenue 2 variants; net income, assets, equity, OCF, diluted EPS, shares outstanding 1 each; operating income missing for SIVB and PXD; gross profit present only for CELG and WRK, derived as `Revenues − CostOfRevenue` elsewhere with the fallback documented in the module docstring); point-in-time selection returns the latest fact with `filed <= t`, proven by a test on a real restatement; SUE is the seasonal random walk `EPS_q − EPS_{q−4}` scaled by the dispersion of recent surprises, with the minimum history it needs stated and enforced.
+  - **Status**: completed
+  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 5 of 7)
+  - **Satisfies**: R3 — Concept ladder over the measured tag variants, gross profit derived with a documented fallback
+  - **Depends on**: P1-ENG-FPIL
+  - **Plan**: `.workflows/plan/P1-ENG-9U93.md`
+  - **Completed**: 2026-10-05 10:04
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/fundamentals/__init__.py, engine/src/seer_engine/fundamentals/ladder.py, engine/src/seer_engine/fundamentals/panel.py, engine/src/seer_engine/fundamentals/sue.py, engine/tests/test_fundamentals_derive.py, engine/tests/test_strategy_purity.py
+  - **Drift**:
+    - None. `test_strategy_purity.py` matched the plan exactly at lines 1-6, 34 and 60-72; the glob extension was the three additive edits the plan specified.
+    - The 31 errors in the full-suite run are all `engine/tests/test_cik.py` (FileNotFoundError on the vendored CSV phase 1 has not finished generating). Zero failures, zero non-cik errors; the swarm coordinator ruled in advance that these belong to phase 1.
+  - **Decided**:
+    - `ladder.py`'s docstring said "revising it needs no re-ingest", while the plan's reconciled input contract and the plan index's Phase 5 Owns both require it to state that adding a rung costs a full re-ingest. The docstring now carries both precisely: reordering or dropping rungs among already-ingested tags is free; adding a NEW tag rung is not, because `LADDER_TAGS` is also phase 4's ingest allowlist — and the re-ingest recipe is spelled out. (Rung 4: the plan index's Phase 5 Owns outranks the stale prose inside the code block.)
+- [x] **P1-ENG-FPIL** Phase 2: Schema: `ticker_cik`, `fundamental_facts`, `fundamentals_log`
+  - **Difficulty**: EASY
+  - **Type**: Feature
+  - **Context**: Owns `db/migrations/005_fundamentals.sql` and the two `test_migrate.py` assertions that assume 004 is the last migration (`:300` and `:318`, repointed at `_upto(tmp_path, "004_news_veto.sql")`) plus the new 005 block; no other phase touches `engine/tests/test_migrate.py`. Does not touch any `engine/src` Python or `docs/runbooks/data-pipeline.md` (phase 7 owns it entirely). Exit: `migrate` applies it cleanly and is idempotent; `fundamental_facts`'s primary key is `(cik, taxonomy, tag, unit, period_start, period_end, accn)` — `accn` so a restatement inserts rather than overwrites, `period_start` so a 10-K's Q4 figure cannot collide with its full-year figure; `period_start` is `NOT NULL` with `period_start = period_end` meaning instantaneous; `fundamentals_log` mirrors `backfill_log`'s shape but is keyed by `cik` (invariant 4); `ticker_cik.source`'s CHECK matches phase 1's tier labels; every table is additive (`CREATE TABLE IF NOT EXISTS`) in the style of `002_engine.sql`; `test_migrate.py` is green.
+  - **Status**: completed
+  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 2 of 7)
+  - **Satisfies**: R4 — Postgres schema + migration consistent with `bars`/`universe`/`dividends`/`split_adjustments`
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-FPIL.md`
+  - **Completed**: 2026-10-05 09:40
+  - **Method**: /do
+  - **Files**: db/migrations/005_fundamentals.sql, engine/tests/test_migrate.py
+  - **Drift**:
+    - Plan Step 2's code block calls `_upto(tmp_path, '004_news_veto.sql')` twice in one test; `_upto` does a bare `mkdir()` so the second call raised FileExistsError. The plan's prose claimed the two calls get different directories — that was wrong, the directory name is keyed only on `last`. Bound the directory to a local and reused it.
+    - The worktree had no `engine/.venv`; created one (python 3.12.7, `pip install -e 'engine[dev]'`) rather than using the main checkout's editable install.
+    - No `seer-pg` test container existed; started one per `docs/runbooks/data-pipeline.md:238` (postgres:16 on 55432).
+    - The plan's manual check against the real database was not run — no `.env` / `DATABASE_URL_UNPOOLED` is reachable from this worktree.
+  - **Decided**:
+    - Plan Step 2's duplicate `_upto` call -> bind the directory to a local and reuse it, rather than making the shared `_upto` helper idempotent (rung 3: the phase plan's code block is the authority on intent; the plan also says nothing else in the file moves)
+    - Manual `migrate` against the real Neon DB -> skipped; exit criterion 1 is proven by `test_005_is_applied_last_and_only_once` and `test_005_sql_is_idempotent` against a real Postgres 16 (rung 2: the exit criteria name the tests)
+    - Verification interpreter -> the worktree's own `engine/.venv`, created here (rung 6: surrounding convention, which states never to test a worktree with `/home/miftah/seer/engine/.venv`)
+- [x] **P1-ENG-0351** Phase 3: SEC client (`sec.py`) and `SEC_CONTACT_EMAIL`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `seer_engine/sec.py`, the `SEC_CONTACT_EMAIL` key in `.env.example` (the only phase that edits that file), and `engine/tests/test_sec.py`; `config.py` is not edited — it exposes no named accessors, so `sec.require_contact()` is the local accessor exactly as `finnhub.load_key` is. Does not touch `http.py`'s module-level session (Massive and Finnhub must not inherit the contact User-Agent), the database, the command module. Exit: the client fetches `companyfacts/CIK##########.json`, enforces ≤ 10 req/s from the end of the previous call, sends a `User-Agent` carrying `SEC_CONTACT_EMAIL`, retries 429/5xx with backoff honouring `Retry-After`, raises a typed error otherwise, and takes an injectable transport/clock/sleep so tests never touch the network.
+  - **Status**: completed
+  - **Plan Set**: `EDGAR_FUNDAMENTALS_PLAN.md` (phase 3 of 7)
+  - **Satisfies**: R2 — Bulk ingest of SEC XBRL facts, `filed` as the no-look-ahead boundary, restatements kept queryable; R5 — New resumable `seer_engine` command respecting SEC fair access (User-Agent, 10 req/s)
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-0351.md`
+  - **Completed**: 2026-10-05 09:40
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/sec.py, engine/tests/test_sec.py, .env.example
+  - **Drift**: none — the tree matched every line the plan quoted: `.env.example` ended at line 21 on `FINNHUB_API_KEY=`, `http.py` had `redact`/`_session`/`USER_AGENT`/`HttpError(message, status)`, `config.py` had `require`/`ConfigError`/`_loaded`, `__version__ == 0.1.0`
+  - **Decided**:
+    - `test_first_call_does_not_wait_and_calls_are_spaced_by_min_interval` asserted `clock.sleeps == [0.11, 0.11]`, but a wait is computed as `last + MIN_INTERVAL - now` and lands at 0.10999999999999943 -> both expected values wrapped in `pytest.approx` (rung 3, the plan's own code blocks: the sibling test two functions below already uses `pytest.approx(sec.MIN_INTERVAL - 0.04)` for the identical arithmetic). What is asserted — two waits, each one MIN_INTERVAL — is unchanged
+    - Step 3 created a task for phase 3 only, not all seven (rung 6 / narrower blast radius: phases 1 and 2 are live in this same worktree and six of seven phases map to this file, so three sessions minting from one counter would be a lost-update race). A sibling had already booked all seven; deferred to its published P1-ENG-0351
+    - readme-updater not dispatched: `engine/package_readme.md` is shared with two live sibling phases, and phase 3's Files table names exactly three files. Phase 7 owns the runbook line for `SEC_CONTACT_EMAIL` per this plan's Handoffs
 - [x] **P1-ENG-6QQA** Phase 1: Lab snapshot export + synthesis kind
   - **Difficulty**: NORMAL
   - **Type**: Feature

@@ -27,7 +27,7 @@ from seer_engine.backtest.dev import DEV_END, run_candidate
 from seer_engine.backtest.registry import REGISTRY
 from seer_engine.lab import store
 from seer_engine.lab.method import discover, source_sha
-from seer_engine.strategies.allocator import Allocator
+from seer_engine.strategies.allocator import Allocator, MarketAware
 
 METHODS = discover()
 CANDIDATES = [(mid, c) for mid, (m, _) in METHODS.items() for c in m.candidates]
@@ -90,6 +90,13 @@ def test_allocator_contract(market, mid, c):
     nonempty = assert_p4_identity(c.allocator, market.history, members, [dates.prev_session(s) for s in probe],
                        held_sets, [c.params])
     nonempty += assert_no_lookahead(c.allocator, market.history, members, probe, held_sets, [c.params])
+    if isinstance(c.allocator, MarketAware):
+        # A market-aware allocator reads its panel through prepare_market(market); the kit only
+        # drives prepare(history), so by contract it must target nothing here. The checks above
+        # still prove the history-only path never crashes and never looks ahead; the live path
+        # is covered by the allocator's own test module.
+        assert nonempty == 0, f"{c.id}: a market-aware allocator must target nothing with no panel"
+        return
     assert nonempty > 0, f"{c.id}: every probe returned no targets, so the contract check proved nothing"
 
 

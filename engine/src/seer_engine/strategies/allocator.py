@@ -18,6 +18,11 @@ tests/allocatorkit.py checks all of this for every allocator.
 ``prepare(history)`` takes no params, so the adapter and overlays, whose inner objects live in
 their params, prepare lazily: their prepared value is a ``LazyPrepared`` that runs each inner
 object's ``prepare`` on first use and keeps the result, keyed by object identity.
+
+An allocator that needs more than bars -- the point-in-time fundamentals panel, say -- declares
+``prepare_market(market)`` instead and gets the whole ``Market``. ``prepare`` is unchanged and
+stays the interface every existing allocator implements; the two are dispatched by
+``prepare_for(obj, market)``, which the dev/lab runner calls.
 """
 
 from __future__ import annotations
@@ -28,7 +33,7 @@ from collections.abc import Set as AbstractSet
 from dataclasses import dataclass, replace
 from datetime import date
 from decimal import ROUND_DOWN, Decimal
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import numpy as np
 
@@ -41,13 +46,23 @@ from seer_engine.strategies.indicators import stdev_return_window
 
 TRADING_DAYS = 252  # vol annualization: daily stdev × sqrt(252)
 
+if TYPE_CHECKING:  # typing only: no runtime import, so no strategies -> backtest import cycle
+    from seer_engine.backtest.market import Market
+
 
 # --------------------------------------------------------------------------- the protocol
 
 
 @runtime_checkable
 class Allocator(Protocol):
-    """Maps history at data_date's close (plus what is held) to target weights for the next session."""
+    """Maps history at data_date's close (plus what is held) to target weights for the next session.
+
+    ``prepare_market`` is NOT a member of this protocol, deliberately: this protocol is
+    ``runtime_checkable`` and eight production sites test ``isinstance(x, Allocator)``, so adding
+    a member -- even one with a default body -- would make every existing allocator fail the
+    check. An allocator that wants the whole ``Market`` implements ``MarketAware`` alongside this
+    protocol instead, and ``prepare_for`` picks the right one.
+    """
 
     id: str
 
@@ -78,6 +93,46 @@ class Allocator(Protocol):
         held: frozenset[str],
         params: Any,
     ) -> tuple[Target, ...]: ...
+
+
+@runtime_checkable
+class MarketAware(Protocol):
+    """An allocator that prepares from the whole ``Market``, not only its bars.
+
+    Optional and additive: an allocator implements this *in addition to* ``Allocator``, and
+    ``prepare_for`` routes to ``prepare_market`` when it is present and to ``prepare`` when it is
+    not. An implementer still needs ``prepare`` -- it is an ``Allocator`` member, and
+    ``allocatorkit``'s P4 identity check drives the plain path.
+
+    ``runtime_checkable`` tests attribute presence only. ``isinstance(x, MarketAware)`` is
+    therefore exactly "``x`` has an attribute called ``prepare_market``": it does not check the
+    arity, the annotations, the return type, or even that the attribute is callable. That is
+    enough for dispatch and no more, which is why ``prepare_for`` checks callability itself.
+    """
+
+    def prepare_market(self, market: Market) -> Any: ...
+
+
+def prepare_for(obj: Any, market: Market) -> Any:
+    """``obj``'s prepared value for ``market``: the ``MarketAware`` path when it has one.
+
+    ``obj.prepare_market(market)`` when ``obj`` defines ``prepare_market``, otherwise
+    ``obj.prepare(market.history)`` -- which is what every call site did before the hook existed,
+    so an allocator that does not define it sees no change at all. ``obj`` may be an
+    ``Allocator`` or a bracket ``Strategy``; both have ``prepare``.
+
+    Raises TypeError when ``prepare_market`` is present but not callable, because
+    ``runtime_checkable`` cannot tell a method from a data attribute and a silent fallback there
+    would hide a typo as a quietly bar-only allocator.
+    """
+    if not isinstance(obj, MarketAware):
+        return obj.prepare(market.history)
+    fn = obj.prepare_market
+    if not callable(fn):
+        raise TypeError(
+            f"{type(obj).__name__}.prepare_market must be callable, got {type(fn).__name__}"
+        )
+    return fn(market)
 
 
 # --------------------------------------------------------------------------- shared helpers

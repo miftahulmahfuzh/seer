@@ -47,8 +47,15 @@ import pandas as pd
 
 from seer_engine import config, dates, fx, membership, yahoo
 from seer_engine.backtest.benchmark import Dividend
-from seer_engine.backtest.io import BAR_COLUMNS, LoadError, histories_from_frame, merge_intervals
-from seer_engine.backtest.market import Market, Membership
+from seer_engine.backtest.io import (
+    BAR_COLUMNS,
+    LoadError,
+    facts_from_frame,
+    histories_from_frame,
+    merge_intervals,
+)
+from seer_engine.backtest.market import EMPTY_FUNDAMENTALS, Market, Membership
+from seer_engine.fundamentals import FACT_COLUMNS, Fact, FundamentalPanel as Panel
 from seer_engine.prices import to_decimal
 
 log = logging.getLogger(__name__)
@@ -69,13 +76,25 @@ BARS_FILE = "bars.csv"
 DIVIDENDS_FILE = "dividends.csv"
 FX_FILE = "fx.csv"
 UNSERVED_FILE = "unserved.csv"
+FUNDAMENTALS_FILE = "fundamentals.csv"
 MANIFEST_FILE = "manifest.json"
 DATA_FILES: tuple[str, ...] = (BARS_FILE, DIVIDENDS_FILE, FX_FILE, UNSERVED_FILE)
+
+OPTIONAL_DATA_FILES: tuple[str, ...] = (FUNDAMENTALS_FILE,)
+"""Store files a build MAY write. Deliberately separate from ``DATA_FILES``.
+
+``fundamentals.csv`` is optional, never a fifth required file: ``_read_manifest`` requires the
+four ``DATA_FILES`` names and ``load_store`` hashes the manifest's own keys, so a store built
+before fundamentals existed keeps loading with a **bit-identical fingerprint** and every
+recorded lab trial stays valid. Widening ``DATA_FILES`` instead would make every store on disk
+raise ``ValueError`` before any reader ran.
+"""
 
 BARS_HEADER = "symbol,date,open,high,low,close,volume"
 DIVIDENDS_HEADER = "symbol,ex_date,amount"
 FX_HEADER = "date,usd_idr"
 UNSERVED_HEADER = "symbol,reason"
+FUNDAMENTALS_HEADER = ",".join(FACT_COLUMNS)
 UNSERVED_REASON = f"yfinance returned no bars for {STORE_START.isoformat()}..{DEV_END.isoformat()}"
 
 _COUNT_KEYS: tuple[str, ...] = (
@@ -200,6 +219,71 @@ def fingerprint_of(files: Mapping[str, str]) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+# ---- fundamentals --------------------------------------------------------------------------
+
+
+def fundamentals_lines(facts: Sequence[Fact]) -> list[str]:
+    """``facts`` as ``FUNDAMENTALS_HEADER`` rows, sorted, in ``io.FACTS_COPY_SQL``'s encoding.
+
+    The cells are exactly what that COPY emits, because ``_read_fundamentals`` parses them with
+    ``io.facts_from_frame`` -- the one text -> ``Fact`` path in the tree. So: ISO dates, ``''``
+    for ``period_start`` when the fact is instantaneous (``Fact.period_start is None``), and
+    ``''`` for a null ``fy``/``fp``. ``val`` is written with ``repr``, which round-trips a
+    float64 exactly under ``float_precision="round_trip"``.
+
+    The sort is the COPY's ``ORDER BY``, so a store rebuilt from the same facts is byte-stable
+    and its fingerprint is a function of the data alone. No cell can hold a comma: they are
+    tickers, SEC tags, units, accession numbers, form types, ISO dates and float reprs.
+    """
+    rows = []
+    for f in facts:
+        if not isinstance(f, Fact):
+            raise TypeError(f"facts must hold fundamentals.Fact, got {type(f).__name__}")
+        rows.append(
+            (
+                f.symbol,
+                f.taxonomy,
+                f.tag,
+                f.unit,
+                f.period_start.isoformat() if f.period_start is not None else "",
+                f.period_end.isoformat(),
+                repr(float(f.val)),
+                f.accn,
+                f.form,
+                "" if f.fy is None else str(f.fy),
+                "" if f.fp is None else f.fp,
+                f.filed.isoformat(),
+            )
+        )
+    rows.sort(key=lambda r: (r[0], r[1], r[2], r[3], r[5], r[4], r[11], r[7]))
+    return [",".join(r) for r in rows]
+
+
+def _read_fundamentals(path: Path) -> Panel:
+    """The store's fact panel, or EMPTY_FUNDAMENTALS when the store has no fundamentals.csv.
+
+    The file is written from ``fundamentals_lines`` in ``io.FACTS_COPY_SQL``'s encoding, so its
+    cells are exactly what that COPY emits: ISO dates, ``''`` for a NULL fy/fp, and ``''`` for
+    ``period_start`` when the fact is instantaneous. ``io.facts_from_frame`` is the ONE function
+    in the tree that turns that text back into ``Fact`` objects, and reusing it here is what
+    makes the store-backed panel and the database-backed panel identical by construction rather
+    than by inspection. Do NOT route this through ``fundamentals.fact_from_row``: that function
+    takes typed values (date, Decimal) and would reject every string cell -- silently, because
+    ``facts_from_rows`` skips what it cannot parse.
+    """
+    if not path.is_file():
+        return EMPTY_FUNDAMENTALS
+    frame = pd.read_csv(
+        path,
+        dtype={c: str for c in FACT_COLUMNS} | {"val": np.float64},
+        na_filter=False,
+        float_precision="round_trip",
+    )
+    if tuple(frame.columns) != FACT_COLUMNS:
+        raise ValueError(f"{path.name}: header is {tuple(frame.columns)}, expected {FACT_COLUMNS}")
+    return Panel.from_facts(facts_from_frame(frame))
+
+
 # ---- build ---------------------------------------------------------------------------------
 
 
@@ -211,6 +295,7 @@ def build_store(
     sleep: Sleep = time.sleep,
     batch_size: int = DEFAULT_BATCH_SIZE,
     data_dir: Path | None = None,
+    facts: Sequence[Fact] | None = None,
 ) -> dict[str, Any]:
     """Build the research store at ``store_dir``; return its manifest.
 
@@ -219,6 +304,13 @@ def build_store(
     directory (default ``membership.DATA_DIR``). Raises ResearchStoreError when the build
     cannot finish (rate limited out, a download error, an unserved ETF, no or conflicting FX);
     then nothing is written and a previous store at ``store_dir`` is left untouched.
+
+    ``facts`` is the SEC point-in-time panel, as a plain sequence of ``fundamentals.Fact`` --
+    never a database connection, because this module imports nothing from ``seer_engine.db``
+    (see the module docstring's "Never Neon"). ``commands/research_store.py`` reads them behind
+    ``--with-fundamentals`` and passes them in. ``None`` -- the default, and every caller that
+    predates fundamentals -- writes no ``fundamentals.csv`` at all, so the store is
+    byte-identical to the one this function built before the field existed.
     """
     if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
         raise ValueError(f"batch_size must be an int >= 1, got {batch_size!r}")
@@ -243,6 +335,10 @@ def build_store(
             )
         _write_text(tmp / DIVIDENDS_FILE, DIVIDENDS_HEADER, dividend_lines)
         _write_text(tmp / UNSERVED_FILE, UNSERVED_HEADER, [f"{s},{UNSERVED_REASON}" for s in unserved])
+        extra_files: tuple[str, ...] = ()
+        if facts is not None:
+            _write_text(tmp / FUNDAMENTALS_FILE, FUNDAMENTALS_HEADER, fundamentals_lines(facts))
+            extra_files = (FUNDAMENTALS_FILE,)
         counts = {
             "bar_rows": bar_rows,
             "dividend_rows": len(dividend_lines),
@@ -250,7 +346,7 @@ def build_store(
             "symbols_requested": len(symbols),
             "symbols_served": len(served),
         }
-        manifest = _seal(tmp, counts)
+        manifest = _seal(tmp, counts, extra_files=extra_files)
         _swap_in(tmp, store_dir)
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -401,8 +497,15 @@ def _write_text(path: Path, header: str, lines: Sequence[str]) -> None:
             fh.write(line + "\n")
 
 
-def _seal(tmp: Path, counts: Mapping[str, int]) -> dict[str, Any]:
-    files = {name: file_sha256(tmp / name) for name in DATA_FILES}
+def _seal(tmp: Path, counts: Mapping[str, int], *, extra_files: Sequence[str] = ()) -> dict[str, Any]:
+    """The manifest for the store under ``tmp``, written and returned.
+
+    ``extra_files`` are the ``OPTIONAL_DATA_FILES`` this build actually wrote; they join
+    ``files`` (and therefore the fingerprint) and nothing else. ``_COUNT_KEYS`` deliberately
+    gains nothing: ``MANIFEST_KEYS`` is asserted as a whole set by
+    ``engine/tests/test_research_store.py``, which no phase of this plan set owns.
+    """
+    files = {name: file_sha256(tmp / name) for name in (*DATA_FILES, *extra_files)}
     manifest: dict[str, Any] = {
         "dev_end": DEV_END.isoformat(),
         "store_start": STORE_START.isoformat(),
@@ -438,7 +541,10 @@ def load_store(store_dir: Path, *, data_dir: Path | None = None) -> ResearchData
     store_dir = Path(store_dir)
     manifest = _read_manifest(store_dir)
     files: dict[str, str] = manifest["files"]
-    for name in DATA_FILES:
+    # The manifest's OWN keys, not DATA_FILES: a store built before fundamentals existed lists
+    # four files and must hash exactly those four, so its fingerprint is bit-identical to the
+    # one origin/main computes for the same directory.
+    for name in sorted(files):
         actual = file_sha256(store_dir / name)
         if actual != files[name]:
             raise ValueError(
@@ -454,6 +560,11 @@ def load_store(store_dir: Path, *, data_dir: Path | None = None) -> ResearchData
     dividends = _read_dividends(store_dir / DIVIDENDS_FILE)
     fx_rows = _read_fx(store_dir / FX_FILE)
     unserved = _read_unserved(store_dir / UNSERVED_FILE)
+    fundamentals = (
+        _read_fundamentals(store_dir / FUNDAMENTALS_FILE)
+        if FUNDAMENTALS_FILE in files
+        else EMPTY_FUNDAMENTALS
+    )
     served = int(frame["symbol"].nunique()) if len(frame) else 0
     actual_counts = {
         "bar_rows": int(len(frame)),
@@ -469,7 +580,12 @@ def load_store(store_dir: Path, *, data_dir: Path | None = None) -> ResearchData
         history = histories_from_frame(frame)
     except LoadError as exc:
         raise ValueError(f"{BARS_FILE}: {exc}") from exc
-    market = Market(history=history, membership=research_membership(data_dir), fx=fx_rows)
+    market = Market(
+        history=history,
+        membership=research_membership(data_dir),
+        fx=fx_rows,
+        fundamentals=fundamentals,
+    )
     spy_dividends = tuple(
         Dividend(ex_date=d, amount=a) for d, a in sorted(dividends.get("SPY", {}).items())
     )
@@ -521,12 +637,18 @@ def _read_manifest(store_dir: Path) -> dict[str, Any]:
             f"expects {STORE_START.isoformat()}; rebuild it"
         )
     files = manifest["files"]
+    # The four DATA_FILES are required; the OPTIONAL_DATA_FILES may be there and nothing else
+    # may. This is what keeps a store built before fundamentals existed loadable -- widening
+    # DATA_FILES instead would reject every such store with a ValueError before any reader ran.
     if (
         not isinstance(files, dict)
-        or set(files) != set(DATA_FILES)
+        or not set(DATA_FILES) <= set(files) <= set(DATA_FILES) | set(OPTIONAL_DATA_FILES)
         or not all(isinstance(v, str) for v in files.values())
     ):
-        raise ValueError(f"{path}: 'files' must map exactly {list(DATA_FILES)} to sha256 hex strings")
+        raise ValueError(
+            f"{path}: 'files' must map {list(DATA_FILES)} (optionally also "
+            f"{list(OPTIONAL_DATA_FILES)}) to sha256 hex strings"
+        )
     if not isinstance(manifest["fingerprint"], str):
         raise ValueError(f"{path}: 'fingerprint' must be a string")
     for key in _COUNT_KEYS:

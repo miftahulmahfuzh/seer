@@ -43,7 +43,7 @@ from __future__ import annotations
 import argparse
 import logging
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -251,7 +251,7 @@ def night_view(market: Market, session: date, later: Mapping[str, Decimal]) -> M
             cut = _undo_split(cut, factor)
         history[symbol] = cut
     fx = tuple(row for row in market.fx if row[0] <= session)
-    return Market(history=history, membership=market.membership, fx=fx)
+    return replace(market, history=history, fx=fx)
 
 
 @dataclass

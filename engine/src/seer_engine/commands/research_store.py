@@ -10,8 +10,13 @@ the unserved members per year.
 Never touches Neon and needs no DATABASE_URL.
 
     python -m seer_engine research_store [--store DIR] [--batch-size N] [--verify]
+                                        [--with-fundamentals]
 
-``--verify`` loads an existing store only (no network). The global ``--dry-run`` builds into a
+``--verify`` loads an existing store only (no network). ``--with-fundamentals`` additionally
+reads the SEC point-in-time fact panel from the database (``DATABASE_URL_UNPOOLED``, the one
+place in this command that needs it) and writes it as the store's optional fifth file, so
+``lab run`` sees a non-empty ``Market.fundamentals``; without the flag the store carries no
+fundamentals and the lab ranks on bars alone, silently. The global ``--dry-run`` builds into a
 temporary directory and discards it. Exit codes: 0 ok; 1 build failed or a check failed;
 2 the store is missing or invalid.
 """
@@ -26,6 +31,7 @@ from pathlib import Path
 
 from seer_engine import research
 from seer_engine.backtest import io as bt_io
+from seer_engine.fundamentals import Fact
 
 log = logging.getLogger(__name__)
 
@@ -63,28 +69,48 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
         action="store_true",
         help="load and check an existing store only (no network)",
     )
+    p.add_argument(
+        "--with-fundamentals",
+        action="store_true",
+        help=(
+            "also write fundamentals.csv from fundamental_facts (needs DATABASE_URL_UNPOOLED); "
+            "without it the store carries no panel and the lab ranks on bars alone"
+        ),
+    )
 
 
 def run(args: argparse.Namespace) -> int:
     store = Path(args.store)
     if args.verify:
         return _verify(store, note="")
+    facts = _read_facts() if getattr(args, "with_fundamentals", False) else None
     if getattr(args, "dry_run", False):
         with tempfile.TemporaryDirectory(prefix="seer-research-") as tmp:
             target = Path(tmp) / "store"
-            code = _build(target, int(args.batch_size))
+            code = _build(target, int(args.batch_size), facts)
             if code != 0:
                 return code
             return _verify(target, note=" (dry run: built in a temporary directory and discarded)")
-    code = _build(store, int(args.batch_size))
+    code = _build(store, int(args.batch_size), facts)
     if code != 0:
         return code
     return _verify(store, note="")
 
 
-def _build(store: Path, batch_size: int) -> int:
+def _read_facts() -> tuple[Fact, ...]:
+    """The SEC panel, as plain values, from ``bt_io`` -- which owns the connection.
+
+    Neither this module nor ``research.py`` may name ``seer_engine.db`` or ``psycopg``:
+    ``test_research_store.py::test_no_neon_and_no_database_url_needed`` AST-scans both and
+    fails on either name. ``bt_io.read_facts`` is the backtest's declared impure edge and runs
+    the same read ``bt_io.load_panel`` does, so the store's panel equals the database's.
+    """
+    return bt_io.read_facts()
+
+
+def _build(store: Path, batch_size: int, facts: Sequence[Fact] | None) -> int:
     try:
-        research.build_store(store, batch_size=batch_size)
+        research.build_store(store, batch_size=batch_size, facts=facts)
     except research.ResearchStoreError as exc:
         log.error("research_store: build failed, nothing written: %s", exc)
         return 1

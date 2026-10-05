@@ -80,14 +80,14 @@ engine/
       b_model.py            Strategy B's model (P6a): fit_tree / fit_ridge, BModel (digest identity), importance, dumps / loads
       b.py                  Strategy B (P6a): 18 features, rank01, candidates, BParams, picks > 0, FrozenModel, STRATEGY_B_FROZEN, StrategyB
       c.py                  Strategy C (P6): CParams, STRATEGY_C_PARAMS, the frozen prompt c-veto-v1, candidates(), NewsVeto, parse_verdict()
-      allocator.py          Allocator protocol (target weights), target_from_close, month_end_closes, PICKS / BLEND / VOLTARGET (P7a)
+      allocator.py          Allocator protocol (target weights), target_from_close, month_end_closes, PICKS / BLEND / VOLTARGET (P7a); MarketAware protocol + prepare_for() (edgar-fundamentals)
       f_index.py            F1/F10 TIMING (trend-timed index), F11 CALENDAR (turn of month) (P7a)
       f_rotation.py         F2/F3 ROTATION (dual momentum, sector rotation) (P7a)
       f_factor.py           F4/F5/F6 FACTOR (momentum, low vol, momentum + low vol) on index members (P7a)
       f_swing.py            F7 SWING (longer-horizon RSI(2) mean reversion, signal exits) (P7a)
     backtest/               10-year backtest (P3) and walk-forward (P3b, P6a); every module but io.py is pure
       __init__.py           docstring only
-      market.py             Membership, Market: bars, universe and FX in memory
+      market.py             Membership, Market: bars, universe, FX and the point-in-time SEC fact panel in memory; EMPTY_FUNDAMENTALS, Market.with_fundamentals() (edgar-fundamentals)
       runner.py             run_backtest(), RunResult, survivorship(), ParamsSchedule (P3b)
       benchmark.py          SPY buy-and-hold, price-only and total-return
       metrics.py            Metrics, strategy_metrics(), checklist() (web/lib/metrics.ts parity), metrics_through() (P3b)
@@ -103,6 +103,13 @@ engine/
       dev_report.py         DevReport, Markdown, rows/curves CSVs, frontier SVG, P7b pre-registration (P7a)
       registry.py           REGISTRY: the append-only candidate registry (P7a)
       io.py                 Neon loader + bar cache, dividends CSV, report writers write_report() / write_wf_report() / write_b_report() / write_dev_report(), write_model_artifact() (impure)
+                            load_panel() + fact cache, read_facts() -- the tree's one declared impure backtest edge for fundamentals (edgar-fundamentals)
+    fundamentals/           raw SEC XBRL facts -> point-in-time panel: pure, like `strategies` (edgar-fundamentals)
+      __init__.py           public surface; `sue` stays a module, never re-exported
+      ladder.py             LADDER_TAGS, the ingest allowlist the impure ingest command imports; per-metric tag preference order
+      panel.py              Fact, Snapshot, FundamentalPanel.as_of(symbol, t) -> Snapshot (the one read surface), EMPTY_PANEL (what Market.fundamentals defaults to), FACT_COLUMNS (the 12-column projection contract)
+                            filed <= t only, never period_end; tiebreak (filed desc, rung asc, accn desc) per period; restatements preserved, never overwritten; flow metrics annual, not TTM; gross profit reported -> derived (Revenues - CostOfRevenue, same fiscal period end) -> none, never zero, never partial
+      sue.py                standardized unexpected earnings on the seasonal random walk EPS_q - EPS_{q-4}, scaled by the dispersion of prior surprises; MIN_QUARTERS = 9
     commands/
       __init__.py           command-module contract
       migrate.py            `migrate` command
@@ -119,8 +126,8 @@ engine/
       veto.py               `veto` command (P6): Strategy C's nightly news check
   tests/                    pytest; DB tests need PG_TEST_URL
   data/spy_dividends.csv    SPY dividends (ex_date, amount_usd), vendored from yfinance (see data/SOURCES.md)
-  .cache/                   gitignored; bars-<max date>-<rows>.pkl written by the backtest loader
-  .research/                gitignored; the P7a research store: bars.csv, dividends.csv, fx.csv, unserved.csv, manifest.json (research_store)
+  .cache/                   gitignored; bars-<max date>-<rows>.pkl and fundamentals-<max filed>-<rows>.pkl written by the backtest loader
+  .research/                gitignored; the P7a research store: bars.csv, dividends.csv, fx.csv, unserved.csv, manifest.json (research_store), plus the optional fundamentals.csv (--with-fundamentals)
 docs/backtests/             committed reports: <end>-strategy-a{.md,-equity.csv,-equity.svg} (P3); <end>-strategy-a2-walkforward{.md,-equity.csv,-equity.svg,-variants.svg,-grid.csv} (P3b); <end>-strategy-b-walkforward{.md,-equity.csv,-equity.svg} (P6a); <run date>-p7a-dev-exploration{.md,-rows.csv,-curves.csv,-frontier.svg} (P7a)
 docs/plans/                 <run date>-p7b-preregistration.md: the P7b finalists (or "none eligible"), written by backtest_dev (P7a)
 db/migrations/002_engine.sql  (outside the package, owned by it)
@@ -315,15 +322,24 @@ passing run's artifact) are written as usual.
 
 ```
 python -m seer_engine research_store [--dry-run] [-v] [--store STORE] [--batch-size BATCH_SIZE] [--verify]
+                                    [--with-fundamentals]
 ```
 
 This builds the local research store (D5). It covers pre-2015 bars for every S&P 500 member since
 1996 and Nasdaq-100 member since 2007 that yfinance can serve, plus the 21 research ETFs, cash
 dividends from the start, and Frankfurter USD/IDR. It **never connects to Neon** and needs no
-database setting.
+database setting — `--with-fundamentals` is the single exception, below.
 
 - **`--store`** defaults to `engine/.research` (gitignored), and **`--batch-size`** to 40 symbols
   per yfinance request.
+- **`--with-fundamentals`** (edgar-fundamentals) additionally reads the SEC point-in-time fact
+  panel through `backtest.io.read_facts()` (`DATABASE_URL_UNPOOLED`, the one place in this command
+  that needs a database) and writes it as the store's **optional** fifth file, `fundamentals.csv`,
+  so a later dev/lab run sees a non-empty `Market.fundamentals`. Without the flag the store carries
+  no panel and the run ranks on bars alone, silently. The read lives in `backtest/io.py`, not here:
+  `test_research_store.py::test_no_neon_and_no_database_url_needed` AST-scans both `research.py`
+  and this command and fails either one that names `seer_engine.db` or `psycopg`. Omitting the flag
+  leaves the store byte-identical to a pre-fundamentals build, fingerprint included.
 - **The build** is throttled with backoff and runs all-or-nothing: temp files first, then a rename.
   The same downloads give byte-identical files and the same fingerprint. Nothing dated after
   2015-10-16 is kept.
@@ -599,9 +615,9 @@ Pure and deterministic: no database, no network, no clock, no randomness, no log
 ### strategies (P3)
 
 Pure, like `sim`: no database, network, clock, randomness or logging, and never `bars`.
-`tests/test_strategy_purity.py` globs every module in `strategies/` and `backtest/` (except
-`backtest/io.py`) and checks this in a subprocess and on the AST. P4 calls this code nightly and
-P6 adds strategies B and C beside `a.py`.
+`tests/test_strategy_purity.py` globs every module in `strategies/`, `backtest/`,
+`fundamentals/` and `paper/` — the two declared impure edges `backtest/io.py` and
+`paper/store.py` excepted — and checks this in a subprocess and on the AST. P4 calls this code nightly and P6 adds strategies B and C beside `a.py`.
 
 **`strategies.base`**
 - `@dataclass(frozen, slots) History(symbol, dates, open, high, low, close, volume)`: one symbol's
@@ -785,10 +801,20 @@ the database.
 
 - **`backtest.market`**: `Membership(intervals)` with `members_on(d) -> frozenset[str]` (both
   indices unioned, `[start, end)`), evaluated in memory instead of one query per date.
-  `Market(history, membership, fx)`: `bar(symbol, d) -> Bar | None` builds a 4-dp `Decimal` `Bar`
-  on demand (only for symbols with a live order, and SPY), `bars_on(d, symbols)`,
-  `last_bar_date(symbol)`, `usd_idr_on(d)` (latest FX row dated `<= d`, `ValueError` when none),
-  `spy()`.
+  `Market(history, membership, fx, fundamentals=EMPTY_FUNDAMENTALS)`: `bar(symbol, d) -> Bar | None`
+  builds a 4-dp `Decimal` `Bar` on demand (only for symbols with a live order, and SPY),
+  `bars_on(d, symbols)`, `last_bar_date(symbol)`, `usd_idr_on(d)` (latest FX row dated `<= d`,
+  `ValueError` when none), `spy()`.
+  **`fundamentals`** (edgar-fundamentals) is the point-in-time SEC fact panel
+  (`fundamentals.FundamentalPanel`), read through `panel.as_of(symbol, t)`. It defaults to
+  `EMPTY_FUNDAMENTALS`, which **is** `fundamentals.EMPTY_PANEL` — one shared instance, so
+  `market.fundamentals is EMPTY_PANEL` is a usable identity test — so every existing
+  `Market(...)` call site keeps working unchanged. `Market` is frozen, so
+  `with_fundamentals(panel) -> Market` is the supported way to attach a panel to a market built
+  without one (the research store, a paper replay, a test fixture) without any caller knowing the
+  field order. The panel is deliberately **independent of `history`**: a symbol may have facts and
+  no bars (a delisted ever-member) or bars and no facts (every ETF), and nothing cross-checks the
+  two. `__post_init__` type-checks it like the other fields.
 - **`backtest.runner`**: `INITIAL_IDR = Decimal("20000000")`.
   `run_backtest(market, strategy, params, start, end, *, prepared=None, initial_idr=INITIAL_IDR) -> RunResult`
   is the "P3 backtest loop" below: each session `size_picks(picks(prev_session(S)))` → `step` →
@@ -826,6 +852,35 @@ the database.
   `write_wf_report(out_dir, report: WalkForwardReport) -> list[Path]` (renders all five files,
   `<stem>.md`, `-equity.csv`, `-equity.svg`, `-variants.svg`, `-grid.csv`, before writing any, LF
   endings; returns the paths in that order).
+- **`backtest.io`, the fundamentals load** (edgar-fundamentals; still the only impure module here):
+  `load_market` now also fills `market.fundamentals` via
+  `load_panel(conn, *, cache_dir=CACHE_DIR, refresh=False) -> Panel`, inside the same
+  `REPEATABLE READ, READ ONLY` transaction it already owns and rolls back.
+  - The rows come from `fundamental_facts` JOINed to `ticker_cik`, because the facts are
+    **CIK-keyed** and the panel is **symbol-keyed**.
+  - It is cached by table fingerprint exactly the way `bars` is:
+    `facts_fingerprint(conn) -> (count(*), max(filed))` **over the join** is the cache key,
+    `facts_cache_path` names `fundamentals-<max filed>-<rows>.pkl` in `.cache/`, and
+    `read_facts_frame` streams one COPY on a miss (or with `refresh`). A broken pickle is a
+    warning and a re-download, never fatal.
+  - **It degrades instead of failing.** `facts_fingerprint` tests both tables with `to_regclass`
+    and returns `(0, None)` when **either** is missing, so `load_panel` returns
+    `EMPTY_FUNDAMENTALS` with no error — the state of every database that has not run
+    `005_fundamentals.sql`, and of one that has but has not yet run `fundamentals`. `load_market`
+    against such a database is unchanged (verified against the live Neon DB, and the backtest and
+    `load_market` output are byte-identical to `origin/main`).
+  - `read_facts(*, conninfo=None) -> tuple[Fact, ...]` opens its own connection
+    (`DATABASE_URL_UNPOOLED`), runs the same fingerprint + COPY + `facts_from_frame` trio
+    `load_panel` uses — so the facts equal the panel's by construction — and always rolls back.
+    It lives **here, not in `commands/research_store.py`**: `io.py` is the one module in
+    `seer_engine.backtest` that touches the database and the one `test_strategy_purity.py` skips
+    by name, and `test_research_store.py::test_no_neon_and_no_database_url_needed` AST-scans both
+    `research.py` and the `research_store` command and fails either one that names
+    `seer_engine.db` or `psycopg`. The "Never Neon" invariant is untouched: `research.py` still
+    imports nothing from `seer_engine.db`, and `build_store` still takes a plain sequence of facts.
+  - `tests/test_market_fundamentals.py` covers the field, the `EMPTY_PANEL` identity, the
+    `with_fundamentals` / `replace` carry-through, the `to_regclass` degradation path and the fact
+    cache.
 
 **Windows.** In-sample 2015-10-19 → 2021-12-31 (tuning); out-of-sample 2022-01-03 → the last SPY
 bar (validation, run once); full 2015-10-19 → the last SPY bar (one continuous portfolio). Each
@@ -1201,6 +1256,25 @@ The new modules are pure and flat in `strategies/`, so the purity glob covers th
       L11, which scales the inner weights by `min(1, target ÷ realized vol)`.
   - `prepare(history)` takes no params, so one prepared value per allocator id serves every
     candidate (`LazyPrepared` for `PICKS`, `BLEND` and `VOLTARGET`; D-D).
+  - **`MarketAware` and `prepare_for`** (edgar-fundamentals): an allocator that needs more than
+    bars — the SEC fact panel, FX, membership — implements `prepare_market(market) -> Any` and so
+    satisfies the second `runtime_checkable` protocol `MarketAware`, *in addition to* `Allocator`.
+    `prepare_for(obj, market)` is the dispatch: `obj.prepare_market(market)` when the attribute is
+    present, else `obj.prepare(market.history)` — exactly what every call site did before — so an
+    allocator that does not define it sees no change at all. `obj` may be an `Allocator` or a
+    bracket `Strategy`; both have `prepare`. A present-but-not-callable `prepare_market` is a
+    `TypeError`, because `runtime_checkable` cannot tell a method from a data attribute and a
+    silent fallback would hide a typo as a quietly bar-only allocator.
+    - **`prepare_market` is deliberately NOT a member of `Allocator`.** `Allocator` is
+      `runtime_checkable` and production sites test `isinstance(x, Allocator)`; adding a member —
+      even one with a default body — would make every existing structural implementer fail the
+      check. `Allocator`'s member set is therefore unchanged by this phase.
+    - An implementer still needs `prepare`: it is an `Allocator` member, and `allocatorkit`'s P4
+      identity check drives the plain path.
+    - The single real dispatch site is `backtest.dev`'s per-allocator-id prepared cache; nothing in
+      the first registry implements `MarketAware` yet.
+  - `strategies/__init__.py` is still unchanged: import `MarketAware` and `prepare_for` from
+    `strategies.allocator`.
 - **`strategies.indicators.return_window(close, n, skip=0)`** (additive):
   `c[:, -1-skip] / c[:, -1-n] − 1`. It follows the same bit-identity rule as the existing windows.
 - **Families.** Each family is one singleton plus a frozen params dataclass with
@@ -1232,6 +1306,12 @@ The store is local and gitignored, in `engine/.research/`.
   - `RESEARCH_ETFS`: 21 ETFs (BIL, DIA, EFA, GLD, IEF, IWM, QLD, QQQ, SHY, SPY, SSO, TLT and the 9
     sector SPDRs);
   - `SECTOR_ETFS`, equal to `backtest.registry.SECTOR_ETFS` (tested).
+  - `DATA_FILES` (the four required files) and, since edgar-fundamentals,
+    `OPTIONAL_DATA_FILES = (FUNDAMENTALS_FILE,)`. `fundamentals.csv` is in the **optional** tuple,
+    never a fifth required file: `_read_manifest` requires `DATA_FILES` and *permits* the optional
+    ones, and the fingerprint is the sha256 of the sorted `name:sha` lines of the files that were
+    actually written. So a store built before this phase keeps loading with a **bit-identical
+    fingerprint**, and `--verify` still passes on it.
 - Files. All are LF text, sorted and deterministic, with prices at 4 dp like `bars`:
 
 | File | Columns | Notes |
@@ -1240,21 +1320,29 @@ The store is local and gitignored, in `engine/.research/`.
 | `dividends.csv` | `symbol,ex_date,amount` | cash dividends from `actions=True`, ≤ 6 dp |
 | `fx.csv` | `date,usd_idr` | Frankfurter from 1999-01-04 |
 | `unserved.csv` | `symbol,reason` | members overlapping [1996-01-02, `DEV_END`] that yfinance could not serve |
+| `fundamentals.csv` | `FACT_COLUMNS`: `symbol,taxonomy,tag,unit,period_start,period_end,val,accn,form,fy,fp,filed` | **optional** (edgar-fundamentals), written only with `--with-fundamentals`; sorted, in `io.FACTS_COPY_SQL`'s encoding |
 | `manifest.json` | — | counts, a sha256 per file, and `fingerprint` (the sha256 of the sorted `name:sha` lines); no timestamps |
 
-- `build_store(store_dir, *, downloader=None, fetch_fx=None, sleep=time.sleep, batch_size=40, data_dir=None)`:
+- `build_store(store_dir, *, downloader=None, fetch_fx=None, sleep=time.sleep, batch_size=40, data_dir=None, facts=None)`:
   - the symbols are `RESEARCH_ETFS` plus every `compute_universe()` member overlapping
     [1996-01-02, `DEV_END`];
   - downloads are throttled and batched, with rate-limit backoff like `backfill`;
   - rows after `DEV_END` are dropped defensively;
   - it writes every file to a temp dir and then renames it, so the build is all-or-nothing
     (`ResearchStoreError` on failure);
+  - `facts` (edgar-fundamentals) is the SEC point-in-time panel as a plain sequence of
+    `fundamentals.Fact`, rendered by `fundamentals_lines(facts)` into `fundamentals.csv` and added
+    to the manifest. `None` — the default, and every caller that predates fundamentals — writes no
+    `fundamentals.csv` at all. `research.py` never opens a connection for them: the command passes
+    them in (see `--with-fundamentals` below), so the "Never Neon" invariant (D5) is unchanged.
   - it returns the manifest.
 - `load_store(store_dir, *, data_dir=None) -> ResearchData(market, dividends, spy_dividends, fingerprint, manifest, unserved)`:
   - it verifies every sha256 and rejects any row dated after `DEV_END` (`ValueError`, also for a
     missing store). That is the data-level guard of D9.
   - Its `Market` takes membership from `membership.compute_universe()` through
-    `io.merge_intervals`, offline.
+    `io.merge_intervals`, offline. Its `fundamentals` is `_read_fundamentals(fundamentals.csv)`
+    when the manifest lists that file and `EMPTY_FUNDAMENTALS` otherwise (edgar-fundamentals), so
+    a pre-fundamentals store loads to a market with an empty panel rather than an error.
 - `run_checks(data, vendored)`: the three data checks `research_store --verify` prints.
 
 **The committed store** (built in phase 4, verified in phase 13): fingerprint `5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a`.
@@ -1319,7 +1407,11 @@ here is pure, and the purity glob covers it; the one writer is `backtest.io.writ
     earlier than `MEMBERSHIP_START`.
   - `run_candidate(market, dividends, spy_dividends, c, *, prepared=None)` and
     `run_registry(market, dividends, spy_dividends, registry, *, on_result=None)` run sequentially,
-    in registry order, with one prepared value per allocator id. Starting cash is
+    in registry order, with one prepared value per allocator id — built by
+    `strategies.allocator.prepare_for(allocator, market)` (edgar-fundamentals), so a `MarketAware`
+    allocator gets the whole `Market` (fundamentals included) and every other one gets exactly the
+    `allocator.prepare(market.history)` it got before. The candidate's market copy carries
+    `fundamentals` over with `history` and `membership`, so a long window keeps the panel. Starting cash is
     `initial_cash_usd(20,000,000 IDR, usd_idr_on(max(start, FX_START)))`; a window starting before
     `FX_START` runs on a market copy whose `fx` is that single rate (D-C). FX before 1999 affects
     only that conversion, never a decision.
@@ -1510,7 +1602,7 @@ exception. The real night is `migrate` → `nightly` → `veto` → `paper` → 
 - `http` imports `__version__` for `USER_AGENT`.
 - `yahoo` imports `bars` and pandas. `commands.backfill` imports `bars`, `dates`, `db`, `demo`, `fx`, `universe` and `yahoo`.
 - `sim.model` imports `prices`. `sim.lifecycle` and `sim.split_adjust` import `dates`, `prices` and `sim.model`. `sim.sizing` imports `dates` and `sim.model`. Nothing in `sim` imports `bars`, `db` or `http`.
-- `strategies.*` import numpy, `prices`, `sim` (for `Pick` and `q`) and each other. `backtest.market`, `runner`, `benchmark`, `metrics`, `tuning` and `report` import numpy, `dates`, `prices`, `sim`, `strategies` and each other. None of them imports `bars`, `db`, `http` or `config`.
+- `strategies.*` import numpy, `prices`, `sim` (for `Pick` and `q`) and each other. `backtest.market`, `runner`, `benchmark`, `metrics`, `tuning` and `report` import numpy, `dates`, `prices`, `sim`, `strategies` and each other; `backtest.market` also imports `seer_engine.fundamentals` (`EMPTY_PANEL`, `FundamentalPanel`), which is pure. None of them imports `bars`, `db`, `http` or `config`.
 - `backtest.io` imports `config`, psycopg, pandas, numpy and the pure backtest modules. `commands.backtest` imports `config`, `db`, `dates`, `prices`, `universe` (for `BENCHMARK`), `backtest.*` and `strategies.a`.
 - `strategies.a2` imports numpy, `sim`, `strategies.a`, `strategies.base` and `strategies.indicators`; never `universe` (psycopg), so `REGIME_SYMBOL` repeats `universe.BENCHMARK` and a test asserts they are equal. `backtest.walkforward` imports `dates`, `strategies.a2`, `strategies.base` and `backtest.runner`, `metrics`, `tuning`, `market` and `benchmark`. `backtest.wf_report` imports `backtest.report`'s helpers (read-only), `dates`, `sim`, `strategies.a` (`ATR_N`, `SMA_N`), `strategies.a2`, and `backtest.metrics`, `runner`, `tuning`, `benchmark` and `walkforward`. None of them imports `bars`, `db`, `http` or `config`.
 - `backtest.io` also imports `wf_report` (for `write_wf_report`). `commands.backtest_wf` imports `config`, `db`, `dates`, `universe` (for `BENCHMARK`), `backtest.io`, `walkforward`, `benchmark`, `market`, `metrics`, `runner`, `tuning`, `wf_report`, `commands.backtest` (for `never_fetched_members`) and `strategies.a2`.
@@ -1518,9 +1610,9 @@ exception. The real night is `migrate` → `nightly` → `veto` → `paper` → 
 - `backtest.labels` imports numpy, `dates`, `sim.model` (`TIME_STOP_DAYS`) and `strategies.base`; its `COST` repeats `sim.COST_RATE` as a float, and a test pins them equal. `backtest.b_walkforward` imports numpy, `dates`, `strategies.b`, `strategies.b_model`, `backtest.labels`, `runner`, `metrics`, `market`, `tuning` (`Verdict`) and `walkforward` (`Fold` and the private `_check_folds`, `_day`, `_session`, `_join`, `_GATE_NAMES`, read-only). `backtest.b_report` imports `backtest.report`'s and `wf_report`'s helpers (read-only), `dates`, `strategies.a`, `strategies.b`, `strategies.b_model` (constants), and `backtest.b_walkforward`, `labels`, `metrics`, `runner`, `tuning`, `benchmark` and `walkforward`. None of them imports `bars`, `db`, `http` or `config`.
 - `backtest.io` also imports `b_report` and `strategies.b_model` (for `write_b_report` and `write_model_artifact`). `commands.backtest_b` imports `config`, `db`, numpy, `backtest.io`, `b_walkforward`, `b_report`, `walkforward`, `benchmark`, `market`, `metrics`, `runner`, `commands.backtest_wf` (`resolve`, `tune_all`, `run_walk_forward`, `BacktestWfError`), `commands.backtest` (`never_fetched_members`), `strategies.a2`, `strategies.b` and `strategies.b_model`.
 - `sim.rules` imports `dates` only (its agreement with `sim.model`'s constants is a test). `sim.book` imports `dates`, `prices` (`Bar`), `sim.model` (`q`) and `sim.rules`. Neither imports `sim.lifecycle` or `sim.sizing`, and nothing in `sim` imports `bars`, `db` or `http`.
-- `strategies.allocator` imports numpy, `dates`, `prices`, `sim` (`Pick`, `q`), `sim.book`, `strategies.base` and `strategies.indicators`. `strategies.f_index`, `f_rotation`, `f_factor` and `f_swing` import numpy, `strategies.allocator` (`target_from_close`, and `month_end_closes` in `f_index`), `strategies.base`, `strategies.indicators` and `sim` / `sim.book`, plus `dates` (`f_index`) or `prices` (`f_rotation`, `f_swing`); none imports another family or `universe`.
+- `strategies.allocator` imports numpy, `dates`, `prices`, `sim` (`Pick`, `q`), `sim.book`, `strategies.base` and `strategies.indicators`. It names `backtest.market.Market` under `TYPE_CHECKING` only (for `MarketAware` / `prepare_for`), so there is no runtime `strategies` -> `backtest` import and no cycle. `strategies.f_index`, `f_rotation`, `f_factor` and `f_swing` import numpy, `strategies.allocator` (`target_from_close`, and `month_end_closes` in `f_index`), `strategies.base`, `strategies.indicators` and `sim` / `sim.book`, plus `dates` (`f_index`) or `prices` (`f_rotation`, `f_swing`); none imports another family or `universe`.
 - `backtest.book_runner` imports `dates`, `market`, `metrics`, `runner` (`run_backtest`, `RunResult`, `INITIAL_IDR`, read-only), `sim.book`, `sim.model`, `sim.rules`, `strategies.allocator` and `strategies.base`. `backtest.dev` imports `dates`, `tuning`, `benchmark`, `book_runner`, `market`, `metrics`, `runner` (`RunResult`), `sim.rules`, `strategies.allocator` and `strategies.base`. `backtest.dev_report` imports `benchmark`, `dev`, `metrics`, `report`'s helpers (read-only), `runner` (`INITIAL_IDR`, `YearGap`), `tuning` (thresholds), `sim.rules` and `strategies.allocator`. `backtest.registry` imports `dev`, `sim.rules`, `strategies.a` (`STRATEGY_A`, for `REF-A-V0`), `strategies.allocator`, `strategies.base` and every family module. None of them imports `bars`, `db`, `http` or `config`.
-- `research` (impure) imports `config`, `dates`, `fx`, `membership`, `yahoo` (the dividends-aware download), `prices`, `backtest.benchmark`, `backtest.io` (`histories_from_frame`, `merge_intervals`) and `backtest.market`; it never imports `db`. `commands.research_store` imports `research` and `backtest.io` (the vendored SPY dividends for `--verify`). `backtest.io` also imports `dev_report` (for `dev_report_files` and `write_dev_report`). `commands.backtest_dev` imports `config`, `research`, `backtest.dev`, `dev_report`, `registry`, `backtest.io`, `benchmark`, `market`, `metrics`, `runner` and `sim`, and `subprocess` for the `git status` registry check.
+- `research` (impure) imports `config`, `dates`, `fx`, `membership`, `yahoo` (the dividends-aware download), `prices`, `backtest.benchmark`, `backtest.io` (`histories_from_frame`, `merge_intervals`) and `backtest.market`; it never imports `db`. `commands.research_store` imports `research`, `backtest.io` (the vendored SPY dividends for `--verify`, and `read_facts` for `--with-fundamentals`) and `seer_engine.fundamentals` (`Fact`, a type only); it still names neither `seer_engine.db` nor `psycopg`. `research` also imports `seer_engine.fundamentals` (`FACT_COLUMNS`, `Fact`, `FundamentalPanel`). `backtest.io` imports `seer_engine.fundamentals` and `seer_engine.db` (for `read_facts`). `backtest.io` also imports `dev_report` (for `dev_report_files` and `write_dev_report`). `commands.backtest_dev` imports `config`, `research`, `backtest.dev`, `dev_report`, `registry`, `backtest.io`, `benchmark`, `market`, `metrics`, `runner` and `sim`, and `subprocess` for the `git status` registry check.
 - `strategies.c` imports `dates`, `sim` (`Pick`), `strategies.a` (`STRATEGY_A`, `STRATEGY_A_PARAMS`, `AParams`) and `strategies.base`; never `finnhub`, `llm`, `db` or `universe`. `finnhub` imports `config`, `http` (`redact`), `requests` and `strategies.c` (`Headline`). `commands.veto` imports `db`, `dates`, `demo`, `runs`, `finnhub`, `llm`, `commands.nightly` (`_parse_now`), `paper.roster`, `paper.store`, `sim.sizing` (`Pick`) and `strategies.c`.
 ### Standard library
 `argparse`, `importlib`/`pkgutil` (command discovery), `logging`, `contextlib`, `dataclasses`, `decimal`, `functools.lru_cache`, `re`, `time`.
@@ -1793,6 +1885,9 @@ which writes nothing. A committed report always comes from a full run over a cle
 - **C's verdicts are decided once.** `paper_check` replays C from `news_vetoes` and never re-asks the LLM. Never edit, delete or re-run verdicts for a session Paper already decided: the replay would no longer match what Paper did. `veto` refuses on its own once the session is checked or decided.
 - **C's model is part of its spec.** `LLM_MODEL` must be `glm-5.3`; another value makes every C verdict `failed`. Editing `strategies.c.FROZEN_MODEL`, the prompt or any `CParams` field changes C's digest and fails the whole night with `SpecMismatch`. A different model or prompt is a new roster id.
 - **No look-ahead in news.** `select_headlines` keeps only items published before the `veto` run started (`decided_at`); the earnings window is the schedule as known then.
+- **Rebuild a `Market` with `dataclasses.replace`, never `Market(history=..., membership=..., fx=...)`.** Every windowing site that re-listed the fields by hand (`paper.replay.expected_bracket`, `commands.paper.night_view`, `backtest.dev`'s FX-window copy) now uses `replace`, so a new field such as `fundamentals` is carried over instead of being silently dropped back to the empty panel. Use `market.with_fundamentals(panel)` to attach one.
+- **`prepare_market` must not be added to the `Allocator` protocol.** `Allocator` is `runtime_checkable` and several production sites test `isinstance(x, Allocator)`; adding a member — even one with a default body — makes every structural implementer fail the check. Implement `strategies.allocator.MarketAware` alongside it and let `prepare_for(obj, market)` dispatch.
+- **Fundamentals are optional everywhere they are read.** A database with no `fundamental_facts` / `ticker_cik` (or no rows) loads to `EMPTY_FUNDAMENTALS`, and a research store built before the panel existed loads with a bit-identical fingerprint. Never make either an error: the backtest must stay runnable on a database that has not applied `005_fundamentals.sql`.
 
 ## Notes
 

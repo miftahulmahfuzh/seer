@@ -197,7 +197,8 @@ def tune(
 
     One ``run_backtest`` per combination on ``[folds[0].tune_start, folds[-1].tune_end]``, sliced per
     fold with ``metrics_through``. Sequential, in ``combos`` order, so the rows come back in a fixed
-    order. ``prepared`` is ``strategy.prepare(market.history)`` or None.
+    order. ``prepared`` is ``allocator.prepare_for(strategy, market)`` (which is
+    ``strategy.prepare(market.history)`` for every strategy that is not ``MarketAware``) or None.
     """
     fs = _check_folds(folds)
     cs = tuple(combos)

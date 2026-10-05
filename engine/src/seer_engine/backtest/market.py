@@ -17,14 +17,29 @@ from __future__ import annotations
 
 from bisect import bisect_right
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from decimal import Decimal
 
+from seer_engine.fundamentals import EMPTY_PANEL, FundamentalPanel as Panel
 from seer_engine.prices import Bar, to_decimal
 from seer_engine.strategies.base import History
 
 SPY = "SPY"
+
+EMPTY_FUNDAMENTALS: Panel = EMPTY_PANEL
+"""The panel a ``Market`` carries when no fundamentals were loaded.
+
+This IS ``seer_engine.fundamentals.EMPTY_PANEL``, not a second empty panel built here: one
+shared instance means ``market.fundamentals is EMPTY_PANEL`` is a usable identity test and
+there is exactly one object the whole tree means by "no fundamentals". It is immutable, so it
+is a safe dataclass default. ``load_market`` returns it for a database with no
+``fundamental_facts`` rows -- and for one where the table does not exist yet, which is every
+database that has not run phase 2's migration.
+
+``FundamentalPanel`` is aliased to ``Panel`` here and in ``io.py`` because that is the name
+this phase's code, tests and docstrings use throughout; phase 5 owns the type.
+"""
 
 
 def _check_date(name: str, d: object) -> date:
@@ -96,12 +111,19 @@ class Market:
 
     ``history``: every symbol with bars (SPY included), keyed by symbol, each ``History``
     ascending. ``fx``: ``(date, usd_idr)`` rows, strictly ascending, ``usd_idr`` a Decimal > 0
-    (publishing days only, so not every session has a row).
+    (publishing days only, so not every session has a row). ``fundamentals``: the point-in-time
+    SEC fact panel built by ``seer_engine.fundamentals``, ``EMPTY_FUNDAMENTALS`` when none was
+    loaded.
+
+    ``fundamentals`` is deliberately independent of ``history``. A symbol may have facts and no
+    bars (the 133 delisted ever-members, whose prices are blocked on Gap A) or bars and no facts
+    (every ETF). Nothing here cross-checks the two and nothing may start to.
     """
 
     history: Mapping[str, History]
     membership: Membership
     fx: tuple[tuple[date, Decimal], ...]
+    fundamentals: Panel = EMPTY_FUNDAMENTALS
     _fx_dates: tuple[date, ...] = field(init=False, repr=False)
     _last: Mapping[str, date] = field(init=False, repr=False)
 
@@ -112,6 +134,8 @@ class Market:
             raise TypeError(f"membership must be a Membership, got {type(self.membership).__name__}")
         if not isinstance(self.fx, tuple):
             raise TypeError("fx must be a tuple of (date, Decimal) rows")
+        if not isinstance(self.fundamentals, Panel):
+            raise TypeError(f"fundamentals must be a Panel, got {type(self.fundamentals).__name__}")
         last: dict[str, date] = {}
         for symbol, h in self.history.items():
             if not isinstance(h, History):
@@ -136,6 +160,16 @@ class Market:
             prev = d
         object.__setattr__(self, "_fx_dates", tuple(d for d, _ in self.fx))
         object.__setattr__(self, "_last", last)
+
+    def with_fundamentals(self, fundamentals: Panel) -> Market:
+        """This market with ``fundamentals`` attached; every other field is carried over.
+
+        ``Market`` is frozen, so this returns a new value and leaves ``self`` untouched. It is
+        the supported way to put a panel on a market that was built without one -- the research
+        store, a paper replay, a test fixture -- without any of those having to know the field
+        order.
+        """
+        return replace(self, fundamentals=fundamentals)
 
     def bar(self, symbol: str, d: date) -> Bar | None:
         """``symbol``'s bar dated ``d`` as a Decimal ``Bar`` (exact 4 dp), or None."""

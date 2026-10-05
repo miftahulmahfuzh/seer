@@ -32,7 +32,7 @@ a replay over the rewritten bars); ``not-started`` without a paper start.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal
@@ -278,7 +278,7 @@ def expected_bracket(market: Market, strategy: Strategy, params: Any, head: Pape
         pf = new_portfolio(cash0)
         snapshots: tuple[Snapshot, ...] = (_day0(start, cash0),)
     else:
-        fixed = Market(history=market.history, membership=market.membership, fx=((start, head.usd_idr),))
+        fixed = replace(market, fx=((start, head.usd_idr),))
         run = run_rules(fixed, strategy, params, DESIGN_V0, start, last)
         if not isinstance(run, RunResult):
             raise TypeError(f"DESIGN_V0 replay of {head.strategy_id} returned {type(run).__name__}")

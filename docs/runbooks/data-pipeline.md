@@ -11,7 +11,15 @@ vendored point-in-time S&P 500 and Nasdaq-100 histories in `engine/data/` (plus
 `membership_overrides.csv` and `ticker_aliases.csv`) into the `universe` table. `backfill` loads
 split-adjusted daily bars for every symbol that was ever a member since 2015-01-02, plus SPY,
 from yfinance, and USD/IDR history from Frankfurter. Each symbol's outcome is recorded in
-`backfill_log`, so the backfill can resume. `nightly` runs after every US session. It computes
+`backfill_log`, so the backfill can resume.
+`fundamentals` loads SEC EDGAR XBRL company facts for every ever-member since 2015-01-02,
+resolving each ticker to a CIK through the vendored `engine/data/ticker_cik.csv` (dated, because
+tickers are recycled). Facts are stored raw in `fundamental_facts`, keyed including the
+accession number so a restatement inserts beside the original rather than overwriting it; the
+derived metrics the factors use are computed in pure Python at load time, not in SQL. Each
+symbol's outcome goes to `fundamentals_log`, so it resumes exactly as `backfill` does. It needs
+no price bars: the 133 ever-members Yahoo no longer serves still have complete filings.
+`nightly` runs after every US session. It computes
 `data_date`/`session_date` from the NYSE calendar, fetches the missing sessions from Massive
 grouped-daily (universe ∪ SPY, plus any symbol held or pending in paper state), applies new
 splits once (`split_adjustments`), records each session's cash dividends (`dividends`), records the
@@ -40,6 +48,11 @@ check below goes through Python.
 | `… backfill --fx-only` / `--skip-fx` | only / everything but the FX history | same |
 | `… -m seer_engine nightly` | the nightly run for "now"; no-op if that session already succeeded | `bars`, `split_adjustments`, `dividends`, `fx_rates`, `runs` |
 | `… nightly --now 2026-10-05T23:00:00Z` | replay the nightly as of a given UTC instant (format: `nightly --help`) | same |
+| `… -m seer_engine fundamentals` | SEC EDGAR company facts for every ever-member since 2015-01-02, resolved through `engine/data/ticker_cik.csv` by **(ticker, date)**; the unit of work is the **CIK**, so a share-class pair (GOOG/GOOGL) is one fetch and one log row; skips every CIK already in `fundamentals_log` (any status), so a re-run resumes | `fundamental_facts`, `fundamentals_log`, `ticker_cik` |
+| `… fundamentals --symbols AAPL,MSFT` | load specific symbols (comma-separated, dot form); still deduped to CIKs, but ignores `fundamentals_log` | same |
+| `… fundamentals --retry-failed` | retry CIKs logged `failed`/`empty` (never touches `ok`) | same |
+| `… fundamentals --no-sync-map` | skip mirroring `engine/data/ticker_cik.csv` into the `ticker_cik` table | `fundamental_facts`, `fundamentals_log` |
+| `… -m seer_engine research_store --with-fundamentals` | rebuild the research store **with** a `fundamentals.csv` panel read from the database. Without the flag the store is built exactly as before and the lab sees an empty panel — see "The lab and fundamentals" below | `engine/.research/` |
 
 Global flags go **before** the command: `--dry-run` does every read and computes every write,
 then rolls back (nothing is written; the demo purge also runs and is rolled back, and is logged
@@ -51,6 +64,7 @@ Exit codes:
 | Command | 0 | 1 | 2 |
 |---|---|---|---|
 | `backfill` | no symbol `failed`, FX loaded (`empty` = delisted/unknown to Yahoo is expected and fine) | some symbol `failed` (rate limit, download error) or FX failed; fetched bars are committed → re-run with `--retry-failed` (or `--fx-only`) | empty universe (run `universe refresh`) or bad arguments |
+| `fundamentals` | no symbol `failed` (`empty` = a filer EDGAR has no XBRL facts for, **or one `ticker_cik.csv` marks `NONE`**, is expected and fine) | some symbol `failed` (SEC 429/5xx after retries, a malformed `companyfacts` payload, **or no CIK for it in `ticker_cik.csv`**); facts already fetched are committed → re-run with `--retry-failed`, or re-vendor the CSV | `SEC_CONTACT_EMAIL` or `DATABASE_URL_UNPOOLED` missing, empty universe (run `universe refresh`), an empty `ticker_cik.csv`, or bad arguments |
 | `nightly` | run `success`, or the session already succeeded (no-op) | run marked `failed` with `error`; no bars written for it | `MASSIVE_API_KEY` or `DATABASE_URL_UNPOOLED` missing |
 | `universe check` | identical to Wikipedia | drift (or a fetch/parse error) | — |
 | any | — | uncaught error | missing setting (`ConfigError`) |
@@ -75,6 +89,77 @@ Exit codes:
 - Re-running `backfill --symbols X` after a split overwrites X's history with yfinance's newly
   adjusted values, which are consistent with what the nightly applied.
 
+## SEC fundamentals
+
+- SEC's fair-access policy requires a declared `User-Agent` carrying a contact address and caps
+  requests at 10/second. The engine reads the address from `SEC_CONTACT_EMAIL` and rate-limits
+  from the *end* of the previous call, the way `massive.py` does. `http.py`'s shared session is
+  not used, so the contact address never leaks into Massive or Finnhub calls. Measured from this
+  host, `data.sec.gov` answers a `companyfacts` request in **7–60 s**, not the sub-second the
+  10 req/s cap would suggest — a full 795-member run is hours, not minutes, and the pacing floor
+  is never the binding constraint.
+- `filed` is the only availability boundary. Every read path exposes the latest fact with
+  `filed <= t` and nothing else. A fact's `period_end` is never its availability date: a Q4
+  figure for a period ending 2015-12-31 is typically filed in February 2016.
+- Restatements are preserved, never overwritten: `accn` is part of a fact's identity, so a
+  revised figure inserts beside the original and both stay queryable.
+- Gross profit is derived. Only 2 of 8 sampled dead filers tagged `GrossProfit`, so the ladder
+  falls back to `Revenues − CostOfRevenue`; the fallback is documented in the derivation
+  package's module docstring. Revenue itself has two tag variants (`Revenues`,
+  `RevenueFromContractWithCustomerExcludingAssessedTax`).
+- Market capitalisation is point-in-time only because the share count is filed-dated
+  (`dei:EntityCommonStockSharesOutstanding`) and is multiplied by the close from `bars`. When
+  either side is missing the cap is undefined and the value factor drops that name for that day,
+  rather than substituting a zero.
+
+### Re-vendoring `engine/data/ticker_cik.csv`
+
+A ticker alone never identifies a company: `CA` is now an Xtrackers ETF, `MON` a SPAC, `PLL`
+Piedmont Lithium, `ALTR` Altair, `LLL` JX Luxventure, `DTV` DTE units. Every row therefore
+carries a validity interval and the loader rejects overlaps for one ticker. The file is data,
+generated once and committed — it is never rebuilt at runtime.
+
+1. Re-vendor as `engine/data/SOURCES.md` describes for this file: the delisted reference gives
+   the company name, SEC's `cik-lookup-data.txt` (about 39 MB, from `www.sec.gov`) maps name →
+   CIK after stripping corporate suffixes. SEC's `company_tickers.json` resolves **0** of the
+   133 delisted names and must not be relied on for them.
+2. The automated pass resolved 98 of 133 (94 exact, 4 fuzzy) when it was built. The residue is
+   mapped by hand, reviewed, and committed as data.
+3. **Read every fuzzy row by hand before committing it.** The shipped file carries *zero* fuzzy
+   rows deliberately: when it was built, the automated name screen matched "Harman
+   International" to AMERICAN INTERNATIONAL INDUSTRIES (`0001073146`) — a different company
+   entirely; the real HAR is `0000800459`. A fuzzy name match is a suggestion, never evidence.
+4. Validate and commit:
+   `engine/.venv/bin/pytest engine/tests/test_cik.py -q` (it checks the header, rejects
+   overlapping intervals and a CIK that is not 10 digits, and asserts each recycled ticker
+   resolves to the company that held it during its membership, not to the current holder).
+5. Update the file's sha256 block in `engine/data/SOURCES.md`.
+6. Re-run `engine/.venv/bin/python -m seer_engine fundamentals --symbols <the changed tickers>`
+   so their facts are reloaded under the corrected CIK.
+
+### The lab and fundamentals
+
+`lab run` loads the research store. `research.load_store` builds its `Market` with a
+fundamental panel **only when the store holds a `fundamentals.csv`**, which is an optional
+file written by `python -m seer_engine research_store --with-fundamentals`. A store built
+before that flag existed, or rebuilt without it, loads cleanly with an **empty** panel and no
+warning — that is deliberate (it keeps every store on disk loadable and its fingerprint
+unchanged), and it is the trap. Method **M0005**
+(`lab/methods/m0005_fundamental_factors.py`) ranks on that panel, so running it against an
+empty one would record six all-cash trials, freeze the method file's `source_sha` and burn the
+method id permanently (`runner.preflight` refuses a second run of any method).
+
+**Before `lab run M0005`, confirm the store actually has the panel:**
+
+```bash
+python -c "import json,pathlib; print('fundamentals.csv' in json.loads(pathlib.Path('engine/.research/manifest.json').read_text())['files'])"
+```
+
+If that prints `False`, rebuild first:
+`python -m seer_engine research_store --with-fundamentals` (needs `DATABASE_URL_UNPOOLED`, and
+needs `python -m seer_engine fundamentals` to have run). **Do not run `lab run M0005` until it
+prints `True`.**
+
 Tests: `PG_TEST_URL=… engine/.venv/bin/pytest engine/tests -q` (see "Local test database").
 Without `PG_TEST_URL` the DB tests are skipped with a reason.
 
@@ -84,6 +169,7 @@ Without `PG_TEST_URL` the DB tests are skipped with a reason.
 |---|---|---|
 | `DATABASE_URL_UNPOOLED` | every engine command | `.env.local` locally; repo secret in Actions |
 | `MASSIVE_API_KEY` | `nightly` only | `.env.local` locally; repo secret in Actions |
+| `SEC_CONTACT_EMAIL` | `fundamentals` only | `.env.local` locally; repo secret in Actions |
 | `PG_TEST_URL` | tests only | your shell locally; set by `engine-ci.yml` in CI |
 
 ### Owner steps (need the owner's approval; not done by the pipeline session)
@@ -258,7 +344,8 @@ engine/.venv/bin/python - <<'PY'
 from seer_engine import config, db
 config.load_env()
 with db.connect() as conn:
-    for t in ["bars", "fx_rates", "runs", "universe", "split_adjustments", "backfill_log"]:
+    for t in ["bars", "fx_rates", "runs", "universe", "split_adjustments", "backfill_log",
+              "ticker_cik", "fundamental_facts", "fundamentals_log"]:
         n, h = conn.execute(f"SELECT count(*), coalesce(sum(('x' || left(md5(r::text), 15))::bit(60)::bigint), 0) "
                             f"FROM {t} r").fetchone()
         print(f"{t:18} rows={n:>9} hash={h}")
@@ -272,12 +359,15 @@ Restores the demo state, for example to re-test the purge:
 ```sql
 DELETE FROM runs WHERE NOT is_demo;
 TRUNCATE bars, fx_rates, universe, split_adjustments, backfill_log;
+TRUNCATE fundamental_facts, fundamentals_log, ticker_cik;
 ```
 
 Run it through Python (`conn.execute(...)` in a `with conn.transaction():` block), then
 `cd web && npm run db:seed-demo`. The seed now refuses only while real runs or more than 100
 bars exist. Migration 002 is additive; dropping its three tables and the `runs_real_session_uidx`
-index reverses it.
+index reverses it. Migration `005_fundamentals.sql` is additive too; dropping
+`fundamental_facts`, `fundamentals_log` and `ticker_cik` and deleting its
+`schema_migrations` row reverses it.
 
 ## First run — 2026-10-03
 

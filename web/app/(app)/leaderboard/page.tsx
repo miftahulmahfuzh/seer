@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+import Link from 'next/link';
 import { Archive, Check, CircleDashed, Crown, X } from 'lucide-react';
 import { AppHeader } from '@/components/AppHeader';
 import { strategyIcon } from '@/components/roster';
@@ -7,7 +9,7 @@ import { monthDay, monthName, shortDate, signedPct } from '@/lib/format';
 import { checklist } from '@/lib/metrics';
 import { wibDate } from '@/lib/session';
 import {
-  compare, LOOK_FALLBACK, looks, MIN_COMMON_SESSIONS, monthLines, monthsBg, NO_GATE, pickResearch,
+  compare, LOOK_FALLBACK, looks, MIN_COMMON_SESSIONS, monthLines, NO_GATE, pickResearch,
   researchOf, retiredLabel, scoreOf, sinceStartLine, spyOverSpan, windowLine,
   type CompareRow, type Look, type MonthLine,
 } from './view';
@@ -111,7 +113,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={s.chart} role="img"
         aria-label="Equity curves of each strategy against SPY">
-        {chart.grid.map(y => <line key={y} x1="0" x2={W} y1={y} y2={y} vectorEffect="non-scaling-stroke" stroke="var(--hair)" />)}
+        {chart.grid.map((y, i) => <line key={i} x1="0" x2={W} y1={y} y2={y} vectorEffect="non-scaling-stroke" stroke="var(--hair)" />)}
         <line x1="0" x2={W} y1={chart.zero} y2={chart.zero} vectorEffect="non-scaling-stroke" stroke="var(--outline)" strokeDasharray="3 3" />
         {chart.lines.map(l => (
           <path key={l.id} d={l.d} vectorEffect="non-scaling-stroke" fill="none" stroke={l.color} strokeWidth={l.width}
@@ -124,7 +126,8 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
   );
 
   const checklistSheet = (
-    <section className={`sheet over bg-butter ${s.check}`}>
+    // Butter on mobile (the design's checklist sheet); on desktop it takes the picked strategy's tint.
+    <section className={`sheet over ${s.check}`} style={{ '--pick': pick ? lookOf(pick.id).tint : undefined } as CSSProperties}>
       {pick && research.length > 1 && (
         <div className={s.switch}>
           <StrategySwitch strategies={research} current={pick.id}
@@ -149,8 +152,13 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
     </section>
   );
 
+  // Desktop: the picked card drops into this sheet as a tab. At either end of the row the tab meets
+  // the sheet's own rounded corner, which has to square off for the two to read as one surface.
+  const ids = board.rows.map(r => r.strategy.id);
+  const tabEdge = !pick ? undefined : ids[0] === pick.id ? 'first' : ids.at(-1) === pick.id ? 'last' : undefined;
   const monthsSheet = (
-    <section className={`sheet over ${pick ? monthsBg(lookOf(pick.id)) : 'bg-sheet'} ${s.months}`} aria-labelledby="months-title">
+    <section className={`sheet over ${pick ? lookOf(pick.id).bg : 'bg-sheet'} ${s.months}`} data-tab={tabEdge}
+      aria-labelledby="months-title">
       <h2 id="months-title" className="eyebrow">Month by month · {pick ? pick.name : '—'}</h2>
       {pick && since ? (
         <table className={s.table}>
@@ -188,36 +196,46 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
         <div className={s.cards}>
           {board.rows.map(({ strategy: st, metrics: m }) => {
             const Icon = strategyIcon(st.icon);
+            const look = lookOf(st.id);
             const dash = (v: string) => (st.isBenchmark ? '—' : v);
             const cr = cmpOf(st.id);
             const retired = st.status === 'retired';
-            return (
-              <article key={st.id} data-status={cr?.status ?? 'benchmark'}
-                className={`sheet over ${lookOf(st.id).bg} ${s.card}`}>
+            const active = st.id === pick?.id;
+            // Desktop shows the code only; the full name and the one-line description live in this tip.
+            const tip = `${st.name}\n${st.sub}`;
+            const body = (
+              <>
                 <div className={s.cardHead}>
                   <div className={s.cardName}>
-                    {/* One row: the name gives way (ellipsis) before the chips wrap under it. No Paper
-                        chip here: the whole page is paper. */}
-                    <span className={s.name}>
-                      <span className={s.nameText}>{st.name}</span>
-                      {st.isChampion && <span data-tip="Champion" aria-label="Champion" role="img" className={s.crown}><Crown size={20} /></span>}
-                      {retired && (
-                        <span className={`chip ${s.retired}`}
-                          data-tip="Retired: it stopped trading and keeps its whole record">
-                          <Archive size={14} strokeWidth={1.75} aria-hidden="true" />
-                          {retiredLabel(st.paperEnd)}
-                        </span>
-                      )}
-                      {cr?.status === 'insufficient' && (
-                        <span className={`chip ${s.unranked}`}
-                          data-tip={`Not ranked: fewer than ${MIN_COMMON_SESSIONS} sessions shared with the others`}>
-                          Not ranked
-                        </span>
-                      )}
-                    </span>
+                    <div className={s.titleRow}>
+                      {/* Mobile: one row, the name gives way (ellipsis) before the chips wrap under it.
+                          Desktop: the code, with the chips on their own fixed-height line below. */}
+                      <span className={s.name} data-tip={tip}>
+                        <span className={`${s.nameText} mobile-only`}>{st.name}</span>
+                        <span className={`${s.nameText} desk-only`}>{st.short}</span>
+                        {st.isChampion && <span data-tip="Champion" aria-label="Champion" role="img" className={`${s.crown} mobile-only`}><Crown size={20} /></span>}
+                      </span>
+                      {/* Desktop: the status line under the code — champion, retired, not ranked. */}
+                      <span className={s.chips}>
+                        {st.isChampion && <span data-tip="Champion" aria-label="Champion" role="img" className={`${s.crown} desk-only`}><Crown size={20} /></span>}
+                        {retired && (
+                          <span className={`chip ${s.retired}`}
+                            data-tip="Retired: it stopped trading and keeps its whole record">
+                            <Archive size={14} strokeWidth={1.75} aria-hidden="true" />
+                            {retiredLabel(st.paperEnd)}
+                          </span>
+                        )}
+                        {cr?.status === 'insufficient' && (
+                          <span className={`chip ${s.unranked}`}
+                            data-tip={`Not ranked: fewer than ${MIN_COMMON_SESSIONS} sessions shared with the others`}>
+                            Not ranked
+                          </span>
+                        )}
+                      </span>
+                    </div>
                     <span className={s.cardSub}>{st.sub}</span>
                   </div>
-                  <span className={s.icon}><Icon size={22} strokeWidth={1.6} /></span>
+                  <span className={s.icon} data-tip={tip}><Icon size={22} strokeWidth={1.6} /></span>
                 </div>
                 <div className={s.metrics}>
                   <div className={s.metric}><span className={`num ${s.ret} ${tone(m.totalReturn)}`}>{ret(m.totalReturn)}</span><span className={s.mLabel}><span className="mobile-only">Return</span><span className="desk-only">Total return</span></span></div>
@@ -226,7 +244,17 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
                   <div className={s.metric}><span className="num">{m.maxDrawdown === null ? '—' : (m.maxDrawdown * 100).toFixed(1) + '%'}</span><span className={s.mLabel}><span className="mobile-only">Max DD</span><span className="desk-only">Max drawdown</span></span></div>
                   <div className={s.metric}><span className="num">{dash(String(m.trades))}</span><span className={s.mLabel}>Trades</span></div>
                 </div>
-              </article>
+              </>
+            );
+            const cls = `sheet over ${look.bg} ${s.card}${active ? ` ${s.cardActive}` : ''}`;
+            const style = { '--tint': look.tint } as CSSProperties;
+            // SPY is in every month row already, so only research cards pick the month-by-month sheet.
+            return st.isBenchmark ? (
+              <article key={st.id} data-status={cr?.status ?? 'benchmark'} className={cls} style={style}>{body}</article>
+            ) : (
+              <Link key={st.id} href={`/leaderboard?s=${encodeURIComponent(st.id)}`} scroll={false}
+                data-status={cr?.status ?? 'benchmark'} aria-current={active ? 'true' : undefined}
+                className={`${cls} ${s.cardLink}`} style={style}>{body}</Link>
             );
           })}
         </div>

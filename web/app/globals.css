@@ -17,6 +17,9 @@
   --lav: #eceefb;
   --sky: #d6e8ee;
   --stone: #efe8dd;
+  --sage: #dcebd8;
+  --rose: #f8e0d9;
+  --plum: #ebe0ee;
   --pos: #2b7d38;
   --neg: #b8321f;
   --bar: #1d1c1a;
@@ -51,6 +54,9 @@
     --lav: #2a2c40;
     --sky: #1d3038;
     --stone: #2c2823;
+    --sage: #1f3226;
+    --rose: #3b2623;
+    --plum: #33263a;
     --pos: #86d483;
     --neg: #ff9180;
     --bar: #f4f1ea;
@@ -217,6 +223,9 @@ h1, h2 { margin: 0; font-weight: 400; }
 .bg-butter { background: var(--butter); }
 .bg-sky { background: var(--sky); }
 .bg-stone { background: var(--stone); }
+.bg-sage { background: var(--sage); }
+.bg-rose { background: var(--rose); }
+.bg-plum { background: var(--plum); }
 .bg-coral { background: var(--coral); color: var(--on-coral); }
 
 @media (max-width: 1023.98px) {

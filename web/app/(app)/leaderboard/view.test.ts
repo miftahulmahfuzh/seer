@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Snapshot } from '../../../lib/metrics';
 import type { MonthlyTable } from '../../../lib/monthly';
 import {
-  CHECKS, compare, looks, MIN_COMMON_SESSIONS, MIN_RANKED, monthLabel, monthLines, monthsBg,
+  CHECKS, compare, looks, MIN_COMMON_SESSIONS, MIN_RANKED, monthLabel, monthLines,
   NO_GATE, pickResearch, researchOf, retiredLabel, scoreOf, sinceStartLine, spyOverSpan,
   windowLine, type RankIn, type RosterIn,
 } from './view';
@@ -18,54 +18,49 @@ const RESEARCH = ['A', 'F4-MOM12-N20-TREND', 'F1-SPY-SMA200-M', 'C'];
 
 describe('looks', () => {
   it('gives the benchmark the dotted line on a plain sheet', () => {
-    expect(looks(roster).get('SPY')).toEqual({ bg: 'bg-sheet', line: 'var(--ink-3)', width: 1.75, dotted: true });
+    expect(looks(roster).get('SPY')).toEqual({ bg: 'bg-sheet', tint: 'var(--sheet)', line: 'var(--ink-3)', width: 1.75, dotted: true });
   });
   it('assigns research sheets and lines in roster order', () => {
     const l = looks(roster);
-    expect(RESEARCH.map(id => l.get(id)!.bg)).toEqual(['bg-lav', 'bg-sky', 'bg-stone', 'bg-butter']);
+    expect(RESEARCH.map(id => l.get(id)!.bg)).toEqual(['bg-lav', 'bg-sky', 'bg-sage', 'bg-rose']);
+    expect(RESEARCH.map(id => l.get(id)!.tint)).toEqual(['var(--lav)', 'var(--sky)', 'var(--sage)', 'var(--rose)']);
     expect(RESEARCH.map(id => l.get(id)!.line)).toEqual(['var(--ink)', 'var(--line-b)', 'var(--line-c)', 'var(--coral)']);
     expect(RESEARCH.map(id => l.get(id)!.width)).toEqual([2, 2, 2, 2]);
   });
   it('never gives C the look of A', () => {
     const l = looks(roster);
     expect(l.get('C')).not.toEqual(l.get('A'));
-    expect(l.get('C')).toEqual({ bg: 'bg-butter', line: 'var(--coral)', width: 2, dotted: false });
+    expect(l.get('C')).toEqual({ bg: 'bg-rose', tint: 'var(--rose)', line: 'var(--coral)', width: 2, dotted: false });
   });
   it('follows roster order, not ids', () => {
     const l = looks([roster[3], roster[0], roster[1]]);
-    expect(l.get('F1-SPY-SMA200-M')).toEqual({ bg: 'bg-lav', line: 'var(--ink)', width: 2, dotted: false });
-    expect(l.get('A')).toEqual({ bg: 'bg-sky', line: 'var(--line-b)', width: 2, dotted: false });
+    expect(l.get('F1-SPY-SMA200-M')).toEqual({ bg: 'bg-lav', tint: 'var(--lav)', line: 'var(--ink)', width: 2, dotted: false });
+    expect(l.get('A')).toEqual({ bg: 'bg-sky', tint: 'var(--sky)', line: 'var(--line-b)', width: 2, dotted: false });
   });
-  it('cycles sheets and uses the spare line for a fifth research strategy', () => {
+  it('gives a fifth research strategy plum and the spare line', () => {
     const l = looks([...roster, { id: 'X9', isChampion: false, isBenchmark: false }]);
-    expect(l.get('X9')).toEqual({ bg: 'bg-lav', line: 'var(--ink-2)', width: 2, dotted: false });
+    expect(l.get('X9')).toEqual({ bg: 'bg-plum', tint: 'var(--plum)', line: 'var(--ink-2)', width: 2, dotted: false });
   });
-  it('gives a sixth and a seventh research strategy looks of their own', () => {
-    const extra = ['X9', 'X10', 'X11'].map(id => ({ id, isChampion: false, isBenchmark: false }));
+  it('gives six research strategies six different sheets, butter never among them', () => {
+    const extra = ['X9', 'X10'].map(id => ({ id, isChampion: false, isBenchmark: false }));
     const l = looks([...roster, ...extra]);
-    expect(l.get('X10')).toEqual({ bg: 'bg-sky', line: 'var(--ink)', width: 2, dotted: false });
-    expect(l.get('X11')).toEqual({ bg: 'bg-stone', line: 'var(--line-b)', width: 2, dotted: false });
+    const bgs = [...RESEARCH, ...extra.map(e => e.id)].map(id => l.get(id)!.bg);
+    expect(new Set(bgs).size).toBe(6);
+    expect(bgs).not.toContain('bg-butter');
+    expect(bgs).not.toContain('bg-sheet');
+    expect(l.get('X10')).toEqual({ bg: 'bg-stone', tint: 'var(--stone)', line: 'var(--ink)', width: 2, dotted: false });
   });
-  it('never gives two research strategies the same look, up to a roster of twenty', () => {
-    const many: RosterIn[] = Array.from({ length: 20 }, (_, i) => ({
+  it('never gives two research strategies the same look, up to a roster of thirty', () => {
+    const many: RosterIn[] = Array.from({ length: 30 }, (_, i) => ({
       id: `S${i}`, isChampion: false, isBenchmark: false,
     }));
     const l = looks(many);
     const seen = many.map(st => `${l.get(st.id)!.bg}|${l.get(st.id)!.line}`);
-    expect(new Set(seen).size).toBe(20);
+    expect(new Set(seen).size).toBe(30);
   });
   it('emphasises a non-benchmark champion', () => {
     const l = looks([{ ...roster[0], isChampion: false }, { ...roster[1], isChampion: true }]);
     expect(l.get('A')!.width).toBe(2.75);
-  });
-});
-
-describe('monthsBg', () => {
-  it('keeps the card sheet, except butter, which would merge into the butter checklist above it', () => {
-    const l = looks(roster);
-    expect(monthsBg(l.get('A')!)).toBe('bg-lav');
-    expect(monthsBg(l.get('F4-MOM12-N20-TREND')!)).toBe('bg-sky');
-    expect(monthsBg(l.get('C')!)).toBe('bg-stone');
   });
 });
 

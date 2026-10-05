@@ -28,24 +28,30 @@ export type RosterIn = { id: string; isChampion: boolean; isBenchmark: boolean }
 export type RankIn = RosterIn & { status: 'active' | 'retired' };
 
 /**
- * Research strategies take the design's sheet and line pairs in roster order: the A/B/C pairs, then
- * butter (the fourth sheet of the design's slot palette) with the coral accent line, so a fourth
- * research strategy (C · News veto) never reuses the first one's look.
+ * Every research strategy gets a sheet of its own: the design's lav/sky/stone tints plus sage, rose
+ * and plum, so today's five never share a colour with each other or with SPY's plain sheet. Butter
+ * is not in the rotation: it is the checklist's own sheet on mobile, and the month-by-month sheet
+ * stacked right under it takes the picked strategy's tint, so a butter strategy would merge them.
+ * Stone, the closest tint to the plain sheet in dark mode, is last.
  *
  * The roster is variable length — a promotion adds a horseman and a retirement keeps one on the
  * board — so neither array may be assumed to cover it. They are cycled independently and their
  * lengths are coprime, so the (sheet, line) pair a strategy gets is unique for the first
- * `LOOK_PERIOD` research strategies. Both tokens are defined for light and dark in `globals.css`.
+ * `LOOK_PERIOD` research strategies. Every token is defined for light and dark in `globals.css`.
  */
-export const CARD_BGS = ['bg-lav', 'bg-sky', 'bg-stone', 'bg-butter'] as const;
+export const CARD_BGS = ['bg-lav', 'bg-sky', 'bg-sage', 'bg-rose', 'bg-plum', 'bg-stone'] as const;
 export const LINES = ['var(--ink)', 'var(--line-b)', 'var(--line-c)', 'var(--coral)', 'var(--ink-2)'] as const;
 
 /** lcm(CARD_BGS.length, LINES.length): research strategies before any (sheet, line) pair repeats. */
-export const LOOK_PERIOD = 20;
+export const LOOK_PERIOD = 30;
 
-export type Look = { bg: string; line: string; width: number; dotted: boolean };
+/** `bg` is the sheet class; `tint` is the same colour as a CSS value, for surfaces that borrow it. */
+export type Look = { bg: string; tint: string; line: string; width: number; dotted: boolean };
 
-export const LOOK_FALLBACK: Look = { bg: 'bg-sheet', line: 'var(--ink-2)', width: 2, dotted: false };
+/** 'bg-lav' -> 'var(--lav)': every sheet class in globals.css is a one-token background. */
+const tintOf = (bg: string): string => `var(--${bg.slice(3)})`;
+
+export const LOOK_FALLBACK: Look = { bg: 'bg-sheet', tint: 'var(--sheet)', line: 'var(--ink-2)', width: 2, dotted: false };
 
 /** Card sheet and chart line per strategy id, by roster order. The benchmark is the dotted line on a plain sheet. */
 export function looks(roster: RosterIn[]): Map<string, Look> {
@@ -53,11 +59,13 @@ export function looks(roster: RosterIn[]): Map<string, Look> {
   let i = 0;
   for (const st of roster) {
     if (st.isBenchmark) {
-      out.set(st.id, { bg: 'bg-sheet', line: 'var(--ink-3)', width: 1.75, dotted: true });
+      out.set(st.id, { bg: 'bg-sheet', tint: 'var(--sheet)', line: 'var(--ink-3)', width: 1.75, dotted: true });
       continue;
     }
+    const bg = CARD_BGS[i % CARD_BGS.length];
     out.set(st.id, {
-      bg: CARD_BGS[i % CARD_BGS.length],
+      bg,
+      tint: tintOf(bg),
       line: LINES[i % LINES.length],
       width: st.isChampion ? 2.75 : 2,
       dotted: false,
@@ -66,12 +74,6 @@ export function looks(roster: RosterIn[]): Map<string, Look> {
   }
   return out;
 }
-
-/**
- * The month-by-month sheet's tint: the strategy's card sheet, except butter, which on mobile would
- * merge into the butter checklist sheet stacked right above it; that one takes stone instead.
- */
-export const monthsBg = (look: Look): string => (look.bg === 'bg-butter' ? 'bg-stone' : look.bg);
 
 export const researchOf = <T extends RosterIn>(roster: T[]): T[] => roster.filter(st => !st.isBenchmark);
 

@@ -58,7 +58,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "886c7ad",
       "depends_on": [
         1,
         2,
@@ -67,16 +67,16 @@
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "fundamentals.py + test_fundamentals_command.py, exactly 2 files (verified by coordinator). LADDER_TAGS imported from phase 5, never copied - a test pins identity. Suite 2478 passed/0 failed. DECISIONS: (1) sec.require_contact() in try/except ConfigError -> exit 2, not Step 4's bare config.require (rung 3 + rung 6, nightly.py:76-80). (2) kept Step 7's 'except SecNotFound -> empty' branch over the Impact prose two lines below claiming it is not special-cased - the code block has the branch and C4 says 404->empty; the prose is the stale half (rung 3). (3) PLAN BUG, test-only: Step 11's seed_universe calls conn.executemany, which psycopg3 Connection lacks (Cursor only); fixed to 'with conn.cursor() as cur:' per test_backtest_io.py:51. 20 tests failed before the fix. (4) readme-updater skipped - package_readme.md shared with live phase 7, which owns the runbook rows where this command's contract belongs. COORDINATOR FINDING: phases 2 and 4 both reported 'no credentials' because they looked for .env; the real file is .env.local at repo root (config.env_file() = SEER_ENV_FILE or REPO_ROOT/.env.local) and the WORKTREE has none, only the main checkout. DATABASE_URL_UNPOOLED IS present there, so the landing migration is possible. SEC_CONTACT_EMAIL is NOT present - the first live ingest run needs it added. Exit criteria 1-4 and 6 remain the operator's first real run.",
       "package": "seer_engine.commands",
       "plan": ".workflows/plan/edgar-fundamentals/phase-4.md",
-      "reported_at": "2026-10-05T02:33:15+00:00",
+      "reported_at": "2026-10-05T04:01:46+00:00",
       "satisfies": [
         "R1",
         "R2",
         "R5"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ENG-22VQ",
       "title": "fundamentals` command \u2014 resumable ingest"
     },
@@ -143,6 +143,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/edgar-fundamentals/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "edgar-fundamentals",
-  "updated": "2026-10-05T03:52:51+00:00",
+  "updated": "2026-10-05T04:01:46+00:00",
   "worktree": "/home/miftah/.worktrees/seer/edgar-fundamentals"
 }

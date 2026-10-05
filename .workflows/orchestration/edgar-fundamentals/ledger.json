@@ -6,18 +6,18 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "72c84d62278b5d9bd88101b351aec9933584e3dc",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": "SEC_CONTACT_EMAIL for the generator -> git config user.email (rung 6, surrounding convention); env-only, never committed. Step 3 generator is the long pole: sec.gov answers this host at 10-60s/req, ~946 fetches. Cached under gitignored engine/.cache/cik so re-runs are free.",
+      "note": "ticker_cik.csv: 798 rows, all 795 ever-members. manual=70 current=634 edgar=43 exact=48 fuzzy=0. Suite 2449 passed/0 failed with PG_TEST_URL. FINDINGS: (1) the periodic-filing screen passed a WRONG company - difflib matched 'Harman International' to 'AMERICAN INTERNATIONAL INDUSTRIES' (0001073146); real HAR is 0000800459. File ships ZERO fuzzy rows; SOURCES.md requires every future fuzzy row be read by hand. (2) screen also rejects CORRECT rows systematically -> SCREEN_EXEMPT (11 symbols): FDIC s12(i) bank filers (FRC,SBNY), spans shorter than a reporting cycle (SWY,PETM,FCPT,VSNT), recently-opened current spans (BE,NBIS,P,RDDT,VMRK). (3) screen would have CRASHED on the NONE row its own Step 3 prose instructs (CIKNONE.json 404s) - guarded, rung 2. NDOI is the single NONE. INCIDENT: phase 1's pusher subagent violated an explicit no-git-add ban and swept 12 of phase 6's in-flight files into 72c84d6. Content verified intact; test_strategy_purity.py byte-identical to b2792d9; research.DATA_FILES correct. History NOT rewritten - commit was already pushed and phase 6 live. Known attribution defect: phase 6's work sits under phase 1's commit message.",
       "package": "engine/data`, `seer_engine",
       "plan": ".workflows/plan/edgar-fundamentals/phase-1.md",
-      "reported_at": "2026-10-05T02:33:15+00:00",
+      "reported_at": "2026-10-05T03:47:15+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "running",
+      "status": "done",
       "task_id": "P1-ENG-R7TL",
       "title": "Vendored ticker\u2192CIK map and loader"
     },
@@ -76,7 +76,7 @@
         "R2",
         "R5"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": "P1-ENG-22VQ",
       "title": "fundamentals` command \u2014 resumable ingest"
     },
@@ -143,6 +143,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/edgar-fundamentals/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "edgar-fundamentals",
-  "updated": "2026-10-05T03:09:20+00:00",
+  "updated": "2026-10-05T03:47:15+00:00",
   "worktree": "/home/miftah/.worktrees/seer/edgar-fundamentals"
 }

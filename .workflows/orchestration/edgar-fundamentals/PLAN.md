@@ -6,8 +6,8 @@
 **Worktree:** `/home/miftah/.worktrees/seer/edgar-fundamentals`
 **Branch:** `feature/edgar-fundamentals` (base: `origin/main` @ `3df1b98`)
 **Phases:** 7
-**Status:** reconciled
-**Coordinator:** —
+**Status:** landed (merge cf08103)
+**Coordinator:** orch-edgar-fundamentals
 **Reconciled:** 2026-10-05, rounds 1 and 2 (`plan-reconciler`) — round 2 was the verify pass
 
 ---
@@ -110,13 +110,13 @@ fundamental factor allocator and one lab method; runbook updates.
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Vendored ticker→CIK map and loader | R1 | `engine/data`, `seer_engine` | 5 | — | NORMAL | `.workflows/plan/edgar-fundamentals/phase-1.md` | P1-ENG-R7TL | — |
-| 2 | Schema: `ticker_cik`, `fundamental_facts`, `fundamentals_log` | R4 | `db/migrations` | 2 | — | EASY | `.workflows/plan/edgar-fundamentals/phase-2.md` | P1-ENG-FPIL | — |
+| 1 ✅ | Vendored ticker→CIK map and loader | R1 | `engine/data`, `seer_engine` | 5 | — | NORMAL | `.workflows/plan/edgar-fundamentals/phase-1.md` | P1-ENG-R7TL | — |
+| 2 ✅ | Schema: `ticker_cik`, `fundamental_facts`, `fundamentals_log` | R4 | `db/migrations` | 2 | — | EASY | `.workflows/plan/edgar-fundamentals/phase-2.md` | P1-ENG-FPIL | — |
 | 3 ✅ | SEC client (`sec.py`) and `SEC_CONTACT_EMAIL` | R2, R5 | `seer_engine` | 3 | — | NORMAL | `.workflows/plan/edgar-fundamentals/phase-3.md` | P1-ENG-0351 | — |
-| 4 | `fundamentals` command — resumable ingest | R1, R2, R5 | `seer_engine.commands` | 2 | 1, 2, 3, 5 | HARD | `.workflows/plan/edgar-fundamentals/phase-4.md` | P1-ENG-22VQ | — |
-| 5 | Pure derivation: concept ladder, PIT selection, SUE | R3 | `seer_engine.fundamentals` | 6 | 2 | HARD | `.workflows/plan/edgar-fundamentals/phase-5.md` | P1-ENG-9U93 | — |
-| 6 | `Market.fundamentals` + the `MarketAware` hook | R6 | `seer_engine.backtest`, `seer_engine.strategies`, `seer_engine.research` | 11 | 2, 5 | HARD | `.workflows/plan/edgar-fundamentals/phase-6.md` | P1-ENG-0LUS | — |
-| 7 | Fundamental factor allocator, lab method, runbook | R6 | `seer_engine.strategies`, `seer_engine.lab`, `docs` | 5 | 5, 6 | NORMAL | `.workflows/plan/edgar-fundamentals/phase-7.md` | P1-ENG-AHLW | — |
+| 4 ✅ | `fundamentals` command — resumable ingest | R1, R2, R5 | `seer_engine.commands` | 2 | 1, 2, 3, 5 | HARD | `.workflows/plan/edgar-fundamentals/phase-4.md` | P1-ENG-22VQ | — |
+| 5 ✅ | Pure derivation: concept ladder, PIT selection, SUE | R3 | `seer_engine.fundamentals` | 6 | 2 | HARD | `.workflows/plan/edgar-fundamentals/phase-5.md` | P1-ENG-9U93 | — |
+| 6 ✅ | `Market.fundamentals` + the `MarketAware` hook | R6 | `seer_engine.backtest`, `seer_engine.strategies`, `seer_engine.research` | 11 | 2, 5 | HARD | `.workflows/plan/edgar-fundamentals/phase-6.md` | P1-ENG-0LUS | — |
+| 7 ✅ | Fundamental factor allocator, lab method, runbook | R6 | `seer_engine.strategies`, `seer_engine.lab`, `docs` | 5 | 5, 6 | NORMAL | `.workflows/plan/edgar-fundamentals/phase-7.md` | P1-ENG-AHLW | — |
 
 Waves the `Depends on` column implies: **{1, 2, 3} → {5} → {4, 6} → {7}**.
 

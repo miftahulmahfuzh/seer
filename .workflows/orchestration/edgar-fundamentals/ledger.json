@@ -3,6 +3,12 @@
   "coordinator": "orch-edgar-fundamentals",
   "coordinator_session_id": "4cdcf3a8-0eec-42a4-83e1-f2f6a524554d",
   "created": "2026-10-05T02:23:18+00:00",
+  "landed": {
+    "at": "2026-10-05T04:10:39+00:00",
+    "base": "main",
+    "commit": "cf081034364958abba677588f5c6b8f348f2552f",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -121,21 +127,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "81d2256",
       "depends_on": [
         5,
         6
       ],
       "difficulty": "NORMAL",
       "n": 7,
-      "note": null,
+      "note": "f_fundamental.py (FND), m0005_fundamental_factors.py (6 variants, UNRUN), test_f_fundamental.py (51 tests), the one test_lab_methods.py branch, runbook, and the package_readme purity-glob fix. 6 files, verified. Suite 2542 passed/0 failed. SUE_FREE/SUE_RANKING computed from factors_read (3 and 3), not hand-listed. M0001/M0004 verified still on the unchanged branch - isinstance MarketAware False for all nine of their candidates, True for all six of M0005's. FOUR PLAN DEFECTS: three rung 3 (prose vs code block) - mis-ordered quality ranking expectation; SUE test calling fundamental_rows with 4 args and comparing list to (); NO_FLOOR min_price=0.0 violating the plan's own validator that a sibling test pins as must-raise (25 of 51 tests failed on this one). One rung 2 - dev-window test's 400 sessions stopped ~2015-08-07, ten weeks short of the DEV_END it asserts; raised to 460 filtered to <=DEV_END (452). NOTE FOR OPERATOR: lab run M0005 NOT executed by design; the gate is whether the store manifest lists fundamentals.csv, not whether phase 6 landed - a store rebuilt without --with-fundamentals loads silently with an empty panel.",
       "package": "seer_engine.strategies`, `seer_engine.lab`, `docs",
       "plan": ".workflows/plan/edgar-fundamentals/phase-7.md",
-      "reported_at": "2026-10-05T02:33:15+00:00",
+      "reported_at": "2026-10-05T04:09:47+00:00",
       "satisfies": [
         "R6"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ENG-AHLW",
       "title": "Fundamental factor allocator, lab method, runbook"
     }
@@ -143,6 +149,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/edgar-fundamentals/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "edgar-fundamentals",
-  "updated": "2026-10-05T04:01:46+00:00",
+  "updated": "2026-10-05T04:10:39+00:00",
   "worktree": "/home/miftah/.worktrees/seer/edgar-fundamentals"
 }

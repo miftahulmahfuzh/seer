@@ -40,21 +40,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "e8c798f",
       "depends_on": [
         2
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "Phase 3 landed e8c798f, verified by coordinator from git: ancestor of branch, pushed, exactly 2 code files (commands/fundamentals.py, test_fundamentals_command.py) plus todos.md. Both floors confirmed at 2009-01-01 in the tree. C6 FOLLOWED EXACTLY: --symbols with the whole 912-symbol member set, --retry-failed NOT passed, nothing truncated, no log row deleted anywhere; fundamentals_log_pre_fixb is a read-only 776-row snapshot never restored from. Invariants 8/11 held at every step - absolute SEER_ENV_FILE, DSN proved localhost:55432 before the first write, PYTHONPATH over main's venv, no worktree venv, Neon untouched. RUN: 927 ok / 17 empty / 0 failed / 0 skipped; 915 companyfacts calls (was 776, coordinator's estimate was 890) and 915 log rows; 1,589,093 facts kept, 360,271 inserted or changed; table 385 MB -> 471.2 MB, 1,228,822 -> 1,589,093 rows over 899 CIKs; ~10 minutes, not 30. FIX A + FIX B COMPOUND, M3 is the proof: panel join 831,725 rows / 780 symbols -> 1,213,351 / 869. 2013 and 2014 were previously ZERO rows and are now 74,248 and 74,339 - 181,491 stored-and-invisible facts now reach the panel, plus 2009-2012 on top. So Fix A did not merely add pre-2015 history, it unblocked facts already stored that the clamped map could not join. THE HONEST FINDING, and it is a deliverable not a defect: the real floor is ~2011, not 2009. 2009 = 22,219 facts / 403 filers (~25% of the 2013 baseline of 89,913 / 773); 2010 = 60,550 / 670 (~67%); 2011 = 90,505 / 729, the first year at baseline; 2012 = 99,641 / 738, above it. Expected shape, not an ingest failure - XBRL phased in by filer size, so 2009-2010 are thin AND large-cap-skewed. CAVEAT FOR PHASE 5 (invariant 9): none of this is panel coverage. 'Facts by filed year' != 'dates the panel can rank 20 symbols on'; that is phase 1's --coverage, measured after phase 4's store refresh. Tests +0 exactly as C9 predicted: 2261 passed / 332 skipped, 2593 passed / 0 skipped with PG_TEST_URL. One ladder decision, rung 3: the plan's Verification greps for no '2015-01-02' in commands/fundamentals.py but one survives at :358, in resolve_cik's docstring as the recycled-ticker illustration ('CA on 2015-01-02 is CA Inc. and not the Xtrackers ETF'). Kept - the plan's code blocks and Files table enumerate exactly four changing regions and resolve_cik is not among them; the grep is shorthand for 'no FLOOR still says 2015/2013'. Coordinator confirmed from the tree that :358 is a docstring, not a floor. Two intended residues in the LOCAL train DB, both in the plan's rollback: universe populated 0 -> 1544 rows (needed by plan_jobs's per-symbol windows), and fundamentals_log_pre_fixb left as a rollback aid. fundamentals_log now 899 ok / 16 empty / 0 failed. Full M1/M3/M4/M5/M6 tables are in e8c798f's commit body and todos.md.",
       "package": "engine/src/seer_engine/commands",
       "plan": ".workflows/plan/fundamental-panel-coverage/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T09:01:20+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-F2BN",
       "title": "Fix B: re-ingest at `--since-filed 2009-01-01` via `--symbols`, and measure 2009\u20132012"
     },
     {
@@ -95,7 +95,7 @@
         "R4",
         "R5"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Measure, report honestly, and retire the runbook snippet"
     }
@@ -103,7 +103,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/fundamental-panel-coverage/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "fundamental-panel-coverage",
-  "updated": "2026-10-05T08:33:46+00:00",
+  "updated": "2026-10-05T09:01:25+00:00",
   "verified_at": "2026-10-05T07:53:22+00:00",
   "worktree": "/home/miftah/.worktrees/seer/fundamental-panel-coverage"
 }

@@ -3,6 +3,12 @@
   "coordinator": "orch-roster-promotion-pipeline",
   "coordinator_session_id": "ebf23947-cf09-44fe-a553-289f0f38590d",
   "created": "2026-10-05T10:45:53+00:00",
+  "landed": {
+    "at": "2026-10-05T13:01:51+00:00",
+    "base": "main",
+    "commit": "2993d36e19f53d889e0234efb788b08cc941d3e0",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -99,28 +105,28 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "1e26b7c",
       "depends_on": [
         5
       ],
       "difficulty": "HARD",
       "n": 6,
-      "note": null,
+      "note": "decide_book/expected_book dispatch MarketAware via prepare_for+targets_prepared; byte-identical expression for every non-MarketAware allocator. Suite 2700 passed/0 skipped with PG_TEST_URL (+17). Invariant 2 holds (five pre-existing digests byte-identical; FND 4a9dacc3 as pinned). MAX_LOOKBACK_BARS 253 (D12). D1 holds. Lab record written and committed: M0005 stays rejected, source_sha + six trials untouched, analysis grew one # Promotion section, insights one row. All four coordinator handoffs taken. DECISIONS: (1) delta is +17 not the plan's +16 ON PURPOSE -- with an empty panel both dispatch branches return (), so every empty-panel test the plan specified is vacuous for night-vs-replay agreement and would NOT have caught a missing 'prepared=' on replay.py, the exact paper_check mismatch this phase exists to prevent. Added test_the_night_and_the_replay_decide_fnd_the_same_way driving replay.expected_book against a real panel; verified by sabotage (prepared=None fails, restored passes). Plan's exit criteria said +14 while its own delta table said +16 -- table was right, +14 stale. (2) PLAN-VS-TREE DRIFT: docs/runbooks/paper.md does not exist, the file is paper-trading.md. Four more existing tests needed the same literal widening the plan prescribed for three: test_paper_roster.py (5-way unpack, two active() lists, a promoted_from-IS-NULL assertion FND legitimately breaks), test_migrate.py, test_paper_store.py, test_paper_c.py. All widened minimally, no assertion weakened. (3) test_paper_c.py's 'roster.ROSTER[-1].id == C' broke on FND being sort 6; widened to 'C in roster.ROSTER_IDS', which is what it actually checked. LAND-TIME: live Neon promote deliberately outstanding -- 007_fnd.sql is idempotent and writes the same row, so applying 006+007 to production covers it.",
       "package": "engine/src/seer_engine/paper`, `db`, `docs",
       "plan": ".workflows/plan/roster-promotion-pipeline/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T12:59:42+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-H3WF",
       "title": "FND` onto the roster \u2014 the first promotion through the new path"
     }
   ],
   "plan": "/home/miftah/.worktrees/seer/roster-promotion-pipeline/ROSTER_PROMOTION_PIPELINE_PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "roster-promotion-pipeline",
-  "updated": "2026-10-05T12:15:56+00:00",
+  "updated": "2026-10-05T13:01:51+00:00",
   "verified_at": "2026-10-05T11:29:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/roster-promotion-pipeline"
 }

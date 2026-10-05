@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/roster-promotion-pipeline`
 **Branch:** `feature/roster-promotion-pipeline` (base: `origin/main` @ `0d03490`)
 **Phases:** 6
-**Status:** reconciled — phases 1, 2, 3, 4, 5 of 6 complete
+**Status:** complete — all 6 phases complete
 **Coordinator:** —
 
 ---
@@ -171,7 +171,7 @@ For `web/`: `cd $SEER_WT/web && npm ci` once, then `npm test` and `npm run build
 | 3 ✅ | Common-window, risk-adjusted comparison over `equity_snapshots` | R3 | `engine/src/seer_engine/{paper,commands}` | 3 | — | HARD | `.workflows/plan/roster-promotion-pipeline/phase-3.md` | P1-ENG-7V3C | — |
 | 4 ✅ | The leaderboard re-sorts honestly, and shows retired horsemen | R3 | `web` | 5 | 1, 3 | NORMAL | `.workflows/plan/roster-promotion-pipeline/phase-4.md` | P1-WEB-C6PK | — |
 | 5 ✅ | `promote`: the lab → roster bridge | R4 | `engine/src/seer_engine/{commands,lab}` | 4 | 1, 2 | HARD | `.workflows/plan/roster-promotion-pipeline/phase-5.md` | P1-ENG-Z8MR | — |
-| 6 | `FND` onto the roster — the first promotion through the new path | R1 | `engine/src/seer_engine/paper`, `db`, `docs` | 10 | 5 | HARD | `.workflows/plan/roster-promotion-pipeline/phase-6.md` | P1-ENG-H3WF | — |
+| 6 ✅ | `FND` onto the roster — the first promotion through the new path | R1 | `engine/src/seer_engine/paper`, `db`, `docs` | 10 | 5 | HARD | `.workflows/plan/roster-promotion-pipeline/phase-6.md` | P1-ENG-H3WF | — |
 
 Four of those cells moved during reconciliation. Phase 1 is 4 files, not 5 (the migration,
 `roster.py`, `store.py`, `test_paper_roster.py`). Phase 2 is 6, not 4 (three sources, three test

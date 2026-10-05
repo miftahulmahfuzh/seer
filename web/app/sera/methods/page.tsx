@@ -90,10 +90,10 @@ export default async function Methods({ searchParams }: { searchParams: Promise<
                   <th className={s.cMethod} scope="col">Method</th>
                   <th className={s.cSource} scope="col">Source</th>
                   <th className={`${s.cCagr} ${s.r}`} scope="col"><T k="cagr">Growth a year</T> vs SPY</th>
-                  <th className={`${s.cNum} ${s.r}`} scope="col"><T k="maxDrawdown">Max DD</T></th>
-                  <th className={`${s.cNum} ${s.r}`} scope="col"><T k="profitFactor">PF</T></th>
-                  <th className={`${s.cNum} ${s.r}`} scope="col"><T k="trades">Trades</T></th>
-                  <th className={`${s.cNum} ${s.r}`} scope="col"><T k="dsr">DSR</T></th>
+                  <th className={`${s.cMaxDd} ${s.r}`} scope="col"><T k="maxDrawdown">Max DD</T></th>
+                  <th className={`${s.cPf} ${s.r}`} scope="col"><T k="profitFactor">PF</T></th>
+                  <th className={`${s.cTrades} ${s.r}`} scope="col"><T k="trades">Trades</T></th>
+                  <th className={`${s.cDsr} ${s.r}`} scope="col"><T k="dsr">DSR</T></th>
                   <th className={s.cDots} scope="col">Hurdles</th>
                   <th className={s.cVerdict} scope="col">Verdict</th>
                   <th className={s.cGo} aria-hidden="true" />

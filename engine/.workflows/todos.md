@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-05 14:50
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-05 15:35
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 2
-- Completed: 62
+- Blocked: 1
+- Completed: 63
 
 ---
 
@@ -43,20 +43,41 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - readme-updater skipped: `engine/package_readme.md` is phase 5's (rung 4: the index Scope and phase 1's "Leaves alone")
     - Phases 2–5 left for their own sessions to claim rather than pre-flipped (rung 6: phase 2's session claimed its own entry the same way)
   - **Notes**: `lab run` was NOT executed, by design. The 6 `test_cik.py` failures present in the shared worktree at commit time are phase 2's in-flight edits — its own new tests asserting a `ticker_cik.csv` it has not regenerated yet — and phase 1 touches no file phase 2 touches. Phase 1's delta is +27 (20 new in `test_fundamentals_coverage.py`, 7 added to `test_lab_runner.py`); full suite 2242 passed / 332 skipped, 2574 passed / 0 skipped with `PG_TEST_URL`.
-- [ ] **P1-ENG-QD7X** Phase 2: Fix A: re-vendor `ticker_cik.csv` back to real 2009 membership, with the `EARLY` start screen
+- [x] **P1-ENG-QD7X** Phase 2: Fix A: re-vendor `ticker_cik.csv` back to real 2009 membership, with the `EARLY` start screen
   - **Difficulty**: HARD
   - **Type**: Update
   - **Context**: Owns `engine/src/seer_engine/cik.py` (`SINCE` → `date(2009, 1, 1)` and the docstring that explains it), `engine/scripts/build_ticker_cik.py` (the `MANUAL` start sentinel, the new audits, `SCREEN_EXEMPT` additions, the second `EARLY` screen — `periodic_dates`, `EARLY_WINDOW_DAYS` and `EARLY_EXEMPT` — and the measured counts in its module docstring), the regenerated `engine/data/ticker_cik.csv`, `engine/data/SOURCES.md`, and `engine/tests/test_cik.py` (one assertion widened, five tests added). Does not touch `commands/fundamentals.py` (phase 3 owns both ingest floors), `fundamentals/` (phase 1), `research.py` (phase 4), any `docs/` file outside `engine/data`, or the `ticker_cik` table and `005_fundamentals.sql`. `spans()` already derives every start from `max(iv.start_date, SINCE)`, so lowering `SINCE` fixes tiers 1–4 for free; what it does not fix is `MANUAL`, whose ~60 literal `"2015-01-02"` starts become an empty-cell sentinel meaning "the symbol's membership start from `spans()`" while genuinely later starts stay literal and every `end` stays literal and unchanged. 118 symbols enter scope, most delisted before 2015 and resolved by hand against `https://data.sec.gov/submissions/CIK<cik>.json`, with new pre-2015 recycling split into two dated rows rather than merged. Exit: the CSV loads through `cik.load_index()` with 913 symbols; `cik.coverage_gaps(index, compute_universe())` is empty; zero rows carry `source=fuzzy`; zero rows start at 2015-01-02; `NDOI` is still the only `NONE` and still alone; the generator exits 0 with `UNRESOLVED`, `SCREEN` and `EARLY` all empty and every exemption carrying a reason naming what was checked; `RECYCLED`, `SPOT_CHECKS`, `SHARE_CLASSES`, the WestRock and Alphabet tests all pass with their existing expected values; `SOURCES.md`'s row and tier counts match the file. Suite green at +5.
-  - **Status**: in_progress
+  - **Status**: completed
   - **Plan Set**: `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` (phase 2 of 5)
   - **Satisfies**: R1 — Fix A (§2): re-vendor `ticker_cik.csv` with real first-membership intervals, every §2 invariant still enforced by tests
   - **Depends on**: none
   - **Plan**: `.workflows/plan/P1-ENG-QD7X.md`
+  - **Completed**: 2026-10-05 — commit `85f6bfd`
+  - **Result**: `ticker_cik.csv` 798 rows/795 symbols -> 944/913. 0 rows at the retired
+    2015-01-02 clamp (525 removed), 540 at the 2009 floor, 0 before it, 0 `fuzzy`, `NDOI`
+    still the only `NONE` and alone, `coverage_gaps` empty, `K` -> 0000055067. The new
+    `EARLY` screen (450 days from the span's start) flagged 56 rows `SCREEN` cannot see,
+    including pre-existing errors: `DIS` and `XRX` were mapped to their 2019 holdcos and
+    `SNDK` to the 2025 spinoff. 69 symbols hand-audited in all; `MANUAL` 70 -> 152 symbols /
+    183 rows, every CIK read off data.sec.gov/submissions. Generator exits 0 and a re-run is
+    byte-identical. Suite 2261 passed / 332 skipped (delta +5); 2593 passed with
+    `PG_TEST_URL`. All 11 `SCREEN_EXEMPT` reasons intact; no `end_date` pushed forward; no
+    database or network write.
+  - **Decisions**: five tests not four (inv 1/C9); successor handovers split at the
+    successor's first periodic filing, measured (inv 2+10); membership-gap symbols split at
+    real membership boundaries, hole left uncovered (the plan's own `Q` block); hull opening
+    before the ticker existed -> `EARLY_EXEMPT`, not a `membership_overrides.csv` fix (C7i) —
+    `CCEP`, `DXC`, `LMCK`, `PSKY`, `VTRS`; `CCE` single row -> split, its old
+    "NOT 0000804055" note held only at the 2015 floor (inv 2); two `coverage_gaps` unit tests
+    re-anchored from a literal 2015-01-02 to `c.SINCE`, assertions unchanged and both still
+    pass (inv 1); `BNI`'s fuzzy match hand-read and promoted to `manual` (inv 3).
+  - **Note**: C7i predicted `DXC` passes both screens; it does not — `EARLY` flags it. Kept
+    out of scope as C7i directs and exempted with the reason.
 - [ ] **P1-ENG-F2BN** Phase 3: Fix B: re-ingest at `--since-filed 2009-01-01` via `--symbols`, and measure 2009–2012
   - **Difficulty**: NORMAL
   - **Type**: Update
   - **Context**: Owns `engine/src/seer_engine/commands/fundamentals.py` (`DEFAULT_SINCE` and `DEFAULT_SINCE_FILED` → `date(2009, 1, 1)`, the module docstring's "since 2015-01-02", the two `--since*` help strings, the storage paragraph's arithmetic), `engine/tests/test_fundamentals_command.py`, and the ingest run itself against `.env.local-train`. Does not touch `cik.py` or `ticker_cik.csv` (phase 2), `fundamentals/` (phase 1), `research.py` or `engine/.research/` (phases 4 and 5), Neon, or the `005` migration. The local train database holds 0 `universe` and 0 `bars` rows, so `universe refresh` (no network) must run before the ingest even under `--symbols`, which bypasses `select_symbols` but not `plan_jobs`'s per-symbol `windows`. The decision doc §3's `--retry-failed` does not work — it narrows `done` to `{ok}` and skips all 773 `ok` filers — so the run is `fundamentals --since 2009-01-01 --since-filed 2009-01-01 --symbols <912 symbols>`, which makes `plan_jobs` set `logged = {}` and fetch every resolved CIK without deleting a row anywhere; `--since` moves too, or the member set stays at 795. Budget ~30 minutes for roughly 890 companyfacts calls. The measurement is as much the deliverable as the rows: facts by `filed` year for 2009–2012 against the 2013–2026 baseline, expected partial and size-biased because XBRL phased in by filer size. Exit: `fundamentals_log` holds no unexplained `failed` row and no log row was deleted to get there; a per-year `filed` count for 2009–2026 is recorded in the phase's summary; `fundamental_facts` row count and `pg_total_relation_size` are recorded; the resolved DSN named `localhost:55432` before anything was written. Suite green at +0 (four existing tests edited in place, none added or removed).
-  - **Status**: blocked
+  - **Status**: ready
   - **Plan Set**: `FUNDAMENTAL_PANEL_COVERAGE_PLAN.md` (phase 3 of 5)
   - **Satisfies**: R2 — Fix B (§3): re-ingest at `--since-filed 2009-01-01`, and measure how much 2009–2012 XBRL actually exists
   - **Depends on**: P1-ENG-QD7X

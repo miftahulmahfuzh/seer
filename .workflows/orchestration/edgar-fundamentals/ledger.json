@@ -10,15 +10,15 @@
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": null,
+      "note": "SEC_CONTACT_EMAIL for the generator -> git config user.email (rung 6, surrounding convention); env-only, never committed. Step 3 generator is the long pole: sec.gov answers this host at 10-60s/req, ~946 fetches. Cached under gitignored engine/.cache/cik so re-runs are free.",
       "package": "engine/data`, `seer_engine",
       "plan": ".workflows/plan/edgar-fundamentals/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T02:33:15+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "running",
+      "task_id": "P1-ENG-R7TL",
       "title": "Vendored ticker\u2192CIK map and loader"
     },
     {
@@ -30,12 +30,12 @@
       "note": null,
       "package": "db/migrations",
       "plan": ".workflows/plan/edgar-fundamentals/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T02:33:15+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "running",
+      "task_id": "P1-ENG-FPIL",
       "title": "Schema: `ticker_cik`, `fundamental_facts`, `fundamentals_log"
     },
     {
@@ -47,13 +47,13 @@
       "note": null,
       "package": "seer_engine",
       "plan": ".workflows/plan/edgar-fundamentals/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T02:33:15+00:00",
       "satisfies": [
         "R2",
         "R5"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "running",
+      "task_id": "P1-ENG-0351",
       "title": "SEC client (`sec.py`) and `SEC_CONTACT_EMAIL"
     },
     {
@@ -70,14 +70,14 @@
       "note": null,
       "package": "seer_engine.commands",
       "plan": ".workflows/plan/edgar-fundamentals/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T02:33:15+00:00",
       "satisfies": [
         "R1",
         "R2",
         "R5"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ENG-22VQ",
       "title": "fundamentals` command \u2014 resumable ingest"
     },
     {
@@ -91,12 +91,12 @@
       "note": null,
       "package": "seer_engine.fundamentals",
       "plan": ".workflows/plan/edgar-fundamentals/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T02:33:15+00:00",
       "satisfies": [
         "R3"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ENG-9U93",
       "title": "Pure derivation: concept ladder, PIT selection, SUE"
     },
     {
@@ -111,12 +111,12 @@
       "note": null,
       "package": "seer_engine.backtest`, `seer_engine.strategies`, `seer_engine.research",
       "plan": ".workflows/plan/edgar-fundamentals/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T02:33:15+00:00",
       "satisfies": [
         "R6"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ENG-0LUS",
       "title": "Market.fundamentals` + the `MarketAware` hook"
     },
     {
@@ -131,18 +131,18 @@
       "note": null,
       "package": "seer_engine.strategies`, `seer_engine.lab`, `docs",
       "plan": ".workflows/plan/edgar-fundamentals/phase-7.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T02:33:15+00:00",
       "satisfies": [
         "R6"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ENG-AHLW",
       "title": "Fundamental factor allocator, lab method, runbook"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/edgar-fundamentals/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "edgar-fundamentals",
-  "updated": "2026-10-05T02:23:18+00:00",
+  "updated": "2026-10-05T02:33:15+00:00",
   "worktree": "/home/miftah/.worktrees/seer/edgar-fundamentals"
 }

@@ -1,0 +1,108 @@
+{
+  "branch": "feature/fundamental-panel-coverage",
+  "coordinator": "orch-fundamental-panel-coverage",
+  "coordinator_session_id": "16ed6cbd-0ab7-4869-8cf0-ba75aef23e0c",
+  "created": "2026-10-05T07:17:46+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 1,
+      "note": null,
+      "package": "engine/src/seer_engine/fundamentals`, `commands`, `lab",
+      "plan": ".workflows/plan/fundamental-panel-coverage/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The coverage gate: a pure measure, a CLI surface, a `lab run` refusal"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "engine/scripts`, `engine/data`, `seer_engine.cik",
+      "plan": ".workflows/plan/fundamental-panel-coverage/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Fix A: re-vendor `ticker_cik.csv` back to real 2009 membership, with the `EARLY` start screen"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "engine/src/seer_engine/commands",
+      "plan": ".workflows/plan/fundamental-panel-coverage/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Fix B: re-ingest at `--since-filed 2009-01-01` via `--symbols`, and measure 2009\u20132012"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 4,
+      "note": null,
+      "package": "engine/src/seer_engine` (research)",
+      "plan": ".workflows/plan/fundamental-panel-coverage/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Refresh the store's panel without re-downloading bars"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "difficulty": "NORMAL",
+      "n": 5,
+      "note": null,
+      "package": "docs`, `engine` (docs only)",
+      "plan": ".workflows/plan/fundamental-panel-coverage/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4",
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Measure, report honestly, and retire the runbook snippet"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/fundamental-panel-coverage/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "fundamental-panel-coverage",
+  "updated": "2026-10-05T07:17:46+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/fundamental-panel-coverage"
+}

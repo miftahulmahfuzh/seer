@@ -9,7 +9,7 @@
 .empty { padding: 12px 0; font-size: 16px; color: var(--ink-2); }
 
 .tableWrap { overflow-x: auto; margin: 0 -8px; }
-.table { width: 100%; min-width: 1200px; border-collapse: collapse; table-layout: fixed; font-size: 15px; }
+.table { width: 100%; min-width: 1240px; border-collapse: collapse; table-layout: fixed; font-size: 15px; }
 .table th, .table td {
   padding: 13px 8px; text-align: left; font-weight: 400; vertical-align: middle;
   border-bottom: 1px solid var(--hair);
@@ -24,7 +24,7 @@
 .cStatus { width: 150px; }
 .cMethod { width: 24%; }
 .cSource { width: 150px; }
-.cCagr { width: 142px; }
+.cCagr { width: 170px; white-space: nowrap; }
 .cNum { width: 74px; }
 .cDots { width: 112px; }
 .cVerdict { width: auto; }

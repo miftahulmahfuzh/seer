@@ -158,7 +158,10 @@ function Row({ r }: { r: MethodRow }) {
           <td><Dots best={b} passed={r.passed ?? 0} /></td>
         </>
       ) : (
-        <td colSpan={6} className={s.untested}>Not tested yet</td>
+        <>
+          <td className={`${s.untested} ${s.r}`}>Not tested yet</td>
+          <td colSpan={5} />
+        </>
       )}
       <td><span className={s.verdict}>{m.verdict || '—'}</span></td>
       <td className={s.go} aria-hidden="true"><ChevronRight size={18} /></td>

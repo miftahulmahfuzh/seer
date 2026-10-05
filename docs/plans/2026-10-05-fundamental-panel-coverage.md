@@ -155,9 +155,50 @@ Honest accounting of what the two fixes reach:
 | State | Cost | Coverage of the 19.8-year dev window |
 |---|---|---|
 | today | — | **4%** (zero until 2015) |
-| + Fix A (re-vendor intervals) | a CSV regeneration, no downloads | ~14% (2013 →) |
-| + Fix B (`--since-filed 2009`) | ~13 min, 776 free requests, ~250 MB **local** | **~30%** (2009 →), XBRL-limited |
+| + Fix A (re-vendor intervals) | a CSV regeneration, no downloads | **0.1387** (2013 →), **measured, upper bound** |
+| + Fix B (`--since-filed 2009`) | ~13 min, 776 free requests, ~250 MB **local** | **0.3151** (2009 →), **measured, upper bound**, XBRL-limited |
 | 1996–2008 | impossible at any price | — |
+
+> **Measured 2026-10-05**, replacing the `~14%` and `~30%` estimates this table shipped with.
+> Store `399d0d254c7a90b8cdb49f7ce598269087d38730f795cae90453eeb580b07cf8` (the 2026-10-05 store
+> was `e597367b…`), 869 panel symbols, 1,213,303 facts. "Coverage" is
+> `research_store --coverage`'s measure: the fraction of monthly sample dates from 1996-01-02 to
+> 2015-10-02 (238 samples over a dev window ending 2015-10-16) on which the panel can rank at
+> least 20 symbols whose newest fact was filed within 400 days — the same eligibility gate
+> `f_fundamental` applies, so it predicts rankability rather than fact-existence. **It is an
+> upper bound**: the measure reads no bars, so index membership on the date, `min_price` and
+> `min_dollar_volume` are not applied and can only remove symbols from it. Fix B's row is
+> 75 of 238 covered dates; the first covered sample date is 2009-08-02. The `+ Fix A` row is that
+> same measure over the same refreshed panel with facts filtered to `filed >= 2013-01-01`, which
+> is what Fix A alone would have reached: 33 of 238. The `today` row's `4%` is left as it was
+> recorded — it is a span estimate (9 months of 19.8 years), not this measure; running this
+> measure against the pre-fix store `e597367b…` reports **0.0378** (9 of 238).
+>
+> What Fix B actually recovered, by `filed` year, against the ~90k/year the 2013-onward baseline
+> holds: 2009 **22,219** facts from 403 filers, 2010 **60,550** from 670, 2011 **90,505** from
+> 729, 2012 **99,641** from 738. XBRL phased in by filer size — large accelerated filers from
+> roughly FY2009, all filers by FY2011 — so the early years are partial and size-biased by
+> construction. **§3's open question is now answered: the real floor is roughly 2011, not 2009.**
+> 2009 holds about a quarter of a full year and 2010 about two thirds; 2011 is the first year to
+> reach the 2013 baseline. For a *ranking* method the skew matters more than the shortfall — a
+> 2009 cross-section is a large-cap cross-section, not the index.
+>
+> Fix A did more than extend the range backwards. The dated `ticker_cik` join had **zero** panel
+> rows for 2013 and 2014 before the re-vendoring and has 74,248 and 74,339 now; the panel went
+> 831,725 rows / 780 symbols to 1,213,351 / 869. 181,491 facts were stored and invisible. The
+> audit also found rows that were **wrong**, not merely missing, and that nothing had queried:
+> `MFE` → MCAFEE COM CORP (no filings after 2000), `JNS` → an entity with no periodic filings,
+> `AKS` → a non-filing subsidiary, `WFT` → Weatherford Enterra (filings end 1998), and `DIS`,
+> `XRX` and `SNDK` → 2019 holdcos and a 2025 spinoff — `SNDK` resolving to the 2025 Sandisk
+> spinoff rather than the SanDisk that was in the index. Those shipped in `main`; the clamp meant
+> nothing ever queried the range that would expose them.
+>
+> **This does not solve the test problem, and §5 below still stands unchanged.** The dev window
+> opens 1996-01-03 and no XBRL exists before roughly 2009, so about thirteen of its nineteen
+> years are permanently uncoverable from this source. `>= 100 trades` over a window most of which
+> holds cash is not reachable, so **the `>= 100 trades` gate remains unreachable for a
+> fundamentals method on this dev window**. The test-window decision of §5 remains **unmade** and
+> out of scope.
 
 ## 5. What this does NOT fix
 

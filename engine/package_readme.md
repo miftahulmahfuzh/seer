@@ -322,7 +322,7 @@ passing run's artifact) are written as usual.
 
 ```
 python -m seer_engine research_store [--dry-run] [-v] [--store STORE] [--batch-size BATCH_SIZE] [--verify]
-                                    [--with-fundamentals]
+                                    [--with-fundamentals] [--refresh-fundamentals] [--coverage]
 ```
 
 This builds the local research store (D5). It covers pre-2015 bars for every S&P 500 member since
@@ -340,6 +340,23 @@ database setting — `--with-fundamentals` is the single exception, below.
   `test_research_store.py::test_no_neon_and_no_database_url_needed` AST-scans both `research.py`
   and this command and fails either one that names `seer_engine.db` or `psycopg`. Omitting the flag
   leaves the store byte-identical to a pre-fundamentals build, fingerprint included.
+- **`--refresh-fundamentals`** (fundamental-panel-coverage) rewrites `fundamentals.csv` **only**:
+  `bars.csv`, `dividends.csv`, `fx.csv` and `unserved.csv` are carried over from the existing
+  store byte for byte and every `_COUNT_KEYS` value with them, so the panel changes and the bar
+  history does not. It exists because `build_store` always downloads every symbol's bars first,
+  and two yfinance crawls on two days give two different fingerprints — which would break
+  comparability with the trials already recorded. It needs `DATABASE_URL_UNPOOLED` (set
+  `SEER_ENV_FILE` to the train env file) and re-seals and swaps atomically; nothing is written
+  on failure.
+- **`--coverage`** (fundamental-panel-coverage) loads the store and prints, for each sampled
+  dev-window date, how many symbols the panel can actually rank — a symbol counts only when
+  `as_of` returns a snapshot with **non-empty `observations`** whose newest fact was filed within
+  `max_stale_days` — plus one fraction over the window. `as_of` never returns `None`, so a
+  presence check measures nothing; this is the content check, and it is the same measure
+  `lab run` refuses on below `fundamentals.coverage.MIN_DEV_COVERAGE`. No network, no database.
+  It reads no bars, so membership, `min_price` and `min_dollar_volume` are not applied and the
+  fraction is an **upper bound**: below the floor is conclusive, above it is necessary and not
+  sufficient.
 - **The build** is throttled with backoff and runs all-or-nothing: temp files first, then a rename.
   The same downloads give byte-identical files and the same fingerprint. Nothing dated after
   2015-10-16 is kept.
@@ -1344,10 +1361,29 @@ The store is local and gitignored, in `engine/.research/`.
     when the manifest lists that file and `EMPTY_FUNDAMENTALS` otherwise (edgar-fundamentals), so
     a pre-fundamentals store loads to a market with an empty panel rather than an error.
 - `run_checks(data, vendored)`: the three data checks `research_store --verify` prints.
+- the fundamentals-only refresh (fundamental-panel-coverage): reuses an existing store's four
+  required files byte for byte, writes a new `fundamentals.csv`, re-seals and `_swap_in`s. The
+  manifest's copied counts (`bar_rows`, `dividend_rows`, `fx_rows`, `symbols_requested`,
+  `symbols_served`) are carried over, never re-derived from a download.
 
 **The committed store** (built in phase 4, verified in phase 13): fingerprint `5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a`.
 - 2,490,793 bar rows; 539 of 1,061 symbols served, and 522 members unserved.
 - 28,206 dividend rows and 4,300 FX rows.
+
+**The current train/eval store** (fundamental-panel-coverage, 2026-10-05): fingerprint
+`399d0d254c7a90b8cdb49f7ce598269087d38730f795cae90453eeb580b07cf8`, superseding
+`e597367bb6806d7edc2f9af4033b26c366aae92517207b4e71daad96346fcca3`.
+Same bars — the refresh copied them byte for byte — with a panel rebuilt from facts filed since
+2009-01-01 against the re-vendored `ticker_cik.csv`: 1,213,303 facts over 869 symbols. Dev-window
+coverage **0.3151** (`research_store --coverage`, 75 of 238 monthly samples); it was **0.0378**
+before. That is better data and not a valid test: the dev window opens in 1996 and XBRL starts
+around 2009, so a fundamentals method still cannot reach the lab's `>= 100 trades` gate on it.
+The store syncs between machines with `/sync-research-store` (`push`/`pull`, content-addressed on
+this fingerprint, Vercel Blob); push it with `--keep 0`, because a plain `push` prunes to the
+newest three versions.
+
+Both coverage figures above are **upper bounds** — the measure reads no bars, so membership,
+`min_price` and `min_dollar_volume` are not applied.
 
 yfinance has no delisted tickers, so the dev window's survivorship gap is far larger than the 115
 members since 2015, and single-stock dev results are optimistic (D4). The report counts the gap year

@@ -173,11 +173,11 @@ rescues the generator and nothing else.
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | The coverage gate: a pure measure, a CLI surface, a `lab run` refusal | R3 | `engine/src/seer_engine/fundamentals`, `commands`, `lab` | 7 | — | NORMAL | `.workflows/plan/fundamental-panel-coverage/phase-1.md` | — | — |
-| 2 | Fix A: re-vendor `ticker_cik.csv` back to real 2009 membership, with the `EARLY` start screen | R1 | `engine/scripts`, `engine/data`, `seer_engine.cik` | 5 | — | HARD | `.workflows/plan/fundamental-panel-coverage/phase-2.md` | — | — |
-| 3 | Fix B: re-ingest at `--since-filed 2009-01-01` via `--symbols`, and measure 2009–2012 | R2 | `engine/src/seer_engine/commands` | 2 | 2 | NORMAL | `.workflows/plan/fundamental-panel-coverage/phase-3.md` | — | — |
-| 4 | Refresh the store's panel without re-downloading bars | R4 | `engine/src/seer_engine` (research) | 3 | **1** | NORMAL | `.workflows/plan/fundamental-panel-coverage/phase-4.md` | — | — |
-| 5 | Measure, report honestly, and retire the runbook snippet | R4, R5 | `docs`, `engine` (docs only) | 4 (+2 untracked) | 1, 2, 3, 4 | NORMAL | `.workflows/plan/fundamental-panel-coverage/phase-5.md` | — | — |
+| 1 | The coverage gate: a pure measure, a CLI surface, a `lab run` refusal | R3 | `engine/src/seer_engine/fundamentals`, `commands`, `lab` | 7 | — | NORMAL | `.workflows/plan/fundamental-panel-coverage/phase-1.md` | P1-ENG-TJ4M | — |
+| 2 | Fix A: re-vendor `ticker_cik.csv` back to real 2009 membership, with the `EARLY` start screen | R1 | `engine/scripts`, `engine/data`, `seer_engine.cik` | 5 | — | HARD | `.workflows/plan/fundamental-panel-coverage/phase-2.md` | P1-ENG-QD7X | — |
+| 3 | Fix B: re-ingest at `--since-filed 2009-01-01` via `--symbols`, and measure 2009–2012 | R2 | `engine/src/seer_engine/commands` | 2 | 2 | NORMAL | `.workflows/plan/fundamental-panel-coverage/phase-3.md` | P1-ENG-F2BN | — |
+| 4 | Refresh the store's panel without re-downloading bars | R4 | `engine/src/seer_engine` (research) | 3 | **1** | NORMAL | `.workflows/plan/fundamental-panel-coverage/phase-4.md` | P1-ENG-K8RV | — |
+| 5 | Measure, report honestly, and retire the runbook snippet | R4, R5 | `docs`, `engine` (docs only) | 4 (+2 untracked) | 1, 2, 3, 4 | NORMAL | `.workflows/plan/fundamental-panel-coverage/phase-5.md` | P1-ENG-M3HE | — |
 
 Waves the `Depends on` column implies: **{1, 2}** concurrently, then **{3, 4}**, then **{5}**.
 

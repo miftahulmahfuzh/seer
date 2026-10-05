@@ -27,14 +27,14 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "Decided without asking (phase 2, confirmed by coordinator): (1) step 8b prose says four new test_cik.py tests, Interface Contract names five -> FIVE. Rung 1: a stated invariant, invariant 1 pins P2 at +5. Matches Decisions row C10. (2) Commit by explicit pathspec, the five Owns files only, never add -A/-a -> phase 1 is building concurrently in the SAME worktree on the SAME branch; file-disjoint is not commit-disjoint. Rung 4: the index's phase table note 'Phase 1 and phase 2 share no file and no package'. Reached independently by p2 and by the coordinator. Status at 14:30: not blocked, waiting on cold-cache SEC/Massive fetch PID 942195 (913 ever-members confirmed, 123 to name-matching, Massive delisted page 5/~24 at 12.5s/page free-tier pacing, then ~900 SEC submissions JSONs at 0.15s pacing). ETA 15-25 min to first SCREEN/EARLY list. Step 7d backstop already ran offline: exactly 37 hull-gap stretches with the plan's predicted leaders (CIEN 5894, Q 5330, FLEX 4928, STLD 4749, DELL 3982, CEG 3613, SNDK 3487) - the plan's measurements hold against the current tree.",
       "package": "engine/scripts`, `engine/data`, `seer_engine.cik",
       "plan": ".workflows/plan/fundamental-panel-coverage/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-05T07:26:03+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
+      "status": "running",
       "task_id": null,
       "title": "Fix A: re-vendor `ticker_cik.csv` back to real 2009 membership, with the `EARLY` start screen"
     },
@@ -103,6 +103,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/fundamental-panel-coverage/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "fundamental-panel-coverage",
-  "updated": "2026-10-05T07:17:46+00:00",
+  "updated": "2026-10-05T07:26:03+00:00",
+  "verified_at": "2026-10-05T07:24:57+00:00",
   "worktree": "/home/miftah/.worktrees/seer/fundamental-panel-coverage"
 }

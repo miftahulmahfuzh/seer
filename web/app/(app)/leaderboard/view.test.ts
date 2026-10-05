@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Snapshot } from '../../../lib/metrics';
 import type { MonthlyTable } from '../../../lib/monthly';
 import {
-  CHECKS, compare, looks, MIN_COMMON_SESSIONS, MIN_RANKED, monthLabel, monthLines,
+  CHECKS, compare, LOOK_PERIOD, looks, MIN_COMMON_SESSIONS, MIN_RANKED, monthLabel, monthLines,
   NO_GATE, pickResearch, researchOf, retiredLabel, scoreOf, sinceStartLine, spyOverSpan,
   windowLine, type RankIn, type RosterIn,
 } from './view';
@@ -18,28 +18,25 @@ const RESEARCH = ['A', 'F4-MOM12-N20-TREND', 'F1-SPY-SMA200-M', 'C'];
 
 describe('looks', () => {
   it('gives the benchmark the dotted line on a plain sheet', () => {
-    expect(looks(roster).get('SPY')).toEqual({ bg: 'bg-sheet', tint: 'var(--sheet)', line: 'var(--ink-3)', width: 1.75, dotted: true });
+    expect(looks(roster).get('SPY')).toEqual({ bg: 'bg-sheet', tint: 'var(--sheet)', line: 'var(--ink-3)', width: 1.75, dash: '1 4' });
   });
-  it('assigns research sheets and lines in roster order', () => {
+  it('assigns research sheets, and lines of the same colour, in roster order', () => {
     const l = looks(roster);
     expect(RESEARCH.map(id => l.get(id)!.bg)).toEqual(['bg-lav', 'bg-sky', 'bg-sage', 'bg-rose']);
     expect(RESEARCH.map(id => l.get(id)!.tint)).toEqual(['var(--lav)', 'var(--sky)', 'var(--sage)', 'var(--rose)']);
-    expect(RESEARCH.map(id => l.get(id)!.line)).toEqual(['var(--ink)', 'var(--line-b)', 'var(--line-c)', 'var(--coral)']);
+    expect(RESEARCH.map(id => l.get(id)!.line)).toEqual(['var(--lav-line)', 'var(--sky-line)', 'var(--sage-line)', 'var(--rose-line)']);
     expect(RESEARCH.map(id => l.get(id)!.width)).toEqual([2, 2, 2, 2]);
+    expect(RESEARCH.map(id => l.get(id)!.dash)).toEqual([null, null, null, null]);
   });
   it('never gives C the look of A', () => {
     const l = looks(roster);
     expect(l.get('C')).not.toEqual(l.get('A'));
-    expect(l.get('C')).toEqual({ bg: 'bg-rose', tint: 'var(--rose)', line: 'var(--coral)', width: 2, dotted: false });
+    expect(l.get('C')).toEqual({ bg: 'bg-rose', tint: 'var(--rose)', line: 'var(--rose-line)', width: 2, dash: null });
   });
   it('follows roster order, not ids', () => {
     const l = looks([roster[3], roster[0], roster[1]]);
-    expect(l.get('F1-SPY-SMA200-M')).toEqual({ bg: 'bg-lav', tint: 'var(--lav)', line: 'var(--ink)', width: 2, dotted: false });
-    expect(l.get('A')).toEqual({ bg: 'bg-sky', tint: 'var(--sky)', line: 'var(--line-b)', width: 2, dotted: false });
-  });
-  it('gives a fifth research strategy plum and the spare line', () => {
-    const l = looks([...roster, { id: 'X9', isChampion: false, isBenchmark: false }]);
-    expect(l.get('X9')).toEqual({ bg: 'bg-plum', tint: 'var(--plum)', line: 'var(--ink-2)', width: 2, dotted: false });
+    expect(l.get('F1-SPY-SMA200-M')!.bg).toBe('bg-lav');
+    expect(l.get('A')!.bg).toBe('bg-sky');
   });
   it('gives six research strategies six different sheets, butter never among them', () => {
     const extra = ['X9', 'X10'].map(id => ({ id, isChampion: false, isBenchmark: false }));
@@ -48,15 +45,22 @@ describe('looks', () => {
     expect(new Set(bgs).size).toBe(6);
     expect(bgs).not.toContain('bg-butter');
     expect(bgs).not.toContain('bg-sheet');
-    expect(l.get('X10')).toEqual({ bg: 'bg-stone', tint: 'var(--stone)', line: 'var(--ink)', width: 2, dotted: false });
+    expect(l.get('X9')).toEqual({ bg: 'bg-plum', tint: 'var(--plum)', line: 'var(--plum-line)', width: 2, dash: null });
+    expect(l.get('X10')).toEqual({ bg: 'bg-stone', tint: 'var(--stone)', line: 'var(--stone-line)', width: 2, dash: null });
   });
-  it('never gives two research strategies the same look, up to a roster of thirty', () => {
-    const many: RosterIn[] = Array.from({ length: 30 }, (_, i) => ({
+  it('dashes the second lap of the palette', () => {
+    const many: RosterIn[] = Array.from({ length: 7 }, (_, i) => ({ id: `S${i}`, isChampion: false, isBenchmark: false }));
+    const l = looks(many);
+    expect(l.get('S6')).toEqual({ bg: 'bg-lav', tint: 'var(--lav)', line: 'var(--lav-line)', width: 2, dash: '7 5' });
+  });
+  it('never gives two research strategies the same line, up to LOOK_PERIOD', () => {
+    expect(LOOK_PERIOD).toBe(12);
+    const many: RosterIn[] = Array.from({ length: LOOK_PERIOD }, (_, i) => ({
       id: `S${i}`, isChampion: false, isBenchmark: false,
     }));
     const l = looks(many);
-    const seen = many.map(st => `${l.get(st.id)!.bg}|${l.get(st.id)!.line}`);
-    expect(new Set(seen).size).toBe(30);
+    const seen = many.map(st => `${l.get(st.id)!.line}|${l.get(st.id)!.dash}`);
+    expect(new Set(seen).size).toBe(LOOK_PERIOD);
   });
   it('emphasises a non-benchmark champion', () => {
     const l = looks([{ ...roster[0], isChampion: false }, { ...roster[1], isChampion: true }]);

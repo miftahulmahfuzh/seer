@@ -9,7 +9,7 @@ import { monthDay, monthName, shortDate, signedPct } from '@/lib/format';
 import { checklist } from '@/lib/metrics';
 import { wibDate } from '@/lib/session';
 import {
-  compare, LOOK_FALLBACK, looks, MIN_COMMON_SESSIONS, monthLines, NO_GATE, pickResearch,
+  BENCHMARK_DASH, compare, LOOK_FALLBACK, looks, MIN_COMMON_SESSIONS, monthLines, NO_GATE, pickResearch,
   researchOf, retiredLabel, scoreOf, sinceStartLine, spyOverSpan, windowLine,
   type CompareRow, type Look, type MonthLine,
 } from './view';
@@ -117,7 +117,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
         <line x1="0" x2={W} y1={chart.zero} y2={chart.zero} vectorEffect="non-scaling-stroke" stroke="var(--outline)" strokeDasharray="3 3" />
         {chart.lines.map(l => (
           <path key={l.id} d={l.d} vectorEffect="non-scaling-stroke" fill="none" stroke={l.color} strokeWidth={l.width}
-            strokeDasharray={l.dotted ? '1 4' : undefined} strokeLinecap="round" strokeLinejoin="round" />
+            strokeDasharray={l.dash ?? undefined} strokeLinecap="round" strokeLinejoin="round" />
         ))}
       </svg>
       <div className={`${s.axis} ${s.pad}`}>{chart.labels.map((l, i) => <span key={i}>{l}</span>)}</div>
@@ -298,8 +298,8 @@ function Legend({ rows, lookOf, className }: {
         return (
           <span key={st.id} data-tip={tip} aria-label={tip}
             className={retired ? `${s.legendItem} ${s.legendRetired}` : s.legendItem}>
-            {look.dotted
-              ? <span className={s.swatchDot} />
+            {look.dash
+              ? <span className={s.swatchDash} style={{ borderTopColor: look.line, borderTopStyle: look.dash === BENCHMARK_DASH ? 'dotted' : 'dashed' }} />
               : <span className={s.swatch} style={{ background: look.line }} />}
             {st.short}
           </span>
@@ -331,7 +331,7 @@ function buildChart(board: Board, lookOf: (id: string) => Look) {
       d: pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.x)} ${y(p.v)}`).join(' '),
       color: look.line,
       width: look.width,
-      dotted: look.dotted,
+      dash: look.dash,
     };
   });
 

@@ -20,6 +20,14 @@
   --sage: #dcebd8;
   --rose: #f8e0d9;
   --plum: #ebe0ee;
+  /* Chart lines, one per sheet tint, dark enough to read on the white chart sheet. */
+  --lav-line: #6b72d6;
+  --sky-line: #2a8aa3;
+  --sage-line: #3f9150;
+  --rose-line: #e2604a;
+  --plum-line: #9a5bb4;
+  --stone-line: #9a7a52;
+  --chip-plain: #efe8dd;
   --pos: #2b7d38;
   --neg: #b8321f;
   --bar: #1d1c1a;
@@ -57,6 +65,13 @@
     --sage: #1f3226;
     --rose: #3b2623;
     --plum: #33263a;
+    --lav-line: #a3a8f5;
+    --sky-line: #6cc6da;
+    --sage-line: #86d08f;
+    --rose-line: #ff8f7a;
+    --plum-line: #cf9de6;
+    --stone-line: #cfae84;
+    --chip-plain: rgba(255, 255, 255, 0.14);
     --pos: #86d483;
     --neg: #ff9180;
     --bar: #f4f1ea;

@@ -21,7 +21,7 @@
 /* Mobile: spread edge to edge under the axis labels, never wrapping. */
 .legendRow { flex-wrap: nowrap; justify-content: space-between; gap: 10px; }
 .swatch { width: 18px; height: 3px; border-radius: 9px; }
-.swatchDot { width: 18px; height: 0; border-top: 2.5px dotted var(--ink-3); }
+.swatchDash { width: 18px; height: 0; border-top-width: 2.5px; }
 
 .check { padding-bottom: 64px; gap: 8px; background: var(--butter); }
 .switch { display: flex; gap: 6px; padding-bottom: 8px; }
@@ -84,6 +84,8 @@
   flex: none; width: 52px; height: 52px; border-radius: 999px; background: var(--chip-solid);
   display: flex; align-items: center; justify-content: center;
 }
+/* On the plain sheet (SPY) the light-mode chip is white on white; take the page ground instead. */
+.card:global(.bg-sheet) .icon { background: var(--chip-plain); }
 .metrics { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr; gap: 8px; align-items: end; font-size: 18px; }
 .metric { display: flex; flex-direction: column; gap: 2px; }
 .ret { font-size: 24px; letter-spacing: -0.03em; }

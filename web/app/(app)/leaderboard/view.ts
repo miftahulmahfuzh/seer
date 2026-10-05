@@ -34,41 +34,52 @@ export type RankIn = RosterIn & { status: 'active' | 'retired' };
  * stacked right under it takes the picked strategy's tint, so a butter strategy would merge them.
  * Stone, the closest tint to the plain sheet in dark mode, is last.
  *
+ * Each sheet has its chart line in the same colour family (`--<tint>-line`, saturated enough to
+ * read on the plain chart sheet), so a card, its tab and its curve all say the same colour.
+ *
  * The roster is variable length — a promotion adds a horseman and a retirement keeps one on the
- * board — so neither array may be assumed to cover it. They are cycled independently and their
- * lengths are coprime, so the (sheet, line) pair a strategy gets is unique for the first
- * `LOOK_PERIOD` research strategies. Every token is defined for light and dark in `globals.css`.
+ * board — so the palette may not be assumed to cover it. A seventh research strategy starts a
+ * second lap that reuses the colours with a dashed line, so the line stays unique for the first
+ * `LOOK_PERIOD`; past that both repeat. Every token is defined for light and dark in `globals.css`.
  */
 export const CARD_BGS = ['bg-lav', 'bg-sky', 'bg-sage', 'bg-rose', 'bg-plum', 'bg-stone'] as const;
-export const LINES = ['var(--ink)', 'var(--line-b)', 'var(--line-c)', 'var(--coral)', 'var(--ink-2)'] as const;
 
-/** lcm(CARD_BGS.length, LINES.length): research strategies before any (sheet, line) pair repeats. */
-export const LOOK_PERIOD = 30;
+/** Stroke patterns per lap of the palette: solid, then dashed. SPY's dotted '1 4' is not among them. */
+export const LAP_DASHES = [null, '7 5'] as const;
 
-/** `bg` is the sheet class; `tint` is the same colour as a CSS value, for surfaces that borrow it. */
-export type Look = { bg: string; tint: string; line: string; width: number; dotted: boolean };
+/** Research strategies before any line repeats. */
+export const LOOK_PERIOD = CARD_BGS.length * LAP_DASHES.length;
 
-/** 'bg-lav' -> 'var(--lav)': every sheet class in globals.css is a one-token background. */
-const tintOf = (bg: string): string => `var(--${bg.slice(3)})`;
+/**
+ * `bg` is the sheet class; `tint` is the same colour as a CSS value, for surfaces that borrow it;
+ * `dash` is the line's stroke-dasharray, null for a solid line.
+ */
+export type Look = { bg: string; tint: string; line: string; width: number; dash: string | null };
 
-export const LOOK_FALLBACK: Look = { bg: 'bg-sheet', tint: 'var(--sheet)', line: 'var(--ink-2)', width: 2, dotted: false };
+/** 'bg-lav' -> 'lav': every sheet class in globals.css is a one-token background. */
+const tokenOf = (bg: string): string => bg.slice(3);
 
-/** Card sheet and chart line per strategy id, by roster order. The benchmark is the dotted line on a plain sheet. */
+export const LOOK_FALLBACK: Look = { bg: 'bg-sheet', tint: 'var(--sheet)', line: 'var(--ink-2)', width: 2, dash: null };
+
+/** SPY's stroke: the benchmark is the dotted line on a plain sheet. */
+export const BENCHMARK_DASH = '1 4';
+
+/** Card sheet and chart line per strategy id, by roster order. */
 export function looks(roster: RosterIn[]): Map<string, Look> {
   const out = new Map<string, Look>();
   let i = 0;
   for (const st of roster) {
     if (st.isBenchmark) {
-      out.set(st.id, { bg: 'bg-sheet', tint: 'var(--sheet)', line: 'var(--ink-3)', width: 1.75, dotted: true });
+      out.set(st.id, { bg: 'bg-sheet', tint: 'var(--sheet)', line: 'var(--ink-3)', width: 1.75, dash: BENCHMARK_DASH });
       continue;
     }
-    const bg = CARD_BGS[i % CARD_BGS.length];
+    const t = tokenOf(CARD_BGS[i % CARD_BGS.length]);
     out.set(st.id, {
-      bg,
-      tint: tintOf(bg),
-      line: LINES[i % LINES.length],
+      bg: `bg-${t}`,
+      tint: `var(--${t})`,
+      line: `var(--${t}-line)`,
       width: st.isChampion ? 2.75 : 2,
-      dotted: false,
+      dash: LAP_DASHES[Math.floor(i / CARD_BGS.length) % LAP_DASHES.length],
     });
     i += 1;
   }

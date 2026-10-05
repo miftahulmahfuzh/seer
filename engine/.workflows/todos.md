@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-05
-**Total Active Tasks**: 4
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 4
+- P1 High: 3
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 3
-- Completed: 66
+- Blocked: 2
+- Completed: 67
 
 ---
 
@@ -321,19 +321,33 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation in a concurrent swarm -> left to phase 1's session, which created all 7 tasks (P1-ENG-DKWU is phase 3) (tie-break: narrower blast radius, avoid racing peers on todos.md)
     - readme-updater -> skipped for this phase; engine/package_readme.md is owned by phase 7 per the plan index Scope/phase 7 Owns (rung 4: index scope)
 
-- [ ] **P1-ENG-7KQ2** Phase 1: The roster becomes data: `status`, `paper_end`, and a name→object resolver
+- [x] **P1-ENG-7KQ2** Phase 1: The roster becomes data: `status`, `paper_end`, and a name→object resolver
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns new `db/migrations/006_roster.sql`, `engine/src/seer_engine/paper/roster.py`, the read side of `engine/src/seer_engine/paper/store.py`, and `engine/tests/test_paper_roster.py`. Does not touch `commands/paper.py`'s night logic (phase 2), the comparison math (phase 3), anything under `web/` (phase 4), or `backtest/registry.py` (never). 006 adds **seven** columns to `strategies`, additively — `status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','retired'))`, `paper_end date`, `promoted_from text`, `object_name text`, `registry_id text`, `gate_note text`, `gate_applicable boolean NOT NULL DEFAULT true` — and backfills the four definition columns on the five rows 003/004 inserted. `roster.RESOLVER: dict[str, Binding]` maps a stable object name to the live Python object; `roster.from_row`/`from_rows` build `RosterEntry` values from database rows through it; and `ROSTER` becomes `from_rows(SEED_ROWS)`, so the compiled roster travels the *same* builder as the stored one and the pins prove the data path rather than sitting beside it. Exit: `store.read_roster_rows(conn)` returns the `engine IS NOT NULL` rows by `(sort, id)` and `roster.from_rows(store.read_roster_rows(conn)) == roster.ROSTER` against a migrated database; the five existing entries resolve to byte-identical `spec_digest` values and `test_paper_roster.py`'s pinned digests pass unchanged; an unresolvable `object_name` raises `UnknownObject` naming the strategy id *and* the object name and poisons the whole build rather than dropping one entry (invariant 9), covered by a test; `ROSTER`/`ROSTER_IDS`/`MAX_LOOKBACK_BARS`/`entry` keep working for callers that have not moved, and `MAX_LOOKBACK_BARS` stays 253 and is this phase's alone (D12).
-  - **Status**: in_progress
+  - **Status**: completed
   - **Plan Set**: `ROSTER_PROMOTION_PIPELINE_PLAN.md` (phase 1 of 6)
   - **Satisfies**: R2 — Replace the four horsemen easily — swapping an approach must not require editing engine code
   - **Plan**: `.workflows/plan/P1-ENG-7KQ2.md`
+  - **Completed**: 2026-10-05 18:03
+  - **Method**: /implement
+  - **Files**: db/migrations/006_roster.sql, engine/src/seer_engine/paper/roster.py, engine/src/seer_engine/paper/store.py, engine/tests/test_paper_roster.py
+  - **Verified**: `pytest engine/tests/test_paper_roster.py -q` with `PG_TEST_URL` -> 36 passed (20 existing + 16 new); the five pinned `spec_digest` values in `PINS` pass unchanged. Invariant 2 proved by byte-identity: `spec_text`, `spec_digest`, `strategy_params` and `lookback` captured before the rewrite and compared after -> identical for all five entries; the identity assertions (`is STRATEGY_A`, `is STRATEGY_A_PARAMS`, `is DESIGN_V0`, `is STRATEGY_C`, `is STRATEGY_C_PARAMS`, `is FACTOR`, `is TIMING`, `is MONTHLY_HOLD`) all hold; `MAX_LOOKBACK_BARS` still 253 (D12). `ruff check engine/src engine/tests` -> all checks passed. `pytest engine/tests/test_strategy_purity.py -q` -> 3 passed (`roster.py` stays pure). Full suite WITHOUT `PG_TEST_URL`: 2273 passed, 336 skipped — delta +12 passed, +4 skipped off the plan's 2261/332 baseline, measured before the peer's test file existed, so it is a clean measure of phase 1 alone. Full suite WITH `PG_TEST_URL`: 2648 passed, 0 failed, 0 skipped = baseline 2593 + 16 (phase 1) + 39 (the concurrent phase 3) — phase 1's own delta is +16 passed. Migration applied twice into a scratch schema: idempotent (`ADD COLUMN IF NOT EXISTS` skips), seven columns present with `status`/`gate_applicable` NOT NULL + defaults and the rest nullable, all five rows backfilled, and the `status` CHECK live (`'zombie'` raises CheckViolation); scratch schema dropped.
+  - **Drift**:
+    - No code drift: `store.py:104-152` and `roster.py` matched the plan's quotes byte for byte.
+    - The plan's prose says "+15 tests (12 pure, 3 pg-gated)" but its own code block contains 16 (12 pure, 4 pg-gated). Implemented all 16 per the code block; the prose arithmetic was simply off by one. The index's test-delta table (`| 1 | +15 passed | +12 passed, +3 skipped |`) therefore reads one low against the measured +16 / +12+4; the measurement above is the honest number.
+    - A concurrent peer session implemented phase 3 in this same worktree and left `engine/src/seer_engine/paper/compare.py`, `engine/src/seer_engine/commands/compare.py` and `engine/tests/test_paper_compare.py` in the tree (and in the shared index). They are NOT phase 1's and were deliberately kept out of this commit's pathspec.
+  - **Decided**:
+    - Task package for phases 1, 2, 3, 5, 6 -> `engine`, phase 4 -> `web` (`db/` has no `.workflows/`) (rung 6: surrounding code convention).
+    - The plan prose's "+15 tests" vs its code block's 16 -> implemented the code block's 16 (rung 3: the phase plan's code blocks outrank the prose around them).
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the direct precedent recorded two blocks above by phase 3 of this same set, and by all five phases of the previous swarm in this same file). Five peer sessions hold this one file open in one shared working tree; a cross-file block move is the single edit most likely to clobber a peer's concurrent append.
+    - Completion: no `**Commit**` field (rung 6: phase 3's entry in this file, immediately above, has none either). `engine/.workflows/todos.md` is committed *inside* the phase's own commit, so a field naming that commit's sha cannot exist in it, and the alternatives — `--amend` after a push, or a second commit — either need a force-push or add a rewrite to a branch five peers are committing onto. The sha is reported to the set's coordinator and is one `git log` away.
+    - Completion: the plan index's `**Status:**` left at `reconciled` and no per-phase tick added (rung 6: phase 3's recorded decision in this file). The phase table has no status column, and adding one would mean rewriting all six rows of a file five peer sessions hold open — the maximal conflict surface. `.workflows/orchestration/roster-promotion-pipeline/ledger.json` is the per-phase status of record for a swarm-tracked set, and a single scalar cannot represent out-of-order concurrent completion. Phase 2's `P1-ENG-J5XD` was unblocked (`blocked` -> `open`) because its stated dependency genuinely landed; no other peer phase's task was touched.
 - [ ] **P1-ENG-J5XD** Phase 2: Retire and activate: the paper night honours roster lifecycle
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `engine/src/seer_engine/commands/paper.py`, the write side of `engine/src/seer_engine/paper/store.py`, `engine/src/seer_engine/commands/paper_check.py` if the replay needs it, and `engine/tests/test_paper*.py`. Does not touch `roster.py`'s resolver (phase 1 owns it), the migration (phase 1), or `web/`. Exit: `commands/paper.py` and `commands/paper_check.py` source their entries from `roster.from_rows(store.read_roster_rows(conn))` — **not** from `roster.ROSTER`, and not from `read_strategies`, which returns legacy rows `from_rows` correctly refuses; `paper` skips `status='retired'` entries with no orders, no equity snapshot and no `paper_state` step; retiring sets `paper_end` to the last session actually traded, at retirement time through `store.retire` or on the next night through `store.set_paper_end` for a retirement taken by hand, and never deletes a row; a strategy added as `active` with no `paper_start` starts on the next night exactly as a new entry does today (`store.freeze_spec`); `store.check_digest`'s `SpecMismatch` refusal is still reachable on every active started strategy and `test_changed_frozen_spec_is_refused` still passes untouched; an unresolvable roster entry fails the night with a named error, writes nothing, and its message contains neither "retired" nor "skip" so the two skips are never confusable (invariant 9); `store.retire` is the only writer phase 5 may use for a retirement and re-retiring is a no-op returning the stored `paper_end`, so an interrupted swap can be re-run; and `paper_check` replay passes over a window containing a retirement.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `ROSTER_PROMOTION_PIPELINE_PLAN.md` (phase 2 of 6)
   - **Satisfies**: R2 — Replace the four horsemen easily — swapping an approach must not require editing engine code
   - **Depends on**: P1-ENG-7KQ2

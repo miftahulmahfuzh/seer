@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (src layout: `engine/src/seer_engine`)
-**Last Updated**: 2026-10-04 (P6 Strategy C, phase 7 of `STRATEGY_C_NEWS_VETO_PLAN.md`: `strategies.c`, `finnhub`, `llm` call options, roster entry `C`, the `news_vetoes` store, migration 004, the `veto` command, `paper` / `paper_check` deciding and replaying C)
+**Last Updated**: 2026-10-05 (roster promotion pipeline, phase 1 of `ROSTER_PROMOTION_PIPELINE_PLAN.md`: the roster became data — migration 006's lifecycle and definition columns on `strategies`, `paper.roster`'s `RESOLVER` / `Row` / `from_row` / `from_rows` / `SEED_ROWS` / `active`, and `paper.store.read_roster_rows`)
 
 ## Overview
 
@@ -29,6 +29,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - Trade rules as a value and a dev-window strategy search (P7a): `sim.rules` (`TradeRules`, with `DESIGN_V0` reproducing design §5 exactly) and a second pure engine, `sim.book` (signal exits, rebalancing, dividends, fractional shares, open entries, idle instruments); the `Allocator` protocol and the families F1–F11 (`strategies/allocator.py`, `f_index.py`, `f_rotation.py`, `f_factor.py`, `f_swing.py`); `backtest/book_runner.py`; a local, gitignored research store of pre-2015 history (`research.py`, `research_store` command); and a pre-registered registry run only on the development window (≤ 2015-10-16) by `backtest/dev.py`, `dev_report.py`, `registry.py` and the `backtest_dev` command, which writes the dev report and the P7b pre-registration
 - Nightly paper trading (P4, paper-only by the owner's option (b), 2026-10-04): a frozen roster of four paper portfolios (`SPY` the champion and benchmark, `A`, `F4-MOM12-N20-TREND`, `F1-SPY-SMA200-M`) stepped one session at a time by pure night functions (`paper/bracket.py`, `paper/book.py`, `paper/benchmark.py`) that mirror the backtest runners' loop bodies; persisted in migration 003's tables by `paper/store.py`; driven by the `paper` command after `nightly`; proven equal to a one-shot `run_rules` / `buy_and_hold` replay by `paper_check`; optionally explained by an LLM (`explain`). No real-money path exists, and design §1 is unchanged
 - Strategy C on paper (P6): a fifth roster entry `C` whose picks are A's first 10 ranked candidates minus every symbol whose nightly news check did not say `allow`. `strategies.c` holds the pure part (the `NewsVeto` strategy, the frozen prompt `c-veto-v1`, the JSON verdict parser); `finnhub.py` reads company news and earnings dates; the `veto` command asks the LLM once per candidate before `paper` and stores every verdict and the headlines it saw in `news_vetoes` (migration 004); `paper` and `paper_check` read only stored verdicts, so the replay never re-asks the LLM. A failed or missing verdict is no trade (design §8). No backtest gate applies (design §1 item 5)
+- The roster as data (roster-promotion-pipeline, phase 1): a paper portfolio is a `strategies` row, not a Python literal. Migration 006 adds the lifecycle (`status`, `paper_end`, `promoted_from`) and definition (`object_name`, `registry_id`, `gate_note`, `gate_applicable`) columns; `paper/roster.py` gains `RESOLVER` (the one code-side table mapping a stable object name to the live `Strategy` / `Allocator`) and `from_row` / `from_rows`, which build `RosterEntry` values out of rows; `paper/store.py` gains `read_roster_rows`. `ROSTER` is now `from_rows(SEED_ROWS)`, so the compiled roster and a database's roster travel the same builder, and the five pinned spec digests are unchanged. Nothing reads the stored roster yet — `paper`, `paper_check` and `veto` still use `ROSTER`
 
 ## Layout
 
@@ -65,7 +66,7 @@ engine/
       book.py               the book engine: Target, Book, Position, Fill, Trade, step_book(), close_book_unpriced() (P7a); apply_book_split(), BookSplit (P4)
     paper/                  nightly paper trading (P4); every module but store.py is pure
       __init__.py           docstring only
-      roster.py             the frozen roster: five entries (C since P6), canonical spec text, digest, backtest_gate
+      roster.py             the roster builder: RESOLVER, Row / RosterRow, from_row() / from_rows(), SEED_ROWS -> ROSTER (five entries), active(), canonical spec text, digest, backtest_gate
       bracket.py            settle_bracket(), decide_bracket(): run_backtest's loop body for one session
       book.py               settle_book(), decide_book(): run_book's loop body for one session
       benchmark.py          BenchmarkState, start_benchmark(), split_benchmark(), step_benchmark(): buy_and_hold for one session
@@ -133,6 +134,7 @@ docs/plans/                 <run date>-p7b-preregistration.md: the P7b finalists
 db/migrations/002_engine.sql  (outside the package, owned by it)
 db/migrations/003_paper.sql   (outside the package; paper state, book tables, dividends, roster rows; P4)
 db/migrations/004_news_veto.sql (outside the package; the C roster row and news_vetoes; P6)
+db/migrations/006_roster.sql  (outside the package; the strategies lifecycle and definition columns, and the five seeded rows' definition values; roster-promotion-pipeline phase 1)
 ```
 
 ## CLI
@@ -1492,13 +1494,22 @@ Each night function steps exactly one session the way a runner's loop body does,
 that looping it equals the runner (`run_backtest`, `run_book`, `buy_and_hold`) over hundreds of
 synthetic sessions.
 
-- **`paper.roster`**: the frozen roster (D1, D4).
-  - `BENCHMARK_ID = "SPY"`, `F4_ID = "F4-MOM12-N20-TREND"`, `F1_ID = "F1-SPY-SMA200-M"`.
-  - `RosterEntry` (frozen dataclass), one paper portfolio: `id, name, sub, icon, is_champion, is_benchmark, sort` (equal to the rows migrations 003 and 004 insert), `engine: Engine`, `rules: TradeRules | None`, `obj: Strategy | Allocator | None`, `object_name`, `params`, `registry_id: str | None`, `lookback: int`, `gate_note: str`, `gate_applicable: bool = True` (P6; false only for `C`).
-  - `ROSTER: tuple[RosterEntry, ...]` (SPY, A, F4, F1, C), `ROSTER_IDS`, `MAX_LOOKBACK_BARS = max(e.lookback for e in ROSTER)`. `C` (P6): `C · News veto`, icon `gavel`, sort 5, engine `bracket`, rules `DESIGN_V0`, `obj = STRATEGY_C`, `params = STRATEGY_C_PARAMS`, gate note "Backtest gate: not applicable (LLM strategy, design §1 item 5)".
-  - `entry(strategy_id) -> RosterEntry`: the roster entry; `KeyError` when it is not on the roster.
+- **`paper.roster`**: the roster builder (D1, D4; roster-promotion-pipeline R2, D2, D3). Pure: no database, no clock, no I/O, and it imports nothing from `store`. A roster entry is a `strategies` row plus the live Python object the row names; this module is the only place that turns one into the other.
+  - `BENCHMARK_ID = "SPY"`, `F4_ID = "F4-MOM12-N20-TREND"`, `F1_ID = "F1-SPY-SMA200-M"`, `BENCHMARK_OBJECT = "buy_and_hold"`. `Engine = Literal["bracket", "book", "benchmark"]` and `Status = Literal["active", "retired"]`, with `ENGINES` / `STATUSES` as the `CHECK`s in Python.
+  - Errors, all `RosterError(LookupError)` and all naming **the strategy id and the offending value**: `UnknownObject` (`object_name` is not a `RESOLVER` key), `UnknownRules` (`rules_id` is not a `sim.rules` preset), `BadRosterRow` (bad engine or status, missing or surplus fields). None is ever swallowed — a row that cannot be built stops the whole build, because skipping it would leave an unfillable hole in that portfolio's equity curve.
+  - `RosterEntry` (frozen dataclass), one paper portfolio: `id, name, sub, icon, is_champion, is_benchmark, sort` (the display fields of the row), `engine: Engine`, `rules: TradeRules | None`, `obj: Strategy | Allocator | None`, `object_name`, `params`, `registry_id: str | None`, `lookback: int`, `gate_note: str`, `gate_applicable: bool = True` (P6; false only for `C`), plus the lifecycle fields `status: Status = "active"` and `paper_end: date | None` (migration 006). `rules_id` is a property (`None` for the benchmark).
+  - `Binding(obj, params=None, from_registry=False)`: what an `object_name` resolves to — the live object and where its params come from (`from_registry` means the row's `registry_id` names the `backtest.registry` candidate that supplies them, as F4 and F1 have always worked).
+  - `RESOLVER: dict[str, Binding]` — **the one code-side table, and the extension point** (D2): `buy_and_hold` → no object, `STRATEGY_A`, `STRATEGY_C`, `FACTOR` and `TIMING`. A database cannot hold an `Allocator`, and `eval`-ing an import path out of a row would make `strategies` a code-execution surface, so a row carries a stable *name* instead. Keys are forever: a stored spec names one, so renaming a key would move a live digest. Append only. `resolver_names() -> tuple[str, ...]` (sorted); `resolve(object_name) -> Binding` (`UnknownObject`, never a default and never `None`).
+  - `rules_for(rules_id) -> TradeRules | None`: the `sim.rules` preset, the same object (so `is DESIGN_V0` holds); `None` → `None` (the benchmark trades under no rule set); an unknown id raises `UnknownRules`.
+  - `Row` (Protocol): what `from_row` reads off a `strategies` row — `id, name, sub, icon, is_champion, is_benchmark, sort, engine, rules_id, object_name, registry_id, gate_note, gate_applicable, status, paper_end`, at the column types, nullables included. `paper.store.StrategyRow` satisfies it structurally, which is how `roster` stays pure. `RosterRow` is the same thing as a plain frozen dataclass, used by the seeds and the tests.
+  - `from_row(row) -> RosterEntry`: one row, through `RESOLVER`. Validates engine and status against the `CHECK`s, resolves the object and the rules, requires a non-empty `gate_note`, and enforces the shape rules — a `benchmark` row carries no object, rules or `registry_id`; a `bracket` / `book` row needs a `rules_id` and an object; a `from_registry` object needs a `registry_id` (checked against `REGISTRY` for allocator and rules identity) and any other object must have `registry_id` NULL. `lookback` comes from the object (`obj.lookback` for bracket, `obj.lookback(params)` for book, 1 for the benchmark). There is no path that returns `None` or a half-understood entry.
+  - `from_rows(rows) -> tuple[RosterEntry, ...]`: every row as an entry, sorted by `(sort, id)`, raising on the first row it cannot build and refusing duplicate ids. All or nothing — no row is ever dropped.
+  - `SEED_ROWS: tuple[RosterRow, ...]`: the five rows `003_paper.sql`, `004_news_veto.sql` and `006_roster.sql` write, as data; `tests/test_paper_roster.py` checks it equals a migrated database's `strategies` rows.
+  - `ROSTER: tuple[RosterEntry, ...] = from_rows(SEED_ROWS)` (SPY, A, F4, F1, C), `ROSTER_IDS`, `MAX_LOOKBACK_BARS = max(e.lookback for e in ROSTER)` (253, FACTOR's `factor_lookback`; a property of `SEED_ROWS`, not of whatever a live database holds). The compiled roster and the stored roster therefore travel the *same* builder, so the pinned digests prove the data path and not just a literal. `C` (P6): `C · News veto`, icon `gavel`, sort 5, engine `bracket`, rules `DESIGN_V0`, `obj = STRATEGY_C`, `params = STRATEGY_C_PARAMS`, gate note "Backtest gate: not applicable (LLM strategy, design §1 item 5)".
+  - `active(entries=ROSTER) -> tuple[RosterEntry, ...]`: the entries still trading (`status == "active"`), in order. A retired entry keeps every row it ever wrote and its leaderboard place; it only stops trading.
+  - `entry(strategy_id) -> RosterEntry`: the seeded roster entry; `KeyError` when it is not on the roster.
   - `rules_dict(rules: TradeRules) -> dict[str, str | None]`: every `TradeRules` field, in field order, as plain strings — minus a lever still at its pre-pin default (`sim.rules.is_pinned_default`), so a roster strategy that does not use a newly added lever keeps the spec digest already written to its live `strategies.params` row.
-  - `spec(e) -> dict[str, Any]`: the frozen spec (C2 `params.spec`), JSON-ready, strings and nulls only.
+  - `spec(e) -> dict[str, Any]`: the frozen spec (C2 `params.spec`), JSON-ready, strings and nulls only: `id`, `engine`, `object` (the `RESOLVER` key), `object_id`, `registry_id`, `registry_digest`, `rules_id`, `rules`, `params`, `initial_idr`. `status`, `paper_end`, `gate_note` and `gate_applicable` are deliberately **not** in it: retiring a strategy or correcting a note must not move a live digest.
   - `spec_text(s) -> str`: the canonical text of a spec: JSON with sorted keys, no whitespace, ASCII only.
   - `spec_digest(s) -> str`: sha256 (hex) of `spec_text(s)` in UTF-8. The five digests are pinned in `tests/test_paper_roster.py`; the four P4 digests never change.
   - `backtest_gate(e) -> dict[str, Any]`: C2 `params.backtest_gate`, `passed` false for every entry, with `e.gate_note`; for `C` also `"applicable": false` (the web shows "Not applicable" and counts it as not passed). Not part of the spec, so no digest depends on it.
@@ -1525,7 +1536,9 @@ synthetic sessions.
   - `failures(results, require_sessions) -> tuple[str, ...]`; `exit_code(results, require_sessions) -> int` (1 when `failures` is non-empty); `render(results) -> tuple[str, ...]`.
 - **`paper.store`** (impure; nothing commits, `paper` runs a night in one transaction):
   - `BENCHMARK_ID = "SPY"`, `MARKET_WINDOW_DAYS = 550` (the only window constant), `PRICE_QUANTUM`, `DIVIDEND_QUANTUM`. `StoreError(RuntimeError)`; `SpecMismatch(StoreError)`: a frozen strategy's stored digest differs from the code's.
-  - Roster rows: `StrategyRow(id, name, engine, rules_id, is_champion, is_benchmark, sort, paper_start, params)`; `read_strategies(conn)`, `read_strategy(conn, strategy_id)`; `freeze_spec(conn, strategy_id, *, spec, digest, backtest_gate, paper_start)` (writes once); `check_digest(row, digest)` (raises `SpecMismatch`).
+  - Roster rows: `StrategyRow(id, name, sub, icon, engine, rules_id, is_champion, is_benchmark, sort, paper_start, params, status="active", paper_end=None, promoted_from=None, object_name=None, registry_id=None, gate_note=None, gate_applicable=True)` — structurally a `paper.roster.Row`, so `roster.from_rows(read_roster_rows(conn))` is the whole roster-from-data path and neither module imports the other. The migration 006 columns are nullable on rows that are not roster rows; `roster.from_row` validates them with a named error rather than defaulting them.
+  - `read_strategies(conn)`, `read_strategy(conn, strategy_id)`; `read_roster_rows(conn)`: every row with `engine IS NOT NULL`, by `(sort, id)`. `engine` is the predicate because it is what the paper night dispatches on and what migration 003 set on exactly the roster's rows. **Retired rows are returned** (only `roster.active` drops them from a night), and a row with an `engine` but an unusable `object_name` is *not* filtered out here — `roster.from_row` raises `UnknownObject` for it, which is the point.
+  - `freeze_spec(conn, strategy_id, *, spec, digest, backtest_gate, paper_start)` (writes once); `check_digest(row, digest)` (raises `SpecMismatch`).
   - State: `PaperState(strategy_id, last_session, cash_usd, equity_usd, initial_cash_usd, usd_idr, pending_session, pending_decision)`; `read_paper_state(conn, strategy_id)`; `init_paper_state(conn, strategy_id, *, paper_start, cash0, usd_idr) -> PaperState` (day 0: `last_session = prev_session(paper_start)` plus the day-0 snapshot); `write_paper_state(conn, strategy_id, *, cash, equity, last_session)`; `write_pending(conn, strategy_id, session, *, decision)`; `upsert_snapshot(conn, strategy_id, snapshot)`; `read_snapshots(conn, strategy_id)`.
   - Bracket: `load_portfolio(conn, strategy_id) -> Portfolio`; `insert_pending_orders(conn, strategy_id, placed, companies=None) -> int`; `save_bracket_night(conn, strategy_id, portfolio, events, snapshot)`; `read_orders(conn, strategy_id) -> tuple[tuple[Order, Decimal | None], ...]`.
   - Book: `LoadedBook(book, pending_session, targets, idle_added)`; `load_book(conn, strategy_id, *, idle_symbol=None) -> LoadedBook`; `save_book_night(conn, strategy_id, book, fills, trades, snapshot, *, executed_targets=None)`; `save_book_decision(conn, strategy_id, session, targets)` (an empty decision writes no row); `read_book_positions`, `read_book_targets(conn, strategy_id, session)`, `read_book_fills`, `read_book_trades`.
@@ -1602,6 +1615,18 @@ Additive only.
 - `news_vetoes(strategy_id → strategies, session_date, rank ≥ 1, symbol, verdict IN ('allow','veto','failed'), reason, model NULL when unset, prompt_version, headlines jsonb [{id, datetime, source, headline}] newest first, earnings_date, decided_at timestamptz)`, PK `(strategy_id, session_date, symbol)`, unique `(strategy_id, session_date, rank)`. One row per candidate checked; `paper` and `paper_check` read it, the LLM is never re-asked. About 0.55 MB a month.
 - Demo-owned: `demo.DEMO_TABLES` includes `news_vetoes`. `paper`'s orphaned-rows guard does not count it (verdicts exist before C starts).
 - Applied to Neon by the nightly `Migrate` step on the first scheduled run after the merge; that night also starts C's clock.
+
+## Migration 006 (`db/migrations/006_roster.sql`, roster-promotion-pipeline phase 1)
+
+Additive only, to 003's discipline: every new column is nullable or defaulted, nothing is dropped,
+no `CHECK` is narrowed, migrations 001–005 are untouched. Written by the engine; web reads `status`
+and `paper_end` from the leaderboard.
+
+- Lifecycle: `strategies` gains `status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','retired'))` (a retired row keeps its history and stops trading), `paper_end date` (the last session actually traded; NULL while active) and `promoted_from text` (the lab `methods.id` the row came from, when it was promoted).
+- Definition, read by `paper.roster.from_row`: `object_name text` (a `paper.roster.RESOLVER` key), `registry_id text` (a `backtest.registry` id for book entries, else NULL), `gate_note text` (the display fact the go-live checklist reads) and `gate_applicable boolean NOT NULL DEFAULT true`.
+- Data: the five rows 003 and 004 inserted are backfilled with the four definition values, byte-for-byte `paper/roster.py`'s `SEED_ROWS`; `tests/test_paper_roster.py` checks that equality against a migrated database. The five spec digests do not move — none of these columns is in the spec.
+- Why a name and not an import path: a row cannot hold an `Allocator`, and `eval`-ing an import path out of the table would make `strategies` a code-execution surface. A name the resolver does not know is a hard error when the roster is built, never a silently dropped portfolio.
+- Replacing a horseman is therefore a transaction, not a code edit: INSERT the new row, set the old row's `status` to `retired` and its `paper_end`. Retirement never deletes `equity_snapshots`, `orders`, `book_*` or `paper_state` rows and never clears `paper_start`, so the leaderboard keeps the whole track record and can say the row is retired rather than hiding it.
 
 ## Data Flow
 
@@ -1915,6 +1940,7 @@ which writes nothing. A committed report always comes from a full run over a cle
 - `backtest_dev` refuses a full run (exit 2) while `backtest/registry.py` has uncommitted changes. `--only` skips that check and writes nothing; its numbers are a smoke test, never a result.
 - **Paper state stays in the units it was sized in.** Never rebuild a mark or a price of a live paper order or position from `bars`: `nightly` rewrites history backwards on a split, and `apply_split` / `apply_book_split` would then rescale it twice. Marks are stored (`orders.mark`, `book_positions.mark`).
 - **A roster entry is frozen.** `paper` fails the night (`store.SpecMismatch`, rolled back, `runs.paper_status = failed`) when a started strategy's stored spec digest differs from `paper/roster.py`'s. Change a strategy by adding a new id (its own `paper_start`), never by editing a started one or deleting its rows.
+- **`RESOLVER` keys are forever, and an unknown one stops the build.** A stored spec names its `object_name`, so renaming or removing a key a started strategy still names would move a live digest. Append only. And `roster.from_row` raises `UnknownObject` rather than skipping a row it cannot resolve: a dropped portfolio is a hole in a track record that nothing later can fill, so the whole build fails loudly instead.
 - `paper` runs only after a successful bars run for the same session, and only in the `seer-db-writer` concurrency group. Never run a real (non-`--dry-run`) `paper` locally against Neon while the scheduled job may run, and never before the code is on `main` (D11: no back-dated paper days).
 - `paper_check` reports a strategy `split-affected` (not failed) once an applied split touched a symbol it held or had pending: whole-share rounding before and after a split cannot match a replay over adjusted bars.
 - `explain` must never decide anything: it writes text only, and a failure leaves NULL.
@@ -1964,3 +1990,13 @@ nightly flow) were added on 2026-10-04. C runs on paper only: no backtest gate a
 strategy (design §1 item 5), and real money for C would need an explicit owner decision. Design,
 invariants and decisions: `STRATEGY_C_NEWS_VETO_PLAN.md` and
 `docs/handover/2026-10-04-strategy-c-news-veto.md`; operations: `docs/runbooks/paper-trading.md`.
+
+The roster-as-data sections (migration 006, `paper.roster`'s `RESOLVER`, `Binding`, `Row` /
+`RosterRow`, `from_row` / `from_rows`, `SEED_ROWS`, `active` and the `RosterError` family, and
+`paper.store.read_roster_rows` with the widened `StrategyRow`) were added on 2026-10-05 as phase 1
+of `ROSTER_PROMOTION_PIPELINE_PLAN.md`. This phase is pure plumbing: `ROSTER` is now
+`from_rows(SEED_ROWS)` instead of a hand-written tuple, the five spec digests are byte-identical
+and still pinned in `tests/test_paper_roster.py`, and `paper`, `paper_check` and `veto` continue to
+read the compiled `ROSTER` — nothing yet builds the roster from the database at run time. The later
+phases of that plan set (reading the stored roster on a night, promotion, retirement) are not
+described here until they land.

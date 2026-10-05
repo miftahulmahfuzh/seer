@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from datetime import date, timedelta
 
+import psycopg
 import pytest
 from psycopg.types.json import Jsonb
 
@@ -21,11 +22,23 @@ from seer_engine import dates
 from seer_engine.backtest.registry import REGISTRY, candidate_digest
 from seer_engine.paper.roster import (
     BENCHMARK_ID,
+    BENCHMARK_OBJECT,
     MAX_LOOKBACK_BARS,
+    RESOLVER,
     ROSTER,
     ROSTER_IDS,
+    SEED_ROWS,
+    BadRosterRow,
+    RosterRow,
+    UnknownObject,
+    UnknownRules,
+    active,
     backtest_gate,
     entry,
+    from_row,
+    from_rows,
+    resolve,
+    resolver_names,
     rules_dict,
     spec,
     spec_digest,
@@ -260,3 +273,159 @@ def test_c_digest_moves_with_the_model_and_the_prompt():
 
 def test_the_roster_c_object_carries_no_verdicts():
     assert len(entry("C").obj.allowed) == 0
+
+
+# ---- the roster is data (roster-promotion-pipeline phase 1, R2, D2) ------------------------------
+
+import dataclasses  # noqa: E402 - section-local, kept beside the tests that use it
+
+from seer_engine.paper import store  # noqa: E402
+
+ROW_COLUMNS = (
+    "id", "name", "sub", "icon", "is_champion", "is_benchmark", "sort", "engine", "rules_id",
+    "object_name", "registry_id", "gate_note", "gate_applicable", "status", "paper_end",
+)
+
+
+def a_row(**overrides) -> RosterRow:
+    """A valid bracket row, with the fields a test cares about overridden."""
+    base = dict(
+        id="X", name="X", sub="x", icon="x", is_champion=False, is_benchmark=False, sort=9,
+        engine="bracket", rules_id="design-v0", object_name="STRATEGY_A", registry_id=None,
+        gate_note="not a real strategy",
+    )
+    return RosterRow(**{**base, **overrides})
+
+
+def test_the_roster_is_built_from_the_seed_rows_through_the_resolver():
+    assert ROSTER == from_rows(SEED_ROWS)
+    assert tuple(r.id for r in SEED_ROWS) == ROSTER_IDS
+    assert {spec_digest(spec(e)) for e in from_rows(SEED_ROWS)} == set(PINS.values())
+
+
+def test_every_seed_row_names_a_resolver_object():
+    assert {r.object_name for r in SEED_ROWS} <= set(RESOLVER)
+    assert resolver_names() == tuple(sorted(RESOLVER))
+    assert resolve(BENCHMARK_OBJECT).obj is None
+    assert resolve("FACTOR").from_registry and resolve("FACTOR").params is None
+    assert resolve("STRATEGY_A").params is STRATEGY_A_PARAMS
+
+
+def test_an_unresolvable_object_name_is_a_named_error_not_a_skip():
+    with pytest.raises(UnknownObject, match="is not in paper.roster.RESOLVER"):
+        from_row(a_row(object_name="STRATEGY_Z"))
+    with pytest.raises(UnknownObject):
+        from_row(a_row(object_name=None))
+    with pytest.raises(UnknownObject):
+        resolve("nope")
+    # and one bad row poisons the whole build: nothing is silently dropped
+    with pytest.raises(UnknownObject):
+        from_rows([*SEED_ROWS, a_row(object_name="STRATEGY_Z")])
+
+
+def test_an_unknown_rules_id_is_a_named_error():
+    with pytest.raises(UnknownRules, match="is not a sim.rules preset"):
+        from_row(a_row(rules_id="no-such-preset"))
+    with pytest.raises(BadRosterRow, match="needs a rules_id"):
+        from_row(a_row(rules_id=None))
+
+
+def test_a_bad_engine_or_status_is_a_named_error():
+    with pytest.raises(BadRosterRow, match="engine"):
+        from_row(a_row(engine="quantum"))
+    with pytest.raises(BadRosterRow, match="engine"):
+        from_row(a_row(engine=None))
+    with pytest.raises(BadRosterRow, match="status"):
+        from_row(a_row(status="zombie"))
+    with pytest.raises(BadRosterRow, match="gate_note"):
+        from_row(a_row(gate_note=None))
+
+
+def test_a_benchmark_row_carries_no_object_rules_or_registry_id():
+    ok = a_row(id="B2", engine="benchmark", rules_id=None, object_name=BENCHMARK_OBJECT)
+    assert (from_row(ok).obj, from_row(ok).params, from_row(ok).lookback) == (None, None, 1)
+    with pytest.raises(BadRosterRow, match="benchmark row"):
+        from_row(a_row(id="B2", engine="benchmark", rules_id="design-v0", object_name=BENCHMARK_OBJECT))
+    with pytest.raises(BadRosterRow, match="benchmark engine"):
+        from_row(a_row(engine="bracket", object_name=BENCHMARK_OBJECT))
+
+
+def test_a_registry_backed_object_needs_its_registry_id_and_an_own_params_object_refuses_one():
+    with pytest.raises(BadRosterRow, match="backtest.registry"):
+        from_row(a_row(engine="book", rules_id="monthly-hold", object_name="FACTOR", registry_id=None))
+    with pytest.raises(BadRosterRow, match="registry_id must be NULL"):
+        from_row(a_row(registry_id=F4))
+
+
+def test_from_rows_sorts_by_sort_and_refuses_duplicate_ids():
+    shuffled = tuple(reversed(SEED_ROWS))
+    assert tuple(e.id for e in from_rows(shuffled)) == ROSTER_IDS
+    with pytest.raises(BadRosterRow, match="duplicate ids"):
+        from_rows([*SEED_ROWS, dataclasses.replace(SEED_ROWS[1], sort=99)])
+
+
+def test_the_seed_roster_is_all_active_with_no_paper_end():
+    assert all(e.status == "active" and e.paper_end is None for e in ROSTER)
+    assert active(ROSTER) == ROSTER
+    assert active() == ROSTER
+
+
+def test_active_drops_retired_entries_and_keeps_order():
+    rows = tuple(
+        dataclasses.replace(r, status="retired", paper_end=date(2026, 10, 2)) if r.id == "A" else r
+        for r in SEED_ROWS
+    )
+    entries = from_rows(rows)
+    assert [e.id for e in entries] == list(ROSTER_IDS)  # retired rows are never dropped from the roster
+    assert [e.id for e in active(entries)] == ["SPY", F4, F1, "C"]
+    a = next(e for e in entries if e.id == "A")
+    assert (a.status, a.paper_end) == ("retired", date(2026, 10, 2))
+
+
+def test_retiring_a_strategy_does_not_move_its_digest():
+    """Invariant 2 and 3: status and paper_end are lifecycle, never spec."""
+    retired = from_row(dataclasses.replace(SEED_ROWS[1], status="retired", paper_end=date(2026, 10, 2)))
+    assert spec_digest(spec(retired)) == PINS["A"]
+    assert strategy_params(retired) == strategy_params(entry("A"))
+
+
+def test_a_corrected_gate_note_does_not_move_a_digest():
+    corrected = from_row(dataclasses.replace(SEED_ROWS[1], gate_note="corrected, still failed"))
+    assert spec_digest(spec(corrected)) == PINS["A"]
+    assert backtest_gate(corrected)["note"] == "corrected, still failed"
+
+
+def test_the_migration_rows_equal_the_seed_rows(pg):
+    """Invariant 7, strengthened: not just the display fields, the whole row."""
+    rows = pg.execute(
+        f"SELECT {', '.join(ROW_COLUMNS)} FROM strategies ORDER BY sort, id"
+    ).fetchall()
+    assert tuple(RosterRow(**dict(zip(ROW_COLUMNS, r))) for r in rows) == SEED_ROWS
+
+
+def test_the_database_rows_rebuild_the_roster_with_the_pinned_digests(pg):
+    entries = from_rows(store.read_roster_rows(pg))
+    assert entries == ROSTER
+    assert {e.id: spec_digest(spec(e)) for e in entries} == PINS
+    assert {e.id: strategy_params(e) for e in entries} == {e.id: strategy_params(e) for e in ROSTER}
+
+
+def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
+    rows = {r.id: r for r in store.read_roster_rows(pg)}
+    assert [r.id for r in store.read_roster_rows(pg)] == list(ROSTER_IDS)
+    assert all(r.status == "active" and r.paper_end is None and r.promoted_from is None for r in rows.values())
+    assert (rows["A"].object_name, rows["A"].registry_id, rows["A"].gate_applicable) == ("STRATEGY_A", None, True)
+    assert (rows[F4].object_name, rows[F4].registry_id) == ("FACTOR", F4)
+    assert rows["C"].gate_applicable is False
+    assert rows["SPY"].object_name == BENCHMARK_OBJECT
+    pg.execute("UPDATE strategies SET status = 'retired', paper_end = %s WHERE id = 'A'", (date(2026, 10, 2),))
+    retired = {r.id: r for r in store.read_roster_rows(pg)}["A"]
+    assert (retired.status, retired.paper_end) == ("retired", date(2026, 10, 2))
+    assert [e.id for e in active(from_rows(store.read_roster_rows(pg)))] == ["SPY", F4, F1, "C"]
+    pg.rollback()
+
+
+def test_the_status_check_refuses_an_unknown_status(pg):
+    with pytest.raises(psycopg.errors.CheckViolation):
+        pg.execute("UPDATE strategies SET status = 'zombie' WHERE id = 'A'")
+    pg.rollback()

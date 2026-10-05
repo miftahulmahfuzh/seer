@@ -105,10 +105,22 @@ def _one_row(cur: psycopg.Cursor, what: str) -> None:
 
 @dataclass(frozen=True)
 class StrategyRow:
-    """One ``strategies`` row as the paper command needs it."""
+    """One ``strategies`` row as the paper command needs it.
+
+    Structurally a ``paper.roster.Row``: ``roster.from_rows(read_roster_rows(conn))`` is the
+    whole roster-from-data path, and neither module imports the other (``roster`` is pure;
+    ``tests/test_strategy_purity.py`` globs it).
+
+    ``status``, ``paper_end`` and ``promoted_from`` are migration 006's lifecycle columns;
+    ``object_name``, ``registry_id``, ``gate_note`` and ``gate_applicable`` are its definition
+    columns. They are nullable on rows that are not roster rows, and ``roster.from_row``
+    validates them with a named error rather than defaulting them.
+    """
 
     id: str
     name: str
+    sub: str
+    icon: str
     engine: str | None
     rules_id: str | None
     is_champion: bool
@@ -116,19 +128,48 @@ class StrategyRow:
     sort: int
     paper_start: date | None
     params: Mapping[str, Any]
+    status: str = "active"
+    paper_end: date | None = None
+    promoted_from: str | None = None
+    object_name: str | None = None
+    registry_id: str | None = None
+    gate_note: str | None = None
+    gate_applicable: bool = True
 
 
 _STRATEGY_SQL = (
-    "SELECT id, name, engine, rules_id, is_champion, is_benchmark, sort, paper_start, params "
+    "SELECT id, name, sub, icon, engine, rules_id, is_champion, is_benchmark, sort, paper_start, "
+    "params, status, paper_end, promoted_from, object_name, registry_id, gate_note, gate_applicable "
     "FROM strategies"
 )
 
 
 def _strategy(row: tuple) -> StrategyRow:
-    sid, name, engine, rules_id, champion, benchmark, sort, paper_start, params = row
+    (
+        sid,
+        name,
+        sub,
+        icon,
+        engine,
+        rules_id,
+        champion,
+        benchmark,
+        sort,
+        paper_start,
+        params,
+        status,
+        paper_end,
+        promoted_from,
+        object_name,
+        registry_id,
+        gate_note,
+        gate_applicable,
+    ) = row
     return StrategyRow(
         id=sid,
         name=name,
+        sub=sub,
+        icon=icon,
         engine=engine,
         rules_id=rules_id,
         is_champion=bool(champion),
@@ -136,12 +177,33 @@ def _strategy(row: tuple) -> StrategyRow:
         sort=int(sort),
         paper_start=paper_start,
         params=params if isinstance(params, dict) else {},
+        status=status,
+        paper_end=paper_end,
+        promoted_from=promoted_from,
+        object_name=object_name,
+        registry_id=registry_id,
+        gate_note=gate_note,
+        gate_applicable=bool(gate_applicable),
     )
 
 
 def read_strategies(conn: psycopg.Connection) -> tuple[StrategyRow, ...]:
     """Every ``strategies`` row, by (sort, id)."""
     rows = conn.execute(_STRATEGY_SQL + " ORDER BY sort, id").fetchall()
+    return tuple(_strategy(r) for r in rows)
+
+
+def read_roster_rows(conn: psycopg.Connection) -> tuple[StrategyRow, ...]:
+    """The roster rows -- every ``strategies`` row with an ``engine`` -- by (sort, id).
+
+    ``engine`` is the predicate because it is what the paper night dispatches on and what
+    migration 003 set on exactly the roster's rows; a legacy display row that never traded has
+    none. Retired rows ARE returned: a retired strategy keeps its history and its leaderboard
+    place, and only ``roster.active`` drops it from a night. A row that has an ``engine`` but no
+    usable ``object_name`` is NOT filtered out here -- ``roster.from_row`` raises
+    ``UnknownObject`` for it, which is the point (invariant 9).
+    """
+    rows = conn.execute(_STRATEGY_SQL + " WHERE engine IS NOT NULL ORDER BY sort, id").fetchall()
     return tuple(_strategy(r) for r in rows)
 
 

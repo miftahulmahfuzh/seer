@@ -48,6 +48,28 @@ def four_only() -> tuple[roster.RosterEntry, ...]:
     return tuple(e for e in roster.ROSTER if e.id != C)
 
 
+def hide_c(conn) -> str:
+    """Take C off the DATABASE roster and return the ``engine`` it had, so it can land again.
+
+    Since phase 2 the night and the replay resolve their entries from
+    ``store.read_roster_rows(conn)`` -- every ``strategies`` row with an ``engine`` -- so
+    monkeypatching ``roster.ROSTER`` no longer hides a strategy from a night. Clearing C's
+    ``engine`` is ``four_only()`` at the data layer, and it is literally C's row before migration
+    004 gave it one: the state these tests call "before C landed".
+    """
+    [(engine,)] = q(conn, "SELECT engine FROM strategies WHERE id = %s", (C,))
+    assert engine is not None
+    with db.transaction(conn, False):
+        conn.execute("UPDATE strategies SET engine = NULL WHERE id = %s", (C,))
+    return engine
+
+
+def land_c(conn, engine: str) -> None:
+    """C joins the database roster: the other half of ``hide_c``."""
+    with db.transaction(conn, False):
+        conn.execute("UPDATE strategies SET engine = %s WHERE id = %s", (engine, C))
+
+
 # ---- the world and the night -------------------------------------------------------------------
 
 
@@ -273,9 +295,11 @@ def test_a_has_at_most_ten_picks_every_night_so_c_candidates_are_all_of_them(wor
 
 def test_c_starts_on_its_first_night_with_its_own_paper_start(world, monkeypatch):
     monkeypatch.setattr(roster, "ROSTER", four_only())
+    c_engine = hide_c(world)
     for d in NIGHTS[:3]:  # before C landed
         night(world, d, None)
     monkeypatch.undo()
+    land_c(world, c_engine)
     assert roster.ROSTER[-1].id == C
     for d in NIGHTS[3:]:
         night(world, d, allow_all)
@@ -429,11 +453,14 @@ def test_paper_rerun_writes_nothing(world):
 
 def test_the_four_strategies_rows_are_identical_with_or_without_c(world, monkeypatch):
     monkeypatch.setattr(roster, "ROSTER", four_only())
+    c_engine = hide_c(world)
     for d in NIGHTS:
         night(world, d, None)
     four_alone = content(world, FOUR)
+    assert q(world, "SELECT count(*) FROM paper_state WHERE strategy_id = %s", (C,)) == [(0,)]
     assert q(world, "SELECT count(*) FROM orders WHERE strategy_id = %s", (C,)) == [(0,)]
     monkeypatch.undo()
+    land_c(world, c_engine)
 
     reset(world)
     for d in NIGHTS:  # the same nights with C on the roster, trading from stored verdicts

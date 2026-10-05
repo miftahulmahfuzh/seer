@@ -4,7 +4,9 @@ The pure night cores (``paper.bracket``, ``paper.book``, ``paper.benchmark``) st
 over values; this module turns those values into rows of the migration-003 tables and back.
 
 - Roster rows: ``strategies`` read; the frozen spec (C2) and ``paper_start`` written once;
-  the stored digest checked against the code's.
+  the stored digest checked against the code's. The lifecycle columns (006) have exactly two
+  writers here: ``retire`` (``status`` + ``paper_end``, what ``promote --retire`` calls) and
+  ``set_paper_end`` (the night's repair of a hand-written retirement). Retiring deletes nothing.
 - ``paper_state``: one row per paper strategy, the state between nights.
 - Bracket (strategy A): a ``sim.Portfolio`` is ``paper_state`` plus the strategy's live
   ``orders`` rows (pending and open, by slot); open orders' marks live in ``orders.mark``, in
@@ -259,6 +261,59 @@ def check_digest(row: StrategyRow, digest: str) -> None:
             f"{row.id}: stored spec digest {stored!r} differs from the code's {digest!r}; "
             f"a changed strategy needs a new id"
         )
+
+
+def retire(conn: psycopg.Connection, strategy_id: str) -> date | None:
+    """Retire ``strategy_id``: ``status = 'retired'`` and ``paper_end`` = the last session it
+    actually traded.
+
+    The last session actually traded is ``paper_state.last_session``: once the status is
+    ``retired`` the paper night steps the strategy no further, so that row is final. A strategy
+    that never started (no ``paper_state``) retires with ``paper_end`` NULL.
+
+    Retirement is a status change and a date, **nothing else** (plan invariant 4): no
+    ``equity_snapshots``, ``orders``, ``book_positions``, ``book_targets``, ``book_fills``,
+    ``book_trades`` or ``paper_state`` row is read for anything but the date, and none is written
+    or deleted. The strategy keeps its whole track record and stays on the leaderboard.
+
+    Returns the stamped ``paper_end``. A row that is already retired is left exactly as it is and
+    its stored ``paper_end`` is returned, so an interrupted swap can be re-run; a missing row is a
+    ``StoreError``. The caller's transaction decides (``promote`` retires and inserts the
+    replacement in one transaction, so the board never shows two rosters).
+    """
+    row = read_strategy(conn, strategy_id)
+    if row is None:
+        raise StoreError(f"no strategies row {strategy_id!r}")
+    if row.status == "retired":
+        return row.paper_end
+    state = read_paper_state(conn, strategy_id)
+    paper_end = None if state is None else state.last_session
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE strategies SET status = 'retired', paper_end = %s WHERE id = %s AND status = 'active'",
+            (paper_end, strategy_id),
+        )
+        _one_row(cur, f"retire {strategy_id}")
+    return paper_end
+
+
+def set_paper_end(conn: psycopg.Connection, strategy_id: str, paper_end: date) -> None:
+    """Stamp ``paper_end`` on a retired strategy that has none.
+
+    ``retire`` stamps it already; this is the repair for a retirement taken by hand
+    (``UPDATE strategies SET status = 'retired' ...``, as the plan index's Rollback writes it).
+    The paper night calls it on the first night after such a retirement, inside the night's own
+    transaction. Only a retired row whose ``paper_end`` is still NULL is written; an active row,
+    a missing row or one already stamped is a ``StoreError``, because each of those means the
+    caller's picture of the lifecycle is wrong.
+    """
+    _session("paper_end", paper_end)
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE strategies SET paper_end = %s WHERE id = %s AND status = 'retired' AND paper_end IS NULL",
+            (paper_end, strategy_id),
+        )
+        _one_row(cur, f"paper_end {strategy_id}")
 
 
 # --------------------------------------------------------------------------- paper_state

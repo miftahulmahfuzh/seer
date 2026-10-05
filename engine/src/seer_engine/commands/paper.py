@@ -6,10 +6,17 @@ Flow (handover D10, design §8, plan index C4):
   1. purge demo data if a demo run exists (own transaction; rolled back under --dry-run)
   2. rd = run_dates(now). The real runs row for rd.session_date must be ``success``; otherwise log
      and exit 1 with no paper writes (no paper step after a failed or missing bars run)
-  3. read the roster rows and paper_state; a set paper_start under a different spec digest is
-     refused (``store.check_digest``: a changed strategy needs a new id, handover D4)
-  4. every roster strategy already stepped through rd.data_date: no-op, exit 0, nothing written
-     (a re-run, a weekend or a holiday lands here)
+  3. read the roster rows (``store.read_roster_rows``) and resolve them into roster entries
+     (``roster.from_rows``); a
+     row whose object cannot be resolved stops the night with a named error and writes nothing
+     (plan invariant 9). A ``status='retired'`` entry is then skipped deliberately: no orders, no
+     equity snapshot, no ``paper_state`` step, and its ``paper_end`` is stamped with the last
+     session it actually traded if it has none. For every **active** entry, a set paper_start
+     under a different spec digest is refused (``store.check_digest``: a changed strategy needs a
+     new id, handover D4). An active entry with no ``paper_start`` -- one just added to the
+     roster -- starts tonight exactly as any new entry does (step 6).
+  4. every active roster strategy already stepped through rd.data_date and every retirement
+     already stamped: no-op, exit 0, nothing written (a re-run, a weekend or a holiday lands here)
   5. runs.paper_status = running (own transaction)
   6. ONE transaction: load the bars window; start new strategies (frozen spec + paper_start =
      rd.session_date, USD/IDR = the latest fx row on or before rd.data_date, day-0 snapshot at
@@ -78,18 +85,44 @@ class PaperError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class Retired:
+    """A ``status='retired'`` roster entry: tonight it takes no decisions at all.
+
+    No orders, no equity snapshot, no ``paper_state`` step, and no row of its history is touched
+    (plan invariant 4) -- it keeps every snapshot, order, book row and trade it ever wrote.
+
+    ``paper_end`` is the last session it actually traded (``paper_state.last_session``), or None
+    when it never started. ``stamp`` is True when the stored ``strategies.paper_end`` is still
+    NULL and tonight must write it: that is the repair for a retirement taken by hand SQL, since
+    ``store.retire`` stamps it at retirement time.
+    """
+
+    entry: RosterEntry
+    paper_end: date | None
+    stamp: bool
+
+
+@dataclass(frozen=True)
 class NightPlan:
     """What tonight does.
 
-    ``start``: roster entries with no paper state yet (they start tonight).
-    ``step``: (entry, its state) for entries whose last session is before rd.data_date.
+    ``start``: active roster entries with no paper state yet (they start tonight).
+    ``step``: (entry, its state) for active entries whose last session is before rd.data_date.
+    ``retired``: every retired entry, with the ``paper_end`` it has or needs. They trade nothing.
     """
 
     start: tuple[RosterEntry, ...]
     step: tuple[tuple[RosterEntry, PaperState], ...]
+    retired: tuple[Retired, ...] = ()
 
     def empty(self) -> bool:
-        return not self.start and not self.step
+        """Nothing to write tonight.
+
+        A retired entry keeps the night awake only while its ``paper_end`` is unstamped: once
+        stamped it costs nothing every night thereafter, so a roster that is all-retired settles
+        into the ordinary no-op.
+        """
+        return not self.start and not self.step and not any(r.stamp for r in self.retired)
 
 
 def add_arguments(p: argparse.ArgumentParser) -> None:
@@ -138,17 +171,31 @@ def execute(conn: psycopg.Connection, *, now: datetime, dry_run: bool = False) -
 
     try:
         try:
-            rows = {row.id: row for row in store.read_strategies(conn)}
+            strategy_rows = store.read_roster_rows(conn)
+            # The roster is data (phase 1). An entry whose object cannot be resolved raises here,
+            # by name, and the whole night stops (plan invariant 9) -- that is NOT the deliberate
+            # skip a retired entry gets below, and the two never share a code path or a log line.
+            entries = roster.from_rows(strategy_rows)
+            rows = {row.id: row for row in strategy_rows}
             states: dict[str, PaperState] = {}
-            for e in roster.ROSTER:
+            for e in entries:
                 state = store.read_paper_state(conn, e.id)
                 if state is not None:
                     states[e.id] = state
         finally:
             conn.rollback()
-        plan = plan_night(roster.ROSTER, rows, states, rd)
+        plan = plan_night(entries, rows, states, rd)
+        for r in plan.retired:
+            log.info(
+                "%s: retired; no orders, no equity snapshot, no paper_state step. paper_end %s%s",
+                r.entry.id,
+                "-" if r.paper_end is None else r.paper_end,
+                " (stamped tonight)" if r.stamp else "",
+            )
         if plan.empty():
-            log.info("every roster strategy is stepped through %s; nothing to do", rd.data_date)
+            log.info(
+                "every active roster strategy is stepped through %s; nothing to do", rd.data_date
+            )
             return 0
 
         with db.transaction(conn, dry_run):
@@ -176,22 +223,45 @@ def plan_night(
     states: Mapping[str, PaperState],
     rd: dates.RunDates,
 ) -> NightPlan:
-    """Which entries start tonight and which step, after the frozen-spec checks.
+    """Which entries start tonight, which step, and which are retired, after the frozen-spec checks.
 
-    Raises ``store.SpecMismatch`` when a set ``paper_start`` holds a spec digest other than the
-    code's (handover D4: a changed strategy needs a new id). Raises PaperError when an entry has
-    no ``strategies`` row, has ``paper_start`` but no paper state (its clock must be reset first),
-    has paper state but no ``paper_start``, or when the stored pending session is not the session
-    after the last one stepped.
+    A ``status='retired'`` entry is a **deliberate skip**: it is collected into ``NightPlan.retired``
+    and takes no decision, no snapshot and no ``paper_state`` step. It is not an error, and it is
+    not the same thing as an entry whose object cannot be resolved -- that one never reaches this
+    function, because ``roster.from_rows`` raises before the plan exists and the night stops
+    (plan invariant 9).
+
+    Raises ``store.SpecMismatch`` when an **active** entry's set ``paper_start`` holds a spec
+    digest other than the code's (handover D4: a changed strategy needs a new id). Raises
+    PaperError when an entry has no ``strategies`` row, carries a status this night does not
+    understand, has ``paper_start`` but no paper state (its clock must be reset first), has paper
+    state but no ``paper_start``, or when the stored pending session is not the session after the
+    last one stepped.
     """
     start: list[RosterEntry] = []
     step: list[tuple[RosterEntry, PaperState]] = []
+    retired: list[Retired] = []
     for e in entries:
         row = rows.get(e.id)
         if row is None:
             raise PaperError(f"strategies row {e.id!r} is missing; run `migrate` (003) first")
-        store.check_digest(row, roster.strategy_params(e)["digest"])
+        if row.status not in ("active", "retired"):
+            raise PaperError(
+                f"strategy {e.id!r} has status {row.status!r}; the paper night understands only "
+                f"'active' and 'retired'"
+            )
         state = states.get(e.id)
+        if row.status == "retired":
+            last_traded = None if state is None else state.last_session
+            retired.append(
+                Retired(
+                    entry=e,
+                    paper_end=row.paper_end if row.paper_end is not None else last_traded,
+                    stamp=row.paper_end is None and last_traded is not None,
+                )
+            )
+            continue
+        store.check_digest(row, roster.strategy_params(e)["digest"])
         if state is None:
             if row.paper_start is not None:
                 raise PaperError(
@@ -211,7 +281,7 @@ def plan_night(
                 f"after its last one ({state.last_session} -> {expected})"
             )
         step.append((e, state))
-    return NightPlan(start=tuple(start), step=tuple(step))
+    return NightPlan(start=tuple(start), step=tuple(step), retired=tuple(retired))
 
 
 # ---- the market as it stood on the night of a session ------------------------------------------
@@ -303,7 +373,29 @@ def _check_window(since: date, earliest: date, entries: Sequence[RosterEntry]) -
 
 
 def _night(conn: psycopg.Connection, rd: dates.RunDates, plan: NightPlan, run_id: int) -> None:
-    """The single paper transaction's body (the caller's db.transaction commits or rolls back)."""
+    """The single paper transaction's body (the caller's db.transaction commits or rolls back).
+
+    Retirements are settled first and cost nothing: a retired strategy keeps every history row it
+    ever wrote, and the only column tonight may write for it is ``paper_end`` (invariant 4). The
+    market window is loaded only when something actually trades, so an all-retired roster is a
+    cheap night, not a crash.
+    """
+    for r in plan.retired:
+        if not r.stamp or r.paper_end is None:
+            continue
+        store.set_paper_end(conn, r.entry.id, r.paper_end)
+        log.info(
+            "%s: paper_end %s, the last session it traded; its history is kept",
+            r.entry.id,
+            r.paper_end,
+        )
+    if plan.start or plan.step:
+        _trade(conn, rd, plan)
+    runs.finish_paper(conn, run_id)
+
+
+def _trade(conn: psycopg.Connection, rd: dates.RunDates, plan: NightPlan) -> None:
+    """Start and step every active entry on tonight's bars window. Never called with nothing to do."""
     lasts = [state.last_session for _, state in plan.step]
     if plan.start:
         lasts.append(rd.data_date)
@@ -338,7 +430,6 @@ def _night(conn: psycopg.Connection, rd: dates.RunDates, plan: NightPlan, run_id
             _step_benchmark(conn, e, sessions, tonight)
         else:
             raise PaperError(f"strategy {e.id!r} has unknown engine {e.engine!r}")
-    runs.finish_paper(conn, run_id)
 
 
 _PAPER_ROWS_SQL = """

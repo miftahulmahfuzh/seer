@@ -83,6 +83,54 @@ def test_freeze_spec_writes_params_and_start_once_and_check_digest_compares(pg):
         store.freeze_spec(pg, "A", spec=spec, digest="x", backtest_gate=gate, paper_start=date(2026, 10, 3))
 
 
+def test_retire_stamps_paper_end_from_paper_state_and_keeps_every_history_row(pg):
+    store.init_paper_state(pg, "A", paper_start=S1, cash0=CASH0, usd_idr=RATE)
+    store.write_paper_state(pg, "A", cash=CASH0, equity=CASH0, last_session=S2)
+    before = pg.execute("SELECT count(*) FROM equity_snapshots WHERE strategy_id = 'A'").fetchone()[0]
+    assert before == 1
+
+    assert store.retire(pg, "A") == S2
+    row = store.read_strategy(pg, "A")
+    assert (row.status, row.paper_end) == ("retired", S2)
+    # Invariant 4: retirement is a status change and a date, nothing else.
+    assert pg.execute("SELECT count(*) FROM equity_snapshots WHERE strategy_id = 'A'").fetchone()[0] == before
+    assert store.read_paper_state(pg, "A").last_session == S2
+    pg.rollback()
+
+
+def test_retire_of_a_strategy_that_never_traded_leaves_paper_end_null(pg):
+    assert store.retire(pg, "A") is None
+    row = store.read_strategy(pg, "A")
+    assert (row.status, row.paper_end, row.paper_start) == ("retired", None, None)
+    pg.rollback()
+
+
+def test_retire_is_a_no_op_on_an_already_retired_row_and_a_missing_row_is_an_error(pg):
+    store.init_paper_state(pg, "A", paper_start=S1, cash0=CASH0, usd_idr=RATE)
+    assert store.retire(pg, "A") == dates.prev_session(S1)
+    store.write_paper_state(pg, "A", cash=CASH0, equity=CASH0, last_session=S2)
+    # Already retired: the stored paper_end stands, it is not re-stamped from the newer state.
+    assert store.retire(pg, "A") == dates.prev_session(S1)
+    assert store.read_strategy(pg, "A").paper_end == dates.prev_session(S1)
+    with pytest.raises(store.StoreError, match="no strategies row"):
+        store.retire(pg, "nope")
+    pg.rollback()
+
+
+def test_set_paper_end_writes_only_a_retired_row_with_no_paper_end(pg):
+    with pytest.raises(store.StoreError, match="paper_end A"):
+        store.set_paper_end(pg, "A", S2)  # still active
+    pg.rollback()
+    pg.execute("UPDATE strategies SET status = 'retired' WHERE id = 'A'")
+    store.set_paper_end(pg, "A", S2)
+    assert store.read_strategy(pg, "A").paper_end == S2
+    with pytest.raises(store.StoreError, match="paper_end A"):
+        store.set_paper_end(pg, "A", S3)  # already stamped
+    pg.rollback()
+    with pytest.raises(ValueError, match="not an NYSE session"):
+        store.set_paper_end(pg, "A", date(2026, 10, 3))
+
+
 # --------------------------------------------------------------------------- day 0 and paper_state
 
 

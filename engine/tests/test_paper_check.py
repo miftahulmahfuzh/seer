@@ -371,6 +371,25 @@ def test_unreadable_stored_row_is_a_mismatch_not_a_crash(stepped):
     assert {found[s].status for s in ("SPY", F4, F1)} == {"ok"}
 
 
+def test_the_replay_passes_over_a_window_containing_a_retirement(world):
+    from seer_engine.paper import store
+
+    for d in NIGHTS[:4]:
+        night(world, d)
+    [(last_traded,)] = q(world, "SELECT last_session FROM paper_state WHERE strategy_id = 'A'")
+    with db.transaction(world, False):
+        assert store.retire(world, "A") == last_traded
+    for d in NIGHTS[4:]:
+        night(world, d)
+
+    found = results(world)
+    assert tuple(found) == ROSTER_IDS  # retired, but still on the board and still checked
+    assert found["A"].status in ("ok", "split-affected"), text(found)
+    assert found["A"].last_session == last_traded
+    assert found["SPY"].last_session == LAST
+    assert paper_check.execute(world) == 0
+
+
 def test_check_needs_an_idle_connection(pg):
     pg.execute("SELECT 1")
     with pytest.raises(ValueError, match="no transaction in progress"):

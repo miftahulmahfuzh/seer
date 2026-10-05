@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-05
-**Total Active Tasks**: 3
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 2
-- Completed: 67
+- Blocked: 1
+- Completed: 68
 
 ---
 
@@ -343,20 +343,36 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the direct precedent recorded two blocks above by phase 3 of this same set, and by all five phases of the previous swarm in this same file). Five peer sessions hold this one file open in one shared working tree; a cross-file block move is the single edit most likely to clobber a peer's concurrent append.
     - Completion: no `**Commit**` field (rung 6: phase 3's entry in this file, immediately above, has none either). `engine/.workflows/todos.md` is committed *inside* the phase's own commit, so a field naming that commit's sha cannot exist in it, and the alternatives — `--amend` after a push, or a second commit — either need a force-push or add a rewrite to a branch five peers are committing onto. The sha is reported to the set's coordinator and is one `git log` away.
     - Completion: the plan index's `**Status:**` left at `reconciled` and no per-phase tick added (rung 6: phase 3's recorded decision in this file). The phase table has no status column, and adding one would mean rewriting all six rows of a file five peer sessions hold open — the maximal conflict surface. `.workflows/orchestration/roster-promotion-pipeline/ledger.json` is the per-phase status of record for a swarm-tracked set, and a single scalar cannot represent out-of-order concurrent completion. Phase 2's `P1-ENG-J5XD` was unblocked (`blocked` -> `open`) because its stated dependency genuinely landed; no other peer phase's task was touched.
-- [ ] **P1-ENG-J5XD** Phase 2: Retire and activate: the paper night honours roster lifecycle
+- [x] **P1-ENG-J5XD** Phase 2: Retire and activate: the paper night honours roster lifecycle
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `engine/src/seer_engine/commands/paper.py`, the write side of `engine/src/seer_engine/paper/store.py`, `engine/src/seer_engine/commands/paper_check.py` if the replay needs it, and `engine/tests/test_paper*.py`. Does not touch `roster.py`'s resolver (phase 1 owns it), the migration (phase 1), or `web/`. Exit: `commands/paper.py` and `commands/paper_check.py` source their entries from `roster.from_rows(store.read_roster_rows(conn))` — **not** from `roster.ROSTER`, and not from `read_strategies`, which returns legacy rows `from_rows` correctly refuses; `paper` skips `status='retired'` entries with no orders, no equity snapshot and no `paper_state` step; retiring sets `paper_end` to the last session actually traded, at retirement time through `store.retire` or on the next night through `store.set_paper_end` for a retirement taken by hand, and never deletes a row; a strategy added as `active` with no `paper_start` starts on the next night exactly as a new entry does today (`store.freeze_spec`); `store.check_digest`'s `SpecMismatch` refusal is still reachable on every active started strategy and `test_changed_frozen_spec_is_refused` still passes untouched; an unresolvable roster entry fails the night with a named error, writes nothing, and its message contains neither "retired" nor "skip" so the two skips are never confusable (invariant 9); `store.retire` is the only writer phase 5 may use for a retirement and re-retiring is a no-op returning the stored `paper_end`, so an interrupted swap can be re-run; and `paper_check` replay passes over a window containing a retirement.
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `ROSTER_PROMOTION_PIPELINE_PLAN.md` (phase 2 of 6)
   - **Satisfies**: R2 — Replace the four horsemen easily — swapping an approach must not require editing engine code
   - **Depends on**: P1-ENG-7KQ2
   - **Plan**: `.workflows/plan/P1-ENG-J5XD.md`
+  - **Completed**: 2026-10-05 18:44
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/commands/paper.py, engine/src/seer_engine/commands/paper_check.py, engine/src/seer_engine/paper/store.py, engine/tests/test_paper_command.py, engine/tests/test_paper_store.py, engine/tests/test_paper_check.py, engine/tests/test_paper_c.py
+  - **Verified**: `ruff check engine` all passed; `compileall` clean on the three sources. Phase surface (test_paper_command/store/check/roster) 114 passed. Full engine suite WITH `PG_TEST_URL`: 2659 passed, 0 failed; WITHOUT: 2309 passed, 350 skipped. Inherited baseline MEASURED in a throwaway detached worktree at HEAD (7f2241d): 2648 passed with PG, 2309 passed / 339 skipped without. **Delta +11 passed / +0 skipped with PG, +0 passed / +11 skipped without — exactly the plan index's stated phase-2 delta. No existing test changed its result.** Manual dry-night check could not reach the roster (the local train DB has no bars run for session 2026-10-06, so `paper` exits at flow step 2); the log line it was meant to eyeball is asserted directly by `test_retiring_by_hand_stamps_paper_end_on_the_next_night` via caplog.
+  - **Drift**:
+    - Line numbers in the plan's Files table were a few lines off after phase 1 landed; every anchor matched by exact text, no semantic drift.
+    - `test_paper_c.py` was not in the plan's Files table but is inside the phase's Owns (`engine/tests/test_paper*.py`). Its two tests that simulate "before C landed" by monkeypatching `roster.ROSTER` stopped working once `paper`/`paper_check` source entries from the database: one failed outright, the other passed vacuously. Translated `four_only()` to the data layer with new `hide_c`/`land_c` helpers (clear and restore `strategies.engine`, which is exactly what `read_roster_rows` filters on). Both tests pass and now test what they claim again.
+  - **Decided**:
+    - `test_an_unresolvable_roster_entry_stops_the_night_and_is_not_a_skip` asserted `everything()` unchanged, but a deliberately failed night DOES write its `runs` row (`paper_status=failed` + `paper_error`), which Step 4 of the plan requires -> switched the assertion to `content()`, the existing precedent in `test_changed_frozen_spec_is_refused`. (Rung 2/3: exit criterion 5 "writes nothing" means writes no paper data, and the plan's own Step 4 code block states the failure writes `runs.paper_error`.)
+    - `test_paper_c.py`'s `roster.ROSTER` monkeypatch no longer hides a strategy from a night -> translated it to the data layer rather than leaving it inert. (Rung 1: invariant 1, no existing test may change its result; rung 6: the test's own `four_only()` docstring, "the roster as it was before C landed".)
+    - `ruff format --check` reports 254 files would be reformatted across `engine/` -> not treated as a gate. (Rung 6: verified identical at HEAD for the same files; the repo has never been `ruff format` clean, only `ruff check` is enforced, and it passes.)
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the direct precedent recorded by phases 1 and 3 of this same set in the two blocks above, and by all five phases of the previous swarm in this same file). A cross-file block move is the single edit most likely to clobber a peer's concurrent append in a shared worktree.
+    - Completion: no `**Commit**` field (rung 6: phases 1 and 3 above have none either). This file is committed *inside* the phase's own commit, so a field naming that commit's sha cannot exist in it; the sha is reported to the set's coordinator and is one `git log` away.
+    - Completion: the plan index's phase-2 row ticked and its `**Status:**` advanced to `phases 1, 2, 3, 4 of 6 complete`. This REVERSES phase 1's recorded decision to leave both alone, because the premise of that decision no longer holds: the index as it stands already carries ✅ on rows 1, 3 and 4 and already names the completed phases on its Status line, so leaving row 2 blank would now misreport the set rather than avoid a conflict (rung 6: the file's own current state outranks a decision its later edits superseded). Edit confined to one table row and one line.
+    - Completion: `P1-ENG-Z8MR` (phase 5) unblocked `blocked` -> `open` — both its stated dependencies, `P1-ENG-7KQ2` and `P1-ENG-J5XD`, have now landed. `P1-ENG-H3WF` (phase 6) left `blocked`; it depends on phase 5, which has not.
+    - Completion: landing NOT attempted. `swarm.py find --plan ROSTER_PROMOTION_PIPELINE_PLAN.md` returns `swarm: true` with coordinator `orch-roster-promotion-pipeline`, and this is phase 2 of 6 in any case — the merge belongs to the set's coordinator.
 - [ ] **P1-ENG-Z8MR** Phase 5: `promote`: the lab → roster bridge
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns new `engine/src/seer_engine/commands/promote.py`, `engine/src/seer_engine/lab/store.py` (recording the promotion) and its tests. Does not touch `backtest/registry.py` (D1), the paper night (phase 2 owns it), or `web/`. Exit: `promote --method M --candidate M-X --id <roster-id> [--retire <id>]` inserts a `strategies` row with `status='active'`, `promoted_from='<method id>'`, **the definition columns (`object_name`, `registry_id` NULL, `gate_note`, `gate_applicable`)**, full contract-C2 `params` and no `paper_start`, so the next paper night starts its clock the ordinary way; the row it just wrote is read back and rebuilt through `roster.from_row` **inside the same transaction**, so a row the paper night would refuse never commits; it refuses — each with a named error — to reuse an id that already has a `paper_start` (invariant 3), an allocator the resolver does not name (naming the one `Binding(...)` line to add), a method whose variant is ambiguous, and a candidate whose rules are not a `sim.rules` preset; `--retire <id>` calls `store.retire` (phase 2's, never its own SQL) in the same transaction as the insert, so a swap is atomic and the board never shows five active horsemen or three; the lab database records the promotion against the method — `analysis` grown, one `insights` row — at **any** status, and moves `status` to `paper` only along the `('test-passed','paper')` edge `TRANSITIONS` already has, with `--lab-status-stays` recording without moving (the shape a `rejected` method needs) and `source_sha`, `hypothesis` and `verdict` untouched and no `TRANSITIONS` edge added; a dry-run mode prints every row it would write in both databases and writes nothing; and `backtest/registry.py` is byte-identical to `origin/main` (D1), pinned by a test.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `ROSTER_PROMOTION_PIPELINE_PLAN.md` (phase 5 of 6)
   - **Satisfies**: R4 — Promote a method found in a `/sera-the-explorer` session onto the main app's leaderboard
   - **Depends on**: P1-ENG-7KQ2, P1-ENG-J5XD

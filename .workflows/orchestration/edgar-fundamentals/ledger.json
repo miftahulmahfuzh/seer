@@ -1,0 +1,148 @@
+{
+  "branch": "feature/edgar-fundamentals",
+  "coordinator": "orch-edgar-fundamentals",
+  "coordinator_session_id": "4cdcf3a8-0eec-42a4-83e1-f2f6a524554d",
+  "created": "2026-10-05T02:23:18+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 1,
+      "note": null,
+      "package": "engine/data`, `seer_engine",
+      "plan": ".workflows/plan/edgar-fundamentals/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Vendored ticker\u2192CIK map and loader"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "EASY",
+      "n": 2,
+      "note": null,
+      "package": "db/migrations",
+      "plan": ".workflows/plan/edgar-fundamentals/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Schema: `ticker_cik`, `fundamental_facts`, `fundamentals_log"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "seer_engine",
+      "plan": ".workflows/plan/edgar-fundamentals/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "SEC client (`sec.py`) and `SEC_CONTACT_EMAIL"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2,
+        3,
+        5
+      ],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": null,
+      "package": "seer_engine.commands",
+      "plan": ".workflows/plan/edgar-fundamentals/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2",
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "fundamentals` command \u2014 resumable ingest"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2
+      ],
+      "difficulty": "HARD",
+      "n": 5,
+      "note": null,
+      "package": "seer_engine.fundamentals",
+      "plan": ".workflows/plan/edgar-fundamentals/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Pure derivation: concept ladder, PIT selection, SUE"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2,
+        5
+      ],
+      "difficulty": "HARD",
+      "n": 6,
+      "note": null,
+      "package": "seer_engine.backtest`, `seer_engine.strategies`, `seer_engine.research",
+      "plan": ".workflows/plan/edgar-fundamentals/phase-6.md",
+      "reported_at": null,
+      "satisfies": [
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Market.fundamentals` + the `MarketAware` hook"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        5,
+        6
+      ],
+      "difficulty": "NORMAL",
+      "n": 7,
+      "note": null,
+      "package": "seer_engine.strategies`, `seer_engine.lab`, `docs",
+      "plan": ".workflows/plan/edgar-fundamentals/phase-7.md",
+      "reported_at": null,
+      "satisfies": [
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Fundamental factor allocator, lab method, runbook"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/edgar-fundamentals/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "edgar-fundamentals",
+  "updated": "2026-10-05T02:23:18+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/edgar-fundamentals"
+}

@@ -40,8 +40,18 @@ from seer_engine.membership import Interval, MembershipError
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 TICKER_CIK_FILE = "ticker_cik.csv"
 
-#: First day of the backtest window. The map is only guaranteed from here on.
-SINCE = date(2015, 1, 2)
+#: First day the map is guaranteed from, and the floor every membership start is clipped to.
+#: 2009-01-01, because SEC XBRL company facts do not exist before it at any price: large
+#: accelerated filers phased in from FY2009 and everyone else by FY2011, so a map reaching
+#: further back would buy no fundamentals. It costs what it is worth and no more --
+#: ``membership.symbols_since`` counts 1265 ever-members at 1996-01-02 against 913 here and 795
+#: at the retired floor, so 1996 would mean ~470 further hand-audited rows for nothing.
+#: It was ``date(2015, 1, 2)`` until 2026-10-05. That value was the first day of the *bars*
+#: window borrowed as a *map* floor, and ``build_ticker_cik.spans()`` wrote it into 525 rows as
+#: though it were those companies' first membership date. Because the projection in
+#: ``backtest/io.py`` joins ``fundamental_facts.filed >= ticker_cik.start_date``, those 525 rows
+#: discarded every fact filed before 2015 -- 181,491 of them already in the local database.
+SINCE = date(2009, 1, 1)
 
 HEADER: tuple[str, ...] = (
     "symbol",

@@ -13,10 +13,11 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
+from seer_engine import cik as cik_mod
 from seer_engine import sec
 from seer_engine.commands import fundamentals as fcmd
 
@@ -49,7 +50,7 @@ class Mapping:
     """
 
     symbol: str
-    cik: str
+    cik: str | None
     company_name: str = "Test Co"
     start_date: date = date(1990, 1, 1)
     end_date: date | None = None
@@ -208,32 +209,61 @@ def test_recycled_ticker_resolves_to_the_holder_during_membership():
         Mapping("CA", "0000356028", "CA Inc.", date(1990, 1, 1), date(2018, 11, 6)),
         Mapping("CA", "0001503290", "Xtrackers CA Muni ETF", date(2018, 11, 6), None),
     ]
-    assert fcmd.resolve_window_cik(rows, "CA", SINCE, date(2018, 11, 5)) == (
-        "0000356028", fcmd.STATUS_OK, None
+    assert fcmd.resolve_window_ciks(rows, "CA", SINCE, date(2018, 11, 5)) == (
+        ("0000356028",), fcmd.STATUS_OK, None
     )
     held_now = fcmd.resolve_cik(rows, "CA", date(2026, 1, 2))
     assert held_now is not None and held_now.cik == "0001503290"
 
 
-def test_a_ticker_changing_hands_mid_membership_is_a_failure_not_a_guess():
-    rows = [
-        Mapping("CA", "0000356028", "CA Inc.", date(1990, 1, 1), date(2018, 11, 6)),
-        Mapping("CA", "0001503290", "Xtrackers CA Muni ETF", date(2018, 11, 6), None),
-    ]
-    number, status, why = fcmd.resolve_window_cik(rows, "CA", SINCE, date(2020, 1, 2))
-    assert number is None and status == fcmd.STATUS_FAILED and "changed hands" in why
+def test_the_vendored_map_defends_against_recycling_by_truncating_the_interval():
+    """Recycling is defended against in the DATA, not by refusing ambiguous windows.
+
+    ``engine/data/ticker_cik.csv`` ends a recycled ticker's row at the handover and simply
+    omits the new holder, so only one filer ever covers the membership window. An earlier
+    two-endpoint probe refused whenever the window's ends disagreed; because of this
+    truncation that could never fire on a recycled ticker, only on a legitimate reorg --
+    which cost GOOG, GOOGL and WRK their fundamentals and bought nothing.
+    """
+    index = cik_mod.load_index()
+    for symbol in ("CA", "MON", "PLL", "ALTR", "LLL", "DTV"):
+        rows = index[symbol]
+        assert len(rows) == 1, f"{symbol} should carry one truncated row, got {len(rows)}"
+        assert rows[0].end_date is not None, f"{symbol}'s row must be closed at the handover"
+        flat = [r for g in index.values() for r in g]
+        numbers, status, _ = fcmd.resolve_window_ciks(
+            flat, symbol, rows[0].start_date, rows[0].end_date - timedelta(days=1)
+        )
+        assert status == fcmd.STATUS_OK and numbers == (rows[0].cik,)
+
+
+def test_a_reorganised_registrant_yields_both_filers():
+    """GOOG/GOOGL across the 2015-10-02 Alphabet holdco reorg, WRK across WestRock's 2018 one.
+
+    Both filers are fetched. Nothing is mixed: facts are CIK-keyed and phase 6's panel joins
+    ``ticker_cik`` by date, so any given ``t`` reads the filer that actually held the ticker.
+    """
+    index = cik_mod.load_index()
+    flat = [r for g in index.values() for r in g]
+    for symbol in ("GOOG", "GOOGL", "WRK"):
+        rows = index[symbol]
+        assert len(rows) == 2, f"{symbol} should carry two reorg rows"
+        last = rows[-1].end_date - timedelta(days=1) if rows[-1].end_date else TODAY
+        numbers, status, _ = fcmd.resolve_window_ciks(flat, symbol, rows[0].start_date, last)
+        assert status == fcmd.STATUS_OK
+        assert numbers == tuple(r.cik for r in rows), f"{symbol}: {numbers}"
 
 
 def test_an_unmapped_ticker_says_what_to_do_about_it():
-    number, status, why = fcmd.resolve_window_cik([], "NDOI", SINCE, TODAY)
-    assert number is None and status == fcmd.STATUS_FAILED and "ticker_cik.csv" in why
+    numbers, status, why = fcmd.resolve_window_ciks([], "NDOI", SINCE, TODAY)
+    assert not numbers and status == fcmd.STATUS_FAILED and "ticker_cik.csv" in why
 
 
 def test_a_none_filer_is_empty_not_failed():
     """The map ANSWERED: there is nothing at EDGAR. That is `empty`, and `empty` exits 0."""
-    rows = [Mapping("DEAD", fcmd.cik.NO_FILER, "Private LBO", note="no EDGAR filer")]
-    number, status, why = fcmd.resolve_window_cik(rows, "DEAD", SINCE, TODAY)
-    assert number is None and status == fcmd.STATUS_EMPTY and "no EDGAR filer" in why
+    rows = [Mapping("DEAD", None, "Private LBO", note="no EDGAR filer")]
+    numbers, status, why = fcmd.resolve_window_ciks(rows, "DEAD", SINCE, TODAY)
+    assert not numbers and status == fcmd.STATUS_EMPTY and "no EDGAR filer" in why
 
 
 # ---------------------------------------------------------------- fact filtering
@@ -447,7 +477,7 @@ def test_a_symbol_the_map_marks_NONE_is_empty_and_gets_no_log_row(pg):
 
     s = fcmd.ingest(
         pg, opts(), source=source,
-        mappings=[Mapping("DEAD", fcmd.cik.NO_FILER, note="taken private, no filer")],
+        mappings=[Mapping("DEAD", None, note="taken private, no filer")],
     )
 
     assert source.calls == [] and s.empty == ["DEAD"] and s.exit_code() == 0
@@ -620,3 +650,35 @@ def test_summary_text_reports_counts_and_table_size(pg):
     text = fcmd.format_summary(s, o)
     assert "1 ok, 0 empty, 0 failed" in text
     assert "fundamental_facts table:" in text
+
+
+def test_the_real_vendored_map_syncs_without_crashing_on_its_none_row():
+    """The fixture above types ``cik`` as ``str | None`` because that is what phase 1's
+    loader produces -- ``_parse_cik_cell`` returns ``None`` for the CSV token ``NONE``,
+    while ``cik.NO_FILER`` is the token itself.
+
+    Comparing a parsed row against the token therefore never matches, which crashed
+    ``sync_ticker_cik`` on ``int(None)`` and made ``resolve_window_cik`` call NDOI
+    ``failed`` instead of ``empty``. Every unit test passed anyway, because the fake
+    passed the token where the loader passes ``None``. So this test reads the REAL
+    vendored file: it is the only one that can catch a fixture disagreeing with the loader.
+    """
+    index = cik_mod.load_index()
+    rows = [r for group in index.values() for r in group]
+    none_rows = [r for r in rows if r.cik is None]
+    assert none_rows, "the vendored CSV is expected to carry at least one NONE row"
+
+    # The sync set must simply exclude them -- no exception, and none of them present.
+    wanted = {m.symbol for m in rows if m.cik is not None}
+    assert all(r.symbol not in wanted or any(
+        o.cik is not None for o in index[r.symbol]) for r in none_rows)
+    # Probe each NONE row across ITS OWN validity interval, which is what the command
+    # does: the window comes from membership, and a NONE symbol's membership is the span
+    # the row covers. Probing outside it hits the "no row on that date" branch first,
+    # which is a different (and correct) failure.
+    for r in none_rows:
+        last = r.end_date - timedelta(days=1) if r.end_date else TODAY
+        numbers, status, why = fcmd.resolve_window_ciks(rows, r.symbol, r.start_date, last)
+        assert not numbers
+        assert status == fcmd.STATUS_EMPTY, f"{r.symbol} should be empty, got {status}"
+        assert "no EDGAR filer" in why

@@ -45,7 +45,7 @@ import logging
 import math
 from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Protocol
@@ -317,7 +317,7 @@ def resolve_cik(mappings: Iterable[cik.CikRow], symbol: str, on: date) -> cik.Ci
     (symbol, date) and never on the bare ticker, so CA on 2015-01-02 is CA Inc. and not the
     Xtrackers ETF that holds the ticker today. Phase 1's loader rejects overlapping intervals
     for one symbol, so at most one row can match. A row whose ``cik`` is ``cik.NO_FILER`` is
-    returned, not skipped -- "this symbol has no filer" is an answer, and ``resolve_window_cik``
+    returned, not skipped -- "this symbol has no filer" is an answer, and ``resolve_window_ciks``
     turns it into ``empty`` rather than ``failed``.
     """
     for mapping in mappings:
@@ -328,44 +328,54 @@ def resolve_cik(mappings: Iterable[cik.CikRow], symbol: str, on: date) -> cik.Ci
     return None
 
 
-def resolve_window_cik(
+def resolve_window_ciks(
     mappings: Iterable[cik.CikRow], symbol: str, first_day: date, last_day: date
-) -> tuple[str | None, str, str | None]:
-    """``(cik, status, error)`` for ``symbol`` across its whole membership window.
+) -> tuple[tuple[str, ...], str, str | None]:
+    """``(ciks, status, error)`` for ``symbol`` across its whole membership window.
 
-    Returns one of three outcomes, and the three-way split is the point:
+    Returns one of three outcomes:
 
-    * ``(cik10, STATUS_OK, None)``   -- one filer covers the whole window; fetch it.
-    * ``(None, STATUS_EMPTY, note)`` -- the map says this symbol has **no EDGAR filer**
-      (``cik == cik.NO_FILER``). Not an error: ``Summary.exit_code`` treats ``empty`` as
-      success, exactly as ``backfill`` does for a symbol with no bars.
-    * ``(None, STATUS_FAILED, why)`` -- the map cannot answer: no row at all, or two different
-      filers across the window.
+    * ``(ciks, STATUS_OK, None)``    -- every filer that backed the ticker while it was a
+      member, oldest first. Usually one; **two when the registrant was reorganised
+      mid-membership** (GOOG/GOOGL across the 2015-10-02 Alphabet holdco reorg, WRK across
+      WestRock's 2018 reorg). Each is fetched separately, so nothing is mixed: facts are
+      CIK-keyed and phase 6's panel joins ``ticker_cik`` **by date**, which is what picks the
+      right filer's facts for any given ``t``.
+    * ``(.., STATUS_EMPTY, note)``   -- the map says this symbol has **no EDGAR filer**
+      (a ``NONE`` row, parsed to ``cik is None``). Not an error: ``Summary.exit_code`` treats
+      ``empty`` as success, exactly as ``backfill`` does for a symbol with no bars.
+    * ``(.., STATUS_FAILED, why)``   -- the map cannot answer: no row covering the window.
 
-    Both ends of the window are probed and must agree. A disagreement means the ticker changed
-    hands while the symbol was an index member, which would make a single companyfacts fetch
-    silently mix two companies -- so it is a failure, never a guess.
+    This delegates to ``cik.filers``, whose own docstring names it "the ingest entry point:
+    Phase 4 fetches ``companyfacts`` once per CIK returned here". It replaces an earlier
+    two-endpoint probe that refused whenever the two ends disagreed. That probe could only
+    ever fire on a legitimate reorg, never on a recycled ticker: ``engine/data/ticker_cik.csv``
+    defends against recycling in the **data**, by truncating a recycled ticker's interval at
+    the handover (CA ends 2018-11-06 and the Xtrackers row is simply absent; likewise MON,
+    PLL, ALTR, LLL, DTV). So the probe cost GOOG, GOOGL and WRK their fundamentals and bought
+    nothing -- see ``test_a_reorganised_registrant_yields_both_filers``.
     """
     rows = list(mappings)
-    first = resolve_cik(rows, symbol, first_day)
-    last = resolve_cik(rows, symbol, last_day)
-    if first is None or last is None:
-        missing = first_day if first is None else last_day
-        return None, STATUS_FAILED, (
-            f"no CIK for {symbol} on {missing.isoformat()}: add a dated row to "
-            f"engine/data/ticker_cik.csv (a ticker alone never identifies a company)"
+    index = cik.build_index(rows)
+    # `filers` treats `end` as exclusive; the window's last day is inclusive.
+    numbers = cik.filers(symbol, index, first_day, last_day + timedelta(days=1))
+    if numbers:
+        return numbers, STATUS_OK, None
+
+    # No usable filer. Distinguish "the map answered NONE" from "the map has no row".
+    covering = [
+        r for r in index.get(symbol, ())
+        if r.start_date <= last_day and (r.end_date is None or first_day < r.end_date)
+    ]
+    none_row = next((r for r in covering if r.cik is None), None)
+    if none_row is not None:
+        return (), STATUS_EMPTY, (
+            f"{symbol} has no EDGAR filer in engine/data/ticker_cik.csv: {none_row.note}"
         )
-    if first.cik == cik.NO_FILER or last.cik == cik.NO_FILER:
-        return None, STATUS_EMPTY, (
-            f"{symbol} has no EDGAR filer in engine/data/ticker_cik.csv: {first.note or last.note}"
-        )
-    if first.cik != last.cik:
-        return None, STATUS_FAILED, (
-            f"{symbol} maps to CIK {first.cik} on {first_day.isoformat()} but CIK {last.cik} "
-            f"on {last_day.isoformat()}: the ticker changed hands inside its index membership; "
-            f"split the interval in engine/data/ticker_cik.csv"
-        )
-    return first.cik, STATUS_OK, None
+    return (), STATUS_FAILED, (
+        f"no CIK for {symbol} over {first_day.isoformat()}..{last_day.isoformat()}: add a "
+        f"dated row to engine/data/ticker_cik.csv (a ticker alone never identifies a company)"
+    )
 
 
 # ------------------------------------------- membership windows and job selection
@@ -450,15 +460,19 @@ def plan_jobs(
     unresolved: list[SymbolResult] = []
     for symbol in symbols:
         window = windows.get(symbol, (opts.since, opts.today))
-        number, status, why = resolve_window_cik(mappings, symbol, *window)
-        if number is None:
+        numbers, status, why = resolve_window_ciks(mappings, symbol, *window)
+        if not numbers:
             if status == STATUS_FAILED:
                 log.warning("fundamentals: %s unresolved: %s", symbol, why)
             unresolved.append(
                 SymbolResult(symbol, status, error=_error_text(str(why)) if why else None)
             )
             continue
-        by_cik.setdefault(number, []).append(symbol)
+        # Usually one CIK; two when the registrant was reorganised mid-membership. The
+        # symbol is attached to each, so both filers' facts are fetched and the summary
+        # still reports the symbol once per outcome.
+        for number in numbers:
+            by_cik.setdefault(number, []).append(symbol)
 
     # `--symbols` ignores the log outright -- that is what its help text promises and what
     # makes it the tool for re-fetching one filer after a fix. Everything else resumes.
@@ -736,7 +750,7 @@ def sync_ticker_cik(
     CSV's ``company_name``. ``cik`` is a ``bigint``, so the CSV's 10-digit zero-padded string
     is parsed with ``int()``. **Rows whose CSV ``cik`` is ``cik.NO_FILER`` are skipped** --
     the column is NOT NULL and those symbols have no EDGAR filer to record. They are still
-    resolvable from the CSV, which is what ``resolve_window_cik`` reads; the table is a mirror
+    resolvable from the CSV, which is what ``resolve_window_ciks`` reads; the table is a mirror
     for SQL joins (phase 6's panel load), not the source of truth.
     """
     wanted = {
@@ -750,7 +764,7 @@ def sync_ticker_cik(
             m.note or None,
         )
         for m in mappings
-        if m.cik != cik.NO_FILER
+        if m.cik is not None
     }
     stored = {tuple(row) for row in conn.execute(_MAP_SELECT).fetchall()}
     if stored == wanted:

@@ -1,11 +1,11 @@
 import { ArrowUpRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
-import { BarChart } from '@/components/sera/charts/BarChart';
+import type { CSSProperties, ReactNode } from 'react';
+import type { BarGroup } from '@/components/sera/charts/BarChart';
 import { Legend } from '@/components/sera/charts/Legend';
 import { LineChart } from '@/components/sera/charts/LineChart';
-import { fmtNumber, fmtPct, fmtSignedPct, resolveAxis } from '@/components/sera/charts/scale';
+import { type Domain, fmtNumber, fmtPct, fmtSignedPct, resolveAxis } from '@/components/sera/charts/scale';
 import { ScatterChart } from '@/components/sera/charts/ScatterChart';
 import { PageHeader } from '@/components/sera/PageHeader';
 import { Section } from '@/components/sera/Section';
@@ -19,7 +19,6 @@ import {
   ABOVE_COLOR,
   dayText,
   ELIGIBLE_COLOR,
-  type Families,
   HISTORICAL_COLOR,
   HURDLES,
   LAB_COLOR,
@@ -185,14 +184,7 @@ export default async function SeraOverview() {
             </>
           }
         >
-          <BarChart
-            ariaLabel={`Tries passing each of the ${HURDLES} hurdles`}
-            groups={hu.groups}
-            orientation="horizontal"
-            domain={hu.domain}
-            format={fmtNumber(0)}
-            width={560}
-          />
+          <FillBars groups={hu.groups} domain={hu.domain} ariaLabel={`Tries passing each of the ${HURDLES} hurdles`} empty="No tries yet." />
         </Section>
 
         {/* (4) Are we getting closer? */}
@@ -277,7 +269,7 @@ export default async function SeraOverview() {
           title={`${fa.count} ${fa.count === 1 ? 'family' : 'families'}`}
           caption="Tries per family of ideas; hover a bar for its best MAR. A long bar with a weak best means the family has been squeezed hard."
         >
-          <FamilyBars families={fa} />
+          <FillBars groups={fa.groups} domain={fa.domain} ariaLabel="Tries per method family" empty="No family has a dev try yet." />
         </Section>
 
         {/* (7) Latest methods */}
@@ -324,37 +316,42 @@ export default async function SeraOverview() {
 }
 
 /**
- * Tries per family as HTML rows, not an SVG: the rows stretch to fill whatever height the sheet gets
- * next to Latest methods, and the short (7-character) labels keep every bar starting at the same x.
+ * Horizontal bars as HTML rows, not an SVG: the rows stretch to fill whatever height the sheet gets
+ * from its neighbour, and a label column sized to the longest label keeps every bar starting at the same x.
  */
-function FamilyBars({ families }: { families: Families }) {
-  if (!families.groups.length) return <p className={s.empty}>No family has a dev try yet.</p>;
+function FillBars({ groups, domain, ariaLabel, empty }: { groups: readonly BarGroup[]; domain: Domain; ariaLabel: string; empty: string }) {
+  if (!groups.length) return <p className={s.empty}>{empty}</p>;
   const fmt = fmtNumber(0);
-  const { domain, ticks } = resolveAxis(families.domain, { domain: families.domain, format: fmt, count: 4 });
+  const { ticks } = resolveAxis(domain, { domain, format: fmt, count: 4 });
   const hi = Math.max(1, domain[1]);
   const pct = (v: number) => `${(Math.min(v, hi) / hi) * 100}%`;
+  const textOf = (g: BarGroup) => g.items[0]?.valueText ?? fmt(g.items[0]?.value ?? 0);
+  const style = {
+    '--fill-label': `${Math.max(...groups.map(g => g.label.length)) + 1}ch`,
+    '--fill-value': `${Math.max(...groups.map(g => textOf(g).length)) + 2}ch`,
+  } as CSSProperties;
   return (
-    <div className={s.famChart} role="img" aria-label="Tries per method family">
-      <ul className={s.famRows}>
-        {families.groups.map(g => {
+    <div className={s.fillChart} style={style} role="img" aria-label={ariaLabel}>
+      <ul className={s.fillRows}>
+        {groups.map(g => {
           const it = g.items[0];
           const v = it?.value ?? 0;
           return (
-            <li key={g.id} className={s.famRow}>
-              <span className={s.famLabel} data-tip={g.tip}>{g.label}</span>
-              <span className={s.famTrack}>
-                {ticks.map(t => <span key={t.value} className={s.famGrid} style={{ left: pct(t.value) }} />)}
-                <span className={s.famBar} style={{ width: pct(v), background: it?.color }} data-tip={it?.tip} />
-                <span className={s.famValue} style={{ left: pct(v) }}>{it?.valueText ?? fmt(v)}</span>
+            <li key={g.id} className={s.fillRow}>
+              <span className={s.fillLabel} data-tip={g.tip}>{g.label}</span>
+              <span className={s.fillTrack}>
+                {ticks.map(t => <span key={t.value} className={s.fillGrid} style={{ left: pct(t.value) }} />)}
+                <span className={s.fillBar} style={{ width: pct(v), background: it?.color }} data-tip={it?.tip} />
+                <span className={s.fillValue} style={{ left: pct(v) }}>{textOf(g)}</span>
               </span>
             </li>
           );
         })}
       </ul>
-      <div className={s.famAxis} aria-hidden>
+      <div className={s.fillAxis} aria-hidden>
         <span />
-        <span className={s.famTicks}>
-          {ticks.map(t => <span key={t.value} className={s.famTick} style={{ left: pct(t.value) }}>{t.label}</span>)}
+        <span className={s.fillTicks}>
+          {ticks.map(t => <span key={t.value} className={s.fillTick} style={{ left: pct(t.value) }}>{t.label}</span>)}
         </span>
       </div>
     </div>

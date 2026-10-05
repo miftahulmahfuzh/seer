@@ -23,19 +23,19 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "85f6bfd",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 2,
-      "note": "Phase 2 IS LIVE (session impl-fundamental-panel-coverage-p2, tmux @21) - do NOT respawn. verify derives 'pending' only because it has no commit yet; it is mid-audit, not abandoned. Pass 1 exited 1 at 14:30:44 with UNRESOLVED(28) and wrote no CSV (invariant 3 working as designed); p2 resolved all 28 by hand and pass-2 generator PID 983958 is running the ~900 SEC submissions fetch.",
+      "note": "Phase 2 landed 85f6bfd, verified by coordinator from git: ancestor of branch, pushed, exactly its five Owns files. DATA VERIFIED INDEPENDENTLY: ticker_cik.csv 944 rows / 913 symbols (was 798/795); invariant 3 zero fuzzy rows; invariant 4 NDOI is the only NONE; invariant 5 K -> 0000055067 KELLANOVA; invariant 2 HOLDS - CA/MON/PLL/ALTR/LLL/DTV all keep byte-identical end_dates (only start_date moved back 2015-01-02 -> 2009-01-01, which the invariant permits) and a full-file scan vs base 2dad9ff finds ZERO end_dates pushed forward. Graded check matched the plan line for line: 540 rows at the floor (predicted 540), 0 at 2015-01-02, 0 before the floor, 0 coverage gaps, 525 clamp lines removed (predicted 525). AUDIT: 28 UNRESOLVED + 32 SCREEN + 56 EARLY = 69 unique symbols hand-audited, every CIK read off data.sec.gov/submissions; MANUAL 70 -> 152 symbols / 183 rows. Wrong entities the tiers had answered with, now corrected: MFE (0001095388 MCAFEE COM CORP, no filings after 2000; member is 0000890801), JNS (0000812295, no periodic filings), AKS (0000918192 non-filing operating subsidiary), DF (0000027500, pre-2001 company Suiza acquired), RX (0001595262, the 2014 re-IPO), ACAS (0000004707, namesake with zero filings), WFT (0000029302 Weatherford Enterra, filings end 1998). DIS and XRX were mapped to their 2019 holdcos and SNDK to the 2025 spinoff - pre-existing errors the clamp was HIDING, not merely missing. Tests: +5 exactly (test_cik.py 74 -> 79 collected); suite 2261 passed / 332 skipped, 2593 passed / 0 skipped with PG_TEST_URL. Decisions, two of seven worth review: (1) successor handovers split at the successor's FIRST periodic filing measured from its submissions JSON, not a remembered corporate-event date - rung 1, invariants 2 and 10; it also guarantees row1.end == row2.start which _check_intervals and coverage_gaps both require. (2) two existing coverage_gaps tests hard-coded 2015-01-02 in synthetic fixtures and went red on the re-floor; fixtures re-anchored to c.SINCE, ASSERTIONS UNTOUCHED, both pass asserting the same property and survive the next re-floor - nothing relaxed, invariant 1 holds. PLAN PREDICTION FALSIFIED, recorded: C7i asserted TMUS, DXC and LDOS all pass both screens. DXC does NOT - EARLY flags it, hull opens 2009-01-01 but DXC Technology first filed 2017-03-31. Kept out of scope per C7i and exempted in EARLY_EXEMPT with the reason rather than editing membership_overrides.csv; same treatment for CCEP, LMCK, PSKY, VTRS. FOR PHASE 3: cik.filers now reaches ~890 distinct CIKs, up from 776, and a pre-2015 filer is resolvable, so --since-filed 2009-01-01 has somewhere to land. FOR PHASE 5: the SNDK note deserves a sentence in honest reporting - the clamp was hiding a WRONG answer, not merely a missing one. Phase 2 touched no docs/ file; the runbook's stale lines at :12,15,44,51,151-175,245-247 remain phase 5's per C7ii.",
       "package": "engine/scripts`, `engine/data`, `seer_engine.cik",
       "plan": ".workflows/plan/fundamental-panel-coverage/phase-2.md",
-      "reported_at": "2026-10-05T07:36:44+00:00",
+      "reported_at": "2026-10-05T08:33:42+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-QD7X",
       "title": "Fix A: re-vendor `ticker_cik.csv` back to real 2009 membership, with the `EARLY` start screen"
     },
     {
@@ -53,7 +53,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Fix B: re-ingest at `--since-filed 2009-01-01` via `--symbols`, and measure 2009\u20132012"
     },
@@ -103,7 +103,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/fundamental-panel-coverage/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "fundamental-panel-coverage",
-  "updated": "2026-10-05T07:53:22+00:00",
+  "updated": "2026-10-05T08:33:46+00:00",
   "verified_at": "2026-10-05T07:53:22+00:00",
   "worktree": "/home/miftah/.worktrees/seer/fundamental-panel-coverage"
 }

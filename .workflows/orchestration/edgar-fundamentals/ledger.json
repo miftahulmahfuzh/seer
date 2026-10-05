@@ -23,36 +23,36 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "02ab228ce4b8611407dd673f6e28e6693fae8408",
       "depends_on": [],
       "difficulty": "EASY",
       "n": 2,
-      "note": null,
+      "note": "005_fundamentals.sql + test_migrate.py only. Decisions: (1) plan's Step 2 code block called _upto(tmp_path,'004_news_veto.sql') twice, bare mkdir() -> FileExistsError; bound dir to a local and reused (rung 3, code block is authority on intent); shared _upto helper untouched. (2) Neon manual check NOT run - no DATABASE_URL_UNPOOLED reachable; migrating prod from an unlanded branch is not phase 2's (rung 2). COORDINATOR MUST RUN migrate AT LANDING. (3) ticker_cik.source CHECK ships phase 1's five labels (current,edgar,exact,fuzzy,manual) per widen-not-rename.",
       "package": "db/migrations",
       "plan": ".workflows/plan/edgar-fundamentals/phase-2.md",
-      "reported_at": "2026-10-05T02:33:15+00:00",
+      "reported_at": "2026-10-05T02:43:52+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "running",
+      "status": "done",
       "task_id": "P1-ENG-FPIL",
       "title": "Schema: `ticker_cik`, `fundamental_facts`, `fundamentals_log"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "4369558655",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "sec.py + test_sec.py + .env.example (+ todos.md/PLAN.md bookkeeping swept in). http.py and test_strategy_purity.py verified byte-unchanged. MIN_INTERVAL=0.11 from end of previous attempt; 404->SecNotFound which phase 4 maps to empty not failed. Decisions: (1) pytest.approx on float pacing assert (rung 3, sibling test does same). (2) deferred TaskID minting to phase 1's coherent 7-row write rather than race the counter. (3) readme-updater not dispatched - phase 7 owns the SEC_CONTACT_EMAIL runbook line. Handoff to p4: build client once as sec.Client(sec.require_contact()), catch ConfigError -> exit 2 like nightly.py:77-80; Fact carries cik/period_start/period_end; Fact.frame exists but is NOT persisted (no frame column).",
       "package": "seer_engine",
       "plan": ".workflows/plan/edgar-fundamentals/phase-3.md",
-      "reported_at": "2026-10-05T02:33:15+00:00",
+      "reported_at": "2026-10-05T02:43:52+00:00",
       "satisfies": [
         "R2",
         "R5"
       ],
-      "status": "running",
+      "status": "done",
       "task_id": "P1-ENG-0351",
       "title": "SEC client (`sec.py`) and `SEC_CONTACT_EMAIL"
     },
@@ -95,7 +95,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": "P1-ENG-9U93",
       "title": "Pure derivation: concept ladder, PIT selection, SUE"
     },
@@ -143,6 +143,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/edgar-fundamentals/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "edgar-fundamentals",
-  "updated": "2026-10-05T02:33:15+00:00",
+  "updated": "2026-10-05T02:43:52+00:00",
   "worktree": "/home/miftah/.worktrees/seer/edgar-fundamentals"
 }

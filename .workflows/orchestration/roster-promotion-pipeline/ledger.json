@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "de16ca3",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": "Session impl-roster-promotion-pipeline-p1 alive and busy in tmux @34. verify --apply downgraded spawned->pending on commit-absence alone; that is mid-build, not abandonment. Do NOT re-spawn while @34 is live.",
+      "note": "Handoffs: no swap made in commands/paper.py or paper_check.py and no status/paper_end setter added -- deliberately left as phase 2's exit criterion. Phase 5: call roster.from_row on the row it is about to write, inside its transaction; RESOLVER is dict[str,Binding] so inverse lookup must scan 'b.obj is obj'. Phase 6: extension point is exactly one RESOLVER entry + one RosterRow appended to SEED_ROWS. Decision: plan prose said '+15 tests (12 pure, 3 pg)' but its own code block had 16 (12 pure, 4 pg); implemented the code block, rung 3 (code blocks outrank surrounding prose).",
       "package": "db`, `engine/src/seer_engine/paper",
       "plan": ".workflows/plan/roster-promotion-pipeline/phase-1.md",
-      "reported_at": "2026-10-05T11:04:12+00:00",
+      "reported_at": "2026-10-05T11:14:30+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-7KQ2",
       "title": "The roster becomes data: `status`, `paper_end`, and a name\u2192object resolver"
     },
     {
@@ -36,7 +36,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Retire and activate: the paper night honours roster lifecycle"
     },
@@ -73,7 +73,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The leaderboard re-sorts honestly, and shows retired horsemen"
     },
@@ -120,7 +120,7 @@
   "plan": "/home/miftah/.worktrees/seer/roster-promotion-pipeline/ROSTER_PROMOTION_PIPELINE_PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "roster-promotion-pipeline",
-  "updated": "2026-10-05T11:04:18+00:00",
+  "updated": "2026-10-05T11:14:36+00:00",
   "verified_at": "2026-10-05T11:03:48+00:00",
   "worktree": "/home/miftah/.worktrees/seer/roster-promotion-pipeline"
 }

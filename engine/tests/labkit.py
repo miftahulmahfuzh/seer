@@ -12,6 +12,7 @@ from seer_engine import dates
 from seer_engine.backtest.benchmark import Dividend
 from seer_engine.backtest.dev import DEV_END
 from seer_engine.backtest.market import Market, Membership
+from seer_engine.backtest.window import Window
 from seer_engine.research import ResearchData
 from seer_engine.strategies.base import History
 
@@ -55,4 +56,51 @@ def smoke_data(extra: Iterable[str] = ()) -> ResearchData:
         spy_dividends=(Dividend(SPY_EX_DATE, spy_div),),
         fingerprint="smoke",
         manifest={},
+    )
+
+
+# ---- the test window (build-promotion-path phase 4) ------------------------------------------
+
+TEST_FIRST = date(2015, 10, 19)  # the first session after DEV_END: the test window opens here
+TEST_LAST = date(2018, 12, 31)  # a fixture end; the real store's end is whatever its manifest says
+TEST_SPY_EX_DATE = date(2016, 6, 17)
+
+
+def smoke_test_window() -> Window:
+    """The fixture's test window, shaped like the one a built ``engine/.research-test`` carries."""
+    return Window(name="test", start=TEST_FIRST, end=TEST_LAST)
+
+
+def smoke_test_market(extra: Iterable[str] = ()) -> Market:
+    """``smoke_market``'s shape over test-window sessions only: no bar on or before ``DEV_END``.
+
+    The symbols, the price generator and the membership are the dev fixture's, so a candidate that
+    runs on one runs on the other and only the window differs.
+    """
+    days = dates.sessions(TEST_FIRST, TEST_LAST)
+    assert days[0] > DEV_END  # a test fixture that straddles DEV_END would prove nothing
+    symbols = tuple(sorted(set(BASE_ETFS) | set(extra) - set(MEMBER_STOCKS))) + MEMBER_STOCKS
+    history = {s: smoke_history(s, k, days) for k, s in enumerate(symbols)}
+    membership = Membership(intervals=tuple((s, days[0], None) for s in MEMBER_STOCKS))
+    return Market(history=history, membership=membership, fx=((days[0], Decimal("2000")),))
+
+
+def smoke_test_data(extra: Iterable[str] = ()) -> ResearchData:
+    """A loaded *test*-window store, as ``research.load_store(d, window=declared_window(d))``
+    returns one (phase 2's idiom: ask the store which window it is for, then ask for that one)."""
+    spy_div = Decimal("1.1000")
+    return ResearchData(
+        market=smoke_test_market(extra),
+        dividends={"SPY": {TEST_SPY_EX_DATE: spy_div}},
+        spy_dividends=(Dividend(TEST_SPY_EX_DATE, spy_div),),
+        fingerprint="smoke-test",
+        # Phase 2's three optional manifest keys, spelled as it spells them. Nothing in
+        # `run_test` reads the manifest -- the window travels on `ResearchData.window` -- but a
+        # fixture that invents key names is a fixture that teaches the wrong ones.
+        manifest={
+            "window_name": "test",
+            "window_start": TEST_FIRST.isoformat(),
+            "window_end": TEST_LAST.isoformat(),
+        },
+        window=smoke_test_window(),
     )

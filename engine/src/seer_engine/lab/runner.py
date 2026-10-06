@@ -1,13 +1,32 @@
-"""``lab run``: one method's variants on the dev window, into the lab database (design §2, §3).
+"""The lab's two runners: ``lab run`` on the dev window, ``lab test`` on the test window.
 
-1. Refuse when the method file is not committed (its commit is the pre-registration), when
-   the method has already run, or when any variant's configuration already has a dev trial.
+``lab run`` (design §2, §3) -- the search:
+
+1. Refuse when the method file is not committed (its commit is the pre-registration), when the
+   method has already run, or when any variant's configuration already has a dev trial.
 2. Run the variants through ``dev.run_registry`` on the research store (every D9 guard).
 3. Deflated Sharpe per trial with N = every dev trial in the lab, this batch included, and the
    variance of the daily Sharpe across those trials.
 4. Eligible = the five P7a D8 conditions and DSR >= 0.95. Insert the trials, set the method's
    ``source_sha`` and status (``dev-eligible`` when any trial is eligible, else ``rejected``),
    all in one transaction.
+
+``lab test`` (design §3) -- the one counted look:
+
+1. Refuse a method that is not ``promoted``, a method file that is not committed or no longer
+   hashes to the ``source_sha`` it ran under, a pre-registration that is missing, uncommitted or
+   names another configuration, a configuration with no dev trial, and a configuration that has
+   already been looked at.
+2. Run the one pre-registered variant through the same ``dev.run_registry`` on the **test**-window
+   store, between the bounds that store carries.
+3. Append one ``trials`` row with ``window='test'`` and move the method to ``test-passed`` or
+   ``test-failed``, both final, in one transaction.
+
+**The look does not move the lab's N.** ``store.dev_trial_count`` and ``store.dev_daily_sharpes``
+are dev-only and stay dev-only: design §1 makes ``trials`` the multiple-testing count of the
+*search*, and §3 makes the test window a *look* at one already-counted configuration. A dev trial
+recorded tomorrow is deflated by exactly the N it would have had if no look had ever been spent,
+so every recorded dev trial stays reproducible.
 """
 
 from __future__ import annotations
@@ -18,16 +37,19 @@ import statistics
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from seer_engine import research
 from seer_engine.backtest import dev
-from seer_engine.backtest.dev import DevRow
+from seer_engine.backtest.dev import Candidate, DevRow
 from seer_engine.commands.backtest_dev import daily_moments, month_end_curve, registry_problem
 from seer_engine.fundamentals import coverage
 from seer_engine.lab import store
-from seer_engine.lab.method import Method, config_digest, config_text, source_sha
+from seer_engine.lab.method import METHOD_ID, Method, config_digest, config_text, source_sha
 from seer_engine.strategies.allocator import MarketAware
+
+if TYPE_CHECKING:  # typing only: prereg is imported inside the functions that use it, so
+    from seer_engine.lab import prereg  # importing `runner` never pulls in git or the docs tree
 
 log = logging.getLogger(__name__)
 
@@ -251,3 +273,286 @@ def run_method(
 
 def _hypothesis(method: Method) -> str:
     return f"{method.hypothesis.strip()}\n\nExpected failure: {method.expected_failure.strip()}"
+
+
+# --------------------------------------------------------------------------- the test window
+
+
+@dataclass(frozen=True)
+class Tested:
+    """The one counted look at the test window: its trial row, its dev row and its verdict."""
+
+    trial: store.TrialRow
+    row: DevRow
+    status: str  # "test-passed" | "test-failed", both final
+
+
+def resolve_candidate(candidate_id: str) -> tuple[Method, Path, Candidate]:
+    """``(METHOD, its file, the named Candidate)`` for a candidate id like ``M0007-RESID``.
+
+    ``lab test`` is addressed by *candidate*, not by method, because one variant per method is
+    pre-registered and it is that variant -- not the method -- that gets the look. The method id
+    is the part before the first hyphen (``method.Method`` enforces that shape at ``method.py:84``).
+
+    ``store.LabError`` when the id is not a candidate id, when no method file carries it, or when
+    the method has no such variant.
+    """
+    method_id, sep, _suffix = candidate_id.partition("-")
+    if not sep or METHOD_ID.fullmatch(method_id) is None:
+        raise store.LabError(
+            f"{candidate_id!r} is not a candidate id; `lab test` takes the pre-registered variant, "
+            f"which looks like M0007-RESID (<method>-<suffix>)"
+        )
+    from seer_engine.lab.method import discover
+
+    methods = discover()
+    if method_id not in methods:
+        raise store.LabError(
+            f"no method file for {method_id} in seer_engine/lab/methods/. The test window runs the "
+            f"committed method file, not a database row. Known: {', '.join(methods) or '(none)'}"
+        )
+    method, path = methods[method_id]
+    found = [c for c in method.candidates if c.id == candidate_id]
+    if len(found) != 1:
+        raise store.LabError(
+            f"{method_id} has no variant {candidate_id!r}; its variants are "
+            f"{', '.join(c.id for c in method.candidates)}"
+        )
+    return method, path, found[0]
+
+
+def preflight_test(
+    conn: sqlite3.Connection,
+    method: Method,
+    path: Path,
+    candidate: Candidate,
+    *,
+    pre: "prereg.Prereg | None" = None,
+    require_commit: bool = True,
+) -> "prereg.Prereg":
+    """Every refusal ``lab test`` makes before any data is loaded (``store.LabError``).
+
+    The look at the test window is spent once and never given back, so each of these is checked
+    before the store is even opened:
+
+    1. **the method is ``promoted``.** ``lab promote`` (phase 3) is the only thing that moves it
+       there, and the lab's ``TRANSITIONS`` give ``promoted`` only two exits, both of them final.
+    2. **the method file is committed and still hashes to the ``source_sha`` recorded when it
+       ran.** The dev trial measured one file; the test window must measure the same one. A
+       changed file is a new variation method, not a second look.
+    3. **a pre-registration exists, is committed, and names this candidate and this configuration
+       digest** (``lab.prereg``, phase 3). This is design §3's "pre-registered ... before any test
+       number exists": the thing pre-registered is the thing that runs. Both halves are phase 3's
+       functions -- ``require_committed`` (git state, and that the file names *this* method and
+       *this* candidate) and ``check_digest`` (that the configuration has not drifted since) --
+       and neither is reimplemented here.
+    4. **this configuration has a recorded ``dev`` trial.** The test window confirms a dev result;
+       it never discovers one.
+    5. **this configuration has no ``test`` trial.** The database refuses a second look on its own
+       (``UNIQUE(config_digest, window)`` plus the append-only triggers, ``store.py:169``,
+       ``:186``, ``:189``); this is the early, readable form of the same no, made before a store
+       is loaded and a backtest is run.
+
+    Returns the pre-registration, so the caller can print what it is about to honour.
+
+    ``pre`` is an already-read pre-registration. ``require_committed`` shells out to git, so the
+    caller reads it once and hands it back for the re-check inside the write lock; ``check_digest``
+    and the two database refusals still run every time. ``require_commit=False`` skips 2's git
+    checks on the *method file*; it never relaxes 1, 3's digest comparison, 4 or 5. Tests pass
+    both.
+    """
+    from seer_engine.lab import prereg
+
+    row = store.get_method(conn, method.id)
+    if row is None:
+        raise store.LabError(
+            f"no method {method.id} in the lab database; nothing reaches the test window that the "
+            f"lab has not run"
+        )
+    status = str(row["status"])
+    if status != "promoted":
+        raise store.LabError(
+            f"{method.id} is {status!r}; only a 'promoted' method reaches the test window. "
+            f"`lab promote {method.id}` pre-registers the best dev-eligible variant by MAR and "
+            f"moves it there. From {status!r} the lab's TRANSITIONS have no edge to 'promoted', "
+            f"and the test window stays shut"
+        )
+    if require_commit:
+        problem = registry_problem(path)
+        if problem is not None:
+            raise store.LabError(
+                f"{method.id}: {problem}. The test window is spent once; it runs only against the "
+                f"committed method file"
+            )
+        recorded = row["source_sha"]
+        actual = source_sha(path)
+        if recorded is not None and recorded != actual:
+            raise store.LabError(
+                f"{method.id}: the method file hashes {actual[:12]} but its dev trials ran under "
+                f"{recorded[:12]}; the file changed after it ran. A changed method is a new "
+                f"variation method (source_kind='variation', parent_id={method.id}), not a second look"
+            )
+    # Phase 3 owns both halves of refusal 3. require_committed checks git AND that the file
+    # names this method and this candidate; check_digest checks what the candidate *does*.
+    if pre is None:
+        pre = prereg.require_committed(candidate.id)
+    digest = config_digest(candidate)
+    prereg.check_digest(pre, digest)
+    if not store.has_trial(conn, digest, "dev"):
+        raise store.LabError(
+            f"{candidate.id}: this configuration has no dev trial. The test window confirms a dev "
+            f"result; it never discovers one"
+        )
+    if store.has_trial(conn, digest, "test"):
+        hit = conn.execute(
+            "SELECT candidate_id, run_at, eligible FROM trials WHERE config_digest = ? AND window = 'test'",
+            (digest,),
+        ).fetchone()
+        raise store.LabError(
+            f"{candidate.id}: this configuration already had its look at the test window as "
+            f"{hit[0]} on {hit[1]} ({'passed' if hit[2] else 'failed'}). There is no second look: "
+            f"the database holds at most one test trial per configuration and trials are "
+            f"append-only"
+        )
+    return pre
+
+
+def test_trial_row(
+    conn: sqlite3.Connection,
+    method: Method,
+    row: DevRow,
+    curve: Any,
+    *,
+    fingerprint: str,
+    git_sha: str,
+) -> store.TrialRow:
+    """The one ``window='test'`` trial row for ``row`` (``curve``: its month-end equity curve).
+
+    **It does not move the lab's N.** ``n_trials_at_run`` is ``store.dev_trial_count(conn)`` as it
+    stands, unchanged by this row: design §1 makes ``trials`` the multiple-testing count of the
+    *search*, and §3 makes the test window a look at one already-counted configuration, not a new
+    search. ``store.dev_trial_count`` and ``store.dev_daily_sharpes`` are dev-only and stay
+    dev-only, so a dev trial recorded afterwards is deflated by exactly the N it would have had if
+    this look had never happened and every recorded dev trial stays reproducible.
+
+    ``dsr`` is recorded and **does not decide the verdict**: the out-of-sample Sharpe deflated by
+    the N that selected this configuration and by the variance of the dev trials' daily Sharpe. It
+    is worth keeping in the column the web already renders, but it is not a condition, because the
+    look was pre-registered -- there is no selection among test results to deflate, and
+    ``store.DSR_LABEL`` never appears in a test trial's ``failed``.
+
+    The verdict is the five design §1 go-live conditions, which ``dev.make_row`` already applied to
+    ``row``; ``failed`` and ``eligible`` are the row's own.
+    """
+    n_trials = store.dev_trial_count(conn)
+    sharpes = store.dev_daily_sharpes(conn)
+    var_trials = statistics.variance(sharpes) if len(sharpes) >= 2 else None
+    c = row.candidate
+    m = row.stats.metrics
+    worst = row.stats.worst_year
+    return store.TrialRow(
+        method_id=method.id,
+        candidate_id=c.id,
+        config_digest=config_digest(c),
+        config_text=config_text(c),
+        rules_id=c.rules.id,
+        allocator_id=str(c.allocator.id),
+        window="test",
+        start=row.start.isoformat(),
+        end=row.end.isoformat(),
+        store_fingerprint=fingerprint,
+        git_sha=git_sha,
+        run_at=store.now_iso(),
+        total_return=_f(m.total_return),
+        cagr=_f(m.cagr),
+        max_drawdown=_f(m.max_drawdown),
+        profit_factor=_f(m.profit_factor),
+        trades=int(m.trades),
+        sharpe=_f(row.stats.sharpe),
+        exposure=_f(row.stats.exposure),
+        turnover=_f(row.stats.turnover),
+        worst_year=None if worst is None else int(worst[0]),
+        worst_year_return=None if worst is None else float(worst[1]),
+        spy_tr_return=_f(row.spy_tr.total_return),
+        spy_tr_cagr=_f(row.spy_tr.cagr),
+        mar=row.mar,
+        failed="; ".join(row.failed),
+        eligible=row.eligible,
+        dsr=_dsr(row, n_trials, var_trials),
+        n_trials_at_run=n_trials,
+        curve_json=store.curve_json(curve),
+    )
+
+
+def run_test(
+    conn: sqlite3.Connection,
+    method: Method,
+    path: Path,
+    candidate: Candidate,
+    data: research.ResearchData,
+    *,
+    git_sha: str,
+    require_commit: bool = True,
+) -> Tested:
+    """Spend the one counted look at the test window and record it (design §3).
+
+    ``data`` must be a **test**-window store. The window it was built for travels on it
+    (``ResearchData.window``, phase 2), the candidate runs between that window's bounds, and a dev
+    store is refused here as well as by ``load_store``: a mis-pointed ``SEER_RESEARCH_STORE`` must
+    never produce a ``window='test'`` trial measured on dev data, because the row can never be
+    corrected.
+
+    The candidate goes through ``dev.run_registry`` -- the same path, the same ``prepare_for``
+    dispatch and the same D8 row ``lab run`` uses, with the window as the only difference -- then
+    one ``trials`` row is appended and the method moves to ``test-passed`` or ``test-failed``, both
+    final, in one transaction. Every refusal is made before the store is loaded except the two the
+    store itself makes possible, and all of them spend nothing.
+    """
+    window = data.window
+    if window.name != "test":
+        raise store.LabError(
+            f"{candidate.id}: this research store was built for the {window.name!r} window "
+            f"({window.start}..{window.end}); `lab test` runs on the test window and nothing else. "
+            f"Build it with `python -m seer_engine research_store --test-window`"
+        )
+    aware = market_aware_candidates(method)
+    if candidate.id in aware and len(data.market.fundamentals) == 0:
+        raise store.LabError(
+            f"{candidate.id} ranks on Market.fundamentals and this test store carries no panel; "
+            f"the look would measure the missing panel, not the hypothesis. Build the test store "
+            f"with `research_store --test-window --with-fundamentals` and run it again -- nothing "
+            f"has been spent"
+        )
+    pre = preflight_test(conn, method, path, candidate, require_commit=require_commit)
+
+    captured: list[tuple[DevRow, Any]] = []
+
+    def on_result(i: int, result: Any, row: DevRow) -> None:
+        captured.append((row, month_end_curve(result.snapshots)))
+
+    dev.run_registry(
+        data.market,
+        data.dividends,
+        data.spy_dividends,
+        (candidate,),
+        on_result=on_result,
+        window=window,
+    )
+    (row, curve), = captured
+    m = row.stats.metrics
+    log.info(
+        "%s on the test window %s..%s: return %s vs SPY TR %s, max DD %s, PF %s, trades %d",
+        candidate.id, row.start, row.end, m.total_return, row.spy_tr.total_return,
+        m.max_drawdown, m.profit_factor, m.trades,
+    )
+    store.begin_immediate(conn)  # the look and the status move, atomic against parallel sessions
+    with conn:
+        # A parallel session may have won the race to this configuration's one look. `pre` is
+        # the pre-registration git already vouched for above, so this re-check costs no
+        # subprocess and still re-runs check_digest and both database refusals.
+        preflight_test(conn, method, path, candidate, pre=pre, require_commit=False)
+        trial = test_trial_row(conn, method, row, curve, fingerprint=data.fingerprint, git_sha=git_sha)
+        status = "test-passed" if row.eligible else "test-failed"
+        store.insert_trials(conn, [trial])
+        store.update_method(conn, method.id, status=status)
+    return Tested(trial=trial, row=row, status=status)

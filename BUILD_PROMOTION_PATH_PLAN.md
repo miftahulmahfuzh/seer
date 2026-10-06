@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/build-promotion-path`
 **Branch:** `feature/build-promotion-path` (base: `origin/main` @ `2d03fd1`)
 **Phases:** 4
-**Status:** phase 3/4 complete — phases 1, 2 and 3 of 4 landed; phase 4 is unblocked (both its dependencies are complete) and is the coordinator's to dispatch
+**Status:** complete — all 4 phases implemented and committed on `feature/build-promotion-path`; the merge to `main` belongs to the swarm coordinator `orch-build-promotion-path` (analyze-orchestrator Step 5), not to any phase session
 **Coordinator:** —
 **Reconciled:** 2026-10-06 (round 1) — 11 conflicts found, 11 resolved; see **Reconciliation Log**
 
@@ -90,7 +90,7 @@ Every phase must hold all of these, and each phase's exit criteria restate the o
 | 1 ✅ | Make the backtest window a parameter, keeping D9 absolute | R1, R2 | `engine/src/seer_engine/backtest`, `research.py` | 6 | — | HARD | `.workflows/plan/build-promotion-path/phase-1.md` | P1-ENG-5X3M | — |
 | 2 ✅ | Build and load the test-window store | R1 | `research.py`, `commands/research_store.py` | 5 | 1 | NORMAL | `.workflows/plan/build-promotion-path/phase-2.md` | P1-ENG-8OLO | — |
 | 3 ✅ | Pre-registration: `lab promote` and `docs/lab/prereg/` | R3 | `lab/`, `commands/lab.py` | 6 | — | NORMAL | `.workflows/plan/build-promotion-path/phase-3.md` | P1-ENG-AZ81 | — |
-| 4 | `lab test`: one counted look, recorded and final | R2 | `lab/runner.py`, `commands/lab.py`, `SKILL.md` | 5 | 2, 3 | HARD | `.workflows/plan/build-promotion-path/phase-4.md` | P1-ENG-YJDW | — |
+| 4 ✅ | `lab test`: one counted look, recorded and final | R2 | `lab/runner.py`, `commands/lab.py`, `SKILL.md` | 5 | 2, 3 | HARD | `.workflows/plan/build-promotion-path/phase-4.md` | P1-ENG-YJDW | — |
 
 Phases 1 and 3 share no edge and run concurrently. Phase 1 serves two requirements because the
 window parameter is a single foundation both the store (R1) and the runner (R2) need; splitting

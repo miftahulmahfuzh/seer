@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-06
-**Total Active Tasks**: 1
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 73
+- Completed: 74
 
 ---
 
@@ -485,15 +485,29 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the direct precedent recorded by phase 1 of this same set three blocks above, and by all of the ROSTER_PROMOTION_PIPELINE and FUNDAMENTAL_PANEL_COVERAGE swarms in this same file). A cross-file block move is the one edit that reliably loses a peer's concurrent append, and peers are appending to this file.
     - Completion: no `**Commit**` field (rung 6: the same precedent). This file is committed inside the phase's own commit, so a field naming that sha cannot exist in it; the sha is reported to the caller instead.
     - Landing: not attempted, and `next_command` is empty. `swarm.py find --plan BUILD_PROMOTION_PATH_PLAN.md` returns `swarm: true` with coordinator `orch-build-promotion-path`, so per `analyze-orchestrator` Step 5 both the merge and the dispatch of the next phase belong to that coordinator.
-- [ ] **P1-ENG-YJDW** Phase 4: `lab test`: one counted look, recorded and final
+- [x] **P1-ENG-YJDW** Phase 4: `lab test`: one counted look, recorded and final
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns the test-window runner appended to `lab/runner.py` (`Tested`, `resolve_candidate`, `preflight_test`, `test_trial_row`, `run_test` — nothing above `:253` changes), the `lab test <candidate>` subcommand, the `promoted → test-passed|test-failed` transition, the printed hand-off to `commands/promote.py` on a pass, `tests/labkit.py`'s test-window fixtures, and the whole `## Promotion` section of `.claude/skills/explore-and-experiment-new-method/SKILL.md` (which must document `lab promote` as well as `lab test`). Leaves `backtest/dev.py` (phase 1), `research.py` and `commands/research_store.py` (phase 2), `lab/prereg.py` and the `promote` subcommand (phase 3), `lab/store.py`, `record_promotion`, the eligibility gate, `lab/lab.sqlite` and `web/data/lab.json` alone. Exit: `lab test` refuses a candidate with no committed prereg, a drifted digest, a method that is not `promoted`, no dev trial, and a second look (proven against the database with raw SQL); refuses a dev store by name before anything runs; records one `trials` row with `window='test'` that does not increment the lab's dev N (`dev_trial_count` and `dev_daily_sharpes` byte-identical); DSR recorded and never in `failed`; sets final `test-passed`/`test-failed`; on a pass prints a ready-to-run `promote` command; `SKILL.md` names both subcommands; `lab status` and the web snapshot report `test-window looks used: 1` after a simulated look in a temp database and 0 in the real one.
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `BUILD_PROMOTION_PATH_PLAN.md` (phase 4 of 4)
   - **Satisfies**: R2 — `lab test <candidate>`: refuses without a committed pre-registration, runs once, records a `test` trial, sets `test-passed`/`test-failed`
   - **Depends on**: P1-ENG-8OLO, P1-ENG-AZ81
   - **Plan**: `.workflows/plan/P1-ENG-YJDW.md`
+  - **Completed**: 2026-10-06 13:41
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/runner.py, engine/src/seer_engine/commands/lab.py, engine/tests/labkit.py, engine/tests/test_lab_test_window.py (new), .claude/skills/explore-and-experiment-new-method/SKILL.md
+  - **Verified**: `ruff check src/seer_engine tests` clean; `import seer_engine.lab.runner, seer_engine.commands.lab` ok. `pytest tests/test_lab_test_window.py -q` **17 passed** (the plan's ~16 plus an added refusal-5 test). Neighbour suites `test_lab_runner.py test_lab_store.py test_lab_snapshot.py test_lab_methods.py test_backtest_dev.py test_research_store.py test_fundamentals_coverage.py test_lab_prereg.py` — **271 passed**. Whole engine suite with `PG_TEST_URL` set: **2829 passed**, 0 failed, 0 skipped, 291s. Manual: `lab status` prints `test-window looks used: 0` against the real lab (no look spent); `git status --porcelain lab/lab.sqlite web/data/lab.json engine/.research-test` prints nothing; `lab test --help` lists the subcommand and `lab test M0007-N20 --dry-run` exits 2 with "M0007 is 'rejected'; only a 'promoted' method reaches the test window". `git diff --stat` is **empty** for `engine/tests/test_fundamentals_coverage.py`, `engine/tests/test_research_store.py`, `fundamentals/coverage.py`, `backtest/dev.py`, `research.py`, `lab/prereg.py` and `lab/store.py` — the three `DEV_END` pins pass unedited and no other phase's file was touched. Plan invariants 1-7 all hold; the phase is purely additive.
+  - **Drift**:
+    - This worktree has no `engine/.venv`, so verification ran on the main checkout's interpreter (`/home/miftah/seer/engine/.venv/bin/python`) with `PYTHONPATH=<worktree>/engine/src`, verified to shadow the editable install (`seer_engine` resolves into the worktree). Same workaround phases 2 and 3 recorded.
+    - The plan's Verification example `lab test M0007-RESID --dry-run` uses an illustrative variant id M0007 does not have, so it exits 2 via `resolve_candidate`'s "no variant" refusal rather than the status refusal the plan names. Re-run with a real variant, `lab test M0007-N20 --dry-run`, which exits 2 with "M0007 is 'rejected'; only a 'promoted' method reaches the test window" — the live proof the plan wanted.
+  - **Decided**:
+    - Where to run verification, given no `engine/.venv` in this worktree -> the main checkout's interpreter with `PYTHONPATH` into the worktree's `src` (rung 6: the direct precedent recorded by phases 2 and 3 of this same set).
+    - The plan's `pre: "prereg.Prereg | None"` string annotations with a function-local `prereg` import tripped ruff F821 -> added a `TYPE_CHECKING` guard importing `seer_engine.lab.prereg` for typing only, keeping the runtime import function-local exactly as the plan wrote it (rung 2: the phase's exit criteria require a ruff-green tree, and the plan's own rationale keeps `prereg` out of module scope to avoid pulling git and the docs tree into `import runner`). The codebase already uses this idiom at `strategies/allocator.py:49`.
+    - `test_a_second_look_is_refused_after_a_real_run` as the plan wrote it asserted "already had its look" after a real run, but `run_test` moves the method to `test-failed` first, so `preflight_test`'s refusal 1 (status) fires before refusal 5 (second look) — the plan's own documented order. Fixed the TEST, not the refusal order (rung 3: both the status move and the 1..5 ordering are the plan's quoted code; the assertion is one line written against an ordering that code contradicts). The test now asserts the status refusal after a real run, and a NEW test `test_a_recorded_look_is_refused_even_while_the_method_is_still_promoted` reaches refusal 5 on its own by recording a test trial against a method still at `promoted`. No check was relaxed; the raw-SQL database proof of the second-look refusal passes unchanged.
+    - Landing: not attempted, and `next_command` is empty. `swarm.py find --plan BUILD_PROMOTION_PATH_PLAN.md --task P1-ENG-YJDW` returns `swarm: true` with coordinator `orch-build-promotion-path`, so per `analyze-orchestrator` Step 5 the merge of `feature/build-promotion-path` into `main` belongs to that coordinator, not to this session.
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the direct precedent recorded by phases 1 and 3 of this same set, and by the ROSTER_PROMOTION_PIPELINE and FUNDAMENTAL_PANEL_COVERAGE swarms in this same file). A cross-file block move is the one edit that reliably loses a peer's concurrent append.
+    - Completion: no `**Commit**` field (rung 6: the same precedent). This file is committed inside the phase's own commit, so a field naming that sha cannot exist in it; the sha is reported to the caller for the swarm ledger instead.
 
 ### [P2] Medium
 

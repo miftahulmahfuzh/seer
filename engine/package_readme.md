@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (src layout: `engine/src/seer_engine`)
-**Last Updated**: 2026-10-05 (roster promotion pipeline, phase 6 of 6 of `ROSTER_PROMOTION_PIPELINE_PLAN.md`: `FND` joins the roster as its sixth entry, migration 007, and the `MarketAware` dispatch in `paper/book.py` and `paper/replay.py`; also documents phase 3's read-only `compare` command)
+**Last Updated**: 2026-10-06 (build the promotion path, phase 4 of 4 of `BUILD_PROMOTION_PATH_PLAN.md`: the `lab test` subcommand and the test-window half of `lab/runner.py` — the one counted look at the test window, and the hand-off to `promote`)
 
 ## Overview
 
@@ -36,6 +36,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - `FND` joins the roster (roster-promotion-pipeline, phase 6): a sixth entry, `FND · Fundamentals` (top 20 by SEC filing factors, monthly; `object_name = 'FUNDAMENTAL'`, `rules_id = 'monthly-hold'`, the book engine, `sort = 6`, `promoted_from = 'M0005'`, `registry_id` NULL), seeded by migration 007 and put on the live board by phase 5's `promote --method M0005 --candidate M0005-ALL --id FND --lab-status-stays` — the first promotion through the new lab → roster path rather than around it. Its `gate_note` says out loud that it **failed** its M0005 dev-window gate: passing a backtest gate has never been this roster's admission criterion (Decisions D5), and the gate binds the real-money decision, not paper membership. It is also the roster's first `MarketAware` object, which is why `paper/book.py` and `paper/replay.py` gained the prepared dispatch below. The five pre-existing spec digests are unchanged and `MAX_LOOKBACK_BARS` is still 253
 - Two windows, two stores (build-promotion-path, phase 2): the research window became a parameter on the store half. `build_store` / `load_store` / `refresh_fundamentals` each take a keyword `window=` defaulting to `DEV_WINDOW`, and a store declares its own window in three **optional** manifest keys (`window_name`, `window_start`, `window_end`) that a dev build never writes — **absent means dev**, so `engine/.research`'s manifest stays exactly the nine `MANIFEST_KEYS` it was sealed with and its fingerprint cannot move. `research_store --test-window` builds the P7b test-window store (2015-10-19..data end) into `engine/.research-test` (gitignored); `load_store` refuses a dev store where a test store is expected and the reverse, before it reads a single data file. `MANIFEST_KEYS` is unchanged at nine, no test-window look is spent, and no lab state changes
 - Pre-registration, the half a database cannot enforce (build-promotion-path, phase 3): the lab gets **one** look at the test window per configuration, and `UNIQUE(config_digest, window)` on `trials` enforces the *count* but not *which* configuration the look is spent on. `lab/prereg.py` owns the committed file that does — `docs/lab/prereg/MNNNN.md`, a strict `key: value` block then prose — with its writer, its parser (`parse(render(p, name)) == p` exactly) and the gate `lab test` calls before it looks (`require_committed`, `check_digest`). `lab promote <method>` writes that file for the method's best dev-eligible variant by MAR (`lab.store.best_dev_eligible`) and moves the method `dev-eligible -> promoted`; it loads no research store, runs no backtest and inserts no `trials` row, so pre-registering costs no look. A pre-registration is written once and never rewritten: a better variant found later is a new method with its own dev trials, not an edit to the file
+- Spending the look (build-promotion-path, phase 4): `lab test <candidate>` is the one counted look at the test window, and the last step before the roster. `lab/runner.py` gains an appended test-window half — `Tested`, `resolve_candidate`, `preflight_test`, `test_trial_row`, `run_test` — and `commands/lab.py` the `test` subcommand (with `--dry-run`, `--store`, `--roster-id`). It refuses, in this order, a method that is not `promoted`, a method file that has changed since its dev trials ran, a missing or uncommitted pre-registration, a pre-registered digest that has drifted, a configuration with no recorded dev trial, and a configuration that has already had its look — the last enforced in the database by `UNIQUE(config_digest, window)`, not only in the command — and it refuses a dev research store *by name* before anything is loaded. A run appends exactly one `trials` row with `window = 'test'`, which **does not move the lab's N** (`dev_trial_count` and `dev_daily_sharpes` stay dev-only, so a test look is a look, not a search); DSR is recorded and never decides the verdict, because a pre-registered look has no selection among results to deflate. The method ends at `test-passed` or `test-failed`, both final, and a pass prints a ready-to-run `seer_engine promote ...` line that hands off to phase 5's existing paper-roster path. `lab status` now lists `Test-passed` and `Test-failed` alongside `Promoted (pre-registered)`; against the real lab `test-window looks used` still reads 0 — this phase builds the mechanism and spends nothing
 
 ## Layout
 
@@ -123,7 +124,7 @@ engine/
       __init__.py           docstring only
       method.py             a lab method file: METHOD, Candidate, METHOD_ID, discover(), config_digest(), source_sha()
       store.py              lab/lab.sqlite: committed and append-only; methods, trials, ideas, insights; TRANSITIONS, record_promotion(), best_dev_eligible() (build-promotion-path phase 3)
-      runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head()
+      runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4)
       prereg.py             the docs/lab/prereg/MNNNN.md pre-registration: Prereg, render()/parse(), require_committed(), check_digest(), check_source(), promote_method() (build-promotion-path phase 3)
       seed.py               one-time import of the pre-lab record (P7a's 54 candidates)
       methods/              one file per method, mNNNN_<slug>.py exporting METHOD
@@ -136,7 +137,7 @@ engine/
       backtest_b.py         `backtest_b` command (P6a)
       research_store.py     `research_store` command (P7a)
       backtest_dev.py       `backtest_dev` command (P7a)
-      lab.py                `lab` command: the method lab (status / show / run / promote / idea / note / insight / stage / export ...)
+      lab.py                `lab` command: the method lab (status / show / run / promote / test / idea / note / insight / stage / export ...)
       nightly.py            `nightly` command (P1; P4 adds dividends and held paper symbols)
       paper.py              `paper` command (P4)
       paper_check.py        `paper_check` command (P4)
@@ -615,6 +616,71 @@ pre-registering costs no look.
 - **Exit codes**: 0 success; 2 for any `PreregError` (a `store.LabError`, so `lab`'s existing handler
   already maps it); 1 for anything else.
 - Tests: `tests/test_lab_prereg.py` (25) and the `best_dev_eligible` case in `tests/test_lab_store.py`.
+
+### `lab test` (build-promotion-path phase 4)
+
+```
+python -m seer_engine lab test M0007-RESID [--store PATH] [--roster-id ID] [--dry-run]
+```
+
+The one counted look at the test window (design §3), and the last step before the paper roster. It
+is addressed by **candidate**, not by method: one variant per method is pre-registered, and it is
+that variant the look is spent on. `runner.resolve_candidate` reads it out of the committed method
+file, so `lab test` runs the file, not a database row.
+
+- **It refuses before it loads anything**, in this order (`runner.preflight_test`, every one a
+  `store.LabError`): the method is not `promoted` (only `lab promote` moves it there); the method
+  file is uncommitted, or no longer hashes to the `source_sha` its dev trials ran under — a changed
+  method is a new variation method, not a second look; there is no committed pre-registration naming
+  this method and this candidate (`prereg.require_committed`); the pre-registered configuration
+  digest has drifted (`prereg.check_digest`); this configuration has no recorded `dev` trial — the
+  test window confirms a dev result, it never discovers one; and this configuration has already had
+  its look. That last refusal is the readable, early form of a no the database makes anyway:
+  `UNIQUE(config_digest, window)` on `trials` plus the append-only triggers. None of them spends
+  anything.
+- **The store must be the test store.** `--store` defaults to `research.TEST_STORE_DIR`
+  (`engine/.research-test`) or `$SEER_RESEARCH_TEST_STORE`. The command asks
+  `research.declared_window(store_dir)` what the store is for and refuses a dev store **by name**
+  before a data file is read; `load_store` refuses the mismatch a second time, and `run_test` makes
+  the same check a third time on `data.window`. Three independent noes, because a `window = 'test'`
+  row measured on dev data can never be corrected. A missing store is reported with the
+  `research_store --test-window` line that builds it, and a `MarketAware` candidate against a test
+  store with no fundamentals panel is refused rather than measured.
+- **What a run records**: exactly one `trials` row with `window = 'test'`, appended with the status
+  move in one `BEGIN IMMEDIATE` transaction, with `preflight_test` re-run inside the lock so a
+  parallel session cannot win the same look twice. The candidate goes through `dev.run_registry` —
+  the same path, the same `prepare_for` dispatch and the same D8 row as `lab run`, with the window
+  as the only difference.
+- **It does not move the lab's N.** `n_trials_at_run` is `store.dev_trial_count` as it already
+  stands: `trials` counts the multiple testing of the *search*, and a pre-registered look at an
+  already-counted configuration is not a new search. `dev_trial_count` and `dev_daily_sharpes` stay
+  dev-only, so every recorded dev trial stays reproducible and a later dev trial is deflated by
+  exactly the N it would have had if this look had never happened.
+- **DSR is recorded and is not a condition.** The verdict is the five design §1 go-live conditions
+  (`dev.FAILURE_LABELS`), which `dev.make_row` has already applied; `store.DSR_LABEL` never appears
+  in a test trial's `failed`. A pre-registered look has no selection among results to deflate.
+- **The method ends final**: `test-passed` or `test-failed`, and `TRANSITIONS` gives `promoted` only
+  those two exits. `test-failed` is final on every window — the follow-up is a variation method with
+  its own dev trials, not a retry.
+- **On a pass it prints the next command rather than running it** (`_promote_argv`): a complete
+  `python -m seer_engine promote --method ... --candidate ... --id ... --gate-note ...` line, plus
+  `lab stage`. `lab test` reads a research store and a SQLite file and stays offline; `promote`
+  opens Neon, and the two writes cannot share a transaction. `--roster-id` sets the id proposed in
+  that line (default: the method id). The generated `--gate-note` states both windows and says out
+  loud what the method still has not got — forward paper time.
+- **`--dry-run`** prints what would run (the method, variant, config digest, the committed
+  pre-registration and its date, the store, the five conditions, and both outcomes) and stops. It
+  loads nothing, runs nothing and records nothing; the look is not spent. This is the one `lab`
+  subcommand where `--dry-run` means something.
+- **Output**: the refreshed `lab show` for the method, then the verdict with return vs SPY TR, CAGR,
+  max DD, PF, trades, MAR and the recorded DSR at N, then either the promote hand-off or the
+  `test-failed` note, then `Lab N (dev trials) is still N; test-window looks used: K`.
+- **Exit codes**: 0 success (a `test-failed` verdict is a successful run and exits 0); 2 for any
+  `store.LabError`, which is every refusal above; 1 for anything else.
+- `lab status` lists `Test-passed` and `Test-failed` as their own sections, next to `Dev-eligible`
+  and `Promoted (pre-registered)`. Against the real lab, `test-window looks used` reads **0**: this
+  phase builds the mechanism and spends nothing.
+- Tests: `tests/test_lab_test_window.py`, with the fixtures in `tests/labkit.py`.
 
 
 ## Exported API
@@ -2277,6 +2343,14 @@ Neither store can be used in the other's place: `--test-window` against `engine/
 dev invocation against `engine/.research-test`) exits 2, and `load_store` refuses the mismatch
 before it reads a data file.
 
+Spending the one look on that store is `lab test` (build-promotion-path phase 4), after the method
+has been pre-registered by `lab promote` and that file committed **and pushed**:
+
+```
+engine/.venv/bin/python -m seer_engine lab test M0007-RESID --dry-run  # loads nothing, runs nothing, spends nothing
+engine/.venv/bin/python -m seer_engine lab test M0007-RESID            # the one counted look; test-passed or test-failed, both final
+```
+
 Neither command needs `SEER_ENV_FILE`: neither reads Neon. Then read
 `docs/backtests/<run date>-p7a-dev-exploration.md` and `docs/plans/<run date>-p7b-preregistration.md`.
 The report's store fingerprint must equal `research_store --verify`'s, and its registry digest must
@@ -2413,3 +2487,18 @@ the committed file names which configuration each look is spent on, before any t
 All three source edits are pure additions (90 insertions, 0 deletions) and `lab run` is
 behaviourally unchanged. Tests: `tests/test_lab_prereg.py` (25) and one case in
 `tests/test_lab_store.py`.
+
+Phase 4 of `BUILD_PROMOTION_PATH_PLAN.md` landed on 2026-10-06 (P1-ENG-YJDW), the last of the set:
+the `lab test` subcommand and the test-window half of `lab/runner.py` (`Tested`,
+`resolve_candidate`, `preflight_test`, `test_trial_row`, `run_test`). `runner.py` is appended to and
+nothing above its `lab run` half changed, so `lab run` is behaviourally unchanged. It closes the
+path the first three phases built: phase 2's second store supplies the data, phase 3's committed
+pre-registration says which configuration the look is spent on, and this phase spends it — one
+`window = 'test'` trial row that does not move the lab's N, a verdict of `test-passed` or
+`test-failed` (both final), and on a pass the exact `promote` line that hands the method to phase
+5's existing roster path. The one-look rule is enforced in two places on purpose: readably in
+`preflight_test`, and in the database by `UNIQUE(config_digest, window)` — the second is the one
+that holds against a parallel session, which is why `run_test` re-runs the preflight inside its
+write lock. The mechanism is built and **nothing has been spent**: `test-window looks used` reads 0
+against the real lab. Tests: `tests/test_lab_test_window.py`, with the fixtures in
+`tests/labkit.py`.

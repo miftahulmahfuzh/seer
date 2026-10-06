@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/paper-split-cadence`
 **Branch:** `feature/paper-split-cadence` (base: `origin/main` @ `dffac31`)
 **Phases:** 3
-**Status:** planned
+**Status:** phase 3 of 3 complete (P1-WEB-10T8); phases 1–2 pending
 **Coordinator:** —
 
 ---
@@ -71,9 +71,9 @@ Positions page copy and a trim/top-up cell for split-cadence strategies.
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Pure split-cadence decision, replay and fractional preset | R1, R3, R5 | `engine/paper`, `engine/sim` | 9 | — | HARD | `.workflows/plan/paper-split-cadence/phase-1.md` | — | — |
-| 2 | Nightly wiring and end-to-end tests (paper night, paper_check, promote) | R1, R2, R3, R7 | `engine/commands`, `engine/tests` | 2 | 1 | HARD | `.workflows/plan/paper-split-cadence/phase-2.md` | — | — |
-| 3 | Positions page: monthly pick / weekly size copy and buy/add/trim cell | R6 | `web` | 4 | — | NORMAL | `.workflows/plan/paper-split-cadence/phase-3.md` | — | — |
+| 1 | Pure split-cadence decision, replay and fractional preset | R1, R3, R5 | `engine/paper`, `engine/sim` | 9 | — | HARD | `.workflows/plan/paper-split-cadence/phase-1.md` | P1-ENG-Q47S | — |
+| 2 | Nightly wiring and end-to-end tests (paper night, paper_check, promote) | R1, R2, R3, R7 | `engine/commands`, `engine/tests` | 2 | 1 | HARD | `.workflows/plan/paper-split-cadence/phase-2.md` | P1-ENG-GX63 | — |
+| 3 | Positions page: monthly pick / weekly size copy and buy/add/trim cell | R6 | `web` | 4 | — | NORMAL | `.workflows/plan/paper-split-cadence/phase-3.md` | P1-WEB-10T8 (done 2026-10-07) | — |
 
 ### Phase 1 — Pure split-cadence decision, replay and fractional preset
 **Satisfies:** R1, R3, R5 (holds R4)

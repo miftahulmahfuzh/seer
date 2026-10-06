@@ -23,6 +23,7 @@ from seer_engine.sim.rules import (
     SWING_T20_OPEN,
     LEVERS_SINCE_PINS,
     MONTHLY_RANK_WEEKLY_RESIZE,
+    MONTHLY_RANK_WEEKLY_RESIZE_FRAC,
     MONTHLY_RANK_WEEKLY_RESIZE_TBILL,
     V0_BOOK,
     WEEKLY_HOLD,
@@ -100,6 +101,7 @@ def test_preset_ids_are_unique_and_in_order():
         "monthly-rank-weekly-resize",
         "monthly-rank-weekly-resize-tbill",
         "monthly-hold-frac",
+        "monthly-rank-weekly-resize-frac",
     ]
     assert len(set(ids)) == len(ids)
 
@@ -337,6 +339,14 @@ def test_monthly_rank_weekly_resize_preset():
     )
     assert MONTHLY_RANK_WEEKLY_RESIZE_TBILL.idle_symbol == "BIL"
     assert replace(MONTHLY_HOLD, id=r.id, resize_cadence="weekly") == r
+
+
+def test_monthly_rank_weekly_resize_frac_is_the_split_cadence_in_fractional_shares():
+    r = MONTHLY_RANK_WEEKLY_RESIZE_FRAC
+    assert r == replace(MONTHLY_RANK_WEEKLY_RESIZE, id="monthly-rank-weekly-resize-frac", fractional=True)
+    assert (r.cadence, r.resize_cadence, r.fractional, r.idle_symbol) == ("monthly", "weekly", True, None)
+    assert PRESETS[-1] is r and sim.MONTHLY_RANK_WEEKLY_RESIZE_FRAC is r
+    assert rule_owner_inputs(r) == ("fractional",)
 
 
 def test_a_rank_session_is_never_also_a_resize_session():

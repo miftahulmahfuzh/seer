@@ -349,9 +349,21 @@ def test_the_registry_is_not_appended_to():
 
 
 def test_fractional_twin_maps_a_whole_share_preset_to_its_fractional_preset():
-    from seer_engine.sim.rules import DESIGN_V0, MONTHLY_HOLD, MONTHLY_HOLD_FRAC
+    from seer_engine.sim.rules import (
+        DESIGN_V0,
+        MONTHLY_HOLD,
+        MONTHLY_HOLD_FRAC,
+        MONTHLY_RANK_WEEKLY_RESIZE,
+        MONTHLY_RANK_WEEKLY_RESIZE_FRAC,
+        MONTHLY_RANK_WEEKLY_RESIZE_TBILL,
+    )
 
     assert promote.fractional_twin(MONTHLY_HOLD) is MONTHLY_HOLD_FRAC
     assert promote.fractional_twin(MONTHLY_HOLD_FRAC) is MONTHLY_HOLD_FRAC
+    assert promote.fractional_twin(MONTHLY_RANK_WEEKLY_RESIZE) is MONTHLY_RANK_WEEKLY_RESIZE_FRAC
+    assert promote.fractional_twin(MONTHLY_RANK_WEEKLY_RESIZE_FRAC) is MONTHLY_RANK_WEEKLY_RESIZE_FRAC
+    # The T-bill split cadence has no fractional preset (not asked for): still refused.
+    with pytest.raises(promote.NotPromotable, match="no fractional preset matching 'monthly-rank-weekly-resize-tbill'"):
+        promote.fractional_twin(MONTHLY_RANK_WEEKLY_RESIZE_TBILL)
     with pytest.raises(promote.NotPromotable, match="no fractional preset matching 'design-v0'"):
         promote.fractional_twin(DESIGN_V0)

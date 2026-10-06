@@ -1,6 +1,6 @@
 """The book engine's night (``seer_engine.paper.book``; plan phase 4, contract C3, R1).
 
-Four groups:
+Five groups:
 
 1. Same path: ``decide_book`` + ``settle_book`` looped night by night from ``new_book(cash0)``
    equal ``run_book`` field for field (snapshots, fills, trades, open_at_end, dividends_usd,
@@ -16,6 +16,8 @@ Four groups:
    ``data_date``, the idle symbol never passed as held, argument checks.
 4. ``settle_book``: splits (on a held position and on the targets decided for the split
    session), dividend routing, force-close timing from ``last_bar_date``, argument checks.
+5. Split cadence: the night loop with ``last_rank`` read back from the stored rank decision
+   equals ``run_book``; ``decide_book``'s resize path; ``rank_basket``.
 
 Simulator arithmetic (``seer_engine.sim``): buy cash ``q(p x n x 1.001)``, sell proceeds
 ``q(p x n x 0.999)``, ``q`` = 4 dp half-up; "open_limit" buys at ``min(open, q(last x 1.02))``
@@ -25,7 +27,8 @@ when the low trades below that limit.
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import replace
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
 from functools import lru_cache
@@ -38,14 +41,33 @@ from stratkit import hist, mutate_from, session_days, truncate_before
 from test_book_runner import SEED_DAYS, Scripted, seeded_market, wiring_market
 
 from seer_engine import dates
+from seer_engine.backtest import book_runner
 from seer_engine.backtest.book_runner import BookResult, DividendMap, run_book
 from seer_engine.backtest.market import Market, Membership
 from seer_engine.backtest.runner import INITIAL_IDR
-from seer_engine.paper.book import BookNight, decide_book, settle_book
+from seer_engine.paper.book import (
+    BookNight,
+    decide_book,
+    last_rank_session,
+    needs_kickoff,
+    rank_basket,
+    settle_book,
+)
 from seer_engine.prices import Bar
 from seer_engine.sim.book import Book, BookSnapshot, Position, Target, apply_book_split, new_book
-from seer_engine.sim.model import initial_cash_usd
-from seer_engine.sim.rules import DESIGN_V0, MONTHLY_HOLD, MONTHLY_HOLD_TBILL, is_decision_session
+from seer_engine.sim.model import initial_cash_usd, q
+from seer_engine.sim.rules import (
+    DESIGN_V0,
+    MONTHLY_HOLD,
+    MONTHLY_HOLD_TBILL,
+    MONTHLY_RANK_WEEKLY_RESIZE,
+    MONTHLY_RANK_WEEKLY_RESIZE_FRAC,
+    MONTHLY_RANK_WEEKLY_RESIZE_TBILL,
+    is_decision_session,
+    is_rank_session,
+    is_resize_session,
+)
+from seer_engine.strategies.allocator import target_from_close
 from seer_engine.strategies.f_factor import FACTOR, FactorParams
 from seer_engine.strategies.f_index import TIMING, TimingParams
 
@@ -638,12 +660,415 @@ def test_settle_book_argument_checks():
         settle_book(book, PREV, {}, None, False, MONTHLY_HOLD, {}, (), _always)
 
 
-def test_decide_book_refuses_a_split_cadence_rule_set():
-    """Paper is stateless: it has no last-rank basket, so it must refuse rather than re-rank weekly."""
+# =========================================================================== 5. split cadence
+#
+# MONTHLY_RANK_WEEKLY_RESIZE ranks on each month's first session and re-scales on every other
+# week start. run_book keeps the last rank basket in a loop variable; the paper night has none,
+# so `split_paper_run` reads it back the way the paper night does: the targets stored for
+# last_rank_session(...) (an empty decision stores no row), through rank_basket, with the book's
+# marks. Looping that from new_book(cash0) must equal run_book(kickoff=<the kickoff it chose>).
+#
+# SPLIT_DAYS: 2025-01-02 .. 2025-06-30. AAA 50 + 0.2 t, BBB 40 + 0.1 t, CCC 30 flat, BIL 100 flat
+# (spread 0.05, not a member), DDD 60 + 0.1 t until 2025-03-12, when it opens at the previous
+# close and trades down 25% intraday (below the 10% stop BREATHE puts on it) and stays there.
+
+SPLIT_DAYS = dates.sessions(D("2025-01-02"), D("2025-06-30"))
+SPLIT_END = SPLIT_DAYS[-1]
+DDD_CRASH = D("2025-03-12")
+AAA_SPLIT = D("2025-03-05")  # between the 03-03 rank and the 03-10 resize (split test only)
+SPLIT_RULES = (MONTHLY_RANK_WEEKLY_RESIZE, MONTHLY_RANK_WEEKLY_RESIZE_TBILL, MONTHLY_RANK_WEEKLY_RESIZE_FRAC)
+
+
+def split_market(*, aaa_split: bool = False) -> Market:
+    """The split-cadence market. With ``aaa_split``: AAA before AAA_SPLIT as it traded (2x the
+    adjusted prices), i.e. the database before the 2-for-1 split on AAA_SPLIT rewrote it."""
+    n = len(SPLIT_DAYS)
+    crash = SPLIT_DAYS.index(DDD_CRASH)
+    aaa = [round(50.0 + 0.2 * t, 2) for t in range(n)]
+    if aaa_split:
+        cut = SPLIT_DAYS.index(AAA_SPLIT)
+        aaa = [c * 2 if t < cut else c for t, c in enumerate(aaa)]
+    ddd = [round(60.0 + 0.1 * t, 2) for t in range(n)]
+    ddd = ddd[:crash] + [round(c * 0.75, 2) for c in ddd[crash:]]
+    ddd_opens = list(ddd)
+    ddd_opens[crash] = ddd[crash - 1]
+    ddd_highs = [max(o, c) + 0.5 for o, c in zip(ddd_opens, ddd)]
+    return Market(
+        history={
+            "AAA": hist("AAA", aaa, days=SPLIT_DAYS),
+            "BBB": hist("BBB", [round(40.0 + 0.1 * t, 2) for t in range(n)], days=SPLIT_DAYS),
+            "BIL": hist("BIL", [100.0] * n, days=SPLIT_DAYS, spread=0.05),
+            "CCC": hist("CCC", [30.0] * n, days=SPLIT_DAYS),
+            "DDD": hist("DDD", ddd, days=SPLIT_DAYS, opens=ddd_opens, highs=ddd_highs),
+        },
+        membership=Membership(tuple((s, D("2020-01-02"), None) for s in ("AAA", "BBB", "CCC", "DDD"))),
+        fx=((D("2024-12-31"), Decimal("16000")),),
+    )
+
+
+# Two names chosen by data_date's month (a rank on the first session of month m+1 reads month m),
+# each at half the exposure of data_date's ISO week. DDD carries a stop 10% under its close.
+BREATHE_BASKETS = {1: ("AAA", "BBB"), 2: ("DDD", "AAA"), 3: ("DDD", "CCC"), 4: ("BBB", "CCC"), 5: ("AAA", "DDD"),
+                   6: ("CCC", "BBB")}
+BREATHE_EXPOSURE = ("0.9", "0.5", "0.7", "0.3", "0.8")
+
+
+class Breathe:
+    """A fixed-width basket whose exposure moves every week: what a split cadence is for."""
+
+    id = "BREATHE"
+
+    def lookback(self, params: Any) -> int:
+        return 1
+
+    def symbols(self, params: Any) -> tuple[str, ...]:
+        return ()
+
+    def holds(self, params: Any) -> tuple[str, ...]:
+        return ()
+
+    def uses_members(self, params: Any) -> bool:
+        return True
+
+    def targets(self, history, members, data_date, held, params) -> tuple[Target, ...]:
+        each = Decimal(BREATHE_EXPOSURE[data_date.isocalendar()[1] % len(BREATHE_EXPOSURE)]) / 2
+        out: list[Target] = []
+        for symbol in BREATHE_BASKETS[data_date.month]:
+            h = history.get(symbol)
+            i = None if h is None else h.index_of(data_date)
+            if i is None or symbol not in members:
+                continue
+            close = float(h.close[i])
+            t = target_from_close(symbol, close, each, stop=close * 0.9 if symbol == "DDD" else None)
+            if t is not None:
+                out.append(t)
+        return tuple(out)
+
+    def prepare(self, history):
+        return dict(history)
+
+    def targets_prepared(self, prepared, members, data_date, held, params) -> tuple[Target, ...]:
+        return self.targets(prepared, members, data_date, held, params)
+
+
+BREATHE = Breathe()
+
+
+@dataclass(frozen=True)
+class SplitRun:
+    result: BookResult
+    kickoff: date | None
+    stored: dict[date, tuple[Target, ...]]  # book_targets: session -> the decision (no row when empty)
+    decided: dict[date, tuple[Target, ...]]  # every decision, empty ones included
+
+
+def split_paper_run(
+    market_at: Callable[[date], Market],
+    allocator: Any,
+    params: Any,
+    rules: Any,
+    start: date,
+    end: date,
+    *,
+    splits: Mapping[date, tuple[tuple[str, Decimal], ...]] | None = None,
+    dividends: DividendMap | None = None,
+    initial_idr: Decimal = INITIAL_IDR,
+) -> SplitRun:
+    """The paper night over a split-cadence rule set, one session at a time.
+
+    ``market_at(d)``: the market as the database holds it the night of ``d`` (its bars through
+    ``d``). Night of ``data_date``: the kickoff from ``needs_kickoff``, the last rank basket from
+    the decisions stored so far (``last_rank_session`` -> ``rank_basket``), the marks from the
+    book, then ``decide_book``. Night of S: ``settle_book`` with S's bars and the splits on S.
+    """
+    divs: DividendMap = {} if dividends is None else dividends
+    split_on = {} if splits is None else splits
+    rate = market_at(start).usd_idr_on(start)
+    cash0 = initial_cash_usd(initial_idr, rate)
+    book = new_book(cash0)
+    data_date = dates.prev_session(start)
+    snapshots = [BookSnapshot(date=data_date, cash_usd=book.cash, equity_usd=book.equity, invested_usd=_ZERO)]
+    fills: list[Any] = []
+    trades: list[Any] = []
+    rejections: Counter[str] = Counter()
+    dividends_usd = _ZERO
+    stored: dict[date, tuple[Target, ...]] = {}
+    decided: dict[date, tuple[Target, ...]] = {}
+    kickoff: date | None = None
+
+    def decide(d: date, now: Book) -> tuple[tuple[Target, ...] | None, bool]:
+        nonlocal kickoff
+        session = dates.next_session(d)
+        force = needs_kickoff(rules, start, session, kickoff)
+        rank_day = last_rank_session(rules, start, kickoff, session)
+        last_rank = None if rank_day is None else rank_basket(stored.get(rank_day, ()), rules.idle_symbol)
+        marks = {p.symbol: p.mark for p in now.positions}
+        targets, idle_added = decide_book(market_at(d), allocator, params, rules, d, now.held(), force=force,
+                                          last_rank=last_rank, marks=marks)
+        if force:
+            kickoff = session
+        if targets is not None:
+            decided[session] = targets
+            if targets:
+                stored[session] = targets
+        return targets, idle_added
+
+    targets, idle_added = decide(data_date, book)
+    for session in dates.sessions(start, end):
+        night_market = market_at(session)
+        symbols = set(book.held())
+        if targets is not None:
+            symbols.update(t.symbol for t in targets)
+        bars = night_market.bars_on(session, sorted(symbols))
+        night = settle_book(book, session, bars, targets, idle_added, rules, divs, split_on.get(session, ()),
+                            night_market.last_bar_date)
+        book = night.book
+        fills.extend(night.fills)
+        trades.extend(night.trades)
+        for _, amount in night.dividends:
+            dividends_usd += amount
+        for _, reason in night.rejected:
+            rejections[reason] += 1
+        snapshots.append(night.snapshot)
+        data_date = session
+        targets, idle_added = decide(data_date, book)
+
+    costs_usd = _ZERO
+    for f in fills:
+        costs_usd += f.cost_usd
+    result = BookResult(
+        allocator_id=allocator.id,
+        params=params,
+        rules=rules,
+        start=start,
+        end=end,
+        usd_idr=rate,
+        initial_cash=cash0,
+        snapshots=tuple(snapshots),
+        fills=tuple(fills),
+        trades=tuple(trades),
+        open_at_end=book.positions,
+        dividends_usd=dividends_usd,
+        costs_usd=costs_usd,
+        rejections=tuple(sorted(rejections.items())),
+    )
+    return SplitRun(result=result, kickoff=kickoff, stored=stored, decided=decided)
+
+
+SPLIT_STARTS = {
+    "rank-day": D("2025-02-03"),  # the first session of February: ranks on the cadence, no kickoff
+    "mid-month": D("2025-02-12"),  # a Wednesday: kicks off there
+    "resize-monday": D("2025-02-10"),  # a resize-only Monday with no rank behind it: kicks off there
+}
+SPLIT_DIVIDENDS = {
+    "AAA": {D("2025-03-20"): Decimal("0.30")},
+    "BBB": {D("2025-05-15"): Decimal("0.20")},
+    "BIL": {D("2025-04-15"): Decimal("0.30")},
+}
+
+
+@pytest.mark.parametrize("rules", SPLIT_RULES, ids=lambda r: r.id)
+@pytest.mark.parametrize("start", list(SPLIT_STARTS.values()), ids=list(SPLIT_STARTS))
+def test_split_cadence_nights_equal_run_book(rules, start):
+    market = split_market()
+    got = split_paper_run(lambda d: cut_market(market, dates.next_session(d)), BREATHE, None, rules, start,
+                          SPLIT_END, dividends=SPLIT_DIVIDENDS)
+    assert got.kickoff == (None if is_rank_session(rules, start) else start)
+    want = run_book(market, BREATHE, None, rules, start, SPLIT_END, dividends=SPLIT_DIVIDENDS, kickoff=got.kickoff)
+    assert_same_run(got.result, want)
+    resized = [s for s in got.decided if is_resize_session(rules, s)]
+    assert len(resized) >= 12, "the window re-scales every week between the month starts"
+    assert {f.reason for f in want.fills if f.session_date in resized} >= {"trim", "add"}
+    assert want.dividends_usd > 0
+
+
+@pytest.mark.parametrize("rules", SPLIT_RULES, ids=lambda r: r.id)
+def test_a_resize_week_keeps_the_ranked_names_at_the_new_exposure(rules):
+    market = split_market()
+    got = split_paper_run(lambda d: market, BREATHE, None, rules, D("2025-02-12"), SPLIT_END)
+    idle = rules.idle_symbol
+    for session, targets in got.decided.items():
+        if not is_resize_session(rules, session):
+            continue
+        rank_day = last_rank_session(rules, D("2025-02-12"), got.kickoff, session)
+        ranked = {t.symbol for t in rank_basket(got.decided[rank_day], idle)}
+        names = [t.symbol for t in rank_basket(targets, idle)]
+        assert set(names) <= ranked, session  # never a new name on a resize week
+        if idle is not None and targets:
+            assert targets[-1].symbol == idle  # the freed weight goes to the idle instrument
+    # 2025-03-10: the March rank (DDD, AAA at 0.4 each: week 9 wants 0.8) at week 10's 0.9; the
+    # allocator wanted (DDD, CCC) that week, and CCC is not bought.
+    resize = rank_basket(got.decided[D("2025-03-10")], idle)
+    assert [(t.symbol, t.weight) for t in resize] == [("DDD", Decimal("0.45")), ("AAA", Decimal("0.45"))]
+    assert not any(f.symbol == "CCC" and f.side == "buy" and f.session_date < D("2025-04-01")
+                   for f in got.result.fills)
+
+
+@pytest.mark.parametrize("rules", SPLIT_RULES, ids=lambda r: r.id)
+def test_a_stopped_out_position_is_not_bought_back_on_a_resize_week(rules):
+    market = split_market()
+    got = split_paper_run(lambda d: market, BREATHE, None, rules, D("2025-02-12"), SPLIT_END)
+    (stopped,) = [t for t in got.result.trades if t.symbol == "DDD" and t.exit_date == DDD_CRASH]
+    assert stopped.exit_reason == "sl"
+    # The allocator still wants DDD on the next three resize weeks (March's basket is DDD, CCC) ...
+    weeks = [D("2025-03-17"), D("2025-03-24"), D("2025-03-31")]
+    for session in weeks:
+        assert is_resize_session(rules, session)
+        assert "DDD" not in {t.symbol for t in got.decided[session]}
+    # ... and buys it again only on the April rank.
+    ddd_buys = [f.session_date for f in got.result.fills if f.symbol == "DDD" and f.side == "buy"]
+    assert DDD_CRASH not in ddd_buys and not any(DDD_CRASH < d < D("2025-04-01") for d in ddd_buys)
+    assert D("2025-04-01") in ddd_buys
+
+
+def test_a_split_between_the_rank_and_the_resize_changes_nothing_the_resize_reads():
+    # The 03-03 rank is decided and stored in pre-split units (AAA at its traded price); AAA
+    # splits 2-for-1 on 03-05 and the database is rewritten. The 03-10 resize reads that stored
+    # basket for its symbols and weights only, so it decides exactly what run_book decides over
+    # the rewritten history.
+    rules = MONTHLY_RANK_WEEKLY_RESIZE_FRAC
+    raw, adjusted = split_market(aaa_split=True), split_market()
+
+    def market_at(d: date) -> Market:
+        return cut_market(raw if d < AAA_SPLIT else adjusted, dates.next_session(d))
+
+    start = D("2025-02-12")
+    got = split_paper_run(market_at, BREATHE, None, rules, start, D("2025-04-30"),
+                          splits={AAA_SPLIT: (("AAA", Decimal("2")),)})
+    want = split_paper_run(lambda d: adjusted, BREATHE, None, rules, start, D("2025-04-30"))
+    rank_got, rank_want = got.stored[D("2025-03-03")], want.stored[D("2025-03-03")]
+    aaa_got = next(t for t in rank_got if t.symbol == "AAA")
+    aaa_want = next(t for t in rank_want if t.symbol == "AAA")
+    assert aaa_got.last == 2 * aaa_want.last  # stored before the split, in the units it traded in
+    assert [(t.symbol, t.weight) for t in rank_got] == [(t.symbol, t.weight) for t in rank_want]
+    for session in dates.sessions(D("2025-03-06"), D("2025-04-30")):
+        if session in want.decided:
+            assert got.decided[session] == want.decided[session], session
+    assert got.decided[D("2025-03-10")] == want.decided[D("2025-03-10")] != ()
+
+
+# ---- decide_book's resize path, hand-checked on the wiring market ------------------------------
+#
+# wiring_market: 2025-03-03 ranks (data_date 02-28), 2025-03-10 is resize-only (data_date 03-07),
+# 2025-03-05 is neither (data_date 03-04).
+
+W_RANK = (Target(symbol="AAA", weight=Decimal("0.4"), last=P("11.2")),
+          Target(symbol="BBB", weight=Decimal("0.4"), last=P("22.4")))
+
+
+def test_decide_book_rescales_the_last_rank_basket_on_a_resize_session():
     market = wiring_market()
-    split = replace(MONTHLY_HOLD, id="monthly-rank-weekly-resize", resize_cadence="weekly")
-    for data_date in (D("2025-02-28"), D("2025-03-07"), D("2025-03-04")):  # a rank, a resize, neither
-        with pytest.raises(ValueError, match="paper trading cannot decide them yet"):
-            decide_book(market, Scripted((("AAA", "0.5"),)), None, split, data_date, frozenset())
-    # The unsplit rule set it was built from still decides normally.
-    assert decide_book(market, Scripted((("AAA", "0.5"),)), None, MONTHLY_HOLD, D("2025-02-28"), frozenset())[0]
+    alloc = Scripted((("CCC", "0.2"),))
+    marks = {"AAA": P("11"), "BBB": P("22")}
+    held, day = frozenset({"AAA", "BBB"}), D("2025-03-07")
+    got = decide_book(market, alloc, None, MONTHLY_RANK_WEEKLY_RESIZE, day, held, last_rank=W_RANK, marks=marks)
+    fresh = (Target(symbol="CCC", weight=Decimal("0.2"), last=P("30")),)  # what Scripted answers on 03-07
+    rescaled = book_runner._rescaled(market, W_RANK, fresh, held, day, marks)
+    assert got == book_runner._with_idle(market, MONTHLY_RANK_WEEKLY_RESIZE, rescaled, day)
+    assert [(t.symbol, t.weight) for t in got[0]] == [("AAA", Decimal("0.1")), ("BBB", Decimal("0.1"))]
+    assert [t.last for t in got[0]] == [q(market.bar("AAA", D("2025-03-07")).close),
+                                        q(market.bar("BBB", D("2025-03-07")).close)]
+    (call,) = alloc.calls  # called once, at data_date, for its total only
+    assert (call.data_date, call.held) == (D("2025-03-07"), frozenset({"AAA", "BBB"}))
+
+
+def test_decide_book_resize_with_the_idle_instrument_moves_only_the_idle_weight():
+    alloc = Scripted((("AAA", "0.2"), ("BBB", "0.2")))
+    tbill = MONTHLY_RANK_WEEKLY_RESIZE_TBILL
+    targets, idle_added = decide_book(wiring_market(), alloc, None, tbill, D("2025-03-07"),
+                                      frozenset({"AAA", "BBB", "BIL"}), last_rank=W_RANK, marks={})
+    assert idle_added is True
+    assert [(t.symbol, t.weight) for t in targets] == [
+        ("AAA", Decimal("0.2")), ("BBB", Decimal("0.2")), ("BIL", Decimal("0.6"))
+    ]
+    assert alloc.calls[0].held == frozenset({"AAA", "BBB"})  # the idle position is never the allocator's
+
+
+def test_decide_book_resize_drops_what_is_no_longer_held():
+    alloc = Scripted((("AAA", "0.8"),))
+    targets, _ = decide_book(wiring_market(), alloc, None, MONTHLY_RANK_WEEKLY_RESIZE, D("2025-03-07"),
+                             frozenset({"BBB"}), last_rank=W_RANK, marks={"BBB": P("22")})
+    assert [(t.symbol, t.weight) for t in targets] == [("BBB", Decimal("0.4"))]
+    empty, added = decide_book(wiring_market(), alloc, None, MONTHLY_RANK_WEEKLY_RESIZE, D("2025-03-07"),
+                               frozenset(), last_rank=W_RANK, marks={})
+    assert (empty, added) == ((), False)  # a decision to hold nothing, not "no decision"
+    from_empty_rank, _ = decide_book(wiring_market(), alloc, None, MONTHLY_RANK_WEEKLY_RESIZE, D("2025-03-07"),
+                                     frozenset({"BBB"}), last_rank=(), marks={})
+    assert from_empty_rank == ()
+
+
+def test_decide_book_resize_without_a_rank_yet_is_no_decision():
+    alloc = Scripted((("AAA", "0.5"),))
+    assert decide_book(wiring_market(), alloc, None, MONTHLY_RANK_WEEKLY_RESIZE, D("2025-03-07"), frozenset(),
+                       marks={}) == (None, False)
+    assert alloc.calls == []
+
+
+def test_decide_book_resize_needs_the_marks():
+    with pytest.raises(ValueError, match="marks"):
+        decide_book(wiring_market(), Scripted((("AAA", "0.5"),)), None, MONTHLY_RANK_WEEKLY_RESIZE,
+                    D("2025-03-07"), frozenset({"AAA"}), last_rank=W_RANK)
+
+
+def test_decide_book_split_rules_rank_and_skip_as_the_cadence_says():
+    market = wiring_market()
+    split = MONTHLY_RANK_WEEKLY_RESIZE
+    # The month start ranks, whatever last_rank says: the allocator's basket, not the old one.
+    alloc = Scripted((("CCC", "0.5"),))
+    ranked, _ = decide_book(market, alloc, None, split, D("2025-02-28"), frozenset({"AAA"}), last_rank=W_RANK,
+                            marks={})
+    assert [(t.symbol, t.weight) for t in ranked] == [("CCC", Decimal("0.5"))]
+    # A session that is neither: no decision, no call.
+    idle = Scripted((("CCC", "0.5"),))
+    assert decide_book(market, idle, None, split, D("2025-03-04"), frozenset(), last_rank=W_RANK,
+                       marks={}) == (None, False)
+    assert idle.calls == []
+    # force ranks a resize-only session (the kickoff on a resize Monday, and the nightly preview).
+    forced, _ = decide_book(market, Scripted((("CCC", "0.5"),)), None, split, D("2025-03-07"), frozenset({"AAA"}),
+                            force=True, last_rank=W_RANK, marks={})
+    assert [t.symbol for t in forced] == ["CCC"]
+
+
+def test_decide_book_ignores_last_rank_and_marks_without_a_resize_cadence():
+    market = wiring_market()
+    for data_date in (D("2025-02-28"), D("2025-03-07"), D("2025-03-04")):  # a rank, a week start, neither
+        plain = decide_book(market, Scripted((("AAA", "0.5"),)), None, MONTHLY_HOLD, data_date, frozenset({"AAA"}))
+        given = decide_book(market, Scripted((("AAA", "0.5"),)), None, MONTHLY_HOLD, data_date, frozenset({"AAA"}),
+                            last_rank=W_RANK, marks={"AAA": P("1")})
+        assert given == plain
+
+
+def test_decide_book_last_rank_and_marks_argument_checks():
+    market, alloc, d = wiring_market(), Scripted(), D("2025-03-07")
+    with pytest.raises(TypeError, match="last_rank"):
+        decide_book(market, alloc, None, MONTHLY_RANK_WEEKLY_RESIZE, d, frozenset(), last_rank=list(W_RANK), marks={})
+    with pytest.raises(TypeError, match="Target"):
+        decide_book(market, alloc, None, MONTHLY_RANK_WEEKLY_RESIZE, d, frozenset(), last_rank=("AAA",), marks={})
+    with pytest.raises(TypeError, match="marks"):
+        decide_book(market, alloc, None, MONTHLY_RANK_WEEKLY_RESIZE, d, frozenset(), last_rank=W_RANK, marks=[])
+    with pytest.raises(TypeError, match="Decimal"):
+        decide_book(market, alloc, None, MONTHLY_RANK_WEEKLY_RESIZE, d, frozenset(), last_rank=W_RANK,
+                    marks={"AAA": 11.0})
+
+
+# ---- rank_basket ---------------------------------------------------------------------------------
+
+
+def test_rank_basket_takes_off_the_trailing_idle_row_only():
+    bil = Target(symbol="BIL", weight=Decimal("0.2"), last=P("100"))
+    assert rank_basket(W_RANK + (bil,), "BIL") == W_RANK
+    assert rank_basket(W_RANK, "BIL") == W_RANK  # no idle row (no BIL bar that night, or full weight)
+    assert rank_basket(W_RANK, None) == W_RANK
+    assert rank_basket((bil,), "BIL") == ()  # the rank chose nothing; the book sat in BIL
+    assert rank_basket((), "BIL") == () and rank_basket([], None) == ()
+    assert rank_basket(list(W_RANK), None) == W_RANK
+
+
+def test_rank_basket_refuses_what_no_decision_writes():
+    bil = Target(symbol="BIL", weight=Decimal("0.2"), last=P("100"))
+    with pytest.raises(ValueError, match="idle"):
+        rank_basket((bil,) + W_RANK, "BIL")
+    with pytest.raises(TypeError, match="Target"):
+        rank_basket(("AAA",), None)
+    with pytest.raises(TypeError, match="sequence"):
+        rank_basket({"AAA": 1}, None)

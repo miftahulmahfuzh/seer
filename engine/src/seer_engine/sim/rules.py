@@ -180,6 +180,11 @@ MONTHLY_RANK_WEEKLY_RESIZE = replace(MONTHLY_HOLD, id="monthly-rank-weekly-resiz
 MONTHLY_RANK_WEEKLY_RESIZE_TBILL = replace(
     MONTHLY_RANK_WEEKLY_RESIZE, id="monthly-rank-weekly-resize-tbill", idle_symbol="BIL"
 )
+# The split cadence in fractional shares: what `promote --fractional` maps a monthly-rank-weekly-resize
+# lab winner to, as monthly-hold-frac is monthly-hold's (paper split cadence, 2026-10-07).
+MONTHLY_RANK_WEEKLY_RESIZE_FRAC = replace(
+    MONTHLY_RANK_WEEKLY_RESIZE, id="monthly-rank-weekly-resize-frac", fractional=True
+)
 
 PRESETS: tuple[TradeRules, ...] = (
     DESIGN_V0,
@@ -194,6 +199,7 @@ PRESETS: tuple[TradeRules, ...] = (
     MONTHLY_RANK_WEEKLY_RESIZE,
     MONTHLY_RANK_WEEKLY_RESIZE_TBILL,
     MONTHLY_HOLD_FRAC,
+    MONTHLY_RANK_WEEKLY_RESIZE_FRAC,
 )
 
 

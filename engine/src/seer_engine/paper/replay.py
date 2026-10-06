@@ -16,7 +16,10 @@ Expected records, per engine, over ``[paper_start, last_session]``:
   dividends=dividends, usd_idr=usd_idr, kickoff=head.kickoff)``. Expected targets:
   ``paper.book.decide_book`` on every decision session (and the stored kickoff session, forced)
   from ``paper_start`` through ``pending_session``, with the held set rebuilt
-  from the run's fills; an empty decision is left out (it writes no ``book_targets`` row).
+  from the run's fills; an empty decision is left out (it writes no ``book_targets`` row). Under
+  split-cadence rules a resize-only session is decided from the replay's OWN last rank basket
+  (``paper.book.rank_basket`` of its latest rank or kickoff decision) and marks (``last_close``
+  of each held symbol), never from the stored rows.
 - ``benchmark`` (SPY): ``buy_and_hold(market.spy(), paper_start, last_session, cash0,
   dividends=SPY's)``; the holding is ``(SPY, whole shares, last close)``.
 
@@ -43,7 +46,7 @@ from seer_engine.backtest.benchmark import Dividend, buy_and_hold
 from seer_engine.backtest.book_runner import BookResult, DividendMap, run_rules
 from seer_engine.backtest.market import SPY, Market
 from seer_engine.backtest.runner import RunResult
-from seer_engine.paper.book import decide_book
+from seer_engine.paper.book import decide_book, rank_basket
 from seer_engine.paper.bracket import decide_bracket
 from seer_engine.paper.capital import PAPER_INITIAL_IDR
 from seer_engine.sim import (
@@ -58,6 +61,7 @@ from seer_engine.sim import (
     TradeRules,
     initial_cash_usd,
     is_decision_session,
+    is_rank_session,
     new_portfolio,
 )
 from seer_engine.strategies.allocator import Allocator, MarketAware, prepare_for
@@ -359,13 +363,28 @@ def expected_book(
     pending = dates.next_session(last)
     decisions: list[tuple[date, tuple[Target, ...]]] = []
     pending_decision = False
+    # The replay's own last rank basket (pre-idle), as run_book's loop keeps it: built from the
+    # replay's rank decisions, never read from the stored rows, so the check stays a check. It
+    # only matters under a resize_cadence; without one every decision session is a rank.
+    last_rank: tuple[Target, ...] | None = None
     for session in dates.sessions(start, pending):
         kickoff = session == head.kickoff
         if not kickoff and not is_decision_session(rules, session):
             continue
+        data_date = dates.prev_session(session)
+        held = held_before(fills, session)
+        rank = kickoff or is_rank_session(rules, session)
+        marks: dict[str, Decimal] | None = None
+        if not rank and last_rank is not None:
+            # The book's marks the night of data_date: each held symbol's last close on or before it.
+            marks = {symbol: last_close(market, symbol, data_date) for symbol in sorted(held)}
         wanted, _ = decide_book(
-            market, allocator, params, rules, dates.prev_session(session), held_before(fills, session), force=kickoff
+            market, allocator, params, rules, data_date, held, force=kickoff, last_rank=last_rank, marks=marks
         )
+        if rank:
+            if wanted is None:
+                raise AssertionError(f"decide_book gave no decision for the rank session {session}")
+            last_rank = rank_basket(wanted, rules.idle_symbol)
         if session == pending:
             pending_decision = wanted is not None
         if wanted:

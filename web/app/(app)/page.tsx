@@ -7,7 +7,7 @@ import {
   champion, picks as getPicks, positions as getPositions, runStatus,
   type Holding, type Pick, type Strategy,
 } from '@/lib/data';
-import { money, monthDay, rp, shortDate, signedRp, signedUsd, usd } from '@/lib/format';
+import { companyName, money, monthDay, rp, shortDate, signedRp, signedUsd, usd } from '@/lib/format';
 import { wibDate } from '@/lib/session';
 import { SLOT_BG, SLOT_LETTERS, slotBg, slotLetter } from '@/lib/slots';
 import { dismiss } from './actions';
@@ -166,7 +166,7 @@ function PickCard({ p, rate }: { p: Pick; rate: number }) {
       <div className={s.pickHead}>
         <div className={s.ticker}>
           <span className={s.sym}>{p.symbol}</span>
-          <span className={s.company}>{p.company}</span>
+          {companyName(p.company, p.symbol) && <span className={s.company}>{p.company}</span>}
         </div>
         <span className={s.slot}>{slotLetter(p.slot)}</span>
       </div>

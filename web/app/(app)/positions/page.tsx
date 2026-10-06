@@ -8,7 +8,7 @@ import {
   pendingOrders, positions as getPositions, runStatus, strategies, vetoes as getVetoes,
   type Holding, type Pending, type PendingOrder, type RunStatus, type Strategy, type Veto,
 } from '@/lib/data';
-import { monthDay, pct, shortDate, signedPct, signedRp, signedUsd, usd } from '@/lib/format';
+import { companyName, monthDay, pct, shortDate, signedPct, signedRp, signedUsd, usd } from '@/lib/format';
 import { wibDate } from '@/lib/session';
 import { cardBg } from '@/lib/slots';
 import { checkedLine, headlinesLabel, noCheckLine, vetoSheet, type VetoSheet } from '@/lib/vetoes';
@@ -274,7 +274,7 @@ function BracketCard({ q, bg, paper }: { q: Holding; bg: string; paper: boolean 
       <div className={s.head}>
         <div className={s.ticker}>
           <span className={s.sym}>{q.symbol}</span>
-          <span className={s.company}>{q.company ? `${q.company} · ` : ''}{sharesLabel(q.shares)}</span>
+          <span className={s.company}>{companyName(q.company, q.symbol) ? `${q.company} · ` : ''}{sharesLabel(q.shares)}</span>
         </div>
         <Change pnl={q.pnl} ratio={q.pnlPct} />
       </div>
@@ -300,7 +300,7 @@ function BookCard({ q, bg, paper }: { q: Holding; bg: string; paper: boolean }) 
       <div className={s.head}>
         <div className={s.ticker}>
           <span className={s.sym}>{q.symbol}</span>
-          <span className={s.company}>{q.company ? `${q.company} · ` : ''}{sharesLabel(q.shares)}</span>
+          <span className={s.company}>{companyName(q.company, q.symbol) ? `${q.company} · ` : ''}{sharesLabel(q.shares)}</span>
         </div>
         <Change pnl={q.pnl} ratio={q.pnlPct} />
       </div>
@@ -325,7 +325,7 @@ function BenchmarkCard({ q }: { q: Holding }) {
       <div className={s.head}>
         <div className={s.ticker}>
           <span className={s.sym}>{q.symbol}</span>
-          <span className={s.company}>{q.company ? `${q.company} · ` : ''}{sharesLabel(q.shares)}</span>
+          <span className={s.company}>{companyName(q.company, q.symbol) ? `${q.company} · ` : ''}{sharesLabel(q.shares)}</span>
         </div>
         <Change pnl={q.pnl} ratio={q.pnlPct} />
       </div>
@@ -364,7 +364,7 @@ function OrderRow({ o }: { o: PendingOrder }) {
       <div className={s.orderHead}>
         {o.kind === 'book' && <span className={s.rank}>{o.rank}</span>}
         <span className={s.orderSym}>{o.symbol}</span>
-        <span className={s.orderCo}>{o.company ? `${o.company} · ` : ''}last {usd(o.last)}</span>
+        <span className={s.orderCo}>{companyName(o.company, o.symbol) ? `${o.company} · ` : ''}last {usd(o.last)}</span>
       </div>
       <OrderCells cells={cells} />
       <WhyToggle text={o.explanation} />

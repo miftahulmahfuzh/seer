@@ -23,3 +23,7 @@ export const shortDate = (ymd: string) => SHORT.format(new Date(`${ymd}T12:00:00
 export const monthDay = (ymd: string) => MONTH_DAY.format(new Date(`${ymd}T12:00:00Z`));
 /** '2026-10-08' -> 'Oct' */
 export const monthName = (ymd: string) => MONTH.format(new Date(`${ymd}T12:00:00Z`));
+
+/** The company name worth showing beside a ticker: null when missing or just the ticker again. */
+export const companyName = (company: string | null | undefined, symbol: string) =>
+  company && company.trim().toUpperCase() !== symbol.trim().toUpperCase() ? company : null;

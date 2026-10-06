@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { money, pct, rp, shortDate, signedPct, signedRp, signedUsd, usd } from './format';
+import { companyName, money, pct, rp, shortDate, signedPct, signedRp, signedUsd, usd } from './format';
 
 describe('format', () => {
   it('formats USD like the Gotrade ticket', () => {
@@ -20,5 +20,11 @@ describe('format', () => {
   });
   it('formats ISO dates without timezone drift', () => {
     expect(shortDate('2026-10-08')).toBe('Thu, Oct 8');
+  });
+  it('hides a company name that only repeats the ticker', () => {
+    expect(companyName('JNJ', 'JNJ')).toBeNull();
+    expect(companyName('jnj ', 'JNJ')).toBeNull();
+    expect(companyName(null, 'JNJ')).toBeNull();
+    expect(companyName('Johnson & Johnson', 'JNJ')).toBe('Johnson & Johnson');
   });
 });

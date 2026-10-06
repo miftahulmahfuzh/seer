@@ -246,7 +246,7 @@ export default async function SeraOverview() {
               xFormat={fmtNumber(0)}
               xLabel="Tries counted when it ran (N)"
               yLabel="Luck score (DSR)"
-              height={300}
+              height={460}
               legend={
                 <Legend
                   items={[

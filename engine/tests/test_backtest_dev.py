@@ -26,6 +26,7 @@ from seer_engine.backtest.benchmark import Dividend, spy_curves
 from seer_engine.backtest.book_runner import BookResult, RunStats, run_stats
 from seer_engine.backtest.dev import (
     DEV_END,
+    DEV_WINDOW,
     FAILURE_LABELS,
     FX_START,
     MAX_CANDIDATES,
@@ -45,6 +46,7 @@ from seer_engine.backtest.dev import (
 from seer_engine.backtest.market import Market, Membership
 from seer_engine.backtest.metrics import Metrics, curve_metrics
 from seer_engine.backtest.runner import INITIAL_IDR, RunResult, run_backtest
+from seer_engine.backtest.window import Window
 from seer_engine.prices import to_decimal
 from seer_engine.sim import Pick, initial_cash_usd, q
 from seer_engine.sim.book import Target
@@ -655,3 +657,94 @@ def test_registry_rows_equal_unprepared_single_runs():
     registry, _, _, _ = short_registry()
     rows = run_registry(market, DIVS, SPY_DIVS, registry)
     assert rows == tuple(run_candidate(market, DIVS, SPY_DIVS, c)[1] for c in registry)
+
+
+# --------------------------------------------------------------------------- the test window
+
+ACROSS_DAYS = dates.sessions(date(2015, 6, 1), date(2015, 11, 30))  # spans DEV_END
+TEST_WINDOW = Window(name="test", start=date(2015, 10, 19), end=date(2015, 11, 30))
+
+
+def across_market() -> Market:
+    """SPY and AAA from 2015-06-01 to 2015-11-30: a market that runs past DEV_END."""
+    return Market(
+        history={
+            "AAA": hist("AAA", sawtooth(len(ACROSS_DAYS), 50.0, 1.0, 0.9), days=ACROSS_DAYS),
+            "SPY": hist("SPY", sawtooth(len(ACROSS_DAYS), 200.0, 2.0, 1.5), days=ACROSS_DAYS),
+        },
+        membership=Membership((("AAA", date(1990, 1, 2), None),)),
+        fx=FX_SHORT,
+    )
+
+
+def test_the_default_window_is_the_dev_window():
+    assert DEV_WINDOW == Window(name="dev", start=date.min, end=DEV_END)
+    assert DEV_WINDOW.end == DEV_END
+
+
+def test_a_caller_that_passes_nothing_is_still_refused_past_dev_end():
+    """The D9 refusal is absolute by default: the window argument does not weaken it."""
+    market = across_market()
+    c = cand("T-DEFAULT", allocator=HoldOne("TD", "SPY", lookback=5))
+    for call in (lambda: candidate_window(market, c),
+                 lambda: run_candidate(market, {}, (), c),
+                 lambda: run_registry(market, {}, (), (c,))):
+        with pytest.raises(DevWindowError, match="after the dev window end 2015-10-16"):
+            call()
+
+
+def test_an_explicit_test_window_runs_past_dev_end():
+    market = across_market()
+    c = cand("T-RUN", allocator=HoldOne("TR", "SPY", lookback=5))
+    assert candidate_window(market, c, window=TEST_WINDOW) == (date(2015, 10, 19), date(2015, 11, 30))
+    result, row = run_candidate(market, {}, (), c, window=TEST_WINDOW)
+    assert (row.start, row.end) == (date(2015, 10, 19), date(2015, 11, 30))
+    assert row.window == TEST_WINDOW and row.window.name == "test"
+    assert run_registry(market, {}, (), (c,), window=TEST_WINDOW) == (row,)
+
+
+def test_a_test_window_opens_no_earlier_than_its_own_start():
+    """The floor: the lookback may be satisfied long before the window, the run may not start there."""
+    c = cand("T-FLOOR", allocator=HoldOne("TF", "SPY", lookback=1))
+    assert candidate_window(short_market(), c)[0] == date(2015, 6, 2)  # dev: as early as the data allows
+    assert candidate_window(across_market(), c, window=TEST_WINDOW)[0] == TEST_WINDOW.start
+
+
+def test_a_test_window_still_waits_for_the_lookback():
+    market = across_market()
+    n = ACROSS_DAYS.index(date(2015, 11, 2)) + 1  # SPY's n-th bar is 2015-11-02
+    c = cand("T-LOOK", allocator=HoldOne("TL", "SPY", lookback=n))
+    assert candidate_window(market, c, window=TEST_WINDOW) == (
+        dates.next_session(date(2015, 11, 2)), date(2015, 11, 30))
+
+
+def test_the_dividend_guard_follows_the_window_too():
+    market = across_market()
+    c = cand("T-DIV", allocator=HoldOne("TV", "SPY", lookback=5))
+    late = date(2015, 11, 20)
+    divs = {"SPY": {late: Decimal("1.03")}}
+    spy_divs = (Dividend(late, Decimal("1.03")),)
+    with pytest.raises(DevWindowError, match="after the dev window end"):
+        run_candidate(market, divs, spy_divs, c)
+    _, row = run_candidate(market, divs, spy_divs, c, window=TEST_WINDOW)
+    assert row.end == date(2015, 11, 30)
+    beyond = (Dividend(date(2015, 12, 18), Decimal("1.03")),)
+    with pytest.raises(DevWindowError, match="after the test window end 2015-11-30"):
+        run_candidate(market, divs, beyond, c, window=TEST_WINDOW)
+
+
+def test_rows_carry_their_window():
+    s = stats(metrics())
+    with pytest.raises(DevWindowError, match="after the dev window end"):
+        make_row(cand("T-ROW"), date(2015, 10, 19), date(2015, 11, 30), s, spy_tr=SPY_TR, spy_price=SPY_TR)
+    row = make_row(cand("T-ROW"), date(2015, 10, 19), date(2015, 11, 30), s,
+                   spy_tr=SPY_TR, spy_price=SPY_TR, window=TEST_WINDOW)
+    assert row.window == TEST_WINDOW
+    with pytest.raises(ValueError, match="is before the test window start"):
+        make_row(cand("T-EARLY"), date(2015, 6, 8), date(2015, 11, 30), s,
+                 spy_tr=SPY_TR, spy_price=SPY_TR, window=TEST_WINDOW)
+    assert make_row(cand("T-DEV"), date(2015, 6, 8), DEV_END, s,
+                    spy_tr=SPY_TR, spy_price=SPY_TR).window == DEV_WINDOW
+    with pytest.raises(TypeError, match="window must be a Window"):
+        make_row(cand("T-BAD"), date(2015, 6, 8), DEV_END, s,
+                 spy_tr=SPY_TR, spy_price=SPY_TR, window="test")

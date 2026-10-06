@@ -122,25 +122,43 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
 
 ## Promotion (dev-eligible): autonomous, one counted look
 
-Nobody approves this; you do it. If `lab test` and the test-window store don't exist yet, build
-them first (with tests), following design §3:
-- **Test store:** `engine/.research-test/`, gitignored, sessions 2015-10-19 → the latest
-  session, built the way `research.build_store` builds the dev store (same files, manifest and
-  checks).
-- **`lab test <candidate>`:** refuses unless a pre-registration file exists and is committed.
-  Runs once. Records a `test` trial, which `UNIQUE(config_digest, window)` makes the only one.
-  Sets the method to `test-passed` or `test-failed`.
+Nobody approves this; you do it. Both commands exist — do not build them:
+
+- **`lab promote <method>`:** picks the method's best eligible **dev** trial by MAR (one variant
+  per method), writes `docs/lab/prereg/MNNNN.md` with the `config_digest` **copied from that
+  recorded trial**, and moves the method `dev-eligible → promoted`. It is written once and never
+  rewritten: a re-run with a better-looking variant available is a refusal, not an update. It
+  loads no store, runs no backtest and spends no look.
+- **`lab test <candidate>`:** takes the *variant* id (`M0007-RESID`), not the method id. It
+  refuses a method that is not `promoted`, refuses a pre-registration that is missing,
+  uncommitted, modified or names another configuration, refuses a configuration with no dev
+  trial, and the database refuses a second look at any configuration
+  (`UNIQUE(config_digest, window)` plus append-only triggers). `--dry-run` prints what would run
+  and spends nothing. One `test` trial is recorded; **the lab's N does not move** (a look is not
+  a search), and the method ends at `test-passed` or `test-failed`, both final.
+- **The test-window store** lives at `engine/.research-test/` (gitignored), sessions 2015-10-19 →
+  the latest session, built by `python -m seer_engine research_store --test-window`. It holds the
+  same deep history as the dev store from 1993 — the window bounds what is *scored*, the store
+  carries the lookback run-up — plus every session after `DEV_END`. Build it once, the first time
+  something is promoted. `lab test` refuses a dev store pointed at it, and `lab run` refuses this
+  one, so the two can never be swapped by accident.
 
 Then:
-1. Pre-register the best eligible variant by MAR, one per method, in `docs/lab/prereg/MNNNN.md`:
-   id, digest, gate, window, date. Commit and push it before any test number exists.
-2. Run `lab test`.
-3. Write the analysis and verdict.
-4. **Pass:** add it to the paper roster under a new id with its own clock, following
-   `docs/runbooks/paper-trading.md` and the existing roster code. Set the method to `paper`.
-   Commit (the database through `lab stage`), push, verify. **Real money stays out of scope:** design §1 needs ≥ 3 months and
-   ≥ 100 closed trades of forward paper first.
-5. **Fail:** `test-failed` is final. Queue a variation if the evidence supports one.
+1. `python -m seer_engine lab promote MNNNN`. Read what it printed, then **commit and push
+   `docs/lab/prereg/MNNNN.md` before any test number exists** (design §3) — the command prints the
+   exact `git add` / `git commit` lines. `lab test` refuses while the file is uncommitted, so this
+   is not optional and not a formality.
+2. `python -m seer_engine lab test MNNNN-X --dry-run` to read back what it will do, then the same
+   command without `--dry-run`. That is the one look; there is never another.
+3. Write the analysis and verdict (`lab note`).
+4. **Pass:** `lab test` prints the exact `python -m seer_engine promote …` command, every argument
+   filled in from the two recorded trials. **Run it** — you do not ask anyone (design §6). It
+   writes the roster row with no `paper_start`, so the next paper night freezes the spec and
+   starts its own clock. Then `lab stage`, commit, push, verify. **Real money stays out of
+   scope:** design §1 needs ≥ 3 months and ≥ 100 closed paper trades of forward paper first.
+5. **Fail:** `test-failed` is final. There is no second look at that configuration, on any
+   window. Queue a variation (`lab idea --source-kind variation --parent MNNNN …`) if the
+   evidence supports one, and journal what the test window said that the dev window did not.
 
 ## Never
 

@@ -569,6 +569,27 @@ def trials_of(conn: sqlite3.Connection, method_id: str) -> list[sqlite3.Row]:
     return conn.execute("SELECT * FROM trials WHERE method_id = ? ORDER BY n", (method_id,)).fetchall()
 
 
+def best_dev_eligible(conn: sqlite3.Connection, method_id: str) -> sqlite3.Row | None:
+    """The method's best eligible dev trial by MAR -- the one variant design §3 pre-registers.
+
+    Highest MAR wins and a tie breaks on the trial number, so the answer is exactly one row and
+    the same row every time: "one per method" is a property of this query, not of the caller.
+
+    Only ``window = 'dev'`` is considered. A test trial is the out-of-sample check on a
+    configuration this query already chose, so letting one back in here would let a test number
+    decide what gets tested. A trial with no MAR is never the answer either -- an eligible trial
+    always has one, because ``beats SPY TR`` is among the conditions it passed, so a NULL here
+    means a row that cannot be compared rather than a row that compares badly.
+
+    None when the method has no eligible dev trial at all.
+    """
+    return conn.execute(
+        "SELECT * FROM trials WHERE method_id = ? AND window = 'dev' AND eligible = 1 "
+        "AND mar IS NOT NULL ORDER BY mar DESC, n ASC LIMIT 1",
+        (method_id,),
+    ).fetchone()
+
+
 # --------------------------------------------------------------------------- ideas_seen
 
 

@@ -4,11 +4,14 @@ Pure: no database, network, files, clock or randomness (tests/test_strategy_puri
 this module). It never imports ``seer_engine.research``, the impure research store, whose own
 ``DEV_END`` is a duplicate constant pinned equal to this one by a test.
 
-- **D9, the code-level guard.** ``DEV_END`` is 2015-10-16. Every public entry point that is
-  handed a date, a market or dividends raises ``DevWindowError`` (a ``ValueError``) when any
-  of them is dated after ``DEV_END``: ``check_dev_session``, ``candidate_window``,
-  ``run_candidate``, ``run_registry``, ``make_row`` and ``DevRow`` itself. Nothing takes an
-  ``end``: every candidate runs to ``DEV_END``.
+- **D9, the code-level guard.** ``DEV_END`` is 2015-10-16 and ``DEV_WINDOW`` is the window
+  every entry point here defaults to. Every public entry point that is handed a date, a market
+  or dividends raises ``DevWindowError`` (a ``ValueError``) when any of them is dated after
+  that window's end: ``check_dev_session``, ``candidate_window``, ``run_candidate``,
+  ``run_registry``, ``make_row`` and ``DevRow`` itself. A caller that passes nothing gets the
+  dev window, so the refusal is absolute by default. The ``window=`` argument is the only way
+  to reach the P7b test window (method lab design §3), and only ``lab test`` passes one.
+  Nothing takes a bare ``end``: every candidate runs to its window's end.
 - **D3, each candidate's own window.** ``candidate_window`` starts at the first session whose
   data date gives every instrument the candidate reads (and SPY) its full lookback, and, for
   candidates that read index members, not before the first membership snapshot.
@@ -46,6 +49,7 @@ from seer_engine.backtest.book_runner import BookResult, DividendMap, RunStats, 
 from seer_engine.backtest.market import SPY, Market
 from seer_engine.backtest.metrics import Metrics, curve_metrics
 from seer_engine.backtest.runner import RunResult
+from seer_engine.backtest.window import Window
 from seer_engine.sim.rules import DEFAULT_ETFS, LEVERAGED_ETFS, TradeRules, rule_owner_inputs
 from seer_engine.strategies.allocator import Allocator, prepare_for
 from seer_engine.strategies.base import Strategy
@@ -54,6 +58,14 @@ DEV_END = date(2015, 10, 16)  # last dev session; 2015-10-19 opens the P7b test 
 MEMBERSHIP_START = date(1996, 1, 2)  # first sp500_history.csv row
 FX_START = date(1999, 1, 4)  # first Frankfurter USD/IDR row (verified 2026-10-03)
 MAX_CANDIDATES = 60  # handover D6
+
+DEV_WINDOW = Window(name="dev", start=date.min, end=DEV_END)
+"""The window every entry point in this module defaults to (D9).
+
+``start`` is ``date.min``, not ``MEMBERSHIP_START``: the dev window has no lower bound, and a
+long-lookback SPY candidate legitimately opens in 1993. ``research.DEV_WINDOW`` is the same
+value built from ``research.DEV_END``; ``tests/test_backtest_window.py`` pins them equal.
+"""
 
 FAILURE_LABELS: tuple[str, ...] = (
     "beats SPY TR",
@@ -71,7 +83,11 @@ _FAMILY = re.compile(r"F([1-9]|1[01])|REF|M\d{4}")  # M0001…: method lab famil
 
 
 class DevWindowError(ValueError):
-    """A session, bar, FX row or dividend after ``DEV_END`` reached the dev runner (D9)."""
+    """A session, bar, FX row or dividend after the running window's end reached the runner (D9).
+
+    The running window is ``DEV_WINDOW`` unless the caller passed one, so the unqualified
+    reading -- "after ``DEV_END``" -- is the only one a dev path can produce.
+    """
 
 
 def _as_date(name: str, d: object) -> date:
@@ -80,43 +96,47 @@ def _as_date(name: str, d: object) -> date:
     return d
 
 
-def check_dev_session(d: date) -> None:
-    """Raise ``DevWindowError`` when ``d`` is after ``DEV_END`` (``TypeError`` for a non-date)."""
+def check_dev_session(d: date, window: Window = DEV_WINDOW) -> None:
+    """Raise ``DevWindowError`` when ``d`` is after ``window.end`` (``TypeError`` for a non-date).
+
+    The name is historical and the default is the point: ``check_dev_session(d)`` is the D9
+    check it has always been.
+    """
     _as_date("session", d)
-    if d > DEV_END:
-        raise DevWindowError(f"session {d} is after the dev window end {DEV_END} (D9)")
+    if d > window.end:
+        raise DevWindowError(f"session {d} is after the {window.name} window end {window.end} (D9)")
 
 
-def _check_market(market: object) -> Market:
+def _check_market(market: object, window: Window = DEV_WINDOW) -> Market:
     if not isinstance(market, Market):
         raise TypeError(f"market must be a Market, got {type(market).__name__}")
     for symbol in sorted(market.history):
         last = market.history[symbol].last_date()
-        if last is not None and last > DEV_END:
-            raise DevWindowError(f"{symbol} has a bar on {last}, after the dev window end {DEV_END} (D9)")
-    if market.fx and market.fx[-1][0] > DEV_END:
-        raise DevWindowError(f"the market has a usd_idr row on {market.fx[-1][0]}, after the dev window end {DEV_END} (D9)")
+        if last is not None and last > window.end:
+            raise DevWindowError(f"{symbol} has a bar on {last}, after the {window.name} window end {window.end} (D9)")
+    if market.fx and market.fx[-1][0] > window.end:
+        raise DevWindowError(f"the market has a usd_idr row on {market.fx[-1][0]}, after the {window.name} window end {window.end} (D9)")
     return market
 
 
-def _check_dividends(dividends: object, spy_dividends: object) -> tuple[Dividend, ...]:
+def _check_dividends(dividends: object, spy_dividends: object, window: Window = DEV_WINDOW) -> tuple[Dividend, ...]:
     if not isinstance(dividends, Mapping):
         raise TypeError(f"dividends must be a Mapping, got {type(dividends).__name__}")
     for symbol in sorted(dividends):
         by_date = dividends[symbol]
         if not isinstance(by_date, Mapping):
             raise TypeError(f"dividends[{symbol!r}] must be a Mapping of ex_date -> amount")
-        late = [d for d in by_date if _as_date(f"{symbol} ex_date", d) > DEV_END]
+        late = [d for d in by_date if _as_date(f"{symbol} ex_date", d) > window.end]
         if late:
-            raise DevWindowError(f"{symbol} has a dividend on {min(late)}, after the dev window end {DEV_END} (D9)")
+            raise DevWindowError(f"{symbol} has a dividend on {min(late)}, after the {window.name} window end {window.end} (D9)")
     if isinstance(spy_dividends, (str, bytes)) or not isinstance(spy_dividends, Sequence):
         raise TypeError(f"spy_dividends must be a sequence of Dividend, got {type(spy_dividends).__name__}")
     out = tuple(spy_dividends)
     for div in out:
         if not isinstance(div, Dividend):
             raise TypeError(f"spy_dividends holds a {type(div).__name__}, not a Dividend")
-        if div.ex_date > DEV_END:
-            raise DevWindowError(f"SPY has a dividend on {div.ex_date}, after the dev window end {DEV_END} (D9)")
+        if div.ex_date > window.end:
+            raise DevWindowError(f"SPY has a dividend on {div.ex_date}, after the {window.name} window end {window.end} (D9)")
     return out
 
 
@@ -212,19 +232,24 @@ def candidate_owner_inputs(c: Candidate) -> tuple[str, ...]:
     return tuple(sorted(out))
 
 
-def candidate_window(market: Market, c: Candidate) -> tuple[date, date]:
-    """``(start, DEV_END)``: ``start`` is the first NYSE session S such that every symbol the
+def candidate_window(market: Market, c: Candidate, *, window: Window = DEV_WINDOW) -> tuple[date, date]:
+    """``(start, window.end)``: ``start`` is the first NYSE session S such that every symbol the
     candidate reads, and SPY, has at least ``lookback`` bars dated on or before
     ``prev_session(S)``; for candidates that read index members, also
-    ``prev_session(S) >= MEMBERSHIP_START``. ``DESIGN_V0`` strategies read SPY and members
-    with ``strategy.lookback``. The idle instrument is not part of the rule (idle cash earns
-    nothing until it has a bar).
+    ``prev_session(S) >= MEMBERSHIP_START``; and never before ``window.start``. ``DESIGN_V0``
+    strategies read SPY and members with ``strategy.lookback``. The idle instrument is not part
+    of the rule (idle cash earns nothing until it has a bar).
+
+    ``window`` defaults to ``DEV_WINDOW``, whose ``start`` is ``date.min``: on the dev window
+    the floor can never bind and the result is exactly what it has always been. On the test
+    window the floor is the window's opening session, so a long history in the store warms the
+    lookback up without the run reaching back into it.
 
     ``ValueError`` when a symbol is missing or has fewer than ``lookback`` bars;
-    ``DevWindowError`` when the window would start after ``DEV_END`` or the market holds data
-    after it.
+    ``DevWindowError`` when the window would start after ``window.end`` or the market holds
+    data after it.
     """
-    _check_market(market)
+    _check_market(market, window)
     if not isinstance(c, Candidate):
         raise TypeError(f"expected a Candidate, got {type(c).__name__}")
     symbols, lookback, members = _reads(c)
@@ -239,9 +264,11 @@ def candidate_window(market: Market, c: Candidate) -> tuple[date, date]:
             ready = enough
     data_date = ready if dates.is_session(ready) else dates.next_session(ready)
     start = dates.next_session(data_date)
-    if start > DEV_END:
-        raise DevWindowError(f"{c.id}: its dev window would start on {start}, after the dev window end {DEV_END} (D9)")
-    return start, DEV_END
+    if start < window.start:
+        start = window.start if dates.is_session(window.start) else dates.next_session(window.start)
+    if start > window.end:
+        raise DevWindowError(f"{c.id}: its {window.name} window would start on {start}, after the {window.name} window end {window.end} (D9)")
+    return start, window.end
 
 
 # --------------------------------------------------------------------------- rows
@@ -249,11 +276,13 @@ def candidate_window(market: Market, c: Candidate) -> tuple[date, date]:
 
 @dataclass(frozen=True)
 class DevRow:
-    """One candidate's dev-window result and its D8 standing.
+    """One candidate's result on its window and its D8 standing.
 
     ``spy_tr``/``spy_price`` are the SPY curves' metrics on the same window and starting cash.
     ``failed`` lists the D8 conditions the row misses, in ``FAILURE_LABELS`` order;
-    ``eligible`` is ``failed == ()``.
+    ``eligible`` is ``failed == ()``. ``window`` is the window the row was produced on and
+    defaults to ``DEV_WINDOW``, so a row built without one is a dev row and is checked against
+    ``DEV_END`` exactly as before. ``window.name`` is what a lab trial records.
     """
 
     candidate: Candidate
@@ -266,15 +295,23 @@ class DevRow:
     mar: float | None
     eligible: bool
     failed: tuple[str, ...]
+    window: Window = DEV_WINDOW
 
     def __post_init__(self) -> None:
         if not isinstance(self.candidate, Candidate):
             raise TypeError(f"candidate must be a Candidate, got {type(self.candidate).__name__}")
+        if not isinstance(self.window, Window):
+            raise TypeError(f"window must be a Window, got {type(self.window).__name__}")
         _as_date("start", self.start)
         _as_date("end", self.end)
-        check_dev_session(self.end)
+        check_dev_session(self.end, self.window)
         if self.start > self.end:
             raise ValueError(f"{self.candidate.id}: start {self.start} is after end {self.end}")
+        if self.start < self.window.start:
+            raise ValueError(
+                f"{self.candidate.id}: start {self.start} is before the {self.window.name} "
+                f"window start {self.window.start}"
+            )
         if not isinstance(self.stats, RunStats):
             raise TypeError(f"stats must be a RunStats, got {type(self.stats).__name__}")
         for name in ("spy_tr", "spy_price"):
@@ -307,11 +344,13 @@ def make_row(
     *,
     spy_tr: Metrics,
     spy_price: Metrics,
+    window: Window = DEV_WINDOW,
 ) -> DevRow:
     """The ``DevRow`` for ``candidate``: SPY comparison, MAR and the D8 eligibility checks.
 
     MAR = CAGR / max drawdown (None when either is None or the drawdown is 0). Thresholds are
     read from ``tuning`` at call time; owner inputs are ``candidate_owner_inputs(candidate)``.
+    ``window`` defaults to ``DEV_WINDOW`` and is carried onto the row.
     """
     if not isinstance(candidate, Candidate):
         raise TypeError(f"expected a Candidate, got {type(candidate).__name__}")
@@ -344,6 +383,7 @@ def make_row(
         mar=mar,
         eligible=not failed,
         failed=failed,
+        window=window,
     )
 
 
@@ -357,9 +397,10 @@ def _run(
     spy_dividends: tuple[Dividend, ...],
     c: Candidate,
     prepared: Any,
+    window: Window,
 ) -> tuple[RunResult | BookResult, DevRow]:
-    start, end = candidate_window(market, c)
-    check_dev_session(end)
+    start, end = candidate_window(market, c, window=window)
+    check_dev_session(end, window)
     rate: Decimal = market.usd_idr_on(max(start, FX_START))
     run_market = market
     if start < FX_START:
@@ -385,6 +426,7 @@ def _run(
         run_stats(result),
         spy_tr=curve_metrics(total),
         spy_price=curve_metrics(price),
+        window=window,
     )
     return result, row
 
@@ -396,18 +438,21 @@ def run_candidate(
     c: Candidate,
     *,
     prepared: Any = None,
+    window: Window = DEV_WINDOW,
 ) -> tuple[RunResult | BookResult, DevRow]:
-    """Run ``c`` once on its dev window ``candidate_window(market, c)``.
+    """Run ``c`` once on ``candidate_window(market, c, window=window)``.
 
     ``dividends`` (symbol -> ex_date -> amount) reach the book engine only; ``spy_dividends``
     feed the total-return SPY curve. ``prepared`` is ``c.allocator.prepare(market.history)``
-    or None. Every input is checked against ``DEV_END`` first (``DevWindowError``).
+    or None. Every input is checked against ``window.end`` first (``DevWindowError``), and
+    ``window`` defaults to ``DEV_WINDOW``: pass nothing and this is the D9-guarded dev run it
+    has always been.
     """
-    _check_market(market)
-    spy_divs = _check_dividends(dividends, spy_dividends)
+    _check_market(market, window)
+    spy_divs = _check_dividends(dividends, spy_dividends, window)
     if not isinstance(c, Candidate):
         raise TypeError(f"expected a Candidate, got {type(c).__name__}")
-    return _run(market, market.spy(), dividends, spy_divs, c, prepared)
+    return _run(market, market.spy(), dividends, spy_divs, c, prepared, window)
 
 
 def run_registry(
@@ -417,6 +462,7 @@ def run_registry(
     registry: Sequence[Candidate],
     *,
     on_result: Callable[[int, RunResult | BookResult, DevRow], None] | None = None,
+    window: Window = DEV_WINDOW,
 ) -> tuple[DevRow, ...]:
     """Every candidate, sequentially, in registry order; one row each, in that order.
 
@@ -425,9 +471,10 @@ def run_registry(
     is ``allocator.prepare_market(market)`` for a ``MarketAware`` allocator and
     ``allocator.prepare(market.history)`` for every other. Two different objects sharing an id
     are refused. ``on_result(index, result, row)``, when given, is called after each candidate.
+    ``window`` defaults to ``DEV_WINDOW``; ``lab test`` is the only caller that passes another.
     """
-    _check_market(market)
-    spy_divs = _check_dividends(dividends, spy_dividends)
+    _check_market(market, window)
+    spy_divs = _check_dividends(dividends, spy_dividends, window)
     if isinstance(registry, (str, bytes)) or not isinstance(registry, Sequence):
         raise TypeError(f"registry must be a sequence of Candidate, got {type(registry).__name__}")
     candidates = tuple(registry)
@@ -455,7 +502,7 @@ def run_registry(
         key = c.allocator.id
         if key not in cache:
             cache[key] = prepare_for(c.allocator, market)
-        result, row = _run(market, spy, dividends, spy_divs, c, cache[key])
+        result, row = _run(market, spy, dividends, spy_divs, c, cache[key], window)
         if last_use[key] == i:
             del cache[key]
         rows.append(row)

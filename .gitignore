@@ -22,6 +22,12 @@ engine/.research/
 engine/.research.tmp/
 engine/.research.old/
 
+# P7b test-window research store (`python -m seer_engine research_store --test-window`);
+# built on first promotion, never before (docs/plans/2026-10-04-method-lab-design.md §3)
+engine/.research-test/
+engine/.research-test.tmp/
+engine/.research-test.old/
+
 # misc
 .DS_Store
 *.log

@@ -6,6 +6,16 @@
                                     run a committed method on the dev window, record its trials;
                                     a method with a MarketAware allocator is refused when the
                                     store's fundamental panel covers less than 80% of the window
+    lab promote M0007               pre-register the best dev-eligible variant by MAR in
+                                    docs/lab/prereg/M0007.md and move the method to promoted;
+                                    commit that file before `lab test` will spend the one look
+    lab test M0007-A [--store DIR] [--roster-id ID] [--dry-run]
+                                    the one counted look: run a promoted method's pre-registered
+                                    variant once on the test window, record a `test` trial and set
+                                    test-passed / test-failed (both final). Refuses without a
+                                    committed pre-registration, refuses a method that is not
+                                    promoted, and the database refuses a second look. --dry-run
+                                    prints what would run and spends nothing
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
@@ -76,6 +86,36 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
             "allocator are gated at all"
         ),
     )
+
+    s = sub.add_parser(
+        "promote", help="pre-register a dev-eligible method's best variant for the test window"
+    )
+    s.add_argument("method")
+    s.add_argument(
+        "--dir",
+        type=Path,
+        default=None,
+        help="where the pre-registration file goes (default: docs/lab/prereg/ in this checkout)",
+    )
+
+    s = sub.add_parser("test", help="the one counted look at the test window (design §3)")
+    s.add_argument("candidate", metavar="M0007-A",
+                   help="the pre-registered variant, not the method: one variant per method "
+                        "is pre-registered and it is the one that gets the look")
+    s.add_argument(
+        "--store",
+        type=Path,
+        default=Path(os.environ.get("SEER_RESEARCH_TEST_STORE") or research.TEST_STORE_DIR),
+        help=f"test-window research store (default: {research.TEST_STORE_DIR}, or "
+             "$SEER_RESEARCH_TEST_STORE); a dev store here is refused",
+    )
+    s.add_argument("--roster-id", default=None, metavar="ID",
+                   help="the paper-roster id to propose in the promote command printed on a pass "
+                        "(default: the method id)")
+    s.add_argument("--dry-run", action="store_true",
+                   help="print what would run -- the window, the store, the pre-registration and "
+                        "the conditions that decide the verdict -- and stop. Loads nothing, runs "
+                        "nothing, records nothing; the look is not spent")
 
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
@@ -172,7 +212,8 @@ def _status(conn, args) -> int:
             f"{fmt_pct(r['max_drawdown'])}  PF {fmt_pf(r['profit_factor'])}  trades {r['trades']}  DSR {fmt_num(r['dsr'], 3)}"
         )
     for title, status in (("Backlog (idea)", "idea"), ("Blocked on data", "blocked-data"),
-                          ("Dev-eligible / promoted", "dev-eligible"), ("Promoted", "promoted")):
+                          ("Dev-eligible", "dev-eligible"), ("Promoted (pre-registered)", "promoted"),
+                          ("Test-passed", "test-passed"), ("Test-failed", "test-failed")):
         rows = conn.execute("SELECT * FROM methods WHERE status = ? ORDER BY id", (status,)).fetchall()
         if rows:
             out.append("")
@@ -259,6 +300,211 @@ def _run(conn, args) -> int:
     log.info("%s: %d trial(s) recorded, status %s (%.1fs)", method.id, len(ran), status, time.perf_counter() - t0)
     _show(conn, argparse.Namespace(method=method.id))
     print(f"\nLab N (dev trials) is now {store.dev_trial_count(conn)}; test-window looks used: {store.test_looks(conn)}")
+    return 0
+
+
+def _promote(conn, args) -> int:
+    """`lab promote M0007`: pre-register the best dev-eligible variant and move it to promoted.
+
+    Writes one markdown file and one status transition. It loads no research store, runs no
+    backtest and inserts no trial, so the test-window look count it prints is the one it found.
+
+    Like every other `lab` subcommand, the global `--dry-run` is ignored: there is no roll-back
+    half of this to show, and a dry run that printed a pre-registration without writing it would
+    be exactly the artefact design §3 exists to prevent.
+    """
+    from seer_engine.lab import prereg
+    from seer_engine.lab.runner import git_head
+
+    done = prereg.promote_method(
+        conn,
+        args.method,
+        git_sha=git_head(config.REPO_ROOT),
+        directory=None if args.dir is None else Path(args.dir),
+    )
+    p = done.prereg
+    rel = prereg.repo_path(done.path)
+    print(f"wrote {rel}" if done.wrote_file else f"{rel} already pre-registers {p.candidate}")
+    print(f"{p.method} is {done.status}" + ("" if done.moved_status else " (already)"))
+    print(f"  candidate      {p.candidate}  (dev trial #{p.dev_trial})")
+    print(f"  config digest  {p.config_digest}")
+    print(f"  dev window     {p.dev_window}  MAR {p.mar}  DSR {p.dsr} at N = {p.n_trials_at_run}")
+    print(f"  test window    {p.test_window}")
+    print(f"  gate           {p.gate}")
+    print()
+    print(f"Commit and push {rel} before the look is spent (design §3):")
+    print(f"    git add {rel}")
+    print(f"    git commit -m 'lab: pre-register {p.candidate} for the test window'")
+    print(f"    python -m seer_engine lab test {p.candidate}")
+    print(f"\ntest-window looks used: {store.test_looks(conn)}")
+    return 0
+
+
+def _test_plan(method, candidate, pre, store_dir: Path) -> str:
+    """What ``lab test`` would do, printed by ``--dry-run``. Nothing is loaded or run.
+
+    ``pre`` is a ``lab.prereg.Prereg`` (phase 3): every field is a ``str`` and it carries no
+    path, so the file is named with ``prereg.path_for(pre.method)``.
+    """
+    from seer_engine.lab.method import config_digest
+    from seer_engine.lab.prereg import path_for, repo_path
+
+    return "\n".join((
+        f"lab test {candidate.id}  (dry run: nothing is loaded, run or recorded)",
+        "",
+        f"  method            {method.id} {method.name}  [promoted]",
+        f"  variant           {candidate.id}  rules {candidate.rules.id}  allocator "
+        f"<{candidate.allocator.id}>",
+        f"  config digest     {config_digest(candidate)}",
+        f"  pre-registration  {repo_path(path_for(pre.method))}  (committed; digest "
+        f"{pre.config_digest[:12]})",
+        f"  pre-registered    {pre.candidate} on {pre.date}, for the test window {pre.test_window}",
+        f"  test store        {store_dir}",
+        "",
+        "  the verdict is the five design §1 go-live conditions on the test window:",
+        "    " + ", ".join(dev.FAILURE_LABELS),
+        "  DSR is recorded, not a condition: the look is pre-registered, so there is nothing to",
+        "  deflate. The lab's N does not move -- a test trial is a look, not a search.",
+        "",
+        "  on a pass  -> test-passed (final), and the promote command is printed",
+        "  on a fail  -> test-failed (final)",
+        "",
+        "  Run it for real without --dry-run. There is exactly one look per configuration and the",
+        "  database refuses a second.",
+    ))
+
+
+def _gate_note(conn, tested) -> str:
+    """The honest backtest-gate sentence for ``promote --gate-note``.
+
+    Every roster entry's gate note says what the backtest gate actually did; no entry has ever
+    passed one. A method that reaches here is the first kind that can say otherwise, and the
+    sentence says exactly what it passed and what it still has not: forward paper time.
+    """
+    t = tested.trial
+    d = conn.execute(
+        "SELECT * FROM trials WHERE config_digest = ? AND window = 'dev'", (t.config_digest,)
+    ).fetchone()
+    dev_part = (
+        "no recorded dev trial"
+        if d is None
+        else (f"dev window {d['start']}..{d['end']}: MAR {fmt_num(d['mar'])}, DSR "
+              f"{fmt_num(d['dsr'], 3)} at N={d['n_trials_at_run']}, all five conditions met")
+    )
+    test_part = (
+        f"test window {t.start}..{t.end}, one pre-registered look: return "
+        f"{fmt_signed_pct(t.total_return)} vs SPY TR {fmt_signed_pct(t.spy_tr_return)}, max DD "
+        f"{fmt_pct(t.max_drawdown)}, PF {fmt_pf(t.profit_factor)}, {t.trades} trades, MAR "
+        f"{fmt_num(t.mar)} -- all five conditions met"
+    )
+    return (
+        f"Passed the quant backtest gate. {dev_part}; {test_part}. No forward paper record yet: "
+        f"design §1 still needs >= 3 months and >= 100 closed paper trades before real money."
+    )
+
+
+def _promote_argv(method, tested, *, roster_id: str, gate_note: str, lab_db: Path) -> list[str]:
+    """The exact ``promote`` command for a passed method. Pure: builds argv, runs nothing.
+
+    ``lab test`` does not call ``commands/promote.py`` in-process. It reads a research store and a
+    SQLite file and must stay offline; ``promote`` opens Neon, and the two writes cannot share a
+    transaction (``promote.py`` module docstring). Design §6's "never ask" is satisfied by the
+    skill running this line immediately, which is what it does.
+    """
+    sub = method.hypothesis.strip().splitlines()[0].strip()
+    if len(sub) > 80:
+        sub = sub[:77].rstrip() + "..."
+    return [
+        "python", "-m", "seer_engine", "promote",
+        "--method", method.id,
+        "--candidate", tested.trial.candidate_id,
+        "--id", roster_id,
+        "--name", f"{roster_id} · {method.name}",
+        "--sub", sub,
+        "--gate-note", gate_note,
+        "--lab-db", str(lab_db),
+    ]
+
+
+def _verdict_report(conn, method, tested, *, roster_id: str, lab_db: Path) -> str:
+    """What the owner (or the skill) reads after the look: the verdict and the one next step."""
+    import shlex
+
+    t = tested.trial
+    head = [
+        "",
+        f"{t.candidate_id} on the test window {t.start}..{t.end}: {tested.status.upper()}",
+        f"  return {fmt_signed_pct(t.total_return)} vs SPY TR {fmt_signed_pct(t.spy_tr_return)}, "
+        f"CAGR {fmt_signed_pct(t.cagr)}, maxDD {fmt_pct(t.max_drawdown)}, "
+        f"PF {fmt_pf(t.profit_factor)}, trades {t.trades}, MAR {fmt_num(t.mar)}",
+        f"  DSR {fmt_num(t.dsr, 3)} at N={t.n_trials_at_run} (recorded, not a condition)",
+    ]
+    if tested.status == "test-failed":
+        return "\n".join(head + [
+            f"  failed: {t.failed}",
+            "",
+            "test-failed is final. There is no second look at this configuration, on any window.",
+            "Queue a variation (lab idea --source-kind variation --parent "
+            f"{method.id} ...) if the evidence supports one, and journal what the test window said",
+            "that the dev window did not.",
+        ])
+    argv = _promote_argv(method, tested, roster_id=roster_id,
+                         gate_note=_gate_note(conn, tested), lab_db=lab_db)
+    return "\n".join(head + [
+        "",
+        "test-passed. Next, without asking anyone (design §6): put it on the paper roster under a",
+        "new id with its own clock, then stage and commit the lab.",
+        "",
+        f"  {shlex.join(argv)}",
+        "",
+        "  lab stage      # writes web/data/lab.json and git-adds it with the database",
+        "",
+        "promote writes the roster row with no paper_start, so the next paper night freezes the",
+        "spec and starts the clock there: the paper record begins at the promotion and claims",
+        "nothing earlier. Real money still needs all of design §1.",
+    ])
+
+
+def _test(conn, args) -> int:
+    """``lab test <candidate>``: the one counted look at the test window (design §3)."""
+    from seer_engine.lab import runner
+
+    method, path, candidate = runner.resolve_candidate(args.candidate)
+    store_dir = Path(args.store)
+    pre = runner.preflight_test(conn, method, path, candidate)
+    if args.dry_run:
+        print(_test_plan(method, candidate, pre, store_dir))
+        return 0
+    t0 = time.perf_counter()
+    # Phase 2's idiom: ask the store which window it is for, then ask load_store for exactly
+    # that one. load_store compares the two before it reads a single data file, so a dev store
+    # here is refused by name; the `window.name != "test"` test below is the second of the two
+    # independent noes `run_test` wants, and it names the fix.
+    try:
+        window = research.declared_window(store_dir)
+        if window.name != "test":
+            raise store.LabError(
+                f"{store_dir} declares the {window.name} window; `lab test` needs the test-window "
+                f"store. Build it with `python -m seer_engine research_store --test-window` and "
+                f"point --store at {research.TEST_STORE_DIR}"
+            )
+        data = research.load_store(store_dir, window=window)
+    except FileNotFoundError as e:
+        raise store.LabError(
+            f"test-window research store {store_dir} is missing {e.filename or e}; build it with "
+            f"`python -m seer_engine research_store --test-window --store {store_dir}`"
+        ) from e
+    except ValueError as e:
+        raise store.LabError(f"{store_dir}: {e}") from e
+    log.info("test store %s loaded, window %s..%s (%.1fs)", data.fingerprint[:12],
+             data.window.start, data.window.end, time.perf_counter() - t0)
+    tested = runner.run_test(conn, method, path, candidate, data,
+                             git_sha=runner.git_head(config.REPO_ROOT))
+    _show(conn, argparse.Namespace(method=method.id))
+    print(_verdict_report(conn, method, tested,
+                          roster_id=args.roster_id or method.id, lab_db=Path(args.db)))
+    print(f"\nLab N (dev trials) is still {store.dev_trial_count(conn)}; "
+          f"test-window looks used: {store.test_looks(conn)}")
     return 0
 
 
@@ -376,6 +622,8 @@ _HANDLERS = {
     "status": _status,
     "show": _show,
     "run": _run,
+    "promote": _promote,
+    "test": _test,
     "idea": _idea,
     "note": _note,
     "block": _block,

@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-05
-**Total Active Tasks**: 0
+**Last Updated**: 2026-10-06
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 3
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 0
-- Completed: 70
+- Blocked: 1
+- Completed: 71
 
 ---
 
@@ -421,6 +421,51 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the direct precedent recorded by phases 1, 2, 3 and 5 of this same set in the blocks above, and by all five phases of the previous swarm in this same file). Keeping the set's six phase blocks contiguous is what a reader of this set wants; splitting the last one off alone would scatter it.
     - Completion: no `**Commit**` field (rung 6: phases 1, 2, 3 and 5 above have none either). This file is committed *inside* the phase's own commit, so a field naming that commit's sha cannot exist in it; the sha is reported to the set's coordinator and is one `git log` away.
     - Completion: landing NOT attempted, and `next_command` is empty. `swarm.py find --plan ROSTER_PROMOTION_PIPELINE_PLAN.md` returns `swarm: true` with coordinator `orch-roster-promotion-pipeline`; per `analyze-orchestrator` Step 5 the merge of the whole set belongs to that coordinator, and landing it here too is the double-merge that rule exists to prevent. This is the set's last phase, so there is no successor task either.
+
+- [x] **P1-ENG-5X3M** Phase 1: Make the backtest window a parameter, keeping D9 absolute
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns a new `backtest/window.py`, the window threading through `backtest/dev.py` (guards, `candidate_window`, `run_candidate`, `run_registry`, `DevRow.window` and the relaxation of `DevRow.__post_init__` to `check_dev_session(self.end, self.window)`), and `research.py`'s window-bearing helpers (`_members_start`, `_overlaps_window`, `requested_symbols`, `research_membership`, `unserved_by_year`, `unserved_reason`); sole editor of `engine/tests/test_research_store.py`. Leaves store build/load on disk, all of `lab/`, every CLI and `dev_report.py` alone. Exit: `DEV_END` unchanged in both modules and its equality test passes untouched; no manifest key added (`test_research_store.py:235`'s `set(manifest) == MANIFEST_KEYS` holds); `unserved_reason()` byte-identical to the retired `UNSERVED_REASON`, so the dev fingerprint `399d0d25…` cannot move; every existing caller compiles with no argument changes; a post-`DEV_END` bar is still refused under the dev window and accepted only when a test window is passed; the membership clamp is against the passed window's end and the universe is `[max(window.start, MEMBERSHIP_START), window.end]`; `lab run`'s digests byte-identical.
+  - **Status**: completed
+  - **Plan Set**: `BUILD_PROMOTION_PATH_PLAN.md` (phase 1 of 4)
+  - **Satisfies**: R1 — A test-window research store (2015-10-19 → latest session), built like the dev store, with the same files, manifest and checks; R2 — `lab test <candidate>`: refuses without a committed pre-registration, runs once, records a `test` trial, sets `test-passed`/`test-failed`
+  - **Plan**: `.workflows/plan/P1-ENG-5X3M.md`
+  - **Completed**: 2026-10-06 12:54
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/window.py (new), engine/src/seer_engine/backtest/dev.py, engine/src/seer_engine/research.py, engine/tests/test_backtest_window.py (new), engine/tests/test_backtest_dev.py, engine/tests/test_research_store.py
+  - **Verified**: `ruff check src tests` clean; full engine suite 2392 passed / 360 skipped in 160.91s (every skip `PG_TEST_URL`-gated and pre-existing). No venv on PATH in this worktree, so the suite ran under the main checkout's interpreter (`/home/miftah/seer/engine/.venv/bin/python`) with `PYTHONPATH` pointed at this worktree's `src`. The plan's three manual checks all confirmed: (1) `git diff -U0` over `dev.py` and `research.py` filtered on `DEV_END = ` printed nothing — the literal `date(2015, 10, 16)` is unchanged in both; (2) `test_fundamentals_coverage.py` (which pins `coverage.WINDOW_END == dev.DEV_END == research.DEV_END`) has a zero-line diff, and both `test_backtest_dev.py` (+93) and `test_research_store.py` (+54) are pure insertions with zero deletions, so no existing test function was edited; (3) `DEV_WINDOW.start == date.min`, which makes `candidate_window`'s new floor provably dead code on the dev window, so no recorded dev trial's start/end can shift. Also confirmed at runtime: `MANIFEST_KEYS` still holds exactly 9 keys (dev store fingerprint `399d0d25…` cannot move), `unserved_reason()` is byte-identical to the retired `UNSERVED_REASON`, and `dev.DEV_WINDOW == research.DEV_WINDOW`. Plan invariants 1-7 all hold; nothing wrote to `lab/lab.sqlite` or `web/data/lab.json` and no test-window look was spent.
+  - **Drift**: none. Every code block in the phase plan applied against the tree exactly as quoted. A concurrent session is implementing phase 3 (which shares no dependency with phase 1) in this same worktree; its files are excluded from this phase's commit by the decision below.
+  - **Decided**:
+    - Which index to tick: `-f` named `.workflows/orchestration/build-promotion-path/PLAN.md`, but the committed index carrying the TaskID column is `BUILD_PROMOTION_PATH_PLAN.md` at the repo root -> tick the root index (rung 5: the plan's own Next block prints `-f BUILD_PROMOTION_PATH_PLAN.md`, and Step 3 wrote the TaskIDs there).
+    - Shared worktree with a live phase-3 session -> commit only phase 1's six files plus the set-wide bookkeeping, leaving `lab/`, `commands/lab.py`, `docs/lab/` and `tests/test_lab_*` to phase 3 (rung 6: the index's File-ownership table makes `lab/` phase 3's region). Committed by explicit pathspec; no `git add -A`.
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the precedent recorded repeatedly in this same file by the ROSTER_PROMOTION_PIPELINE and FUNDAMENTAL_PANEL_COVERAGE swarms). A cross-file block move is the one edit that reliably loses a peer's concurrent append, and a peer is appending to this file right now.
+    - Completion: no `**Commit**` field (rung 6: the same precedent). This file is committed inside the phase's own commit, so a field naming that sha cannot exist in it; the sha is reported to the caller instead.
+- [ ] **P1-ENG-8OLO** Phase 2: Build and load the test-window store
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `research.build_store` / `load_store` / `refresh_fundamentals` window plumbing, `ResearchData.window`, the manifest's optional window identity (`window_name`, `window_start`, `window_end`) and `declared_window`, `TEST_STORE_DIR` / `TEST_WINDOW_START` / `test_window` / `latest_session`, the swap of `research._after_dev_end` for `_after_window_end`, `commands/research_store.py`'s `--test-window` and `--window-end`, and the `.gitignore` / ruff excludes for `engine/.research-test`. Leaves `backtest/` (phase 1), `commands/lab.py` and `lab/` (phases 3–4) and `test_research_store.py` alone, adding `engine/tests/test_research_test_store.py` instead. Exit: a test store builds into `engine/.research-test` via `research_store --test-window`; `load_store` verifies by fingerprint and refuses a dev store where a test store is expected and vice versa before any data file is read; membership clamps against the test window's end; the universe is the test window's members at both ends; the store's data still runs from `STORE_START` (1993-01-29) so the lookback run-up is present; `MANIFEST_KEYS` unchanged and a dev build writes no window key, so the dev store loads bit-identically (`399d0d25…`) and `test_research_store.py:235` passes unedited.
+  - **Status**: open
+  - **Plan Set**: `BUILD_PROMOTION_PATH_PLAN.md` (phase 2 of 4)
+  - **Satisfies**: R1 — A test-window research store (2015-10-19 → latest session), built like the dev store, with the same files, manifest and checks
+  - **Depends on**: P1-ENG-5X3M
+  - **Plan**: `.workflows/plan/P1-ENG-8OLO.md`
+- [ ] **P1-ENG-AZ81** Phase 3: Pre-registration: `lab promote` and `docs/lab/prereg/`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `lab/prereg.py` — the `docs/lab/prereg/MNNNN.md` format, its writer, its parser and the committed-file gate (`require_committed(candidate_id, *, directory=None) -> Prereg`, `check_digest(p, digest, *, directory=None)`, `PreregError(store.LabError)`) — plus `store.best_dev_eligible`, a `lab promote <method>` subcommand that writes the prereg file and moves `dev-eligible → promoted`, and `docs/lab/prereg/README.md`. Lands before phase 4 in `commands/lab.py` and is the earlier owner of that file's three insertion regions. Leaves `backtest/`, `research.py`, the test store and runner, `record_promotion`, `commands/promote.py` and every skill file alone. Exit: `lab promote` refuses a method that is not `dev-eligible`; writes exactly one prereg file carrying `method`, `candidate`, `config_digest`, `gate`, `test_window` and `date` (all `str`); is idempotent and never rewrites a committed file, not even its `date`; refuses to change which variant is pre-registered; a test proves the prereg digest is copied from the recorded dev trial's digest; the prose states the test look is judged by the five go-live conditions alone with DSR recorded and not applied, so the `gate` field cannot be read as the test gate; `store.test_looks` stays 0 and no `trials` row is written.
+  - **Status**: in_progress
+  - **Plan Set**: `BUILD_PROMOTION_PATH_PLAN.md` (phase 3 of 4)
+  - **Satisfies**: R3 — Pre-registration of the best dev-eligible variant by MAR in `docs/lab/prereg/MNNNN.md`, committed before any test number exists
+  - **Plan**: `.workflows/plan/P1-ENG-AZ81.md`
+- [ ] **P1-ENG-YJDW** Phase 4: `lab test`: one counted look, recorded and final
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns the test-window runner appended to `lab/runner.py` (`Tested`, `resolve_candidate`, `preflight_test`, `test_trial_row`, `run_test` — nothing above `:253` changes), the `lab test <candidate>` subcommand, the `promoted → test-passed|test-failed` transition, the printed hand-off to `commands/promote.py` on a pass, `tests/labkit.py`'s test-window fixtures, and the whole `## Promotion` section of `.claude/skills/explore-and-experiment-new-method/SKILL.md` (which must document `lab promote` as well as `lab test`). Leaves `backtest/dev.py` (phase 1), `research.py` and `commands/research_store.py` (phase 2), `lab/prereg.py` and the `promote` subcommand (phase 3), `lab/store.py`, `record_promotion`, the eligibility gate, `lab/lab.sqlite` and `web/data/lab.json` alone. Exit: `lab test` refuses a candidate with no committed prereg, a drifted digest, a method that is not `promoted`, no dev trial, and a second look (proven against the database with raw SQL); refuses a dev store by name before anything runs; records one `trials` row with `window='test'` that does not increment the lab's dev N (`dev_trial_count` and `dev_daily_sharpes` byte-identical); DSR recorded and never in `failed`; sets final `test-passed`/`test-failed`; on a pass prints a ready-to-run `promote` command; `SKILL.md` names both subcommands; `lab status` and the web snapshot report `test-window looks used: 1` after a simulated look in a temp database and 0 in the real one.
+  - **Status**: blocked
+  - **Plan Set**: `BUILD_PROMOTION_PATH_PLAN.md` (phase 4 of 4)
+  - **Satisfies**: R2 — `lab test <candidate>`: refuses without a committed pre-registration, runs once, records a `test` trial, sets `test-passed`/`test-failed`
+  - **Depends on**: P1-ENG-8OLO, P1-ENG-AZ81
+  - **Plan**: `.workflows/plan/P1-ENG-YJDW.md`
 
 ### [P2] Medium
 

@@ -18,6 +18,7 @@ import pytest
 
 from seer_engine import cli, config, db, research, yahoo
 from seer_engine.backtest.benchmark import Dividend
+from seer_engine.backtest.window import Window
 from seer_engine.commands import research_store as research_cmd
 from seer_engine.fundamentals import Fact
 
@@ -771,3 +772,56 @@ def test_command_refresh_dry_run_leaves_the_store_untouched(
     assert "dry run: refreshed a copy in a temporary directory and discarded it" in out
     assert {n: (store / n).read_bytes() for n in kept} == before
     assert not (tmp_path / "store.tmp").exists()
+
+
+# ---- the window parameter ------------------------------------------------------------------
+
+TEST_WINDOW = Window(name="test", start=date(2015, 10, 19), end=date(2026, 8, 18))
+
+
+def test_the_dev_window_is_what_every_helper_defaults_to(members_dir):
+    assert research.DEV_WINDOW == Window(name="dev", start=date.min, end=research.DEV_END)
+    assert research.requested_symbols(members_dir, window=research.DEV_WINDOW) == research.requested_symbols(members_dir)
+    explicit = research.research_membership(members_dir, window=research.DEV_WINDOW)
+    assert explicit.intervals == research.research_membership(members_dir).intervals
+    members = research.research_membership(members_dir)
+    assert research.unserved_by_year(members, ["DDD"], window=research.DEV_WINDOW) == research.unserved_by_year(
+        members, ["DDD"])
+
+
+def test_the_test_window_selects_its_own_universe(members_dir):
+    symbols = research.requested_symbols(members_dir, window=TEST_WINDOW)
+    assert "NEW" in symbols  # joined 2016-01-04: never a dev-window member
+    assert "GONE" not in symbols  # left 2000-01-03: never a test-window member
+    assert set(research.RESEARCH_ETFS) <= set(symbols)
+
+
+def test_membership_is_clamped_against_this_windows_end(members_dir):
+    m = research.research_membership(members_dir, window=TEST_WINDOW)
+    # BBB leaves on 2016-01-04, inside this window: the end is kept, not opened up.
+    assert ("BBB", date(1996, 1, 2), date(2016, 1, 4)) in m.intervals
+    assert ("NEW", date(2016, 1, 4), None) in m.intervals
+    assert all(end is None or end <= TEST_WINDOW.end for _, _, end in m.intervals)
+    assert "NEW" in m.members_on(date(2016, 1, 5))
+    assert "BBB" not in m.members_on(date(2016, 1, 5))
+    # A window that ends before BBB leaves: open-ended again, exactly as the dev store has it.
+    early = research.research_membership(
+        members_dir, window=Window(name="test", start=date(2015, 10, 19), end=date(2015, 12, 31))
+    )
+    assert ("BBB", date(1996, 1, 2), None) in early.intervals
+
+
+def test_unserved_by_year_follows_the_window(members_dir):
+    m = research.research_membership(members_dir, window=TEST_WINDOW)
+    table = research.unserved_by_year(m, ["DDD"], window=TEST_WINDOW)
+    assert [y for y, _, _ in table] == list(range(2015, 2027))
+    rows = {y: (n, u) for y, n, u in table}
+    assert rows[2026][1] == 1  # DDD is still a member and still unserved
+
+
+def test_unserved_reason_names_the_range_it_is_given():
+    assert research.unserved_reason() == research.UNSERVED_REASON
+    assert research.UNSERVED_REASON == "yfinance returned no bars for 1993-01-29..2015-10-16"
+    assert research.unserved_reason(date(2015, 10, 19), date(2026, 8, 18)) == (
+        "yfinance returned no bars for 2015-10-19..2026-08-18"
+    )

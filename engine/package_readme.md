@@ -105,7 +105,8 @@ engine/
       b_walkforward.py      candidate table, purge, per-fold fits, probe, B / B-linear runs, calibration, gate_p6a() (P6a)
       b_report.py           BReport, machine lines, Markdown, equity CSV, SVG (P6a)
       book_runner.py        run_book(), run_rules() (DESIGN_V0 -> run_backtest unchanged), BookResult, RunStats, run_stats() (P7a)
-      dev.py                DEV_END guard, Candidate, candidate_window(), run_registry(), D8 finalists(), deflated_sharpe() (P7a)
+      window.py             Window(name, start, end), WINDOW_NAMES: the session range a run is bound to (P7a)
+      dev.py                DEV_WINDOW / DEV_END guard, Candidate, candidate_window(), run_registry(), D8 finalists(), deflated_sharpe() (P7a)
       dev_report.py         DevReport, Markdown, rows/curves CSVs, frontier SVG, P7b pre-registration (P7a)
       registry.py           REGISTRY: the append-only candidate registry (P7a)
       io.py                 Neon loader + bar cache, dividends CSV, report writers write_report() / write_wf_report() / write_b_report() / write_dev_report(), write_model_artifact() (impure)
@@ -1382,7 +1383,7 @@ F8 (a learned ranker at a longer horizon) and F12 (earnings drift) are not in th
 The store is local and gitignored, in `engine/.research/`.
 
 - Constants:
-  - `DEV_END = date(2015, 10, 16)`, `MEMBERSHIP_START` and `FX_START`, each equal to
+  - `DEV_END = date(2015, 10, 16)`, `DEV_WINDOW`, `MEMBERSHIP_START` and `FX_START`, each equal to
     `backtest.dev`'s (tested);
   - `STORE_START = date(1993, 1, 29)`;
   - `STORE_DIR`;
@@ -1395,6 +1396,13 @@ The store is local and gitignored, in `engine/.research/`.
     ones, and the fingerprint is the sha256 of the sorted `name:sha` lines of the files that were
     actually written. So a store built before this phase keeps loading with a **bit-identical
     fingerprint**, and `--verify` still passes on it.
+- The window-bearing helpers — `requested_symbols`, `research_membership`, `unserved_by_year` and
+  the private `_overlaps_window` / `_members_start` — each take a keyword `window=` that defaults
+  to `DEV_WINDOW`, so every existing caller is unchanged. The membership lower bound stays
+  `max(window.start, MEMBERSHIP_START)`: it is a property of the vendored CSVs, not of the window,
+  and for the dev window (`start = date.min`) it is `MEMBERSHIP_START` exactly as before.
+  `UNSERVED_REASON` is now produced by `unserved_reason(start=STORE_START, end=DEV_END)`; the
+  module constant is kept as that function's default call, so `unserved.csv` is byte-identical.
 - Files. All are LF text, sorted and deterministic, with prices at 4 dp like `bars`:
 
 | File | Columns | Notes |
@@ -1495,21 +1503,34 @@ by year (41.4% of member-sessions over 1996–2015 have no bar). ETF-only candid
 These add to P3, P3b and P6a without changing them, on top of the book runner above. Every module
 here is pure, and the purity glob covers it; the one writer is `backtest.io.write_dev_report`.
 
+- **`backtest.window`**: one frozen value object and nothing else — `Window(name, start, end)`,
+  with `name` in `WINDOW_NAMES = ("dev", "test")`, `covers(d)` and
+  `following(name, end)` (the window opening on the session after this one). Pure, and the purity
+  glob covers it. It holds no date of its own, so it adds no third copy of `DEV_END`: the dev
+  window is a constant in each of the two modules that already own one (`dev.DEV_WINDOW` and
+  `research.DEV_WINDOW`, pinned equal by `tests/test_backtest_window.py`, as the two `DEV_END`s
+  are). `start = date.min` means *no lower bound* — that is the dev window, whose backtests open
+  as early as the data allows (SPY's first session, 1993-01-29).
 - **`backtest.dev`**:
-  - Constants: `DEV_END = 2015-10-16`, `MEMBERSHIP_START = 1996-01-02`, `FX_START = 1999-01-04`
-    and `MAX_CANDIDATES = 60`.
-  - `check_dev_session(d)` raises `DevWindowError` (a `ValueError`) after `DEV_END`. Every public
-    entry point calls it before anything else.
+  - Constants: `DEV_END = 2015-10-16`, `DEV_WINDOW = Window("dev", date.min, DEV_END)`,
+    `MEMBERSHIP_START = 1996-01-02`, `FX_START = 1999-01-04` and `MAX_CANDIDATES = 60`.
+  - **The window is a value, not a module constant.** Every entry point below takes a `window=`
+    argument that **defaults to `DEV_WINDOW`**, so a caller that passes nothing gets the D9 dev
+    behaviour it has always had, byte for byte; `DEV_END` itself is unchanged.
+  - `check_dev_session(d, window=DEV_WINDOW)` raises `DevWindowError` (a `ValueError`) after
+    `window.end` — `DEV_END` on every path that passes no window. Every public entry point calls
+    it before anything else.
   - `Candidate(id, family, rules, allocator, params, rationale, added, owner_inputs)`.
     `candidate_owner_inputs(c)` returns `rule_owner_inputs` plus every held ETF outside
     `DEFAULT_ETFS`, plus `leverage` for a held leveraged ETF. An empty tuple means executable under
     the conservative defaults.
-  - `candidate_window(market, c) -> (start, DEV_END)`. The start is the first session where every
-    instrument the candidate reads, and SPY, has its lookback. A member family also starts no
-    earlier than `MEMBERSHIP_START`.
-  - `run_candidate(market, dividends, spy_dividends, c, *, prepared=None)` and
-    `run_registry(market, dividends, spy_dividends, registry, *, on_result=None)` run sequentially,
-    in registry order, with one prepared value per allocator id — built by
+  - `candidate_window(market, c, *, window=DEV_WINDOW) -> (start, window.end)`. The start is the
+    first session where every instrument the candidate reads, and SPY, has its lookback. A member
+    family also starts no earlier than `MEMBERSHIP_START`, and no candidate opens before
+    `window.start` — a floor that can never bind on the dev window, whose start is `date.min`.
+  - `run_candidate(market, dividends, spy_dividends, c, *, prepared=None, window=DEV_WINDOW)` and
+    `run_registry(market, dividends, spy_dividends, registry, *, on_result=None, window=DEV_WINDOW)`
+    run sequentially, in registry order, with one prepared value per allocator id — built by
     `strategies.allocator.prepare_for(allocator, market)` (edgar-fundamentals), so a `MarketAware`
     allocator gets the whole `Market` (fundamentals included) and every other one gets exactly the
     `allocator.prepare(market.history)` it got before. The candidate's market copy carries
@@ -1518,7 +1539,8 @@ here is pure, and the purity glob covers it; the one writer is `backtest.io.writ
     `FX_START` runs on a market copy whose `fx` is that single rate (D-C). FX before 1999 affects
     only that conversion, never a decision.
   - `DevRow` holds the stats and both SPY curves on the candidate's own window and cash. SPY's
-    dividends come from the store.
+    dividends come from the store. Its trailing `window` field (defaulted to `DEV_WINDOW`) records
+    which window produced the row; `make_row(..., window=DEV_WINDOW)` carries it over.
   - `finalists(rows)` is D8:
     - **eligible** means beating SPY TR, max DD ≤ 15%, PF ≥ 1.3, ≥ 100 closed trades, and no owner
       input;

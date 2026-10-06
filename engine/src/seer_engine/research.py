@@ -55,6 +55,7 @@ from seer_engine.backtest.io import (
     merge_intervals,
 )
 from seer_engine.backtest.market import EMPTY_FUNDAMENTALS, Market, Membership
+from seer_engine.backtest.window import Window
 from seer_engine.fundamentals import FACT_COLUMNS, Fact, FundamentalPanel as Panel
 from seer_engine.prices import to_decimal
 
@@ -65,6 +66,14 @@ STORE_START = date(1993, 1, 29)  # SPY's first session
 MEMBERSHIP_START = date(1996, 1, 2)  # first sp500_history.csv row (== backtest.dev.MEMBERSHIP_START)
 FX_START = date(1999, 1, 4)  # first Frankfurter USD/IDR row (== backtest.dev.FX_START)
 STORE_DIR = config.REPO_ROOT / "engine" / ".research"  # gitignored
+
+DEV_WINDOW = Window(name="dev", start=date.min, end=DEV_END)
+"""The window every helper here defaults to; ``== backtest.dev.DEV_WINDOW`` (a test pins it).
+
+``start`` is ``date.min`` -- the dev window has no lower bound. The membership lower bound is
+``MEMBERSHIP_START``, a property of the vendored CSVs rather than of the window, and the
+helpers below apply it with ``max(window.start, MEMBERSHIP_START)``.
+"""
 
 RESEARCH_ETFS: tuple[str, ...] = (
     "BIL", "DIA", "EFA", "GLD", "IEF", "IWM", "QLD", "QQQ", "SHY", "SPY", "SSO",
@@ -95,7 +104,14 @@ DIVIDENDS_HEADER = "symbol,ex_date,amount"
 FX_HEADER = "date,usd_idr"
 UNSERVED_HEADER = "symbol,reason"
 FUNDAMENTALS_HEADER = ",".join(FACT_COLUMNS)
-UNSERVED_REASON = f"yfinance returned no bars for {STORE_START.isoformat()}..{DEV_END.isoformat()}"
+
+
+def unserved_reason(start: date = STORE_START, end: date = DEV_END) -> str:
+    """What ``unserved.csv`` records for a requested member yfinance returned no bars for."""
+    return f"yfinance returned no bars for {start.isoformat()}..{end.isoformat()}"
+
+
+UNSERVED_REASON = unserved_reason()  # the dev store's: "...for 1993-01-29..2015-10-16"
 
 _COUNT_KEYS: tuple[str, ...] = (
     "bar_rows",
@@ -153,42 +169,68 @@ def _universe(data_dir: Path | None) -> list[membership.Interval]:
     return membership.compute_universe(data_dir if data_dir is not None else membership.DATA_DIR)
 
 
-def _overlaps_window(iv: membership.Interval) -> bool:
-    return iv.start_date <= DEV_END and (iv.end_date is None or iv.end_date > MEMBERSHIP_START)
+def _members_start(window: Window) -> date:
+    """The window's membership lower bound: its own start, but never before the CSVs begin.
+
+    ``DEV_WINDOW.start`` is ``date.min``, so for the dev window this is ``MEMBERSHIP_START``
+    and every result below is exactly what it was before the window became a parameter.
+    """
+    return max(window.start, MEMBERSHIP_START)
 
 
-def requested_symbols(data_dir: Path | None = None) -> tuple[str, ...]:
-    """RESEARCH_ETFS ∪ every member whose interval overlaps [MEMBERSHIP_START, DEV_END], sorted."""
-    members = {iv.symbol for iv in _universe(data_dir) if _overlaps_window(iv)}
+def _overlaps_window(iv: membership.Interval, window: Window = DEV_WINDOW) -> bool:
+    lo = _members_start(window)
+    return iv.start_date <= window.end and (iv.end_date is None or iv.end_date > lo)
+
+
+def requested_symbols(data_dir: Path | None = None, *, window: Window = DEV_WINDOW) -> tuple[str, ...]:
+    """RESEARCH_ETFS ∪ every member whose interval overlaps the window, sorted.
+
+    The overlap is ``[max(window.start, MEMBERSHIP_START), window.end]``, which is
+    ``[MEMBERSHIP_START, DEV_END]`` for the dev window. The test window's members are a
+    different set -- everything that joined after October 2015 is in it and everything that
+    left before is not -- so a store must be built with its own window's universe.
+    """
+    members = {iv.symbol for iv in _universe(data_dir) if _overlaps_window(iv, window)}
     return tuple(sorted(set(RESEARCH_ETFS) | members))
 
 
-def research_membership(data_dir: Path | None = None) -> Membership:
-    """Point-in-time membership for the dev window, from the vendored CSVs (no Neon).
+def research_membership(data_dir: Path | None = None, *, window: Window = DEV_WINDOW) -> Membership:
+    """Point-in-time membership for ``window``, from the vendored CSVs (no Neon).
 
-    Only intervals overlapping [MEMBERSHIP_START, DEV_END] are kept, and an end after DEV_END
-    becomes None (still a member on every dev session), so nothing dated after DEV_END is
-    visible even through membership. Both indices are merged with ``io.merge_intervals``,
-    exactly like ``io.read_intervals`` does for Neon's ``universe``.
+    Only intervals overlapping the window are kept, and an end after ``window.end`` becomes
+    None (the company is a member on every session of this window), so nothing dated after
+    ``window.end`` is visible even through membership. An end *inside* the window is kept as
+    it is -- that is what makes this correct for the test window, where a company that left
+    the index in 2018 must stop being a member in 2018. Both indices are merged with
+    ``io.merge_intervals``, exactly like ``io.read_intervals`` does for Neon's ``universe``.
     """
     rows: list[tuple[str, date, date | None]] = []
     for iv in _universe(data_dir):
-        if not _overlaps_window(iv):
+        if not _overlaps_window(iv, window):
             continue
-        end = iv.end_date if iv.end_date is not None and iv.end_date <= DEV_END else None
+        end = iv.end_date if iv.end_date is not None and iv.end_date <= window.end else None
         rows.append((iv.symbol, iv.start_date, end))
     return Membership(intervals=merge_intervals(rows))
 
 
-def unserved_by_year(members: Membership, unserved: Iterable[str]) -> tuple[tuple[int, int, int], ...]:
-    """Per calendar year MEMBERSHIP_START.year..DEV_END.year: (year, distinct members that year,
-    of which unserved). A symbol counts in a year when one of its intervals overlaps that year's
-    part of [MEMBERSHIP_START, DEV_END]."""
+def unserved_by_year(
+    members: Membership,
+    unserved: Iterable[str],
+    *,
+    window: Window = DEV_WINDOW,
+) -> tuple[tuple[int, int, int], ...]:
+    """Per calendar year of the window: (year, distinct members that year, of which unserved).
+
+    The years run ``max(window.start, MEMBERSHIP_START).year .. window.end.year`` -- 1996..2015
+    for the dev window. A symbol counts in a year when one of its intervals overlaps that
+    year's part of the window."""
     missing = set(unserved)
+    lo_bound = _members_start(window)
     out: list[tuple[int, int, int]] = []
-    for year in range(MEMBERSHIP_START.year, DEV_END.year + 1):
-        lo = max(date(year, 1, 1), MEMBERSHIP_START)
-        hi = min(date(year, 12, 31), DEV_END)
+    for year in range(lo_bound.year, window.end.year + 1):
+        lo = max(date(year, 1, 1), lo_bound)
+        hi = min(date(year, 12, 31), window.end)
         seen = {
             symbol
             for symbol, start, end in members.intervals

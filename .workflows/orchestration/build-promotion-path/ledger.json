@@ -24,21 +24,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "7e8d504",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "Window param on the store half; store declares its window in 3 optional manifest keys a dev build never writes (absent=dev), so MANIFEST_KEYS stays 9 and the real dev store still loads at fingerprint 399d0d25. load_store refuses dev<->test both ways before reading any data file. Build flag is --test-window (+ --window-end); load_store(window=) takes a Window VALUE not a name; loaded window is ResearchData.window. Decision: plan's test literal members_on(2016-01-05)=={AAA,CCC} corrected to {AAA,CCC,NEW,DDD} per the fixture and exit criterion 4 (rung 2) -- code unchanged. Phase 4 unblocked. Caveat: the --test-window clobber guard is relative to this checkout's STORE_DIR, so another worktree's .research is not refused; manifest declaration is the real protection.",
       "package": "research.py`, `commands/research_store.py",
       "plan": ".workflows/plan/build-promotion-path/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-06T06:27:38+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-8OLO",
       "title": "Build and load the test-window store"
     },
     {
@@ -74,7 +74,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "lab test`: one counted look, recorded and final"
     }
@@ -82,7 +82,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/build-promotion-path/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "build-promotion-path",
-  "updated": "2026-10-06T06:07:06+00:00",
+  "updated": "2026-10-06T06:28:28+00:00",
   "verified_at": "2026-10-06T06:07:06+00:00",
   "worktree": "/home/miftah/.worktrees/seer/build-promotion-path"
 }

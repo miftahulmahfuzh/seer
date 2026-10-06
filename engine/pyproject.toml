@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.16,<0.17"]
+dev = ["pytest>=8", "pytest-xdist>=3.6", "ruff>=0.16,<0.17"]
 
 [project.scripts]
 seer-engine = "seer_engine.cli:main"
@@ -30,7 +30,9 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra"
+# -n auto: one worker per core. Every DB test already gets its own schema (conftest pg_schema),
+# so workers never share state; the full suite drops from ~7m45s to ~1m10s. -n0 runs serially.
+addopts = "-ra -n auto"
 
 [tool.ruff]
 target-version = "py311"

@@ -2075,7 +2075,7 @@ exception. The real night is `migrate` → `nightly` → `veto` → `paper` → 
 - `yfinance>=1.0`: used only by `yahoo.py` (phase 3 backfill, and P7a's research store through its dividends-aware download with `actions=True`), imported lazily.
 - Finnhub REST (P6, no new package: `requests`): `company-news` and `calendar/earnings` on the free tier, 60 calls a minute.
 - `scikit-learn>=1.9,<1.10` (P6a): Strategy B's `HistGradientBoostingRegressor`, used only by `strategies.b_model`. The minor version is pinned, because a frozen model is a pickle of its estimator, and `b_model`'s digest reads the fitted trees' private node arrays. It brings `threadpoolctl` (used to cap the threads in the determinism probe), `joblib` and `scipy`. `cli.discover` imports every command, so `backtest_b` makes every command load scikit-learn at startup (about 0.5–1 s); `import seer_engine.strategies` alone does not.
-- dev: `pytest>=8`, `ruff>=0.16,<0.17` (lint config in `[tool.ruff]`: `py311`, selects `E9` and `F`, ignores `F401`).
+- dev: `pytest>=8`, `pytest-xdist>=3.6` (pytest runs `-n auto` by default, one worker per core; pass `-n0` to run serially), `ruff>=0.16,<0.17` (lint config in `[tool.ruff]`: `py311`, selects `E9` and `F`, ignores `F401`).
 
 ### Internal module graph
 - `cli` imports `config` and `commands`. `commands.migrate` imports `config` and `db`.

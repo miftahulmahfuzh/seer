@@ -87,10 +87,10 @@ Every phase must hold all of these, and each phase's exit criteria restate the o
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Make the backtest window a parameter, keeping D9 absolute | R1, R2 | `engine/src/seer_engine/backtest`, `research.py` | 6 | — | HARD | `.workflows/plan/build-promotion-path/phase-1.md` | — | — |
-| 2 | Build and load the test-window store | R1 | `research.py`, `commands/research_store.py` | 5 | 1 | NORMAL | `.workflows/plan/build-promotion-path/phase-2.md` | — | — |
-| 3 | Pre-registration: `lab promote` and `docs/lab/prereg/` | R3 | `lab/`, `commands/lab.py` | 6 | — | NORMAL | `.workflows/plan/build-promotion-path/phase-3.md` | — | — |
-| 4 | `lab test`: one counted look, recorded and final | R2 | `lab/runner.py`, `commands/lab.py`, `SKILL.md` | 5 | 2, 3 | HARD | `.workflows/plan/build-promotion-path/phase-4.md` | — | — |
+| 1 | Make the backtest window a parameter, keeping D9 absolute | R1, R2 | `engine/src/seer_engine/backtest`, `research.py` | 6 | — | HARD | `.workflows/plan/build-promotion-path/phase-1.md` | P1-ENG-5X3M | — |
+| 2 | Build and load the test-window store | R1 | `research.py`, `commands/research_store.py` | 5 | 1 | NORMAL | `.workflows/plan/build-promotion-path/phase-2.md` | P1-ENG-8OLO | — |
+| 3 | Pre-registration: `lab promote` and `docs/lab/prereg/` | R3 | `lab/`, `commands/lab.py` | 6 | — | NORMAL | `.workflows/plan/build-promotion-path/phase-3.md` | P1-ENG-AZ81 | — |
+| 4 | `lab test`: one counted look, recorded and final | R2 | `lab/runner.py`, `commands/lab.py`, `SKILL.md` | 5 | 2, 3 | HARD | `.workflows/plan/build-promotion-path/phase-4.md` | P1-ENG-YJDW | — |
 
 Phases 1 and 3 share no edge and run concurrently. Phase 1 serves two requirements because the
 window parameter is a single foundation both the store (R1) and the runner (R2) need; splitting

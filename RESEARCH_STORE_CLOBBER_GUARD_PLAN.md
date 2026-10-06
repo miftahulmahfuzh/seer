@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/research-store-clobber-guard`
 **Branch:** `feature/research-store-clobber-guard` (base: `origin/main` @ `542ef5d`)
 **Phases:** 1
-**Status:** planned
+**Status:** complete — the single phase is implemented, verified (2480 passed, 360 skipped, 0 failed) and committed on `feature/research-store-clobber-guard`. Landing was not attempted by the phase session: the calling session reserved the swarm-ledger check and the merge decision for itself.
 **Coordinator:** —
 
 ---
@@ -128,7 +128,7 @@ do **not** copy a research store in — invariant 5, and the absent store is wha
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Content-based clobber guard on the build path | R1, R2 | `seer_engine.commands` | 3 | — | NORMAL | `.workflows/plan/research-store-clobber-guard/phase-1.md` | — | — |
+| 1 ✅ | Content-based clobber guard on the build path | R1, R2 | `seer_engine.commands` | 3 | — | NORMAL | `.workflows/plan/research-store-clobber-guard/phase-1.md` | P1-ENG-G4TQ | — |
 
 ### Phase 1 — Content-based clobber guard on the build path
 

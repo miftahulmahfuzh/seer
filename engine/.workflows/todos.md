@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 74
+- Completed: 75
 
 ---
 
@@ -520,6 +520,26 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-G4TQ** Phase 1: Content-based clobber guard on the build path
+  - **Difficulty**: NORMAL
+  - **Type**: Bug
+  - **Context**: Owns `engine/src/seer_engine/commands/research_store.py` (content-based window check on the build path, additive to the two existing `_same_dir` name checks, plus the module docstring's two-stores paragraph), `engine/tests/test_research_test_store.py` (R1 cross-checkout refusal both directions, four fall-through shapes, R2 sibling-path regression tests), `engine/package_readme.md:2372`. Exit: cross-checkout wrong-window build exits 2 both directions; missing/empty/unparseable/same-window paths fall through; `test_research_test_store.py:449-452` passes unedited; sibling-path regression tests pass against unchanged sibling code; `pytest -q` in `engine/` green at 2480 passed, 360 skipped, 0 failed.
+  - **Status**: completed
+  - **Plan Set**: `RESEARCH_STORE_CLOBBER_GUARD_PLAN.md` (phase 1 of 1)
+  - **Satisfies**: R1 — a `--test-window` build must refuse a dev store belonging to any checkout or worktree, and symmetrically for a dev build aimed at another checkout's test store; R2 — do it without weakening the guard that already works, with the sibling paths shown covered by regression test
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-G4TQ.md`
+  - **Completed**: 2026-10-06 14:53
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/commands/research_store.py, engine/tests/test_research_test_store.py, engine/package_readme.md, engine/.workflows/todos.md, engine/.workflows/plan/P1-ENG-G4TQ.md, RESEARCH_STORE_CLOBBER_GUARD_PLAN.md
+  - **Verified**: full engine suite 2480 passed, 360 skipped, 0 failed in 167s (baseline 2469/360; +11 is exactly this phase's new tests) — exit criterion 6, invariant 7. `test_research_test_store.py` alone 39 passed; `test_command_refuses_the_test_window_on_the_dev_store` passes UNEDITED in this worktree where `research.STORE_DIR` does not exist (invariant 3 / exit criterion 4); `test_research_store.py` + `test_fundamentals_coverage.py` + `test_lab_test_window.py` 89 passed, none edited; `ruff check engine/src engine/tests` clean. Invariant 1: main checkout's `engine/.research/manifest.json` still fingerprint `399d0d25…b07cf8` with 9 keys. Invariant 4: `lab/lab.sqlite` reads `dev|85`, no `test` row — no counted test-window look spent. Invariant 5: `engine/.research` not created in the worktree, `engine/.research-test` still absent on main.
+  - **Drift**:
+    - No code drift: every block the phase plan quoted matched the tree byte-for-byte and was applied as written.
+    - The plan's manual check `git diff research_store.py | grep -c '^-'` expected ~7 and reads 3 (with the `---` header excluded). That is the plan's own grep arithmetic, not a behaviour difference: git coalesces the 4 unchanged leading lines of the rewritten docstring paragraph, so only its last 3 prose lines are deletions. Verified by inspection — the 3 deleted lines are all docstring text, and no code line is deleted anywhere in the diff.
+  - **Decided**:
+    - The executor reported no decisions; the plan's three forks were all settled at /analyze time and recorded in the plan index's Decisions table.
+    - Completion: the `[x]` block MOVED into `## Completed Tasks` rather than left in place. The in-place precedent recorded by the ROSTER_PROMOTION_PIPELINE / FUNDAMENTAL_PANEL_COVERAGE / BUILD_PROMOTION_PATH phases exists to protect concurrent peers appending to this same file in a shared worktree; this set has one phase and no peers, so the reason for the exception is absent and the default applies.
+    - Completion: `**Method**: /implement`, not `/do` — the set was executed via `/implement -f RESEARCH_STORE_CLOBBER_GUARD_PLAN.md --phase 1`, which is what the plan index's Next block prescribes and what every other plan-set phase in this file records.
 - [x] **P1-ENG-22VQ** Phase 4: `fundamentals` command — resumable ingest
   - **Difficulty**: HARD
   - **Type**: Feature

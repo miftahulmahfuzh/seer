@@ -26,9 +26,16 @@ Two windows, two stores:
 manifest (``window_start`` / ``window_end``); ``--window-end`` pins it instead, so an
 interrupted build can be resumed to the same end rather than silently moving. The two stores
 are **not** interchangeable: ``research.load_store`` refuses a store whose declared window is
-not the one the caller asked for, this command refuses to build one window into the other's
-directory, and ``--verify`` / ``--refresh-fundamentals`` refuse a store whose declared window
-disagrees with ``--test-window``.
+not the one the caller asked for, and ``--verify`` / ``--refresh-fundamentals`` refuse a store
+whose declared window disagrees with ``--test-window``. A **build** is refused twice over. By
+name: ``--store`` naming this checkout's own ``engine/.research`` under ``--test-window``, or
+its ``engine/.research-test`` without it, is refused on the path alone. By content: the build
+reads the target's own ``manifest.json`` (``research.declared_window``) and refuses, exit 2,
+when the store already in that directory declares the other window. The content check is on the
+store's manifest and never on the path, so it refuses a wrong-window store belonging to **any**
+checkout or worktree, not only the running one. When the target holds no store, or one whose
+manifest will not parse, the window cannot be told and the build proceeds -- the first build of
+all is exactly that case.
 
 ``--verify`` loads an existing store only (no network). ``--coverage`` also loads an existing
 store only and measures what its fundamental panel can rank across the dev window
@@ -172,6 +179,30 @@ def _same_dir(a: Path, b: Path) -> bool:
         return a == b
 
 
+def _declared_window_or_none(store: Path) -> research.Window | None:
+    """The window the store at ``store`` declares, or ``None`` when that cannot be told.
+
+    ``research.declared_window`` reads the target's own ``manifest.json`` and nothing else, so the
+    answer is a property of the **store**, not of the path: it is the same for a store in this
+    checkout and for one in a worktree five directories away. That is what makes the build guard
+    in :func:`run` checkout-independent where ``_same_dir`` is not.
+
+    ``None`` means *undecidable*, never *wrong*. A missing directory, an empty one and an
+    unparseable ``manifest.json`` all raise ``ValueError`` from ``declared_window`` (an unreadable
+    one can raise ``OSError``), and a build into any of those destroys no store -- the very first
+    build is exactly the missing-directory case -- so the caller falls through instead of refusing.
+    A half-written manifest cannot occur in a published store: ``build_store`` writes ``<store>.tmp``
+    and ``research._swap_in`` publishes it with ``os.replace``.
+
+    Deliberately not in ``research.py``: that module already exports ``declared_window``, which is
+    the whole mechanism. This is the command's own "cannot tell" convention wrapped around it.
+    """
+    try:
+        return research.declared_window(store)
+    except (OSError, ValueError):
+        return None
+
+
 def run(args: argparse.Namespace) -> int:
     test = bool(getattr(args, "test_window", False))
     refresh = bool(getattr(args, "refresh_fundamentals", False))
@@ -237,6 +268,32 @@ def run(args: argparse.Namespace) -> int:
         return _verify(store, note="", test=test)
     if refresh:
         return _run_refresh(store, bool(getattr(args, "dry_run", False)), test)
+
+    # Past this point the command BUILDS, and a build replaces the whole directory
+    # (``research._swap_in``). The two guards above compare PATHS, so they can only ever fire
+    # inside this checkout -- ``research.STORE_DIR`` is derived from the running module's own
+    # location. This one compares CONTENT: it asks the target which window the store sitting in it
+    # declares, which is true of a store in any checkout or worktree. When the window cannot be
+    # told there is no store there to destroy, so the build proceeds; that is the first build of
+    # all, and it is why this check is additive to the two above rather than a replacement.
+    declared = _declared_window_or_none(store)
+    if declared is not None and (declared != research.DEV_WINDOW) != test:
+        have = (
+            "the dev window"
+            if declared == research.DEV_WINDOW
+            else f"the test window {declared.start.isoformat()}..{declared.end.isoformat()}"
+        )
+        log.error(
+            "research_store: refusing to build the %s window into %s: that directory already "
+            "holds a store declaring %s, and a build REPLACES the directory. A store is "
+            "identified by the window its own manifest declares, not by its path, so this holds "
+            "for a store in any checkout or worktree. Point --store at the matching directory, "
+            "or remove that store first if it is genuinely disposable",
+            "test" if test else "dev",
+            store,
+            have,
+        )
+        return 2
 
     window = research.DEV_WINDOW
     if test:

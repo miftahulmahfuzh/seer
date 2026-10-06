@@ -511,3 +511,184 @@ def test_command_window_end_pins_the_build(tmp_path, members_dir, monkeypatch):
         ]
     )
     assert json.loads(read(store, research.MANIFEST_FILE))["window_end"] == TEST_END.isoformat()
+
+
+# ---- command: the cross-checkout clobber guard (build path) --------------------------------------
+
+
+def test_command_build_refuses_a_cross_checkout_dev_store(
+    tmp_path, members_dir, monkeypatch, caplog
+):
+    """R1 forward: --test-window over a dev store that belongs to ANOTHER checkout.
+
+    ``tmp_path`` is outside the running checkout, so ``_same_dir(store, research.STORE_DIR)`` is
+    False and the path guard at research_store.py:219 cannot fire. Only the content guard can
+    refuse here, and before this phase the build proceeded and replaced the manifest (measured).
+    """
+    patched_build(monkeypatch, members_dir)
+    store = tmp_path / "other-checkout" / "engine" / ".research"
+    store.parent.mkdir(parents=True)
+    build(store, members_dir)
+    before = read(store, research.MANIFEST_FILE)
+    assert store.resolve() != research.STORE_DIR.resolve()  # the path guard cannot fire
+
+    code = cli.main(["research_store", "--test-window", "--store", str(store)])
+
+    assert code == 2
+    assert "already holds a store declaring" in caplog.text
+    assert str(store) in caplog.text
+    assert "the dev window" in caplog.text
+    assert read(store, research.MANIFEST_FILE) == before  # not one byte written
+    assert set(json.loads(before)) == research.MANIFEST_KEYS
+    assert not (store.parent / ".research.tmp").exists()
+    assert not (store.parent / ".research.old").exists()
+    # A dry run is a rehearsal of the same destructive build and is refused the same way.
+    assert cli.main(["--dry-run", "research_store", "--test-window", "--store", str(store)]) == 2
+    assert read(store, research.MANIFEST_FILE) == before
+
+
+def test_command_build_refuses_a_cross_checkout_test_store(
+    tmp_path, members_dir, monkeypatch, caplog
+):
+    """R1 reverse: a dev build aimed at another checkout's test store. Lower stake, same defect.
+
+    ``end=research.DEV_END`` because a dev build asks Frankfurter for FX through DEV_END and
+    ``patched_build``'s fake asserts the range; with the default end a regression would fail inside
+    the FX fetch and this test would pass for the wrong reason.
+    """
+    patched_build(monkeypatch, members_dir, end=research.DEV_END)
+    store = tmp_path / "other-checkout" / "engine" / ".research-test"
+    store.parent.mkdir(parents=True)
+    build(store, members_dir, window=research.test_window(TEST_END))
+    before = read(store, research.MANIFEST_FILE)
+    assert store.resolve() != research.TEST_STORE_DIR.resolve()  # the path guard cannot fire
+
+    code = cli.main(["research_store", "--store", str(store)])
+
+    assert code == 2
+    assert "already holds a store declaring" in caplog.text
+    assert str(store) in caplog.text
+    assert f"the test window 2015-10-19..{TEST_END.isoformat()}" in caplog.text
+    assert read(store, research.MANIFEST_FILE) == before
+    assert json.loads(before)["window_end"] == TEST_END.isoformat()
+    assert not (store.parent / ".research-test.tmp").exists()
+
+
+@pytest.mark.parametrize("shape", ["missing", "empty", "unparseable"])
+def test_command_build_proceeds_when_the_window_cannot_be_told(
+    tmp_path, members_dir, monkeypatch, capsys, shape
+):
+    """The three undecidable shapes fall through. ``missing`` is the first build of all, and it is
+    also ``research.STORE_DIR`` in every worktree, which is why the guard may never refuse it."""
+    patched_build(monkeypatch, members_dir)
+    store = tmp_path / "target"
+    if shape in ("empty", "unparseable"):
+        store.mkdir()
+    if shape == "unparseable":
+        (store / research.MANIFEST_FILE).write_text("{not json", encoding="utf-8")
+
+    code = cli.main(["research_store", "--test-window", "--store", str(store)])
+
+    capsys.readouterr()
+    assert code == 1  # built fine; the real-data checks fail on fake data
+    manifest = json.loads(read(store, research.MANIFEST_FILE))
+    assert manifest["window_end"] == TEST_END.isoformat()
+    assert manifest["window_name"] == "test"
+
+
+def test_command_build_allows_a_same_window_dev_rebuild(
+    tmp_path, members_dir, monkeypatch, capsys
+):
+    """A rebuild over a store of the SAME window is legitimate and must not be refused:
+    ``--with-fundamentals`` over an existing dev store is the documented routine."""
+    patched_build(monkeypatch, members_dir, end=research.DEV_END)
+    store = tmp_path / "dev"
+    first = build(store, members_dir)
+
+    code = cli.main(["research_store", "--store", str(store)])
+
+    out = capsys.readouterr().out
+    assert code == 1
+    second = json.loads(read(store, research.MANIFEST_FILE))
+    assert set(second) == research.MANIFEST_KEYS  # still nine keys, still no window key
+    assert second["fingerprint"] == first["fingerprint"]  # it really rebuilt the same store
+    assert "store_start: 1993-01-29" in out
+
+
+def test_command_build_allows_a_same_window_test_rebuild(
+    tmp_path, members_dir, monkeypatch, capsys
+):
+    patched_build(monkeypatch, members_dir)
+    store = tmp_path / "test"
+    build(store, members_dir, window=research.test_window(TEST_END))
+
+    code = cli.main(["research_store", "--test-window", "--store", str(store)])
+
+    capsys.readouterr()
+    assert code == 1
+    assert json.loads(read(store, research.MANIFEST_FILE))["window_end"] == TEST_END.isoformat()
+
+
+# ---- R2: the sibling paths were never checkout-local, and these pin it -----------------------------
+
+
+def test_command_verify_refuses_a_cross_checkout_dev_store(tmp_path, members_dir, capsys):
+    """The direction ``test_command_verify_refuses_a_cross_window_store`` does not cover: a DEV
+    store under --test-window. Content-based through ``_store_window``, with no edit to it."""
+    store = tmp_path / "dev"
+    build(store, members_dir)
+    assert cli.main(["research_store", "--verify", "--test-window", "--store", str(store)]) == 2
+    assert capsys.readouterr().out == ""
+
+
+def test_command_refresh_fundamentals_refuses_a_cross_checkout_store(tmp_path, members_dir):
+    """Both directions, and no database is reached: ``_run_refresh`` calls ``_store_window``
+    before ``_read_facts``, so the refusal happens with no DATABASE_URL in the environment."""
+    dev = tmp_path / "dev"
+    build(dev, members_dir)
+    assert (
+        cli.main(["research_store", "--refresh-fundamentals", "--test-window", "--store", str(dev)])
+        == 2
+    )
+    test = tmp_path / "test"
+    build(test, members_dir, window=research.test_window(TEST_END))
+    assert cli.main(["research_store", "--refresh-fundamentals", "--store", str(test)]) == 2
+    assert read(dev, research.MANIFEST_FILE)  # both stores still there, unread and unwritten
+    assert json.loads(read(test, research.MANIFEST_FILE))["window_end"] == TEST_END.isoformat()
+
+
+def test_command_coverage_refuses_a_cross_checkout_test_store(tmp_path, members_dir, capsys):
+    """--coverage has no ``_store_window`` call, but ``load_store`` defaults to DEV_WINDOW and
+    ``_read_manifest`` compares the declaration before opening a single data file."""
+    store = tmp_path / "test"
+    build(store, members_dir, window=research.test_window(TEST_END))
+    assert cli.main(["research_store", "--coverage", "--store", str(store)]) == 2
+    assert capsys.readouterr().out == ""  # the number is never printed for a refused store
+
+
+def test_command_lab_test_refuses_a_cross_checkout_dev_store(tmp_path, members_dir, monkeypatch):
+    """``lab test --store`` was already content-guarded at commands/lab.py:484. Pinned, not edited.
+
+    ``resolve_candidate`` and ``preflight_test`` are stubbed because they run before the store is
+    read and would otherwise refuse first, for an unrelated reason; the window check is then the
+    first thing that actually runs. The two imports are function-local so this file's import block
+    stays byte-for-byte as it was. ``runner.run_test``'s second, independent refusal is already
+    pinned by ``test_lab_test_window.py:215-221`` and is not duplicated here.
+    """
+    from seer_engine.lab import runner
+    from seer_engine.lab import store as lab_store
+
+    store = tmp_path / "dev"
+    build(store, members_dir)
+    monkeypatch.setattr(runner, "resolve_candidate", lambda cid: (None, tmp_path / "m.py", None))
+    monkeypatch.setattr(runner, "preflight_test", lambda conn, method, path, candidate: None)
+    db = tmp_path / "lab.sqlite"
+
+    code = cli.main(["lab", "--db", str(db), "test", "M0001-A", "--store", str(store)])
+
+    assert code == 2
+    conn = lab_store.connect(db)
+    try:
+        assert lab_store.test_looks(conn) == 0  # the one counted look was not spent
+    finally:
+        conn.close()

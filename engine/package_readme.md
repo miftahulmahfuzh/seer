@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (src layout: `engine/src/seer_engine`)
-**Last Updated**: 2026-10-06 (build the promotion path, phase 4 of 4 of `BUILD_PROMOTION_PATH_PLAN.md`: the `lab test` subcommand and the test-window half of `lab/runner.py` — the one counted look at the test window, and the hand-off to `promote`)
+**Last Updated**: 2026-10-06 (make the research-store clobber guard checkout-independent, the single phase of `RESEARCH_STORE_CLOBBER_GUARD_PLAN.md`: `research_store`'s build path now refuses a wrong-window store by its manifest, not by its path)
 
 ## Overview
 
@@ -37,6 +37,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - Two windows, two stores (build-promotion-path, phase 2): the research window became a parameter on the store half. `build_store` / `load_store` / `refresh_fundamentals` each take a keyword `window=` defaulting to `DEV_WINDOW`, and a store declares its own window in three **optional** manifest keys (`window_name`, `window_start`, `window_end`) that a dev build never writes — **absent means dev**, so `engine/.research`'s manifest stays exactly the nine `MANIFEST_KEYS` it was sealed with and its fingerprint cannot move. `research_store --test-window` builds the P7b test-window store (2015-10-19..data end) into `engine/.research-test` (gitignored); `load_store` refuses a dev store where a test store is expected and the reverse, before it reads a single data file. `MANIFEST_KEYS` is unchanged at nine, no test-window look is spent, and no lab state changes
 - Pre-registration, the half a database cannot enforce (build-promotion-path, phase 3): the lab gets **one** look at the test window per configuration, and `UNIQUE(config_digest, window)` on `trials` enforces the *count* but not *which* configuration the look is spent on. `lab/prereg.py` owns the committed file that does — `docs/lab/prereg/MNNNN.md`, a strict `key: value` block then prose — with its writer, its parser (`parse(render(p, name)) == p` exactly) and the gate `lab test` calls before it looks (`require_committed`, `check_digest`). `lab promote <method>` writes that file for the method's best dev-eligible variant by MAR (`lab.store.best_dev_eligible`) and moves the method `dev-eligible -> promoted`; it loads no research store, runs no backtest and inserts no `trials` row, so pre-registering costs no look. A pre-registration is written once and never rewritten: a better variant found later is a new method with its own dev trials, not an edit to the file
 - Spending the look (build-promotion-path, phase 4): `lab test <candidate>` is the one counted look at the test window, and the last step before the roster. `lab/runner.py` gains an appended test-window half — `Tested`, `resolve_candidate`, `preflight_test`, `test_trial_row`, `run_test` — and `commands/lab.py` the `test` subcommand (with `--dry-run`, `--store`, `--roster-id`). It refuses, in this order, a method that is not `promoted`, a method file that has changed since its dev trials ran, a missing or uncommitted pre-registration, a pre-registered digest that has drifted, a configuration with no recorded dev trial, and a configuration that has already had its look — the last enforced in the database by `UNIQUE(config_digest, window)`, not only in the command — and it refuses a dev research store *by name* before anything is loaded. A run appends exactly one `trials` row with `window = 'test'`, which **does not move the lab's N** (`dev_trial_count` and `dev_daily_sharpes` stay dev-only, so a test look is a look, not a search); DSR is recorded and never decides the verdict, because a pre-registered look has no selection among results to deflate. The method ends at `test-passed` or `test-failed`, both final, and a pass prints a ready-to-run `seer_engine promote ...` line that hands off to phase 5's existing paper-roster path. `lab status` now lists `Test-passed` and `Test-failed` alongside `Promoted (pre-registered)`; against the real lab `test-window looks used` still reads 0 — this phase builds the mechanism and spends nothing
+- The clobber guard knows a store by its content, not by its path (research-store-clobber-guard, the set's single phase): `commands/research_store.py`'s two `_same_dir` guards compare the `--store` path against `research.STORE_DIR` / `research.TEST_STORE_DIR`, which are derived from the **running module's own location** — so a `--test-window` build aimed at another checkout's or worktree's `engine/.research` was not refused, and a build replaces the whole directory. The **build path only** now also asks the target what it is: `_declared_window_or_none` wraps `research.declared_window`, and a declared window that disagrees with `--test-window` exits 2 before a single symbol is downloaded. The answer comes from the target's own `manifest.json`, so it holds for a store anywhere on the machine; `None` means *undecidable*, never *wrong*, so a missing, empty or unparseable target falls through and the first build of all still works. The two path guards are byte-for-byte unchanged and still fire first, and `--verify`, `--coverage` and `--refresh-fundamentals` are untouched — they read a store rather than replace one
 
 ## Layout
 
@@ -362,7 +363,12 @@ read, and the store whose fingerprint every recorded lab trial was measured agai
 **test window** (2015-10-19..data end) lives in `engine/.research-test` behind `--test-window`,
 read only by `lab test`. The two are **not** interchangeable: `research.load_store` refuses a store
 whose declared window is not the one the caller asked for, and this command refuses (exit 2) to
-build one window into the other's directory even when the operator names it explicitly.
+build one window into the other's directory even when the operator names it explicitly — by **path**
+for this checkout's own two directories, and, since research-store-clobber-guard, by **content** as
+well: a build reads the target's own `manifest.json` (`research.declared_window`) and refuses when
+the store already sitting there declares the other window, which protects a store in **any** checkout
+or worktree and not merely the running one. A target holding no readable store declares nothing, so
+the first build of all still proceeds.
 
 - **`--store`** defaults to `engine/.research` (gitignored), or `engine/.research-test` with
   `--test-window`, and **`--batch-size`** to 40 symbols per yfinance request.
@@ -423,8 +429,10 @@ build one window into the other's directory even when the operator names it expl
   fails (nothing is written, any previous store is kept) or a check fails; 2 when the store is
   missing or invalid (a tampered file, or a row after the declared window's end), or when the flags
   refuse — a store/window mismatch, `--test-window` aimed at `engine/.research` or a dev invocation
-  aimed at `engine/.research-test`, `--window-end` without `--test-window` or on a read-only mode,
-  or `--coverage` with `--test-window`.
+  aimed at `engine/.research-test`, a **build** whose target directory already holds a store whose
+  manifest declares the other window (the content guard, which holds wherever that store lives),
+  `--window-end` without `--test-window` or on a read-only mode, or `--coverage` with
+  `--test-window`.
 
 ### `backtest_dev` (P7a)
 
@@ -2340,8 +2348,9 @@ engine/.venv/bin/python -m seer_engine research_store --test-window --verify    
 ```
 
 Neither store can be used in the other's place: `--test-window` against `engine/.research` (or a
-dev invocation against `engine/.research-test`) exits 2, and `load_store` refuses the mismatch
-before it reads a data file.
+dev invocation against `engine/.research-test`) exits 2 — as does any build whose target already
+holds a store declaring the other window, wherever on the machine that store lives — and
+`load_store` refuses the mismatch before it reads a data file.
 
 Spending the one look on that store is `lab test` (build-promotion-path phase 4), after the method
 has been pre-registered by `lab promote` and that file committed **and pushed**:
@@ -2369,7 +2378,7 @@ which writes nothing. A committed report always comes from a full run over a cle
 - `universe.end_date` is exclusive.
 - Under `--dry-run`, `migrate` reports the files it would apply, but leaves no `schema_migrations` table behind.
 - **The dev window is law.** Every dev entry point raises `backtest.dev.DevWindowError` for a session after 2015-10-16, and `research.load_store` rejects a store holding a row after the window it was asked for — `DEV_WINDOW` unless the caller says otherwise, and `lab run` and `backtest_dev` never say otherwise. Never add a flag, a default or a store that gets past either guard. P7b runs the pre-registered finalists on the test window under its own handover.
-- **A dev store and a test store are never interchangeable** (build-promotion-path phase 2). They live in different directories (`engine/.research` vs `engine/.research-test`) and a store declares which it is in its manifest, so `load_store` refuses the wrong one *before* reading any data file, and `research_store` refuses to build or verify one window against the other's directory even when `--store` names it explicitly. Do not "fix" a mismatch by pointing `--store` or `SEER_RESEARCH_STORE` somewhere else: the test store holds the same history **and** every session after `DEV_END`, so running the dev pipeline on it would spend unseen data silently.
+- **A dev store and a test store are never interchangeable** (build-promotion-path phase 2; the build guard is content-based since research-store-clobber-guard). They live in different directories (`engine/.research` vs `engine/.research-test`) and a store declares which it is in its manifest, so `load_store` refuses the wrong one *before* reading any data file, and `research_store` refuses to build or verify one window against the other's directory even when `--store` names it explicitly — the **build** check reads the target's own `manifest.json` (`research.declared_window`), not the `--store` path, so it refuses a wrong-window store in **any** checkout or worktree and not merely this one, and falls through only when the directory holds no readable store at all. Do not "fix" a mismatch by pointing `--store` or `SEER_RESEARCH_STORE` somewhere else: the test store holds the same history **and** every session after `DEV_END`, so running the dev pipeline on it would spend unseen data silently.
 - **The dev store's manifest is nine keys, and a dev build must never write a tenth.** `window_name` / `window_start` / `window_end` are `OPTIONAL_MANIFEST_KEYS` and **absent means the dev window** — never a `window_name: "dev"`. `engine/.research` was sealed with exactly `MANIFEST_KEYS`; requiring a window key, or writing one on a dev build, would reject or re-seal the store whose fingerprint `/sync-research-store` keys on and every recorded lab trial was measured against.
 - **The test store starts in 1993, not in 2015.** `TEST_WINDOW_START` (2015-10-19) is the first session the test window *trades*; `STORE_START` is where its data begins, the same as the dev store's. A candidate first traded on 2015-10-19 still needs its `lookback` bars before that date, and the lab gets exactly one append-only look per configuration, so a test store opening at its own window start would make that one look permanently and unrecoverably wrong.
 - **Build the test store on the first promotion, never before** (design S3), and pin `--window-end` when resuming an interrupted build. Without the pin the window silently moves to whatever the latest completed session is that day, which changes what a recorded test trial meant.

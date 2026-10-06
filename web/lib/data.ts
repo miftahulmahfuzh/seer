@@ -94,7 +94,12 @@ export async function strategies(): Promise<Strategy[]> {
       paper_start::text AS paper_start, paper_end::text AS paper_end, status,
       params->'backtest_gate' AS gate,
       COALESCE(params->'spec'->>'object', object_name) AS spec_object
-    FROM strategies ORDER BY sort, id`;
+    FROM strategies
+    -- A retired strategy that never traded on paper has no record to show (FND and the whole-share
+    -- F4/F1, retired 2026-10-07 before their first session): it is not part of the app at all.
+    -- A retired strategy WITH a paper record stays, marked, because the record is the evidence.
+    WHERE NOT (status = 'retired' AND paper_start IS NULL)
+    ORDER BY sort, id`;
   return rows.map(toStrategy);
 }
 

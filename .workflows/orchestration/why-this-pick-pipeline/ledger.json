@@ -44,24 +44,24 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "ab5ac4e",
       "depends_on": [
         2
       ],
       "difficulty": "HARD",
       "n": 3,
-      "note": null,
+      "note": "explain reads stored evidence only, thinking off, vet() checks; test seed KO slot 5->1 (orders.slot CHECK 1-4)",
       "package": "engine/commands`, docs",
       "plan": ".workflows/plan/why-this-pick-pipeline/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-06T15:33:32+00:00",
       "satisfies": [
         "R2",
         "R3",
         "R4",
         "R8"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-Q0OH",
       "title": "Explain from evidence, with checks"
     },
     {
@@ -108,7 +108,7 @@
   "plan": "/home/miftah/.worktrees/seer/why-this-pick-pipeline/.workflows/orchestration/why-this-pick-pipeline/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "why-this-pick-pipeline",
-  "updated": "2026-10-06T15:21:41+00:00",
+  "updated": "2026-10-06T15:33:32+00:00",
   "verified_at": "2026-10-06T15:21:41+00:00",
   "worktree": "/home/miftah/.worktrees/seer/why-this-pick-pipeline"
 }

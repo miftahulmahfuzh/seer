@@ -41,6 +41,12 @@ its roster object that carries the verdicts ``veto`` stored for the sessions bei
 ``veto``, a ``failed`` verdict or no row at all is no trade (design §8). ``paper`` never calls the
 network and never fails because of C's verdicts.
 
+Evidence (migration 009, ``strategies.evidence``): every decision written tonight -- a bracket
+entry's pending orders, a book entry's targets and its "would pick now" preview -- stores, per
+symbol, the facts its method's formula read on that night's view (``_evidence``). The idle
+instrument gets none. Evidence never changes a decision and never fails the night: an evidence
+function that raises leaves that strategy's evidence NULL for the night and logs a warning.
+
 Trade logic lives in ``paper.bracket``, ``paper.book`` and ``paper.benchmark`` (pure), and all
 persistence in ``paper.store``; this module only sequences them.
 """
@@ -49,7 +55,7 @@ from __future__ import annotations
 
 import argparse
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal
@@ -67,6 +73,7 @@ from seer_engine.paper.bracket import decide_bracket, settle_bracket
 from seer_engine.paper.roster import RosterEntry
 from seer_engine.paper.store import PaperState, StrategyRow
 from seer_engine.sim import initial_cash_usd, new_portfolio
+from seer_engine.strategies import evidence
 from seer_engine.strategies.base import History, Strategy
 from seer_engine.strategies.c import NewsVeto
 
@@ -460,6 +467,51 @@ def _bracket_strategy(conn: psycopg.Connection, e: RosterEntry, first: date, las
     return e.obj.with_allowed(store.allowed_between(conn, e.id, first, last))
 
 
+Facts = tuple[str, ...]
+
+
+def _evidence(e: RosterEntry, market: Market, data_date: date, symbols: Iterable[str]) -> dict[str, Facts]:
+    """``{symbol: facts}`` for the symbols ``e`` just decided on ``market`` (the decision's own
+    night view) and ``data_date``, through ``strategies.evidence.evidence_for``.
+
+    The idle instrument (``e.rules.idle_symbol``) is never asked for and never gets evidence.
+    A symbol the method cannot explain is absent (stored NULL). Never raises (plan invariant 5):
+    any exception -- an unknown object name, a bug in an evidence function, a malformed result --
+    logs one warning and returns ``{}``, so the decision is stored with NULL evidence and the
+    night goes on. Nothing here feeds back into a decision.
+    """
+    idle = None if e.rules is None else e.rules.idle_symbol
+    wanted = tuple(dict.fromkeys(s for s in symbols if s != idle))
+    if not wanted:
+        return {}
+    try:
+        found = evidence.evidence_for(e.object_name, market, e.params, data_date, wanted)
+        if not isinstance(found, Mapping):
+            raise TypeError(f"evidence_for returned {type(found).__name__}, not a mapping")
+        out: dict[str, Facts] = {}
+        for symbol in wanted:
+            facts = found.get(symbol)
+            if facts is None:
+                continue
+            if isinstance(facts, str):
+                raise TypeError(f"{symbol}: facts must be a sequence of strings, got a str")
+            items = tuple(facts)
+            for f in items:
+                if not isinstance(f, str) or not f.strip():
+                    raise TypeError(f"{symbol}: every fact must be a non-empty string, got {f!r}")
+            if items:
+                out[symbol] = items
+        return out
+    except Exception as exc:  # noqa: BLE001 - evidence must never fail the night (invariant 5)
+        log.warning(
+            "%s %s: no evidence stored tonight (%s); the decision is unchanged",
+            e.id,
+            data_date,
+            _error_text(exc),
+        )
+        return {}
+
+
 def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight: _Tonight) -> None:
     """Start ``e`` tonight.
 
@@ -501,15 +553,17 @@ def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight
             view.membership.members_on(rd.data_date),
             rd.data_date,
         )
-        store.insert_pending_orders(conn, e.id, sized.placed)
+        facts = _evidence(e, view, rd.data_date, (o.symbol for o in sized.placed))
+        store.insert_pending_orders(conn, e.id, sized.placed, evidence=facts)
         store.write_pending(conn, e.id, paper_start, decision=False)
     elif e.engine == "book":
         kickoff = needs_kickoff(e.rules, paper_start, paper_start, None)
         targets, _ = decide_book(view, e.obj, e.params, e.rules, rd.data_date, frozenset(), force=kickoff)
-        store.save_book_decision(conn, e.id, paper_start, targets)
+        facts = None if targets is None else _evidence(e, view, rd.data_date, (t.symbol for t in targets))
+        store.save_book_decision(conn, e.id, paper_start, targets, evidence=facts)
         if kickoff:
             store.write_kickoff(conn, e.id, paper_start)
-        store.save_book_preview(conn, e.id, rd.data_date, targets)
+        store.save_book_preview(conn, e.id, rd.data_date, targets, evidence=facts)
     elif e.engine == "benchmark":
         store.write_pending(conn, e.id, paper_start, decision=False)
     else:
@@ -527,7 +581,8 @@ def _step_bracket(conn: psycopg.Connection, e: RosterEntry, sessions: Sequence[d
         night = settle_bracket(pf, s, view.bars_on(s, pf.held_symbols()), tonight.splits_on(s), view.last_bar_date)
         store.save_bracket_night(conn, e.id, night.portfolio, night.events, night.snapshot)
         sized = decide_bracket(night.portfolio, strategy, e.params, view.history, view.membership.members_on(s), s)
-        store.insert_pending_orders(conn, e.id, sized.placed)
+        facts = _evidence(e, view, s, (o.symbol for o in sized.placed))
+        store.insert_pending_orders(conn, e.id, sized.placed, evidence=facts)
         store.write_pending(conn, e.id, dates.next_session(s), decision=False)
         pf = sized.portfolio
         log.info("%s %s: equity %s, %d live order(s)", e.id, s, pf.equity, len(pf.orders))
@@ -570,16 +625,18 @@ def _step_book(
         # cadence (008, paper.book.needs_kickoff); the replay ranks on the stored kickoff too.
         kickoff = needs_kickoff(rules, paper_start, nxt, kicked)
         targets, idle_added = decide_book(view, e.obj, e.params, rules, s, book.held(), force=kickoff)
-        store.save_book_decision(conn, e.id, nxt, targets)
+        facts = None if targets is None else _evidence(e, view, s, (t.symbol for t in targets))
+        store.save_book_decision(conn, e.id, nxt, targets, evidence=facts)
         if kickoff:
             store.write_kickoff(conn, e.id, nxt)
             kicked = nxt
         if s == sessions[-1]:
             # What it would pick if it ranked tonight: display only, never traded or replayed.
-            preview = targets
+            preview, preview_facts = targets, facts
             if preview is None:
                 preview, _ = decide_book(view, e.obj, e.params, rules, s, book.held(), force=True)
-            store.save_book_preview(conn, e.id, s, preview)
+                preview_facts = None if preview is None else _evidence(e, view, s, (t.symbol for t in preview))
+            store.save_book_preview(conn, e.id, s, preview, evidence=preview_facts)
         log.info(
             "%s %s: equity %s, %d position(s)%s",
             e.id,

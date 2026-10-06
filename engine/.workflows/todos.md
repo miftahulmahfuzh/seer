@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-06
-**Total Active Tasks**: 3
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 76
+- Blocked: 0
+- Completed: 77
 
 ---
 
@@ -23,20 +23,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ENG-H5LC** Phase 2: Store evidence with every paper entry
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `db/migrations/009_evidence.sql` (nullable `evidence jsonb` on orders, book_targets, book_previews), keyword-only `evidence=None` params in `paper/store.py`, the catch-all evidence helper and calls in `commands/paper.py` (`_start`/`_step_bracket`, `_start`/`_step_book`), and `engine/tests/test_paper_evidence.py`; decisions, replay, explain, web, docs untouched. Exit: after a paper night every pending A and C order and every non-idle target/preview row has evidence (idle symbol NULL; TIMING-off night explains nothing); a raising evidence function leaves NULL and the night succeeds; `paper_check` green; existing paper tests unchanged and green.
-  - **Status**: open
-  - **Plan Set**: `WHY_THIS_PICK_PIPELINE_PLAN.md` (phase 2 of 5)
-  - **Satisfies**: R1, R6 — Every method that recommends stocks exposes per-pick evidence: the numbers its formula used; "Would pick now" rows get reasons too, if cheap
-  - **Depends on**: P1-ENG-A1SZ
-  - **Plan**: `.workflows/plan/P1-ENG-H5LC.md`
 - [ ] **P1-ENG-Q0OH** Phase 3: Explain from evidence, with checks
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `commands/explain.py` (K3: prompt from facts + strategy plain name, `thinking="disabled"`, temperature 0, `EXPLAIN_MAX_TOKENS`, `accept()` checks), `tests/test_explain.py`, `tests/test_paper_c.py:490` (one assertion), `llm.py` docstrings, `docs/runbooks/paper-trading.md` (Explain section, Paper evidence and Explain lines) and `engine/package_readme.md` (pipeline overview, migration 009, promote's third condition). Exit: prompt built from evidence only; accept() rejects invented numbers, cut-off text, >2 sentences, banned phrases, duplicates; no "…"; entries without evidence skipped; always exit 0; phase 1's exact fact shapes pass `vet`.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `WHY_THIS_PICK_PIPELINE_PLAN.md` (phase 3 of 5)
   - **Satisfies**: R2, R3, R4, R8 — Explain passes those facts to the LLM → 1–2 plain sentences per pick, distinct per stock; Facts only, no predictions, no buy advice; every number checked against the facts; failing text discarded; never fails the night; Fix today's bugs: boilerplate, NULL, truncated texts; Plain words for a non-trader; no ids/codes on the site
   - **Depends on**: P1-ENG-H5LC
@@ -547,6 +538,18 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-H5LC** Phase 2: Store evidence with every paper entry
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `db/migrations/009_evidence.sql` (nullable `evidence jsonb` on orders, book_targets, book_previews), keyword-only `evidence=None` params in `paper/store.py`, the catch-all evidence helper and calls in `commands/paper.py` (`_start`/`_step_bracket`, `_start`/`_step_book`), and `engine/tests/test_paper_evidence.py`; decisions, replay, explain, web, docs untouched. Exit: after a paper night every pending A and C order and every non-idle target/preview row has evidence (idle symbol NULL; TIMING-off night explains nothing); a raising evidence function leaves NULL and the night succeeds; `paper_check` green; existing paper tests unchanged and green.
+  - **Status**: completed
+  - **Plan Set**: `WHY_THIS_PICK_PIPELINE_PLAN.md` (phase 2 of 5)
+  - **Satisfies**: R1, R6 — Every method that recommends stocks exposes per-pick evidence: the numbers its formula used; "Would pick now" rows get reasons too, if cheap
+  - **Depends on**: P1-ENG-A1SZ
+  - **Plan**: `.workflows/plan/P1-ENG-H5LC.md`
+  - **Completed**: 2026-10-06 23:30
+  - **Method**: /do
+  - **Files**: db/migrations/009_evidence.sql, engine/src/seer_engine/paper/store.py, engine/src/seer_engine/commands/paper.py, engine/tests/test_paper_evidence.py
 - [x] **P1-ENG-A1SZ** Phase 1: Pure evidence module
   - **Difficulty**: HARD
   - **Type**: Feature

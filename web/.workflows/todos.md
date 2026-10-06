@@ -13,7 +13,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
+- Blocked: 0
 - Completed: 10
 
 ---
@@ -27,7 +27,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns new `web/lib/why.ts` + `why.test.ts`, `web/lib/data.ts` (evidence on PendingOrder, Pick, PreviewPick via `to_jsonb(...)->'evidence'`), Positions `OrderRow`/`WouldPick`, Today `PickCard`, `WhyToggle.tsx` + CSS (facts list), `web/scripts/seed-demo.mjs` (demo evidence in phase 1's exact wording), `web/package_readme.md`; no engine edits. Exit: K5 behaviour (LLM text, else facts list, "unavailable" only when both missing; "Would pick now" rows get a "Why it's on the list" toggle; C's news-check line stays); vitest covers the fallback helper; tsc clean; screens checked at 414 pt light and dark, icon-only buttons, no ids/codes.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `WHY_THIS_PICK_PIPELINE_PLAN.md` (phase 5 of 5)
   - **Satisfies**: R5, R6, R8 — C keeps its news-check reason as a second line; "Would pick now" rows get reasons too, if cheap; Plain words for a non-trader; no ids/codes on the site
   - **Depends on**: P1-ENG-H5LC

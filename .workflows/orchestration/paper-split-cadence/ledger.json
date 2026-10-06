@@ -1,0 +1,71 @@
+{
+  "branch": "feature/paper-split-cadence",
+  "coordinator": "orch-paper-split-cadence",
+  "coordinator_session_id": "8b77acbf-fe54-41dc-9fdc-eecb5142b4ce",
+  "created": "2026-10-06T18:47:06+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "engine/paper`, `engine/sim",
+      "plan": ".workflows/plan/paper-split-cadence/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R3",
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Pure split-cadence decision, replay and fractional preset"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "engine/commands`, `engine/tests",
+      "plan": ".workflows/plan/paper-split-cadence/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2",
+        "R3",
+        "R7"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Nightly wiring and end-to-end tests (paper night, paper_check, promote)"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "web",
+      "plan": ".workflows/plan/paper-split-cadence/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Positions page: monthly pick / weekly size copy and buy/add/trim cell"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/paper-split-cadence/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "paper-split-cadence",
+  "updated": "2026-10-06T18:47:06+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/paper-split-cadence"
+}

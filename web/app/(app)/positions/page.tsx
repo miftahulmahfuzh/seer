@@ -355,7 +355,9 @@ function BenchmarkCard({ q }: { q: Holding }) {
 
 /**
  * What a book strategy would hold if it rebalanced tonight (`book_previews`): shown between its monthly
- * decisions so a monthly strategy is never silent. Display only: nothing trades on it.
+ * decisions so a monthly strategy is never silent. Display only: nothing trades on it. Each row's reason
+ * is the facts the ranking read, as stored (no LLM: previews are replaced every night); a row without
+ * stored facts shows no toggle rather than a list of "unavailable" lines.
  */
 function WouldPick({ st, preview }: { st: Strategy; preview: Preview }) {
   return (
@@ -376,6 +378,7 @@ function WouldPick({ st, preview }: { st: Strategy; preview: Preview }) {
               <span className={s.orderCo}>last {usd(p.last)}</span>
             </div>
             <OrderCells cells={[['Weight', pct(p.weight, 1)]]} />
+            {p.evidence && <WhyToggle text={null} facts={p.evidence} label="Why it's on the list" />}
           </li>
         ))}
       </ul>
@@ -405,7 +408,7 @@ function OrderRow({ o, passed }: { o: PendingOrder; passed?: Veto }) {
         <span className={s.orderCo}>{companyName(o.company, o.symbol) ? `${o.company} · ` : ''}last {usd(o.last)}</span>
       </div>
       <OrderCells cells={cells} />
-      <WhyToggle text={o.explanation} />
+      <WhyToggle text={o.explanation} facts={o.evidence} />
       {passed && (
         <>
           <span className={s.vetoFacts}>{headlinesLabel(passed.headlineCount)} read{passed.earningsDate ? ` · earnings ${monthDay(passed.earningsDate)}` : ''}</span>

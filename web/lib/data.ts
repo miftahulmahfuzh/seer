@@ -4,6 +4,7 @@ import { monthlyTable, type MonthlyTable } from '@/lib/monthly';
 import { isStale } from '@/lib/session';
 import { checksNews, engineOf, parseGate, shortLabel, type Engine, type Gate } from '@/lib/strategy';
 import { parseVerdict, type Veto } from '@/lib/vetoes';
+import { parseEvidence } from '@/lib/why';
 
 export type { Engine, Gate } from '@/lib/strategy';
 export type { Veto, Verdict } from '@/lib/vetoes';
@@ -148,15 +149,21 @@ export async function runStatus(now = new Date()): Promise<RunStatus> {
 export type Pick = {
   id: number; slot: number; symbol: string; company: string; last: number;
   limit: number; tp: number; sl: number; shares: number; explanation: string | null;
+  /** The facts the method used for this pick (migration 009); null when none were stored. */
+  evidence: string[] | null;
 };
 
-/** The champion's pending bracket orders for one session (Today). Unchanged; returns [] for SPY. */
+/** The champion's pending bracket orders for one session (Today). Returns [] for SPY. */
 export async function picks(strategyId: string, sessionDate: string): Promise<Pick[]> {
-  const rows = await sql`SELECT id, slot, symbol, company, last_price, limit_price, tp_price, sl_price, shares, explanation
-    FROM orders WHERE strategy_id = ${strategyId} AND session_date = ${sessionDate} AND status = 'pending' ORDER BY slot`;
+  // `to_jsonb(o) -> 'evidence'` never names the column: before the nightly applies migration 009 the
+  // key is absent and the value is NULL, where `o.evidence` would fail the whole query.
+  const rows = await sql`SELECT o.id, o.slot, o.symbol, o.company, o.last_price, o.limit_price, o.tp_price, o.sl_price,
+      o.shares, o.explanation, to_jsonb(o) -> 'evidence' AS evidence
+    FROM orders o WHERE o.strategy_id = ${strategyId} AND o.session_date = ${sessionDate} AND o.status = 'pending' ORDER BY o.slot`;
   return rows.map(r => ({
     id: n(r.id), slot: r.slot, symbol: r.symbol, company: r.company, last: n(r.last_price),
     limit: n(r.limit_price), tp: n(r.tp_price), sl: n(r.sl_price), shares: r.shares, explanation: r.explanation,
+    evidence: parseEvidence(r.evidence),
   }));
 }
 
@@ -266,6 +273,8 @@ export type PendingOrder = {
   /** Book: target weight of equity, (0, 1]. Bracket: null. */
   weight: number | null;
   explanation: string | null;
+  /** The facts the method used for this pick (migration 009); null when none were stored. */
+  evidence: string[] | null;
 };
 
 export type Pending = {
@@ -278,14 +287,15 @@ export type Pending = {
 
 /** What a strategy will do at the next session: pending bracket orders, or a book decision's targets. */
 export async function pendingOrders(strategyId: string): Promise<Pending> {
+  // `to_jsonb(<row>) -> 'evidence'`: NULL, not a query error, before the nightly applies migration 009.
   const [[st], [ps], orders, targets] = await Promise.all([
     sql`SELECT engine, is_benchmark FROM strategies WHERE id = ${strategyId}`,
     sql`SELECT pending_session::text AS pending_session, pending_decision FROM paper_state WHERE strategy_id = ${strategyId}`,
-    sql`SELECT id, session_date::text AS session_date, slot, symbol, company, last_price, limit_price, tp_price, sl_price,
-        shares, explanation
-      FROM orders WHERE strategy_id = ${strategyId} AND status = 'pending' ORDER BY session_date, slot`,
+    sql`SELECT o.id, o.session_date::text AS session_date, o.slot, o.symbol, o.company, o.last_price, o.limit_price, o.tp_price,
+        o.sl_price, o.shares, o.explanation, to_jsonb(o) -> 'evidence' AS evidence
+      FROM orders o WHERE o.strategy_id = ${strategyId} AND o.status = 'pending' ORDER BY o.session_date, o.slot`,
     sql`SELECT t.session_date::text AS session_date, t.rank, t.symbol, t.weight, t.last_price, t.limit_price,
-        t.stop_price, t.take_price, t.explanation
+        t.stop_price, t.take_price, t.explanation, to_jsonb(t) -> 'evidence' AS evidence
       FROM paper_state ps JOIN book_targets t ON t.strategy_id = ps.strategy_id AND t.session_date = ps.pending_session
       WHERE ps.strategy_id = ${strategyId} AND ps.pending_decision ORDER BY t.rank`,
   ]);
@@ -298,6 +308,7 @@ export async function pendingOrders(strategyId: string): Promise<Pending> {
       key: `o:${r.id}`, kind: 'bracket', sessionDate: ymd(r.session_date), rank: n(r.slot), slot: n(r.slot),
       symbol: r.symbol, company: r.company ?? null, last: n(r.last_price), limit: n(r.limit_price),
       tp: n(r.tp_price), sl: n(r.sl_price), shares: n(r.shares), weight: null, explanation: r.explanation ?? null,
+      evidence: parseEvidence(r.evidence),
     }));
     return { sessionDate: pendingSession ?? items[0]?.sessionDate ?? null, decision: true, orders: items };
   }
@@ -306,24 +317,33 @@ export async function pendingOrders(strategyId: string): Promise<Pending> {
       key: `t:${strategyId}:${ymd(r.session_date)}:${r.symbol}`, kind: 'book', sessionDate: ymd(r.session_date),
       rank: n(r.rank), slot: null, symbol: r.symbol, company: null, last: n(r.last_price), limit: nn(r.limit_price),
       tp: nn(r.take_price), sl: nn(r.stop_price), shares: null, weight: n(r.weight), explanation: r.explanation ?? null,
+      evidence: parseEvidence(r.evidence),
     }));
     return { sessionDate: pendingSession, decision: ps?.pending_decision === true, orders: items };
   }
   return { sessionDate: pendingSession, decision: false, orders: [] };
 }
 
-export type PreviewPick = { rank: number; symbol: string; weight: number; last: number };
+export type PreviewPick = {
+  rank: number; symbol: string; weight: number; last: number;
+  /** The facts the method used for this pick (migration 009); null when none were stored. Shown as-is, no LLM. */
+  evidence: string[] | null;
+};
 
 /** What a book strategy would pick if it ranked tonight (`book_previews`, migration 008): display only. */
 export type Preview = { dataDate: string | null; picks: PreviewPick[] };
 
 export async function bookPreview(strategyId: string): Promise<Preview> {
   try {
-    const rows = await sql`SELECT data_date::text AS data_date, rank, symbol, weight, last
-      FROM book_previews WHERE strategy_id = ${strategyId} ORDER BY rank`;
+    // `to_jsonb(p) -> 'evidence'`: NULL, not a query error, before the nightly applies migration 009.
+    const rows = await sql`SELECT p.data_date::text AS data_date, p.rank, p.symbol, p.weight, p.last,
+        to_jsonb(p) -> 'evidence' AS evidence
+      FROM book_previews p WHERE p.strategy_id = ${strategyId} ORDER BY p.rank`;
     return {
       dataDate: rows[0] ? ymd(rows[0].data_date) : null,
-      picks: rows.map(r => ({ rank: n(r.rank), symbol: r.symbol, weight: n(r.weight), last: n(r.last) })),
+      picks: rows.map(r => ({
+        rank: n(r.rank), symbol: r.symbol, weight: n(r.weight), last: n(r.last), evidence: parseEvidence(r.evidence),
+      })),
     };
   } catch {
     // Before the nightly applies 008 the table does not exist yet: no preview, not a broken page.

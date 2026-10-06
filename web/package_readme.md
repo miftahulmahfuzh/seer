@@ -1,7 +1,7 @@
 # Package: seer-web
 
 **Location**: `web` (Next.js app router; package name `seer-web`, private)
-**Last Updated**: 2026-10-04 (P1-ROOT-MO5N, sera-lab-site phase 7: a `## Sera (/sera)` section (routes, access gate, how `data/lab.json` stays current); the Overview route and `data/lab.json` in the layout)
+**Last Updated**: 2026-10-06 (why-this-pick-pipeline phase 5: "Why this pick" falls back to the method's stored facts; "would pick now" rows show theirs; `lib/why.ts`)
 
 ## Overview
 
@@ -88,6 +88,7 @@ web/
     strategy.ts             Engine, Gate, engineOf, parseGate, shortLabel, checksNews (pure)
     metrics.ts              Snapshot, Metrics, strategyMetrics, gateItem, checklist (pure)
     vetoes.ts               Verdict, Veto, parseVerdict, vetoSheet, checkedLine, headlinesLabel, noCheckLine (pure; P6)
+    why.ts                  parseEvidence, Why, whyContent: what a "why" toggle shows     (pure)
     monthly.ts              monthlyTable, monthOf                                  (pure)
     slots.ts                slot letters/sheets, slotCount, cardBg                 (pure)
     session.ts              nextUsSession, isStale, wibDate                        (pure)
@@ -185,14 +186,26 @@ const noCheckLine: (day: string, short: string) => string;
 - `vetoSheet`: no rows → `missing`; every row `failed` with one shared reason → `failed` (shown once); else the `veto` and `failed` rows by rank with the counts.
 - `noCheckLine`: the `missing` state's line, "No news check for {day}: A had no candidates, or the check did not run. {short} buys nothing this session." `veto` writes no rows on a night A has no candidates, so the app cannot tell that from a check that did not run, and says so.
 
+### lib/why.ts (pure)
+
+```ts
+function parseEvidence(raw: unknown): string[] | null;   // non-array -> null; non-strings and blanks dropped; empty -> null
+type Why = { kind: 'text'; text: string } | { kind: 'facts'; facts: string[] } | { kind: 'missing'; text: string };
+function whyContent(text: string | null | undefined, facts: readonly string[] | null | undefined, missing: string): Why;
+```
+
+- `evidence` (migration 009, written by the engine's paper step) is a JSON array of short plain-English facts: the numbers the method used for that pick. The engine's Explain step writes `explanation` from them.
+- `whyContent`: the text when it is non-blank; else the facts (a short list); else `missing`. `WhyToggle` renders it.
+
 ### lib/data.ts (server only; every function queries Neon)
 
 Types:
 - `Strategy`: `id, name, sub, icon, isChampion, isBenchmark, engine, rulesId, paperStart, status, paperEnd, gate, isPaper, short, checksNews`. `isPaper` = neither champion nor benchmark (research strategy, never a buy recommendation). `paperStart` is null until the engine's `paper` command starts the clock. `status: StrategyStatus = 'active' | 'retired'` and `paperEnd` (the last paper session a retired strategy traded; null while active) are migration 006's roster lifecycle. `parseStatus` reads **only** the exact string `'retired'` as retired, so a missing, null or malformed value reads as active and a bad read never hides a live strategy. `checksNews` (P6) marks C, whose Positions view reads its verdicts.
 - `RunStatus`: `sessionDate, dataDate, finishedAt, isDemo, stale, usdIdr` from the latest **successful** run (IDR falls back to 16500), plus `latestStatus, paperStatus, paperError, paperFinishedAt` from the most recent run whatever its outcome. `RunState = 'running' | 'success' | 'failed'`.
-- `Pick`: a champion's pending bracket order for Today (unchanged shape).
+- `Pick`: a champion's pending bracket order for Today, with `evidence`.
 - `Holding` (replaces the old `Position`): one open holding of any engine. `key` is unique across engines (`'o:<orders.id>'` or `'b:<strategy>:<symbol>'`); `kind: Engine`; bracket-only `orderId`, `slot`; `tp`/`sl` nullable (book sets them only when its rules do); `maxDays` is 5 for bracket, null otherwise; `weight` = value / last equity; `pnl`/`pnlPct` for book include fees and dividends (`value + income - cost`); `dismissed` (bracket day-5 action done); `exitPending` (book sell decided for the next open).
-- `PendingOrder` / `Pending`: what a strategy will do at the next session. Bracket: pending orders (`rank` = slot, whole `shares`). Book: `book_targets` of the pending decision (`weight` in (0,1], `shares` null). `Pending.decision` is false for SPY and for book strategies whose next session is not a decision session.
+- `PendingOrder` / `Pending`: what a strategy will do at the next session. Bracket: pending orders (`rank` = slot, whole `shares`). Book: `book_targets` of the pending decision (`weight` in (0,1], `shares` null). `Pending.decision` is false for SPY and for book strategies whose next session is not a decision session. `evidence: string[] | null` is the method's stored facts for the pick.
+- `PreviewPick` / `Preview`: `book_previews` rows (`rank, symbol, weight, last, evidence`) for 'would pick now'.
 - `ExitReason = 'tp' | 'sl' | 'time' | 'gap' | 'signal' | 'forced'`.
 - `Trade`: closed trade of either engine. `key` unique across engines (`'o:<id>'` / `'b:<id>'`); `id` is unique only within its own table; `kind`, `strategyShort`, nullable `shares` (book keeps none) and `days`.
 - `Board`: `{ rows: { strategy, metrics, curve }[]; from; to }`.
@@ -204,6 +217,7 @@ Functions:
 - `picks(strategyId, sessionDate): Promise<Pick[]>`: pending bracket orders for one session.
 - `positions(strategyId): Promise<Holding[]>`: bracket orders (days held desc, slot) then book positions (value desc). Equity for `weight` comes from `paper_state`, else the latest snapshot.
 - `pendingOrders(strategyId): Promise<Pending>`.
+- `bookPreview(strategyId): Promise<Preview>`: tonight's 'would pick now' list; empty when 008 is not applied. `picks`, `pendingOrders` and `bookPreview` read `evidence` as `to_jsonb(<row>) -> 'evidence'`, so they work before the nightly applies 009 (the value is NULL), and pass it through `parseEvidence`.
 - `vetoes(strategyId, sessionDate): Promise<Veto[]>` (P6): every `news_vetoes` row for that strategy and session, by rank (`headlineCount = jsonb_array_length(headlines)`). Called only for `checksNews` strategies: their roster row and the table both come from migration 004.
 - `closedTrades(strategyId | null, 'win' | 'loss' | null): Promise<Trade[]>`: closed orders UNION non-idle book trades, newest first, max 300.
 - `leaderboard(): Promise<Board>`: each strategy's metrics over all its snapshots (day 0 included) and only **its own engine's** closed trades (bracket -> orders, book -> book_trades, benchmark -> none).
@@ -319,8 +333,8 @@ parallel (`Promise.all`). Dates are selected as `::text` and sliced to `YYYY-MM-
 timezone never shifts them.
 
 Page consumers:
-- Today: `champion`, `runStatus`, then `picks` and `positions` only for a picks champion (not benchmark, engine `bracket`); actions are holdings with an `orderId`, a `maxDays` and `day >= maxDays`, not dismissed. Any other champion (SPY under D2) shows the no-buys sheet: "Seer recommends no buys", research strategies trade on paper only and their orders live in Positions.
-- Positions: `strategies`, `runStatus`, then `positions(strat)` and `pendingOrders(strat)` for `selectStrategy(roster, ?s)`. Pending orders are skipped (empty `Pending`) for the benchmark and while the run is stale. Holdings split by `Holding.kind` into `BracketCard` (stop/target range, days), `BookCard` (weight, stop/target only when set) and `BenchmarkCard`; cards keyed by `Holding.key`. The orders sheet lists bracket orders by slot or book targets by rank with weight; empty-state copy depends on engine and `Pending.decision`. A paper-step warning shows when `paperStatus !== 'success'` (failed / running / not yet run). `PaperChip` and a "on paper since" line mark `isPaper` strategies. For a `checksNews` bracket strategy (C) with a pending session it also calls `vetoes(strat, session)` and renders `vetoSheet` as a stone "Vetoed tonight" sheet; each vetoed/failed row reuses `WhyToggle` (new optional `label`/`missing` props) as "Why vetoed" / "Why it failed".
+- Today: `champion`, `runStatus`, then `picks` and `positions` only for a picks champion (not benchmark, engine `bracket`); actions are holdings with an `orderId`, a `maxDays` and `day >= maxDays`, not dismissed. Any other champion (SPY under D2) shows the no-buys sheet: "Seer recommends no buys", research strategies trade on paper only and their orders live in Positions. `PickCard`'s 'Why this pick' uses the same fallback.
+- Positions: `strategies`, `runStatus`, then `positions(strat)` and `pendingOrders(strat)` for `selectStrategy(roster, ?s)`. Pending orders are skipped (empty `Pending`) for the benchmark and while the run is stale. Holdings split by `Holding.kind` into `BracketCard` (stop/target range, days), `BookCard` (weight, stop/target only when set) and `BenchmarkCard`; cards keyed by `Holding.key`. The orders sheet lists bracket orders by slot or book targets by rank with weight; empty-state copy depends on engine and `Pending.decision`. A paper-step warning shows when `paperStatus !== 'success'` (failed / running / not yet run). `PaperChip` and a "on paper since" line mark `isPaper` strategies. For a `checksNews` bracket strategy (C) with a pending session it also calls `vetoes(strat, session)` and renders `vetoSheet` as a stone "Vetoed tonight" sheet; each vetoed/failed row reuses `WhyToggle` (new optional `label`/`missing` props) as "Why vetoed" / "Why it failed". Every order row's `WhyToggle` gets `facts={o.evidence}`: it shows the explanation, else the facts as a list, else 'unavailable'; C's 'Why it passed the news check' line follows unchanged. For a book strategy between decisions, `bookPreview` feeds 'would pick now'; each row with stored facts has a 'Why it's on the list' toggle showing them (no LLM).
 - History: `strategies`, `closedTrades`, `runStatus`. Filters are `StrategySwitch` over non-benchmark strategies with an `ALL` button (`?s=`, unknown ids read as all) and win/loss icon buttons (`?o=`); defaults are dropped from the URL. Exit-reason icons cover `tp`, `sl`, `time`, `gap`, `signal` (rules said sell, sold at the open) and `forced` (forced close, no more prices), with a fallback for unknown reasons. Rows keyed by `Trade.key`; each shows the strategy tag (`strategyShort`) and a small `PaperChip` when the strategy is paper or missing from the roster.
 - Leaderboard: `leaderboard`, `runStatus`, then `monthly(pick.id, run.sessionDate)`. Every card, chart line and legend entry comes from the roster via `looks`. The big figure is the champion (crowned; SPY today); the second figure is `compare(board.rows).best` — the best research strategy **over the common window** — while the champion is the benchmark, else SPY; with no common window there is no second figure, only `windowLine`'s label. `windowLine` prints under the chart. The checklist and month sheet follow `pick = pickResearch(researchOf(roster), ?s)`; a `StrategySwitch` over research strategies shows when there are two or more (SPY is not selectable here, it is the SPY column). Checklist is `checklist(pick.metrics, spyOverSpan(spy.curve, pick.curve), pick.strategy.gate)` scored by `scoreOf`; the gate's `note` prints under it. "Month by month" lists the since-start row then months newest first, with a `CircleDashed` partial-month marker while the next session is in that month.
 
@@ -401,8 +415,8 @@ window lacks two month starts.
 - `DATABASE_URL` (app, pooled HTTP), `DATABASE_URL_UNPOOLED` (scripts), `ALLOWED_EMAIL`, NextAuth Google credentials. Scripts read `web/.env.local` via `node --env-file`.
 - Sera needs no env var: `SERA_EMAIL` is a constant (`lib/sera/access.ts`), and its data is the committed `data/lab.json`. Regenerate the JSON with `python -m seer_engine lab stage` (writes and stages it with `lab/lab.sqlite`) or `lab export-json` (writes only). In a worktree, run them as `env -u SEER_LAB_DB PYTHONPATH=<worktree>/engine/src /home/miftah/seer/engine/.venv/bin/python -m seer_engine …`.
 - `npm run db:migrate`: apply new migrations in name order, one transaction each.
-- `npm run db:seed-demo [-- --dry-run]`: builds a 66-session demo (day 0 + paper start, at least three calendar months) ending at the last completed session, flagged `is_demo`. Roster: SPY (champion, buy and hold), A (bracket), F4-MOM12-N20-TREND and F1-SPY-SMA200-M (monthly book strategies, deciding on each month's first session), and C (bracket, its own younger clock, gate `applicable: false`). Needs migration 004 applied first. Writes strategies (with `engine`, `rules_id`, `paper_start`, `params.backtest_gate`), runs (with paper status), fx, bars, orders, equity snapshots, `paper_state`, `book_positions`, `book_targets`, `book_trades`, and six `news_vetoes` rows for C's pending session. `--dry-run` builds every row and prints counts without connecting.
-- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`, `sera/*`), `components/roster`, `components/sera/charts`, `components/sera/diagrams/geometry`, `app/(app)/leaderboard/view` and the `app/sera/*/view` helpers.
+- `npm run db:seed-demo [-- --dry-run]`: builds a 66-session demo (day 0 + paper start, at least three calendar months) ending at the last completed session, flagged `is_demo`. Roster: SPY (champion, buy and hold), A (bracket), F4-MOM12-N20-TREND and F1-SPY-SMA200-M (monthly book strategies, deciding on each month's first session), and C (bracket, its own younger clock, gate `applicable: false`). Needs migrations through 009 applied first (`npm run db:migrate`, then `npm run db:seed-demo`; it only runs on an empty database, never production). Writes strategies (with `engine`, `rules_id`, `paper_start`, `params.backtest_gate`), runs (with paper status), fx, bars, orders, equity snapshots, `paper_state`, `book_positions`, `book_targets` and `book_previews` (pending orders, targets and previews with demo `evidence`; A's CSCO has no explanation so its facts show), `book_trades`, and six `news_vetoes` rows for C's pending session. `--dry-run` builds every row and prints counts without connecting.
+- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`, `why`, `sera/*`), `components/roster`, `components/sera/charts`, `components/sera/diagrams/geometry`, `app/(app)/leaderboard/view` and the `app/sera/*/view` helpers.
 
 ## Gotchas
 
@@ -426,6 +440,7 @@ window lacks two month starts.
 - `data/lab.json` is generated. Never edit it by hand or commit it without its database: the engine sync guard fails the build. A lab change reaches `/sera` only by being committed and pushed, because the snapshot is bundled at build time.
 - `lib/sera/*` and the page helper modules import each other relatively: vitest has no `@/` alias. Only `page.tsx` files and components use `@/`.
 - Sera's markdown renderer escapes HTML first. Analysis text is never trusted as HTML.
+- Read `evidence` only as `to_jsonb(<row>) -> 'evidence'`, never as a plain column: Vercel deploys on push, hours before the nightly applies 009, and a named missing column fails the whole query. The facts are rendered verbatim, so they must stay plain English (the engine's evidence module owns the wording).
 - The paper bar (3 months, 100 trades) on How it works is a constant in `app/sera/how/view.ts`, not snapshot data; change it there if design section 1 changes.
 
 ## Notes

@@ -4,7 +4,9 @@
 // (monthly book strategies), C (bracket: A's picks minus the news check's vetoes, on its own
 // younger clock). 66 sessions ending at the last completed session: day 0 is the first, paper
 // start the second, so the demo spans at least three calendar months. C starts 28 sessions ago.
-// Needs migration 004 (news_vetoes, the C row's columns) applied first.
+// Needs migrations through 009 applied first (`npm run db:migrate`): 004 (news_vetoes, the C row's
+// columns), 008 (book_previews) and 009 (`evidence` on orders, book_targets and book_previews).
+// Pending orders, book targets and "would pick now" rows carry demo evidence: plain-English facts.
 // Refuses to run once the real engine has written a run, backfilled bars or started paper trading.
 // `--dry-run` builds every row and prints the counts without connecting.
 import { Pool, neonConfig } from '@neondatabase/serverless';
@@ -17,6 +19,14 @@ const START_USD = +(20_000_000 / RATE).toFixed(4);
 const FEE = 0.001; // demo cost per side
 const r2 = v => +v.toFixed(2);
 const r4 = v => +v.toFixed(4);
+// Money as the engine's facts write it (strategies/evidence.py `_money`): "$1,231.40".
+const $ = v => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const ordinal = k => {
+  const t = k % 100, u = k % 10;
+  return k + (t >= 11 && t <= 13 ? 'th' : u === 1 ? 'st' : u === 2 ? 'nd' : u === 3 ? 'rd' : 'th');
+};
+// An `evidence` value for a jsonb parameter: a JSON array of strings, or NULL.
+const json = v => (v === null || v === undefined ? null : JSON.stringify(v));
 
 // --- dates (ET calendar, weekdays only) -------------------------------------
 const etNow = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
@@ -84,7 +94,8 @@ const openOf = i => r2(spy[i - 1] * (1 + (rnd() - 0.5) * 0.004)); // session i's
 const snapshots = []; // [strategy, date, cash, equity]
 const paperState = []; // [strategy, cash, equity, pendingDecision]
 const bookPositions = []; // [strategy, symbol, shares, mark, entryDate, entryPrice, daysHeld, cost, income, stop, take, exitPending]
-const bookTargets = []; // [strategy, session, rank, symbol, weight, last, limit, stop, take, explanation]
+const bookTargets = []; // [strategy, session, rank, symbol, weight, last, limit, stop, take, explanation, evidence?]
+const bookPreviews = []; // [strategy, rank, symbol, weight, last, evidence]: "would pick now" for dataDate
 const bookTrades = []; // [strategy, symbol, entryDate, exitDate, entryPrice, exitPrice, daysHeld, cost, income, pnl, reason]
 
 // --- SPY: whole shares at paper start's open, held, marked at each close -------
@@ -110,8 +121,14 @@ const bookTrades = []; // [strategy, symbol, entryDate, exitDate, entryPrice, ex
     snapshots.push(i < FIRST_DECISION ? [id, sessions[i], START_USD, START_USD] : [id, sessions[i], cash, r4(cash + shares * spy[i])]);
   bookPositions.push([id, 'SPY', shares, spy[LAST], sessions[FIRST_DECISION], entry, LAST - FIRST_DECISION + 1, cost, 0, null, null, false]);
   const why = 'SPY closed above its 200-day average, so F1 holds SPY for the month.';
-  for (const d of decisions) bookTargets.push([id, sessions[d], 1, 'SPY', 1, spy[d - 1], null, null, null, why]);
-  if (pendingDecision) bookTargets.push([id, session, 1, 'SPY', 1, spy[LAST], null, null, null, why]);
+  // The facts F1's rule read (demo numbers), in the engine's exact TIMING wording (phase 1 "Fact strings").
+  const f1Facts = close => [
+    `SPY closed at ${$(close)}, 6.2% above its 200-day average of ${$(close / 1.062)}.`,
+    'The rule holds SPY while SPY closes above its 200-day average, so it holds SPY.',
+  ];
+  for (const d of decisions) bookTargets.push([id, sessions[d], 1, 'SPY', 1, spy[d - 1], null, null, null, why, f1Facts(spy[d - 1])]);
+  if (pendingDecision) bookTargets.push([id, session, 1, 'SPY', 1, spy[LAST], null, null, null, why, f1Facts(spy[LAST])]);
+  bookPreviews.push([id, 1, 'SPY', 1, spy[LAST], f1Facts(spy[LAST])]);
   paperState.push([id, cash, r4(cash + shares * spy[LAST]), pendingDecision]);
 }
 
@@ -138,16 +155,25 @@ const curve = (target, vol, from = 1) => {
   const HELD = [['INTC', 36.42, true], ['PFE', 25.08, false], ['F', 11.31, true], ['T', 27.64, true], ['BAC', 47.18, false],
     ['WBD', 12.37, true], ['KMI', 27.93, false], ['HPE', 22.46, true], ['CMCSA', 32.81, false], ['CSX', 33.57, true],
     ['CCL', 28.44, false], ['HBAN', 16.72, true]];
+  // The facts F4's ranking read (demo numbers, falling with rank), in the engine's exact FACTOR wording
+  // (phase 1 "Fact strings"): the price move, its rank, the market filter.
+  const f4Facts = rank => [
+    `Its price rose ${(61.4 - rank * 2.3).toFixed(1)}% from 12 months ago to 1 month ago.`,
+    `It ranked ${ordinal(rank)} of 412 stocks checked on that move, strongest first.`,
+    'SPY closed 4.1% above its 200-day average, so the method is allowed to hold stocks.',
+  ];
   let invested = 0;
   HELD.forEach(([sym, mark, early], rank) => {
     const from = early ? FIRST_DECISION : LAST_DECISION;
     const entry = r2(mark / (1 + (rnd() - 0.4) * 0.15));
     const shares = Math.max(1, Math.floor((0.05 * E) / mark));
     invested += shares * mark;
+    const facts = f4Facts(rank + 1);
     bookPositions.push([id, sym, shares, mark, sessions[from], entry, LAST - from + 1, r4(shares * entry * (1 + FEE)), 0, null, null, false]);
     bookTargets.push([id, sessions[LAST_DECISION], rank + 1, sym, 0.05, r2(mark * (1 + (rnd() - 0.5) * 0.04)), null, null, null,
-      rank === 0 ? `${sym} ranks first by 12-1 momentum among index members, and SPY is above its 200-day average.` : null]);
-    if (pendingDecision) bookTargets.push([id, session, rank + 1, sym, 0.05, mark, null, null, null, null]);
+      rank === 0 ? `${sym} rose the most of the index members from 12 months ago to 1 month ago, and SPY is above its 200-day average.` : null, facts]);
+    if (pendingDecision) bookTargets.push([id, session, rank + 1, sym, 0.05, mark, null, null, null, null, facts]);
+    bookPreviews.push([id, rank + 1, sym, 0.05, mark, facts]);
   });
   // The first decision's targets: the early names, five sold at the last decision (their rank
   // fell), and one closed by force when it left the index and its bars stopped.
@@ -174,14 +200,33 @@ const curve = (target, vol, from = 1) => {
 }
 
 // --- bracket portfolios (A, C): pending picks, open orders, closed trades -------------
-// Pending picks: [slot, symbol, company, last, limit, tp, sl, shares, explanation]
+// A's facts for a pick (demo numbers), in the engine's exact STRATEGY_A wording (phase 1 "Fact
+// strings"): close vs its 200-day average, the 2-day strength score, the 2- and 5-day moves, daily
+// trading value, and its place among the stocks that passed the rule. C trades A's picks, so its
+// pending orders carry the same facts (the engine's C evidence is A's under C's params).
+const aFacts = ({ close, above, score, d2, d5, traded, place, of }) => [
+  `It closed at ${$(close)}, ${above.toFixed(1)}% above its 200-day average of ${$(close / (1 + above / 100))}.`,
+  `Its 2-day strength score was ${score} out of 100; below 10 counts as a sharp short drop.`,
+  `Over the last 2 trading days it fell ${d2.toFixed(1)}%, and over the last 5 it fell ${d5.toFixed(1)}%.`,
+  `On an average day over the last 20 trading days, ${traded} of its shares changed hands.`,
+  `It ranked ${ordinal(place)} of ${of} stocks that passed the rule that day, lowest strength score first.`,
+];
+const A_FACTS = {
+  GE: aFacts({ close: 273.18, above: 9.4, score: 4, d2: 3.1, d5: 4.8, traded: '$1.6 billion', place: 1, of: 6 }),
+  LRCX: aFacts({ close: 99.64, above: 12.7, score: 3, d2: 5.2, d5: 7.9, traded: '$1.1 billion', place: 2, of: 6 }),
+  CSCO: aFacts({ close: 67.42, above: 3.8, score: 8, d2: 1.6, d5: 2.4, traded: '$1.3 billion', place: 3, of: 6 }),
+};
+
+// Pending picks: [slot, symbol, company, last, limit, tp, sl, shares, explanation, evidence]. CSCO has no
+// explanation, so the demo shows the facts standing in for it.
 const picks = [
   [1, 'GE', 'GE Aerospace', 273.18, 271.40, 278.90, 260.15, 1,
-    'GE fell three days in a row and now sits below its usual range, while its longer trend is still up. Strategy A buys short dips like this when they have usually recovered within a week. The limit is a little under the last price, so it only buys if the price dips further at the open.'],
+    'GE fell three days in a row and now sits below its usual range, while its longer trend is still up. Strategy A buys short dips like this when they have usually recovered within a week. The limit is a little under the last price, so it only buys if the price dips further at the open.',
+    A_FACTS.GE],
   [2, 'LRCX', 'Lam Research', 99.64, 98.20, 102.10, 92.35, 3,
-    'Chip-equipment stocks sold off and Lam Research dropped more than its peers without news of its own. Past drops of this size have tended to win back part of the move within five sessions. The stop sits below last month’s low.'],
-  [3, 'CSCO', 'Cisco Systems', 67.42, 66.85, 68.30, 64.70, 4,
-    'Cisco is a steady, slow-moving stock that slipped to the bottom of its two-week range. The target is modest because Cisco rarely moves far. Four shares keep the possible loss in line with the other picks.'],
+    'Chip-equipment stocks sold off and Lam Research dropped more than its peers without news of its own. Past drops of this size have tended to win back part of the move within five sessions. The stop sits below last month’s low.',
+    A_FACTS.LRCX],
+  [3, 'CSCO', 'Cisco Systems', 67.42, 66.85, 68.30, 64.70, 4, null, A_FACTS.CSCO],
 ];
 
 // [symbol, company, shares, entry, current, tp, sl, days held]
@@ -236,9 +281,11 @@ bracketBook('A', 0.021, 3.3, 0, open);
 // slots; PANW is allowed but C has no slot left.
 const cPicks = [
   [1, 'GE', 'GE Aerospace', 273.18, 271.40, 278.90, 260.15, 1,
-    'Strategy C takes the same GE dip as Strategy A. The news check read six recent headlines, all routine contract and product news with no earnings date in the next five sessions, so it let the pick through.'],
+    'Strategy C takes the same GE dip as Strategy A. The news check read six recent headlines, all routine contract and product news with no earnings date in the next five sessions, so it let the pick through.',
+    A_FACTS.GE],
   [2, 'CSCO', 'Cisco Systems', 67.42, 66.85, 68.30, 64.70, 4,
-    'Cisco slipped to the bottom of its two-week range, the same setup Strategy A sees. Its recent news is product launches and analyst notes without a rating change, so the news check allowed it.'],
+    'Cisco slipped to the bottom of its two-week range, the same setup Strategy A sees. Its recent news is product launches and analyst notes without a rating change, so the news check allowed it.',
+    A_FACTS.CSCO],
 ];
 // [symbol, company, shares, entry, current, tp, sl, days held]
 const cOpen = [
@@ -276,7 +323,7 @@ const newsVetoes = VETO_CHECKS.map(([rank, sym, name, verdict, reason, k, earnin
   earnings, VETO_DECIDED.toISOString(),
 ]);
 
-const rows = { strategies, snapshots, paperState, bookPositions, bookTargets, bookTrades, picks, open, closed,
+const rows = { strategies, snapshots, paperState, bookPositions, bookTargets, bookPreviews, bookTrades, picks, open, closed,
   cPicks, cOpen, cClosed, newsVetoes };
 
 if (DRY_RUN) {
@@ -301,7 +348,7 @@ try {
 
   await c.query('BEGIN');
   await c.query(`TRUNCATE action_dismissals, orders, equity_snapshots, bars, fx_rates, runs, paper_state, book_positions,
-    book_targets, book_fills, book_trades, dividends, news_vetoes, strategies RESTART IDENTITY CASCADE`);
+    book_targets, book_previews, book_fills, book_trades, dividends, news_vetoes, strategies RESTART IDENTITY CASCADE`);
 
   for (const s of strategies)
     await c.query(`INSERT INTO strategies (id, name, sub, icon, is_champion, is_benchmark, sort, engine, rules_id, paper_start, params)
@@ -314,9 +361,10 @@ try {
 
   const bar = (sym, close) => c.query('INSERT INTO bars VALUES ($1,$2,$3,$3,$3,$3,1000000) ON CONFLICT DO NOTHING', [sym, dataDate, close]);
   for (const b of brackets) {
-    for (const [slot, sym, name, last, lim, tp, sl, sh, why] of b.picks) {
-      await c.query(`INSERT INTO orders (strategy_id, session_date, slot, symbol, company, last_price, limit_price, tp_price, sl_price, shares, explanation, status)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending')`, [b.id, session, slot, sym, name, last, lim, tp, sl, sh, why]);
+    for (const [slot, sym, name, last, lim, tp, sl, sh, why, facts] of b.picks) {
+      await c.query(`INSERT INTO orders (strategy_id, session_date, slot, symbol, company, last_price, limit_price, tp_price, sl_price, shares,
+          explanation, evidence, status)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending')`, [b.id, session, slot, sym, name, last, lim, tp, sl, sh, why, json(facts)]);
       await bar(sym, last);
     }
 
@@ -355,8 +403,12 @@ try {
         stop_price, take_price, exit_pending) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, r);
 
   for (const r of bookTargets)
-    await c.query(`INSERT INTO book_targets (strategy_id, session_date, rank, symbol, weight, last_price, limit_price, stop_price, take_price, explanation)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, r);
+    await c.query(`INSERT INTO book_targets (strategy_id, session_date, rank, symbol, weight, last_price, limit_price, stop_price, take_price,
+        explanation, evidence) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, [...r.slice(0, 10), json(r[10])]);
+
+  for (const [id, rank, sym, weight, last, facts] of bookPreviews)
+    await c.query(`INSERT INTO book_previews (strategy_id, data_date, rank, symbol, weight, last, evidence)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)`, [id, dataDate, rank, sym, weight, last, json(facts)]);
 
   for (const r of bookTrades)
     await c.query(`INSERT INTO book_trades (strategy_id, symbol, entry_date, exit_date, entry_price, exit_price, days_held, cost_usd, income_usd,
@@ -365,6 +417,7 @@ try {
   await c.query('COMMIT');
   const counts = await c.query(`SELECT 'orders ' || status AS what, count(*)::int AS n FROM orders GROUP BY status
     UNION ALL SELECT 'book_positions', count(*)::int FROM book_positions
+    UNION ALL SELECT 'book_previews', count(*)::int FROM book_previews
     UNION ALL SELECT 'book_trades', count(*)::int FROM book_trades
     UNION ALL SELECT 'equity_snapshots', count(*)::int FROM equity_snapshots
     UNION ALL SELECT 'news_vetoes', count(*)::int FROM news_vetoes ORDER BY what`);

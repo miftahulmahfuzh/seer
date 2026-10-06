@@ -487,7 +487,7 @@ def test_explain_fills_c_pending_orders_like_a(world):
         q(world, "SELECT symbol, explanation FROM orders WHERE strategy_id = %s AND session_date = %s", (C, session))
     )
     assert notes == {s: f"Paper note for {s}." for s in c_pending}
-    assert sum("C · News veto" in p for p in client.prompts) == len(c_pending)
+    assert sum("Method: News veto," in p for p in client.prompts) == len(c_pending)
     again = FakeClient()
     assert explain.execute(world, client=again) == 0
     assert again.prompts == []

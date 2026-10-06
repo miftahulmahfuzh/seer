@@ -9,12 +9,12 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 78
+- Completed: 79
 
 ---
 
@@ -23,15 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ENG-Q0OH** Phase 3: Explain from evidence, with checks
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `commands/explain.py` (K3: prompt from facts + strategy plain name, `thinking="disabled"`, temperature 0, `EXPLAIN_MAX_TOKENS`, `accept()` checks), `tests/test_explain.py`, `tests/test_paper_c.py:490` (one assertion), `llm.py` docstrings, `docs/runbooks/paper-trading.md` (Explain section, Paper evidence and Explain lines) and `engine/package_readme.md` (pipeline overview, migration 009, promote's third condition). Exit: prompt built from evidence only; accept() rejects invented numbers, cut-off text, >2 sentences, banned phrases, duplicates; no "…"; entries without evidence skipped; always exit 0; phase 1's exact fact shapes pass `vet`.
-  - **Status**: open
-  - **Plan Set**: `WHY_THIS_PICK_PIPELINE_PLAN.md` (phase 3 of 5)
-  - **Satisfies**: R2, R3, R4, R8 — Explain passes those facts to the LLM → 1–2 plain sentences per pick, distinct per stock; Facts only, no predictions, no buy advice; every number checked against the facts; failing text discarded; never fails the night; Fix today's bugs: boilerplate, NULL, truncated texts; Plain words for a non-trader; no ids/codes on the site
-  - **Depends on**: P1-ENG-H5LC
-  - **Plan**: `.workflows/plan/P1-ENG-Q0OH.md`
 - [x] **P1-ENG-7V3C** Phase 3: Common-window, risk-adjusted comparison over `equity_snapshots`
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -529,6 +520,19 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-Q0OH** Phase 3: Explain from evidence, with checks
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `commands/explain.py` (K3: prompt from facts + strategy plain name, `thinking="disabled"`, temperature 0, `EXPLAIN_MAX_TOKENS`, `accept()` checks), `tests/test_explain.py`, `tests/test_paper_c.py:490` (one assertion), `llm.py` docstrings, `docs/runbooks/paper-trading.md` (Explain section, Paper evidence and Explain lines) and `engine/package_readme.md` (pipeline overview, migration 009, promote's third condition). Exit: prompt built from evidence only; accept() rejects invented numbers, cut-off text, >2 sentences, banned phrases, duplicates; no "…"; entries without evidence skipped; always exit 0; phase 1's exact fact shapes pass `vet`.
+  - **Status**: completed
+  - **Plan Set**: `WHY_THIS_PICK_PIPELINE_PLAN.md` (phase 3 of 5)
+  - **Satisfies**: R2, R3, R4, R8 — Explain passes those facts to the LLM → 1–2 plain sentences per pick, distinct per stock; Facts only, no predictions, no buy advice; every number checked against the facts; failing text discarded; never fails the night; Fix today's bugs: boilerplate, NULL, truncated texts; Plain words for a non-trader; no ids/codes on the site
+  - **Depends on**: P1-ENG-H5LC
+  - **Plan**: `.workflows/plan/P1-ENG-Q0OH.md`
+  - **Completed**: 2026-10-06 22:31
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/commands/explain.py, engine/tests/test_explain.py, engine/tests/test_paper_c.py, engine/src/seer_engine/llm.py, docs/runbooks/paper-trading.md, engine/package_readme.md
+  - **Drift**: Plan's test seed inserted the KO order at slot 5; orders.slot has CHECK (slot BETWEEN 1 AND 4). KO is on a different session (LAST), so it now uses slot 1 — same intent, valid row.
 - [x] **P1-ENG-BZYN** Phase 4: Promote requires evidence
   - **Difficulty**: EASY
   - **Type**: Feature

@@ -67,9 +67,9 @@ F1 = "F1-SPY-SMA200-M"
 FND = "FND"
 F4_FR = "F4-MOM12-N20-TREND-FR"
 F1_FR = "F1-SPY-SMA200-M-FR"
-FND_FR = "FND-FR"
+RM = "RM-FR"  # lab M0011-RAW20-TV14-N21 in fractional shares; replaces FND (010)
 RETIRED = (F4, F1, FND)  # the whole-share three, retired by 010 when their fractional twins joined
-ACTIVE_IDS = ("SPY", "A", "C", F4_FR, F1_FR, FND_FR)
+ACTIVE_IDS = ("SPY", "A", "C", F4_FR, F1_FR, RM)
 
 PINS = {
     "SPY": "ca309ea7f19d0b771f236c63309a2fcf28a82e16048528d738dc329a42d4d198",
@@ -85,7 +85,7 @@ PINS = {
     # are unchanged byte for byte.
     F4_FR: "2dc26f634daf8efb161a087ab8f3a915044e6836b2a7d3cbdff477528aafa928",
     F1_FR: "a5e4239e12c720636707059c5bddb776322a47a06caa0ccf69c2519eff9a2d2a",
-    FND_FR: "29f48c9d0e8a8849100208e58290b452bd37e9e133f2ae72030fbb969ac05f19",
+    RM: "ba0fb4ffca4077361220957d00b9c9e4ddcf5f42a073a0fa607073fe9478a541",
 }
 
 FACTOR_PARAMS_AS_DICT = {
@@ -106,7 +106,7 @@ DISPLAY = ("id", "name", "sub", "icon", "is_champion", "is_benchmark", "sort", "
 
 
 def test_the_roster_is_the_handover_entries_in_sort_order():
-    assert ROSTER_IDS == ("SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, FND_FR)
+    assert ROSTER_IDS == ("SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, RM)
     assert [e.sort for e in ROSTER] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
     assert "B" not in ROSTER_IDS
 
@@ -122,7 +122,7 @@ def test_display_fields_equal_the_migration_rows(pg):
 
 
 def test_each_entry_is_the_named_object_params_and_rules():
-    spy, a, f4, f1, c, fnd, f4_fr, f1_fr, fnd_fr = (entry(i) for i in ROSTER_IDS)
+    spy, a, f4, f1, c, fnd, f4_fr, f1_fr, rm = (entry(i) for i in ROSTER_IDS)
     assert (spy.engine, spy.obj, spy.rules, spy.rules_id, spy.params) == ("benchmark", None, None, None, None)
     assert a.engine == "bracket"
     assert a.obj is STRATEGY_A and a.params is STRATEGY_A_PARAMS and a.rules is DESIGN_V0
@@ -143,9 +143,15 @@ def test_each_entry_is_the_named_object_params_and_rules():
     # rule set that differs from the candidate's in the share granularity only).
     assert f4_fr.obj is FACTOR and f4_fr.params is f4.params and f4_fr.rules is MONTHLY_HOLD_FRAC
     assert f1_fr.obj is TIMING and f1_fr.params is f1.params and f1_fr.rules is MONTHLY_HOLD_FRAC
-    assert fnd_fr.obj is FUNDAMENTAL and fnd_fr.params is fnd.params and fnd_fr.rules is MONTHLY_HOLD_FRAC
-    assert (f4_fr.object_name, f1_fr.object_name, fnd_fr.object_name) == ("FACTOR", "TIMING", "FUNDAMENTAL")
-    assert (f4_fr.registry_id, f1_fr.registry_id, fnd_fr.registry_id) == (F4, F1, None)
+    assert (f4_fr.object_name, f1_fr.object_name) == ("FACTOR", "TIMING")
+    assert (f4_fr.registry_id, f1_fr.registry_id) == (F4, F1)
+    # RM: lab M0011's braked residual momentum, its RAW20-TV14-N21 variant, in fractional shares.
+    from seer_engine.lab.methods.m0011_raw_residual_own_vol import METHOD as M0011
+    from seer_engine.lab.methods.m0011_raw_residual_own_vol import RESIDVOL
+
+    trial = next(c for c in M0011.candidates if c.id == "M0011-RAW20-TV14-N21")
+    assert rm.obj is RESIDVOL and rm.params is trial.params and rm.object_name == "RESIDVOL"
+    assert rm.rules is MONTHLY_HOLD_FRAC and trial.rules is MONTHLY_HOLD and rm.registry_id is None
     assert MONTHLY_HOLD_FRAC.fractional and MONTHLY_HOLD_FRAC == dataclasses.replace(
         MONTHLY_HOLD, id="monthly-hold-frac", fractional=True
     )
@@ -232,17 +238,21 @@ def test_strategy_params_round_trip_through_jsonb(pg):
 
 def test_lookbacks():
     assert {e.id: e.lookback for e in ROSTER} == {
-        "SPY": 1, "A": 200, F4: 253, F1: 200, "C": 200, FND: 20, F4_FR: 253, F1_FR: 200, FND_FR: 20
+        "SPY": 1, "A": 200, F4: 253, F1: 200, "C": 200, FND: 20, F4_FR: 253, F1_FR: 200, RM: 401
     }
     # FND's lookback is the 20-bar dollar-volume window: a filing's availability is its `filed`
-    # date, not a bar count. The roster's longest lookback is still F4's 253.
-    assert MAX_LOOKBACK_BARS == 253
+    # date, not a bar count. RM's 401 (a 378-session market-link estimate ending a month back)
+    # is the roster's longest, which is why the night loads 640 calendar days, not 550.
+    assert MAX_LOOKBACK_BARS == 401
 
 
-def test_550_calendar_days_hold_the_longest_lookback():
-    # Plan decision "History at night": bars since data_date − 550 calendar days.
+def test_the_night_window_holds_the_longest_lookback():
+    # Plan decision "History at night": bars since data_date − MARKET_WINDOW_DAYS calendar days.
+    from seer_engine.paper.store import MARKET_WINDOW_DAYS
+
+    assert MARKET_WINDOW_DAYS == 640
     for d in dates.sessions(date(2026, 10, 1), date(2027, 12, 31)):
-        assert len(dates.sessions(d - timedelta(days=550), d)) >= MAX_LOOKBACK_BARS
+        assert len(dates.sessions(d - timedelta(days=MARKET_WINDOW_DAYS), d)) >= MAX_LOOKBACK_BARS
 
 
 def test_entry_rejects_an_id_off_the_roster():
@@ -415,7 +425,7 @@ def test_active_drops_retired_entries_and_keeps_order():
     )
     entries = from_rows(rows)
     assert [e.id for e in entries] == list(ROSTER_IDS)  # retired rows are never dropped from the roster
-    assert [e.id for e in active(entries)] == ["SPY", "C", F4_FR, F1_FR, FND_FR]
+    assert [e.id for e in active(entries)] == ["SPY", "C", F4_FR, F1_FR, RM]
     a = next(e for e in entries if e.id == "A")
     assert (a.status, a.paper_end) == ("retired", date(2026, 10, 2))
 
@@ -456,8 +466,9 @@ def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
     # promoted_from defaults to NULL for every row 003/004 seeded; FND is the one row written
     # by a promotion (007_fnd.sql mirrors what `promote --method M0005` writes on the live
     # database), so it is the one row that names its provenance.
-    assert {r.id for r in rows.values() if r.promoted_from is not None} == {FND}
-    assert rows[FND].promoted_from == "M0005"
+    # RM-FR (010) is the second: lab M0011, promoted to replace FND.
+    assert {r.id for r in rows.values() if r.promoted_from is not None} == {FND, RM}
+    assert (rows[FND].promoted_from, rows[RM].promoted_from) == ("M0005", "M0011")
     assert (rows["A"].object_name, rows["A"].registry_id, rows["A"].gate_applicable) == ("STRATEGY_A", None, True)
     assert (rows[F4].object_name, rows[F4].registry_id) == ("FACTOR", F4)
     assert rows["C"].gate_applicable is False
@@ -465,7 +476,7 @@ def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
     pg.execute("UPDATE strategies SET status = 'retired', paper_end = %s WHERE id = 'A'", (date(2026, 10, 2),))
     retired = {r.id: r for r in store.read_roster_rows(pg)}["A"]
     assert (retired.status, retired.paper_end) == ("retired", date(2026, 10, 2))
-    assert [e.id for e in active(from_rows(store.read_roster_rows(pg)))] == ["SPY", "C", F4_FR, F1_FR, FND_FR]
+    assert [e.id for e in active(from_rows(store.read_roster_rows(pg)))] == ["SPY", "C", F4_FR, F1_FR, RM]
     pg.rollback()
 
 

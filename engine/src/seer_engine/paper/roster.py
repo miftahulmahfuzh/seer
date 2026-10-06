@@ -89,6 +89,8 @@ from typing import Any, Literal, Protocol
 
 from seer_engine.backtest.registry import REGISTRY, candidate_digest
 from seer_engine.backtest.runner import INITIAL_IDR
+from seer_engine.lab.methods.m0011_raw_residual_own_vol import METHOD as M0011
+from seer_engine.lab.methods.m0011_raw_residual_own_vol import RESIDVOL
 from seer_engine.sim import COST_RATE
 from seer_engine.sim.rules import PRESETS, TradeRules, is_pinned_default
 from seer_engine.strategies.a import STRATEGY_A, STRATEGY_A_PARAMS
@@ -107,10 +109,10 @@ F4_ID = "F4-MOM12-N20-TREND"
 F1_ID = "F1-SPY-SMA200-M"
 FND_ID = "FND"
 # The fractional-share versions (2026-10-07): the same methods under monthly-hold-frac. A changed
-# rule set is a new id (frozen roster); the whole-share three above are retired by 010.
+# rule set is a new id (frozen roster); 010 retires the whole-share F4 and F1, and FND for RM.
 F4_FR_ID = "F4-MOM12-N20-TREND-FR"
 F1_FR_ID = "F1-SPY-SMA200-M-FR"
-FND_FR_ID = "FND-FR"
+RM_ID = "RM-FR"  # lab M0011-RAW20-TV14-N21 in fractional shares; replaces FND (owner, 2026-10-07)
 
 #: ``object_name`` of the benchmark: ``backtest.benchmark.buy_and_hold``, which is rules, not an object.
 BENCHMARK_OBJECT = "buy_and_hold"
@@ -227,6 +229,9 @@ class Binding:
 # `store.check_digest` refuses FND's second night with a SpecMismatch. The test is in the test
 # file, where importing the lab module is free; this file must never import it.
 FUNDAMENTAL_PARAMS = FundamentalParams(rank="composite", top=20)
+#: RM's params: lab M0011's RAW20-TV14-N21 variant, read from the frozen method file (its sha is
+#: pinned by tests/test_lab_methods.py), so the roster can never drift from the trial it records.
+RESIDVOL_PARAMS = next(c.params for c in M0011.candidates if c.id == "M0011-RAW20-TV14-N21")
 
 
 #: The one code-side table (D2). **This is the extension point**: a new strategy is a row in
@@ -241,6 +246,8 @@ RESOLVER: dict[str, Binding] = {
     "FACTOR": Binding(obj=FACTOR, from_registry=True),
     "TIMING": Binding(obj=TIMING, from_registry=True),
     "FUNDAMENTAL": Binding(obj=FUNDAMENTAL, params=FUNDAMENTAL_PARAMS),
+    # Lab M0011's braked residual momentum, its RAW20-TV14-N21 variant (promoted 2026-10-07).
+    "RESIDVOL": Binding(obj=RESIDVOL, params=RESIDVOL_PARAMS),
 }
 
 
@@ -554,7 +561,8 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         ),
         status="retired",
     ),
-    # 010: the same three methods in fractional shares (Gotrade takes fractional limit orders).
+    # 010: F4 and F1 in fractional shares (Gotrade takes fractional limit orders), and RM, which
+    # replaces FND (lab M0011, the near-miss that failed only the luck test).
     RosterRow(
         id=F4_FR_ID,
         name="F4 · Momentum",
@@ -590,21 +598,21 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         ),
     ),
     RosterRow(
-        id=FND_FR_ID,
-        name="FND · Fundamentals",
-        sub="Top 20 by company filings, monthly, fractional shares",
-        icon="book-open",
+        id=RM_ID,
+        name="RM · Braked momentum",
+        sub="Top 20 by rise beyond the market, holds less when jumpy, monthly, fractional shares",
+        icon="activity",
         is_champion=False,
         is_benchmark=False,
         sort=9,
         engine="book",
         rules_id="monthly-hold-frac",
-        object_name="FUNDAMENTAL",
+        object_name="RESIDVOL",
         registry_id=None,
         gate_note=(
-            "Same method as the whole-share FND: M0005 dev window only; failed beats SPY TR "
-            "(+1.8% vs +351.4%), >= 100 trades (15) and DSR >= 0.95 (0.006). Backtested in whole "
-            "shares; this version trades fractional shares"
+            "Lab M0011 dev window only (1996-01-03..2015-10-16), in whole shares: beats SPY TR "
+            "(+660.2% vs +351.4%), max DD 14.1%, PF 2.03 and 1,588 trades all pass; failed only "
+            "DSR >= 0.95 (0.897 at N=90). On paper to test it forward"
         ),
     ),
 )

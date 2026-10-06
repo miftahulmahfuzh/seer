@@ -407,7 +407,7 @@ def _trade(conn: psycopg.Connection, rd: dates.RunDates, plan: NightPlan) -> Non
     if plan.start:
         lasts.append(rd.data_date)
     earliest = min(lasts)
-    since = store.market_window_since(earliest)  # earliest - store.MARKET_WINDOW_DAYS (550) days
+    since = store.market_window_since(earliest)  # earliest - store.MARKET_WINDOW_DAYS (640) days
     _check_window(since, earliest, list(plan.start) + [e for e, _ in plan.step])
 
     market = store.load_market_window(conn, since)

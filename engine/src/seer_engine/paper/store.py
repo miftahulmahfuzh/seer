@@ -56,7 +56,7 @@ from seer_engine.sim.rules import SHARE_QUANTUM
 from seer_engine.strategies.c import VERDICTS, allowed_map
 
 BENCHMARK_ID = "SPY"
-MARKET_WINDOW_DAYS = 550  # calendar days of bars loaded per night (plan Decisions: "history at night")
+MARKET_WINDOW_DAYS = 640  # calendar days of bars loaded per night; 550 until RM (401-bar lookback), 2026-10-07
 
 PRICE_QUANTUM = Decimal("0.0001")  # numeric(12,4) / numeric(14,4)
 DIVIDEND_QUANTUM = Decimal("0.000001")  # dividends.amount numeric(14,6)

@@ -194,7 +194,7 @@ def test_the_resolver_names_fundamental_and_the_seed_row_uses_it():
     assert binding.from_registry is False       # D1: never a backtest.registry entry
     row = next(r for r in SEED_ROWS if r.id == FND_ID)
     assert (row.object_name, row.registry_id, row.rules_id) == ("FUNDAMENTAL", None, "monthly-hold")
-    # Retired by 010 for FND-FR, the same method in fractional shares.
+    # Retired by 010: the owner replaced FND with RM (lab M0011) on 2026-10-07.
     assert (row.status, row.paper_end, row.gate_applicable) == ("retired", None, True)
 
 

@@ -53,6 +53,7 @@ from __future__ import annotations
 import argparse
 import logging
 from dataclasses import dataclass
+from dataclasses import fields as dc_fields
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -63,7 +64,7 @@ from seer_engine import config, dates, db
 from seer_engine.lab import store as lab_store
 from seer_engine.paper import roster
 from seer_engine.paper import store as paper_store
-from seer_engine.sim.rules import TradeRules
+from seer_engine.sim.rules import PRESETS, TradeRules
 from seer_engine.strategies import evidence
 
 log = logging.getLogger(__name__)
@@ -120,6 +121,25 @@ def object_name_of(obj: object) -> str:
         f"the roster resolver gives <{ident}> ({where}) {len(names)} names "
         f"({', '.join(names)}); a roster object must have exactly one, because the name is part "
         f"of the frozen spec digest"
+    )
+
+
+def fractional_twin(rules: TradeRules) -> TradeRules:
+    """The ``sim.rules`` preset that is ``rules`` in fractional shares (``--fractional``).
+
+    Gotrade takes fractional limit orders (owner, 2026-10-07), so a book method may trade its lab
+    variant in fractional shares: the same rules but for ``fractional`` and the id naming them.
+    NotPromotable when no preset is that twin (add one to ``sim.rules.PRESETS`` first).
+    """
+    if rules.fractional:
+        return rules
+    same = [f.name for f in dc_fields(rules) if f.name not in ("id", "fractional")]
+    for r in PRESETS:
+        if r.fractional and all(getattr(r, n) == getattr(rules, n) for n in same):
+            return r
+    raise NotPromotable(
+        f"--fractional: sim.rules has no fractional preset matching {rules.id!r}; add one to PRESETS "
+        f"(as monthly-hold-frac is monthly-hold with fractional=True), commit it, then promote again."
     )
 
 
@@ -231,10 +251,11 @@ def build_promotion(args: argparse.Namespace, data_date: date, sort: int) -> Pro
     """The roster entry and its contract-C2 params, from the named method variant. No I/O."""
     _method, _path, candidate = find_candidate(args.method, args.candidate)
     obj = candidate.allocator
-    _check_rules(candidate.rules)
+    rules = fractional_twin(candidate.rules) if getattr(args, "fractional", False) else candidate.rules
+    _check_rules(rules)
     object_name = object_name_of(obj)
     _check_evidence(object_name)
-    engine = "bracket" if candidate.rules.engine == "bracket_v0" else "book"
+    engine = "bracket" if rules.engine == "bracket_v0" else "book"
     lookback = obj.lookback if engine == "bracket" else obj.lookback(candidate.params)
     check_lookback(int(lookback), data_date)
     entry = roster.RosterEntry(
@@ -246,7 +267,7 @@ def build_promotion(args: argparse.Namespace, data_date: date, sort: int) -> Pro
         is_benchmark=False,
         sort=sort,
         engine=engine,
-        rules=candidate.rules,
+        rules=rules,
         obj=obj,
         object_name=object_name,
         params=candidate.params,
@@ -418,6 +439,10 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--gate-not-applicable", action="store_true",
                    help="the quant backtest gate does not apply to this entry (an LLM strategy, "
                         "as C is); it still counts as not passed")
+    p.add_argument("--fractional", action="store_true",
+                   help="trade the variant in fractional shares: its rules' fractional preset "
+                        "(e.g. monthly-hold -> monthly-hold-frac). Gotrade takes fractional limit "
+                        "orders; its take-profit/stop-loss order needs whole shares")
     p.add_argument("--retire", default=None, metavar="ID",
                    help="retire this strategy in the same transaction as the insert")
     p.add_argument("--lab-db", type=Path, default=lab_store.DB_PATH,

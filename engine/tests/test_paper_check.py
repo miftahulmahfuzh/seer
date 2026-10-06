@@ -49,10 +49,10 @@ NOV2 = date(2026, 11, 2)
 F4 = "F4-MOM12-N20-TREND-FR"
 F1 = "F1-SPY-SMA200-M-FR"
 # The active roster (the strategies a night steps), and every row in sort order: the whole-share
-# F4, F1 and FND are retired by 010 and never start in these worlds, but stay on the board.
-ROSTER_IDS = ("SPY", "A", "C", F4, F1, "FND-FR")
+# F4, F1 and FND are retired by 010 (RM-FR replaces FND) and never start in these worlds, but stay on the board.
+ROSTER_IDS = ("SPY", "A", "C", F4, F1, "RM-FR")
 RETIRED_IDS = ("F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "FND")
-ALL_IDS = ("SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND", F4, F1, "FND-FR")
+ALL_IDS = ("SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND", F4, F1, "RM-FR")
 
 
 # ---- the synthetic world -----------------------------------------------------------------------

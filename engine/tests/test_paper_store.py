@@ -57,7 +57,7 @@ def bar(symbol: str, d: date, o: str, h: str, low: str, c: str) -> Bar:
 def test_read_strategies_returns_the_roster_rows_in_sort_order(pg):
     rows = store.read_strategies(pg)
     assert [r.id for r in rows] == [
-        "SPY", "A", BOOK_ID, TIMING_ID, "C", "FND", f"{BOOK_ID}-FR", f"{TIMING_ID}-FR", "FND-FR"
+        "SPY", "A", BOOK_ID, TIMING_ID, "C", "FND", f"{BOOK_ID}-FR", f"{TIMING_ID}-FR", "RM-FR"
     ]
     spy = rows[0]
     assert (spy.engine, spy.rules_id, spy.is_champion, spy.is_benchmark) == ("benchmark", None, True, True)
@@ -536,8 +536,9 @@ def test_market_window_equals_the_full_load_cut_at_since(pg, tmp_path):
     assert window.fx == full.fx
 
 
-def test_market_window_since_is_550_calendar_days_back():
-    assert store.market_window_since(date(2026, 10, 2)) == date(2026, 10, 2) - timedelta(days=550)
+def test_market_window_since_is_640_calendar_days_back():
+    # 550 until RM joined (2026-10-07): its 401-bar lookback needs about 582 calendar days.
+    assert store.market_window_since(date(2026, 10, 2)) == date(2026, 10, 2) - timedelta(days=640)
 
 
 def test_read_bars_frame_default_statement_is_unchanged_and_since_filters(pg, monkeypatch):

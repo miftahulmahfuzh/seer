@@ -343,3 +343,15 @@ def test_the_registry_is_not_appended_to():
 
     assert len(after_registry) == before
     assert all(c.id != VARIANT for c in after_registry)
+
+
+# ---- --fractional (2026-10-07): a book variant may be traded in fractional shares --------------
+
+
+def test_fractional_twin_maps_a_whole_share_preset_to_its_fractional_preset():
+    from seer_engine.sim.rules import DESIGN_V0, MONTHLY_HOLD, MONTHLY_HOLD_FRAC
+
+    assert promote.fractional_twin(MONTHLY_HOLD) is MONTHLY_HOLD_FRAC
+    assert promote.fractional_twin(MONTHLY_HOLD_FRAC) is MONTHLY_HOLD_FRAC
+    with pytest.raises(promote.NotPromotable, match="no fractional preset matching 'design-v0'"):
+        promote.fractional_twin(DESIGN_V0)

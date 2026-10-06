@@ -301,6 +301,70 @@ def factor_evidence(market: Market, params: Any, data_date: date, symbols: Seque
     return out
 
 
+# --------------------------------------------------------------------------- RESIDVOL (lab M0011)
+
+
+def residvol_evidence(market: Market, params: Any, data_date: date, symbols: Sequence[str]) -> dict[str, Facts]:
+    """``RESIDVOL`` (lab M0011, braked residual momentum): the stock's rise beyond what the market's
+    move explains, its place among the stocks checked on that, the market filter, and how much of
+    the money the volatility brake lets the method hold tonight."""
+    # Imported here, not at module level: the lab method modules import backtest.dev, and a
+    # module-level import would close a strategies -> backtest cycle (see the module docstring).
+    from seer_engine.lab.methods.m0001_momentum_own_vol_scaling import basket_scale
+    from seer_engine.lab.methods.m0007_residual_momentum import RESIDMOM, build_grid, residual_scores
+    from seer_engine.lab.methods.m0011_raw_residual_own_vol import ResidVolParams
+
+    p: ResidVolParams = _typed("RESIDVOL", params, ResidVolParams)
+    inner = p.inner
+    wanted = _wanted(symbols)
+    history = _cut(market, data_date)
+    members = market.membership.members_on(data_date)
+    rows = factor_rows(history, members, data_date, inner.inner)
+    grid = build_grid(history, inner.market) if rows else None
+    if grid is None:
+        return {}
+    scores = residual_scores(grid, [r.symbol for r in rows], data_date, inner)
+    ranked = sorted((s for s in scores if math.isfinite(scores[s])), key=lambda s: (-scores[s], s))
+    n = len(ranked)
+    if n == 0:
+        return {}
+    picks = RESIDMOM.targets(history, members, data_date, frozenset(), inner)
+    scale = basket_scale(history, picks, data_date, p.n, p.target_vol)
+    held_share = 1.0 if scale is None else float(scale)
+    months = _span(inner.mom_n)
+    skip = _span(inner.skip)
+    brake = (
+        f"Over the last {_span(p.n)}, its picks together swung more than the {_pct(float(p.target_vol))} "
+        f"a year the method allows, so it puts {_pct(held_share)} of its money in stocks and keeps the "
+        "rest in cash."
+        if scale is not None
+        else f"Over the last {_span(p.n)}, its picks together swung less than the {_pct(float(p.target_vol))} "
+        "a year the method allows, so it puts all its money in stocks."
+    )
+    on = factor_trend_on(history, data_date, inner.inner)
+    out: dict[str, Facts] = {}
+    for symbol in wanted:
+        score = scores.get(symbol)
+        if score is None or not math.isfinite(score) or symbol not in ranked:
+            continue
+        # The score is the sum of daily returns left after taking out the market's move: a
+        # running total, not a compounded return, hence "added up to about".
+        direction = "gains" if score > 0 else "losses"
+        beyond = (
+            f"Beyond what the market's own move explains, its daily {direction} from {months} ago to "
+            f"{skip} ago added up to about {_pct(score)}."
+        )
+        facts = [
+            beyond,
+            f"It ranked {_ordinal(ranked.index(symbol) + 1)} of {n} stocks checked on that, strongest first.",
+            brake,
+        ]
+        if inner.inner.trend is not None:
+            facts.append(_trend_fact(history, data_date, inner.inner.trend, on))
+        out[symbol] = tuple(facts[:MAX_FACTS])
+    return out
+
+
 # --------------------------------------------------------------------------- TIMING (F1/F10)
 
 
@@ -445,6 +509,7 @@ EVIDENCE: dict[str, EvidenceFn] = {
     "FACTOR": factor_evidence,
     "TIMING": timing_evidence,
     "FUNDAMENTAL": fundamental_evidence,
+    "RESIDVOL": residvol_evidence,
 }
 
 

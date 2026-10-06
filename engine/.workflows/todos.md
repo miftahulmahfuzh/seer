@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-07
-**Total Active Tasks**: 1
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 80
+- Completed: 81
 
 ---
 
@@ -23,15 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ENG-GX63** Phase 2: Nightly wiring and end-to-end tests (paper night, paper_check, promote)
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `commands/paper.py` only among sources: private `_resize_only` and `_split_inputs`; `_start`/`_step_book` pass, for split rules only, `last_rank` = `rank_basket(store.read_book_targets(... last_rank_session(...)))` and `marks` from the settled book; evidence None on a resize-only decision; rules without `resize_cadence` call `decide_book` exactly as today. New `engine/tests/test_paper_split_cadence.py`: a scripted `monthly-rank-weekly-resize-frac` entry over 20 Postgres nights (mid-month kickoff, resize weeks, catch-up across a rank, a 2:1 split on a resize Monday, a stopped-out position never re-bought) equal to `run_rules`, `paper_check` ok/split-affected never mismatch; and `promote --fractional` of `M0022-W-TV14` (RESOLVER/EVIDENCE via monkeypatch only) then 25 nights to a green `paper_check`. Does not touch `paper/book.py`, `paper/replay.py`, `paper/store.py`, `commands/promote.py`, existing tests, web, roster or `PAPER_PAUSED`. Exit: split-cadence entry paper-trades end to end equal to `run_rules`/`run_book`; resize-only decisions carry no evidence; promote writes `rules_id = 'monthly-rank-weekly-resize-frac'` and trades to a green `paper_check`; every existing test unedited and green.
-  - **Status**: open
-  - **Plan Set**: `PAPER_SPLIT_CADENCE_PLAN.md` (phase 2 of 3)
-  - **Satisfies**: R1, R2, R3, R7 — split-cadence decisions wired into the paper night with the last rank basket read back from `book_targets` (no migration); replay agrees over many nights; promote accepts only what paper runs and paper runs all it accepts
-  - **Depends on**: P1-ENG-Q47S
-  - **Plan**: `.workflows/plan/P1-ENG-GX63.md`
 - [x] **P1-ENG-7V3C** Phase 3: Common-window, risk-adjusted comparison over `equity_snapshots`
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -529,6 +520,18 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-GX63** Phase 2: Nightly wiring and end-to-end tests (paper night, paper_check, promote)
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `commands/paper.py` only among sources: private `_resize_only` and `_split_inputs`; `_start`/`_step_book` pass, for split rules only, `last_rank` = `rank_basket(store.read_book_targets(... last_rank_session(...)))` and `marks` from the settled book; evidence None on a resize-only decision; rules without `resize_cadence` call `decide_book` exactly as today. New `engine/tests/test_paper_split_cadence.py`: a scripted `monthly-rank-weekly-resize-frac` entry over 20 Postgres nights (mid-month kickoff, resize weeks, catch-up across a rank, a 2:1 split on a resize Monday, a stopped-out position never re-bought) equal to `run_rules`, `paper_check` ok/split-affected never mismatch; and `promote --fractional` of `M0022-W-TV14` (RESOLVER/EVIDENCE via monkeypatch only) then 25 nights to a green `paper_check`. Does not touch `paper/book.py`, `paper/replay.py`, `paper/store.py`, `commands/promote.py`, existing tests, web, roster or `PAPER_PAUSED`. Exit: split-cadence entry paper-trades end to end equal to `run_rules`/`run_book`; resize-only decisions carry no evidence; promote writes `rules_id = 'monthly-rank-weekly-resize-frac'` and trades to a green `paper_check`; every existing test unedited and green.
+  - **Status**: completed
+  - **Plan Set**: `PAPER_SPLIT_CADENCE_PLAN.md` (phase 2 of 3)
+  - **Satisfies**: R1, R2, R3, R7 — split-cadence decisions wired into the paper night with the last rank basket read back from `book_targets` (no migration); replay agrees over many nights; promote accepts only what paper runs and paper runs all it accepts
+  - **Depends on**: P1-ENG-Q47S
+  - **Plan**: `.workflows/plan/P1-ENG-GX63.md`
+  - **Completed**: 2026-10-07 01:58
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/commands/paper.py, engine/tests/test_paper_split_cadence.py
 - [x] **P1-ENG-Q47S** Phase 1: Pure split-cadence decision, replay and fractional preset
   - **Difficulty**: HARD
   - **Type**: Feature

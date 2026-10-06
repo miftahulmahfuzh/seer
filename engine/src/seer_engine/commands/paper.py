@@ -47,6 +47,15 @@ symbol, the facts its method's formula read on that night's view (``_evidence``)
 instrument gets none. Evidence never changes a decision and never fails the night: an evidence
 function that raises leaves that strategy's evidence NULL for the night and logs a warning.
 
+Split-cadence rules (``rules.resize_cadence``, e.g. ``monthly-rank-weekly-resize-frac``): a book
+picks its basket on rank sessions (and its kickoff) and re-scales that frozen basket on
+resize-only sessions. The basket is never recomputed. The night reads it back from the
+``book_targets`` rows of the last rank session (``paper.book.last_rank_session``, then
+``paper.book.rank_basket`` drops a trailing idle row) on tonight's own connection, so a rank decided
+earlier in a catch-up loop is seen. It hands that basket and the settled book's marks to
+``decide_book``. A resize-only decision opens no position, so it stores no evidence. A rule
+set without ``resize_cadence`` takes none of these reads and calls ``decide_book`` exactly as before.
+
 Trade logic lives in ``paper.bracket``, ``paper.book`` and ``paper.benchmark`` (pure), and all
 persistence in ``paper.store``; this module only sequences them.
 """
@@ -67,12 +76,14 @@ from seer_engine.backtest.market import Market
 from seer_engine.commands.nightly import _parse_now
 from seer_engine.paper import roster, store
 from seer_engine.paper.benchmark import SPY, step_benchmark
-from seer_engine.paper.book import decide_book, needs_kickoff, settle_book
+from seer_engine.paper.book import decide_book, last_rank_session, needs_kickoff, rank_basket, settle_book
 from seer_engine.paper.bracket import decide_bracket, settle_bracket
 from seer_engine.paper.capital import PAPER_INITIAL_IDR
 from seer_engine.paper.roster import RosterEntry
 from seer_engine.paper.store import PaperState, StrategyRow
 from seer_engine.sim import initial_cash_usd, new_portfolio
+from seer_engine.sim.book import Position, Target
+from seer_engine.sim.rules import TradeRules, is_resize_session
 from seer_engine.strategies import evidence
 from seer_engine.strategies.base import History, Strategy
 from seer_engine.strategies.c import NewsVeto
@@ -512,6 +523,48 @@ def _evidence(e: RosterEntry, market: Market, data_date: date, symbols: Iterable
         return {}
 
 
+def _resize_only(rules: TradeRules, session: date, kickoff: bool) -> bool:
+    """True when the decision for ``session`` is a resize-only one: ``rules`` split their
+    cadences, ``session`` re-scales the frozen basket (``sim.rules.is_resize_session``) and it is
+    not the kickoff (a forced rank). Such a decision opens no position, so it stores no evidence
+    (plan Decisions, handover §5 Q1).
+
+    False at once for every rule set without ``resize_cadence``: ``is_resize_session`` is not even
+    called, so those nights run exactly as before.
+    """
+    return rules.resize_cadence is not None and not kickoff and is_resize_session(rules, session)
+
+
+def _split_inputs(
+    conn: psycopg.Connection,
+    strategy_id: str,
+    rules: TradeRules,
+    paper_start: date,
+    kickoff: date | None,
+    session: date,
+    positions: Sequence[Position],
+) -> tuple[tuple[Target, ...] | None, dict[str, Decimal]]:
+    """``(last_rank, marks)`` for ``decide_book`` deciding ``session`` under split-cadence rules.
+
+    ``last_rank`` is the pre-idle basket of the last rank session before ``session``:
+    ``paper.book.last_rank_session`` gives the latest rank session, or the stored ``kickoff``, in
+    ``[paper_start, session)``. Its ``book_targets`` rows are read on ``conn`` (inside tonight's
+    transaction, so a rank decided earlier in tonight's catch-up loop is visible), and
+    ``paper.book.rank_basket`` drops a trailing idle row. ``()`` when that rank chose nothing (an
+    empty decision writes no rows). None when no rank has happened yet. Stored weights are exact
+    at ``WEIGHT_QUANTUM`` and a split never changes a weight, so this is ``run_book``'s own
+    ``last_rank`` (plan Decisions: option (a), read back, not recomputed).
+
+    ``marks`` is ``{symbol: mark}`` over ``positions``: the book after ``prev_session(session)``
+    settled, which is ``run_book``'s ``marks``.
+    """
+    marks = {p.symbol: p.mark for p in positions}
+    ranked = last_rank_session(rules, paper_start, kickoff, session)
+    if ranked is None:
+        return None, marks
+    return rank_basket(store.read_book_targets(conn, strategy_id, ranked), rules.idle_symbol), marks
+
+
 def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight: _Tonight) -> None:
     """Start ``e`` tonight.
 
@@ -519,6 +572,10 @@ def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight
     ``store.init_paper_state`` writes ``paper_state`` and the day-0 snapshot at
     ``prev_session(paper_start)`` (= ``rd.data_date``); then the decision for ``paper_start`` is
     written and ``paper_state.pending_session`` set to it (every engine, SPY included).
+
+    A split-cadence book (``e.rules.resize_cadence``) gets ``last_rank`` and ``marks`` from
+    ``_split_inputs``: at the start there is no rank yet and nothing is held, so they are None and
+    ``{}``, and the first decision is a rank (``paper_start`` is a rank session or the kickoff).
     """
     if _has_paper_rows(conn, e.id):
         raise PaperError(
@@ -558,8 +615,25 @@ def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight
         store.write_pending(conn, e.id, paper_start, decision=False)
     elif e.engine == "book":
         kickoff = needs_kickoff(e.rules, paper_start, paper_start, None)
-        targets, _ = decide_book(view, e.obj, e.params, e.rules, rd.data_date, frozenset(), force=kickoff)
-        facts = None if targets is None else _evidence(e, view, rd.data_date, (t.symbol for t in targets))
+        if e.rules.resize_cadence is None:
+            targets, _ = decide_book(view, e.obj, e.params, e.rules, rd.data_date, frozenset(), force=kickoff)
+        else:
+            last_rank, marks = _split_inputs(conn, e.id, e.rules, paper_start, None, paper_start, ())
+            targets, _ = decide_book(
+                view,
+                e.obj,
+                e.params,
+                e.rules,
+                rd.data_date,
+                frozenset(),
+                force=kickoff,
+                last_rank=last_rank,
+                marks=marks,
+            )
+        if targets is None or _resize_only(e.rules, paper_start, kickoff):
+            facts = None
+        else:
+            facts = _evidence(e, view, rd.data_date, (t.symbol for t in targets))
         store.save_book_decision(conn, e.id, paper_start, targets, evidence=facts)
         if kickoff:
             store.write_kickoff(conn, e.id, paper_start)
@@ -624,8 +698,28 @@ def _step_book(
         # A book that has never decided ranks on its first session instead of waiting for its
         # cadence (008, paper.book.needs_kickoff); the replay ranks on the stored kickoff too.
         kickoff = needs_kickoff(rules, paper_start, nxt, kicked)
-        targets, idle_added = decide_book(view, e.obj, e.params, rules, s, book.held(), force=kickoff)
-        facts = None if targets is None else _evidence(e, view, s, (t.symbol for t in targets))
+        if rules.resize_cadence is None:
+            targets, idle_added = decide_book(view, e.obj, e.params, rules, s, book.held(), force=kickoff)
+        else:
+            # Split cadences: a resize-only session re-scales the LAST RANK SESSION'S basket, read
+            # back from book_targets in this transaction, at the settled book's marks.
+            last_rank, marks = _split_inputs(conn, e.id, rules, paper_start, kicked, nxt, book.positions)
+            targets, idle_added = decide_book(
+                view,
+                e.obj,
+                e.params,
+                rules,
+                s,
+                book.held(),
+                force=kickoff,
+                last_rank=last_rank,
+                marks=marks,
+            )
+        # A resize-only decision opens no position, so it has nothing to explain.
+        if targets is None or _resize_only(rules, nxt, kickoff):
+            facts = None
+        else:
+            facts = _evidence(e, view, s, (t.symbol for t in targets))
         store.save_book_decision(conn, e.id, nxt, targets, evidence=facts)
         if kickoff:
             store.write_kickoff(conn, e.id, nxt)

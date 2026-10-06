@@ -146,7 +146,8 @@ export default async function Today() {
             )}
           </div>
         )}
-        <div className="nav-clear" />
+        {/* The stale sheet runs to the bottom edge itself; a spacer under it would only show page background. */}
+        {!run.stale && <div className="nav-clear" />}
       </div>
     </>
   );

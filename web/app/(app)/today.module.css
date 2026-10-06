@@ -9,7 +9,13 @@
 .strat { display: flex; align-items: center; gap: 6px; font-size: 15px; text-align: right; }
 
 /* ---- Stale ---- */
-.alarm { background: var(--alarm); color: var(--alarm-ink); min-height: 560px; padding-bottom: 150px; }
+/* The last sheet on the page: it grows into whatever slack the stack has left so its bottom edge
+   is the bottom edge of the screen, square-cornered there, with no page background showing under
+   it. The bottom padding clears the floating nav and the home indicator. */
+.alarm {
+  background: var(--alarm); color: var(--alarm-ink); min-height: 560px;
+  flex: 1 0 auto; border-radius: 40px 40px 0 0; padding-bottom: var(--nav-clear);
+}
 .alarmIcon {
   width: 60px; height: 60px; border-radius: 999px; background: var(--coral); color: #1d1c1a;
   display: flex; align-items: center; justify-content: center;
@@ -81,7 +87,7 @@
 
 /* ---- Desktop ---- */
 @media (min-width: 1024px) {
-  .alarm { border-radius: 40px; }
+  .alarm { border-radius: 40px; flex: none; }
   /* No nav to clear and no stack to fill: the sheet is only as tall as what it says. */
   .none { border-radius: 40px; min-height: 0; padding: 36px 32px 40px; }
 

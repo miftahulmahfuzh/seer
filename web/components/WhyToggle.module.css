@@ -1,10 +1,10 @@
 .row { display: flex; align-items: center; gap: 12px; }
 .label { font-size: 15px; color: var(--ink-2); }
-.why { margin-top: -4px; font-size: 17px; line-height: 1.5; text-wrap: pretty; }
+.why { margin-top: -4px; font-size: 17px; line-height: 1.5; }
 .facts {
   margin: -4px 0 0; padding: 0; list-style: none;
   display: flex; flex-direction: column; gap: 8px;
-  font-size: 17px; line-height: 1.45; text-wrap: pretty;
+  font-size: 17px; line-height: 1.45;
 }
 .facts li { position: relative; padding-left: 16px; }
 .facts li::before {

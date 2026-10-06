@@ -9,12 +9,12 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 77
+- Completed: 78
 
 ---
 
@@ -32,15 +32,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R2, R3, R4, R8 — Explain passes those facts to the LLM → 1–2 plain sentences per pick, distinct per stock; Facts only, no predictions, no buy advice; every number checked against the facts; failing text discarded; never fails the night; Fix today's bugs: boilerplate, NULL, truncated texts; Plain words for a non-trader; no ids/codes on the site
   - **Depends on**: P1-ENG-H5LC
   - **Plan**: `.workflows/plan/P1-ENG-Q0OH.md`
-- [ ] **P1-ENG-BZYN** Phase 4: Promote requires evidence
-  - **Difficulty**: EASY
-  - **Type**: Feature
-  - **Context**: Owns the `commands/promote.py` gate (K4: exit 2 `NotPromotable` when `not evidence.has_evidence(name)`, one-line reason), `tests/test_promote_command.py`, and the explore skill's promotion rule (a promotable allocator needs an `EVIDENCE` entry and a `RESOLVER` entry); does not touch the evidence module contents, roster, lab methods or `engine/package_readme.md`. Exit: promoting a candidate whose object has no evidence exits 2 with a one-line reason; existing promote tests green.
-  - **Status**: open
-  - **Plan Set**: `WHY_THIS_PICK_PIPELINE_PLAN.md` (phase 4 of 5)
-  - **Satisfies**: R7 — Evidence is required before a lab method is promoted to the site
-  - **Depends on**: P1-ENG-A1SZ
-  - **Plan**: `.workflows/plan/P1-ENG-BZYN.md`
 - [x] **P1-ENG-7V3C** Phase 3: Common-window, risk-adjusted comparison over `equity_snapshots`
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -538,6 +529,18 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-BZYN** Phase 4: Promote requires evidence
+  - **Difficulty**: EASY
+  - **Type**: Feature
+  - **Context**: Owns the `commands/promote.py` gate (K4: exit 2 `NotPromotable` when `not evidence.has_evidence(name)`, one-line reason), `tests/test_promote_command.py`, and the explore skill's promotion rule (a promotable allocator needs an `EVIDENCE` entry and a `RESOLVER` entry); does not touch the evidence module contents, roster, lab methods or `engine/package_readme.md`. Exit: promoting a candidate whose object has no evidence exits 2 with a one-line reason; existing promote tests green.
+  - **Status**: completed
+  - **Plan Set**: `WHY_THIS_PICK_PIPELINE_PLAN.md` (phase 4 of 5)
+  - **Satisfies**: R7 — Evidence is required before a lab method is promoted to the site
+  - **Depends on**: P1-ENG-A1SZ
+  - **Plan**: `.workflows/plan/P1-ENG-BZYN.md`
+  - **Completed**: 2026-10-06 22:20
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/commands/promote.py, engine/tests/test_promote_command.py, .claude/skills/explore-and-experiment-new-method/SKILL.md
 - [x] **P1-ENG-H5LC** Phase 2: Store evidence with every paper entry
   - **Difficulty**: NORMAL
   - **Type**: Feature

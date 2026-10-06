@@ -152,7 +152,11 @@ Then:
    command without `--dry-run`. That is the one look; there is never another.
 3. Write the analysis and verdict (`lab note`).
 4. **Pass:** `lab test` prints the exact `python -m seer_engine promote …` command, every argument
-   filled in from the two recorded trials. **Run it** — you do not ask anyone (design §6). It
+   filled in from the two recorded trials. **Run it** — you do not ask anyone (design §6). A new
+   allocator is refused until it has two committed entries: a name in `RESOLVER`
+   (`paper/roster.py`) and an evidence function under that name in `EVIDENCE`
+   (`strategies/evidence.py`) — 2–6 plain-English facts per pick, the numbers its formula used,
+   which become the site's "Why this pick". Add both, commit, then run it. It
    writes the roster row with no `paper_start`, so the next paper night freezes the spec and
    starts its own clock. Then `lab stage`, commit, push, verify. **Real money stays out of
    scope:** design §1 needs ≥ 3 months and ≥ 100 closed paper trades of forward paper first.

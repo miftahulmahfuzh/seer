@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/why-this-pick-pipeline`
 **Branch:** `feature/why-this-pick-pipeline` (base: `origin/main` @ `3dd43e3`)
 **Phases:** 5
-**Status:** phases 1, 2 of 5 complete
+**Status:** phases 1, 2, 4 of 5 complete
 **Coordinator:** —
 
 ---
@@ -177,7 +177,7 @@ their facts. C's "Why it passed the news check" line stays.
 | 1 ✅ | Pure evidence module | R1, R8 | `engine/strategies` | 2 | — | HARD | `.workflows/plan/why-this-pick-pipeline/phase-1.md` | P1-ENG-A1SZ | — |
 | 2 ✅ | Store evidence with every paper entry | R1, R6 | `engine/paper`, `db` | 4 | 1 | NORMAL | `.workflows/plan/why-this-pick-pipeline/phase-2.md` | P1-ENG-H5LC | — |
 | 3 | Explain from evidence, with checks | R2, R3, R4, R8 | `engine/commands`, docs | 6 | 2 | HARD | `.workflows/plan/why-this-pick-pipeline/phase-3.md` | P1-ENG-Q0OH | — |
-| 4 | Promote requires evidence | R7 | `engine/commands`, skill | 3 | 1 | EASY | `.workflows/plan/why-this-pick-pipeline/phase-4.md` | P1-ENG-BZYN | — |
+| 4 ✅ | Promote requires evidence | R7 | `engine/commands`, skill | 3 | 1 | EASY | `.workflows/plan/why-this-pick-pipeline/phase-4.md` | P1-ENG-BZYN | — |
 | 5 | Show reasons on the site | R5, R6, R8 | `web` | 9 | 2 | NORMAL | `.workflows/plan/why-this-pick-pipeline/phase-5.md` | P1-WEB-YJSP | — |
 
 ### Phase 1 — Pure evidence module

@@ -3,6 +3,12 @@
   "coordinator": "orch-build-promotion-path",
   "coordinator_session_id": "a118fa68-7670-403f-b5be-438bda81dcbb",
   "created": "2026-10-06T05:43:20+00:00",
+  "landed": {
+    "at": "2026-10-06T06:51:03+00:00",
+    "base": "main",
+    "commit": "9ce5c4edc30bc231af1585024093de39306d17d8",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -60,29 +66,29 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "bdba47d47e96d1379ca16d69e2e8a1d341f9ef39",
       "depends_on": [
         2,
         3
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "lab test shipped; 2829 passed, ruff clean, real lab still 0 looks. Decisions: ruff F821 on the plan's \"prereg.Prereg\" annotations -> TYPE_CHECKING guard, runtime import stays function-local; the plan's second-look test asserted an order its own code contradicts (run_test moves to test-failed, so refusal 1 precedes refusal 5) -> fixed the test and added test_a_recorded_look_is_refused_even_while_the_method_is_still_promoted, no check relaxed; verified on the main venv + PYTHONPATH, no .venv in this worktree.",
       "package": "lab/runner.py`, `commands/lab.py`, `SKILL.md",
       "plan": ".workflows/plan/build-promotion-path/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-06T06:46:54+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-YJDW",
       "title": "lab test`: one counted look, recorded and final"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/build-promotion-path/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "build-promotion-path",
-  "updated": "2026-10-06T06:28:28+00:00",
+  "updated": "2026-10-06T06:51:03+00:00",
   "verified_at": "2026-10-06T06:07:06+00:00",
   "worktree": "/home/miftah/.worktrees/seer/build-promotion-path"
 }

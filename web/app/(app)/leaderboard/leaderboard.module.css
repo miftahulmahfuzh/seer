@@ -122,9 +122,9 @@
      stack their metrics instead (container query below). */
   .cards {
     order: 1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
-    gap: 12px; margin-top: 12px; container: cards / inline-size;
+    gap: 12px; margin-top: 12px; container: cards / inline-size; --card-r: 32px;
   }
-  .card { border-radius: 32px; padding: 22px; gap: 18px; container: card / inline-size; }
+  .card { border-radius: var(--card-r); padding: 22px; gap: 18px; container: card / inline-size; }
   .cardHead { align-items: flex-start; gap: 10px; }
   /* Uniform heads: the code, then a chip line that keeps its height when it has no chip. */
   .titleRow { flex-direction: column; align-items: flex-start; gap: 8px; }
@@ -136,17 +136,27 @@
   .cardLink:hover .icon, .cardActive .icon { background: var(--ink); color: var(--sheet); }
 
   /* The tab: square bottom, stretched over the 12px gap onto the sheet, with concave fillets
-     where it meets the sheet's top edge. --tint is the card's own sheet colour. */
+     where it meets the sheet's top edge. The fillets take the card's own corner radius, so the
+     turn into the sheet reads as the same curve as the corner above it. --tint is the card's
+     sheet colour. The fillet reaches past the 12px gap onto the neighbour's column, but only
+     below the neighbour's bottom edge: at --card-r 32 the curve clears it by 13px. */
   .cardActive {
     position: relative; z-index: 1;
     border-bottom-left-radius: 0; border-bottom-right-radius: 0;
     margin-bottom: -12px; padding-bottom: 34px;
   }
   .cardActive::before, .cardActive::after {
-    content: ''; position: absolute; bottom: 0; width: 12px; height: 12px; pointer-events: none;
+    content: ''; position: absolute; bottom: 0;
+    width: var(--card-r); height: var(--card-r); pointer-events: none;
   }
-  .cardActive::before { left: -12px; background: radial-gradient(circle at 0 0, transparent 11.5px, var(--tint) 12px); }
-  .cardActive::after { right: -12px; background: radial-gradient(circle at 100% 0, transparent 11.5px, var(--tint) 12px); }
+  .cardActive::before {
+    left: calc(var(--card-r) * -1);
+    background: radial-gradient(circle at 0 0, transparent calc(var(--card-r) - 0.5px), var(--tint) var(--card-r));
+  }
+  .cardActive::after {
+    right: calc(var(--card-r) * -1);
+    background: radial-gradient(circle at 100% 0, transparent calc(var(--card-r) - 0.5px), var(--tint) var(--card-r));
+  }
   .cardActive:first-child::before, .cardActive:last-child::after { display: none; }
   .months[data-tab='first'] { border-top-left-radius: 0; }
   .months[data-tab='last'] { border-top-right-radius: 0; }

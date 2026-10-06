@@ -9,6 +9,7 @@ triggers and moves only along TRANSITIONS; --dry-run writes to neither database.
 from __future__ import annotations
 
 import argparse
+import logging
 from datetime import date
 
 import pytest
@@ -19,6 +20,7 @@ from seer_engine.lab import store as lab_store
 from seer_engine.paper import roster
 from seer_engine.paper import store as paper_store
 from seer_engine.sim.rules import MONTHLY_HOLD
+from seer_engine.strategies import evidence
 from seer_engine.strategies.f_fundamental import FUNDAMENTAL, FundamentalParams
 
 METHOD = "M0005"
@@ -187,6 +189,22 @@ def test_check_lookback_refuses_more_bars_than_the_night_loads():
         promote.check_lookback(have + 1, d)
 
 
+def test_check_evidence_refuses_an_object_without_evidence(monkeypatch):
+    promote._check_evidence("FUNDAMENTAL")  # phase 1 gives the real roster object its facts
+    monkeypatch.delitem(evidence.EVIDENCE, "FUNDAMENTAL")
+    with pytest.raises(promote.NotPromotable, match="FUNDAMENTAL has no per-pick evidence"):
+        promote._check_evidence("FUNDAMENTAL")
+    with pytest.raises(promote.NotPromotable, match="seer_engine/strategies/evidence.py"):
+        promote._check_evidence("FUNDAMENTAL")
+
+
+def test_every_resolver_object_has_evidence():
+    """The roster today is promotable by this rule: every named object can explain its picks."""
+    for name, binding in roster.RESOLVER.items():
+        if binding.obj is not None:
+            promote._check_evidence(name)
+
+
 # ---- the roster row (database) ------------------------------------------------------------------
 
 
@@ -296,6 +314,24 @@ def test_a_rejected_method_needs_the_acknowledgement(pg, monkeypatch, lab, tmp_p
     with pytest.raises(lab_store.LabError, match="--lab-status-stays"):
         promote._run(_args(lab_status_stays=False, lab_db=tmp_path / "lab.sqlite"))
     assert pg.execute("SELECT count(*) FROM strategies WHERE id = 'TEST-FND'").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_an_allocator_without_evidence_is_refused_before_writing(
+    pg, monkeypatch, lab, tmp_path, caplog, dry_run
+):
+    """R7: no evidence entry -> exit 2 with the file and dict to extend, and neither database moves."""
+    monkeypatch.delitem(evidence.EVIDENCE, "FUNDAMENTAL")
+    _wire(monkeypatch, pg=pg, lab=lab)
+    caplog.set_level(logging.ERROR, logger=promote.__name__)
+    assert promote.run(_args(dry_run=dry_run, lab_db=tmp_path / "lab.sqlite")) == 2
+    errors = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+    assert len(errors) == 1
+    assert "\n" not in errors[0]
+    assert "EVIDENCE" in errors[0] and "seer_engine/strategies/evidence.py" in errors[0]
+    pg.rollback()
+    assert pg.execute("SELECT count(*) FROM strategies WHERE id = 'TEST-FND'").fetchone()[0] == 0
+    assert lab_store.PROMOTION_MARKER not in lab_store.get_method(lab, METHOD)["analysis"]
 
 
 def test_the_registry_is_not_appended_to():

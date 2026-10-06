@@ -20,6 +20,10 @@ over values; this module turns those values into rows of the migration-003 table
   ``veto`` and read by ``paper`` / ``paper_check`` as the verdicts C decides and replays from.
 - Inputs read at night: dividends by ex-date, splits applied on a session, and the windowed
   ``Market`` (bars since a date, membership, fx).
+- Evidence (migration 009): ``orders``, ``book_targets`` and ``book_previews`` take an optional
+  ``evidence`` mapping ``{symbol: facts}`` when they are written; each row stores its symbol's
+  facts as a jsonb array of strings, or NULL. Nothing here reads it back: the replay never
+  compares it, and ``explain`` / the site read it with their own SQL.
 
 Every money value, price and share count is written only when the column holds it exactly
 (4 dp; weights 6 dp), so a save followed by a load gives back equal values. Rows are returned
@@ -100,6 +104,29 @@ def _exact_or_none(name: str, x: object, quantum: Decimal = PRICE_QUANTUM) -> De
 def _one_row(cur: psycopg.Cursor, what: str) -> None:
     if cur.rowcount != 1:
         raise StoreError(f"{what}: expected to change 1 row, changed {cur.rowcount}")
+
+
+def _evidence_json(evidence: Mapping[str, Sequence[str]] | None, symbol: str) -> Jsonb | None:
+    """``evidence[symbol]`` as a jsonb array of strings for an ``evidence`` column (009).
+
+    None (SQL NULL) when ``evidence`` is None, the symbol is absent, or its facts are empty: the
+    column never holds ``[]``. A non-mapping, a bare string, or a non-string fact is a TypeError
+    (``commands.paper._evidence`` normalizes before it gets here, so the night never sees one).
+    """
+    if evidence is None:
+        return None
+    if not isinstance(evidence, Mapping):
+        raise TypeError(f"evidence must be a mapping of symbol to facts, got {type(evidence).__name__}")
+    facts = evidence.get(symbol)
+    if facts is None:
+        return None
+    if isinstance(facts, str) or not isinstance(facts, Sequence):
+        raise TypeError(f"{symbol}: evidence must be a sequence of strings, got {type(facts).__name__}")
+    items = list(facts)
+    for f in items:
+        if not isinstance(f, str):
+            raise TypeError(f"{symbol}: evidence must hold only strings, got {type(f).__name__}")
+    return Jsonb(items) if items else None
 
 
 # --------------------------------------------------------------------------- roster rows
@@ -463,22 +490,41 @@ def write_kickoff(conn: psycopg.Connection, strategy_id: str, session: date) -> 
 
 
 def save_book_preview(
-    conn: psycopg.Connection, strategy_id: str, data_date: date, targets: Sequence[Target] | None
+    conn: psycopg.Connection,
+    strategy_id: str,
+    data_date: date,
+    targets: Sequence[Target] | None,
+    *,
+    evidence: Mapping[str, Sequence[str]] | None = None,
 ) -> None:
     """Replace the strategy's ``book_previews`` with ``targets``, what it would pick from the bars
-    of ``data_date`` if it ranked tonight. Display only (008). None or empty leaves no rows."""
+    of ``data_date`` if it ranked tonight. Display only (008). None or empty leaves no rows.
+
+    ``evidence``: ``{symbol: facts}`` (009); each row stores its symbol's facts, or NULL when the
+    symbol is absent (the idle instrument, one the method could not explain) or ``evidence`` is
+    None."""
     _session("data_date", data_date)
     conn.execute("DELETE FROM book_previews WHERE strategy_id = %s", (strategy_id,))
     rows: list[tuple[Any, ...]] = []
     for rank, t in enumerate(targets or (), start=1):
         if not isinstance(t, Target):
             raise TypeError(f"targets must hold Target values, got {type(t).__name__}")
-        rows.append((strategy_id, data_date, rank, t.symbol, _exact("weight", t.weight, WEIGHT_QUANTUM), _exact("last", t.last)))
+        rows.append(
+            (
+                strategy_id,
+                data_date,
+                rank,
+                t.symbol,
+                _exact("weight", t.weight, WEIGHT_QUANTUM),
+                _exact("last", t.last),
+                _evidence_json(evidence, t.symbol),
+            )
+        )
     if rows:
         with conn.cursor() as cur:
             cur.executemany(
-                "INSERT INTO book_previews (strategy_id, data_date, rank, symbol, weight, last) "
-                "VALUES (%s, %s, %s, %s, %s, %s)",
+                "INSERT INTO book_previews (strategy_id, data_date, rank, symbol, weight, last, evidence) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
                 rows,
             )
 
@@ -630,13 +676,17 @@ def insert_pending_orders(
     strategy_id: str,
     placed: Iterable[Order],
     companies: Mapping[str, str] | None = None,
+    *,
+    evidence: Mapping[str, Sequence[str]] | None = None,
 ) -> int:
     """Insert ``SizingResult.placed`` as pending ``orders`` rows; returns how many.
 
     ``company`` is ``companies[symbol]`` when given, else the symbol (``orders.company`` is NOT
-    NULL and the engine has no company names). ``explanation`` stays NULL (``explain`` fills it).
-    Only pending orders are accepted. A row that already exists for (strategy, session, symbol)
-    is a database error: the caller decides each session once.
+    NULL and the engine has no company names). ``evidence`` is ``{symbol: facts}`` (009): each
+    row stores its symbol's facts as a jsonb array, or NULL when the symbol is absent or
+    ``evidence`` is None; no later update of the row touches it. ``explanation`` stays NULL
+    (``explain`` fills it). Only pending orders are accepted. A row that already exists for
+    (strategy, session, symbol) is a database error: the caller decides each session once.
     """
     rows: list[dict[str, Any]] = []
     for o in placed:
@@ -646,15 +696,16 @@ def insert_pending_orders(
             raise ValueError(f"only pending orders are inserted, got {o.status} {o.symbol}")
         params = _order_params(strategy_id, o, None)
         params["company"] = (companies or {}).get(o.symbol, o.symbol)
+        params["evidence"] = _evidence_json(evidence, o.symbol)
         rows.append(params)
     if not rows:
         return 0
     with conn.cursor() as cur:
         cur.executemany(
             "INSERT INTO orders (strategy_id, session_date, slot, symbol, company, last_price, "
-            "limit_price, tp_price, sl_price, shares, status) VALUES (%(strategy_id)s, "
+            "limit_price, tp_price, sl_price, shares, status, evidence) VALUES (%(strategy_id)s, "
             "%(session_date)s, %(slot)s, %(symbol)s, %(company)s, %(last_price)s, %(limit_price)s, "
-            "%(tp_price)s, %(sl_price)s, %(shares)s, 'pending')",
+            "%(tp_price)s, %(sl_price)s, %(shares)s, 'pending', %(evidence)s)",
             rows,
         )
     return len(rows)
@@ -969,6 +1020,8 @@ def save_book_decision(
     strategy_id: str,
     session: date,
     targets: Sequence[Target] | None,
+    *,
+    evidence: Mapping[str, Sequence[str]] | None = None,
 ) -> None:
     """Record tonight's decision for ``session`` (``next_session(paper_state.last_session)``).
 
@@ -976,6 +1029,10 @@ def save_book_decision(
     false). A sequence (possibly empty, idle target included last when ``_with_idle`` added one):
     the rows for (strategy, ``session``) are replaced by these, ranked 1.. in order, and
     ``pending_decision`` is true. Earlier sessions' rows are kept as the decision record.
+
+    ``evidence`` is ``{symbol: facts}`` (009): each row stores its symbol's facts as a jsonb
+    array, or NULL when the symbol is absent (the idle target, one the method could not explain)
+    or ``evidence`` is None. ``read_book_targets`` never reads it back, so the replay ignores it.
     """
     write_pending(conn, strategy_id, session, decision=targets is not None)
     if targets is None:
@@ -995,6 +1052,7 @@ def save_book_decision(
                 _exact_or_none("limit", t.limit),
                 _exact_or_none("stop", t.stop),
                 _exact_or_none("take", t.take),
+                _evidence_json(evidence, t.symbol),
             )
         )
     with conn.cursor() as cur:
@@ -1004,7 +1062,8 @@ def save_book_decision(
         if rows:
             cur.executemany(
                 "INSERT INTO book_targets (strategy_id, session_date, rank, symbol, weight, last_price, "
-                "limit_price, stop_price, take_price) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                "limit_price, stop_price, take_price, evidence) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 rows,
             )
 

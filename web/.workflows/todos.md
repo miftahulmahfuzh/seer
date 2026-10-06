@@ -2,7 +2,7 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-10-05
+**Last Updated**: 2026-10-06
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 10
+- Completed: 11
 
 ---
 
@@ -35,6 +35,25 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-YJSP** Phase 5: Show reasons on the site
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `web/lib/why.ts` + `why.test.ts`, `web/lib/data.ts` (evidence on PendingOrder, Pick, PreviewPick via `to_jsonb(...)->'evidence'`), Positions `OrderRow`/`WouldPick`, Today `PickCard`, `WhyToggle.tsx` + CSS (facts list), `web/scripts/seed-demo.mjs` (demo evidence in phase 1's exact wording), `web/package_readme.md`; no engine edits. Exit: K5 behaviour (LLM text, else facts list, "unavailable" only when both missing; "Would pick now" rows get a "Why it's on the list" toggle; C's news-check line stays); vitest covers the fallback helper; tsc clean; screens checked at 414 pt light and dark, icon-only buttons, no ids/codes.
+  - **Status**: done
+  - **Plan Set**: `WHY_THIS_PICK_PIPELINE_PLAN.md` (phase 5 of 5)
+  - **Satisfies**: R5, R6, R8 — C keeps its news-check reason as a second line; "Would pick now" rows get reasons too, if cheap; Plain words for a non-trader; no ids/codes on the site
+  - **Depends on**: P1-ENG-H5LC
+  - **Plan**: `.workflows/plan/P1-WEB-YJSP.md`
+  - **Completed**: 2026-10-06 22:34
+  - **Method**: /do
+  - **Files**: web/lib/why.ts, web/lib/why.test.ts, web/lib/data.ts, web/components/WhyToggle.tsx, web/components/WhyToggle.module.css, web/app/(app)/positions/page.tsx, web/app/(app)/page.tsx, web/scripts/seed-demo.mjs, web/package_readme.md
+  - **Drift**:
+    - Trivial only: picks() doc comment said 'Unchanged; returns [] for SPY' — replaced per plan.
+    - Demo strategy subtitle 'Top 20 by 12-1 momentum, monthly' (seed-demo.mjs:75) still contains the 12-1 code; out of the plan's step list, left as is (demo only).
+    - Manual check: production had no 'would pick now' rows (F4/F1/FND started paper 2026-10-06), so that toggle was not seen on screen; it reuses the same WhyToggle/.facts path verified on C's rows.
+  - **Decided**:
+    - Pass B temporary edit restored by file backup copy instead of staging web first → backup/cp (narrower blast radius: index shared with a concurrent phase-3 session)
 
 - [x] **P1-WEB-5767** Phase 2: Web data layer for the snapshot
   - **Difficulty**: NORMAL

@@ -7,13 +7,16 @@ The lab→roster bridge (plan roster-promotion-pipeline, phase 5; Decisions D1, 
         --gate-note "..." [--icon book-open] [--sort 6] \\
         [--retire F1-SPY-SMA200-M] [--lab-status-stays] [--dry-run]
 
-**Promotable** means two things, and this command refuses anything that is not both:
+**Promotable** means three things, and this command refuses anything that is not all three:
 
 1. the method file exposes the variant as a ``Candidate`` -- a frozen (rules, allocator, params)
    triple. The roster entry is that triple unchanged; nothing here invents a parameter.
 2. the variant's allocator is a value ``paper.roster.RESOLVER`` names. A ``strategies`` row
    cannot hold a live Python object, and the object's *name* is part of the frozen spec, so an
    object the resolver cannot name has no roster identity. The refusal says which line to add.
+3. that name has an entry in ``strategies.evidence.EVIDENCE``: the plain-English facts behind
+   each pick, which the paper night stores and ``explain`` turns into the site's "Why this
+   pick". A strategy that cannot say why it picked a stock does not go on the site.
 
 **What it writes.** One ``strategies`` row: the display columns, the definition columns migration
 006 added (``object_name``, ``registry_id`` NULL, ``gate_note``, ``gate_applicable``) --
@@ -61,6 +64,7 @@ from seer_engine.lab import store as lab_store
 from seer_engine.paper import roster
 from seer_engine.paper import store as paper_store
 from seer_engine.sim.rules import TradeRules
+from seer_engine.strategies import evidence
 
 log = logging.getLogger(__name__)
 
@@ -134,6 +138,22 @@ def _check_rules(rules: TradeRules) -> None:
             f"id; a roster row carries only the id, so the spec would be frozen under one rule "
             f"set and read back under another. Promote a variant that uses a preset, or add this "
             f"rule set to sim.rules.PRESETS first"
+        )
+
+
+def _check_evidence(object_name: str) -> None:
+    """NotPromotable when ``object_name`` has no entry in ``strategies.evidence.EVIDENCE``.
+
+    The paper night stores each pick's evidence and ``explain`` writes the site's "Why this pick"
+    from it, using only those facts. A roster object without an evidence function would put picks
+    on the site with no reason at all, so the gap is refused here rather than discovered there.
+    """
+    if not evidence.has_evidence(object_name):
+        raise NotPromotable(
+            f"{object_name} has no per-pick evidence, so the site could not say why it picked a "
+            f"stock. Add an entry \"{object_name}\": <its evidence function> to EVIDENCE in "
+            f"seer_engine/strategies/evidence.py (2-6 plain-English facts per pick, numbers "
+            f"formatted), commit it, then promote again."
         )
 
 
@@ -212,6 +232,8 @@ def build_promotion(args: argparse.Namespace, data_date: date, sort: int) -> Pro
     _method, _path, candidate = find_candidate(args.method, args.candidate)
     obj = candidate.allocator
     _check_rules(candidate.rules)
+    object_name = object_name_of(obj)
+    _check_evidence(object_name)
     engine = "bracket" if candidate.rules.engine == "bracket_v0" else "book"
     lookback = obj.lookback if engine == "bracket" else obj.lookback(candidate.params)
     check_lookback(int(lookback), data_date)
@@ -226,7 +248,7 @@ def build_promotion(args: argparse.Namespace, data_date: date, sort: int) -> Pro
         engine=engine,
         rules=candidate.rules,
         obj=obj,
-        object_name=object_name_of(obj),
+        object_name=object_name,
         params=candidate.params,
         registry_id=None,  # D1: a promoted entry is never a REGISTRY entry
         lookback=int(lookback),

@@ -3,7 +3,7 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-06
-**Total Active Tasks**: 0
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 75
+- Completed: 79
 
 ---
 
@@ -520,6 +520,55 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-Q0OH** Phase 3: Explain from evidence, with checks
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `commands/explain.py` (K3: prompt from facts + strategy plain name, `thinking="disabled"`, temperature 0, `EXPLAIN_MAX_TOKENS`, `accept()` checks), `tests/test_explain.py`, `tests/test_paper_c.py:490` (one assertion), `llm.py` docstrings, `docs/runbooks/paper-trading.md` (Explain section, Paper evidence and Explain lines) and `engine/package_readme.md` (pipeline overview, migration 009, promote's third condition). Exit: prompt built from evidence only; accept() rejects invented numbers, cut-off text, >2 sentences, banned phrases, duplicates; no "…"; entries without evidence skipped; always exit 0; phase 1's exact fact shapes pass `vet`.
+  - **Status**: completed
+  - **Plan Set**: `WHY_THIS_PICK_PIPELINE_PLAN.md` (phase 3 of 5)
+  - **Satisfies**: R2, R3, R4, R8 — Explain passes those facts to the LLM → 1–2 plain sentences per pick, distinct per stock; Facts only, no predictions, no buy advice; every number checked against the facts; failing text discarded; never fails the night; Fix today's bugs: boilerplate, NULL, truncated texts; Plain words for a non-trader; no ids/codes on the site
+  - **Depends on**: P1-ENG-H5LC
+  - **Plan**: `.workflows/plan/P1-ENG-Q0OH.md`
+  - **Completed**: 2026-10-06 22:31
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/commands/explain.py, engine/tests/test_explain.py, engine/tests/test_paper_c.py, engine/src/seer_engine/llm.py, docs/runbooks/paper-trading.md, engine/package_readme.md
+  - **Drift**: Plan's test seed inserted the KO order at slot 5; orders.slot has CHECK (slot BETWEEN 1 AND 4). KO is on a different session (LAST), so it now uses slot 1 — same intent, valid row.
+- [x] **P1-ENG-BZYN** Phase 4: Promote requires evidence
+  - **Difficulty**: EASY
+  - **Type**: Feature
+  - **Context**: Owns the `commands/promote.py` gate (K4: exit 2 `NotPromotable` when `not evidence.has_evidence(name)`, one-line reason), `tests/test_promote_command.py`, and the explore skill's promotion rule (a promotable allocator needs an `EVIDENCE` entry and a `RESOLVER` entry); does not touch the evidence module contents, roster, lab methods or `engine/package_readme.md`. Exit: promoting a candidate whose object has no evidence exits 2 with a one-line reason; existing promote tests green.
+  - **Status**: completed
+  - **Plan Set**: `WHY_THIS_PICK_PIPELINE_PLAN.md` (phase 4 of 5)
+  - **Satisfies**: R7 — Evidence is required before a lab method is promoted to the site
+  - **Depends on**: P1-ENG-A1SZ
+  - **Plan**: `.workflows/plan/P1-ENG-BZYN.md`
+  - **Completed**: 2026-10-06 22:20
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/commands/promote.py, engine/tests/test_promote_command.py, .claude/skills/explore-and-experiment-new-method/SKILL.md
+- [x] **P1-ENG-H5LC** Phase 2: Store evidence with every paper entry
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `db/migrations/009_evidence.sql` (nullable `evidence jsonb` on orders, book_targets, book_previews), keyword-only `evidence=None` params in `paper/store.py`, the catch-all evidence helper and calls in `commands/paper.py` (`_start`/`_step_bracket`, `_start`/`_step_book`), and `engine/tests/test_paper_evidence.py`; decisions, replay, explain, web, docs untouched. Exit: after a paper night every pending A and C order and every non-idle target/preview row has evidence (idle symbol NULL; TIMING-off night explains nothing); a raising evidence function leaves NULL and the night succeeds; `paper_check` green; existing paper tests unchanged and green.
+  - **Status**: completed
+  - **Plan Set**: `WHY_THIS_PICK_PIPELINE_PLAN.md` (phase 2 of 5)
+  - **Satisfies**: R1, R6 — Every method that recommends stocks exposes per-pick evidence: the numbers its formula used; "Would pick now" rows get reasons too, if cheap
+  - **Depends on**: P1-ENG-A1SZ
+  - **Plan**: `.workflows/plan/P1-ENG-H5LC.md`
+  - **Completed**: 2026-10-06 23:30
+  - **Method**: /do
+  - **Files**: db/migrations/009_evidence.sql, engine/src/seer_engine/paper/store.py, engine/src/seer_engine/commands/paper.py, engine/tests/test_paper_evidence.py
+- [x] **P1-ENG-A1SZ** Phase 1: Pure evidence module
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new pure `engine/src/seer_engine/strategies/evidence.py` (K1: `Facts`, `EvidenceFn`, `EVIDENCE` keyed by RESOLVER names minus the benchmark, `evidence_for`, `has_evidence`, both reading `EVIDENCE` at call time) and `engine/tests/test_evidence.py`; touches no existing strategy, params, roster, paper, explain or web file. Exit: every non-benchmark RESOLVER object has an evidence function; tests show distinct facts per symbol on synthetic markets, plain wording (no "RSI", "SMA", ids, no Explain `BANNED` word; market filter says "hold", never "buy"), no look-ahead (facts identical when later bars are added), purity test green.
+  - **Status**: completed
+  - **Plan Set**: `WHY_THIS_PICK_PIPELINE_PLAN.md` (phase 1 of 5)
+  - **Satisfies**: R1, R8 — Every method that recommends stocks exposes per-pick evidence: the numbers its formula used; Plain words for a non-trader; no ids/codes on the site
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-A1SZ.md`
+  - **Completed**: 2026-10-06 22:05
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/strategies/evidence.py (new), engine/tests/test_evidence.py (new)
 - [x] **P1-ENG-G4TQ** Phase 1: Content-based clobber guard on the build path
   - **Difficulty**: NORMAL
   - **Type**: Bug

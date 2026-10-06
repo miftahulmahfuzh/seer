@@ -1,16 +1,26 @@
-"""explain: optional plain-language notes for the newest paper entries (design §4, D9).
+"""explain: a plain "why this pick" note for each newest paper entry, from its stored evidence (design §4, D9).
 
 For every roster strategy with a ``paper_state`` row whose ``pending_session`` is set:
   - bracket strategies: ``orders`` of that session with status 'pending' and no explanation;
   - book strategies: ``book_targets`` of that session with no explanation whose symbol the
     strategy does not already hold (``book_positions``): new entries only.
-Each entry's prompt holds stored numbers only (symbol, strategy, prices, shares or weight, the
-rule text from ``sim.rules.describe_rules``) and says it is PAPER ONLY, not a recommendation.
+Each entry carries ``evidence`` (migration 009): the plain facts its method's formula used on that
+stock the night ``paper`` picked it (``strategies.evidence``). The prompt holds the method's plain
+name, the stock symbol and those facts, and nothing else: no order mechanics, no rule text. An entry
+whose evidence is NULL or empty is skipped (logged) and keeps a NULL explanation.
+
+The call disables thinking, at temperature 0, with ``EXPLAIN_MAX_TOKENS``: a reasoning model given a
+small budget spends it thinking and returns a cut or empty text (the 2026-10-06 bug). Every reply
+then goes through ``vet``: at most MAX_SENTENCES complete sentences, at most MAX_CHARS characters,
+every number in it found among the facts' numbers, no advice or prediction phrase (``BANNED``), and
+not a copy of a note already accepted for the same strategy tonight. A reply that fails is
+discarded with its reason logged and stays NULL. Nothing is ever cut, and no ellipsis is added.
 
 Failure never fails the night (design §8 "LLM fails -> explanation 'unavailable'"):
   - LLM_* not configured -> log "explanations unavailable", exit 0, no database connection;
-  - an entry whose call fails or returns nothing -> its explanation stays NULL, the rest go on;
-  - MAX_CONSECUTIVE_FAILURES failures in a row -> no more calls tonight, the rest stay NULL.
+  - an entry whose call raises, or whose reply is rejected -> its explanation stays NULL;
+  - MAX_CONSECUTIVE_FAILURES calls in a row that *raise* -> no more calls tonight. A rejected reply
+    is not an outage (the LLM answered), so it does not count and it resets the count.
 Reads happen in one short transaction that is closed before any LLM call; each strategy's
 updates are then written in their own transaction, only where ``explanation IS NULL``.
 ``--dry-run`` reads, calls the LLM and runs the updates, then rolls back.
@@ -20,34 +30,41 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
-from typing import Protocol
+from typing import Any, Protocol
 
 import psycopg
 
 from seer_engine import db, llm
-from seer_engine.sim.rules import PRESETS, describe_rules
 
 log = logging.getLogger(__name__)
 
 HELP = "Write optional LLM explanations for the newest paper entries (never fails the night)"
 
 MAX_CONSECUTIVE_FAILURES = 3
-MAX_CHARS = 600
+MAX_CHARS = 320
+MAX_SENTENCES = 2
+
+# The call's settings. Thinking off is what makes the reply arrive whole: with thinking on,
+# glm-5.3 spent a small budget on reasoning and returned a cut or empty text. Temperature 0 keeps
+# the note a plain restatement of the facts. 1024 tokens is far more than two sentences need, so a
+# provider that thinks anyway still has room to finish (veto uses the same three settings).
+EXPLAIN_TEMPERATURE = 0.0
+EXPLAIN_THINKING = "disabled"
+EXPLAIN_MAX_TOKENS = 1024
 
 SYSTEM = (
     "You write short factual notes for a paper-trading log kept by a research app. "
     "Use only the facts you are given and add no numbers of your own. "
     "Never recommend buying or selling, never predict prices, never give financial advice. "
-    "Write plain sentences without markdown, lists or headings."
+    "Write plain sentences for a reader who is not a trader, without markdown, lists or headings."
 )
 
-_RULES_BY_ID = {r.id: r for r in PRESETS}
-
 _STRATEGIES_SQL = """
-SELECT s.id, s.name, s.sub, s.engine, s.rules_id, ps.pending_session
+SELECT s.id, s.name, s.engine, ps.pending_session
 FROM strategies s
 JOIN paper_state ps ON ps.strategy_id = s.id
 WHERE s.engine IN ('bracket', 'book') AND ps.pending_session IS NOT NULL
@@ -55,14 +72,14 @@ ORDER BY s.sort, s.id
 """
 
 _BRACKET_SQL = """
-SELECT id, symbol, company, last_price, limit_price, tp_price, sl_price, shares
+SELECT id, symbol, evidence
 FROM orders
 WHERE strategy_id = %s AND session_date = %s AND status = 'pending' AND explanation IS NULL
 ORDER BY slot, symbol
 """
 
 _BOOK_SQL = """
-SELECT t.rank, t.symbol, t.weight, t.last_price, t.limit_price, t.stop_price, t.take_price
+SELECT t.symbol, t.evidence
 FROM book_targets t
 WHERE t.strategy_id = %s AND t.session_date = %s AND t.explanation IS NULL
   AND NOT EXISTS (
@@ -80,17 +97,40 @@ WHERE strategy_id = %s AND session_date = %s AND symbol = %s AND explanation IS 
 
 
 class Completer(Protocol):
-    def complete(self, system: str, prompt: str) -> str: ...
+    """What ``explain`` needs from the LLM (``llm.Client``)."""
+
+    def complete(
+        self,
+        system: str,
+        prompt: str,
+        *,
+        temperature: float | None = None,
+        thinking: str | None = None,
+        max_tokens: int | None = None,
+    ) -> str: ...
+
+
+def plain_name(name: str) -> str:
+    """The display name without its roster code: 'F4 · Momentum' -> 'Momentum'.
+
+    The code would put a number the facts do not hold (the 4 of F4) into the note, and the owner
+    reads plain words, not ids. A name with no ' · ' part is returned as it is.
+    """
+    _, sep, rest = name.partition("·")
+    rest = rest.strip()
+    return rest if sep and rest else name.strip()
 
 
 @dataclass(frozen=True)
 class StrategyRow:
     id: str
     name: str
-    sub: str
     engine: str
-    rules_lines: tuple[str, ...]
     session_date: date
+
+    @property
+    def plain_name(self) -> str:
+        return plain_name(self.name)
 
 
 @dataclass(frozen=True)
@@ -98,116 +138,182 @@ class BracketEntry:
     strategy: StrategyRow
     order_id: int
     symbol: str
-    company: str
-    last_price: Decimal
-    limit_price: Decimal
-    tp_price: Decimal
-    sl_price: Decimal
-    shares: int
+    facts: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class BookEntry:
     strategy: StrategyRow
-    rank: int
     symbol: str
-    weight: Decimal
-    last_price: Decimal
-    limit_price: Decimal | None
-    stop_price: Decimal | None
-    take_price: Decimal | None
+    facts: tuple[str, ...]
 
 
 Entry = BracketEntry | BookEntry
 
 
-def _rules_lines(rules_id: str | None) -> tuple[str, ...]:
-    rules = _RULES_BY_ID.get(rules_id) if rules_id is not None else None
-    if rules is None:
-        if rules_id is not None:
-            log.debug("unknown rules_id %r; prompt carries no rule text", rules_id)
+def facts_from(raw: Any) -> tuple[str, ...]:
+    """A stored ``evidence`` value as facts: a JSON array of strings -> its non-blank strings,
+    whitespace collapsed, in order. NULL, an empty array, or anything that is not an array of
+    strings -> () (nothing to explain with)."""
+    if not isinstance(raw, list) or not all(isinstance(f, str) for f in raw):
         return ()
-    return describe_rules(rules)
+    return tuple(" ".join(f.split()) for f in raw if f.strip())
 
 
 def load_batches(conn: psycopg.Connection) -> list[tuple[StrategyRow, list[Entry]]]:
-    """Every strategy's unexplained newest entries, in roster order; strategies with none omitted."""
+    """Every strategy's unexplained newest entries, in roster order; strategies with none omitted.
+
+    Entries without evidence are returned too (with ``facts == ()``) so ``execute`` can count and
+    log them; it never sends them to the LLM.
+    """
     batches: list[tuple[StrategyRow, list[Entry]]] = []
-    for sid, name, sub, engine, rules_id, pending in conn.execute(_STRATEGIES_SQL).fetchall():
-        strategy = StrategyRow(sid, name, sub, engine, _rules_lines(rules_id), pending)
+    for sid, name, engine, pending in conn.execute(_STRATEGIES_SQL).fetchall():
+        strategy = StrategyRow(sid, name, engine, pending)
         entries: list[Entry] = []
         if engine == "bracket":
-            for oid, symbol, company, last, limit, tp, sl, shares in conn.execute(
-                _BRACKET_SQL, (sid, pending)
-            ).fetchall():
-                entries.append(BracketEntry(strategy, oid, symbol, company, last, limit, tp, sl, shares))
+            for oid, symbol, evidence in conn.execute(_BRACKET_SQL, (sid, pending)).fetchall():
+                entries.append(BracketEntry(strategy, oid, symbol, facts_from(evidence)))
         else:
-            for rank, symbol, weight, last, limit, stop, take in conn.execute(_BOOK_SQL, (sid, pending)).fetchall():
-                entries.append(BookEntry(strategy, rank, symbol, weight, last, limit, stop, take))
+            for symbol, evidence in conn.execute(_BOOK_SQL, (sid, pending)).fetchall():
+                entries.append(BookEntry(strategy, symbol, facts_from(evidence)))
         if entries:
             batches.append((strategy, entries))
     return batches
 
 
-def _usd(x: Decimal) -> str:
-    return f"${x:,.2f}"
-
-
-def _pct(x: Decimal) -> str:
-    return f"{x * 100:.1f}%"
-
-
 def prompt_for(entry: Entry) -> str:
-    """The user prompt for one entry: stored facts only, then the task."""
-    s = entry.strategy
-    facts = [
-        "This is a PAPER trade only, simulated by the Seer research app. It is not a recommendation "
-        "to buy, and no real money is involved.",
-        f"Strategy: {s.name} ({s.sub}), a research strategy on paper.",
-        f"Session the paper order is for: {s.session_date.isoformat()}.",
-    ]
-    if isinstance(entry, BracketEntry):
-        facts += [
-            f"Symbol: {entry.symbol} ({entry.company}).",
-            f"Last close: {_usd(entry.last_price)}.",
-            f"Paper order: buy {entry.shares} shares with a limit of {_usd(entry.limit_price)} "
-            f"(about {_usd(entry.limit_price * entry.shares)}).",
-            f"Take-profit: {_usd(entry.tp_price)}. Stop-loss: {_usd(entry.sl_price)}.",
+    """The user prompt for one entry: the method's plain name, the stock, its facts, the task."""
+    return "\n".join(
+        [
+            f"Method: {entry.strategy.plain_name}, a research method followed on paper.",
+            f"Stock: {entry.symbol}",
+            "Facts the method's formula used on this stock:",
+            *(f"- {fact}" for fact in entry.facts),
+            "Task: in at most 2 short plain sentences, say why this method picked this stock, "
+            "using only these facts. Write every number exactly as the facts write it. "
+            "No advice, no predictions.",
         ]
-    else:
-        facts += [
-            f"Symbol: {entry.symbol}.",
-            f"Rank among this session's targets: {entry.rank}.",
-            f"Target weight: {_pct(entry.weight)} of the paper portfolio.",
-            f"Last close: {_usd(entry.last_price)}.",
-        ]
-        if entry.limit_price is not None:
-            facts.append(f"Paper buy limit: {_usd(entry.limit_price)}.")
-        if entry.take_price is not None:
-            facts.append(f"Take-profit: {_usd(entry.take_price)}.")
-        if entry.stop_price is not None:
-            facts.append(f"Stop-loss: {_usd(entry.stop_price)}.")
-    lines = ["Facts (all stored by Seer):", *(f"- {f}" for f in facts)]
-    if s.rules_lines:
-        lines.append("- Rules the paper simulator follows:")
-        lines += [f"  - {r}" for r in s.rules_lines]
-    lines.append(
-        "Task: in at most 3 short plain-language sentences, explain what this paper entry does and "
-        "how the rules above would exit it. Say that it is a paper trade, not a recommendation to buy. "
-        "Use only the facts above."
     )
-    return "\n".join(lines)
 
 
-def clean(text: str) -> str | None:
-    """Whitespace collapsed and capped at MAX_CHARS (cut at a word); None when nothing is left."""
-    flat = " ".join(str(text).split())
-    if not flat:
+# ---- the checks ------------------------------------------------------------------------------
+
+
+class Rejected(ValueError):
+    """A reply ``vet`` refuses; the message is the reason, for the log."""
+
+
+@dataclass(frozen=True)
+class Banned:
+    """A phrase no note may hold. ``allowed_if_in_facts``: the phrase may describe the past (e.g.
+    "than expected"), so restating a fact that already uses it is not a prediction."""
+
+    label: str
+    pattern: re.Pattern[str]
+    allowed_if_in_facts: bool = False
+
+
+def _phrase(regex: str) -> re.Pattern[str]:
+    return re.compile(regex, re.IGNORECASE)
+
+
+# Word-bounded so "buyback", "buyer", "resell", "seller" and "unexpected" pass. "Best Buy" and
+# "sell-off" are rejected; such a note stays NULL and the site shows the facts instead.
+BANNED: tuple[Banned, ...] = (
+    Banned("buy", _phrase(r"\bbuy(?:s|ing)?\b")),
+    Banned("sell", _phrase(r"\bsell(?:s|ing)?\b")),
+    Banned("recommend", _phrase(r"\brecommend\w*")),
+    Banned("should", _phrase(r"\bshould(?:n['’]?t)?\b")),
+    Banned(
+        "will + a price move",
+        _phrase(
+            r"\bwill\s+(?:likely\s+|probably\s+)?(?:rise|go\s+up|go\s+down|fall|climb|drop|gain|grow|"
+            r"rebound|recover|bounce|continue|keep|outperform|beat|soar|surge|rally)\b"
+        ),
+    ),
+    Banned("going to", _phrase(r"\bgoing\s+to\b")),
+    Banned("expect", _phrase(r"\bexpect(?:s|ed|ing|ations?)?\b"), allowed_if_in_facts=True),
+    Banned("guarantee", _phrase(r"\bguarantee\w*")),
+)
+
+# A number: optional $, digits with optional thousands commas, optional decimals, optional %.
+# Not preceded by a letter or digit, so a symbol such as S01 or a code such as F4 is not a number.
+# A sign is not part of the token: "+3", "-3" and "3" are the same number to the reader.
+_NUMBER = re.compile(r"(?<![A-Za-z0-9_])\$?\d(?:[\d,]*\d)?(?:\.\d+)?%?")
+# A sentence ends at . ! or ? (plus closing quotes or brackets) followed by the end of the text, or
+# by a space and a capital, digit, quote or bracket. "Inc. is" and "4.5" are not ends.
+_SENTENCE_END = re.compile(r"[.!?]+[\"'”’)\]]*(?=\s+[A-Z0-9\"“(]|\s*$)")
+_MARKUP = re.compile(r"[*_`#]+")
+_BULLET = re.compile(r"^(?:[-•]|\d+[.)])\s+")
+_QUOTES = "\"'“”‘’"
+
+
+def normalize_number(token: str) -> str:
+    """'$1,850.00' -> '1850', '6.10%' -> '6.1', '0.50' -> '0.5', '007' -> '7'."""
+    s = token.replace("$", "").replace(",", "").replace("%", "")
+    if "." in s:
+        s = s.rstrip("0").rstrip(".")
+    s = s.lstrip("0")
+    return "0" + s if not s or s.startswith(".") else s
+
+
+def numbers_in(text: str) -> set[str]:
+    """Every number in ``text``, normalized (``normalize_number``)."""
+    return {normalize_number(m) for m in _NUMBER.findall(text)}
+
+
+def sentence_count(text: str) -> int:
+    return len(_SENTENCE_END.findall(text))
+
+
+def clean(text: str) -> str:
+    """The reply without markdown marks, a leading bullet or wrapping quotes, whitespace collapsed.
+    Never cut; "" when nothing is left."""
+    flat = _MARKUP.sub("", " ".join(str(text).split()))
+    flat = _BULLET.sub("", flat.strip())
+    flat = flat.strip().strip(_QUOTES).strip()
+    return " ".join(flat.split())
+
+
+def vet(reply: str, facts: Sequence[str], earlier: Collection[str] = ()) -> str:
+    """The cleaned note when it passes every check; ``Rejected(reason)`` otherwise.
+
+    ``earlier``: the notes already accepted for the same strategy tonight.
+    """
+    text = clean(reply)
+    if not text:
+        raise Rejected("empty reply")
+    if "…" in text or "..." in text:
+        raise Rejected("has an ellipsis (a cut-off text)")
+    if text[-1] not in ".!?":
+        raise Rejected("not a complete sentence")
+    n = sentence_count(text)
+    if n > MAX_SENTENCES:
+        raise Rejected(f"{n} sentences, at most {MAX_SENTENCES}")
+    if len(text) > MAX_CHARS:
+        raise Rejected(f"{len(text)} characters, at most {MAX_CHARS}")
+    joined = " ".join(facts)
+    for banned in BANNED:
+        if banned.pattern.search(text) and not (banned.allowed_if_in_facts and banned.pattern.search(joined)):
+            raise Rejected(f"banned phrase ({banned.label})")
+    invented = sorted(numbers_in(text) - numbers_in(joined))
+    if invented:
+        raise Rejected(f"number not in the facts: {', '.join(invented)}")
+    key = text.casefold()
+    if any(clean(e).casefold() == key for e in earlier):
+        raise Rejected("same as an earlier note for this strategy")
+    return text
+
+
+def accept(text: str, facts: Sequence[str], earlier: Collection[str] = ()) -> str | None:
+    """``vet`` as a value: the note, or None when it is rejected."""
+    try:
+        return vet(text, facts, earlier)
+    except Rejected:
         return None
-    if len(flat) > MAX_CHARS:
-        cut = flat[:MAX_CHARS].rsplit(" ", 1)[0].rstrip(",;:")
-        flat = f"{cut}…"
-    return flat
+
+
+# ---- the step --------------------------------------------------------------------------------
 
 
 def _update(conn: psycopg.Connection, entry: Entry, text: str) -> int:
@@ -221,7 +327,7 @@ def _update(conn: psycopg.Connection, entry: Entry, text: str) -> int:
 
 
 def execute(conn: psycopg.Connection, *, client: Completer, dry_run: bool = False) -> int:
-    """Explain every new paper entry ``client`` can explain. Always returns 0."""
+    """Explain every new paper entry that has evidence and a reply that passes ``vet``. Always 0."""
     batches = load_batches(conn)
     conn.rollback()  # close the read transaction before any slow network call
     total = sum(len(entries) for _, entries in batches)
@@ -229,19 +335,28 @@ def execute(conn: psycopg.Connection, *, client: Completer, dry_run: bool = Fals
         log.info("explain: no new paper entries without an explanation")
         return 0
 
-    written = 0
+    written = skipped = rejected = failed = 0
     failures_in_row = 0
     stopped = False
     for strategy, entries in batches:
         texts: list[tuple[Entry, str]] = []
         for entry in entries:
+            if not entry.facts:
+                skipped += 1
+                log.info("explain: %s %s has no evidence; left unexplained", strategy.id, entry.symbol)
+                continue
             if stopped:
-                break
+                continue
             try:
-                text = clean(client.complete(SYSTEM, prompt_for(entry)))
-                if text is None:
-                    raise llm.LlmError("empty explanation")
+                reply = client.complete(
+                    SYSTEM,
+                    prompt_for(entry),
+                    temperature=EXPLAIN_TEMPERATURE,
+                    thinking=EXPLAIN_THINKING,
+                    max_tokens=EXPLAIN_MAX_TOKENS,
+                )
             except Exception as exc:  # noqa: BLE001 - an explanation must never fail the night
+                failed += 1
                 failures_in_row += 1
                 log.warning("explanation unavailable for %s %s: %s", strategy.id, entry.symbol, exc)
                 if failures_in_row >= MAX_CONSECUTIVE_FAILURES:
@@ -251,14 +366,23 @@ def execute(conn: psycopg.Connection, *, client: Completer, dry_run: bool = Fals
                         failures_in_row,
                     )
                 continue
-            failures_in_row = 0
+            failures_in_row = 0  # the LLM answered: whatever vet says, it is not an outage
+            try:
+                text = vet(reply, entry.facts, [t for _, t in texts])
+            except Rejected as why:
+                rejected += 1
+                log.warning("explanation rejected for %s %s: %s", strategy.id, entry.symbol, why)
+                continue
             texts.append((entry, text))
         if texts:
             with db.transaction(conn, dry_run):
                 n = sum(_update(conn, entry, text) for entry, text in texts)
             written += n
             log.info("explain: %s %d of %d entries explained", strategy.id, n, len(entries))
-    log.info("explain: %d written, %d unavailable, of %d new paper entries", written, total - written, total)
+    log.info(
+        "explain: %d written, %d rejected, %d failed, %d without evidence, of %d new paper entries",
+        written, rejected, failed, skipped, total,
+    )
     return 0
 
 

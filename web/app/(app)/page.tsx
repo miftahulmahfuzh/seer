@@ -190,7 +190,7 @@ function PickCard({ p, rate }: { p: Pick; rate: number }) {
         <div className={`${s.estItem} pos`}><span className={s.estLabel}>Est. profit</span><span className={s.estVals}><span className={s.estUsd}>{signedUsd(profit)}</span><span className={s.estIdr}>{signedRp(profit, rate)}</span></span></div>
         <div className={`${s.estItem} neg`}><span className={s.estLabel}>Est. loss</span><span className={s.estVals}><span className={s.estUsd}>{signedUsd(-loss)}</span><span className={s.estIdr}>{signedRp(-loss, rate)}</span></span></div>
       </div>
-      <WhyToggle text={p.explanation} />
+      <WhyToggle text={p.explanation} facts={p.evidence} />
     </article>
   );
 }

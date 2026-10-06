@@ -92,10 +92,15 @@ GitHub Actions nightly.yml   cron 23:00 UTC Mon-Fri (06:00 WIB), retry 01:00 UTC
 │                              then decide session_date (A: picks → size_picks → pending orders;
 │                              C: A's picks minus every symbol without a stored `allow` → size_picks;
 │                              F4/F1: targets on a month's first session → book_targets; SPY: hold)
+│                              → each decided symbol's evidence (strategies/evidence.py) stored with it
+│                                (orders / book_targets / book_previews .evidence, migration 009); the idle
+│                                symbol gets none; an evidence error logs "<id> <date>: no evidence stored
+│                                tonight (…)", stores NULL and never changes a decision or fails the night
 ├─ Paper check               read-only replay: run_rules / buy_and_hold over [paper_start, last
 │                            session] on Neon's bars must equal what Paper stored (C from its stored
 │                            verdicts; the LLM is never re-asked). Red on mismatch.
-└─ Explain                   optional LLM text for new paper entries (C's included); never fails the night
+└─ Explain                   one or two plain sentences per new pick, from the evidence Paper stored
+                             (C's included); replies are checked, a failing one stays NULL; never fails the night
 ```
 
 The web (Vercel) only reads. Today shows the SPY-champion "no buys" state. Positions and History
@@ -133,7 +138,7 @@ Run from the repo root or a worktree. Locally, point `SEER_ENV_FILE` at the main
 | `… -m seer_engine paper --now 2026-10-06T23:30:00Z` | the paper step as of a given UTC instant (format: `paper --help`) | as `paper` |
 | `… -m seer_engine -v paper_check` | the replay check over every started strategy | nothing |
 | `… -m seer_engine paper_check --require-sessions 5` | the same, and also requires ≥ 5 stepped sessions per strategy (the release check) | nothing |
-| `… -m seer_engine -v explain` | LLM explanations for new paper entries that have none yet | `orders.explanation`, `book_targets.explanation` |
+| `… -m seer_engine -v explain` | "why this pick" notes for new paper entries that have evidence and no note yet (see [Explain: why this pick](#explain-why-this-pick)) | `orders.explanation`, `book_targets.explanation` |
 | `… -m seer_engine --dry-run -v veto` | Strategy C's news check for `run_dates(now).session_date`: real Finnhub and LLM calls, then rolls back | nothing |
 | `… -m seer_engine -v veto` | the same, kept. Only the nightly job runs this for real: verdicts written by hand at another hour would be what Paper then trades on | `news_vetoes` |
 
@@ -145,7 +150,7 @@ Global flags go before the command: `--dry-run` (do everything, roll back) and `
 |---|---|---|---|
 | `paper` | night stepped and decided (`runs.paper_status = success`), or already done for this session (no-op) | no successful bars run for the session (design §8: no paper step, nothing written); or the night failed: everything rolled back, `runs.paper_status = failed`, `paper_error` set (a changed spec digest fails here as `SpecMismatch`) | missing setting (`DATABASE_URL_UNPOOLED`) |
 | `paper_check` | every started strategy equals its replay (strategies touched by a split are reported `split-affected`, not failed), or nothing has started yet (`not-started`) | a mismatch: the first differing snapshot, trade or position is logged; or `--require-sessions N` is given and a strategy stepped fewer than N sessions (`not-started` counts as 0) | missing setting (`DATABASE_URL_UNPOOLED`) |
-| `explain` | always, including when any `LLM_*` is unset or empty (logged "explanations unavailable", no database connection) or an entry's LLM call fails (text stays NULL) | only a database error (connection or SQL), which `cli.main` turns into 1; the workflow step is `continue-on-error` | `LLM_*` set but `DATABASE_URL_UNPOOLED` missing |
+| `explain` | always, including when any `LLM_*` is unset or empty (logged "explanations unavailable", no database connection), an entry has no evidence (skipped), an entry's LLM call fails, or its reply fails the checks (text stays NULL) | only a database error (connection or SQL), which `cli.main` turns into 1; the workflow step is `continue-on-error` | `LLM_*` set but `DATABASE_URL_UNPOOLED` missing |
 | `veto` | verdicts written (any mix of `allow`, `veto`, `failed`, all `failed` included); no candidates tonight; the session is already checked; or Paper has already decided the session (too late, nothing written) | no successful bars run for the session (nothing written, no call); or a database error. The workflow step is `continue-on-error`, so neither fails the night | missing setting (`DATABASE_URL_UNPOOLED`) |
 
 ## Failure states (design §8) and what the app shows
@@ -156,7 +161,7 @@ Global flags go before the command: `--dry-run` (do everything, roll back) and `
 | Paper failed (a bug, a DB error, Neon full) | whole paper transaction rolled back; `runs.paper_status = failed`, `paper_error` | red at "Paper" | paper warning on Positions; data stays at the last good night | read `paper_error` (Health check), fix, then `gh workflow run nightly.yml` (bars are a no-op, paper catches up every missed session) |
 | Paper check mismatch | paper state already committed | red at "Paper check"; Explain still runs | no change | run `paper_check -v` locally; the log names the first difference. A mismatch is a same-path bug: open a card, do not edit rows by hand |
 | A split on a held or pending symbol | state rescaled once (`apply_split` / `apply_book_split`); `paper_check` reports that strategy `split-affected` from then on | green | positions in post-split shares and prices | none: whole-share rounding across a split makes exact replay equality impossible (see Splits) |
-| Explain failed or `LLM_*` not set | text stays NULL | green (`continue-on-error`) | "explanation unavailable" | Owner step 1 |
+| Explain failed, `LLM_*` not set, or a reply failed the checks | text stays NULL | green (`continue-on-error`) | the stored facts instead of the note, or "explanation unavailable" when there are none | Owner step 1 when `LLM_*` is missing; otherwise nothing (the log line `explanation rejected for …` names the reason) |
 | Veto failed in any way (secrets missing, Finnhub or LLM down, wrong `LLM_MODEL`, crash, 10-minute limit) | C buys nothing it has no `allow` for; the other four strategies are untouched | green (Veto shows a warning when it failed) | Positions for C: "Vetoed tonight" with the reason, or "No news check for {date}: A had no candidates, or the check did not run. C buys nothing this session." | see [Strategy C: the news check](#strategy-c-the-news-check) |
 | Holiday / weekend | the run finds the session already succeeded: bars no-op, paper no-op | green | unchanged | none |
 | Data stale (no successful run for the next session) | — | — | stale-data screen first on Today | as for a failed bars run |
@@ -319,6 +324,50 @@ trades on it and the replay never reads it.
 
 About 163 rows a month (≈ 7.8 candidates a night) × ≈ 3.4 KB (headlines ≈ 3.1 KB) ≈ 0.55 MB a month,
 ≈ 6.6 MB a year. Negligible on Neon's free 0.5 GB; no retention job.
+
+## Explain: why this pick
+
+The last step of the night writes the "Why this pick" text for every new paper entry: A's and
+C's new pending orders, and new targets of F4, F1 and FND (a symbol the strategy already
+holds is a re-weight and is skipped).
+
+**What it reads.** Only the entry's `evidence` (migration 009). Paper writes it at decision time,
+from `strategies/evidence.py`. It is a short list of plain facts with their numbers, such as "Its
+price rose 48.2% from 12 months ago to 1 month ago." or "It ranked 3rd of 412 stocks checked on that
+move, strongest first." The
+prompt is the method's plain name ("Momentum", not "F4 · Momentum"), the stock symbol, those facts,
+and the task: "in at most 2 short plain sentences, say why this method picked this stock, using only
+these facts". There are no order prices, no share counts, no rule text and no "this is a paper trade"
+(the site already labels everything **paper**). An entry with no evidence (NULL or an empty
+list: written before 009, the idle symbol, or a night whose evidence function raised — Paper's log
+then has `<strategy> <date>: no evidence stored tonight (…)`) is skipped and its text stays NULL.
+
+**Why thinking is disabled.** The call is `temperature=0.0, thinking="disabled",
+max_tokens=1024`, the same settings Veto uses. Before this, `glm-5.3` thought by default on a
+400-token budget. Reasoning used up the budget, so the text stopped mid-sentence ("This is a paper
+trade simulated by the Seer") or came back empty (NULL). Temperature 0 keeps the note a
+restatement of the facts.
+
+**The checks.** Every reply must pass all of these, or it is discarded (logged as
+`explanation rejected for <strategy> <symbol>: <reason>`), and the text stays NULL:
+- a complete sentence: it ends with `.`, `!` or `?`, and it has no `…` or `...`;
+- at most 2 sentences and at most 320 characters. Nothing is ever cut, and no ellipsis is added;
+- every number in the reply also appears in the facts. Before comparing, `$`, `,`, `%` and signs
+  are removed and trailing zeros dropped, so `$1,850.00` matches `1850`. The digits of a ticker
+  such as `S01` are not numbers. Numbers spelled out in words are not checked;
+- no advice or prediction phrase: buy, sell, recommend, should, "will" with a price move (rise,
+  fall, go up, ...), going to, expect, guarantee. Matches are whole words, so "buyback" and
+  "unexpected" pass. "expect" is allowed only when the facts themselves use it (a past
+  earnings result);
+- not the same text as a note already accepted for the same strategy that night.
+
+**Failures.** A call that raises (timeout, 5xx, a client bug) leaves that text NULL. After 3
+calls in a row raise, no more calls are made that night. A rejected reply is not an outage,
+because the LLM answered: it does not count toward the 3, and it resets the count. Explain
+always exits 0 unless the database fails.
+
+**Old entries.** Entries written before the evidence pipeline shipped have no evidence. They stay
+as they are and are not re-explained. New entries get notes from the next night on.
 
 ## Health checks
 

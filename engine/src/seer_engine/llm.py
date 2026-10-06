@@ -11,8 +11,8 @@ Configured by three environment variables (see ``.env.example``):
 ``messages_url(LLM_BASE_URL)`` and returns the reply's text. Optional keywords
 ``temperature``, ``thinking`` and ``max_tokens`` add ``"temperature"`` and
 ``"thinking": {"type": ...}`` to the body and override the client's ``max_tokens`` for that call
-(Strategy C's veto); without them the body is exactly ``{model, max_tokens, system, messages}``
-(``explain``). Connection errors, timeouts, 429
+(Strategy C's veto and ``explain`` both pass all three, thinking disabled); without them the body
+is exactly ``{model, max_tokens, system, messages}``. Connection errors, timeouts, 429
 and 5xx are retried ``retries`` times; any other failure raises ``LlmError`` at once. Every
 error message is scrubbed of the API key and of key/token query parameters.
 
@@ -167,8 +167,8 @@ class Client:
 
         ``temperature`` adds ``"temperature"`` to the body, ``thinking`` adds
         ``"thinking": {"type": thinking}`` (e.g. ``"disabled"``), and ``max_tokens`` replaces the
-        client's default for this call. With none of them the body is byte-identical to the
-        keyword-less call ``explain`` makes.
+        client's default for this call. With none of them the body is exactly
+        ``{model, max_tokens, system, messages}``.
         """
         if max_tokens is not None and max_tokens < 1:
             raise ValueError(f"max_tokens must be >= 1, got {max_tokens}")

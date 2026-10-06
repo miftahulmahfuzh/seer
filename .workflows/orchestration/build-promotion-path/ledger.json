@@ -6,20 +6,20 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "499a1ca",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "Window value object + window= defaulted everywhere; D9 absolute by default. DEV_END untouched, MANIFEST_KEYS still 9, candidate_window floor dead on dev -> dev digests cannot shift. Decisions: tick root BUILD_PROMOTION_PATH_PLAN.md not the orchestration copy (rung 5); commit scoped to phase 1's 6 files, phase 3's lab/ work left alone (rung 6). Phase 4: import Window from backtest.window; DevRow.__post_init__ now checks against self.window, so no dev.py change needed.",
       "package": "engine/src/seer_engine/backtest`, `research.py",
       "plan": ".workflows/plan/build-promotion-path/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-06T05:58:21+00:00",
       "satisfies": [
         "R1",
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-5X3M",
       "title": "Make the backtest window a parameter, keeping D9 absolute"
     },
     {
@@ -37,7 +37,7 @@
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Build and load the test-window store"
     },
@@ -82,6 +82,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/build-promotion-path/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "build-promotion-path",
-  "updated": "2026-10-06T05:43:20+00:00",
+  "updated": "2026-10-06T05:59:29+00:00",
+  "verified_at": "2026-10-06T05:58:47+00:00",
   "worktree": "/home/miftah/.worktrees/seer/build-promotion-path"
 }

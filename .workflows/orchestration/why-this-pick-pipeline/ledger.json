@@ -6,20 +6,20 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "e7ee0b2be176f3a9a23dae797ea00b084b2f861e",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "strategies/evidence.py: EVIDENCE for 5 non-benchmark roster objects, evidence_for/has_evidence read at call time; full suite green",
       "package": "engine/strategies",
       "plan": ".workflows/plan/why-this-pick-pipeline/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-06T15:06:41+00:00",
       "satisfies": [
         "R1",
         "R8"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-A1SZ",
       "title": "Pure evidence module"
     },
     {
@@ -38,7 +38,7 @@
         "R1",
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Store evidence with every paper entry"
     },
@@ -79,7 +79,7 @@
       "satisfies": [
         "R7"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Promote requires evidence"
     },
@@ -108,6 +108,6 @@
   "plan": "/home/miftah/.worktrees/seer/why-this-pick-pipeline/.workflows/orchestration/why-this-pick-pipeline/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "why-this-pick-pipeline",
-  "updated": "2026-10-06T14:55:44+00:00",
+  "updated": "2026-10-06T15:06:57+00:00",
   "worktree": "/home/miftah/.worktrees/seer/why-this-pick-pipeline"
 }

@@ -34,7 +34,7 @@ addopts = "-ra"
 
 [tool.ruff]
 target-version = "py311"
-extend-exclude = [".cache", ".research"]
+extend-exclude = [".cache", ".research", ".research-test"]
 
 [tool.ruff.lint]
 # P0 CI lint: bugs only. E9 = syntax/IO errors; F = pyflakes (undefined names, redefinitions,

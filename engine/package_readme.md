@@ -34,6 +34,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - Promotion: the lab reaches the roster by command (roster-promotion-pipeline, phase 5): `commands/promote.py` turns a lab method's pre-registered `Candidate` into a `strategies` row (`status='active'`, `promoted_from=<method id>`, `registry_id` NULL, the full contract-C2 `params`, and **no** `paper_start` — the next paper night starts the clock the ordinary way, so a promoted strategy's record begins at its promotion). The row is read back and rebuilt through `roster.from_row` inside the same transaction, so a row the night would refuse never commits; `--retire <id>` runs phase 2's `store.retire` in that transaction, making a swap atomic. `lab/store.py` gains `record_promotion` (an append-only, idempotent lab note, moving the method's status only along the existing `('test-passed','paper')` edge) and `PROMOTION_MARKER`. `backtest/registry.py` is deliberately never touched (Decisions D1)
 - Honest comparison (roster-promotion-pipeline, phase 3): `paper/compare.py` is the pure, common-window, risk-adjusted comparison of the paper equity curves — every ranked figure is computed over the one window every ranked strategy shares (the intersection of snapshot dates, not `[max(start), min(end)]`), the window travels with the figures, inception-to-date is carried separately and never ranked, and a strategy that cannot join the window is an explicit `insufficient` row with a reason rather than a silent omission. The read-only `compare` command is its one impure edge
 - `FND` joins the roster (roster-promotion-pipeline, phase 6): a sixth entry, `FND · Fundamentals` (top 20 by SEC filing factors, monthly; `object_name = 'FUNDAMENTAL'`, `rules_id = 'monthly-hold'`, the book engine, `sort = 6`, `promoted_from = 'M0005'`, `registry_id` NULL), seeded by migration 007 and put on the live board by phase 5's `promote --method M0005 --candidate M0005-ALL --id FND --lab-status-stays` — the first promotion through the new lab → roster path rather than around it. Its `gate_note` says out loud that it **failed** its M0005 dev-window gate: passing a backtest gate has never been this roster's admission criterion (Decisions D5), and the gate binds the real-money decision, not paper membership. It is also the roster's first `MarketAware` object, which is why `paper/book.py` and `paper/replay.py` gained the prepared dispatch below. The five pre-existing spec digests are unchanged and `MAX_LOOKBACK_BARS` is still 253
+- Two windows, two stores (build-promotion-path, phase 2): the research window became a parameter on the store half. `build_store` / `load_store` / `refresh_fundamentals` each take a keyword `window=` defaulting to `DEV_WINDOW`, and a store declares its own window in three **optional** manifest keys (`window_name`, `window_start`, `window_end`) that a dev build never writes — **absent means dev**, so `engine/.research`'s manifest stays exactly the nine `MANIFEST_KEYS` it was sealed with and its fingerprint cannot move. `research_store --test-window` builds the P7b test-window store (2015-10-19..data end) into `engine/.research-test` (gitignored); `load_store` refuses a dev store where a test store is expected and the reverse, before it reads a single data file. `MANIFEST_KEYS` is unchanged at nine, no test-window look is spent, and no lab state changes
 - Pre-registration, the half a database cannot enforce (build-promotion-path, phase 3): the lab gets **one** look at the test window per configuration, and `UNIQUE(config_digest, window)` on `trials` enforces the *count* but not *which* configuration the look is spent on. `lab/prereg.py` owns the committed file that does — `docs/lab/prereg/MNNNN.md`, a strict `key: value` block then prose — with its writer, its parser (`parse(render(p, name)) == p` exactly) and the gate `lab test` calls before it looks (`require_committed`, `check_digest`). `lab promote <method>` writes that file for the method's best dev-eligible variant by MAR (`lab.store.best_dev_eligible`) and moves the method `dev-eligible -> promoted`; it loads no research store, runs no backtest and inserts no `trials` row, so pre-registering costs no look. A pre-registration is written once and never rewritten: a better variant found later is a new method with its own dev trials, not an edit to the file
 
 ## Layout
@@ -57,7 +58,7 @@ engine/
     fx.py                   Frankfurter USD/IDR fetch, upsert_fx()
     yahoo.py                yfinance download + frame parsing, BRK.B <-> BRK-B (phase 3)
     runs.py                 start_run / finish_run / fail_run
-    research.py             local research store: build_store() / load_store(), DEV_END guard (impure; P7a)
+    research.py             local research store: build_store() / load_store() / refresh_fundamentals(), each with a keyword window=; test_window(), latest_session(), declared_window(); the D9 end-of-window guard (impure; P7a, windowed in build-promotion-path phase 2)
     dividends.py            Massive cash dividends (CD + SC) per ex-date, upsert into `dividends` (P4)
     llm.py                  Anthropic-compatible Messages call for `explain` (P4) and `veto` (P6, with temperature/thinking/max_tokens per call)
     finnhub.py              Finnhub company news and earnings calendar, rate-limited, key in a header only (P6)
@@ -146,7 +147,8 @@ engine/
   tests/                    pytest; DB tests need PG_TEST_URL
   data/spy_dividends.csv    SPY dividends (ex_date, amount_usd), vendored from yfinance (see data/SOURCES.md)
   .cache/                   gitignored; bars-<max date>-<rows>.pkl and fundamentals-<max filed>-<rows>.pkl written by the backtest loader
-  .research/                gitignored; the P7a research store: bars.csv, dividends.csv, fx.csv, unserved.csv, manifest.json (research_store), plus the optional fundamentals.csv (--with-fundamentals)
+  .research/                gitignored; the P7a research store, dev window: bars.csv, dividends.csv, fx.csv, unserved.csv, manifest.json (research_store), plus the optional fundamentals.csv (--with-fundamentals)
+  .research-test/           gitignored; the P7b test-window store, the same files (research_store --test-window), its manifest declaring window_name/window_start/window_end; built on the first promotion and never before (build-promotion-path phase 2)
 docs/backtests/             committed reports: <end>-strategy-a{.md,-equity.csv,-equity.svg} (P3); <end>-strategy-a2-walkforward{.md,-equity.csv,-equity.svg,-variants.svg,-grid.csv} (P3b); <end>-strategy-b-walkforward{.md,-equity.csv,-equity.svg} (P6a); <run date>-p7a-dev-exploration{.md,-rows.csv,-curves.csv,-frontier.svg} (P7a)
 docs/plans/                 <run date>-p7b-preregistration.md: the P7b finalists (or "none eligible"), written by backtest_dev (P7a)
 docs/lab/prereg/            committed pre-registrations, one MNNNN.md per promoted method, written by `lab promote`; README.md documents the format (build-promotion-path phase 3)
@@ -345,15 +347,37 @@ passing run's artifact) are written as usual.
 ```
 python -m seer_engine research_store [--dry-run] [-v] [--store STORE] [--batch-size BATCH_SIZE] [--verify]
                                     [--with-fundamentals] [--refresh-fundamentals] [--coverage]
+                                    [--test-window [--window-end YYYY-MM-DD]]
 ```
 
-This builds the local research store (D5). It covers pre-2015 bars for every S&P 500 member since
-1996 and Nasdaq-100 member since 2007 that yfinance can serve, plus the 21 research ETFs, cash
-dividends from the start, and Frankfurter USD/IDR. It **never connects to Neon** and needs no
-database setting — `--with-fundamentals` is the single exception, below.
+This builds the local research store (D5). It covers bars for every S&P 500 member since 1996 and
+Nasdaq-100 member since 2007 that yfinance can serve, plus the 21 research ETFs, cash dividends
+from the start, and Frankfurter USD/IDR. It **never connects to Neon** and needs no database
+setting — `--with-fundamentals` is the single exception, below.
 
-- **`--store`** defaults to `engine/.research` (gitignored), and **`--batch-size`** to 40 symbols
-  per yfinance request.
+**Two windows, two stores** (build-promotion-path phase 2): the **dev window**
+(1993-01-29..2015-10-16) in `engine/.research` is the default — what `lab run` and `backtest_dev`
+read, and the store whose fingerprint every recorded lab trial was measured against — and the
+**test window** (2015-10-19..data end) lives in `engine/.research-test` behind `--test-window`,
+read only by `lab test`. The two are **not** interchangeable: `research.load_store` refuses a store
+whose declared window is not the one the caller asked for, and this command refuses (exit 2) to
+build one window into the other's directory even when the operator names it explicitly.
+
+- **`--store`** defaults to `engine/.research` (gitignored), or `engine/.research-test` with
+  `--test-window`, and **`--batch-size`** to 40 symbols per yfinance request.
+- **`--test-window`** (build-promotion-path phase 2) acts on the P7b test store. A build covers
+  `2015-10-19..`the latest completed NYSE session and records that window in the manifest's three
+  optional keys. It still holds the **same deep history from 1993-01-29** as the dev store — a
+  candidate first traded on 2015-10-19 needs its `lookback` bars before that date, and the one
+  look per configuration is append-only, so a store starting at its own window start would make
+  that look permanently wrong. The universe follows the window at both ends, so every company that
+  joined the index after October 2015 is in and everything that left before 2015-10-19 is out.
+  Build it only when something is being promoted (design S3), never speculatively.
+- **`--window-end`** pins the test window's last scored session instead of taking the latest
+  completed one, so an interrupted build can be resumed to the *same* end rather than silently
+  moving. It must be an NYSE session after `DEV_END`, applies only with `--test-window`, and only
+  to a build — `--verify`, `--coverage` and `--refresh-fundamentals` read the window the store
+  already declares (exit 2 otherwise).
 - **`--with-fundamentals`** (edgar-fundamentals) additionally reads the SEC point-in-time fact
   panel through `backtest.io.read_facts()` (`DATABASE_URL_UNPOOLED`, the one place in this command
   that needs a database) and writes it as the store's **optional** fifth file, `fundamentals.csv`,
@@ -369,7 +393,9 @@ database setting — `--with-fundamentals` is the single exception, below.
   and two yfinance crawls on two days give two different fingerprints — which would break
   comparability with the trials already recorded. It needs `DATABASE_URL_UNPOOLED` (set
   `SEER_ENV_FILE` to the train env file) and re-seals and swaps atomically; nothing is written
-  on failure.
+  on failure. Re-sealing **re-declares the window the store already had**, so refreshing a store
+  can never change which window it is for, and the mode refuses a store whose declared window
+  disagrees with `--test-window`.
 - **`--coverage`** (fundamental-panel-coverage) loads the store and prints, for each sampled
   dev-window date, how many symbols the panel can actually rank — a symbol counts only when
   `as_of` returns a snapshot with **non-empty `observations`** whose newest fact was filed within
@@ -378,20 +404,26 @@ database setting — `--with-fundamentals` is the single exception, below.
   `lab run` refuses on below `fundamentals.coverage.MIN_DEV_COVERAGE`. No network, no database.
   It reads no bars, so membership, `min_price` and `min_dollar_volume` are not applied and the
   fraction is an **upper bound**: below the floor is conclusive, above it is necessary and not
-  sufficient.
+  sufficient. It is a **dev-window** measure and is refused (exit 2) with `--test-window`.
 - **The build** is throttled with backoff and runs all-or-nothing: temp files first, then a rename.
-  The same downloads give byte-identical files and the same fingerprint. Nothing dated after
-  2015-10-16 is kept.
+  The same downloads give byte-identical files and the same fingerprint. Nothing dated after the
+  window's end is kept — 2015-10-16 on the dev window, the recorded `window_end` on a test store.
 - **`--verify`** uses no network. It loads the store, checks every file's sha256 against
-  `manifest.json` and that no row is after 2015-10-16, runs three data checks (SPY has a bar on
-  every NYSE session 1993-02-01 → 2015-10-16; SPY's 2015 dividends equal the vendored
-  `data/spy_dividends.csv`; AAPL's 2012 dividends are on the split-adjusted price scale), and
-  prints the fingerprint and the counts. It is the check to run before any dev run.
+  `manifest.json` and that no row is after the store's declared window end, runs three data checks
+  (SPY has a bar on every NYSE session from 1993-02-01 through that end; SPY's dividends equal the
+  vendored `data/spy_dividends.csv` on the overlap of the two; AAPL's 2012 dividends are on the
+  split-adjusted price scale), and prints the window, the fingerprint and the counts. The printed
+  window states what is **scored** and `store_start` what is **held**, which differ on a test
+  store. It is the check to run before any dev run, and it refuses a store whose declared window
+  disagrees with `--test-window`.
 - **`--dry-run`** builds into a temporary directory, verifies it, and discards it.
 - **Logs:** batches, unserved symbols, counts, and the fingerprint.
 - **Exit codes:** 0 when the store is built (or loaded) and all three checks pass; 1 when the build
   fails (nothing is written, any previous store is kept) or a check fails; 2 when the store is
-  missing or invalid (a tampered file, or a row after `DEV_END`).
+  missing or invalid (a tampered file, or a row after the declared window's end), or when the flags
+  refuse — a store/window mismatch, `--test-window` aimed at `engine/.research` or a dev invocation
+  aimed at `engine/.research-test`, `--window-end` without `--test-window` or on a read-only mode,
+  or `--coverage` with `--test-window`.
 
 ### `backtest_dev` (P7a)
 
@@ -1438,13 +1470,19 @@ F8 (a learned ranker at a longer horizon) and F12 (earnings drift) are not in th
 ### research store (P7a)
 
 `seer_engine.research` is an **impure** edge: yfinance, Frankfurter and files. It is never Neon (D5).
-The store is local and gitignored, in `engine/.research/`.
+The store is local and gitignored: `engine/.research/` for the dev window, and since
+build-promotion-path phase 2 `engine/.research-test/` for the P7b test window. Every public entry
+point takes a keyword `window=` that defaults to `DEV_WINDOW`, so every caller that predates the
+parameter builds, loads and refreshes exactly what it did before.
 
 - Constants:
   - `DEV_END = date(2015, 10, 16)`, `DEV_WINDOW`, `MEMBERSHIP_START` and `FX_START`, each equal to
     `backtest.dev`'s (tested);
   - `STORE_START = date(1993, 1, 29)`;
-  - `STORE_DIR`;
+  - `STORE_DIR` (`engine/.research`), and since build-promotion-path phase 2
+    `TEST_STORE_DIR` (`engine/.research-test`) and `TEST_WINDOW_START = date(2015, 10, 19)`, the
+    first session the test window **trades** — deliberately *not* where the test store's data
+    starts, which is `STORE_START` on both windows;
   - `RESEARCH_ETFS`: 21 ETFs (BIL, DIA, EFA, GLD, IEF, IWM, QLD, QQQ, SHY, SPY, SSO, TLT and the 9
     sector SPDRs);
   - `SECTOR_ETFS`, equal to `backtest.registry.SECTOR_ETFS` (tested).
@@ -1454,6 +1492,17 @@ The store is local and gitignored, in `engine/.research/`.
     ones, and the fingerprint is the sha256 of the sorted `name:sha` lines of the files that were
     actually written. So a store built before this phase keeps loading with a **bit-identical
     fingerprint**, and `--verify` still passes on it.
+  - `MANIFEST_KEYS` — still the same **nine** keys — and, since build-promotion-path phase 2,
+    `OPTIONAL_MANIFEST_KEYS = {window_name, window_start, window_end}`: the window a non-dev store
+    declares, all three or none. They say what the store is **scored** on, never what it holds
+    (`store_start` is `1993-01-29` on a test store too), and `dev_end` stays a *code-version pin*
+    — the `DEV_END` the building code was compiled against — which a test store carries unchanged.
+    **Absent means the dev window.** That is the compatibility hinge, not a convenience:
+    `engine/.research` was sealed with exactly `MANIFEST_KEYS`, so a dev build writes none of the
+    three and its manifest stays byte-identical. The fingerprint is unaffected either way —
+    `fingerprint_of` hashes the `files` map alone — but the manifest's bytes are not, and a shipped
+    test reads them. It is the same precedent `OPTIONAL_DATA_FILES` set for a four-file manifest
+    from before fundamentals existed.
 - The window-bearing helpers — `requested_symbols`, `research_membership`, `unserved_by_year` and
   the private `_overlaps_window` / `_members_start` — each take a keyword `window=` that defaults
   to `DEV_WINDOW`, so every existing caller is unchanged. The membership lower bound stays
@@ -1461,6 +1510,21 @@ The store is local and gitignored, in `engine/.research/`.
   and for the dev window (`start = date.min`) it is `MEMBERSHIP_START` exactly as before.
   `UNSERVED_REASON` is now produced by `unserved_reason(start=STORE_START, end=DEV_END)`; the
   module constant is kept as that function's default call, so `unserved.csv` is byte-identical.
+- The window entry points (build-promotion-path phase 2):
+  - `test_window(end) -> Window`: `TEST_WINDOW_START` through `end`, equal to
+    `DEV_WINDOW.following("test", end)` and asserted equal to it in `tests/test_research_test_store.py`
+    so the two spellings cannot drift. `ValueError` when `end` is not after `DEV_END` (that is the
+    dev window's territory) or is not an NYSE session. `end` is deliberately **not** a constant: a
+    hardcoded end goes stale and would silently change what a recorded test trial meant.
+  - `latest_session(now_utc=None) -> date`: an injectable wrapper over
+    `dates.last_completed_session` — "data end" at build time, the default end of a
+    `--test-window` build.
+  - `declared_window(store_dir) -> Window`: what a store says it is for, from its manifest alone.
+    It reads no data file and verifies nothing, so a caller can pass the matching `window` to
+    `load_store`, which does the verifying. A store with no window keys declares `DEV_WINDOW`. It
+    is **not** a way around `load_store`'s refusal — a caller that wants the dev window still
+    passes `DEV_WINDOW` and is still refused a test store — and `lab run` and `backtest_dev` never
+    call it.
 - Files. All are LF text, sorted and deterministic, with prices at 4 dp like `bars`:
 
 | File | Columns | Notes |
@@ -1472,11 +1536,26 @@ The store is local and gitignored, in `engine/.research/`.
 | `fundamentals.csv` | `FACT_COLUMNS`: `symbol,taxonomy,tag,unit,period_start,period_end,val,accn,form,fy,fp,filed` | **optional** (edgar-fundamentals), written only with `--with-fundamentals`; sorted, in `io.FACTS_COPY_SQL`'s encoding |
 | `manifest.json` | — | counts, a sha256 per file, and `fingerprint` (the sha256 of the sorted `name:sha` lines); no timestamps |
 
-- `build_store(store_dir, *, downloader=None, fetch_fx=None, sleep=time.sleep, batch_size=40, data_dir=None, facts=None)`:
-  - the symbols are `RESEARCH_ETFS` plus every `compute_universe()` member overlapping
-    [1996-01-02, `DEV_END`];
+- `build_store(store_dir, *, downloader=None, fetch_fx=None, sleep=time.sleep, batch_size=40, data_dir=None, facts=None, window=DEV_WINDOW)`:
+  - `window` is the window the store is built for and declares. On the default every byte is what
+    it was before the parameter existed — same symbols, same range, same `unserved.csv` text, same
+    nine manifest keys, same fingerprint. Pass `test_window(latest_session())` for the test store.
+  - **the data range follows `window.end` alone**: always `STORE_START..window.end` for bars and
+    `FX_START..window.end` for FX, on either window. A test store therefore carries the *same* deep
+    history as the dev store plus everything after it.
+  - **the universe follows the window at both ends**: `requested_symbols(data_dir, window=window)`
+    is every member overlapping `[max(window.start, MEMBERSHIP_START), window.end]` —
+    `[1996-01-02, DEV_END]` on the dev window, unchanged. On the test window every post-2015 joiner
+    is in and everything that left before 2015-10-19 is out, because no test-window session ever
+    ranks, holds or exits one; `members_on(t)` is the same set either way and only the crawl size
+    differs. A membership interval closing in 2018 also stays closed instead of reading as open.
+  - facts are **not** filtered by `window`: `FundamentalPanel` selects point-in-time on `filed <= t`
+    at read time, so a later filing is invisible on an earlier session, and filtering here would
+    rewrite `fundamentals.csv` and move the dev store's fingerprint for no gain.
+  - `unserved.csv` names the range the **download** covered (`STORE_START..window.end`), which is
+    byte-identical to `UNSERVED_REASON` on the dev window;
   - downloads are throttled and batched, with rate-limit backoff like `backfill`;
-  - rows after `DEV_END` are dropped defensively;
+  - rows after `window.end` are dropped defensively;
   - it writes every file to a temp dir and then renames it, so the build is all-or-nothing
     (`ResearchStoreError` on failure);
   - `facts` (edgar-fundamentals) is the SEC point-in-time panel as a plain sequence of
@@ -1485,18 +1564,38 @@ The store is local and gitignored, in `engine/.research/`.
     `fundamentals.csv` at all. `research.py` never opens a connection for them: the command passes
     them in (see `--with-fundamentals` below), so the "Never Neon" invariant (D5) is unchanged.
   - it returns the manifest.
-- `load_store(store_dir, *, data_dir=None) -> ResearchData(market, dividends, spy_dividends, fingerprint, manifest, unserved)`:
-  - it verifies every sha256 and rejects any row dated after `DEV_END` (`ValueError`, also for a
-    missing store). That is the data-level guard of D9.
+- `load_store(store_dir, *, data_dir=None, window=DEV_WINDOW) -> ResearchData(market, dividends, spy_dividends, fingerprint, manifest, unserved, window)`:
+  - `window` is the window the **caller** expects, and `ResearchData` now carries the window the
+    store declares. The default means every dev path — `lab run`, `backtest_dev`, this module's own
+    refresh — gets the dev guarantee without passing anything, and a mis-pointed
+    `SEER_RESEARCH_STORE` aimed at the test store fails loudly instead of silently running the dev
+    pipeline on test data. A test-window caller must ask for it explicitly, normally by passing
+    `declared_window(store_dir)` straight back in.
+  - **it refuses a window mismatch before it reads a data file**: a dev store where a test store is
+    expected, or the reverse, is a `ValueError` naming both windows. The two are not
+    interchangeable — the test store holds the same history *and* every session after `DEV_END`, so
+    loading one where the other is expected would run the dev pipeline on unseen data (D9).
+  - it verifies every sha256 and rejects any row dated after `window.end` (`ValueError`, also for a
+    missing store). That is the data-level guard of D9; on the dev window the refusal message is
+    unchanged, word for word.
   - Its `Market` takes membership from `membership.compute_universe()` through
     `io.merge_intervals`, offline. Its `fundamentals` is `_read_fundamentals(fundamentals.csv)`
     when the manifest lists that file and `EMPTY_FUNDAMENTALS` otherwise (edgar-fundamentals), so
     a pre-fundamentals store loads to a market with an empty panel rather than an error.
-- `run_checks(data, vendored)`: the three data checks `research_store --verify` prints.
-- the fundamentals-only refresh (fundamental-panel-coverage): reuses an existing store's four
+- `run_checks(data, vendored)`: the three data checks `research_store --verify` prints. Two of
+  them now follow `data.window` (build-promotion-path phase 2): `check_spy_sessions` defaults its
+  `end` to the store's own window end, and `check_spy_dividends` compares on the overlap
+  `[first vendored ex_date, min(window end, last vendored ex_date)]`. The clamp is what stops a
+  test store built past the vendored file's last row from reading as a mismatch; on the dev window
+  the window end is still the earlier bound, so neither check weakens.
+- `refresh_fundamentals(store_dir, facts, *, data_dir=None, window=DEV_WINDOW)`, the
+  fundamentals-only refresh (fundamental-panel-coverage): reuses an existing store's four
   required files byte for byte, writes a new `fundamentals.csv`, re-seals and `_swap_in`s. The
   manifest's copied counts (`bar_rows`, `dividend_rows`, `fx_rows`, `symbols_requested`,
-  `symbols_served`) are carried over, never re-derived from a download.
+  `symbols_served`) are carried over, never re-derived from a download. `window` must be the window
+  the store declares (pass `declared_window(store_dir)`); `load_store` refuses a mismatch, so a dev
+  refresh can never be aimed at the test store or the reverse, and `_seal` re-declares the same
+  window — refreshing a store never changes which window it is for.
 
 **The committed store** (built in phase 4, verified in phase 13): fingerprint `5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a`.
 - 2,490,793 bar rows; 539 of 1,061 symbols served, and 522 members unserved.
@@ -1513,6 +1612,13 @@ around 2009, so a fundamentals method still cannot reach the lab's `>= 100 trade
 The store syncs between machines with `/sync-research-store` (`push`/`pull`, content-addressed on
 this fingerprint, Vercel Blob); push it with `--keep 0`, because a plain `push` prunes to the
 newest three versions.
+
+**That fingerprint cannot move**, and build-promotion-path phase 2 was built around keeping it so:
+it is the identity `/sync-research-store` keys on and the one every recorded lab trial was measured
+against. The dev store's manifest therefore still carries exactly nine keys — the window keys are
+optional and a dev build writes none of them — and the dev store has **no test-window twin inside
+it**: the test window is a separate directory, `engine/.research-test`, with no fingerprint on
+record until something is actually promoted.
 
 Both coverage figures above are **upper bounds** — the measure reads no bars, so membership,
 `min_price` and `min_dollar_volume` are not applied.
@@ -2155,9 +2261,21 @@ follow it. Committing a newer report is a re-measurement on new data, not a new 
 ```
 cd <repo or worktree root>
 engine/.venv/bin/python -m seer_engine research_store            # build engine/.research (network; 30-60 min)
-engine/.venv/bin/python -m seer_engine research_store --verify   # no network: sha256s, DEV_END guard, data checks, fingerprint
+engine/.venv/bin/python -m seer_engine research_store --verify   # no network: sha256s, window guard, data checks, fingerprint
 engine/.venv/bin/python -m seer_engine backtest_dev              # every REGISTRY candidate, dev window only (~1 min)
 ```
+
+The test-window store is a separate build, done on the first promotion and never before (design S3):
+
+```
+engine/.venv/bin/python -m seer_engine research_store --test-window                          # engine/.research-test, through the latest session
+engine/.venv/bin/python -m seer_engine research_store --test-window --window-end 2026-10-02  # resume an interrupted build to the same end
+engine/.venv/bin/python -m seer_engine research_store --test-window --verify                 # its own window, its own fingerprint
+```
+
+Neither store can be used in the other's place: `--test-window` against `engine/.research` (or a
+dev invocation against `engine/.research-test`) exits 2, and `load_store` refuses the mismatch
+before it reads a data file.
 
 Neither command needs `SEER_ENV_FILE`: neither reads Neon. Then read
 `docs/backtests/<run date>-p7a-dev-exploration.md` and `docs/plans/<run date>-p7b-preregistration.md`.
@@ -2176,7 +2294,11 @@ which writes nothing. A committed report always comes from a full run over a cle
 - Convert symbols to Yahoo's dash form (`BRK-B`) only inside the Yahoo adapter (phase 3). Tables always store `BRK.B`.
 - `universe.end_date` is exclusive.
 - Under `--dry-run`, `migrate` reports the files it would apply, but leaves no `schema_migrations` table behind.
-- **The dev window is law.** Every dev entry point raises `backtest.dev.DevWindowError` for a session after 2015-10-16, and `research.load_store` rejects a store holding a later row. Never add a flag, a default or a store that gets past either guard. P7b runs the pre-registered finalists on the test window under its own handover.
+- **The dev window is law.** Every dev entry point raises `backtest.dev.DevWindowError` for a session after 2015-10-16, and `research.load_store` rejects a store holding a row after the window it was asked for — `DEV_WINDOW` unless the caller says otherwise, and `lab run` and `backtest_dev` never say otherwise. Never add a flag, a default or a store that gets past either guard. P7b runs the pre-registered finalists on the test window under its own handover.
+- **A dev store and a test store are never interchangeable** (build-promotion-path phase 2). They live in different directories (`engine/.research` vs `engine/.research-test`) and a store declares which it is in its manifest, so `load_store` refuses the wrong one *before* reading any data file, and `research_store` refuses to build or verify one window against the other's directory even when `--store` names it explicitly. Do not "fix" a mismatch by pointing `--store` or `SEER_RESEARCH_STORE` somewhere else: the test store holds the same history **and** every session after `DEV_END`, so running the dev pipeline on it would spend unseen data silently.
+- **The dev store's manifest is nine keys, and a dev build must never write a tenth.** `window_name` / `window_start` / `window_end` are `OPTIONAL_MANIFEST_KEYS` and **absent means the dev window** — never a `window_name: "dev"`. `engine/.research` was sealed with exactly `MANIFEST_KEYS`; requiring a window key, or writing one on a dev build, would reject or re-seal the store whose fingerprint `/sync-research-store` keys on and every recorded lab trial was measured against.
+- **The test store starts in 1993, not in 2015.** `TEST_WINDOW_START` (2015-10-19) is the first session the test window *trades*; `STORE_START` is where its data begins, the same as the dev store's. A candidate first traded on 2015-10-19 still needs its `lookback` bars before that date, and the lab gets exactly one append-only look per configuration, so a test store opening at its own window start would make that one look permanently and unrecoverably wrong.
+- **Build the test store on the first promotion, never before** (design S3), and pin `--window-end` when resuming an interrupted build. Without the pin the window silently moves to whatever the latest completed session is that day, which changes what a recorded test trial meant.
 - **The registry is append-only.** `tests/test_registry.py` pins every `(id, digest)`. A new candidate is appended and pinned in its own commit, before its dev run (D6). Editing an entry after its result exists is not allowed, even to fix a "typo": append a new id instead, and it counts as a trial.
 - `backtest_dev` refuses a full run (exit 2) while `backtest/registry.py` has uncommitted changes. `--only` skips that check and writes nothing; its numbers are a smoke test, never a result.
 - **Paper state stays in the units it was sized in.** Never rebuild a mark or a price of a live paper order or position from `bars`: `nightly` rewrites history backwards on a split, and `apply_split` / `apply_book_split` would then rescale it twice. Marks are stored (`orders.mark`, `book_positions.mark`).

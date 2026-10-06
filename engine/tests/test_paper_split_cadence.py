@@ -507,7 +507,7 @@ def test_a_split_inside_the_month_on_a_held_symbol(split_world):
 # ---- promote --fractional of a split-cadence lab variant, then nights --------------------------
 
 
-PROMOTE_ID = "RMW-FR"
+PROMOTE_ID = "RMW-TEST"  # not RMW-FR: that id is on the seeded roster since 011
 M0022_VARIANT = "M0022-W-TV14"
 
 

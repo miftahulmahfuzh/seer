@@ -90,6 +90,8 @@ from typing import Any, Literal, Protocol
 from seer_engine.backtest.registry import REGISTRY, candidate_digest
 from seer_engine.lab.methods.m0011_raw_residual_own_vol import METHOD as M0011
 from seer_engine.lab.methods.m0011_raw_residual_own_vol import RESIDVOL
+from seer_engine.lab.methods.m0022_weekly_brake_residual import METHOD as M0022
+from seer_engine.lab.methods.m0022_weekly_brake_residual import WEEKLYBRAKE
 from seer_engine.paper.capital import PAPER_INITIAL_IDR
 from seer_engine.sim import COST_RATE
 from seer_engine.sim.rules import PRESETS, TradeRules, is_pinned_default
@@ -112,7 +114,8 @@ FND_ID = "FND"
 # rule set is a new id (frozen roster); 010 retires the whole-share F4 and F1, and FND for RM.
 F4_FR_ID = "F4-MOM12-N20-TREND-FR"
 F1_FR_ID = "F1-SPY-SMA200-M-FR"
-RM_ID = "RM-FR"  # lab M0011-RAW20-TV14-N21 in fractional shares; replaces FND (owner, 2026-10-07)
+RM_ID = "RM-FR"  # retired 2026-10-07 for RMW before its first paper session
+RMW_ID = "RMW-FR"  # lab M0022-W-TV16 in fractional shares (monthly pick, weekly brake)  # lab M0011-RAW20-TV14-N21 in fractional shares; replaces FND (owner, 2026-10-07)
 
 #: ``object_name`` of the benchmark: ``backtest.benchmark.buy_and_hold``, which is rules, not an object.
 BENCHMARK_OBJECT = "buy_and_hold"
@@ -233,6 +236,10 @@ FUNDAMENTAL_PARAMS = FundamentalParams(rank="composite", top=20)
 #: pinned by tests/test_lab_methods.py), so the roster can never drift from the trial it records.
 RESIDVOL_PARAMS = next(c.params for c in M0011.candidates if c.id == "M0011-RAW20-TV14-N21")
 
+#: RMW's params: lab M0022's W-TV16 variant (RM's book, brake read weekly at a 16% limit), read from
+#: the frozen method file like RESIDVOL_PARAMS.
+WEEKLYBRAKE_PARAMS = next(c.params for c in M0022.candidates if c.id == "M0022-W-TV16")
+
 
 #: The one code-side table (D2). **This is the extension point**: a new strategy is a row in
 #: ``strategies`` plus, if its object is not already here, one entry here. Nothing else in this
@@ -248,6 +255,8 @@ RESOLVER: dict[str, Binding] = {
     "FUNDAMENTAL": Binding(obj=FUNDAMENTAL, params=FUNDAMENTAL_PARAMS),
     # Lab M0011's braked residual momentum, its RAW20-TV14-N21 variant (promoted 2026-10-07).
     "RESIDVOL": Binding(obj=RESIDVOL, params=RESIDVOL_PARAMS),
+    # Lab M0022's weekly-brake book, its W-TV16 variant (promoted 2026-10-07, replaces RM).
+    "WEEKLYBRAKE": Binding(obj=WEEKLYBRAKE, params=WEEKLYBRAKE_PARAMS),
 }
 
 
@@ -613,6 +622,26 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "Lab M0011 dev window only (1996-01-03..2015-10-16), in whole shares: beats SPY TR "
             "(+660.2% vs +351.4%), max DD 14.1%, PF 2.03 and 1,588 trades all pass; failed only "
             "DSR >= 0.95 (0.897 at N=90). On paper to test it forward"
+        ),
+        status="retired",
+    ),
+    # 011: RM's book with its brake read every week (lab M0022-W-TV16) replaces RM.
+    RosterRow(
+        id=RMW_ID,
+        name="RM · Braked momentum",
+        sub="Top 20 by rise beyond the market, picked monthly; holds less when jumpy, checked weekly; fractional shares",
+        icon="activity",
+        is_champion=False,
+        is_benchmark=False,
+        sort=10,
+        engine="book",
+        rules_id="monthly-rank-weekly-resize-frac",
+        object_name="WEEKLYBRAKE",
+        registry_id=None,
+        gate_note=(
+            "Lab M0022 dev window only (1996-01-03..2015-10-16), in whole shares: beats SPY TR "
+            "(+789.2% vs +351.4%), max DD 14.3%, PF 2.06 and 1,589 trades all pass; failed only "
+            "DSR >= 0.95 (0.916 at N=110). On paper to test it forward"
         ),
     ),
 )

@@ -365,6 +365,46 @@ def residvol_evidence(market: Market, params: Any, data_date: date, symbols: Seq
     return out
 
 
+# --------------------------------------------------------------------------- WEEKLYBRAKE (lab M0022)
+
+
+def weeklybrake_evidence(market: Market, params: Any, data_date: date, symbols: Sequence[str]) -> dict[str, Facts]:
+    """``WEEKLYBRAKE`` (lab M0022): the facts of what it actually holds. Its basket is the inner
+    book's pick on the month's anchor date (the data date before the month's first session), so
+    the rise, the rank and the market filter are read there; the brake is read on ``data_date``,
+    as the allocator does: the share of money in stocks is its targets' total weight over the
+    anchor basket's unscaled total."""
+    from seer_engine.lab.methods.m0007_residual_momentum import RESIDMOM
+    from seer_engine.lab.methods.m0020_stop_with_weekly_reentry import anchor_date
+    from seer_engine.lab.methods.m0022_weekly_brake_residual import WEEKLYBRAKE, WeeklyBrakeParams
+
+    p: WeeklyBrakeParams = _typed("WEEKLYBRAKE", params, WeeklyBrakeParams)
+    anchor = anchor_date(data_date)
+    picked = residvol_evidence(market, p.inner, anchor, symbols)  # [rise, rank, brake@anchor, filter]
+    if not picked:
+        return {}
+    members = market.membership.members_on(data_date)
+    cut = _cut(market, data_date)
+    held = WEEKLYBRAKE.targets(cut, members, data_date, frozenset(), p)
+    basket = RESIDMOM.targets({s: h.upto(anchor) for s, h in cut.items()}, members, anchor, frozenset(), p.inner.inner)
+    full = sum((float(t.weight) for t in basket), 0.0)
+    share = sum((float(t.weight) for t in held), 0.0) / full if full > 0 else 0.0
+    limit = _pct(float(p.inner.target_vol))
+    brake = (
+        f"Over the last {_span(p.inner.n)}, its picks together swung more than the {limit} a year the "
+        f"method allows, so this week it puts {_pct(share)} of its money in stocks and keeps the rest in cash."
+        if share < 0.9995
+        else f"Over the last {_span(p.inner.n)}, its picks together swung less than the {limit} a year the "
+        "method allows, so this week it puts all its money in stocks."
+    )
+    note = "It picks its stocks once a month and checks that swing every week, holding more or less to match."
+    out: dict[str, Facts] = {}
+    for symbol, facts in picked.items():
+        rest = [f for k, f in enumerate(facts) if k not in (2,)]  # drop the anchor-date brake fact
+        out[symbol] = tuple([*rest[:2], brake, *rest[2:], note][:MAX_FACTS])
+    return out
+
+
 # --------------------------------------------------------------------------- TIMING (F1/F10)
 
 
@@ -510,6 +550,7 @@ EVIDENCE: dict[str, EvidenceFn] = {
     "TIMING": timing_evidence,
     "FUNDAMENTAL": fundamental_evidence,
     "RESIDVOL": residvol_evidence,
+    "WEEKLYBRAKE": weeklybrake_evidence,
 }
 
 

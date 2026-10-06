@@ -18,6 +18,7 @@ from typing import Any
 import pytest
 from allocatorkit import FIXED, FixedParams
 from simkit import D, P, bar
+from test_paper_book import BREATHE, SPLIT_END, SPLIT_RULES, split_market, split_paper_run
 
 from seer_engine import dates
 from seer_engine.backtest.benchmark import Dividend, buy_and_hold
@@ -36,11 +37,13 @@ from seer_engine.paper.replay import (
 from seer_engine.prices import Bar
 from seer_engine.sim import (
     MONTHLY_HOLD,
+    MONTHLY_RANK_WEEKLY_RESIZE,
     Pick,
     Portfolio,
     Snapshot,
     Trade,
     initial_cash_usd,
+    is_resize_session,
     size_picks,
 )
 from seer_engine.strategies.base import History, history_from_bars
@@ -516,3 +519,39 @@ def test_paper_head_validation():
 
 def test_difference_str():
     assert str(Difference("snapshot 2025-03-04", "missing")) == "snapshot 2025-03-04: missing"
+
+
+# ---- split cadence: the replay keeps its own last rank basket ---------------------------------
+#
+# The split-cadence market and allocator of tests/test_paper_book.py. The replay rebuilds the
+# last rank basket from its own rank decisions and the marks from last_close; the paper night
+# (split_paper_run there) reads them back from what it stored. Both must decide the same.
+
+
+@pytest.mark.parametrize("rules", SPLIT_RULES, ids=lambda r: r.id)
+@pytest.mark.parametrize("start", [D("2025-02-03"), D("2025-02-10"), D("2025-02-12")],
+                         ids=["rank-day", "resize-monday", "mid-month"])
+def test_expected_book_of_split_cadence_rules_equals_the_nights(rules, start):
+    m = split_market()
+    nights = split_paper_run(lambda d: m, BREATHE, None, rules, start, SPLIT_END, initial_idr=PAPER_INITIAL_IDR)
+    head = PaperHead("S", "book", start, SPLIT_END, USD_IDR, kickoff=nights.kickoff)
+    got = replay.expected_book(m, BREATHE, None, rules, head, {})
+    assert got.snapshots == tuple(Snapshot(s.date, s.cash_usd, s.equity_usd) for s in nights.result.snapshots)
+    assert got.fills == nights.result.fills and got.trades == nights.result.trades
+    assert got.positions == nights.result.open_at_end
+    assert got.targets == tuple(sorted(nights.stored.items()))
+    assert any(is_resize_session(rules, s) for s, _ in got.targets)
+    assert replay.compare("book", got, got) == ()
+
+
+def test_expected_book_pending_resize_decision():
+    m, rules = split_market(), MONTHLY_RANK_WEEKLY_RESIZE
+    head = PaperHead("S", "book", D("2025-02-12"), D("2025-03-07"), USD_IDR, kickoff=D("2025-02-12"))
+    got = replay.expected_book(m, BREATHE, None, rules, head, {})
+    assert got.pending_session == D("2025-03-10") and got.pending_decision is True
+    (pending,) = [t for s, t in got.targets if s == D("2025-03-10")]
+    assert [(t.symbol, t.weight) for t in pending] == [("DDD", Decimal("0.45")), ("AAA", Decimal("0.45"))]
+    # Before any rank (a head with no kickoff, started mid-month) a resize week decides nothing.
+    early = replay.expected_book(m, BREATHE, None, rules, replace(head, last_session=D("2025-02-14"), kickoff=None), {})
+    assert early.pending_session == D("2025-02-18") and is_resize_session(rules, D("2025-02-18"))
+    assert early.pending_decision is False and early.targets == ()

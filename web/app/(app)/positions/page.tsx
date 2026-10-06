@@ -4,6 +4,7 @@ import { PaperChip } from '@/components/PaperChip';
 import { selectStrategy, sharesLabel, strategyIcon } from '@/components/roster';
 import { StrategySwitch } from '@/components/StrategySwitch';
 import { WhyToggle } from '@/components/WhyToggle';
+import { heldUsd, orderSizeChange, picksMonthlySizesWeekly, sizeLabel, sizeTip, type SizeChange } from '@/lib/cadence';
 import {
   bookPreview, pendingOrders, positions as getPositions, runStatus, strategies, vetoes as getVetoes,
   type Holding, type Pending, type PendingOrder, type Preview, type RunStatus, type Strategy, type Veto,
@@ -47,6 +48,9 @@ export default async function Positions({ searchParams }: { searchParams: Promis
   const href = (id: string) => `/positions?s=${encodeURIComponent(id)}`;
   const [noneTitle, noneSub] = emptyState(strat);
   const orderSession = showOrders ? pending.sessionDate : null;
+  // Monthly pick, weekly size check (web/lib/cadence.ts): only these strategies show the change per order.
+  const splitCadence = !!strat && picksMonthlySizesWeekly(strat.rulesId);
+  const held = heldUsd(book);
   // The news check's verdicts for the same session (C, handover D10). Read only for a strategy that runs
   // the check: its roster row comes from migration 004, which also creates news_vetoes.
   const showChecks = !!strat && !!orderSession && strat.checksNews && strat.engine === 'bracket';
@@ -123,7 +127,8 @@ export default async function Positions({ searchParams }: { searchParams: Promis
             ) : (
               <ul className={s.orderList}>
                 {pending.orders.map(o => (
-                  <OrderRow key={o.key} o={o} equity={pending.equity} passed={checks.find(v => v.symbol === o.symbol && v.verdict === 'allow')} />
+                  <OrderRow key={o.key} o={o} equity={pending.equity} passed={checks.find(v => v.symbol === o.symbol && v.verdict === 'allow')}
+                    size={splitCadence && o.kind === 'book' ? orderSizeChange(o.weight, pending.equity, o.symbol, held) : undefined} />
                 ))}
               </ul>
             )}
@@ -156,14 +161,18 @@ function paperWarning(status: RunStatus['paperStatus'], session: string): string
 function emptyState(st: Strategy | null): [string, string | null] {
   if (!st) return ['No strategies yet.', null];
   if (st.engine === 'benchmark') return ['Not bought yet.', `${st.name} is bought at the open of the first paper session.`];
+  if (st.engine === 'book' && picksMonthlySizesWeekly(st.rulesId)) {
+    return ['In cash.', `${st.short} makes its first decision at its first paper session, then picks its stocks on the first session of each month and checks how much to hold on the first session of each week.`];
+  }
   if (st.engine === 'book') return ['In cash.', `${st.short} makes its first decision at its first paper session, then rebalances on the first session of each month.`];
   return ['No open positions.', null];
 }
 
 function noOrders(st: Strategy, p: Pending, sheet: VetoSheet | null): string {
   if (st.engine === 'book') {
-    return p.decision
-      ? `No orders. ${st.short} decided to hold cash.`
+    if (p.decision) return `No orders. ${st.short} decided to hold cash.`;
+    return picksMonthlySizesWeekly(st.rulesId)
+      ? `No orders. ${st.short} keeps what it holds. It picks its stocks on the first session of each month and checks how much to hold on the first session of each week.`
       : `No orders. ${st.short} keeps what it holds until it rebalances on the first session of each month.`;
   }
   if (sheet && sheet.state === 'missing') return `No orders. ${st.short} buys nothing this session.`;
@@ -362,7 +371,8 @@ function BenchmarkCard({ q }: { q: Holding }) {
  * What a book strategy would hold if it rebalanced tonight (`book_previews`): shown between its monthly
  * decisions so a monthly strategy is never silent. Display only: nothing trades on it. Each row's reason
  * is the facts the ranking read, as stored (no LLM: previews are replaced every night); a row without
- * stored facts shows no toggle rather than a list of "unavailable" lines.
+ * stored facts shows no toggle rather than a list of "unavailable" lines. A strategy that picks monthly
+ * and checks its sizes weekly says so instead of "only trades when it rebalances".
  */
 function WouldPick({ st, preview }: { st: Strategy; preview: Preview }) {
   return (
@@ -372,7 +382,9 @@ function WouldPick({ st, preview }: { st: Strategy; preview: Preview }) {
         <span className="chip num">{preview.picks.length}</span>
       </div>
       <span className={s.ordersSub}>
-        From the {shortDate(preview.dataDate!)} closes. {st.short} only trades when it rebalances, on the first session of each month.
+        {picksMonthlySizesWeekly(st.rulesId)
+          ? <>From the {shortDate(preview.dataDate!)} closes. {st.short} only changes its stocks on the first session of each month, and checks how much to hold on the first session of each week.</>
+          : <>From the {shortDate(preview.dataDate!)} closes. {st.short} only trades when it rebalances, on the first session of each month.</>}
       </span>
       <ul className={s.orderList}>
         {preview.picks.map(p => (
@@ -391,7 +403,7 @@ function WouldPick({ st, preview }: { st: Strategy; preview: Preview }) {
   );
 }
 
-function OrderRow({ o, equity, passed }: { o: PendingOrder; equity: number | null; passed?: Veto }) {
+function OrderRow({ o, equity, passed, size }: { o: PendingOrder; equity: number | null; passed?: Veto; size?: SizeChange | null }) {
   const cells: [string, string][] = o.kind === 'bracket'
     ? [
         ['Limit', o.limit === null ? '—' : usd(o.limit)],
@@ -416,6 +428,7 @@ function OrderRow({ o, equity, passed }: { o: PendingOrder; equity: number | nul
         <span className={s.orderCo}>{companyName(o.company, o.symbol) ? `${o.company} · ` : ''}last {usd(o.last)}</span>
       </div>
       <OrderCells cells={cells} />
+      {size !== undefined && <SizeCell size={size} />}
       <WhyToggle text={o.explanation} facts={o.evidence} />
       {passed && (
         <>
@@ -434,6 +447,21 @@ function OrderCells({ cells }: { cells: [string, string][] }) {
       {cells.map(([k, v]) => (
         <div key={k} className={s.cell}><dt>{k}</dt><dd className="num">{v}</dd></div>
       ))}
+    </dl>
+  );
+}
+
+/**
+ * Split-cadence strategies only: the order against what is held now, at tonight's marks and equity.
+ * "No change" when the gap is under 1% of paper equity, the engine's RESIZE_BAND (web/lib/cadence.ts).
+ */
+function SizeCell({ size }: { size: SizeChange | null }) {
+  return (
+    <dl className={s.cells}>
+      <div className={`${s.cell} ${s.cellWide}`} data-tip={size ? sizeTip(size) : 'Paper equity is not known yet'}>
+        <dt>Against what it holds now</dt>
+        <dd className="num">{size ? sizeLabel(size) : '—'}</dd>
+      </div>
     </dl>
   );
 }

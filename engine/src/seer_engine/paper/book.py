@@ -4,12 +4,16 @@ Pure (purity-tested with every ``paper/*.py`` except ``store.py``): no database,
 clock, randomness, logging or file access. Paper trading runs ``backtest.book_runner.run_book``'s
 loop body one session at a time, over state persisted between nights, in two halves:
 
-``decide_book`` (the night of ``data_date``, after its bars arrived) is ``run_book``'s step 1 and
-2 for ``S = next_session(data_date)``: ``None`` when ``S`` is not a decision session under
-``rules``; otherwise ``allocator.targets`` on every history cut at ``data_date``, the members on
-``data_date`` and the symbols held at night minus the idle instrument, then
-``book_runner._with_idle`` (imported, not copied). It returns ``(targets, idle_added)``; the
-caller persists both and hands them back to ``settle_book`` for ``S``.
+``decide_book`` (the night of ``data_date``, after its bars arrived) is ``run_book``'s step 1,
+1b and 2 for ``S = next_session(data_date)``: ``None`` when ``S`` is not a decision session under
+``rules``; on a rank session ``allocator.targets`` on every history cut at ``data_date``, the
+members on ``data_date`` and the symbols held at night minus the idle instrument; on a
+resize-only session (split-cadence rules) the last rank basket re-scaled by
+``book_runner._rescaled``; then ``book_runner._with_idle`` (both imported, not copied). It
+returns ``(targets, idle_added)``; the caller persists both and hands them back to
+``settle_book`` for ``S``. ``run_book`` keeps the last rank basket in a loop variable; paper
+keeps none, so the caller passes it in: the targets stored for ``last_rank_session(...)``,
+through ``rank_basket``.
 
 ``settle_book`` (the night of ``S``, after S's bars arrived) is ``run_book``'s steps 3 and 4 for
 ``S``, preceded by the splits that executed on ``S``:
@@ -25,7 +29,8 @@ caller persists both and hands them back to ``settle_book`` for ``S``.
 
 Looping ``decide_book`` then ``settle_book`` from ``new_book(cash0)`` with ``data_date =
 prev_session(start)`` and no splits reproduces ``run_book`` field for field
-(tests/test_paper_book.py). ``last_bar_date`` is ``Market.last_bar_date`` in a replay; at night
+(tests/test_paper_book.py), split-cadence rules included when each night passes ``last_rank``
+and the book's ``marks``. ``last_bar_date`` is ``Market.last_bar_date`` in a replay; at night
 it is the latest bar date the database holds, so a halted symbol is force-closed on the first
 session it misses (plan Decisions, "Force-close rule live").
 """
@@ -40,7 +45,7 @@ from decimal import Decimal
 from typing import Any
 
 from seer_engine import dates
-from seer_engine.backtest.book_runner import DividendMap, _dividends_on, _invested, _with_idle
+from seer_engine.backtest.book_runner import DividendMap, _dividends_on, _invested, _rescaled, _with_idle
 from seer_engine.backtest.market import Market
 from seer_engine.prices import Bar
 from seer_engine.sim.book import (
@@ -55,7 +60,7 @@ from seer_engine.sim.book import (
     close_book_unpriced,
     step_book,
 )
-from seer_engine.sim.rules import TradeRules, is_decision_session, is_rank_session
+from seer_engine.sim.rules import TradeRules, is_rank_session, is_resize_session
 from seer_engine.strategies.allocator import Allocator, MarketAware, prepare_for
 
 LastBarDate = Callable[[str], date | None]  # symbol -> its latest bar date known, or None
@@ -132,60 +137,22 @@ def _splits(splits: object) -> tuple[tuple[str, Decimal], ...]:
     return tuple(sorted(out.items()))
 
 
-def decide_book(
-    market: Market,
-    allocator: Allocator,
-    params: Any,
-    rules: TradeRules,
-    data_date: date,
-    held: AbstractSet[str],
-    *,
-    force: bool = False,
-) -> tuple[tuple[Target, ...] | None, bool]:
-    """The targets for ``next_session(data_date)`` and whether the idle residual was appended.
+def _wanted(
+    market: Market, allocator: Allocator, params: Any, data_date: date, mine: frozenset[str]
+) -> tuple[Target, ...]:
+    """``allocator``'s targets for the night of ``data_date``: ``run_book``'s allocator call.
 
-    ``(None, False)`` when that session is not a decision session under ``rules`` (the
-    allocator is not called), unless ``force``: then the session is ranked whatever the cadence
-    (the kickoff, ``needs_kickoff``; also the nightly preview of what the book would pick now).
-
-    Split-cadence rules (``rules.resize_cadence``) are a ValueError here: a resize-only session
-    needs the LAST RANK SESSION'S basket, and this function is stateless — the paper store does
-    not carry it yet. ``backtest.book_runner.run_book`` does, so backtests and replays of split
-    rules are correct; only the nightly live decision is refused, loudly rather than by silently
-    re-ranking every week. Otherwise exactly ``run_book``'s decision: ``allocator.targets``
-    on ``{s: h.upto(data_date)}``, ``market.membership.members_on(data_date)``, ``held`` minus
-    ``rules.idle_symbol``, ``params``; then ``book_runner._with_idle``. ``held`` is the set of
-    symbols the book holds at the night of ``data_date`` (``book.held()`` after that session
-    settled). Nothing dated after ``data_date`` is read.
-
-    A ``MarketAware`` allocator (``strategies.allocator.MarketAware``: it defines
-    ``prepare_market``) takes ``run_book``'s prepared branch instead --
-    ``targets_prepared(prepare_for(allocator, market_cut_at_data_date), ...)``. It must: such an
-    allocator reads part of the ``Market`` that ``history`` cannot carry, and for ``FUNDAMENTAL``
-    the history-only path is not a worse answer but a fixed empty one (its docstring: with no
-    panel no symbol is eligible, so ``targets`` returns ``()``). The branch is keyed on the
-    protocol and nothing else, so an allocator without ``prepare_market`` runs today's expression
-    unchanged.
+    ``market.membership.members_on(data_date)``, every history cut at ``data_date``, ``mine``
+    (the held symbols, the idle instrument left out) and ``params``. A ``MarketAware`` allocator
+    (``strategies.allocator.MarketAware``: it defines ``prepare_market``) takes the prepared
+    branch -- ``targets_prepared(prepare_for(allocator, market_cut_at_data_date), ...)``. It must:
+    such an allocator reads part of the ``Market`` that ``history`` cannot carry, and for
+    ``FUNDAMENTAL`` the history-only path is not a worse answer but a fixed empty one (its
+    docstring: with no panel no symbol is eligible, so ``targets`` returns ``()``). The branch is
+    keyed on the protocol and nothing else, so an allocator without ``prepare_market`` runs the
+    plain expression unchanged.
     """
-    if not isinstance(market, Market):
-        raise TypeError(f"market must be a Market, got {type(market).__name__}")
-    if not isinstance(allocator, Allocator):
-        raise TypeError(f"allocator must be an Allocator, got {type(allocator).__name__}")
-    _book_rules(rules)
-    _session("data_date", data_date)
-    held_now = _held(held)
-    session = dates.next_session(data_date)
-    if rules.resize_cadence is not None:
-        raise ValueError(
-            f"rules {rules.id!r} split rank and resize cadences; paper trading cannot decide them yet "
-            "(the last rank session's basket is not stored). Backtest them with run_book."
-        )
-    if not force and not is_decision_session(rules, session):
-        return None, False
-    assert force or is_rank_session(rules, session)  # no resize_cadence above, so every decision is a rank
     members = market.membership.members_on(data_date)
-    # The idle position is the runner's residual, never a family's (as run_book).
-    mine = held_now - {rules.idle_symbol} if rules.idle_symbol is not None else held_now
     history = {s: h.upto(data_date) for s, h in market.history.items()}
     if isinstance(allocator, MarketAware):
         # A MarketAware allocator reads more of the Market than its bars (FUNDAMENTAL reads
@@ -200,10 +167,99 @@ def decide_book(
         # filed <= d and only those, and `filed` IS the no-look-ahead boundary
         # (005_fundamentals.sql, "filed IS THE ONLY NO-LOOK-AHEAD BOUNDARY").
         prepared = prepare_for(allocator, replace(market, history=history))
-        wanted = allocator.targets_prepared(prepared, members, data_date, mine, params)
-    else:
-        wanted = allocator.targets(history, members, data_date, mine, params)
-    return _with_idle(market, rules, tuple(wanted), data_date)
+        return tuple(allocator.targets_prepared(prepared, members, data_date, mine, params))
+    return tuple(allocator.targets(history, members, data_date, mine, params))
+
+
+def _last_rank(last_rank: object) -> tuple[Target, ...] | None:
+    if last_rank is None:
+        return None
+    if not isinstance(last_rank, tuple):
+        raise TypeError(f"last_rank must be a tuple of Target or None, got {type(last_rank).__name__}")
+    for t in last_rank:
+        if not isinstance(t, Target):
+            raise TypeError(f"last_rank holds Targets, got {type(t).__name__}")
+    return last_rank
+
+
+def _marks(marks: object) -> Mapping[str, Decimal] | None:
+    if marks is None:
+        return None
+    if not isinstance(marks, Mapping):
+        raise TypeError(f"marks must be a Mapping of symbol -> Decimal or None, got {type(marks).__name__}")
+    for symbol, mark in marks.items():
+        if not isinstance(symbol, str):
+            raise TypeError(f"marks keys are symbols (str), got {type(symbol).__name__}")
+        if not isinstance(mark, Decimal):
+            raise TypeError(f"mark for {symbol} must be a Decimal, got {type(mark).__name__}")
+    return marks
+
+
+def decide_book(
+    market: Market,
+    allocator: Allocator,
+    params: Any,
+    rules: TradeRules,
+    data_date: date,
+    held: AbstractSet[str],
+    *,
+    force: bool = False,
+    last_rank: tuple[Target, ...] | None = None,
+    marks: Mapping[str, Decimal] | None = None,
+) -> tuple[tuple[Target, ...] | None, bool]:
+    """The targets for ``S = next_session(data_date)`` and whether the idle residual was appended.
+
+    Exactly ``run_book``'s decision for ``S``. ``held`` is the set of symbols the book holds at
+    the night of ``data_date`` (``book.held()`` after that session settled); the allocator sees
+    it minus ``rules.idle_symbol``. Nothing dated after ``data_date`` is read.
+
+    - A RANK session -- ``force`` (the kickoff, ``needs_kickoff``; also the nightly preview of
+      what the book would pick now) or ``is_rank_session(rules, S)``: ``_wanted`` (the allocator
+      on every history cut at ``data_date``, the members on ``data_date``, the held symbols,
+      ``params``; a ``MarketAware`` allocator through its prepared branch), then
+      ``book_runner._with_idle``. ``last_rank`` and ``marks`` are not read.
+    - A RESIZE-ONLY session (``is_resize_session(rules, S)``, only under a ``resize_cadence``)
+      with ``last_rank`` given: the allocator is called the same way, but only its total weight
+      is used: ``book_runner._with_idle(book_runner._rescaled(market, last_rank, wanted, held -
+      idle, data_date, marks))`` (both imported, not copied). ``last_rank`` is the last rank
+      session's targets WITHOUT the idle row (``rank_basket``), ``()`` when that rank chose
+      nothing; only each target's ``symbol`` and ``weight`` reach the result, so the basket may
+      be in pre- or post-split units. ``marks`` is ``{p.symbol: p.mark for p in
+      book.positions}`` of the same book ``held`` came from (``_rescaled``'s price for a held
+      symbol without a bar on ``data_date``); a ValueError when it is missing here.
+    - Otherwise ``(None, False)`` and the allocator is not called: a session that is neither,
+      and a resize-only session with ``last_rank`` None (no rank yet: ``run_book`` does not
+      decide a resize session before its first rank either).
+
+    For every rule set without a ``resize_cadence`` no session is resize-only, so the result is
+    the rank-or-nothing decision it always was, whatever ``last_rank`` and ``marks`` hold.
+    """
+    if not isinstance(market, Market):
+        raise TypeError(f"market must be a Market, got {type(market).__name__}")
+    if not isinstance(allocator, Allocator):
+        raise TypeError(f"allocator must be an Allocator, got {type(allocator).__name__}")
+    _book_rules(rules)
+    _session("data_date", data_date)
+    held_now = _held(held)
+    basket_then = _last_rank(last_rank)
+    marks_now = _marks(marks)
+    session = dates.next_session(data_date)
+    rank = force or is_rank_session(rules, session)
+    if not rank and (basket_then is None or not is_resize_session(rules, session)):
+        return None, False
+    if not rank and marks_now is None:
+        raise ValueError(
+            f"{session} is a resize-only session under {rules.id!r}: decide_book needs the book's marks "
+            "(symbol -> mark) to re-scale the last rank basket"
+        )
+    # The idle position is the runner's residual, never a family's (as run_book).
+    mine = held_now - {rules.idle_symbol} if rules.idle_symbol is not None else held_now
+    wanted = _wanted(market, allocator, params, data_date, mine)
+    if rank:
+        return _with_idle(market, rules, wanted, data_date)
+    assert basket_then is not None and marks_now is not None
+    basket = _rescaled(market, basket_then, wanted, mine, data_date, marks_now)
+    return _with_idle(market, rules, basket, data_date)
 
 
 def needs_kickoff(rules: TradeRules, paper_start: date, session: date, kickoff: date | None) -> bool:
@@ -212,15 +268,62 @@ def needs_kickoff(rules: TradeRules, paper_start: date, session: date, kickoff: 
     A book strategy whose paper clock starts between two rank sessions would otherwise hold its
     starting cash until the next one (up to a month for monthly rules). It ranks instead on the
     first session it can, once: when no kickoff is stored yet (``kickoff`` None), ``session`` is
-    not a decision session, and no rank session lies in ``[paper_start, session)`` (one there was
+    not a rank session, and no rank session lies in ``[paper_start, session)`` (one there was
     already a first decision). Replays rank on the stored kickoff (``run_book(kickoff=...)``).
+
+    A resize-only session (split-cadence rules) is not a rank session: before the first rank
+    there is no basket to re-scale, so ``run_book`` does not decide it, and a clock starting on
+    one kicks off there. Without a ``resize_cadence`` every decision session is a rank session,
+    so this is the test it always was.
     """
     _book_rules(rules)
     _session("paper_start", paper_start)
     _session("session", session)
-    if kickoff is not None or is_decision_session(rules, session):
+    if kickoff is not None or is_rank_session(rules, session):
         return False
     return not any(is_rank_session(rules, s) for s in dates.sessions(paper_start, session) if s < session)
+
+
+def last_rank_session(rules: TradeRules, paper_start: date, kickoff: date | None, session: date) -> date | None:
+    """The session whose decision holds the basket a resize-only ``session`` re-scales, or None.
+
+    The latest ``d`` in ``[paper_start, session)`` that ranked: ``is_rank_session(rules, d)`` or
+    ``d == kickoff`` (the stored kickoff session) -- ``run_book``'s ``last_rank`` variable, read
+    off the calendar instead of a loop. Paper decides every session in order, so that session's
+    stored targets (``rank_basket`` of them; ``()`` when it chose nothing and wrote no row) are
+    the basket exactly. None when nothing ranked before ``session``: ``decide_book`` then decides
+    no resize session, as ``run_book`` does not.
+    """
+    _book_rules(rules)
+    _session("paper_start", paper_start)
+    _session("session", session)
+    if kickoff is not None:
+        _session("kickoff", kickoff)
+    for d in reversed(dates.sessions(paper_start, session)):
+        if d < session and (d == kickoff or is_rank_session(rules, d)):
+            return d
+    return None
+
+
+def rank_basket(targets: Sequence[Target], idle_symbol: str | None) -> tuple[Target, ...]:
+    """A rank decision's targets as ``decide_book``'s ``last_rank``: the idle row taken off.
+
+    ``book_runner._with_idle`` appends at most one target, last, in ``idle_symbol``; an allocator
+    that targets the idle symbol is a ValueError there, so a trailing ``idle_symbol`` row is the
+    runner's residual and nothing else. A row in ``idle_symbol`` anywhere but last is a
+    ValueError (those targets were not a decision). ``targets`` in rank order, as stored.
+    """
+    if isinstance(targets, (str, Mapping)) or not isinstance(targets, Sequence):
+        raise TypeError(f"targets must be a sequence of Target, got {type(targets).__name__}")
+    rows = tuple(targets)
+    for t in rows:
+        if not isinstance(t, Target):
+            raise TypeError(f"targets holds Targets, got {type(t).__name__}")
+    if idle_symbol is not None and rows and rows[-1].symbol == idle_symbol:
+        rows = rows[:-1]
+    if idle_symbol is not None and any(t.symbol == idle_symbol for t in rows):
+        raise ValueError(f"the idle symbol {idle_symbol} is targeted before the last row; not a book decision")
+    return rows
 
 
 def settle_book(

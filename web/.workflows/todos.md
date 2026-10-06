@@ -2,7 +2,7 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-10-06
+**Last Updated**: 2026-10-07
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 11
+- Completed: 12
 
 ---
 
@@ -35,6 +35,22 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-10T8** Phase 3: Positions page: monthly pick / weekly size copy and buy/add/trim cell
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns: new `web/lib/cadence.ts` (`SPLIT_CADENCE_RULES` = `monthly-rank-weekly-resize`, `monthly-rank-weekly-resize-tbill`, `monthly-rank-weekly-resize-frac`; `picksMonthlySizesWeekly`, `RESIZE_BAND = 0.01`, `sizeChange`, `heldUsd`, `orderSizeChange`, `sizeLabel`, `sizeTip`) and `web/lib/cadence.test.ts`; in `web/app/(app)/positions/page.tsx` the three monthly sentences (158, 166, 374) branching on it, and for such a strategy a full-width per-order `SizeCell` comparing the target dollars (weight × equity) with what is held now: "Buy about $X" (symbol not held — the band does not apply), "Add about $X", "Trim about $X", or "No change" when the gap is under 1% of equity (the engine's `RESIZE_BAND`), each with a plain-words tooltip; `.cellWide` in `positions.module.css`. Exit criteria: non-split strategies render exactly as before; for a split-cadence strategy the sentences speak of a monthly pick and a weekly size check and each book order shows Buy / Add / Trim about $X or No change; vitest and tsc green.
+  - **Status**: done
+  - **Plan Set**: `PAPER_SPLIT_CADENCE_PLAN.md` (phase 3 of 3)
+  - **Satisfies**: R6 — Positions page: plain words "picks monthly, adjusts weekly"; on a resize week shows what to trim or top up
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-WEB-10T8.md`
+  - **Completed**: 2026-10-07 01:49
+  - **Method**: /do
+  - **Files**: web/lib/cadence.ts, web/lib/cadence.test.ts, web/app/(app)/positions/page.tsx, web/app/(app)/positions/positions.module.css, web/.workflows/todos.md, web/.workflows/plan/P1-WEB-10T8.md
+  - **Decided**:
+    - Step 3 creates every phase's task -> only phase 3's (web) created; the phase 1 session runs concurrently in the same worktree and owns engine bookkeeping (tie-break: narrower blast radius)
+    - Invariant 1 engine pytest/ruff at end of phase -> not run by this phase: phase 1's in-progress engine edits share the worktree, and this phase changes no engine file (rung 6 / narrower blast radius)
 
 - [x] **P1-WEB-YJSP** Phase 5: Show reasons on the site
   - **Difficulty**: NORMAL

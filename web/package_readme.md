@@ -1,7 +1,7 @@
 # Package: seer-web
 
 **Location**: `web` (Next.js app router; package name `seer-web`, private)
-**Last Updated**: 2026-10-06 (why-this-pick-pipeline phase 5: "Why this pick" falls back to the method's stored facts; "would pick now" rows show theirs; `lib/why.ts`)
+**Last Updated**: 2026-10-07 (P1-WEB-10T8, paper-split-cadence: Positions speaks "picks monthly, sizes weekly" for split-cadence book strategies and shows each order against what is held now; `lib/cadence.ts`)
 
 ## Overview
 
@@ -16,7 +16,7 @@ from a committed JSON snapshot (`data/lab.json`), not from Neon.
 **Key Responsibilities:**
 - Google sign-in locked to exactly one allowlisted account (`auth.ts`, `lib/allow.ts`)
 - One data layer (`lib/data.ts`) that turns rows of all three engines (`bracket`, `book`, `benchmark`) into typed view models
-- Pure, DB-free logic that tests run without a connection: metrics and the go-live checklist (`lib/metrics.ts`), month-by-month paper performance (`lib/monthly.ts`), strategy row helpers (`lib/strategy.ts`), slot letters and card colours (`lib/slots.ts`), session freshness (`lib/session.ts`), number/date formatting (`lib/format.ts`)
+- Pure, DB-free logic that tests run without a connection: metrics and the go-live checklist (`lib/metrics.ts`), month-by-month paper performance (`lib/monthly.ts`), strategy row helpers (`lib/strategy.ts`), split-cadence wording and per-order size change (`lib/cadence.ts`), slot letters and card colours (`lib/slots.ts`), session freshness (`lib/session.ts`), number/date formatting (`lib/format.ts`)
 - Four pages: Today, Positions, History, Leaderboard
 - Sera (`/sera`), the method lab section: gated to one account (`lib/sera/`), its own desktop shell and rail (`app/sera/layout.tsx`, `components/sera/`), a dependency-free SVG chart kit (`components/sera/charts/`), hand-built SVG diagrams for How it works (`components/sera/diagrams/`), and a pure data layer over the bundled lab snapshot `data/lab.json` (`lib/sera/types.ts`, `lab.ts`, `derive.ts`, `glossary.ts`, `markdown.ts`). Pages: Overview, Methods list + detail, Journal, Ideas, How it works; each page keeps its logic in a pure, tested `view.ts` (`overview.ts` for the Overview). See [Sera](#sera-sera)
 - Shared roster UI (`components/StrategySwitch.tsx`, `components/PaperChip.tsx`, `components/roster.ts`): icon-only strategy switching by `?s=` and the paper marker on research strategies' holdings, orders and trades
@@ -89,6 +89,7 @@ web/
     metrics.ts              Snapshot, Metrics, strategyMetrics, gateItem, checklist (pure)
     vetoes.ts               Verdict, Veto, parseVerdict, vetoSheet, checkedLine, headlinesLabel, noCheckLine (pure; P6)
     why.ts                  parseEvidence, Why, whyContent: what a "why" toggle shows     (pure)
+    cadence.ts              SPLIT_CADENCE_RULES, picksMonthlySizesWeekly, RESIZE_BAND, sizeChange, sizeLabel (pure)
     monthly.ts              monthlyTable, monthOf                                  (pure)
     slots.ts                slot letters/sheets, slotCount, cardBg                 (pure)
     session.ts              nextUsSession, isStale, wibDate                        (pure)
@@ -196,6 +197,24 @@ function whyContent(text: string | null | undefined, facts: readonly string[] | 
 
 - `evidence` (migration 009, written by the engine's paper step) is a JSON array of short plain-English facts: the numbers the method used for that pick. The engine's Explain step writes `explanation` from them.
 - `whyContent`: the text when it is non-blank; else the facts (a short list); else `missing`. `WhyToggle` renders it.
+
+### lib/cadence.ts (pure)
+
+```ts
+const SPLIT_CADENCE_RULES: readonly string[];   // 'monthly-rank-weekly-resize', '-tbill', '-frac'
+function picksMonthlySizesWeekly(rulesId: string | null | undefined): boolean;
+const RESIZE_BAND = 0.01;                        // share of paper equity
+type SizeChange = { action: 'buy' | 'add' | 'trim' | 'none'; usd: number };   // usd >= 0, 0 for none
+function sizeChange(weight: number, equity: number, heldUsd: number | null): SizeChange;
+function heldUsd(holdings: readonly { symbol: string; value: number }[]): Map<string, number>;
+function orderSizeChange(weight: number | null, equity: number | null, symbol: string, held: ReadonlyMap<string, number>): SizeChange | null;
+function sizeLabel(c: SizeChange): string;      // 'Buy about $40.00' | 'Add about …' | 'Trim about …' | 'No change'
+function sizeTip(c: SizeChange): string;        // plain-words tooltip
+```
+
+- Split-cadence book strategies pick their stocks on the first session of each month and check how much to hold on the first session of each week (engine `sim/rules.py` `MONTHLY_RANK_WEEKLY_RESIZE*`). `picksMonthlySizesWeekly` keys on `Strategy.rulesId`.
+- `sizeChange`: target = `weight × equity`. Not held -> `buy` the whole target; held and off by less than `RESIZE_BAND × equity` -> `none` (the engine skips such a trade); else `add` / `trim` the gap. Approximate on purpose: the engine sizes at the open's equity, the page at tonight's equity and marks.
+- `orderSizeChange` returns null when the weight or paper equity is unknown; `heldUsd` sums `Holding.value` per symbol.
 
 ### lib/data.ts (server only; every function queries Neon)
 
@@ -334,7 +353,7 @@ timezone never shifts them.
 
 Page consumers:
 - Today: `champion`, `runStatus`, then `picks` and `positions` only for a picks champion (not benchmark, engine `bracket`); actions are holdings with an `orderId`, a `maxDays` and `day >= maxDays`, not dismissed. Any other champion (SPY under D2) shows the no-buys sheet: "Seer recommends no buys", research strategies trade on paper only and their orders live in Positions. `PickCard`'s 'Why this pick' uses the same fallback.
-- Positions: `strategies`, `runStatus`, then `positions(strat)` and `pendingOrders(strat)` for `selectStrategy(roster, ?s)`. Pending orders are skipped (empty `Pending`) for the benchmark and while the run is stale. Holdings split by `Holding.kind` into `BracketCard` (stop/target range, days), `BookCard` (weight, stop/target only when set) and `BenchmarkCard`; cards keyed by `Holding.key`. The orders sheet lists bracket orders by slot or book targets by rank with weight; empty-state copy depends on engine and `Pending.decision`. A paper-step warning shows when `paperStatus !== 'success'` (failed / running / not yet run). `PaperChip` and a "on paper since" line mark `isPaper` strategies. For a `checksNews` bracket strategy (C) with a pending session it also calls `vetoes(strat, session)` and renders `vetoSheet` as a stone "Vetoed tonight" sheet; each vetoed/failed row reuses `WhyToggle` (new optional `label`/`missing` props) as "Why vetoed" / "Why it failed". Every order row's `WhyToggle` gets `facts={o.evidence}`: it shows the explanation, else the facts as a list, else 'unavailable'; C's 'Why it passed the news check' line follows unchanged. For a book strategy between decisions, `bookPreview` feeds 'would pick now'; each row with stored facts has a 'Why it's on the list' toggle showing them (no LLM).
+- Positions: `strategies`, `runStatus`, then `positions(strat)` and `pendingOrders(strat)` for `selectStrategy(roster, ?s)`. Pending orders are skipped (empty `Pending`) for the benchmark and while the run is stale. Holdings split by `Holding.kind` into `BracketCard` (stop/target range, days), `BookCard` (weight, stop/target only when set) and `BenchmarkCard`; cards keyed by `Holding.key`. The orders sheet lists bracket orders by slot or book targets by rank with weight; empty-state copy depends on engine and `Pending.decision`. A paper-step warning shows when `paperStatus !== 'success'` (failed / running / not yet run). `PaperChip` and a "on paper since" line mark `isPaper` strategies. For a `checksNews` bracket strategy (C) with a pending session it also calls `vetoes(strat, session)` and renders `vetoSheet` as a stone "Vetoed tonight" sheet; each vetoed/failed row reuses `WhyToggle` (new optional `label`/`missing` props) as "Why vetoed" / "Why it failed". Every order row's `WhyToggle` gets `facts={o.evidence}`: it shows the explanation, else the facts as a list, else 'unavailable'; C's 'Why it passed the news check' line follows unchanged. For a book strategy between decisions, `bookPreview` feeds 'would pick now'; each row with stored facts has a 'Why it's on the list' toggle showing them (no LLM). For a split-cadence book strategy (`picksMonthlySizesWeekly(strat.rulesId)`) the empty-state, no-orders and 'would pick now' sentences say it picks its stocks monthly and checks how much to hold weekly (instead of "rebalances on the first session of each month"), and each book order row adds a full-width `SizeCell` ("Against what it holds now", `.cellWide`): `sizeLabel(orderSizeChange(o.weight, pending.equity, o.symbol, heldUsd(book)))` with `sizeTip` as its tooltip, `—` when paper equity is unknown.
 - History: `strategies`, `closedTrades`, `runStatus`. Filters are `StrategySwitch` over non-benchmark strategies with an `ALL` button (`?s=`, unknown ids read as all) and win/loss icon buttons (`?o=`); defaults are dropped from the URL. Exit-reason icons cover `tp`, `sl`, `time`, `gap`, `signal` (rules said sell, sold at the open) and `forced` (forced close, no more prices), with a fallback for unknown reasons. Rows keyed by `Trade.key`; each shows the strategy tag (`strategyShort`) and a small `PaperChip` when the strategy is paper or missing from the roster.
 - Leaderboard: `leaderboard`, `runStatus`, then `monthly(pick.id, run.sessionDate)`. Every card, chart line and legend entry comes from the roster via `looks`. The big figure is the champion (crowned; SPY today); the second figure is `compare(board.rows).best` — the best research strategy **over the common window** — while the champion is the benchmark, else SPY; with no common window there is no second figure, only `windowLine`'s label. `windowLine` prints under the chart. The checklist and month sheet follow `pick = pickResearch(researchOf(roster), ?s)`; a `StrategySwitch` over research strategies shows when there are two or more (SPY is not selectable here, it is the SPY column). Checklist is `checklist(pick.metrics, spyOverSpan(spy.curve, pick.curve), pick.strategy.gate)` scored by `scoreOf`; the gate's `note` prints under it. "Month by month" lists the since-start row then months newest first, with a `CircleDashed` partial-month marker while the next session is in that month.
 
@@ -432,6 +451,7 @@ window lacks two month starts.
 - The Leaderboard never ranks on raw total return: with promotable strategies the paper starts differ, so `compare` ranks only over the sessions the live strategies share and `windowLine` always says which. `MIN_COMMON_SESSIONS` / `MIN_RANKED` and the rank key must stay equal to `engine/src/seer_engine/paper/compare.py`'s — the port is only honest while it tracks the engine.
 - A retired strategy is excluded, not hidden: it keeps every snapshot, its card, its chart line and its month sheet, and is dropped only from the window and from "best", so a retirement can never shorten the living strategies' comparison.
 - Seer ships paper-only (2026-10-04): `isPaper` strategies are research, never a buy recommendation. Today never shows their orders; Positions and History mark them with `PaperChip`.
+- `RESIZE_BAND` in `lib/cadence.ts` must equal the engine's `RESIZE_BAND` (`engine/src/seer_engine/sim/rules.py`), and `SPLIT_CADENCE_RULES` must list every split-cadence `rules_id`; a new variant missing there falls back to the monthly-rebalance wording and loses its size cell. The page's dollar figures are estimates at tonight's marks, not the engine's fill sizes.
 - Positions defaults to the first research strategy, not the champion: with SPY as champion, `selectStrategy` skips the benchmark unless `?s=` asks for it.
 - `StrategySwitch` takes `href` as a function, so it must stay a server component (functions cannot cross into a client component).
 - Sera access is two locks: sign-in still needs `ALLOWED_EMAIL`, and `/sera` additionally needs `SERA_EMAIL` (hard-coded). Any other signed-in account gets a 404, not a denial page, by design.

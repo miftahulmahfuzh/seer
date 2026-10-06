@@ -43,11 +43,10 @@ jobs:
       MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
       DRY_RUN: ${{ inputs.dry_run == true }}
       PYTHONUNBUFFERED: '1'
-      # Paper trading paused by the owner (2026-10-07) until paper can run split-cadence rules
-      # (docs/handover/2026-10-07-paper-split-cadence.md) and RM is replaced, so every roster
-      # strategy starts its paper record on the same day. Bars (Migrate, Nightly) keep running.
-      # Set to 'false' to resume: the next night starts every clock (kickoff on day one).
-      PAPER_PAUSED: 'true'
+      # Paper trading switch. Paused 2026-10-07 until paper could run split-cadence rules and RM was
+      # replaced by RMW; resumed the same day so every roster strategy starts on the same night.
+      # 'true' skips Veto, Paper, Paper check and Explain; Migrate and Nightly (bars) always run.
+      PAPER_PAUSED: 'false'
     steps:
       - name: Check secrets
         run: |

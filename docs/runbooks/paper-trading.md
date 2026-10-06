@@ -280,13 +280,20 @@ headline count) and a line "`n` checked · `k` allowed".
 `paper` never fails because of C's verdicts, and `paper_check` replays C from exactly the rows Paper
 used.
 
-### Paper trading is paused (2026-10-07)
+### Paper trading was paused, then resumed with RMW (2026-10-07)
 
 The owner paused the paper steps until paper can run split-cadence rules and RM is replaced by the
 weekly-brake book (docs/handover/2026-10-07-paper-split-cadence.md), so every roster strategy starts
 on the same day. `nightly.yml` sets `PAPER_PAUSED: 'true'` in the job env: Veto, Paper, Paper check
 and Explain are skipped; Migrate and Nightly (bars) still run. No paper clock had started. To
 resume, set it to `'false'`, commit and push: the next night starts every clock, with the kickoff.
+
+Resumed the same day (`PAPER_PAUSED: 'false'`) once split-cadence paper landed (merge 97374a8)
+and RMW-FR (lab M0022-W-TV16: RM's book with its one-month volatility brake read weekly at a 16%
+limit, `monthly-rank-weekly-resize-frac`) replaced RM-FR via `promote --method M0022 --candidate
+M0022-W-TV16 --fractional --retire RM-FR --lab-status-stays` (011 writes the same row elsewhere).
+The active roster: SPY, A, C, F4-MOM12-N20-TREND-FR, F1-SPY-SMA200-M-FR, RMW-FR, all starting on
+the same night. The pause switch stays in `nightly.yml` for next time.
 
 ### The paper books start with 10,000,000 IDR (2026-10-07)
 

@@ -85,30 +85,30 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "0b4a5f9",
       "depends_on": [
         2
       ],
       "difficulty": "NORMAL",
       "n": 5,
-      "note": null,
+      "note": "Why this pick = LLM text, else stored facts list; would-pick-now facts toggle; to_jsonb guard; would-pick-now not seen live (no prod previews yet)",
       "package": "web",
       "plan": ".workflows/plan/why-this-pick-pipeline/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-06T15:35:07+00:00",
       "satisfies": [
         "R5",
         "R6",
         "R8"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-YJSP",
       "title": "Show reasons on the site"
     }
   ],
   "plan": "/home/miftah/.worktrees/seer/why-this-pick-pipeline/.workflows/orchestration/why-this-pick-pipeline/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "why-this-pick-pipeline",
-  "updated": "2026-10-06T15:33:32+00:00",
+  "updated": "2026-10-06T15:35:07+00:00",
   "verified_at": "2026-10-06T15:21:41+00:00",
   "worktree": "/home/miftah/.worktrees/seer/why-this-pick-pipeline"
 }

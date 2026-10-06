@@ -3,6 +3,12 @@
   "coordinator": "orch-paper-split-cadence",
   "coordinator_session_id": "8b77acbf-fe54-41dc-9fdc-eecb5142b4ce",
   "created": "2026-10-06T18:47:06+00:00",
+  "landed": {
+    "at": "2026-10-06T19:01:13+00:00",
+    "base": "main",
+    "commit": "97374a8a70eb4087f487fda00c84966e8721cd21",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -66,7 +72,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/paper-split-cadence/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "paper-split-cadence",
-  "updated": "2026-10-06T19:00:25+00:00",
+  "updated": "2026-10-06T19:01:13+00:00",
   "verified_at": "2026-10-06T18:50:51+00:00",
   "worktree": "/home/miftah/.worktrees/seer/paper-split-cadence"
 }

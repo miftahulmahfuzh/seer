@@ -41,7 +41,8 @@ export default async function Positions({ searchParams }: { searchParams: Promis
   const invested = book.reduce((a, p) => a + (p.weight ?? 0), 0);
   const holdsBook = strat?.engine === 'book' || strat?.engine === 'benchmark';
   const paper = !!strat && strat.isPaper;
-  const paperWarn = !!run.sessionDate && run.paperStatus !== 'success';
+  // No warning for a strategy whose paper clock has not started (a paused or not-yet-run paper night).
+  const paperWarn = !!run.sessionDate && run.paperStatus !== 'success' && !!strat?.paperStart;
   const StratIcon = strat ? strategyIcon(strat.icon) : Landmark;
   const href = (id: string) => `/positions?s=${encodeURIComponent(id)}`;
   const [noneTitle, noneSub] = emptyState(strat);

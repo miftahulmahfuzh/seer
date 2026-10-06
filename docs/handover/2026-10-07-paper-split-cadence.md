@@ -106,6 +106,16 @@ Nothing here changes what any current roster strategy does. Every roster entry t
    split-cadence candidate must paper-trade end to end; add a test that promotes one into a test
    database and runs nights.
 
+8. **Paper is paused until this lands, and resumes with the roster swap.** The owner paused the
+   paper steps on 2026-10-07 (`.github/workflows/nightly.yml`, job env `PAPER_PAUSED: 'true'`;
+   Veto, Paper, Paper check and Explain are skipped, bars keep loading) so every roster strategy
+   starts its paper record on the same day. No paper clock has started yet. After this work
+   lands: promote M0022's `W-TV16` variant fractionally in place of `RM-FR`
+   (`promote --method M0022 --candidate M0022-W-TV16 --fractional --retire RM-FR
+   --lab-status-stays`, plus its RESOLVER and EVIDENCE entries; the owner's decision of
+   2026-10-07), then set `PAPER_PAUSED: 'false'`. If this work stalls for more than a few days,
+   resume without waiting: forward paper days are the scarce resource.
+
 ## 5. Questions the analysis must settle
 
 - Does the evidence path (`strategies/evidence.py`, Explain) need anything for a resize-only night?

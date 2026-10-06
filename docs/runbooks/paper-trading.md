@@ -280,6 +280,14 @@ headline count) and a line "`n` checked · `k` allowed".
 `paper` never fails because of C's verdicts, and `paper_check` replays C from exactly the rows Paper
 used.
 
+### Paper trading is paused (2026-10-07)
+
+The owner paused the paper steps until paper can run split-cadence rules and RM is replaced by the
+weekly-brake book (docs/handover/2026-10-07-paper-split-cadence.md), so every roster strategy starts
+on the same day. `nightly.yml` sets `PAPER_PAUSED: 'true'` in the job env: Veto, Paper, Paper check
+and Explain are skipped; Migrate and Nightly (bars) still run. No paper clock had started. To
+resume, set it to `'false'`, commit and push: the next night starts every clock, with the kickoff.
+
 ### The paper books start with 10,000,000 IDR (2026-10-07)
 
 Every paper book starts with `paper.capital.PAPER_INITIAL_IDR` = 10,000,000 IDR, the owner's own

@@ -43,6 +43,11 @@ jobs:
       MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
       DRY_RUN: ${{ inputs.dry_run == true }}
       PYTHONUNBUFFERED: '1'
+      # Paper trading paused by the owner (2026-10-07) until paper can run split-cadence rules
+      # (docs/handover/2026-10-07-paper-split-cadence.md) and RM is replaced, so every roster
+      # strategy starts its paper record on the same day. Bars (Migrate, Nightly) keep running.
+      # Set to 'false' to resume: the next night starts every clock (kickoff on day one).
+      PAPER_PAUSED: 'true'
     steps:
       - name: Check secrets
         run: |
@@ -86,6 +91,7 @@ jobs:
       # strategies never read it. Nominally about 1 minute. A re-run for a session already
       # checked makes no calls. See docs/runbooks/paper-trading.md (Strategy C: the news check).
       - name: Veto
+        if: ${{ env.PAPER_PAUSED != 'true' }}
         continue-on-error: true
         timeout-minutes: 10
         env:
@@ -99,6 +105,7 @@ jobs:
           python -m seer_engine "${flags[@]}" veto
 
       - name: Paper
+        if: ${{ env.PAPER_PAUSED != 'true' }}
         run: |
           flags=(-v)
           if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
@@ -108,6 +115,7 @@ jobs:
       # replay. Read-only. A mismatch turns the run red (GitHub emails); paper state is already
       # committed and the next night still runs. See docs/runbooks/paper-trading.md.
       - name: Paper check
+        if: ${{ env.PAPER_PAUSED != 'true' }}
         id: paper_check
         run: |
           flags=(-v)
@@ -118,7 +126,7 @@ jobs:
       # leave the text NULL ("unavailable" in the app). Runs after a red Paper check too, but
       # not after a failed Nightly or Paper.
       - name: Explain
-        if: ${{ success() || steps.paper_check.outcome == 'failure' }}
+        if: ${{ env.PAPER_PAUSED != 'true' && (success() || steps.paper_check.outcome == 'failure') }}
         continue-on-error: true
         env:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}

@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
 
 type Search = { s?: string };
 
-const NO_PENDING: Pending = { sessionDate: null, decision: false, orders: [] };
+const NO_PENDING: Pending = { sessionDate: null, decision: false, orders: [], equity: null };
 const NO_PREVIEW: Preview = { dataDate: null, picks: [] };
 
 export default async function Positions({ searchParams }: { searchParams: Promise<Search> }) {
@@ -64,7 +64,11 @@ export default async function Positions({ searchParams }: { searchParams: Promis
               {strat?.name ?? '—'}
             </span>
           </div>
-          {strat && <StrategySwitch strategies={roster} current={strat.id} href={href} label="Strategy" />}
+          {strat && (
+            // Retired strategies hold nothing and place nothing: only the one asked for by link is kept.
+            <StrategySwitch strategies={roster.filter(r => r.status !== 'retired' || r.id === strat.id)} current={strat.id}
+              href={href} label="Strategy" />
+          )}
           <div className={s.stats}>
             <div className={`${s.stat} ${pnl < 0 ? 'neg' : 'pos'}`}>
               <span className={`num ${s.big}`}>{signedUsd(pnl)}</span>
@@ -118,7 +122,7 @@ export default async function Positions({ searchParams }: { searchParams: Promis
             ) : (
               <ul className={s.orderList}>
                 {pending.orders.map(o => (
-                  <OrderRow key={o.key} o={o} passed={checks.find(v => v.symbol === o.symbol && v.verdict === 'allow')} />
+                  <OrderRow key={o.key} o={o} equity={pending.equity} passed={checks.find(v => v.symbol === o.symbol && v.verdict === 'allow')} />
                 ))}
               </ul>
             )}
@@ -386,7 +390,7 @@ function WouldPick({ st, preview }: { st: Strategy; preview: Preview }) {
   );
 }
 
-function OrderRow({ o, passed }: { o: PendingOrder; passed?: Veto }) {
+function OrderRow({ o, equity, passed }: { o: PendingOrder; equity: number | null; passed?: Veto }) {
   const cells: [string, string][] = o.kind === 'bracket'
     ? [
         ['Limit', o.limit === null ? '—' : usd(o.limit)],
@@ -396,9 +400,12 @@ function OrderRow({ o, passed }: { o: PendingOrder; passed?: Veto }) {
       ]
     : [
         ['Weight', o.weight === null ? '—' : pct(o.weight, 1)],
+        // What the weight buys at tonight's equity; the open's equity sizes the real order.
+        ['About', o.weight === null || equity === null ? '—' : usd(o.weight * equity)],
         ['Limit', o.limit === null ? 'Open' : usd(o.limit)],
-        ['Stop', o.sl === null ? '—' : usd(o.sl)],
-        ['Target', o.tp === null ? '—' : usd(o.tp)],
+        o.sl === null && o.tp === null
+          ? ['Exit', 'Monthly']
+          : ['Stop', o.sl === null ? '—' : usd(o.sl)],
       ];
   return (
     <li className={s.order}>

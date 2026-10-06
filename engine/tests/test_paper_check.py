@@ -46,9 +46,13 @@ PAPER_START = date(2026, 10, 26)
 LAST = date(2026, 11, 3)
 DAY0 = date(2026, 10, 23)
 NOV2 = date(2026, 11, 2)
-F4 = "F4-MOM12-N20-TREND"
-F1 = "F1-SPY-SMA200-M"
-ROSTER_IDS = ("SPY", "A", F4, F1, "C", "FND")
+F4 = "F4-MOM12-N20-TREND-FR"
+F1 = "F1-SPY-SMA200-M-FR"
+# The active roster (the strategies a night steps), and every row in sort order: the whole-share
+# F4, F1 and FND are retired by 010 and never start in these worlds, but stay on the board.
+ROSTER_IDS = ("SPY", "A", "C", F4, F1, "FND-FR")
+RETIRED_IDS = ("F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "FND")
+ALL_IDS = ("SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND", F4, F1, "FND-FR")
 
 
 # ---- the synthetic world -----------------------------------------------------------------------
@@ -167,7 +171,7 @@ def test_paper_check_is_a_command():
 
 def test_fresh_database_reports_every_strategy_not_started(pg):
     found = results(pg)
-    assert tuple(found) == ROSTER_IDS
+    assert tuple(found) == ALL_IDS
     assert {r.status for r in found.values()} == {"not-started"}
     assert paper_check.execute(pg) == 0
     assert paper_check.execute(pg, require_sessions=1) == 1
@@ -254,35 +258,35 @@ TAMPERS = [
         id="open-mark",
     ),
     pytest.param(
-        "UPDATE book_positions SET shares = shares + 1 WHERE strategy_id = 'F1-SPY-SMA200-M' AND symbol = 'SPY'",
+        "UPDATE book_positions SET shares = shares + 1 WHERE strategy_id = 'F1-SPY-SMA200-M-FR' AND symbol = 'SPY'",
         F1,
         "position SPY: shares stored",
         id="position",
     ),
     pytest.param(
         "UPDATE book_targets SET weight = weight / 2 "
-        "WHERE strategy_id = 'F4-MOM12-N20-TREND' AND session_date = DATE '2026-11-02' AND rank = 1",
+        "WHERE strategy_id = 'F4-MOM12-N20-TREND-FR' AND session_date = DATE '2026-11-02' AND rank = 1",
         F4,
         "target 2026-11-02 rank 1: weight stored",
         id="target",
     ),
     pytest.param(
         "UPDATE book_fills SET price = price + 0.01 "
-        "WHERE strategy_id = 'F4-MOM12-N20-TREND' AND session_date = DATE '2026-11-02' AND seq = 1",
+        "WHERE strategy_id = 'F4-MOM12-N20-TREND-FR' AND session_date = DATE '2026-11-02' AND seq = 1",
         F4,
         ": price stored",
         id="fill",
     ),
     pytest.param(
         "INSERT INTO book_trades (strategy_id, symbol, entry_date, exit_date, entry_price, exit_price, days_held, "
-        "cost_usd, income_usd, pnl_usd, exit_reason, idle) VALUES ('F4-MOM12-N20-TREND', 'S00', "
+        "cost_usd, income_usd, pnl_usd, exit_reason, idle) VALUES ('F4-MOM12-N20-TREND-FR', 'S00', "
         "DATE '2026-11-03', DATE '2026-11-03', 10, 11, 1, 0.02, 0, 0.98, 'signal', false)",
         F4,
         "in the database, not in the replay",
         id="trade",
     ),
     pytest.param(
-        "UPDATE paper_state SET pending_decision = NOT pending_decision WHERE strategy_id = 'F1-SPY-SMA200-M'",
+        "UPDATE paper_state SET pending_decision = NOT pending_decision WHERE strategy_id = 'F1-SPY-SMA200-M-FR'",
         F1,
         "paper_state: pending_decision stored",
         id="pending-decision",
@@ -347,7 +351,8 @@ def test_unapplied_split_is_ignored(stepped):
             "VALUES ('SPY', %s, 1, 2, false)",
             (LAST,),
         )
-    assert {r.status for r in results(stepped).values()} == {"ok"}
+    found = results(stepped)
+    assert {found[sid].status for sid in ROSTER_IDS} == {"ok"}
 
 
 def test_paper_start_without_state_is_a_mismatch(stepped):
@@ -383,7 +388,7 @@ def test_the_replay_passes_over_a_window_containing_a_retirement(world):
         night(world, d)
 
     found = results(world)
-    assert tuple(found) == ROSTER_IDS  # retired, but still on the board and still checked
+    assert tuple(found) == ALL_IDS  # retired, but still on the board and still checked
     assert found["A"].status in ("ok", "split-affected"), text(found)
     assert found["A"].last_session == last_traded
     assert found["SPY"].last_session == LAST

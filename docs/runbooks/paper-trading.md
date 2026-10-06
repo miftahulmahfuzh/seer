@@ -280,6 +280,19 @@ headline count) and a line "`n` checked · `k` allowed".
 `paper` never fails because of C's verdicts, and `paper_check` replays C from exactly the rows Paper
 used.
 
+### F4, F1 and FND trade fractional shares (migration 010)
+
+The owner verified on 2026-10-07 that Gotrade takes fractional **limit** buys and sells (its
+take-profit/stop-loss order needs whole shares, which only A and C use). In whole shares a
+10,000,000 IDR book could not hold most of F4's and FND's 20 targets (about $55 each), and F1 could
+hold one SPY share of its $1,116. So the same three methods run under `monthly-hold-frac`
+(`monthly-hold` with `fractional=True`) as new roster ids `F4-MOM12-N20-TREND-FR`,
+`F1-SPY-SMA200-M-FR` and `FND-FR`, and 010 retires the whole-share three (one session in cash, no
+trade; their rows stay). F4 and F1 stay the registry candidates: `roster._registered` accepts rules
+that differ from the candidate's in the share granularity only. Positions shows each book order's
+weight and about how many dollars it buys at the strategy's paper equity. `paper_check
+--require-sessions N` no longer counts a retired strategy short.
+
 ### Book strategies kick off on day one (migration 008)
 
 A book strategy (F4, F1, FND) ranks on its cadence (monthly-hold: the first session of each month).

@@ -11,6 +11,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import json
 from datetime import date, timedelta
 
@@ -45,7 +47,7 @@ from seer_engine.paper.roster import (
     spec_text,
     strategy_params,
 )
-from seer_engine.sim.rules import DESIGN_V0, MONTHLY_HOLD
+from seer_engine.sim.rules import DESIGN_V0, MONTHLY_HOLD, MONTHLY_HOLD_FRAC
 from seer_engine.strategies.a import STRATEGY_A, STRATEGY_A_PARAMS
 from seer_engine.strategies.c import (
     FROZEN_MODEL,
@@ -63,6 +65,11 @@ from seer_engine.strategies.f_index import TIMING
 F4 = "F4-MOM12-N20-TREND"
 F1 = "F1-SPY-SMA200-M"
 FND = "FND"
+F4_FR = "F4-MOM12-N20-TREND-FR"
+F1_FR = "F1-SPY-SMA200-M-FR"
+FND_FR = "FND-FR"
+RETIRED = (F4, F1, FND)  # the whole-share three, retired by 010 when their fractional twins joined
+ACTIVE_IDS = ("SPY", "A", "C", F4_FR, F1_FR, FND_FR)
 
 PINS = {
     "SPY": "ca309ea7f19d0b771f236c63309a2fcf28a82e16048528d738dc329a42d4d198",
@@ -74,6 +81,11 @@ PINS = {
     # fundamentals, top 20, equal sizing, under monthly-hold. The five values above are
     # unchanged, byte for byte: adding an entry must never re-digest a started strategy.
     FND: "4a9dacc37478bf4d17b3ba35cbebd9e0c3f8759f122c4596f7cd9d076d8ef530",
+    # 010: the same three methods under monthly-hold-frac. New ids, new digests; the six above
+    # are unchanged byte for byte.
+    F4_FR: "2dc26f634daf8efb161a087ab8f3a915044e6836b2a7d3cbdff477528aafa928",
+    F1_FR: "a5e4239e12c720636707059c5bddb776322a47a06caa0ccf69c2519eff9a2d2a",
+    FND_FR: "29f48c9d0e8a8849100208e58290b452bd37e9e133f2ae72030fbb969ac05f19",
 }
 
 FACTOR_PARAMS_AS_DICT = {
@@ -94,8 +106,8 @@ DISPLAY = ("id", "name", "sub", "icon", "is_champion", "is_benchmark", "sort", "
 
 
 def test_the_roster_is_the_handover_entries_in_sort_order():
-    assert ROSTER_IDS == ("SPY", "A", F4, F1, "C", FND)
-    assert [e.sort for e in ROSTER] == [1, 2, 3, 4, 5, 6]
+    assert ROSTER_IDS == ("SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, FND_FR)
+    assert [e.sort for e in ROSTER] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
     assert "B" not in ROSTER_IDS
 
 
@@ -110,7 +122,7 @@ def test_display_fields_equal_the_migration_rows(pg):
 
 
 def test_each_entry_is_the_named_object_params_and_rules():
-    spy, a, f4, f1, c, fnd = (entry(i) for i in ROSTER_IDS)
+    spy, a, f4, f1, c, fnd, f4_fr, f1_fr, fnd_fr = (entry(i) for i in ROSTER_IDS)
     assert (spy.engine, spy.obj, spy.rules, spy.rules_id, spy.params) == ("benchmark", None, None, None, None)
     assert a.engine == "bracket"
     assert a.obj is STRATEGY_A and a.params is STRATEGY_A_PARAMS and a.rules is DESIGN_V0
@@ -126,6 +138,17 @@ def test_each_entry_is_the_named_object_params_and_rules():
     # strategy: it resolves to FUNDAMENTAL by name with its own params (D1, D2).
     assert fnd.engine == "book" and fnd.obj is FUNDAMENTAL and fnd.rules == MONTHLY_HOLD
     assert fnd.object_name == "FUNDAMENTAL" and fnd.registry_id is None
+    # 010: the fractional twins run the same objects and params under monthly-hold-frac. F4 and F1
+    # are the same registry candidates, traded in fractional shares (roster._registered allows a
+    # rule set that differs from the candidate's in the share granularity only).
+    assert f4_fr.obj is FACTOR and f4_fr.params is f4.params and f4_fr.rules is MONTHLY_HOLD_FRAC
+    assert f1_fr.obj is TIMING and f1_fr.params is f1.params and f1_fr.rules is MONTHLY_HOLD_FRAC
+    assert fnd_fr.obj is FUNDAMENTAL and fnd_fr.params is fnd.params and fnd_fr.rules is MONTHLY_HOLD_FRAC
+    assert (f4_fr.object_name, f1_fr.object_name, fnd_fr.object_name) == ("FACTOR", "TIMING", "FUNDAMENTAL")
+    assert (f4_fr.registry_id, f1_fr.registry_id, fnd_fr.registry_id) == (F4, F1, None)
+    assert MONTHLY_HOLD_FRAC.fractional and MONTHLY_HOLD_FRAC == dataclasses.replace(
+        MONTHLY_HOLD, id="monthly-hold-frac", fractional=True
+    )
 
 
 def test_book_entries_are_the_registry_entries_unchanged():
@@ -136,7 +159,8 @@ def test_book_entries_are_the_registry_entries_unchanged():
         c = by_id[e.registry_id]
         assert e.obj is c.allocator
         assert e.params == c.params
-        assert e.rules == c.rules
+        # The rules are the candidate's, or (010) the same rules in fractional shares.
+        assert e.rules == c.rules or dataclasses.replace(e.rules, id=c.rules.id, fractional=False) == c.rules
         assert spec(e)["registry_digest"] == candidate_digest(c)
 
 
@@ -207,7 +231,9 @@ def test_strategy_params_round_trip_through_jsonb(pg):
 
 
 def test_lookbacks():
-    assert {e.id: e.lookback for e in ROSTER} == {"SPY": 1, "A": 200, F4: 253, F1: 200, "C": 200, FND: 20}
+    assert {e.id: e.lookback for e in ROSTER} == {
+        "SPY": 1, "A": 200, F4: 253, F1: 200, "C": 200, FND: 20, F4_FR: 253, F1_FR: 200, FND_FR: 20
+    }
     # FND's lookback is the 20-bar dollar-volume window: a filing's availability is its `filed`
     # date, not a bar count. The roster's longest lookback is still F4's 253.
     assert MAX_LOOKBACK_BARS == 253
@@ -289,7 +315,6 @@ def test_the_roster_c_object_carries_no_verdicts():
 
 # ---- the roster is data (roster-promotion-pipeline phase 1, R2, D2) ------------------------------
 
-import dataclasses  # noqa: E402 - section-local, kept beside the tests that use it
 
 from seer_engine.paper import store  # noqa: E402
 
@@ -376,10 +401,11 @@ def test_from_rows_sorts_by_sort_and_refuses_duplicate_ids():
         from_rows([*SEED_ROWS, dataclasses.replace(SEED_ROWS[1], sort=99)])
 
 
-def test_the_seed_roster_is_all_active_with_no_paper_end():
-    assert all(e.status == "active" and e.paper_end is None for e in ROSTER)
-    assert active(ROSTER) == ROSTER
-    assert active() == ROSTER
+def test_the_seed_roster_retires_the_whole_share_three_with_no_paper_end():
+    assert {e.id for e in ROSTER if e.status == "retired"} == set(RETIRED)
+    assert all(e.paper_end is None for e in ROSTER)  # the paper night stamps paper_end
+    assert tuple(e.id for e in active(ROSTER)) == ACTIVE_IDS
+    assert active() == active(ROSTER)
 
 
 def test_active_drops_retired_entries_and_keeps_order():
@@ -389,7 +415,7 @@ def test_active_drops_retired_entries_and_keeps_order():
     )
     entries = from_rows(rows)
     assert [e.id for e in entries] == list(ROSTER_IDS)  # retired rows are never dropped from the roster
-    assert [e.id for e in active(entries)] == ["SPY", F4, F1, "C", FND]
+    assert [e.id for e in active(entries)] == ["SPY", "C", F4_FR, F1_FR, FND_FR]
     a = next(e for e in entries if e.id == "A")
     assert (a.status, a.paper_end) == ("retired", date(2026, 10, 2))
 
@@ -425,7 +451,8 @@ def test_the_database_rows_rebuild_the_roster_with_the_pinned_digests(pg):
 def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
     rows = {r.id: r for r in store.read_roster_rows(pg)}
     assert [r.id for r in store.read_roster_rows(pg)] == list(ROSTER_IDS)
-    assert all(r.status == "active" and r.paper_end is None for r in rows.values())
+    assert {r.id for r in rows.values() if r.status == "retired"} == set(RETIRED)
+    assert all(r.paper_end is None for r in rows.values())
     # promoted_from defaults to NULL for every row 003/004 seeded; FND is the one row written
     # by a promotion (007_fnd.sql mirrors what `promote --method M0005` writes on the live
     # database), so it is the one row that names its provenance.
@@ -438,7 +465,7 @@ def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
     pg.execute("UPDATE strategies SET status = 'retired', paper_end = %s WHERE id = 'A'", (date(2026, 10, 2),))
     retired = {r.id: r for r in store.read_roster_rows(pg)}["A"]
     assert (retired.status, retired.paper_end) == ("retired", date(2026, 10, 2))
-    assert [e.id for e in active(from_rows(store.read_roster_rows(pg)))] == ["SPY", F4, F1, "C", FND]
+    assert [e.id for e in active(from_rows(store.read_roster_rows(pg)))] == ["SPY", "C", F4_FR, F1_FR, FND_FR]
     pg.rollback()
 
 

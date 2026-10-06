@@ -26,7 +26,7 @@ from seer_engine.strategies.c import FROZEN_MODEL, PROMPT_VERSION, STRATEGY_C_PA
 
 UTC = timezone.utc
 C = "C"
-FOUR = ("SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M")
+FOUR = ("SPY", "A", "F4-MOM12-N20-TREND-FR", "F1-SPY-SMA200-M-FR")  # the active book pair since 010
 ALL = FOUR + (C,)
 
 # (session, rank, symbol) -> the stored verdict, or None for no row. Only a tail of the ranked
@@ -307,10 +307,9 @@ def test_c_starts_on_its_first_night_with_its_own_paper_start(world, monkeypatch
         night(world, d, allow_all)
 
     four_start, c_start = session_of(NIGHTS[0]), session_of(NIGHTS[3])
-    assert q(world, "SELECT id, paper_start FROM strategies WHERE id = ANY(%s) ORDER BY sort", (list(ALL),)) == [
-        *[(i, four_start) for i in FOUR],
-        (C, c_start),
-    ]
+    assert q(world, "SELECT id, paper_start FROM strategies WHERE id = ANY(%s) ORDER BY id", (list(ALL),)) == sorted(
+        [*[(i, four_start) for i in FOUR], (C, c_start)]
+    )
     entry = roster.entry(C)
     assert q(world, "SELECT params->>'digest', params->'backtest_gate' FROM strategies WHERE id = %s", (C,)) == [
         (roster.strategy_params(entry)["digest"], roster.backtest_gate(entry))

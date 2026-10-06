@@ -156,8 +156,8 @@ def no_panel() -> Market:
 
 
 def test_fnd_is_the_sixth_roster_entry():
-    assert ROSTER_IDS[-1] == FND_ID == "FND"
-    assert len(ROSTER_IDS) == 6
+    assert ROSTER_IDS[5] == FND_ID == "FND"
+    assert len(ROSTER_IDS) == 9  # 010 appends the fractional F4, F1 and FND
     e = entry(FND_ID)
     assert (e.sort, e.engine, e.rules_id, e.is_champion, e.is_benchmark) == (6, "book", "monthly-hold", False, False)
     assert e.obj is FUNDAMENTAL
@@ -194,7 +194,8 @@ def test_the_resolver_names_fundamental_and_the_seed_row_uses_it():
     assert binding.from_registry is False       # D1: never a backtest.registry entry
     row = next(r for r in SEED_ROWS if r.id == FND_ID)
     assert (row.object_name, row.registry_id, row.rules_id) == ("FUNDAMENTAL", None, "monthly-hold")
-    assert (row.status, row.paper_end, row.gate_applicable) == ("active", None, True)
+    # Retired by 010 for FND-FR, the same method in fractional shares.
+    assert (row.status, row.paper_end, row.gate_applicable) == ("retired", None, True)
 
 
 def test_the_roster_params_equal_the_lab_candidate_promote_writes_from():

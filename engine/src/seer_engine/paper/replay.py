@@ -224,6 +224,7 @@ class CheckResult:
     differences: tuple[Difference, ...] = ()
     total_differences: int = 0
     splits: tuple[tuple[str, date], ...] = ()
+    retired: bool = False  # a retired strategy is exempt from --require-sessions
 
 
 # --------------------------------------------------------------------------- helpers
@@ -678,15 +679,16 @@ def _count(n: int, word: str) -> str:
 
 def failures(results: Sequence[CheckResult], require_sessions: int) -> tuple[str, ...]:
     """Why the check fails, one line per reason (empty: it passes). A mismatch always fails;
-    with ``require_sessions > 0`` so does any strategy that stepped fewer sessions (not started
-    counts as 0). Split-affected never fails by itself."""
+    with ``require_sessions > 0`` so does any active strategy that stepped fewer sessions (not
+    started counts as 0; a retired one stopped on purpose and is exempt). Split-affected never
+    fails by itself."""
     if require_sessions < 0:
         raise ValueError(f"require_sessions must be >= 0, got {require_sessions}")
     out: list[str] = []
     for r in results:
         if r.status == "mismatch":
             out.append(f"{r.strategy_id}: replay mismatch ({_count(r.total_differences, 'difference')})")
-        if require_sessions > 0 and r.sessions < require_sessions:
+        if require_sessions > 0 and r.sessions < require_sessions and not r.retired:
             out.append(f"{r.strategy_id}: {r.sessions} sessions stepped, {require_sessions} required")
     return tuple(out)
 

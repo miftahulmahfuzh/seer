@@ -283,6 +283,8 @@ export type Pending = {
   /** False when a book strategy's next session is not a decision session (it changes nothing), and for SPY. */
   decision: boolean;
   orders: PendingOrder[];
+  /** The strategy's paper equity in USD (paper_state.equity_usd): a book target's weight × this is about what it buys. */
+  equity: number | null;
 };
 
 /** What a strategy will do at the next session: pending bracket orders, or a book decision's targets. */
@@ -290,7 +292,7 @@ export async function pendingOrders(strategyId: string): Promise<Pending> {
   // `to_jsonb(<row>) -> 'evidence'`: NULL, not a query error, before the nightly applies migration 009.
   const [[st], [ps], orders, targets] = await Promise.all([
     sql`SELECT engine, is_benchmark FROM strategies WHERE id = ${strategyId}`,
-    sql`SELECT pending_session::text AS pending_session, pending_decision FROM paper_state WHERE strategy_id = ${strategyId}`,
+    sql`SELECT pending_session::text AS pending_session, pending_decision, equity_usd FROM paper_state WHERE strategy_id = ${strategyId}`,
     sql`SELECT o.id, o.session_date::text AS session_date, o.slot, o.symbol, o.company, o.last_price, o.limit_price, o.tp_price,
         o.sl_price, o.shares, o.explanation, to_jsonb(o) -> 'evidence' AS evidence
       FROM orders o WHERE o.strategy_id = ${strategyId} AND o.status = 'pending' ORDER BY o.session_date, o.slot`,
@@ -299,9 +301,10 @@ export async function pendingOrders(strategyId: string): Promise<Pending> {
       FROM paper_state ps JOIN book_targets t ON t.strategy_id = ps.strategy_id AND t.session_date = ps.pending_session
       WHERE ps.strategy_id = ${strategyId} AND ps.pending_decision ORDER BY t.rank`,
   ]);
-  if (!st) return { sessionDate: null, decision: false, orders: [] };
+  if (!st) return { sessionDate: null, decision: false, orders: [], equity: null };
   const engine = engineOf(st.engine, st.is_benchmark === true);
   const pendingSession = ps ? ymdOrNull(ps.pending_session) : null;
+  const equity = ps ? nn(ps.equity_usd) : null;
 
   if (engine === 'bracket') {
     const items: PendingOrder[] = orders.map(r => ({
@@ -310,7 +313,7 @@ export async function pendingOrders(strategyId: string): Promise<Pending> {
       tp: n(r.tp_price), sl: n(r.sl_price), shares: n(r.shares), weight: null, explanation: r.explanation ?? null,
       evidence: parseEvidence(r.evidence),
     }));
-    return { sessionDate: pendingSession ?? items[0]?.sessionDate ?? null, decision: true, orders: items };
+    return { sessionDate: pendingSession ?? items[0]?.sessionDate ?? null, decision: true, orders: items, equity };
   }
   if (engine === 'book') {
     const items: PendingOrder[] = targets.map(r => ({
@@ -319,9 +322,9 @@ export async function pendingOrders(strategyId: string): Promise<Pending> {
       tp: nn(r.take_price), sl: nn(r.stop_price), shares: null, weight: n(r.weight), explanation: r.explanation ?? null,
       evidence: parseEvidence(r.evidence),
     }));
-    return { sessionDate: pendingSession, decision: ps?.pending_decision === true, orders: items };
+    return { sessionDate: pendingSession, decision: ps?.pending_decision === true, orders: items, equity };
   }
-  return { sessionDate: pendingSession, decision: false, orders: [] };
+  return { sessionDate: pendingSession, decision: false, orders: [], equity };
 }
 
 export type PreviewPick = {

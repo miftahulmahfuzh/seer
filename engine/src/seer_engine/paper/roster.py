@@ -82,7 +82,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from datetime import date
 from decimal import Decimal
 from typing import Any, Literal, Protocol
@@ -106,6 +106,11 @@ BENCHMARK_ID = "SPY"
 F4_ID = "F4-MOM12-N20-TREND"
 F1_ID = "F1-SPY-SMA200-M"
 FND_ID = "FND"
+# The fractional-share versions (2026-10-07): the same methods under monthly-hold-frac. A changed
+# rule set is a new id (frozen roster); the whole-share three above are retired by 010.
+F4_FR_ID = "F4-MOM12-N20-TREND-FR"
+F1_FR_ID = "F1-SPY-SMA200-M-FR"
+FND_FR_ID = "FND-FR"
 
 #: ``object_name`` of the benchmark: ``backtest.benchmark.buy_and_hold``, which is rules, not an object.
 BENCHMARK_OBJECT = "buy_and_hold"
@@ -337,7 +342,10 @@ def _registered(registry_id: str, expected_obj: Allocator, rules: TradeRules) ->
     c = found[0]
     if c.allocator is not expected_obj:
         raise LookupError(f"{registry_id}: registry allocator is <{c.allocator.id}>, expected <{expected_obj.id}>")
-    if c.rules != rules:
+    # A roster entry may trade a registry candidate in fractional shares (010: Gotrade takes
+    # fractional limit orders): its rules may differ from the candidate's in the share granularity
+    # and the id that names it, and in nothing else.
+    if replace(rules, id=c.rules.id, fractional=c.rules.fractional) != c.rules:
         raise LookupError(f"{registry_id}: registry rules are {c.rules.id!r}, expected {rules.id!r}")
     return c.allocator, c.params
 
@@ -496,6 +504,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         object_name="FACTOR",
         registry_id=F4_ID,
         gate_note="P7a dev window only; failed max DD <= 15% (22.2%)",
+        status="retired",
     ),
     RosterRow(
         id=F1_ID,
@@ -510,6 +519,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         object_name="TIMING",
         registry_id=F1_ID,
         gate_note="P7a dev window only; failed max DD <= 15% (18.7%) and >= 100 trades (11)",
+        status="retired",
     ),
     RosterRow(
         id="C",
@@ -541,6 +551,60 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         gate_note=(
             "M0005 dev window only (1996-01-03..2015-10-16, fundamental coverage 0.3151); failed "
             "beats SPY TR (+1.8% vs +351.4%), >= 100 trades (15) and DSR >= 0.95 (0.006)"
+        ),
+        status="retired",
+    ),
+    # 010: the same three methods in fractional shares (Gotrade takes fractional limit orders).
+    RosterRow(
+        id=F4_FR_ID,
+        name="F4 · Momentum",
+        sub="Top 20 by last year's rise, monthly, fractional shares",
+        icon="trending-up",
+        is_champion=False,
+        is_benchmark=False,
+        sort=7,
+        engine="book",
+        rules_id="monthly-hold-frac",
+        object_name="FACTOR",
+        registry_id=F4_ID,
+        gate_note=(
+            "Same method as the whole-share F4: P7a dev window only; failed max DD <= 15% (22.2%). "
+            "Backtested in whole shares; this version trades fractional shares"
+        ),
+    ),
+    RosterRow(
+        id=F1_FR_ID,
+        name="F1 · Trend",
+        sub="SPY above its 200-day average, monthly, fractional shares",
+        icon="shield",
+        is_champion=False,
+        is_benchmark=False,
+        sort=8,
+        engine="book",
+        rules_id="monthly-hold-frac",
+        object_name="TIMING",
+        registry_id=F1_ID,
+        gate_note=(
+            "Same method as the whole-share F1: P7a dev window only; failed max DD <= 15% (18.7%) "
+            "and >= 100 trades (11). Backtested in whole shares; this version trades fractional shares"
+        ),
+    ),
+    RosterRow(
+        id=FND_FR_ID,
+        name="FND · Fundamentals",
+        sub="Top 20 by company filings, monthly, fractional shares",
+        icon="book-open",
+        is_champion=False,
+        is_benchmark=False,
+        sort=9,
+        engine="book",
+        rules_id="monthly-hold-frac",
+        object_name="FUNDAMENTAL",
+        registry_id=None,
+        gate_note=(
+            "Same method as the whole-share FND: M0005 dev window only; failed beats SPY TR "
+            "(+1.8% vs +351.4%), >= 100 trades (15) and DSR >= 0.95 (0.006). Backtested in whole "
+            "shares; this version trades fractional shares"
         ),
     ),
 )

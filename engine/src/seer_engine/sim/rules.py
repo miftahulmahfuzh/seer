@@ -166,6 +166,9 @@ V0_BOOK = replace(DESIGN_V0, id="v0-book", engine="book")
 
 MONTHLY_HOLD = TradeRules(id="monthly-hold", engine="book", cadence="monthly", entry="open_limit", resize=True)
 MONTHLY_HOLD_TBILL = replace(MONTHLY_HOLD, id="monthly-hold-tbill", idle_symbol="BIL")
+# Monthly-hold in fractional shares: Gotrade takes fractional LIMIT buys and sells (owner, 2026-10-07),
+# so a 10,000,000 IDR book can hold every target instead of only the ones a whole share fits.
+MONTHLY_HOLD_FRAC = replace(MONTHLY_HOLD, id="monthly-hold-frac", fractional=True)
 WEEKLY_HOLD = TradeRules(id="weekly-hold", engine="book", cadence="weekly", entry="open_limit", resize=True)
 DAILY_SWITCH = TradeRules(id="daily-switch", engine="book", cadence="daily", entry="open_limit", resize=False)
 DAILY_SWITCH_TBILL = replace(DAILY_SWITCH, id="daily-switch-tbill", idle_symbol="BIL")
@@ -190,6 +193,7 @@ PRESETS: tuple[TradeRules, ...] = (
     SWING_T20_OPEN,
     MONTHLY_RANK_WEEKLY_RESIZE,
     MONTHLY_RANK_WEEKLY_RESIZE_TBILL,
+    MONTHLY_HOLD_FRAC,
 )
 
 

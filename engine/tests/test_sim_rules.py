@@ -99,6 +99,7 @@ def test_preset_ids_are_unique_and_in_order():
         "swing-t20-open",
         "monthly-rank-weekly-resize",
         "monthly-rank-weekly-resize-tbill",
+        "monthly-hold-frac",
     ]
     assert len(set(ids)) == len(ids)
 
@@ -237,7 +238,7 @@ def test_decision_session_rejects_non_sessions_and_bad_types():
 
 def test_owner_inputs_of_the_presets():
     for r in PRESETS:
-        expected = ("etf:BIL",) if r.idle_symbol == "BIL" else ()
+        expected = ("etf:BIL",) if r.idle_symbol == "BIL" else ("fractional",) if r.fractional else ()
         assert rule_owner_inputs(r) == expected, r.id
     assert rule_owner_inputs(V0_BOOK) == ()
 

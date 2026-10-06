@@ -50,11 +50,11 @@ N0 = NIGHTS[0]
 PAPER_START = date(2026, 9, 24)
 OCT1 = date(2026, 10, 1)
 OCT2 = date(2026, 10, 2)
-F4 = "F4-MOM12-N20-TREND"
-F1 = "F1-SPY-SMA200-M"
+F4 = "F4-MOM12-N20-TREND-FR"
+F1 = "F1-SPY-SMA200-M-FR"
 
 ENTRIES = {e.id: e for e in roster.ROSTER}
-IDS = tuple(sorted(ENTRIES))
+IDS = tuple(sorted(e.id for e in roster.active(roster.ROSTER)))  # the whole-share F4, F1, FND are retired (010)
 
 
 # ---- the synthetic world -----------------------------------------------------------------------

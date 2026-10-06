@@ -287,11 +287,15 @@ def test_004_on_a_fresh_schema_adds_c_last_and_the_news_vetoes_table(pg_empty):
         "SELECT id, name, sub, icon, is_champion, is_benchmark, sort, engine, rules_id, params, paper_start "
         "FROM strategies ORDER BY sort"
     ).fetchall()
-    assert [r[0] for r in rows] == ["SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND"]
-    # C is 004's last row; 007_fnd.sql appends FND behind it at sort 6.
+    assert [r[0] for r in rows] == [
+        "SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND",
+        "F4-MOM12-N20-TREND-FR", "F1-SPY-SMA200-M-FR", "FND-FR",
+    ]
+    # C is 004's last row; 007_fnd.sql appends FND behind it at sort 6; 010 the fractional three.
     assert rows[4] == (*C_ROW, {}, None)
-    assert rows[-1][:9] == FND_ROW
-    assert rows[-1][9:] == ({}, None)  # no frozen spec and no paper clock until the first night
+    assert rows[5][:9] == FND_ROW
+    assert rows[5][9:] == ({}, None)  # no frozen spec and no paper clock until the first night
+    assert all(r[9:] == ({}, None) for r in rows[6:])
     assert pg_empty.execute("SELECT id FROM strategies WHERE is_champion").fetchall() == [("SPY",)]
     assert [c for c in _columns(pg_empty) if c[0] == "news_vetoes"] == NEWS_VETOES_COLUMNS
     assert pg_empty.execute("SELECT count(*) FROM news_vetoes").fetchone()[0] == 0

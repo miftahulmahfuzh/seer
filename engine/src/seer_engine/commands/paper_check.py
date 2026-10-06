@@ -22,6 +22,7 @@ least N sessions); exit 1 otherwise. Config errors exit 2 (cli).
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import logging
 from collections.abc import Sequence
 from datetime import date, timedelta
@@ -181,7 +182,11 @@ def _check(conn: psycopg.Connection, entries: Sequence[RosterEntry]) -> tuple[Ch
                 )
                 continue
             results[entry.id] = replay.judge(head, stored[entry.id], expected, splits)
-    return tuple(results[e.id] for e in entries)
+    # A retired strategy stopped stepping on purpose: replayed and judged, never counted short.
+    return tuple(
+        dataclasses.replace(results[e.id], retired=True) if e.status == "retired" else results[e.id]
+        for e in entries
+    )
 
 
 def _disagreement(paper_start: date | None, state: PaperState | None) -> str:

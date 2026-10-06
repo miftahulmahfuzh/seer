@@ -390,22 +390,35 @@ Schedules only run from the default branch (`main`), so nothing is scheduled unt
 
 | Workflow | Trigger | UTC | WIB (UTC+7) | New York |
 |---|---|---|---|---|
-| `nightly.yml` | cron `0 23 * * 1-5` | 23:00 Mon–Fri | 06:00 Tue–Sat | 19:00 EDT / 18:00 EST Mon–Fri |
-| `nightly.yml` retry | cron `0 1 * * 2-6` | 01:00 Tue–Sat | 08:00 Tue–Sat | 21:00 EDT / 20:00 EST Mon–Fri |
+| `nightly.yml` | cron `17 6 * * 2-6` | 06:17 Tue–Sat | 13:17 Tue–Sat | 02:17 EDT / 01:17 EST Tue–Sat |
+| `nightly.yml` retry 1 | cron `41 9 * * 2-6` | 09:41 Tue–Sat | 16:41 Tue–Sat | 05:41 EDT / 04:41 EST Tue–Sat |
+| `nightly.yml` retry 2 | cron `41 12 * * 2-6` | 12:41 Tue–Sat | 19:41 Tue–Sat | 08:41 EDT / 07:41 EST Tue–Sat |
 | `universe.yml` | cron `30 0 * * 1` | 00:30 Mon | 07:30 Mon | 20:30 EDT / 19:30 EST Sun |
 | `backfill.yml` | manual only (`start`, `symbols`, `retry_failed`) | — | — | — |
 | `engine-ci.yml` | push / PR touching `engine/`, `db/`, `web/`, `.github/workflows/` | — | — | — |
 
-- The NYSE close is 20:00 UTC in summer and 21:00 UTC in winter. The engine waits one hour of
-  settle time, so 23:00 UTC is always after it. Half days close earlier and are covered too.
-- GitHub cron often starts late, from minutes to about an hour. The retry slot covers a late
-  start, and it covers Massive publishing late.
+- **The night runs the morning after the session, not the evening of it.** The NYSE close is
+  20:00 UTC in summer and 21:00 UTC in winter, and the engine's one hour of settle time clears
+  it — but the close is not the binding constraint. Massive's plan refuses the grouped
+  aggregate for any date that is still *today* in Eastern time, with HTTP 403
+  `NOT_AUTHORIZED` / "Attempted to request today's data before end of day". Session D unlocks at
+  ET midnight: 04:00 UTC in EDT, 05:00 UTC in EST. Every slot therefore sits after 05:00 UTC, so
+  it holds in both offsets. This is why the original 23:00 / 01:00 UTC pair could never work —
+  19:00 and 21:00 ET are the same ET day as the session.
+- The far edge is the next US open, 13:30 UTC in EDT and 14:30 UTC in EST: picks for session
+  `session_date` must exist before it. `last_completed_session` returns the same `data_date` for
+  any instant between the session's close + settle and the *next* session's close + settle, so
+  anything in the 05:00–13:30 UTC band yields the same correct pair. Half days close earlier
+  and are covered too.
+- GitHub cron often starts late — nominally minutes to about an hour, but this repo has seen
+  5h33m (`universe.yml` asked for 00:30 UTC on 2026-10-05 and ran at 06:03). That is why the
+  minutes are off the hour (`:17`, `:41`) rather than `:00` or `:30`, and why there are two
+  retries: even a badly delayed 06:17 lands before the open, and a lost slot is covered twice.
 - Nightly, universe and backfill share the concurrency group `seer-db-writer`, so only one of
   them writes to Neon at a time. A run that is in progress is never cancelled. While a long
-  backfill runs, a queued 23:00 nightly may be replaced by the 01:00 retry, which does the same
-  work.
-- Weekday holidays (for example Thanksgiving): the run that evening finds the same
-  `session_date` that already succeeded the night before, and exits without writing anything.
+  backfill runs, a queued 06:17 nightly may be replaced by a retry, which does the same work.
+- Weekday holidays (for example Thanksgiving): the run the next morning finds the same
+  `session_date` that already succeeded, and exits without writing anything.
 - **60-day inactivity.** GitHub disables scheduled workflows in a public repo after 60 days
   without repository activity. The nightly job commits nothing, so this *will* happen. GitHub
   emails a warning about a week ahead. Re-enable with
@@ -419,7 +432,8 @@ that row's `session_date` is earlier than the next US session (`web/lib/session.
 
 | Failure | Engine result | Workflow | Web | Fix |
 |---|---|---|---|---|
-| Massive down, 429, or not yet published | run row `failed` + `error`, **no bars** for that date | red; GitHub emails | stale screen (previous session's data) | nothing: the 01:00 retry reuses the failed row. Otherwise `gh workflow run nightly.yml` |
+| Massive down, 429, or not yet published | run row `failed` + `error`, **no bars** for that date | red; GitHub emails | stale screen (previous session's data) | nothing: a retry slot reuses the failed row. Otherwise `gh workflow run nightly.yml` |
+| Nightly run before ET midnight | 403 `NOT_AUTHORIZED` "Attempted to request today's data before end of day", run `failed` | red | stale screen | wait for the scheduled slot; a hand-run before 05:00 UTC always fails this way |
 | Frankfurter down | same as above (FX is part of the nightly transaction) | red | stale screen | same |
 | Secret missing or wrong | "Check secrets" step fails before Python starts, or the connection fails | red | stale screen | Owner steps above |
 | Neon storage full (0.5 GB) | insert fails, run `failed` | red | stale screen | see Storage budget |

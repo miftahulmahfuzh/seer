@@ -2,10 +2,21 @@ name: Nightly
 
 on:
   schedule:
-    # 23:00 UTC Mon-Fri = 06:00 WIB Tue-Sat = 19:00 EDT / 18:00 EST after each US session.
-    - cron: '0 23 * * 1-5'
-    # Retry slot, 01:00 UTC Tue-Sat. No-op when the 23:00 run already succeeded.
-    - cron: '0 1 * * 2-6'
+    # Massive's plan refuses the grouped aggregate for a date that is still *today* in Eastern
+    # time ("Attempted to request today's data before end of day", HTTP 403). The NYSE close is
+    # not the gate the data is: session D only becomes fetchable at ET midnight, i.e. 04:00 UTC
+    # in EDT and 05:00 UTC in EST. So the night's run happens on the morning *after* the session
+    # it reads, not the evening of it, and every slot sits after 05:00 UTC to hold in both
+    # offsets. The far edge is the next US open (13:30 UTC EDT / 14:30 UTC EST): picks for
+    # session D+1 must exist before it. Minutes are off the hour on purpose — GitHub's scheduler
+    # runs hours late on :00 and :30.
+    #
+    # 06:17 UTC Tue-Sat = 13:17 WIB, reading Mon-Fri's session.
+    - cron: '17 6 * * 2-6'
+    # Retry slots, 09:41 and 12:41 UTC (16:41 and 19:41 WIB). Each is a no-op once the session
+    # has succeeded; the last lands before the US open in both EDT and EST.
+    - cron: '41 9 * * 2-6'
+    - cron: '41 12 * * 2-6'
   workflow_dispatch:
     inputs:
       dry_run:

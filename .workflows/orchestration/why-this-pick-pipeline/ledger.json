@@ -3,6 +3,12 @@
   "coordinator": "orch-why-this-pick-pipeline",
   "coordinator_session_id": "01b1810b-045e-4f91-9bf1-daa2f939762a",
   "created": "2026-10-06T14:55:44+00:00",
+  "landed": {
+    "at": "2026-10-06T15:39:08+00:00",
+    "base": "main",
+    "commit": "d9082e87286962fdd2e0cd3fac6ee33955d8971a",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -108,7 +114,7 @@
   "plan": "/home/miftah/.worktrees/seer/why-this-pick-pipeline/.workflows/orchestration/why-this-pick-pipeline/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "why-this-pick-pipeline",
-  "updated": "2026-10-06T15:35:07+00:00",
+  "updated": "2026-10-06T15:39:08+00:00",
   "verified_at": "2026-10-06T15:21:41+00:00",
   "worktree": "/home/miftah/.worktrees/seer/why-this-pick-pipeline"
 }

@@ -6,6 +6,9 @@
                                     run a committed method on the dev window, record its trials;
                                     a method with a MarketAware allocator is refused when the
                                     store's fundamental panel covers less than 80% of the window
+    lab promote M0007               pre-register the best dev-eligible variant by MAR in
+                                    docs/lab/prereg/M0007.md and move the method to promoted;
+                                    commit that file before `lab test` will spend the one look
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
@@ -75,6 +78,17 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
             "the per-year table are printed either way. Only methods with a MarketAware "
             "allocator are gated at all"
         ),
+    )
+
+    s = sub.add_parser(
+        "promote", help="pre-register a dev-eligible method's best variant for the test window"
+    )
+    s.add_argument("method")
+    s.add_argument(
+        "--dir",
+        type=Path,
+        default=None,
+        help="where the pre-registration file goes (default: docs/lab/prereg/ in this checkout)",
     )
 
     s = sub.add_parser("idea", help="queue an idea in the backlog")
@@ -262,6 +276,43 @@ def _run(conn, args) -> int:
     return 0
 
 
+def _promote(conn, args) -> int:
+    """`lab promote M0007`: pre-register the best dev-eligible variant and move it to promoted.
+
+    Writes one markdown file and one status transition. It loads no research store, runs no
+    backtest and inserts no trial, so the test-window look count it prints is the one it found.
+
+    Like every other `lab` subcommand, the global `--dry-run` is ignored: there is no roll-back
+    half of this to show, and a dry run that printed a pre-registration without writing it would
+    be exactly the artefact design §3 exists to prevent.
+    """
+    from seer_engine.lab import prereg
+    from seer_engine.lab.runner import git_head
+
+    done = prereg.promote_method(
+        conn,
+        args.method,
+        git_sha=git_head(config.REPO_ROOT),
+        directory=None if args.dir is None else Path(args.dir),
+    )
+    p = done.prereg
+    rel = prereg.repo_path(done.path)
+    print(f"wrote {rel}" if done.wrote_file else f"{rel} already pre-registers {p.candidate}")
+    print(f"{p.method} is {done.status}" + ("" if done.moved_status else " (already)"))
+    print(f"  candidate      {p.candidate}  (dev trial #{p.dev_trial})")
+    print(f"  config digest  {p.config_digest}")
+    print(f"  dev window     {p.dev_window}  MAR {p.mar}  DSR {p.dsr} at N = {p.n_trials_at_run}")
+    print(f"  test window    {p.test_window}")
+    print(f"  gate           {p.gate}")
+    print()
+    print(f"Commit and push {rel} before the look is spent (design §3):")
+    print(f"    git add {rel}")
+    print(f"    git commit -m 'lab: pre-register {p.candidate} for the test window'")
+    print(f"    python -m seer_engine lab test {p.candidate}")
+    print(f"\ntest-window looks used: {store.test_looks(conn)}")
+    return 0
+
+
 def _idea(conn, args) -> int:
     store.begin_immediate(conn)  # the next id and its insert, atomic against parallel sessions
     with conn:
@@ -376,6 +427,7 @@ _HANDLERS = {
     "status": _status,
     "show": _show,
     "run": _run,
+    "promote": _promote,
     "idea": _idea,
     "note": _note,
     "block": _block,

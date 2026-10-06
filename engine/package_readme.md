@@ -34,6 +34,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - Promotion: the lab reaches the roster by command (roster-promotion-pipeline, phase 5): `commands/promote.py` turns a lab method's pre-registered `Candidate` into a `strategies` row (`status='active'`, `promoted_from=<method id>`, `registry_id` NULL, the full contract-C2 `params`, and **no** `paper_start` — the next paper night starts the clock the ordinary way, so a promoted strategy's record begins at its promotion). The row is read back and rebuilt through `roster.from_row` inside the same transaction, so a row the night would refuse never commits; `--retire <id>` runs phase 2's `store.retire` in that transaction, making a swap atomic. `lab/store.py` gains `record_promotion` (an append-only, idempotent lab note, moving the method's status only along the existing `('test-passed','paper')` edge) and `PROMOTION_MARKER`. `backtest/registry.py` is deliberately never touched (Decisions D1)
 - Honest comparison (roster-promotion-pipeline, phase 3): `paper/compare.py` is the pure, common-window, risk-adjusted comparison of the paper equity curves — every ranked figure is computed over the one window every ranked strategy shares (the intersection of snapshot dates, not `[max(start), min(end)]`), the window travels with the figures, inception-to-date is carried separately and never ranked, and a strategy that cannot join the window is an explicit `insufficient` row with a reason rather than a silent omission. The read-only `compare` command is its one impure edge
 - `FND` joins the roster (roster-promotion-pipeline, phase 6): a sixth entry, `FND · Fundamentals` (top 20 by SEC filing factors, monthly; `object_name = 'FUNDAMENTAL'`, `rules_id = 'monthly-hold'`, the book engine, `sort = 6`, `promoted_from = 'M0005'`, `registry_id` NULL), seeded by migration 007 and put on the live board by phase 5's `promote --method M0005 --candidate M0005-ALL --id FND --lab-status-stays` — the first promotion through the new lab → roster path rather than around it. Its `gate_note` says out loud that it **failed** its M0005 dev-window gate: passing a backtest gate has never been this roster's admission criterion (Decisions D5), and the gate binds the real-money decision, not paper membership. It is also the roster's first `MarketAware` object, which is why `paper/book.py` and `paper/replay.py` gained the prepared dispatch below. The five pre-existing spec digests are unchanged and `MAX_LOOKBACK_BARS` is still 253
+- Pre-registration, the half a database cannot enforce (build-promotion-path, phase 3): the lab gets **one** look at the test window per configuration, and `UNIQUE(config_digest, window)` on `trials` enforces the *count* but not *which* configuration the look is spent on. `lab/prereg.py` owns the committed file that does — `docs/lab/prereg/MNNNN.md`, a strict `key: value` block then prose — with its writer, its parser (`parse(render(p, name)) == p` exactly) and the gate `lab test` calls before it looks (`require_committed`, `check_digest`). `lab promote <method>` writes that file for the method's best dev-eligible variant by MAR (`lab.store.best_dev_eligible`) and moves the method `dev-eligible -> promoted`; it loads no research store, runs no backtest and inserts no `trials` row, so pre-registering costs no look. A pre-registration is written once and never rewritten: a better variant found later is a new method with its own dev trials, not an edit to the file
 
 ## Layout
 
@@ -117,6 +118,14 @@ engine/
       panel.py              Fact, Snapshot, FundamentalPanel.as_of(symbol, t) -> Snapshot (the one read surface), EMPTY_PANEL (what Market.fundamentals defaults to), FACT_COLUMNS (the 12-column projection contract)
                             filed <= t only, never period_end; tiebreak (filed desc, rung asc, accn desc) per period; restatements preserved, never overwritten; flow metrics annual, not TTM; gross profit reported -> derived (Revenues - CostOfRevenue, same fiscal period end) -> none, never zero, never partial
       sue.py                standardized unexpected earnings on the seasonal random walk EPS_q - EPS_{q-4}, scaled by the dispersion of prior surprises; MIN_QUARTERS = 9
+    lab/                    the method lab (docs/plans/2026-10-04-method-lab-design.md); only store.py and prereg.py touch the disk
+      __init__.py           docstring only
+      method.py             a lab method file: METHOD, Candidate, METHOD_ID, discover(), config_digest(), source_sha()
+      store.py              lab/lab.sqlite: committed and append-only; methods, trials, ideas, insights; TRANSITIONS, record_promotion(), best_dev_eligible() (build-promotion-path phase 3)
+      runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head()
+      prereg.py             the docs/lab/prereg/MNNNN.md pre-registration: Prereg, render()/parse(), require_committed(), check_digest(), check_source(), promote_method() (build-promotion-path phase 3)
+      seed.py               one-time import of the pre-lab record (P7a's 54 candidates)
+      methods/              one file per method, mNNNN_<slug>.py exporting METHOD
     commands/
       __init__.py           command-module contract
       migrate.py            `migrate` command
@@ -126,6 +135,7 @@ engine/
       backtest_b.py         `backtest_b` command (P6a)
       research_store.py     `research_store` command (P7a)
       backtest_dev.py       `backtest_dev` command (P7a)
+      lab.py                `lab` command: the method lab (status / show / run / promote / idea / note / insight / stage / export ...)
       nightly.py            `nightly` command (P1; P4 adds dividends and held paper symbols)
       paper.py              `paper` command (P4)
       paper_check.py        `paper_check` command (P4)
@@ -139,6 +149,7 @@ engine/
   .research/                gitignored; the P7a research store: bars.csv, dividends.csv, fx.csv, unserved.csv, manifest.json (research_store), plus the optional fundamentals.csv (--with-fundamentals)
 docs/backtests/             committed reports: <end>-strategy-a{.md,-equity.csv,-equity.svg} (P3); <end>-strategy-a2-walkforward{.md,-equity.csv,-equity.svg,-variants.svg,-grid.csv} (P3b); <end>-strategy-b-walkforward{.md,-equity.csv,-equity.svg} (P6a); <run date>-p7a-dev-exploration{.md,-rows.csv,-curves.csv,-frontier.svg} (P7a)
 docs/plans/                 <run date>-p7b-preregistration.md: the P7b finalists (or "none eligible"), written by backtest_dev (P7a)
+docs/lab/prereg/            committed pre-registrations, one MNNNN.md per promoted method, written by `lab promote`; README.md documents the format (build-promotion-path phase 3)
 db/migrations/002_engine.sql  (outside the package, owned by it)
 db/migrations/003_paper.sql   (outside the package; paper state, book tables, dividends, roster rows; P4)
 db/migrations/004_news_veto.sql (outside the package; the C roster row and news_vetoes; P6)
@@ -526,6 +537,53 @@ change.
 - **Exit codes**: 0 when a comparison was produced; with `--require-window`, 1 when no window of
   `--min-sessions` sessions exists (useful in CI, and the honest answer for a young board); 2 for a
   missing setting.
+
+### `lab promote` (build-promotion-path phase 3)
+
+```
+python -m seer_engine lab promote M0007 [--dir PATH]
+```
+
+Method lab design §3 in one command: it pre-registers a method's best dev-eligible variant for the
+test window and moves the method `dev-eligible -> promoted`. It loads no research store, runs no
+backtest and inserts no `trials` row, so `store.test_looks` reads the same after it as before —
+pre-registering costs no look.
+
+- **Which variant**: `lab.store.best_dev_eligible(conn, method_id)` — the highest `mar` among that
+  method's `window = 'dev'`, `eligible = 1` trials, ties broken on the trial number. "One variant per
+  method" is a property of that query, not of the caller. A test trial is never a candidate: letting
+  one back in would let a test number decide what gets tested.
+- **What it writes**: `docs/lab/prereg/M0007.md` (`--dir` relocates it, for tests), one dated
+  `# Pre-registration` section appended to the method's `analysis`, one `insights` row of kind
+  `observation`, and the status transition. The file is written **first**, inside the write lock, and
+  the status moves second in the same transaction — the file write is not rolled back, and that
+  asymmetry is the point. A crash between them leaves a pre-registration for a method still reading
+  `dev-eligible`, which a re-run finishes, rather than a `promoted` method with nothing
+  pre-registered, which is the one state design §3 forbids.
+- **The digest is copied, never recomputed** from the live method file: it comes off the recorded dev
+  `trials` row, so the file names what was actually measured. `prereg.check_source` separately proves
+  the method file still hashes to the `source_sha` frozen when it ran and that the trial's candidate
+  still digests to the trial's `config_digest`.
+- **Idempotent, and more than idempotent**: a method already at `promoted` is not moved again (the
+  forward-only trigger would refuse it anyway) and its analysis is not appended to twice; a
+  pre-registration already on disk is read, checked and left **byte-for-byte alone**, date line
+  included — rewriting identical-but-for-the-date bytes would un-commit a file whose whole value is
+  that it was committed first. A *missing* file is rewritten, which repairs a half-finished promotion.
+- **It refuses to change its mind**: when the file, or the method's analysis, already pre-registers a
+  different candidate than the one the database now ranks best, that is a `PreregError`. The first
+  choice is the one the look is spent on; a genuinely better variant is a new method with its own dev
+  trials, not a new version of this file.
+- **`--dry-run` is ignored**, as it is for every `lab` subcommand: there is no roll-back half to show,
+  and a dry run that printed a pre-registration without writing it would be exactly the artefact
+  design §3 exists to prevent.
+- **Output**: whether the file was written or already pre-registered the candidate, the method's
+  status, the candidate and its dev trial, the config digest, the dev window with MAR / DSR / N, the
+  test window, the gate, the `git add` / `git commit` / `lab test` lines to run next, and the
+  test-window look count.
+- **Exit codes**: 0 success; 2 for any `PreregError` (a `store.LabError`, so `lab`'s existing handler
+  already maps it); 1 for anything else.
+- Tests: `tests/test_lab_prereg.py` (25) and the `best_dev_eligible` case in `tests/test_lab_store.py`.
+
 
 ## Exported API
 
@@ -1572,6 +1630,77 @@ The best MAR was `F4-MOM12-N20-TREND` (F4): CAGR +16.2% against +7.9% for total-
 `docs/backtests/2026-10-04-p7a-dev-exploration.md` and its frontier chart. P7b does not run; the
 pre-registration file records "none eligible".
 
+### lab: pre-registration (build-promotion-path phase 3)
+
+`lab/prereg.py` owns the `docs/lab/prereg/MNNNN.md` format — its writer, its parser and the
+committed-file gate. Nothing in it loads a research store, runs a backtest or writes a `trials` row.
+
+- **Why a file at all.** The lab gets one look at the test window per configuration, and the database
+  already enforces that much: `UNIQUE(config_digest, window)` plus the append-only triggers. What a
+  database cannot enforce is *which* configuration the look is spent on, and it cannot stop a
+  disappointing answer from retroactively becoming a different question. The committed markdown file
+  is that missing half, and the property is a conjunction of three facts: the file's `config_digest`
+  is copied out of the recorded dev `trials` row and never recomputed from the live method file; the
+  method file still hashes to the `source_sha` frozen when it ran; and the file is in git, unmodified,
+  before the look. `docs/lab/prereg/README.md` states the same contract for a human reader.
+- `PreregError(store.LabError)`: every refusal in the module. Being a `LabError` means
+  `commands/lab.py` already turns it into exit 2 and no caller needs a second `except`.
+- `Prereg`: a frozen dataclass of the file's front-matter block — `method`, `candidate`,
+  `config_digest`, `rules_id`, `allocator_id`, `dev_trial`, `dev_window`, `test_window`, `gate`,
+  `mar`, `dsr`, `n_trials_at_run`, `store_fingerprint`, `git_sha`, `date`. **Every field is a `str`**:
+  the file is the record and this value is a reading of it, not a parallel source of truth, so
+  `parse(render(p, name)) == p` exactly with no number formatting in the round trip. `FIELDS` is the
+  tuple of names, taken from the dataclass.
+- `render(p, name) -> str` / `parse(text) -> Prereg`: the exact bytes of the file, and the reading of
+  them. `parse` is strict on purpose — the block must be the first thing in the file, must be closed
+  by its second `---`, must carry every key in `FIELDS` exactly once and must carry nothing else. An
+  unknown key is an error rather than a shrug, so a misspelled `config_digest` can never read as "no
+  digest given".
+- `require_committed(candidate_id, *, directory=None) -> Prereg`: **the gate `lab test` calls before
+  it spends the look**, and the only reason the module exists — a test number must not be reachable
+  unless the thing being tested was named, in git, first. It refuses when `candidate_id` is not a
+  `MNNNN-SUFFIX` candidate id (a bare method id is an ambiguity to refuse, not a thing to guess at),
+  when `docs/lab/prereg/<method>.md` does not exist, when git does not track it or it has staged or
+  unstaged changes, when it does not parse, and when it pre-registers a different method or a
+  different candidate. It deliberately does **not** look at the database: the method's status and the
+  one-look rule are the caller's refusals, so a missing file and a wrong status give different
+  messages rather than one vague one.
+- `check_digest(p, digest, *, directory=None) -> None`: `require_committed` matched the candidate's
+  *id*; this matches what the candidate *does*, which is the match that counts — an id can be reused,
+  a digest cannot. The caller passes the digest of the thing it is about to run.
+- `check_source(method_id, row, trial) -> Path`: two equalities, both `PreregError` when broken — the
+  method file's sha256 is the `source_sha` frozen when the method ran, and the candidate the trial
+  names still digests to the trial's `config_digest`. The second is checked even though the first
+  mostly implies it, because `config_digest` canonicalizes `TradeRules` and allocator params defined
+  in *other* files, so the method file's own bytes do not pin it. No git call: `lab run` already
+  refused an uncommitted method file before recording those trials.
+- `promote_method(conn, method_id, *, git_sha, today=None, directory=None, check_method_file=True) ->
+  Promotion`: what `lab promote` runs; the CLI section above has its ordering, idempotence and
+  refusals. `Promotion(prereg, path, trial_n, status, wrote_file, moved_status)` is what it did, for
+  the caller to print. `check_method_file=False` skips `check_source` and exists for tests, which
+  build `trials` rows with no method file behind them; nothing in the CLI passes it.
+- `path_for(method_id, directory=None)`, `method_of(candidate_id)`, `repo_path(path)`,
+  `committed_problem(path)`, `PREREG_DIR`, `FENCE`, `MARKER`.
+- `gate_text()` is **built** from `backtest.dev.FAILURE_LABELS` and `store.DSR_LABEL` rather than
+  retyped, so a file written next year cannot claim a condition the code stopped applying. What it
+  states is the **dev** gate the variant passed to become `dev-eligible` (the five P7a D8 conditions
+  plus `DSR >= 0.95` at N = every dev trial in the lab). It is *not* the gate the one test-window look
+  is judged by: that is the five D8 conditions alone, because a pre-registered look has no selection
+  among results to deflate, so DSR is recorded on the test trial and is not a condition. `render`
+  says so in the file's prose, so a reader of the pre-registration cannot mistake one for the other.
+- `test_window_label()` is `dates.next_session(dev.DEV_END)..data end` — the same start
+  `lab.store.snapshot` publishes as `gate.testStart`. The end is deliberately not a date this step
+  can know (the test-window store is built on first promotion and reaches the latest session
+  available then), so the exact end is pinned afterwards by the `trials` row `lab test` writes.
+- `store.best_dev_eligible(conn, method_id) -> sqlite3.Row | None` (a pure addition to `lab/store.py`):
+  the method's best eligible dev trial by MAR, ties broken on the trial number, so the answer is
+  exactly one row and the same row every time. Only `window = 'dev'`, only `eligible = 1`, and only a
+  non-NULL `mar` — an eligible trial always has one, since "beats SPY TR" is among the conditions it
+  passed, so a NULL here means a row that cannot be compared rather than a row that compares badly.
+  `None` when the method has no eligible dev trial at all. `TRANSITIONS` already carried the
+  `('dev-eligible', 'promoted')` edge; no schema or trigger changed.
+
+
 ### paper (P4)
 
 `seer_engine.paper` is nightly paper trading. Every module but `store.py` is pure (no psycopg,
@@ -1783,6 +1912,7 @@ exception. The real night is `migrate` → `nightly` → `veto` → `paper` → 
 - `research` (impure) imports `config`, `dates`, `fx`, `membership`, `yahoo` (the dividends-aware download), `prices`, `backtest.benchmark`, `backtest.io` (`histories_from_frame`, `merge_intervals`) and `backtest.market`; it never imports `db`. `commands.research_store` imports `research`, `backtest.io` (the vendored SPY dividends for `--verify`, and `read_facts` for `--with-fundamentals`) and `seer_engine.fundamentals` (`Fact`, a type only); it still names neither `seer_engine.db` nor `psycopg`. `research` also imports `seer_engine.fundamentals` (`FACT_COLUMNS`, `Fact`, `FundamentalPanel`). `backtest.io` imports `seer_engine.fundamentals` and `seer_engine.db` (for `read_facts`). `backtest.io` also imports `dev_report` (for `dev_report_files` and `write_dev_report`). `commands.backtest_dev` imports `config`, `research`, `backtest.dev`, `dev_report`, `registry`, `backtest.io`, `benchmark`, `market`, `metrics`, `runner` and `sim`, and `subprocess` for the `git status` registry check.
 - `strategies.c` imports `dates`, `sim` (`Pick`), `strategies.a` (`STRATEGY_A`, `STRATEGY_A_PARAMS`, `AParams`) and `strategies.base`; never `finnhub`, `llm`, `db` or `universe`. `finnhub` imports `config`, `http` (`redact`), `requests` and `strategies.c` (`Headline`). `commands.veto` imports `db`, `dates`, `demo`, `runs`, `finnhub`, `llm`, `commands.nightly` (`_parse_now`), `paper.roster`, `paper.store`, `sim.sizing` (`Pick`) and `strategies.c`.
 - `commands.promote` (phase 5) imports `config`, `dates`, `db`, `lab.store`, `lab.method` (`discover`, inside the function), `paper.roster`, `paper.store`, `sim.rules` (`TradeRules`) and `psycopg.types.json.Jsonb`. It never imports `backtest.registry` (D1), and it is the only module that holds a Neon connection and a lab SQLite connection at the same time — sequentially, never in one transaction.
+- `lab.prereg` (build-promotion-path phase 3) imports `config`, `lab.store` and `lab.method` (`METHOD_ID`, `config_digest`, `source_sha`), plus `sqlite3` from the standard library. `backtest.dev` (`FAILURE_LABELS`, `DEV_END`), `dates` (`next_session`), `lab.method.discover` and `commands.backtest_dev.registry_problem` — the same `git status` check `lab run` makes on a method file — are imported *inside* the functions that need them, so importing `lab.prereg` does not drag in `backtest`. `commands.lab`'s `promote` handler imports `lab.prereg` and `lab.runner.git_head` inside the function. It never touches Neon: the pre-registration is a lab-side artefact only.
 - `paper.compare` (phase 3) imports nothing from the package at all — only the standard library — which is what keeps it portable to the leaderboard's TypeScript port. `commands.compare` imports `db`, `paper.compare` and `psycopg`, and reads one table.
 - `paper.book` and `paper.replay` (phase 6) also import `MarketAware` and `prepare_for` from `strategies.allocator`; `paper.roster` imports `strategies.f_fundamental` (`FUNDAMENTAL`, `FundamentalParams`) and still never imports `lab.methods.*` — the lab must not become an input to a paper spec digest.
 ### Standard library
@@ -2055,6 +2185,8 @@ which writes nothing. A committed report always comes from a full run over a cle
 - **`promote` never appends to `backtest/registry.py`** (D1). The registry is the P7a dev-run candidate set, fixed before that run and digest-pinned; a promoted method reaches the roster through `paper.roster.RESOLVER` instead, so the lab's multiple-testing count stays honest. Add the `Binding` to `RESOLVER`, never a `REGISTRY` entry.
 - **A promotion leaves `paper_start` NULL on purpose.** `promote` writes the row; the next paper night freezes the spec and starts the clock. Never back-date a promoted entry's `paper_start`, and never re-point a started id at another algorithm — `promote` raises `AlreadyStarted` for exactly that. Promote under a new id and `--retire` the old one in the same command, so the swap is one transaction.
 - **The roster write and the lab note cannot be one transaction** (Neon and SQLite). The roster commits first; if the lab note is then lost, re-run the identical `promote` command — both halves are idempotent. Never reorder them: the lab is append-only, so a note for a promotion that did not happen cannot be withdrawn.
+- **A pre-registration is written once and never rewritten** (design §3). `lab promote` leaves an existing `docs/lab/prereg/MNNNN.md` byte-for-byte alone, date line included, and raises rather than re-pointing it at a better variant found later; if the first choice is genuinely wrong, that is a new method with its own dev trials. And the file must be committed **and pushed before** `lab test`: `prereg.require_committed` refuses on a file git does not track or that has staged or unstaged changes, which is the whole point of putting the record in git.
+- **The gate named in a pre-registration is the dev gate, not the test gate.** `prereg.gate_text` states what the variant passed to become `dev-eligible` (the five P7a D8 conditions plus `DSR >= 0.95` at N = every dev trial). The one test-window look is judged by the five D8 conditions alone; DSR is recorded on the test trial and is not a condition, because a pre-registered look has no selection among results to deflate and a look is not a search.
 - `paper` runs only after a successful bars run for the same session, and only in the `seer-db-writer` concurrency group. Never run a real (non-`--dry-run`) `paper` locally against Neon while the scheduled job may run, and never before the code is on `main` (D11: no back-dated paper days).
 - `paper_check` reports a strategy `split-affected` (not failed) once an applied split touched a symbol it held or had pending: whole-share rounding before and after a split cannot match a replay over adjusted bars.
 - `explain` must never decide anything: it writes text only, and a failure leaves NULL.
@@ -2149,3 +2281,13 @@ on the roster would have held cash forever while every log line said it had deci
 keyed on the protocol alone, so for every allocator that is not `MarketAware` the expression is
 byte-identical to before: the five pre-existing spec digests are unchanged, the five strategies with
 a paper clock replay bit for bit, and `MAX_LOOKBACK_BARS` is still 253.
+
+Phase 3 of `BUILD_PROMOTION_PATH_PLAN.md` landed on 2026-10-06 (P1-ENG-AZ81): `lab/prereg.py`, the
+committed pre-registration format it owns (`docs/lab/prereg/MNNNN.md`, with
+`docs/lab/prereg/README.md` stating that format for a human reader), `lab.store.best_dev_eligible`
+and the `lab promote` subcommand. It supplies the half of the one-look rule a database cannot
+enforce: SQLite counts the looks (`UNIQUE(config_digest, window)` and the append-only triggers), and
+the committed file names which configuration each look is spent on, before any test number exists.
+All three source edits are pure additions (90 insertions, 0 deletions) and `lab run` is
+behaviourally unchanged. Tests: `tests/test_lab_prereg.py` (25) and one case in
+`tests/test_lab_store.py`.

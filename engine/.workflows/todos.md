@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-06
-**Total Active Tasks**: 3
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 1
-- Completed: 71
+- Completed: 72
 
 ---
 
@@ -449,14 +449,28 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R1 — A test-window research store (2015-10-19 → latest session), built like the dev store, with the same files, manifest and checks
   - **Depends on**: P1-ENG-5X3M
   - **Plan**: `.workflows/plan/P1-ENG-8OLO.md`
-- [ ] **P1-ENG-AZ81** Phase 3: Pre-registration: `lab promote` and `docs/lab/prereg/`
+- [x] **P1-ENG-AZ81** Phase 3: Pre-registration: `lab promote` and `docs/lab/prereg/`
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `lab/prereg.py` — the `docs/lab/prereg/MNNNN.md` format, its writer, its parser and the committed-file gate (`require_committed(candidate_id, *, directory=None) -> Prereg`, `check_digest(p, digest, *, directory=None)`, `PreregError(store.LabError)`) — plus `store.best_dev_eligible`, a `lab promote <method>` subcommand that writes the prereg file and moves `dev-eligible → promoted`, and `docs/lab/prereg/README.md`. Lands before phase 4 in `commands/lab.py` and is the earlier owner of that file's three insertion regions. Leaves `backtest/`, `research.py`, the test store and runner, `record_promotion`, `commands/promote.py` and every skill file alone. Exit: `lab promote` refuses a method that is not `dev-eligible`; writes exactly one prereg file carrying `method`, `candidate`, `config_digest`, `gate`, `test_window` and `date` (all `str`); is idempotent and never rewrites a committed file, not even its `date`; refuses to change which variant is pre-registered; a test proves the prereg digest is copied from the recorded dev trial's digest; the prose states the test look is judged by the five go-live conditions alone with DSR recorded and not applied, so the `gate` field cannot be read as the test gate; `store.test_looks` stays 0 and no `trials` row is written.
-  - **Status**: in_progress
+  - **Status**: completed
   - **Plan Set**: `BUILD_PROMOTION_PATH_PLAN.md` (phase 3 of 4)
   - **Satisfies**: R3 — Pre-registration of the best dev-eligible variant by MAR in `docs/lab/prereg/MNNNN.md`, committed before any test number exists
   - **Plan**: `.workflows/plan/P1-ENG-AZ81.md`
+  - **Completed**: 2026-10-06 12:59
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/prereg.py (new), engine/src/seer_engine/lab/store.py, engine/src/seer_engine/commands/lab.py, docs/lab/prereg/README.md (new), engine/tests/test_lab_prereg.py (new), engine/tests/test_lab_store.py
+  - **Verified**: `import seer_engine.lab.prereg, seer_engine.commands.lab` ok; `ruff check src tests` clean; full engine suite **2407 passed / 360 skipped** with phase 3 alone on base `353d744` in a throwaway worktree, and **2424 passed / 360 skipped** in the shared tree that also carried phase 1's work (every skip `PG_TEST_URL`-gated and pre-existing). `python -m seer_engine lab promote --help` lists the subcommand; `lab promote M0007` exits 2 with "M0007 is 'rejected', and only a dev-eligible method is pre-registered". Against the real database `store.test_looks()` is **0** and `git status` shows no `lab/lab.sqlite` and no `web/data/lab.json` — no look was spent and no `trials` row written. All seven exit criteria met. Plan invariants 1–7 hold: `DEV_END` is untouched because this phase edits none of `backtest/dev.py`, `research.py` or `fundamentals/coverage.py`, and all three source edits are pure additions (90 insertions, 0 deletions), so `lab run` is behaviourally unchanged.
+  - **Drift**:
+    - None. Every anchor the plan quotes matched the tree exactly: `store.py` `trials_of` at `:568-569` with the `ideas_seen` divider at `:572`; `commands/lab.py` docstring `:9`, the `--allow-coverage` block ending `:78`, `_run` ending `:262`, `_HANDLERS` at `:375`; and `registry_problem`, `git_head`, `FAILURE_LABELS`, `DSR_LABEL`, `dates.next_session`, `config.REPO_ROOT`, `TRANSITIONS` and the `test_lab_store.py` `_method`/`_trial` fixtures all as described.
+    - This worktree has no `engine/.venv`, so verification ran on the main checkout's interpreter (`/home/miftah/seer/engine/.venv/bin/python`) with `PYTHONPATH=<worktree>/engine/src`, verified to shadow the editable install (`seer_engine` resolves to the worktree).
+  - **Decided**:
+    - Where to verify, given a live peer session editing this same worktree -> ran the suite a second time in a throwaway worktree holding ONLY phase 3's six files on top of base `353d744` (rung 1: invariant 1 is per-phase, and the Rollback section makes each phase one revertible commit). Phase 3 alone: 2407 passed. The shared tree including the peer's work also passed: 2424 passed.
+    - Whether phase 4 is unblocked -> NO (rung 4: the index's phase table). Phase 4 (`P1-ENG-YJDW`) depends on phases 2 **and** 3; phase 2 (`P1-ENG-8OLO`) has not landed, so phase 4 stays `blocked`. Only this task flips to completed.
+    - Which paths this phase's commit may contain -> phase 3's six files plus the shared plan-set bookkeeping only; the peer's work-in-progress is explicitly excluded (rung 1: the Rollback section's "each phase is one commit on `feature/build-promotion-path`; `git revert` it"). Committed by explicit pathspec; no `git add -A`.
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the direct precedent recorded by phase 1 of this same set three blocks above, and by all of the ROSTER_PROMOTION_PIPELINE and FUNDAMENTAL_PANEL_COVERAGE swarms in this same file). A cross-file block move is the one edit that reliably loses a peer's concurrent append, and peers are appending to this file.
+    - Completion: no `**Commit**` field (rung 6: the same precedent). This file is committed inside the phase's own commit, so a field naming that sha cannot exist in it; the sha is reported to the caller instead.
+    - Landing: not attempted, and `next_command` is empty. `swarm.py find --plan BUILD_PROMOTION_PATH_PLAN.md` returns `swarm: true` with coordinator `orch-build-promotion-path`, so per `analyze-orchestrator` Step 5 both the merge and the dispatch of the next phase belong to that coordinator.
 - [ ] **P1-ENG-YJDW** Phase 4: `lab test`: one counted look, recorded and final
   - **Difficulty**: HARD
   - **Type**: Feature

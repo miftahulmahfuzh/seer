@@ -65,6 +65,23 @@ def test_a_configuration_runs_once_per_window(conn):
     assert store.dev_trial_count(conn) == 1
 
 
+def test_best_dev_eligible_is_the_highest_mar_and_breaks_ties_on_the_trial_number(conn):
+    _method(conn)
+    assert store.best_dev_eligible(conn, "M0001") is None
+    with conn:
+        store.insert_trials(conn, [
+            _trial(candidate_id="M0001-A", config_digest="da", mar=0.9, eligible=True, failed=""),
+            _trial(candidate_id="M0001-B", config_digest="db", mar=0.9, eligible=True, failed=""),
+            _trial(candidate_id="M0001-C", config_digest="dc", mar=1.4),  # not eligible
+            _trial(candidate_id="M0001-D", config_digest="dd", mar=None, eligible=True, failed=""),
+            _trial(candidate_id="M0001-E", config_digest="de", window="test", mar=2.0,
+                   eligible=True, failed=""),
+        ])
+    best = store.best_dev_eligible(conn, "M0001")
+    assert best["candidate_id"] == "M0001-A"  # the tie breaks on n, and the test trial is not it
+    assert store.best_dev_eligible(conn, "M0002") is None
+
+
 def test_status_only_moves_forward(conn):
     _method(conn)
     with conn:

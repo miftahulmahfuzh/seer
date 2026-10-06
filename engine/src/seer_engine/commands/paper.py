@@ -64,12 +64,12 @@ import psycopg
 
 from seer_engine import dates, db, demo, http, runs
 from seer_engine.backtest.market import Market
-from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.commands.nightly import _parse_now
 from seer_engine.paper import roster, store
 from seer_engine.paper.benchmark import SPY, step_benchmark
 from seer_engine.paper.book import decide_book, needs_kickoff, settle_book
 from seer_engine.paper.bracket import decide_bracket, settle_bracket
+from seer_engine.paper.capital import PAPER_INITIAL_IDR
 from seer_engine.paper.roster import RosterEntry
 from seer_engine.paper.store import PaperState, StrategyRow
 from seer_engine.sim import initial_cash_usd, new_portfolio
@@ -530,7 +530,7 @@ def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight
         usd_idr = view.usd_idr_on(rd.data_date)
     except ValueError as exc:
         raise PaperError(f"no USD/IDR rate on or before {rd.data_date}; cannot start {e.id!r}") from exc
-    cash0 = initial_cash_usd(INITIAL_IDR, usd_idr)
+    cash0 = initial_cash_usd(PAPER_INITIAL_IDR, usd_idr)
     paper_start = rd.session_date
 
     frozen = roster.strategy_params(e)

@@ -2,8 +2,10 @@
 looped over a window equal ``buy_and_hold`` with dividends exactly; the persisted shape
 (``Position``, ``Fill``); the split rule.
 
-Arithmetic: ``buy_cost(p, n) = q(p × n × 1.001)``; whole shares ``floor(cash / (price × 1.001))``
-(``backtest.benchmark._whole_shares``); dividend credit ``q(shares × amount)``.
+Arithmetic: ``fractional_buy_cost(p, n) = q(p × n × 1.001)``; shares ``cash / (price × 1.001)``
+floored to 0.0001 (``backtest.benchmark._fractional_shares``: the paper benchmark is fractional
+since 2026-10-07, when the paper books went to 10,000,000 IDR); dividend credit ``q(shares × amount)``.
+The loops compare against ``buy_and_hold(..., fractional=True)``.
 """
 
 from __future__ import annotations
@@ -88,7 +90,7 @@ def test_window_has_at_least_300_sessions_and_all_ex_dates_are_sessions():
 
 
 def test_nights_equal_buy_and_hold_total_return():
-    curve = buy_and_hold(SPY_BARS, START, END, CASH0, dividends=DIVIDENDS, name="spy_tr")
+    curve = buy_and_hold(SPY_BARS, START, END, CASH0, dividends=DIVIDENDS, name="spy_tr", fractional=True)
     state, snaps, fills, _ = run_nights(SPY_BARS, START, END, CASH0, PAID)
     assert snaps == curve.snapshots
     assert state.shares == curve.shares
@@ -105,14 +107,14 @@ def test_every_prefix_equals_buy_and_hold_on_that_prefix():
     _, _, _, states = run_nights(SPY_BARS, START, END, CASH0, PAID)
     for i in range(1, len(states), 37):
         end = states[i].last_session
-        curve = buy_and_hold(SPY_BARS, START, end, CASH0, dividends=DIVIDENDS, name="spy_tr")
+        curve = buy_and_hold(SPY_BARS, START, end, CASH0, dividends=DIVIDENDS, name="spy_tr", fractional=True)
         assert (states[i].shares, states[i].cash, states[i].equity) == (
             curve.shares, curve.cash, curve.snapshots[-1].equity_usd,
         )
 
 
 def test_nights_equal_buy_and_hold_price_only():
-    curve = buy_and_hold(SPY_BARS, START, END, CASH0, name="spy_price")
+    curve = buy_and_hold(SPY_BARS, START, END, CASH0, name="spy_price", fractional=True)
     state, snaps, fills, _ = run_nights(SPY_BARS, START, END, CASH0, {})
     assert snaps == curve.snapshots
     assert (state.shares, state.cash) == (curve.shares, curve.cash)
@@ -139,26 +141,27 @@ def test_start_state_is_day_zero_cash_only():
     s = start_benchmark(P("1000"), MON)
     assert s == BenchmarkState(start=MON, cash=P("1000"), equity=P("1000"), position=None, last_session=D("2026-02-27"))
     assert s.snapshot() == Snapshot(D("2026-02-27"), P("1000"), P("1000"))
-    assert (s.shares, s.income_usd) == (0, P("0"))
+    assert (s.shares, s.income_usd) == (P("0"), P("0"))
 
 
 def test_position_and_fills_by_hand():
-    # MON open 100: floor(1000 / 100.1) = 9 sh, cost q(900.9) = 900.9000, fee q(0.9) = 0.9;
-    #   cash 99.1, equity 99.1 + 9 × 101 = 1008.1.
-    # WED dividend 2.5: cash + q(22.5) = 121.6; floor(121.6 / 98.098) = 1 sh at close 98,
-    #   cost 98.0980 (fee 0.098 -> 0.0980): cash 23.502, 10 sh, equity 23.502 + 980 = 1003.502.
+    # MON open 100: 1000 / 100.1 = 9.99000.. -> 9.9900 sh, cost q(999.999) = 999.999, fee
+    #   q(0.999) = 0.999; cash 0.001, equity 0.001 + 9.99 × 101 = 1008.991.
+    # WED dividend 2.5: cash + q(24.975) = 24.976; 24.976 / 98.098 = 0.25460.. -> 0.2546 sh at the
+    #   close 98, cost q(24.9757508) = 24.9758, fee q(0.0249508) = 0.0250: cash 0.0002,
+    #   10.2446 sh, equity 0.0002 + 10.2446 × 98 = 1003.971.
     s = start_benchmark(P("1000"), MON)
     s, snap, fills = step_benchmark(s, MON, WEEK_BARS[MON], None)
-    assert snap == Snapshot(MON, P("99.1"), P("1008.1"))
-    assert fills == (Fill(MON, SPY, "buy", Decimal(9), P("100"), P("-900.9"), P("0.9"), "entry"),)
-    assert s.position == Position(SPY, Decimal(9), P("101"), MON, P("100"), 1, P("900.9"), P("0"), None, None)
+    assert snap == Snapshot(MON, P("0.001"), P("1008.991"))
+    assert fills == (Fill(MON, SPY, "buy", P("9.99"), P("100"), P("-999.999"), P("0.999"), "entry"),)
+    assert s.position == Position(SPY, P("9.99"), P("101"), MON, P("100"), 1, P("999.999"), P("0"), None, None)
     s, snap, fills = step_benchmark(s, TUE, WEEK_BARS[TUE], None)
     assert fills == () and s.position.days_held == 2 and s.position.mark == P("102")
     s, snap, fills = step_benchmark(s, WED, WEEK_BARS[WED], Decimal("2.5"))
-    assert snap == Snapshot(WED, P("23.502"), P("1003.502"))
-    assert fills == (Fill(WED, SPY, "buy", Decimal(1), P("98"), P("-98.098"), P("0.098"), "add"),)
-    assert s.position == Position(SPY, Decimal(10), P("98"), MON, P("100"), 3, P("998.998"), P("22.5"), None, None)
-    assert s.income_usd == P("22.5")
+    assert snap == Snapshot(WED, P("0.0002"), P("1003.971"))
+    assert fills == (Fill(WED, SPY, "buy", P("0.2546"), P("98"), P("-24.9758"), P("0.025"), "add"),)
+    assert s.position == Position(SPY, P("10.2446"), P("98"), MON, P("100"), 3, P("1024.9748"), P("24.975"), None, None)
+    assert s.income_usd == P("24.975")
 
 
 def test_dividend_on_start_is_not_credited():
@@ -169,12 +172,15 @@ def test_dividend_on_start_is_not_credited():
 
 
 def test_reinvestment_can_open_the_holding():
-    # 100 USD buys no share at MON's open (100.1 each). WED dividend credits q(0 × 2.5) = 0, but
-    # the 100 idle buys floor(100 / 98.098) = 1 sh at the close 98: cost 98.098, cash 1.902.
-    curve = buy_and_hold(WEEK_BARS, MON, FRI, P("100"), dividends=[Dividend(WED, Decimal("2.5"))], name="x")
-    state, snaps, fills, _ = run_nights(WEEK_BARS, MON, FRI, P("100"), {WED: Decimal("2.5")})
+    # 0.01 USD buys no share at MON's open (0.01 / 100.1 < 0.0001). WED dividend credits
+    # q(0 × 2.5) = 0, but the idle 0.01 buys 0.01 / 98.098 -> 0.0001 sh at the close 98:
+    # cost q(0.0098098) = 0.0098, cash 0.0002.
+    curve = buy_and_hold(
+        WEEK_BARS, MON, FRI, P("0.01"), dividends=[Dividend(WED, Decimal("2.5"))], name="x", fractional=True
+    )
+    state, snaps, fills, _ = run_nights(WEEK_BARS, MON, FRI, P("0.01"), {WED: Decimal("2.5")})
     assert snaps == curve.snapshots
-    assert (state.shares, state.cash) == (curve.shares, curve.cash) == (1, P("1.902"))
+    assert (state.shares, state.cash) == (curve.shares, curve.cash) == (P("0.0001"), P("0.0002"))
     assert [f.reason for f in fills] == ["entry"]
     assert state.position.entry_date == WED and state.position.days_held == 3
 
@@ -187,10 +193,10 @@ def test_state_round_trips_through_its_fields():
     p = s.position
     loaded = BenchmarkState(
         start=MON,
-        cash=Decimal("23.5020"),
-        equity=Decimal("1003.5020"),
-        position=Position(p.symbol, Decimal("10.0000"), Decimal("98.0000"), p.entry_date, Decimal("100.0000"),
-                          p.days_held, Decimal("998.9980"), Decimal("22.5000"), None, None),
+        cash=Decimal("0.0002"),
+        equity=Decimal("1003.9710"),
+        position=Position(p.symbol, Decimal("10.2446"), Decimal("98.0000"), p.entry_date, Decimal("100.0000"),
+                          p.days_held, Decimal("1024.9748"), Decimal("24.9750"), None, None),
         last_session=WED,
     )
     assert loaded == s
@@ -202,9 +208,9 @@ def test_state_round_trips_through_its_fields():
 def test_state_validation():
     with pytest.raises(ValueError, match="cash only"):
         BenchmarkState(start=MON, cash=P("1"), equity=P("2"), position=None, last_session=D("2026-02-27"))
-    with pytest.raises(ValueError, match="whole shares"):
+    with pytest.raises(ValueError, match="multiple of 0.0001"):
         BenchmarkState(start=MON, cash=P("1"), equity=P("2"),
-                       position=Position(SPY, Decimal("1.5"), P("1"), MON, P("1"), 1, P("1"), P("0"), None, None),
+                       position=Position(SPY, Decimal("1.50005"), P("1"), MON, P("1"), 1, P("1"), P("0"), None, None),
                        last_session=MON)
     with pytest.raises(ValueError, match="holds SPY"):
         BenchmarkState(start=MON, cash=P("1"), equity=P("2"),
@@ -245,39 +251,49 @@ def _held_after_tue(cash: str = "1000") -> BenchmarkState:
 
 
 def test_forward_split_rescales_exactly():
-    # 9 sh, mark 102, entry 100 -> 2-for-1: 18 sh, mark 51, entry 50, no cash in lieu.
+    # 9.99 sh, mark 102, entry 100 -> 2-for-1: 19.98 sh, mark 51, entry 50, no cash in lieu.
     s = _held_after_tue()
     out, in_lieu = split_benchmark(s, Decimal(2), WED)
     assert in_lieu == P("0")
-    assert (out.shares, out.position.mark, out.position.entry_price, out.cash) == (18, P("51"), P("50"), s.cash)
+    assert (out.shares, out.position.mark, out.position.entry_price, out.cash) == (P("19.98"), P("51"), P("50"), s.cash)
     assert (out.equity, out.last_session) == (s.equity, s.last_session)
 
 
-def test_reverse_split_pays_the_fraction_in_lieu():
-    # 9 sh, 1-for-2 (factor 0.5): floor(4.5) = 4 sh, mark 204; 0.5 sh in lieu q(0.5 × 204) = 102
-    # -> cash 99.1 + 102 = 201.1, income 102. Then WED (bar in post-split units, close 196):
-    # equity 201.1 + 4 × 196 = 985.1.
+def test_reverse_split_keeps_fractions_and_pays_only_below_0_0001_in_lieu():
+    # 9.99 sh, 1-for-2 (factor 0.5): 4.995 sh exactly, mark 204, nothing in lieu (fractional
+    # shares keep what a whole-share holding would have paid out). Then WED (bar in post-split
+    # units, close 196): equity 0.001 + 4.995 × 196 = 979.021.
     s = _held_after_tue()
     out, in_lieu = split_benchmark(s, Decimal("0.5"), WED)
-    assert in_lieu == P("102")
+    assert in_lieu == P("0")
     assert (out.shares, out.position.mark, out.position.entry_price, out.cash, out.income_usd) == (
-        4, P("204"), P("200"), P("201.1"), P("102"),
+        P("4.995"), P("204"), P("200"), P("0.001"), P("0"),
     )
     wed = bar(SPY, WED, "200", "205", "195", "196")
     stepped, snap, fills = step_benchmark(s, WED, wed, None, split=Decimal("0.5"))
     assert fills == ()
-    assert snap == Snapshot(WED, P("201.1"), P("985.1"))
+    assert snap == Snapshot(WED, P("0.001"), P("979.021"))
     assert stepped.position.mark == P("196") and stepped.position.days_held == 3
 
 
-def test_split_that_floors_to_zero_pays_everything_in_lieu():
-    # 1500 buys floor(1500 / 100.1) = 14 sh at MON's open; 1-for-20: floor(0.7) = 0 sh, all 0.7 sh
-    # in lieu at the new mark 102 × 20 = 2040: q(0.7 × 2040) = 1428.
+def test_split_pays_the_part_below_0_0001_share_in_lieu():
+    # 1500 buys 1500 / 100.1 -> 14.985 sh at MON's open; 1-for-20: 0.74925 sh -> 0.7492 kept,
+    # 0.00005 sh in lieu at the new mark 102 × 20 = 2040: q(0.102) = 0.102.
     s = _held_after_tue("1500")
-    assert s.shares == 14
+    assert s.shares == P("14.985")
     out, in_lieu = split_benchmark(s, Decimal("0.05"), WED)
-    assert in_lieu == P("1428")
-    assert out.position is None and out.cash == s.cash + P("1428")
+    assert in_lieu == P("0.102")
+    assert out.shares == P("0.7492") and out.cash == s.cash + P("0.102")
+
+
+def test_split_that_floors_to_zero_pays_everything_in_lieu():
+    # A holding below 0.0001 post-split share: 0.0001 sh bought on WED, 1-for-20 -> 0.000005 sh,
+    # floors to 0, all of it in lieu at the new mark 98 × 20 = 1960: q(0.0098) = 0.0098.
+    state, _, _, _ = run_nights(WEEK_BARS, MON, WED, P("0.01"), {WED: Decimal("2.5")})
+    assert state.shares == P("0.0001")
+    out, in_lieu = split_benchmark(state, Decimal("0.05"), THU)
+    assert in_lieu == P("0.0098")
+    assert out.position is None and out.cash == state.cash + P("0.0098")
 
 
 def test_split_without_a_holding_and_bad_splits():

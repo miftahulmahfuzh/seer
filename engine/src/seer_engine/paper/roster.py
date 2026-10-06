@@ -88,9 +88,9 @@ from decimal import Decimal
 from typing import Any, Literal, Protocol
 
 from seer_engine.backtest.registry import REGISTRY, candidate_digest
-from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.lab.methods.m0011_raw_residual_own_vol import METHOD as M0011
 from seer_engine.lab.methods.m0011_raw_residual_own_vol import RESIDVOL
+from seer_engine.paper.capital import PAPER_INITIAL_IDR
 from seer_engine.sim import COST_RATE
 from seer_engine.sim.rules import PRESETS, TradeRules, is_pinned_default
 from seer_engine.strategies.a import STRATEGY_A, STRATEGY_A_PARAMS
@@ -696,7 +696,7 @@ def spec(e: RosterEntry) -> dict[str, Any]:
         "rules_id": e.rules_id,
         "rules": None if e.rules is None else rules_dict(e.rules),
         "params": params,
-        "initial_idr": str(INITIAL_IDR),
+        "initial_idr": str(PAPER_INITIAL_IDR),
     }
 
 

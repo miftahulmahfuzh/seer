@@ -42,9 +42,10 @@ from seer_engine import dates
 from seer_engine.backtest.benchmark import Dividend, buy_and_hold
 from seer_engine.backtest.book_runner import BookResult, DividendMap, run_rules
 from seer_engine.backtest.market import SPY, Market
-from seer_engine.backtest.runner import INITIAL_IDR, RunResult
+from seer_engine.backtest.runner import RunResult
 from seer_engine.paper.book import decide_book
 from seer_engine.paper.bracket import decide_bracket
+from seer_engine.paper.capital import PAPER_INITIAL_IDR
 from seer_engine.sim import (
     DESIGN_V0,
     Fill,
@@ -121,7 +122,7 @@ HOLDING_FIELDS: tuple[str, ...] = ("shares", "mark")
 
 @dataclass(frozen=True, slots=True)
 class Holding:
-    """The benchmark's holding as ``book_positions`` stores it: whole shares and the last close."""
+    """The benchmark's holding as ``book_positions`` stores it: its (fractional) shares and the last close."""
 
     symbol: str
     shares: Decimal
@@ -275,14 +276,14 @@ def expected_bracket(market: Market, strategy: Strategy, params: Any, head: Pape
     if head.engine != "bracket":
         raise ValueError(f"{head.strategy_id} is a {head.engine} strategy, not bracket")
     start, last = head.paper_start, head.last_session
-    cash0 = initial_cash_usd(INITIAL_IDR, head.usd_idr)
+    cash0 = initial_cash_usd(PAPER_INITIAL_IDR, head.usd_idr)
     settled: tuple[Order, ...] = ()
     if last < start:
         pf = new_portfolio(cash0)
         snapshots: tuple[Snapshot, ...] = (_day0(start, cash0),)
     else:
         fixed = replace(market, fx=((start, head.usd_idr),))
-        run = run_rules(fixed, strategy, params, DESIGN_V0, start, last)
+        run = run_rules(fixed, strategy, params, DESIGN_V0, start, last, initial_idr=PAPER_INITIAL_IDR)
         if not isinstance(run, RunResult):
             raise TypeError(f"DESIGN_V0 replay of {head.strategy_id} returned {type(run).__name__}")
         snapshots = run.snapshots
@@ -324,7 +325,7 @@ def expected_book(
     if not isinstance(rules, TradeRules) or rules.engine != "book":
         raise ValueError(f"{head.strategy_id}: book replay needs book rules, got {rules!r}")
     start, last = head.paper_start, head.last_session
-    cash0 = initial_cash_usd(INITIAL_IDR, head.usd_idr)
+    cash0 = initial_cash_usd(PAPER_INITIAL_IDR, head.usd_idr)
     fills: tuple[Fill, ...] = ()
     trades: tuple[Trade, ...] = ()
     positions: tuple[Position, ...] = ()
@@ -349,6 +350,7 @@ def expected_book(
             dividends=dividends,
             usd_idr=head.usd_idr,
             kickoff=head.kickoff,
+            initial_idr=PAPER_INITIAL_IDR,
         )
         if not isinstance(run, BookResult):
             raise TypeError(f"book replay of {head.strategy_id} returned {type(run).__name__}")
@@ -387,7 +389,7 @@ def expected_benchmark(market: Market, head: PaperHead, dividends: DividendMap) 
     if head.engine != "benchmark":
         raise ValueError(f"{head.strategy_id} is a {head.engine} strategy, not benchmark")
     start, last = head.paper_start, head.last_session
-    cash0 = initial_cash_usd(INITIAL_IDR, head.usd_idr)
+    cash0 = initial_cash_usd(PAPER_INITIAL_IDR, head.usd_idr)
     if last < start:
         snapshots: tuple[Snapshot, ...] = (_day0(start, cash0),)
         cash = cash0
@@ -395,7 +397,7 @@ def expected_benchmark(market: Market, head: PaperHead, dividends: DividendMap) 
     else:
         by_date = dividends.get(BENCHMARK_SYMBOL, {})
         paid = tuple(Dividend(ex_date=d, amount=by_date[d]) for d in sorted(by_date))
-        curve = buy_and_hold(market.spy(), start, last, cash0, dividends=paid, name=BENCHMARK_SYMBOL)
+        curve = buy_and_hold(market.spy(), start, last, cash0, dividends=paid, name=BENCHMARK_SYMBOL, fractional=True)
         snapshots = curve.snapshots
         cash = curve.cash
         holdings = ()

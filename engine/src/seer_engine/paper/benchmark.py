@@ -7,14 +7,15 @@ return, dividends reinvested):
 - :func:`start_benchmark` holds ``cash0 = q(initial cash)`` and nothing else; its
   :meth:`BenchmarkState.snapshot` is ``Snapshot(prev_session(start), cash0, cash0)``, the
   curve's first point.
-- On ``start`` (the first paper session), buy ``_whole_shares(cash, open)`` whole shares at the
-  open, paying ``sim.buy_cost``; the remainder sits idle. A dividend with ex-date ``start`` is
+- On ``start`` (the first paper session), buy ``_fractional_shares(cash, open)`` shares (multiples
+  of ``SHARE_QUANTUM``: Gotrade sells SPY in fractions, and since 2026-10-07 a 10,000,000 IDR book
+  cannot afford one whole share) at the open, paying ``fractional_buy_cost``; the remainder sits idle. A dividend with ex-date ``start`` is
   not credited (bought at the open, not a holder at the previous close).
 - On every later session with a SPY dividend whose ex-date is that session, credit
-  ``q(shares × amount)`` and buy ``_whole_shares(cash, close)`` more at that close.
+  ``q(shares × amount)`` and buy ``_fractional_shares(cash, close)`` more at that close.
 - Every session is marked at its close: ``equity = q(cash + shares × close)``. Nothing is sold.
 
-The holding is a ``sim.book.Position`` (symbol ``SPY``, whole shares as a Decimal, no stop or
+The holding is a ``sim.book.Position`` (symbol ``SPY``, shares as a Decimal, no stop or
 take), so the store persists it as one ``book_positions`` row; ``cost_usd`` is every buy's cash,
 ``income_usd`` every dividend credited (plus any split cash in lieu). Each buy is a
 ``sim.book.Fill``: ``entry`` (the first buy) or ``add`` (a reinvestment), for ``book_fills``.
@@ -22,8 +23,8 @@ take), so the store persists it as one ``book_positions`` row; ``cost_usd`` is e
 Splits: ``buy_and_hold`` never sees one (its bars are pre-adjusted), and SPY has never split. A
 split executing on a session that ``nightly`` applied to the stored bars is still handled, by
 :func:`split_benchmark` (also reachable as ``step_benchmark(..., split=factor)``), with
-``sim.apply_split``'s rule for an open bracket position: shares become
-``floor(shares × ratio)``, the fraction is paid as cash in lieu ``q(fraction × new mark)``
+the book engine's fractional rule: shares become ``shares × ratio`` floored to ``SHARE_QUANTUM``,
+the remainder is paid as cash in lieu ``q(remainder × new mark)``
 (added to cash and to the position's ``income_usd``), mark and entry price become
 ``q(price / ratio)`` exactly; a holding that floors to 0 shares is paid out entirely in lieu.
 Raising instead would fail the whole paper night (every roster strategy is stepped in one
@@ -38,10 +39,12 @@ from decimal import Decimal
 from fractions import Fraction
 
 from seer_engine import dates
-from seer_engine.backtest.benchmark import _whole_shares
+from seer_engine.backtest.benchmark import _fractional_shares, fractional_buy_cost
 from seer_engine.prices import Bar
-from seer_engine.sim import COST_RATE, Fill, Position, Snapshot, buy_cost, q
-from seer_engine.sim.split_adjust import _q_exact, _rescale_price, _split_ratio, _split_shares
+from seer_engine.sim import COST_RATE, Fill, Position, Snapshot, q
+from seer_engine.sim.book import _split_position_shares
+from seer_engine.sim.rules import SHARE_QUANTUM
+from seer_engine.sim.split_adjust import _q_exact, _rescale_price, _split_ratio
 
 SPY = "SPY"
 _ZERO = Decimal("0.0000")
@@ -98,8 +101,8 @@ class BenchmarkState:
                 raise TypeError(f"position must be a Position, got {type(p).__name__}")
             if p.symbol != SPY:
                 raise ValueError(f"the benchmark holds {SPY}, got {p.symbol}")
-            if p.shares != p.shares.to_integral_value():
-                raise ValueError(f"the benchmark holds whole shares, got {p.shares}")
+            if p.shares <= 0 or p.shares.quantize(SHARE_QUANTUM) != p.shares:
+                raise ValueError(f"the benchmark holds a positive multiple of {SHARE_QUANTUM} shares, got {p.shares}")
             if p.stop is not None or p.take is not None or p.exit_pending:
                 raise ValueError("the benchmark position has no stop, take or pending exit")
             if not self.start <= p.entry_date <= self.last_session:
@@ -110,9 +113,9 @@ class BenchmarkState:
             raise ValueError("before the first session the benchmark holds cash only")
 
     @property
-    def shares(self) -> int:
-        """Whole SPY shares held (0 without a position)."""
-        return 0 if self.position is None else int(self.position.shares)
+    def shares(self) -> Decimal:
+        """SPY shares held (0 without a position)."""
+        return Decimal(0) if self.position is None else self.position.shares
 
     @property
     def income_usd(self) -> Decimal:
@@ -155,8 +158,8 @@ def _check_bar(bar: object, session: date) -> Bar:
     return bar
 
 
-def _buy_fill(session: date, price: Decimal, shares: int, cost: Decimal, reason: str) -> Fill:
-    n = Decimal(shares)
+def _buy_fill(session: date, price: Decimal, shares: Decimal, cost: Decimal, reason: str) -> Fill:
+    n = shares
     return Fill(
         session_date=session,
         symbol=SPY,
@@ -187,7 +190,7 @@ def split_benchmark(state: BenchmarkState, factor: Decimal, session: date) -> tu
     p = state.position
     if p is None:
         return state, _ZERO
-    whole, fraction = _split_shares(int(p.shares), ratio)
+    whole, fraction = _split_position_shares(p.shares, ratio, True)
     new_mark = _rescale_price(p.mark, ratio)
     new_entry = _rescale_price(p.entry_price, ratio)
     if new_mark <= 0 or new_entry <= 0:
@@ -198,7 +201,7 @@ def split_benchmark(state: BenchmarkState, factor: Decimal, session: date) -> tu
         return replace(state, cash=cash, position=None), in_lieu
     position = replace(
         p,
-        shares=Decimal(whole),
+        shares=whole,
         mark=new_mark,
         entry_price=new_entry,
         income_usd=p.income_usd + in_lieu,
@@ -243,14 +246,14 @@ def step_benchmark(
     pos = state.position
     fills: list[Fill] = []
     if session == state.start:
-        shares = _whole_shares(cash, b.open)
-        cost = buy_cost(b.open, shares)
+        shares = _fractional_shares(cash, b.open)
+        cost = fractional_buy_cost(b.open, shares)
         cash -= cost
         if shares > 0:
             price = q(b.open)
             pos = Position(
                 symbol=SPY,
-                shares=Decimal(shares),
+                shares=shares,
                 mark=b.close,
                 entry_date=session,
                 entry_price=price,
@@ -265,20 +268,20 @@ def step_benchmark(
         if pos is not None:
             pos = replace(pos, days_held=pos.days_held + 1)
         if dividend is not None:
-            held = 0 if pos is None else int(pos.shares)
+            held = Decimal(0) if pos is None else pos.shares
             income = q(held * dividend)
             cash += income
             if pos is not None:
                 pos = replace(pos, income_usd=pos.income_usd + income)
-            more = _whole_shares(cash, b.close)
+            more = _fractional_shares(cash, b.close)
             if more > 0:
-                cost = buy_cost(b.close, more)
+                cost = fractional_buy_cost(b.close, more)
                 cash -= cost
                 price = q(b.close)
                 if pos is None:
                     pos = Position(
                         symbol=SPY,
-                        shares=Decimal(more),
+                        shares=more,
                         mark=b.close,
                         entry_date=session,
                         entry_price=price,
@@ -295,7 +298,7 @@ def step_benchmark(
 
     if pos is not None:
         pos = replace(pos, mark=b.close)
-    held = 0 if pos is None else int(pos.shares)
+    held = Decimal(0) if pos is None else pos.shares
     equity = q(cash + held * b.close)
     new = BenchmarkState(start=state.start, cash=cash, equity=equity, position=pos, last_session=session)
     return new, Snapshot(date=session, cash_usd=cash, equity_usd=equity), tuple(fills)

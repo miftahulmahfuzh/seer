@@ -71,21 +71,22 @@ RM = "RM-FR"  # lab M0011-RAW20-TV14-N21 in fractional shares; replaces FND (010
 RETIRED = (F4, F1, FND)  # the whole-share three, retired by 010 when their fractional twins joined
 ACTIVE_IDS = ("SPY", "A", "C", F4_FR, F1_FR, RM)
 
+# 2026-10-07: every digest moved once, on purpose, when the paper books' starting cash went from
+# 20,000,000 to 10,000,000 IDR (spec "initial_idr"; the owner's own Gotrade money). Production's
+# paper clocks were reset the same day, before any session had been stepped.
 PINS = {
-    "SPY": "ca309ea7f19d0b771f236c63309a2fcf28a82e16048528d738dc329a42d4d198",
-    "A": "37cd89be4b4c82f9dc2d4f3bdd69551a7d31aef83119f23ee757f8ec6568362f",
-    F4: "6c55c13acc487a6fccbe2c5c0eb91a36e39f3a5444555a0dbfba4ffba5b30deb",
-    F1: "e7fbb32d1cc4e11b2d0d9b941ab01ac1a545e49a08c11bf8c70da5c54cad9e2f",
-    "C": "6cea6cb8de993f6a3f2d7ef4b48c878654a57df16cab87f72a95e9dd49a1b762",
-    # FND joins the roster in phase 6 of roster-promotion-pipeline. Its spec is composite-rank
-    # fundamentals, top 20, equal sizing, under monthly-hold. The five values above are
-    # unchanged, byte for byte: adding an entry must never re-digest a started strategy.
-    FND: "4a9dacc37478bf4d17b3ba35cbebd9e0c3f8759f122c4596f7cd9d076d8ef530",
-    # 010: the same three methods under monthly-hold-frac. New ids, new digests; the six above
-    # are unchanged byte for byte.
-    F4_FR: "2dc26f634daf8efb161a087ab8f3a915044e6836b2a7d3cbdff477528aafa928",
-    F1_FR: "a5e4239e12c720636707059c5bddb776322a47a06caa0ccf69c2519eff9a2d2a",
-    RM: "ba0fb4ffca4077361220957d00b9c9e4ddcf5f42a073a0fa607073fe9478a541",
+    "SPY": "9737a68ed0075b0a66bb076c12097f2ff54bd79c45fc6085b1bd8bf7fb110dab",
+    "A": "ee49ea0bb1e972a1cf808456bb094fdbf3e97cce6efafdb115ae4e5273c287d5",
+    F4: "0141e9833a5a26ae31ac969c758fb90b3d737d36d2b8d572a88eada6a2cea93c",
+    F1: "a00d98e604427fcbba19b936c760eae653f859eb878a6469b1c23c7e9f680706",
+    "C": "fc355c3fbbfe7589328c53521ea418ecab814c2a65fc9b0a6945ed28a9a8fb35",
+    # FND joined the roster in phase 6 of roster-promotion-pipeline: composite-rank fundamentals,
+    # top 20, equal sizing, under monthly-hold. Adding an entry must never re-digest another one.
+    FND: "d6b262921285300d65fa78181c374464e34f664bd1f6d076e0686a65e75ecc20",
+    # 010: F4 and F1 under monthly-hold-frac, and RM (lab M0011) replacing FND.
+    F4_FR: "a553cf218e17b49f28d474bf8e0d9f00bdaf5ea2042722f45b9e31af7e7b1900",
+    F1_FR: "38cfe989faadafa765058764e948583ed2f3cc28e174369b278e06fa65c25c44",
+    RM: "fb435dc8d0a5e372d137938b1881b4558c94639ca3483e56f225751b82535264",
 }
 
 FACTOR_PARAMS_AS_DICT = {
@@ -202,7 +203,7 @@ def test_the_spec_names_engine_object_rules_and_params():
     )
     assert s["params"] == FACTOR_PARAMS_AS_DICT
     assert s["rules"] == rules_dict(MONTHLY_HOLD)
-    assert s["initial_idr"] == "20000000"
+    assert s["initial_idr"] == "10000000"
     a = spec(entry("A"))
     assert a["params"] == STRATEGY_A_PARAMS.as_dict()
     assert a["rules"]["engine"] == "bracket_v0"
@@ -287,7 +288,7 @@ def test_c_spec_is_a_plus_the_frozen_news_check():
     )
     assert STRATEGY_C.id == STRATEGY_C_ID == "C-news-veto"
     assert s["rules"] == rules_dict(DESIGN_V0) == spec(entry("A"))["rules"]
-    assert s["initial_idr"] == "20000000"
+    assert s["initial_idr"] == "10000000"
     p = s["params"]
     assert p == STRATEGY_C_PARAMS.as_dict()
     assert {k[2:]: v for k, v in p.items() if k.startswith("a.")} == STRATEGY_A_PARAMS.as_dict()

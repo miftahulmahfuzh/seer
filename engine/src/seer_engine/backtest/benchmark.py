@@ -25,11 +25,12 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_FLOOR, Decimal, InvalidOperation
 
 from seer_engine.dates import prev_session, sessions
 from seer_engine.prices import Bar
 from seer_engine.sim import COST_RATE, Snapshot, buy_cost, q
+from seer_engine.sim.rules import SHARE_QUANTUM
 
 DIVIDENDS_HEADER = "ex_date,amount_usd"
 PRICE_CURVE = "spy_price"
@@ -55,7 +56,7 @@ class BenchmarkCurve:
 
     name: str
     snapshots: tuple[Snapshot, ...]
-    shares: int
+    shares: int | Decimal  # whole shares, or a multiple of SHARE_QUANTUM when fractional
     cash: Decimal
     dividends_usd: Decimal
 
@@ -109,6 +110,21 @@ def _whole_shares(cash: Decimal, price: Decimal) -> int:
     return n
 
 
+def _fractional_shares(cash: Decimal, price: Decimal) -> Decimal:
+    """The most shares ``cash`` buys at ``price`` after the 0.1% cost, in multiples of
+    ``SHARE_QUANTUM`` (0.0001): the paper benchmark (Gotrade sells SPY in fractions)."""
+    unit = price * (1 + COST_RATE)
+    n = (cash / unit).quantize(SHARE_QUANTUM, rounding=ROUND_FLOOR)
+    while n > 0 and fractional_buy_cost(price, n) > cash:
+        n -= SHARE_QUANTUM
+    return n if n > 0 else Decimal(0)
+
+
+def fractional_buy_cost(price: Decimal, shares: Decimal) -> Decimal:
+    """``buy_cost`` for a fractional share count: ``q(price × n × 1.001)``."""
+    return q(price * shares * (1 + COST_RATE))
+
+
 def _bar(spy: Mapping[date, Bar], d: date) -> Bar:
     bar = spy.get(d)
     if bar is None:
@@ -128,6 +144,7 @@ def buy_and_hold(
     *,
     dividends: Sequence[Dividend] = (),
     name: str,
+    fractional: bool = False,
 ) -> BenchmarkCurve:
     """Buy SPY at ``start``'s open, hold, mark every close through ``end``.
 
@@ -135,6 +152,9 @@ def buy_and_hold(
     curve. Raises ``ValueError`` when ``start``/``end`` are not sessions, ``end < start``,
     ``initial_cash <= 0``, a dividend list is not strictly ascending, a dividend inside
     ``(start, end]`` is not dated on a session, or a session has no SPY bar.
+
+    ``fractional`` buys in multiples of ``SHARE_QUANTUM`` instead of whole shares (the paper
+    benchmark since 2026-10-07; every backtest keeps the whole-share default).
     """
     if not isinstance(initial_cash, Decimal):
         raise TypeError(f"initial_cash must be a Decimal, got {type(initial_cash).__name__}")
@@ -161,8 +181,12 @@ def buy_and_hold(
 
     snaps: list[Snapshot] = [Snapshot(date=prev_session(start), cash_usd=cash0, equity_usd=cash0)]
     first = _bar(spy, start)
-    shares = _whole_shares(cash0, first.open)
-    cash = cash0 - buy_cost(first.open, shares)
+    if fractional:
+        shares: int | Decimal = _fractional_shares(cash0, first.open)
+        cash = cash0 - fractional_buy_cost(first.open, shares)
+    else:
+        shares = _whole_shares(cash0, first.open)
+        cash = cash0 - buy_cost(first.open, shares)
     credited = Decimal("0.0000")
     for d in window:
         bar = _bar(spy, d)
@@ -171,9 +195,14 @@ def buy_and_hold(
             income = q(shares * amount)
             cash += income
             credited += income
-            more = _whole_shares(cash, bar.close)
-            cash -= buy_cost(bar.close, more)
-            shares += more
+            if fractional:
+                extra = _fractional_shares(cash, bar.close)
+                cash -= fractional_buy_cost(bar.close, extra)
+                shares += extra
+            else:
+                more = _whole_shares(cash, bar.close)
+                cash -= buy_cost(bar.close, more)
+                shares += more
         snaps.append(Snapshot(date=d, cash_usd=cash, equity_usd=q(cash + shares * bar.close)))
     return BenchmarkCurve(
         name=name,

@@ -362,6 +362,7 @@ def run_rules(
     dividends: DividendMap = _NO_DIVIDENDS,
     usd_idr: Decimal | None = None,
     kickoff: date | None = None,
+    initial_idr: Decimal = INITIAL_IDR,
 ) -> RunResult | BookResult:
     """Run under ``rules``: the single dispatch every P7a caller uses.
 
@@ -389,7 +390,9 @@ def run_rules(
             )
         if kickoff is not None:
             raise ValueError(f"rules {rules.id!r} rank no book; kickoff must be None, got {kickoff}")
-        return run_backtest(market, strategy_or_allocator, params, start, end, prepared=prepared)
+        return run_backtest(
+            market, strategy_or_allocator, params, start, end, prepared=prepared, initial_idr=initial_idr
+        )
     if not isinstance(strategy_or_allocator, Allocator):
         raise TypeError(f"rules {rules.id!r} run an Allocator, got {type(strategy_or_allocator).__name__}")
     return run_book(
@@ -403,6 +406,7 @@ def run_rules(
         dividends=dividends,
         usd_idr=usd_idr,
         kickoff=kickoff,
+        initial_idr=initial_idr,
     )
 
 

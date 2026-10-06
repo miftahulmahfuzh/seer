@@ -8,7 +8,8 @@ the stored rate would show. Every expected record is checked against the runner 
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Set as AbstractSet
+from collections.abc import Mapping
+from collections.abc import Set as AbstractSet
 from dataclasses import replace
 from datetime import date
 from decimal import Decimal
@@ -22,16 +23,31 @@ from seer_engine import dates
 from seer_engine.backtest.benchmark import Dividend, buy_and_hold
 from seer_engine.backtest.book_runner import run_book
 from seer_engine.backtest.market import Market, Membership
-from seer_engine.backtest.runner import INITIAL_IDR, run_backtest
+from seer_engine.backtest.runner import run_backtest
 from seer_engine.paper import replay
-from seer_engine.paper.replay import CheckResult, Difference, Holding, PaperHead, Records
+from seer_engine.paper.capital import PAPER_INITIAL_IDR
+from seer_engine.paper.replay import (
+    CheckResult,
+    Difference,
+    Holding,
+    PaperHead,
+    Records,
+)
 from seer_engine.prices import Bar
-from seer_engine.sim import MONTHLY_HOLD, Pick, Portfolio, Snapshot, Trade, initial_cash_usd, size_picks
+from seer_engine.sim import (
+    MONTHLY_HOLD,
+    Pick,
+    Portfolio,
+    Snapshot,
+    Trade,
+    initial_cash_usd,
+    size_picks,
+)
 from seer_engine.strategies.base import History, history_from_bars
 
 FIRST, LAST_BAR = D("2025-02-18"), D("2025-03-14")
 USD_IDR = Decimal("16000")
-CASH0 = initial_cash_usd(INITIAL_IDR, USD_IDR)  # 1250.0000
+CASH0 = initial_cash_usd(PAPER_INITIAL_IDR, USD_IDR)  # 625.0000: the paper books start with 10,000,000 IDR
 
 
 def _bars(symbol: str, special: Mapping[str, tuple[str, str, str, str]], default: tuple[str, str, str, str]) -> list[Bar]:
@@ -123,7 +139,9 @@ def test_expected_bracket_is_run_backtest_at_the_stored_rate():
     m = market()
     got = _bracket()
     fixed = Market(history=m.history, membership=m.membership, fx=((BRACKET_HEAD.paper_start, USD_IDR),))
-    run = run_backtest(fixed, PICKS, None, BRACKET_HEAD.paper_start, BRACKET_HEAD.last_session)
+    run = run_backtest(
+        fixed, PICKS, None, BRACKET_HEAD.paper_start, BRACKET_HEAD.last_session, initial_idr=PAPER_INITIAL_IDR
+    )
     assert got.snapshots == run.snapshots
     assert got.initial_cash == CASH0 == run.initial_cash
     assert (got.cash, got.equity) == (run.snapshots[-1].cash_usd, run.snapshots[-1].equity_usd)
@@ -157,14 +175,15 @@ def test_expected_book_is_run_book_with_every_decision():
     m = market()
     got = _book()
     run = run_book(
-        m, FIXED, FIXED_PARAMS, MONTHLY_HOLD, BOOK_HEAD.paper_start, BOOK_HEAD.last_session, dividends=DIVIDENDS, usd_idr=USD_IDR
+        m, FIXED, FIXED_PARAMS, MONTHLY_HOLD, BOOK_HEAD.paper_start, BOOK_HEAD.last_session, dividends=DIVIDENDS, usd_idr=USD_IDR,
+        initial_idr=PAPER_INITIAL_IDR,
     )
     assert got.snapshots == tuple(Snapshot(s.date, s.cash_usd, s.equity_usd) for s in run.snapshots)
     assert got.fills == run.fills and len(got.fills) == 2
     assert got.trades == run.trades
     assert got.positions == run.open_at_end
     assert {p.symbol for p in got.positions} == {"AAA", "BBB"}
-    assert run.dividends_usd == P("14.5")
+    assert run.dividends_usd == P("7.25")  # half the shares of a 20,000,000 IDR book: 10,000,000 since 2026-10-07
     assert [s for s, _ in got.targets] == [D("2025-03-03")]  # the first session of March only
     assert [t.symbol for t in got.targets[0][1]] == ["AAA", "BBB"]
     assert got.pending_session == D("2025-03-06") and got.pending_decision is False
@@ -190,13 +209,15 @@ def test_expected_benchmark_is_buy_and_hold_with_spy_dividends():
     got = _benchmark()
     curve = buy_and_hold(
         m.spy(), SPY_HEAD.paper_start, SPY_HEAD.last_session, CASH0,
-        dividends=(Dividend(D("2025-03-05"), Decimal("1.5")),), name="SPY",
+        dividends=(Dividend(D("2025-03-05"), Decimal("1.5")),), name="SPY", fractional=True,
     )
-    assert curve.dividends_usd == P("3")
+    # A $625 book buys about 1.25 SPY shares (fractional since 2026-10-07): nearly all of it
+    # invested, the dividend credited on that holding and reinvested at the ex-date close.
+    assert curve.dividends_usd == P("1.8693")
     assert got.snapshots == curve.snapshots
-    assert got.cash == curve.cash == P("249.998")
-    assert got.holdings == (Holding("SPY", Decimal(curve.shares), P("501")),)
-    assert curve.shares == 2
+    assert got.cash == curve.cash == P("0.0432")
+    assert got.holdings == (Holding("SPY", curve.shares, P("501")),)
+    assert curve.shares == P("1.2499")
 
 
 def test_expected_benchmark_first_night_holds_cash_only():

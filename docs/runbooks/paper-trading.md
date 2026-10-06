@@ -280,6 +280,22 @@ headline count) and a line "`n` checked · `k` allowed".
 `paper` never fails because of C's verdicts, and `paper_check` replays C from exactly the rows Paper
 used.
 
+### The paper books start with 10,000,000 IDR (2026-10-07)
+
+Every paper book starts with `paper.capital.PAPER_INITIAL_IDR` = 10,000,000 IDR, the owner's own
+Gotrade money, so the "About $X" amounts on Positions are the amounts the owner types into Gotrade
+(it was `backtest.runner.INITIAL_IDR`, 20,000,000; the backtests keep that, since their records
+are closed and only percentages matter there). The amount is part of every spec (`initial_idr`),
+so every digest moved once. At 10,000,000 IDR (about $558) one SPY share no longer fits, so the
+SPY benchmark buys fractional shares (Gotrade sells SPY in fractions): `paper.benchmark` and the
+replay's `buy_and_hold(..., fractional=True)`; the backtest benchmark keeps whole shares.
+
+Production's paper state was reset the same night, before any session had been stepped (day-0
+cash rows and A's and C's first pending orders only), with the "Reset paper state" statements
+below plus `TRUNCATE book_previews` and `paper_end = NULL`. The rows were saved first. Every
+strategy's clock starts again on the next nightly. `news_vetoes` were kept. M0011's lab promotion
+note records the spec digest before the change; the roster's digest for RM-FR is the current one.
+
 ### F4 and F1 trade fractional shares, RM replaces FND (migration 010)
 
 The owner verified on 2026-10-07 that Gotrade takes fractional **limit** buys and sells (its
@@ -318,7 +334,7 @@ trades on it and the replay never reads it.
   merge** (Migrate applies `004` that night; no session is back-dated). The four P4 clocks do not
   move.
 - **Until the four secrets exist, every verdict is `failed` and C makes no trades**: it holds its
-  20,000,000 IDR in cash, and those flat sessions stay in its record (no reset to hide them). Set the
+  10,000,000 IDR in cash, and those flat sessions stay in its record (no reset to hide them). Set the
   secrets (Owner step 1) before the first scheduled night after the merge, so C trades from its
   first session.
 - `paper_check --require-sessions 5` counts every roster strategy, `C` included. C's clock starts

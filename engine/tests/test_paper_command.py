@@ -20,9 +20,9 @@ from seer_engine.backtest import io as bio
 from seer_engine.backtest.benchmark import Dividend, buy_and_hold
 from seer_engine.backtest.book_runner import run_rules
 from seer_engine.backtest.market import Market, Membership
-from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.commands import paper
 from seer_engine.paper import roster
+from seer_engine.paper.capital import PAPER_INITIAL_IDR
 from seer_engine.prices import Bar
 from seer_engine.sim import initial_cash_usd
 from seer_engine.strategies.base import history_from_bars
@@ -273,7 +273,7 @@ def test_first_night_starts_every_roster_strategy(world):
     assert night(world, N0) == 0
     usd = fx_rate(N0)
     assert usd != fx_rate(PAPER_START)  # the first paper day's own rate is not known yet
-    cash0 = initial_cash_usd(INITIAL_IDR, usd)
+    cash0 = initial_cash_usd(PAPER_INITIAL_IDR, usd)
     assert q(
         world,
         "SELECT strategy_id, last_session, cash_usd, equity_usd, initial_cash_usd, usd_idr, pending_session "
@@ -320,7 +320,8 @@ def test_seven_nights_step_every_session_and_equal_the_runners(world, tmp_path):
     [(usd, cash0)] = q(world, "SELECT usd_idr, initial_cash_usd FROM paper_state WHERE strategy_id = 'SPY'")
     market, _ = bio.load_market(world, cache_dir=tmp_path)
     spy = buy_and_hold(
-        market.spy(), PAPER_START, OCT1, cash0, dividends=(Dividend(DIV_DATE, DIV_AMT),), name="spy_tr"
+        market.spy(), PAPER_START, OCT1, cash0, dividends=(Dividend(DIV_DATE, DIV_AMT),), name="spy_tr",
+        fractional=True,
     )
     assert snaps(world, "SPY") == [(s.date, s.cash_usd, s.equity_usd) for s in spy.snapshots]
     for sid in (F4, F1):
@@ -335,6 +336,7 @@ def test_seven_nights_step_every_session_and_equal_the_runners(world, tmp_path):
             dividends={"SPY": {DIV_DATE: DIV_AMT}},
             usd_idr=usd,
             kickoff=PAPER_START,
+            initial_idr=PAPER_INITIAL_IDR,
         )
         assert snaps(world, sid) == [(s.date, s.cash_usd, s.equity_usd) for s in result.snapshots]
         assert q(

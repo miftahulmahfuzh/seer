@@ -1,0 +1,87 @@
+{
+  "branch": "feature/build-promotion-path",
+  "coordinator": "orch-build-promotion-path",
+  "coordinator_session_id": "a118fa68-7670-403f-b5be-438bda81dcbb",
+  "created": "2026-10-06T05:43:20+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "engine/src/seer_engine/backtest`, `research.py",
+      "plan": ".workflows/plan/build-promotion-path/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Make the backtest window a parameter, keeping D9 absolute"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 2,
+      "note": null,
+      "package": "research.py`, `commands/research_store.py",
+      "plan": ".workflows/plan/build-promotion-path/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Build and load the test-window store"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "lab/`, `commands/lab.py",
+      "plan": ".workflows/plan/build-promotion-path/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Pre-registration: `lab promote` and `docs/lab/prereg/"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2,
+        3
+      ],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": null,
+      "package": "lab/runner.py`, `commands/lab.py`, `SKILL.md",
+      "plan": ".workflows/plan/build-promotion-path/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "lab test`: one counted look, recorded and final"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/build-promotion-path/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "build-promotion-path",
+  "updated": "2026-10-06T05:43:20+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/build-promotion-path"
+}

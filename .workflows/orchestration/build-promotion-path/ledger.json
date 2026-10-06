@@ -37,25 +37,25 @@
       "satisfies": [
         "R1"
       ],
-      "status": "spawned",
+      "status": "pending",
       "task_id": null,
       "title": "Build and load the test-window store"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "2d5aaf0",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "lab promote + lab/prereg.py + docs/lab/prereg/README.md; all 3 source edits pure additions (90 ins, 0 del) so lab run is unchanged. Phase 4 left BLOCKED: it depends on 2 and 3, and 2 has not landed. Phase 4 must use prereg.require_committed(candidate_id) + check_digest(p, digest); Prereg field is .candidate, no .path - use prereg.path_for(p.method); no require_commit= flag exists.",
       "package": "lab/`, `commands/lab.py",
       "plan": ".workflows/plan/build-promotion-path/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-06T06:06:21+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-AZ81",
       "title": "Pre-registration: `lab promote` and `docs/lab/prereg/"
     },
     {
@@ -82,7 +82,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/build-promotion-path/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "build-promotion-path",
-  "updated": "2026-10-06T05:59:29+00:00",
-  "verified_at": "2026-10-06T05:58:47+00:00",
+  "updated": "2026-10-06T06:07:06+00:00",
+  "verified_at": "2026-10-06T06:07:06+00:00",
   "worktree": "/home/miftah/.worktrees/seer/build-promotion-path"
 }

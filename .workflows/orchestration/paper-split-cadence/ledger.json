@@ -25,24 +25,24 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "06d12ea",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "paper night passes last_rank (from book_targets) + marks for split rules; resize-only decisions store no evidence; 5 new Postgres e2e tests green",
       "package": "engine/commands`, `engine/tests",
       "plan": ".workflows/plan/paper-split-cadence/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-06T19:00:25+00:00",
       "satisfies": [
         "R1",
         "R2",
         "R3",
         "R7"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-GX63",
       "title": "Nightly wiring and end-to-end tests (paper night, paper_check, promote)"
     },
     {
@@ -66,7 +66,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/paper-split-cadence/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "paper-split-cadence",
-  "updated": "2026-10-06T18:53:07+00:00",
+  "updated": "2026-10-06T19:00:25+00:00",
   "verified_at": "2026-10-06T18:50:51+00:00",
   "worktree": "/home/miftah/.worktrees/seer/paper-split-cadence"
 }

@@ -139,11 +139,14 @@ def decide_book(
     rules: TradeRules,
     data_date: date,
     held: AbstractSet[str],
+    *,
+    force: bool = False,
 ) -> tuple[tuple[Target, ...] | None, bool]:
     """The targets for ``next_session(data_date)`` and whether the idle residual was appended.
 
     ``(None, False)`` when that session is not a decision session under ``rules`` (the
-    allocator is not called).
+    allocator is not called), unless ``force``: then the session is ranked whatever the cadence
+    (the kickoff, ``needs_kickoff``; also the nightly preview of what the book would pick now).
 
     Split-cadence rules (``rules.resize_cadence``) are a ValueError here: a resize-only session
     needs the LAST RANK SESSION'S basket, and this function is stateless — the paper store does
@@ -177,9 +180,9 @@ def decide_book(
             f"rules {rules.id!r} split rank and resize cadences; paper trading cannot decide them yet "
             "(the last rank session's basket is not stored). Backtest them with run_book."
         )
-    if not is_decision_session(rules, session):
+    if not force and not is_decision_session(rules, session):
         return None, False
-    assert is_rank_session(rules, session)  # no resize_cadence above, so every decision is a rank
+    assert force or is_rank_session(rules, session)  # no resize_cadence above, so every decision is a rank
     members = market.membership.members_on(data_date)
     # The idle position is the runner's residual, never a family's (as run_book).
     mine = held_now - {rules.idle_symbol} if rules.idle_symbol is not None else held_now
@@ -201,6 +204,23 @@ def decide_book(
     else:
         wanted = allocator.targets(history, members, data_date, mine, params)
     return _with_idle(market, rules, tuple(wanted), data_date)
+
+
+def needs_kickoff(rules: TradeRules, paper_start: date, session: date, kickoff: date | None) -> bool:
+    """True when ``session`` must be the book's kickoff: its first decision, off the cadence.
+
+    A book strategy whose paper clock starts between two rank sessions would otherwise hold its
+    starting cash until the next one (up to a month for monthly rules). It ranks instead on the
+    first session it can, once: when no kickoff is stored yet (``kickoff`` None), ``session`` is
+    not a decision session, and no rank session lies in ``[paper_start, session)`` (one there was
+    already a first decision). Replays rank on the stored kickoff (``run_book(kickoff=...)``).
+    """
+    _book_rules(rules)
+    _session("paper_start", paper_start)
+    _session("session", session)
+    if kickoff is not None or is_decision_session(rules, session):
+        return False
+    return not any(is_rank_session(rules, s) for s in dates.sessions(paper_start, session) if s < session)
 
 
 def settle_book(

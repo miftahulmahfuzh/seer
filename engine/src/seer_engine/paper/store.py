@@ -331,13 +331,14 @@ class PaperState:
     usd_idr: Decimal
     pending_session: date | None
     pending_decision: bool
+    kickoff_session: date | None = None  # book: the one off-cadence first decision (008)
 
 
 def read_paper_state(conn: psycopg.Connection, strategy_id: str) -> PaperState | None:
     """The ``paper_state`` row of ``strategy_id``, or None before its day-0 init."""
     row = conn.execute(
         "SELECT strategy_id, last_session, cash_usd, equity_usd, initial_cash_usd, usd_idr, "
-        "pending_session, pending_decision FROM paper_state WHERE strategy_id = %s",
+        "pending_session, pending_decision, kickoff_session FROM paper_state WHERE strategy_id = %s",
         (strategy_id,),
     ).fetchone()
     if row is None:
@@ -351,6 +352,7 @@ def read_paper_state(conn: psycopg.Connection, strategy_id: str) -> PaperState |
         usd_idr=row[5],
         pending_session=row[6],
         pending_decision=bool(row[7]),
+        kickoff_session=row[8],
     )
 
 
@@ -443,6 +445,42 @@ def write_pending(conn: psycopg.Connection, strategy_id: str, session: date, *, 
             (session, bool(decision), strategy_id),
         )
         _one_row(cur, f"paper_state {strategy_id}")
+
+
+def write_kickoff(conn: psycopg.Connection, strategy_id: str, session: date) -> None:
+    """Record ``session`` as the book's kickoff (``paper.book.needs_kickoff``). Once only: a
+    second kickoff is a StoreError (the replay ranks on exactly one)."""
+    _session("session", session)
+    state = _require_state(conn, strategy_id)
+    if state.kickoff_session is not None:
+        raise StoreError(f"{strategy_id} already kicked off on {state.kickoff_session}")
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE paper_state SET kickoff_session = %s, updated_at = now() WHERE strategy_id = %s",
+            (session, strategy_id),
+        )
+        _one_row(cur, f"paper_state {strategy_id}")
+
+
+def save_book_preview(
+    conn: psycopg.Connection, strategy_id: str, data_date: date, targets: Sequence[Target] | None
+) -> None:
+    """Replace the strategy's ``book_previews`` with ``targets``, what it would pick from the bars
+    of ``data_date`` if it ranked tonight. Display only (008). None or empty leaves no rows."""
+    _session("data_date", data_date)
+    conn.execute("DELETE FROM book_previews WHERE strategy_id = %s", (strategy_id,))
+    rows: list[tuple[Any, ...]] = []
+    for rank, t in enumerate(targets or (), start=1):
+        if not isinstance(t, Target):
+            raise TypeError(f"targets must hold Target values, got {type(t).__name__}")
+        rows.append((strategy_id, data_date, rank, t.symbol, _exact("weight", t.weight, WEIGHT_QUANTUM), _exact("last", t.last)))
+    if rows:
+        with conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO book_previews (strategy_id, data_date, rank, symbol, weight, last) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                rows,
+            )
 
 
 # --------------------------------------------------------------------------- equity snapshots

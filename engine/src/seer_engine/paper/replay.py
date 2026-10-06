@@ -13,8 +13,9 @@ Expected records, per engine, over ``[paper_start, last_session]``:
   orders ``paper.bracket.decide_bracket`` sizes for ``pending_session`` from the run's end
   portfolio. Expected marks: each open symbol's last close on or before ``last_session``.
 - ``book`` (F4, F1): ``run_rules(market, allocator, params, rules, paper_start, last_session,
-  dividends=dividends, usd_idr=usd_idr)``. Expected targets: ``paper.book.decide_book`` on every
-  decision session from ``paper_start`` through ``pending_session``, with the held set rebuilt
+  dividends=dividends, usd_idr=usd_idr, kickoff=head.kickoff)``. Expected targets:
+  ``paper.book.decide_book`` on every decision session (and the stored kickoff session, forced)
+  from ``paper_start`` through ``pending_session``, with the held set rebuilt
   from the run's fills; an empty decision is left out (it writes no ``book_targets`` row).
 - ``benchmark`` (SPY): ``buy_and_hold(market.spy(), paper_start, last_session, cash0,
   dividends=SPY's)``; the holding is ``(SPY, whole shares, last close)``.
@@ -141,6 +142,7 @@ class PaperHead:
     paper_start: date
     last_session: date
     usd_idr: Decimal
+    kickoff: date | None = None  # book: paper_state.kickoff_session, the off-cadence first rank
 
     def __post_init__(self) -> None:
         if self.engine not in ENGINES:
@@ -345,6 +347,7 @@ def expected_book(
             prepared=prepared,
             dividends=dividends,
             usd_idr=head.usd_idr,
+            kickoff=head.kickoff,
         )
         if not isinstance(run, BookResult):
             raise TypeError(f"book replay of {head.strategy_id} returned {type(run).__name__}")
@@ -354,10 +357,11 @@ def expected_book(
     decisions: list[tuple[date, tuple[Target, ...]]] = []
     pending_decision = False
     for session in dates.sessions(start, pending):
-        if not is_decision_session(rules, session):
+        kickoff = session == head.kickoff
+        if not kickoff and not is_decision_session(rules, session):
             continue
         wanted, _ = decide_book(
-            market, allocator, params, rules, dates.prev_session(session), held_before(fills, session)
+            market, allocator, params, rules, dates.prev_session(session), held_before(fills, session), force=kickoff
         )
         if session == pending:
             pending_decision = wanted is not None

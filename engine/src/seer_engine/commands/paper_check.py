@@ -138,6 +138,7 @@ def _check(conn: psycopg.Connection, entries: Sequence[RosterEntry]) -> tuple[Ch
                 paper_start=paper_start,
                 last_session=state.last_session,
                 usd_idr=state.usd_idr,
+                kickoff=state.kickoff_session,
             )
             stored[entry.id] = _stored_records(conn, entry.engine, entry.id, state)
         except (TypeError, ValueError) as exc:

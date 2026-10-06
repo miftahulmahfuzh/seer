@@ -5,8 +5,8 @@ import { selectStrategy, sharesLabel, strategyIcon } from '@/components/roster';
 import { StrategySwitch } from '@/components/StrategySwitch';
 import { WhyToggle } from '@/components/WhyToggle';
 import {
-  pendingOrders, positions as getPositions, runStatus, strategies, vetoes as getVetoes,
-  type Holding, type Pending, type PendingOrder, type RunStatus, type Strategy, type Veto,
+  bookPreview, pendingOrders, positions as getPositions, runStatus, strategies, vetoes as getVetoes,
+  type Holding, type Pending, type PendingOrder, type Preview, type RunStatus, type Strategy, type Veto,
 } from '@/lib/data';
 import { companyName, monthDay, pct, shortDate, signedPct, signedRp, signedUsd, usd } from '@/lib/format';
 import { wibDate } from '@/lib/session';
@@ -19,6 +19,7 @@ export const dynamic = 'force-dynamic';
 type Search = { s?: string };
 
 const NO_PENDING: Pending = { sessionDate: null, decision: false, orders: [] };
+const NO_PREVIEW: Preview = { dataDate: null, picks: [] };
 
 export default async function Positions({ searchParams }: { searchParams: Promise<Search> }) {
   const now = new Date();
@@ -27,9 +28,10 @@ export default async function Positions({ searchParams }: { searchParams: Promis
   const strat = selectStrategy(roster, q.s);
   // Paper orders exist for research strategies only; hidden while the data is stale.
   const showOrders = !!strat && !strat.isBenchmark && !run.stale;
-  const [open, pending] = await Promise.all([
+  const [open, pending, preview] = await Promise.all([
     strat ? getPositions(strat.id) : Promise.resolve([] as Holding[]),
     showOrders && strat ? pendingOrders(strat.id) : Promise.resolve(NO_PENDING),
+    showOrders && strat?.engine === 'book' ? bookPreview(strat.id) : Promise.resolve(NO_PREVIEW),
   ]);
 
   const bracket = open.filter(p => p.kind === 'bracket');
@@ -115,10 +117,16 @@ export default async function Positions({ searchParams }: { searchParams: Promis
               <span className={s.ordersNone}>{noOrders(strat, pending, sheet)}</span>
             ) : (
               <ul className={s.orderList}>
-                {pending.orders.map(o => <OrderRow key={o.key} o={o} />)}
+                {pending.orders.map(o => (
+                  <OrderRow key={o.key} o={o} passed={checks.find(v => v.symbol === o.symbol && v.verdict === 'allow')} />
+                ))}
               </ul>
             )}
           </section>
+        )}
+
+        {strat && !pending.decision && preview.picks.length > 0 && preview.dataDate && (
+          <WouldPick st={strat} preview={preview} />
         )}
 
         {strat && orderSession && sheet && <VetoedTonight st={strat} session={orderSession} sheet={sheet} />}
@@ -143,7 +151,7 @@ function paperWarning(status: RunStatus['paperStatus'], session: string): string
 function emptyState(st: Strategy | null): [string, string | null] {
   if (!st) return ['No strategies yet.', null];
   if (st.engine === 'benchmark') return ['Not bought yet.', `${st.name} is bought at the open of the first paper session.`];
-  if (st.engine === 'book') return ['In cash.', `${st.short} decides on the first session of each month.`];
+  if (st.engine === 'book') return ['In cash.', `${st.short} makes its first decision at its first paper session, then rebalances on the first session of each month.`];
   return ['No open positions.', null];
 }
 
@@ -151,7 +159,7 @@ function noOrders(st: Strategy, p: Pending, sheet: VetoSheet | null): string {
   if (st.engine === 'book') {
     return p.decision
       ? `No orders. ${st.short} decided to hold cash.`
-      : `No orders. ${st.short} decides on the first session of each month.`;
+      : `No orders. ${st.short} keeps what it holds until it rebalances on the first session of each month.`;
   }
   if (sheet && sheet.state === 'missing') return `No orders. ${st.short} buys nothing this session.`;
   if (sheet && sheet.state === 'failed') return `No orders. ${st.short} sits this session out.`;
@@ -345,7 +353,37 @@ function BenchmarkCard({ q }: { q: Holding }) {
   );
 }
 
-function OrderRow({ o }: { o: PendingOrder }) {
+/**
+ * What a book strategy would hold if it rebalanced tonight (`book_previews`): shown between its monthly
+ * decisions so a monthly strategy is never silent. Display only: nothing trades on it.
+ */
+function WouldPick({ st, preview }: { st: Strategy; preview: Preview }) {
+  return (
+    <section className={`sheet over bg-sheet ${s.orders}`}>
+      <div className={s.between}>
+        <span className="eyebrow">{st.short} would pick now</span>
+        <span className="chip num">{preview.picks.length}</span>
+      </div>
+      <span className={s.ordersSub}>
+        From the {shortDate(preview.dataDate!)} closes. {st.short} only trades when it rebalances, on the first session of each month.
+      </span>
+      <ul className={s.orderList}>
+        {preview.picks.map(p => (
+          <li key={p.symbol} className={s.order}>
+            <div className={s.orderHead}>
+              <span className={s.rank} data-tip="Rank in tonight's list">{p.rank}</span>
+              <span className={s.orderSym}>{p.symbol}</span>
+              <span className={s.orderCo}>last {usd(p.last)}</span>
+            </div>
+            <OrderCells cells={[['Weight', pct(p.weight, 1)]]} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function OrderRow({ o, passed }: { o: PendingOrder; passed?: Veto }) {
   const cells: [string, string][] = o.kind === 'bracket'
     ? [
         ['Limit', o.limit === null ? '—' : usd(o.limit)],
@@ -368,6 +406,13 @@ function OrderRow({ o }: { o: PendingOrder }) {
       </div>
       <OrderCells cells={cells} />
       <WhyToggle text={o.explanation} />
+      {passed && (
+        <>
+          <span className={s.vetoFacts}>{headlinesLabel(passed.headlineCount)} read{passed.earningsDate ? ` · earnings ${monthDay(passed.earningsDate)}` : ''}</span>
+          <WhyToggle text={passed.reason.trim() === '' ? null : passed.reason} label="Why it passed the news check"
+            missing="No reason was stored for this check." />
+        </>
+      )}
     </li>
   );
 }

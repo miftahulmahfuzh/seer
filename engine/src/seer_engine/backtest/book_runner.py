@@ -229,6 +229,7 @@ def run_book(
     dividends: DividendMap = _NO_DIVIDENDS,
     initial_idr: Decimal = INITIAL_IDR,
     usd_idr: Decimal | None = None,
+    kickoff: date | None = None,
 ) -> BookResult:
     """Run ``allocator`` with ``params`` under the book rules ``rules`` over every session in ``[start, end]``.
 
@@ -242,6 +243,9 @@ def run_book(
 
     ``rules.engine`` must be ``"book"``: ``DESIGN_V0`` (``"bracket_v0"``) is a ValueError, run it
     with ``run_rules``.
+
+    ``kickoff``: one extra rank session, off the cadence (paper trading's first decision, see
+    ``paper.book.needs_kickoff``). None, the default and every backtest, ranks on the cadence only.
     """
     if not isinstance(market, Market):
         raise TypeError(f"market must be a Market, got {type(market).__name__}")
@@ -276,7 +280,7 @@ def run_book(
         held = book.held()
         targets: tuple[Target, ...] | None = None
         idle_added = False
-        rank = is_rank_session(rules, session)
+        rank = is_rank_session(rules, session) or session == kickoff
         # A resize session before the first rank has no basket to re-scale: it is not a decision.
         if rank or (last_rank is not None and is_resize_session(rules, session)):
             members = market.membership.members_on(data_date)
@@ -357,6 +361,7 @@ def run_rules(
     prepared: Any = None,
     dividends: DividendMap = _NO_DIVIDENDS,
     usd_idr: Decimal | None = None,
+    kickoff: date | None = None,
 ) -> RunResult | BookResult:
     """Run under ``rules``: the single dispatch every P7a caller uses.
 
@@ -366,6 +371,7 @@ def run_rules(
       equal ``market.usd_idr_on(start)`` (ValueError otherwise): ``run_backtest`` always converts
       at that rate.
     - ``rules.engine == "book"`` with an ``Allocator``: ``run_book`` with every argument.
+    - ``kickoff`` is a book argument; with bracket rules it must be None (ValueError).
     - any other pairing: TypeError.
     """
     if not isinstance(rules, TradeRules):
@@ -381,6 +387,8 @@ def run_rules(
             raise ValueError(
                 f"rules {rules.id!r} convert at market.usd_idr_on(start) = {market.usd_idr_on(start)}, got {usd_idr}"
             )
+        if kickoff is not None:
+            raise ValueError(f"rules {rules.id!r} rank no book; kickoff must be None, got {kickoff}")
         return run_backtest(market, strategy_or_allocator, params, start, end, prepared=prepared)
     if not isinstance(strategy_or_allocator, Allocator):
         raise TypeError(f"rules {rules.id!r} run an Allocator, got {type(strategy_or_allocator).__name__}")
@@ -394,6 +402,7 @@ def run_rules(
         prepared=prepared,
         dividends=dividends,
         usd_idr=usd_idr,
+        kickoff=kickoff,
     )
 
 

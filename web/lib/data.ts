@@ -312,6 +312,25 @@ export async function pendingOrders(strategyId: string): Promise<Pending> {
   return { sessionDate: pendingSession, decision: false, orders: [] };
 }
 
+export type PreviewPick = { rank: number; symbol: string; weight: number; last: number };
+
+/** What a book strategy would pick if it ranked tonight (`book_previews`, migration 008): display only. */
+export type Preview = { dataDate: string | null; picks: PreviewPick[] };
+
+export async function bookPreview(strategyId: string): Promise<Preview> {
+  try {
+    const rows = await sql`SELECT data_date::text AS data_date, rank, symbol, weight, last
+      FROM book_previews WHERE strategy_id = ${strategyId} ORDER BY rank`;
+    return {
+      dataDate: rows[0] ? ymd(rows[0].data_date) : null,
+      picks: rows.map(r => ({ rank: n(r.rank), symbol: r.symbol, weight: n(r.weight), last: n(r.last) })),
+    };
+  } catch {
+    // Before the nightly applies 008 the table does not exist yet: no preview, not a broken page.
+    return { dataDate: null, picks: [] };
+  }
+}
+
 /**
  * The news check's verdicts for one strategy and session (`news_vetoes`, migration 004), every
  * verdict, by rank in A's list. Empty when the `veto` step did not run (or found no candidates).

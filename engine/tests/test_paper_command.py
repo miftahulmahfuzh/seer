@@ -287,8 +287,18 @@ def test_first_night_starts_every_roster_strategy(world):
     assert q(world, "SELECT strategy_id, date, cash_usd, equity_usd FROM equity_snapshots ORDER BY strategy_id") == [
         (i, N0, cash0, cash0) for i in IDS
     ]
-    assert q(world, "SELECT count(*) FROM book_targets") == [(0,)]  # 2026-09-24 is no monthly decision
-    assert q(world, "SELECT DISTINCT pending_decision FROM paper_state") == [(False,)]
+    # 2026-09-24 is no monthly decision, so every book strategy kicks off on it instead of waiting
+    # for 2026-10-01 (paper.book.needs_kickoff); bracket and benchmark entries have no kickoff.
+    books = sorted(i for i in IDS if ENTRIES[i].engine == "book")
+    assert q(world, "SELECT strategy_id, pending_decision, kickoff_session FROM paper_state ORDER BY strategy_id") == [
+        (i, i in books, PAPER_START if i in books else None) for i in IDS
+    ]
+    assert q(world, "SELECT count(*) FROM book_targets WHERE strategy_id = %s AND session_date = %s", (F1, PAPER_START)) == [
+        (1,)
+    ]
+    assert q(world, "SELECT DISTINCT strategy_id, data_date FROM book_previews WHERE strategy_id = %s", (F1,)) == [
+        (F1, N0)
+    ]
     [(status, error, finished_at)] = paper_run(world, N0)
     assert status == "success" and error is None and finished_at is not None
 
@@ -316,7 +326,15 @@ def test_seven_nights_step_every_session_and_equal_the_runners(world, tmp_path):
     for sid in (F4, F1):
         e = ENTRIES[sid]
         result = run_rules(
-            market, e.obj, e.params, e.rules, PAPER_START, OCT1, dividends={"SPY": {DIV_DATE: DIV_AMT}}, usd_idr=usd
+            market,
+            e.obj,
+            e.params,
+            e.rules,
+            PAPER_START,
+            OCT1,
+            dividends={"SPY": {DIV_DATE: DIV_AMT}},
+            usd_idr=usd,
+            kickoff=PAPER_START,
         )
         assert snaps(world, sid) == [(s.date, s.cash_usd, s.equity_usd) for s in result.snapshots]
         assert q(

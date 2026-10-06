@@ -275,6 +275,19 @@ headline count) and a line "`n` checked · `k` allowed".
 `paper` never fails because of C's verdicts, and `paper_check` replays C from exactly the rows Paper
 used.
 
+### Book strategies kick off on day one (migration 008)
+
+A book strategy (F4, F1, FND) ranks on its cadence (monthly-hold: the first session of each month).
+A clock that starts between two rank sessions would sit in cash until the next one, so the book
+**kicks off**: it ranks once on its first session the night can decide (`paper.book.needs_kickoff`),
+and `paper_state.kickoff_session` records that session. `paper_check` replays it with
+`run_book(kickoff=...)`; backtests never pass one, so every backtest record is unchanged. The clocks
+started on 2026-10-06 (before the rule) kick off on 2026-10-07.
+
+Every night Paper also writes `book_previews`: what each book strategy would pick if it ranked
+tonight. Positions shows it as "{F4} would pick now" between rebalances. Display only: nothing
+trades on it and the replay never reads it.
+
 ### C's clock
 
 - `C`'s `paper_start` is the session decided on the **first scheduled night after the Strategy C

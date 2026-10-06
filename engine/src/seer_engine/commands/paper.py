@@ -62,7 +62,7 @@ from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.commands.nightly import _parse_now
 from seer_engine.paper import roster, store
 from seer_engine.paper.benchmark import SPY, step_benchmark
-from seer_engine.paper.book import decide_book, settle_book
+from seer_engine.paper.book import decide_book, needs_kickoff, settle_book
 from seer_engine.paper.bracket import decide_bracket, settle_bracket
 from seer_engine.paper.roster import RosterEntry
 from seer_engine.paper.store import PaperState, StrategyRow
@@ -420,12 +420,13 @@ def _trade(conn: psycopg.Connection, rd: dates.RunDates, plan: NightPlan) -> Non
 
     for e in plan.start:
         _start(conn, e, rd, tonight)
+    starts = {row.id: row.paper_start for row in store.read_strategies(conn)}
     for e, state in plan.step:
         sessions = dates.sessions(dates.next_session(state.last_session), rd.data_date)
         if e.engine == "bracket":
             _step_bracket(conn, e, sessions, tonight)
         elif e.engine == "book":
-            _step_book(conn, e, sessions, tonight)
+            _step_book(conn, e, sessions, tonight, state, starts[e.id])
         elif e.engine == "benchmark":
             _step_benchmark(conn, e, sessions, tonight)
         else:
@@ -503,8 +504,12 @@ def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight
         store.insert_pending_orders(conn, e.id, sized.placed)
         store.write_pending(conn, e.id, paper_start, decision=False)
     elif e.engine == "book":
-        targets, _ = decide_book(view, e.obj, e.params, e.rules, rd.data_date, frozenset())
+        kickoff = needs_kickoff(e.rules, paper_start, paper_start, None)
+        targets, _ = decide_book(view, e.obj, e.params, e.rules, rd.data_date, frozenset(), force=kickoff)
         store.save_book_decision(conn, e.id, paper_start, targets)
+        if kickoff:
+            store.write_kickoff(conn, e.id, paper_start)
+        store.save_book_preview(conn, e.id, rd.data_date, targets)
     elif e.engine == "benchmark":
         store.write_pending(conn, e.id, paper_start, decision=False)
     else:
@@ -528,10 +533,18 @@ def _step_bracket(conn: psycopg.Connection, e: RosterEntry, sessions: Sequence[d
         log.info("%s %s: equity %s, %d live order(s)", e.id, s, pf.equity, len(pf.orders))
 
 
-def _step_book(conn: psycopg.Connection, e: RosterEntry, sessions: Sequence[date], tonight: _Tonight) -> None:
+def _step_book(
+    conn: psycopg.Connection,
+    e: RosterEntry,
+    sessions: Sequence[date],
+    tonight: _Tonight,
+    state: PaperState,
+    paper_start: date,
+) -> None:
     rules = e.rules
     loaded = store.load_book(conn, e.id, idle_symbol=rules.idle_symbol)
     book, targets, idle_added = loaded.book, loaded.targets, loaded.idle_added
+    kicked = state.kickoff_session
     for s in sessions:
         view = tonight.view(s)
         symbols = set(book.held())
@@ -553,8 +566,20 @@ def _step_book(conn: psycopg.Connection, e: RosterEntry, sessions: Sequence[date
         )
         book = night.book
         nxt = dates.next_session(s)
-        targets, idle_added = decide_book(view, e.obj, e.params, rules, s, book.held())
+        # A book that has never decided ranks on its first session instead of waiting for its
+        # cadence (008, paper.book.needs_kickoff); the replay ranks on the stored kickoff too.
+        kickoff = needs_kickoff(rules, paper_start, nxt, kicked)
+        targets, idle_added = decide_book(view, e.obj, e.params, rules, s, book.held(), force=kickoff)
         store.save_book_decision(conn, e.id, nxt, targets)
+        if kickoff:
+            store.write_kickoff(conn, e.id, nxt)
+            kicked = nxt
+        if s == sessions[-1]:
+            # What it would pick if it ranked tonight: display only, never traded or replayed.
+            preview = targets
+            if preview is None:
+                preview, _ = decide_book(view, e.obj, e.params, rules, s, book.held(), force=True)
+            store.save_book_preview(conn, e.id, s, preview)
         log.info(
             "%s %s: equity %s, %d position(s)%s",
             e.id,

@@ -276,7 +276,7 @@ TAMPERS = [
     pytest.param(
         "INSERT INTO book_trades (strategy_id, symbol, entry_date, exit_date, entry_price, exit_price, days_held, "
         "cost_usd, income_usd, pnl_usd, exit_reason, idle) VALUES ('F4-MOM12-N20-TREND', 'S00', "
-        "DATE '2026-10-26', DATE '2026-10-27', 10, 11, 2, 0.02, 0, 0.98, 'signal', false)",
+        "DATE '2026-11-03', DATE '2026-11-03', 10, 11, 1, 0.02, 0, 0.98, 'signal', false)",
         F4,
         "in the database, not in the replay",
         id="trade",

@@ -60,27 +60,27 @@
         "R4",
         "R8"
       ],
-      "status": "spawned",
+      "status": "pending",
       "task_id": null,
       "title": "Explain from evidence, with checks"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "8fdcdfc4d29803ce77f47b73d8d60717dc385f5a",
       "depends_on": [
         1
       ],
       "difficulty": "EASY",
       "n": 4,
-      "note": null,
+      "note": "promote refuses (exit 2) an allocator with no EVIDENCE entry, before any write; skill updated; no drift, no decisions",
       "package": "engine/commands`, skill",
       "plan": ".workflows/plan/why-this-pick-pipeline/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-06T15:21:28+00:00",
       "satisfies": [
         "R7"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-BZYN",
       "title": "Promote requires evidence"
     },
     {
@@ -100,7 +100,7 @@
         "R6",
         "R8"
       ],
-      "status": "spawned",
+      "status": "pending",
       "task_id": null,
       "title": "Show reasons on the site"
     }
@@ -108,7 +108,7 @@
   "plan": "/home/miftah/.worktrees/seer/why-this-pick-pipeline/.workflows/orchestration/why-this-pick-pipeline/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "why-this-pick-pipeline",
-  "updated": "2026-10-06T15:20:56+00:00",
-  "verified_at": "2026-10-06T15:20:50+00:00",
+  "updated": "2026-10-06T15:21:41+00:00",
+  "verified_at": "2026-10-06T15:21:41+00:00",
   "worktree": "/home/miftah/.worktrees/seer/why-this-pick-pipeline"
 }

@@ -18,7 +18,7 @@ for watching, not for deciding.
 ## The roster
 
 Fixed on 2026-10-04, before any paper result (D1). `C` was added by the Strategy C set (P6), also
-before any paper result. Every entry starts from 20,000,000 IDR, converted at the latest `fx_rates`
+before any paper result. Every entry starts from 10,000,000 IDR (20,000,000 before 2026-10-07), converted at the latest `fx_rates`
 rate on or before its first paper night's `data_date`; the rate is stored in `paper_state.usd_idr`.
 The four P4 entries share one first paper session (`strategies.paper_start`). `C` has its own: the
 session decided on the first scheduled night after the Strategy C merge (see

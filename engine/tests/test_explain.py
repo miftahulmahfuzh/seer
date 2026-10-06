@@ -373,6 +373,14 @@ def test_a_past_tense_phrase_the_facts_use_is_allowed():
         explain.vet("Its last earnings came in above what was expected.", FACTS)
 
 
+def test_the_prompt_states_a_length_below_the_check():
+    assert explain.PROMPT_CHARS < explain.MAX_CHARS
+    row = explain.StrategyRow("A", "A · Quant", "bracket", date(2026, 10, 6))
+    p = explain.prompt_for(explain.BookEntry(row, "AAPL", AAPL_FACTS))
+    assert f"under {explain.PROMPT_CHARS} characters" in p and "not all of them" in p
+    assert "never that it flagged it" in p
+
+
 def test_accepted_notes_are_short_and_never_cut():
     assert explain.MAX_CHARS <= 320 and explain.MAX_SENTENCES == 2
     long = "NVDA rose 48.2% over 12 months " + "and kept its place " * 20 + "."

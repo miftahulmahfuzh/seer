@@ -47,6 +47,10 @@ HELP = "Write optional LLM explanations for the newest paper entries (never fail
 MAX_CONSECUTIVE_FAILURES = 3
 MAX_CHARS = 320
 MAX_SENTENCES = 2
+# The length the prompt asks for, kept below MAX_CHARS so a reply that runs a little over still
+# passes. Without a stated length the model restated all five facts and 6 of 8 replies came back
+# at 330-381 characters (2026-10-06, first run on production).
+PROMPT_CHARS = 260
 
 # The call's settings. Thinking off is what makes the reply arrive whole: with thinking on,
 # glm-5.3 spent a small budget on reasoning and returned a cut or empty text. Temperature 0 keeps
@@ -191,6 +195,8 @@ def prompt_for(entry: Entry) -> str:
             *(f"- {fact}" for fact in entry.facts),
             "Task: in at most 2 short plain sentences, say why this method picked this stock, "
             "using only these facts. Write every number exactly as the facts write it. "
+            f"Keep the whole note under {PROMPT_CHARS} characters: use the two or three facts that "
+            "matter most, not all of them. Say the method picked it, never that it flagged it. "
             "No advice, no predictions.",
         ]
     )

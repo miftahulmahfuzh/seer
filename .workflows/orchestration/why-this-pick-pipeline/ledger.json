@@ -24,22 +24,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "2e86de4",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "migration 009 + paper stores evidence on orders/book_targets/book_previews; idle NULL; decisions unchanged",
       "package": "engine/paper`, `db",
       "plan": ".workflows/plan/why-this-pick-pipeline/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-06T15:20:40+00:00",
       "satisfies": [
         "R1",
         "R6"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-H5LC",
       "title": "Store evidence with every paper entry"
     },
     {
@@ -60,7 +60,7 @@
         "R4",
         "R8"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Explain from evidence, with checks"
     },
@@ -79,7 +79,7 @@
       "satisfies": [
         "R7"
       ],
-      "status": "spawned",
+      "status": "pending",
       "task_id": null,
       "title": "Promote requires evidence"
     },
@@ -100,7 +100,7 @@
         "R6",
         "R8"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Show reasons on the site"
     }
@@ -108,6 +108,7 @@
   "plan": "/home/miftah/.worktrees/seer/why-this-pick-pipeline/.workflows/orchestration/why-this-pick-pipeline/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "why-this-pick-pipeline",
-  "updated": "2026-10-06T15:06:57+00:00",
+  "updated": "2026-10-06T15:20:56+00:00",
+  "verified_at": "2026-10-06T15:20:50+00:00",
   "worktree": "/home/miftah/.worktrees/seer/why-this-pick-pipeline"
 }

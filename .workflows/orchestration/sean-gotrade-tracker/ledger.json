@@ -83,22 +83,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "f254d793a277579b62a3323316e54020d2954088",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "HARD",
       "n": 5,
-      "note": null,
+      "note": "Plan tab: link a roster method, buy/sell reminders, coral dot on both Sean buttons; plan applied verbatim, no decisions",
       "package": "web/app/sean/plan`, `web/lib/sean`, `web/components",
       "plan": ".workflows/plan/sean-gotrade-tracker/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T16:38:21+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-XA2W",
       "title": "Plan: link a roster method, buy/sell reminders"
     },
     {
@@ -142,7 +142,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/sean-gotrade-tracker/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sean-gotrade-tracker",
-  "updated": "2026-10-07T16:36:58+00:00",
+  "updated": "2026-10-07T16:38:21+00:00",
   "verified_at": "2026-10-07T16:33:40+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sean-gotrade-tracker"
 }

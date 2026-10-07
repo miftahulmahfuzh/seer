@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "503e7b6",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "Harness lands as 3 new files, engine unchanged. Smoke reproduces M2 (5.091%/4.002%, 10096 member-yrs) and M1/M3 (11.68% CAGR, 14.31% fall, 1589 trades) exactly. Break-even is OFF the grid: mean edge still +0.32 pts/yr at r=-100%, so phase 2 must expect NONE, not a stop. CLI spellings are final: --entry/--hazard unserved|all|NUM/--returns/--seeds/--seed0/--jobs/--store/--csv/--decline-sessions/--smoke; --csv schema as the Interface Contract states. Decided: PG_TEST_URL unset in env, exported conftest.py:6's documented URL (seer-pg :55432) rather than halt (rung 1+6). UNOWNED GAP: engine/package_readme.md needs delisting.py in its Layout tree, an Exported API H3, and an internal-module-graph bullet; not committed because phase 1's exit criterion 7 pins the commit to exactly 3 paths. Also package_readme.md:1957 (the D4 'dev results are optimistic' line) belongs to phase 2.",
       "package": "engine/src/seer_engine`, `engine/scripts`, `engine/tests",
       "plan": ".workflows/plan/delisting-stress-roster-rules/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T11:22:24+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-D7XQ",
       "title": "The delisting stress harness"
     },
     {
@@ -36,7 +36,7 @@
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Run it, and record what it found"
     },
@@ -89,7 +89,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
+      "status": "pending",
       "task_id": null,
       "title": "MOM-FR, judged under the rule"
     }
@@ -97,7 +97,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/delisting-stress-roster-rules/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "delisting-stress-roster-rules",
-  "updated": "2026-10-07T11:16:46+00:00",
-  "verified_at": "2026-10-07T11:16:10+00:00",
+  "updated": "2026-10-07T11:23:05+00:00",
+  "verified_at": "2026-10-07T11:23:04+00:00",
   "worktree": "/home/miftah/.worktrees/seer/delisting-stress-roster-rules"
 }

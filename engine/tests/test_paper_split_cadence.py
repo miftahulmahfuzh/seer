@@ -552,7 +552,11 @@ def test_promote_fractional_puts_a_split_cadence_variant_on_paper(pg, monkeypatc
             method="M0022", candidate=M0022_VARIANT, id=PROMOTE_ID, name="RMW · Weekly brake",
             sub="Picks monthly, adjusts weekly", icon="flask-conical", sort=None,
             gate_note="No backtest gate: a test promotion", gate_not_applicable=False, fractional=True,
-            retire=None, lab_db=tmp_path / "lab.sqlite", lab_status_stays=True, dry_run=False, verbose=0,
+            retire=None, lab_db=tmp_path / "lab.sqlite", lab_status_stays=True,
+            # M0022 is 'rejected' here, so this promotion is an owner-override and the basis goes
+            # on the record (lab-luck-gate R4, D3): `promote` refuses one that gives no reason.
+            lab_override_reason="a test promotion of a method the lab has not passed",
+            dry_run=False, verbose=0,
         )
         assert promote.run(args) == 0
     finally:

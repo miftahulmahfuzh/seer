@@ -45,6 +45,14 @@ is skipped for a row this promotion already owns, and ``lab.store.record_promoti
 idempotent. The reverse order was rejected: a lab note for a promotion that did not happen cannot
 be taken back, because the lab is append-only.
 
+**The admission basis (lab-luck-gate R4, D3).** The roster's admission rule is not the lab's
+gate: a method that has not passed a test window may still be promoted. What this command will
+not do is let that happen silently. Whenever the method is not at ``test-passed``,
+``--lab-override-reason`` is required: one line saying why. The basis and that line are written
+into the method's ``analysis`` by ``lab.store.record_promotion``, and the command prints the
+``paper.roster.LAB_PROVENANCE`` entry to add to the roster in the same commit, so the roster
+states exactly what the lab records. ``tests/test_paper_roster.py`` is what makes forgetting loud.
+
 Exit 0 on success; 2 when a rule refuses the request; 1 on any other error.
 """
 
@@ -247,8 +255,17 @@ class Promotion:
         return str(self.params["digest"])
 
 
-def build_promotion(args: argparse.Namespace, data_date: date, sort: int) -> Promotion:
-    """The roster entry and its contract-C2 params, from the named method variant. No I/O."""
+def build_promotion(
+    args: argparse.Namespace, data_date: date, sort: int, lab_status: str
+) -> Promotion:
+    """The roster entry and its contract-C2 params, from the named method variant. No I/O.
+
+    ``lab_status`` is the method's status as ``_run`` just read it; it becomes the entry's
+    :class:`roster.LabProvenance` together with the basis that status implies and the owner's
+    ``--lab-override-reason``. ``LabProvenance`` refuses an override with no reason, so a
+    promotion that would leave the divergence unexplained fails here -- before either database
+    is opened for writing.
+    """
     _method, _path, candidate = find_candidate(args.method, args.candidate)
     obj = candidate.allocator
     rules = fractional_twin(candidate.rules) if getattr(args, "fractional", False) else candidate.rules
@@ -275,6 +292,13 @@ def build_promotion(args: argparse.Namespace, data_date: date, sort: int) -> Pro
         lookback=int(lookback),
         gate_note=args.gate_note,
         gate_applicable=not args.gate_not_applicable,
+        lab_provenance=roster.LabProvenance(
+            method_id=args.method,
+            candidate_id=candidate.id,
+            lab_status=lab_status,
+            basis=lab_store.promotion_basis(lab_status),
+            reason=str(getattr(args, "lab_override_reason", "") or "").strip(),
+        ),
     )
     return Promotion(
         entry=entry,
@@ -322,6 +346,7 @@ def render_plan(p: Promotion, *, retire_end: date | None, lab_status: str, lab_m
             f"    paper_end      {end}",
             "    (same transaction as the INSERT: the swap is atomic)",
         ]
+    prov = e.lab_provenance
     out += [
         "",
         f"  lab/lab.sqlite, method {p.method_id} (now {lab_status!r})",
@@ -331,6 +356,12 @@ def render_plan(p: Promotion, *, retire_end: date | None, lab_status: str, lab_m
         "    methods.status    "
         + ("test-passed -> paper" if lab_move and lab_status == "test-passed"
            else f"{lab_status} (unchanged)"),
+        "",
+        "  lab provenance (recorded on both sides, never part of the spec)",
+        f"    method/variant  {prov.method_id} / {prov.candidate_id}",
+        f"    lab status at admission  {prov.lab_status}",
+        f"    basis           {prov.basis}",
+        f"    reason          {prov.reason or '(the lab passed it; no override)'}",
         "",
         "  backtest.registry.REGISTRY  untouched (Decisions D1)",
     ]
@@ -452,6 +483,12 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
                         "when the method is not at 'test-passed', because TRANSITIONS has no edge "
                         "to 'paper' from anywhere else. An acknowledgement that the roster is "
                         "taking a method the lab has not passed")
+    p.add_argument("--lab-override-reason", default="", metavar="REASON",
+                   help="one line saying why the roster is taking a method the lab has not "
+                        "passed. Required whenever the method is not at 'test-passed': the "
+                        "roster's admission rule is the owner's, not the lab's gate, but the "
+                        "basis goes on the record (lab-luck-gate D3). Recorded in the method's "
+                        "analysis and in paper.roster.LAB_PROVENANCE")
 
 
 def run(args: argparse.Namespace) -> int:
@@ -485,14 +522,23 @@ def _run(args: argparse.Namespace) -> int:
                 f"{args.method} is {lab_status!r} and the lab's TRANSITIONS have no edge "
                 f"{lab_status!r} -> 'paper'; only 'test-passed' reaches 'paper'. The roster may "
                 f"still take this method -- its admission rule is not the lab's gate (plan "
-                f"Decisions D5) -- but say so: re-run with --lab-status-stays."
+                f"Decisions D3) -- but say so: re-run with --lab-status-stays."
+            )
+        basis = lab_store.promotion_basis(lab_status)
+        reason = str(getattr(args, "lab_override_reason", "") or "").strip()
+        if basis == "owner-override" and not reason:
+            raise PromoteError(
+                f"{args.method} is {lab_status!r}, so this is an owner-override: the roster is "
+                f"taking a method the lab has not passed. That is allowed (lab-luck-gate D3) but "
+                f"it goes on the record -- re-run with --lab-override-reason 'one line saying "
+                f"why'. Neither database was touched."
             )
 
         conn = db.connect()
         try:
             with conn.cursor() as cur:
                 sort = args.sort if args.sort is not None else _next_sort(cur)
-            p = build_promotion(args, data_date, sort)
+            p = build_promotion(args, data_date, sort, lab_status)
 
             retire_end: date | None = None
             with db.transaction(conn, args.dry_run):
@@ -518,6 +564,8 @@ def _run(args: argparse.Namespace) -> int:
                 spec_digest=p.digest,
                 retired_id=p.retire_id,
                 move_status=move,
+                basis=basis,
+                reason=reason,
             )
             if args.dry_run:
                 lab_conn.rollback()
@@ -532,9 +580,21 @@ def _run(args: argparse.Namespace) -> int:
         lab_conn.close()
 
     if not args.dry_run:
+        prov = p.entry.lab_provenance
         print(
             f"\n{p.entry.id} is on the roster as active with no paper_start. The next paper night "
             f"freezes its spec and starts its clock. Commit {args.lab_db} and "
             f"{lab_store.snapshot_path(Path(args.lab_db))} with `lab stage`."
+        )
+        print(
+            f"\nAdd this to paper.roster.LAB_PROVENANCE in the same commit, or the roster will "
+            f"not state what the lab now records:\n"
+            f"    {p.entry.id!r}: LabProvenance(\n"
+            f"        method_id={prov.method_id!r},\n"
+            f"        candidate_id={prov.candidate_id!r},\n"
+            f"        lab_status={prov.lab_status!r},\n"
+            f"        basis={prov.basis!r},\n"
+            f"        reason={prov.reason!r},\n"
+            f"    ),"
         )
     return 0

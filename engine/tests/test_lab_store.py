@@ -82,6 +82,50 @@ def test_best_dev_eligible_is_the_highest_mar_and_breaks_ties_on_the_trial_numbe
     assert store.best_dev_eligible(conn, "M0002") is None
 
 
+def _moments(**kw) -> store.MomentsRow:
+    base = dict(trial_n=1, sr_daily=0.0501, t=3959, skew=-0.31, kurt=7.2, var_trials=2.395e-04,
+                n_at_run=110, measured="2026-10-07T00:00:00+00:00")
+    base.update(kw)
+    return store.MomentsRow(**base)
+
+
+def test_trial_moments_are_append_only_and_at_most_one_per_trial(conn):
+    _method(conn)
+    with conn:
+        ns = store.insert_trials(conn, [_trial()])
+    assert store.moments_of(conn, ns[0]) is None  # a trial recorded before this table has none
+    with conn:
+        store.insert_moments(conn, [_moments(trial_n=ns[0])])
+    got = store.moments_of(conn, ns[0])
+    assert list(got.keys()) == list(store.MOMENTS_COLUMNS)
+    assert (got["trial_n"], got["t"], got["n_at_run"]) == (ns[0], 3959, 110)
+    assert got["sr_daily"] == 0.0501 and got["skew"] == -0.31 and got["kurt"] == 7.2
+    assert got["var_trials"] == 2.395e-04 and got["measured"] == "2026-10-07T00:00:00+00:00"
+
+    with pytest.raises(store.LabError, match="already has recorded moments"):
+        store.insert_moments(conn, [_moments(trial_n=ns[0], t=10)])
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+        conn.execute("UPDATE trial_moments SET t = 9")
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+        conn.execute("DELETE FROM trial_moments")
+    assert store.moments_of(conn, ns[0])["t"] == 3959
+
+
+def test_moments_need_a_real_trial_number(conn):
+    _method(conn)
+    with conn:
+        store.insert_trials(conn, [_trial()])
+    with pytest.raises(store.LabError, match="insert_trials assigned"):
+        store.insert_moments(conn, [_moments(trial_n=0)])
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        with conn:
+            store.insert_moments(conn, [_moments(trial_n=999)])
+    assert store.moments_of(conn, 999) is None
+    with conn:  # var_trials is nullable: a lab with fewer than two Sharpes has no variance
+        store.insert_moments(conn, [_moments(trial_n=1, var_trials=None, n_at_run=1)])
+    assert store.moments_of(conn, 1)["var_trials"] is None
+
+
 def test_status_only_moves_forward(conn):
     _method(conn)
     with conn:
@@ -202,6 +246,7 @@ def _promote(conn, **kw):
     base = dict(
         method_id="M0001", strategy_id="FND", candidate_id="M0001-A",
         object_name="FUNDAMENTAL", spec_digest="d" * 64,
+        reason="the lab has not passed it; on paper to test it forward",
     )
     base.update(kw)
     with conn:
@@ -250,3 +295,40 @@ def test_record_promotion_is_idempotent_and_never_touches_source_sha(conn):
     assert row["analysis"].count(store.PROMOTION_MARKER) == 1
     assert conn.execute("SELECT count(*) FROM insights").fetchone()[0] == 1
     assert row["source_sha"] == "a" * 64
+
+
+def test_promotion_basis_is_derived_from_the_lab_status():
+    assert store.promotion_basis("test-passed") == "test-passed"
+    assert store.promotion_basis("paper") == "test-passed"
+    for s in ("idea", "registered", "rejected", "dev-eligible", "promoted", "blocked-data"):
+        assert store.promotion_basis(s) == "owner-override"
+    assert set(store.PROMOTION_BASES) == {"test-passed", "owner-override"}
+
+
+def test_record_promotion_writes_the_basis_the_status_and_the_reason(conn):
+    _method(conn, status="idea")
+    assert _promote(conn, move_status=False) == "idea"
+    analysis = store.get_method(conn, "M0001")["analysis"]
+    assert "Lab status at admission: `idea`" in analysis
+    assert "Basis: `owner-override`" in analysis
+    assert "on paper to test it forward" in analysis
+
+
+def test_an_override_with_no_reason_is_refused_and_writes_nothing(conn):
+    _method(conn, status="idea")
+    with pytest.raises(store.LabError, match="reason"):
+        _promote(conn, move_status=False, reason="   ")
+    row = store.get_method(conn, "M0001")
+    assert store.PROMOTION_MARKER not in row["analysis"]
+    assert conn.execute("SELECT count(*) FROM insights").fetchone()[0] == 0
+
+
+def test_a_test_passed_method_needs_no_reason_and_says_so(conn):
+    _method(conn, status="idea")
+    with conn:
+        for nxt in ("registered", "dev-eligible", "promoted", "test-passed"):
+            store.update_method(conn, "M0001", status=nxt)
+    assert _promote(conn, reason="") == "paper"
+    analysis = store.get_method(conn, "M0001")["analysis"]
+    assert "Basis: `test-passed`" in analysis
+    assert "Lab status at admission: `test-passed`" in analysis

@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-07
-**Total Active Tasks**: 0
+**Total Active Tasks**: 6
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 0
-- Completed: 81
+- Blocked: 4
+- Completed: 85
 
 ---
 
@@ -508,6 +508,113 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Landing: not attempted, and `next_command` is empty. `swarm.py find --plan BUILD_PROMOTION_PATH_PLAN.md --task P1-ENG-YJDW` returns `swarm: true` with coordinator `orch-build-promotion-path`, so per `analyze-orchestrator` Step 5 the merge of `feature/build-promotion-path` into `main` belongs to that coordinator, not to this session.
     - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the direct precedent recorded by phases 1 and 3 of this same set, and by the ROSTER_PROMOTION_PIPELINE and FUNDAMENTAL_PANEL_COVERAGE swarms in this same file). A cross-file block move is the one edit that reliably loses a peer's concurrent append.
     - Completion: no `**Commit**` field (rung 6: the same precedent). This file is committed inside the phase's own commit, so a field naming that sha cannot exist in it; the sha is reported to the caller for the swarm ledger instead.
+- [x] **P1-ENG-FNKE** Phase 1: The N policy and the effective-N estimator
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns a new pure module `engine/src/seer_engine/lab/npolicy.py`: the named policies (`all-trials`, `methods`, `effective`), the participation-ratio estimator computed from the month-end curves already in `trials.curve_json`, `effective_n(conn, policy) -> NCount` carrying both the number used and the evidence behind it, and `NCount.basis` — the one-line evidence string phase 7 commits into every pre-registration and into `web/data/lab.json`. Tests. Exit: `npolicy.effective_n` returns 110 under `all-trials`, 23 under `methods` and ~2 under `effective` on the committed database; `all-trials` returns 0 on an empty lab and is not floored; `DEFAULT_POLICY == "all-trials"`; `NCount.basis` is a non-empty single line for every policy on every lab; the `methods` policy is floored at the measured participation ratio; pytest green.
+  - **Status**: completed
+  - **Plan Set**: `LAB_LUCK_GATE_PLAN.md` (phase 1 of 9)
+  - **Satisfies**: R1 — The gate admits nothing at 110 trials and the bar rises with every exploration regardless of merit — 110 correlated variant rows deflated as 110 independent trials.
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-FNKE.md`
+  - **Completed**: 2026-10-07 10:53
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/npolicy.py, engine/tests/test_lab_npolicy.py, engine/.workflows/plan/P1-ENG-FNKE.md
+  - **Verified**: `pytest tests/test_lab_npolicy.py` -> 13 passed (serial, `-o addopts="-ra"`); full engine suite in an isolated HEAD worktree carrying only this phase's two new files -> 2675 passed / 382 skipped / 0 failed; `ruff check --select E9,F --ignore F401` -> All checks passed. Manual check against the committed `lab/lab.sqlite` reproduced the plan's expected output byte-for-byte: N = 110 (`all-trials`) / 23 (`methods`) / 2 (`effective`), participation ratio 2.44, mean pairwise correlation 0.595 over 102 common month-ends. Invariant 2 held: `store.test_looks()` = 0. `lab/lab.sqlite`, `engine/pyproject.toml` and `web/data/lab.json` untouched. `grep -rn npolicy engine/src engine/tests` finds no caller outside the module and its own test -- by design; phase 4 wires the gate.
+  - **Drift**:
+    - Plan cites `engine/pyproject.toml:10` for the `numpy>=2` dependency; it is actually line 13. Verify-only step, no edit made, content as the plan quotes it.
+    - The plan's Verification prose says `Expected: 14 passed`; its Step 2 code block defines 13 test functions. The code block is authoritative (rung 3) -- 13 passed, no skips.
+    - `pytest-xdist` is not installed in `/home/miftah/seer/engine/.venv`, but `engine/pyproject.toml` sets `addopts = "-ra -n auto"`, so the plan's verification command errors with `unrecognized arguments: -n`. Ran with `-o addopts="-ra"` (serial) instead of installing into the venv three peer sessions are using. Every test still ran.
+    - The full suite cannot be run in the shared worktree right now: phase 8's in-flight `dev.FAILURE_LABELS[1]` change (D13) makes `tests/test_backtest_dev_report.py` fail collection on the literal `max DD <= 15%`. That is phase 8's work mid-flight, not phase 1's. Invariant 1 was verified instead in a throwaway worktree cut from HEAD carrying only phase 1's two new files: 2675 passed, 382 skipped, 0 failed. That worktree has been removed.
+    - `engine/.workflows/todos.md` is modified by three concurrent sessions (phases 1, 2 and 6 each appended a task entry). Deliberately left out of the commit allowlist.
+  - **Decided**:
+    - Step 3 says create every phase's task; created only phase 1's (P1-ENG-FNKE) (tie-break: narrower blast radius -- phases 1, 2, 6 and 8 are spawned concurrently and all land in `engine/.workflows/todos.md`).
+    - `pytest-xdist` missing: ran serially with `-o addopts="-ra"` rather than pip-installing into the shared venv (tie-break: narrower blast radius / reversible option).
+    - Full-suite verification done in an isolated HEAD worktree rather than the shared one, because peers' in-flight edits break collection (rung 1: invariant 1 requires pytest green for THIS phase's change; a peer's half-written file is not phase 1's failure).
+    - Commit allowlist excludes `engine/.workflows/todos.md`; the adopted plan copy `P1-ENG-FNKE.md` replaces the plan's already-committed, unmodified `.workflows/plan/lab-luck-gate/phase-1.md` (rung 3: the phase plan's commit-allowlist block).
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the direct precedent recorded by the BUILD_PROMOTION_PATH, ROSTER_PROMOTION_PIPELINE and FUNDAMENTAL_PANEL_COVERAGE swarms in this same file). A cross-file block move is the one edit that reliably loses a peer's concurrent append.
+    - Completion: no `**Commit**` field (rung 6: the same precedent). This file is committed by whichever session commits it later, not by this phase, so a field naming this phase's sha cannot be consistent; the sha is reported to the caller for the swarm ledger instead.
+    - Quick Stats recounted from the file rather than blind-decremented (the header read `P1 High: 1 / Completed: 81` against 8 open P1 blocks and 83 `[x]` blocks -- three concurrent sessions had already lost each other's increments). A recount is idempotent and converges under concurrency; a decrement compounds the race.
+- [x] **P1-ENG-CA69** Phase 6: Every roster entry carries its lab provenance
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns making the lab/roster divergence explicit and checked rather than silent — a `lab_provenance` field on the roster entry (lab method and candidate id, lab status at admission, admission basis `test-passed`/`owner-override` with its reason), outside the spec digest like `gate_note`; `store.record_promotion` writing the same fact onto the method; a test asserting every roster entry whose id names a lab candidate has provenance matching `lab.sqlite`. Exit: RM-FR and RMW-FR carry `owner-override` provenance naming M0011/M0022 and the `rejected` status they were admitted under; the roster digest test still passes unchanged; pytest green.
+  - **Status**: completed
+  - **Plan Set**: `LAB_LUCK_GATE_PLAN.md` (phase 6 of 9)
+  - **Satisfies**: R4 — The lab verdict and the paper roster have diverged silently — RM and RMW trade while both read `rejected`.
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-CA69.md`
+  - **Completed**: 2026-10-07 11:01
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/paper/roster.py, engine/src/seer_engine/lab/store.py, engine/src/seer_engine/commands/promote.py, engine/tests/test_paper_roster.py, engine/tests/test_lab_store.py, engine/tests/test_promote_command.py, engine/tests/test_paper_split_cadence.py, engine/.workflows/todos.md, engine/.workflows/plan/P1-ENG-CA69.md
+  - **Drift**:
+    - test_paper_split_cadence.py is a THIRD `promote` call site the plan did not know about -- its Step 8 Impact note names "exactly one production caller and two test call sites". It landed in 06d12ea (the paper-split-cadence set) after the analysis was taken, hand-builds an argparse.Namespace with no `lab_override_reason`, and promotes a `rejected` M0022, so the new refusal fired and the test failed. Fixed exactly as Steps 11/12 fix the two known call sites. Seventh file; the plan said six.
+    - The `lab` fixture in test_promote_command.py ends at status `rejected`, not `idea` as Step 12's prose claims (it calls update_method to `rejected` right after add_method). Still an owner-override either way, so the refusal test is unaffected; the printed-provenance assertion was written as lab_status='rejected' to match the fixture that actually exists.
+    - Every store.py line number in the phase plan was pre-phase-2 and had already moved (phase 2 is live in this worktree). Anchored on quoted text throughout, as the shared-file protocol's rule 2 requires -- the PROMOTION_MARKER block and record_promotion were the anchors.
+    - The repo's pytest addopts is `-ra -n auto` but pytest-xdist is not installed in the only venv on this machine (/home/miftah/seer/engine/.venv). Pre-existing environment gap, unrelated to this phase; ran the identical tests serially with `-o addopts=-ra`.
+    - Four tests fail in the shared worktree and belong to peers still running, not to this phase: test_backtest_tuning.py::test_select_fallback_is_used_only_when_nothing_qualifies and test_backtest_walkforward.py::test_select_fold_falls_back_when_nothing_qualifies (phase 8's MAX_DRAWDOWN 0.15->0.20 changing which grid row qualifies), and both test_lab_snapshot.py failures (phase 2's trial_moments migration / snapshot export). None touch any file in this phase's allowlist.
+  - **Decided**:
+    - Step 3 said create tasks for all 9 phases; created only phase 6's -> rung 6 (surrounding convention) plus the narrower-blast-radius tie-break: phases 1, 2 and 8 run concurrently in this shared worktree and each would otherwise write all nine entries into the same todos.md and the same TaskID column -- four writers, 36 duplicate rows.
+    - Plan Step 12 asserts lab_status='idea' in the printed LAB_PROVENANCE line; wrote 'rejected' -> rung 3 (the code block's intent is that the printed provenance names the fixture's actual lab status), read against the fixture on disk, which ends at 'rejected'.
+    - test_paper_split_cadence.py's promote Namespace gained lab_override_reason -> rung 2 (the phase's exit criterion "pytest green in engine/") and rung 3 (Steps 11 and 12 do exactly this at every other call site). Weakening the new refusal was ruled out: a failing verification is never settled by relaxing the check.
+    - Ran pytest serially by overriding addopts, since pytest-xdist is absent -> not a relaxation; the identical tests run, only not in parallel.
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the direct precedent recorded by phase 1 of this same set, and by the BUILD_PROMOTION_PATH / ROSTER_PROMOTION_PIPELINE / FUNDAMENTAL_PANEL_COVERAGE swarms in this file). A cross-file block move is the one edit that reliably loses a peer's concurrent append.
+    - Completion: no `**Commit**` field, and `LAB_LUCK_GATE_PLAN.md` left untouched (rung 6: phase 1's precedent; rung 3: the set is a swarm whose coordinator `orch-lab-luck-gate` owns the ledger at .workflows/orchestration/lab-luck-gate/ledger.json). The index's phase table has no tick column and eight peers hold it open; the sha goes to the coordinator instead.
+    - Quick Stats recounted from the file rather than blind-decremented (recount is idempotent under concurrency; a decrement compounds the race).
+- [ ] **P1-ENG-6134** Phase 2: Record the DSR's inputs with every dev trial
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns an additive, append-only `trial_moments` side table (`trial_n`, `sr_daily`, `t`, `skew`, `kurt`, `var_trials`, `n_at_run`, `measured`) in `store.py`'s schema and `_migrate`, its writer, and `runner.trial_rows` populating it in the same transaction as the trial it describes — it owns the whole body of `trial_rows`, with phase 4 applying a two-line delta to it and nothing else; it does not touch the `trials` table's columns, triggers or contents, nor the eligibility decision, which still reads exactly as it does today. Exit: a new `lab run` writes one `trial_moments` row per dev trial; the committed database migrates in place without touching any `trials` row; `test_looks` still 0; `pytest` green.
+  - **Status**: in_progress
+  - **Plan Set**: `LAB_LUCK_GATE_PLAN.md` (phase 2 of 9)
+  - **Satisfies**: R2 — A trial's verdict is frozen at the N of its run date, so verdicts are not comparable across time and a method can never be re-judged.
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-6134.md`
+- [ ] **P1-ENG-921N** Phase 3: `lab remeasure` — recover the inputs for a recorded method
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `lab remeasure <method>` in `commands/lab.py` and the new `lab/remeasure.py` module: re-runs *only* the dev window for a method whose trials predate phase 2, writes `trial_moments` rows and nothing else, and is idempotent; refuses any method with a test trial and refuses the test window by name. Does not touch `trials`, `methods.status`, the prereg files or the test-window store. Exit: `lab remeasure M0022` populates three `trial_moments` rows whose recomputed DSR reproduces each recorded `dsr` to within 1e-6 at the recorded `n_trials_at_run`; running it twice changes nothing; `pytest` green.
+  - **Status**: blocked
+  - **Plan Set**: `LAB_LUCK_GATE_PLAN.md` (phase 3 of 9)
+  - **Satisfies**: R2 — A trial's verdict is frozen at the N of its run date, so verdicts are not comparable across time and a method can never be re-judged.
+  - **Depends on**: P1-ENG-6134
+  - **Plan**: `.workflows/plan/P1-ENG-921N.md`
+- [ ] **P1-ENG-B6Y5** Phase 4: The verdict is derived under one policy, at the current N
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns the gate change: `store.DSR_MIN` 0.95 → 0.90 (sole owner), `store.DSR_POLICY = "all-trials"` as the single constant deciding N, and `store.verdict(conn, trial)` deciding every condition at evaluation time — the four threshold owner conditions re-derived from the trial's recorded columns against the live constants, `owner inputs` carried from the record, and the luck test decided on the trial's DSR at the gate's current N (`store.dsr_at`, exact from `trial_moments` or recovered by `store.recover_dsr`). Also owns the shared label/arithmetic helpers (`LUCK_LABEL_PREFIX`, `is_luck_label`, `recorded_labels`, `OWNER_INPUTS_LABEL`, `owner_failures`, `sr_star`, `recover_dsr`, `dev_sharpe_variance`, `dsr_at`), `best_dev_eligible`, the twice-guarded `("rejected", "dev-eligible")` transition, `runner.trial_rows`'s two-line delta, `lab reevaluate`, and the additive idempotent migration of the committed `lab/lab.sqlite` plus its re-export of `web/data/lab.json`. `dsr_at` deflates by today's `dev_sharpe_variance` on BOTH routes (D12). Exit: at (N=110, DSR >= 0.90, max DD <= 20%) exactly three trials are eligible — M0022-W-TV14, M0022-W-TV16, M0020-W-NOSTOP — with M0007-N20-RAW explicitly not eligible (0.8985 at N=110) and M0011 still out; a trial whose DSR cannot be evaluated fails the luck test; `DSR_POLICY="all-trials"`, `DSR_MIN=0.95` and `MAX_DRAWDOWN=0.15` together reproduce `main`'s verdicts exactly; all 110 recorded `dsr`/`eligible`/`failed`/`n_trials_at_run` columns byte-identical before and after; `test_looks` 0; `pytest` green.
+  - **Status**: blocked
+  - **Plan Set**: `LAB_LUCK_GATE_PLAN.md` (phase 4 of 9)
+  - **Satisfies**: R1 — The gate admits nothing at 110 trials and the bar rises with every exploration regardless of merit — 110 correlated variant rows deflated as 110 independent trials; R2 — A trial's verdict is frozen at the N of its run date, so verdicts are not comparable across time and a method can never be re-judged.
+  - **Depends on**: P1-ENG-FNKE, P1-ENG-6134, P1-ENG-EH4K
+  - **Plan**: `.workflows/plan/P1-ENG-B6Y5.md`
+- [ ] **P1-ENG-QM5I** Phase 5: `lab status` shows the queue and the look budget; `lab luck`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `commands/lab.py`'s `_status` — the promotion path printed always, including when it is empty and with the reason it is empty; "test-window looks used: k" per design §3; a "Promotable now" section; the D1b ratchet warning — and the new read-only `lab luck`, printing the leaderboard under each policy side by side so the gate's sensitivity is inspectable without editing a constant. Does not touch the gate, the policy default or any write path; every rule it applies is phase 4's (`_owner_misses`, `_dev_var`, `sr_star`, `recover_dsr` are aliases or re-exports). Exit: `lab status` on a lab with nothing promotable prints why; after phase 4 it lists M0022 (with W-TV14) and M0020 (with W-NOSTOP); the ratchet warning names N = 143; `lab luck` reproduces the analysis document's N-sensitivity table, counting three clearing at N=110 and seven at N=23; `pytest` green.
+  - **Status**: blocked
+  - **Plan Set**: `LAB_LUCK_GATE_PLAN.md` (phase 5 of 9)
+  - **Satisfies**: R3 — The promotion path is unreachable and the test window unspent, and nothing surfaces either; R1 — The gate admits nothing at 110 trials and the bar rises with every exploration regardless of merit — 110 correlated variant rows deflated as 110 independent trials.
+  - **Depends on**: P1-ENG-B6Y5
+  - **Plan**: `.workflows/plan/P1-ENG-QM5I.md`
+- [ ] **P1-ENG-EH4K** Phase 8: The go-live drawdown bar, 15% → 20%
+  - **Difficulty**: HARD
+  - **Type**: Update
+  - **Context**: Owns `MAX_DRAWDOWN` 0.15 → 0.20 and its single home — the constant moves into `backtest/metrics.py` with `tuning` re-exporting it (`MAX_DRAWDOWN = _metrics.MAX_DRAWDOWN`), because `metrics.checklist` compares against a literal `0.15` today and `tuning.gate` / `walkforward.gate_p3b` / `b_walkforward.gate_p6a` all decide drawdown through `checklist(...)[2:5]`, so the P3/P3b/P6a real-money gates never read `MAX_DRAWDOWN` at all; `metrics.py` imports nothing from `tuning.py`, so this is the only non-circular arrangement and every existing reader of `tuning.MAX_DRAWDOWN` resolves unchanged. Also `dev.FAILURE_LABELS[1]` becoming `f"max DD <= {tuning.MAX_DRAWDOWN:.0%}"` (D13), `tuning._GATE_NAMES`, `web/lib/metrics.ts` (a second hardcoded implementation of go-live #4), `web/lib/golive.ts` + its engine-pinning test, design §1 item 4 of `docs/plans/2026-10-03-seer-design.md` with a new dated §11, and the pinned tests. Shares six files with phase 7 and lands first, moving only the drawdown number in each. Exit: one definition of the drawdown bar read by the lab screen, the go-live checklist and the web; `dev.FAILURE_LABELS[1] == "max DD <= 20%"` and prefix-stable so the 30 historical `"max DD <= 15%"` rows are still recognised as drawdown misses; `FAILURE_LABELS` keeps five entries in order; every gate-override test still overrides to a differing value; `lab/lab.sqlite` byte-identical to `origin/main`; `pytest` green and `npm test` green.
+  - **Status**: in_progress
+  - **Plan Set**: `LAB_LUCK_GATE_PLAN.md` (phase 8 of 9)
+  - **Satisfies**: R5 — The owner's drawdown appetite is 20%, not 15%, and the bar must be one number rather than one per language.
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-EH4K.md`
+- [ ] **P1-ENG-ALY2** Phase 9: Luck-test the P7a seed
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns extending `seer_engine.lab.remeasure` (phase 3's module) with a seed-specific path and a resumable batch mode over all 54 P7a trials, recovering their daily moments and writing only `trial_moments` rows. Does not touch `trials` — not one row, by invariant 7 — `methods.status`, the P7a `REGISTRY`, the test window or any constant; it changes runtime data, not any phase's logic. Exit: all 54 seed trials have `trial_moments` and therefore a real luck verdict; `store.dev_trial_count`, `npolicy.effective_n(conn, "all-trials").n`, `store.dev_sharpe_variance` and `store.dev_daily_sharpes` identical before and after; the batch is resumable, idempotent and ~65 seconds (10.8s store load + 51.5s of backtests), chunk-invariant; `test_looks` 0; `pytest` green. It makes nothing eligible — the report names `F9-SPY200M70-MOM30`'s resolved DSR at the gate's N (0.856651 under D12's today's-variance rule) with the as-of-P7a figure (0.903053) beside it in brackets, and reads `luck: fail` / `not eligible`; the eligible set stays three, but F9 is now held out by a luck test it received rather than by a data gap.
+  - **Status**: blocked
+  - **Plan Set**: `LAB_LUCK_GATE_PLAN.md` (phase 9 of 9)
+  - **Satisfies**: R6 — Half the lab's trials have never been luck-tested; they pay into N and get no verdict for it.
+  - **Depends on**: P1-ENG-6134, P1-ENG-921N, P1-ENG-B6Y5
+  - **Plan**: `.workflows/plan/P1-ENG-ALY2.md`
 
 ### [P2] Medium
 

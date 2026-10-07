@@ -16,11 +16,16 @@ Tables:
 - ``ideas_seen``: dedupe keys (``url:…``, ``concept:…``) of sources already explored.
 - ``insights``: the lab journal (observations, hypotheses, data and feature wishes, risks, and
   batch syntheses). Triggers refuse every UPDATE and DELETE.
+- ``trial_moments``: the deflated Sharpe's inputs for one dev trial -- its daily Sharpe, the
+  number of daily returns, the skew, the kurtosis, and the ``var_trials`` and N it was judged
+  against -- so a recorded verdict can be recomputed later without re-running the backtest.
+  At most one row per trial, keyed by ``trials.n``. Triggers refuse every UPDATE and DELETE.
 
 Schema versions (``meta.schema_version``): 1 is the first lab; 2 adds the ``synthesis`` insight
-kind. ``connect`` migrates an older database in place; ``connect_readonly`` never does.
+kind; 3 adds the ``trial_moments`` side table. ``connect`` migrates an older database in place;
+``connect_readonly`` never does.
 
-``snapshot`` / ``snapshot_json`` turn a database (v1 or v2) into the web's ``web/data/lab.json``
+``snapshot`` / ``snapshot_json`` turn a database (v1, v2 or v3) into the web's ``web/data/lab.json``
 (seertrade.site/sera). ``lab stage`` writes it next to the database and stages both.
 
 ``journal_mode`` stays DELETE, so the committed file is the whole database (no ``-wal``).
@@ -45,7 +50,7 @@ COMMITTED_DB = config.REPO_ROOT / "lab" / "lab.sqlite"
 # database through SEER_LAB_DB; only the coordinator commits it.
 DB_PATH = Path(os.environ.get("SEER_LAB_DB") or COMMITTED_DB)
 XLSX_PATH = config.REPO_ROOT / "lab" / "lab.xlsx"  # gitignored
-SCHEMA_VERSION = "2"  # 2: the synthesis insight kind (see _migrate)
+SCHEMA_VERSION = "3"  # 2: the synthesis insight kind; 3: the trial_moments side table (see _migrate)
 
 SOURCE_KINDS: tuple[str, ...] = ("paper", "blog", "github", "knowledge", "variation", "seed")
 STATUSES: tuple[str, ...] = (
@@ -83,6 +88,23 @@ DSR_LABEL = "DSR >= 0.95"
 # a method whose analysis already names this roster id has been recorded and is not recorded twice.
 PROMOTION_MARKER = "Promoted to the paper roster as "
 
+#: How a roster entry was admitted (lab-luck-gate R4, D3): either the lab's own test window
+#: passed the variant, or the owner took it anyway and said why. The same two words as
+#: ``paper.roster.BASES``, which is the roster's side of the same bridge.
+PROMOTION_BASES: tuple[str, ...] = ("test-passed", "owner-override")
+
+
+def promotion_basis(status: str) -> str:
+    """The admission basis a method's lab status implies at the moment it is promoted.
+
+    ``'test-passed'`` only from the two statuses on the far side of the lab's own test window;
+    everything else -- ``'rejected'`` included -- is an ``'owner-override'``. An override is
+    allowed (the paper roster's admission rule is not the lab's gate: ``paper.roster``'s module
+    docstring, plan Decisions D3) and must state a reason, which is what
+    :func:`record_promotion` enforces.
+    """
+    return "test-passed" if status in ("test-passed", "paper") else "owner-override"
+
 
 def _quoted(values: Iterable[str]) -> str:
     return ", ".join(f"'{v}'" for v in values)
@@ -103,6 +125,33 @@ _INSIGHTS_TRIGGERS: tuple[str, ...] = (
 BEGIN SELECT RAISE(ABORT, 'insights are append-only: add a newer one instead'); END""",
     """CREATE TRIGGER IF NOT EXISTS insights_no_delete BEFORE DELETE ON insights
 BEGIN SELECT RAISE(ABORT, 'insights are append-only'); END""",
+)
+
+# The trial_moments side table and its two triggers, one statement each. ``_SCHEMA`` creates them
+# on a new database; ``_migrate`` creates them on a v2 database. They are deliberately separate
+# constants rather than inline SQL so that there is exactly one definition of the v3 table: the
+# migration cannot drift from the fresh schema, and the tests can strip them back out to
+# reconstruct a v2 database from ``_SCHEMA`` itself.
+#
+# ``trial_n`` is the primary key, so a trial has at most one moments row and ``INSERT`` is the
+# whole lifecycle: the two triggers below refuse UPDATE and DELETE exactly as ``trials`` does.
+# ``var_trials`` is nullable because a lab with fewer than two dev Sharpes has no variance to
+# deflate by -- the same condition under which ``trials.dsr`` is NULL.
+_MOMENTS_TABLE = """CREATE TABLE IF NOT EXISTS trial_moments (
+    trial_n    INTEGER PRIMARY KEY REFERENCES trials(n),
+    sr_daily   REAL NOT NULL,
+    t          INTEGER NOT NULL CHECK (t >= 2),
+    skew       REAL NOT NULL,
+    kurt       REAL NOT NULL,
+    var_trials REAL,
+    n_at_run   INTEGER NOT NULL CHECK (n_at_run >= 1),
+    measured   TEXT NOT NULL CHECK (length(trim(measured)) > 0)
+)"""
+_MOMENTS_TRIGGERS: tuple[str, ...] = (
+    """CREATE TRIGGER IF NOT EXISTS trial_moments_no_update BEFORE UPDATE ON trial_moments
+BEGIN SELECT RAISE(ABORT, 'trial_moments are append-only: a moments row is never updated'); END""",
+    """CREATE TRIGGER IF NOT EXISTS trial_moments_no_delete BEFORE DELETE ON trial_moments
+BEGIN SELECT RAISE(ABORT, 'trial_moments are append-only: a moments row is never deleted'); END""",
 )
 
 _SCHEMA = f"""
@@ -183,6 +232,12 @@ CREATE TABLE IF NOT EXISTS ideas_seen (
 
 {_INSIGHTS_TRIGGERS[1]};
 
+{_MOMENTS_TABLE};
+
+{_MOMENTS_TRIGGERS[0]};
+
+{_MOMENTS_TRIGGERS[1]};
+
 CREATE TRIGGER IF NOT EXISTS trials_no_update BEFORE UPDATE ON trials
 BEGIN SELECT RAISE(ABORT, 'trials are append-only: a trial row is never updated'); END;
 
@@ -261,46 +316,76 @@ def schema_version(conn: sqlite3.Connection) -> str | None:
     return None if row is None else str(row[0])
 
 
-def _migrate(conn: sqlite3.Connection) -> None:
-    """Bring an older database up to ``SCHEMA_VERSION`` in one transaction under the write lock.
-
-    v1 -> v2 adds the ``synthesis`` insight kind. SQLite cannot alter a CHECK, so ``insights`` is
+def _v1_to_v2(conn: sqlite3.Connection) -> None:
+    """Add the ``synthesis`` insight kind. SQLite cannot alter a CHECK, so ``insights`` is
     rebuilt: the v1 table is renamed aside, the v2 table is created from ``_INSIGHTS_TABLE``,
     every row is copied with its id, the AUTOINCREMENT counter is carried over, the v1 table is
     dropped (which drops its triggers and fires none), and the two append-only triggers are
-    created on the new table. The triggers come last: while the v1 table exists its triggers
-    hold their names, and ``CREATE TRIGGER IF NOT EXISTS`` would silently skip them.
+    created on the new table. The triggers come last: while the v1 table exists its triggers hold
+    their names, and ``CREATE TRIGGER IF NOT EXISTS`` would silently skip them."""
+    seq = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = 'insights'").fetchone()
+    conn.execute("ALTER TABLE insights RENAME TO insights_v1")
+    conn.execute(_INSIGHTS_TABLE)
+    conn.execute(
+        "INSERT INTO insights (id, kind, title, body, method_id, added) "
+        "SELECT id, kind, title, body, method_id, added FROM insights_v1 ORDER BY id"
+    )
+    conn.execute("DROP TABLE insights_v1")
+    if seq is not None:
+        cur = conn.execute(
+            "UPDATE sqlite_sequence SET seq = max(seq, ?) WHERE name = 'insights'", (seq[0],)
+        )
+        if cur.rowcount == 0:
+            conn.execute("INSERT INTO sqlite_sequence (name, seq) VALUES ('insights', ?)", (seq[0],))
+    for trigger in _INSIGHTS_TRIGGERS:
+        conn.execute(trigger)
+
+
+def _v2_to_v3(conn: sqlite3.Connection) -> None:
+    """Add the ``trial_moments`` side table and its two append-only triggers.
+
+    Purely additive, and deliberately so: no ``trials`` row is read, written, rebuilt or
+    re-keyed, no column is altered, and no verdict moves. A v2 database that migrates and is then
+    never written again differs from its v2 self only by an empty table, two triggers and the
+    ``schema_version`` string. (``connect`` has already run ``_SCHEMA`` by the time this is
+    called, so in practice these are no-ops; they are issued anyway so the migration is complete
+    on its own terms and does not depend on the order ``connect`` happens to use.)
+    """
+    conn.execute(_MOMENTS_TABLE)
+    for trigger in _MOMENTS_TRIGGERS:
+        conn.execute(trigger)
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Bring an older database up to ``SCHEMA_VERSION`` in one transaction under the write lock.
+
+    A ladder: each step moves the database up exactly one version, so a v1 database reaches v3 in
+    one open by running both steps in order. v1 -> v2 adds the ``synthesis`` insight kind
+    (``_v1_to_v2``); v2 -> v3 adds the ``trial_moments`` side table (``_v2_to_v3``). A version
+    this code does not know is refused rather than guessed at.
 
     Parallel sessions may connect at once, so the version is read again after
-    ``BEGIN IMMEDIATE``: only the first one migrates, the others find v2 and do nothing.
+    ``BEGIN IMMEDIATE``: only the first one migrates, the others find the current version and do
+    nothing.
     """
     if schema_version(conn) == SCHEMA_VERSION:
         return
     begin_immediate(conn)
     try:
-        version = schema_version(conn)
+        found = schema_version(conn)
+        version = found
         if version == "1":
-            seq = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = 'insights'").fetchone()
-            conn.execute("ALTER TABLE insights RENAME TO insights_v1")
-            conn.execute(_INSIGHTS_TABLE)
-            conn.execute(
-                "INSERT INTO insights (id, kind, title, body, method_id, added) "
-                "SELECT id, kind, title, body, method_id, added FROM insights_v1 ORDER BY id"
-            )
-            conn.execute("DROP TABLE insights_v1")
-            if seq is not None:
-                cur = conn.execute(
-                    "UPDATE sqlite_sequence SET seq = max(seq, ?) WHERE name = 'insights'", (seq[0],)
-                )
-                if cur.rowcount == 0:
-                    conn.execute("INSERT INTO sqlite_sequence (name, seq) VALUES ('insights', ?)", (seq[0],))
-            for trigger in _INSIGHTS_TRIGGERS:
-                conn.execute(trigger)
-            conn.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (SCHEMA_VERSION,))
-        elif version != SCHEMA_VERSION:
+            _v1_to_v2(conn)
+            version = "2"
+        if version == "2":
+            _v2_to_v3(conn)
+            version = "3"
+        if version != SCHEMA_VERSION:
             raise LabError(
-                f"lab database schema version {version!r} is unknown to this code (expects {SCHEMA_VERSION})"
+                f"lab database schema version {found!r} is unknown to this code "
+                f"(expects {SCHEMA_VERSION})"
             )
+        conn.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (SCHEMA_VERSION,))
         conn.commit()
     except BaseException:
         conn.rollback()
@@ -402,6 +487,8 @@ def record_promotion(
     spec_digest: str,
     retired_id: str | None = None,
     move_status: bool = True,
+    basis: str | None = None,
+    reason: str = "",
 ) -> str:
     """Record that ``candidate_id`` became paper roster entry ``strategy_id``; return the status.
 
@@ -414,15 +501,26 @@ def record_promotion(
       status this raises LabError, because there is no edge and inventing one would make the
       lab's own vocabulary mean less. Pass ``move_status=False`` to record the promotion and
       leave the status where it is -- the honest shape for a roster that is taking a method the
-      lab has not passed (the roster's admission rule is not the lab's gate: plan Decisions D5).
+      lab has not passed (the roster's admission rule is not the lab's gate: plan Decisions D3).
+
+    **The basis (lab-luck-gate R4, D3).** ``basis`` is how the roster admitted the variant:
+    ``'test-passed'`` when the lab's own test window passed it, ``'owner-override'`` when the
+    owner took it anyway. Left ``None`` it is derived from the method's current status by
+    :func:`promotion_basis`, which is right for every caller that has just read that status. An
+    ``'owner-override'`` **must** carry a one-line ``reason``; without one this raises, because an
+    unexplained override is exactly the silent divergence this argument exists to end. The basis,
+    the reason and the status at admission are written into the analysis section, so the lab
+    records the same fact ``paper.roster.LAB_PROVENANCE`` states on the roster's side.
 
     ``hypothesis``, ``verdict``, ``parent_id`` and above all ``source_sha`` are never written.
     No ``trials`` row is inserted: a promotion is not a backtest and must not move the lab's N.
 
     Idempotent: a method whose ``analysis`` already carries ``PROMOTION_MARKER`` followed by
-    ``strategy_id`` is already recorded, and this writes nothing and returns the current status.
-    That is what lets the command be re-run to repair a half-finished promotion, since the roster
-    (Neon) and the lab (SQLite) cannot share one transaction.
+    ``strategy_id`` is already recorded, and this writes nothing and returns the current status --
+    including when this call's ``basis`` or ``reason`` differ, because what was recorded is what
+    was true on the night of the admission. That is what lets the command be re-run to repair a
+    half-finished promotion, since the roster (Neon) and the lab (SQLite) cannot share one
+    transaction.
 
     The caller holds the transaction (``begin_immediate`` / ``with conn``), as every other writer
     in this module does.
@@ -446,11 +544,24 @@ def record_promotion(
                 f"status alone."
             )
 
+    basis = promotion_basis(status) if basis is None else basis
+    if basis not in PROMOTION_BASES:
+        raise LabError(f"basis {basis!r} is not one of {PROMOTION_BASES}")
+    reason = reason.strip()
+    if basis == "owner-override" and not reason:
+        raise LabError(
+            f"{method_id} is {status!r}, so the roster is admitting a method the lab has not "
+            f"passed. That is allowed -- the roster's admission rule is not the lab's gate -- but "
+            f"the basis goes on the record: pass reason='the one line that says why'."
+        )
+
     retired = "" if retired_id is None else f", replacing `{retired_id}` (retired the same moment)"
+    why = f" {reason}" if reason else ""
     body = (
         f"{PROMOTION_MARKER}`{strategy_id}`{retired}.\n\n"
         f"Variant: `{candidate_id}`. Roster object: `{object_name}`. "
         f"Frozen spec digest: `{spec_digest}`.\n\n"
+        f"Lab status at admission: `{status}`. Basis: `{basis}`.{why}\n\n"
         f"The roster row is `status='active'` with no `paper_start`: the next paper night freezes "
         f"the spec and starts its own clock, so the paper record begins at the promotion and "
         f"claims nothing earlier. `backtest.registry.REGISTRY` was not appended to -- a promoted "
@@ -587,6 +698,91 @@ def best_dev_eligible(conn: sqlite3.Connection, method_id: str) -> sqlite3.Row |
         "SELECT * FROM trials WHERE method_id = ? AND window = 'dev' AND eligible = 1 "
         "AND mar IS NOT NULL ORDER BY mar DESC, n ASC LIMIT 1",
         (method_id,),
+    ).fetchone()
+
+
+# --------------------------------------------------------------------------- trial moments
+
+
+@dataclass(frozen=True)
+class MomentsRow:
+    """The deflated Sharpe's inputs for one dev trial, as they were at the moment it was judged.
+
+    ``dev.deflated_sharpe(sr_daily, n_at_run, var_trials, t, skew, kurt)`` reproduces that
+    trial's recorded ``dsr`` exactly; substituting another N re-judges it under another policy
+    without re-running the backtest. That is the whole point of the table: ``trials`` is
+    append-only and its ``dsr`` is frozen at the N of its run date, so a verdict can only be
+    recomputed from inputs that were kept.
+
+    - ``trial_n``   the ``trials.n`` this describes. ``insert_trials`` assigns it, so a row built
+                    before the insert carries ``0`` and is stamped with
+                    ``dataclasses.replace(row, trial_n=n)`` afterwards; ``insert_moments``
+                    refuses ``0``.
+    - ``sr_daily``  the daily Sharpe (``daily_moments(...)[0]``), not annualized.
+    - ``t``         the number of daily returns the trial produced.
+    - ``skew``      skewness of those returns (``m3 / m2**1.5``).
+    - ``kurt``      kurtosis of those returns, **not** excess (3.0 for a normal).
+    - ``var_trials``the variance of the daily Sharpe across the trials this one was deflated
+                    against, or None when the lab had fewer than two -- the same condition under
+                    which ``trials.dsr`` is NULL.
+    - ``n_at_run``  the N used, which equals the trial's ``n_trials_at_run``.
+    - ``measured``  an ISO timestamp: for a trial recorded by ``lab run`` this is the trial's own
+                    ``run_at``, so the pair is one measurement with one stamp.
+    """
+
+    trial_n: int
+    sr_daily: float
+    t: int
+    skew: float
+    kurt: float
+    var_trials: float | None
+    n_at_run: int
+    measured: str
+
+
+MOMENTS_COLUMNS: tuple[str, ...] = tuple(f.name for f in fields(MomentsRow))
+
+
+def insert_moments(conn: sqlite3.Connection, rows: Sequence[MomentsRow]) -> None:
+    """Record the DSR's inputs for trials that already exist (the caller holds the transaction).
+
+    Append-only and one row per trial: a trial that already has moments is refused rather than
+    overwritten, so a backfill (``lab remeasure``) can be made idempotent by skipping what
+    ``moments_of`` already returns instead of racing the triggers.
+
+    ``trial_n`` must be a real trial number -- the foreign key enforces that the trial exists,
+    and the explicit check below turns the pre-insert sentinel ``0`` into a readable refusal
+    rather than a foreign-key error from inside a long run.
+    """
+    cols = ", ".join(f'"{c}"' for c in MOMENTS_COLUMNS)
+    marks = ", ".join("?" for _ in MOMENTS_COLUMNS)
+    for r in rows:
+        if r.trial_n <= 0:
+            raise LabError(
+                f"moments need the trial number insert_trials assigned, got {r.trial_n!r}: "
+                "insert the trial first, then stamp its moments with dataclasses.replace"
+            )
+        if moments_of(conn, r.trial_n) is not None:
+            raise LabError(
+                f"trial {r.trial_n} already has recorded moments: trial_moments is append-only, "
+                "and a second measurement of the same trial would be a second verdict"
+            )
+        conn.execute(
+            f"INSERT INTO trial_moments ({cols}) VALUES ({marks})",
+            [getattr(r, c) for c in MOMENTS_COLUMNS],
+        )
+
+
+def moments_of(conn: sqlite3.Connection, trial_n: int) -> sqlite3.Row | None:
+    """The recorded DSR inputs for one trial, or None when it has none.
+
+    None is the normal answer for every trial recorded before this table existed, and for any
+    trial whose daily returns had no computable moments (fewer than two returns, or zero
+    variance) -- which is exactly the set of trials whose ``dsr`` is NULL. A caller that
+    re-evaluates must therefore have a fallback for None; it is never an error.
+    """
+    return conn.execute(
+        "SELECT * FROM trial_moments WHERE trial_n = ?", (int(trial_n),)
     ).fetchone()
 
 

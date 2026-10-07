@@ -36,7 +36,7 @@
       "satisfies": [
         "R1"
       ],
-      "status": "spawned",
+      "status": "pending",
       "task_id": null,
       "title": "Run it, and record what it found"
     },
@@ -76,28 +76,28 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "16917e94ee78072cd8806545166314966e3786a1",
       "depends_on": [
         3
       ],
       "difficulty": "NORMAL",
       "n": 5,
-      "note": null,
+      "note": "Verdict: keep MOM-FR. Rule resolved as method-lab-design SS8 'The roster replacement rule (2026-10-07)', refusals R1-R3 / triggers T1-T5, all eight in the doc's SS2 table. No trigger fires; Step 4 (roster edit) did not fire. Decided: the plan's verbatim profit-factor gloss had a corrupted currency glyph, written as '$2.33 on winners for every $1 lost' per invariant 7 (plain prose). Suite 3229 passed / 0 failed / 0 skipped; lab N=110, 0 looks, insights 32. todos.md + PLAN.md row-5 tick left UNCOMMITTED for land to sweep (siblings writing concurrently).",
       "package": "docs/handover",
       "plan": ".workflows/plan/delisting-stress-roster-rules/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T11:25:43+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-W5GD",
       "title": "MOM-FR, judged under the rule"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/delisting-stress-roster-rules/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "delisting-stress-roster-rules",
-  "updated": "2026-10-07T11:23:05+00:00",
-  "verified_at": "2026-10-07T11:23:04+00:00",
+  "updated": "2026-10-07T11:25:43+00:00",
+  "verified_at": "2026-10-07T11:24:29+00:00",
   "worktree": "/home/miftah/.worktrees/seer/delisting-stress-roster-rules"
 }

@@ -1,6 +1,14 @@
 """`lab`: the method lab (docs/plans/2026-10-04-method-lab-design.md).
 
-    lab status                      N, test looks, near misses, backlog, blocked ideas
+    lab status                      N, the promotion path and what is promotable now, the
+                                    test-window look budget, a warning when the luck bar is about
+                                    to re-close, near misses, backlog, blocked ideas
+    lab luck [--at N ...] [--limit K]
+                                    read-only: the dev leaderboard under every N policy side by
+                                    side, the N each resolves to, the evidence behind it and how
+                                    many candidates clear the luck bar there. Writes nothing,
+                                    loads no research store, spends no look. --at N adds a column
+                                    at a literal N (repeatable)
     lab show M0007                  one method and its trials
     lab run M0007 [--store DIR] [--allow-coverage F]
                                     run a committed method on the dev window, record its trials;
@@ -55,9 +63,13 @@ Exit 0 on success; 2 when the lab's rules refuse the request; 1 on any other err
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import logging
+import math
 import os
+import statistics
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 from seer_engine import config, research
@@ -81,11 +93,55 @@ def _coverage_floor(text: str) -> float:
     return value
 
 
+def _positive_n(text: str) -> int:
+    """An ``--at N`` column: an integer the deflated Sharpe is defined at.
+
+    ``dev.deflated_sharpe`` returns None below two looks, so ``--at 1`` would silently add a
+    column of dashes. argparse says so instead.
+    """
+    try:
+        value = int(text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"not an integer: {text!r}") from exc
+    if value < 2:
+        raise argparse.ArgumentTypeError(
+            f"the deflated Sharpe is undefined below N = 2 trials, got {value}"
+        )
+    return value
+
+
 def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--db", type=Path, default=store.DB_PATH, help="lab database (default: lab/lab.sqlite)")
     sub = p.add_subparsers(dest="lab_command", metavar="<lab command>", required=True)
 
     sub.add_parser("status", help="the lab at a glance")
+
+    s = sub.add_parser(
+        "luck",
+        help="read-only: the dev leaderboard under every N policy, side by side",
+        description=(
+            "Re-evaluate every recorded dev DSR at the N each named policy resolves to, and at "
+            "any literal N given with --at, and say how many candidates clear the luck bar at "
+            "each. Reads the lab, writes nothing, loads no research store and spends no "
+            "test-window look: safe against the committed database. The gate itself is one "
+            "constant, store.DSR_POLICY; this command is how you decide whether to touch it."
+        ),
+    )
+    s.add_argument(
+        "--at",
+        type=_positive_n,
+        action="append",
+        default=None,
+        metavar="N",
+        help="add a column at this literal N, on top of the named policies (repeatable)",
+    )
+    s.add_argument(
+        "--limit",
+        type=int,
+        default=12,
+        metavar="K",
+        help="how many dev trials to list, ranked by the live policy (default 12; 0 for all)",
+    )
     s = sub.add_parser("show", help="one method and its trials")
     s.add_argument("method")
 
@@ -254,22 +310,14 @@ def _status(conn, args) -> int:
     out.append("Closest to eligible (fewest failed go-live conditions, DSR aside, then MAR):")
     rows = conn.execute("SELECT * FROM trials WHERE window = 'dev' AND mar IS NOT NULL").fetchall()
 
-    def misses(r) -> list[str]:
-        # The row, not its `failed` string. `trials` is append-only, so that string names the
-        # bars in force on the run date -- "DSR >= 0.95", "max DD <= 15%" -- and both have since
-        # moved. `store.owner_failures` re-derives the four threshold conditions from this row's
-        # recorded columns against the bars in force now, and carries `owner inputs`.
-        return list(store.owner_failures(r))
-
-    for r in sorted(rows, key=lambda r: (len(misses(r)), -r["mar"], r["n"]))[:8]:
+    for r in sorted(rows, key=lambda r: (len(_owner_misses(r)), -r["mar"], r["n"]))[:8]:
         out.append(
-            f"  {r['candidate_id']:<28} misses {len(misses(r))}: {'; '.join(misses(r)) or '-'}  "
+            f"  {r['candidate_id']:<28} misses {len(_owner_misses(r))}: "
+            f"{'; '.join(_owner_misses(r)) or '-'}  "
             f"CAGR {fmt_signed_pct(r['cagr'])} vs {fmt_signed_pct(r['spy_tr_cagr'])}  maxDD "
             f"{fmt_pct(r['max_drawdown'])}  PF {fmt_pf(r['profit_factor'])}  trades {r['trades']}  DSR {fmt_num(r['dsr'], 3)}"
         )
-    for title, status in (("Backlog (idea)", "idea"), ("Blocked on data", "blocked-data"),
-                          ("Dev-eligible", "dev-eligible"), ("Promoted (pre-registered)", "promoted"),
-                          ("Test-passed", "test-passed"), ("Test-failed", "test-failed")):
+    for title, status in (("Backlog (idea)", "idea"), ("Blocked on data", "blocked-data")):
         rows = conn.execute("SELECT * FROM methods WHERE status = ? ORDER BY id", (status,)).fetchall()
         if rows:
             out.append("")
@@ -277,6 +325,8 @@ def _status(conn, args) -> int:
             for m in rows:
                 extra = f" [needs: {m['blocked_on']}]" if m["blocked_on"] else ""
                 out.append(f"  {m['id']} {m['name']} ({m['family']}, {m['source_kind']}){extra}")
+    out.append("")
+    out += _promotion_path(conn)
     out.append("")
     out.append("Latest insights:")
     for i in conn.execute("SELECT * FROM insights ORDER BY id DESC LIMIT 8"):
@@ -287,6 +337,637 @@ def _status(conn, args) -> int:
         "SELECT * FROM methods WHERE verdict <> '' AND id GLOB 'M*' ORDER BY updated DESC LIMIT 8"
     ):
         out.append(f"  {m['id']} {m['name']}: {m['verdict']}")
+    print("\n".join(out))
+    return 0
+
+
+# --------------------------------------------------------------------------- the luck bar at another N
+#
+# `lab luck` and the ratchet warning answer one question: what would the recorded verdicts be
+# if the deflated Sharpe had deflated by a different number of looks? They answer it without
+# re-running anything, from the columns `trials` already carries, and they write nothing.
+#
+#     DSR = Phi((SR - SR*(N)) * k),  k = sqrt(t - 1) / sqrt(1 - g3*SR + (g4-1)/4 * SR^2)
+#
+# `k` does not depend on N. `t`, `g3` and `g4` are not in `trials` -- that is exactly what phase
+# 2's `trial_moments` exists to fix for trials run from now on -- so `k` is recovered by
+# inverting a known DSR at the N it belongs to, and the answer is the same Phi with a different
+# `SR*`. See the analysis document, "What each N would do to the recorded verdicts".
+
+
+def _owner_misses(row) -> list[str]:
+    """The five go-live conditions ``row`` misses **at the bars in force now**. One line, by rule.
+
+    ``store.owner_failures`` is the single definition of that question and it lives in
+    ``lab/store.py`` (phase 4). This is a thin alias so the call sites below read as English;
+    it must never grow a rule of its own.
+
+    **It takes the trial row, not ``row["failed"]``.** That distinction is the whole point.
+    ``trials`` is append-only, so a recorded ``failed`` string names the bars in force on the
+    trial's **run date** -- all 110 recorded rows say ``"DSR >= 0.95"`` and ``"max DD <= 15%"``,
+    and the owner moved both on 2026-10-07 (0.90 and 20%). Reading conditions back out of that
+    string would show ``M0022`` as failing a luck bar nobody applies and ``M0020-W-NOSTOP`` as
+    failing a drawdown bar nobody applies -- the two candidates this plan set exists to unblock,
+    both rendered permanently ineligible by a sentence about the past.
+
+    ``store.owner_failures`` re-derives the four *threshold* conditions from the row's recorded
+    numeric columns against the live constants, and carries ``owner inputs`` -- the one condition
+    that is not a threshold and has no column -- from the recorded string. See phase 4.
+    """
+    return list(store.owner_failures(row))
+
+
+# ``sr_star`` and ``recover_dsr`` are **phase 4's**, defined in ``lab/store.py`` beside the gate
+# that uses them, and re-exported here so this module's call sites and tests read as English.
+# (Reconciled: this phase drafted them locally because ``store.py`` belonged to phases 2 and 4;
+# phase 4 then needed the same inversion for ``store.dsr_at``, and the lab must not carry two
+# implementations of the deflated Sharpe's inversion.)
+#
+#   sr_star(n_trials, var_trials)        -- the daily hurdle SR* at n_trials looks
+#   recover_dsr(*, sharpe_daily, dsr_at_run, n_at_run, var_trials, n_trials)
+#                                        -- a recorded DSR re-evaluated at another N; returns
+#                                           dsr_at_run exactly at n_trials == n_at_run
+from seer_engine.lab.store import recover_dsr, sr_star  # noqa: E402, F401  (re-exported for the CLI)
+
+
+def _dev_var(conn) -> float | None:
+    """The variance of the dev trials' daily Sharpes. **Phase 4's ``store.dev_sharpe_variance``.**
+
+    An alias, kept so the call sites below read locally; it must not grow a rule of its own. It
+    is the same expression ``runner.trial_rows`` deflates by **and** the one ``store.dsr_at``
+    uses on both of its routes, so the hurdle this module prints is the hurdle the gate applies.
+    """
+    return store.dev_sharpe_variance(conn)
+
+
+def _policies() -> tuple[str, ...]:
+    """The named N policies, in ``npolicy``'s own order."""
+    from seer_engine.lab import npolicy
+
+    return tuple(getattr(npolicy, "POLICIES", ("all-trials", "methods", "effective")))
+
+
+def _n_counts(conn) -> list[tuple[str, object | None, str]]:
+    """``(policy, NCount | None, why-not)`` for every named policy.
+
+    A policy that cannot be resolved on this database -- too few trials to estimate a
+    participation ratio, no stored curves -- keeps its row with ``None`` and the reason, instead
+    of being dropped. ``lab luck`` is the command you run when the gate is behaving oddly; a
+    policy that silently vanished from its table would be the worst possible answer.
+    """
+    from seer_engine.lab import npolicy
+
+    out: list[tuple[str, object | None, str]] = []
+    for name in _policies():
+        try:
+            out.append((name, npolicy.effective_n(conn, name), ""))
+        except Exception as e:  # noqa: BLE001 - a diagnostic never dies on one unresolvable policy
+            out.append((name, None, str(e) or type(e).__name__))
+    return out
+
+
+def _evidence(count: object) -> str:
+    """Every field of an ``npolicy.NCount`` except ``n`` and ``policy``, which the caller prints.
+
+    Read generically rather than by name: phase 1 owns the field names, and the evidence behind a
+    policy is exactly the thing that must not go stale in this output.
+    """
+    try:
+        data = dataclasses.asdict(count)  # type: ignore[arg-type]
+    except TypeError:
+        data = {
+            k: getattr(count, k)
+            for k in dir(count)
+            if not k.startswith("_") and not callable(getattr(count, k, None))
+        }
+    parts = []
+    for key, value in data.items():
+        if key in ("n", "policy") or value is None:
+            continue
+        shown = fmt_num(value, 3) if isinstance(value, float) else value
+        parts.append(f"{key.replace('_', ' ')} {shown}")
+    return ", ".join(parts)
+
+
+def _live_n(conn, policy: str) -> int | None:
+    """The N the live policy resolves to, or None when it cannot be resolved here.
+
+    ``lab status`` must print on any database, a fresh one with no trials included, so an
+    unresolvable policy costs the N in the heading and nothing else.
+    """
+    from seer_engine.lab import npolicy
+
+    try:
+        return int(npolicy.effective_n(conn, policy).n)
+    except Exception:  # noqa: BLE001 - see the docstring; status prints either way
+        return None
+
+
+def _labels(failed: object) -> list[str]:
+    """``Verdict.failed`` (phase 4) as a list of labels, whichever shape it carries.
+
+    ``trials.failed`` is a ``"; "``-joined string; ``DevRow.failed`` is a sequence. Phase 4's
+    ``Verdict.failed`` mirrors one of the two. Both are read here, so the sentences this file
+    exists to print are not the thing that breaks when that is pinned.
+    """
+    if failed is None:
+        return []
+    if isinstance(failed, str):
+        return [f for f in failed.split("; ") if f]
+    return [str(f) for f in failed]  # type: ignore[union-attr]
+
+
+def _eligible_at(conn, n_trials: int, var_trials: float) -> list[str]:
+    """The candidates that would clear the luck bar at ``n_trials`` looks, missing nothing else.
+
+    D1's evidence, recomputed rather than quoted: on the committed database this returns three
+    candidates at N = 110 (M0022-W-TV14, M0022-W-TV16 and M0020-W-NOSTOP, the live policy) and
+    seven at N = 23. That contrast is why the owner can move the threshold and leave the N alone
+    with confidence, and it belongs in `lab luck`'s output rather than in a commit message.
+
+    Owner conditions come from the row's own columns through ``_owner_misses``; only the luck
+    test moves with N.
+    """
+    out: list[str] = []
+    for r in conn.execute(
+        "SELECT * FROM trials WHERE window = 'dev' AND dsr IS NOT NULL AND sharpe IS NOT NULL "
+        "ORDER BY n"
+    ).fetchall():
+        if _owner_misses(r):
+            continue
+        v = recover_dsr(
+            sharpe_daily=float(r["sharpe"]) / math.sqrt(252),
+            dsr_at_run=float(r["dsr"]),
+            n_at_run=int(r["n_trials_at_run"]),
+            var_trials=var_trials,
+            n_trials=n_trials,
+        )
+        if v is not None and v >= store.DSR_MIN:
+            out.append(str(r["candidate_id"]))
+    return out
+
+
+# --------------------------------------------------------------------------- the promotion path
+#
+# design §3's path is dev-eligible -> promoted -> test-passed -> paper, and every step refuses a
+# method that has not taken the one before it. A lab where nothing is dev-eligible therefore has
+# an unreachable `lab promote` and an unreachable `lab test`. Until this block existed, `lab
+# status` listed these sections only when they had rows -- so that state printed nothing at all
+# about the promotion path, and the one condition that most needed saying was the one condition
+# that was silent. 110 dev trials went by that way.
+#
+# Here every section prints, an empty one prints the reason it is empty built from the trials,
+# and `_ratchet_warning` says so *before* it happens again (Decision D1b).
+
+_PROMOTION_STATUSES: tuple[tuple[str, str, str], ...] = (
+    ("Dev-eligible", "dev-eligible", "`lab promote` pre-registers these"),
+    ("Promoted (pre-registered)", "promoted", "`lab test` spends the one look on these"),
+    ("Test-passed", "test-passed", "the owner's call: a paper roster entry with its own clock"),
+    ("Test-failed", "test-failed", "final; there is no second look at the configuration"),
+    ("Paper", "paper", "trading on the paper roster"),
+)
+
+# D1b. 0.03 of DSR is roughly 30 more dev trials at the margins this lab runs at, which is under
+# a run day of Sera -- close enough that the owner wants to hear about it before the batch, not
+# after. The warning is a sentence, not a gate: nothing refuses to run because of it.
+_WARN_MARGIN = 0.03
+_N_CEILING = 100_000  # beyond this the ratchet is not a near-term concern; say "never" instead
+
+
+def _best_luck_only(conn):
+    """The dev trial with the highest derived DSR among those missing no owner condition.
+
+    The pre-filter is on the row's own columns (``_owner_misses``), because phase 4's derived
+    verdict re-derives the owner conditions from exactly those columns -- so filtering first
+    keeps `lab status` to a handful of ``store.verdict`` calls instead of one per dev trial,
+    without applying a second rule.
+
+    ``(row, verdict)``, or None when no dev trial passes all five owner conditions.
+    """
+    best = None
+    for r in conn.execute(
+        "SELECT * FROM trials WHERE window = 'dev' AND mar IS NOT NULL ORDER BY n"
+    ).fetchall():
+        if _owner_misses(r):
+            continue
+        v = store.verdict(conn, r)
+        key = (-1.0 if v.dsr is None else float(v.dsr), -int(r["n"]))
+        if best is None or key > best[0]:
+            best = (key, r, v)
+    return None if best is None else (best[1], best[2])
+
+
+def _sinks_at(conn, trial, verdict, var_trials: float | None) -> int | None:
+    """The smallest N at which this trial's DSR falls below the bar. D1b's number.
+
+    Seeded from the verdict (phase 4), not from the recorded columns: the warning has to be about
+    the gate as it actually stands. ``recover_dsr`` anchored at ``(verdict.dsr, verdict.n)``
+    returns ``verdict.dsr`` exactly at ``verdict.n`` and falls monotonically from there, so this
+    is the gate's own curve and the bisection on it is exact.
+
+    None when it never falls below within ``_N_CEILING`` looks, or when the recovery is
+    undefined, or when the verdict is already under the bar -- in which case the empty
+    ``Dev-eligible`` section is already saying so and a second sentence would be noise.
+    """
+    if var_trials is None or var_trials <= 0 or verdict.dsr is None:
+        return None
+    if trial["sharpe"] is None or int(verdict.n) < 2:
+        return None
+    if float(verdict.dsr) <= 0.5 or float(verdict.dsr) < store.DSR_MIN:
+        return None
+    common = dict(
+        sharpe_daily=float(trial["sharpe"]) / math.sqrt(252),
+        dsr_at_run=float(verdict.dsr),
+        n_at_run=int(verdict.n),
+        var_trials=var_trials,
+    )
+    lo, hi = int(verdict.n), _N_CEILING
+    far = recover_dsr(n_trials=hi, **common)
+    if far is None or far >= store.DSR_MIN:
+        return None
+    while lo + 1 < hi:
+        mid = (lo + hi) // 2
+        v = recover_dsr(n_trials=mid, **common)
+        if v is None:
+            return None
+        if v >= store.DSR_MIN:
+            lo = mid
+        else:
+            hi = mid
+    return hi
+
+
+def _dev_trials_per_run_day(conn) -> float | None:
+    """The lab's recent rate: the median dev trials recorded per distinct run day.
+
+    Measured from ``trials.run_at``, never assumed -- a hardcoded "a Sera night is 25 trials"
+    would be exactly the kind of stale constant this plan set exists to remove. None below three
+    run days, where a median is not a rate.
+    """
+    counts = [
+        int(r[0])
+        for r in conn.execute(
+            "SELECT count(*) FROM trials WHERE window = 'dev' "
+            "GROUP BY substr(run_at, 1, 10) ORDER BY substr(run_at, 1, 10) DESC LIMIT 10"
+        ).fetchall()
+    ]
+    return statistics.median(counts) if len(counts) >= 3 else None
+
+
+def _ratchet_warning(conn, var_trials: float | None) -> list[str]:
+    """Decision D1b: say it *before* the luck bar re-closes, not 110 trials after.
+
+    The gate admits a candidate today because the threshold moved, not because the N did. The N
+    still rises with every exploration, so the margin the threshold bought is spent by the search
+    itself -- which is the complaint R1 names, deferred rather than removed. This prints the
+    margin, the N at which the best candidate falls back below the bar, and, when the lab has
+    enough run days to have a rate, how many run days of exploration that is.
+
+    Nothing here is a constant lifted from the analysis document: the candidate and its DSR come
+    from ``store.verdict``, its N from ``npolicy`` through that, the bar from ``store.DSR_MIN``
+    and the rate from ``trials.run_at``. It is silent when there is no candidate above the bar,
+    and silent when the margin is comfortable.
+    """
+    found = _best_luck_only(conn)
+    if found is None:
+        return []
+    trial, v = found
+    if v.dsr is None or float(v.dsr) < store.DSR_MIN:
+        return []  # the empty Dev-eligible section already explains this one
+    margin = float(v.dsr) - store.DSR_MIN
+    if margin > _WARN_MARGIN:
+        return []
+    sinks = _sinks_at(conn, trial, v, var_trials)
+    head = (
+        f"  !! The luck bar is close. {trial['candidate_id']} is the best candidate that passes "
+        f"all five go-live"
+    )
+    second = (
+        f"     conditions, and its DSR is {fmt_num(v.dsr, 3)} against a {store.DSR_MIN} bar -- "
+        f"{fmt_num(margin, 3)} of margin at N = {v.n} ({v.policy})."
+    )
+    if sinks is None:
+        return [head, second, "     It does not fall below the bar at any N worth worrying about."]
+    more = sinks - int(v.n)
+    rate = _dev_trials_per_run_day(conn)
+    pace = ""
+    if rate and rate > 0:
+        days = more / float(rate)
+        pace = (
+            f" -- about {fmt_num(days, 1)} run day(s) at this lab's recent rate of "
+            f"{fmt_num(rate, 0)} dev trials a run day"
+        )
+    return [
+        head,
+        second,
+        f"     It falls below the bar at N = {sinks}: {more} more dev trials{pace}.",
+        "     More exploration re-closes this gate. `lab luck` shows what each N policy would do.",
+    ]
+
+
+def _no_dev_eligible_reason(conn) -> str:
+    """Why no method is dev-eligible, in one sentence built from the trials.
+
+    Three shapes, in the order a reader needs them:
+
+    1. nothing has run, so nothing has been judged;
+    2. something has run, and every candidate misses an owner condition -- which no change to the
+       luck bar's N or threshold can rescue, and the sentence says so;
+    3. candidates pass all five owner conditions and the luck bar alone is holding them, in which
+       case the closest one, its derived DSR and its distance from the bar *is* the sentence.
+    """
+    methods = int(
+        conn.execute(
+            "SELECT count(DISTINCT method_id) FROM trials WHERE window = 'dev'"
+        ).fetchone()[0]
+    )
+    if methods == 0:
+        return "no method has run on the dev window yet, so nothing has been judged"
+    ran = "1 method has run" if methods == 1 else f"{methods} methods have run"
+    found = _best_luck_only(conn)
+    if found is not None:
+        r, v = found
+        return (
+            f"no method is dev-eligible: {ran}, and every candidate that passes all five go-live "
+            f"conditions is held by the luck bar alone -- the closest is {r['candidate_id']} at "
+            f"DSR {fmt_num(v.dsr, 3)} against a {store.DSR_MIN} bar, N = {v.n} under policy "
+            f"{v.policy}. `lab luck` shows what another N would do"
+        )
+    rows = conn.execute(
+        "SELECT * FROM trials WHERE window = 'dev' AND mar IS NOT NULL ORDER BY n"
+    ).fetchall()
+    if rows:
+        r = min(
+            rows,
+            key=lambda x: (len(_owner_misses(x)), -(x["mar"] or 0.0), int(x["n"])),
+        )
+        misses = _owner_misses(r)
+        return (
+            f"no method is dev-eligible: {ran} and none passes the five go-live conditions -- the "
+            f"closest is {r['candidate_id']}, missing {len(misses)}: {'; '.join(misses)}. No luck "
+            f"bar, at any N or any threshold, can rescue a candidate that misses one of these"
+        )
+    return f"no method is dev-eligible: {ran} but no dev trial carries a MAR, so nothing can rank"
+
+
+def _empty_reason(conn, status: str) -> str:
+    """Why one promotion-path section is empty.
+
+    Every step but the first is empty for exactly one reason worth printing -- the step before it
+    -- and naming the command that would move it is the whole value of the sentence. The first
+    step, ``dev-eligible``, is empty because of the gate, and that is the sentence this block
+    exists for.
+    """
+    if status == "dev-eligible":
+        return _no_dev_eligible_reason(conn)
+    prior = {
+        "promoted": "dev-eligible",
+        "test-passed": "promoted",
+        "test-failed": "promoted",
+        "paper": "test-passed",
+    }[status]
+    cmd = {
+        "promoted": "lab promote",
+        "test-passed": "lab test",
+        "test-failed": "lab test",
+        "paper": "python -m seer_engine promote",
+    }[status]
+    n = int(conn.execute("SELECT count(*) FROM methods WHERE status = ?", (prior,)).fetchone()[0])
+    if n == 0:
+        return f"nothing is {prior}, so `{cmd}` has nothing to take"
+    noun = "1 method is" if n == 1 else f"{n} methods are"
+    it = "it" if n == 1 else "them"
+    return f"{noun} {prior}; `{cmd}` has not been run on {it} yet"
+
+
+def _promotable_now(conn) -> list[str]:
+    """What ``lab promote`` would take today, and what the status machine is still holding back.
+
+    ``prereg.promote_method`` wants two things: a method at ``dev-eligible`` (or already
+    ``promoted``), and a best dev trial the verdict calls eligible. ``store.best_dev_eligible``
+    answers the second under ``store.DSR_POLICY`` (phase 4), so this section says what the gate
+    says and cannot drift from it -- which is the point of reading the derived verdict here
+    rather than the recorded ``eligible`` column, which was frozen at a 0.95 bar and an N of
+    whatever day the trial ran.
+
+    A method whose best trial *is* derived-eligible but whose status still reads ``rejected`` is
+    listed separately and by name: it is not promotable now, and the one command that moves it is
+    ``lab reevaluate <id>`` (phase 4), which takes the ``rejected -> dev-eligible`` edge. **Not
+    ``lab run``** -- that refuses a method whose variants already have dev trials, so telling the
+    reader to run it would send them into a refusal.
+
+    Only methods that have a dev trial are asked, so the derivation runs 23 times on the
+    committed database rather than 37.
+    """
+    ready: list[str] = []
+    held: list[str] = []
+    for m in conn.execute(
+        "SELECT * FROM methods m WHERE EXISTS "
+        "(SELECT 1 FROM trials t WHERE t.method_id = m.id AND t.window = 'dev') ORDER BY m.id"
+    ).fetchall():
+        best = store.best_dev_eligible(conn, m["id"])
+        if best is None:
+            continue
+        if m["status"] in ("dev-eligible", "promoted"):
+            v = store.verdict(conn, best)
+            tail = "  (already pre-registered)" if m["status"] == "promoted" else ""
+            ready.append(
+                f"    {m['id']:<6} {best['candidate_id']:<28} MAR {fmt_num(best['mar'])}  "
+                f"DSR {fmt_num(v.dsr, 3)} at N={v.n} ({v.policy}){tail}"
+            )
+        else:
+            held.append(
+                f"    {m['id']:<6} {best['candidate_id']:<28} status {m['status']!r}: "
+                f"`lab reevaluate {m['id']}` re-judges it and moves it to dev-eligible"
+            )
+    out = ["  Promotable now (`lab promote` would take these):"]
+    out += ready or ["    (none)"]
+    if held:
+        out.append("  Eligible on the evidence, held by the status machine:")
+        out += held
+    return out
+
+
+def _promotion_path(conn) -> list[str]:
+    """The whole promotion-path block: always printed, empty sections included."""
+    policy = store.DSR_POLICY
+    n = _live_n(conn, policy)
+    at = f" at N = {n}" if n is not None else ""
+    out = [
+        f"Promotion path (dev-eligible -> promoted -> test-passed -> paper), luck bar "
+        f"DSR >= {store.DSR_MIN} under policy {policy}{at}:"
+    ]
+    out += _ratchet_warning(conn, _dev_var(conn))
+    out += _promotable_now(conn)
+    for title, status, why in _PROMOTION_STATUSES:
+        rows = conn.execute(
+            "SELECT * FROM methods WHERE status = ? ORDER BY id", (status,)
+        ).fetchall()
+        if rows:
+            out.append(f"  {title} ({len(rows)}) -- {why}:")
+            for m in rows:
+                out.append(f"    {m['id']} {m['name']} ({m['family']}, {m['source_kind']})")
+        else:
+            out.append(f"  {title}: (none) -- {_empty_reason(conn, status)}")
+    out.append(
+        f"  Test-window looks used: {store.test_looks(conn)}. One look per configuration, "
+        f"pre-registered before it is spent, and never given back (design §3)."
+    )
+    return out
+
+
+def _luck_rows(
+    conn,
+    ns: Sequence[int],
+    *,
+    var_trials: float,
+    rank_at: int,
+    limit: int,
+) -> list[tuple[object, list[float | None]]]:
+    """Every dev trial with a recorded DSR, re-evaluated at each N in ``ns``.
+
+    Ranked by the DSR at ``rank_at`` -- the live policy's N -- highest first, ties by trial
+    number, so the order is a property of this function and not of the insertion order.
+
+    The 54 P7a seed trials carry ``dsr IS NULL`` by construction (``seed.py``: "P7a reported it
+    for one row only") and are skipped. There is nothing to re-evaluate for them, and putting a
+    number where the record has none is the opposite of what this command is for.
+    """
+    scored: list[tuple[object, list[float | None], float]] = []
+    for r in conn.execute(
+        "SELECT * FROM trials WHERE window = 'dev' AND dsr IS NOT NULL AND sharpe IS NOT NULL "
+        "ORDER BY n"
+    ).fetchall():
+        common = dict(
+            sharpe_daily=float(r["sharpe"]) / math.sqrt(252),
+            dsr_at_run=float(r["dsr"]),
+            n_at_run=int(r["n_trials_at_run"]),
+            var_trials=var_trials,
+        )
+        at = [recover_dsr(n_trials=n, **common) for n in ns]
+        rank = recover_dsr(n_trials=rank_at, **common)
+        scored.append((r, at, -1.0 if rank is None else rank))
+    scored.sort(key=lambda x: (-x[2], int(x[0]["n"])))  # type: ignore[index]
+    rows = [(r, at) for r, at, _ in scored]
+    return rows if limit <= 0 else rows[:limit]
+
+
+def _luck(conn, args) -> int:
+    """``lab luck``: the dev leaderboard under every N policy, side by side. Read-only.
+
+    It opens no research store, runs no backtest, inserts no row and spends no test-window look.
+    That is the point. Decision D1 moved the threshold and deliberately left the N where it was,
+    so the second lever is built, measured and *not pulled* -- and this is the instrument that
+    shows what pulling it would do, against the committed database, without editing
+    ``store.DSR_POLICY`` and re-running anything.
+
+    What it is not: a verdict. The verdict is ``store.verdict``, which recomputes exactly from
+    ``trial_moments``. The columns here are recovered from the recorded columns by inverting each
+    trial's own per-trial constant at the N it ran at -- so the ``recorded`` column reproduces the
+    database exactly and the other columns move only the multiple-testing count.
+    """
+    live = store.DSR_POLICY
+    counts = _n_counts(conn)
+    var = _dev_var(conn)
+    out: list[str] = [
+        "lab luck -- the dev leaderboard under each N policy (read-only: nothing is written)",
+        "",
+        f"dev trials {store.dev_trial_count(conn)}  ·  test-window looks used "
+        f"{store.test_looks(conn)}  ·  luck bar {store.DSR_LABEL}",
+        f"live policy: {live}  (store.DSR_POLICY -- changing the N is this one constant)",
+        "",
+        "The N each policy resolves to, and what clears the bar there:",
+    ]
+    ns: list[int] = []
+    labels: list[str] = []
+    for name, count, why in counts:
+        mark = "   <- live" if name == live else ""
+        if count is None:
+            out.append(f"  {name:<12} N = ?      unavailable here: {why}{mark}")
+            continue
+        n = int(count.n)  # type: ignore[attr-defined]
+        if var is None:
+            out.append(f"  {name:<12} N = {n:<6d}{mark}")
+        else:
+            clears = _eligible_at(conn, n, var)
+            out.append(
+                f"  {name:<12} N = {n:<6d} SR* {sr_star(n, var):.6f}/day   {len(clears)} "
+                f"candidate(s) clear {store.DSR_LABEL}{mark}"
+            )
+            if clears:
+                out.append(f"  {'':<12} {', '.join(clears)}")
+        out.append(f"  {'':<12} evidence: {_evidence(count)}")
+        ns.append(n)
+        labels.append(name)
+    # --at columns are never deduplicated against a policy that happens to resolve to the same N:
+    # the reader asked for a column at a literal N and gets one, labelled by the N.
+    extra = [int(n) for n in (args.at or ())]
+    for n in extra:
+        ns.append(n)
+        labels.append(f"N={n}")
+    if extra and var is not None:
+        out.append("")
+        out.append(
+            "  at a literal N:  "
+            + "  ·  ".join(f"N={n} -> {len(_eligible_at(conn, n, var))} clear" for n in extra)
+        )
+
+    if var is None or not ns:
+        out += [
+            "",
+            "No leaderboard: "
+            + (
+                "fewer than two dev trials carry a Sharpe, so there is no trial-Sharpe variance "
+                "to deflate by."
+                if var is None
+                else "no policy resolved to an N on this database and no --at N was given."
+            ),
+        ]
+        print("\n".join(out))
+        return 0
+
+    rank_at = next(
+        (int(c.n) for name, c, _ in counts if name == live and c is not None),  # type: ignore[attr-defined]
+        ns[0],
+    )
+    sharpes = len(store.dev_daily_sharpes(conn))
+    out += [
+        "",
+        f"Trial-Sharpe variance now: {var:.6e} (sd {math.sqrt(var):.6f}) over {sharpes} dev "
+        f"trials carrying a Sharpe.",
+        "",
+        f"Dev leaderboard, each recorded DSR re-evaluated at each N, ranked by {live} "
+        f"(N={rank_at}).",
+        "Trials with no recorded DSR (the P7a seed import) are not listed: there is nothing to "
+        "re-evaluate.",
+        "",
+        "  "
+        + f"{'candidate':<28}{'N@run':>7}{'recorded':>10}"
+        + "".join(f"{lab:>12}" for lab in labels)
+        + "   other failed conditions",
+    ]
+    for r, at in _luck_rows(conn, ns, var_trials=var, rank_at=rank_at, limit=int(args.limit)):
+        others = "; ".join(_owner_misses(r))  # type: ignore[index]
+        out.append(
+            "  "
+            + f"{r['candidate_id']:<28}{int(r['n_trials_at_run']):>7}"  # type: ignore[index]
+            + f"{fmt_num(r['dsr'], 3):>10}"  # type: ignore[index]
+            + "".join(f"{fmt_num(v, 3):>12}" for v in at)
+            + f"   {others or 'none'}"
+        )
+    out += [
+        "",
+        f"A cell at or above {store.DSR_MIN} with 'none' in the last column is a candidate that N "
+        f"would admit.",
+        "The `recorded` column is this same recovery evaluated at each trial's own N@run, so it "
+        "reproduces the",
+        "database exactly; the other columns move nothing but the multiple-testing count. The "
+        "verdict the gate",
+        "uses is store.verdict, which recomputes from trial_moments where `lab remeasure` has "
+        "recovered them.",
+        "",
+        "Nothing was written and no test-window look was spent.",
+    ]
     print("\n".join(out))
     return 0
 
@@ -878,6 +1559,7 @@ def _seed(conn, args) -> int:
 
 _HANDLERS = {
     "status": _status,
+    "luck": _luck,
     "show": _show,
     "run": _run,
     "promote": _promote,

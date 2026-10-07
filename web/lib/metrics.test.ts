@@ -4,9 +4,9 @@ import { checklist, gateItem, strategyMetrics } from './metrics';
 const snaps = (vals: number[]) =>
   vals.map((equity, i) => ({ date: new Date(Date.UTC(2026, 6, 1 + i)).toISOString().slice(0, 10), equity }));
 
-const FAILED = { passed: false, applicable: true, note: 'P7a dev window only; failed max DD <= 15% (22.2%)' };
-const PASSED = { passed: true, applicable: true, note: null };
-const NOT_APPLICABLE = { passed: false, applicable: false, note: 'Backtest gate: not applicable (LLM strategy, design §1 item 5)' };
+const FAILED = { passed: false, applicable: true };
+const PASSED = { passed: true, applicable: true };
+const NOT_APPLICABLE = { passed: false, applicable: false };
 
 describe('strategyMetrics', () => {
   it('computes return, win rate, profit factor, drawdown and trade count', () => {
@@ -58,14 +58,14 @@ describe('checklist', () => {
   it('adds the backtest gate as a fifth rule', () => {
     const items = checklist(base, 0.046, FAILED);
     expect(items).toHaveLength(5);
-    expect(items[4]).toEqual({ label: 'Backtest gate passed', val: 'Not passed', ok: false, note: FAILED.note });
+    expect(items[4]).toEqual({ label: 'Backtest gate passed', val: 'Not passed', ok: false });
     expect(checklist(base, 0.046, PASSED)[4]).toEqual({ label: 'Backtest gate passed', val: 'Passed', ok: true });
   });
 
   it('reads "Not applicable" for C and never counts it as passed (handover D9)', () => {
     const items = checklist(base, 0.046, NOT_APPLICABLE);
     expect(items).toHaveLength(5);
-    expect(items[4]).toEqual({ label: 'Backtest gate', val: 'Not applicable', ok: false, note: NOT_APPLICABLE.note });
+    expect(items[4]).toEqual({ label: 'Backtest gate', val: 'Not applicable', ok: false });
     // Even every forward metric passing leaves C at four of five.
     const allForward = checklist({ ...base, months: 18 }, 0.046, NOT_APPLICABLE);
     expect(allForward.filter(i => i.ok)).toHaveLength(4);
@@ -73,8 +73,18 @@ describe('checklist', () => {
   });
 
   it('builds the fifth rule on its own', () => {
-    expect(gateItem({ passed: false, applicable: false, note: null })).toEqual({ label: 'Backtest gate', val: 'Not applicable', ok: false });
+    expect(gateItem({ passed: false, applicable: false })).toEqual({ label: 'Backtest gate', val: 'Not applicable', ok: false });
     expect(gateItem(PASSED)).toEqual({ label: 'Backtest gate passed', val: 'Passed', ok: true });
+  });
+
+  // A checklist item is a verdict and nothing else (owner, 2026-10-07). `gateItem` used to hang the
+  // roster's prose off the failing row, which is how it reached the leaderboard sheet at all.
+  it('carries no prose on any item: a failed gate explains itself on the Sera method page', () => {
+    for (const gate of [PASSED, FAILED, NOT_APPLICABLE]) {
+      for (const item of checklist({ ...base, months: 18 }, 0.046, gate)) {
+        expect(Object.keys(item).sort()).toEqual(['label', 'ok', 'val']);
+      }
+    }
   });
 
   it('passes only when all five hold', () => {

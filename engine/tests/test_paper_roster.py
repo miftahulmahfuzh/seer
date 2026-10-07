@@ -246,9 +246,27 @@ def test_strategy_params_is_contract_c2():
         assert set(p) == {"spec", "digest", "backtest_gate"}
         assert p["digest"] == spec_digest(p["spec"])
         assert p["backtest_gate"] == backtest_gate(e)
-        assert p["backtest_gate"]["passed"] is False and p["backtest_gate"]["note"] == e.gate_note
-        assert e.gate_note
+        assert p["backtest_gate"]["passed"] is False
+        assert e.gate_note  # still recorded on the entry
+        assert "note" not in p["backtest_gate"]  # and no longer written into params
         json.dumps(p)
+
+
+def test_params_carry_the_gate_verdict_and_never_the_gate_note():
+    """The purge (owner, 2026-10-07), asserted where the prose used to enter the app.
+
+    The leaderboard's go-live sheet printed `params.backtest_gate.note` under its five ticks.
+    Nothing renders it now, but the durable guarantee is one layer earlier: the note never
+    reaches `params` at all, so no future page can pick it back up by reading the row. The note
+    stays on the roster entry as the record of why the entry was admitted -- that is the point
+    of the asymmetry, and both halves are asserted here together.
+    """
+    for e in ROSTER:
+        gate = backtest_gate(e)
+        assert set(gate) <= {"passed", "applicable"}, f"{e.id}: {gate}"
+        assert e.gate_note, f"{e.id}: the admission record must survive the display purge"
+        # The whole params blob, not just the gate dict: the prose is nowhere in the row.
+        assert e.gate_note not in json.dumps(strategy_params(e))
 
 
 def test_strategy_params_round_trip_through_jsonb(pg):
@@ -289,20 +307,21 @@ def test_entry_rejects_an_id_off_the_roster():
 # ---- C (strategy-c-news-veto D1, D5, D9) ---------------------------------------------------------
 
 
-def test_the_four_earlier_gate_dicts_are_unchanged():
+def test_an_applicable_gate_dict_is_the_verdict_alone():
+    """Was `{"passed": False, "note": ...}` until the 2026-10-07 purge; now the verdict alone."""
     for sid in ("SPY", "A", F4, F1):
         e = entry(sid)
         assert e.gate_applicable is True
         gate = backtest_gate(e)
-        assert gate == {"passed": False, "note": e.gate_note}
-        assert list(gate) == ["passed", "note"]
+        assert gate == {"passed": False}
+        assert list(gate) == ["passed"]
 
 
 def test_c_gate_is_not_applicable_and_not_passed():
     c = entry("C")
     assert c.gate_applicable is False
     assert c.gate_note == "Backtest gate: not applicable (LLM strategy, design §1 item 5)"
-    assert backtest_gate(c) == {"passed": False, "applicable": False, "note": c.gate_note}
+    assert backtest_gate(c) == {"passed": False, "applicable": False}
     assert strategy_params(c)["backtest_gate"] == backtest_gate(c)
 
 
@@ -469,7 +488,11 @@ def test_retiring_a_strategy_does_not_move_its_digest():
 def test_a_corrected_gate_note_does_not_move_a_digest():
     corrected = from_row(dataclasses.replace(SEED_ROWS[1], gate_note="corrected, still failed"))
     assert spec_digest(spec(corrected)) == PINS["A"]
-    assert backtest_gate(corrected)["note"] == "corrected, still failed"
+    # The correction lands on the entry's record. It does not move the digest, and since the
+    # 2026-10-07 purge it does not reach `params` either -- it has no display path left at all.
+    assert corrected.gate_note == "corrected, still failed"
+    assert backtest_gate(corrected) == backtest_gate(entry("A"))
+    assert strategy_params(corrected) == strategy_params(entry("A"))
 
 
 def test_the_migration_rows_equal_the_seed_rows(pg):

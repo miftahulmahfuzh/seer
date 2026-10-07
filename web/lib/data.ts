@@ -54,7 +54,7 @@ export type Strategy = {
   status: StrategyStatus;
   /** Last paper session a retired strategy traded (migration 006); null while it is active. */
   paperEnd: string | null;
-  /** params->'backtest_gate'; { passed: false, applicable: true, note: null } until `paper` writes the frozen spec. */
+  /** params->'backtest_gate', verdict only; { passed: false, applicable: true } until `paper` writes the frozen spec. */
   gate: Gate;
   /** A research strategy: its orders and positions are paper only and never a buy recommendation. */
   isPaper: boolean;

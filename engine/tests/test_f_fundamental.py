@@ -27,6 +27,7 @@ from seer_engine.prices import to_decimal
 from seer_engine.sim.book import equal_weight
 from seer_engine.strategies.allocator import Allocator, MarketAware
 from seer_engine.strategies.base import History
+from seer_engine.strategies.f_factor import FACTOR
 from seer_engine.strategies.f_fundamental import (
     DV_N,
     EMPTY_PANEL,
@@ -494,7 +495,13 @@ def test_allocator_shape():
     assert isinstance(FUNDAMENTAL, MarketAware)
     # Adding prepare_market must NOT have been done by widening Allocator: that would make
     # isinstance False for every structural implementer and break eight production sites.
-    assert "prepare_market" not in Allocator.__protocol_attrs__
+    # FACTOR is such an implementer -- an Allocator with no prepare_market -- so this pair is
+    # the consequence, and it holds on every Python version.
+    assert isinstance(FACTOR, Allocator) and not isinstance(FACTOR, MarketAware)
+    # The same thing said directly on the member set: sharper, but `__protocol_attrs__` is a
+    # CPython internal added in 3.12 and CI runs 3.11, so it is read through getattr and is
+    # vacuous there. A skip is not available -- the CI step fails the job on any `^SKIPPED`.
+    assert "prepare_market" not in getattr(Allocator, "__protocol_attrs__", frozenset())
     assert FUNDAMENTAL.id == "FND"
     p = FundamentalParams(rank="value")
     assert FUNDAMENTAL.symbols(p) == () and FUNDAMENTAL.holds(p) == ()

@@ -9,7 +9,7 @@ to `origin/main` @ `ba8a05b`** on 2026-10-07, which brought in `seer-fc`'s go-li
 §13, `metrics.MIN_PAPER_MONTHS = 18` and the `dev.py` comment. Every plan in the set has been
 re-checked against that tree.)
 **Phases:** 5
-**Status:** complete
+**Status:** reconciled
 **Coordinator:** —
 
 ---
@@ -162,11 +162,11 @@ Every phase must hold all of these, and each phase's exit criteria restate the o
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 **done** | The delisting stress harness | R1 | `engine/src/seer_engine`, `engine/scripts`, `engine/tests` | 3 | — | HARD | `.workflows/plan/delisting-stress-roster-rules/phase-1.md` | P1-ENG-D7XQ | — |
-| 2 **done** | Run it, and record what it found | R1 | `docs/plans`, `lab`, `web/data` | **3** | 1 | NORMAL | `.workflows/plan/delisting-stress-roster-rules/phase-2.md` | P1-ROOT-T8MK | — |
-| 3 **done** | The roster replacement rule | R4 | `docs/plans` | 1 | — | NORMAL | `.workflows/plan/delisting-stress-roster-rules/phase-3.md` | P1-ROOT-K3VD | — |
-| 4 **done** | **A test that pins the dev gate's trades bar** | R2 | `engine/tests` | **1** | — | EASY | `.workflows/plan/delisting-stress-roster-rules/phase-4.md` | P1-ENG-T4KD | — |
-| 5 **done** | MOM-FR, judged under the rule | R3 | `docs/handover` | 1 | 3 | NORMAL | `.workflows/plan/delisting-stress-roster-rules/phase-5.md` | P1-ROOT-W5GD | — |
+| 1 | The delisting stress harness | R1 | `engine/src/seer_engine`, `engine/scripts`, `engine/tests` | 3 | — | HARD | `.workflows/plan/delisting-stress-roster-rules/phase-1.md` | — | — |
+| 2 | Run it, and record what it found | R1 | `docs/plans`, `lab`, `web/data` | **3** | 1 | NORMAL | `.workflows/plan/delisting-stress-roster-rules/phase-2.md` | — | — |
+| 3 | The roster replacement rule | R4 | `docs/plans` | 1 | — | NORMAL | `.workflows/plan/delisting-stress-roster-rules/phase-3.md` | — | — |
+| 4 | **A test that pins the dev gate's trades bar** | R2 | `engine/tests` | **1** | — | EASY | `.workflows/plan/delisting-stress-roster-rules/phase-4.md` | — | — |
+| 5 | MOM-FR, judged under the rule | R3 | `docs/handover` | 1 | 3 | NORMAL | `.workflows/plan/delisting-stress-roster-rules/phase-5.md` | — | — |
 
 Waves the `Depends on` column implies: **{1, 3, 4}** concurrently, then **{2, 5}** concurrently.
 

@@ -15,6 +15,7 @@ import subprocess
 import pytest
 
 from seer_engine import cli
+from seer_engine.backtest import tuning
 from seer_engine.lab import seed as seed_mod
 from seer_engine.lab import store
 from seer_engine.lab.seed import seed
@@ -274,11 +275,27 @@ def test_the_snapshot_follows_the_contract(lab):
     assert list(s) == ["version", "asOf", "gate", "data", "summary", "benchmark", "methods", "trials",
                        "insights", "ideasSeen"]
     assert s["version"] == 1
-    # dsrMin 0.95 -> 0.90 and maxDrawdown 0.15 -> 0.20: the owner's two risk-appetite changes of
-    # 2026-10-07 (LAB_LUCK_GATE_PLAN.md Decisions D1 and D6). The snapshot publishes the live
-    # constants, so this dict follows them.
-    assert s["gate"] == {"maxDrawdown": 0.20, "minProfitFactor": 1.3, "minTrades": 100, "dsrMin": 0.90,
-                         "devStart": "1993-01-29", "devEnd": "2015-10-16", "testStart": "2015-10-19"}
+    gate = s["gate"]
+    assert list(gate) == [
+        "maxDrawdown", "minProfitFactor", "minTrades", "dsrMin",
+        "dsrPolicy", "dsrN", "dsrNBasis", "devStart", "devEnd", "testStart",
+    ]
+    assert {k: gate[k] for k in ("minProfitFactor", "minTrades",
+                                 "devStart", "devEnd", "testStart")} == {
+        "minProfitFactor": 1.3, "minTrades": 100,
+        "devStart": "1993-01-29", "devEnd": "2015-10-16", "testStart": "2015-10-19"}
+    # BOTH bars are the owner's dials and BOTH moved on 2026-10-07 (design §7.1 and §1 item 4):
+    # published from the constants, never pinned here. A test that hardcodes an owner-set number
+    # turns the next adjustment into a test failure for no benefit -- which is what happened to
+    # the six files this phase is fixing.
+    assert gate["dsrMin"] == store.DSR_MIN
+    assert gate["maxDrawdown"] == tuning.MAX_DRAWDOWN
+    # The N is resolved from the policy at export time, not stored: assert the contract the web
+    # reads (a known policy, a usable integer, one line of evidence), not phase 1's arithmetic.
+    assert gate["dsrPolicy"] == store.DSR_POLICY
+    assert isinstance(gate["dsrN"], int) and gate["dsrN"] >= 0
+    assert isinstance(gate["dsrNBasis"], str) and gate["dsrNBasis"]
+    assert "\n" not in gate["dsrNBasis"]  # it is a one-line field in a committed prereg file too
     assert s["data"] == {
         "storeStart": "1993-01-29", "membershipStart": "1996-01-02", "fxStart": "1999-01-04",
         "fingerprints": sorted({seed_mod.P7A_FINGERPRINT, "fp"}),

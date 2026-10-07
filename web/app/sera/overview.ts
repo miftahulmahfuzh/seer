@@ -12,7 +12,7 @@ import {
   misses,
   progress,
 } from '../../lib/sera/derive';
-import type { LabInsight, LabMethod, LabSnapshot, LabTrial } from '../../lib/sera/types';
+import type { DsrPolicy, LabInsight, LabMethod, LabSnapshot, LabTrial } from '../../lib/sera/types';
 
 /** The six conditions every dev try is judged on (the contract's failure labels). A count, not a threshold. */
 export const HURDLES = 6;
@@ -308,7 +308,19 @@ export function closer(snap: LabSnapshot): Closer {
 
 // ---- (5) The luck bar ---------------------------------------------------------------------------
 
-export type Luck = { points: ScatterPoint[]; refY: RefLine[]; yTicks: Tick[]; above: number; total: number };
+export type Luck = {
+  points: ScatterPoint[];
+  refY: RefLine[];
+  /** The N the gate deflates by today, on the same axis as each try's own N. */
+  refX: RefLine[];
+  yTicks: Tick[];
+  above: number;
+  total: number;
+  n: number;
+  policy: DsrPolicy;
+  /** One line of evidence for `n`, written by the engine. Shown as given. */
+  basis: string;
+};
 
 export function luck(snap: LabSnapshot): Luck | null {
   const gate = snap.gate;
@@ -320,15 +332,27 @@ export function luck(snap: LabSnapshot): Luck | null {
     y: t.dsr,
     color: t.eligible ? ELIGIBLE_COLOR : t.dsr >= gate.dsrMin ? ABOVE_COLOR : LAB_COLOR,
     r: t.eligible ? 8 : 6,
-    tip: `${t.candidateId}: DSR ${ratioText(t.dsr)} at N = ${t.nTrialsAtRun}`,
+    tip: `${t.candidateId}: DSR ${ratioText(t.dsr)}, scored at N = ${t.nTrialsAtRun}`,
     href: methodHref(t.methodId),
   }));
   return {
     points,
     refY: [{ value: gate.dsrMin, label: `Luck bar ${ratioText(gate.dsrMin)}`, color: 'var(--neg)' }],
+    refX: [
+      {
+        value: gate.dsrN,
+        label: `N = ${gate.dsrN} today`,
+        color: 'var(--ink-3)',
+        dash: '4 3',
+        tip: gate.dsrNBasis,
+      },
+    ],
     yTicks: [0, 0.25, 0.5, 0.75, 1].map(v => ({ value: v, label: v.toFixed(2) })),
     above: rows.filter(t => t.dsr >= gate.dsrMin).length,
     total: rows.length,
+    n: gate.dsrN,
+    policy: gate.dsrPolicy,
+    basis: gate.dsrNBasis,
   };
 }
 

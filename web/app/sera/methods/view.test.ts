@@ -143,7 +143,7 @@ describe('marks / workedSummary', () => {
       'Beats SPY: no (7.6% vs 7.9% a year). Max drawdown: yes (12.9% ≤ 20%). ' +
       'Profit factor: yes (2.27 ≥ 1.3). Trade count: yes (1,130 ≥ 100). ' +
       'Owner inputs: yes (none needed). ' +
-      'Luck check: no (0.90 < 0.95, after 58 tries).',
+      'Luck check: no (0.899 < 0.90, scored at N = 58).',
     );
   });
   it('says yes when every hurdle clears', () => {

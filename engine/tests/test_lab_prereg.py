@@ -425,12 +425,27 @@ def test_parse_refuses_an_unknown_or_repeated_field():
         prereg.parse(f"{prereg.FENCE}\n{good}\nmethod: y\n{prereg.FENCE}\n")
 
 
-def test_the_recorded_gate_names_every_condition_the_lab_applies():
-    """The gate line is built from the engine's own labels, so it cannot drift from the code."""
+def test_the_recorded_gate_names_every_condition_the_lab_applies(tmp_path):
+    """The gate line is built from the engine's own labels, so it cannot drift from the code.
+
+    Two forms. Without a connection it names the five conditions, the threshold and the policy.
+    With one it also carries the N that policy resolved to and the evidence for it, which is what
+    ``promote_method`` writes into the committed file.
+    """
     text = prereg.gate_text()
     for label in dev.FAILURE_LABELS:
         assert label in text
-    assert store.DSR_LABEL in text
+    assert f"{store.DSR_MIN:.2f}" in text  # the bar the owner set (design §7.1)
+    assert store.DSR_POLICY in text  # the policy that chooses N (design §7.2)
+
+    conn = store.connect(tmp_path / "lab.sqlite")
+    try:
+        resolved = prereg.gate_text(conn)
+    finally:
+        conn.close()
+    assert resolved.startswith(text)  # the conn form only appends
+    assert "N = " in resolved
+    assert "\n" not in resolved  # one `key: value` line in the committed file
 
 
 def test_the_recorded_test_window_starts_the_session_after_dev_end():

@@ -87,7 +87,10 @@ const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
     maxDrawdown: 0.2,
     minProfitFactor: 1.3,
     minTrades: 100,
-    dsrMin: 0.95,
+    dsrMin: 0.9,
+    dsrPolicy: 'all-trials',
+    dsrN: 4,
+    dsrNBasis: '4 dev trials, every variant run counted as one independent look',
     devStart: '1993-01-29',
     devEnd: '2015-10-16',
     testStart: '2015-10-19',
@@ -249,10 +252,18 @@ describe('luck', () => {
   it('plots only tries with a DSR against the gate line', () => {
     const l = luck(snap())!;
     expect(l.points).toHaveLength(2);
-    expect(l.refY[0].value).toBe(0.95);
-    expect(l.above).toBe(1);
+    expect(l.refY[0].value).toBe(0.9);
+    expect(l.above).toBe(2); // 0.90 and 0.97 both clear a 0.90 bar
     expect(l.points.map(p => p.x)).toEqual([4, 4]);
     expect(l.yTicks.map(t => t.label)).toEqual(['0.00', '0.25', '0.50', '0.75', '1.00']);
+  });
+  it('marks the N the gate deflates by today, with its evidence', () => {
+    const l = luck(snap())!;
+    expect(l.refX[0].value).toBe(4);
+    expect(l.refX[0].label).toBe('N = 4 today');
+    expect(l.refX[0].tip).toBe('4 dev trials, every variant run counted as one independent look');
+    expect(l.n).toBe(4);
+    expect(l.policy).toBe('all-trials');
   });
   it('is null when no try has a DSR', () => {
     const base = snap();

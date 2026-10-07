@@ -146,25 +146,49 @@ def method_of(candidate_id: str) -> str:
     return head
 
 
-def gate_text() -> str:
+def gate_text(conn: sqlite3.Connection | None = None) -> str:
     """The **dev** gate this variant passed, in the lab's own words.
 
-    Built from ``dev.FAILURE_LABELS`` and ``store.DSR_LABEL`` rather than retyped, so a file
-    written next year cannot claim a condition the code stopped applying.
+    Built from ``dev.FAILURE_LABELS``, ``store.DSR_MIN`` and ``store.DSR_POLICY`` rather than
+    retyped, so a file written next year cannot claim a condition the code stopped applying, a
+    bar the owner has moved, or an N the gate stopped deflating by.
+
+    Two numbers, both of which decide the verdict and neither of which can be recovered from the
+    other. The **threshold** moved on 2026-10-07 (design §7.1: the owner set ``DSR_MIN`` to 0.90),
+    and a pre-registration written at 0.90 records a different claim from one written at 0.95, so
+    the file has to say which. The **N** is whatever the policy named in ``store.DSR_POLICY``
+    resolves to -- ``all-trials``, every dev trial in the lab, as design §3 has always said and
+    §7.2 deliberately left it -- and the number it came to that day is the multiple-testing count
+    the deflation actually used.
+
+    ``conn`` resolves that N and the one-line evidence behind it. ``promote_method`` always passes
+    one, so **every committed pre-registration carries both numbers for the day it was written**,
+    which is the whole point of a pre-registration: the rule is pinned before the look. The
+    ``conn=None`` form names the threshold and the policy and stops short of the count; it exists
+    for refusal messages and for tests that build a ``Prereg`` with no database behind them.
 
     This is what the variant passed to become ``dev-eligible``; it is **not** the gate the one
     test-window look is judged by. That one is the five P7a D8 conditions alone -- DSR is
     recorded on the test trial and is not a condition, because a pre-registered look has no
-    selection among results to deflate (phase 4, ``runner.test_trial_row``). ``render`` says so
-    in the file's prose, so a reader of the pre-registration cannot mistake one for the other.
+    selection among results to deflate (``runner.test_trial_row``). ``render`` says so in the
+    file's prose, so a reader of the pre-registration cannot mistake one for the other.
+
+    The returned string is always a single line: it is a ``key: value`` field in a committed file
+    whose parser splits on newlines (``parse``), so ``npolicy``'s evidence line must not wrap.
     """
     from seer_engine.backtest import dev
+    from seer_engine.lab import npolicy
 
     conditions = "; ".join(dev.FAILURE_LABELS[:-1])
-    return (
+    head = (
         f"dev-eligible = the five P7a D8 conditions ({conditions}; no {dev.FAILURE_LABELS[-1]}) "
-        f"and {store.DSR_LABEL} with N = every dev trial in the lab"
+        f"and DSR >= {store.DSR_MIN:.2f}, deflated by the multiple-testing N that the "
+        f"'{store.DSR_POLICY}' policy resolves to"
     )
+    if conn is None:
+        return head
+    n = npolicy.effective_n(conn, store.DSR_POLICY)
+    return f"{head}: N = {n.n} when this file was written ({n.basis})"
 
 
 def test_window_label() -> str:
@@ -201,7 +225,10 @@ the variant *does* (rules, allocator id, params), not what it is called, so a re
 re-tuned variant has a different digest and this file does not name it.
 
 **Gate passed, on the dev window {p.dev_window}:** {p.gate}.
-MAR {p.mar}, DSR {p.dsr} at N = {p.n_trials_at_run}.
+MAR {p.mar}, DSR {p.dsr}, recorded at `n_trials_at_run` = {p.n_trials_at_run} on dev trial
+#{p.dev_trial}. The bar that DSR cleared and the N it was deflated by are both stated in the gate
+line above, because both are settings the owner can move (design §7) and a number without them is
+not a record of a pass.
 Research store `{p.store_fingerprint}`, engine `{p.git_sha}`.
 
 **The look that follows.** `python -m seer_engine lab test {p.candidate}` runs this
@@ -413,7 +440,8 @@ def _existing(path: Path, method_id: str) -> Prereg | None:
 def _analysis_body(p: Prereg, path: Path) -> str:
     return (
         f"{MARKER}`{p.candidate}` (dev trial #{p.dev_trial}, config digest "
-        f"`{p.config_digest}`, MAR {p.mar}, DSR {p.dsr} at N = {p.n_trials_at_run}).\n\n"
+        f"`{p.config_digest}`, MAR {p.mar}, DSR {p.dsr} at N = {p.n_trials_at_run}; the bar it "
+        f"cleared is the one named in the pre-registration's gate line).\n\n"
         f"Pre-registration: `{repo_path(path)}`, written before any test number exists and "
         f"committed before the look is spent (design §3). The test window is {p.test_window}; "
         f"`lab test {p.candidate}` spends the one look this configuration gets, and the database "
@@ -467,7 +495,7 @@ def promote_method(
         if status not in ("dev-eligible", "promoted"):
             raise PreregError(
                 f"{method_id} is {status!r}, and only a dev-eligible method is pre-registered. "
-                f"The gate is: {gate_text()}"
+                f"The gate is: {gate_text(conn)}"
             )
         trial = store.best_dev_eligible(conn, method_id)
         if trial is None:
@@ -487,7 +515,7 @@ def promote_method(
             dev_trial=str(trial["n"]),
             dev_window=f"{trial['start']}..{trial['end']}",
             test_window=test_window_label(),
-            gate=gate_text(),
+            gate=gate_text(conn),
             mar=_fmt(trial["mar"]),
             dsr=_fmt(trial["dsr"]),
             n_trials_at_run=str(trial["n_trials_at_run"]),

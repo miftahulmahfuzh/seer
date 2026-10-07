@@ -326,7 +326,10 @@ function Tested({ m, trials, best }: { m: LabMethod; trials: LabTrial[]; best: L
                   <td className={`num ${s.r}`}>{count(t.trades)}</td>
                   <td className={`num ${s.r}`}>{fixed(t.sharpe, 2)}</td>
                   <td className={`num ${s.r}`}>{fixed(t.mar, 2)}</td>
-                  <td className={`num ${s.r}`}>{fixed(t.dsr, 2)}</td>
+                  <td className={`num ${s.r}`}>
+                    {fixed(t.dsr, 2)}
+                    {t.dsr !== null && <span className={s.vs}> at N {count(t.nTrialsAtRun)}</span>}
+                  </td>
                   {marks(t).map(x => (
                     <td key={x.key} className={s.c}><MarkIcon mark={x} size={14} /></td>
                   ))}

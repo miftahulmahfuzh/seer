@@ -1724,13 +1724,38 @@ def _snapshot_trial(t: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _gate_n(conn: sqlite3.Connection) -> dict[str, Any]:
+    """The multiple-testing N the luck gate deflates by, and the evidence behind it.
+
+    Three keys rather than one number, because the number alone is not reviewable. A reader of
+    ``web/data/lab.json`` -- or of seertrade.site/sera, which draws this beside the luck bar --
+    has to be able to see *which* policy produced the N and *what measurement* that policy rests
+    on. That matters more here than it would if the policy had changed: it did not. ``DSR_POLICY``
+    ships as ``all-trials`` on purpose (design §7.2), and publishing the name, the count and the
+    evidence is what keeps the lever that was deliberately not pulled visible on the site rather
+    than buried in a plan file.
+
+    Resolved at snapshot time from ``DSR_POLICY`` and never stored, so flipping that one constant
+    moves the published gate on the next export with no data change -- the same property the
+    derived verdict has. Reads only ``trials``, which schema v1 and v2 share, so ``snapshot``'s
+    promise to work on a read-only, unmigrated connection still holds.
+    """
+    from seer_engine.lab import npolicy
+
+    n = npolicy.effective_n(conn, DSR_POLICY)
+    return {"dsrPolicy": n.policy, "dsrN": n.n, "dsrNBasis": n.basis}
+
+
 def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
     """The whole lab as the web's ``LabSnapshot`` (SERA_LAB_SITE_PLAN.md Interface Contract).
 
     Deterministic: the same database gives the same value; there is no wall-clock time in it
     (``asOf`` is the latest timestamp found in the data, "" for an empty lab). Reads only what
     schema v1 and v2 share and never touches ``meta``, so it works on a read-only connection to
-    a database that has not been migrated. Gate and data facts come from the engine's constants.
+    a database that has not been migrated. Gate and data facts come from the engine's constants;
+    the gate's ``dsrPolicy`` / ``dsrN`` / ``dsrNBasis`` are resolved from ``DSR_POLICY`` against
+    ``trials`` at export time rather than stored, so the published gate follows the constant
+    (design §7).
     """
     from seer_engine import dates, research
     from seer_engine.backtest import dev, tuning
@@ -1756,6 +1781,7 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
             "minProfitFactor": tuning.MIN_PROFIT_FACTOR,
             "minTrades": dev._MIN_TRADES,
             "dsrMin": DSR_MIN,
+            **_gate_n(conn),
             "devStart": research.STORE_START.isoformat(),
             "devEnd": dev.DEV_END.isoformat(),
             "testStart": dates.next_session(dev.DEV_END).isoformat(),

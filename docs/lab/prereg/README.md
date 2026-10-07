@@ -33,8 +33,8 @@ block is machine-read (`seer_engine.lab.prereg.parse`); the prose is not.
 | `dev_trial` | the `trials.n` the digest was copied from |
 | `dev_window` | that trial's `start..end` |
 | `test_window` | `2015-10-19..data end` — the start is the first session after `DEV_END`; the end is pinned by the test trial, because the test store reaches the latest session available when it is built |
-| `gate` | the conditions the variant passed on the dev window |
-| `mar`, `dsr`, `n_trials_at_run` | the dev numbers it passed with, and the N the DSR deflated by |
+| `gate` | the conditions the variant passed on the dev window, **including the DSR threshold in force and the multiple-testing policy with the N it resolved to** on the day the file was written (design §7). Both are settings the owner can move, so both are pinned here |
+| `mar`, `dsr`, `n_trials_at_run` | the dev numbers it passed with. `n_trials_at_run` is the trial-row count recorded with that trial; under the `all-trials` policy it is also the N the DSR deflated by, but the N the gate used is the one stated in `gate`, which stays correct if the policy changes |
 | `store_fingerprint`, `git_sha` | the research store and the engine that produced them |
 | `date` | the day it was pre-registered; it does not move on a re-run |
 

@@ -4,9 +4,38 @@
  */
 import raw from '../../data/lab.json';
 import { trialsByMethod } from './derive';
+import { DSR_POLICIES } from './types';
 import type { LabInsight, LabMethod, LabSnapshot, LabTrial } from './types';
 
-export const lab = raw as unknown as LabSnapshot;
+/**
+ * Build-time guard on the gate block every page reads.
+ *
+ * `raw` is cast, not validated, so a `web/data/lab.json` exported by an engine that predates the
+ * N policy (design §7.2) would reach the luck bar as `undefined` and render silently wrong rather
+ * than fail. The snapshot and this file always ship in the same commit — `lab stage` runs
+ * `export-json`, and an engine test asserts the committed JSON is byte-for-byte the export of the
+ * committed database — so a mismatch here can only mean the JSON was not regenerated.
+ */
+function requireGate(snap: LabSnapshot): LabSnapshot {
+  const g = snap.gate;
+  const ok =
+    g != null &&
+    Number.isFinite(g.dsrMin) &&
+    Number.isInteger(g.dsrN) &&
+    g.dsrN >= 0 &&
+    DSR_POLICIES.includes(g.dsrPolicy) &&
+    typeof g.dsrNBasis === 'string' &&
+    g.dsrNBasis.length > 0;
+  if (!ok) {
+    throw new Error(
+      'web/data/lab.json is missing a usable gate.dsrPolicy / gate.dsrN / gate.dsrNBasis. ' +
+        'Regenerate it with `python -m seer_engine lab export-json` and commit it.',
+    );
+  }
+  return snap;
+}
+
+export const lab = requireGate(raw as unknown as LabSnapshot);
 
 const methodsById = new Map(lab.methods.map((m) => [m.id, m]));
 const trialsById = trialsByMethod(lab.trials);

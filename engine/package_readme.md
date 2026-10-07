@@ -1212,9 +1212,9 @@ the database.
   its `data_date`), `OOS_START = 2022-01-03` (in-sample ends 2021-12-31). `grid()`: the 81 params
   fixed before any result was seen — RSI `{5, 10, 15}` × limit `{0.25, 0.5, 0.75}` × TP
   `{0.75, 1.0, 1.5}` × SL `{1.0, 1.5, 2.0}` ATR. `select(rows)`: highest in-sample total return
-  among runs with max DD ≤ 15% and PF ≥ 1.3; ties → lower max DD → earlier grid index;
+  among runs with max DD ≤ 20% and PF ≥ 1.3; ties → lower max DD → earlier grid index;
   `DESIGN_PARAMS` when none qualifies. `gate(oos, spy_tr_oos) -> Verdict`: passes only when, on
-  **out-of-sample**, total return > total-return SPY, PF ≥ 1.3 and max DD ≤ 15%.
+  **out-of-sample**, total return > total-return SPY, PF ≥ 1.3 and max DD ≤ 20%.
 - **`backtest.report`**: `BacktestReport`, `render_markdown`, `equity_csv`, `equity_svg`,
   `report_stem(data_end)`. Deterministic: the same inputs give byte-identical files. The Markdown
   carries two machine-readable lines, `frozen-params:` (the code's `STRATEGY_A_PARAMS` at run
@@ -1331,12 +1331,12 @@ the rest of `backtest/`, every module here except `io.py` is pure, and the purit
 The traded segments form **one** portfolio: 20,000,000 IDR at `prev_session(2018-01-02)`'s FX, with
 params switching at each year's first session. Picks for that session use `data_date` = the last
 session of Y−1 = `tune_end(Y)`. Each fold selects among all 324 (variant × grid) combinations with
-P3's rule (highest tuning-window total return among max DD ≤ 15% and PF ≥ 1.3; ties → lower DD →
+P3's rule (highest tuning-window total return among max DD ≤ 20% and PF ≥ 1.3; ties → lower DD →
 combination order), else V0 with the design values. Each variant also gets its own walk-forward,
 with the variant fixed and the grid tuned per fold.
 
 **Gate (P3b).** A2 passes only if the combined walk-forward curve (2018-01-02 → data end) beats
-total-return SPY over the same span with PF ≥ 1.3 and max DD ≤ 15%, measured with P3's `metrics`
+total-return SPY over the same span with PF ≥ 1.3 and max DD ≤ 20%, measured with P3's `metrics`
 (web parity). The 2022-01-03 → data end window has been seen before. The report shows it only as a
 labelled slice of the continuous curves, and it never feeds the gate.
 
@@ -1443,7 +1443,7 @@ is pure, and the purity glob covers it.
   a night with no positive prediction trades nothing.
 
 **Gate (P6a).** The gated curve passes only if its walk-forward (2018-01-02 → data end) beats
-total-return SPY over the same span with PF ≥ 1.3 and max DD ≤ 15%, measured with P3's `metrics`
+total-return SPY over the same span with PF ≥ 1.3 and max DD ≤ 20%, measured with P3's `metrics`
 (web parity). The gated curve is B, unless the last fold's determinism probe fails. Then the
 pre-registered switch gates B-linear, and the verdict sentence says so. B-linear is otherwise
 information only and never promotable on this data. A2's walk-forward is on the chart and in the
@@ -1907,7 +1907,7 @@ here is pure, and the purity glob covers it; the one writer is `backtest.io.writ
     dividends come from the store. Its trailing `window` field (defaulted to `DEV_WINDOW`) records
     which window produced the row; `make_row(..., window=DEV_WINDOW)` carries it over.
   - `finalists(rows)` is D8:
-    - **eligible** means beating SPY TR, max DD ≤ 15%, PF ≥ 1.3, ≥ 100 closed trades, and no owner
+    - **eligible** means beating SPY TR, max DD ≤ 20%, PF ≥ 1.3, ≥ 100 closed trades, and no owner
       input;
     - the eligible rows are ranked by MAR (CAGR ÷ max DD), ties by id;
     - the top 3 are kept, at most one per family.
@@ -1988,15 +1988,20 @@ committed-file gate. Nothing in it loads a research store, runs a backtest or wr
   build `trials` rows with no method file behind them; nothing in the CLI passes it.
 - `path_for(method_id, directory=None)`, `method_of(candidate_id)`, `repo_path(path)`,
   `committed_problem(path)`, `PREREG_DIR`, `FENCE`, `MARKER`.
-- `gate_text()` is **built** from `backtest.dev.FAILURE_LABELS` and `store.DSR_LABEL` rather than
-  retyped, so a file written next year cannot claim a condition the code stopped applying. What it
-  states is the **dev** gate the variant passed to become `dev-eligible` (the five P7a D8 conditions
-  plus `store.DSR_LABEL`, the luck test at `store.DSR_MIN` and at the N `store.DSR_POLICY` resolves
-  to — since phase 4 both are read off the constants rather than being a fixed 0.95 at the dev trial
-  row count). It is *not* the gate the one test-window look
-  is judged by: that is the five D8 conditions alone, because a pre-registered look has no selection
-  among results to deflate, so DSR is recorded on the test trial and is not a condition. `render`
-  says so in the file's prose, so a reader of the pre-registration cannot mistake one for the other.
+- `gate_text(conn=None)` is **built** from `backtest.dev.FAILURE_LABELS`, `store.DSR_MIN` and
+  `store.DSR_POLICY` rather than retyped, so a pre-registration cannot claim a condition the code
+  stopped applying, a bar the owner has moved, or an N the gate stopped deflating by. What it
+  states is the **dev** gate the variant passed to become `dev-eligible`: the five P7a D8
+  conditions plus `DSR >= DSR_MIN` (0.90 since 2026-10-07, the owner's risk appetite — design
+  §7.1), deflated by the N the policy in `store.DSR_POLICY` resolves to (`all-trials` = every dev
+  trial in the lab, left there deliberately — §7.2). `promote_method` always passes the
+  connection, so every committed file carries the threshold, the policy name *and* the count it
+  resolved to that day; the `conn=None` form stops short of the count and exists for refusal
+  messages and for tests that build a `Prereg` with no database. It is *not* the gate the one
+  test-window look is judged by: that is the five D8 conditions alone, because a pre-registered
+  look has no selection among results to deflate, so DSR is recorded on the test trial and is not
+  a condition. `render` says so in the file's prose, so a reader of the pre-registration cannot
+  mistake one for the other.
 - `test_window_label()` is `dates.next_session(dev.DEV_END)..data end` — the same start
   `lab.store.snapshot` publishes as `gate.testStart`. The end is deliberately not a date this step
   can know (the test-window store is built on first promotion and reaches the latest session
@@ -2695,7 +2700,7 @@ which writes nothing. A committed report always comes from a full run over a cle
 - **A promotion leaves `paper_start` NULL on purpose.** `promote` writes the row; the next paper night freezes the spec and starts the clock. Never back-date a promoted entry's `paper_start`, and never re-point a started id at another algorithm — `promote` raises `AlreadyStarted` for exactly that. Promote under a new id and `--retire` the old one in the same command, so the swap is one transaction.
 - **The roster write and the lab note cannot be one transaction** (Neon and SQLite). The roster commits first; if the lab note is then lost, re-run the identical `promote` command — both halves are idempotent. Never reorder them: the lab is append-only, so a note for a promotion that did not happen cannot be withdrawn.
 - **A pre-registration is written once and never rewritten** (design §3). `lab promote` leaves an existing `docs/lab/prereg/MNNNN.md` byte-for-byte alone, date line included, and raises rather than re-pointing it at a better variant found later; if the first choice is genuinely wrong, that is a new method with its own dev trials. And the file must be committed **and pushed before** `lab test`: `prereg.require_committed` refuses on a file git does not track or that has staged or unstaged changes, which is the whole point of putting the record in git.
-- **The gate named in a pre-registration is the dev gate, not the test gate.** `prereg.gate_text` states what the variant passed to become `dev-eligible` (the five P7a D8 conditions plus `store.DSR_LABEL` — the luck test at `store.DSR_MIN`, at the N `store.DSR_POLICY` resolves to; both read off the constants since lab-luck-gate phase 4, so the file states the bar that was actually applied rather than a retyped one). The one test-window look is judged by the five D8 conditions alone; DSR is recorded on the test trial and is not a condition, because a pre-registered look has no selection among results to deflate and a look is not a search.
+- **The gate named in a pre-registration is the dev gate, not the test gate.** `prereg.gate_text` states what the variant passed to become `dev-eligible` (the five P7a D8 conditions plus `DSR >= store.DSR_MIN`, deflated by the N that `store.DSR_POLICY` resolves to — both pinned into the file, because both are settings the owner can move; design §7). The one test-window look is judged by the five D8 conditions alone; DSR is recorded on the test trial and is not a condition, because a pre-registered look has no selection among results to deflate and a look is not a search.
 - `paper` runs only after a successful bars run for the same session, and only in the `seer-db-writer` concurrency group. Never run a real (non-`--dry-run`) `paper` locally against Neon while the scheduled job may run, and never before the code is on `main` (D11: no back-dated paper days).
 - `paper_check` reports a strategy `split-affected` (not failed) once an applied split touched a symbol it held or had pending: whole-share rounding before and after a split cannot match a replay over adjusted bars.
 - `explain` must never decide anything: it writes text only, and a failure leaves NULL. It reads only stored evidence. Never add order mechanics, rule text or anything outside the facts to its prompt, and never loosen `vet` to let a reply through: a NULL note shows the facts on the site, while a wrong note shows advice the facts do not support.

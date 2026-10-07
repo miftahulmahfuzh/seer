@@ -1,7 +1,7 @@
 # Package: seer-web
 
 **Location**: `web` (Next.js app router; package name `seer-web`, private)
-**Last Updated**: 2026-10-07 (P1-WEB-10T8, paper-split-cadence: Positions speaks "picks monthly, sizes weekly" for split-cadence book strategies and shows each order against what is held now; `lib/cadence.ts`)
+**Last Updated**: 2026-10-07 (P1-ROOT-FWWQ, lab-luck-gate phase 7: every written statement of the lab's gate now matches what the lab applies — luck bar `DSR >= 0.90`, N policy `all-trials` with its N and basis in `snapshot.gate`, drawdown bar 20%; the site reads both threshold-bearing failure labels by prefix)
 
 ## Overview
 
@@ -99,7 +99,7 @@ web/
     sera/gate.ts            requireSera(next) (server only)
     sera/types.ts           LabSnapshot / LabMethod / LabTrial / LabInsight: the data/lab.json contract
     sera/lab.ts             lab snapshot + methodById, trialsOf, insightsOf, childrenOf (server only)
-    sera/derive.ts          gate checks, misses, closest, bestVariant, funnel, progress, families, SPY TR, drawdown, years (pure)
+    sera/derive.ts          gate checks (threshold labels matched by prefix), misses, closest, bestVariant, funnel, progress, families, SPY TR, drawdown, years (pure)
     sera/glossary.ts        GLOSSARY plain-language terms, status / insight / source labels  (pure)
     sera/markdown.ts        escape-first markdown -> HTML for lab analysis text            (pure)
     sera/fixture.ts         GATE, trial(), method() builders (tests only)
@@ -139,7 +139,7 @@ function checklist(m: Metrics, spyReturn: number | null, gate: Gate): CheckItem[
 ```
 
 - `strategyMetrics`: total return first-to-last snapshot, win rate and profit factor over closed-trade P/L (`Infinity` with no losses), max drawdown over the curve, months = days / 30.44. Expects snapshots in date order. Definitions are identical to the engine's backtest metrics.
-- `checklist`: design §1 go-live rules, **six** items, all must hold: >= 3 months forward, >= 100 trades, beats SPY, profit factor >= 1.3, max drawdown <= 15%, and **Backtest gate passed** (from `gate`; carries `note` when the roster gives one). The gate parameter is required. Row 6 is `gateItem(gate)`: for a not-applicable gate it reads `{ label: 'Backtest gate', val: 'Not applicable', ok: false }` (plus the note), so such a strategy never passes all six.
+- `checklist`: design §1 go-live rules, **six** items, all must hold: >= 3 months forward, >= 100 trades, beats SPY, profit factor >= 1.3, max drawdown <= 20% (`MAX_DRAWDOWN` / `MAX_DRAWDOWN_LABEL` from `lib/golive.ts`, raised from 15% on 2026-10-07; `golive.test.ts` asserts it equals `data/lab.json`'s `gate.maxDrawdown`, so the leaderboard can never judge at a bar the engine abandoned), and **Backtest gate passed** (from `gate`; carries `note` when the roster gives one). The gate parameter is required. Row 6 is `gateItem(gate)`: for a not-applicable gate it reads `{ label: 'Backtest gate', val: 'Not applicable', ok: false }` (plus the note), so such a strategy never passes all six.
 
 ### lib/monthly.ts (pure)
 
@@ -321,9 +321,9 @@ function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null befo
 - `lib/allow.ts`: `isAllowed(email, allowed)`, case/space-insensitive exact match. `safeNext(next, fallback = '/')`: returns `next` (first value if an array) only when it is an internal path: starts with `/`, not `//` or `/\`, no control characters or backslashes; else `fallback`. Sign-in uses it for its post-login redirect.
 - `lib/sera/access.ts`: `SERA_EMAIL = 'mahfuzh74@gmail.com'`; `isSeraUser(email)` trimmed, case-insensitive equality with it.
 - `lib/sera/gate.ts`: `requireSera(next = '/sera')`: signed out -> `redirect('/signin?next=…')`; signed in but not `ALLOWED_EMAIL` or not `SERA_EMAIL` -> `notFound()` (the section is not revealed); else returns the user. Called by `app/sera/layout.tsx`.
-- `lib/sera/types.ts`: the `data/lab.json` contract (`LabSnapshot` with `asOf`, `gate`, `data`, `summary`, `benchmark`, `methods`, `trials`, `insights`, `ideasSeen`), derived aliases (`LabStatus`, `InsightKind`, `SourceKind`, `Gate`, `Benchmark`, `Point = [date, value]`) and the `METHOD_STATUSES` / `INSIGHT_KINDS` / `SOURCE_KINDS` lists. Must match the engine's `lab stage` export.
+- `lib/sera/types.ts`: the `data/lab.json` contract (`LabSnapshot` with `asOf`, `gate`, `data`, `summary`, `benchmark`, `methods`, `trials`, `insights`, `ideasSeen`), derived aliases (`LabStatus`, `InsightKind`, `SourceKind`, `Gate`, `DsrPolicy`, `Benchmark`, `Point = [date, value]`) and the `METHOD_STATUSES` / `INSIGHT_KINDS` / `SOURCE_KINDS` lists. Must match the engine's `lab stage` export. The `gate` block carries the luck check in full: `dsrMin` (the bar, `lab.store.DSR_MIN`, 0.90 since 2026-10-07), `dsrPolicy` (`DsrPolicy = 'all-trials' | 'methods' | 'effective'` — `lab.store.DSR_POLICY`, `all-trials` in force), `dsrN` (what that policy resolves to on this snapshot, computed at export time, not stored) and `dsrNBasis` (one line of engine-written evidence for that N; display as given, never parse it). `maxDrawdown` is 0.2.
 - `lib/sera/lab.ts`: `lab` (the JSON imported at build time; server components only, it is large), `methodById(id)`, `trialsOf(methodId)` (by n), `insightsOf(methodId)` (by id), `childrenOf(methodId)` (by id).
-- `lib/sera/derive.ts` (pure): six hurdles `CONDITION_KEYS` (`spy, drawdown, pf, trades, owner, dsr`) with `CONDITION_LABEL` / `FAILURE_LABEL`; `conditionOk` (null = not measured), `gateChecks(trial, gate)`, `conditionsPassed`, `misses`, `excessCagr`; over dev-window trials: `closest(trials, k)` (most hurdles, then MAR, then earliest), `bestVariant` (fewest misses, falls back to non-dev trials), `funnel`, `progress` (running best); `families(methods, trials)` aggregates; `trialsByMethod`; `spyForWindow(trial, benchmark)` rebases SPY TR to 1.0 at the trial start on its curve dates; `drawdownSeries(curve)`, `yearlyReturns(curve)` (calendar years).
+- `lib/sera/derive.ts` (pure): six hurdles `CONDITION_KEYS` (`spy, drawdown, pf, trades, owner, dsr`) with `CONDITION_LABEL` / `FAILURE_LABEL`. `FAILURE_LABEL` covers only the four labels that carry no number; the luck and drawdown labels spell their own threshold, so `conditionOk` matches them by prefix instead — `DSR_FAILURE_PREFIX = 'DSR >= '` and `DRAWDOWN_FAILURE_PREFIX = 'max DD <= '`, mirroring the engine's `lab.store.LUCK_LABEL_PREFIX` and `dev.FAILURE_LABELS`. `trials` is append-only, so a row judged before 2026-10-07 carries `DSR >= 0.95` and `max DD <= 15%` for ever while a later row carries `DSR >= 0.90` and `max DD <= 20%`; both mean the same miss, and exact-equality matching would silently stop recognising the older half. Also `conditionOk` (null = not measured), `gateChecks(trial, gate)`, `conditionsPassed`, `misses`, `excessCagr`; over dev-window trials: `closest(trials, k)` (most hurdles, then MAR, then earliest), `bestVariant` (fewest misses, falls back to non-dev trials), `funnel`, `progress` (running best); `families(methods, trials)` aggregates; `trialsByMethod`; `spyForWindow(trial, benchmark)` rebases SPY TR to 1.0 at the trial start on its curve dates; `drawdownSeries(curve)`, `yearlyReturns(curve)` (calendar years).
 - `lib/sera/glossary.ts` (pure): `GLOSSARY` / `GLOSSARY_ORDER` plain-language definitions, `CONDITION_TERM`, `STATUS_LABEL` (label, meaning, tone), `INSIGHT_KIND_LABEL`, `SOURCE_KIND_LABEL`.
 - `lib/sera/markdown.ts` (pure): `escapeHtml`, `renderInline`, `renderMarkdown`. Escapes all source first, then adds only headings (`#`..`###` -> h3..h5), paragraphs, bold/italic/code, lists, pipe tables and http(s) links; raw HTML always renders as text.
 - `lib/sera/fixture.ts`: test builders `GATE`, `trial(over)`, `method(over)`; not for runtime code.
@@ -368,12 +368,12 @@ analysis and opinion on each method, and the insights journal. It is desktop-fir
 
 | Route | What it shows |
 |---|---|
-| `/sera` | Overview: the latest `synthesis` insight as the headline (else the latest insight); KPI tiles; every dev trial as max DD vs CAGR minus SPY, with the pass zone shaded; how many trials pass each hurdle; progress over trial number; each trial's DSR vs the 0.95 line; families; latest methods |
+| `/sera` | Overview: the latest `synthesis` insight as the headline (else the latest insight); KPI tiles; every dev trial as max DD vs CAGR minus SPY, with the pass zone shaded; how many trials pass each hurdle; progress over trial number; the luck bar — each trial's DSR against `gate.dsrMin` (0.90 today) with an `N = gate.dsrN` marker whose tip is `gate.dsrNBasis`, and the policy (`all-trials`) named; families; latest methods |
 | `/sera/methods` | every method with status, family, source and best variant (CAGR vs SPY, max DD, PF, trades, DSR, conditions passed n/6) and verdict; icon-only filter `?show=all\|lab\|historical\|alive` |
 | `/sera/methods/[id]` | one method: idea, what could go wrong, verdict, parent and children, variants against the six conditions, growth of 1 vs total-return SPY, drawdown, year by year, its variants against the gate, the rendered analysis, related insights, each trial's full technical detail. `generateStaticParams` covers every method; unknown id -> `notFound()` |
 | `/sera/journal` | insights grouped as Batch summaries (synthesis), What we learned, Ideas worth testing, Data we wish we had, Features to build, Risks we see; `?kind=<kind>` filter (e.g. `/sera/journal?kind=data-wish`), newest first |
 | `/sera/ideas` | the backlog (`idea`, `#backlog`), ideas blocked on data (a data wishlist, `#blocked`), and the reading list from `ideasSeen` (`url:` keys as links, `concept:` keys as tags, `#reading`) |
-| `/sera/how` | the pipeline and time-window diagrams, each hurdle with its threshold from `snapshot.gate`, the honesty rules, the data the lab has and lacks, and the glossary |
+| `/sera/how` | the pipeline and time-window diagrams, each hurdle with its threshold from `snapshot.gate` (the luck hurdle naming `dsrMin` and the N it is discounted by, `dsrN`, against the total dev tries), the honesty rules, the data the lab has and lacks, and the glossary |
 
 ### Access gate
 
@@ -403,7 +403,12 @@ skill session (explore / sera) -> lab/lab.sqlite
   An engine test fails any commit whose JSON differs from `lab export-json` of the committed
   database, and CI runs on `lab/**` as well as `web/**`.
 - The web never computes a trading result. It only reshapes and draws the snapshot. Gate
-  thresholds come from `snapshot.gate`, never from numbers in web code.
+  thresholds come from `snapshot.gate`, never from numbers in web code, and no web test pins a
+  threshold's value — moving `DSR_MIN` or `MAX_DRAWDOWN` in the engine must not need a web edit.
+  The one deliberate copy is `lib/golive.ts`, which the leaderboard needs outside a server
+  component; its test asserts it equals `gate.maxDrawdown`. Where a threshold is baked into a
+  stored failure label, the site matches the label by prefix (`lib/sera/derive.ts`) so that
+  append-only rows judged under an older bar still read as the same miss.
 - The newest `synthesis` insight (written by `/sera-the-explorer` at the end of each batch) becomes
   the Overview headline on the next push; method analyses and insights come from
   `/explore-and-experiment-new-method`, written in plain language with a closing `My opinion:`.

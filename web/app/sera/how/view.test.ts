@@ -58,13 +58,14 @@ describe('pipelineStages', () => {
     expect(st[2].title).toEqual(['Tested on', '1993–2015']);
     expect(st[4].title).toEqual(['One look at', '2015–today']);
     expect(st[3].detail.join(' | ')).toBe(
-      'Beat SPY + dividends | Worst fall ≤ 20% | PF ≥ 1.3 · 100+ trades | No owner inputs | Luck check ≥ 0.95',
+      'Beat SPY + dividends | Worst fall ≤ 20% | PF ≥ 1.3 · 100+ trades | No owner inputs | Luck check ≥ 0.9',
     );
-    // The overrides must differ from GATE's own values, or this stops proving the detail line
-    // is read from the gate rather than hardcoded.
-    const loose = pipelineStages(snap({ gate: { ...GATE, maxDrawdown: 0.3, dsrMin: 0.9 } }));
+    // 0.3 / 0.8, not 0.2 / 0.9: once the defaults ARE 0.2 and 0.9 an override to those values is
+    // a no-op and the case passes while proving nothing. The override has to differ from the
+    // default or it is not testing that the value is read from the gate.
+    const loose = pipelineStages(snap({ gate: { ...GATE, maxDrawdown: 0.3, dsrMin: 0.8 } }));
     expect(loose[3].detail).toContain('Worst fall ≤ 30%');
-    expect(loose[3].detail).toContain('Luck check ≥ 0.9');
+    expect(loose[3].detail).toContain('Luck check ≥ 0.8');
   });
   it('shows current counts', () => {
     expect(st.map(x => x.count)).toEqual(['2 waiting', '2 methods', '58 tries', '1 pass', '0 looks used', '1 on paper', 'None yet']);
@@ -107,10 +108,11 @@ describe('hurdles', () => {
     expect(h.map(x => x.key)).toEqual(['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr']);
     expect(h.map(x => x.target)).toEqual([
       'More than SPY total return', 'Max drawdown ≤ 20%', 'Profit factor ≥ 1.3', 'At least 100 trades',
-      'Nothing left for the owner to decide', 'Luck check ≥ 0.95',
+      'Nothing left for the owner to decide', 'Luck check ≥ 0.9',
     ]);
     expect(h.map(x => x.term)).toEqual(['spyTr', 'maxDrawdown', 'profitFactor', 'trades', 'ownerInputs', 'dsr']);
-    expect(h[5].plain).toContain('N = 58');
+    expect(h[5].plain).toContain('N = 110'); // the gate's N, from GATE.dsrN
+    expect(h[5].plain).toContain('58'); // the tries argument, still quoted
   });
 });
 

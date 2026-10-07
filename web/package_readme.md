@@ -1,7 +1,7 @@
 # Package: seer-web
 
 **Location**: `web` (Next.js app router; package name `seer-web`, private)
-**Last Updated**: 2026-10-07 (P1-ROOT-FWWQ, lab-luck-gate phase 7: every written statement of the lab's gate now matches what the lab applies — luck bar `DSR >= 0.90`, N policy `all-trials` with its N and basis in `snapshot.gate`, drawdown bar 20%; the site reads both threshold-bearing failure labels by prefix)
+**Last Updated**: 2026-10-07 (P1-ROOT-AUY5, Sean phase 1: migration `015_sean.sql` and the pure, DB-free foundation of Sean, the owner's real Gotrade trade tracker, under `lib/sean/` — receipt parsing and checking, the glm-4.6v screenshot reader, the shared ledger, a dependency-free zip reader — plus the live smoke script `scripts/sean-vision-smoke.mjs`. No route or page uses them yet)
 
 ## Overview
 
@@ -16,12 +16,18 @@ trials, insights — comes from the snapshot and none of it from Neon. The one t
 Postgres is reader state: which Journal entries have been seen (`journal_seen`), so the badges on
 the Journal's tabs count what is new instead of what exists.
 
+A third section, **Sean**, is being built (plan `sean-gotrade-tracker`, 7 phases): it tracks the
+owner's *real* Gotrade trades from "Order Summary" screenshots and shows real profit and loss.
+Phase 1 landed only its schema (`db/migrations/015_sean.sql`) and pure modules (`lib/sean/`); there
+is no Sean route, page or Neon read in the app yet. See [Sean (lib/sean, phase 1)](#sean-libsean-phase-1).
+
 **Key Responsibilities:**
 - Google sign-in locked to exactly one allowlisted account (`auth.ts`, `lib/allow.ts`)
 - One data layer (`lib/data.ts`) that turns rows of all three engines (`bracket`, `book`, `benchmark`) into typed view models
 - Pure, DB-free logic that tests run without a connection: metrics and the go-live checklist (`lib/metrics.ts`), month-by-month paper performance (`lib/monthly.ts`), strategy row helpers (`lib/strategy.ts`), split-cadence wording and per-order size change (`lib/cadence.ts`), slot letters and card colours (`lib/slots.ts`), session freshness (`lib/session.ts`), number/date formatting (`lib/format.ts`)
 - Four pages: Today, Positions, History, Leaderboard
 - Sera (`/sera`), the method lab section: gated to one account (`lib/sera/`), its own desktop shell and rail (`app/sera/layout.tsx`, `components/sera/`), a dependency-free SVG chart kit (`components/sera/charts/`), hand-built SVG diagrams for How it works (`components/sera/diagrams/`), and a pure data layer over the bundled lab snapshot `data/lab.json` (`lib/sera/types.ts`, `lab.ts`, `derive.ts`, `glossary.ts`, `markdown.ts`). Pages: Overview, Methods list + detail, Journal, Ideas, How it works; each page keeps its logic in a pure, tested `view.ts` (`overview.ts` for the Overview, and the Journal a second one, `seen-client.ts`, beside it). The Journal is the one Sera page that also touches Neon, for reader state only: `lib/sera/seen.ts` over `journal_seen` decides which entries are unseen, which orders them and fills the badges; it is also the only Sera page to mount a `'use client'` island of its own (`JournalSeen.tsx`), so `SeraNav.tsx` is no longer the section's sole client component. See [Sera](#sera-sera)
+- Sean foundation (`lib/sean/`, phase 1, pure): Gotrade receipt text -> numbers (`money.ts`), the arithmetic check that turns the model's JSON into one `SeanOrder` (`order.ts`), the glm-4.6v vision client with its token floor (`vision.ts`, `prompt.ts`, `extractJson.ts`), the read-and-one-repair flow (`readOrder.ts`), the average-cost ledger shared with the engine (`ledger.ts`), and a browser zip reader (`unzip.ts`)
 - Shared roster UI (`components/StrategySwitch.tsx`, `components/PaperChip.tsx`, `components/roster.ts`): icon-only strategy switching by `?s=` and the paper marker on research strategies' holdings, orders and trades
 - Migrations runner shared with the engine (`scripts/migrate.mjs`) and a demo seeder (`scripts/seed-demo.mjs`)
 
@@ -110,10 +116,24 @@ web/
     sera/glossary.ts        GLOSSARY plain-language terms, status / insight / source labels  (pure)
     sera/markdown.ts        escape-first markdown -> HTML for lab analysis text            (pure)
     sera/fixture.ts         GATE, trial(), method() builders (tests only)
+    sera/gotrade-symbol.ts  normalizeSymbol: a Gotrade ticker -> the engine's canonical symbol (used by sean/order.ts)
+    sean/                   Sean phase 1, all pure (relative imports only), each with a colocated *.test.ts
+      types.ts              OrderSide, SeanFill, SeanOrder (mirrors sean_orders), RawFill, RawReceipt (the model's printed-text shape)
+      money.ts              asText, roundHalfUp (Python ROUND_HALF_UP), cents, fixed, parseUsdParts, parseUsd, parseShares, parseReceiptDate (WIB)
+      extractJson.ts        extractJsonObject: first `{` to last `}` of a model reply, null never throws
+      prompt.ts             ORDER_SYSTEM_PROMPT, ORDER_SHAPE, jpegDataUri, buildOrderUserContent, buildRepairNote
+      vision.ts             glm-4.6v fetch client: visionConfigFromEnv, tokenFloor, readOrderWithFetch, repairOrderWithFetch, VisionTokenFloorError, VisionTransportError
+      order.ts              toOrder(raw) -> { ok, order } | { ok: false, kind, issues }; sideOf; tolerances
+      readOrder.ts          readOrder(deps, imageB64, budgetMs): vision -> JSON -> toOrder -> at most one repair; READ_MESSAGES, isReaderDown, visionDeps
+      ledger.ts             orderSession (NY session), buildLedger, pnlSeries, pnlAt, DUST_SHARES
+      unzip.ts              readZip (stored + deflate, CRC-checked), ZipError, inflateRawWeb, IMAGE_NAME, baseName, isJunkEntry, crc32
+      fixtures/receipts.json  four real receipts transcribed by hand, raw + expected SeanOrder
+      fixtures/ledger.json    shared ledger fixture (contract B), replayed by web and engine tests alike
     *.test.ts               vitest suites for every pure module
   scripts/
     migrate.mjs             applies ../db/migrations/*.sql once each (schema_migrations)
     seed-demo.mjs           demo data in the paper-trading shape; --dry-run
+    sean-vision-smoke.mjs   live (paid) check of lib/sean/readOrder against real receipts; never in CI
 ```
 
 ## Exported API
@@ -344,6 +364,7 @@ function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null befo
 - `app/sera/ideas/view.ts` (pure): `methodsWithStatus(methods, status)` (numeric-aware id order; page uses `idea` and `blocked-data`), `needs(blockedOn)`, `sourceLabel`, `sourceLink` (http(s) only, else null), `urlParts` (safe flag, host, 72-char display), `readingList(ideasSeen)`: `url:` keys become links newest first, every other key is a concept (`concept:` prefix dropped) grouped by method id, untied last.
 - `app/sera/how/view.ts` (pure, takes a structurally narrowed `HowInput`): `stageCounts`, `pipelineStages` / `pipelineLabel` (Pipeline model), `windowsModel` (Windows model; `paperSince` = earliest `updated` of a `paper` method; `asOf` falls back to `gate.testStart` for an empty lab), `hurdles(gate, tries)` (the six `CONDITION_KEYS` in plain words), `honestyRules`, `dataFacts(data, gate)` (has / lacks), `BEARS` (2000-02, 2008-09) and `PAPER_MONTHS = 3` / `PAPER_TRADES = 100` (design section 1's paper bar; not in `snapshot.gate`).
 - `auth.ts`: `handlers, auth, signIn, signOut`, `currentUser()`.
+- `lib/sean/*`: see [Sean (lib/sean, phase 1)](#sean-libsean-phase-1).
 - `app/(app)/actions.ts`: server action `dismiss(formData)` (auth check, validates `orderId`, revalidates `/`).
 
 ## Data Flow
@@ -355,6 +376,9 @@ engine (Python, nightly) -> Neon tables -> lib/data.ts (SQL, row -> view model)
 engine `lab stage` -> web/data/lab.json (committed) -> lib/sera/lab.ts -> pure lib/sera/derive.ts -> /sera server components
 user "Mark as done" -> actions.dismiss -> data.dismissAction -> action_dismissals
 reader reads /sera/journal -> JournalSeen (dwell on screen, or arrow click) -> POST /api/sera/journal/seen -> sera/seen.markInsightsSeen -> journal_seen
+Sean (phase 1, no route yet): screenshot (or a .zip of them, unzip.readZip) -> readOrder (vision.ts glm-4.6v
+  -> extractJson -> order.toOrder, one repair on "unreadable") -> SeanOrder -> [phase 2: sean_orders]
+  sean_orders + sean_marks -> ledger.pnlSeries (web) == engine sean/ledger.py -> [phase 4: sean_equity]
 journal_seen -> sera/seen.seenInsightIds -> journal/view.ts (unseen counts, unseen-then-seen order) -> the seven badges
              -> sera/seen.unseenCount(lab ids) -> app/sera/layout.tsx -> the SeraNav Journal badge (null = no badge)
 ```
@@ -466,6 +490,61 @@ what "seen" means, so do not build a filter on it.
   the result to `SeraNav`, so the Journal tab carries a badge on every `/sera/*` page. It is
   computed when the layout renders, so it is a per-load number, not a live one.
 
+## Sean (lib/sean, phase 1)
+
+Sean tracks the owner's real Gotrade orders. Every order leaves an "Order Summary" receipt; Sean
+reads the screenshot with a vision model, checks the numbers, stores one row per order and (from
+later phases) marks holdings to market nightly and shows profit and loss, optionally following one
+roster method. Phase 1 is the schema and the pure modules only.
+
+**Schema (`db/migrations/015_sean.sql`, additive; nothing outside Sean reads these):**
+- `sean_orders`: one row per receipt. Fee columns are magnitudes (the receipt's +/- sign only
+  restates the side). `image_sha256 UNIQUE` dedupes a re-upload of the same file, and
+  `UNIQUE (symbol, side, executed_at, shares)` dedupes the same order from two screenshots; the
+  image itself is never stored. `executed_at` is the receipt's Date + Time read as WIB. `fills` is
+  the partial-fill lines, `raw` the model's JSON for audit, `net_profit_usd` Gotrade's own figure
+  (sells only).
+- `sean_link`: singleton (`id = 1`) — the one roster strategy Sean follows, `since`, `budget_usd`.
+- `sean_reminder_marks`: reminders ticked off by hand, keyed by strategy, session, symbol, action.
+- `sean_marks` (engine-written): daily closes for every symbol the owner has held.
+- `sean_equity` (engine-written, replaced whole each run): value, cost, realized, unrealized, pnl, fees per NYSE session.
+
+**Modules (`lib/sean/`, pure, relative imports only so vitest loads them without `@/`):**
+- `money.ts`: `parseUsd` / `parseUsdParts` (sign and magnitude, `$1,063.886`, `US$`, unicode minus),
+  `parseShares`, `parseReceiptDate(date, time)` -> ISO with `+07:00`; `roundHalfUp` matches Python's
+  `ROUND_HALF_UP` (with a `toPrecision(15)` step so binary noise cannot turn a tie into a round-down);
+  `cents`, `fixed`.
+- `order.ts`: `toOrder(raw: unknown)` -> `{ ok: true, order }` or `{ ok: false, kind: 'not_order' |
+  'not_filled' | 'unreadable', issues }`. Hand-rolled, no zod: total = amount +/- fees within
+  `TOTAL_TOLERANCE_USD` (0.01); amount = price x shares within `AMOUNT_TOLERANCE_USD` + shares x
+  `AMOUNT_TOLERANCE_PER_SHARE` (0.005); fills sum to filled shares within `FILL_SHARES_TOLERANCE`
+  and average to the price; a fee with the other side's sign is a misread. Issues are worded for
+  both the model's repair turn and the owner. Symbol goes through `lib/sera/gotrade-symbol.ts`.
+- `prompt.ts`: the model transcribes printed text only (`ORDER_SHAPE`, every value a string);
+  `money.ts` does the parsing. `buildRepairNote(issues)` drives the one retry.
+- `vision.ts`: one `fetch` to `{LLM_VISION_BASE_URL}/chat/completions` (OpenAI shape, thinking
+  disabled, `MAX_TOKENS` 2048), `fetch` injected. `visionConfigFromEnv` returns `null` when a key is
+  missing **or the base URL is z.ai's `/anthropic` one**, which answers 200 while dropping the image.
+  `tokenFloor(messages, images)` = sent text at 3 chars/token + 150 per image; a reply reporting
+  fewer prompt tokens throws `VisionTokenFloorError` and is never read. Measured 2026-10-07: 2,351
+  prompt tokens per receipt vs a floor of 1,141, 30/30 receipts read correctly first try.
+- `readOrder.ts`: `readOrder(deps, imageB64, budgetMs = READ_BUDGET_MS /* 55 s */)` never throws for a
+  model problem; it returns `{ ok: false, code, message, issues, ... }` with `READ_MESSAGES[code]`
+  in plain words. Only `unreadable` gets the single repair, and only if `MIN_REPAIR_BUDGET_MS` is
+  left; `isReaderDown(code)` (token floor, timeout, transport) separates reader failures (route
+  502) from bad pictures (422). `ReadOrderDeps` injects the calls and the clock.
+- `ledger.ts`: average cost with fees inside the cost; orders replay by `executedAt` then id, each
+  in its New York session (`orderSession`: a 03:30 WIB fill belongs to the previous NY day). A sell
+  is clamped to the shares Sean knows about, so selling a position bought before uploads began
+  books no phantom profit; dust below `DUST_SHARES` closes a position. Value uses the last close on
+  or before the date, else the last order price. Money rounds to cents only at output, so `pnlUsd`
+  may differ from realized + unrealized by a cent. `buildLedger`, `pnlSeries`, `pnlAt`.
+- `unzip.ts`: `readZip(bytes, { inflateRaw?, accept? })` reads the central directory, stored and
+  deflate entries (browser `DecompressionStream('deflate-raw')` by default; tests and the smoke
+  script pass `node:zlib`), checks size and CRC-32, skips `__MACOSX/`, `._*`, `.DS_Store`, refuses
+  Zip64 and encryption with a plain-words `ZipError`.
+- `extractJson.ts`: ported verbatim from run-insights; strips a ```json fence, takes first `{` to last `}`.
+
 ## Dependencies
 
 - `next` 16, `react` / `react-dom` 19: app router, server components, server actions.
@@ -473,7 +552,8 @@ what "seen" means, so do not build a filter on it.
 - `@neondatabase/serverless`: `neon()` HTTP tagged-template `sql` for the app; `Pool` over websockets (`ws`) for the scripts, which need transactions.
 - `lucide-react`: icons (every button is icon-only with `aria-label` and a tooltip).
 - Dev: `typescript`, `vitest`, `ws`.
-- Internal: shares `db/migrations/*.sql` and `schema_migrations` with the engine; the engine owns writes to every table except `action_dismissals` and `journal_seen` (`db/migrations/012_journal_seen.sql`), which only the web app writes.
+- Internal: shares `db/migrations/*.sql` and `schema_migrations` with the engine; the engine owns writes to every table except `action_dismissals` and `journal_seen` (`db/migrations/012_journal_seen.sql`), which only the web app writes. Sean (`015_sean.sql`) splits the same way once its later phases land: the web writes `sean_orders`, `sean_link`, `sean_reminder_marks`; the engine writes `sean_marks`, `sean_equity`.
+- External (Sean): a glm-4.6v vision endpoint over plain `fetch`, no SDK.
 
 ## Concurrency
 
@@ -497,9 +577,11 @@ window lacks two month starts.
 
 - `DATABASE_URL` (app, pooled HTTP), `DATABASE_URL_UNPOOLED` (scripts), `ALLOWED_EMAIL`, NextAuth Google credentials. Scripts read `web/.env.local` via `node --env-file`.
 - Sera needs no env var of its own: `SERA_EMAIL` is a constant (`lib/sera/access.ts`), and its lab data is the committed `data/lab.json`. It does share the app's `DATABASE_URL`, for `journal_seen` only. Regenerate the JSON with `python -m seer_engine lab stage` (writes and stages it with `lab/lab.sqlite`) or `lab export-json` (writes only). In a worktree, run them as `env -u SEER_LAB_DB PYTHONPATH=<worktree>/engine/src /home/miftah/seer/engine/.venv/bin/python -m seer_engine …`.
+- Sean's reader: `LLM_API_KEY`, `LLM_VISION_BASE_URL` (OpenAI-shaped; never z.ai's `/api/anthropic`), `LLM_VISION_MODEL` (glm-4.6v). Unused by the app until phase 2's upload route.
+- `npx vite-node scripts/sean-vision-smoke.mjs -- <zip | folder | image ...> [--truth <json>] [--env .env.local] [--limit N]` (from `web/`): runs the real `readOrder` against real screenshots, prints prompt tokens vs the floor, tries and seconds per picture, and with `--truth` compares every field to a hand-checked transcription; exits 1 on any failure. Spends tokens; never in CI. Re-run it after any change to `prompt.ts`.
 - `npm run db:migrate`: apply new migrations in name order, one transaction each.
 - `npm run db:seed-demo [-- --dry-run]`: builds a 66-session demo (day 0 + paper start, at least three calendar months) ending at the last completed session, flagged `is_demo`. Roster: SPY (champion, buy and hold), A (bracket), F4-MOM12-N20-TREND and F1-SPY-SMA200-M (monthly book strategies, deciding on each month's first session), and C (bracket, its own younger clock, gate `applicable: false`). Needs migrations through 009 applied first (`npm run db:migrate`, then `npm run db:seed-demo`; it only runs on an empty database, never production). Writes strategies (with `engine`, `rules_id`, `paper_start`, `params.backtest_gate`), runs (with paper status), fx, bars, orders, equity snapshots, `paper_state`, `book_positions`, `book_targets` and `book_previews` (pending orders, targets and previews with demo `evidence`; A's CSCO has no explanation so its facts show), `book_trades`, and six `news_vetoes` rows for C's pending session. `--dry-run` builds every row and prints counts without connecting.
-- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`, `why`, `sera/*`), `components/roster`, `components/sera/charts`, `components/sera/diagrams/geometry`, `app/(app)/leaderboard/view`, the `app/sera/*/view` helpers and `app/sera/journal/seen-client`.
+- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`, `why`, `sera/*`), `components/roster`, `components/sera/charts`, `components/sera/diagrams/geometry`, `app/(app)/leaderboard/view`, the `app/sera/*/view` helpers, `app/sera/journal/seen-client` and `lib/sean/*` (receipts and ledger fixtures included; no network).
 
 ## Gotchas
 
@@ -530,6 +612,10 @@ window lacks two month starts.
 - `lib/sera/*` and the page helper modules import each other relatively: vitest has no `@/` alias. Only `page.tsx` files and components use `@/`.
 - Sera's markdown renderer escapes HTML first. Analysis text is never trusted as HTML.
 - Read `evidence` only as `to_jsonb(<row>) -> 'evidence'`, never as a plain column: Vercel deploys on push, hours before the nightly applies 009, and a named missing column fails the whole query. The facts are rendered verbatim, so they must stay plain English (the engine's evidence module owns the wording).
+- Sean's ledger exists twice: `lib/sean/ledger.ts` and the engine's `seer_engine/sean/ledger.py` (phase 4). Both must pass `lib/sean/fixtures/ledger.json`; change the math in one and you change it in the other. `roundHalfUp` is what keeps their cents equal.
+- Sean's realized profit is not Gotrade's "Net Profit": Gotrade leaves buy fees out of its basis. Keep both; never reconcile one to the other.
+- Sean never stores a screenshot. `image_sha256` and the `(symbol, side, executed_at, shares)` key are the only dedupe.
+- `lib/sean/vision.ts` and `readOrder.ts` take their config and `fetch` as arguments and never read a server env module, so they stay importable from vitest and the smoke script; keep the server-only part in the (phase 2) route.
 - The paper bar (3 months, 100 trades) on How it works is a constant in `app/sera/how/view.ts`, not snapshot data; change it there if design section 1 changes.
 
 ## Notes

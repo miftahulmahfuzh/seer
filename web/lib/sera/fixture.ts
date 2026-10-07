@@ -2,7 +2,7 @@
 import type { Gate, LabMethod, LabTrial } from './types';
 
 export const GATE: Gate = {
-  maxDrawdown: 0.15,
+  maxDrawdown: 0.2,
   minProfitFactor: 1.3,
   minTrades: 100,
   dsrMin: 0.95,

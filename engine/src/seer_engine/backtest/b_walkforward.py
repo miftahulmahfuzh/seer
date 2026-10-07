@@ -467,9 +467,9 @@ def gate_p6a(wf: Metrics, spy_tr: Metrics, start: date, end: date, gated: str) -
     """The P6a gate on the gated walk-forward curve over ``[start, end]``.
 
     The same rule as P3b: the walk-forward total return beats total-return SPY (strict), with
-    profit factor ≥ 1.3 and max drawdown ≤ 15% (``checklist`` items 3–5, the web's labels and
-    values). ``gated`` is ``B``, or ``B_LINEAR`` only when the determinism switch fired, and
-    then the sentence's subject says so.
+    profit factor ≥ 1.3 and max drawdown ≤ ``tuning.MAX_DRAWDOWN`` (``checklist`` items 3–5, the
+    web's labels and values). ``gated`` is ``B``, or ``B_LINEAR`` only when the determinism
+    switch fired, and then the sentence's subject says so.
     """
     if not isinstance(wf, Metrics) or not isinstance(spy_tr, Metrics):
         raise TypeError("gate_p6a takes two Metrics")

@@ -28,6 +28,20 @@ from seer_engine.sim import Order
 
 MONTH_DAYS = 30.44
 YEAR_DAYS = 365.25
+
+MAX_DRAWDOWN = 0.20
+"""Go-live condition #4 (design §1): the deepest peak-to-trough fall a strategy may show.
+
+The single definition in Python. ``tuning.MAX_DRAWDOWN`` re-exports this name, so every caller
+that reads the threshold -- ``checklist`` below, ``tuning.qualifies``, ``tuning.gate``,
+``walkforward.gate_p3b``, ``b_walkforward.gate_p6a``, ``dev.make_row`` and ``lab.store.snapshot``
+-- resolves to this one float. It lives here, not in ``tuning``, only because ``tuning`` imports
+``metrics`` and the dependency cannot run the other way.
+
+0.15 until 2026-10-07, when the owner raised it to 0.20 on stated risk appetite; design §11
+records the revision. ``web/lib/golive.ts`` carries the same number for the leaderboard and is
+pinned to it through ``data/lab.json``'s gate by ``web/lib/golive.test.ts``.
+"""
 EXIT_REASONS: tuple[str, ...] = ("tp", "sl", "time", "gap")
 MINUS = "−"  # the web's minus sign in signed percentages
 DASH = "—"  # the web's "no value"
@@ -242,6 +256,11 @@ def fmt_num(v: float | None, digits: int = 2) -> str:
 
 # --------------------------------------------------------------------------- go-live checklist
 
+MAX_DRAWDOWN_LABEL = f"Max drawdown ≤ {fmt_pct(MAX_DRAWDOWN, 0)}"
+"""The checklist's label for go-live #4, built from ``MAX_DRAWDOWN`` so it cannot drift from the
+threshold it names. ``web/lib/golive.ts`` builds the same string the same way."""
+
+
 
 def checklist(m: Metrics, spy_return: float | None) -> list[CheckItem]:
     """``checklist`` from web/lib/metrics.ts: the fixed go-live rules (design §1), same labels and
@@ -266,8 +285,8 @@ def checklist(m: Metrics, spy_return: float | None) -> list[CheckItem]:
             (pf if pf is not None else 0.0) >= 1.3,
         ),
         CheckItem(
-            "Max drawdown ≤ 15%",
+            MAX_DRAWDOWN_LABEL,
             DASH if m.max_drawdown is None else to_fixed(m.max_drawdown * 100, 1) + "%",
-            m.max_drawdown is not None and m.max_drawdown <= 0.15,
+            m.max_drawdown is not None and m.max_drawdown <= MAX_DRAWDOWN,
         ),
     ]

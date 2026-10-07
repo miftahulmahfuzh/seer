@@ -307,7 +307,7 @@ def test_markdown_window_tables():
 
 def test_markdown_checklist_has_the_backtest_items():
     md = _section(render_markdown(build_report()), "## Go-live checklist")
-    for label in ("≥ 3 months forward", "≥ 100 trades", "Beats SPY", "Profit factor ≥ 1.3", "Max drawdown ≤ 15%"):
+    for label in ("≥ 3 months forward", "≥ 100 trades", "Beats SPY", "Profit factor ≥ 1.3", "Max drawdown ≤ 20%"):
         assert f"| {label} |" in md
     assert "| Passed a 10-year backtest under identical rules | #5, decided by the gate |" in md
     assert "forward-only: information" in md
@@ -334,7 +334,7 @@ def test_markdown_verdict_sentence_twice_and_checks():
     assert md.count(r.verdict.sentence) == 2
     assert md.startswith(f"# Strategy A backtest, data through 2026-10-02\n\n**Gate verdict:** {r.verdict.sentence}\n")
     v = _section(md, "## Gate verdict")
-    assert "- Beats SPY: " in v and "- Profit factor ≥ 1.3: " in v and "- Max drawdown ≤ 15%: " in v
+    assert "- Beats SPY: " in v and "- Profit factor ≥ 1.3: " in v and "- Max drawdown ≤ 20%: " in v
 
 
 def test_markdown_links_the_curve_files():

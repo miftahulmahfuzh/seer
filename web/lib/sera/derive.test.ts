@@ -36,7 +36,7 @@ describe('gateChecks', () => {
       target: 'more than +7.9% a year',
       ok: false,
     });
-    expect(checks[1]).toMatchObject({ value: '12.0% at worst', target: '15% or less', ok: true });
+    expect(checks[1]).toMatchObject({ value: '12.0% at worst', target: '20% or less', ok: true });
     expect(checks[2]).toMatchObject({ value: '1.50', target: '1.3 or more', ok: true });
     expect(checks[3]).toMatchObject({ value: '240', target: '100 or more', ok: true });
     expect(checks[4]).toMatchObject({ value: 'none needed', target: 'none needed', ok: true });
@@ -44,8 +44,9 @@ describe('gateChecks', () => {
   });
 
   it('reads targets from the gate, not constants', () => {
-    const checks = gateChecks(trial(), { ...GATE, maxDrawdown: 0.2, minProfitFactor: 1.5, minTrades: 50 });
-    expect(checks[1].target).toBe('20% or less');
+    // 0.3 rather than 0.2: at 0.2 the override would equal GATE and prove nothing.
+    const checks = gateChecks(trial(), { ...GATE, maxDrawdown: 0.3, minProfitFactor: 1.5, minTrades: 50 });
+    expect(checks[1].target).toBe('30% or less');
     expect(checks[2].target).toBe('1.5 or more');
     expect(checks[3].target).toBe('50 or more');
   });

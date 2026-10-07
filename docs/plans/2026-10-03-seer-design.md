@@ -12,11 +12,12 @@ The goal is **not** "make predictions". It is to **prove or disprove an edge** c
 paper before real money (20,000,000 IDR) is risked.
 
 - Benchmark: SPY buy-and-hold over the same period, net of costs.
-- A strategy may trade real money only when **all** of these hold (fixed now, never moved):
+- A strategy may trade real money only when **all** of these hold (fixed; moved only by a dated
+  owner revision — see §11):
   1. ≥ 3 months of forward paper trading **and** ≥ 100 closed trades
   2. Total return beats SPY buy-and-hold over the same forward period
   3. Profit factor ≥ 1.3
-  4. Max drawdown ≤ 15%
+  4. Max drawdown ≤ 20%  *(revised 2026-10-07; was 15% — see §11)*
   5. Passed a 10-year backtest under identical rules (quant strategies only)
 
 ## 2. Constraints from Gotrade (verified from the app)
@@ -136,3 +137,29 @@ SPY, metrics, go-live checklist, champion crown) · History. Bottom tab bar, 4 i
 
 Real-trade journal (later phase), notifications, multi-user, settings UI, intraday data,
 extended-hours trading.
+
+## 11. Revision 2026-10-07 (owner): the go-live drawdown bar is 20%
+
+- **Go-live condition #4 is now "Max drawdown ≤ 20%."** The original sentence, preserved: *"4. Max
+  drawdown ≤ 15%"*, written 2026-10-03 under the clause "fixed now, never moved".
+- **Who and why.** The owner, on stated risk appetite: *"i am thinking of my risk appetite, and i
+  think let's set the Max drawdown to 20% instead of 15%."* Asked explicitly whether this was a
+  lab-screen change or the real-money bar as well, the owner chose **both**, after being told it
+  is a real-money safety setting and shown what it touches.
+- **What it does not change.** Conditions 1, 2, 3 and 5 are untouched. The no-real-money rule
+  stands: nothing trades real money without ≥ 3 months of forward paper and ≥ 100 closed trades.
+  The development/test window split, the one-look test-window rule and the lab's luck check are
+  separate mechanisms and are not affected by this item.
+- **Where it is implemented.** `backtest.metrics.MAX_DRAWDOWN`, re-exported as
+  `backtest.tuning.MAX_DRAWDOWN`, is the one Python definition; `web/lib/golive.ts` is the one
+  TypeScript definition, pinned to it by `web/lib/golive.test.ts` through `data/lab.json`'s gate.
+  It decides the P3, P3b and P6a backtest gates, the dev lab's D8 drawdown condition, the
+  in-sample grid's selection rule and the leaderboard's go-live checklist.
+- **The clause that said "never moved"** is now "moved only by a dated owner revision". That is a
+  weakening of a stated guarantee and is recorded here deliberately rather than edited away: the
+  bar has moved exactly once, on this date, by the owner, on the record.
+- **Measured effect on the lab's 110 recorded dev trials** (bar alone, holding everything else as
+  committed): 30 trials change from missing the drawdown condition to meeting it. Two of them
+  clear every other condition and have a recorded DSR above 0.90 — `M0020-W-NOSTOP` (fall 19.3%,
+  CAGR +15.3%, MAR 0.79) and `M0007-N20-RAW` (fall 19.6%, MAR 0.77). `M0019-RAW20-S25` (fall
+  20.7%) still misses it.

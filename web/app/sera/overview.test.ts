@@ -84,7 +84,7 @@ const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
   version: 1,
   asOf: '2026-10-04T14:12:24+00:00',
   gate: {
-    maxDrawdown: 0.15,
+    maxDrawdown: 0.2,
     minProfitFactor: 1.3,
     minTrades: 100,
     dsrMin: 0.95,
@@ -155,10 +155,12 @@ describe('landing', () => {
   });
   it('shades the pass zone from the gate and keeps it visible', () => {
     const l = landing(snap());
-    expect(l.regions[0]).toMatchObject({ x1: 0.15, y0: 0, label: 'Pass zone' });
+    expect(l.regions[0]).toMatchObject({ x1: 0.2, y0: 0, label: 'Pass zone' });
     expect(l.refY[0].value).toBe(0);
     expect(l.yDomain[1]).toBeGreaterThan(0);
-    expect(l.inZone).toBe(1);
+    // H-B (fall 19%, +0.9pp a year over SPY) enters the pass zone at the 20% bar; at 15% only
+    // M0001-C4 was inside. This is the owner's 2026-10-07 change, seen on the landing chart.
+    expect(l.inZone).toBe(2);
     const base = snap();
     const none = landing({ ...base, trials: base.trials.filter(t => t.n === 1) });
     expect(none.yDomain[1]).toBeGreaterThan(0);
@@ -183,7 +185,7 @@ describe('state', () => {
   });
   it('reports no best beat when nothing beats SPY inside the gate', () => {
     const base = snap();
-    const s = state({ ...base, trials: base.trials.filter(t => t.n !== 4) });
+    const s = state({ ...base, trials: base.trials.filter(t => t.n !== 4 && t.n !== 2) });
     expect(s.bestBeat).toBeNull();
   });
   it('prefers the newest synthesis over newer insights of other kinds', () => {

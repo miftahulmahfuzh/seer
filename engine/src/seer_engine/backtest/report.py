@@ -42,6 +42,7 @@ from seer_engine.backtest.metrics import (
 )
 from seer_engine.backtest.runner import INITIAL_IDR, RunResult, YearGap
 from seer_engine.backtest.tuning import (
+    MAX_DRAWDOWN,
     GRID_LIMIT,
     GRID_RSI,
     GRID_SL,
@@ -246,13 +247,15 @@ def _method_section(report: BacktestReport) -> list[str]:
         f"- **Tuning.** The grid is RSI {{{_plain(GRID_RSI)}}} × limit {{{_plain(GRID_LIMIT)}}} × "
         f"TP {{{_plain(GRID_TP)}}} × SL {{{_plain(GRID_SL)}}} ATR, and it runs on the in-sample "
         "window only.",
-        "  - Selection takes the highest in-sample total return among runs with max drawdown ≤ 15% "
+        f"  - Selection takes the highest in-sample total return among runs with max drawdown "
+        f"≤ {fmt_pct(MAX_DRAWDOWN, 0)} "
         "and profit factor ≥ 1.3. Ties go to the lower max drawdown, then to grid order. If no "
         "run qualifies, the design values are kept.",
         "  - The out-of-sample window runs once, with the selected parameters, and its numbers "
         "never feed back into the selection.",
         "- **Gate.** Passes only if, out of sample, total return > total-return SPY, profit "
-        "factor ≥ 1.3 and max drawdown ≤ 15%. In-sample numbers never decide it.",
+        f"factor ≥ 1.3 and max drawdown ≤ {fmt_pct(MAX_DRAWDOWN, 0)}. In-sample numbers never "
+        "decide it.",
         "",
     ]
 
@@ -288,7 +291,8 @@ def _grid_section(report: BacktestReport) -> list[str]:
         f"## In-sample grid ({len(report.grid_rows)} runs, {_span(report.in_sample.run)})",
         "",
         "Every grid run, in grid order, on the in-sample window. A run qualifies when max "
-        "drawdown ≤ 15% and profit factor ≥ 1.3. Selection reads these numbers and nothing else.",
+        f"drawdown ≤ {fmt_pct(MAX_DRAWDOWN, 0)} and profit factor ≥ 1.3. Selection reads these "
+        "numbers and nothing else.",
         "",
         *_table(
             [

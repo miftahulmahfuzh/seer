@@ -50,6 +50,7 @@ from seer_engine.backtest.b_walkforward import (
 from seer_engine.backtest.labels import label_orders
 from seer_engine.backtest.market import Market, Membership
 from seer_engine.backtest.metrics import Metrics, checklist
+from seer_engine.backtest.tuning import MAX_DRAWDOWN
 from seer_engine.backtest.runner import ParamsSchedule, run_backtest
 from seer_engine.backtest.walkforward import Fold, folds
 from seer_engine.strategies.b import FEATURE_NAMES, STRATEGY_B, BParams, bracket, prepare_b
@@ -582,7 +583,7 @@ def test_gate_p6a_fail_sentence_names_every_failed_check_and_blocks_p4(gated, su
     assert v.sentence == (
         f"{subject} fails the P6a gate: walk-forward from 2018-01-02 to 2026-10-02 it returned "
         "−10.0% against +75.0% for total-return SPY, with profit factor 0.90 and max drawdown 30.0%, "
-        "so it fails on beating total-return SPY, profit factor ≥ 1.3 and max drawdown ≤ 15%; "
+        "so it fails on beating total-return SPY, profit factor ≥ 1.3 and max drawdown ≤ 20%; "
         "Strategy B's one round has failed on this data, and P4 stays blocked."
     )
 
@@ -592,7 +593,7 @@ def test_gate_p6a_fail_sentence_names_every_failed_check_and_blocks_p4(gated, su
     [
         (M(0.70, pf=1.5, dd=0.12), "beating total-return SPY"),
         (M(0.80, pf=1.29, dd=0.12), "profit factor ≥ 1.3"),
-        (M(0.80, pf=1.5, dd=0.151), "max drawdown ≤ 15%"),
+        (M(0.80, pf=1.5, dd=math.nextafter(MAX_DRAWDOWN, 1)), "max drawdown ≤ 20%"),
     ],
 )
 def test_gate_p6a_fails_on_each_condition_alone(wf_m, name):
@@ -605,7 +606,7 @@ def test_gate_p6a_fails_on_each_condition_alone(wf_m, name):
 
 def test_gate_p6a_boundaries_and_bad_arguments():
     assert not gate_p6a(M(0.75, pf=1.5, dd=0.12), SPY_TR, GATE_START, GATE_END, B).passed  # equal is not beating
-    assert gate_p6a(M(0.80, pf=1.3, dd=0.15), SPY_TR, GATE_START, GATE_END, B).passed  # inclusive thresholds
+    assert gate_p6a(M(0.80, pf=1.3, dd=MAX_DRAWDOWN), SPY_TR, GATE_START, GATE_END, B).passed  # inclusive thresholds
     inf = gate_p6a(M(0.80, pf=math.inf, dd=0.10), SPY_TR, GATE_START, GATE_END, B)
     assert inf.passed and "profit factor ∞" in inf.sentence
     with pytest.raises(TypeError):

@@ -58,10 +58,12 @@ describe('pipelineStages', () => {
     expect(st[2].title).toEqual(['Tested on', '1993–2015']);
     expect(st[4].title).toEqual(['One look at', '2015–today']);
     expect(st[3].detail.join(' | ')).toBe(
-      'Beat SPY + dividends | Worst fall ≤ 15% | PF ≥ 1.3 · 100+ trades | No owner inputs | Luck check ≥ 0.95',
+      'Beat SPY + dividends | Worst fall ≤ 20% | PF ≥ 1.3 · 100+ trades | No owner inputs | Luck check ≥ 0.95',
     );
-    const loose = pipelineStages(snap({ gate: { ...GATE, maxDrawdown: 0.2, dsrMin: 0.9 } }));
-    expect(loose[3].detail).toContain('Worst fall ≤ 20%');
+    // The overrides must differ from GATE's own values, or this stops proving the detail line
+    // is read from the gate rather than hardcoded.
+    const loose = pipelineStages(snap({ gate: { ...GATE, maxDrawdown: 0.3, dsrMin: 0.9 } }));
+    expect(loose[3].detail).toContain('Worst fall ≤ 30%');
     expect(loose[3].detail).toContain('Luck check ≥ 0.9');
   });
   it('shows current counts', () => {
@@ -104,7 +106,7 @@ describe('hurdles', () => {
     const h = hurdles(GATE, 58);
     expect(h.map(x => x.key)).toEqual(['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr']);
     expect(h.map(x => x.target)).toEqual([
-      'More than SPY total return', 'Max drawdown ≤ 15%', 'Profit factor ≥ 1.3', 'At least 100 trades',
+      'More than SPY total return', 'Max drawdown ≤ 20%', 'Profit factor ≥ 1.3', 'At least 100 trades',
       'Nothing left for the owner to decide', 'Luck check ≥ 0.95',
     ]);
     expect(h.map(x => x.term)).toEqual(['spyTr', 'maxDrawdown', 'profitFactor', 'trades', 'ownerInputs', 'dsr']);

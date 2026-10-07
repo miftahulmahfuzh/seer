@@ -41,7 +41,7 @@ describe('checklist', () => {
     const items = checklist(base, 0.046, PASSED);
     expect(items.slice(0, 5).map(i => i.ok)).toEqual([true, false, true, true, true]);
     expect(items[1].val).toBe('84 / 100');
-    expect(checklist({ ...base, maxDrawdown: 0.16, trades: 120 }, 0.046, PASSED)[4].ok).toBe(false);
+    expect(checklist({ ...base, maxDrawdown: 0.21, trades: 120 }, 0.046, PASSED)[4].ok).toBe(false);
   });
 
   it('adds the backtest gate as a sixth rule', () => {

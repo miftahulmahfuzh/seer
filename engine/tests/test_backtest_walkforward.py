@@ -31,7 +31,7 @@ from seer_engine.backtest.benchmark import BenchmarkCurve
 from seer_engine.backtest.market import Market, Membership
 from seer_engine.backtest.metrics import Metrics, checklist, curve_metrics, run_metrics, strategy_metrics
 from seer_engine.backtest.runner import ParamsSchedule, RunResult, run_backtest
-from seer_engine.backtest.tuning import GridRow, Selection, grid
+from seer_engine.backtest.tuning import MAX_DRAWDOWN, GridRow, Selection, grid
 from seer_engine.backtest.walkforward import (
     COMBINED,
     FIRST_TRADE_YEAR,
@@ -159,7 +159,7 @@ def test_select_fold_falls_back_when_nothing_qualifies():
         params=A2_DESIGN_PARAMS,
         qualified=False,
         reason=(
-            "No in-sample grid run had max drawdown ≤ 15% and profit factor ≥ 1.3 (0 of 324), "
+            "No in-sample grid run had max drawdown ≤ 20% and profit factor ≥ 1.3 (0 of 324), "
             "so the design values are kept."
         ),
     )
@@ -635,7 +635,7 @@ def test_gate_p3b_fail_sentence_names_every_failed_check_and_blocks_p4():
     assert v.sentence == (
         "Strategy A2 fails the P3b gate: walk-forward from 2018-01-02 to 2026-10-02 it returned "
         "−10.0% against +75.0% for total-return SPY, with profit factor 0.90 and max drawdown 30.0%, "
-        "so it fails on beating total-return SPY, profit factor ≥ 1.3 and max drawdown ≤ 15%; "
+        "so it fails on beating total-return SPY, profit factor ≥ 1.3 and max drawdown ≤ 20%; "
         "Strategy A's one rework has failed, and P4 stays blocked."
     )
 
@@ -645,7 +645,7 @@ def test_gate_p3b_fail_sentence_names_every_failed_check_and_blocks_p4():
     [
         (M(0.70, pf=1.5, dd=0.12), "beating total-return SPY"),
         (M(0.80, pf=1.29, dd=0.12), "profit factor ≥ 1.3"),
-        (M(0.80, pf=1.5, dd=0.151), "max drawdown ≤ 15%"),
+        (M(0.80, pf=1.5, dd=math.nextafter(MAX_DRAWDOWN, 1)), "max drawdown ≤ 20%"),
     ],
 )
 def test_gate_p3b_fails_on_each_condition_alone(wf_m, name):
@@ -656,7 +656,7 @@ def test_gate_p3b_fails_on_each_condition_alone(wf_m, name):
 
 def test_gate_p3b_boundaries():
     assert not gate_p3b(M(0.75, pf=1.5, dd=0.12), SPY_TR, WF_START, WF_GATE_END).passed  # equal is not beating
-    assert gate_p3b(M(0.80, pf=1.3, dd=0.15), SPY_TR, WF_START, WF_GATE_END).passed  # inclusive thresholds
+    assert gate_p3b(M(0.80, pf=1.3, dd=MAX_DRAWDOWN), SPY_TR, WF_START, WF_GATE_END).passed  # inclusive thresholds
     inf = gate_p3b(M(0.80, pf=math.inf, dd=0.10), SPY_TR, WF_START, WF_GATE_END)
     assert inf.passed and "profit factor ∞" in inf.sentence
     with pytest.raises(TypeError):

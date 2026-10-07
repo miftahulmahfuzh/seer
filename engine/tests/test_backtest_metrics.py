@@ -113,7 +113,7 @@ def test_parity_checklist_passes_only_when_every_rule_holds():
     assert [i.ok for i in items] == [True, False, True, True, True]
     assert items[1].val == "84 / 100"
     assert all(i.ok for i in checklist(Metrics(**{**BASE.__dict__, "trades": 120}), 0.046))
-    assert checklist(Metrics(**{**BASE.__dict__, "max_drawdown": 0.16, "trades": 120}), 0.046)[4].ok is False
+    assert checklist(Metrics(**{**BASE.__dict__, "max_drawdown": 0.21, "trades": 120}), 0.046)[4].ok is False
 
 
 def test_parity_checklist_labels_and_values_match_the_web_strings():
@@ -123,7 +123,7 @@ def test_parity_checklist_labels_and_values_match_the_web_strings():
         ("≥ 100 trades", "84 / 100"),
         ("Beats SPY", "+6.8 vs +4.6"),
         ("Profit factor ≥ 1.3", "1.42"),
-        ("Max drawdown ≤ 15%", "7.9%"),
+        ("Max drawdown ≤ 20%", "7.9%"),
     ]
 
 
@@ -135,10 +135,10 @@ def test_checklist_edge_strings():
     assert items[3].val == DASH and items[3].ok is False
     assert items[4].val == DASH and items[4].ok is False
     assert checklist(m, 0.0)[2].val == f"{MINUS}1.2 vs +0.0"
-    inf = Metrics(total_return=0.2, win_rate=1.0, profit_factor=math.inf, max_drawdown=0.15, trades=1, months=1.0)
+    inf = Metrics(total_return=0.2, win_rate=1.0, profit_factor=math.inf, max_drawdown=0.20, trades=1, months=1.0)
     items = checklist(inf, 0.2)
     assert items[3].val == INFINITY and items[3].ok is True
-    assert items[4].val == "15.0%" and items[4].ok is True  # ≤ is inclusive
+    assert items[4].val == "20.0%" and items[4].ok is True  # ≤ is inclusive
     assert items[2].ok is False  # beats SPY is strict
     assert checklist(Metrics(**{**inf.__dict__, "profit_factor": 1.3}), 0.1)[3].ok is True
 

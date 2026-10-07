@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-07
-**Total Active Tasks**: 5
+**Total Active Tasks**: 4
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 4
-- Completed: 86
+- Completed: 87
 
 ---
 
@@ -611,15 +611,35 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R3 — The promotion path is unreachable and the test window unspent, and nothing surfaces either; R1 — The gate admits nothing at 110 trials and the bar rises with every exploration regardless of merit — 110 correlated variant rows deflated as 110 independent trials.
   - **Depends on**: P1-ENG-B6Y5
   - **Plan**: `.workflows/plan/P1-ENG-QM5I.md`
-- [ ] **P1-ENG-EH4K** Phase 8: The go-live drawdown bar, 15% → 20%
+- [x] **P1-ENG-EH4K** Phase 8: The go-live drawdown bar, 15% → 20%
   - **Difficulty**: HARD
   - **Type**: Update
   - **Context**: Owns `MAX_DRAWDOWN` 0.15 → 0.20 and its single home — the constant moves into `backtest/metrics.py` with `tuning` re-exporting it (`MAX_DRAWDOWN = _metrics.MAX_DRAWDOWN`), because `metrics.checklist` compares against a literal `0.15` today and `tuning.gate` / `walkforward.gate_p3b` / `b_walkforward.gate_p6a` all decide drawdown through `checklist(...)[2:5]`, so the P3/P3b/P6a real-money gates never read `MAX_DRAWDOWN` at all; `metrics.py` imports nothing from `tuning.py`, so this is the only non-circular arrangement and every existing reader of `tuning.MAX_DRAWDOWN` resolves unchanged. Also `dev.FAILURE_LABELS[1]` becoming `f"max DD <= {tuning.MAX_DRAWDOWN:.0%}"` (D13), `tuning._GATE_NAMES`, `web/lib/metrics.ts` (a second hardcoded implementation of go-live #4), `web/lib/golive.ts` + its engine-pinning test, design §1 item 4 of `docs/plans/2026-10-03-seer-design.md` with a new dated §11, and the pinned tests. Shares six files with phase 7 and lands first, moving only the drawdown number in each. Exit: one definition of the drawdown bar read by the lab screen, the go-live checklist and the web; `dev.FAILURE_LABELS[1] == "max DD <= 20%"` and prefix-stable so the 30 historical `"max DD <= 15%"` rows are still recognised as drawdown misses; `FAILURE_LABELS` keeps five entries in order; every gate-override test still overrides to a differing value; `lab/lab.sqlite` byte-identical to `origin/main`; `pytest` green and `npm test` green.
-  - **Status**: in_progress
+  - **Status**: completed
   - **Plan Set**: `LAB_LUCK_GATE_PLAN.md` (phase 8 of 9)
   - **Satisfies**: R5 — The owner's drawdown appetite is 20%, not 15%, and the bar must be one number rather than one per language.
   - **Depends on**: —
   - **Plan**: `.workflows/plan/P1-ENG-EH4K.md`
+  - **Completed**: 2026-10-07 11:16
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/metrics.py, engine/src/seer_engine/backtest/tuning.py, engine/src/seer_engine/backtest/dev.py, engine/src/seer_engine/backtest/walkforward.py, engine/src/seer_engine/backtest/b_walkforward.py, engine/src/seer_engine/backtest/dev_report.py, engine/src/seer_engine/backtest/report.py, engine/src/seer_engine/backtest/wf_report.py, engine/src/seer_engine/backtest/b_report.py, engine/tests/test_backtest_metrics.py, engine/tests/test_backtest_tuning.py, engine/tests/test_backtest_dev.py, engine/tests/test_backtest_walkforward.py, engine/tests/test_backtest_b_walkforward.py, engine/tests/test_backtest_report.py, engine/tests/test_backtest_wf_report.py, engine/tests/test_backtest_dev_report.py, engine/tests/test_lab_test_window.py, web/lib/golive.ts, web/lib/golive.test.ts, web/lib/metrics.ts, web/lib/metrics.test.ts, web/data/lab.json, web/lib/sera/fixture.ts, web/app/sera/overview.test.ts, web/app/sera/how/view.test.ts, web/lib/sera/derive.test.ts, web/app/sera/methods/view.test.ts, docs/plans/2026-10-03-seer-design.md, engine/.workflows/plan/P1-ENG-EH4K.md, engine/.workflows/todos.md
+  - **Verified**: `pytest` in `engine/` with `PG_TEST_URL` set, `-o addopts=-ra` (serial) -> **3076 passed, 0 failed, 0 skipped**; `ruff check src tests` clean; `npx vitest run` in `web/` -> **292 passed (27 files)**; `npm run build` in `web/` succeeded. One definition proved: `tuning.MAX_DRAWDOWN` and `metrics.MAX_DRAWDOWN` both `0.2`, `metrics.MAX_DRAWDOWN_LABEL` = `Max drawdown <= 20%`, and `web/data/lab.json`'s gate reads `maxDrawdown: 0.2`. The bar actually moved and still discriminates: `M0020-W-NOSTOP` dd=0.1927 passes=True; `M0019-RAW20-S25` dd=0.2066 passes=False. Invariants held: `lab/lab.sqlite` byte-identical to `origin/main`; `store.test_looks` = 0.
+  - **Drift**:
+    - The plan's Step 9/10 file table under-listed the engine tests. Eight further drawdown assertions moved because the bar widened: `test_backtest_metrics.py` (the 0.16 "fails" case -> 0.21; the "inclusive" boundary 0.15 -> 0.20), `test_backtest_tuning.py` (three "does not qualify" grid fixtures at dd=0.16/0.2 -> 0.25, the inclusive case -> `MAX_DRAWDOWN`, and the `select()` fallback reason string), `test_backtest_walkforward.py` (the `select_fold` fallback reason string), `test_backtest_dev.py` (the `FAILURE_LABELS` pin at :206), `test_backtest_dev_report.py` (the `SPECS` fixture's failed tuple and its CSV assertion). Each fixture was moved clear of the new bar so it still proves what it names; no assertion was weakened.
+    - Unlisted second copy of the drawdown label: `dev_report.py:60` `FAIL_ORDER` hardcoded `('beats SPY TR', 'max DD <= 15%', ...)`. It orders the failure histogram by exact string, so it would have dropped the drawdown bucket out of its slot once the label became `max DD <= 20%`. Now `FAIL_ORDER = dev.FAILURE_LABELS`.
+    - `DevRow.__post_init__` validates `failed` against the live `FAILURE_LABELS`, so constructed test fixtures could not keep the literal `max DD <= 15%` (it broke collection of `test_backtest_dev_report.py`). Those fixtures now reference `FAILURE_LABELS[1]` symbolically. Recorded `trials.failed` strings in the database are untouched -- they are never validated through `DevRow`.
+    - `engine/tests/test_lab_snapshot.py` is DELIBERATELY NOT in the files list. Step 11's one-line edit (gate `maxDrawdown` 0.15 -> 0.20, now at :277) IS applied on disk and the suite is green with it, but phase 2 has ~114 uncommitted lines of `trial_moments` schema-v3 work in that same file. Staging it would commit a peer's in-flight work under phase 8's name. The line rides with phase 2's commit instead; phase 2 has been told.
+    - `readme-updater` deliberately skipped: `engine/package_readme.md`'s drawdown lines are phase 7's per phase-8 handoff H2, and the file is currently dirty with a peer's uncommitted work.
+    - `web/node_modules` was missing `lucide-react` and `react-dom` (both declared in `package.json`); `npm install` repaired it. `node_modules` is gitignored; no tracked file changed.
+  - **Decided**:
+    - Plan's engine-test list incomplete -> moved each extra drawdown fixture clear of the new bar rather than relaxing any assertion (rung 3: the plan's code blocks, plus "a failing verification is never settled by relaxing the check").
+    - `dev_report.FAIL_ORDER` was a second hardcoded label copy -> derived it from `dev.FAILURE_LABELS` (rung 3: Step 3b's rule that every reader follows the constant).
+    - `test_lab_snapshot.py` excluded from the commit allowlist -> the edit lands with phase 2, which owns that file's uncommitted body (rung: /implement Step 4, "a file wrongly in it is a peer's work committed under your name").
+    - `readme-updater` skipped -> `engine/package_readme.md` is phase 7's per H2 (rung 3: the phase plan's "Leaves alone (owned by others)").
+    - `pytest` run with `-o addopts=-ra` rather than pip-installing `pytest-xdist` -> four sessions share that venv (rung 6: don't mutate shared ground mid-swarm; also the coordinator's broadcast decision on phase 1).
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and no `**Commit**` field (rung 6: the direct precedent recorded by phases 1, 2 and 6 of this same swarm in this same file -- a cross-file block move is the one edit that reliably loses a peer's concurrent append, and this file is committed by whichever session commits it, so a sha field cannot stay consistent).
+    - Quick Stats recounted from the file rather than blind-decremented (rung 6: same precedent -- a recount is idempotent under concurrency, a decrement compounds the race).
+    - Plan index: ticked phase 8's TaskID cell `(done 2026-10-07)` and left `**Status:** reconciled` alone (rung 6: phases 1 and 6 ticked exactly that way and touched neither; in a swarm the phases finish out of order, so a `phase N/9 complete` line would assert an order that does not exist).
 - [ ] **P1-ENG-ALY2** Phase 9: Luck-test the P7a seed
   - **Difficulty**: NORMAL
   - **Type**: Feature

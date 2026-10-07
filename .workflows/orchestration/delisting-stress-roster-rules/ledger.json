@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "503e7b6",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "Harness lands as 3 new files, engine unchanged. Smoke reproduces M2 (5.091%/4.002%, 10096 member-yrs) and M1/M3 (11.68% CAGR, 14.31% fall, 1589 trades) exactly. Break-even is OFF the grid: mean edge still +0.32 pts/yr at r=-100%, so phase 2 must expect NONE, not a stop. CLI spellings are final: --entry/--hazard unserved|all|NUM/--returns/--seeds/--seed0/--jobs/--store/--csv/--decline-sessions/--smoke; --csv schema as the Interface Contract states. Decided: PG_TEST_URL unset in env, exported conftest.py:6's documented URL (seer-pg :55432) rather than halt (rung 1+6). UNOWNED GAP: engine/package_readme.md needs delisting.py in its Layout tree, an Exported API H3, and an internal-module-graph bullet; not committed because phase 1's exit criterion 7 pins the commit to exactly 3 paths. Also package_readme.md:1957 (the D4 'dev results are optimistic' line) belongs to phase 2.",
       "package": "engine/src/seer_engine`, `engine/scripts`, `engine/tests",
       "plan": ".workflows/plan/delisting-stress-roster-rules/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T11:22:24+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-D7XQ",
       "title": "The delisting stress harness"
     },
     {
@@ -36,42 +36,42 @@
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Run it, and record what it found"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "81f93ca77da34e8545b404a0cc7b4033fac4cfad",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "Lab design gains \u00a78, the roster replacement rule (3 refusals, 5 triggers, swap priced at the owner's 18-month clock); names no entry as replaceable, leaving MOM-FR to phase 5. Decisions: section number \u00a78 resolved by reading the file (rung 3); Step 3 task creation scoped to phase 3 only, not all five, to avoid a todos.md race (rung 1, invariant 8); commit allowlist is the one docs path alone, .workflows/todos.md deliberately left uncommitted because it holds phases 2 and 5's rows too (rung 2, exit criterion 9). Suite 3201 passed / 0 failed / 0 skipped. N stays 110.",
       "package": "docs/plans",
       "plan": ".workflows/plan/delisting-stress-roster-rules/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T11:15:40+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-K3VD",
       "title": "The roster replacement rule"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "f250de9c70ccf2ce4ac068ad266750e20f1fa42d",
       "depends_on": [],
       "difficulty": "EASY",
       "n": 4,
-      "note": null,
+      "note": "Test-only, one file. Handover note stays cancelled per the Reconciliation Log. Decisions: minted only phase 4's task (peers minted their own); commit stages one path, shared engine todos.md left uncommitted since it also carries phase 1's line.",
       "package": "engine/tests",
       "plan": ".workflows/plan/delisting-stress-roster-rules/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T11:16:04+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-T4KD",
       "title": "**A test that pins the dev gate's trades bar**"
     },
     {
@@ -97,6 +97,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/delisting-stress-roster-rules/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "delisting-stress-roster-rules",
-  "updated": "2026-10-07T11:04:36+00:00",
+  "updated": "2026-10-07T11:23:05+00:00",
+  "verified_at": "2026-10-07T11:23:04+00:00",
   "worktree": "/home/miftah/.worktrees/seer/delisting-stress-roster-rules"
 }

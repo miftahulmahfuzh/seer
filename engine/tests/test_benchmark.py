@@ -258,3 +258,36 @@ def test_vendored_spy_dividends_parse_and_cover_2015_2026():
     assert divs[0].ex_date.year == 2015
     assert all(by_year.get(y) == 4 for y in range(2015, 2026)), by_year
     assert by_year.get(2026, 0) >= 2, by_year
+
+
+# ----------------------------------------------------------------------------- Gotrade costs
+
+
+def test_gotrade_benchmark_pays_the_schedule_on_the_first_buy():
+    # 9 shares at the open 100: $900 + trading 1.80 + regulatory 0.11 (cap) + PPN
+    # q½↓(1.91 × 0.11 = 0.2101) 0.21 = 902.12; 10 shares would need 1002.34.
+    c = buy_and_hold(spy_bars(), START, END, CASH, name="spy_price", cost_model="gotrade")
+    assert (c.shares, c.cash) == (9, P("97.88"))
+    assert equities(c) == [P(x) for x in ("1000", "1006.88", "1015.88", "979.88", "988.88", "1002.38")]
+
+
+def test_gotrade_benchmark_pays_the_schedule_on_each_reinvestment():
+    # 03-04: cash 97.88 + q(9 × 2.5) = 120.38; 1 share at the close 98 costs
+    # 98 + 0.20 + 0.06 + q½↓(0.26 × 0.11 = 0.0286) 0.03 = 98.29 -> cash 22.09, 10 shares.
+    _, tr = spy_curves(spy_bars(), START, END, CASH, [div("2026-03-04", "2.5")], cost_model="gotrade")
+    assert (tr.shares, tr.cash, tr.dividends_usd) == (10, P("22.09"), P("22.5"))
+    assert equities(tr) == [P(x) for x in ("1000", "1006.88", "1015.88", "1002.09", "1012.09", "1027.09")]
+
+
+def test_gotrade_fractional_benchmark_spends_to_the_cent():
+    # fees on the whole $1000 are 2.00 + 0.11 + 0.23 = 2.34, so 9.9766 shares (997.66) fit exactly.
+    c = buy_and_hold(spy_bars(), START, END, CASH, name="x", fractional=True, cost_model="gotrade")
+    assert (c.shares, c.cash) == (Decimal("9.9766"), P("0"))
+
+
+def test_cost_model_default_is_flat_and_unknown_is_refused():
+    assert buy_and_hold(spy_bars(), START, END, CASH, name="x") == buy_and_hold(
+        spy_bars(), START, END, CASH, name="x", cost_model="flat"
+    )
+    with pytest.raises(ValueError, match="cost_model"):
+        buy_and_hold(spy_bars(), START, END, CASH, name="x", cost_model="ibkr")  # type: ignore[arg-type]

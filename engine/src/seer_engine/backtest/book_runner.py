@@ -426,8 +426,9 @@ class RunStats:
     - ``turnover``: sum of fill notionals (price x shares, buys and sells, idle and forced fills
       included) / mean session equity / years, years = calendar days from ``snapshots[0]`` to
       ``snapshots[-1]`` / 365.25.
-    - ``costs_usd``: every fee paid (``sum(Fill.cost_usd)``; for a RunResult
-      ``q(price x shares x COST_RATE)`` per fill and exit).
+    - ``costs_usd``: every fee paid (``sum(Fill.cost_usd)``, which is already the rule set's
+      cost model: Gotrade's schedule under ``cost_model="gotrade"``; for a RunResult, always
+      ``DESIGN_V0``'s flat rate, ``q(price x shares x COST_RATE)`` per fill and exit).
     - ``gross_pnl_usd``: sum of the non-idle closed trades' pnl plus the fees of their own fills.
     - ``cost_drag``: those trades' fees / ``gross_pnl_usd`` when gross > 0, else None.
     - ``dividends_usd``: cash dividends credited (0 for a RunResult).
@@ -516,7 +517,8 @@ def _turnover(notional: Decimal, equity: Sequence[tuple[date, float]]) -> float:
 
 
 def _fee(price: Decimal, shares: Decimal | int) -> Decimal:
-    """The fee part of one simulator fill: ``q(price x shares x COST_RATE)`` (== ``Fill.cost_usd``)."""
+    """The fee part of one bracket-simulator fill (``DESIGN_V0`` only, always flat):
+    ``q(price x shares x COST_RATE)``. Book fills carry their own ``Fill.cost_usd``."""
     return q(price * shares * COST_RATE)
 
 

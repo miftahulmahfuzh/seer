@@ -6,7 +6,9 @@ weights; ``step_book`` turns them into sells and buys at that session's open, ap
 and take-profits fixed at entry, credits dividends, and marks the book at the close.
 
 One session, in this exact order (all money ``Decimal``; ``q`` at every product; buy cash
-``q(p × n × (1 + c))``, sell proceeds ``q(p × n × (1 − c))``, fee ``q(p × n × c)``):
+``q(p × n × (1 + c))``, sell proceeds ``q(p × n × (1 − c))``, fee ``q(p × n × c)``; under
+``rules.cost_model == "gotrade"`` instead buy cash ``q(p × n) + fee``, sell proceeds
+``q(p × n) − fee``, the fee from Gotrade's current schedule, ``sim.costs.gotrade_cash``):
 
 1. dividends (``rules.dividends``): each position held before S with an ex-date on S is
    credited ``q(shares × amount)``;
@@ -53,6 +55,7 @@ from typing import Literal
 
 from seer_engine import dates
 from seer_engine.prices import Bar
+from seer_engine.sim.costs import gotrade_cash, gotrade_shares_for
 from seer_engine.sim.model import q
 from seer_engine.sim.rules import OPEN_LIMIT_BAND, RESIZE_BAND, SHARE_QUANTUM, TradeRules
 from seer_engine.sim.split_adjust import _q_exact, _rescale_price, _split_ratio
@@ -333,23 +336,37 @@ def new_book(cash_usd: Decimal) -> Book:
 
 
 def _buy_cash(price: Decimal, shares: Decimal, rules: TradeRules) -> Decimal:
+    if rules.cost_model == "gotrade":
+        return gotrade_cash("buy", price, shares)[0]
     return q(price * shares * (_ONE + rules.cost_rate))
 
 
 def _sell_cash(price: Decimal, shares: Decimal, rules: TradeRules) -> Decimal:
+    if rules.cost_model == "gotrade":
+        return gotrade_cash("sell", price, shares)[0]
     return q(price * shares * (_ONE - rules.cost_rate))
 
 
-def _fee(price: Decimal, shares: Decimal, rules: TradeRules) -> Decimal:
+def _fee(price: Decimal, shares: Decimal, rules: TradeRules, side: Literal["buy", "sell"]) -> Decimal:
+    """The fee part of one fill (``Fill.cost_usd``). ``side`` matters only under "gotrade"."""
+    if rules.cost_model == "gotrade":
+        return gotrade_cash(side, price, shares)[1]
     return q(price * shares * rules.cost_rate)
 
 
 def _shares_for(budget: Decimal, price: Decimal, rules: TradeRules) -> Decimal:
     """The most shares whose unrounded buy cash ``price × n × (1 + c)`` fits ``budget``:
     whole shares (``sim.sizing._whole_shares``, step-back loop included) or, with
-    ``rules.fractional``, multiples of ``SHARE_QUANTUM``. 0 when nothing fits."""
+    ``rules.fractional``, multiples of ``SHARE_QUANTUM``. 0 when nothing fits.
+
+    Under ``cost_model == "gotrade"`` the fee is not proportional (a $0.10 minimum, a capped
+    regulatory fee), so the count is solved exactly: the most shares whose ROUNDED buy cash
+    ``_buy_cash`` is <= ``budget`` (``sim.costs.gotrade_shares_for``); it never overspends."""
     if budget <= 0:
         return _ZERO
+    if rules.cost_model == "gotrade":
+        n = gotrade_shares_for(budget, price, SHARE_QUANTUM if rules.fractional else _ONE)
+        return n if n > 0 else _ZERO
     unit = price * (_ONE + rules.cost_rate)
     if rules.fractional:
         shares = (budget / unit).quantize(SHARE_QUANTUM, rounding=ROUND_FLOOR)
@@ -405,7 +422,7 @@ def _close_out(
         shares=p.shares,
         price=exit_price,
         cash_usd=proceeds,
-        cost_usd=_fee(exit_price, p.shares, rules),
+        cost_usd=_fee(exit_price, p.shares, rules, "sell"),
         reason=fill_reason,
     )
     income = p.income_usd + proceeds
@@ -611,7 +628,7 @@ def step_book(
             proceeds = _sell_cash(price, excess, rules)
             cash += proceeds
             fills_trim.append(
-                Fill(session, symbol, "sell", excess, price, proceeds, _fee(price, excess, rules), "trim")
+                Fill(session, symbol, "sell", excess, price, proceeds, _fee(price, excess, rules, "sell"), "trim")
             )
             pos[symbol] = replace(p, shares=desired, income_usd=p.income_usd + proceeds)
 
@@ -677,7 +694,7 @@ def step_book(
                 cost = _buy_cash(fill_price, shares, rules)
             cash -= cost
             fills_buy.append(
-                Fill(session, symbol, "buy", shares, fill_price, -cost, _fee(fill_price, shares, rules), fill_reason)
+                Fill(session, symbol, "buy", shares, fill_price, -cost, _fee(fill_price, shares, rules, "buy"), fill_reason)
             )
             if p is not None:
                 pos[symbol] = replace(p, shares=p.shares + shares, cost_usd=p.cost_usd + cost)

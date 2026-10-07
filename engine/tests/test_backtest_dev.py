@@ -409,6 +409,26 @@ def test_book_candidate_and_spy_curves():
     assert row.candidate is c
 
 
+def test_a_gotrade_candidate_and_its_spy_benchmark_both_pay_gotrade_fees():
+    market = short_market()
+    gotrade = replace(DAILY_SWITCH, id="daily-switch-gotrade", cost_model="gotrade")
+    flat_c = cand("F1-FLIP-D", allocator=HoldOne("FLIP", "SPY", flip=True), rules=DAILY_SWITCH)
+    real_c = cand("F1-FLIP-G", allocator=HoldOne("FLIP", "SPY", flip=True), rules=gotrade)
+    assert real_c.owner_inputs == flat_c.owner_inputs  # the measured schedule needs no owner input
+    flat, flat_row = run_candidate(market, DIVS, SPY_DIVS, flat_c)
+    real, real_row = run_candidate(market, DIVS, SPY_DIVS, real_c)
+    assert isinstance(real, BookResult) and isinstance(flat, BookResult)
+    assert (real_row.start, real_row.end) == (flat_row.start, flat_row.end)
+    assert real.costs_usd > flat.costs_usd
+    assert real_row.stats == run_stats(real)
+    price, total = spy_curves(
+        market.spy(), real_row.start, real_row.end, real.initial_cash, SPY_DIVS, cost_model="gotrade"
+    )
+    assert real_row.spy_price == curve_metrics(price)
+    assert real_row.spy_tr == curve_metrics(total)
+    assert real_row.spy_tr != flat_row.spy_tr  # the benchmark paid Gotrade's fees too
+
+
 def test_window_before_fx_start_converts_at_the_fx_start_rate():
     market = long_market()
     cash = initial_cash_usd(INITIAL_IDR, Decimal("8002"))

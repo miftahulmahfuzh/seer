@@ -42,6 +42,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - Every roster entry carries its lab provenance (lab-luck-gate, phase 6): a paper entry that came from a recorded lab candidate now says in code which lab method and variant it is, the lab status it was admitted under, and on what basis — `test-passed`, or `owner-override` with a one-line reason. `paper/roster.py` gains `Basis` / `BASES`, the frozen `LabProvenance` dataclass (which refuses an override with no reason), the `LAB_PROVENANCE` table keyed by roster id, and a `lab_provenance` field on `RosterEntry` that `from_row` fills from that table. It sits **outside** the spec, exactly where `status`, `paper_end`, `gate_note` and `gate_applicable` already sit, so no `spec_digest` moves and no entry is retired. `lab/store.py` gains `PROMOTION_BASES` and `promotion_basis(status)`, and `record_promotion` takes `basis=` / `reason=`, writes both into the method's `# Promotion` analysis section, and **refuses an unexplained owner override**. `promote` gains `--lab-override-reason`, requires it whenever the method is not at `test-passed`, and prints the `LAB_PROVENANCE` line to add in the same commit. The admission *policy* is unchanged (Decisions D3: paper membership has never required a gate pass, and the lab's design §3/§6 reading that a test pass leads to the roster is a *sufficient*, never a necessary, route); what changed is that the basis stopped being prose in a commit message. `tests/test_paper_roster.py` checks every provenance line against the committed `lab/lab.sqlite`
 - The verdict is derived, under one policy, at evaluation time (lab-luck-gate, phase 4): a dev trial's eligibility stopped being a column read back off the row and became something `lab/store.py` *decides* when asked. `store.verdict(conn, trial)` re-derives the four threshold owner conditions from the trial's own recorded columns against the live `tuning.MAX_DRAWDOWN` / `tuning.MIN_PROFIT_FACTOR` / `dev._MIN_TRADES` (`owner_failures`), carries only `owner inputs` from the record — the one condition no constant re-decides — and settles the luck test on that trial's DSR **at the gate's current N** (`dsr_at`, exact from `trial_moments` or recovered by inverting the recorded DSR through `recover_dsr`, deflated on both routes by today's `dev_sharpe_variance`). A DSR that cannot be evaluated *fails* the luck test, so nothing is admitted for being unmeasurable. The gate's two constants are `store.DSR_MIN` (0.95 -> 0.90, the owner's stated risk appetite) and the new `store.DSR_POLICY = "all-trials"`, the single name that decides N; `store.gate` / `pending_gate` resolve it, and `runner.trial_rows` is a two-line delta onto `pending_gate`, so a trial recorded tonight is judged by the same bar as one recorded six weeks ago. Recorded rows keep the labels of the bars they were judged under — all 110 say `DSR >= 0.95` and `max DD <= 15%` — so every reader goes through `is_luck_label` and `owner_failures` rather than comparing to `DSR_LABEL` or parsing `failed`. `TRANSITIONS` gains exactly one new edge, `('rejected','dev-eligible')`, reachable only through the twice-guarded `reevaluate_method` behind the new `lab reevaluate` command. Nothing in `trials` is written, the lab's N does not move and `test_looks` is still 0; `lab/lab.sqlite` takes an additive, idempotent migration (schema_version 3) and `web/data/lab.json` is re-exported from it. Net effect: at (N = 110, DSR >= 0.90, max DD <= 20%) exactly three trials are eligible — `M0022-W-TV14`, `M0022-W-TV16` and `M0020-W-NOSTOP` — so the promotion path is reachable for the first time, and `(all-trials, 0.95, 15%)` reproduces the previous verdicts exactly
 - The second lever is built, measured and not pulled (lab-luck-gate, phase 5): the luck bar has two levers — the threshold `store.DSR_MIN` and the N that `store.DSR_POLICY` resolves to — and Decision D1 moved only the first, deliberately. `commands/lab.py` gains the read-only `lab luck` (`_HANDLERS["luck"]`), the instrument that shows what moving the second would do **against the committed database, without editing the constant and re-running anything**: one column per named N policy and one per repeatable `--at N`, each recorded DSR re-evaluated there by inverting that trial's own per-trial constant through `store.recover_dsr`, so the `recorded` column reproduces the database exactly and every other column moves nothing but the multiple-testing count. Per policy it prints the N and the evidence for it, the daily hurdle `SR*`, and which candidates clear the bar — on the committed lab exactly three do at the live N = 110 — above the trial-Sharpe variance the deflation rests on; each policy's `evidence:` line is read generically off its `npolicy.NCount`, so the participation ratio and mean pairwise correlation behind an N cannot go stale in this output. In the same phase `lab status` stops hiding an empty promotion path: `_promotion_path` now **always** prints every step from `Dev-eligible` to `Paper`, an empty one with `_empty_reason`'s one sentence saying why (and, for `dev-eligible`, which bar is holding the closest candidate), alongside a `Promotable now` list ranked by MAR, the methods eligible on the evidence but held by the status machine, `Test-window looks used: k` (design §3), and the D1b ratchet warning — which names the N at which the best passing candidate's DSR falls back under the bar and how many more dev trials that is, because more exploration re-closes the gate the threshold just opened. Both commands are strictly read-only, proven by measurement rather than asserted: `lab/lab.sqlite`'s md5 is unchanged across both and `store.test_looks` still reads 0
+- Gotrade's real fees as a cost model (Sean plan, phase 6): `sim/costs.py` holds `GOTRADE`, a schedule of four dated fee regimes fitted to the owner's 30 Gotrade order receipts (`tests/fixtures/gotrade_fees.json`, fee columns only). `TradeRules` gains `cost_model: Literal["flat", "gotrade"] = "flat"`, a lever in `LEVERS_SINCE_PINS`, so at "flat" no registry, lab-trial or paper-spec digest moves (`tests/test_cost_model_pins.py` recomputes every committed lab digest byte for byte). Under "gotrade" the book engine prices every fill from today's regime, and the lab's SPY benchmark (`backtest.dev._run` → `spy_curves`) pays the candidate's own cost model. The paper benchmark stays flat, and no preset uses "gotrade" yet
 
 ## Layout
 
@@ -77,6 +78,7 @@ engine/
       lifecycle.py          step(), close_unpriced()
       sizing.py             Pick, Rejection, SizingResult, size_picks()
       split_adjust.py       apply_split()
+      costs.py              Gotrade's measured fee schedule: FeeParts, FeeRegime, GotradeSchedule, GOTRADE, fee_parts(), gotrade_cash(), gotrade_shares_for() (Sean phase 6)
       rules.py              TradeRules, DESIGN_V0, V0_BOOK, the presets, the rank/resize cadence split (P7a)
       book.py               the book engine: Target, Book, Position, Fill, Trade, step_book(), close_book_unpriced() (P7a); apply_book_split(), BookSplit (P4)
     paper/                  nightly paper trading (P4); every module but store.py is pure
@@ -1335,6 +1337,12 @@ the database.
   the 0.1% cost, idle remainder, marked at each close, never sold. Total-return reinvests a
   dividend when `start < ex_date ≤ end`: cash `+= q(shares × amount)`, then whole shares at that
   close with `buy_cost`.
+  `buy_and_hold(..., cost_model="flat")` and `spy_curves(..., *, cost_model="flat")` (Sean phase 6):
+  under `"gotrade"` every buy (the first one and each dividend reinvestment, whole or fractional)
+  pays `sim.costs.gotrade_cash` instead of 0.1%, with the share count from
+  `sim.costs.gotrade_shares_for` (the most whose rounded cash fits). Any other value is a
+  `ValueError`. `"flat"` leaves every curve unchanged; the paper benchmark (`paper/benchmark.py`)
+  stays flat.
 - **`backtest.metrics`**: `strategy_metrics(snaps, pnls) -> Metrics` and `checklist(m, spy_return)`,
   identical to `web/lib/metrics.ts` (a loss is `pnl ≤ 0`; PF = gross win / gross loss, `inf` with
   no loss; max drawdown on per-session equity; total return = last / first − 1;
@@ -1630,7 +1638,9 @@ from `seer_engine.sim`.
   - `DEFAULT_ETFS = {"SPY", "QQQ"}`, the owner-input default;
   - `LEVERAGED_ETFS = {"SSO", "QLD", "UPRO", "TQQQ"}`.
 - `TradeRules` is a frozen value. `__post_init__` validates types (`TypeError`), ints ≥ 1,
-  `cost_rate` in [0, 0.05) and a kebab-case `id` (`ValueError`).
+  `cost_rate` in [0, 0.05) and a kebab-case `id` (`ValueError`). `cost_model` must be a `str`
+  (`TypeError`) in `sim.costs.COST_MODELS`, and `"gotrade"` requires the default `cost_rate`
+  (`ValueError`). `DESIGN_V0`'s lever tuple pins `"flat"`, so the bracket engine never uses Gotrade fees.
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -1646,6 +1656,7 @@ from `seer_engine.sim`.
 | `dividends` | `True` | credit cash dividends on the ex-date (D11) |
 | `idle_symbol` | `None` | the residual weight (1 − Σ targets) held in this instrument on decision sessions; 0% while it has no bar (BIL before 2007) |
 | `cost_rate` | `0.001` | per side; any other value is an owner input |
+| `cost_model` | `"flat"` | `"flat"`: `cost_rate` per side. `"gotrade"`: every fill pays Gotrade's current measured schedule (`sim.costs`, Sean phase 6); not an owner input. No preset sets it |
 
 - Presets (`PRESETS` holds every row below except `V0_BOOK`; ids are unique):
 
@@ -1673,14 +1684,18 @@ from `seer_engine.sim`.
   correct. All three raise `ValueError` for a non-session.
 - `LEVERS_SINCE_PINS` / `is_pinned_default(name, value)`: a lever added AFTER the P7a registry, the lab
   trials and the paper roster were pinned, mapped to the value meaning "as before this lever existed"
-  (`{"resize_cadence": None}`). Every canonical form pinned before the lever leaves such a field out
+  (`{"resize_cadence": None, "cost_model": "flat"}`). Every canonical form pinned before the lever leaves such a field out
   while it holds that value — `backtest.registry._canon` (so no pinned candidate digest moves and no
   closed lab trial re-digests through `lab.method.config_digest`) and `paper.roster.rules_dict` (so no
   live paper spec digest moves). A rule set that uses the lever canonicalizes differently.
 - `rule_owner_inputs(rules) -> tuple[str, ...]`. The result is sorted and drawn from
-  `market-on-open`, `fractional`, `etf:<idle symbol>` (outside `DEFAULT_ETFS`) and `fee`.
+  `market-on-open`, `fractional`, `etf:<idle symbol>` (outside `DEFAULT_ETFS`) and `fee`. `fee`
+  means a flat `cost_rate` other than 0.1%; `cost_model="gotrade"` never adds it, because the
+  schedule is fitted to the owner's own receipts.
 - `describe_rules(rules) -> tuple[str, ...]`: one fixed plain-English line per lever. The reports
-  and the pre-registration's §5 text use it.
+  and the pre-registration's §5 text use it. Under `cost_model="gotrade"` the costs line is
+  read off `GOTRADE.current` (rates, minimum, cap, sell extra, PPN and the regime's start date),
+  so it cannot drift from what the simulator charges.
 
 **`sim.book`** (`WEIGHT_QUANTUM = Decimal("0.000001")`):
 - `Target(symbol, weight, last, limit=None, stop=None, take=None)`: one instrument wanted after the
@@ -1726,10 +1741,53 @@ from `seer_engine.sim`.
     6. `days_held + 1` and marks.
     7. The snapshot.
   - Buy cash is `q(p × n × (1 + c))`. Sell proceeds are `q(p × n × (1 − c))`.
+  - Under `rules.cost_model == "gotrade"`, `_buy_cash`, `_sell_cash` and `_fee` instead use
+    `sim.costs.gotrade_cash` (buy `q(p × n) + fee`, sell `q(p × n) − fee`). `Fill.cost_usd` is the
+    side-specific fee, and `_shares_for` solves the count exactly with `gotrade_shares_for` (whole
+    shares or `SHARE_QUANTUM`), so a buy never overspends despite the $0.10 minimum.
 - `close_book_unpriced(book, symbols, rules) -> (book, fills, trades)` sells at the mark with reason
   `forced`, mirroring `sim.close_unpriced`.
 - **Parity:** `run_book(PICKS(A), V0_BOOK)` reproduces `run_backtest(STRATEGY_A)` exactly: equal
   snapshots and equal closed trades on seeded synthetic markets (`tests/test_book_runner.py`).
+
+### sim: Gotrade's fee schedule (Sean phase 6)
+
+`sim/costs.py` is pure: no clock, no I/O and no floats. `tests/test_sim_costs.py` reproduces every
+receipt in `tests/fixtures/gotrade_fees.json`.
+
+- `CostModel = Literal["flat", "gotrade"]`, `COST_MODELS`, `Side`, `SIDES`, `CENT`.
+- `FeeParts(trading, regulatory, ppn, total)`: one order's printed fees to the cent, with
+  `total == trading + regulatory + ppn` enforced.
+- `FeeRegime(since, trading_rate, trading_min, regulatory_rate, regulatory_cap, sell_extra_rate, ppn_rate)`
+  and its `.fees(side, amount)`. The amount is rounded half-up to the cent (at least $0.01; exactly 0
+  pays nothing). Then:
+  - **trading** is the rate rounded half-up, raised to `trading_min`;
+  - **regulatory** is the rate rounded UP and capped, and a sell adds `sell_extra_rate` rounded up
+    and uncapped;
+  - **PPN** is `ppn_rate × (trading + regulatory)` rounded HALF-DOWN. Only half-down fits all 30 receipts.
+- `GotradeSchedule(regimes)`: strictly ascending by `since`. `.current` is the last regime.
+  `.regime_on(on)` returns the regime in force on a date (`None` → current; before the first one
+  → `ValueError`). `.fee_parts(side, amount, on=None)` delegates to it.
+- `GOTRADE`, four regimes. Each `since` is the date of the first receipt seen under that regime:
+
+| since | trading | regulatory | sell extra | PPN |
+|---|---|---|---|---|
+| 2025-06-10 | none | 0.3% up, no cap | — | none |
+| 2025-06-26 | 0.3% half-up, min $0.10 | 0.054% up, cap $0.10 | 0.04% | 11% |
+| 2026-03-25 | 0.3% half-up, min $0.10 | 0.054% up, cap $0.11 | 0.04% | 11% |
+| 2026-06-16 (current) | 0.2% half-up, min $0.10 | 0.054% up, cap $0.11 | 0.04% | 11% |
+
+  The sell extra rests on one sell receipt (PLTR 2026-10-07). It is deliberately conservative
+  until more sells arrive.
+- `fee_parts(side, amount, on=None) -> FeeParts`: the module-level shortcut to `GOTRADE`.
+- `gotrade_cash(side, price, shares) -> (cash, fee)` is priced at the CURRENT regime. The amount is
+  `q(price × shares)`. A buy's cash is `amount + fee`. A sell receives `amount − fee`, with the fee
+  capped at the amount.
+- `gotrade_shares_for(budget, price, quantum) -> Decimal`: the most shares, as a multiple of
+  `quantum`, whose rounded buy cash fits `budget`. It is found by exact bisection, because the
+  minimum fee makes cost non-linear in shares.
+- Every backtest prices every simulated date at the current regime (`on=None`). The lab asks what a
+  method would cost the owner now, not what it would have cost in 2012.
 
 ### strategies: allocators and the P7a families
 
@@ -2005,7 +2063,8 @@ the injected death is abrupt, which makes the whole result an **upper bound** on
   `run_book`; any other pairing is a TypeError.
 - **`run_stats(RunResult | BookResult) -> RunStats`**: what the dev report needs from either
   result: `metrics` (non-idle trades for a book run, plus `avg_days_held` and `exit_reasons`),
-  `exposure`, annualized `turnover`, `costs_usd`, `gross_pnl_usd`, `cost_drag`, `dividends_usd`,
+  `exposure`, annualized `turnover`, `costs_usd` (a book run's `Fill.cost_usd`, so Gotrade's fees
+  under `cost_model="gotrade"`; always the flat rate for a `DESIGN_V0` RunResult), `gross_pnl_usd`, `cost_drag`, `dividends_usd`,
   `daily_returns`, `sharpe` (population stdev, x sqrt(252)), `year_returns` and `worst_year`.
   Floats exist only here, summed left to right as in `backtest.metrics`.
 
@@ -2050,7 +2109,8 @@ here is pure, and the purity glob covers it; the one writer is `backtest.io.writ
     `FX_START` runs on a market copy whose `fx` is that single rate (D-C). FX before 1999 affects
     only that conversion, never a decision.
   - `DevRow` holds the stats and both SPY curves on the candidate's own window and cash. SPY's
-    dividends come from the store. Its trailing `window` field (defaulted to `DEV_WINDOW`) records
+    dividends come from the store. The curves pay the candidate's `rules.cost_model` (`spy_curves(...,
+    cost_model=c.rules.cost_model)`), so a `"gotrade"` method and its benchmark pay the same fees. Its trailing `window` field (defaulted to `DEV_WINDOW`) records
     which window produced the row; `make_row(..., window=DEV_WINDOW)` carries it over.
   - `finalists(rows)` is D8:
     - **eligible** means beating SPY TR, max DD ≤ 20%, PF ≥ 1.3, ≥ 100 closed trades, and no owner

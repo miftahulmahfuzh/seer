@@ -1,0 +1,183 @@
+{
+  "branch": "feature/lab-luck-gate",
+  "coordinator": "orch-lab-luck-gate",
+  "coordinator_session_id": "1423b60b-3b25-40e1-987f-32fdc6a389fe",
+  "created": "2026-10-07T03:41:48+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 1,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/lab-luck-gate/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The N policy and the effective-N estimator"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 2,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/lab-luck-gate/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Record the DSR's inputs with every dev trial"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "engine/commands",
+      "plan": ".workflows/plan/lab-luck-gate/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "lab remeasure` \u2014 recover the inputs for a recorded method"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2,
+        8
+      ],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/lab-luck-gate/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The verdict is derived under one policy, at the current N"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        4
+      ],
+      "difficulty": "NORMAL",
+      "n": 5,
+      "note": null,
+      "package": "engine/commands",
+      "plan": ".workflows/plan/lab-luck-gate/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3",
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "lab status` shows the queue and the look budget; `lab luck"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 6,
+      "note": null,
+      "package": "engine/paper",
+      "plan": ".workflows/plan/lab-luck-gate/phase-6.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Every roster entry carries its lab provenance"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        4,
+        8
+      ],
+      "difficulty": "NORMAL",
+      "n": 7,
+      "note": null,
+      "package": "docs` + `web",
+      "plan": ".workflows/plan/lab-luck-gate/phase-7.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Docs, the pre-registration wording, and the site's gate"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 8,
+      "note": null,
+      "package": "engine/backtest` + `web",
+      "plan": ".workflows/plan/lab-luck-gate/phase-8.md",
+      "reported_at": null,
+      "satisfies": [
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The go-live drawdown bar, 15% \u2192 20%"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2,
+        3,
+        4
+      ],
+      "difficulty": "NORMAL",
+      "n": 9,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/lab-luck-gate/phase-9.md",
+      "reported_at": null,
+      "satisfies": [
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Luck-test the P7a seed"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/lab-luck-gate/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "lab-luck-gate",
+  "updated": "2026-10-07T03:41:48+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/lab-luck-gate"
+}

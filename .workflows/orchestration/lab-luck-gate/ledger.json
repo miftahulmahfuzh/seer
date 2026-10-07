@@ -75,7 +75,7 @@
         "R1",
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The verdict is derived under one policy, at the current N"
     },
@@ -138,19 +138,19 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "f1b4120",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 8,
-      "note": null,
+      "note": "verified: 31 files, none belonging to phases 1/2/3/5/6/9; deflated_sharpe function body byte-identical to pre-flight baseline 8a8c973a (invariant 4 holds -- dev.py IS modified but only at the D13 FAILURE_LABELS line, which invariant 4 explicitly exempts); DEV_END unmoved; lab.sqlite md5 unchanged. Suite 3076 passed/0 failed/0 skipped, ruff clean, vitest 292, npm build ok. PLAN UNDER-COUNT FOUND: 8 further drawdown fixtures moved beyond the 2 the plan's table listed -- a widened bar turns authored non-qualifiers into winners; phase 8 moved each fixture clear of the bar rather than relaxing any assertion. Relayed to phase 4, which faces the identical class via DSR_MIN 0.95->0.90. SECOND UNLISTED LABEL MIRROR: dev_report.py:60 FAIL_ORDER matched the drawdown label by exact string and would have silently dropped the bucket; now FAIL_ORDER = dev.FAILURE_LABELS. Phase 7 owes handoff H2's three doc contradictions + H3's lab stage regeneration. web/node_modules needed npm install (lucide-react, react-dom absent despite package.json).",
       "package": "engine/backtest` + `web",
       "plan": ".workflows/plan/lab-luck-gate/phase-8.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T04:21:36+00:00",
       "satisfies": [
         "R5"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-EH4K",
       "title": "The go-live drawdown bar, 15% \u2192 20%"
     },
     {
@@ -178,7 +178,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-luck-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-luck-gate",
-  "updated": "2026-10-07T04:17:28+00:00",
+  "updated": "2026-10-07T04:21:36+00:00",
   "verified_at": "2026-10-07T03:59:26+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-luck-gate"
 }

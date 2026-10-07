@@ -127,7 +127,7 @@ Every phase must hold all of these, and each phase's exit criteria restate the o
 | 5 | `lab status` shows the queue and the look budget; `lab luck` | R3, R1 | `engine/commands` | 3 | 4 | NORMAL | `.workflows/plan/lab-luck-gate/phase-5.md` | P1-ENG-QM5I | — |
 | 6 | Every roster entry carries its lab provenance | R4 | `engine/paper` | 6 | — | NORMAL | `.workflows/plan/lab-luck-gate/phase-6.md` | P1-ENG-CA69 | — |
 | 7 | Docs, the pre-registration wording, and the site's gate | R1 | `docs` + `web` | 25 | 4, 8 | NORMAL | `.workflows/plan/lab-luck-gate/phase-7.md` | P1-ROOT-FWWQ | — |
-| 8 | The go-live drawdown bar, 15% → 20% | R5 | `engine/backtest` + `web` | 30 | — | HARD | `.workflows/plan/lab-luck-gate/phase-8.md` | P1-ENG-EH4K | — |
+| 8 | The go-live drawdown bar, 15% → 20% | R5 | `engine/backtest` + `web` | 30 | — | HARD | `.workflows/plan/lab-luck-gate/phase-8.md` | P1-ENG-EH4K (done 2026-10-07) | — |
 | 9 | Luck-test the P7a seed | R6 | `engine/lab` | 3 | 2, 3, 4 | NORMAL | `.workflows/plan/lab-luck-gate/phase-9.md` | P1-ENG-ALY2 | — |
 
 ### Waves

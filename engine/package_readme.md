@@ -65,6 +65,9 @@ engine/
     yahoo.py                yfinance download + frame parsing, BRK.B <-> BRK-B (phase 3)
     runs.py                 start_run / finish_run / fail_run
     research.py             local research store: build_store() / load_store() / refresh_fundamentals(), each with a keyword window=; test_window(), latest_session(), declared_window(); the D9 end-of-window guard (impure; P7a, windowed in build-promotion-path phase 2)
+    delisting.py            delisting stress: measure_hazard() / survivors() / draw_deaths() / kill() / stressed();
+                            pure given its Random, reads no clock and no I/O, imports no lab module
+                            (delisting-stress-roster-rules phase 1)
     dividends.py            Massive cash dividends (CD + SC) per ex-date, upsert into `dividends` (P4)
     llm.py                  Anthropic-compatible Messages call for `explain` (P4) and `veto` (P6, with temperature/thinking/max_tokens per call)
     finnhub.py              Finnhub company news and earnings calendar, rate-limited, key in a header only (P6)
@@ -1929,7 +1932,10 @@ parameter builds, loads and refreshes exactly what it did before.
   window — refreshing a store never changes which window it is for.
 
 **The committed store** (built in phase 4, verified in phase 13): fingerprint `5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a`.
-- 2,490,793 bar rows; 539 of 1,061 symbols served, and 522 members unserved.
+- 2,490,793 bar rows; 539 of 1,061 symbols served, and 522 members unserved. Of those 522, **404
+  left the index inside the dev window and 118 were still members on its last day** — a split that
+  matters because only the 404 are a death a stress test can inject; what is missing for the other
+  118 is twenty years of prices, not an exit, and design §14 names their cost as unmeasured.
 - 28,206 dividend rows and 4,300 FX rows.
 
 **The current train/eval store** (fundamental-panel-coverage, 2026-10-05): fingerprint
@@ -1957,6 +1963,16 @@ Both coverage figures above are **upper bounds** — the measure reads no bars, 
 yfinance has no delisted tickers, so the dev window's survivorship gap is far larger than the 115
 members since 2015, and single-stock dev results are optimistic (D4). The report counts the gap year
 by year (41.4% of member-sessions over 1996–2015 have no bar). ETF-only candidates have no such bias.
+
+**How optimistic, measured** (design §14, delisting-stress-roster-rules phase 2): the gap does not
+explain the edge. Injecting deaths into the priced survivors at the store's own measured rate
+(4.002%/yr unpriced exits; 5.091%/yr all exits) and re-running 100 seeds per assumed loss, all four
+quant roster entries still beat total-return SPY **even when every vanishing company is assumed to
+go to zero** — +0.73 (RMW-FR), +3.69 (RAW-FR), +2.30 (MOM-FR) and +0.11 (MVW-FR) points a year at
+`r = -100%`. There is no break-even on the grid at the measured rate. Two caveats the number does
+not carry: at the pessimistic 5.091%/yr rate MVW-FR's break-even lands on the scale at **-85.8%**
+and RMW-FR sits at +0.01 pts/yr, so for those two the conclusion rests on the measured rate; and
+the injected death is abrupt, which makes the whole result an **upper bound** on the damage.
 
 ### backtest book runner (P7a)
 
@@ -2370,6 +2386,24 @@ synthetic sessions.
   - Market: `dividends_on(conn, session, symbols)`, `dividends_between(conn, start, end)` (`book_runner.DividendMap` shape); `applied_splits_on(conn, session) -> tuple[tuple[str, Decimal], ...]`, `applied_splits_between(conn, start, end)`; `market_window_since(data_date) -> date`; `load_market_window(conn, since) -> Market` (bars via `backtest.io.read_bars_frame(conn, since=...)`, every membership interval, FX).
   - News verdicts (P6): `NewsVerdict(rank, symbol, verdict, reason, model, prompt_version, headlines, earnings_date, decided_at)`; `has_vetoes(conn, strategy_id, session) -> bool`; `write_vetoes(conn, strategy_id, session, verdicts) -> int` (plain INSERTs after validating ranks 1..n, unique symbols, a known verdict and a tz-aware `decided_at`; a duplicate is a database error, so callers check `has_vetoes` first in the same transaction); `read_vetoes(conn, strategy_id, session)` (by rank); `allowed_between(conn, strategy_id, start, end) -> dict[date, frozenset[str]]` (only `allow`, sessions `start..end` inclusive).
 
+### delisting (delisting-stress-roster-rules phase 1)
+
+Read-only survivorship stress. It perturbs an in-memory `Market` and nothing else: it records no lab
+trial, moves no N, spends no test-window look and never writes `engine/.research`. A test asserts it
+imports neither `lab.store` nor `lab.runner`, so it cannot record a trial even by accident. Its
+randomness is a `Random` passed in by the caller, which is why it lives here rather than under
+`backtest/` or `sim/` (`tests/test_strategy_purity.py` globs those two paths).
+
+- `WINDOW_START = date(1996, 1, 2)`, `WINDOW_END = date(2015, 10, 16)` (the dev window), `YEAR_DAYS = 365.25`, `MIN_PRICE = 0.0001`.
+- `Hazard`: what the store's own membership says about how often a member stopped being priceable — `ever_members`, `served`, `unserved`, `exits`, `served_exits`, `unserved_exits`, `mean_members`, `member_years`, `exits_by_year`.
+- `measure_hazard(market, *, unserved=(), window_start=WINDOW_START, window_end=WINDOW_END) -> Hazard`: measured, never assumed. On the committed store this is 5.091%/yr for all exits and 4.002%/yr for unpriced exits, over 10,096 member-years.
+- `Exposure`: one priced survivor's member-time — when it was both an index member and priceable.
+- `survivors(market, *, window_start=..., window_end=...) -> tuple[Exposure, ...]`: the priced members that never left the index inside the window, sorted by symbol. These are what a run injects deaths into.
+- `Death(symbol, last_bar)`: one injected delisting; the symbol is gone the session after `last_bar`.
+- `draw_deaths(market, exposures, hazard_per_year, rng) -> tuple[Death, ...]`: who dies and when, under a constant annual hazard, `P(death) = 1 - exp(-hazard x years)`.
+- `kill(market, deaths, delisting_return, *, decline_sessions=1) -> Market`: a **new** `Market` in which every named symbol is delisted on its death date at return `r`. `decline_sessions > 1` spreads the loss over that many sessions instead of making it abrupt.
+- `stressed(market, exposures, *, hazard_per_year, delisting_return, rng, decline_sessions=1) -> tuple[Market, tuple[Death, ...]]`: one Monte Carlo draw.
+
 ### dividends (P4)
 
 - `AMOUNT_QUANTUM = Decimal("0.000001")`, `CASH_TYPES = frozenset({"CD", "SC"})`, `CURRENCY = "USD"`.
@@ -2517,6 +2551,7 @@ exception. The real night is `migrate` → `nightly` → `veto` → `paper` → 
 - `commands.promote` (phase 5) imports `config`, `dates`, `db`, `lab.store`, `lab.method` (`discover`, inside the function), `paper.roster`, `paper.store`, `sim.rules` (`TradeRules`) and `psycopg.types.json.Jsonb`. It never imports `backtest.registry` (D1), and it is the only module that holds a Neon connection and a lab SQLite connection at the same time — sequentially, never in one transaction.
 - `lab.prereg` (build-promotion-path phase 3) imports `config`, `lab.store` and `lab.method` (`METHOD_ID`, `config_digest`, `source_sha`), plus `sqlite3` from the standard library. `backtest.dev` (`FAILURE_LABELS`, `DEV_END`), `dates` (`next_session`), `lab.method.discover` and `commands.backtest_dev.registry_problem` — the same `git status` check `lab run` makes on a method file — are imported *inside* the functions that need them, so importing `lab.prereg` does not drag in `backtest`. `commands.lab`'s `promote` handler imports `lab.prereg` and `lab.runner.git_head` inside the function. It never touches Neon: the pre-registration is a lab-side artefact only.
 - `lab.npolicy` (lab-luck-gate phase 1) imports numpy and `sqlite3` only at module scope; it imports `lab.store` (for `dev_trial_count`) *inside* `effective_n`, because `store` will import `npolicy` once the gate reads the policy and a module-scope import would close that cycle. It imports no `backtest` module, no `db`, no `config` and no `http`. Since phase 4, `lab.store.gate` is its one importer, and the import is likewise *inside* `gate` — so the cycle stays open at module scope in both directions, and `import lab.store` does not pull numpy in. `lab.store` keeps the same discipline for the rest of the derived verdict: `backtest.dev` and `backtest.tuning` are imported inside `owner_failures`, `dsr_at`, `sr_star`, `_blocking` and `reevaluate_method`, never at module scope.
+- `delisting` (delisting-stress-roster-rules phase 1) imports numpy, `random.Random`, `backtest.dev` (`DEV_END`, `MEMBERSHIP_START`), `backtest.market` (`SPY`, `Market`, `Membership`) and `strategies.base` (`History`). It imports no `lab` module — `tests/test_delisting.py` asserts that, so the harness can never record a trial — and none of `bars`, `db`, `http` or `config`. `scripts/delisting_stress.py` is its only caller and is not part of the package.
 - `paper.compare` (phase 3) imports nothing from the package at all — only the standard library — which is what keeps it portable to the leaderboard's TypeScript port. `commands.compare` imports `db`, `paper.compare` and `psycopg`, and reads one table.
 - `paper.book` and `paper.replay` (phase 6) also import `MarketAware` and `prepare_for` from `strategies.allocator`; `paper.roster` imports `strategies.f_fundamental` (`FUNDAMENTAL`, `FundamentalParams`) and still never imports `lab.methods.*` — the lab must not become an input to a paper spec digest.
 ### Standard library

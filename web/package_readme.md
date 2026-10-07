@@ -490,7 +490,7 @@ what "seen" means, so do not build a filter on it.
   the result to `SeraNav`, so the Journal tab carries a badge on every `/sera/*` page. It is
   computed when the layout renders, so it is a per-load number, not a live one.
 
-## Sean (lib/sean, phase 1)
+## Sean (/sean, lib/sean)
 
 Sean tracks the owner's real Gotrade orders. Every order leaves an "Order Summary" receipt; Sean
 reads the screenshot with a vision model, checks the numbers, stores one row per order and (from
@@ -545,6 +545,32 @@ roster method. Phase 1 is the schema and the pure modules only.
   Zip64 and encryption with a plain-words `ZipError`.
 - `extractJson.ts`: ported verbatim from run-insights; strips a ```json fence, takes first `{` to last `}`.
 
+**Section (phase 2, owner only).** `app/sean/layout.tsx` gives Sean its own rail (`SeanNav`:
+Overview, Trades, Plan; `planOpen` badge is 0 until phase 5). Overview (`/sean`) and Plan
+(`/sean/plan`) are placeholders pointing at Trades. `/sean/trades` lists every order (`orders()`,
+newest first, `null` on a failed read so the page says so) with a per-row delete
+(`DeleteOrder` -> `deleteOrder` server action), and `Uploader` takes screenshots or a zip
+(unzipped in the browser by `lib/sean/unzip.ts`), re-encodes large or non-JPEG pictures to JPEG
+(`upload.ts`: long side <= `MAX_SIDE_PX`, cap `MAX_UPLOAD_BYTES` 1.5 MB), sends them `CONCURRENCY`
+(3) at a time, then calls `refreshPnl()`. `view.ts` holds the plain-words strings (`SAY`) and
+`readResponse(status, body)`. The way in is an icon button: `Nav` (`showSean`, desktop rail foot,
+above Sera) and `AppHeader` (phone only); `(app)/layout.tsx` shows both to the owner only.
+- `lib/sean/gate.ts`: `requireSean(next)` — signed out -> `/signin?next=`, anyone but the owner
+  (`ALLOWED_EMAIL` and `isSeraUser`, Sera's exact rule) -> 404; every page calls it itself.
+  `isSeanCaller()` is the same check as a boolean for routes and server actions (no redirect).
+- `lib/sean/data.ts` (server only, Neon): `orders`, `ledgerOrders()` (oldest first, `executedAt`
+  ISO with `+07:00`, shaped for `buildLedger`/`pnlSeries`/`pnlAt`; throws on failure),
+  `ownerSymbols`, `orderById`, `orderIdBySha`, `saveOrder(order, sha, raw)` -> `{ id, duplicate }`,
+  `removeOrder`.
+- `POST /api/sean/orders`: body `{ image: base64 JPEG, sha256 }`; the server re-hashes the bytes
+  and refuses a mismatch. Known sha -> 200 `{ order, duplicate: true }`; otherwise `readOrder` on
+  the vision model, then `saveOrder`. 201 new, 400 damaged, 413 too large, 422 not a filled
+  receipt, 502 reader missing/down, 500 save failed, 404 to anyone but the owner.
+  `maxDuration = 60` (must stay a literal).
+- `lib/sean/dispatch.ts`: `dispatchSeanMarks()` POSTs a `workflow_dispatch` for `sean.yml` on
+  `main` so marks and P&L catch up before the nightly. Best effort, never throws: no
+  `GITHUB_DISPATCH_TOKEN`, a 404 (workflow not on main yet) or any error returns `false`.
+
 ## Dependencies
 
 - `next` 16, `react` / `react-dom` 19: app router, server components, server actions.
@@ -577,7 +603,7 @@ window lacks two month starts.
 
 - `DATABASE_URL` (app, pooled HTTP), `DATABASE_URL_UNPOOLED` (scripts), `ALLOWED_EMAIL`, NextAuth Google credentials. Scripts read `web/.env.local` via `node --env-file`.
 - Sera needs no env var of its own: `SERA_EMAIL` is a constant (`lib/sera/access.ts`), and its lab data is the committed `data/lab.json`. It does share the app's `DATABASE_URL`, for `journal_seen` only. Regenerate the JSON with `python -m seer_engine lab stage` (writes and stages it with `lab/lab.sqlite`) or `lab export-json` (writes only). In a worktree, run them as `env -u SEER_LAB_DB PYTHONPATH=<worktree>/engine/src /home/miftah/seer/engine/.venv/bin/python -m seer_engine …`.
-- Sean's reader: `LLM_API_KEY`, `LLM_VISION_BASE_URL` (OpenAI-shaped; never z.ai's `/api/anthropic`), `LLM_VISION_MODEL` (glm-4.6v). Unused by the app until phase 2's upload route.
+- Sean's reader: `LLM_API_KEY`, `LLM_VISION_BASE_URL` (OpenAI-shaped; never z.ai's `/api/anthropic`), `LLM_VISION_MODEL` (glm-4.6v), set in Vercel; read by `/api/sean/orders` (missing -> 502). `GITHUB_DISPATCH_TOKEN` (optional) lets `dispatchSeanMarks` start `sean.yml`.
 - `npx vite-node scripts/sean-vision-smoke.mjs -- <zip | folder | image ...> [--truth <json>] [--env .env.local] [--limit N]` (from `web/`): runs the real `readOrder` against real screenshots, prints prompt tokens vs the floor, tries and seconds per picture, and with `--truth` compares every field to a hand-checked transcription; exits 1 on any failure. Spends tokens; never in CI. Re-run it after any change to `prompt.ts`.
 - `npm run db:migrate`: apply new migrations in name order, one transaction each.
 - `npm run db:seed-demo [-- --dry-run]`: builds a 66-session demo (day 0 + paper start, at least three calendar months) ending at the last completed session, flagged `is_demo`. Roster: SPY (champion, buy and hold), A (bracket), F4-MOM12-N20-TREND and F1-SPY-SMA200-M (monthly book strategies, deciding on each month's first session), and C (bracket, its own younger clock, gate `applicable: false`). Needs migrations through 009 applied first (`npm run db:migrate`, then `npm run db:seed-demo`; it only runs on an empty database, never production). Writes strategies (with `engine`, `rules_id`, `paper_start`, `params.backtest_gate`), runs (with paper status), fx, bars, orders, equity snapshots, `paper_state`, `book_positions`, `book_targets` and `book_previews` (pending orders, targets and previews with demo `evidence`; A's CSCO has no explanation so its facts show), `book_trades`, and six `news_vetoes` rows for C's pending session. `--dry-run` builds every row and prints counts without connecting.

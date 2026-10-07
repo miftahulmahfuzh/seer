@@ -1,0 +1,142 @@
+/* Trades: a drop zone with per-picture status rows, then the order list on hairlines. */
+.page { display: flex; flex-direction: column; gap: 12px; }
+
+/* ---- Uploader -------------------------------------------------------------------------- */
+.uploader { display: flex; flex-direction: column; gap: 12px; }
+
+.drop {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 22px 24px;
+  border-radius: 28px;
+  border: 1.5px dashed var(--outline);
+  background: transparent;
+  transition: background 0.12s, border-color 0.12s;
+}
+.dropOver { border-color: var(--coral); background: var(--sheet); }
+
+.add { width: 64px; height: 64px; border: 0; background: var(--coral); color: var(--on-coral); }
+.add:hover { background: var(--coral); filter: brightness(0.95); }
+.add:disabled { cursor: progress; }
+
+.dropText { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dropLead { font-size: 19px; line-height: 1.35; }
+.dropHint { font-size: 15px; line-height: 1.45; color: var(--ink-2); }
+
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
+.progress { font-size: 15px; line-height: 1.45; color: var(--ink-2); padding: 0 8px; }
+.barActions { display: flex; gap: 8px; flex: none; }
+
+.items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 440px;
+  overflow-y: auto;
+  border-radius: 24px;
+  background: var(--sheet);
+}
+.item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 0.9fr) minmax(0, 1.6fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--hair);
+  font-size: 15px;
+}
+.item:last-child { border-bottom: 0; }
+.itemIcon { display: flex; color: var(--ink-2); }
+.itemName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+.itemMsg { line-height: 1.4; color: var(--ink); }
+/* Coral, not red: red means a loss here. A failed read is something to act on. */
+.failed .itemIcon { color: var(--coral); }
+
+.spin { animation: spin 0.9s linear infinite; }
+
+/* ---- Orders ---------------------------------------------------------------------------- */
+.orders { display: flex; flex-direction: column; }
+.list { list-style: none; margin: 0; padding: 0; }
+
+.head, .order {
+  display: grid;
+  grid-template-columns: 170px minmax(130px, 0.9fr) minmax(200px, 1.4fr) 110px 150px 100px;
+  align-items: center;
+  gap: 16px;
+}
+.head {
+  padding: 0 8px 10px;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--hair);
+}
+.right { text-align: right; }
+.order { padding: 14px 8px; border-bottom: 1px solid var(--hair); }
+.order:last-child { border-bottom: 0; }
+
+.when { font-size: 15px; color: var(--ink-2); }
+.what { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.side {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--chip);
+  display: inline-flex;
+  align-items: center;
+  font-size: 13.5px;
+}
+.sold { background: var(--butter); }
+.symbol { font-size: 20px; font-weight: 500; letter-spacing: 0.02em; }
+.detail { font-size: 15.5px; overflow-wrap: anywhere; }
+.fees { justify-self: start; font-size: 15px; color: var(--ink-2); cursor: help; }
+.total { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 17px; text-align: right; }
+.totalWord { font-size: 13px; color: var(--ink-3); }
+.profit { font-size: 13.5px; }
+
+.del { position: relative; display: flex; justify-content: flex-end; }
+.delForm { display: flex; gap: 6px; }
+.confirm { border: 0; background: var(--coral); color: var(--on-coral); }
+.confirm:hover { background: var(--coral); filter: brightness(0.95); }
+.rowError {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.empty { font-size: 16px; color: var(--ink-2); }
+
+.sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+@media (max-width: 1023.98px) {
+  .drop { flex-direction: column; align-items: flex-start; padding: 20px; }
+  .item { grid-template-columns: 24px minmax(0, 1fr); padding: 12px 16px; }
+  .itemMsg { grid-column: 2; }
+  .order {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'what total'
+      'detail total'
+      'when del'
+      'fees del';
+    row-gap: 4px;
+    padding: 16px 4px;
+  }
+  .what { grid-area: what; }
+  .detail { grid-area: detail; }
+  .when { grid-area: when; }
+  .fees { grid-area: fees; }
+  .total { grid-area: total; }
+  .del { grid-area: del; align-self: end; }
+}

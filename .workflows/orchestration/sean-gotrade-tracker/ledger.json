@@ -44,22 +44,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "8d0a879",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "Overview live: stats, P&L line (nightly or order-price fallback), holdings; no drift, no decisions",
       "package": "web/app/sean`, `web/lib/sean/overviewData.ts",
       "plan": ".workflows/plan/sean-gotrade-tracker/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T16:36:58+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-8JIM",
       "title": "Overview: P&L graph and holdings"
     },
     {
@@ -142,7 +142,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/sean-gotrade-tracker/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sean-gotrade-tracker",
-  "updated": "2026-10-07T16:33:46+00:00",
+  "updated": "2026-10-07T16:36:58+00:00",
   "verified_at": "2026-10-07T16:33:40+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sean-gotrade-tracker"
 }

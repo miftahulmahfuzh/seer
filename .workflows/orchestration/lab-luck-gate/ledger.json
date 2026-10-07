@@ -118,17 +118,17 @@
     },
     {
       "card": null,
-      "commit": "d2ee303778643d68951b7cabb7a0e91292aa4ae6",
+      "commit": "628686f",
       "depends_on": [
         4,
         8
       ],
       "difficulty": "NORMAL",
       "n": 7,
-      "note": "docs+web gate wording; derive.ts matches BOTH DSR>= and max DD<= by prefix (literal match would have rendered a missed luck check as a tick); snapshot gate gains dsrPolicy/dsrN/dsrNBasis, lab.json regenerated last; SKILL.md 15% guardrail + ROADMAP:75 rule line fixed per exit criterion; package_readme H2 line numbers were STALE after phase 4 -- classified by content, 6 rule lines moved to 20%, history left",
+      "note": "COMPLETE across two commits: d2ee303 (29 files, main) + 628686f (docs-only follow-up, engine/package_readme.md alone, 1 file). Verified: follow-up touched no other path and phase 5's 18 in-flight symbols in commands/lab.py remain untouched in the tree. Readme now documents phase 9's seed path/CLI, invariant 7 stated as mechanism not claim, chunk-invariance mechanism (plan.var_trials read once in seed_preflight, plan.todo re-read inside each chunk's write lock, --chunk defaults to dev.MAX_CANDIDATES 60), why a divergent trial is reported rather than raised here unlike phase 3's all-or-nothing check, why METRIC_TOL is absolute (6dp CSV bounds error at 5e-7; worst measured 4.986e-07), and D12's two DSRs side by side with only v.dsr a verdict and dsr_recorded_var explicitly never one. test_lab_gate_wording.py 13 passed; bar sweep finds no un-backticked stale bar. RESIDUAL RISK phase 7 recorded rather than papered over: all three pins against the label-mirror shape live in files phase 7 owns, so a future phase that changes a label and 'fixes' the tests by editing them would still get away with it -- noted in the plan's Risks section. The two instances differed in kind: phase 8's FAIL_ORDER produced wrong output visible to any reader; derive.ts produced wrong output that LOOKS RIGHT on the owner's own screen. The shared cause is matching a label whose own text carries a threshold.",
       "package": "docs` + `web",
       "plan": ".workflows/plan/lab-luck-gate/phase-7.md",
-      "reported_at": "2026-10-07T07:22:09+00:00",
+      "reported_at": "2026-10-07T07:24:56+00:00",
       "satisfies": [
         "R1"
       ],
@@ -178,7 +178,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-luck-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-luck-gate",
-  "updated": "2026-10-07T07:22:09+00:00",
+  "updated": "2026-10-07T07:24:56+00:00",
   "verified_at": "2026-10-07T03:59:26+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-luck-gate"
 }

@@ -125,6 +125,12 @@ export async function orderIdBySha(sha: string): Promise<number | null> {
   return rows.length > 0 ? Number(rows[0].id) : null;
 }
 
+/** The digest of the screenshot an order was read from; null when the order is gone. */
+export async function orderSha(id: number): Promise<string | null> {
+  const rows = await sql`SELECT image_sha256 FROM sean_orders WHERE id = ${id}`;
+  return rows.length > 0 && rows[0].image_sha256 ? String(rows[0].image_sha256) : null;
+}
+
 /**
  * Stores one read order. Both unique keys dedupe: the same picture (image_sha256) and the same
  * order seen in a different screenshot (symbol, side, executed_at, shares). On either conflict

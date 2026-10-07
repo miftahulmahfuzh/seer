@@ -63,7 +63,7 @@
 
 .head, .order {
   display: grid;
-  grid-template-columns: 170px minmax(130px, 0.9fr) minmax(200px, 1.4fr) 110px 150px 100px;
+  grid-template-columns: 170px minmax(130px, 0.9fr) minmax(200px, 1.4fr) 110px 150px 150px;
   align-items: center;
   gap: 16px;
 }
@@ -98,7 +98,23 @@
 .totalWord { font-size: 13px; color: var(--ink-3); }
 .profit { font-size: 13.5px; }
 
+.acts { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
 .del { position: relative; display: flex; justify-content: flex-end; }
+
+/* The original screenshot, full size, over a dimmed page. */
+.shot {
+  max-width: 100vw;
+  max-height: 100dvh;
+  width: auto;
+  padding: 56px 16px 16px;
+  border: 0;
+  background: transparent;
+  overflow: auto;
+}
+.shot::backdrop { background: rgb(0 0 0 / 0.72); }
+.shotClose { position: fixed; top: 12px; right: 12px; background: var(--sheet); color: var(--ink); }
+.shotImg { display: block; max-width: min(560px, calc(100vw - 32px)); height: auto; margin: 0 auto; border-radius: 16px; }
+.shotNote { display: flex; align-items: center; gap: 8px; margin: 0; padding: 14px 18px; border-radius: 16px; background: var(--sheet); color: var(--ink); font-size: 15px; }
 .delForm { display: flex; gap: 6px; }
 .confirm { border: 0; background: var(--coral); color: var(--on-coral); }
 .confirm:hover { background: var(--coral); filter: brightness(0.95); }
@@ -138,5 +154,5 @@
   .when { grid-area: when; }
   .fees { grid-area: fees; }
   .total { grid-area: total; }
-  .del { grid-area: del; align-self: end; }
+  .acts { grid-area: del; align-self: end; }
 }

@@ -5,6 +5,7 @@ import { orders } from '@/lib/sean/data';
 import { requireSean } from '@/lib/sean/gate';
 import { DeleteOrder } from './DeleteOrder';
 import { Uploader } from './Uploader';
+import { ViewReceipt } from './ViewReceipt';
 import { ORDERS_EMPTY, ORDERS_UNREADABLE, orderCount, orderItem, ordersCaption, type OrderItem } from './view';
 import s from './trades.module.css';
 
@@ -39,7 +40,10 @@ function OrderList({ items }: { items: OrderItem[] }) {
               <span className={s.totalWord}>{o.totalWord}</span>
               {o.profit && <span className={`${s.profit} ${o.profit.tone}`}>{o.profit.text}</span>}
             </span>
-            <DeleteOrder id={o.id} label={o.deleteLabel} confirmLabel={o.confirmLabel} />
+            <span className={s.acts}>
+              <ViewReceipt id={o.id} label={o.viewLabel} />
+              <DeleteOrder id={o.id} label={o.deleteLabel} confirmLabel={o.confirmLabel} />
+            </span>
           </li>
         ))}
       </ul>

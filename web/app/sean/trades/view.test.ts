@@ -61,6 +61,7 @@ describe('orderItem', () => {
       total: '$709.44',
       totalWord: 'paid',
       profit: null,
+      viewLabel: 'See the screenshot of the PLTR buy from Jun 10, 2025',
       deleteLabel: 'Delete the PLTR buy from Jun 10, 2025',
       confirmLabel: 'Yes, delete the PLTR buy from Jun 10, 2025',
     });
@@ -75,6 +76,7 @@ describe('orderItem', () => {
     expect(sale.totalWord).toBe('received');
     expect(sale.profit).toEqual({ text: '+$22.31 profit', tone: 'pos' });
     expect(sale.deleteLabel).toBe('Delete the PLTR sale from Oct 7, 2026');
+    expect(sale.viewLabel).toBe('See the screenshot of the PLTR sale from Oct 7, 2026');
   });
   it('says loss or broke even', () => {
     expect(orderItem({ ...PLTR_SELL, netProfitUsd: -1.5 }).profit).toEqual({ text: '−$1.50 loss', tone: 'neg' });

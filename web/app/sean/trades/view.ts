@@ -41,6 +41,7 @@ export type OrderItem = {
   totalWord: 'paid' | 'received';
   /** Gotrade's own profit figure on a sale; null on buys. */
   profit: { text: string; tone: 'pos' | 'neg' | '' } | null;
+  viewLabel: string;
   deleteLabel: string;
   confirmLabel: string;
 };
@@ -70,6 +71,7 @@ export function orderItem(r: OrderRow): OrderItem {
     total: dollars(r.totalUsd),
     totalWord: r.side === 'buy' ? 'paid' : 'received',
     profit,
+    viewLabel: `See the screenshot of ${orderName(r)}`,
     deleteLabel: `Delete ${orderName(r)}`,
     confirmLabel: `Yes, delete ${orderName(r)}`,
   };
@@ -96,6 +98,12 @@ export function ordersCaption(rows: OrderRow[]): string | undefined {
 
 export const ORDERS_EMPTY = 'No orders yet. Add your first Order Summary screenshot above.';
 export const ORDERS_UNREADABLE = "Your orders can't be read right now. Nothing is lost; try again in a moment.";
+
+/* ---- Screenshot ------------------------------------------------------------------------- */
+
+export const SCREENSHOT_LOADING = 'Opening the screenshot…';
+export const SCREENSHOT_MISSING = "This screenshot can't be shown right now. Try again in a moment.";
+export const SCREENSHOT_CLOSE = 'Close the screenshot';
 
 /* ---- Delete ----------------------------------------------------------------------------- */
 
@@ -133,6 +141,7 @@ export const SAY = {
   notSetUp: "Sean's reader isn't set up yet. Nothing was saved.",
   readerDown: "Sean's reader didn't answer in time. Nothing was saved; try this one again.",
   saveFailed: "The receipt was read but couldn't be saved. Try this one again.",
+  notKept: "Sean couldn't keep a copy of this screenshot, so nothing was saved. Try this one again.",
 } as const;
 
 export const WAITING = 'Waiting its turn.';

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { orderById, orderIdBySha, saveOrder } from '@/lib/sean/data';
 import { isSeanCaller } from '@/lib/sean/gate';
+import { archiveReceipt, receiptDepsFromEnv, type ArchiveOutcome } from '@/lib/sean/receipts';
 import { isReaderDown, readOrder, visionDeps, type ReadOrderOutcome } from '@/lib/sean/readOrder';
 import { visionConfigFromEnv } from '@/lib/sean/vision';
 import { parseUploadBody } from '@/app/sean/trades/upload';
@@ -20,8 +21,10 @@ const fail = (status: number, error: string) => Response.json({ error }, { statu
  * 201 {order} new; 200 {order, duplicate: true} same picture or same order already kept;
  * 400 malformed or damaged; 413 over 1.5 MB; 422 not a readable, filled receipt (Phase 1's
  * plain-words message); 502 the reader is missing, unreachable, timed out or did not see the
- * picture; 500 the save failed; 404 to anyone but the owner.
- * The picture itself is never stored: only its SHA-256, for dedupe (plan scope).
+ * picture, or its copy could not be kept; 500 the save failed; 404 to anyone but the owner.
+ * Every new picture is committed to the repo's sean-receipts branch (lib/sean/receipts.ts) while
+ * it is read -- refused ones too, so the trail holds everything the owner sent -- and an order is
+ * saved only once its screenshot is kept.
  */
 export async function POST(req: Request) {
   if (!(await isSeanCaller())) return new Response(null, { status: 404 });
@@ -50,9 +53,22 @@ export async function POST(req: Request) {
     return fail(500, SAY.saveFailed);
   }
 
+  // Runs beside the read and never rejects; every return below waits for it, so the commit is
+  // not cut off when the response ends the function.
+  const receiptDeps = receiptDepsFromEnv();
+  const keeping: Promise<ArchiveOutcome> = receiptDeps
+    ? archiveReceipt(receiptDeps, sha, upload.image)
+    : Promise.resolve({ ok: false, detail: 'GITHUB_DISPATCH_TOKEN is not set' });
+  const kept = async () => {
+    const k = await keeping;
+    if (!k.ok) console.error('sean: screenshot not kept', sha, k.detail);
+    return k.ok;
+  };
+
   const config = visionConfigFromEnv();
   if (!config) {
     console.error('sean: LLM_API_KEY, LLM_VISION_BASE_URL or LLM_VISION_MODEL is not set (or is the /api/anthropic URL)');
+    await kept();
     return fail(502, SAY.notSetUp);
   }
 
@@ -64,13 +80,17 @@ export async function POST(req: Request) {
     out = await readOrder(visionDeps(config), upload.image);
   } catch (e) {
     console.error('sean: read failed unexpectedly', e);
+    await kept();
     return fail(502, SAY.readerDown);
   }
   if (!out.ok) {
     // detail and issues are for the logs only; out.message is already plain words for the owner.
     console.warn('sean: receipt refused', out.code, out.detail ?? out.issues.join(' | '));
+    await kept();
     return fail(isReaderDown(out.code) ? 502 : 422, out.message);
   }
+
+  if (!(await kept())) return fail(502, SAY.notKept);
 
   try {
     const saved = await saveOrder(out.order, sha, out.raw);

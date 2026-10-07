@@ -15,6 +15,7 @@ import {
   SEEN_COPY, badgeTip, dayLabel, journalGroups, journalHref, kindCounts, parseKind, unseenCounts,
   type KindFilter,
 } from './view';
+import { JournalSeen } from './JournalSeen';
 import s from './journal.module.css';
 
 // The layout's title template renders this as "Journal · Sera".
@@ -65,6 +66,21 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
     })),
   ];
 
+  // The ids the server still calls unseen, per kind. This is all the client island needs to count
+  // the badges down, and it is one integer per unseen insight — 26 today — so lab.json's 0.89 MB
+  // of titles and markdown bodies still never reaches the browser. Derived straight from the
+  // snapshot and the seen-set, so the island takes no dependency on view.ts's partition shape.
+  const unseenByKind = Object.fromEntries(
+    INSIGHT_KINDS.map(k => [k, lab.insights.filter(i => i.kind === k && !seenIds.has(i.id)).map(i => i.id)]),
+  ) as Record<InsightKind, number[]>;
+
+  // The other two arguments badgeTip takes beside the live count, per tab. The island calls
+  // badgeTip itself, so the tooltip stays the same words as the server rendered — it just
+  // recomputes the number. Seven short strings and seven integers; nothing else crosses.
+  const badgeMeta = Object.fromEntries(
+    options.map(o => [o.id, { heading: o.heading, total: o.total }]),
+  ) as Record<KindFilter, { heading: string; total: number }>;
+
   return (
     <>
       <PageHeader
@@ -82,7 +98,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
                 <Link key={id} href={journalHref(id)} replace scroll={false} className={`icon-btn md ${s.segBtn}`}
                   data-tip={tip} aria-label={tip} aria-current={on ? 'true' : undefined}>
                   <Icon size={19} strokeWidth={on ? 2 : 1.5} />
-                  <span className={`${s.badge} ${n === 0 ? s.zero : ''}`} aria-hidden="true">{n}</span>
+                  <span className={`${s.badge} ${n === 0 ? s.zero : ''}`} data-badge-kind={id} aria-hidden="true">{n}</span>
                 </Link>
               );
             })}
@@ -119,6 +135,8 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
             </Section>
           );
         })}
+
+        <JournalSeen unseenByKind={unseenByKind} badgeMeta={badgeMeta} zeroClass={s.zero} />
       </div>
     </>
   );

@@ -1,0 +1,147 @@
+{
+  "branch": "feature/sean-gotrade-tracker",
+  "coordinator": "orch-sean-gotrade-tracker",
+  "coordinator_session_id": "e1aa2f0f-7750-4bdc-8239-4e47bfbf4ae1",
+  "created": "2026-10-07T16:18:43+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "db/migrations`, `web/lib/sean",
+      "plan": ".workflows/plan/sean-gotrade-tracker/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Sean core: schema, screenshot reader, ledger"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "web/app/sean`, `web/components`, `web/app/api/sean`, `web/lib/sean",
+      "plan": ".workflows/plan/sean-gotrade-tracker/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Sean section, Sean buttons (rail + phone header), Trades upload"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "web/app/sean`, `web/lib/sean/overviewData.ts",
+      "plan": ".workflows/plan/sean-gotrade-tracker/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Overview: P&L graph and holdings"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 4,
+      "note": null,
+      "package": "engine/src/seer_engine/sean`, `.github/workflows",
+      "plan": ".workflows/plan/sean-gotrade-tracker/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Engine: marks and the daily P&L series"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2
+      ],
+      "difficulty": "HARD",
+      "n": 5,
+      "note": null,
+      "package": "web/app/sean/plan`, `web/lib/sean`, `web/components",
+      "plan": ".workflows/plan/sean-gotrade-tracker/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Plan: link a roster method, buy/sell reminders"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 6,
+      "note": null,
+      "package": "engine/src/seer_engine/sim`, `backtest",
+      "plan": ".workflows/plan/sean-gotrade-tracker/phase-6.md",
+      "reported_at": null,
+      "satisfies": [
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Engine: Gotrade fee schedule as a cost-model lever"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        4,
+        6
+      ],
+      "difficulty": "NORMAL",
+      "n": 7,
+      "note": null,
+      "package": "engine/src/seer_engine/lab`, `sean`, `sim/rules.py`, `.claude/skills`, `docs`, `web/lib/cadence.ts",
+      "plan": ".workflows/plan/sean-gotrade-tracker/phase-7.md",
+      "reported_at": null,
+      "satisfies": [
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Lab: calibrate from real orders, measure methods at real cost"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/sean-gotrade-tracker/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "sean-gotrade-tracker",
+  "updated": "2026-10-07T16:18:43+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/sean-gotrade-tracker"
+}

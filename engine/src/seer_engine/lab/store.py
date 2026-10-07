@@ -537,15 +537,22 @@ def update_method(conn: sqlite3.Connection, method_id: str, **values: Any) -> No
 
 
 def append_analysis(conn: sqlite3.Connection, method_id: str, text: str) -> None:
-    """Append a dated section to a method's analysis (never rewrites what is there)."""
+    """Append a dated section to a method's analysis (never rewrites what is there).
+
+    The author's own ``### <today>`` opening line counts as the section head. A note written
+    that way used to land under a second, identical heading, and the site then showed the date
+    twice; the analysis is append-only, so the duplicate could never be taken back out.
+    """
     row = get_method(conn, method_id)
     if row is None:
         raise LabError(f"no method {method_id}")
     text = text.strip()
     if not text:
         raise LabError("empty analysis")
-    head = f"### {date.today().isoformat()}\n\n"
-    new = (row["analysis"] + "\n\n" if row["analysis"] else "") + head + text + "\n"
+    head = f"### {date.today().isoformat()}"
+    if text != head and not text.startswith(head + "\n"):
+        text = head + "\n\n" + text
+    new = (row["analysis"] + "\n\n" if row["analysis"] else "") + text + "\n"
     conn.execute(
         "UPDATE methods SET analysis = ?, updated = ? WHERE id = ?", (new, now_iso(), method_id)
     )

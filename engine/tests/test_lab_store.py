@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import replace
+from datetime import date
 
 import pytest
 
@@ -161,6 +162,20 @@ def test_a_new_method_starts_as_an_idea_or_registered(conn):
                          hypothesis="h", status="dev-eligible")
     with pytest.raises(sqlite3.IntegrityError):
         store.add_method(conn, id="X1", name="n", family="f", source_kind="knowledge", hypothesis="h")
+
+
+def test_append_analysis_does_not_double_the_authors_own_date_heading(conn):
+    today = date.today().isoformat()
+    _method(conn)
+    with conn:
+        store.append_analysis(conn, "M0001", f"### {today}\n\nthe note")
+        store.append_analysis(conn, "M0001", "a note with no heading of its own")
+        store.append_analysis(conn, "M0001", "### 2020-01-01\n\nsomeone else's date")
+    text = store.get_method(conn, "M0001")["analysis"]
+    assert f"### {today}\n\n### {today}" not in text
+    assert text.count(f"### {today}") == 3  # one head per append, never two
+    assert text.startswith(f"### {today}\n\nthe note")
+    assert f"### {today}\n\n### 2020-01-01" in text  # a stale date is headed, not trusted
 
 
 def test_analysis_grows_and_hypothesis_freezes(conn):

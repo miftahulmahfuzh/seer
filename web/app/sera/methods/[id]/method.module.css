@@ -14,7 +14,7 @@
 .twoUp { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .textSheet, .chartSheet, .proseSheet { gap: 14px; }
 
-.body { font-size: 17px; line-height: 1.55; max-width: 72ch; }
+.body { font-size: 17px; line-height: 1.55; }
 .cite { font-size: 14px; line-height: 1.4; color: var(--ink-2); }
 .muted { font-size: 16px; color: var(--ink-2); }
 
@@ -57,7 +57,7 @@
 
 /* Markdown prose (escape-first HTML from lib/sera/markdown; headings arrive as h3/h4/h5) */
 .proseSheet { gap: 16px; }
-.prose { font-size: 16px; line-height: 1.6; color: var(--ink); max-width: 78ch; }
+.prose { min-width: 0; font-size: 16px; line-height: 1.6; color: var(--ink); }
 .prose > * + * { margin-top: 0.85em; }
 .prose h3, .prose h4, .prose h5 { margin: 1.4em 0 0.4em; font-weight: 500; letter-spacing: -0.01em; line-height: 1.25; }
 .prose h3 { font-size: 21px; }
@@ -75,8 +75,9 @@
 }
 .prose ul, .prose ol { margin: 0; padding-left: 1.3em; }
 .prose li + li { margin-top: 0.3em; }
+.prose [data-md-table] { overflow-x: auto; }
 .prose table {
-  display: block; overflow-x: auto; max-width: 100%; border-collapse: collapse;
+  width: 100%; border-collapse: collapse;
   font-size: 14px; font-variant-numeric: tabular-nums;
 }
 .prose th, .prose td { padding: 7px 10px; border-bottom: 1px solid var(--hair); text-align: left; white-space: nowrap; }

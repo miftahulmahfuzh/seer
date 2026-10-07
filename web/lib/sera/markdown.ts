@@ -4,7 +4,8 @@
  * Supported: # / ## / ### headings (rendered h3 / h4 / h5 so the page keeps h1–h2), paragraphs,
  * **bold**, *italic*, `code`, "- " and "1. " lists, pipe tables with a header separator, and
  * [text](http(s) url) links. Nothing else. All source text is HTML-escaped before any markup is
- * added, so raw HTML in the source always renders as text.
+ * added, so raw HTML in the source always renders as text. Tables come wrapped in a
+ * `<div data-md-table>` the stylesheets hang the sideways scroll on.
  */
 
 const ESCAPES: Record<string, string> = {
@@ -134,7 +135,13 @@ export function renderMarkdown(src: string): string {
       i = j - 1;
       const row = (r: string[], tag: 'th' | 'td') =>
         `<tr>${head.map((_, c) => cell(tag, r[c] ?? '', al[c] ?? null)).join('')}</tr>`;
-      b.out.push(`<table><thead>${row(head, 'th')}</thead><tbody>${body.map((r) => row(r, 'td')).join('')}</tbody></table>`);
+      // The scroll wrapper, not the table, carries the overflow: the table itself stays a real
+      // table so it fills its sheet, and only a table too wide for the sheet scrolls sideways.
+      b.out.push(
+        `<div data-md-table><table><thead>${row(head, 'th')}</thead><tbody>${body
+          .map((r) => row(r, 'td'))
+          .join('')}</tbody></table></div>`,
+      );
       continue;
     }
     const ul = UL.exec(line);
@@ -157,4 +164,28 @@ export function renderMarkdown(src: string): string {
   }
   b.flush();
   return b.out.join('\n');
+}
+
+/**
+ * Drop a heading that is immediately followed by an identical heading.
+ *
+ * A method's `analysis` is an append-only log: `lab note` heads every appended section with
+ * `### <today>`, and a note whose own text already opened with that date left two identical
+ * headings in a row. The engine no longer writes that (`store.append_analysis`), but the rows
+ * that already carry it cannot be rewritten -- the `methods_analysis_grows` trigger permits only
+ * growth -- so the duplicate is dropped on the way to the page instead. Only an *adjacent*
+ * repeat goes: a date that heads two genuinely separate sections is kept, both times.
+ */
+export function collapseRepeatedHeadings(src: string): string {
+  const lines = src.replace(/\r\n?/g, '\n').split('\n');
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (HEADING.test(lines[i])) {
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim() === '') j++;
+      if (j < lines.length && lines[j].trim() === lines[i].trim()) continue; // the next one says it
+    }
+    out.push(lines[i]);
+  }
+  return out.join('\n');
 }

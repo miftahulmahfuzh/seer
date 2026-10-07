@@ -27,7 +27,8 @@
 .body :global(code) { font-size: 0.92em; padding: 1px 6px; border-radius: 6px; background: var(--chip); }
 .body :global(a) { text-decoration: underline; text-underline-offset: 3px; }
 .body :global(h3), .body :global(h4), .body :global(h5) { margin: 12px 0 6px; font-size: 16px; font-weight: 500; }
-.body :global(table) { border-collapse: collapse; font-size: 14px; margin: 0 0 10px; }
+.body :global([data-md-table]) { overflow-x: auto; margin: 0 0 10px; }
+.body :global(table) { width: 100%; border-collapse: collapse; font-size: 14px; }
 .body :global(th), .body :global(td) { padding: 6px 12px 6px 0; border-bottom: 1px solid var(--hair); text-align: left; font-weight: 400; }
 
 .cardFoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px; }

@@ -15,7 +15,7 @@ import { bestVariant, CONDITION_KEYS, CONDITION_LABEL, drawdownSeries, spyForWin
 import { requireSera } from '@/lib/sera/gate';
 import { GLOSSARY, type GlossaryKey, INSIGHT_KIND_LABEL, SOURCE_KIND_LABEL, STATUS_LABEL } from '@/lib/sera/glossary';
 import { childrenOf, insightsOf, lab, methodById, trialsOf } from '@/lib/sera/lab';
-import { renderMarkdown } from '@/lib/sera/markdown';
+import { collapseRepeatedHeadings, renderMarkdown } from '@/lib/sera/markdown';
 import type { LabMethod, LabTrial } from '@/lib/sera/types';
 import {
   BEST_COLOR, conditionTip, count, fixed, growthFmt, growthLines, hurdlePoints, longDate, markLabel, marks, pct1,
@@ -128,7 +128,10 @@ export default async function MethodPage({ params }: { params: Promise<Params> }
         <Section eyebrow="Analysis" title="Sera's analysis and opinion" caption="Sera's own reading of the result: what happened, why, and what to try next." className={s.proseSheet}>
           {m.analysis.trim() ? (
             // Escape-first rendering (lib/sera/markdown): all text is HTML-escaped before markup is added.
-            <div className={s.prose} dangerouslySetInnerHTML={{ __html: renderMarkdown(m.analysis) }} />
+            // collapseRepeatedHeadings drops the doubled date heading older `lab note` runs left at
+            // the top of the log; the stored analysis keeps it, being append-only.
+            <div className={s.prose}
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(collapseRepeatedHeadings(m.analysis)) }} />
           ) : (
             <p className={s.muted}>
               {m.historical

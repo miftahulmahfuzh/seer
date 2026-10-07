@@ -17,7 +17,8 @@
 .prose strong { font-weight: 500; }
 .prose code { font-size: 15px; padding: 1px 6px; border-radius: 8px; background: var(--stone); }
 .prose a { text-decoration: underline; text-decoration-color: var(--outline); text-underline-offset: 3px; }
-.prose table { width: 100%; border-collapse: collapse; font-size: 15px; margin: 6px 0 10px; }
+.prose [data-md-table] { overflow-x: auto; margin: 6px 0 10px; }
+.prose table { width: 100%; border-collapse: collapse; font-size: 15px; }
 .prose th, .prose td { padding: 6px 8px 6px 0; text-align: left; border-bottom: 1px solid var(--hair); font-weight: 400; }
 .prose th { color: var(--ink-2); font-size: 13px; }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, renderInline, renderMarkdown } from './markdown';
+import { collapseRepeatedHeadings, escapeHtml, renderInline, renderMarkdown } from './markdown';
 
 describe('escaping', () => {
   it('never passes raw HTML through', () => {
@@ -50,20 +50,43 @@ describe('blocks', () => {
   it('renders pipe tables with alignment and inline markup', () => {
     const md = '| Variant | CAGR |\n|---|---:|\n| V1 | 7.6% |\n| V2 | **8%** |';
     expect(renderMarkdown(md)).toBe(
-      '<table><thead><tr><th>Variant</th><th style="text-align:right">CAGR</th></tr></thead>' +
+      '<div data-md-table><table><thead><tr><th>Variant</th><th style="text-align:right">CAGR</th></tr></thead>' +
         '<tbody><tr><td>V1</td><td style="text-align:right">7.6%</td></tr>' +
-        '<tr><td>V2</td><td style="text-align:right"><strong>8%</strong></td></tr></tbody></table>',
+        '<tr><td>V2</td><td style="text-align:right"><strong>8%</strong></td></tr></tbody></table></div>',
     );
   });
 
   it('pads short rows, ends a table at a blank line, and leaves a lone pipe as text', () => {
     expect(renderMarkdown('| a | b |\n| --- | --- |\n| 1 |\n\nnext')).toBe(
-      '<table><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td>1</td><td></td></tr></tbody></table>\n<p>next</p>',
+      '<div data-md-table><table><thead><tr><th>a</th><th>b</th></tr></thead>' +
+        '<tbody><tr><td>1</td><td></td></tr></tbody></table></div>\n<p>next</p>',
     );
     expect(renderMarkdown('a | b')).toBe('<p>a | b</p>');
   });
 
   it('escapes table cells', () => {
     expect(renderMarkdown('| <i>x</i> |\n|---|\n| y |')).toContain('<th>&lt;i&gt;x&lt;/i&gt;</th>');
+  });
+});
+
+describe('collapseRepeatedHeadings', () => {
+  it('drops a heading immediately repeated, however many blank lines apart', () => {
+    expect(collapseRepeatedHeadings('### 2026-10-06\n\n### 2026-10-06\n\nbody')).toBe(
+      '\n### 2026-10-06\n\nbody',
+    );
+    expect(renderMarkdown(collapseRepeatedHeadings('### 2026-10-06\n\n### 2026-10-06\n\nbody'))).toBe(
+      '<h5>2026-10-06</h5>\n<p>body</p>',
+    );
+  });
+
+  it('keeps a date that heads two genuinely separate sections', () => {
+    const src = '### 2026-10-07\n\nfirst\n\n### 2026-10-07\n\n# Promotion\n\nsecond';
+    expect(collapseRepeatedHeadings(src)).toBe(src);
+  });
+
+  it('leaves text that merely repeats a heading, and headings of different levels', () => {
+    expect(collapseRepeatedHeadings('### x\n\nx')).toBe('### x\n\nx');
+    expect(collapseRepeatedHeadings('## x\n\n### x')).toBe('## x\n\n### x');
+    expect(collapseRepeatedHeadings('plain text')).toBe('plain text');
   });
 });

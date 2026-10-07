@@ -20,5 +20,22 @@ import { pct } from './format';
 
 export const MAX_DRAWDOWN = 0.2;
 
+/**
+ * Go-live condition #1 (design §1, §13): months of forward paper before a real-money decision.
+ *
+ * The TypeScript twin of `backtest.metrics.MIN_PAPER_MONTHS`, re-exported there as
+ * `tuning.MIN_PAPER_MONTHS`. Unlike `MAX_DRAWDOWN` this one has no carrier in `data/lab.json`'s
+ * gate -- the lab snapshot describes the LAB's bars, and months of forward paper is not one of
+ * them -- so the two sides are kept together by `golive.test.ts` pinning the label and by the
+ * engine/web checklist parity test, not by a shared value. Moving it means moving both.
+ *
+ * Set by the owner on 2026-10-07, replacing "≥ 3 months AND ≥ 100 closed trades": a trade count
+ * scales with how many names a book holds, not with how much evidence exists.
+ */
+export const MIN_PAPER_MONTHS = 18;
+
+/** Built from the threshold so the label can never name a number the comparison does not use. */
+export const MIN_PAPER_MONTHS_LABEL = `≥ ${MIN_PAPER_MONTHS} months forward`;
+
 /** Built from the threshold so the label can never name a number the comparison does not use. */
 export const MAX_DRAWDOWN_LABEL = `Max drawdown ≤ ${pct(MAX_DRAWDOWN, 0)}`;

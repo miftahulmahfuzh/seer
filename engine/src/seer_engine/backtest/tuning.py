@@ -21,6 +21,7 @@ from seer_engine.backtest.metrics import (
     checklist,
     fmt_pct,
     fmt_signed_pct,
+    gate_checks,
     to_fixed,
 )
 from seer_engine.strategies.a import DESIGN_PARAMS, AParams
@@ -38,6 +39,10 @@ GRID_SL: tuple[Decimal, ...] = (Decimal("1.0"), Decimal("1.5"), Decimal("2.0"))
 # goes through this name; the value lives in ``metrics.MAX_DRAWDOWN``. Raised 0.15 -> 0.20 by the
 # owner on 2026-10-07; design §11.
 MAX_DRAWDOWN = _metrics.MAX_DRAWDOWN
+# go-live #1, re-exported for the same reason. Replaced ">= 100 closed trades" by the owner
+# on 2026-10-07; design §13. NOTE this is the FORWARD-paper bar: the dev-window gate keeps its
+# own trades condition (``dev._MIN_TRADES``), and the asymmetry is intentional.
+MIN_PAPER_MONTHS = _metrics.MIN_PAPER_MONTHS
 MIN_PROFIT_FACTOR = 1.3  # go-live #3; equals the threshold in metrics.checklist
 
 _GATE_NAMES = ("beating total-return SPY", "profit factor ≥ 1.3", MAX_DRAWDOWN_LABEL.lower())
@@ -141,7 +146,7 @@ def gate(oos: Metrics, spy_tr_oos: Metrics) -> Verdict:
     ``MIN_PROFIT_FACTOR`` and max drawdown ≤ ``MAX_DRAWDOWN``. The checks are ``checklist``
     items 3–5, so the labels and value strings match the web.
     """
-    beats, pf, dd = checklist(oos, spy_tr_oos.total_return)[2:5]
+    beats, pf, dd = gate_checks(oos, spy_tr_oos.total_return)
     checks = (beats, pf, dd)
     passed = beats.ok and pf.ok and dd.ok
     said = (

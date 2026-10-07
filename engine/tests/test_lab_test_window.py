@@ -394,7 +394,7 @@ def test_the_promote_command_is_printed_filled_in(conn, monkeypatch, prereg_ok, 
     note = lab_cmd._gate_note(conn, tested)
     assert "Passed the quant backtest gate" in note
     assert "one pre-registered look" in note
-    assert "100 closed paper trades" in note  # it still says what has not happened
+    assert "18 months of forward paper" in note  # it still says what has not happened
 
     argv = lab_cmd._promote_argv(promoted, tested, roster_id="SMA", gate_note=note,
                                  lab_db=tmp_path / "lab.sqlite")

@@ -83,7 +83,11 @@ FAILURE_LABELS: tuple[str, ...] = (
     "owner inputs",
 )
 
-_MIN_TRADES = 100  # design §1 go-live item 2
+# The DEV-WINDOW trades bar, and deliberately NOT design §1 item 1 any more: the owner deleted
+# item 1's trades clause on 2026-10-07 (design §13) and left this one standing, because a
+# profit factor computed from 11 trades is not a measurement. The asymmetry is intentional
+# and dated; see §13 for the measurement behind it. Not yours to "tidy".
+_MIN_TRADES = 100
 _MAX_FINALISTS = 3  # handover D8
 _EULER_GAMMA = 0.5772156649  # Euler-Mascheroni, as Bailey & López de Prado state it
 _ID = re.compile(r"[A-Z0-9]+(-[A-Z0-9]+)*")

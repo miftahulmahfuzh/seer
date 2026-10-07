@@ -109,18 +109,19 @@ BASE = Metrics(total_return=0.068, win_rate=0.58, profit_factor=1.42, max_drawdo
 
 
 def test_parity_checklist_passes_only_when_every_rule_holds():
+    # BASE is 3 months, which no longer passes item 1: design §13 raised it to 18 and deleted the
+    # trades clause, so trade count cannot make or break a row here any more.
     items = checklist(BASE, 0.046)
-    assert [i.ok for i in items] == [True, False, True, True, True]
-    assert items[1].val == "84 / 100"
-    assert all(i.ok for i in checklist(Metrics(**{**BASE.__dict__, "trades": 120}), 0.046))
-    assert checklist(Metrics(**{**BASE.__dict__, "max_drawdown": 0.21, "trades": 120}), 0.046)[4].ok is False
+    assert [i.ok for i in items] == [False, True, True, True]
+    assert items[0].val == "3.0 mo"
+    assert all(i.ok for i in checklist(Metrics(**{**BASE.__dict__, "months": 18.0}), 0.046))
+    assert checklist(Metrics(**{**BASE.__dict__, "max_drawdown": 0.21, "months": 18.0}), 0.046)[3].ok is False
 
 
 def test_parity_checklist_labels_and_values_match_the_web_strings():
     items = checklist(BASE, 0.046)
     assert [(i.label, i.val) for i in items] == [
-        ("≥ 3 months forward", "3.0 mo"),
-        ("≥ 100 trades", "84 / 100"),
+        ("≥ 18 months forward", "3.0 mo"),
         ("Beats SPY", "+6.8 vs +4.6"),
         ("Profit factor ≥ 1.3", "1.42"),
         ("Max drawdown ≤ 20%", "7.9%"),
@@ -131,21 +132,21 @@ def test_checklist_edge_strings():
     m = Metrics(total_return=-0.0123, win_rate=None, profit_factor=None, max_drawdown=None, trades=0, months=91 / 30.44)
     items = checklist(m, None)
     assert items[0].val == "2.9 mo" and items[0].ok is False  # floor to 0.1, like the web
+    assert items[1].val == DASH and items[1].ok is False
     assert items[2].val == DASH and items[2].ok is False
     assert items[3].val == DASH and items[3].ok is False
-    assert items[4].val == DASH and items[4].ok is False
-    assert checklist(m, 0.0)[2].val == f"{MINUS}1.2 vs +0.0"
+    assert checklist(m, 0.0)[1].val == f"{MINUS}1.2 vs +0.0"
     inf = Metrics(total_return=0.2, win_rate=1.0, profit_factor=math.inf, max_drawdown=0.20, trades=1, months=1.0)
     items = checklist(inf, 0.2)
-    assert items[3].val == INFINITY and items[3].ok is True
-    assert items[4].val == "20.0%" and items[4].ok is True  # ≤ is inclusive
-    assert items[2].ok is False  # beats SPY is strict
-    assert checklist(Metrics(**{**inf.__dict__, "profit_factor": 1.3}), 0.1)[3].ok is True
+    assert items[2].val == INFINITY and items[2].ok is True
+    assert items[3].val == "20.0%" and items[3].ok is True  # ≤ is inclusive
+    assert items[1].ok is False  # beats SPY is strict
+    assert checklist(Metrics(**{**inf.__dict__, "profit_factor": 1.3}), 0.1)[2].ok is True
 
 
 def test_checklist_total_return_none_counts_as_zero_in_the_value_but_never_beats():
     m = Metrics(total_return=None, win_rate=None, profit_factor=None, max_drawdown=None, trades=0, months=0.0)
-    item = checklist(m, -0.5)[2]
+    item = checklist(m, -0.5)[1]
     assert item.val == f"+0.0 vs {MINUS}50.0"
     assert item.ok is False
 

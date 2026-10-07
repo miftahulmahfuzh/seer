@@ -14,7 +14,7 @@ paper before real money (20,000,000 IDR) is risked.
 - Benchmark: SPY buy-and-hold over the same period, net of costs.
 - A strategy may trade real money only when **all** of these hold (fixed; moved only by a dated
   owner revision — see §11):
-  1. ≥ 3 months of forward paper trading **and** ≥ 100 closed trades
+  1. ≥ 18 months of forward paper trading  *(revised 2026-10-07; was "≥ 3 months … and ≥ 100 closed trades" — see §13)*
   2. Total return beats SPY buy-and-hold over the same forward period
   3. Profit factor ≥ 1.3
   4. Max drawdown ≤ 20%  *(revised 2026-10-07; was 15% — see §11)*
@@ -148,6 +148,9 @@ extended-hours trading.
   is a real-money safety setting and shown what it touches.
 - **What it does not change.** Conditions 1, 2, 3 and 5 are untouched. The no-real-money rule
   stands: nothing trades real money without ≥ 3 months of forward paper and ≥ 100 closed trades.
+  *(That sentence was true when written. Item 1 itself was replaced later the same day — see
+  §13 — and the bar is now ≥ 18 months of forward paper, counting no trades. The original is
+  left standing because §11 is a dated record, not a live statement of the rules.)*
   The development/test window split, the one-look test-window rule and the lab's luck check are
   separate mechanisms and are not affected by this item.
 - **Where it is implemented.** `backtest.metrics.MAX_DRAWDOWN`, re-exported as
@@ -225,3 +228,57 @@ find the damage a paid feed would repair; such a feed costs money monthly; and r
 recorded trials and their DSRs. Revisit when a decision actually hinges on it. The standing answer
 to this worry is forward paper trading, which cannot be flattered by survivors because the
 survivors are not yet known.
+
+## 13. Revision 2026-10-07 (owner): go-live item 1 is 18 months, and counts no trades
+
+- **Go-live condition #1 is now "≥ 18 months of forward paper trading."** The original sentence,
+  preserved: *"1. ≥ 3 months of forward paper trading **and** ≥ 100 closed trades"*.
+- **Who and why.** The owner, on the unit being wrong: *"how about we just remove this >= 100
+  trades because what we pursue here is not trading frequency."* That is right about the unit. A
+  closed-trade count scales with **how many names a strategy holds**, not with how much evidence
+  exists: a 20-name book produces ~80 trades a year mechanically, while `F1-SPY-SMA200-M` produced
+  **11 trades in 22 dev-window years**, so 100 was roughly two centuries away for it. The rule
+  punished a strategy for being concentrated, which says nothing about whether it works.
+- **Why the clause was replaced rather than deleted.** The clause's *purpose* was sample size, and
+  deleting it outright would have left "≥ 3 months", which is a coin flip. Measured from the
+  recorded dev curves — share of rolling windows in which each roster entry actually beat
+  total-return SPY:
+
+  | entry | 3mo | 6mo | 12mo | 18mo | 24mo | 36mo |
+  |---|---|---|---|---|---|---|
+  | RMW-FR | 54% | 59% | 55% | 60% | 65% | 73% |
+  | RAW-FR | 59% | 62% | 65% | 72% | 70% | 78% |
+  | MOM-FR | 50% | 53% | 54% | 59% | 58% | 65% |
+  | MVW-FR | 51% | 55% | 53% | 54% | 57% | 65% |
+
+  These are strategies that clearly beat SPY over twenty years. At three months they are
+  indistinguishable from a coin. The risk claim does **not** settle faster, which was checked
+  rather than assumed: "fell less than SPY" runs 49–58% at three months and 55–69% at twelve;
+  "better Sharpe than SPY" runs 47–52% and 46–59%.
+- **Why 18.** The deleted bar already put the four quant entries at 14.9 to 20.7 months
+  (80.3, 80.7, 58.0 and 61.8 trades a year). 18 months is the engine-neutral statement of where
+  that bar already stood, so this changes almost nothing for the current roster while making an
+  index-timing strategy admissible in principle rather than in two centuries.
+- **What it does not change.** Conditions 2, 3, 4 and 5 are untouched. The no-real-money rule
+  stands. **`backtest.dev._MIN_TRADES` (100) is deliberately NOT changed**: that is the
+  *dev-window* gate under item 5's "identical rules", a different application of the same number.
+  Dropping it too was measured and rejected for now — it would newly pass exactly 2 of the lab's
+  110 trials, `F1-SPY-SMA200-M` and `F1-SPY-10MSMA-M`, at profit factors of 75.45 and 14.48 off 11
+  and 13 trades. A profit factor computed from 11 trades is not a measurement, so dropping the dev
+  bar would move the sample-size problem out of condition 1 and into condition 3. **Item 1 now has
+  no trades clause while `dev.py` still does; that asymmetry is intentional and dated, not drift.**
+  Note also that keeping it currently costs nothing: both those trials are P7a seed rows with
+  `dsr IS NULL`, and under method-lab design §7.1 a luck test that cannot be evaluated is one that
+  was not passed — so each already fails on `DSR >= 0.90` whatever the trades bar does, and
+  dropping it would change **zero** eligibility verdicts today. The bar is not load-bearing for
+  them; it binds future trials that do carry a DSR, which is exactly where the sample-size
+  argument has force.
+- **Where it is implemented.** `backtest.metrics.MIN_PAPER_MONTHS`, re-exported as
+  `backtest.tuning.MIN_PAPER_MONTHS`, is the one Python definition; `web/lib/golive.ts` is the one
+  TypeScript definition. The go-live checklist drops from six items to five.
+- **The honest limit of the new bar.** 18 months is not confidence, it is the point where the
+  verdict stops being a coin flip. Even 36 months only reaches 65–78% on return. **No claim about
+  these strategies is reliably checkable on any practical forward window**, which means the five
+  conditions are weaker evidence than their phrasing suggests, and the lab's dev-window work and
+  its luck test carry more of the real weight than §1 implies. That is worth knowing before anyone
+  reads a passing checklist as proof.

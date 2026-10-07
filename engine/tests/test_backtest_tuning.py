@@ -70,10 +70,10 @@ def test_grid_values_are_the_handover_values():
 def test_thresholds_equal_the_web_checklist():
     edge = Metrics(total_return=0.1, win_rate=0.5, profit_factor=MIN_PROFIT_FACTOR, max_drawdown=MAX_DRAWDOWN, trades=1, months=1.0)
     items = checklist(edge, 0.0)
-    assert items[3].ok and items[4].ok
+    assert items[2].ok and items[3].ok
     below = Metrics(total_return=0.1, win_rate=0.5, profit_factor=math.nextafter(MIN_PROFIT_FACTOR, 0), max_drawdown=math.nextafter(MAX_DRAWDOWN, 1), trades=1, months=1.0)
     items = checklist(below, 0.0)
-    assert not items[3].ok and not items[4].ok
+    assert not items[2].ok and not items[3].ok
     assert qualifies(edge) and not qualifies(below)
 
 

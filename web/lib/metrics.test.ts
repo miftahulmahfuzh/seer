@@ -37,40 +37,51 @@ describe('strategyMetrics', () => {
 describe('checklist', () => {
   const base = { totalReturn: 0.068, winRate: 0.58, profitFactor: 1.42, maxDrawdown: 0.079, trades: 84, months: 3.0 };
 
-  it('keeps the five forward-test rules unchanged', () => {
+  // `base` is 3 months, which no longer passes item 1: design §13 (2026-10-07) raised it to 18
+  // and DELETED the trades clause, so `trades` can no longer make or break any row here.
+  it('keeps the four forward-test rules unchanged', () => {
     const items = checklist(base, 0.046, PASSED);
-    expect(items.slice(0, 5).map(i => i.ok)).toEqual([true, false, true, true, true]);
-    expect(items[1].val).toBe('84 / 100');
-    expect(checklist({ ...base, maxDrawdown: 0.21, trades: 120 }, 0.046, PASSED)[4].ok).toBe(false);
+    expect(items.slice(0, 4).map(i => i.ok)).toEqual([false, true, true, true]);
+    expect(items[0].label).toBe('≥ 18 months forward');
+    expect(items[0].val).toBe('3.0 mo');
+    expect(checklist({ ...base, maxDrawdown: 0.21, months: 18 }, 0.046, PASSED)[3].ok).toBe(false);
   });
 
-  it('adds the backtest gate as a sixth rule', () => {
+  it('counts no trades at all, whatever the trade count is', () => {
+    const many = checklist({ ...base, months: 18, trades: 5000 }, 0.046, PASSED);
+    const few = checklist({ ...base, months: 18, trades: 1 }, 0.046, PASSED);
+    expect(many).toEqual(few);
+    expect(many.every(i => i.ok)).toBe(true);
+    expect(many.some(i => i.label.includes('trades'))).toBe(false);
+  });
+
+  it('adds the backtest gate as a fifth rule', () => {
     const items = checklist(base, 0.046, FAILED);
-    expect(items).toHaveLength(6);
-    expect(items[5]).toEqual({ label: 'Backtest gate passed', val: 'Not passed', ok: false, note: FAILED.note });
-    expect(checklist(base, 0.046, PASSED)[5]).toEqual({ label: 'Backtest gate passed', val: 'Passed', ok: true });
+    expect(items).toHaveLength(5);
+    expect(items[4]).toEqual({ label: 'Backtest gate passed', val: 'Not passed', ok: false, note: FAILED.note });
+    expect(checklist(base, 0.046, PASSED)[4]).toEqual({ label: 'Backtest gate passed', val: 'Passed', ok: true });
   });
 
   it('reads "Not applicable" for C and never counts it as passed (handover D9)', () => {
     const items = checklist(base, 0.046, NOT_APPLICABLE);
-    expect(items).toHaveLength(6);
-    expect(items[5]).toEqual({ label: 'Backtest gate', val: 'Not applicable', ok: false, note: NOT_APPLICABLE.note });
-    // Even every forward metric passing leaves C at five of six.
-    const allForward = checklist({ ...base, trades: 120 }, 0.046, NOT_APPLICABLE);
-    expect(allForward.filter(i => i.ok)).toHaveLength(5);
+    expect(items).toHaveLength(5);
+    expect(items[4]).toEqual({ label: 'Backtest gate', val: 'Not applicable', ok: false, note: NOT_APPLICABLE.note });
+    // Even every forward metric passing leaves C at four of five.
+    const allForward = checklist({ ...base, months: 18 }, 0.046, NOT_APPLICABLE);
+    expect(allForward.filter(i => i.ok)).toHaveLength(4);
     expect(allForward.every(i => i.ok)).toBe(false);
   });
 
-  it('builds the sixth rule on its own', () => {
+  it('builds the fifth rule on its own', () => {
     expect(gateItem({ passed: false, applicable: false, note: null })).toEqual({ label: 'Backtest gate', val: 'Not applicable', ok: false });
     expect(gateItem(PASSED)).toEqual({ label: 'Backtest gate passed', val: 'Passed', ok: true });
   });
 
-  it('passes only when all six hold', () => {
-    expect(checklist({ ...base, trades: 120 }, 0.046, PASSED).every(i => i.ok)).toBe(true);
+  it('passes only when all five hold', () => {
+    expect(checklist({ ...base, months: 18 }, 0.046, PASSED).every(i => i.ok)).toBe(true);
     // Every forward metric passing does not make a strategy ready while its backtest gate failed.
-    const failedGate = checklist({ ...base, trades: 120 }, 0.046, FAILED);
-    expect(failedGate.filter(i => i.ok)).toHaveLength(5);
+    const failedGate = checklist({ ...base, months: 18 }, 0.046, FAILED);
+    expect(failedGate.filter(i => i.ok)).toHaveLength(4);
     expect(failedGate.every(i => i.ok)).toBe(false);
   });
 });

@@ -49,7 +49,7 @@ from seer_engine.backtest.b_walkforward import (
 )
 from seer_engine.backtest.labels import label_orders
 from seer_engine.backtest.market import Market, Membership
-from seer_engine.backtest.metrics import Metrics, checklist
+from seer_engine.backtest.metrics import Metrics, checklist, gate_checks
 from seer_engine.backtest.tuning import MAX_DRAWDOWN
 from seer_engine.backtest.runner import ParamsSchedule, run_backtest
 from seer_engine.backtest.walkforward import Fold, folds
@@ -569,7 +569,7 @@ def test_gate_p6a_pass_sentence(gated, subject):
     wf_m = M(0.80, pf=1.5, dd=0.12, trades=300)
     v = gate_p6a(wf_m, SPY_TR, GATE_START, GATE_END, gated)
     assert v.passed
-    assert v.checks == tuple(checklist(wf_m, 0.75)[2:5])
+    assert v.checks == tuple(gate_checks(wf_m, 0.75))
     assert v.sentence == (
         f"{subject} passes the P6a gate: walk-forward from 2018-01-02 to 2026-10-02 it returned "
         "+80.0% against +75.0% for total-return SPY, with profit factor 1.50 and max drawdown 12.0%."

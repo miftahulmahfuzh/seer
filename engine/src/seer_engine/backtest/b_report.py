@@ -817,7 +817,7 @@ def _checklist_section(r: BReport) -> list[str]:
         "## Go-live checklist (what a backtest can evaluate)",
         "",
         "These are design §1's fixed rules, computed exactly as the web computes them, on the gated "
-        "curve. The \"months forward\" and \"100 trades\" items need forward paper trading, so here "
+        "curve. The \"months forward\" item needs forward paper trading, so here it is "
         "they are information only. \"Beats SPY\" compares with total-return SPY. Only the "
         "walk-forward column is evidence; the seen-before column is information.",
         "",

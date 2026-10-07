@@ -29,7 +29,7 @@ from test_backtest_runner import START as SCENARIO_START, run_scenario
 from seer_engine import dates
 from seer_engine.backtest.benchmark import BenchmarkCurve
 from seer_engine.backtest.market import Market, Membership
-from seer_engine.backtest.metrics import Metrics, checklist, curve_metrics, run_metrics, strategy_metrics
+from seer_engine.backtest.metrics import Metrics, checklist, gate_checks, curve_metrics, run_metrics, strategy_metrics
 from seer_engine.backtest.runner import ParamsSchedule, RunResult, run_backtest
 from seer_engine.backtest.tuning import MAX_DRAWDOWN, GridRow, Selection, grid
 from seer_engine.backtest.walkforward import (
@@ -622,7 +622,7 @@ def test_gate_p3b_pass_sentence():
     wf_m = M(0.80, pf=1.5, dd=0.12, trades=300, months=105.0)
     v = gate_p3b(wf_m, SPY_TR, WF_START, WF_GATE_END)
     assert v.passed
-    assert v.checks == tuple(checklist(wf_m, 0.75)[2:5])
+    assert v.checks == tuple(gate_checks(wf_m, 0.75))
     assert v.sentence == (
         "Strategy A2 passes the P3b gate: walk-forward from 2018-01-02 to 2026-10-02 it returned "
         "+80.0% against +75.0% for total-return SPY, with profit factor 1.50 and max drawdown 12.0%."

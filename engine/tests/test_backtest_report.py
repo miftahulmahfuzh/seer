@@ -307,7 +307,7 @@ def test_markdown_window_tables():
 
 def test_markdown_checklist_has_the_backtest_items():
     md = _section(render_markdown(build_report()), "## Go-live checklist")
-    for label in ("≥ 3 months forward", "≥ 100 trades", "Beats SPY", "Profit factor ≥ 1.3", "Max drawdown ≤ 20%"):
+    for label in ("≥ 18 months forward", "Beats SPY", "Profit factor ≥ 1.3", "Max drawdown ≤ 20%"):
         assert f"| {label} |" in md
     assert "| Passed a 10-year backtest under identical rules | #5, decided by the gate |" in md
     assert "forward-only: information" in md

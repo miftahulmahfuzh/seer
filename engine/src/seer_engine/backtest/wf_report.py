@@ -40,6 +40,7 @@ from seer_engine.backtest.metrics import (
     fmt_pf,
     fmt_signed_pct,
     forced_closes,
+    gate_checks,
     run_metrics,
 )
 from seer_engine.backtest.report import (
@@ -340,7 +341,7 @@ def _slice_sessions(run: RunResult) -> int:
 
 
 def _gate_cell(m: Metrics, spy_return: float | None) -> str:
-    beats, pf, dd = checklist(m, spy_return)[2:5]
+    beats, pf, dd = gate_checks(m, spy_return)
     failed = [c.label for c in (beats, pf, dd) if not c.ok]
     return "yes" if not failed else "no: " + ", ".join(failed)
 
@@ -854,7 +855,7 @@ def _checklist_section(r: WalkForwardReport) -> list[str]:
         "## Go-live checklist (what a backtest can evaluate)",
         "",
         "These are design §1's fixed rules, computed exactly as the web computes them. The "
-        "\"months forward\" and \"100 trades\" items need forward paper trading, so here they are "
+        "\"months forward\" item needs forward paper trading, so here it is "
         "information only. \"Beats SPY\" compares with total-return SPY. Only the walk-forward "
         "column is evidence; the seen-before column is information.",
         "",

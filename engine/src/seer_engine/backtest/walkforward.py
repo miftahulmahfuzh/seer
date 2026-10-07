@@ -44,6 +44,7 @@ from seer_engine.backtest.metrics import (
     checklist,
     exit_reason_counts,
     fmt_signed_pct,
+    gate_checks,
     metrics_through,
     strategy_metrics,
 )
@@ -359,7 +360,7 @@ def gate_p3b(wf: Metrics, spy_tr: Metrics, start: date, end: date) -> Verdict:
         raise TypeError("gate_p3b takes two Metrics")
     _day("start", start)
     _day("end", end)
-    beats, pf, dd = checklist(wf, spy_tr.total_return)[2:5]
+    beats, pf, dd = gate_checks(wf, spy_tr.total_return)
     checks = (beats, pf, dd)
     passed = beats.ok and pf.ok and dd.ok
     said = (

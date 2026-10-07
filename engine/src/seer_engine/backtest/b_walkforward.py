@@ -39,7 +39,7 @@ import numpy as np
 from seer_engine import dates
 from seer_engine.backtest.labels import Labels, label_orders
 from seer_engine.backtest.market import Market
-from seer_engine.backtest.metrics import Metrics, checklist, fmt_signed_pct
+from seer_engine.backtest.metrics import Metrics, checklist, fmt_signed_pct, gate_checks
 from seer_engine.backtest.runner import ParamsSchedule, RunResult, run_backtest
 from seer_engine.backtest.tuning import Verdict
 
@@ -479,7 +479,7 @@ def gate_p6a(wf: Metrics, spy_tr: Metrics, start: date, end: date, gated: str) -
         raise TypeError(f"gated must be a str, got {type(gated).__name__}")
     if gated not in _SUBJECT:
         raise ValueError(f"gated must be {B!r} or {B_LINEAR!r}, got {gated!r}")
-    beats, pf, dd = checklist(wf, spy_tr.total_return)[2:5]
+    beats, pf, dd = gate_checks(wf, spy_tr.total_return)
     checks = (beats, pf, dd)
     passed = beats.ok and pf.ok and dd.ok
     subject = _SUBJECT[gated]

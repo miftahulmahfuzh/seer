@@ -1,5 +1,5 @@
 import type { Gate } from './strategy';
-import { MAX_DRAWDOWN, MAX_DRAWDOWN_LABEL } from './golive';
+import { MAX_DRAWDOWN, MAX_DRAWDOWN_LABEL, MIN_PAPER_MONTHS, MIN_PAPER_MONTHS_LABEL } from './golive';
 
 export type Snapshot = { date: string; equity: number };
 
@@ -41,7 +41,7 @@ export function strategyMetrics(snaps: Snapshot[], pnls: number[]): Metrics {
 /** One go-live rule. `note` explains a backtest-gate verdict when the roster gives one. */
 export type CheckItem = { label: string; val: string; ok: boolean; note?: string };
 
-/** The sixth rule: "Backtest gate passed", or "Not applicable" for C (design §1 item 5), which never counts as passed. */
+/** The fifth rule: "Backtest gate passed", or "Not applicable" for C (design §1 item 5), which never counts as passed. */
 export function gateItem(gate: Gate): CheckItem {
   const item: CheckItem = gate.applicable
     ? { label: 'Backtest gate passed', val: gate.passed ? 'Passed' : 'Not passed', ok: gate.passed }
@@ -51,16 +51,21 @@ export function gateItem(gate: Gate): CheckItem {
 }
 
 /**
- * The fixed go-live rules from the design doc (§1): five forward-test metrics, then
- * "Backtest gate passed" from `strategies.params.backtest_gate` (D12). All six must hold.
- * A strategy whose backtest item is not applicable (C, handover D9) can never pass all six.
+ * The fixed go-live rules from the design doc (§1): four forward-test metrics, then
+ * "Backtest gate passed" from `strategies.params.backtest_gate` (D12). All five must hold.
+ * The trades item went with design §13 (2026-10-07): a trade count scales with how many
+ * names a book holds, not with how much evidence exists, so item 1 is months alone.
+ * A strategy whose backtest item is not applicable (C, handover D9) can never pass all five.
  */
 export function checklist(m: Metrics, spyReturn: number | null, gate: Gate): CheckItem[] {
   const ret = m.totalReturn ?? 0;
   const p1 = (v: number) => (v >= 0 ? '+' : '−') + Math.abs(v * 100).toFixed(1);
   return [
-    { label: '≥ 3 months forward', val: `${(Math.floor(m.months * 10) / 10).toFixed(1)} mo`, ok: m.months >= 3 },
-    { label: '≥ 100 trades', val: `${m.trades} / 100`, ok: m.trades >= 100 },
+    {
+      label: MIN_PAPER_MONTHS_LABEL,
+      val: `${(Math.floor(m.months * 10) / 10).toFixed(1)} mo`,
+      ok: m.months >= MIN_PAPER_MONTHS,
+    },
     {
       label: 'Beats SPY',
       val: spyReturn === null ? '—' : `${p1(ret)} vs ${p1(spyReturn)}`,

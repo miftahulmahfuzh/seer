@@ -29,6 +29,21 @@ from seer_engine.sim import Order
 MONTH_DAYS = 30.44
 YEAR_DAYS = 365.25
 
+MIN_PAPER_MONTHS = 18
+"""Go-live condition #1 (design §1, §13): months of forward paper before a real-money decision.
+
+The single definition in Python; ``tuning.MIN_PAPER_MONTHS`` re-exports it and ``web/lib/
+golive.ts`` is the TypeScript twin. Set by the owner on 2026-10-07, replacing "≥ 3 months AND
+≥ 100 closed trades" -- a trade count scales with how many names a book holds rather than with
+how much evidence exists, so it asked two centuries of an index-timing strategy and five months
+of a twenty-name book. 18 is where the deleted bar already stood for the current roster
+(14.9-20.7 months at its trade rates), stated in a unit that does not depend on the engine.
+
+It is a floor on noise, not a claim of confidence: measured on the recorded dev curves, these
+strategies beat SPY in 54-72% of rolling 18-month windows and only 65-78% of 36-month ones.
+Design §13 carries the table.
+"""
+
 MAX_DRAWDOWN = 0.20
 """Go-live condition #4 (design §1): the deepest peak-to-trough fall a strategy may show.
 
@@ -269,11 +284,10 @@ def checklist(m: Metrics, spy_return: float | None) -> list[CheckItem]:
     pf = m.profit_factor
     return [
         CheckItem(
-            "≥ 3 months forward",
+            f"≥ {MIN_PAPER_MONTHS} months forward",
             f"{to_fixed(math.floor(m.months * 10) / 10, 1)} mo",
-            m.months >= 3,
+            m.months >= MIN_PAPER_MONTHS,
         ),
-        CheckItem("≥ 100 trades", f"{m.trades} / 100", m.trades >= 100),
         CheckItem(
             "Beats SPY",
             DASH if spy_return is None else f"{_p1(ret)} vs {_p1(spy_return)}",
@@ -290,3 +304,20 @@ def checklist(m: Metrics, spy_return: float | None) -> list[CheckItem]:
             m.max_drawdown is not None and m.max_drawdown <= MAX_DRAWDOWN,
         ),
     ]
+
+
+def gate_checks(m: Metrics, spy_return: float | None) -> tuple[CheckItem, CheckItem, CheckItem]:
+    """The three conditions a BACKTEST can evaluate: beats SPY TR, profit factor, max drawdown.
+
+    Design §1 items 2, 3 and 4. ``tuning.gate``, ``walkforward.gate_p3b``,
+    ``b_walkforward.gate_p6a`` and ``wf_report`` all judge exactly these three and take their
+    labels and value strings from :func:`checklist`, so the reports and the web read identically.
+
+    **Why this exists rather than a slice.** Those four call sites each wrote
+    ``checklist(...)[2:5]``. When design §13 dropped the trades item on 2026-10-07 the list
+    shortened, every one of those slices silently became the wrong three items, and 96 tests
+    failed at once. Selecting by meaning rather than by position means the next change to
+    ``checklist`` cannot do that again.
+    """
+    items = {c.label: c for c in checklist(m, spy_return)}
+    return items["Beats SPY"], items["Profit factor ≥ 1.3"], items[MAX_DRAWDOWN_LABEL]

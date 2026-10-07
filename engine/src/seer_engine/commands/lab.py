@@ -73,7 +73,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from seer_engine import config, research
-from seer_engine.backtest import dev
+from seer_engine.backtest import dev, tuning
 from seer_engine.backtest.metrics import fmt_num, fmt_pct, fmt_pf, fmt_signed_pct
 from seer_engine.fundamentals import coverage
 from seer_engine.lab import store
@@ -1202,7 +1202,7 @@ def _gate_note(conn, tested) -> str:
     )
     return (
         f"Passed the quant backtest gate. {dev_part}; {test_part}. No forward paper record yet: "
-        f"design §1 still needs >= 3 months and >= 100 closed paper trades before real money."
+        f"design §1 still needs >= {tuning.MIN_PAPER_MONTHS} months of forward paper before real money."
     )
 
 

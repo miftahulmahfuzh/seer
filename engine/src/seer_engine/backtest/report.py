@@ -400,8 +400,9 @@ def _results_section(report: BacktestReport) -> list[str]:
     return out
 
 
+# One note per `metrics.checklist` item, in its order. Four since design §13 (2026-10-07) deleted
+# the trades item: go-live #1 is months of forward paper alone.
 _CHECK_NOTES = (
-    "#1, forward-only: information",
     "#1, forward-only: information",
     "#2, in the gate (vs total-return SPY)",
     "#3, in the gate",
@@ -431,7 +432,7 @@ def _checklist_section(report: BacktestReport) -> list[str]:
         "## Go-live checklist (what a backtest can evaluate)",
         "",
         "These are design §1's fixed rules, computed exactly as the web computes them. The "
-        "\"months forward\" and \"100 trades\" items need forward paper trading, so here they are "
+        "\"months forward\" item needs forward paper trading, so here it is "
         "information only. \"Beats SPY\" compares with total-return SPY.",
         "",
         *_table(["Item", "Design §1", *names], ["l", "l", "l", "l", "l"], rows),

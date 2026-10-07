@@ -54,7 +54,9 @@ from seer_engine.strategies.allocator import Allocator
 
 TEST_START = date(2015, 10, 19)  # P7b's main test window starts here (the session after DEV_END; D3)
 TEST_SLICE_START = date(2018, 1, 2)  # the slice reported beside it, for comparison with A2 and B
-MIN_TRADES = 100  # design §1 item 2, applied on dev by D8 (phase 9's ">= 100 trades" label)
+# The dev-window bar (``dev._MIN_TRADES``), applied on dev by D8. NOT design §1 item 1, whose
+# trades clause the owner deleted on 2026-10-07 (design §13); this one deliberately stands.
+MIN_TRADES = 100
 MAX_FINALISTS = 3  # D8
 TOP_YEARS = 5  # §7.6: "year by year for the top candidates"; phase 12 picks them (finalists first)
 STORE_COUNT_KEYS: tuple[str, ...] = ("bar_rows", "symbols_requested", "symbols_served", "dividend_rows", "fx_rows")

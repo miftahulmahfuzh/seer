@@ -1,0 +1,56 @@
+name: Sean
+
+# Marks the owner's real Gotrade holdings to market and rewrites Sean's daily profit/loss series
+# (sean_marks, sean_equity). The site dispatches this right after a batch of order screenshots is
+# uploaded, so the graph catches up at once; the nightly run does the same step every night, so a
+# missed dispatch only delays the graph.
+#
+# Its own concurrency group, not seer-db-writer: Sean writes only Sean's tables, and a pending
+# Sean run queued in seer-db-writer would cancel a pending nightly retry (GitHub keeps one pending
+# run per group). An overlap with the nightly Sean step is serialized by a table lock in the engine.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Fetch and compute everything, then roll back (writes nothing)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sean-writer
+  cancel-in-progress: false
+
+jobs:
+  marks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+      DRY_RUN: ${{ inputs.dry_run == true }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: engine/pyproject.toml
+
+      - name: Install engine
+        run: python -m pip install -e engine
+
+      - name: Migrate
+        run: |
+          flags=()
+          if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
+          python -m seer_engine "${flags[@]}" migrate
+
+      - name: Sean marks
+        run: |
+          flags=(-v)
+          if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
+          python -m seer_engine "${flags[@]}" sean marks

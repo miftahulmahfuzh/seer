@@ -135,3 +135,16 @@ jobs:
           flags=(-v)
           if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
           python -m seer_engine "${flags[@]}" explain
+
+      # Sean (the owner's real Gotrade trades): fetch closes for every symbol the owner has held
+      # and rewrite the daily profit/loss series. Independent of paper trading, so it runs while
+      # paper is paused too. Never fails the night: a Yahoo outage or a crash only leaves Sean's
+      # graph a day behind. Runs after a red Paper check, like Explain.
+      - name: Sean marks
+        if: ${{ success() || steps.paper_check.outcome == 'failure' }}
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          flags=(-v)
+          if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
+          python -m seer_engine "${flags[@]}" sean marks

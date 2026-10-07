@@ -141,6 +141,11 @@ engine/
       remeasure.py          `lab remeasure`: re-runs a recorded method's variants on the dev window, proves the re-run reproduces each trial's recorded Sharpe and DSR, and appends trial_moments rows -- Batch, Plan, Reproduced, Report, resolve_method(), batches_of(), preflight(), measure(), check(), remeasure(), format_report() (lab-luck-gate phase 3); plus the P7a seed path, resumable and chunk-invariant -- SEED_PREFIX, SEED_METRICS, METRIC_TOL, SeedTrial, SeedPlan, SeedReport, SeedVerdict, is_seed_id(), seed_var_trials(), seed_preflight(), observe(), run_chunk(), reproduce(), remeasure_seed(), seed_verdicts(), format_seed_report() (lab-luck-gate phase 9)
       seed.py               one-time import of the pre-lab record (P7a's 54 candidates)
       methods/              one file per method, mNNNN_<slug>.py exporting METHOD
+    sean/                   Sean: the owner's real Gotrade orders, marked to market (Sean phases 1 and 4)
+      __init__.py           docstring only
+      ledger.py             pure average-cost ledger (plan contract B), the twin of web/lib/sean/ledger.ts: Order, Holding, Ledger, PnlPoint, build_ledger(), pnl_series(), pnl_at()
+      marks.py              daily closes per owner symbol from Yahoo -> sean_marks: yahoo_closes(), fetch_closes() -> Fetched, upsert_marks(), read_marks() (impure)
+      equity.py             sean_orders + sean_marks -> sean_equity: read_orders(), symbol_starts(), series(), lock(), replace_equity() (impure)
     commands/
       __init__.py           command-module contract
       migrate.py            `migrate` command
@@ -158,6 +163,7 @@ engine/
       veto.py               `veto` command (P6): Strategy C's nightly news check
       promote.py            `promote` command (roster-promotion-pipeline phase 5): a lab method's variant -> a `strategies` row; --lab-override-reason records the admission basis on both sides (lab-luck-gate phase 6)
       compare.py            `compare` command (roster-promotion-pipeline phase 3): read-only ranking over the common window
+      sean.py               `sean` command (Sean phase 4): `sean marks` fetches closes for the owner's symbols and rewrites sean_equity
   tests/                    pytest; DB tests need PG_TEST_URL
   data/spy_dividends.csv    SPY dividends (ex_date, amount_usd), vendored from yfinance (see data/SOURCES.md)
   .cache/                   gitignored; bars-<max date>-<rows>.pkl and fundamentals-<max filed>-<rows>.pkl written by the backtest loader
@@ -171,6 +177,7 @@ db/migrations/003_paper.sql   (outside the package; paper state, book tables, di
 db/migrations/004_news_veto.sql (outside the package; the C roster row and news_vetoes; P6)
 db/migrations/006_roster.sql  (outside the package; the strategies lifecycle and definition columns, and the five seeded rows' definition values; roster-promotion-pipeline phase 1)
 db/migrations/007_fnd.sql     (outside the package; the FND roster row, so a database brought up from migrations has one; roster-promotion-pipeline phase 6)
+db/migrations/015_sean.sql    (outside the package; Sean's tables: sean_orders, sean_link, sean_reminder_marks, and the engine-written sean_marks and sean_equity)
 ```
 
 ## CLI
@@ -950,6 +957,45 @@ could not tell a lab with no candidates from a lab whose candidates were one bar
 - Read-only and measured to be so: `lab/lab.sqlite`'s md5 is unchanged across a `lab status`, and
   `store.test_looks` still reads 0.
 - Tests: `tests/test_lab_status.py` (12).
+
+### `sean marks` (Sean phase 4)
+
+```
+python -m seer_engine [--dry-run] [-v] sean marks [--now ISO8601]
+```
+
+Marks the owner's real Gotrade holdings to market and rewrites Sean's daily profit/loss series.
+It is independent of paper trading and reads no roster or strategy table.
+
+1. `end = dates.last_completed_session(now)`. `--now` pretends the clock is that time (UTC if no
+   offset), for tests and replays.
+2. Read every `sean_orders` row in a short transaction. If there are none, it takes the lock,
+   empties `sean_equity` (so a stale series never outlives deleted orders), logs "no orders yet"
+   and exits 0. It fetches nothing.
+3. With no transaction open, fetch `[first trade date, end]` closes from Yahoo for each symbol
+   ever traded (`equity.symbol_starts` → `marks.fetch_closes`). Owner symbols need not be in the
+   universe and may be delisted, so `bars` is not used. A symbol that raises or comes back empty
+   is logged and listed as missing. It **never fails the run**: its earlier stored closes still
+   stand, and with none the ledger values it at its last order price.
+4. In one transaction: `equity.lock` (`LOCK TABLE sean_marks, sean_equity IN EXCLUSIVE MODE`), then
+   `marks.upsert_marks` (writes new or changed closes only). Then it **re-reads the orders under
+   the lock**, so an upload that landed during the download is counted. It then calls
+   `equity.series(orders, end, marks.read_marks(conn))`, one point per NYSE session from the first
+   trade date through `end`, and `equity.replace_equity` (delete all, insert all).
+5. Log one line: symbols priced, symbols without prices (named), closes written, sessions, the
+   last profit/loss.
+
+`--dry-run` does all of the above and rolls back. Exit codes: 0 on success (missing prices
+included), 1 on any other error.
+
+Callers:
+- `.github/workflows/sean.yml`: `workflow_dispatch` with a `dry_run` input. It runs `migrate` and
+  then `sean marks` under its own concurrency group `sean-writer`, not `seer-db-writer`, because a
+  queued Sean run there would cancel a pending nightly retry. The site dispatches it right after a
+  batch of order screenshots is uploaded.
+- `.github/workflows/nightly.yml`: the last step, "Sean marks", with `continue-on-error: true`, a
+  10-minute timeout, and `if: success() || steps.paper_check.outcome == 'failure'` (it runs after a
+  red Paper check, like Explain). A Yahoo outage or a crash only leaves Sean's graph a day behind.
 
 ## Exported API
 
@@ -2501,6 +2547,54 @@ randomness is a `Random` passed in by the caller, which is why it lives here rat
 - `sim.apply_book_split(book, symbol, factor, session, rules, targets=None) -> BookSplit` (`sim/book.py`, exported from `seer_engine.sim`): the book engine's split rule. Shares × factor (floored for whole-share rules); cash in lieu credited to cash and the position's `income_usd`; stop, take, mark and entry price ÷ the exact factor; floor-to-zero closes as `forced` at the old mark; pending targets for the symbol rescaled. `BookSplit(book, targets, in_lieu, trade, fills)`. Called only for splits recorded with `applied = true`.
 - `backtest.io.read_bars_frame(conn, *, since=None)`: `since` limits the `COPY` to `date >= since`. The default is unchanged, so every existing caller and `load_market` are byte-identical.
 
+### sean (Sean phases 1 and 4)
+
+`sean.ledger` is pure: no database, no network, no clock, no floats. It is the Python twin of
+`web/lib/sean/ledger.ts` (plan contract B). Both must reproduce `web/lib/sean/fixtures/ledger.json`,
+so a change to one is a change to both.
+
+- `Order(id, symbol, side, executed_at, price, shares, total_usd, trading_fee_usd, regulatory_fee_usd, ppn_usd)`:
+  the `sean_orders` columns the ledger reads. `side` is `buy` or `sell`, `executed_at` must be
+  timezone-aware, money fields must be `Decimal`, and `shares > 0`. `.trade_date` is the New York
+  calendar date of the fill (a 03:10 WIB fill belongs to the previous US session). `.fees_usd` is
+  trading + regulatory + PPN.
+- `Holding(symbol, shares, cost_usd)`, `Ledger(holdings, realized_usd, fees_usd)`, and
+  `PnlPoint(day, value_usd, cost_usd, realized_usd, unrealized_usd, pnl_usd, fees_usd)`, whose
+  fields are exactly the `sean_equity` columns.
+- `Closes = Mapping[str, Sequence[tuple[date, Decimal]]]`. Helpers: `money()` (cents, half away
+  from zero), `share_count()` (9 decimals), `order_from_mapping()`, `closes_from_mapping()`,
+  `sort_orders()` (by `executed_at`, then `id`), `close_on_or_before()`.
+- `build_ledger(orders) -> Ledger`, `pnl_series(orders, days, closes) -> list[PnlPoint]` (days
+  strictly ascending, else `ValueError`), `pnl_at(orders, d, closes)`.
+- The method is average cost with fees in the cost basis. A sell is clamped to the shares held,
+  and a sell of a stock never seen bought changes only the fees. A position under 1e-9 shares is
+  closed. Each holding is valued at its last close on or before the date, else at its last order
+  price. Money is rounded only on output.
+
+`sean.marks` (impure: Yahoo and psycopg):
+- `CloseFetch = Callable[[str, date, date], list[tuple[date, Decimal]]]`.
+- `yahoo_closes(symbol, start, end, *, downloader=None)`: split-adjusted daily closes in
+  `[start, end]` through `yahoo.download`.
+- `fetch_closes(starts, end, fetch=yahoo_closes) -> Fetched(closes, missing)`. It never raises for
+  a symbol, and skips a start after `end`. `Fetched.rows()` gives `(symbol, date, close)` rows.
+- `upsert_marks(conn, rows) -> int`: one `unnest` INSERT with `ON CONFLICT (symbol, date) DO UPDATE ... WHERE ... IS DISTINCT FROM`,
+  so an identical re-run writes 0 rows. It does not commit.
+- `read_marks(conn) -> dict[str, list[(date, close)]]`, dates ascending.
+
+`sean.equity` (impure: psycopg):
+- `read_orders(conn) -> list[Order]` in ledger order. `symbol_starts(orders)` gives
+  `(symbol, first trade date)` sorted by symbol.
+- `series(orders, end, closes)` gives one point per `dates.sessions(first trade date, end)`, or
+  `[]` with no orders.
+- `lock(conn)`: `EXCLUSIVE` on `sean_marks` and `sean_equity`. It blocks other writers but not
+  readers, so the site reads the previous series until commit.
+- `replace_equity(conn, points) -> int`: `DELETE FROM sean_equity`, then insert every point. No
+  commit. The series is recomputed in full on every run, because a deleted or late upload changes
+  history.
+
+`commands.sean.execute_marks(conn, *, now_utc=None, dry_run=False, fetch=marks.yahoo_closes) -> int`
+is the testable body of `sean marks`. `tests/test_sean_command.py` injects `fetch`.
+
 ## Migration 002 (`db/migrations/002_engine.sql`)
 
 This migration is additive only. It is written by the engine, and web does not read these tables.
@@ -2576,6 +2670,11 @@ candidates in a transaction it rolls back, makes every Finnhub and LLM call with
 then writes all its rows in one short transaction. A network failure becomes a `failed` row, never an
 exception. The real night is `migrate` → `nightly` → `veto` → `paper` → `paper_check` → `explain`.
 
+`sean marks` (Sean phase 4) follows the same pattern as `veto`. It reads `sean_orders`, fetches
+Yahoo closes with no transaction open, then in one locked transaction upserts `sean_marks`,
+re-reads the orders and replaces `sean_equity` whole. In `nightly.yml` it is the last step, after
+`explain`, and `continue-on-error`.
+
 ## Dependencies
 
 ### External
@@ -2614,6 +2713,7 @@ exception. The real night is `migrate` → `nightly` → `veto` → `paper` → 
 - `delisting` (delisting-stress-roster-rules phase 1) imports numpy, `random.Random`, `backtest.dev` (`DEV_END`, `MEMBERSHIP_START`), `backtest.market` (`SPY`, `Market`, `Membership`) and `strategies.base` (`History`). It imports no `lab` module — `tests/test_delisting.py` asserts that, so the harness can never record a trial — and none of `bars`, `db`, `http` or `config`. `scripts/delisting_stress.py` is its only caller and is not part of the package.
 - `paper.compare` (phase 3) imports nothing from the package at all — only the standard library — which is what keeps it portable to the leaderboard's TypeScript port. `commands.compare` imports `db`, `paper.compare` and `psycopg`, and reads one table.
 - `paper.book` and `paper.replay` (phase 6) also import `MarketAware` and `prepare_for` from `strategies.allocator`; `paper.roster` imports `strategies.f_fundamental` (`FUNDAMENTAL`, `FundamentalParams`) and still never imports `lab.methods.*` — the lab must not become an input to a paper spec digest.
+- `sean.ledger` (Sean phase 1) imports only the standard library (`bisect`, `decimal`, `zoneinfo`). `sean.marks` imports `yahoo` and psycopg. `sean.equity` imports `dates`, `sean.ledger` and psycopg. `commands.sean` (phase 4) imports `dates`, `db`, `sean.equity` and `sean.marks`. Nothing else in the engine imports `sean`, and `sean` imports no `sim`, `paper`, `lab` or `strategies` module.
 ### Standard library
 `argparse`, `importlib`/`pkgutil` (command discovery), `logging`, `contextlib`, `dataclasses`, `decimal`, `functools.lru_cache`, `re`, `time`.
 
@@ -2629,6 +2729,7 @@ exception. The real night is `migrate` → `nightly` → `veto` → `paper` → 
 - P4 runs **paper-only** (owner option (b), 2026-10-04): `commands/paper.py` steps the frozen roster (`paper/roster.py`: `SPY`, `A` with `STRATEGY_A_PARAMS`, `F4-MOM12-N20-TREND` and `F1-SPY-SMA200-M` from `backtest/registry.py`, read-only) through the same `sim` and strategy/allocator code the backtests ran. Nothing is a real-money recommendation: SPY is the champion, and `strategies.params.backtest_gate.passed` is false for every entry.
 - `web/lib/data.ts` reads `paper_state`, `book_positions`, `book_targets`, `book_trades`, `orders`, `equity_snapshots`, `news_vetoes` (P6, Positions' "Vetoed tonight"), `runs.paper_*` and `strategies.params`/`paper_start` (read-only; `params.backtest_gate.applicable`). The web never imports the engine; the schema in migrations 003 and 004 is the contract.
 - `.github/workflows/nightly.yml` runs `migrate` → `nightly` → `veto` (P6, `continue-on-error`, 10 minutes) → `paper` → `paper_check` → `explain`; `.github/workflows/engine-ci.yml` runs `ruff check engine` (rules in `pyproject.toml`) before pytest.
+- Sean (phase 4): `nightly.yml` ends with a `continue-on-error` "Sean marks" step (`sean marks`, 10 minutes). `.github/workflows/sean.yml` (`workflow_dispatch`, concurrency group `sean-writer`) runs `migrate` → `sean marks` and is dispatched by the site after an upload (`web/lib/sean/dispatch.ts`). The web shares only the schema in `015_sean.sql` with the engine and never imports it. The Overview page's graph is meant to read `sean_equity`. `web/lib/sean/ledger.ts` must stay in lockstep with `sean/ledger.py`.
 
 ## Concurrency
 
@@ -2636,6 +2737,8 @@ This package is not designed for concurrent use. It is single-threaded and uses 
 - `http._session` is a module-level `requests.Session`.
 - `config._loaded` is a module-level flag.
 - `dates._calendar`, `_year` and `_closes` are `lru_cache`d per process.
+
+`sean marks` is the one command built to overlap with itself: the nightly step and a dispatched `sean.yml` run can run at the same time under different concurrency groups. `sean.equity.lock` takes `EXCLUSIVE` on `sean_marks` and `sean_equity` for the write transaction, which serializes the writers while readers keep the previous series.
 
 The temp tables `_seer_bars_in` and `_seer_fx_in` are scoped to a session (`ON COMMIT DELETE ROWS`), so concurrent processes do not collide.
 
@@ -2902,6 +3005,18 @@ equal `sha256sum engine/src/seer_engine/backtest/registry.py` at the committed r
 To add a candidate (D6): append it to `REGISTRY`, pin its `(id, digest)` in `tests/test_registry.py`,
 and commit both **before** running it. A smoke run of one candidate is `backtest_dev --only <ID>`,
 which writes nothing. A committed report always comes from a full run over a clean registry.
+
+### Sean: mark the owner's holdings (Sean phase 4)
+
+```
+cd <repo or worktree root>
+SEER_ENV_FILE=/home/miftah/seer/.env.local engine/.venv/bin/python -m seer_engine --dry-run -v sean marks   # rolled back
+SEER_ENV_FILE=/home/miftah/seer/.env.local engine/.venv/bin/python -m seer_engine -v sean marks --now 2026-10-07T23:00:00Z
+```
+
+In production it runs through `sean.yml` (dispatched by the site after an upload, or by hand with
+`dry_run`) and as the last nightly step. Tests: `tests/test_sean_ledger.py` (the shared fixture),
+`tests/test_sean_marks.py`, and `tests/test_sean_command.py` (the DB tests need `PG_TEST_URL`).
 
 ### Gotchas
 - Do not use `with psycopg.connect(...) as conn`, because it commits on exit and defeats `--dry-run`. Use `contextlib.closing` instead.

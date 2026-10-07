@@ -54,7 +54,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Plan Set**: `SEAN_GOTRADE_TRACKER_PLAN.md` (phase 7 of 7)
   - **Satisfies**: R5 — Real Gotrade costs feed method exploration and the Sera lab's profit-and-loss
   - **Depends on**: P1-ROOT-5YLK, P1-ROOT-8S6O
-  - **Unblocked**: 2026-10-07 - P1-ROOT-5YLK (phase 4) and P1-ROOT-8S6O (phase 6) both completed on `feature/sean-gotrade-tracker`.
   - **Unblocked**: 2026-10-07 - P1-ROOT-5YLK (phase 4) and P1-ROOT-8S6O (phase 6) completed; `sean/` ledger and `sim/costs.py` + the `cost_model` lever now exist on `feature/sean-gotrade-tracker`.
   - **Plan**: `.workflows/plan/P1-ROOT-GB56.md`
 

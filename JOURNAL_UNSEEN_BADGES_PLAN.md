@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/journal-unseen-badges`
 **Branch:** `feature/journal-unseen-badges` (base: `origin/main` @ `46c04b4`)
 **Phases:** 5
-**Status:** phase 4/5 complete
+**Status:** complete
 **Reconciled:** 2026-10-07 — 9 conflicts found, 9 resolved, 0 open questions
 **Coordinator:** —
 
@@ -115,7 +115,7 @@ Every phase must leave all of these true.
 | 2 ✅ | Unseen-aware pure view layer: counts and the unseen/seen partition | R1, R3 | `web/app/sera/journal` | 2 | — | NORMAL | `.workflows/plan/journal-unseen-badges/phase-2.md` | `P1-WEB-SSGU` | — |
 | 3 ✅ | The page renders unseen counts, the boundary, and per-card state | R1, R3 | `web/app/sera/journal` | 2 | 1, 2 | NORMAL | `.workflows/plan/journal-unseen-badges/phase-3.md` | `P1-WEB-M2WF` | — |
 | 4 ✅ | The client island: dwell, click, batch, flush, live countdown | R2, R3 | `web/app/sera/journal` | 4 | 1, 2, 3 | HARD | `.workflows/plan/journal-unseen-badges/phase-4.md` | `P1-WEB-Q8DV` | — |
-| 5 | The rail badge and the package readme | R3 | `web/components/sera`, `web/app/sera`, docs | 4 | 1, 2, 3, 4 | EASY | `.workflows/plan/journal-unseen-badges/phase-5.md` | — | — |
+| 5 ✅ | The rail badge and the package readme | R3 | `web/components/sera`, `web/app/sera`, docs | 4 | 1, 2, 3, 4 | EASY | `.workflows/plan/journal-unseen-badges/phase-5.md` | `P1-WEB-Z5LP` | — |
 
 **Waves**, given those dependencies: phases **1 and 2** run concurrently (neither depends on
 anything and they share no file); then **3**; then **4**; then **5**.

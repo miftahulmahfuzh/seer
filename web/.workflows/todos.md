@@ -3,18 +3,18 @@
 **Package Path**: `web`
 **Package Code**: WEB
 **Last Updated**: 2026-10-07
-**Total Active Tasks**: 1
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 16
+- Completed: 17
 
 ---
 
@@ -23,17 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-WEB-Z5LP** Phase 5: The rail badge and the package readme
-  - **Difficulty**: EASY
-  - **Type**: Feature
-  - **Context**: Owns `web/app/sera/layout.tsx` (calls `unseenCount(lab.insights.map(i => i.id))` and renders no badge on `null` or `0`, never `seenInsightIds`), `web/components/sera/SeraNav.tsx` and `SeraNav.module.css` (the Journal tab's optional rail badge, correct in both layouts), and `web/package_readme.md` (the exception to the "Sera never reads Neon" sentence, plus every file this set added in the Layout tree). Exit: the rail's number equals the `all` badge on `/sera/journal`, including when `journal_seen` holds an id outside the snapshot; a failed read shows no badge rather than the full inventory; the rail renders in both the >=1024px rail and the below-1024px top bar; `npx tsc --noEmit && npm test` clean.
-  - **Status**: open
-  - **Plan Set**: `JOURNAL_UNSEEN_BADGES_PLAN.md` (phase 5 of 5)
-  - **Satisfies**: R3 — The notification number on each of the seven tab icons is the true count of unseen items for that tab, so a new number on a tab is a real signal worth getting excited about
-  - **Depends on**: P1-WEB-K3QM, P1-WEB-SSGU, P1-WEB-M2WF, P1-WEB-Q8DV
-  - **Plan**: `.workflows/plan/P1-WEB-Z5LP.md`
-  - **Note (from P1-WEB-M2WF readme check, 2026-10-07)**: readme-updater found four `web/package_readme.md` claims this set invalidates that are NOT in this task's Owns list — check them too: `:12` "plus one write (`action_dismissals`)" and `:418` "the engine owns writes to every table except `action_dismissals`" both omit `journal_seen` (strained by phase 1's `markInsightsSeen`, live once phase 4 lands); `:334` `journalGroups(insights, filter)` gained phase 2's trailing seen-set parameter; `:374` "`/sera/journal` ... newest first" becomes imprecise once phase 4 marks entries seen. `:422` ("the only write is an idempotent `INSERT ... ON CONFLICT DO NOTHING`") happens to stay true and needs no edit.
-  - **Note (from P1-WEB-Q8DV readme check, 2026-10-07)**: a second readme-updater pass found five MORE `web/package_readme.md` claims phase 4 invalidates, none overlapping the M2WF note above: `:438` the `npm test` enumeration lists only `view` helpers and now misses `app/sera/journal/seen-client` (32 new cases); `:343-348` the Data Flow block has no arrow for the Journal's write path (browser island -> `sendBeacon`/`fetch` POST `/api/sera/journal/seen` -> `markInsightsSeen` -> `journal_seen`), which is a route handler rather than a server action and hangs off `/sera`, not `app/(app)`; `:21` "each page keeps its logic in a pure, tested `view.ts`" — Journal now has two pure modules (`view.ts` + `seen-client.ts`) and `/sera/journal` is the first Sera page mounting a `'use client'` island, so `SeraNav.tsx` is no longer the section's only client component; `:325-339` Key modules has no bullet for `seen-client.ts` or `JournalSeen.tsx`, though every other `app/sera/*/view.ts` has one; `:426-429` Error Handling says failures propagate, but the seen write is the app's first deliberately silent path (a failed POST is swallowed and the ids requeue while the badge stays optimistically counted down). Borderline: `:420-422` "the only write" is now singular-but-two, and the client adds a `MAX_BATCH = 50` queue that a `pagehide` beacon can race. Candidate gotchas: the two caps (`MAX_BATCH = 50` client flush trigger vs `MAX_SEEN_BATCH = 500` server limit) are not the same thing; phase 1's route accepts `text/plain` ONLY because `sendBeacon` sends a Blob, so narrowing it to JSON would silently break unload flushes; the arrow-click listener is capture-phase on `document` so it fires before `Link` navigates away; and `view.ts` must stay server-free because `JournalSeen.tsx` imports `badgeTip` from it.
 
 ### [P2] Medium
 
@@ -111,6 +100,28 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Files**: web/app/sera/journal/seen-client.ts, web/app/sera/journal/seen-client.test.ts, web/app/sera/journal/JournalSeen.tsx, web/app/sera/journal/page.tsx, web/.workflows/todos.md, JOURNAL_UNSEEN_BADGES_PLAN.md
   - **Decided**:
     - The plan's `seen-client.test.ts` `unseen()` helper does not compile (TS2352: `Object.fromEntries` widens to a string index signature, which TS will not assert onto `Readonly<Record<InsightKind, readonly number[]>>`) -> built the record with an explicit loop over `INSIGHT_KINDS` plus one `{} as Record<...>` assertion. Rung 1: invariant 1 "the tree builds" outranks a code block that does not; the idiom matches `badgeCounts`' own `const out = {} as Record<BadgeKey, number>` in the same file. No assertion or intent in the test changed.
+
+- [x] **P1-WEB-Z5LP** Phase 5: The rail badge and the package readme
+  - **Difficulty**: EASY
+  - **Type**: Feature
+  - **Context**: Owns `web/app/sera/layout.tsx` (calls `unseenCount(lab.insights.map(i => i.id))` and renders no badge on `null` or `0`, never `seenInsightIds`), `web/components/sera/SeraNav.tsx` and `SeraNav.module.css` (the Journal tab's optional rail badge, correct in both layouts), and `web/package_readme.md` (the exception to the "Sera never reads Neon" sentence, plus every file this set added in the Layout tree). Exit: the rail's number equals the `all` badge on `/sera/journal`, including when `journal_seen` holds an id outside the snapshot; a failed read shows no badge rather than the full inventory; the rail renders in both the >=1024px rail and the below-1024px top bar; `npx tsc --noEmit && npm test` clean.
+  - **Status**: done
+  - **Plan Set**: `JOURNAL_UNSEEN_BADGES_PLAN.md` (phase 5 of 5)
+  - **Satisfies**: R3 — The notification number on each of the seven tab icons is the true count of unseen items for that tab, so a new number on a tab is a real signal worth getting excited about
+  - **Depends on**: P1-WEB-K3QM, P1-WEB-SSGU, P1-WEB-M2WF, P1-WEB-Q8DV
+  - **Plan**: `.workflows/plan/P1-WEB-Z5LP.md`
+  - **Note (from P1-WEB-M2WF readme check, 2026-10-07)**: readme-updater found four `web/package_readme.md` claims this set invalidates that are NOT in this task's Owns list — check them too: `:12` "plus one write (`action_dismissals`)" and `:418` "the engine owns writes to every table except `action_dismissals`" both omit `journal_seen` (strained by phase 1's `markInsightsSeen`, live once phase 4 lands); `:334` `journalGroups(insights, filter)` gained phase 2's trailing seen-set parameter; `:374` "`/sera/journal` ... newest first" becomes imprecise once phase 4 marks entries seen. `:422` ("the only write is an idempotent `INSERT ... ON CONFLICT DO NOTHING`") happens to stay true and needs no edit.
+  - **Note (from P1-WEB-Q8DV readme check, 2026-10-07)**: a second readme-updater pass found five MORE `web/package_readme.md` claims phase 4 invalidates, none overlapping the M2WF note above: `:438` the `npm test` enumeration lists only `view` helpers and now misses `app/sera/journal/seen-client` (32 new cases); `:343-348` the Data Flow block has no arrow for the Journal's write path (browser island -> `sendBeacon`/`fetch` POST `/api/sera/journal/seen` -> `markInsightsSeen` -> `journal_seen`), which is a route handler rather than a server action and hangs off `/sera`, not `app/(app)`; `:21` "each page keeps its logic in a pure, tested `view.ts`" — Journal now has two pure modules (`view.ts` + `seen-client.ts`) and `/sera/journal` is the first Sera page mounting a `'use client'` island, so `SeraNav.tsx` is no longer the section's only client component; `:325-339` Key modules has no bullet for `seen-client.ts` or `JournalSeen.tsx`, though every other `app/sera/*/view.ts` has one; `:426-429` Error Handling says failures propagate, but the seen write is the app's first deliberately silent path (a failed POST is swallowed and the ids requeue while the badge stays optimistically counted down). Borderline: `:420-422` "the only write" is now singular-but-two, and the client adds a `MAX_BATCH = 50` queue that a `pagehide` beacon can race. Candidate gotchas: the two caps (`MAX_BATCH = 50` client flush trigger vs `MAX_SEEN_BATCH = 500` server limit) are not the same thing; phase 1's route accepts `text/plain` ONLY because `sendBeacon` sends a Blob, so narrowing it to JSON would silently break unload flushes; the arrow-click listener is capture-phase on `document` so it fires before `Link` navigates away; and `view.ts` must stay server-free because `JournalSeen.tsx` imports `badgeTip` from it.
+  - **Completed**: 2026-10-07 12:00
+  - **Method**: /do
+  - **Files**: web/app/sera/layout.tsx, web/components/sera/SeraNav.tsx, web/components/sera/SeraNav.module.css, web/package_readme.md, web/.workflows/todos.md, JOURNAL_UNSEEN_BADGES_PLAN.md
+  - **Drift**:
+    - No code drift. layout.tsx, SeraNav.tsx and SeraNav.module.css were byte-identical to what the phase plan quoted, and phase 1's `unseenCount(ids): Promise<number | null>` and phase 2's view.ts exports matched their pinned contracts exactly.
+    - All eleven package_readme.md line anchors in the plan's Step 4 were stale by 3-6 lines (pre-flagged by phase 1's handoff). Every quoted before-string still existed verbatim; every edit was applied by grep-seek, not by line number.
+  - **Decided**:
+    - Last Updated phase id: the plan's literal after-block writes `P5-WEB-J4N8` but its own prefatory note says to use the card's TaskID if one was minted. `P1-WEB-Z5LP` was minted -> used it (rung 3, the code block read with the instruction attached to it; `P5-WEB-J4N8` is the fallback for an un-carded phase).
+    - Four readme edits corrected against the shipped code per phase 1's handoff findings: 4c now states the route's 500 and that it deliberately re-derives the gate from `isAllowed`+`isSeraUser` rather than calling `requireSera` (whose redirect would 307 and disclose the section, invariant 7); 4e no longer claims the module never throws, since `markInsightsSeen` throws by design; a Gotchas bullet now covers the `MAX_SEEN_BATCH = 500` / `MAX_BATCH = 50` cap pairing. Rung: the plan's own Handoffs line "fix the readme to match the code -- never the code to match the readme".
+    - Nine further stale readme claims named in the card's two Notes (not in the plan's Owns list) were also fixed: `:12`/`:418` omitting `journal_seen`, `:334` `journalGroups`' old signature, `:374` "newest first", `:438` test enumeration, `:343-348` data-flow write path, `:21` "one pure view.ts per page", `:325-339` missing Key-modules bullets, `:426-429` error handling vs the first deliberately-silent path. Plus the Access-gate paragraph, which claimed `requireSera` guards every `/sera/**` route while `/api/sera/**` deliberately does not. Rung 5 (task text) over silence in the plan.
 
 - [x] **P1-WEB-10T8** Phase 3: Positions page: monthly pick / weekly size copy and buy/add/trim cell
   - **Difficulty**: NORMAL

@@ -127,6 +127,7 @@ PROSE_BARS: tuple[re.Pattern[str], ...] = (
 #: Files this phase is responsible for. Paths are relative to the repository root.
 SCANNED: tuple[str, ...] = (
     ".claude/skills/explore-and-experiment-new-method/SKILL.md",
+    ".claude/skills/update-stale-sera-methods-page/SKILL.md",
     "docs/lab/prereg/README.md",
     "engine/package_readme.md",
     "engine/src/seer_engine/lab/prereg.py",

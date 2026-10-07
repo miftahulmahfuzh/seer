@@ -43,6 +43,7 @@ import hashlib
 import math
 import shutil
 import sqlite3
+from pathlib import Path
 from statistics import NormalDist
 
 import pytest
@@ -686,13 +687,17 @@ def _recorded_digest(conn) -> str:
     return h.hexdigest()
 
 
+# The committed lab as phase 4 found it (N = 110, no test-window look spent), frozen from commit
+# feed608. Every test below describes that lab, so it reads this copy: the live database grows
+# with each batch and would break these pins for no fault of the rule under test.
+LAB_AT_PHASE_4 = Path(__file__).parent / "fixtures" / "lab_n110.sqlite"
+
+
 @pytest.fixture()
 def committed(tmp_path):
-    """A writable copy of the committed lab, migrated. The original is never opened for writing."""
-    if not store.COMMITTED_DB.exists():
-        pytest.skip("no committed lab database")
+    """A writable copy of the lab at phase 4, migrated. The original is never opened for writing."""
     path = tmp_path / "lab.sqlite"
-    shutil.copyfile(store.COMMITTED_DB, path)
+    shutil.copyfile(LAB_AT_PHASE_4, path)
     c = store.connect(path)
     c.row_factory = sqlite3.Row
     yield c

@@ -126,6 +126,7 @@ engine/
       __init__.py           docstring only
       method.py             a lab method file: METHOD, Candidate, METHOD_ID, discover(), config_digest(), source_sha()
       store.py              lab/lab.sqlite: committed and append-only; methods, trials, ideas, insights; TRANSITIONS, record_promotion(), best_dev_eligible() (build-promotion-path phase 3)
+      npolicy.py            the luck gate's N policy (lab-luck-gate phase 1): POLICIES all-trials / methods / effective, DEFAULT_POLICY, correlation(), participation_ratio(), effective_n() -> NCount. Pure, reads only, no callers yet
       runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4)
       prereg.py             the docs/lab/prereg/MNNNN.md pre-registration: Prereg, render()/parse(), require_committed(), check_digest(), check_source(), promote_method() (build-promotion-path phase 3)
       seed.py               one-time import of the pre-lab record (P7a's 54 candidates)
@@ -1885,6 +1886,54 @@ committed-file gate. Nothing in it loads a research store, runs a backtest or wr
   `('dev-eligible', 'promoted')` edge; no schema or trigger changed.
 
 
+### lab: the N policy for the luck gate (lab-luck-gate phase 1)
+
+`lab/npolicy.py` holds the answer to "N what?" in the deflated Sharpe the lab's luck gate applies.
+It is pure — it reads a lab SQLite connection, writes nothing, and touches no clock, filesystem or
+network — and it **has no callers yet**: phase 4 of the `lab-luck-gate` plan set wires the gate to
+it. Until then the gate still deflates by the dev trial row count, exactly as before.
+
+- **Why it exists.** `backtest.dev.deflated_sharpe` assumes `n_trials` *independent* trial Sharpes.
+  The lab hands it one per dev `trials` row, and those rows are not independent: measured over the
+  month-end equity curves already stored in `trials.curve_json`, the mean pairwise correlation across
+  the dev trials is 0.595 and the participation ratio of their correlation matrix is 2.44, over 102
+  common month-ends. Deflating by the row count therefore asserts an independence the data
+  contradicts, and overstates the hurdle.
+- `Policy` / `POLICIES`: the three named answers, and what each measures on the committed
+  `lab/lab.sqlite` — `all-trials` = **110**, `methods` = **23**, `effective` = **2**.
+  - `all-trials` — one look per dev trial row, the literal reading of the design and what the lab
+    does today. Deliberately **unfloored**, so an empty lab reads 0 rather than a fabricated 2.
+  - `methods` — one look per distinct method with a dev trial, floored at the measured participation
+    ratio: `max(distinct_methods, ceil(participation_ratio))`. Counts a family of variants as the one
+    idea it is, while the floor guarantees the policy can never claim fewer independent looks than
+    the curves measurably show. The floor does not bind on the committed database (ceil(2.44) = 3
+    against 23 methods); `NCount.floored` says when it does.
+  - `effective` — the participation ratio alone, rounded, floored at `DSR_MIN_N = 2` (below two
+    trials the deflated Sharpe is undefined). The honest count of independent *return streams*, and
+    for that reason not a count of how many times the search looked: every lab strategy holds US
+    large-cap equities, so the streams collapse onto the market factor. Kept live so the gate's
+    sensitivity stays inspectable.
+- `DEFAULT_POLICY = "all-trials"` — deliberately the policy the lab actually ships, so a caller that
+  forgets to name one cannot be deflated by an N the gate does not use.
+- `effective_n(conn, policy=DEFAULT_POLICY) -> NCount`: the N and the evidence behind it. `NCount.n`
+  is the int to hand `dev.deflated_sharpe`; the rest is why — `trial_rows`, `distinct_methods`,
+  `participation_ratio`, `mean_pairwise_corr`, `curves_used`, `month_ends`. `NCount.basis` is a
+  **one-line, newline-free** evidence string, shaped for the one-line fields it is destined for
+  (`docs/lab/prereg/MNNNN.md` and `web/data/lab.json`'s `gate.dsrNBasis`); `NCount.evidence()` is the
+  fuller sentence that also repeats `n` and the policy name. `UnknownPolicy(ValueError)` for a name
+  outside `POLICIES`; `check_policy(name)` is the standalone validator.
+- `correlation(conn) -> Correlation` / `participation_ratio(conn) -> float`: the measurement, from
+  the curves the database already holds — it spends no test-window look and runs no backtest. The
+  participation ratio is `(sum L)^2 / sum L^2` over the eigenvalues of the correlation matrix of the
+  trials' monthly returns: 1 when every curve is the same curve, N when they are mutually
+  uncorrelated, and clamped to that range because floating point on a near-singular matrix can step a
+  hair outside either end. Curves are aligned on the month-ends common to *every* one of them, so
+  each row is the same months measured the same way; a curve that is short, unparseable,
+  non-positive or perfectly flat is dropped rather than correlated. Fewer than two surviving curves
+  gives `participation_ratio = 1.0` and `mean_pairwise = None` — one look is still one look — rather
+  than an exception, because the module must never raise on data it only reads.
+- `dev_method_count(conn) -> int`: distinct `method_id` over `window = 'dev'` trials.
+
 ### paper (P4)
 
 `seer_engine.paper` is nightly paper trading. Every module but `store.py` is pure (no psycopg,
@@ -2104,6 +2153,7 @@ exception. The real night is `migrate` → `nightly` → `veto` → `paper` → 
 - `strategies.c` imports `dates`, `sim` (`Pick`), `strategies.a` (`STRATEGY_A`, `STRATEGY_A_PARAMS`, `AParams`) and `strategies.base`; never `finnhub`, `llm`, `db` or `universe`. `finnhub` imports `config`, `http` (`redact`), `requests` and `strategies.c` (`Headline`). `commands.veto` imports `db`, `dates`, `demo`, `runs`, `finnhub`, `llm`, `commands.nightly` (`_parse_now`), `paper.roster`, `paper.store`, `sim.sizing` (`Pick`) and `strategies.c`.
 - `commands.promote` (phase 5) imports `config`, `dates`, `db`, `lab.store`, `lab.method` (`discover`, inside the function), `paper.roster`, `paper.store`, `sim.rules` (`TradeRules`) and `psycopg.types.json.Jsonb`. It never imports `backtest.registry` (D1), and it is the only module that holds a Neon connection and a lab SQLite connection at the same time — sequentially, never in one transaction.
 - `lab.prereg` (build-promotion-path phase 3) imports `config`, `lab.store` and `lab.method` (`METHOD_ID`, `config_digest`, `source_sha`), plus `sqlite3` from the standard library. `backtest.dev` (`FAILURE_LABELS`, `DEV_END`), `dates` (`next_session`), `lab.method.discover` and `commands.backtest_dev.registry_problem` — the same `git status` check `lab run` makes on a method file — are imported *inside* the functions that need them, so importing `lab.prereg` does not drag in `backtest`. `commands.lab`'s `promote` handler imports `lab.prereg` and `lab.runner.git_head` inside the function. It never touches Neon: the pre-registration is a lab-side artefact only.
+- `lab.npolicy` (lab-luck-gate phase 1) imports numpy and `sqlite3` only at module scope; it imports `lab.store` (for `dev_trial_count`) *inside* `effective_n`, because `store` will import `npolicy` once the gate reads the policy and a module-scope import would close that cycle. It imports no `backtest` module, no `db`, no `config` and no `http`. Nothing imports it yet.
 - `paper.compare` (phase 3) imports nothing from the package at all — only the standard library — which is what keeps it portable to the leaderboard's TypeScript port. `commands.compare` imports `db`, `paper.compare` and `psycopg`, and reads one table.
 - `paper.book` and `paper.replay` (phase 6) also import `MarketAware` and `prepare_for` from `strategies.allocator`; `paper.roster` imports `strategies.f_fundamental` (`FUNDAMENTAL`, `FundamentalParams`) and still never imports `lab.methods.*` — the lab must not become an input to a paper spec digest.
 ### Standard library

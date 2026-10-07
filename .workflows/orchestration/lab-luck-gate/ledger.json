@@ -23,19 +23,19 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "73d11b8",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "verified: 6 files all phase-2-owned (store.py correctly absent, already carried by phase 6 under shared-file rule 3); dev.py/research.py byte-identical to base; lab.sqlite md5 unchanged so invariant 6 still reserves it for phase 4. Suite 3076 passed/0 failed with PG_TEST_URL exported. PLAN DEFECT FOUND+FIXED by phase 2: SQLite BEFORE UPDATE/DELETE triggers are row-level and never fire on an empty table, so the plan's step-8e assertion on an empty trial_moments could not pass; fixed by inserting a row first then asserting both triggers abort (rung 2, exit criterion 1 + never-relax-a-check) -- strengthens the check; relayed to phases 3 and 9 which also write trial_moments. KNOWN: 73d11b8 is transiently red alone -- carries phase 8's maxDrawdown 0.20 assertion in test_lab_snapshot.py while committed tuning.py still reads 0.15; branch tip goes green when phase 8 lands. Coordinator must confirm tip-green at Step 5 check. package_readme schema-v3 half closed here as assigned.",
       "package": "engine/lab",
       "plan": ".workflows/plan/lab-luck-gate/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T04:17:28+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-6134",
       "title": "Record the DSR's inputs with every dev trial"
     },
     {
@@ -53,7 +53,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "lab remeasure` \u2014 recover the inputs for a recorded method"
     },
@@ -178,7 +178,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-luck-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-luck-gate",
-  "updated": "2026-10-07T04:09:38+00:00",
+  "updated": "2026-10-07T04:17:28+00:00",
   "verified_at": "2026-10-07T03:59:26+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-luck-gate"
 }

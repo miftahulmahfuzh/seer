@@ -75,7 +75,9 @@
 }
 .prose ul, .prose ol { margin: 0; padding-left: 1.3em; }
 .prose li + li { margin-top: 0.3em; }
-.prose [data-md-table] { overflow-x: auto; }
+/* Its own bottom margin: the paragraph that follows is `.prose p { margin: 0 }`, which
+   outscores the `* + *` rhythm rule, so nothing else would hold the text off the border. */
+.prose [data-md-table] { overflow-x: auto; margin-bottom: 0.85em; }
 .prose table {
   width: 100%; border-collapse: collapse;
   font-size: 14px; font-variant-numeric: tabular-nums;

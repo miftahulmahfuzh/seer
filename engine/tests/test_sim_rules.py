@@ -104,6 +104,8 @@ def test_preset_ids_are_unique_and_in_order():
         "monthly-rank-weekly-resize-tbill",
         "monthly-hold-frac",
         "monthly-rank-weekly-resize-frac",
+        "monthly-hold-frac-gotrade",
+        "monthly-rank-weekly-resize-frac-gotrade",
     ]
     assert len(set(ids)) == len(ids)
 
@@ -347,7 +349,7 @@ def test_monthly_rank_weekly_resize_frac_is_the_split_cadence_in_fractional_shar
     r = MONTHLY_RANK_WEEKLY_RESIZE_FRAC
     assert r == replace(MONTHLY_RANK_WEEKLY_RESIZE, id="monthly-rank-weekly-resize-frac", fractional=True)
     assert (r.cadence, r.resize_cadence, r.fractional, r.idle_symbol) == ("monthly", "weekly", True, None)
-    assert PRESETS[-1] is r and sim.MONTHLY_RANK_WEEKLY_RESIZE_FRAC is r
+    assert PRESETS[12] is r and sim.MONTHLY_RANK_WEEKLY_RESIZE_FRAC is r
     assert rule_owner_inputs(r) == ()  # fractional is owner-verified (2026-10-07)
 
 

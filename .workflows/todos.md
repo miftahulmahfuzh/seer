@@ -2,19 +2,19 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-07 23:55
-**Total Active Tasks**: 1
+**Last Updated**: 2026-10-07 23:39
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 14
+- Completed: 15
 
 ---
 
@@ -23,17 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-
-- [ ] **P1-ROOT-GB56** Phase 7: Lab: calibrate from real orders, measure methods at real cost
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `engine/src/seer_engine/sean/calibrate.py` + `commands/sean.py` subcommand `calibrate` (replays `fee_parts` on each receipt's WIB date; exit 1 when an order since `GOTRADE.current.since` is off by more than a cent); `engine/src/seer_engine/lab/real_costs.py` + `lab costs MNNNN` (report only: no trial, N unchanged, one journal observation); `runner.preflight` refuses a flat-cost variant from M0031; the two real-fee presets `MONTHLY_HOLD_FRAC_GOTRADE` / `MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE` appended to `PRESETS` (rules.py after Phase 6) with their pins in `test_sim_rules.py` and Phase 6's `test_cost_model_pins.py`; `web/lib/cadence.ts` `SPLIT_CADENCE_RULES` + test learn `monthly-rank-weekly-resize-frac-gotrade`; tests `test_sean_calibrate.py`, `test_lab_costs.py`; both lab skills + `method_template.py`; design doc costs line + §15. Does not touch `sim/costs.py` numbers, `sim/book.py`, `backtest/*` (Phase 6); Phase 4's `marks` code; other web files; existing trial rows; `lab/lab.sqlite`. Exit: ruff + full pytest green (DB tests with `PG_TEST_URL`); `web/lib/cadence.test.ts` green; `sean calibrate` exits 0 on the fee fixture and 1 on a drifted receipt; `lab costs` writes exactly one insight and leaves trials, moments, methods, N and looks unchanged; `lab run` refuses a flat-cost M0031 and accepts one on `MONTHLY_HOLD_FRAC_GOTRADE`; `lab costs M0007` runs locally (`SEER_LAB_COSTS_LIVE=1`, skipped in CI).
-  - **Status**: open
-  - **Plan Set**: `SEAN_GOTRADE_TRACKER_PLAN.md` (phase 7 of 7)
-  - **Satisfies**: R5 — Real Gotrade costs feed method exploration and the Sera lab's profit-and-loss
-  - **Depends on**: P1-ROOT-5YLK, P1-ROOT-8S6O
-  - **Unblocked**: 2026-10-07 - P1-ROOT-5YLK (phase 4) and P1-ROOT-8S6O (phase 6) completed; `sean/` ledger and `sim/costs.py` + the `cost_model` lever now exist on `feature/sean-gotrade-tracker`.
-  - **Plan**: `.workflows/plan/P1-ROOT-GB56.md`
 
 ### [P2] Medium
 
@@ -46,6 +35,21 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-GB56** Phase 7: Lab: calibrate from real orders, measure methods at real cost
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/sean/calibrate.py` + `commands/sean.py` subcommand `calibrate` (replays `fee_parts` on each receipt's WIB date; exit 1 when an order since `GOTRADE.current.since` is off by more than a cent); `engine/src/seer_engine/lab/real_costs.py` + `lab costs MNNNN` (report only: no trial, N unchanged, one journal observation); `runner.preflight` refuses a flat-cost variant from M0031; the two real-fee presets `MONTHLY_HOLD_FRAC_GOTRADE` / `MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE` appended to `PRESETS` (rules.py after Phase 6) with their pins in `test_sim_rules.py` and Phase 6's `test_cost_model_pins.py`; `web/lib/cadence.ts` `SPLIT_CADENCE_RULES` + test learn `monthly-rank-weekly-resize-frac-gotrade`; tests `test_sean_calibrate.py`, `test_lab_costs.py`; both lab skills + `method_template.py`; design doc costs line + §15. Does not touch `sim/costs.py` numbers, `sim/book.py`, `backtest/*` (Phase 6); Phase 4's `marks` code; other web files; existing trial rows; `lab/lab.sqlite`. Exit: ruff + full pytest green (DB tests with `PG_TEST_URL`); `web/lib/cadence.test.ts` green; `sean calibrate` exits 0 on the fee fixture and 1 on a drifted receipt; `lab costs` writes exactly one insight and leaves trials, moments, methods, N and looks unchanged; `lab run` refuses a flat-cost M0031 and accepts one on `MONTHLY_HOLD_FRAC_GOTRADE`; `lab costs M0007` runs locally (`SEER_LAB_COSTS_LIVE=1`, skipped in CI).
+  - **Status**: completed
+  - **Plan Set**: `SEAN_GOTRADE_TRACKER_PLAN.md` (phase 7 of 7)
+  - **Satisfies**: R5 — Real Gotrade costs feed method exploration and the Sera lab's profit-and-loss
+  - **Depends on**: P1-ROOT-5YLK, P1-ROOT-8S6O
+  - **Unblocked**: 2026-10-07 - P1-ROOT-5YLK (phase 4) and P1-ROOT-8S6O (phase 6) completed; `sean/` ledger and `sim/costs.py` + the `cost_model` lever now exist on `feature/sean-gotrade-tracker`.
+  - **Plan**: `.workflows/plan/P1-ROOT-GB56.md`
+  - **Completed**: 2026-10-07 23:39
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/sean/calibrate.py, engine/src/seer_engine/lab/real_costs.py, engine/tests/test_sean_calibrate.py, engine/tests/test_lab_costs.py, engine/src/seer_engine/commands/sean.py, engine/src/seer_engine/commands/lab.py, engine/src/seer_engine/lab/runner.py, engine/src/seer_engine/sim/rules.py, engine/tests/test_sim_rules.py, engine/tests/test_cost_model_pins.py, web/lib/cadence.ts, web/lib/cadence.test.ts, .claude/skills/explore-and-experiment-new-method/SKILL.md, .claude/skills/explore-and-experiment-new-method/method_template.py, .claude/skills/sera-the-explorer/SKILL.md, docs/plans/2026-10-03-seer-design.md
+  - **Drift**: Line numbers in the plan for the skill files and commands/lab.py had shifted slightly; edits applied by anchor text, intent unchanged.
 
 - [x] **P1-ROOT-XA2W** Phase 5: Plan: link a roster method, buy/sell reminders
   - **Difficulty**: HARD

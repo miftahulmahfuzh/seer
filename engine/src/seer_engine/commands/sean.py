@@ -4,6 +4,10 @@
                                  (sean_marks) and rewrite the daily profit/loss series
                                  (sean_equity) from the first order to the last completed
                                  NYSE session
+    sean calibrate               replay Gotrade's fee schedule (sim/costs.py) over every stored
+                                 order and print what each paid against what the schedule says;
+                                 exit 1 when an order since the current fee regime is off by more
+                                 than a cent (Gotrade changed its fees: refit the schedule)
 
 No orders yet: clears any stale series, fetches nothing, exit 0. A symbol Yahoo cannot price
 (delisted, not listed there) is logged and valued at its stored closes or its last order
@@ -22,6 +26,7 @@ from datetime import datetime, timezone
 import psycopg
 
 from seer_engine import dates, db
+from seer_engine.sean import calibrate as fee_check
 from seer_engine.sean import equity, marks
 
 log = logging.getLogger(__name__)
@@ -57,6 +62,17 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
         default=None,
         metavar="ISO8601",
         help="pretend the current time is this (UTC if no offset); for tests and replays",
+    )
+
+    sub.add_parser(
+        "calibrate",
+        help="replay Gotrade's fee schedule over every stored order; exit 1 when it needs a refit",
+        description=(
+            "Read every order in sean_orders, ask sim/costs.py what each should have paid on its "
+            "own date (trading fee, regulatory fee, PPN), and print both. Exit 1 when any order "
+            "dated on or after the first day of the current fee regime is off by more than a cent "
+            "in any part. Reads only; writes nothing."
+        ),
     )
 
 
@@ -119,6 +135,20 @@ def _marks(conn: psycopg.Connection, args: argparse.Namespace) -> int:
     return execute_marks(conn, now_utc=args.now, dry_run=bool(args.dry_run))
 
 
+def _calibrate(conn: psycopg.Connection, args: argparse.Namespace) -> int:
+    """Read-only: every stored order's fees against the schedule. ``run`` owns the connection."""
+    paid = fee_check.rows_from_db(conn)
+    conn.rollback()  # close the read transaction; nothing was written
+    result = fee_check.check(paid, since=fee_check.current_since())
+    print(fee_check.format_report(result))
+    log.info(
+        "sean calibrate: %d order(s), %d in the current regime, %d off by more than a cent",
+        len(result.residuals), len(result.current), len(result.misses),
+    )
+    return 0 if result.passed else 1
+
+
 _HANDLERS = {
     "marks": _marks,
+    "calibrate": _calibrate,
 }

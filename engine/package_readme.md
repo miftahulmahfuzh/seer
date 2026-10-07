@@ -42,7 +42,8 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - Every roster entry carries its lab provenance (lab-luck-gate, phase 6): a paper entry that came from a recorded lab candidate now says in code which lab method and variant it is, the lab status it was admitted under, and on what basis — `test-passed`, or `owner-override` with a one-line reason. `paper/roster.py` gains `Basis` / `BASES`, the frozen `LabProvenance` dataclass (which refuses an override with no reason), the `LAB_PROVENANCE` table keyed by roster id, and a `lab_provenance` field on `RosterEntry` that `from_row` fills from that table. It sits **outside** the spec, exactly where `status`, `paper_end`, `gate_note` and `gate_applicable` already sit, so no `spec_digest` moves and no entry is retired. `lab/store.py` gains `PROMOTION_BASES` and `promotion_basis(status)`, and `record_promotion` takes `basis=` / `reason=`, writes both into the method's `# Promotion` analysis section, and **refuses an unexplained owner override**. `promote` gains `--lab-override-reason`, requires it whenever the method is not at `test-passed`, and prints the `LAB_PROVENANCE` line to add in the same commit. The admission *policy* is unchanged (Decisions D3: paper membership has never required a gate pass, and the lab's design §3/§6 reading that a test pass leads to the roster is a *sufficient*, never a necessary, route); what changed is that the basis stopped being prose in a commit message. `tests/test_paper_roster.py` checks every provenance line against the committed `lab/lab.sqlite`
 - The verdict is derived, under one policy, at evaluation time (lab-luck-gate, phase 4): a dev trial's eligibility stopped being a column read back off the row and became something `lab/store.py` *decides* when asked. `store.verdict(conn, trial)` re-derives the four threshold owner conditions from the trial's own recorded columns against the live `tuning.MAX_DRAWDOWN` / `tuning.MIN_PROFIT_FACTOR` / `dev._MIN_TRADES` (`owner_failures`), carries only `owner inputs` from the record — the one condition no constant re-decides — and settles the luck test on that trial's DSR **at the gate's current N** (`dsr_at`, exact from `trial_moments` or recovered by inverting the recorded DSR through `recover_dsr`, deflated on both routes by today's `dev_sharpe_variance`). A DSR that cannot be evaluated *fails* the luck test, so nothing is admitted for being unmeasurable. The gate's two constants are `store.DSR_MIN` (0.95 -> 0.90, the owner's stated risk appetite) and the new `store.DSR_POLICY = "all-trials"`, the single name that decides N; `store.gate` / `pending_gate` resolve it, and `runner.trial_rows` is a two-line delta onto `pending_gate`, so a trial recorded tonight is judged by the same bar as one recorded six weeks ago. Recorded rows keep the labels of the bars they were judged under — all 110 say `DSR >= 0.95` and `max DD <= 15%` — so every reader goes through `is_luck_label` and `owner_failures` rather than comparing to `DSR_LABEL` or parsing `failed`. `TRANSITIONS` gains exactly one new edge, `('rejected','dev-eligible')`, reachable only through the twice-guarded `reevaluate_method` behind the new `lab reevaluate` command. Nothing in `trials` is written, the lab's N does not move and `test_looks` is still 0; `lab/lab.sqlite` takes an additive, idempotent migration (schema_version 3) and `web/data/lab.json` is re-exported from it. Net effect: at (N = 110, DSR >= 0.90, max DD <= 20%) exactly three trials are eligible — `M0022-W-TV14`, `M0022-W-TV16` and `M0020-W-NOSTOP` — so the promotion path is reachable for the first time, and `(all-trials, 0.95, 15%)` reproduces the previous verdicts exactly
 - The second lever is built, measured and not pulled (lab-luck-gate, phase 5): the luck bar has two levers — the threshold `store.DSR_MIN` and the N that `store.DSR_POLICY` resolves to — and Decision D1 moved only the first, deliberately. `commands/lab.py` gains the read-only `lab luck` (`_HANDLERS["luck"]`), the instrument that shows what moving the second would do **against the committed database, without editing the constant and re-running anything**: one column per named N policy and one per repeatable `--at N`, each recorded DSR re-evaluated there by inverting that trial's own per-trial constant through `store.recover_dsr`, so the `recorded` column reproduces the database exactly and every other column moves nothing but the multiple-testing count. Per policy it prints the N and the evidence for it, the daily hurdle `SR*`, and which candidates clear the bar — on the committed lab exactly three do at the live N = 110 — above the trial-Sharpe variance the deflation rests on; each policy's `evidence:` line is read generically off its `npolicy.NCount`, so the participation ratio and mean pairwise correlation behind an N cannot go stale in this output. In the same phase `lab status` stops hiding an empty promotion path: `_promotion_path` now **always** prints every step from `Dev-eligible` to `Paper`, an empty one with `_empty_reason`'s one sentence saying why (and, for `dev-eligible`, which bar is holding the closest candidate), alongside a `Promotable now` list ranked by MAR, the methods eligible on the evidence but held by the status machine, `Test-window looks used: k` (design §3), and the D1b ratchet warning — which names the N at which the best passing candidate's DSR falls back under the bar and how many more dev trials that is, because more exploration re-closes the gate the threshold just opened. Both commands are strictly read-only, proven by measurement rather than asserted: `lab/lab.sqlite`'s md5 is unchanged across both and `store.test_looks` still reads 0
-- Gotrade's real fees as a cost model (Sean plan, phase 6): `sim/costs.py` holds `GOTRADE`, a schedule of four dated fee regimes fitted to the owner's 30 Gotrade order receipts (`tests/fixtures/gotrade_fees.json`, fee columns only). `TradeRules` gains `cost_model: Literal["flat", "gotrade"] = "flat"`, a lever in `LEVERS_SINCE_PINS`, so at "flat" no registry, lab-trial or paper-spec digest moves (`tests/test_cost_model_pins.py` recomputes every committed lab digest byte for byte). Under "gotrade" the book engine prices every fill from today's regime, and the lab's SPY benchmark (`backtest.dev._run` → `spy_curves`) pays the candidate's own cost model. The paper benchmark stays flat, and no preset uses "gotrade" yet
+- Gotrade's real fees as a cost model (Sean plan, phase 6): `sim/costs.py` holds `GOTRADE`, a schedule of four dated fee regimes fitted to the owner's 30 Gotrade order receipts (`tests/fixtures/gotrade_fees.json`, fee columns only). `TradeRules` gains `cost_model: Literal["flat", "gotrade"] = "flat"`, a lever in `LEVERS_SINCE_PINS`, so at "flat" no registry, lab-trial or paper-spec digest moves (`tests/test_cost_model_pins.py` recomputes every committed lab digest byte for byte). Under "gotrade" the book engine prices every fill from today's regime, and the lab's SPY benchmark (`backtest.dev._run` → `spy_curves`) pays the candidate's own cost model. The paper benchmark stays flat
+- Real fees become the lab's rule (Sean plan, phase 7): `sim.rules` gains the two real-fee presets `MONTHLY_HOLD_FRAC_GOTRADE` (`monthly-hold-frac-gotrade`) and `MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE` (`monthly-rank-weekly-resize-frac-gotrade`), appended to `PRESETS` so `promote` can map a real-fee winner to a preset of its own id; they name `cost_model` in their canonical form and digest apart, while every flat preset still omits it. `lab/runner.preflight` now also raises `lab/real_costs.real_cost_problem`: from **M0031** on (`REAL_COST_SINCE = 31`) every variant must be a book rule set at `cost_model="gotrade"`, and methods up to M0030 keep their flat cost and pinned digests. For those older methods the new report-only `lab costs MNNNN` re-runs the best recorded dev variant (by MAR, or `--candidate`) at both cost models and journals one `observation` — no `trials` or `trial_moments` row, no status change, so the lab's N and `test_looks` do not move. On the Sean side, `sean/calibrate.py` and the read-only `sean calibrate` replay `sim.costs.fee_parts` over every stored `sean_orders` receipt (on its WIB date) and exit 1 when an order since the current fee regime is off by more than a cent in any part — the signal to add a new dated regime to `sim/costs.py`
 
 ## Layout
 
@@ -136,16 +137,18 @@ engine/
       method.py             a lab method file: METHOD, Candidate, METHOD_ID, discover(), config_digest(), source_sha()
       store.py              lab/lab.sqlite: committed and append-only; methods, trials, ideas, insights; TRANSITIONS, record_promotion(), best_dev_eligible() (build-promotion-path phase 3); PROMOTION_BASES, promotion_basis() and record_promotion's basis= / reason= (lab-luck-gate phase 6); the append-only trial_moments side table with MomentsRow, MOMENTS_COLUMNS, insert_moments(), moments_of(), SCHEMA_VERSION now "3" and the _v1_to_v2 / _v2_to_v3 migration ladder (lab-luck-gate phase 2); the **derived verdict** (lab-luck-gate phase 4) — DSR_MIN and DSR_POLICY as the gate's two constants, LUCK_LABEL_PREFIX / is_luck_label(), recorded_labels(), OWNER_INPUTS_LABEL / owner_failures(), sr_star(), recover_dsr(), dev_sharpe_variance(), dsr_at(), Gate / gate() / pending_gate(), Verdict / verdict(), best_dev_eligible() now judging on it, and the twice-guarded REEVALUATION_MARKER / Reevaluation / reevaluate_method() / reevaluate() behind the one new ('rejected','dev-eligible') transition
       npolicy.py            the luck gate's N policy (lab-luck-gate phase 1): POLICIES all-trials / methods / effective, DEFAULT_POLICY, correlation(), participation_ratio(), effective_n() -> NCount. Pure, reads only; `store.gate` is its one caller since lab-luck-gate phase 4
-      runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4). The luck test's N comes from store.pending_gate since lab-luck-gate phase 4
+      runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4). The luck test's N comes from store.pending_gate since lab-luck-gate phase 4; preflight() refuses a flat-cost variant from M0031 on (real_costs.real_cost_problem, Sean phase 7)
       prereg.py             the docs/lab/prereg/MNNNN.md pre-registration: Prereg, render()/parse(), require_committed(), check_digest(), check_source(), promote_method() (build-promotion-path phase 3)
       remeasure.py          `lab remeasure`: re-runs a recorded method's variants on the dev window, proves the re-run reproduces each trial's recorded Sharpe and DSR, and appends trial_moments rows -- Batch, Plan, Reproduced, Report, resolve_method(), batches_of(), preflight(), measure(), check(), remeasure(), format_report() (lab-luck-gate phase 3); plus the P7a seed path, resumable and chunk-invariant -- SEED_PREFIX, SEED_METRICS, METRIC_TOL, SeedTrial, SeedPlan, SeedReport, SeedVerdict, is_seed_id(), seed_var_trials(), seed_preflight(), observe(), run_chunk(), reproduce(), remeasure_seed(), seed_verdicts(), format_seed_report() (lab-luck-gate phase 9)
+      real_costs.py         `lab costs` (Sean phase 7): REAL_COST_SINCE = 31, requires_real_cost(), real_cost_problem() (the M0031 rule runner.preflight raises); resolve_method(), pick_candidate(), twins(), Side, side_of(), Comparison, measure(), format_report(), insight_text(), journal(). Report only: writes one journal observation, never a trial
       seed.py               one-time import of the pre-lab record (P7a's 54 candidates)
       methods/              one file per method, mNNNN_<slug>.py exporting METHOD
-    sean/                   Sean: the owner's real Gotrade orders, marked to market (Sean phases 1 and 4)
+    sean/                   Sean: the owner's real Gotrade orders, marked to market (Sean phases 1 and 4) and replayed against the fee schedule (phase 7)
       __init__.py           docstring only
       ledger.py             pure average-cost ledger (plan contract B), the twin of web/lib/sean/ledger.ts: Order, Holding, Ledger, PnlPoint, build_ledger(), pnl_series(), pnl_at()
       marks.py              daily closes per owner symbol from Yahoo -> sean_marks: yahoo_closes(), fetch_closes() -> Fetched, upsert_marks(), read_marks() (impure)
       equity.py             sean_orders + sean_marks -> sean_equity: read_orders(), symbol_starts(), series(), lock(), replace_equity() (impure)
+      calibrate.py          `sean calibrate` (Sean phase 7): every stored receipt against sim.costs -- PaidFees, Residual, Calibration, TOLERANCE, WIB, current_since(), check(), format_report(), wib_date(); pure except rows_from_db()
     commands/
       __init__.py           command-module contract
       migrate.py            `migrate` command
@@ -155,7 +158,7 @@ engine/
       backtest_b.py         `backtest_b` command (P6a)
       research_store.py     `research_store` command (P7a)
       backtest_dev.py       `backtest_dev` command (P7a)
-      lab.py                `lab` command: the method lab (status / luck / show / run / promote / reevaluate / test / remeasure / idea / note / insight / stage / export ...)
+      lab.py                `lab` command: the method lab (status / luck / show / run / promote / reevaluate / test / remeasure / costs / idea / note / insight / stage / export ...)
       nightly.py            `nightly` command (P1; P4 adds dividends and held paper symbols)
       paper.py              `paper` command (P4)
       paper_check.py        `paper_check` command (P4)
@@ -163,7 +166,7 @@ engine/
       veto.py               `veto` command (P6): Strategy C's nightly news check
       promote.py            `promote` command (roster-promotion-pipeline phase 5): a lab method's variant -> a `strategies` row; --lab-override-reason records the admission basis on both sides (lab-luck-gate phase 6)
       compare.py            `compare` command (roster-promotion-pipeline phase 3): read-only ranking over the common window
-      sean.py               `sean` command (Sean phase 4): `sean marks` fetches closes for the owner's symbols and rewrites sean_equity
+      sean.py               `sean` command (Sean phase 4): `sean marks` fetches closes for the owner's symbols and rewrites sean_equity; `sean calibrate` (phase 7) checks the fee schedule against every stored order, read-only
   tests/                    pytest; DB tests need PG_TEST_URL
   data/spy_dividends.csv    SPY dividends (ex_date, amount_usd), vendored from yfinance (see data/SOURCES.md)
   .cache/                   gitignored; bars-<max date>-<rows>.pkl and fundamentals-<max filed>-<rows>.pkl written by the backtest loader
@@ -958,6 +961,34 @@ could not tell a lab with no candidates from a lab whose candidates were one bar
   `store.test_looks` still reads 0.
 - Tests: `tests/test_lab_status.py` (12).
 
+### `lab costs` (Sean phase 7)
+
+```
+python -m seer_engine lab costs M0007 [--candidate M0007-N20-RAW] [--store DIR]
+```
+
+Report only. Re-runs a recorded method's best dev variant (by MAR, ties to the lower trial
+number; or the one named by `--candidate`) twice on the dev window — at the lab's flat 0.1% a
+trade and at Gotrade's real fees (`sim/costs.py`) — prints both side by side, and appends one
+`observation` to the lab journal on that method.
+
+- Refusals (`store.LabError`, before the store loads): not a lab method id or no committed method
+  file; no dev trial; a `--candidate` with no dev trial; a recorded variant missing from the method
+  file; a non-book (design-v0 bracket) variant; a variant with its own `cost_rate`. A test-window
+  store is refused, and `research.DEV_END != dev.DEV_END` is refused.
+- The side the lab recorded is the candidate itself; its twin differs only in `rules.cost_model`
+  and carries a `-GT` or `-FLAT` suffix. It exists only in memory, so no method file or digest
+  changes.
+- The report says whether the recorded side reproduced the trial's total return (`REPRO_TOL`,
+  relative 1e-9). If it did not, the store or engine changed, and the two re-runs still compare
+  with each other.
+- Writes no `trials` or `trial_moments` row and no status. It prints the lab's N and
+  `test_looks` before and after, and they are equal. A re-measure can never make a method
+  eligible: a real-fee configuration is judged only through a new method (M0031 on).
+- Afterwards, solo runs `lab stage` so seertrade.site/sera shows the observation. A Sera child
+  leaves staging to its coordinator.
+- Tests: `tests/test_lab_costs.py` (15).
+
 ### `sean marks` (Sean phase 4)
 
 ```
@@ -996,6 +1027,27 @@ Callers:
 - `.github/workflows/nightly.yml`: the last step, "Sean marks", with `continue-on-error: true`, a
   10-minute timeout, and `if: success() || steps.paper_check.outcome == 'failure'` (it runs after a
   red Paper check, like Explain). A Yahoo outage or a crash only leaves Sean's graph a day behind.
+
+### `sean calibrate` (Sean phase 7)
+
+```
+python -m seer_engine sean calibrate
+```
+
+Checks whether `sim/costs.py` still charges what Gotrade charged. It reads every `sean_orders`
+row, oldest first, and asks `costs.fee_parts(side, amount, on=<receipt WIB date>)` what the order
+should have paid. Then it prints one line per order, paid against schedule for trading,
+regulatory and VAT (PPN), and a closing sentence.
+
+- Exit 1 when any order dated on or after `GOTRADE.current.since` is off by more than
+  `TOLERANCE` ($0.01) in any part. That means Gotrade changed its fees or the fit was wrong: add
+  a new dated regime to `sim/costs.py` and never edit a past one. Orders under an older regime
+  are printed with their residual and never fail the check. Exit 0 otherwise, including with no
+  orders, or with none in the current regime.
+- Dates are WIB calendar dates, which is what the regime boundaries were fitted to. They are
+  deliberately not the ledger's New York trade date.
+- Read-only. The read transaction is rolled back, and nothing is written.
+- Tests: `tests/test_sean_calibrate.py` (15).
 
 ## Exported API
 
@@ -1702,7 +1754,7 @@ from `seer_engine.sim`.
 | `dividends` | `True` | credit cash dividends on the ex-date (D11) |
 | `idle_symbol` | `None` | the residual weight (1 − Σ targets) held in this instrument on decision sessions; 0% while it has no bar (BIL before 2007) |
 | `cost_rate` | `0.001` | per side; any other value is an owner input |
-| `cost_model` | `"flat"` | `"flat"`: `cost_rate` per side. `"gotrade"`: every fill pays Gotrade's current measured schedule (`sim.costs`, Sean phase 6); not an owner input. No preset sets it |
+| `cost_model` | `"flat"` | `"flat"`: `cost_rate` per side. `"gotrade"`: every fill pays Gotrade's current measured schedule (`sim.costs`, Sean phase 6); not an owner input. Set by the two `*_GOTRADE` presets (Sean phase 7) |
 
 - Presets (`PRESETS` holds every row below except `V0_BOOK`; ids are unique):
 
@@ -1721,7 +1773,9 @@ from `seer_engine.sim`.
 | `MONTHLY_RANK_WEEKLY_RESIZE` | `monthly-rank-weekly-resize` | book | monthly rank, weekly resize | open_limit | resize |
 | `MONTHLY_RANK_WEEKLY_RESIZE_TBILL` | `monthly-rank-weekly-resize-tbill` | book | monthly rank, weekly resize | open_limit | resize, idle in BIL |
 | `MONTHLY_HOLD_FRAC` | `monthly-hold-frac` | book | monthly | open_limit | resize, fractional shares |
-| `MONTHLY_RANK_WEEKLY_RESIZE_FRAC` | `monthly-rank-weekly-resize-frac` | book | monthly rank, weekly resize | open_limit | resize, fractional shares; appended last to `PRESETS`, so `promote --fractional` maps a `monthly-rank-weekly-resize` winner to it (as `monthly-hold` maps to `monthly-hold-frac`) |
+| `MONTHLY_RANK_WEEKLY_RESIZE_FRAC` | `monthly-rank-weekly-resize-frac` | book | monthly rank, weekly resize | open_limit | resize, fractional shares; appended to `PRESETS` (now at index 12), so `promote --fractional` maps a `monthly-rank-weekly-resize` winner to it (as `monthly-hold` maps to `monthly-hold-frac`) |
+| `MONTHLY_HOLD_FRAC_GOTRADE` | `monthly-hold-frac-gotrade` | book | monthly | open_limit | `MONTHLY_HOLD_FRAC` at `cost_model="gotrade"` (Sean phase 7) |
+| `MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE` | `monthly-rank-weekly-resize-frac-gotrade` | book | monthly rank, weekly resize | open_limit | `MONTHLY_RANK_WEEKLY_RESIZE_FRAC` at `cost_model="gotrade"` (Sean phase 7). These two close `PRESETS`. They are the bases lab methods from M0031 on build on, and `promote` needs a preset of the variant's own id. Their canonical form names `cost_model`, so they digest apart. `tests/test_cost_model_pins.py` pins that every flat preset still omits it |
 
 - `is_rank_session(rules, session) -> bool`, `is_resize_session(rules, session) -> bool` (a resize-ONLY
   session: False without a `resize_cadence`, and False when the session also ranks — ranking supersedes),
@@ -2595,6 +2649,40 @@ so a change to one is a change to both.
 `commands.sean.execute_marks(conn, *, now_utc=None, dry_run=False, fetch=marks.yahoo_closes) -> int`
 is the testable body of `sean marks`. `tests/test_sean_command.py` injects `fetch`.
 
+`sean.calibrate` (Sean phase 7; pure except `rows_from_db`):
+- `PaidFees(ref, on, side, symbol, amount, trading, regulatory, ppn)` is one receipt. `on` is a
+  WIB `date` (not a datetime), and every money field must be a non-negative finite `Decimal`.
+  `.total` sums the three fee parts.
+- `Residual(paid, expected, current)`. `.gaps` is paid minus expected per part, `.gap` is the
+  largest absolute gap, and `.ok` means `gap <= TOLERANCE` (`Decimal("0.01")`).
+  `.expected_total` sums the expected parts.
+- `Calibration(since, residuals)`. `.current` holds the orders on or after `since`, `.misses`
+  holds the current ones not `ok`, and `.passed` means there are no misses.
+- `current_since()` returns `costs.GOTRADE.current.since`.
+- `check(paid, *, since, fee=costs.fee_parts)` replays `fee(side, amount, on=p.on)` over every
+  order and keeps their order.
+- `format_report(cal)` gives one line per order and a closing sentence, in plain words.
+- `wib_date(at)` returns the WIB date of an aware datetime, and raises `ValueError` on a naive
+  one. `rows_from_db(conn)` reads `sean_orders` in `executed_at, id` order.
+
+`lab.real_costs` (Sean phase 7). Only `measure` runs the engine, and only `journal` writes:
+- `REAL_COST_SINCE = 31`, `FLAT = "flat"`, `REAL = "gotrade"`, `REPRO_TOL = 1e-9`.
+- `requires_real_cost(method_id)` is True for M0031 and later.
+- `real_cost_problem(method) -> str | None` names every variant that is not a book rule set at
+  `cost_model="gotrade"`, and says which `*_GOTRADE` preset to build on. `runner.preflight` raises
+  it as `LabError`.
+- `resolve_method(id) -> (Method, Path)`. `pick_candidate(conn, method, candidate_id=None) ->
+  (Candidate, trial row)` picks the best dev trial by MAR (ties go to the lower `n`, and a trial
+  with no MAR ranks last).
+- `twins(candidate) -> (flat, real)`.
+- `measure(method, candidate, trial, data) -> Comparison` makes one `dev.run_registry` call on
+  the dev window only. It is built from two `Side`s (`side_of`), and `.reproduced` checks the
+  recorded side against the trial's total return.
+- `format_report(cmp)` is the terminal report. `insight_text(cmp) -> (title, body)` is the plain
+  journal text.
+- `journal(conn, cmp) -> insight id` is one `store.add_insight(kind="observation")`, and the
+  caller owns the transaction.
+
 ## Migration 002 (`db/migrations/002_engine.sql`)
 
 This migration is additive only. It is written by the engine, and web does not read these tables.
@@ -2713,7 +2801,8 @@ re-reads the orders and replaces `sean_equity` whole. In `nightly.yml` it is the
 - `delisting` (delisting-stress-roster-rules phase 1) imports numpy, `random.Random`, `backtest.dev` (`DEV_END`, `MEMBERSHIP_START`), `backtest.market` (`SPY`, `Market`, `Membership`) and `strategies.base` (`History`). It imports no `lab` module — `tests/test_delisting.py` asserts that, so the harness can never record a trial — and none of `bars`, `db`, `http` or `config`. `scripts/delisting_stress.py` is its only caller and is not part of the package.
 - `paper.compare` (phase 3) imports nothing from the package at all — only the standard library — which is what keeps it portable to the leaderboard's TypeScript port. `commands.compare` imports `db`, `paper.compare` and `psycopg`, and reads one table.
 - `paper.book` and `paper.replay` (phase 6) also import `MarketAware` and `prepare_for` from `strategies.allocator`; `paper.roster` imports `strategies.f_fundamental` (`FUNDAMENTAL`, `FundamentalParams`) and still never imports `lab.methods.*` — the lab must not become an input to a paper spec digest.
-- `sean.ledger` (Sean phase 1) imports only the standard library (`bisect`, `decimal`, `zoneinfo`). `sean.marks` imports `yahoo` and psycopg. `sean.equity` imports `dates`, `sean.ledger` and psycopg. `commands.sean` (phase 4) imports `dates`, `db`, `sean.equity` and `sean.marks`. Nothing else in the engine imports `sean`, and `sean` imports no `sim`, `paper`, `lab` or `strategies` module.
+- `sean.ledger` (Sean phase 1) imports only the standard library (`bisect`, `decimal`, `zoneinfo`). `sean.marks` imports `yahoo` and psycopg. `sean.equity` imports `dates`, `sean.ledger` and psycopg. `commands.sean` (phase 4) imports `dates`, `db`, `sean.equity`, `sean.marks` and (phase 7) `sean.calibrate`. `sean.calibrate` imports `sim.costs` only, which is the one `sim` edge from `sean`. Nothing else in the engine imports `sean`, and `sean` imports no `paper`, `lab` or `strategies` module.
+- `lab.real_costs` (Sean phase 7) imports `research`, `backtest.dev`, `backtest.metrics` (formatters), `lab.store`, `lab.method` and `sim.rules`. `lab.runner` imports `lab.real_costs.real_cost_problem` at module scope. `commands.lab`'s `costs` handler uses `real_costs`, `research`, `backtest.dev` and `lab.store`.
 ### Standard library
 `argparse`, `importlib`/`pkgutil` (command discovery), `logging`, `contextlib`, `dataclasses`, `decimal`, `functools.lru_cache`, `re`, `time`.
 
@@ -3017,6 +3106,19 @@ SEER_ENV_FILE=/home/miftah/seer/.env.local engine/.venv/bin/python -m seer_engin
 In production it runs through `sean.yml` (dispatched by the site after an upload, or by hand with
 `dry_run`) and as the last nightly step. Tests: `tests/test_sean_ledger.py` (the shared fixture),
 `tests/test_sean_marks.py`, and `tests/test_sean_command.py` (the DB tests need `PG_TEST_URL`).
+
+After a batch of new order screenshots, check the fee schedule (exit 1 means refit `sim/costs.py`):
+
+```
+SEER_ENV_FILE=/home/miftah/seer/.env.local engine/.venv/bin/python -m seer_engine sean calibrate
+```
+
+To see what Gotrade's real fees do to an older (flat-cost) lab method, run this report-only
+command. It writes a journal note, never a trial:
+
+```
+engine/.venv/bin/python -m seer_engine lab costs M0022
+```
 
 ### Gotchas
 - Do not use `with psycopg.connect(...) as conn`, because it commits on exit and defeats `--dry-run`. Use `contextlib.closing` instead.

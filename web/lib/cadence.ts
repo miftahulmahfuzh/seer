@@ -9,6 +9,7 @@ export const SPLIT_CADENCE_RULES: readonly string[] = [
   'monthly-rank-weekly-resize',
   'monthly-rank-weekly-resize-tbill',
   'monthly-rank-weekly-resize-frac',
+  'monthly-rank-weekly-resize-frac-gotrade',
 ];
 
 /** Does this strategy pick its stocks monthly and check how much to hold weekly? */

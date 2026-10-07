@@ -197,6 +197,13 @@ MONTHLY_RANK_WEEKLY_RESIZE_TBILL = replace(
 MONTHLY_RANK_WEEKLY_RESIZE_FRAC = replace(
     MONTHLY_RANK_WEEKLY_RESIZE, id="monthly-rank-weekly-resize-frac", fractional=True
 )
+# The two fractional book presets at Gotrade's real fees (sim/costs.py, fitted to the owner's
+# receipts; Sean, 2026-10-07). Lab methods from M0031 on are built on these (lab/real_costs.py),
+# and `promote` needs a preset of the variant's own id, so a real-fee winner can reach paper.
+MONTHLY_HOLD_FRAC_GOTRADE = replace(MONTHLY_HOLD_FRAC, id="monthly-hold-frac-gotrade", cost_model="gotrade")
+MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE = replace(
+    MONTHLY_RANK_WEEKLY_RESIZE_FRAC, id="monthly-rank-weekly-resize-frac-gotrade", cost_model="gotrade"
+)
 
 PRESETS: tuple[TradeRules, ...] = (
     DESIGN_V0,
@@ -212,6 +219,8 @@ PRESETS: tuple[TradeRules, ...] = (
     MONTHLY_RANK_WEEKLY_RESIZE_TBILL,
     MONTHLY_HOLD_FRAC,
     MONTHLY_RANK_WEEKLY_RESIZE_FRAC,
+    MONTHLY_HOLD_FRAC_GOTRADE,
+    MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE,
 )
 
 

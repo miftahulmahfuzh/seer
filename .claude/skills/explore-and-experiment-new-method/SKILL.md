@@ -66,7 +66,8 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
      fundamentals, intraday, options, short interest or sentiment. If it isn't testable:
      `lab block <id> --on "<data>"` plus a `data-wish` insight. Solo: choose another idea.
      Child: report `blocked`.
-   - **Executable?** Gotrade means long only, whole shares, regular session. Leverage, shorting
+   - **Executable?** Gotrade means long only and the regular session. Limit orders take
+     fractional shares; a take-profit/stop-loss bracket needs whole shares. Leverage, shorting
      and non-default ETFs need owner inputs and are never eligible. Test them only as evidence.
 4. **Write** `engine/src/seer_engine/lab/methods/mNNNN_<slug>.py` from `method_template.py`
    (this folder). Solo: the id comes from `lab next-id`, or from the backlog row.
@@ -83,6 +84,17 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
      dev window hides this because its back-adjusted 1990s prices are tiny. M0021 spent a look
      learning this: 18% invested, +3.3% a year vs SPY +13.6%. Whole shares are only for a strategy
      holding a few names, and only when you say why in the hypothesis.
+   - **Pay what Gotrade really charges.** From M0031 on, every variant runs at Gotrade's real
+     fees: build it on `MONTHLY_HOLD_FRAC_GOTRADE` or `MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE`
+     (`sim/rules.py`). They are the fractional presets with `cost_model="gotrade"`: the fee
+     schedule fitted to the owner's own order receipts (`sim/costs.py`;
+     `python -m seer_engine sean calibrate` checks it against every stored order). `lab run`
+     refuses a flat-cost variant. The fees bite hardest on small slots: a $28 order pays $0.13
+     (0.47%) where the lab used to assume 0.1%, so a 20–40-way book pays several times what the
+     old trials paid to trade. SPY pays the same fees in the same run, so the comparison stays
+     fair. Another cadence at real fees is `replace(<book preset>, cost_model="gotrade")`: it
+     runs on dev, but `promote` needs a preset of its id, so queue a `feature-wish` insight for
+     one if it wins.
    - Pure. Reads only bars dated ≤ `data_date`. Set `seen_keys`.
 5. **Test, then commit** only the method file. Run `pytest -q tests/test_lab_methods.py` and
    `ruff check src tests`. If the contract test fails, fix the method; never weaken the test.
@@ -102,7 +114,9 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    - worst year and when the drawdown hit
    - **why**: the mechanism, not just the numbers
    - whether the hypothesis held and whether the expected failure happened
-   - comparison with the parent or near misses
+   - comparison with the parent or near misses. A method from M0030 or earlier was measured at
+     the flat 0.1%; compare against its numbers from `lab costs <id>` (both fees side by side),
+     never against its recorded trial, or the fees decide the comparison instead of the idea
    - end with a paragraph that starts **`My opinion:`**. Say plainly whether this direction is
      worth more trials, what you would try next, and why. Commit to a view; no hedging.
    The verdict is one plain line the site shows next to the method's name.
@@ -165,6 +179,12 @@ Then:
    still eligible. A look spent on a configuration that could not buy its own picks is wasted and
    can never be retaken. Read the test trial's `exposure` against the dev trial's afterwards. A
    test exposure far below dev exposure means the look measured cash, and the analysis must say so.
+   **And at real fees.** A method from M0030 or earlier ran at the flat 0.1%. Before promoting
+   it, run `lab costs MNNNN` (report only: no trial, N unchanged; it journals what the fees did).
+   If its best variant stops beating SPY, or breaks a go-live condition at real fees, do not
+   promote it. If it still passes, register its real-fee twin as a one-variant variation method
+   on the `-gotrade` preset, run it on dev, and promote that one if it is still eligible. Paper
+   pays real fees, so the look is spent on the configuration paper would trade, or not at all.
 1. `python -m seer_engine lab promote MNNNN`. Read what it printed, then **commit and push
    `docs/lab/prereg/MNNNN.md` before any test number exists** (design §3) — the command prints the
    exact `git add` / `git commit` lines. `lab test` refuses while the file is uncommitted, so this
@@ -195,6 +215,9 @@ Then:
 | "Peek at 2016–2026" | Only through Promotion. Never edit `DEV_END`. |
 | "Delete that embarrassing trial" | Trials and insights are append-only (triggers). |
 | "It's eligible on dev, promote it as is" | Not in whole shares. Promote only the fractional configuration paper would trade (Promotion step 0). |
+| "My new method looks better at the flat 0.1%" | From M0031 `lab run` refuses it. The owner pays real fees; a method that only wins at the old assumption does not win. |
+| "Compare my numbers with that old trial's" | An old trial paid 0.1% a trade. Use `lab costs <old id>` and compare real fees with real fees. |
+| "`lab costs` showed it survives, call it eligible" | Never. `lab costs` is a report, not a trial. Only a new variation method on the `-gotrade` preset can be judged at real fees. |
 | "Max DD 21% is basically 20%" | The bar is 20% since 2026-10-07 (design §1 item 4, the owner's call) and "basically" is not a comparison. Never edit §1/§5, `tuning` thresholds or the P7a registry — they are the owner's dials, not yours. |
 | "The luck bar is still too high; nudge it" | Never. `DSR_MIN` is the owner's risk appetite and `DSR_POLICY` is the owner's call on what counts as an independent look (design §7). Run `lab luck` to see the sensitivity, journal what you found, and leave both alone. |
 | "Nothing worked, stop here" | Journal the insight and queue the next idea. |
@@ -206,6 +229,7 @@ Then:
 ```
 lab status | lab show M0007 | lab next-id | lab seen --find momentum
 lab run M0007                     # needs a committed method file
+lab costs M0007                   # report only: best variant at the flat 0.1% vs Gotrade's real fees; journals it, N unchanged
 lab note M0007 --file /tmp/a.md --verdict "..."
 lab insight --kind data-wish --title "Quarterly fundamentals" --body "..." --method M0007
 lab idea --name "..." --family ... --source-kind variation --parent M0007 --hypothesis "..."

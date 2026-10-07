@@ -64,7 +64,14 @@ def test_flat_is_absent_from_every_canonical_form():
         for c in m.candidates:
             assert "cost_model" not in config_text(c), c.id
     for r in PRESETS:
-        assert "cost_model" not in roster.rules_dict(r), r.id
+        if r.cost_model == "flat":
+            assert "cost_model" not in roster.rules_dict(r), r.id
+        else:  # the real-fee presets (Sean phase 7) name their model, so they digest apart
+            assert roster.rules_dict(r)["cost_model"] == "gotrade", r.id
+    assert [r.id for r in PRESETS if r.cost_model != "flat"] == [
+        "monthly-hold-frac-gotrade",
+        "monthly-rank-weekly-resize-frac-gotrade",
+    ]
 
 
 def test_gotrade_digests_differently():

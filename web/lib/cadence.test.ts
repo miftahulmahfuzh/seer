@@ -4,14 +4,15 @@ import {
 } from './cadence';
 
 describe('picksMonthlySizesWeekly', () => {
-  it('knows the three split-cadence rule sets', () => {
+  it('knows the four split-cadence rule sets', () => {
     expect(picksMonthlySizesWeekly('monthly-rank-weekly-resize')).toBe(true);
     expect(picksMonthlySizesWeekly('monthly-rank-weekly-resize-tbill')).toBe(true);
     expect(picksMonthlySizesWeekly('monthly-rank-weekly-resize-frac')).toBe(true);
-    expect(SPLIT_CADENCE_RULES).toHaveLength(3);
+    expect(picksMonthlySizesWeekly('monthly-rank-weekly-resize-frac-gotrade')).toBe(true);
+    expect(SPLIT_CADENCE_RULES).toHaveLength(4);
   });
   it('is false for every other rule set and for none', () => {
-    for (const id of ['monthly-hold', 'monthly-hold-frac', 'monthly-hold-tbill', 'weekly-hold', 'daily-switch', 'design-v0', '']) {
+    for (const id of ['monthly-hold', 'monthly-hold-frac', 'monthly-hold-frac-gotrade', 'monthly-hold-tbill', 'weekly-hold', 'daily-switch', 'design-v0', '']) {
       expect(picksMonthlySizesWeekly(id)).toBe(false);
     }
     expect(picksMonthlySizesWeekly(null)).toBe(false);

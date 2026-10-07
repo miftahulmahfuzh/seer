@@ -40,6 +40,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - The clobber guard knows a store by its content, not by its path (research-store-clobber-guard, the set's single phase): `commands/research_store.py`'s two `_same_dir` guards compare the `--store` path against `research.STORE_DIR` / `research.TEST_STORE_DIR`, which are derived from the **running module's own location** — so a `--test-window` build aimed at another checkout's or worktree's `engine/.research` was not refused, and a build replaces the whole directory. The **build path only** now also asks the target what it is: `_declared_window_or_none` wraps `research.declared_window`, and a declared window that disagrees with `--test-window` exits 2 before a single symbol is downloaded. The answer comes from the target's own `manifest.json`, so it holds for a store anywhere on the machine; `None` means *undecidable*, never *wrong*, so a missing, empty or unparseable target falls through and the first build of all still works. The two path guards are byte-for-byte unchanged and still fire first, and `--verify`, `--coverage` and `--refresh-fundamentals` are untouched — they read a store rather than replace one
 - A trial keeps the inputs of its own verdict (lab-luck-gate, phase 2): `lab/store.py` gains an additive, append-only `trial_moments` side table (`trial_n` primary key, then `sr_daily`, `t`, `skew`, `kurt`, `var_trials`, `n_at_run`, `measured`) held append-only by two triggers, `trial_moments_no_update` and `trial_moments_no_delete`; `SCHEMA_VERSION` moves 2 -> 3 and `_migrate` becomes a version ladder (`_v1_to_v2` / `_v2_to_v3`), so a v1 database reaches v3 in a single open. Its surface is `store.MomentsRow`, `MOMENTS_COLUMNS`, `insert_moments()` and `moments_of()`; `lab/runner.py` gains `Ran.moments`, with `trial_rows` hoisting its `daily_moments` call so the moments are captured and written in the **same transaction** as the trial they judged. The why is the load-bearing half: `trials` is append-only and a row's `dsr` is frozen at the N of its run date, so a verdict could never be recomputed — `trial_moments` keeps the exact inputs `dev.deflated_sharpe` was fed, so phase 3's `lab remeasure` and phase 4's derived verdict can re-judge a recorded trial at the current N without re-running the backtest. It changes no verdict and adds no `trials` row: the same `dev.deflated_sharpe` call on the same six arguments, `dsr`, `failed`, `eligible` and `n_trials_at_run` unchanged, `trials` still append-only, `test_looks` still 0
 - Every roster entry carries its lab provenance (lab-luck-gate, phase 6): a paper entry that came from a recorded lab candidate now says in code which lab method and variant it is, the lab status it was admitted under, and on what basis — `test-passed`, or `owner-override` with a one-line reason. `paper/roster.py` gains `Basis` / `BASES`, the frozen `LabProvenance` dataclass (which refuses an override with no reason), the `LAB_PROVENANCE` table keyed by roster id, and a `lab_provenance` field on `RosterEntry` that `from_row` fills from that table. It sits **outside** the spec, exactly where `status`, `paper_end`, `gate_note` and `gate_applicable` already sit, so no `spec_digest` moves and no entry is retired. `lab/store.py` gains `PROMOTION_BASES` and `promotion_basis(status)`, and `record_promotion` takes `basis=` / `reason=`, writes both into the method's `# Promotion` analysis section, and **refuses an unexplained owner override**. `promote` gains `--lab-override-reason`, requires it whenever the method is not at `test-passed`, and prints the `LAB_PROVENANCE` line to add in the same commit. The admission *policy* is unchanged (Decisions D3: paper membership has never required a gate pass, and the lab's design §3/§6 reading that a test pass leads to the roster is a *sufficient*, never a necessary, route); what changed is that the basis stopped being prose in a commit message. `tests/test_paper_roster.py` checks every provenance line against the committed `lab/lab.sqlite`
+- The verdict is derived, under one policy, at evaluation time (lab-luck-gate, phase 4): a dev trial's eligibility stopped being a column read back off the row and became something `lab/store.py` *decides* when asked. `store.verdict(conn, trial)` re-derives the four threshold owner conditions from the trial's own recorded columns against the live `tuning.MAX_DRAWDOWN` / `tuning.MIN_PROFIT_FACTOR` / `dev._MIN_TRADES` (`owner_failures`), carries only `owner inputs` from the record — the one condition no constant re-decides — and settles the luck test on that trial's DSR **at the gate's current N** (`dsr_at`, exact from `trial_moments` or recovered by inverting the recorded DSR through `recover_dsr`, deflated on both routes by today's `dev_sharpe_variance`). A DSR that cannot be evaluated *fails* the luck test, so nothing is admitted for being unmeasurable. The gate's two constants are `store.DSR_MIN` (0.95 -> 0.90, the owner's stated risk appetite) and the new `store.DSR_POLICY = "all-trials"`, the single name that decides N; `store.gate` / `pending_gate` resolve it, and `runner.trial_rows` is a two-line delta onto `pending_gate`, so a trial recorded tonight is judged by the same bar as one recorded six weeks ago. Recorded rows keep the labels of the bars they were judged under — all 110 say `DSR >= 0.95` and `max DD <= 15%` — so every reader goes through `is_luck_label` and `owner_failures` rather than comparing to `DSR_LABEL` or parsing `failed`. `TRANSITIONS` gains exactly one new edge, `('rejected','dev-eligible')`, reachable only through the twice-guarded `reevaluate_method` behind the new `lab reevaluate` command. Nothing in `trials` is written, the lab's N does not move and `test_looks` is still 0; `lab/lab.sqlite` takes an additive, idempotent migration (schema_version 3) and `web/data/lab.json` is re-exported from it. Net effect: at (N = 110, DSR >= 0.90, max DD <= 20%) exactly three trials are eligible — `M0022-W-TV14`, `M0022-W-TV16` and `M0020-W-NOSTOP` — so the promotion path is reachable for the first time, and `(all-trials, 0.95, 15%)` reproduces the previous verdicts exactly
 
 ## Layout
 
@@ -127,9 +128,9 @@ engine/
     lab/                    the method lab (docs/plans/2026-10-04-method-lab-design.md); only store.py and prereg.py touch the disk
       __init__.py           docstring only
       method.py             a lab method file: METHOD, Candidate, METHOD_ID, discover(), config_digest(), source_sha()
-      store.py              lab/lab.sqlite: committed and append-only; methods, trials, ideas, insights; TRANSITIONS, record_promotion(), best_dev_eligible() (build-promotion-path phase 3); PROMOTION_BASES, promotion_basis() and record_promotion's basis= / reason= (lab-luck-gate phase 6); the append-only trial_moments side table with MomentsRow, MOMENTS_COLUMNS, insert_moments(), moments_of(), SCHEMA_VERSION now "3" and the _v1_to_v2 / _v2_to_v3 migration ladder (lab-luck-gate phase 2)
-      npolicy.py            the luck gate's N policy (lab-luck-gate phase 1): POLICIES all-trials / methods / effective, DEFAULT_POLICY, correlation(), participation_ratio(), effective_n() -> NCount. Pure, reads only, no callers yet
-      runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4)
+      store.py              lab/lab.sqlite: committed and append-only; methods, trials, ideas, insights; TRANSITIONS, record_promotion(), best_dev_eligible() (build-promotion-path phase 3); PROMOTION_BASES, promotion_basis() and record_promotion's basis= / reason= (lab-luck-gate phase 6); the append-only trial_moments side table with MomentsRow, MOMENTS_COLUMNS, insert_moments(), moments_of(), SCHEMA_VERSION now "3" and the _v1_to_v2 / _v2_to_v3 migration ladder (lab-luck-gate phase 2); the **derived verdict** (lab-luck-gate phase 4) — DSR_MIN and DSR_POLICY as the gate's two constants, LUCK_LABEL_PREFIX / is_luck_label(), recorded_labels(), OWNER_INPUTS_LABEL / owner_failures(), sr_star(), recover_dsr(), dev_sharpe_variance(), dsr_at(), Gate / gate() / pending_gate(), Verdict / verdict(), best_dev_eligible() now judging on it, and the twice-guarded REEVALUATION_MARKER / Reevaluation / reevaluate_method() / reevaluate() behind the one new ('rejected','dev-eligible') transition
+      npolicy.py            the luck gate's N policy (lab-luck-gate phase 1): POLICIES all-trials / methods / effective, DEFAULT_POLICY, correlation(), participation_ratio(), effective_n() -> NCount. Pure, reads only; `store.gate` is its one caller since lab-luck-gate phase 4
+      runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4). The luck test's N comes from store.pending_gate since lab-luck-gate phase 4
       prereg.py             the docs/lab/prereg/MNNNN.md pre-registration: Prereg, render()/parse(), require_committed(), check_digest(), check_source(), promote_method() (build-promotion-path phase 3)
       remeasure.py          `lab remeasure`: re-runs a recorded method's variants on the dev window, proves the re-run reproduces each trial's recorded Sharpe and DSR, and appends trial_moments rows -- Batch, Plan, Reproduced, Report, resolve_method(), batches_of(), preflight(), measure(), check(), remeasure(), format_report() (lab-luck-gate phase 3)
       seed.py               one-time import of the pre-lab record (P7a's 54 candidates)
@@ -143,7 +144,7 @@ engine/
       backtest_b.py         `backtest_b` command (P6a)
       research_store.py     `research_store` command (P7a)
       backtest_dev.py       `backtest_dev` command (P7a)
-      lab.py                `lab` command: the method lab (status / show / run / promote / test / remeasure / idea / note / insight / stage / export ...)
+      lab.py                `lab` command: the method lab (status / show / run / promote / reevaluate / test / remeasure / idea / note / insight / stage / export ...)
       nightly.py            `nightly` command (P1; P4 adds dividends and held paper symbols)
       paper.py              `paper` command (P4)
       paper_check.py        `paper_check` command (P4)
@@ -755,6 +756,64 @@ nothing else. It is addressed by **method**, one at a time, on demand.
   every refusal above and an unknown method; 1 for anything else.
 - Measured: `lab remeasure M0022` reproduced all three recorded DSRs bit-identically.
 - Tests: `tests/test_lab_remeasure.py` (13), with the fixtures in `tests/labkit.py`.
+
+### `lab reevaluate` (lab-luck-gate phase 4)
+
+```
+python -m seer_engine lab reevaluate [M0022 ...]
+```
+
+Re-judges recorded dev trials against the bars in force **now** — `store.DSR_MIN`,
+`store.DSR_POLICY` and `tuning.MAX_DRAWDOWN` — and moves a method those bars unblock from
+`rejected` to `dev-eligible`. With no argument it sweeps every method that reads `rejected`.
+
+- **It reads only the database.** No research store is loaded, no backtest runs, no `trials` row is
+  inserted, updated or deleted, so the lab's N does not move and `test_looks` is untouched. Every
+  recorded `dsr`, `eligible`, `failed` and `n_trials_at_run` still reads exactly as it did —
+  including the `DSR >= 0.95` and `max DD <= 15%` labels that rejected a method, which name the
+  bars of their own day. What is written is two things: one dated `# Re-evaluation` section
+  appended to the method's `analysis` (append-only by trigger, the shape `record_promotion` uses)
+  naming the threshold, the policy, the N and the date that re-judged it, and the `status` column.
+- **One edge, from one status** (`store.TRANSITIONS` gains `('rejected','dev-eligible')`, Decision
+  D2). "Status moves forward only" protects verdicts from being *erased*, and nothing here erases
+  one: the trials that decided the rejection stay in the append-only `trials` table and the
+  re-evaluation is appended, not rewritten. Without the edge the loosened bars would be
+  unreachable — the methods they unblock already read `rejected`, and re-judging one under a new id
+  would need a duplicate configuration digest, which `has_trial` refuses outright. A method at any
+  other status is left alone (`moved` False), and there is no second edge in, so nothing moves
+  twice.
+- **Twice guarded, on purpose.** `store.verdict` derives the five conditions; `store._blocking`
+  then repeats the four threshold comparisons against the same live constants **in its own code**
+  and refuses outright when the recorded `failed` carries `owner inputs`. Two owner-set bars moved
+  in this plan set (the luck threshold here, the drawdown bar in phase 8), and a gate that loosens
+  on two axes at once is worth two noes written in two places: a trial that reads derived-eligible
+  but does not clear the second check is a contradiction inside the module and raises `LabError`
+  rather than promoting quietly. The rule is about the numbers, not the string — `M0020-W-NOSTOP`
+  recorded `"max DD <= 15%; DSR >= 0.95"` and *should* move, because the owner moved both of those
+  bars.
+- **Neither the threshold nor the policy is a flag.** A write path that could unblock a method
+  under any bar on request would make both constants decorative. The read-only comparison across
+  policies is phase 5's `lab luck`; the pairing is deliberate and the names are deliberately not
+  neighbours — **`lab reevaluate` writes, `lab luck` reads**.
+- **A trial whose DSR cannot be evaluated fails the luck test** and is counted and named per
+  method rather than passed over in silence — the 54 P7a seed rows, whose `dsr` is NULL by
+  construction, are the case that matters.
+- **`--dry-run` is ignored**, as it is for every `lab` subcommand but `test`. The whole sweep is
+  one `BEGIN IMMEDIATE` transaction: either every method it unblocks moves, or none does.
+- **Output**: the luck bar, the policy and the N (with the dev trial row count beside it), then one
+  line per method — moved, no dev trial, no evaluable DSR anywhere, or re-judged and unchanged —
+  then `K method(s) moved rejected -> dev-eligible; test-window looks used: 0`. When anything
+  moved it prints the `lab export-json` line to refresh `web/data/lab.json` and says to commit it
+  with `lab/lab.sqlite` (`export-json`, not `stage`, because `lab stage` also `git add`s and the
+  swarm shares one worktree).
+- `lab status`'s "misses" column now comes from `store.owner_failures(row)` rather than from
+  splitting the row's `failed` string and dropping `DSR_LABEL`: the string names the bars of the
+  run date, and both of them have since moved.
+- **Exit codes**: 0 success (a sweep that moves nothing is a successful run); 2 for any
+  `store.LabError`, which is every refusal above; 1 for anything else.
+- Tests: `tests/test_lab_gate_policy.py` (33) — the derived verdict, the two routes to a DSR, the
+  three unblocked candidates, the near misses that stay out, and the proof that
+  `(all-trials, 0.95, 15%)` reproduces the previous verdicts exactly.
 
 
 ## Exported API
@@ -1932,7 +1991,9 @@ committed-file gate. Nothing in it loads a research store, runs a backtest or wr
 - `gate_text()` is **built** from `backtest.dev.FAILURE_LABELS` and `store.DSR_LABEL` rather than
   retyped, so a file written next year cannot claim a condition the code stopped applying. What it
   states is the **dev** gate the variant passed to become `dev-eligible` (the five P7a D8 conditions
-  plus `DSR >= 0.95` at N = every dev trial in the lab). It is *not* the gate the one test-window look
+  plus `store.DSR_LABEL`, the luck test at `store.DSR_MIN` and at the N `store.DSR_POLICY` resolves
+  to — since phase 4 both are read off the constants rather than being a fixed 0.95 at the dev trial
+  row count). It is *not* the gate the one test-window look
   is judged by: that is the five D8 conditions alone, because a pre-registered look has no selection
   among results to deflate, so DSR is recorded on the test trial and is not a condition. `render`
   says so in the file's prose, so a reader of the pre-registration cannot mistake one for the other.
@@ -1953,8 +2014,9 @@ committed-file gate. Nothing in it loads a research store, runs a backtest or wr
 
 `lab/npolicy.py` holds the answer to "N what?" in the deflated Sharpe the lab's luck gate applies.
 It is pure — it reads a lab SQLite connection, writes nothing, and touches no clock, filesystem or
-network — and it **has no callers yet**: phase 4 of the `lab-luck-gate` plan set wires the gate to
-it. Until then the gate still deflates by the dev trial row count, exactly as before.
+network. Phase 4 of the `lab-luck-gate` plan set wired the gate to it: `store.gate` is its one
+caller, it is always passed a policy name explicitly (never `DEFAULT_POLICY`), and the name the
+lab ships is `store.DSR_POLICY`.
 
 - **Why it exists.** `backtest.dev.deflated_sharpe` assumes `n_trials` *independent* trial Sharpes.
   The lab hands it one per dev `trials` row, and those rows are not independent: measured over the
@@ -1996,6 +2058,106 @@ it. Until then the gate still deflates by the dev trial row count, exactly as be
   gives `participation_ratio = 1.0` and `mean_pairwise = None` — one look is still one look — rather
   than an exception, because the module must never raise on data it only reads.
 - `dev_method_count(conn) -> int`: distinct `method_id` over `window = 'dev'` trials.
+
+### lab: the derived verdict (lab-luck-gate phase 4)
+
+A dev trial's eligibility is **decided when it is asked for**, not read back off the row. `trials`
+is append-only, so a recorded `dsr`, `eligible` and `failed` name the bars in force on the run
+date; the lab's two owner-set bars both moved on 2026-10-07, and a leaderboard that mixes bars
+cannot be read. `lab/store.py` owns the whole of it — the two constants, the derivation, and the
+one write path that acts on it.
+
+- **The two constants, and nothing else decides the gate.** `DSR_MIN` is the threshold (0.95 ->
+  0.90, the owner's stated risk appetite, Decision D1) and `DSR_POLICY = "all-trials"` is the
+  single name that decides N (Decision D2). There is no policy over the threshold and no second
+  place either number is written. `DSR_LABEL` is **derived** from `DSR_MIN`
+  (`LUCK_LABEL_PREFIX + f"{DSR_MIN:.2f}"`), so the label and the threshold can never disagree.
+- `is_luck_label(label) -> bool`: true for a luck-test failure label recorded under *any*
+  threshold the lab has used. Recognising the luck label by `label == DSR_LABEL` stops working the
+  moment `DSR_MIN` moves — the recorded rows say `"DSR >= 0.95"` — and a luck-only rejection would
+  then read as an owner failure and could never be reconsidered. The five P7a D8 labels are never
+  of this shape, so the prefix is an exact discriminator. Every reader uses this.
+- `recorded_labels(failed) -> tuple[str, ...]`: a recorded `failed` string split into its labels.
+  **History, not a verdict** — use it to show what the lab said at the time, never to decide what a
+  trial is today.
+- `OWNER_INPUTS_LABEL` / `owner_failures(trial) -> tuple[str, ...]`: the five P7a D8 conditions the
+  row misses *as they read now*, in `dev.FAILURE_LABELS` order. **Four re-derived, one carried.**
+  `beats SPY TR`, `max DD`, `PF` and `trades` are thresholds over columns `trials` already records,
+  so they are recomputed from those columns against the live `tuning.MAX_DRAWDOWN`,
+  `tuning.MIN_PROFIT_FACTOR` and `dev._MIN_TRADES` — the same comparisons `dev.py` makes, on the
+  same values. `owner inputs` is carried from the recorded string, because it is the one condition
+  that is not a threshold: it asks whether a human hand-picked a parameter of the *candidate*,
+  there is no column to recompute it from, and no constant re-decides it. It takes the **row**, not
+  the string, so a trial recorded under the 15% drawdown bar is read against today's.
+- `sr_star(n_trials, var_trials) -> float`: `dev.deflated_sharpe`'s own hurdle line, isolated so it
+  can be asked for at an N no trial was ever run at. The formula being inverted, not a second
+  opinion about it.
+- `recover_dsr(*, sharpe_daily, dsr_at_run, n_at_run, var_trials, n_trials) -> float | None`: a
+  recorded DSR re-evaluated at `n_trials` looks. `DSR = Phi((SR - SR*(N)) * k)` and `k` does not
+  depend on N, so `k` is recovered by inverting a known DSR at the N it belongs to and the answer
+  is the same `Phi` with a different `SR*`. **At `n_trials == n_at_run` it returns `dsr_at_run`
+  exactly, for any `var_trials`** — which is what makes it a *re-reading* of the record. Monotone
+  in N above a half, which is the ratchet as arithmetic. `None` where the inversion is undefined
+  (fewer than two looks at either N, non-positive `var_trials`, a non-finite input, a DSR of
+  exactly 0 or 1, or an SR sitting exactly on the hurdle).
+- `dev_sharpe_variance(conn) -> float | None`: the sample variance of the dev trials' daily
+  Sharpes **as the lab stands now** (`None` below two), the same expression `runner.trial_rows`
+  deflates by.
+- `dsr_at(conn, trial, n_trials) -> float | None`: the trial's DSR at `n_trials` looks, by two
+  routes — exactly from `trial_moments` when phase 2's `lab run` or phase 3's `lab remeasure`
+  recorded them, otherwise by inverting the recorded `dsr` through `recover_dsr`. **Both routes
+  deflate by `dev_sharpe_variance(conn)` and never by the `var_trials` recorded beside the trial**
+  (Decision D12): the variance is read once, before the branch, so the two cannot drift. The
+  deflated Sharpe asks how extreme a Sharpe is against the maximum of N draws from the
+  trial-Sharpe distribution, and *both* N and that distribution must describe the search as it is
+  today — pairing today's N with a frozen variance would mix bars one column over. The recorded
+  `var_trials` stays in `trial_moments` as history. `None` when the recorded `dsr` is NULL, which
+  is the 54 P7a seed rows by construction.
+- `Gate(n, policy)` / `gate(conn, policy=None) -> Gate`: the luck bar in force right now. The
+  threshold is deliberately not in it — that is `DSR_MIN`, one constant. `gate` memoises per
+  (database file, policy, dev trial set): `npolicy.effective_n` eigendecomposes 110 month-end
+  curves, and `lab status` asks for a verdict once per method. The key is content-derived — a
+  `sqlite3.Connection` has nowhere to hang a cache and nothing safe to key on — and because
+  `trials` is append-only, `(row count, highest trial number, distinct methods)` pins the dev trial
+  set exactly, so the cache is self-invalidating. In-memory databases are never cached. A caller
+  judging many trials should still resolve it once and pass `at=`.
+- `pending_gate(conn, method_id, pending, *, policy=None) -> Gate`: the gate a batch of `pending`
+  new dev trials will be judged under. The batch is not in the database yet and `trials` is
+  append-only, so the count is projected forward *in the unit the policy counts in*: `all-trials`
+  gives N + `pending` (exactly `dev_trial_count(conn) + len(results)`, the expression
+  `runner.trial_rows` used before the policy existed), `methods` gives N + 1 only for a method with
+  no dev trial yet, `effective` gives N, and an unrecognised name gives N + `pending`, the most
+  punishing of the three. Every branch returns at least `gate(conn).n`.
+- `Verdict(dsr, failed, eligible, n, policy, derived)` / `verdict(conn, trial, *, at=None,
+  policy=None)`: the trial's eligibility as it reads now. **Nothing is returned verbatim** — the
+  four threshold conditions come from `owner_failures`, `owner inputs` is carried, and the luck
+  test is decided on `dsr_at(conn, trial, g.n)`, this trial's DSR **at the gate's current N**,
+  never at the N it happened to be run under. Re-thresholding only when `n_trials_at_run` already
+  equals the gate's N is explicitly superseded: it would admit a candidate for having been tried
+  *earlier*, which is the defect the phase exists to remove. **A DSR that cannot be evaluated
+  fails the luck test**, the same rule `runner.trial_rows` applies to a new trial whose DSR comes
+  back `None` — `derived` is False exactly then, and `dsr` is `None` with it. `failed == ()` is
+  `eligible`, always. `policy` exists for a read-only comparison; the write paths never pass it.
+- `best_dev_eligible` is unchanged in contract and now judges on `verdict(...).eligible` rather
+  than the frozen `eligible` column, so two trials recorded six weeks apart are ranked against the
+  same bar. The ordering is still MAR then `n`, and selection is still **never** on DSR. It takes
+  `at=` / `policy=` and resolves the gate after the rows are fetched, so a method with no
+  comparable dev trial costs no estimator read.
+- `REEVALUATION_MARKER`, `Reevaluation(method_id, status_before, status_after, moved, gate,
+  unblocked, derived, unjudgeable, dev_trials)`, `reevaluate_method(conn, method_id)` and
+  `reevaluate(conn, method_ids=None)`: the one write path that reconsiders a verdict, behind the
+  single new `('rejected','dev-eligible')` transition and the independent `_blocking` check. The
+  CLI section above has its rules, its refusals and its output; the caller holds the transaction,
+  as every other writer in this module does.
+- `runner.trial_rows` is a two-line delta onto this: `n_trials` is `store.pending_gate(conn,
+  method.id, len(results)).n` instead of `dev_trial_count(conn) + len(results)`. `n_trials_at_run`
+  still records **the N the DSR was computed at**, which is what it has always meant, and the
+  variance is still the sample variance across every recorded dev trial plus the batch — only the
+  *count* of looks is policy-dependent, never the dispersion the expected maximum is drawn from.
+- **Imports stay inside the functions.** `store.gate` imports `lab.npolicy` inside itself, and
+  `owner_failures` / `dsr_at` / `_blocking` import `backtest.dev` and `backtest.tuning` inside
+  themselves, so `import store` — which the whole lab does — still drags in neither the estimator's
+  curve arithmetic nor the backtest package, and no module-scope cycle is closed.
 
 ### paper (P4)
 
@@ -2219,7 +2381,7 @@ exception. The real night is `migrate` → `nightly` → `veto` → `paper` → 
 - `strategies.c` imports `dates`, `sim` (`Pick`), `strategies.a` (`STRATEGY_A`, `STRATEGY_A_PARAMS`, `AParams`) and `strategies.base`; never `finnhub`, `llm`, `db` or `universe`. `finnhub` imports `config`, `http` (`redact`), `requests` and `strategies.c` (`Headline`). `commands.veto` imports `db`, `dates`, `demo`, `runs`, `finnhub`, `llm`, `commands.nightly` (`_parse_now`), `paper.roster`, `paper.store`, `sim.sizing` (`Pick`) and `strategies.c`.
 - `commands.promote` (phase 5) imports `config`, `dates`, `db`, `lab.store`, `lab.method` (`discover`, inside the function), `paper.roster`, `paper.store`, `sim.rules` (`TradeRules`) and `psycopg.types.json.Jsonb`. It never imports `backtest.registry` (D1), and it is the only module that holds a Neon connection and a lab SQLite connection at the same time — sequentially, never in one transaction.
 - `lab.prereg` (build-promotion-path phase 3) imports `config`, `lab.store` and `lab.method` (`METHOD_ID`, `config_digest`, `source_sha`), plus `sqlite3` from the standard library. `backtest.dev` (`FAILURE_LABELS`, `DEV_END`), `dates` (`next_session`), `lab.method.discover` and `commands.backtest_dev.registry_problem` — the same `git status` check `lab run` makes on a method file — are imported *inside* the functions that need them, so importing `lab.prereg` does not drag in `backtest`. `commands.lab`'s `promote` handler imports `lab.prereg` and `lab.runner.git_head` inside the function. It never touches Neon: the pre-registration is a lab-side artefact only.
-- `lab.npolicy` (lab-luck-gate phase 1) imports numpy and `sqlite3` only at module scope; it imports `lab.store` (for `dev_trial_count`) *inside* `effective_n`, because `store` will import `npolicy` once the gate reads the policy and a module-scope import would close that cycle. It imports no `backtest` module, no `db`, no `config` and no `http`. Nothing imports it yet.
+- `lab.npolicy` (lab-luck-gate phase 1) imports numpy and `sqlite3` only at module scope; it imports `lab.store` (for `dev_trial_count`) *inside* `effective_n`, because `store` will import `npolicy` once the gate reads the policy and a module-scope import would close that cycle. It imports no `backtest` module, no `db`, no `config` and no `http`. Since phase 4, `lab.store.gate` is its one importer, and the import is likewise *inside* `gate` — so the cycle stays open at module scope in both directions, and `import lab.store` does not pull numpy in. `lab.store` keeps the same discipline for the rest of the derived verdict: `backtest.dev` and `backtest.tuning` are imported inside `owner_failures`, `dsr_at`, `sr_star`, `_blocking` and `reevaluate_method`, never at module scope.
 - `paper.compare` (phase 3) imports nothing from the package at all — only the standard library — which is what keeps it portable to the leaderboard's TypeScript port. `commands.compare` imports `db`, `paper.compare` and `psycopg`, and reads one table.
 - `paper.book` and `paper.replay` (phase 6) also import `MarketAware` and `prepare_for` from `strategies.allocator`; `paper.roster` imports `strategies.f_fundamental` (`FUNDAMENTAL`, `FundamentalParams`) and still never imports `lab.methods.*` — the lab must not become an input to a paper spec digest.
 ### Standard library
@@ -2533,7 +2695,7 @@ which writes nothing. A committed report always comes from a full run over a cle
 - **A promotion leaves `paper_start` NULL on purpose.** `promote` writes the row; the next paper night freezes the spec and starts the clock. Never back-date a promoted entry's `paper_start`, and never re-point a started id at another algorithm — `promote` raises `AlreadyStarted` for exactly that. Promote under a new id and `--retire` the old one in the same command, so the swap is one transaction.
 - **The roster write and the lab note cannot be one transaction** (Neon and SQLite). The roster commits first; if the lab note is then lost, re-run the identical `promote` command — both halves are idempotent. Never reorder them: the lab is append-only, so a note for a promotion that did not happen cannot be withdrawn.
 - **A pre-registration is written once and never rewritten** (design §3). `lab promote` leaves an existing `docs/lab/prereg/MNNNN.md` byte-for-byte alone, date line included, and raises rather than re-pointing it at a better variant found later; if the first choice is genuinely wrong, that is a new method with its own dev trials. And the file must be committed **and pushed before** `lab test`: `prereg.require_committed` refuses on a file git does not track or that has staged or unstaged changes, which is the whole point of putting the record in git.
-- **The gate named in a pre-registration is the dev gate, not the test gate.** `prereg.gate_text` states what the variant passed to become `dev-eligible` (the five P7a D8 conditions plus `DSR >= 0.95` at N = every dev trial). The one test-window look is judged by the five D8 conditions alone; DSR is recorded on the test trial and is not a condition, because a pre-registered look has no selection among results to deflate and a look is not a search.
+- **The gate named in a pre-registration is the dev gate, not the test gate.** `prereg.gate_text` states what the variant passed to become `dev-eligible` (the five P7a D8 conditions plus `store.DSR_LABEL` — the luck test at `store.DSR_MIN`, at the N `store.DSR_POLICY` resolves to; both read off the constants since lab-luck-gate phase 4, so the file states the bar that was actually applied rather than a retyped one). The one test-window look is judged by the five D8 conditions alone; DSR is recorded on the test trial and is not a condition, because a pre-registered look has no selection among results to deflate and a look is not a search.
 - `paper` runs only after a successful bars run for the same session, and only in the `seer-db-writer` concurrency group. Never run a real (non-`--dry-run`) `paper` locally against Neon while the scheduled job may run, and never before the code is on `main` (D11: no back-dated paper days).
 - `paper_check` reports a strategy `split-affected` (not failed) once an applied split touched a symbol it held or had pending: whole-share rounding before and after a split cannot match a replay over adjusted bars.
 - `explain` must never decide anything: it writes text only, and a failure leaves NULL. It reads only stored evidence. Never add order mechanics, rule text or anything outside the facts to its prompt, and never loosen `vet` to let a reply through: a NULL note shows the facts on the site, while a wrong note shows advice the facts do not support.

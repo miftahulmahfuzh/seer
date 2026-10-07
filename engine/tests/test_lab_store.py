@@ -66,14 +66,26 @@ def test_a_configuration_runs_once_per_window(conn):
 
 
 def test_best_dev_eligible_is_the_highest_mar_and_breaks_ties_on_the_trial_number(conn):
+    # Since LAB_LUCK_GATE_PLAN.md phase 4, "eligible" here is `store.verdict(...).eligible`, not
+    # the recorded `eligible` column -- so the rows have to be eligible in their NUMBERS, under
+    # the bars in force now. Two consequences for this fixture, neither of which touches what the
+    # test is about (MAR order, the tie on `n`, the NULL MAR and the test trial):
+    #   * the Sharpes differ, so the lab has a trial-Sharpe variance for `dsr_at` to deflate by
+    #     -- with one repeated Sharpe there is no dispersion and no DSR is evaluable at all;
+    #   * `n_trials_at_run` is the 4 dev rows below, so each DSR is read back at its own N, and
+    #     C is kept out by a 24.5% drawdown rather than by its recorded `failed` string.
     _method(conn)
     assert store.best_dev_eligible(conn, "M0001") is None
     with conn:
         store.insert_trials(conn, [
-            _trial(candidate_id="M0001-A", config_digest="da", mar=0.9, eligible=True, failed=""),
-            _trial(candidate_id="M0001-B", config_digest="db", mar=0.9, eligible=True, failed=""),
-            _trial(candidate_id="M0001-C", config_digest="dc", mar=1.4),  # not eligible
-            _trial(candidate_id="M0001-D", config_digest="dd", mar=None, eligible=True, failed=""),
+            _trial(candidate_id="M0001-A", config_digest="da", mar=0.9, eligible=True, failed="",
+                   dsr=0.95, sharpe=0.80, n_trials_at_run=4),
+            _trial(candidate_id="M0001-B", config_digest="db", mar=0.9, eligible=True, failed="",
+                   dsr=0.95, sharpe=0.94, n_trials_at_run=4),
+            _trial(candidate_id="M0001-C", config_digest="dc", mar=1.4, max_drawdown=0.245,
+                   dsr=0.95, sharpe=1.10, n_trials_at_run=4),  # not eligible: drawdown
+            _trial(candidate_id="M0001-D", config_digest="dd", mar=None, eligible=True, failed="",
+                   dsr=0.95, sharpe=1.46, n_trials_at_run=4),
             _trial(candidate_id="M0001-E", config_digest="de", window="test", mar=2.0,
                    eligible=True, failed=""),
         ])
@@ -127,12 +139,18 @@ def test_moments_need_a_real_trial_number(conn):
 
 
 def test_status_only_moves_forward(conn):
+    # `rejected -> dev-eligible` is the one edge out of `rejected` (LAB_LUCK_GATE_PLAN.md
+    # Decision D2) and is exercised in test_lab_gate_policy.py, where the Python guard that
+    # admits it lives. Every other move out of `rejected` is still refused, which is what this
+    # test is about.
     _method(conn)
     with conn:
         store.update_method(conn, "M0001", status="registered")
         store.update_method(conn, "M0001", status="rejected")
     with pytest.raises(store.LabError, match="forward"):
-        store.update_method(conn, "M0001", status="dev-eligible")
+        store.update_method(conn, "M0001", status="promoted")
+    with pytest.raises(store.LabError, match="forward"):
+        store.update_method(conn, "M0001", status="paper")
     with pytest.raises(store.LabError, match="forward"):
         store.update_method(conn, "M0001", status="idea")
 

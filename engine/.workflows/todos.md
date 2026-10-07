@@ -3,7 +3,7 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-07
-**Total Active Tasks**: 3
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
@@ -13,8 +13,8 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 3
-- Completed: 88
+- Blocked: 2
+- Completed: 89
 
 ---
 
@@ -609,15 +609,31 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Completion: no `**Commit**` field, and `LAB_LUCK_GATE_PLAN.md` left untouched (rung 6: phases 1, 2 and 6's precedent; rung 3: the set is a swarm whose coordinator owns the ledger at `.workflows/orchestration/lab-luck-gate/ledger.json`). The index's phase table has no tick column — its TaskID and Card columns are `—` for all nine rows — and six peers hold it open; the sha goes to the coordinator instead.
     - No peer phase's task was unblocked or altered: phase 9 (`P1-ENG-ALY2`) stays `blocked` and the coordinator releases it; phase 4 (`P1-ENG-B6Y5`) is in flight in a peer session. `next_task_id` was deliberately empty.
     - Quick Stats recounted from the file rather than blind-decremented (recount is idempotent under concurrency; a decrement compounds the race).
-- [ ] **P1-ENG-B6Y5** Phase 4: The verdict is derived under one policy, at the current N
+- [x] **P1-ENG-B6Y5** Phase 4: The verdict is derived under one policy, at the current N
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns the gate change: `store.DSR_MIN` 0.95 → 0.90 (sole owner), `store.DSR_POLICY = "all-trials"` as the single constant deciding N, and `store.verdict(conn, trial)` deciding every condition at evaluation time — the four threshold owner conditions re-derived from the trial's recorded columns against the live constants, `owner inputs` carried from the record, and the luck test decided on the trial's DSR at the gate's current N (`store.dsr_at`, exact from `trial_moments` or recovered by `store.recover_dsr`). Also owns the shared label/arithmetic helpers (`LUCK_LABEL_PREFIX`, `is_luck_label`, `recorded_labels`, `OWNER_INPUTS_LABEL`, `owner_failures`, `sr_star`, `recover_dsr`, `dev_sharpe_variance`, `dsr_at`), `best_dev_eligible`, the twice-guarded `("rejected", "dev-eligible")` transition, `runner.trial_rows`'s two-line delta, `lab reevaluate`, and the additive idempotent migration of the committed `lab/lab.sqlite` plus its re-export of `web/data/lab.json`. `dsr_at` deflates by today's `dev_sharpe_variance` on BOTH routes (D12). Exit: at (N=110, DSR >= 0.90, max DD <= 20%) exactly three trials are eligible — M0022-W-TV14, M0022-W-TV16, M0020-W-NOSTOP — with M0007-N20-RAW explicitly not eligible (0.8985 at N=110) and M0011 still out; a trial whose DSR cannot be evaluated fails the luck test; `DSR_POLICY="all-trials"`, `DSR_MIN=0.95` and `MAX_DRAWDOWN=0.15` together reproduce `main`'s verdicts exactly; all 110 recorded `dsr`/`eligible`/`failed`/`n_trials_at_run` columns byte-identical before and after; `test_looks` 0; `pytest` green.
-  - **Status**: blocked
+  - **Status**: completed
   - **Plan Set**: `LAB_LUCK_GATE_PLAN.md` (phase 4 of 9)
   - **Satisfies**: R1 — The gate admits nothing at 110 trials and the bar rises with every exploration regardless of merit — 110 correlated variant rows deflated as 110 independent trials; R2 — A trial's verdict is frozen at the N of its run date, so verdicts are not comparable across time and a method can never be re-judged.
   - **Depends on**: P1-ENG-FNKE, P1-ENG-6134, P1-ENG-EH4K
   - **Plan**: `.workflows/plan/P1-ENG-B6Y5.md`
+  - **Completed**: 2026-10-07 13:42
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/store.py, engine/src/seer_engine/lab/runner.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_store.py, engine/tests/test_lab_gate_policy.py, engine/tests/test_lab_prereg.py, engine/tests/test_lab_snapshot.py, engine/.workflows/plan/P1-ENG-B6Y5.md, lab/lab.sqlite, web/data/lab.json, engine/.workflows/todos.md
+  - **Verified**: full engine suite with `PYTHONPATH=src`, `PG_TEST_URL` set and `-o addopts="-ra"` (serial; `pytest-xdist` absent from the shared venv) -> **3122 passed, 0 failed**, 153 warnings in 327s. Gate moved and still discriminates: import check prints `0.9 DSR >= 0.90 all-trials True`. Committed `lab/lab.sqlite` after migration: `schema_version` 3, 110 trials, `trial_moments` 0, test-window looks 0, M0020 and M0022 both `dev-eligible`. Recorded-column digest over all 110 trials `166ae36bdc4425cebd7380b0187f9c21dc7726d502fe999bd7746e60bc974016` -- byte-identical to the plan's constant, so no recorded `dsr`/`eligible`/`failed`/`n_trials_at_run` changed. Migration idempotent: two consecutive `lab reevaluate` runs give identical `sqlite3 .dump` sha256. `web/data/lab.json` regenerated with `lab export-json` (not `lab stage`, which would `git add` in a shared worktree): `gate.dsrMin` 0.90, `gate.maxDrawdown` 0.20, `summary.byStatus` rejected 24 / dev-eligible 2. No reader compares the luck label by equality (`grep -rn 'DSR_LABEL' engine/src | grep -E '==|!=|\bin \b' | grep -v is_luck_label` returns only comments and f-string writes). `lab status` renders; M0022-W-TV14 and M0022-W-TV16 both show `misses 0`. `lab promote M0022` on a copy pre-registers M0022-W-TV14, MAR 0.856651, DSR 0.912210 at N = 110 -- **the promotion path is reachable for the first time** -- with `git status docs/lab/prereg/` clean.
+  - **Drift**:
+    - The plan's Step 8 claimed no other existing test breaks; the full suite showed 18 failures. 15 in `test_lab_prereg.py` and 1 in `test_lab_store.py` were fixture decay from the derived verdict (a fixture lab whose dev trials share one Sharpe has zero trial-Sharpe variance, so under D12 no DSR is evaluable and nothing is eligible; and rows meant to be ineligible relied on a recorded `failed` string that phase 4 deliberately stops reading). Repaired by moving the fixtures clear of the bar -- distinct Sharpes, a `_ballast` second dev trial, and ineligible rows made ineligible in their NUMBERS (`max_drawdown` 0.245, `profit_factor` 1.1). No assertion was weakened and no production code was changed to accommodate a fixture. `test_lab_prereg.py` and `test_lab_snapshot.py` were therefore added to the phase's file list (the plan listed 7 files; this is 7 + 2 test files + the adopted plan copy).
+    - `test_lab_snapshot.py`'s gate dict needed `dsrMin` 0.95 -> 0.90 (its `maxDrawdown` already read 0.20 from phase 8), as the coordinator's brief predicted.
+    - The plan's manual check 2 (`lab promote M0022`) run against the committed database MOVES M0022 to `promoted`, which is forward-only and irreversible. It was run as written, caught, and undone: `lab/lab.sqlite` was restored from HEAD (md5 `bd038a7005dc6ebb231cec2496c76cd2`, the coordinator's baseline), the migration redone, and the promote smoke re-run against a copy via `SEER_LAB_DB`. The committed database holds M0020 and M0022 at `dev-eligible`, not `promoted`.
+    - `commands/lab.py`: phase 3 landed `998e67f` (its four `remeasure` insertions) mid-phase, so this commit's diff of that file carries only phase 4's five hunks. Verified: zero `remeasure` additions in the diff.
+  - **Decided**:
+    - The phase plan's `test_m0011_stays_rejected_so_rm_and_rmw_diverge_on_purpose` asserted `v.derived is False` and `v.n == 90` -> replaced with `derived is True`, `v.n == 110`, `dsr ~= 0.884` (rung 1 and 3: those assertions were the superseded "return the row verbatim at another N" draft, contradicting the same plan's Step 3 code block, Decision D11 and the index's R2; the invariant and the code blocks win over stale prose). The test now pins the re-evaluated figure the index itself quotes.
+    - 18 existing tests broke on fixture decay from `DSR_MIN` 0.95->0.90 plus the derived verdict -> fixtures moved clear of the bar, never an assertion relaxed (rung 3, plus the plan's own rule that a failing verification is never settled by relaxing the check). A one-dev-trial fixture lab has no evaluable DSR by design -- `runner.trial_rows` has always recorded `dsr=None` for a lab's first trial -- so a fixture wanting a promotable method must look like a lab that could have one.
+    - `test_the_two_moved_bars_unblock_exactly_m0022_and_m0020` asserted a `rejected`->`dev-eligible` move against the very database this phase migrates (Decision D5, Step 10), so it could only pass once -> the move assertion is now relative to the starting status while the three-eligible-trials assertion stays unconditional (rung 2: the phase's exit criteria are about which trials are eligible, which is where R1 and R5 live).
+    - Landing: not attempted, and `next_command` is empty. `swarm.py find --plan LAB_LUCK_GATE_PLAN.md --task P1-ENG-B6Y5` returns `swarm: true` with coordinator `orch-lab-luck-gate`, so per `analyze-orchestrator` Step 5 the merge of `feature/lab-luck-gate` into `main` belongs to that coordinator, not to this session. Nothing merged, pushed to main, or deleted.
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks`, no `**Commit**` field, and `LAB_LUCK_GATE_PLAN.md` left untouched (rung 6: the direct precedent recorded by phases 1, 2, 3, 6 and 8 of this same set in this same file). A cross-file block move is the one edit that reliably loses a peer's concurrent append, and the index's phase table has no tick column -- its TaskID and Card columns are `--` for all nine rows -- with six peers holding it open. The sha goes to the coordinator instead.
+    - Phase 5 (`P1-ENG-QM5I`, which depends on this phase) left at `blocked` and `next_command` left empty rather than dispatched: in a swarm the coordinator releases the dependent phase off its ledger (`impl-lab-luck-gate-p5` is already a named peer), so printing `/do P1-ENG-QM5I` for a human would start a duplicate session on the same branch. Same for phase 9 (`P1-ENG-ALY2`).
 - [ ] **P1-ENG-QM5I** Phase 5: `lab status` shows the queue and the look budget; `lab luck`
   - **Difficulty**: NORMAL
   - **Type**: Feature

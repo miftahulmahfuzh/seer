@@ -52,6 +52,30 @@ def _trial(**kw) -> store.TrialRow:
     return store.TrialRow(**base)
 
 
+def _ballast(mid: str = "M0001", **kw) -> store.TrialRow:
+    """A second dev trial, so the fixture lab has a trial-Sharpe variance to deflate by.
+
+    Since LAB_LUCK_GATE_PLAN.md phase 4 a trial's eligibility is *derived* at read time, and the
+    luck half of it is ``store.dsr_at``, which deflates by ``store.dev_sharpe_variance`` -- the
+    sample variance of the dev trials' daily Sharpes. A lab holding one dev trial has no such
+    variance, so no DSR is evaluable and nothing is eligible. That is not a quirk of the derived
+    verdict: ``runner.trial_rows`` has always recorded ``dsr = None`` for the first trial in a
+    lab, for the same reason and in the same words.
+
+    So a fixture that wants a *promotable* method has to look like a lab that could have one:
+    at least two dev trials, with different Sharpes. This row is that second trial. It is
+    deliberately ineligible on a 24.5% drawdown -- outside even the owner's new 20% bar -- and
+    carries the lowest MAR, so it never wins ``best_dev_eligible`` and never changes an answer.
+    """
+    base = dict(
+        method_id=mid, candidate_id=f"{mid}-BALLAST", config_digest=f"ballast-{mid}",
+        sharpe=1.4, max_drawdown=0.245, mar=0.05, eligible=False,
+        failed="max DD <= 15%; DSR >= 0.95",
+    )
+    base.update(kw)
+    return _trial(**base)
+
+
 _PATH_TO: dict[str, tuple[str, ...]] = {
     "idea": (),
     "registered": ("registered",),
@@ -73,7 +97,8 @@ def _eligible(conn, mid: str = "M0001", trials=None) -> None:
     with conn:
         store.add_method(conn, id=mid, name="SMA test", family="trend",
                          source_kind="knowledge", hypothesis="h", status="registered")
-        store.insert_trials(conn, list(trials if trials is not None else [_trial()]))
+        rows = list(trials if trials is not None else [_trial()])
+        store.insert_trials(conn, [*rows, _ballast(mid)])
         store.update_method(conn, mid, status="dev-eligible")
 
 
@@ -89,9 +114,11 @@ def _real_method(conn, mid: str = "M0001"):
         store.add_method(conn, id=mid, name=method.name, family=method.family,
                          source_kind=method.source_kind, source_ref=method.source_ref,
                          hypothesis="h", status="registered")
-        store.insert_trials(conn, [_trial(method_id=mid, candidate_id=c.id,
-                                          config_digest=config_digest(c), rules_id=c.rules.id,
-                                          allocator_id=str(c.allocator.id))])
+        store.insert_trials(conn, [
+            _trial(method_id=mid, candidate_id=c.id, config_digest=config_digest(c),
+                   rules_id=c.rules.id, allocator_id=str(c.allocator.id)),
+            _ballast(mid),
+        ])
         store.update_method(conn, mid, source_sha=source_sha(path), status="dev-eligible")
     return c, path
 
@@ -120,8 +147,11 @@ def test_promote_pre_registers_the_best_eligible_variant_by_mar(conn, prereg_dir
     _eligible(conn, trials=[
         _trial(candidate_id="M0001-A", config_digest="da", mar=0.60),
         _trial(candidate_id="M0001-B", config_digest="db", mar=0.90),
-        _trial(candidate_id="M0001-C", config_digest="dc", mar=1.50, eligible=False,
-               failed="max DD <= 15%"),
+        # Ineligible on its NUMBERS, not on its recorded string: since phase 4 the four
+        # threshold conditions are re-derived from the columns, so a 24.5% drawdown is what
+        # keeps the top-MAR variant out. (At the fixture's old 0.11 it would now qualify.)
+        _trial(candidate_id="M0001-C", config_digest="dc", mar=1.50, max_drawdown=0.245,
+               eligible=False, failed="max DD <= 15%"),
     ])
     done = prereg.promote_method(conn, "M0001", git_sha="deadbeef", today=date(2026, 10, 6),
                                  directory=prereg_dir, check_method_file=False)
@@ -142,8 +172,10 @@ def test_the_pre_registered_digest_is_the_recorded_dev_trials_digest(conn, prere
     _eligible(conn, trials=[
         _trial(candidate_id="M0001-A", config_digest="a" * 64, mar=0.60),
         _trial(candidate_id="M0001-B", config_digest="b" * 64, mar=0.90),
-        _trial(candidate_id="M0001-C", config_digest="c" * 64, mar=1.50, eligible=False,
-               failed="PF >= 1.3"),
+        # Ineligible on its NUMBERS (see above): a profit factor under the live
+        # tuning.MIN_PROFIT_FACTOR, not merely a recorded "PF >= 1.3" label.
+        _trial(candidate_id="M0001-C", config_digest="c" * 64, mar=1.50, profit_factor=1.1,
+               eligible=False, failed="PF >= 1.3"),
     ])
     prereg.promote_method(conn, "M0001", git_sha="deadbeef", directory=prereg_dir,
                           check_method_file=False)
@@ -181,7 +213,9 @@ def test_promote_refuses_a_method_file_that_changed_since_it_ran(conn, prereg_di
         store.add_method(conn, id="M0001", name=method.name, family=method.family,
                          source_kind=method.source_kind, source_ref=method.source_ref,
                          hypothesis="h", status="registered")
-        store.insert_trials(conn, [_trial(candidate_id=c.id, config_digest=config_digest(c))])
+        store.insert_trials(conn, [
+            _trial(candidate_id=c.id, config_digest=config_digest(c)), _ballast(),
+        ])
         store.update_method(conn, "M0001", source_sha="0" * 64, status="dev-eligible")
     with pytest.raises(prereg.PreregError, match="has changed since"):
         prereg.promote_method(conn, "M0001", git_sha="deadbeef", directory=prereg_dir)
@@ -196,7 +230,9 @@ def test_promote_refuses_a_variant_whose_configuration_drifted(conn, prereg_dir)
         store.add_method(conn, id="M0001", name=method.name, family=method.family,
                          source_kind=method.source_kind, source_ref=method.source_ref,
                          hypothesis="h", status="registered")
-        store.insert_trials(conn, [_trial(candidate_id=c.id, config_digest="stale")])
+        store.insert_trials(conn, [
+            _trial(candidate_id=c.id, config_digest="stale"), _ballast(),
+        ])
         store.update_method(conn, "M0001", source_sha=source_sha(path), status="dev-eligible")
     with pytest.raises(prereg.PreregError, match="now digests to"):
         prereg.promote_method(conn, "M0001", git_sha="deadbeef", directory=prereg_dir)
@@ -224,7 +260,9 @@ def test_promote_refuses_an_unknown_method(conn, prereg_dir):
 
 
 def test_promote_refuses_a_dev_eligible_method_with_no_eligible_trial(conn, prereg_dir):
-    _eligible(conn, trials=[_trial(eligible=False, failed="PF >= 1.3")])
+    # The miss has to be in the numbers: `failed` is append-only history, and phase 4 re-derives
+    # the four threshold conditions from the columns against the live constants.
+    _eligible(conn, trials=[_trial(profit_factor=1.1, eligible=False, failed="PF >= 1.3")])
     with pytest.raises(prereg.PreregError, match="nothing to pre-register"):
         prereg.promote_method(conn, "M0001", git_sha="x", directory=prereg_dir,
                               check_method_file=False)

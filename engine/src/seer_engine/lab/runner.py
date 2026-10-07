@@ -5,11 +5,14 @@
 1. Refuse when the method file is not committed (its commit is the pre-registration), when the
    method has already run, or when any variant's configuration already has a dev trial.
 2. Run the variants through ``dev.run_registry`` on the research store (every D9 guard).
-3. Deflated Sharpe per trial with N = every dev trial in the lab, this batch included, and the
-   variance of the daily Sharpe across those trials.
-4. Eligible = the five P7a D8 conditions and DSR >= 0.95. Insert the trials, set the method's
-   ``source_sha`` and status (``dev-eligible`` when any trial is eligible, else ``rejected``),
-   all in one transaction.
+3. Deflated Sharpe per trial with N resolved by ``store.DSR_POLICY`` through
+   ``store.pending_gate`` -- shipped as ``all-trials``, so N = every dev trial in the lab, this
+   batch included -- and the variance of the daily Sharpe across those trials.
+4. Eligible = the five P7a D8 conditions and ``store.DSR_LABEL`` (DSR >= 0.90 since 2026-10-07;
+   LAB_LUCK_GATE_PLAN.md Decision D1). Insert the trials, set the method's ``source_sha`` and
+   status (``dev-eligible`` when any trial is eligible, else ``rejected``), all in one
+   transaction. ``store.verdict`` re-reads a recorded trial against the same threshold and N, so
+   a verdict is comparable across time rather than frozen at its run date.
 
 ``lab test`` (design §3) -- the one counted look:
 
@@ -27,6 +30,10 @@ are dev-only and stay dev-only: design §1 makes ``trials`` the multiple-testing
 *search*, and §3 makes the test window a *look* at one already-counted configuration. A dev trial
 recorded tomorrow is deflated by exactly the N it would have had if no look had ever been spent,
 so every recorded dev trial stays reproducible.
+
+Since LAB_LUCK_GATE_PLAN.md phase 4, *what* N counts is ``store.DSR_POLICY``'s business and need
+not be a row count at all; *which* trials it counts over is still dev trials only, and that is
+what this paragraph is about.
 """
 
 from __future__ import annotations
@@ -173,6 +180,20 @@ def trial_rows(
 ) -> list[Ran]:
     """The trial rows for one method's dev results (``results``: (row, month-end curve)).
 
+    The luck test's N is ``store.pending_gate(conn, method.id, len(results)).n`` -- the N the
+    lab's ``store.DSR_POLICY`` resolves to, projected over this batch, which is the same N
+    ``store.verdict`` re-reads these trials under. A trial run tonight and one recorded six weeks
+    ago are therefore judged by one bar, which is R2. Under the shipped ``all-trials`` policy it
+    is ``dev_trial_count(conn) + len(results)``, exactly the expression this function used before
+    the policy existed.
+
+    ``n_trials_at_run`` records **the N the DSR was computed at**, which is what it has always
+    meant (``lab promote`` prints it as "DSR ... at N = ..."). The raw dev row count is always
+    ``store.dev_trial_count``. The variance is still the sample variance of the daily Sharpe
+    across every recorded dev trial plus this batch: only the *count* of looks is
+    policy-dependent, not the dispersion the expected maximum is drawn from. The threshold the
+    DSR is compared against is ``store.DSR_MIN`` -- 0.90 since 2026-10-07.
+
     Each ``Ran`` also carries the deflated Sharpe's inputs (``store.MomentsRow``) so
     ``run_method`` can record them beside the trial they judged: the daily Sharpe, the number of
     daily returns, the skew and the kurtosis of the variant, plus the ``var_trials`` and the N
@@ -192,7 +213,8 @@ def trial_rows(
     moments = [daily_moments(r.stats.daily_returns) for r, _ in results]
     new_sharpes = [m[0] for m in moments if m is not None]
     all_sharpes = prior + new_sharpes
-    n_trials = store.dev_trial_count(conn) + len(results)
+    gate = store.pending_gate(conn, method.id, len(results))
+    n_trials = gate.n
     var_trials = statistics.variance(all_sharpes) if len(all_sharpes) >= 2 else None
     run_at = store.now_iso()
     out: list[Ran] = []

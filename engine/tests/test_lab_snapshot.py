@@ -274,7 +274,10 @@ def test_the_snapshot_follows_the_contract(lab):
     assert list(s) == ["version", "asOf", "gate", "data", "summary", "benchmark", "methods", "trials",
                        "insights", "ideasSeen"]
     assert s["version"] == 1
-    assert s["gate"] == {"maxDrawdown": 0.20, "minProfitFactor": 1.3, "minTrades": 100, "dsrMin": 0.95,
+    # dsrMin 0.95 -> 0.90 and maxDrawdown 0.15 -> 0.20: the owner's two risk-appetite changes of
+    # 2026-10-07 (LAB_LUCK_GATE_PLAN.md Decisions D1 and D6). The snapshot publishes the live
+    # constants, so this dict follows them.
+    assert s["gate"] == {"maxDrawdown": 0.20, "minProfitFactor": 1.3, "minTrades": 100, "dsrMin": 0.90,
                          "devStart": "1993-01-29", "devEnd": "2015-10-16", "testStart": "2015-10-19"}
     assert s["data"] == {
         "storeStart": "1993-01-29", "membershipStart": "1996-01-02", "fxStart": "1999-01-04",

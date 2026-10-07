@@ -25,6 +25,15 @@ Schema versions (``meta.schema_version``): 1 is the first lab; 2 adds the ``synt
 kind; 3 adds the ``trial_moments`` side table. ``connect`` migrates an older database in place;
 ``connect_readonly`` never does.
 
+The **verdict** a trial reads is derived, not frozen: ``DSR_MIN`` is the threshold (0.90 since
+2026-10-07) and ``DSR_POLICY`` names the multiple-testing N (``all-trials`` today, so N is every
+dev trial, as it has always been). ``verdict`` re-decides every condition at call time -- the four
+threshold owner conditions from the trial's own recorded columns against the live constants, the
+luck test on the trial's DSR at the gate's current N -- and carries only ``owner inputs`` from the
+record, because no constant re-decides it. Recorded rows keep the labels of the bars they were
+judged under, so every reader uses ``is_luck_label`` rather than comparing to ``DSR_LABEL``, and
+``owner_failures`` rather than parsing a ``failed`` string.
+
 ``snapshot`` / ``snapshot_json`` turn a database (v1, v2 or v3) into the web's ``web/data/lab.json``
 (seertrade.site/sera). ``lab stage`` writes it next to the database and stages both.
 
@@ -72,6 +81,15 @@ TRANSITIONS: tuple[tuple[str, str], ...] = (
     ("registered", "dev-eligible"),
     ("registered", "blocked-data"),
     ("blocked-data", "idea"),  # the missing data arrived
+    # The one edge out of ``rejected`` (LAB_LUCK_GATE_PLAN.md Decision D2). "Status moves
+    # forward only" protects *verdicts from being erased*, and nothing here erases one: the
+    # trials that decided the rejection stay in the append-only ``trials`` table, untouched, and
+    # the re-evaluation is *appended* to the method's analysis. Admitted only by
+    # ``reevaluate_method``, and only for a method whose dev trial clears all five conditions at
+    # the bars in force today. Without this edge R1 is unsatisfiable: M0022 reads ``rejected``
+    # today, and re-judging it under a new id would need a duplicate configuration digest, which
+    # ``has_trial`` refuses outright.
+    ("rejected", "dev-eligible"),
     ("dev-eligible", "promoted"),
     ("promoted", "test-passed"),
     ("promoted", "test-failed"),
@@ -81,8 +99,64 @@ WINDOWS: tuple[str, ...] = ("dev", "test")
 INSIGHT_KINDS: tuple[str, ...] = (
     "observation", "hypothesis", "data-wish", "feature-wish", "risk", "synthesis",
 )
-DSR_MIN = 0.95  # lab eligibility on the dev window, on top of the five P7a D8 conditions
-DSR_LABEL = "DSR >= 0.95"
+# The owner's risk appetite on the dev window, on top of the five P7a D8 conditions.
+#
+# 0.95 -> 0.90 on 2026-10-07, on the owner's instruction in the session that produced
+# LAB_LUCK_GATE_PLAN.md: "this 0.95 threshold is too high man. my risk appetite is 0.90".
+# Decision D1 records why this is the lever that moved and the other one is not.
+#
+# Measured on the committed lab at the time of the change, N = 110 dev trials:
+#   at 0.95 nothing is eligible -- the deadlock, 110 trials and 0 promotions;
+#   at 0.90 three candidates clear the whole gate once the owner's other change of the same day
+#           lands (tuning.MAX_DRAWDOWN 0.15 -> 0.20, Decision D6, phase 8): M0022-W-TV14 (0.912),
+#           M0022-W-TV16 (0.916) and M0020-W-NOSTOP (0.913 at N=110, 19.3% drawdown);
+#   three near misses stay out, each for its own reason: M0007-N20-RAW clears the new drawdown
+#           bar at 19.6% but scores 0.898 re-evaluated at N=110; M0019-RAW20-S25 draws down 20.7%,
+#           outside even the new bar; M0001-TV10 does not beat SPY TR.
+#
+# This is a loosening of a gate that exists to prevent self-deception, and it is the owner's
+# call to make. What it is not is a drift: it is one number, cited, dated, measured, and undone
+# by editing this line back to 0.95. Decision D1b records the consequence it does not fix --
+# at 0.90 the best candidate still sinks below the bar at N ~ 200, about four more Sera nights.
+DSR_MIN = 0.90
+
+# The luck label, as it is written into ``trials.failed``. Derived from DSR_MIN rather than
+# retyped, so the label and the threshold can never disagree.
+#
+# ``trials`` is append-only: 110 recorded rows carry the OLD text "DSR >= 0.95". Recognising the
+# luck label by ``label == DSR_LABEL`` therefore stops working the moment DSR_MIN moves, and a
+# luck-only rejection would read as an owner failure and could never be reconsidered. Every
+# reader must use ``is_luck_label`` instead, which matches the label's *shape* and so matches
+# every threshold the lab has ever recorded.
+LUCK_LABEL_PREFIX = "DSR >= "
+DSR_LABEL = f"{LUCK_LABEL_PREFIX}{DSR_MIN:.2f}"
+
+
+def is_luck_label(label: str) -> bool:
+    """True for a luck-test failure label recorded under *any* threshold this lab has used.
+
+    ``DSR_LABEL`` is the one written today; ``"DSR >= 0.95"`` is written on 110 recorded rows.
+    Both are the same condition at different thresholds, and the five P7a D8 conditions are
+    never of this shape, so the prefix is an exact discriminator.
+    """
+    return str(label).startswith(LUCK_LABEL_PREFIX)
+
+
+# The N the luck test deflates by, resolved through ``npolicy.effective_n``. ONE constant: the
+# only place in the lab where the multiple-testing count is decided, read at call time by
+# ``gate`` below rather than frozen into a row at run time.
+#
+# **Shipped as "all-trials" deliberately, and NOT inherited from npolicy's own default.**
+# Decision D1: the owner moved the threshold, not N, so N stays at every dev trial -- 110 today,
+# the same number ``runner.trial_rows`` used before this phase existed. The policy module, its
+# correlation evidence (mean pairwise rho 0.595 across the 110 recorded curves, effective N 2.4,
+# 23 distinct methods) and phase 5's read-only ``lab luck`` are all built, so the second lever
+# is measured and ready -- it is simply not pulled.
+#
+# Set explicitly, and always passed as an argument to ``npolicy.effective_n``, so that nobody has
+# to reason about which module's default wins. ``test_the_shipped_defaults_reproduce_todays_n``
+# holds it to 110.
+DSR_POLICY = "all-trials"
 
 # The first words of the analysis section `record_promotion` appends, and its idempotence key:
 # a method whose analysis already names this roster id has been recorded and is not recorded twice.
@@ -680,7 +754,13 @@ def trials_of(conn: sqlite3.Connection, method_id: str) -> list[sqlite3.Row]:
     return conn.execute("SELECT * FROM trials WHERE method_id = ? ORDER BY n", (method_id,)).fetchall()
 
 
-def best_dev_eligible(conn: sqlite3.Connection, method_id: str) -> sqlite3.Row | None:
+def best_dev_eligible(
+    conn: sqlite3.Connection,
+    method_id: str,
+    *,
+    at: Gate | None = None,
+    policy: str | None = None,
+) -> sqlite3.Row | None:
     """The method's best eligible dev trial by MAR -- the one variant design §3 pre-registers.
 
     Highest MAR wins and a tie breaks on the trial number, so the answer is exactly one row and
@@ -692,13 +772,662 @@ def best_dev_eligible(conn: sqlite3.Connection, method_id: str) -> sqlite3.Row |
     always has one, because ``beats SPY TR`` is among the conditions it passed, so a NULL here
     means a row that cannot be compared rather than a row that compares badly.
 
+    **Eligible means ``verdict(...).eligible``, not the frozen ``eligible`` column.** The verdict
+    is read under one threshold and one N at evaluation time (plan Decisions D1/D2), so two
+    trials recorded six weeks apart are ranked against the same bar instead of against whichever
+    bar happened to be in force on each run date. Nothing else about the choice changed: the
+    ordering is still MAR then ``n``. Selection is still **never** on DSR -- a higher-DSR variant
+    does not outrank a higher-MAR one, which is why ``M0022-W-TV14`` (MAR 0.857, DSR 0.912) is
+    the answer for M0022 and ``M0022-W-TV16`` (MAR 0.816, DSR 0.916) is not.
+
+    The gate is resolved once, after the rows are fetched, so a method with no comparable dev
+    trial costs no estimator read at all.
+
+    ``at`` passes in an already-resolved gate. A caller looping over many methods -- ``lab
+    status`` walks all 23 with dev trials -- should resolve ``gate(conn)`` once and pass it to
+    every call, so the estimator provably runs once rather than relying on ``_GATE_CACHE``.
+    ``policy`` is for phase 5's read-only comparison; the promotion path passes neither.
+
     None when the method has no eligible dev trial at all.
     """
-    return conn.execute(
-        "SELECT * FROM trials WHERE method_id = ? AND window = 'dev' AND eligible = 1 "
-        "AND mar IS NOT NULL ORDER BY mar DESC, n ASC LIMIT 1",
+    rows = conn.execute(
+        "SELECT * FROM trials WHERE method_id = ? AND window = 'dev' AND mar IS NOT NULL "
+        "ORDER BY mar DESC, n ASC",
         (method_id,),
+    ).fetchall()
+    if not rows:
+        return None
+    g = gate(conn, policy) if at is None else at
+    for row in rows:
+        if verdict(conn, row, at=g).eligible:
+            return row
+    return None
+
+
+# --------------------------------------------------------------------------- the derived verdict
+
+
+@dataclass(frozen=True)
+class Gate:
+    """The luck bar in force right now: the policy name and the N it resolved to.
+
+    The threshold is not in here: it is ``DSR_MIN``, one module constant, and there is no policy
+    over it.
+    """
+
+    n: int
+    policy: str
+
+
+@dataclass(frozen=True)
+class Verdict:
+    """One dev trial's eligibility as it reads *now*.
+
+    ``failed`` is the ordered tuple of failure labels (``trials.failed`` is the same list,
+    "; "-joined), owner conditions first in ``dev.FAILURE_LABELS`` order and the luck label last.
+    ``eligible`` is ``failed == ()``, always.
+
+    ``derived`` is True when the DSR in this verdict was **evaluated at ``n``**, and False when
+    it could not be -- in which case ``dsr`` is None and the luck label is among ``failed``. It
+    never means "the recorded columns were returned verbatim": nothing is returned verbatim.
+    """
+
+    dsr: float | None
+    failed: tuple[str, ...]
+    eligible: bool
+    n: int
+    policy: str
+    derived: bool
+
+
+# Resolved gates, keyed by (database file, policy, the dev trial set's fingerprint).
+#
+# ``npolicy.effective_n`` decodes 110 month-end curves out of ``curve_json`` and takes an
+# eigendecomposition of their correlation matrix for the participation ratio. ``lab status``
+# calls ``best_dev_eligible`` once per method with dev trials -- 23 of them -- so without this
+# the estimator would run 23 times for one command.
+#
+# The key is derived from the *content*, not from the connection: ``sqlite3.Connection`` supports
+# neither weak references nor attributes, so there is nowhere on it to hang a cache and nothing
+# safe to key on (``id()`` is reused after a connection is freed). ``trials`` is append-only --
+# the ``trials_no_update`` and ``trials_no_delete`` triggers see to that -- so for one database
+# file the triple (dev row count, highest dev trial number, distinct dev methods) pins the dev
+# trial set exactly, and any insert changes it. That makes the cache self-invalidating.
+#
+# In-memory databases are never cached: their path is "" and two of them could otherwise collide
+# on identical counts.
+_GATE_CACHE: dict[tuple[str, str, int, int, int], Gate] = {}
+_GATE_CACHE_MAX = 32
+
+
+def _gate_key(conn: sqlite3.Connection, policy: str) -> tuple[str, str, int, int, int] | None:
+    """A content-derived cache key, or None when this database must not be cached."""
+    path = ""
+    for _seq, name, file in conn.execute("PRAGMA database_list"):
+        if name == "main":
+            path = str(file or "")
+            break
+    if not path:
+        return None  # ":memory:" and temporary databases
+    count, high, methods = conn.execute(
+        "SELECT count(*), coalesce(max(n), 0), count(DISTINCT method_id) "
+        "FROM trials WHERE window = 'dev'"
     ).fetchone()
+    return (path, policy, int(count), int(high), int(methods))
+
+
+def gate(conn: sqlite3.Connection, policy: str | None = None) -> Gate:
+    """The N the luck test deflates by on this database, under ``policy`` (default ``DSR_POLICY``).
+
+    Memoised per (database file, policy, dev trial set) -- see ``_GATE_CACHE``. A caller judging
+    many trials should still resolve it once and pass it down as ``verdict(..., at=g)`` or
+    ``best_dev_eligible(..., at=g)``: that is explicit and does not depend on the cache being
+    warm or on the key being right.
+
+    The policy is always passed to ``npolicy.effective_n`` explicitly; this module never relies
+    on that module's own default.
+
+    ``npolicy`` is imported here rather than at module scope, the way ``snapshot`` imports its
+    dependencies: importing ``store`` is something the whole lab does, and it should never pull
+    in the estimator's curve arithmetic, nor create a cycle if ``npolicy`` ever needs ``store``.
+    """
+    from seer_engine.lab import npolicy
+
+    name = DSR_POLICY if policy is None else policy
+    key = _gate_key(conn, name)
+    if key is not None:
+        hit = _GATE_CACHE.get(key)
+        if hit is not None:
+            return hit
+    count = npolicy.effective_n(conn, name)
+    resolved = Gate(n=int(count.n), policy=str(count.policy))
+    if key is not None:
+        if len(_GATE_CACHE) >= _GATE_CACHE_MAX:
+            _GATE_CACHE.clear()  # a long-lived process never accumulates stale paths
+        _GATE_CACHE[key] = resolved
+    return resolved
+
+
+def pending_gate(
+    conn: sqlite3.Connection, method_id: str, pending: int, *, policy: str | None = None
+) -> Gate:
+    """The gate a batch of ``pending`` new dev trials for ``method_id`` will be judged under.
+
+    ``gate`` counts what the database holds, and the batch is not in it yet: the DSR and the
+    eligibility have to be decided *before* ``insert_trials`` runs, because ``trials`` is
+    append-only and a row is written exactly once. So the count is projected forward over the
+    batch, in the unit the policy counts in:
+
+    - ``all-trials``  N + ``pending``  -- every new row is another trial. Under the shipped
+      policy this is exactly ``dev_trial_count(conn) + len(results)``, the expression
+      ``runner.trial_rows`` used before this phase, so a new ``lab run`` is deflated by the
+      number it has always been deflated by.
+    - ``methods``     N + 1 when ``method_id`` has no dev trial yet, N otherwise -- a batch of
+      variants of one method is one method. The participation-ratio floor is not re-measured
+      against curves that do not exist yet; it is a floor, and this projection only ever sits
+      on or above it.
+    - ``effective``   N -- the measured independence of curves that have not been recorded
+      cannot be projected, so the batch is judged under the independence already measured.
+    - anything else   N + ``pending``, the most punishing of the three. A policy name this
+      module does not recognise must not quietly deflate a new trial by less than the row count.
+
+    Every branch returns at least ``gate(conn).n``, so a trial recorded today is never deflated
+    by a smaller N than one recorded yesterday under the same policy.
+    """
+    g = gate(conn, policy)
+    if pending <= 0:
+        return g
+    if g.policy == "effective":
+        return g
+    if g.policy == "methods":
+        seen_already = conn.execute(
+            "SELECT 1 FROM trials WHERE method_id = ? AND window = 'dev' LIMIT 1", (method_id,)
+        ).fetchone()
+        return g if seen_already is not None else Gate(n=g.n + 1, policy=g.policy)
+    return Gate(n=g.n + pending, policy=g.policy)
+
+
+# The one D8 condition with no number in it, and therefore the one recorded label that can never
+# go stale: it asks whether a human hand-picked a parameter of the candidate, not whether a metric
+# cleared a bar. ``owner_failures`` carries it from the recorded string instead of re-deriving it,
+# because there is no column to re-derive it from.
+#
+# A literal rather than ``dev.FAILURE_LABELS[-1]``: ``store`` deliberately imports ``dev`` only
+# inside the functions that need it, and a module-level constant would pull the whole backtest
+# package into every ``import store``.
+# ``test_the_owner_inputs_label_is_the_one_dev_still_writes`` pins the two together.
+OWNER_INPUTS_LABEL = "owner inputs"
+
+
+def recorded_labels(failed: str) -> tuple[str, ...]:
+    """A recorded ``trials.failed`` string, split into its labels. **History, not a verdict.**
+
+    Every label it returns names the threshold in force on the trial's **run date**: 110 recorded
+    rows say ``"DSR >= 0.95"`` and ``"max DD <= 15%"``, and the live bars are 0.90 and 20%. Use
+    this to display what the lab said at the time, or to ask whether a particular condition was
+    recorded; never to decide what a trial is today. ``owner_failures`` is that.
+    """
+    return tuple(f for f in str(failed or "").split("; ") if f)
+
+
+def owner_failures(trial: Mapping[str, Any] | sqlite3.Row) -> tuple[str, ...]:
+    """The five P7a D8 conditions ``trial`` misses **as they read now**, in FAILURE_LABELS order.
+
+    **Four re-derived, one carried.** Four of the five are thresholds over numbers ``trials``
+    already records, so they are recomputed here from the recorded columns against the live
+    constants -- the same comparisons ``dev.py`` makes, on the same values:
+
+    - ``beats SPY TR``  ``total_return > spy_tr_return``
+    - ``max DD``        ``max_drawdown <= tuning.MAX_DRAWDOWN`` (0.20 since 2026-10-07, phase 8)
+    - ``PF``            ``profit_factor >= tuning.MIN_PROFIT_FACTOR``
+    - ``trades``        ``trades >= dev._MIN_TRADES``
+
+    The fifth, ``owner inputs``, is **carried from the recorded ``failed`` string**, because it is
+    the one condition that is not a threshold: it asks whether a human hand-picked a parameter of
+    the *candidate* (``dev.candidate_owner_inputs``), there is no column to recompute it from, and
+    no constant re-decides it -- so its recorded label can never go stale.
+
+    **Why nothing is parsed out of ``failed`` for the other four.** ``trials`` is append-only, so
+    a recorded label names the bar in force on its run date. All 110 recorded rows carry
+    ``"max DD <= 15%"``, and the owner moved that bar to 20% on 2026-10-07; reading the condition
+    back out of the string would freeze every recorded trial at the bar it was judged by and
+    ``M0020-W-NOSTOP`` (19.3%) could never become eligible. That is precisely the "verdicts mix
+    bars" defect R2 names, and it is why this function takes the row rather than the string.
+
+    The returned labels are the **live** ones (``dev.FAILURE_LABELS``), so a caller printing them
+    states today's bar, not the one the row was judged by.
+    """
+    from seer_engine.backtest import dev, tuning
+
+    spy, drawdown, pf, trades, owner = dev.FAILURE_LABELS
+    total, bench = trial["total_return"], trial["spy_tr_return"]
+    dd, factor, count = trial["max_drawdown"], trial["profit_factor"], trial["trades"]
+    out: list[str] = []
+    if total is None or bench is None or float(total) <= float(bench):
+        out.append(spy)
+    if dd is None or float(dd) > tuning.MAX_DRAWDOWN:
+        out.append(drawdown)
+    if factor is None or float(factor) < tuning.MIN_PROFIT_FACTOR:
+        out.append(pf)
+    if count is None or int(count) < dev._MIN_TRADES:
+        out.append(trades)
+    if owner in recorded_labels(trial["failed"]):
+        out.append(owner)
+    return tuple(out)
+
+
+def sr_star(n_trials: int, var_trials: float) -> float:
+    """The deflated Sharpe's daily hurdle ``SR*`` at ``n_trials`` independent looks.
+
+    ``dev.deflated_sharpe``'s own ``sr_star`` line, with its own ``_EULER_GAMMA``, isolated so
+    the hurdle can be asked for at an N no trial was ever run at. Nothing is re-derived: this is
+    the formula being inverted, not a second opinion about it.
+    """
+    from statistics import NormalDist
+
+    from seer_engine.backtest import dev
+
+    normal = NormalDist()
+    expected_max = (1 - dev._EULER_GAMMA) * normal.inv_cdf(1 - 1 / n_trials) + (
+        dev._EULER_GAMMA * normal.inv_cdf(1 - 1 / (n_trials * math.e))
+    )
+    return math.sqrt(var_trials) * expected_max
+
+
+def recover_dsr(
+    *,
+    sharpe_daily: float,
+    dsr_at_run: float,
+    n_at_run: int,
+    var_trials: float,
+    n_trials: int,
+) -> float | None:
+    """A recorded DSR re-evaluated at ``n_trials`` looks. Pure; reads and writes nothing.
+
+    ``DSR = Phi((SR - SR*(N)) * k)`` where ``k = sqrt(t-1)/sqrt(radicand)`` does **not** depend on
+    N. ``t``, the skew and the kurtosis are not in ``trials`` -- that is what ``trial_moments``
+    exists to fix going forward -- so ``k`` is recovered by inverting a known DSR at the N it
+    belongs to, and the answer is the same ``Phi`` with a different ``SR*``.
+
+    **At ``n_trials == n_at_run`` this returns ``dsr_at_run`` exactly, for any ``var_trials``** --
+    the two ``SR*`` terms are the same term and ``k`` cancels. That identity is what makes this a
+    *re-reading* of the record rather than a second estimate of it.
+
+    **Monotone in N** for any ``dsr_at_run`` above a half: ``SR*`` rises with N and ``k > 0``
+    there, so the DSR falls as the search widens. That is R1's ratchet, as arithmetic.
+
+    None where the inversion is undefined: fewer than two looks at either N, a non-positive
+    ``var_trials``, a non-finite input, a DSR of exactly 0 or 1 (``Phi^-1`` has no value there),
+    or an SR sitting exactly on the hurdle at ``n_at_run`` (``k`` would divide by zero -- the
+    record says the trial was exactly at the bar and says nothing about its ``k``).
+    """
+    from statistics import NormalDist
+
+    if n_trials < 2 or n_at_run < 2 or var_trials <= 0:
+        return None
+    if not all(math.isfinite(x) for x in (sharpe_daily, dsr_at_run, var_trials)):
+        return None
+    if not 0.0 < dsr_at_run < 1.0:
+        return None
+    gap = sharpe_daily - sr_star(n_at_run, var_trials)
+    if gap == 0.0:
+        return None
+    normal = NormalDist()
+    k = normal.inv_cdf(dsr_at_run) / gap
+    return normal.cdf((sharpe_daily - sr_star(n_trials, var_trials)) * k)
+
+
+def dev_sharpe_variance(conn: sqlite3.Connection) -> float | None:
+    """The variance of the dev trials' daily Sharpes **as the lab stands now**. None below two.
+
+    The same expression ``runner.trial_rows`` deflates by, so the dispersion the expected maximum
+    is drawn from is the dispersion of the search as it actually is -- which is the point: the
+    gate describes today on both axes, the count of looks and their spread.
+    """
+    import statistics
+
+    sharpes = dev_daily_sharpes(conn)
+    return statistics.variance(sharpes) if len(sharpes) >= 2 else None
+
+
+def dsr_at(
+    conn: sqlite3.Connection, trial: Mapping[str, Any] | sqlite3.Row, n_trials: int
+) -> float | None:
+    """``trial``'s deflated Sharpe **at ``n_trials`` looks**, or None when it cannot be had.
+
+    Two routes to one number, in order of exactness:
+
+    1. **From ``trial_moments``**, when ``lab run`` recorded them (phase 2) or ``lab remeasure``
+       recovered them (phase 3). The same ``dev.deflated_sharpe`` on the trial's own measured
+       ``sr_daily``, ``t``, ``skew`` and ``kurt``. An exact recomputation.
+
+    2. **By inverting the recorded ``dsr``** at its own ``n_trials_at_run`` and re-evaluating at
+       ``n_trials`` (``recover_dsr``). Exact arithmetic on recorded data -- no backtest is re-run
+       and nothing is estimated -- and it returns the recorded number unchanged when the trial
+       was already judged at ``n_trials``.
+
+    **Both routes use ``dev_sharpe_variance(conn)`` -- the trial-Sharpe variance as the lab stands
+    now -- and never the ``var_trials`` recorded beside the trial.** The function body reads that
+    variance **once, before either route branches**, precisely so the two cannot drift apart
+    again; ``moments["var_trials"]`` is not referenced anywhere in this function. That is
+    deliberate (**Decision D12**) and it is the same principle as using the gate's N rather than
+    ``n_trials_at_run``: the deflated Sharpe asks "how extreme is this Sharpe against the maximum
+    of N draws from the trial-Sharpe distribution", and **both** N and that distribution describe
+    the search as it is today. Pairing today's N with a variance frozen at the run date would mix
+    bars on the other axis -- exactly the defect R2 names, one column over. The recorded
+    ``var_trials`` stays in ``trial_moments`` as history: it is what the trial *was* judged by,
+    and phase 3's reproduction check is what it is for.
+
+    **This is not a stylistic preference; it decides a candidate.** On the 54 P7a seed rows that
+    phase 9 re-measures, the recorded ``var_trials`` (2.006691e-04, the P7a search's own) and
+    today's (2.395048e-04, all 110 dev trials) differ by enough to move
+    ``F9-SPY200M70-MOM30`` from **0.903053** (which clears 0.90) to **0.856651** (which does not).
+    Under this function it reads **0.8567** and stays ineligible -- on a luck test it finally
+    received rather than on a missing column, which is the whole of R6.
+
+    Measured on the committed lab, the two routes agree to **1.3e-5** across all 56 trials with a
+    recorded DSR, which is what makes route 2 a re-reading of the record rather than a second
+    opinion about it. A trial recorded *today* reads back exactly as it was recorded, because the
+    gate's N and today's variance are then the very values it was judged by.
+
+    **None when the recorded ``dsr`` is NULL**, which is the 54 P7a seed rows by construction
+    (``seed.py``: "P7a reported it for one row only"). A luck test that cannot be evaluated is
+    a luck test that was not passed -- ``verdict`` appends the luck label, exactly as
+    ``runner.trial_rows`` does for a new trial whose DSR comes back None. Nothing is admitted for
+    being unmeasurable.
+    """
+    # ONE variance, read once, used by BOTH routes. `moments["var_trials"]` is deliberately not
+    # read anywhere in this function: see Decision D12 and the docstring above.
+    var = dev_sharpe_variance(conn)
+    if var is None:
+        return None
+    moments = moments_of(conn, int(trial["n"]))
+    if moments is not None:
+        from seer_engine.backtest import dev
+
+        return dev.deflated_sharpe(
+            float(moments["sr_daily"]),
+            n_trials,
+            var,
+            int(moments["t"]),
+            float(moments["skew"]),
+            float(moments["kurt"]),
+        )
+    if trial["dsr"] is None or trial["sharpe"] is None:
+        return None
+    from seer_engine.backtest.book_runner import TRADING_DAYS
+
+    return recover_dsr(
+        sharpe_daily=float(trial["sharpe"]) / math.sqrt(TRADING_DAYS),
+        dsr_at_run=float(trial["dsr"]),
+        n_at_run=int(trial["n_trials_at_run"]),
+        var_trials=var,
+        n_trials=n_trials,
+    )
+
+
+def verdict(
+    conn: sqlite3.Connection,
+    trial: Mapping[str, Any] | sqlite3.Row,
+    *,
+    at: Gate | None = None,
+    policy: str | None = None,
+) -> Verdict:
+    """``trial``'s eligibility as it reads now: every condition, at the bars in force now.
+
+    ``trial`` is a ``trials`` row (anything addressable by column name, including a
+    ``sqlite3.Row``) carrying ``n``, ``dsr``, ``sharpe``, ``failed``, ``n_trials_at_run`` and the
+    four metric columns. Meaningful for ``window = 'dev'`` rows: a test trial's DSR is recorded
+    and is not a condition, because a pre-registered look has no selection among results to
+    deflate.
+
+    The recorded columns are the lab's history and are never written (design §1, plan invariant
+    3). This is the *read*: what the same trial is judged as today, by the bars the lab holds
+    today, rather than by the bars in force on its run date. That is R2's comparability, obtained
+    without rewriting anything.
+
+    **Nothing is ever returned verbatim.** Every one of the six conditions is decided here:
+
+    - the four **threshold** owner conditions are re-derived from this row's recorded columns by
+      ``owner_failures``, against the live ``tuning.MAX_DRAWDOWN`` / ``tuning.MIN_PROFIT_FACTOR``
+      / ``dev._MIN_TRADES``, so a trial recorded under the old 15% drawdown bar reads against
+      today's 20% one;
+    - ``owner inputs`` is carried from the recorded string, because it is not a threshold and no
+      constant re-decides it;
+    - the **luck** test is decided on ``dsr_at(conn, trial, g.n)`` -- this trial's DSR **at the
+      gate's current N**, never at the N it happened to be run under.
+
+    **The luck test is always evaluated at the current N, and that is the whole of R2.** An
+    earlier draft re-thresholded the recorded ``dsr`` only when ``n_trials_at_run`` already
+    equalled the gate's N, and returned the row verbatim otherwise. That rule is **superseded and
+    must not be implemented**: it would admit ``M0007-N20-RAW`` on a DSR of 0.9138 computed at
+    N = 85 while judging ``M0022``'s variants on DSRs computed at N = 110 -- a candidate admitted
+    for having been tried *earlier*, which is precisely the leaderboard-mixes-bars defect R2
+    names and precisely the self-deception the lab exists to prevent. Re-evaluated at today's
+    N = 110, ``M0007-N20-RAW`` is **0.8985** and does not clear 0.90.
+
+    **A DSR that cannot be evaluated fails the luck test.** ``dsr_at`` returns None for the 54
+    P7a seed rows, whose ``dsr`` is NULL by construction, and ``verdict`` then appends the luck
+    label -- the same rule ``runner.trial_rows`` applies to a new trial
+    (``if dsr is None or dsr < DSR_MIN``). Without it, ``F9-SPY200M70-MOM30`` (19.2% drawdown,
+    MAR 0.64, no recorded DSR) would become eligible the moment the drawdown bar moved, on the
+    strength of a luck test nobody ever ran. ``derived`` is False exactly in this case, and
+    ``dsr`` is None with it.
+
+    ``at`` resolves the gate once for a caller judging many trials. ``policy`` names a different
+    policy for a read-only comparison (phase 5's ``lab luck``); the write paths never pass it.
+    """
+    g = gate(conn, policy) if at is None else at
+    dsr = dsr_at(conn, trial, g.n)
+    # Four re-derived from this row's columns against the live constants, one (`owner inputs`)
+    # carried from the recorded string. Never parsed out of `failed` -- that string names the
+    # bars in force on the run date, which are not today's.
+    failed = owner_failures(trial)
+    # The same rule runner.trial_rows applies to a new trial: a DSR that is None is a luck test
+    # that was not passed. Nothing is admitted for being unmeasurable.
+    if dsr is None or dsr < DSR_MIN:
+        failed = failed + (DSR_LABEL,)
+    return Verdict(
+        dsr=dsr, failed=failed, eligible=not failed, n=g.n, policy=g.policy,
+        derived=dsr is not None,
+    )
+
+
+# The first words of the analysis section ``reevaluate_method`` appends. Not an idempotence key:
+# the edge it guards can be taken at most once, because it leads out of the only status it may
+# be taken from.
+REEVALUATION_MARKER = "Re-evaluated under the "
+
+
+@dataclass(frozen=True)
+class Reevaluation:
+    """What ``reevaluate_method`` found, and whether it moved the method."""
+
+    method_id: str
+    status_before: str
+    status_after: str
+    moved: bool
+    gate: Gate
+    unblocked: tuple[str, ...]  # candidate ids now eligible that the recorded column rejects
+    derived: int                # dev trials whose DSR was evaluated at the gate's N
+    unjudgeable: int            # dev trials with no evaluable DSR -- they fail the luck test
+    dev_trials: int
+
+
+def _blocking(trial: Mapping[str, Any] | sqlite3.Row) -> tuple[str, ...]:
+    """The second, independent no: why this trial may **not** take the ``rejected`` edge.
+
+    ``owner_failures`` derives the same four conditions and ``verdict`` reads it, so these
+    comparisons are written here a second time **on purpose**. Two owner-set bars moved in this
+    plan set -- the luck threshold (phase 4) and the drawdown threshold (phase 8) -- and a gate
+    that loosens on two axes at once should not be able to promote a method through a single
+    expression. A future change to ``owner_failures`` has to get past this too.
+
+    Phrased as sentences with the numbers in them, because this text goes into the refusal a
+    human reads.
+    """
+    from seer_engine.backtest import dev, tuning
+
+    out: list[str] = []
+    total, bench = trial["total_return"], trial["spy_tr_return"]
+    if total is None or bench is None or float(total) <= float(bench):
+        out.append(f"total return {total!r} does not beat SPY TR {bench!r}")
+    dd = trial["max_drawdown"]
+    if dd is None or float(dd) > tuning.MAX_DRAWDOWN:
+        out.append(f"max drawdown {dd!r} is outside the {tuning.MAX_DRAWDOWN:.0%} bar")
+    factor = trial["profit_factor"]
+    if factor is None or float(factor) < tuning.MIN_PROFIT_FACTOR:
+        out.append(f"profit factor {factor!r} is under {tuning.MIN_PROFIT_FACTOR}")
+    count = trial["trades"]
+    if count is None or int(count) < dev._MIN_TRADES:
+        out.append(f"{count!r} closed trades is under {dev._MIN_TRADES}")
+    if OWNER_INPUTS_LABEL in recorded_labels(trial["failed"]):
+        out.append(
+            f"it recorded {OWNER_INPUTS_LABEL!r}, which is a property of the candidate and which "
+            f"no threshold re-decides"
+        )
+    return tuple(out)
+
+
+def reevaluate_method(conn: sqlite3.Connection, method_id: str) -> Reevaluation:
+    """Re-judge one method's dev trials under ``DSR_MIN`` and ``DSR_POLICY`` and, if that
+    unblocks it, move it ``rejected -> dev-eligible``.
+
+    **This is the only write path in the lab that reconsiders a verdict, and it is deliberately
+    narrow.** It may take exactly one edge, from exactly one status, for exactly one reason:
+
+    - the method must read ``rejected`` now. Any other status is left alone and ``moved`` is
+      False; there is no other edge into ``dev-eligible`` from here, so a method already moved
+      is not moved twice.
+    - at least one of its dev trials must be eligible under the derived verdict and not already
+      recorded eligible.
+    - **every trial it relies on must clear all five conditions on a second, independently
+      written check.** ``verdict`` already derives them; ``_blocking`` repeats the four
+      comparisons against the same live constants in its own code, and refuses outright if the
+      recorded ``failed`` carries ``OWNER_INPUTS_LABEL``. The repetition is the point: **two
+      owner-set bars moved in this set** (the luck threshold here, the drawdown threshold in
+      phase 8), and a gate that loosens on two axes at once is worth two noes written in two
+      places. A trial that reads derived-eligible but does not clear this check is a
+      contradiction inside this module, and it raises ``LabError`` rather than promoting quietly.
+
+      Note what this check is **not**: it is not "the recorded failure was the luck label alone".
+      That was the earlier draft's rule, and it is wrong now -- ``M0020-W-NOSTOP``'s recorded
+      failure is ``"max DD <= 15%; DSR >= 0.95"`` and it *should* become eligible, because the
+      owner moved both of those bars. The rule is about the numbers, not about the string.
+
+    Nothing in ``trials`` is written: no row is inserted, updated or deleted, so the lab's N does
+    not move and ``test_looks`` is untouched. What is written is one dated section appended to
+    ``analysis`` (append-only by trigger, the shape ``record_promotion`` uses) naming the
+    threshold, the policy, the N and the date that re-judged it, and the ``status`` column. Both
+    happen in the caller's transaction, so a crash leaves neither.
+
+    Neither the threshold nor the policy is a parameter. A write path that could unblock a method
+    under any bar on request would make both constants decorative; the read-only comparison
+    across policies is phase 5's ``lab luck``.
+
+    The caller holds the transaction (``begin_immediate`` / ``with conn``), as every other
+    writer in this module does.
+    """
+    from seer_engine.backtest import tuning  # for the drawdown bar named in the analysis text
+
+    row = get_method(conn, method_id)
+    if row is None:
+        raise LabError(f"no method {method_id}")
+    status = str(row["status"])
+    trials = conn.execute(
+        "SELECT * FROM trials WHERE method_id = ? AND window = 'dev' ORDER BY n", (method_id,)
+    ).fetchall()
+    g = gate(conn)
+    unblocked: list[str] = []
+    verdicts: dict[str, Verdict] = {}
+    derived = 0
+    for t in trials:
+        v = verdict(conn, t, at=g)
+        derived += 1 if v.derived else 0
+        if not v.eligible:
+            continue
+        blocking = _blocking(t)
+        if blocking:
+            raise LabError(
+                f"{t['candidate_id']} reads eligible at {DSR_LABEL} under the {g.policy} policy "
+                f"(N={g.n}), but a second, independent check of its recorded numbers says "
+                f"otherwise: {'; '.join(blocking)}. Refusing to move {method_id} -- a method may "
+                f"only cross this edge when every one of the five conditions clears the bar in "
+                f"force today."
+            )
+        if not bool(t["eligible"]):
+            unblocked.append(str(t["candidate_id"]))
+            verdicts[str(t["candidate_id"])] = v
+    found = Reevaluation(
+        method_id=method_id,
+        status_before=status,
+        status_after=status,
+        moved=False,
+        gate=g,
+        unblocked=tuple(unblocked),
+        derived=derived,
+        unjudgeable=len(trials) - derived,
+        dev_trials=len(trials),
+    )
+    if status != "rejected" or not unblocked:
+        return found
+
+    lines = [
+        "# Re-evaluation",
+        "",
+        f"{REEVALUATION_MARKER}`{g.policy}` N policy at N = {g.n}, against `{DSR_LABEL}` and "
+        f"a max drawdown bar of {tuning.MAX_DRAWDOWN:.0%} (both the owner's risk appetite, set "
+        f"2026-10-07; LAB_LUCK_GATE_PLAN.md Decisions D1 and D6).",
+        "",
+        "Every condition was re-read against the bars in force today: the four threshold "
+        "conditions from this method's own recorded columns, and the luck test from the same "
+        "deflated Sharpe at the same N. No recorded column changed: `trials` is append-only, and "
+        "every `dsr`, `eligible`, `failed` and `n_trials_at_run` this method recorded still reads "
+        "exactly as it did -- including the `DSR >= 0.95` and `max DD <= 15%` labels that "
+        "rejected it, which name the bars of their own day.",
+        "",
+        f"The {'variant' if len(unblocked) == 1 else 'variants'} this unblocks:",
+        "",
+    ]
+    for cid in unblocked:
+        v = verdicts[cid]
+        shown = "None" if v.dsr is None else f"{v.dsr:.4f}"
+        lines.append(f"- `{cid}`: DSR {shown} at N = {g.n}, against {DSR_LABEL}.")
+    lines += [
+        "",
+        "The *set* of five P7a D8 conditions did not change, and `owner inputs` -- the one that "
+        "is a property of the candidate rather than of a number -- was carried from the record "
+        "untouched. Status moves `rejected` -> `dev-eligible`.",
+    ]
+    append_analysis(conn, method_id, "\n".join(lines))
+    update_method(conn, method_id, status="dev-eligible")
+    return Reevaluation(
+        method_id=method_id,
+        status_before=status,
+        status_after="dev-eligible",
+        moved=True,
+        gate=g,
+        unblocked=tuple(unblocked),
+        derived=derived,
+        unjudgeable=len(trials) - derived,
+        dev_trials=len(trials),
+    )
+
+
+def reevaluate(
+    conn: sqlite3.Connection, method_ids: Sequence[str] | None = None
+) -> list[Reevaluation]:
+    """``reevaluate_method`` over ``method_ids``, or over every ``rejected`` method when None.
+
+    The caller holds the transaction, so the whole sweep is one atomic unit: either every method
+    it unblocks moves, or none does.
+    """
+    if method_ids is None:
+        method_ids = [
+            str(r[0])
+            for r in conn.execute("SELECT id FROM methods WHERE status = 'rejected' ORDER BY id")
+        ]
+    return [reevaluate_method(conn, m) for m in method_ids]
 
 
 # --------------------------------------------------------------------------- trial moments

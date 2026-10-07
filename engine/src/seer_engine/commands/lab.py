@@ -9,6 +9,12 @@
     lab promote M0007               pre-register the best dev-eligible variant by MAR in
                                     docs/lab/prereg/M0007.md and move the method to promoted;
                                     commit that file before `lab test` will spend the one look
+    lab reevaluate [M0022 ...]      re-judge recorded dev trials against the bars in force now
+                                    (store.DSR_MIN, store.DSR_POLICY, tuning.MAX_DRAWDOWN) and
+                                    move a method they unblock from rejected to dev-eligible.
+                                    Reads only: no store, no backtest, no trial row, no look. A
+                                    trial whose DSR cannot be evaluated at the gate's N fails the
+                                    luck test and is reported as such
     lab test M0007-A [--store DIR] [--roster-id ID] [--dry-run]
                                     the one counted look: run a promoted method's pre-registered
                                     variant once on the test window, record a `test` trial and set
@@ -102,6 +108,16 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
         type=Path,
         default=None,
         help="where the pre-registration file goes (default: docs/lab/prereg/ in this checkout)",
+    )
+
+    s = sub.add_parser(
+        "reevaluate",
+        help="re-judge recorded dev trials against the current luck bar; moves a method "
+             "rejected -> dev-eligible when the bars in force today clear every condition",
+    )
+    s.add_argument(
+        "method", nargs="*", metavar="M0022",
+        help="methods to re-evaluate (default: every method that reads rejected)",
     )
 
     s = sub.add_parser("test", help="the one counted look at the test window (design §3)")
@@ -224,7 +240,11 @@ def _status(conn, args) -> int:
     rows = conn.execute("SELECT * FROM trials WHERE window = 'dev' AND mar IS NOT NULL").fetchall()
 
     def misses(r) -> list[str]:
-        return [f for f in r["failed"].split("; ") if f and f != store.DSR_LABEL]
+        # The row, not its `failed` string. `trials` is append-only, so that string names the
+        # bars in force on the run date -- "DSR >= 0.95", "max DD <= 15%" -- and both have since
+        # moved. `store.owner_failures` re-derives the four threshold conditions from this row's
+        # recorded columns against the bars in force now, and carries `owner inputs`.
+        return list(store.owner_failures(r))
 
     for r in sorted(rows, key=lambda r: (len(misses(r)), -r["mar"], r["n"]))[:8]:
         out.append(
@@ -358,6 +378,72 @@ def _promote(conn, args) -> int:
     print(f"    git commit -m 'lab: pre-register {p.candidate} for the test window'")
     print(f"    python -m seer_engine lab test {p.candidate}")
     print(f"\ntest-window looks used: {store.test_looks(conn)}")
+    return 0
+
+
+def _reevaluate(conn, args) -> int:
+    """`lab reevaluate [M0022 ...]`: re-judge recorded dev trials against the current luck bar
+    and move anything the moved bars were blocking to dev-eligible.
+
+    No research store is loaded, no backtest runs, no trial row is inserted: this reads the dev
+    trials the lab already has, re-decides every condition for each, and takes at most the one
+    edge `rejected -> dev-eligible`. The test window is not touched and the look count it prints
+    is the one it found.
+
+    Every trial with a recorded DSR is re-judged **at the gate's current N**, either exactly from
+    `trial_moments` or by re-evaluating the recorded DSR there (`store.dsr_at`). A trial whose
+    DSR cannot be evaluated at all -- the 54 P7a seed rows, whose `dsr` is NULL by construction --
+    fails the luck test, exactly as a new trial with no computable DSR does, and is counted and
+    named per method rather than passed over in silence.
+
+    Neither the threshold nor the policy is a flag: the write path always uses `store.DSR_MIN`
+    and `store.DSR_POLICY`, so the gate cannot be loosened per invocation. To see what another
+    policy would say without changing anything, use the read-only `lab luck`.
+
+    The pairing is deliberate and the names are deliberately not neighbours: **`lab reevaluate`
+    writes** (it can move a method across `rejected -> dev-eligible`) and **`lab luck` reads**
+    (it prints the gate's state and its sensitivity to N, and touches nothing).
+
+    Like every other `lab` subcommand, the global `--dry-run` is ignored. The whole sweep is one
+    transaction: either every method it unblocks moves, or none does.
+    """
+    store.begin_immediate(conn)
+    with conn:
+        results = store.reevaluate(conn, args.method or None)
+    if not results:
+        print("nothing to re-evaluate: no method reads rejected")
+        return 0
+    g = results[0].gate
+    print(f"luck bar: {store.DSR_LABEL}   N policy: {g.policy}, N = {g.n}   "
+          f"({store.dev_trial_count(conn)} dev trial rows on the books)")
+    print()
+    moved = 0
+    for r in results:
+        if r.moved:
+            moved += 1
+            print(f"  {r.method_id}: {r.status_before} -> {r.status_after}  "
+                  f"({', '.join(r.unblocked)})")
+        elif r.dev_trials == 0:
+            print(f"  {r.method_id}: no dev trial (dropped before running); unchanged")
+        elif r.derived == 0:
+            print(f"  {r.method_id}: none of its {r.dev_trials} dev trial(s) has an evaluable "
+                  f"DSR (the P7a seed recorded none), so each fails the luck test and the "
+                  f"verdict is unchanged ({r.status_before})")
+        else:
+            extra = (
+                "" if r.unjudgeable == 0
+                else f" ({r.unjudgeable} have no recorded DSR and so fail the luck test)"
+            )
+            print(f"  {r.method_id}: re-judged {r.derived} of {r.dev_trials} dev trial(s) at "
+                  f"N = {r.gate.n} against {store.DSR_LABEL}{extra}; still {r.status_before}")
+    print()
+    print(f"{moved} method(s) moved rejected -> dev-eligible; "
+          f"test-window looks used: {store.test_looks(conn)}")
+    if moved:
+        # `export-json`, not `stage`: `lab stage` also `git add`s, and the swarm shares one
+        # worktree, so this phase stages its own path allowlist by hand (Decision D10).
+        print("Re-export the web snapshot with "
+              "`python -m seer_engine lab export-json`, and commit it with lab/lab.sqlite.")
     return 0
 
 
@@ -697,6 +783,7 @@ _HANDLERS = {
     "show": _show,
     "run": _run,
     "promote": _promote,
+    "reevaluate": _reevaluate,
     "test": _test,
     "remeasure": _remeasure,
     "idea": _idea,

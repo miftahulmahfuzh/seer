@@ -59,7 +59,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "114645d",
       "depends_on": [
         1,
         2,
@@ -67,16 +67,16 @@
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "VERIFIED HARD against the committed DB, not the report: invariant 3 -- all 110 rows' recorded dsr/eligible/failed/n_trials_at_run byte-identical to base a95126a (diff empty); invariant 2 test_looks=0; invariant 7 trial_moments EMPTY (phase 9's to fill); invariant 4 deflated_sharpe body + DEV_END byte-identical to pre-flight baseline 8a8c973a. M0020+M0022 rejected->dev-eligible, the only two moved; NOTHING in 'promoted'. Gate dsrMin 0.90 maxDrawdown 0.20 in both store and web/data/lab.json. Migration additive+idempotent. THE GATE NOW ADMITS -- R1 satisfied. PHASE DECISIONS (3, all on ladder): (a) rung 1+3, plan's own test_m0011_stays_rejected asserted derived=False/n=90, a superseded draft contradicting the same plan's Step 3 block, D11 and R2 -- replaced with derived=True/n=110/dsr~0.884, the figure the index itself quotes; (b) rung 3 + never-relax, 18 fixture failures repaired by moving fixtures clear (distinct Sharpes + _ballast dev trial + ineligible rows made ineligible in their NUMBERS not via a recorded failed string this phase stops reading) -- root cause is real D12 property: a fixture lab whose dev trials share one Sharpe has zero trial-Sharpe variance so no DSR is evaluable; (c) rung 2, test_the_two_moved_bars_unblock assertion made relative to starting status since it asserted a move against the DB this phase migrates and could only pass once; the unconditional 'exactly three eligible' assertion where R1/R5 live is unchanged. NEAR-MISS RECOVERED: plan manual check 2 says run 'lab promote M0022' which against the committed DB moves it to promoted -- forward-only, irreversible. Phase 4 ran it, caught it, restored lab.sqlite from HEAD, redid the migration, re-ran on a copy via SEER_LAB_DB. Committed DB holds dev-eligible, verified by me independently. WARNED to phases 5,7,9. Suite 3122 passed/0 failed.",
       "package": "engine/lab",
       "plan": ".workflows/plan/lab-luck-gate/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T06:54:01+00:00",
       "satisfies": [
         "R1",
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-B6Y5",
       "title": "The verdict is derived under one policy, at the current N"
     },
     {
@@ -95,7 +95,7 @@
         "R3",
         "R1"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "lab status` shows the queue and the look budget; `lab luck"
     },
@@ -132,7 +132,7 @@
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Docs, the pre-registration wording, and the site's gate"
     },
@@ -170,7 +170,7 @@
       "satisfies": [
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Luck-test the P7a seed"
     }
@@ -178,7 +178,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-luck-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-luck-gate",
-  "updated": "2026-10-07T04:43:43+00:00",
+  "updated": "2026-10-07T06:54:01+00:00",
   "verified_at": "2026-10-07T03:59:26+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-luck-gate"
 }

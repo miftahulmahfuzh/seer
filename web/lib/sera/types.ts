@@ -1,8 +1,11 @@
 /** The lab snapshot contract: `web/data/lab.json`, written by `python -m seer_engine lab export-json`. */
 
 export type LabSnapshot = {
-  /** 2 added the derived verdict to every trial (`failedNow` / `eligibleNow` / `dsrNow`). */
-  version: 2;
+  /**
+   * 2 added the derived verdict to every trial (`failedNow` / `eligibleNow` / `dsrNow`);
+   * 3 added `paper`, which names the lab method behind each roster entry.
+   */
+  version: 3;
   asOf: string;
   gate: {
     maxDrawdown: number;
@@ -44,6 +47,26 @@ export type LabSnapshot = {
   trials: LabTrial[];
   insights: LabInsight[];
   ideasSeen: LabSeen[];
+  /** Where each paper roster entry came from in the lab (`paper.roster.LAB_PROVENANCE`). */
+  paper: LabPaper[];
+};
+
+/**
+ * One roster entry's lab provenance, as the engine records it. A fact about the night the entry
+ * was admitted, not a live read: `labStatus` is the method's status at that moment and never
+ * tracks the method's current one. Only entries that came from the lab appear — C and SPY have
+ * no row here, and must not be linked to a method page.
+ */
+export type LabPaper = {
+  /** `strategies.id` on the leaderboard: 'RAW-FR', 'RMW-FR', … */
+  strategyId: string;
+  methodId: string;
+  /** The exact variant behind the entry: 'M0007-N20-RAW'. */
+  candidateId: string;
+  /** The method's status when the roster took it. */
+  labStatus: string;
+  /** 'test-passed' (the lab's own route) or 'owner-override' (the roster's). */
+  basis: string;
 };
 
 export type LabMethod = {

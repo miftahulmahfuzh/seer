@@ -276,8 +276,8 @@ def lab(tmp_path):
 def test_the_snapshot_follows_the_contract(lab):
     s = store.snapshot(lab)
     assert list(s) == ["version", "asOf", "gate", "data", "summary", "benchmark", "methods", "trials",
-                       "insights", "ideasSeen"]
-    assert s["version"] == 2
+                       "insights", "ideasSeen", "paper"]
+    assert s["version"] == 3
     gate = s["gate"]
     assert list(gate) == [
         "maxDrawdown", "minProfitFactor", "minTrades", "dsrMin",
@@ -359,6 +359,33 @@ def test_the_snapshot_follows_the_contract(lab):
     assert s["asOf"] == max(stamps)
 
 
+def test_the_paper_block_is_the_rosters_provenance_verbatim(lab):
+    """``paper`` is the only block that is not a read of the lab database.
+
+    It exists so the web can answer "which method is this roster entry?", which nothing else in
+    the snapshot can: ``rules_id`` is shared by a dozen methods. Asserted against
+    ``LAB_PROVENANCE`` itself rather than against a copied list of ids, so promoting a strategy
+    does not break this test -- the roster is the source and this only checks it arrives whole.
+    """
+    from seer_engine.paper import roster
+
+    paper = store.snapshot(lab)["paper"]
+    assert [p["strategyId"] for p in paper] == sorted(roster.LAB_PROVENANCE)
+    for p in paper:
+        assert set(p) == {"strategyId", "methodId", "candidateId", "labStatus", "basis"}
+        prov = roster.LAB_PROVENANCE[p["strategyId"]]
+        assert (p["methodId"], p["candidateId"], p["labStatus"], p["basis"]) == (
+            prov.method_id, prov.candidate_id, prov.lab_status, prov.basis)
+        # The variant is NOT required to be named after its method: the historical entries carry
+        # their own ids (`F1-SPY-SMA200-M` under `H-P7A-F1`). Only `methodId` ever builds an href,
+        # and that those ids reach a real method is asserted on the committed lab, not on this
+        # fixture, which holds one method.
+    # `reason` is deliberately not published: the roster's prose stays on the roster.
+    assert all("reason" not in p for p in paper)
+    # Entries the lab never produced (C, SPY) have no row, and the web must find none for them.
+    assert {"SPY", "C"}.isdisjoint({p["strategyId"] for p in paper})
+
+
 def test_the_snapshot_json_is_deterministic(lab, tmp_path):
     text = store.snapshot_json(lab)
     assert text == store.snapshot_json(lab)
@@ -436,3 +463,11 @@ def test_the_committed_snapshot_is_the_export_of_the_committed_database():
             "web/data/lab.json is not the export of lab/lab.sqlite: run "
             "`python -m seer_engine lab stage` (or `lab export-json`) and commit both files"
         )
+    # Every roster entry's `methodId` reaches a method this snapshot publishes. The leaderboard
+    # turns that id into `/sera/methods/<id>` with nothing else to check against, so a provenance
+    # row naming a method the lab does not hold is a 404 on a live page -- caught here, on the
+    # real lab, rather than by a reader clicking it.
+    snap = json.loads(committed)
+    ids = {m["id"] for m in snap["methods"]}
+    missing = sorted({p["methodId"] for p in snap["paper"]} - ids)
+    assert not missing, f"paper provenance names methods the lab does not have: {missing}"

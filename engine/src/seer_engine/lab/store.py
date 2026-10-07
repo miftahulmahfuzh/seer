@@ -1680,7 +1680,11 @@ def as_mapping(row: sqlite3.Row) -> Mapping[str, Any]:
 # bump is not cosmetic: before it, the snapshot published the gate's bars live and every trial's
 # verdict as recorded history, so a page drawing both read `0.912 < 0.90` off one trial -- the
 # tick from the row's recorded `DSR >= 0.95`, the number from the live bar beside it.
-SNAPSHOT_VERSION = 2
+#
+# 3 adds ``paper``: which roster entry is which lab method (``paper.roster.LAB_PROVENANCE``). The
+# web had no way to answer that -- ``rules_id`` is shared by a dozen methods, so it is not a key --
+# and a map hand-written in the site would drift the next promotion night in silence.
+SNAPSHOT_VERSION = 3
 EXPECTED_FAILURE_SEP = "\n\nExpected failure: "  # how lab ideas write their hypothesis
 
 
@@ -1837,10 +1841,18 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
     ``dsrNow`` is resolved against that same gate, in the same pass, by ``published_verdict``.
     The two have to move together or not at all -- a snapshot that published live bars beside
     recorded verdicts is what printed ``0.912 < 0.90`` on the site.
+
+    ``paper`` is the one block that is not a read of this database: it is
+    ``paper.roster.LAB_PROVENANCE``, which names the lab method and variant behind every roster
+    entry. It travels here because the web has no other way to get it -- ``rules_id`` is shared by
+    a dozen methods, so it cannot be the key -- and because the alternative, a map written by hand
+    in the site, goes stale on the next promotion night without anything failing. ``reason`` is
+    deliberately left out: the roster's prose belongs on the roster, not in the lab's snapshot.
     """
     from seer_engine import dates, research
     from seer_engine.backtest import dev, tuning
     from seer_engine.lab import seed
+    from seer_engine.paper import roster
 
     def count(sql: str) -> int:
         return int(conn.execute(sql).fetchone()[0])
@@ -1910,6 +1922,12 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
         "ideasSeen": [
             {"key": s["key"], "methodId": s["method_id"], "note": s["note"], "added": s["added"]}
             for s in _dicts(conn, "SELECT * FROM ideas_seen ORDER BY key")
+        ],
+        # Not from the database: the roster's own record of where each paper entry came from.
+        "paper": [
+            {"strategyId": sid, "methodId": p.method_id, "candidateId": p.candidate_id,
+             "labStatus": p.lab_status, "basis": p.basis}
+            for sid, p in sorted(roster.LAB_PROVENANCE.items())
         ],
     }
 

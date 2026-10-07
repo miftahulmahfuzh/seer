@@ -85,7 +85,7 @@ const insight = (id: number, kind: LabInsight['kind'], added: string): LabInsigh
 });
 
 const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
-  version: 2,
+  version: 3,
   asOf: '2026-10-04T14:12:24+00:00',
   gate: {
     maxDrawdown: 0.2,
@@ -130,6 +130,7 @@ const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
   ],
   insights: [],
   ideasSeen: [],
+  paper: [],
   ...over,
 });
 

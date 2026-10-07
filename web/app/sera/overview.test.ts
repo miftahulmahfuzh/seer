@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { withVerdict } from '../../lib/sera/fixture';
 import type { LabInsight, LabMethod, LabSnapshot, LabTrial } from '../../lib/sera/types';
 import {
   closer,
@@ -37,7 +38,7 @@ const method = (id: string, over: Partial<LabMethod> = {}): LabMethod => ({
   ...over,
 });
 
-const trial = (n: number, methodId: string, over: Partial<LabTrial> = {}): LabTrial => ({
+const trial = (n: number, methodId: string, over: Partial<LabTrial> = {}): LabTrial => withVerdict({
   n,
   methodId,
   candidateId: `${methodId}-C${n}`,
@@ -67,9 +68,12 @@ const trial = (n: number, methodId: string, over: Partial<LabTrial> = {}): LabTr
   eligible: false,
   dsr: null,
   nTrialsAtRun: n,
+  failedNow: [],
+  eligibleNow: false,
+  dsrNow: null,
   curve: [],
   ...over,
-});
+}, over);
 
 const insight = (id: number, kind: LabInsight['kind'], added: string): LabInsight => ({
   id,
@@ -81,7 +85,7 @@ const insight = (id: number, kind: LabInsight['kind'], added: string): LabInsigh
 });
 
 const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
-  version: 1,
+  version: 2,
   asOf: '2026-10-04T14:12:24+00:00',
   gate: {
     maxDrawdown: 0.2,
@@ -114,10 +118,14 @@ const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
     method('M0002', { status: 'idea', updated: '2026-10-04T14:00:36+00:00' }),
   ],
   trials: [
-    trial(1, 'H-A', { maxDrawdown: 0.55, cagr: 0.089, spyTrCagr: 0.089, failed: ['beats SPY TR', 'max DD <= 15%', 'PF >= 1.3', '>= 100 trades'] }),
-    trial(2, 'H-B', { maxDrawdown: 0.19, cagr: 0.098, spyTrCagr: 0.089, mar: 0.52, failed: ['max DD <= 15%', '>= 100 trades'] }),
-    trial(3, 'M0001', { maxDrawdown: 0.11, cagr: 0.061, spyTrCagr: 0.079, mar: 0.56, dsr: 0.9, nTrialsAtRun: 4, failed: ['beats SPY TR', 'DSR >= 0.95'] }),
-    trial(4, 'M0001', { maxDrawdown: 0.12, cagr: 0.09, spyTrCagr: 0.079, mar: 0.75, dsr: 0.97, nTrialsAtRun: 4, failed: [], eligible: true }),
+    // `failed` is each row as recorded under the old 15%/0.95 bars; `failedNow` is the same row
+    // at this fixture's gate (20%, 0.90, N = 4). They differ on purpose: H-B's 19% fall and
+    // M0001-C3's 0.90 score are both misses in the record and passes today, which is the whole
+    // behaviour under test. The two historical rows have no DSR, so they miss the luck check.
+    trial(1, 'H-A', { maxDrawdown: 0.55, cagr: 0.089, spyTrCagr: 0.089, failed: ['beats SPY TR', 'max DD <= 15%', 'PF >= 1.3', '>= 100 trades'], failedNow: ['beats SPY TR', 'max DD <= 20%', 'PF >= 1.3', '>= 100 trades', 'DSR >= 0.90'] }),
+    trial(2, 'H-B', { maxDrawdown: 0.19, cagr: 0.098, spyTrCagr: 0.089, mar: 0.52, failed: ['max DD <= 15%', '>= 100 trades'], failedNow: ['>= 100 trades', 'DSR >= 0.90'] }),
+    trial(3, 'M0001', { maxDrawdown: 0.11, cagr: 0.061, spyTrCagr: 0.079, mar: 0.56, dsr: 0.9, nTrialsAtRun: 4, failed: ['beats SPY TR', 'DSR >= 0.95'], failedNow: ['beats SPY TR'] }),
+    trial(4, 'M0001', { maxDrawdown: 0.12, cagr: 0.09, spyTrCagr: 0.079, mar: 0.75, dsr: 0.97, nTrialsAtRun: 4, failed: [], eligible: true, failedNow: [] }),
     trial(5, 'M0001', { window: 'test', maxDrawdown: 0.01, cagr: 0.5 }),
   ],
   insights: [],
@@ -169,7 +177,9 @@ describe('landing', () => {
     expect(none.yDomain[1]).toBeGreaterThan(0);
   });
   it('writes the tip the page promises, with plain hurdle names', () => {
-    expect(trialTip(snap().trials[2])).toBe('M0001-C3: CAGR 6.1% vs SPY 7.9%, max DD 11.0%, misses: Beats SPY, Luck check');
+    // M0001-C3 recorded `DSR >= 0.95` and its 0.90 score clears today's bar, so the only miss
+    // the tip names is the one it still has. The tip reads the verdict, like every other mark.
+    expect(trialTip(snap().trials[2])).toBe('M0001-C3: CAGR 6.1% vs SPY 7.9%, max DD 11.0%, misses: Beats SPY');
   });
 });
 
@@ -230,8 +240,10 @@ describe('hurdles', () => {
     expect(h.domain).toEqual([0, 4]);
     expect(h.total).toBe(4);
     expect(h.groups[4].items[0]).toMatchObject({ value: 4, valueText: '4' });
-    // The luck check was measured on the two lab tries only.
-    expect(h.groups[5].items[0]).toMatchObject({ value: 1, valueText: '1' });
+    // The luck check could only be scored on the two lab tries, and both clear 0.90 — the bar
+    // the fixture's gate holds. The two historical tries have no score, so they miss it and are
+    // not in the denominator the tip quotes.
+    expect(h.groups[5].items[0]).toMatchObject({ value: 2, valueText: '2' });
     expect(h.groups[5].items[0].tip).toContain('older tries predate it');
     expect(h.hardest).toBe('Beats SPY');
   });

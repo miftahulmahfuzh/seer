@@ -1,7 +1,9 @@
 // Pure helpers for /sera/methods and /sera/methods/[id]. No data access: the pages feed them.
 // Relative imports only, because vitest runs without the @/ alias.
-// Pass/miss comes from derive.conditionOk (the engine's `failed` list), and thresholds come from
-// snapshot.gate. Nothing here re-judges a trial (invariant 5).
+// Pass/miss comes from derive.conditionOk (the engine's `failedNow` verdict), and thresholds come
+// from snapshot.gate — the two are resolved against each other at export time, so a tick and the
+// target printed next to it always describe the same day. Nothing here re-judges a trial
+// (invariant 5); `failed`, the run-date record, appears only in techRows, labelled as the record.
 import {
   Archive, Brain, Code, GitFork, GraduationCap, Newspaper, type LucideIcon,
 } from 'lucide-react';
@@ -137,7 +139,11 @@ export const windowText = (t: LabTrial): string => `${t.start.slice(0, 4)}–${t
 
 /* ---- The six hurdles ----------------------------------------------------------------------- */
 
-/** true = cleared, false = missed, null = not measured (derive.conditionOk). */
+/**
+ * true = cleared, false = missed (derive.conditionOk, which reads the engine's `failedNow`).
+ * `null` is kept in the type as the not-decidable case, but no condition produces it today:
+ * a luck test that cannot be scored is a luck test that was not passed.
+ */
 export type Mark = { key: ConditionKey; label: string; ok: boolean | null };
 
 /** The six hurdles of one trial, in display order. */
@@ -177,7 +183,12 @@ export function conditionSentence(key: ConditionKey, ok: boolean | null, t: LabT
     case 'owner':
       return ok ? `${label}: yes (none needed).` : `${label}: no (needs a setting only the owner can decide).`;
     case 'dsr':
-      return `${label}: ${yn} (${fixed(t.dsr, 3)} ${ok ? '≥' : '<'} ${fixed(gate.dsrMin, 2)}, scored at N = ${count(t.nTrialsAtRun)}).`;
+      // `dsrNow` at `gate.dsrN`, never the recorded pair: the bar is the bar *at that N*, and
+      // quoting a score from one N against a bar from another is how this line once read
+      // "no (0.912 < 0.90)". Null means the luck test could not be run, which is a miss.
+      return t.dsrNow === null
+        ? `${label}: no (not measured — the luck test cannot be scored for this trial, so it cannot pass it).`
+        : `${label}: ${yn} (${fixed(t.dsrNow, 3)} ${ok ? '≥' : '<'} ${fixed(gate.dsrMin, 2)}, scored at N = ${count(gate.dsrN)}).`;
   }
 }
 
@@ -303,6 +314,11 @@ export function techRows(t: LabTrial): [string, string][] {
     ['Time in the market', pct1(t.exposure)],
     ['Turnover', fixed(t.turnover, 2)],
     ['Worst year', t.worstYear === null ? '—' : `${t.worstYear} (${signed1(t.worstYearReturn)})`],
-    ['Failed', t.failed.length ? t.failed.join('; ') : 'nothing: eligible'],
+    // Both, and labelled. The record names the bars of its own run date and never changes; the
+    // verdict is the same row read against the bars in force now, which is what the page's ticks
+    // show. They differ for every row recorded before the owner moved a bar on 2026-10-07.
+    ['Luck score when run', t.dsr === null ? 'not measured' : `${fixed(t.dsr, 3)} at N = ${count(t.nTrialsAtRun)}`],
+    ['Missed when run', t.failed.length ? t.failed.join('; ') : 'nothing: eligible'],
+    ['Missed by today’s bars', t.failedNow.length ? t.failedNow.join('; ') : 'nothing: eligible'],
   ];
 }

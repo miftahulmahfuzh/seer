@@ -1,7 +1,8 @@
 /** The lab snapshot contract: `web/data/lab.json`, written by `python -m seer_engine lab export-json`. */
 
 export type LabSnapshot = {
-  version: 1;
+  /** 2 added the derived verdict to every trial (`failedNow` / `eligibleNow` / `dsrNow`). */
+  version: 2;
   asOf: string;
   gate: {
     maxDrawdown: number;
@@ -98,10 +99,39 @@ export type LabTrial = {
   spyTrReturn: number | null;
   spyTrCagr: number | null;
   mar: number | null;
+  /**
+   * **The record, not the verdict.** The hurdles this trial missed *on the day it ran*, by the
+   * bars of that day: `trials` is append-only, so 110 committed rows still say `DSR >= 0.95` and
+   * `max DD <= 15%` even though the owner moved both bars on 2026-10-07.
+   *
+   * Display this only in the technical record, where it is labelled as history. Anything that
+   * decides a tick, a count or a colour must read `failedNow` — judging a row by `failed` while
+   * printing a target out of `gate` is what put `0.912 < 0.90` on the method page.
+   */
   failed: string[];
+  /** The record: eligible as judged on the run date. For today's answer, `eligibleNow`. */
   eligible: boolean;
+  /** The record: the deflated Sharpe as scored at `nTrialsAtRun`. For today's, `dsrNow`. */
   dsr: number | null;
+  /** The record: how many tries the lab had counted when this one ran. */
   nTrialsAtRun: number;
+  /**
+   * **The verdict: the hurdles this trial misses now**, by the bars in `gate`, at `gate.dsrN`.
+   * Written by the engine's `store.published_verdict` at export time — the web never re-judges a
+   * trial, and must not try: the luck test is not a comparison of `dsr` against `gate.dsrMin`.
+   * `dsr` is scored at the N of its own run date, and re-scoring it at today's N is arithmetic
+   * only the engine holds (`M0007-N20-RAW` reads 0.9138 at N = 85 and 0.8985 at N = 110 — a pass
+   * and a fail, from the same recorded number).
+   */
+  failedNow: string[];
+  /** The verdict: `failedNow` is empty. The eligibility every page should count. */
+  eligibleNow: boolean;
+  /**
+   * The verdict: this trial's deflated Sharpe re-evaluated at `gate.dsrN`, or null when it
+   * cannot be — the 54 P7a seed rows have no recorded DSR. Null is a **missed** luck check, not
+   * an excused one: the engine puts the luck label in `failedNow` for exactly those rows.
+   */
+  dsrNow: number | null;
   curve: [string, number][];
 };
 

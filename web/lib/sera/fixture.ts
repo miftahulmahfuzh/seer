@@ -14,8 +14,16 @@ export const GATE: Gate = {
   testStart: '2015-10-19',
 };
 
+/**
+ * A trial. `failedNow` / `eligibleNow` / `dsrNow` mirror the record unless the test sets them.
+ *
+ * Mirroring is the right default because most tests mean "this is the verdict today" and say so
+ * through `failed`. Only a test about the record/verdict split — a row recorded against the old
+ * 0.95 bar and read against today's 0.90 — sets the two sides apart, and then it must set both,
+ * which is exactly the distinction worth making explicit in such a test.
+ */
 export function trial(over: Partial<LabTrial> = {}): LabTrial {
-  return {
+  const t: LabTrial = {
     n: 1,
     methodId: 'M0001',
     candidateId: 'M0001-V1',
@@ -45,9 +53,26 @@ export function trial(over: Partial<LabTrial> = {}): LabTrial {
     eligible: false,
     dsr: 0.97,
     nTrialsAtRun: 55,
-    curve: [['1996-01-31', 1]],
+    failedNow: [] as string[],
+    eligibleNow: false,
+    dsrNow: null as number | null,
+    curve: [['1996-01-31', 1]] as [string, number][],
     ...over,
   };
+  return withVerdict(t, over);
+}
+
+/**
+ * Default a trial's verdict fields from its record: `failedNow` mirrors `failed`, `dsrNow`
+ * mirrors `dsr`, and a row with no score picks up the luck label — the engine's own rule, that a
+ * luck test which cannot be scored was not passed. Shared by the test-local trial builders so
+ * all three agree. A test about the record/verdict split passes the fields explicitly instead.
+ */
+export function withVerdict(t: LabTrial, over: Partial<LabTrial>): LabTrial {
+  const dsrNow = 'dsrNow' in over ? (over.dsrNow as number | null) : t.dsr;
+  const unscored = dsrNow === null && !t.failed.some((f) => f.startsWith('DSR >= '));
+  const failedNow = over.failedNow ?? (unscored ? [...t.failed, 'DSR >= 0.90'] : t.failed);
+  return { ...t, failedNow, eligibleNow: over.eligibleNow ?? failedNow.length === 0, dsrNow };
 }
 
 export function method(over: Partial<LabMethod> = {}): LabMethod {

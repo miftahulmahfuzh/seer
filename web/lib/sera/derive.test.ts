@@ -60,24 +60,52 @@ describe('gateChecks', () => {
     expect(checks[4]).toMatchObject({ value: 'needs owner input', ok: false });
   });
 
-  it('marks an unmeasured luck check as null, and a failed one as false under either bar', () => {
-    const historical = trial({ dsr: null, failed: ['beats SPY TR'] });
-    expect(gateChecks(historical, GATE)[5]).toMatchObject({ value: 'not measured', ok: null });
-    // `trials` is append-only: rows judged before 2026-10-07 keep `DSR >= 0.95` for ever, and
-    // rows judged after carry `DSR >= 0.90`. Both are misses; matching one literal would show
-    // the other as a tick.
-    const old = trial({ dsr: 0.4, failed: ['DSR >= 0.95'] });
+  it('marks an unscorable luck check as a miss, and a failed one as a miss under either bar', () => {
+    // No DSR to re-evaluate at any N. The engine puts the luck label in `failedNow` for exactly
+    // these rows (its D11), so the page shows a cross with "not measured" as the reason — never
+    // a blank that a reader could mistake for an excused hurdle.
+    const seed = trial({ dsr: null, dsrNow: null, failed: ['beats SPY TR'], failedNow: ['beats SPY TR', 'DSR >= 0.90'] });
+    expect(gateChecks(seed, GATE)[5]).toMatchObject({ value: 'not measured', ok: false });
+    // The luck label is matched by prefix, so both spellings of the bar read as a miss. Matching
+    // one literal would show the other as a tick.
+    const old = trial({ dsrNow: 0.4, failedNow: ['DSR >= 0.95'] });
     expect(gateChecks(old, GATE)[5]).toMatchObject({ value: '0.40', ok: false });
-    const recent = trial({ dsr: 0.4, failed: ['DSR >= 0.90'] });
+    const recent = trial({ dsrNow: 0.4, failedNow: ['DSR >= 0.90'] });
     expect(gateChecks(recent, GATE)[5]).toMatchObject({ value: '0.40', ok: false });
+  });
+
+  it('judges by the verdict and never by the record, and shows the score at the gate\'s N', () => {
+    // M0022-W-TV14 exactly: recorded `DSR >= 0.95` at N = 110 on the day it ran, re-read against
+    // today's 0.90 bar and eligible. Judging it by `failed` while printing the target out of
+    // `gate` is what rendered `Luck check: no (0.912 < 0.90)` on the live site.
+    const reread = trial({
+      dsr: 0.91221, nTrialsAtRun: 110, failed: ['DSR >= 0.95'], eligible: false,
+      failedNow: [], eligibleNow: true, dsrNow: 0.91221,
+    });
+    expect(gateChecks(reread, GATE)[5]).toMatchObject({ value: '0.91', target: '0.9 or more', ok: true });
+    expect(misses(reread)).toEqual([]);
+    expect(conditionsPassed(reread)).toBe(6);
+
+    // And the other direction, which is why the web must not re-threshold `dsr` itself:
+    // M0007-N20-RAW scored 0.9138 at N = 85 and reads 0.8985 at today's N = 110.
+    const ratcheted = trial({
+      dsr: 0.913757, nTrialsAtRun: 85, failed: ['DSR >= 0.95'],
+      failedNow: ['DSR >= 0.90'], eligibleNow: false, dsrNow: 0.898468,
+    });
+    expect(gateChecks(ratcheted, GATE)[5]).toMatchObject({ value: '0.90', ok: false });
+    expect(misses(ratcheted)).toEqual(['dsr']);
   });
 });
 
 describe('conditionsPassed / misses / excessCagr', () => {
   it('counts only cleared hurdles and lists misses in order', () => {
-    const t = trial({ dsr: null, failed: ['beats SPY TR', 'PF >= 1.3'] });
-    expect(conditionsPassed(t)).toBe(3);
+    const t = trial({ failedNow: ['beats SPY TR', 'PF >= 1.3'] });
+    expect(conditionsPassed(t)).toBe(4);
     expect(misses(t)).toEqual(['spy', 'pf']);
+    // An unscorable luck check is a miss, so it costs a hurdle rather than being skipped.
+    const seed = trial({ dsr: null, dsrNow: null, failedNow: ['beats SPY TR', 'PF >= 1.3', 'DSR >= 0.90'] });
+    expect(conditionsPassed(seed)).toBe(3);
+    expect(misses(seed)).toEqual(['spy', 'pf', 'dsr']);
     expect(conditionsPassed(trial({ failed: [] }))).toBe(6);
   });
 
@@ -115,10 +143,12 @@ describe('closest / bestVariant', () => {
 describe('funnel', () => {
   it('counts dev trials clearing each hurdle', () => {
     const rows = funnel([
-      trial({ n: 1, failed: ['beats SPY TR'], dsr: 0.97 }),
-      trial({ n: 2, failed: ['max DD <= 15%', 'DSR >= 0.95'], dsr: 0.5 }),
-      trial({ n: 3, failed: ['beats SPY TR'], dsr: null }),
-      trial({ n: 4, window: 'test', failed: [] }),
+      trial({ n: 1, failedNow: ['beats SPY TR'], dsrNow: 0.97 }),
+      trial({ n: 2, failedNow: ['max DD <= 20%', 'DSR >= 0.90'], dsrNow: 0.5 }),
+      // No DSR at any N: it misses the luck check (passing counts it as a miss) but it is not
+      // part of the denominator the page quotes, which is what `measured` is for.
+      trial({ n: 3, failedNow: ['beats SPY TR', 'DSR >= 0.90'], dsr: null, dsrNow: null }),
+      trial({ n: 4, window: 'test', failedNow: [] }),
     ]);
     expect(rows.map((r) => [r.key, r.passing, r.measured, r.total])).toEqual([
       ['spy', 1, 3, 3],

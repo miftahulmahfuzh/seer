@@ -15,7 +15,7 @@ import subprocess
 import pytest
 
 from seer_engine import cli
-from seer_engine.backtest import tuning
+from seer_engine.backtest import dev, tuning
 from seer_engine.lab import seed as seed_mod
 from seer_engine.lab import store
 from seer_engine.lab.seed import seed
@@ -41,13 +41,16 @@ V1_INSIGHTS = [
     (2, "data-wish", "Delisted stocks", "Survivorship.", None, "2026-10-02T00:00:01+00:00"),
     (3, "risk", "The 15% bar", "2008 is in the window.", None, "2026-10-02T00:00:02+00:00"),
 ]
+# The recorded labels this fixture lab wrote (the bars of its own run date) and the live ones a
+# verdict is written in today. `failed` draws from the first set, `failedNow` from the second.
 LABELS = {"beats SPY TR", "max DD <= 15%", "PF >= 1.3", ">= 100 trades", "owner inputs", "DSR >= 0.95"}
+LIVE_LABELS = set(dev.FAILURE_LABELS) | {store.DSR_LABEL}
 METHOD_KEYS = {"id", "name", "family", "parentId", "sourceKind", "sourceRef", "hypothesis", "expectedFailure",
                "status", "analysis", "verdict", "blockedOn", "created", "updated", "historical"}
 TRIAL_KEYS = {"n", "methodId", "candidateId", "rulesId", "allocatorId", "configText", "window", "start", "end",
               "gitSha", "runAt", "totalReturn", "cagr", "maxDrawdown", "profitFactor", "pfInfinite", "trades",
               "sharpe", "exposure", "turnover", "worstYear", "worstYearReturn", "spyTrReturn", "spyTrCagr", "mar",
-              "failed", "eligible", "dsr", "nTrialsAtRun", "curve"}
+              "failed", "eligible", "dsr", "nTrialsAtRun", "failedNow", "eligibleNow", "dsrNow", "curve"}
 
 
 def _v1_db(path):
@@ -274,7 +277,7 @@ def test_the_snapshot_follows_the_contract(lab):
     s = store.snapshot(lab)
     assert list(s) == ["version", "asOf", "gate", "data", "summary", "benchmark", "methods", "trials",
                        "insights", "ideasSeen"]
-    assert s["version"] == 1
+    assert s["version"] == 2
     gate = s["gate"]
     assert list(gate) == [
         "maxDrawdown", "minProfitFactor", "minTrades", "dsrMin",
@@ -327,11 +330,22 @@ def test_the_snapshot_follows_the_contract(lab):
     for t in s["trials"]:
         assert set(t) == TRIAL_KEYS
         assert set(t["failed"]) <= LABELS
+        # The verdict is written in today's labels, whatever the row recorded, and it is a
+        # verdict rather than a copy: `eligibleNow` follows `failedNow`, never `eligible`.
+        assert set(t["failedNow"]) <= LIVE_LABELS
+        assert t["eligibleNow"] == (not t["failedNow"])
         assert all(isinstance(p[0], str) and isinstance(p[1], float) for p in t["curve"])
     t55 = s["trials"][-1]
     assert t55["profitFactor"] is None and t55["pfInfinite"] is True
     assert t55["cagr"] == 0.123457 and t55["dsr"] == 0.412346
     assert t55["failed"] == ["beats SPY TR", "DSR >= 0.95"] and t55["eligible"] is False
+    # The same row read against the bars in force now. Nothing is copied: the four threshold
+    # conditions are re-derived from this row's own columns, so the recorded `beats SPY TR` drops
+    # (total_return 1.0 > spy_tr_return 0.5) and only the luck label survives -- in today's
+    # spelling, 0.90, not the 0.95 the row still records.
+    assert t55["failedNow"] == [store.DSR_LABEL] and t55["eligibleNow"] is False
+    row = lab.execute("SELECT * FROM trials WHERE n = 55").fetchone()
+    assert t55["dsrNow"] == store._num(store.published_verdict(lab, row).dsr)
     assert t55["curve"] == [["2000-01-31", 1.0], ["2000-02-29", 1.012346]]
     assert not any(t["pfInfinite"] for t in s["trials"][:54])
 

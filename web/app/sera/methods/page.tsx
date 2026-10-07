@@ -154,7 +154,7 @@ function Row({ r }: { r: MethodRow }) {
           <td className={`num ${s.r}`}>{pct1(b.maxDrawdown)}</td>
           <td className={`num ${s.r}`}>{pfText(b)}</td>
           <td className={`num ${s.r}`}>{count(b.trades)}</td>
-          <td className={`num ${s.r}`}>{fixed(b.dsr, 2)}</td>
+          <td className={`num ${s.r}`}>{fixed(b.dsrNow, 2)}</td>
           <td><Dots best={b} passed={r.passed ?? 0} /></td>
         </>
       ) : (

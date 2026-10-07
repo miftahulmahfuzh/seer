@@ -30,7 +30,13 @@ const snap = (over: Partial<HowInput> = {}): HowInput => ({
     method({ id: 'M0004', status: 'blocked-data' }),
     method({ id: 'M0005', status: 'paper', updated: '2026-09-01T08:00:00+00:00' }),
   ],
-  trials: [trial({ eligible: true }), trial({ eligible: false }), trial({ window: 'test', eligible: true })],
+  // `eligibleNow` is what the panel counts: the dev try that clears today's bars, not the one
+  // that cleared the bars of its own run date.
+  trials: [
+    trial({ eligible: false, failedNow: [] }),
+    trial({ eligible: true, failedNow: ['DSR >= 0.90'] }),
+    trial({ window: 'test', failedNow: [] }),
+  ],
   ...over,
 });
 

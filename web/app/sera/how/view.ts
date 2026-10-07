@@ -11,7 +11,7 @@ export type HowInput = {
   data: LabSnapshot['data'];
   summary: Pick<LabSnapshot['summary'], 'devTrials' | 'testLooks'>;
   methods: readonly Pick<LabMethod, 'status' | 'historical' | 'updated'>[];
-  trials: readonly Pick<LabTrial, 'window' | 'eligible'>[];
+  trials: readonly Pick<LabTrial, 'window' | 'eligibleNow'>[];
 };
 
 /**
@@ -52,7 +52,8 @@ export function stageCounts(snap: HowInput): StageCounts {
     ideas: snap.methods.filter(m => m.status === 'idea').length,
     registered: snap.methods.filter(m => !m.historical && !NOT_REGISTERED.has(m.status)).length,
     devTrials: snap.summary.devTrials,
-    eligible: snap.trials.filter(t => t.window === 'dev' && t.eligible).length,
+    // Today's verdict, not the run-date record: this panel counts what the lab holds now.
+    eligible: snap.trials.filter(t => t.window === 'dev' && t.eligibleNow).length,
     testLooks: snap.summary.testLooks,
     paper: snap.methods.filter(m => m.status === 'paper').length,
   };

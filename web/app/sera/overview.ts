@@ -121,7 +121,9 @@ export function state(snap: LabSnapshot): State {
     if (!bestBeat || ex > bestBeat.excess) bestBeat = { trial: t, excess: ex };
   }
 
-  const eligible = dev.filter(t => t.eligible).length;
+  // `eligibleNow`, not `eligible`: the count the Overview headlines has to mean "clears the
+  // bars we hold today", or it contradicts the gate panel printed beside it.
+  const eligible = dev.filter(t => t.eligibleNow).length;
 
   // Only Sera's batch synthesis is written for the owner. Other journal notes can be machine records
   // (a promotion's spec digest, roster columns), so without a synthesis the headline is computed.
@@ -198,8 +200,8 @@ export function landing(snap: LabSnapshot): Landing {
     return t.maxDrawdown === null || ex === null ? [] : [{ t, dd: t.maxDrawdown, ex }];
   });
 
-  const color = (t: LabTrial) => (t.eligible ? ELIGIBLE_COLOR : hist.has(t.methodId) ? HISTORICAL_COLOR : LAB_COLOR);
-  const rank = (t: LabTrial) => (t.eligible ? 2 : hist.has(t.methodId) ? 0 : 1);
+  const color = (t: LabTrial) => (t.eligibleNow ? ELIGIBLE_COLOR : hist.has(t.methodId) ? HISTORICAL_COLOR : LAB_COLOR);
+  const rank = (t: LabTrial) => (t.eligibleNow ? 2 : hist.has(t.methodId) ? 0 : 1);
   const points: ScatterPoint[] = [...rows]
     // Draw order: historical under lab, eligible on top.
     .sort((a, b) => rank(a.t) - rank(b.t) || a.t.n - b.t.n)
@@ -208,7 +210,7 @@ export function landing(snap: LabSnapshot): Landing {
       x: dd,
       y: ex,
       color: color(t),
-      r: t.eligible ? 8 : 6,
+      r: t.eligibleNow ? 8 : 6,
       tip: trialTip(t),
       href: methodHref(t.methodId),
     }));
@@ -314,6 +316,12 @@ export type Luck = {
   /** The N the gate deflates by today, on the same axis as each try's own N. */
   refX: RefLine[];
   yTicks: Tick[];
+  /**
+   * How many tries clear the luck bar **today** — `dsrNow` against `gate.dsrMin`, both at
+   * `gate.dsrN`. Not the number of dots drawn above the line: a dot sits at the score and the N
+   * of its own run date, and a score from a narrower search is not a pass under a wider one.
+   * That gap is the ratchet this panel exists to show, and the colours are what show it.
+   */
   above: number;
   total: number;
   n: number;
@@ -326,13 +334,26 @@ export function luck(snap: LabSnapshot): Luck | null {
   const gate = snap.gate;
   const rows = devTrials(snap).filter((t): t is LabTrial & { dsr: number } => t.dsr !== null);
   if (rows.length === 0) return null;
+  // Position is the record (the score at the N of its run date, which is what makes the cloud
+  // drift right); colour is the verdict (does it clear the bar at today's N). A dot above the
+  // line in plain lab colour is a try that looked clear when it ran and no longer is — the
+  // ratchet, drawn. Under `all-trials` N only grows and the DSR falls with it, so an eligible
+  // dot is always above the line: the colours can disagree with the line, never contradict it.
   const points: ScatterPoint[] = rows.map(t => ({
     id: `t${t.n}`,
     x: t.nTrialsAtRun,
     y: t.dsr,
-    color: t.eligible ? ELIGIBLE_COLOR : t.dsr >= gate.dsrMin ? ABOVE_COLOR : LAB_COLOR,
-    r: t.eligible ? 8 : 6,
-    tip: `${t.candidateId}: DSR ${ratioText(t.dsr)}, scored at N = ${t.nTrialsAtRun}`,
+    color: t.eligibleNow
+      ? ELIGIBLE_COLOR
+      : t.dsrNow !== null && t.dsrNow >= gate.dsrMin
+        ? ABOVE_COLOR
+        : LAB_COLOR,
+    r: t.eligibleNow ? 8 : 6,
+    tip:
+      t.dsrNow === null || t.nTrialsAtRun === gate.dsrN
+        ? `${t.candidateId}: DSR ${ratioText(t.dsr)}, scored at N = ${t.nTrialsAtRun}`
+        : `${t.candidateId}: DSR ${ratioText(t.dsr)} scored at N = ${t.nTrialsAtRun}, ` +
+          `${ratioText(t.dsrNow)} at today's N = ${gate.dsrN}`,
     href: methodHref(t.methodId),
   }));
   return {
@@ -348,7 +369,7 @@ export function luck(snap: LabSnapshot): Luck | null {
       },
     ],
     yTicks: [0, 0.25, 0.5, 0.75, 1].map(v => ({ value: v, label: v.toFixed(2) })),
-    above: rows.filter(t => t.dsr >= gate.dsrMin).length,
+    above: rows.filter(t => t.dsrNow !== null && t.dsrNow >= gate.dsrMin).length,
     total: rows.length,
     n: gate.dsrN,
     policy: gate.dsrPolicy,

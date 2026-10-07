@@ -5,7 +5,7 @@ import { DSR_POLICIES, INSIGHT_KINDS, METHOD_STATUSES, SOURCE_KINDS } from './ty
 
 describe('lab snapshot (web/data/lab.json)', () => {
   it('has exactly the contract keys', () => {
-    expect(lab.version).toBe(1);
+    expect(lab.version).toBe(2);
     expect(Object.keys(lab).sort()).toEqual(
       ['asOf', 'benchmark', 'data', 'gate', 'ideasSeen', 'insights', 'methods', 'summary', 'trials', 'version'].sort(),
     );
@@ -28,7 +28,7 @@ describe('lab snapshot (web/data/lab.json)', () => {
     // which renders a missed hurdle as a tick, silently, on the page the owner reads.
     const known = new Set(Object.values(FAILURE_LABEL));
     const unreadable = lab.trials
-      .flatMap((t) => t.failed)
+      .flatMap((t) => [...t.failed, ...t.failedNow])
       .filter(
         (f) =>
           !known.has(f) &&
@@ -44,6 +44,34 @@ describe('lab snapshot (web/data/lab.json)', () => {
     const all = lab.trials.flatMap((t) => t.failed);
     expect(all.some((f) => f.startsWith(DSR_FAILURE_PREFIX))).toBe(true);
     expect(all.some((f) => f.startsWith(DRAWDOWN_FAILURE_PREFIX))).toBe(true);
+  });
+
+  it('publishes a verdict that agrees with the gate published beside it', () => {
+    // The regression this file exists to catch. `/sera/methods/M0022` once rendered
+    // "Luck check: no (0.912 < 0.90)": the cross came from the trial's recorded `DSR >= 0.95`
+    // and the number from the live gate. Both halves of every hurdle must now come from the
+    // same day, so a scored trial misses the luck check exactly when its score is under the bar.
+    for (const t of lab.trials) {
+      const missedLuck = t.failedNow.some((f) => f.startsWith(DSR_FAILURE_PREFIX));
+      if (t.dsrNow !== null) expect([t.candidateId, missedLuck]).toEqual([t.candidateId, t.dsrNow < lab.gate.dsrMin]);
+      // A trial with no score cannot pass a luck test it never had.
+      else expect([t.candidateId, missedLuck]).toEqual([t.candidateId, true]);
+
+      const missedDd = t.failedNow.some((f) => f.startsWith(DRAWDOWN_FAILURE_PREFIX));
+      if (t.maxDrawdown !== null) {
+        expect([t.candidateId, missedDd]).toEqual([t.candidateId, t.maxDrawdown > lab.gate.maxDrawdown]);
+      }
+      expect(t.eligibleNow).toBe(t.failedNow.length === 0);
+    }
+  });
+
+  it('carries a record that differs from the verdict, so neither pin is vacuous', () => {
+    // 110 committed rows were judged against the old 0.95 and 15% bars and still say so. If the
+    // two lists ever became identical everywhere, the test above would stop proving anything.
+    const split = lab.trials.filter((t) => t.failed.join('; ') !== t.failedNow.join('; '));
+    expect(split.length).toBeGreaterThan(0);
+    // And the split actually moves an outcome: some row is eligible today that was not when run.
+    expect(lab.trials.some((t) => t.eligibleNow && !t.eligible)).toBe(true);
   });
 
   it('starts the SPY benchmark at 1.0 on 1993-01-29', () => {

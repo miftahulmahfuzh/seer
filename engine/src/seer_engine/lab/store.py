@@ -1233,6 +1233,36 @@ def verdict(
     )
 
 
+def published_verdict(
+    conn: sqlite3.Connection, trial: Mapping[str, Any] | sqlite3.Row, *, at: Gate | None = None
+) -> Verdict:
+    """``trial``'s verdict for a reader of the snapshot: ``verdict`` for a dev row, and the
+    thresholds alone for a test row.
+
+    ``verdict`` is defined on dev rows, because the luck test is a statement about **selection**
+    among dev results. A test-window row has no selection to deflate -- that is the whole point
+    of pre-registering one variant and looking once -- so its recorded ``dsr`` is a measurement,
+    not a condition, and appending a luck label to it would invent a hurdle the lab never set.
+
+    What a test row does still have is the four owner thresholds, and those are constants the
+    owner moves: a test row recorded under the 15% drawdown bar must read against today's 20%
+    one exactly as a dev row does. So ``owner_failures`` is applied to it (four re-derived from
+    its own columns, ``owner inputs`` carried) and nothing else is.
+
+    ``dsr`` carries the recorded number for a test row and the re-evaluated one for a dev row;
+    ``derived`` says which, so a caller never has to guess. ``n`` and ``policy`` describe the
+    gate either way, because they describe the lab, not the row.
+    """
+    g = gate(conn) if at is None else at
+    if str(trial["window"]) == "dev":
+        return verdict(conn, trial, at=g)
+    failed = owner_failures(trial)
+    dsr = None if trial["dsr"] is None else float(trial["dsr"])
+    return Verdict(
+        dsr=dsr, failed=failed, eligible=not failed, n=g.n, policy=g.policy, derived=False
+    )
+
+
 # The first words of the analysis section ``reevaluate_method`` appends. Not an idempotence key:
 # the edge it guards can be taken at most once, because it leads out of the only status it may
 # be taken from.
@@ -1509,7 +1539,16 @@ def moments_of(conn: sqlite3.Connection, trial_n: int) -> sqlite3.Row | None:
     trial whose daily returns had no computable moments (fewer than two returns, or zero
     variance) -- which is exactly the set of trials whose ``dsr`` is NULL. A caller that
     re-evaluates must therefore have a fallback for None; it is never an error.
+
+    A database on schema v1 or v2 has no ``trial_moments`` table at all, which is the limiting
+    case of "recorded before this table existed" and is answered the same way. ``connect``
+    migrates, so this can only be a ``connect_readonly`` caller -- ``snapshot`` is one, and its
+    promise to work on an unmigrated read-only connection is what this branch keeps.
     """
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'trial_moments'"
+    ).fetchone() is None:
+        return None
     return conn.execute(
         "SELECT * FROM trial_moments WHERE trial_n = ?", (int(trial_n),)
     ).fetchone()
@@ -1630,7 +1669,11 @@ def as_mapping(row: sqlite3.Row) -> Mapping[str, Any]:
 
 # --------------------------------------------------------------------------- web snapshot
 
-SNAPSHOT_VERSION = 1
+# 2 adds the derived verdict to every trial (``failedNow`` / ``eligibleNow`` / ``dsrNow``). The
+# bump is not cosmetic: before it, the snapshot published the gate's bars live and every trial's
+# verdict as recorded history, so a page drawing both read `0.912 < 0.90` off one trial -- the
+# tick from the row's recorded `DSR >= 0.95`, the number from the live bar beside it.
+SNAPSHOT_VERSION = 2
 EXPECTED_FAILURE_SEP = "\n\nExpected failure: "  # how lab ideas write their hypothesis
 
 
@@ -1688,7 +1731,20 @@ def _snapshot_curve(text: str) -> list[list[Any]]:
     return out
 
 
-def _snapshot_trial(t: Mapping[str, Any]) -> dict[str, Any]:
+def _snapshot_trial(t: Mapping[str, Any], v: Verdict) -> dict[str, Any]:
+    """One ``trials`` row as the web reads it: the record, **and** the verdict it reads as now.
+
+    Both, and labelled as such, because they answer different questions and the site asks both.
+    ``failed`` / ``eligible`` / ``dsr`` / ``nTrialsAtRun`` are the row as the lab wrote it on its
+    run date -- append-only history, and the technical record a reader reruns from. ``failedNow``
+    / ``eligibleNow`` / ``dsrNow`` are ``published_verdict``: the same row judged by the bars in
+    force at export time, at the gate's current N.
+
+    Publishing only the first is what made ``/sera/methods/M0022`` print ``0.912 < 0.90``: the
+    gate block beside it is resolved live (``_gate_n``, ``DSR_MIN``), so a page that took its
+    ticks from ``failed`` and its numbers from ``gate`` was reading two different days at once.
+    A page must take **both** from the ``Now`` fields; ``failed`` is for the record panel only.
+    """
     pf = t["profit_factor"]
     return {
         "n": int(t["n"]),
@@ -1716,16 +1772,26 @@ def _snapshot_trial(t: Mapping[str, Any]) -> dict[str, Any]:
         "spyTrReturn": _num(t["spy_tr_return"]),
         "spyTrCagr": _num(t["spy_tr_cagr"]),
         "mar": _num(t["mar"]),
+        # The record: what the lab said on the run date, by the bars of that day.
         "failed": [f for f in t["failed"].split("; ") if f],
         "eligible": bool(t["eligible"]),
         "dsr": _num(t["dsr"]),
         "nTrialsAtRun": int(t["n_trials_at_run"]),
+        # The verdict: the same row by the bars in force now, at the gate's N (gate.dsrN).
+        "failedNow": list(v.failed),
+        "eligibleNow": v.eligible,
+        "dsrNow": _num(v.dsr),
         "curve": _snapshot_curve(t["curve_json"]),
     }
 
 
-def _gate_n(conn: sqlite3.Connection) -> dict[str, Any]:
+def _gate_n(conn: sqlite3.Connection) -> tuple[dict[str, Any], Gate]:
     """The multiple-testing N the luck gate deflates by, and the evidence behind it.
+
+    Returns the published block **and the same N as a ``Gate``**, from one resolution, because
+    ``snapshot`` needs both: the block it publishes and the gate it judges every trial's
+    ``failedNow`` against. Two calls would be two eigendecompositions of 110 curves, and -- worse
+    than slow -- two places the published N could come from.
 
     Three keys rather than one number, because the number alone is not reviewable. A reader of
     ``web/data/lab.json`` -- or of seertrade.site/sera, which draws this beside the luck bar --
@@ -1743,7 +1809,9 @@ def _gate_n(conn: sqlite3.Connection) -> dict[str, Any]:
     from seer_engine.lab import npolicy
 
     n = npolicy.effective_n(conn, DSR_POLICY)
-    return {"dsrPolicy": n.policy, "dsrN": n.n, "dsrNBasis": n.basis}
+    return {"dsrPolicy": n.policy, "dsrN": n.n, "dsrNBasis": n.basis}, Gate(
+        n=int(n.n), policy=str(n.policy)
+    )
 
 
 def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
@@ -1756,6 +1824,12 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
     the gate's ``dsrPolicy`` / ``dsrN`` / ``dsrNBasis`` are resolved from ``DSR_POLICY`` against
     ``trials`` at export time rather than stored, so the published gate follows the constant
     (design §7).
+
+    **Every trial is published twice over: as recorded, and as judged now.** The gate block has
+    always been resolved at export time; from v2 each trial's ``failedNow`` / ``eligibleNow`` /
+    ``dsrNow`` is resolved against that same gate, in the same pass, by ``published_verdict``.
+    The two have to move together or not at all -- a snapshot that published live bars beside
+    recorded verdicts is what printed ``0.912 < 0.90`` on the site.
     """
     from seer_engine import dates, research
     from seer_engine.backtest import dev, tuning
@@ -1773,6 +1847,7 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
         "SELECT max(added) FROM ideas_seen)"
     ).fetchone()[0]
     bench = seed.benchmark_curves()
+    gate_block, g = _gate_n(conn)
     return {
         "version": SNAPSHOT_VERSION,
         "asOf": as_of or "",
@@ -1781,7 +1856,7 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
             "minProfitFactor": tuning.MIN_PROFIT_FACTOR,
             "minTrades": dev._MIN_TRADES,
             "dsrMin": DSR_MIN,
-            **_gate_n(conn),
+            **gate_block,
             "devStart": research.STORE_START.isoformat(),
             "devEnd": dev.DEV_END.isoformat(),
             "testStart": dates.next_session(dev.DEV_END).isoformat(),
@@ -1814,7 +1889,12 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
             "spyPrice": [[d, v] for d, v in bench["spy_price"]],
         },
         "methods": [_snapshot_method(m) for m in _dicts(conn, "SELECT * FROM methods ORDER BY id")],
-        "trials": [_snapshot_trial(t) for t in _dicts(conn, "SELECT * FROM trials ORDER BY n")],
+        # One gate, resolved once and passed down: `published_verdict` judges every row against
+        # the same N, which is also the `gate.dsrN` published above.
+        "trials": [
+            _snapshot_trial(t, published_verdict(conn, t, at=g))
+            for t in _dicts(conn, "SELECT * FROM trials ORDER BY n")
+        ],
         "insights": [
             {"id": int(i["id"]), "kind": i["kind"], "title": i["title"], "body": i["body"],
              "methodId": i["method_id"], "added": i["added"]}

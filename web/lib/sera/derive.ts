@@ -1,8 +1,17 @@
 /**
  * Pure reshaping of the lab snapshot for the /sera pages.
  *
- * Pass/fail always comes from the engine's `trial.failed` (invariant 5: the web never
- * re-judges a trial). The gate is used only to print targets.
+ * Pass/fail always comes from the engine (invariant 5: the web never re-judges a trial), and
+ * the gate is used only to print targets. **Which** engine answer, though, is the whole
+ * question: `trial.failed` is what the lab said on the run date, and `trial.failedNow` is what
+ * the same row is judged as today. Reading the first while printing targets out of `gate` is
+ * how the method page came to render `Luck check: no (0.912 < 0.90)` — the cross from a row
+ * recorded against the old 0.95 bar, the number from the live one beside it.
+ *
+ * So: every pass/fail here reads `failedNow`, and `failed` is displayed only where the page
+ * says it is showing the record (the technical detail block). The web still does not re-judge
+ * anything — it must not, because the luck test is not `dsr >= gate.dsrMin`; re-scoring a DSR
+ * at today's N is arithmetic the engine holds (`store.dsr_at`).
  */
 import { pct, signedPct } from '../format';
 import type { Benchmark, Gate, LabMethod, LabTrial, Point } from './types';
@@ -11,12 +20,12 @@ export const CONDITION_KEYS = ['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr'
 export type ConditionKey = (typeof CONDITION_KEYS)[number];
 
 /**
- * The engine's label for each condition, exactly as it appears in `trial.failed`.
+ * The engine's label for each condition, exactly as it appears in a failure list.
  *
- * The luck check is the exception and is matched by prefix instead (`DSR_FAILURE_PREFIX`):
- * `trials` is append-only, so a trial judged before the owner moved the bar on 2026-10-07 carries
- * `DSR >= 0.95` for ever and one judged after carries `DSR >= 0.90`. Both mean "missed the luck
- * check", and matching one literal would quietly render the other as a pass.
+ * The luck check is the exception and is matched by prefix instead (`DSR_FAILURE_PREFIX`),
+ * because the label carries the bar inside its own text. `failedNow` always names today's bar,
+ * so an exact match would work there — but `failed` does not, the two lists are read by the
+ * same helpers, and a prefix match cannot go stale the next time the owner moves a bar.
  */
 export const FAILURE_LABEL: Record<Exclude<ConditionKey, 'dsr' | 'drawdown'>, string> = {
   spy: 'beats SPY TR',
@@ -28,9 +37,9 @@ export const FAILURE_LABEL: Record<Exclude<ConditionKey, 'dsr' | 'drawdown'>, st
 /**
  * The two labels that carry a threshold in their own text, and so must be matched by prefix.
  *
- * `trials` is append-only, so a row judged before 2026-10-07 carries `DSR >= 0.95` and
- * `max DD <= 15%` for ever, while a row judged after carries `DSR >= 0.90` and `max DD <= 20%` —
- * the owner moved both bars that day. Matching either literal would render the other as a
+ * `trials` is append-only, so the *record* (`failed`) on a row judged before 2026-10-07 carries
+ * `DSR >= 0.95` and `max DD <= 15%` for ever; the *verdict* (`failedNow`) always carries today's
+ * `DSR >= 0.90` and `max DD <= 20%`. Matching either literal would render the other as a
  * **pass**, which is the worst failure this page has: a missed hurdle shown as a green tick.
  *
  * These mirror `store.LUCK_LABEL_PREFIX` and the live `dev.FAILURE_LABELS` drawdown entry; the
@@ -49,7 +58,11 @@ export const CONDITION_LABEL: Record<ConditionKey, string> = {
   dsr: 'Luck check',
 };
 
-/** `ok` is null when the condition was never measured (historical trials have no luck check). */
+/**
+ * `ok` is null only when a condition cannot be decided either way. The luck check is never null:
+ * a DSR that cannot be evaluated is a luck test that was not passed (the engine's D11), so those
+ * rows come back `false` with "not measured" as their value.
+ */
 export type GateCheck = { key: ConditionKey; label: string; value: string; target: string; ok: boolean | null };
 export type FunnelRow = { key: ConditionKey; label: string; passing: number; measured: number; total: number };
 export type ProgressPoint = { n: number; passed: number; bestPassed: number; mar: number | null; bestMar: number | null };
@@ -80,17 +93,17 @@ function marDesc(a: LabTrial, b: LabTrial): number {
   return b.mar - a.mar;
 }
 
-/** true = passed, false = missed, null = not measured. */
+/**
+ * Does this trial clear `key` **as the bars read now**? true = cleared, false = missed.
+ *
+ * Reads `failedNow`, never `failed`. The engine decided all six there (`store.published_verdict`)
+ * against the same gate the snapshot publishes, so this is a lookup, not a judgement — which is
+ * what keeps a tick and the target printed beside it from describing two different days.
+ */
 export function conditionOk(trial: LabTrial, key: ConditionKey): boolean | null {
-  if (key === 'dsr') {
-    if (trial.failed.some((f) => f.startsWith(DSR_FAILURE_PREFIX))) return false;
-    return trial.dsr === null ? null : true;
-  }
-  if (key === 'drawdown') {
-    return !trial.failed.some((f) => f.startsWith(DRAWDOWN_FAILURE_PREFIX));
-  }
-  if (trial.failed.includes(FAILURE_LABEL[key])) return false;
-  return true;
+  if (key === 'dsr') return !trial.failedNow.some((f) => f.startsWith(DSR_FAILURE_PREFIX));
+  if (key === 'drawdown') return !trial.failedNow.some((f) => f.startsWith(DRAWDOWN_FAILURE_PREFIX));
+  return !trial.failedNow.includes(FAILURE_LABEL[key]);
 }
 
 /** The six hurdles for one trial, in display order, with plain labels and display strings. */
@@ -140,7 +153,9 @@ export function gateChecks(trial: LabTrial, gate: Gate): GateCheck[] {
     {
       key: 'dsr',
       label: CONDITION_LABEL.dsr,
-      value: trial.dsr === null ? 'not measured' : trial.dsr.toFixed(2),
+      // `dsrNow`, not `dsr`: the score at the gate's N, which is the N `gate.dsrMin` is the bar
+      // for. The recorded `dsr` belongs to the N of its own run date and is shown as the record.
+      value: trial.dsrNow === null ? 'not measured' : trial.dsrNow.toFixed(2),
       target: `${num(gate.dsrMin)} or more`,
       ok: conditionOk(trial, 'dsr'),
     },
@@ -178,19 +193,24 @@ export function bestVariant(trials: LabTrial[]): LabTrial | null {
   return pool.sort((a, b) => misses(a).length - misses(b).length || marDesc(a, b) || byN(a, b))[0];
 }
 
-/** Per hurdle, how many dev trials cleared it. */
+/**
+ * Per hurdle, how many dev trials cleared it.
+ *
+ * `measured` is how many rows the hurdle could be *scored* on, which is every row except for the
+ * luck check: the P7a seed rows have no DSR to re-evaluate at any N. Those rows still **miss**
+ * the luck check — nothing is admitted for being unmeasurable, and `passing` counts them as
+ * misses — but saying "1 of the 56 it was checked on" rather than "1 of 110" is the honest
+ * denominator, and the page's tip names the gap.
+ */
 export function funnel(trials: LabTrial[]): FunnelRow[] {
   const dev = devTrials(trials);
-  return CONDITION_KEYS.map((key) => {
-    const oks = dev.map((t) => conditionOk(t, key));
-    return {
-      key,
-      label: CONDITION_LABEL[key],
-      passing: oks.filter((o) => o === true).length,
-      measured: oks.filter((o) => o !== null).length,
-      total: dev.length,
-    };
-  });
+  return CONDITION_KEYS.map((key) => ({
+    key,
+    label: CONDITION_LABEL[key],
+    passing: dev.filter((t) => conditionOk(t, key) === true).length,
+    measured: key === 'dsr' ? dev.filter((t) => t.dsrNow !== null).length : dev.length,
+    total: dev.length,
+  }));
 }
 
 /** Over trial number: each dev trial's own score plus the best seen so far. */

@@ -326,9 +326,11 @@ function Tested({ m, trials, best }: { m: LabMethod; trials: LabTrial[]; best: L
                   <td className={`num ${s.r}`}>{count(t.trades)}</td>
                   <td className={`num ${s.r}`}>{fixed(t.sharpe, 2)}</td>
                   <td className={`num ${s.r}`}>{fixed(t.mar, 2)}</td>
+                  {/* The score at today's N, beside ticks decided at today's N. The run-date
+                      pair (t.dsr at t.nTrialsAtRun) is the record and lives in Technical detail. */}
                   <td className={`num ${s.r}`}>
-                    {fixed(t.dsr, 2)}
-                    {t.dsr !== null && <span className={s.vs}> at N {count(t.nTrialsAtRun)}</span>}
+                    {fixed(t.dsrNow, 2)}
+                    {t.dsrNow !== null && <span className={s.vs}> at N {count(gate.dsrN)}</span>}
                   </td>
                   {marks(t).map(x => (
                     <td key={x.key} className={s.c}><MarkIcon mark={x} size={14} /></td>
@@ -349,7 +351,7 @@ function Tech({ t }: { t: LabTrial }) {
       <summary className={s.techSummary} data-tip="Show the technical record">
         <span className={s.techChevron} aria-hidden="true"><ChevronRight size={16} /></span>
         <span className={s.techName}>{t.candidateId}</span>
-        <span className={s.techSub}>#{t.n} · {t.window === 'dev' ? 'development' : 'test'} {windowText(t)} · {t.failed.length ? `missed ${t.failed.length}` : 'eligible'}</span>
+        <span className={s.techSub}>#{t.n} · {t.window === 'dev' ? 'development' : 'test'} {windowText(t)} · {t.failedNow.length ? `missed ${t.failedNow.length}` : 'eligible'}</span>
       </summary>
       <div className={s.techBody}>
         <dl className={s.techGrid}>

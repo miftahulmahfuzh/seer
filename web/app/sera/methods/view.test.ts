@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GATE } from '../../../lib/sera/fixture';
+import { GATE, withVerdict } from '../../../lib/sera/fixture';
 import type { LabMethod, LabTrial } from '../../../lib/sera/types';
 import {
   BEST_COLOR, conditionSentence, count, filterRows, fixed, growthFmt, growthLines, hurdlePoints, isAlive, longDate,
@@ -15,16 +15,21 @@ const method = (over: Partial<LabMethod> = {}): LabMethod => ({
   ...over,
 });
 
-const trial = (over: Partial<LabTrial> = {}): LabTrial => ({
-  n: 58, methodId: 'M0001', candidateId: 'M0001-TV12', rulesId: 'monthly-hold', allocatorId: 'M0001',
-  configText: 'rules=TradeRules(...)', window: 'dev', start: '1996-01-03', end: '2015-10-16', gitSha: 'abc1234',
-  runAt: '2026-10-04T12:00:00+07:00', totalReturn: 3.276, cagr: 0.076, maxDrawdown: 0.129, profitFactor: 2.27,
-  pfInfinite: false, trades: 1130, sharpe: 0.71, exposure: 0.48, turnover: 3.1, worstYear: 2015,
-  worstYearReturn: -0.023, spyTrReturn: 3.514, spyTrCagr: 0.079, mar: 0.59,
-  failed: ['beats SPY TR', 'DSR >= 0.95'], eligible: false, dsr: 0.899, nTrialsAtRun: 58,
-  curve: [['1996-01-31', 1], ['1996-02-29', 1.02], ['1997-01-31', 1.1]],
-  ...over,
-});
+/** Mirrors `lib/sera/fixture`: the verdict follows the record unless a test sets it apart. */
+const trial = (over: Partial<LabTrial> = {}): LabTrial => {
+  const t: LabTrial = {
+    n: 58, methodId: 'M0001', candidateId: 'M0001-TV12', rulesId: 'monthly-hold', allocatorId: 'M0001',
+    configText: 'rules=TradeRules(...)', window: 'dev', start: '1996-01-03', end: '2015-10-16', gitSha: 'abc1234',
+    runAt: '2026-10-04T12:00:00+07:00', totalReturn: 3.276, cagr: 0.076, maxDrawdown: 0.129, profitFactor: 2.27,
+    pfInfinite: false, trades: 1130, sharpe: 0.71, exposure: 0.48, turnover: 3.1, worstYear: 2015,
+    worstYearReturn: -0.023, spyTrReturn: 3.514, spyTrCagr: 0.079, mar: 0.59,
+    failed: ['beats SPY TR', 'DSR >= 0.95'], eligible: false, dsr: 0.899, nTrialsAtRun: 58,
+    failedNow: [], eligibleNow: false, dsrNow: null,
+    curve: [['1996-01-31', 1], ['1996-02-29', 1.02], ['1997-01-31', 1.1]],
+    ...over,
+  };
+  return withVerdict(t, over);
+};
 
 describe('parseShow / showHref', () => {
   it('accepts the four filters', () => {
@@ -130,11 +135,28 @@ describe('marks / workedSummary', () => {
     expect(m).toEqual({ spy: false, drawdown: true, pf: true, trades: true, owner: true, dsr: false });
     expect(markLabel(marks(trial())[0])).toBe('Beats SPY: missed');
   });
-  it('treats a missing luck score as not measured', () => {
-    const dsr = marks(trial({ dsr: null, failed: ['beats SPY TR'] })).find(x => x.key === 'dsr')!;
-    expect(dsr.ok).toBeNull();
-    expect(markLabel(dsr)).toBe('Luck check: not measured');
-    expect(conditionSentence('dsr', null, trial({ dsr: null }), GATE)).toBe('Luck check: not measured.');
+  it('treats a missing luck score as a miss, and says why', () => {
+    // A P7a seed row: no DSR to re-evaluate at any N. The engine puts the luck label in
+    // `failedNow` for exactly these, so the hurdle reads as missed rather than as a blank a
+    // reader could take for an excused one — and the sentence gives the reason.
+    const seed = trial({ dsr: null, dsrNow: null, failedNow: ['beats SPY TR', 'DSR >= 0.90'] });
+    const dsr = marks(seed).find(x => x.key === 'dsr')!;
+    expect(dsr.ok).toBe(false);
+    expect(markLabel(dsr)).toBe('Luck check: missed');
+    expect(conditionSentence('dsr', false, seed, GATE)).toBe(
+      'Luck check: no (not measured — the luck test cannot be scored for this trial, so it cannot pass it).',
+    );
+  });
+  it('quotes the luck score at the gate\'s N, not at the N of the run date', () => {
+    // The bug this guards: a score from one N printed against a bar belonging to another. The
+    // fixture row was scored at N = 58 and reads 0.9122 at today's N = 110, which clears 0.90.
+    const reread = trial({
+      dsr: 0.93, nTrialsAtRun: 58, failed: ['DSR >= 0.95'], eligible: false,
+      failedNow: [], eligibleNow: true, dsrNow: 0.9122,
+    });
+    expect(conditionSentence('dsr', true, reread, GATE)).toBe(
+      'Luck check: yes (0.912 ≥ 0.90, scored at N = 110).',
+    );
   });
   it('writes the plain summary from the gate thresholds', () => {
     const w = workedSummary(trial(), GATE);
@@ -143,17 +165,17 @@ describe('marks / workedSummary', () => {
       'Beats SPY: no (7.6% vs 7.9% a year). Max drawdown: yes (12.9% ≤ 20%). ' +
       'Profit factor: yes (2.27 ≥ 1.3). Trade count: yes (1,130 ≥ 100). ' +
       'Owner inputs: yes (none needed). ' +
-      'Luck check: no (0.899 < 0.90, scored at N = 58).',
+      'Luck check: no (0.899 < 0.90, scored at N = 110).',
     );
   });
   it('says yes when every hurdle clears', () => {
-    const t = trial({ failed: [], eligible: true, cagr: 0.09, dsr: 0.97 });
+    const t = trial({ failed: [], failedNow: [], eligible: true, cagr: 0.09, dsr: 0.97, dsrNow: 0.97 });
     expect(workedSummary(t, GATE).headline).toBe('Yes. Its best variant, M0001-TV12, cleared all six hurdles on 1996–2015 data.');
   });
   it('flips the comparison sign on a miss', () => {
     // 0.23 rather than 0.18: the sentence says "> 20%", so the value must actually exceed 20%
     // or the rendered sentence contradicts itself.
-    const t = trial({ maxDrawdown: 0.23, failed: ['beats SPY TR', 'max DD <= 15%', 'DSR >= 0.95'] });
+    const t = trial({ maxDrawdown: 0.23, failedNow: ['beats SPY TR', 'max DD <= 20%', 'DSR >= 0.90'] });
     expect(conditionSentence('drawdown', false, t, GATE)).toBe('Max drawdown: no (23.0% > 20%).');
   });
 });
@@ -205,12 +227,19 @@ describe('text', () => {
     expect(untestedNote(method({ status: 'registered' }))).toBe('Registered with its exact rules, not run yet.');
   });
   it('lists the technical record', () => {
-    const rows = Object.fromEntries(techRows(trial()));
+    // Set apart on purpose: the record names the 0.95 bar of its run date, the verdict today's.
+    const rows = Object.fromEntries(techRows(trial({ failedNow: ['beats SPY TR', 'DSR >= 0.90'] })));
     expect(rows['Trial number']).toBe('#58');
     expect(rows['Code version (git)']).toBe('abc1234');
     expect(rows['Tries counted when run (N)']).toBe('58');
     expect(rows['Worst year']).toBe('2015 (−2.3%)');
-    expect(rows['Failed']).toBe('beats SPY TR; DSR >= 0.95');
-    expect(Object.fromEntries(techRows(trial({ failed: [] })))['Failed']).toBe('nothing: eligible');
+    // Both sides, each labelled: the record names the bars of its run date for ever, the verdict
+    // names today's. A reader comparing them can see exactly what the owner's change did.
+    expect(rows['Luck score when run']).toBe('0.899 at N = 58');
+    expect(rows['Missed when run']).toBe('beats SPY TR; DSR >= 0.95');
+    expect(rows['Missed by today\u2019s bars']).toBe('beats SPY TR; DSR >= 0.90');
+    const clean = Object.fromEntries(techRows(trial({ failed: [], failedNow: [] })));
+    expect(clean['Missed when run']).toBe('nothing: eligible');
+    expect(clean['Missed by today\u2019s bars']).toBe('nothing: eligible');
   });
 });

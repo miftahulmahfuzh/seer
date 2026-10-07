@@ -56,7 +56,7 @@ Vercel — Next.js, read-only UI — seertrade.site
 | Database | Neon Postgres |
 | Scheduler + compute | GitHub Actions cron |
 | EOD prices (nightly + last ~2 yrs) | Massive (ex-Polygon) free: grouped-daily = whole market in 1 call; 5 calls/min; **history limited to ~2 years** (verified 2026-10-03) |
-| EOD prices (10-yr backtest backfill) | yfinance, one-off backfill run locally/in Actions (free, unofficial; no delisted tickers → survivorship caveat) |
+| EOD prices (10-yr backtest backfill) | yfinance, one-off backfill run locally/in Actions (free, unofficial; no delisted tickers → survivorship caveat, **measured in §12**) |
 | News (Strategy C) | Finnhub free tier |
 | LLM | GLM via z.ai (Anthropic-compatible endpoint, `LLM_*` env) |
 | Auth | Auth.js, **Google provider only**, single allowlisted email (`ALLOWED_EMAIL`) |
@@ -163,3 +163,65 @@ extended-hours trading.
   clear every other condition and have a recorded DSR above 0.90 — `M0020-W-NOSTOP` (fall 19.3%,
   CAGR +15.3%, MAR 0.79) and `M0007-N20-RAW` (fall 19.6%, MAR 0.77). `M0019-RAW20-S25` (fall
   20.7%) still misses it.
+
+## 12. Measured 2026-10-07: the size of the survivorship hole
+
+The §3 services table has always carried "no delisted tickers → survivorship caveat" as a
+parenthetical. This section replaces the parenthetical with the number, because a caveat nobody
+has measured is indistinguishable from one nobody has taken seriously.
+
+**The hole.** Of the 1,041 symbols that held point-in-time S&P 500 / Nasdaq-100 membership over
+the dev window, **522 have no bars in `engine/.research`** — `unserved.csv` lists them, all for
+the same reason (`yfinance returned no bars`). Coverage of the index as it actually stood:
+
+| date | members | priced | coverage |
+|---|---|---|---|
+| 1996-06-30 | 487 | 236 | **48.5%** |
+| 2000-06-30 | 492 | 264 | 53.7% |
+| 2004-06-30 | 495 | 290 | 58.6% |
+| 2008-06-30 | 544 | 344 | 63.2% |
+| 2012-06-30 | 525 | 374 | 71.2% |
+| 2015-10-16 | 527 | 409 | **77.6%** |
+
+Coverage rises monotonically with time, which is the signature of the bias rather than an
+accident: the further back you look, the more of the index has since merged, delisted or gone
+bankrupt and been dropped by a free data source. 32 of the missing symbols carry the `Q`
+bankruptcy suffix (`AAMRQ`, `ABKFQ`, `DPHIQ`, …) — exactly the names a momentum book would have
+bought on the way up and ridden down.
+
+**Whether it is what produces the lab's results: apparently not.** Edge over total-return SPY,
+by era, for the four quant roster entries, sliced from the recorded dev curves (no re-run, so no
+trial and no movement in the lab's N):
+
+| | SPY | RMW | RAW | MOM | MVW |
+|---|---|---|---|---|---|
+| 1996–2001 (~50% coverage) | +11.9%/yr, fall 30.4% | +12.8%, 12.4% | +17.8%, 16.1% | +18.1%, 11.1% | +12.6%, 14.0% |
+| 2002–2008 (~60%) | **−1.4%**/yr, fall 40.5% | +8.4%, 10.1% | +9.4%, 15.2% | +6.8%, 11.7% | +7.4%, 11.6% |
+| 2009–2015 (~70%) | **+16.7%**/yr, fall 16.2% | +14.6%, 9.0% | +19.3%, 10.7% | +14.4%, 10.0% | +14.6%, 10.0% |
+
+If missing bankruptcies were inflating the results, the inflation would be **largest where
+coverage is worst**. It is not: 1996–2001 is the weakest era for three of the four, and the edge
+peaks in the middle-coverage era that contains two crashes.
+
+**The limit of that test, stated rather than buried.** Coverage rises with time, so it is
+collinear with regime; this cannot separate "better data" from "different market", and it has
+limited power. It is evidence against the simple story, not proof the hole is harmless. A test
+that isolates the mechanism — injecting synthetic delistings at the historical rate and solving
+for the break-even delisting return — remains unrun and is the right next step if a decision ever
+turns on this.
+
+**Two findings that outrank the one we went looking for.**
+
+1. The edge is crash insurance. It lives in 2002–2008, where SPY lost 1.4% a year and fell 40.5%
+   while these books made 7–9% a year falling 10–15%. In 2009–2015, a bull market with no crash,
+   three of the four *trail* SPY by about 2 points a year at ~60% of its drawdown. That is the
+   trend gate's price, not a defect, and the leaderboard should be read knowing it.
+2. `RAW-FR` (lab M0007-N20-RAW) is the only entry ahead of SPY in all three eras, at a third to
+   two-thirds of the drawdown throughout.
+
+**Why we are not buying survivorship-free data yet** (owner, 2026-10-07): the check above did not
+find the damage a paid feed would repair; such a feed costs money monthly; and rebuilding
+`engine/.research` from a different source changes every `config_digest`, which resets all 110
+recorded trials and their DSRs. Revisit when a decision actually hinges on it. The standing answer
+to this worry is forward paper trading, which cannot be flattered by survivors because the
+survivors are not yet known.

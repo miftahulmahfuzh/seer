@@ -1,13 +1,17 @@
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { Archive, Check, CircleDashed, Crown, X } from 'lucide-react';
+import { currentUser } from '@/auth';
 import { AppHeader } from '@/components/AppHeader';
 import { strategyIcon } from '@/components/roster';
 import { StrategySwitch } from '@/components/StrategySwitch';
 import { leaderboard, monthly, runStatus, type Board } from '@/lib/data';
 import { monthDay, monthName, shortDate, signedPct } from '@/lib/format';
 import { checklist } from '@/lib/metrics';
+import { isSeraUser } from '@/lib/sera/access';
+import { methodHref } from '@/lib/sera/paper';
 import { wibDate } from '@/lib/session';
+import { PickName } from './PickName';
 import {
   BENCHMARK_DASH, compare, LOOK_FALLBACK, looks, MIN_COMMON_SESSIONS, monthLines, NO_GATE, pickResearch,
   researchOf, retiredLabel, scoreOf, sinceStartLine, spyOverSpan, windowLine,
@@ -24,7 +28,7 @@ type Search = { s?: string };
 export default async function Leaderboard({ searchParams }: { searchParams: Promise<Search> }) {
   const now = new Date();
   const q = await searchParams;
-  const [board, run] = await Promise.all([leaderboard(), runStatus(now)]);
+  const [board, run, user] = await Promise.all([leaderboard(), runStatus(now), currentUser()]);
 
   const roster = board.rows.map(r => r.strategy);
   const lookMap = looks(roster);
@@ -55,6 +59,10 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
   const score = scoreOf(items, gate ?? NO_GATE);
   // The latest month is partial while the engine's next session (runStatus().sessionDate) is in it.
   const table = pick ? await monthly(pick.id, run.sessionDate) : null;
+  // The picked strategy's name doubles as the way into Sera's method page — but only for the one
+  // account /sera lets in. For anyone else `requireSera` is a 404, and the nav already hides the
+  // section from them: a link here would dead-end and announce what the nav is keeping quiet.
+  const seeMethod = pick && isSeraUser(user?.email) ? methodHref(pick.id) : null;
   const since = table ? sinceStartLine(table) : null;
   const months = table ? monthLines(table) : [];
 
@@ -134,7 +142,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
             href={id => `/leaderboard?s=${encodeURIComponent(id)}`} label="Strategy" />
         </div>
       )}
-      <span className="eyebrow">Go-live checklist · {pick ? pick.name : '—'}</span>
+      <span className="eyebrow">Go-live checklist · <PickName name={pick?.name} href={seeMethod} /></span>
       <div className={s.score}>
         <span className={`num ${s.scoreNum}`}>{score.passed}/{score.total}</span>
         <span className={s.scoreText}>{score.lines[0]}<br />{score.lines[1]}</span>
@@ -159,7 +167,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
   const monthsSheet = (
     <section className={`sheet over ${pick ? lookOf(pick.id).bg : 'bg-sheet'} ${s.months}`} data-tab={tabEdge}
       aria-labelledby="months-title">
-      <h2 id="months-title" className="eyebrow">Month by month · {pick ? pick.name : '—'}</h2>
+      <h2 id="months-title" className="eyebrow">Month by month · <PickName name={pick?.name} href={seeMethod} /></h2>
       {pick && since ? (
         <table className={s.table}>
           <thead>

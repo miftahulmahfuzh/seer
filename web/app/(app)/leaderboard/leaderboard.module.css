@@ -23,6 +23,22 @@
 .swatch { width: 18px; height: 3px; border-radius: 9px; }
 .swatchDash { width: 18px; height: 0; border-top-width: 2.5px; }
 
+/* The picked strategy's name as the way into its Sera method page. `a` is undecorated globally,
+   and inside an uppercase, letter-spaced eyebrow a colour shift alone would not read as a link,
+   so the underline is the affordance and the icon says the tab is new. Left inline rather than
+   inline-flex on purpose: flex items do not take the container's text-decoration, and the
+   underline under the name is the whole point. */
+.methodLink {
+  color: inherit;
+  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px;
+  text-decoration-skip-ink: auto;
+  text-decoration-color: var(--outline); transition: text-decoration-color 0.12s;
+}
+.methodLink:hover { text-decoration-color: currentColor; }
+.methodLink:focus-visible { outline: 2px solid var(--coral); outline-offset: 3px; border-radius: 2px; }
+/* The icon rides with the last word so it is never orphaned onto a line of its own. */
+.methodLink svg { margin-left: 4px; vertical-align: -1px; }
+
 .check { padding-bottom: 64px; gap: 8px; background: var(--butter); }
 .switch { display: flex; gap: 6px; padding-bottom: 8px; }
 .score { display: flex; align-items: center; gap: 12px; padding-bottom: 8px; }

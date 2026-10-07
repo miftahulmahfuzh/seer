@@ -6,20 +6,20 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "8fe5ddcc9ecc9d88483e627f53b49ccf3d615fcc",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "verbatim from plan; phase 1 created all 7 tasks (p6 skipped Step 3); live smoke not run (optional)",
       "package": "db/migrations`, `web/lib/sean",
       "plan": ".workflows/plan/sean-gotrade-tracker/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T16:24:17+00:00",
       "satisfies": [
         "R2",
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-AUY5",
       "title": "Sean core: schema, screenshot reader, ledger"
     },
     {
@@ -38,7 +38,7 @@
         "R1",
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Sean section, Sean buttons (rail + phone header), Trades upload"
     },
@@ -77,7 +77,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Engine: marks and the daily P&L series"
     },
@@ -107,15 +107,15 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 6,
-      "note": null,
+      "note": "live in @8; verify downgraded spawned->pending on no-commit, restored by coordinator",
       "package": "engine/src/seer_engine/sim`, `backtest",
       "plan": ".workflows/plan/sean-gotrade-tracker/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T16:24:41+00:00",
       "satisfies": [
         "R5"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "running",
+      "task_id": "P1-ROOT-8S6O",
       "title": "Engine: Gotrade fee schedule as a cost-model lever"
     },
     {
@@ -142,6 +142,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/sean-gotrade-tracker/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sean-gotrade-tracker",
-  "updated": "2026-10-07T16:19:10+00:00",
+  "updated": "2026-10-07T16:24:41+00:00",
+  "verified_at": "2026-10-07T16:24:31+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sean-gotrade-tracker"
 }

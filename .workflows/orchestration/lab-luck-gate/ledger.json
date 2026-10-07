@@ -40,21 +40,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "998e67f",
       "depends_on": [
         2
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "verified: 6 files; commands/lab.py staged HUNK-FILTERED -- committed copy has 0 phase-4 symbols, working tree still has 9, so phase 4's five hunks intact (I checked both sides, not the report). lab.sqlite md5 unchanged; committed DB still has ZERO trial_moments rows. M0022's three recorded DSRs reproduced at delta 0.000e+00 against a 1e-6 bar, reconstructed var_trials 2.395048e-04 as predicted. Suite 3089 passed/0 failed. PROTOCOL REFINEMENT, recorded: shared-file rule 3 ('carry a peer's work at other anchors') holds only when the carried work is SELF-CONTAINED at your commit. Phase 4's hunks call store.owner_failures/reevaluate/dsr_at which do not exist at HEAD, so carrying them whole would have shipped a branch that does not run (AttributeError at import), not merely a transiently-red test as with phases 2/6. Hunk-filter when a hunk references an uncommitted symbol. Relayed to phase 4. PHASE DECISION rung 3: stripped two 'NOTE TO THE IMPLEMENTER' paragraphs from shipped docstrings because phase 9 quotes those docstrings without them and would have broken its diff; rest verbatim.",
       "package": "engine/commands",
       "plan": ".workflows/plan/lab-luck-gate/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T04:43:43+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-921N",
       "title": "lab remeasure` \u2014 recover the inputs for a recorded method"
     },
     {
@@ -178,7 +178,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-luck-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-luck-gate",
-  "updated": "2026-10-07T04:21:36+00:00",
+  "updated": "2026-10-07T04:43:43+00:00",
   "verified_at": "2026-10-07T03:59:26+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-luck-gate"
 }

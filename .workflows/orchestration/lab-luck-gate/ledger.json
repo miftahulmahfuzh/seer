@@ -3,6 +3,12 @@
   "coordinator": "orch-lab-luck-gate",
   "coordinator_session_id": "1423b60b-3b25-40e1-987f-32fdc6a389fe",
   "created": "2026-10-07T03:41:48+00:00",
+  "landed": {
+    "at": "2026-10-07T07:37:21+00:00",
+    "base": "main",
+    "commit": "1f32ac65fe4168fe65ad9b6507ad6f00081da04a",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -81,22 +87,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "e2c4f75",
       "depends_on": [
         4
       ],
       "difficulty": "NORMAL",
       "n": 5,
-      "note": null,
+      "note": "VERIFIED: 6 files; 0 phase-9 symbols in the commit, and at HEAD both coexist (7 phase-9, 18 phase-5). lab.sqlite byte-identical to phase 4's 5b94f444 at the tip; deflated_sharpe body identical to pre-flight baseline. Suite 3186 passed/0 failed; ruff clean; test_looks 0. Promotable-now non-empty for the FIRST TIME: M0020/M0020-W-NOSTOP and M0022/M0022-W-TV14 (MAR ranking picks W-TV14 over W-TV16 as the plan predicted). D1b ratchet warning fires on the measured case to the digit: M0022-W-TV16 0.916 vs 0.9 bar, 0.016 margin at N=110, falls below at N=143 -- 33 more dev trials, ~0.7 run days at 46 dev trials/run day. lab luck reproduces the analysis table to the last digit: sr_star(110)=0.0397, variance 2.395048e-04, mean pairwise corr 0.595. SHARED-FILE, handled twice: commands/lab.py carried phase 9's hunks calling symbols in an uncommitted remeasure.py, so phase 5 excluded them; phase 9 then LANDED mid-commit making the prepared blob stale, so it was rebuilt by replaying the phase-5 patch onto the new HEAD and proved byte-identical to the working tree before staging. PLAN NUMBER WRONG, corrected in code not bent to fit: exit criterion 6 claims SEVEN clear at N=23; measured EIGHTEEN. The plan's LUCK_ONLY tuple is a 7-row SAMPLE, not the pool. Real: 56 dev trials carry a recorded DSR, 25 miss no owner condition, and 3/12/18 clear 0.90 at N=110/37/23. Phase 5 kept _eligible_at recomputing from the database per its own standing rule and fixed the stale comment rather than hardcoding a candidate list. D1 UNAFFECTED and strengthened -- the number D1 rests on (exactly THREE at the live N=110, named) is exact and asserted by name; D1's prose that pulling N to 23 'would admit all seven' understates it at 18 of 25, so the case for leaving DSR_POLICY at all-trials is stronger than written. TRANSIENT, not a defect: test_the_committed_snapshot_is_the_export_of_the_committed_database failed once mid-run while phase 7 was regenerating web/data/lab.json under D10; consistent at HEAD.",
       "package": "engine/commands",
       "plan": ".workflows/plan/lab-luck-gate/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T07:30:20+00:00",
       "satisfies": [
         "R3",
         "R1"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-QM5I",
       "title": "lab status` shows the queue and the look budget; `lab luck"
     },
     {
@@ -178,7 +184,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-luck-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-luck-gate",
-  "updated": "2026-10-07T07:24:56+00:00",
+  "updated": "2026-10-07T07:37:21+00:00",
   "verified_at": "2026-10-07T03:59:26+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-luck-gate"
 }

@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/journal-unseen-badges`
 **Branch:** `feature/journal-unseen-badges` (base: `origin/main` @ `46c04b4`)
 **Phases:** 5
-**Status:** 4/5 phases complete (1, 2, 3, 4); landing owned by the swarm coordinator
+**Status:** LANDED — 5/5 phases merged to main at 6c4e47e (2026-10-07); 012_journal_seen.sql applied and verified on production
 **Reconciled:** 2026-10-07 — 9 conflicts found, 9 resolved, 0 open questions
 **Coordinator:** `orch-journal-unseen-badges`
 

@@ -3,6 +3,12 @@
   "coordinator": "orch-journal-unseen-badges",
   "coordinator_session_id": "7d5e1078-05ba-4679-baea-d1591ccf945c",
   "created": "2026-10-07T04:20:33+00:00",
+  "landed": {
+    "at": "2026-10-07T05:06:02+00:00",
+    "base": "main",
+    "commit": "6c4e47e209a6da5858c184f18db05a178a8721f8",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -84,7 +90,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "b32565b13091a4ee40dfb02682af2b170b42a064",
       "depends_on": [
         1,
         2,
@@ -93,22 +99,22 @@
       ],
       "difficulty": "EASY",
       "n": 5,
-      "note": null,
+      "note": "Rail badge + readme. tsc clean, 343/343 tests (27 files), next build --webpack compiles with no boundary warnings. Decided: Last Updated uses card TaskID P1-WEB-Z5LP, not the plan's literal P5-WEB-J4N8 fallback (rung 3 - the edit's own note makes P5 the un-carded fallback). Applied all 4 phase-1 readme corrections (route 500; route re-derives gate from isAllowed+isSeraUser, never requireSera, per invariant 7; markInsightsSeen throws by design; MAX_SEEN_BATCH 500 vs MAX_BATCH 50 cap-pairing gotcha) and all 9 card-Note stale claims, plus the Access-gate paragraph that claimed requireSera guards every /sera/** route. D1/C4 honoured: unseenCount(lab.insights ids), no badge on null or 0. Landed nothing - coordinator owns the merge.",
       "package": "web/components/sera`, `web/app/sera`, docs",
       "plan": ".workflows/plan/journal-unseen-badges/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T05:03:16+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-Z5LP",
       "title": "The rail badge and the package readme"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/journal-unseen-badges/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "journal-unseen-badges",
-  "updated": "2026-10-07T04:54:41+00:00",
+  "updated": "2026-10-07T05:06:02+00:00",
   "verified_at": "2026-10-07T04:33:20+00:00",
   "worktree": "/home/miftah/.worktrees/seer/journal-unseen-badges"
 }

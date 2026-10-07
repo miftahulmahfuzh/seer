@@ -34,6 +34,33 @@
 .about { font-size: 14px; color: var(--ink-2); }
 .empty { font-size: 16px; color: var(--ink-2); }
 
+/* An unseen card's marker: a coral dot before the title, the same colour as the badge it counts
+   toward. Shown by the data-unseen attribute rather than by React, so the client island can
+   retire one card's marker by flipping attributes (plan invariant 5: it never moves a card).
+   [data-seen-now] is set by phase 4's island on a card marked during this visit: the dot KEEPS
+   its box and fades, so retiring it never reflows the title beside it. */
+.new { display: none; margin-right: 9px; }
+.card[data-unseen='true'] .new, .card[data-seen-now] .new { display: inline-block; }
+.card[data-seen-now] .new { opacity: 0; transition: opacity 240ms ease; }
+.new::before {
+  content: ''; display: inline-block; width: 8px; height: 8px;
+  border-radius: 999px; background: var(--coral); vertical-align: 0.12em;
+}
+
+/* The line between what is new and what has already been read. A labelled hairline spanning the
+   whole grid — a quiet divider, deliberately not a second section header. */
+.boundary {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; margin: 2px 0;
+  font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2);
+}
+.boundary::before, .boundary::after { content: ''; flex: 1 1 auto; height: 1px; background: var(--hair); }
+
+/* Visible to screen readers only (the same rule ideas.module.css uses). */
+.sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
 @media (max-width: 1023.98px) {
   .cards { grid-template-columns: 1fr; }
   .bar { flex-direction: column; align-items: flex-start; }

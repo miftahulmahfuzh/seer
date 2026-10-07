@@ -3,18 +3,18 @@
 **Package Path**: `web`
 **Package Code**: WEB
 **Last Updated**: 2026-10-07
-**Total Active Tasks**: 3
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 2
-- Completed: 14
+- Blocked: 1
+- Completed: 15
 
 ---
 
@@ -32,20 +32,12 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R3 — The notification number on each of the seven tab icons is the true count of unseen items for that tab, so a new number on a tab is a real signal worth getting excited about
   - **Depends on**: P1-WEB-K3QM, P1-WEB-SSGU, P1-WEB-M2WF, P1-WEB-Q8DV
   - **Plan**: `.workflows/plan/P1-WEB-Z5LP.md`
-- [ ] **P1-WEB-M2WF** Phase 3: The page renders unseen counts, the boundary, and per-card state
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `web/app/sera/journal/page.tsx` (force-dynamic, `await seenInsightIds()` into `seenIds`, the seven options carrying unseen counts plus `heading`/`total` fed to `badgeTip`, each section rendering `g.unseen` then the boundary then `g.seen`, and `InsightCard` carrying `data-insight-id`/`data-unseen` with a `data-seen-click` redirect arrow) and `journal.module.css` (the unseen marker, the boundary divider, and the `.card[data-seen-now] .new` fade phase 4 triggers). Exit: seen cards sit below the boundary inside their section and the badges drop by exactly that many; an all-seen or all-unseen section renders no stray boundary; the seven tabs keep their order, icons, `aria-current` and styling with `badgeTip`'s tooltips; `npx tsc --noEmit && npm test` clean.
-  - **Status**: open
-  - **Plan Set**: `JOURNAL_UNSEEN_BADGES_PLAN.md` (phase 3 of 5)
-  - **Satisfies**: R1 — Within every tab's content, unseen items sit at the top sorted newest-to-oldest, and seen items are pushed down below them; R3 — The notification number on each of the seven tab icons is the true count of unseen items for that tab, so a new number on a tab is a real signal worth getting excited about
-  - **Depends on**: P1-WEB-K3QM, P1-WEB-SSGU
-  - **Plan**: `.workflows/plan/P1-WEB-M2WF.md`
+  - **Note (from P1-WEB-M2WF readme check, 2026-10-07)**: readme-updater found four `web/package_readme.md` claims this set invalidates that are NOT in this task's Owns list — check them too: `:12` "plus one write (`action_dismissals`)" and `:418` "the engine owns writes to every table except `action_dismissals`" both omit `journal_seen` (strained by phase 1's `markInsightsSeen`, live once phase 4 lands); `:334` `journalGroups(insights, filter)` gained phase 2's trailing seen-set parameter; `:374` "`/sera/journal` ... newest first" becomes imprecise once phase 4 marks entries seen. `:422` ("the only write is an idempotent `INSERT ... ON CONFLICT DO NOTHING`") happens to stay true and needs no edit.
 - [ ] **P1-WEB-Q8DV** Phase 4: The client island: dwell, click, batch, flush, live countdown
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns new pure `web/app/sera/journal/seen-client.ts` (the policy constants including `MAX_BATCH = 50`, which must stay at or below phase 1's `MAX_SEEN_BATCH = 500`, the dedupe queue, and the on-screen decision) with `seen-client.test.ts`, new `'use client'` `JournalSeen.tsx` (one IntersectionObserver, dwell timers cancelled when a card leaves or the tab goes hidden, arrow clicks marked `via: 'click'`, debounced and capped flushes plus `sendBeacon` on pagehide, and a live badge countdown rewritten through phase 2's `badgeTip`), and four surgical edits to `page.tsx` to mount the island. Exit: only entries actually on screen get marked and a background tab marks nothing; cards never move while the page is open and a retired marker fades without shifting its title; tooltips track their badges; `npx tsc --noEmit && npm test` clean.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `JOURNAL_UNSEEN_BADGES_PLAN.md` (phase 4 of 5)
   - **Satisfies**: R2 — A working definition and mechanism for "seen": a click on an item's redirect-arrow marks it seen, and items with no arrow are marked seen some other way; R3 — The notification number on each of the seven tab icons is the true count of unseen items for that tab, so a new number on a tab is a real signal worth getting excited about
   - **Depends on**: P1-WEB-K3QM, P1-WEB-SSGU, P1-WEB-M2WF
@@ -95,6 +87,23 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Files**: web/app/sera/journal/view.ts, web/app/sera/journal/view.test.ts, web/.workflows/todos.md, web/.workflows/plan/P1-WEB-SSGU.md
   - **Drift**: No code drift: `view.ts` and `page.tsx` were byte-identical to what phase-2.md quotes. One plan-prose miscount — phase-2.md's Impact and exit criteria say the suite goes to 29 cases, but its own verbatim code block yields 30. The code block was applied unchanged (ladder rung 3 outranks surrounding prose); the real number is 30.
   - **Decided**: Step 3 scope in a concurrent swarm wave: mint tasks for all five phases, or only phase 2's? → only phase 2's (rung: tie-break "narrower blast radius" — ladder rungs 1-5 are silent on bookkeeping, and phase 1 was running Step 3 against the same web/.workflows/todos.md, so two sessions each writing five entries would duplicate every TaskID in the set).
+
+- [x] **P1-WEB-M2WF** Phase 3: The page renders unseen counts, the boundary, and per-card state
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `web/app/sera/journal/page.tsx` (force-dynamic, `await seenInsightIds()` into `seenIds`, the seven options carrying unseen counts plus `heading`/`total` fed to `badgeTip`, each section rendering `g.unseen` then the boundary then `g.seen`, and `InsightCard` carrying `data-insight-id`/`data-unseen` with a `data-seen-click` redirect arrow) and `journal.module.css` (the unseen marker, the boundary divider, and the `.card[data-seen-now] .new` fade phase 4 triggers). Exit: seen cards sit below the boundary inside their section and the badges drop by exactly that many; an all-seen or all-unseen section renders no stray boundary; the seven tabs keep their order, icons, `aria-current` and styling with `badgeTip`'s tooltips; `npx tsc --noEmit && npm test` clean.
+  - **Status**: done
+  - **Plan Set**: `JOURNAL_UNSEEN_BADGES_PLAN.md` (phase 3 of 5)
+  - **Satisfies**: R1 — Within every tab's content, unseen items sit at the top sorted newest-to-oldest, and seen items are pushed down below them; R3 — The notification number on each of the seven tab icons is the true count of unseen items for that tab, so a new number on a tab is a real signal worth getting excited about
+  - **Depends on**: P1-WEB-K3QM, P1-WEB-SSGU
+  - **Plan**: `.workflows/plan/P1-WEB-M2WF.md`
+  - **Completed**: 2026-10-07 11:39
+  - **Method**: /do
+  - **Files**: web/app/sera/journal/page.tsx, web/app/sera/journal/journal.module.css, web/.workflows/todos.md, JOURNAL_UNSEEN_BADGES_PLAN.md
+  - **Drift**:
+    - None. Phase 1's lib/sera/seen.ts and phase 2's view.ts both matched the plan's reconciled contract tables exactly (SEEN_COPY, badgeTip, unseenCounts, three-parameter journalGroups with unseen/seen/items/unseenCount, seenInsightIds). Step 7's shape check passed with no adaptation.
+  - **Decided**:
+    - `npx next build` (Turbopack) panics in this worktree with 'Symlink [project]/node_modules is invalid, it points out of the filesystem root' -> verified the build with `npx next build --webpack` instead, which passes and confirms /sera/journal renders as dynamic. Rung 2 (phase exit criteria are `npx tsc --noEmit && npm test`, both clean). Measured, not assumed: the same Turbopack panic reproduces on the base tree with both changed files reverted, so it tests the plan's mandated node_modules symlink rather than this phase's code. The plan's Environment note forbids npm ci/npm install, so the symlink stays.
 
 - [x] **P1-WEB-10T8** Phase 3: Positions page: monthly pick / weekly size copy and buy/add/trim cell
   - **Difficulty**: NORMAL

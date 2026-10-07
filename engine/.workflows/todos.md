@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-07
-**Total Active Tasks**: 6
+**Total Active Tasks**: 5
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 4
-- Completed: 85
+- Completed: 86
 
 ---
 
@@ -561,15 +561,29 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the direct precedent recorded by phase 1 of this same set, and by the BUILD_PROMOTION_PATH / ROSTER_PROMOTION_PIPELINE / FUNDAMENTAL_PANEL_COVERAGE swarms in this file). A cross-file block move is the one edit that reliably loses a peer's concurrent append.
     - Completion: no `**Commit**` field, and `LAB_LUCK_GATE_PLAN.md` left untouched (rung 6: phase 1's precedent; rung 3: the set is a swarm whose coordinator `orch-lab-luck-gate` owns the ledger at .workflows/orchestration/lab-luck-gate/ledger.json). The index's phase table has no tick column and eight peers hold it open; the sha goes to the coordinator instead.
     - Quick Stats recounted from the file rather than blind-decremented (recount is idempotent under concurrency; a decrement compounds the race).
-- [ ] **P1-ENG-6134** Phase 2: Record the DSR's inputs with every dev trial
+- [x] **P1-ENG-6134** Phase 2: Record the DSR's inputs with every dev trial
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns an additive, append-only `trial_moments` side table (`trial_n`, `sr_daily`, `t`, `skew`, `kurt`, `var_trials`, `n_at_run`, `measured`) in `store.py`'s schema and `_migrate`, its writer, and `runner.trial_rows` populating it in the same transaction as the trial it describes — it owns the whole body of `trial_rows`, with phase 4 applying a two-line delta to it and nothing else; it does not touch the `trials` table's columns, triggers or contents, nor the eligibility decision, which still reads exactly as it does today. Exit: a new `lab run` writes one `trial_moments` row per dev trial; the committed database migrates in place without touching any `trials` row; `test_looks` still 0; `pytest` green.
-  - **Status**: in_progress
+  - **Status**: completed
   - **Plan Set**: `LAB_LUCK_GATE_PLAN.md` (phase 2 of 9)
   - **Satisfies**: R2 — A trial's verdict is frozen at the N of its run date, so verdicts are not comparable across time and a method can never be re-judged.
   - **Depends on**: —
   - **Plan**: `.workflows/plan/P1-ENG-6134.md`
+  - **Completed**: 2026-10-07 11:11
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/runner.py, engine/tests/test_lab_runner.py, engine/tests/test_lab_snapshot.py, engine/.workflows/plan/P1-ENG-6134.md (store.py and test_lab_store.py landed with phase 6's `11b802a` under the reconciled shared-file protocol rule 3)
+  - **Verified**: build ok — `store.SCHEMA_VERSION` = 3 and `store.MOMENTS_COLUMNS` = `('trial_n','sr_daily','t','skew','kurt','var_trials','n_at_run','measured')`, exactly the plan's contract. Targeted lab suites (test_lab_store, test_lab_snapshot, test_lab_runner, test_lab_prereg, test_lab_test_window, test_lab_methods) with `PG_TEST_URL`: 224 passed, 0 failed. Full engine suite with `PG_TEST_URL`: **3076 passed, 0 failed, 0 skipped** (413s) — the shared tree is green carrying phases 1 and 6 landed plus 8 in flight. Phase 2 in isolation (throwaway copy of HEAD carrying only phase 2's files): 2670 passed, its single failure a harness artefact because the shared `test_lab_snapshot.py` carries phase 8's `maxDrawdown: 0.20` expectation into a tree with HEAD's 0.15 source. Migration run on a COPY of the committed `lab/lab.sqlite` (never the committed binary): 110 trials, sha256 `6bfc3a9e952987d72842e07b489b72563e017905b579966855ce9a56062f7507` **identical before and after**; `schema_version` 2 → 3; `trial_moments` empty; `test_looks` 0; table plus `trial_moments_no_update` and `trial_moments_no_delete` present; `PRAGMA foreign_key_check` clean. `git status --porcelain lab/lab.sqlite` EMPTY — invariant 6 held, phase 4 keeps the single commit that writes the migrated binary.
+  - **Drift**: No code drift — every anchor `phase-2.md` quotes was present verbatim in `store.py` and `runner.py`, and `runner._dsr` was exactly the computation the plan hoists, so the verdict is provably unchanged.
+    - Environment: the main venv has no `pytest-xdist` but `engine/pyproject.toml` sets `addopts='-ra -n auto'`, so a bare `pytest` cannot start. Ran every suite with `-o addopts="-ra"`. Pre-existing repo condition, confirmed independently by the coordinator; nothing installed into the shared venv.
+    - Plan defect found and repaired in Step 8e: the new v2→v3 migration test asserted the append-only triggers fire on the EMPTY `trial_moments` table, but SQLite BEFORE UPDATE/DELETE triggers are row-level and never fire with zero rows, so the assertion could not pass. The test now inserts one moments row into the migrated table first, then asserts both triggers abort — strengthening the check rather than relaxing it, since it now proves a table arriving by MIGRATION is as append-only as one created by `_SCHEMA`.
+  - **Decided**:
+    - Step 3 said create tasks for all 9 phases → created phase 2's task only (rung 6, surrounding convention plus the narrower blast radius): W1 phases 1/2/6/8 run Step 3 concurrently in one shared worktree, so each creating all nine would write duplicate cards. Peers independently did the same (P1-ENG-FNKE, P1-ENG-CA69).
+    - Verification runner could not start → override `addopts` to `-ra`, serial (rung 6): `-n auto` is a parallelism flag, not an assertion, so the identical test set runs.
+    - Plan's Step 8e trigger assertions were vacuous on an empty table → give the migrated table a row before asserting (rung 2, exit criterion 1 "a fresh database has `trial_moments` with both append-only triggers", plus the never-relax-a-check rule). Strengthens the test.
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the recorded precedent of phases 1 and 6 of this same set, and of the BUILD_PROMOTION_PATH / ROSTER_PROMOTION_PIPELINE / FUNDAMENTAL_PANEL_COVERAGE swarms in this file). A cross-file block move is the one edit that reliably loses a peer's concurrent append.
+    - Completion: no `**Commit**` field, and `LAB_LUCK_GATE_PLAN.md` left untouched (rung 6: phases 1 and 6's precedent; rung 3: the set is a swarm whose coordinator `orch-lab-luck-gate` owns the ledger at `.workflows/orchestration/lab-luck-gate/ledger.json`). The index's phase table has no tick column and seven peers hold it open; the sha goes to the coordinator instead. No peer phase's task was unblocked or altered — phase 3 (`P1-ENG-921N`) stays `blocked`; the coordinator releases it.
+    - Quick Stats recounted from the file rather than blind-decremented (recount is idempotent under concurrency; a decrement compounds the race).
 - [ ] **P1-ENG-921N** Phase 3: `lab remeasure` — recover the inputs for a recorded method
   - **Difficulty**: NORMAL
   - **Type**: Feature

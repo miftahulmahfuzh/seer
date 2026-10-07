@@ -18,7 +18,7 @@
         "R2",
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Sean core: schema, screenshot reader, ledger"
     },
@@ -114,7 +114,7 @@
       "satisfies": [
         "R5"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Engine: Gotrade fee schedule as a cost-model lever"
     },
@@ -142,6 +142,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/sean-gotrade-tracker/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sean-gotrade-tracker",
-  "updated": "2026-10-07T16:18:43+00:00",
+  "updated": "2026-10-07T16:19:10+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sean-gotrade-tracker"
 }

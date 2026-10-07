@@ -1,7 +1,7 @@
 # Package: seer-web
 
 **Location**: `web` (Next.js app router; package name `seer-web`, private)
-**Last Updated**: 2026-10-07 (P1-WEB-10T8, paper-split-cadence: Positions speaks "picks monthly, sizes weekly" for split-cadence book strategies and shows each order against what is held now; `lib/cadence.ts`)
+**Last Updated**: 2026-10-07 (P1-WEB-Z5LP, journal-unseen-badges: the Journal's badges count entries the reader has not seen, unseen entries sort above seen ones, and the Sera rail's Journal tab carries the unseen total; `lib/sera/seen.ts`, `journal_seen`)
 
 ## Overview
 
@@ -9,16 +9,19 @@
 (Postgres) tables written by the Python engine (`engine/`) and shows tonight's picks, open
 holdings, closed trades and the strategy leaderboard. It never trades and never computes
 signals; it is a read model over `strategies`, `runs`, `orders`, `book_positions`,
-`book_targets`, `book_trades`, `equity_snapshots`, `paper_state`, `bars` and `fx_rates`, plus one
-write (`action_dismissals`). A second, separate section, **Sera** (`/sera`), shows the method lab
-from a committed JSON snapshot (`data/lab.json`), not from Neon.
+`book_targets`, `book_trades`, `equity_snapshots`, `paper_state`, `bars` and `fx_rates`, plus two
+writes (`action_dismissals` and `journal_seen`). A second, separate section, **Sera** (`/sera`),
+shows the method lab from a committed JSON snapshot (`data/lab.json`): every lab *fact* — methods,
+trials, insights — comes from the snapshot and none of it from Neon. The one thing Sera keeps in
+Postgres is reader state: which Journal entries have been seen (`journal_seen`), so the badges on
+the Journal's tabs count what is new instead of what exists.
 
 **Key Responsibilities:**
 - Google sign-in locked to exactly one allowlisted account (`auth.ts`, `lib/allow.ts`)
 - One data layer (`lib/data.ts`) that turns rows of all three engines (`bracket`, `book`, `benchmark`) into typed view models
 - Pure, DB-free logic that tests run without a connection: metrics and the go-live checklist (`lib/metrics.ts`), month-by-month paper performance (`lib/monthly.ts`), strategy row helpers (`lib/strategy.ts`), split-cadence wording and per-order size change (`lib/cadence.ts`), slot letters and card colours (`lib/slots.ts`), session freshness (`lib/session.ts`), number/date formatting (`lib/format.ts`)
 - Four pages: Today, Positions, History, Leaderboard
-- Sera (`/sera`), the method lab section: gated to one account (`lib/sera/`), its own desktop shell and rail (`app/sera/layout.tsx`, `components/sera/`), a dependency-free SVG chart kit (`components/sera/charts/`), hand-built SVG diagrams for How it works (`components/sera/diagrams/`), and a pure data layer over the bundled lab snapshot `data/lab.json` (`lib/sera/types.ts`, `lab.ts`, `derive.ts`, `glossary.ts`, `markdown.ts`). Pages: Overview, Methods list + detail, Journal, Ideas, How it works; each page keeps its logic in a pure, tested `view.ts` (`overview.ts` for the Overview). See [Sera](#sera-sera)
+- Sera (`/sera`), the method lab section: gated to one account (`lib/sera/`), its own desktop shell and rail (`app/sera/layout.tsx`, `components/sera/`), a dependency-free SVG chart kit (`components/sera/charts/`), hand-built SVG diagrams for How it works (`components/sera/diagrams/`), and a pure data layer over the bundled lab snapshot `data/lab.json` (`lib/sera/types.ts`, `lab.ts`, `derive.ts`, `glossary.ts`, `markdown.ts`). Pages: Overview, Methods list + detail, Journal, Ideas, How it works; each page keeps its logic in a pure, tested `view.ts` (`overview.ts` for the Overview, and the Journal a second one, `seen-client.ts`, beside it). The Journal is the one Sera page that also touches Neon, for reader state only: `lib/sera/seen.ts` over `journal_seen` decides which entries are unseen, which orders them and fills the badges; it is also the only Sera page to mount a `'use client'` island of its own (`JournalSeen.tsx`), so `SeraNav.tsx` is no longer the section's sole client component. See [Sera](#sera-sera)
 - Shared roster UI (`components/StrategySwitch.tsx`, `components/PaperChip.tsx`, `components/roster.ts`): icon-only strategy switching by `?s=` and the paper marker on research strategies' holdings, orders and trades
 - Migrations runner shared with the engine (`scripts/migrate.mjs`) and a demo seeder (`scripts/seed-demo.mjs`)
 
@@ -39,6 +42,7 @@ web/
     apple-icon.png          home-screen icon: Eye of Horus, Sigma pupil, on coral (scripts/make-icon.mjs)
     signin/                 sign-in / denied page; splash art is the mirrored eye (public/splash-eye.png) masked in --splash-star; honours ?next= via safeNext
     api/auth/               NextAuth route handlers
+    api/sera/journal/seen/  route.ts: POST {ids, via} marks Journal insight ids seen; 204 ok / 400 bad body / 404 not the Sera user / 500 the write threw. Re-derives the /sera rule from isAllowed + isSeraUser rather than calling requireSera, whose redirect() would 307 to /signin and disclose the section exists; force-dynamic, and it parses the body itself without checking Content-Type because sendBeacon sends a Blob typed text/plain
     (app)/
       layout.tsx            signed-in shell
       actions.ts            server action dismiss(formData)
@@ -49,14 +53,16 @@ web/
       leaderboard/view.ts   looks, researchOf, compare, windowLine, spyOverSpan, pickResearch, retiredLabel, scoreOf, monthLines, sinceStartLine  (pure)
       leaderboard/view.test.ts  vitest suite for view.ts
     sera/
-      layout.tsx            requireSera(), then SeraNav rail + centred column (max 1360px); stacks below 1024px
+      layout.tsx            requireSera(), the Journal's unseen total, then SeraNav rail + centred column (max 1360px); stacks below 1024px
       not-found.tsx         in-shell 404 (Section + back-to-overview icon link)
       sera.module.css
       page.tsx              /sera Overview: latest synthesis, KPI tiles, trial scatter vs the gate, hurdle funnel, progress, luck bar, families, latest methods
       overview.ts           pure shaping of the snapshot into chart-kit props (+ overview.test.ts, overview.module.css)
       methods/page.tsx      /sera/methods list, ?show=all|lab|historical|alive (view.ts pure helpers + view.test.ts, methods.module.css)
       methods/[id]/page.tsx /sera/methods/[id] method detail (method.module.css)
-      journal/page.tsx      /sera/journal insights grouped by kind, ?kind= filter (view.ts + view.test.ts, journal.module.css)
+      journal/page.tsx      /sera/journal insights grouped by kind, ?kind= filter; unseen first (newest first), then seen below a divider; badges count unseen (view.ts + view.test.ts, journal.module.css)
+      journal/JournalSeen.tsx   (client) marks entries seen: dwell on screen in a visible tab, or a redirect-arrow click; batches ids, flushes on page-hide, counts the badges down live
+      journal/seen-client.ts    pure dwell/batch policy and the pending-id queue, DOM-free (+ seen-client.test.ts)
       ideas/page.tsx        /sera/ideas backlog, blocked-on-data wishlist, reading list (view.ts + view.test.ts, ideas.module.css)
       how/page.tsx          /sera/how path, calendar, hurdles, honesty rules, data, glossary (view.ts + view.test.ts, how.module.css)
   data/
@@ -67,7 +73,7 @@ web/
     roster.ts               strategyIcon, selectStrategy, sharesLabel                (pure)
     roster.test.ts          vitest suite for roster.ts
     sera/
-      SeraNav.tsx           (client) icon-only rail: Overview, Methods, Journal, Ideas, How it works (/sera/*), Back to Seer
+      SeraNav.tsx           (client) icon-only rail: Overview, Methods, Journal, Ideas, How it works (/sera/*), Back to Seer; the Journal tab carries an unseen-count badge (prop from app/sera/layout.tsx; no badge at zero)
       PageHeader.tsx        eyebrow, title, lede, asOf, aside
       Section.tsx           Section (eyebrow/title/caption, bg sheet|lav|butter|sky|stone|coral, aside), SectionGrid
       Stat.tsx              big figure + label, tone, tip, sub, size
@@ -97,6 +103,7 @@ web/
     allow.ts                isAllowed, safeNext                                    (pure)
     sera/access.ts          SERA_EMAIL, isSeraUser                                 (pure)
     sera/gate.ts            requireSera(next) (server only)
+    sera/seen.ts            seenInsightIds() / unseenCount(ids) / markInsightsSeen(ids, via): the journal_seen read/write. The two reads never throw -- a failed query is an empty set for the page and null for the rail -- while markInsightsSeen throws by design, which is the route's 500 (server only)
     sera/types.ts           LabSnapshot / LabMethod / LabTrial / LabInsight: the data/lab.json contract
     sera/lab.ts             lab snapshot + methodById, trialsOf, insightsOf, childrenOf (server only)
     sera/derive.ts          gate checks, misses, closest, bestVariant, funnel, progress, families, SPY TR, drawdown, years (pure)
@@ -331,7 +338,9 @@ function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null befo
 - `components/tooltip.ts`: short tips stay one-line pills; long tips wrap in a box (max 340px); a `\n` in the text forces a line break (`pre-line`).
 - `components/sera/charts/`: server-renderable inline-SVG charts, no chart library. `LineChart` (series of `[x, y|null, tip?]` points, numeric or date x, reference lines), `ScatterChart` (points plus shaded regions), `BarChart` (groups; `barGroups` lifts a flat list), `Legend` (`line|dash|dot|ring|zone` shapes). Point and bar tooltips use the shared `data-tip` layer. `scale.ts` is pure and unit-tested.
 - `components/sera/diagrams/`: server-rendered inline SVG on a fixed 1240-wide viewBox, no library. `Pipeline({ stages, failLabel, label })` lays `PipelineStage` boxes out by `weight` (SVG text does not wrap, so titles/details arrive pre-broken into short lines; `fails` stages draw a dashed arrow into the journal lane; `final` gets the accent fill). `Windows({ start, devEnd, testStart, today, testNote, paperSince, bears, label })` draws the dev and test bands, the paper strip and `Era` shading over a year axis. `label` is the accessible summary of each diagram. Geometry is pure in `geometry.ts`.
-- `app/sera/journal/view.ts` (pure): `KIND_COPY` (caption, empty text, sheet tone per insight kind), `parseKind(?kind)` (unknown -> `'all'`), `journalHref`, `newestFirst` (by `added`, then higher id), `kindCounts`, `journalGroups(insights, filter)` (one group per kind in `INSIGHT_KINDS` order), `dayLabel` (UTC).
+- `app/sera/journal/view.ts` (pure): `KIND_COPY` (caption, empty text, sheet tone per insight kind), `SEEN_COPY` (the unseen/seen divider label, the card marker and its screen-reader text), `parseKind(?kind)` (unknown -> `'all'`), `journalHref`, `newestFirst` (by `added`, then higher id), `kindCounts` (how many of each kind exist in all), `unseenCounts(insights, seen?)` (how many of each kind are unseen, keyed by all seven tabs so `.all` is the total; a seen id not in the snapshot is ignored), `badgeTip(heading, unseen, total)` (the one formatter for the seven tab tooltips — the server render and the client island both call it, so the wording cannot fork), `journalGroups(insights, filter, seen?)` (one group per kind in `INSIGHT_KINDS` order; inside each, unseen entries newest-first, then seen entries newest-first, carried on the group as `unseen` / `seen` / `items` / `unseenCount` alongside the flat `entries` — the seen set defaults to empty, which is "nothing seen yet"), `dayLabel` (UTC). Takes a `ReadonlySet<number>`; never imports `lib/sera/seen.ts` or the database, which is what lets the client island import `badgeTip` from it.
+- `lib/sera/seen.ts` (server only; every reader queries Neon): `seenInsightIds()` -> every `insight_id` in `journal_seen` as a `Set<number>`; a failed query resolves to an empty set and logs, never throws, so `/sera/journal` degrades to "nothing seen yet" rather than 500 (invariant 9). `unseenCount(ids)` -> how many of `ids` are *not* in the table, or `null` when the read failed — the rail's number, and the one reader that can tell a failure from a clean zero, which is why `app/sera/layout.tsx` shows no badge on `null`. It takes the ids rather than reading the snapshot itself, so the API route's bundle never pulls `data/lab.json`. `markInsightsSeen(ids, via)` -> one multi-row `INSERT … ON CONFLICT DO NOTHING` (`via` is `'view'` or `'click'`), returning how many rows were new; idempotent, so posting the same id twice leaves one row. Unlike the two reads it does *not* swallow a failure — it throws, and the POST route turns that into its 500. `normalizeSeenIds` / `parseSeenVia` are the shared input guard the route uses, and `MAX_SEEN_BATCH` (500) is the per-request id cap, enforced inside `normalizeSeenIds` rather than by the route.
+- `app/sera/journal/seen-client.ts` (pure, DOM-free): the dwell/batch constants in one place (`VISIBLE_FRACTION`, `TALL_VIEWPORT_FRACTION`, `DWELL_MS`, `FLUSH_IDLE_MS`, `MAX_BATCH`, `OBSERVER_THRESHOLDS`, `SEEN_ENDPOINT`), the arithmetic deciding whether an `IntersectionObserver` entry counts as on screen (`isOnScreen`, `isUnseenAttr`), the live badge tally (`badgeCounts`), the request body (`seenRequestBody`) and the pending-id queue (`createSeenQueue`: add, peek, take a batch, remember what is already marked so an id is never posted twice in a session). Unit-tested without a browser (`seen-client.test.ts`).
 - `app/sera/ideas/view.ts` (pure): `methodsWithStatus(methods, status)` (numeric-aware id order; page uses `idea` and `blocked-data`), `needs(blockedOn)`, `sourceLabel`, `sourceLink` (http(s) only, else null), `urlParts` (safe flag, host, 72-char display), `readingList(ideasSeen)`: `url:` keys become links newest first, every other key is a concept (`concept:` prefix dropped) grouped by method id, untied last.
 - `app/sera/how/view.ts` (pure, takes a structurally narrowed `HowInput`): `stageCounts`, `pipelineStages` / `pipelineLabel` (Pipeline model), `windowsModel` (Windows model; `paperSince` = earliest `updated` of a `paper` method; `asOf` falls back to `gate.testStart` for an empty lab), `hurdles(gate, tries)` (the six `CONDITION_KEYS` in plain words), `honestyRules`, `dataFacts(data, gate)` (has / lacks), `BEARS` (2000-02, 2008-09) and `PAPER_MONTHS = 3` / `PAPER_TRADES = 100` (design section 1's paper bar; not in `snapshot.gate`).
 - `auth.ts`: `handlers, auth, signIn, signOut`, `currentUser()`.
@@ -345,6 +354,9 @@ engine (Python, nightly) -> Neon tables -> lib/data.ts (SQL, row -> view model)
                                               -> server components in app/(app)/* -> HTML
 engine `lab stage` -> web/data/lab.json (committed) -> lib/sera/lab.ts -> pure lib/sera/derive.ts -> /sera server components
 user "Mark as done" -> actions.dismiss -> data.dismissAction -> action_dismissals
+reader reads /sera/journal -> JournalSeen (dwell on screen, or arrow click) -> POST /api/sera/journal/seen -> sera/seen.markInsightsSeen -> journal_seen
+journal_seen -> sera/seen.seenInsightIds -> journal/view.ts (unseen counts, unseen-then-seen order) -> the seven badges
+             -> sera/seen.unseenCount(lab ids) -> app/sera/layout.tsx -> the SeraNav Journal badge (null = no badge)
 ```
 
 Pages are async server components; each calls `runStatus()` plus the reads it needs in
@@ -371,7 +383,7 @@ analysis and opinion on each method, and the insights journal. It is desktop-fir
 | `/sera` | Overview: the latest `synthesis` insight as the headline (else the latest insight); KPI tiles; every dev trial as max DD vs CAGR minus SPY, with the pass zone shaded; how many trials pass each hurdle; progress over trial number; each trial's DSR vs the 0.95 line; families; latest methods |
 | `/sera/methods` | every method with status, family, source and best variant (CAGR vs SPY, max DD, PF, trades, DSR, conditions passed n/6) and verdict; icon-only filter `?show=all\|lab\|historical\|alive` |
 | `/sera/methods/[id]` | one method: idea, what could go wrong, verdict, parent and children, variants against the six conditions, growth of 1 vs total-return SPY, drawdown, year by year, its variants against the gate, the rendered analysis, related insights, each trial's full technical detail. `generateStaticParams` covers every method; unknown id -> `notFound()` |
-| `/sera/journal` | insights grouped as Batch summaries (synthesis), What we learned, Ideas worth testing, Data we wish we had, Features to build, Risks we see; `?kind=<kind>` filter (e.g. `/sera/journal?kind=data-wish`), newest first |
+| `/sera/journal` | insights grouped as Batch summaries (synthesis), What we learned, Ideas worth testing, Data we wish we had, Features to build, Risks we see; `?kind=<kind>` filter (e.g. `/sera/journal?kind=data-wish`). Inside each group, unseen entries come first newest-first, then the seen ones below a divider; each of the seven tab badges counts that tab's unseen entries. See [What the reader has seen](#what-the-reader-has-seen-journal_seen) |
 | `/sera/ideas` | the backlog (`idea`, `#backlog`), ideas blocked on data (a data wishlist, `#blocked`), and the reading list from `ideasSeen` (`url:` keys as links, `concept:` keys as tags, `#reading`) |
 | `/sera/how` | the pipeline and time-window diagrams, each hurdle with its threshold from `snapshot.gate`, the honesty rules, the data the lab has and lacks, and the glossary |
 
@@ -385,6 +397,11 @@ internal paths only), so sign-in returns there. Signed in as anyone but `SERA_EM
 so the section's existence is never revealed. `SERA_EMAIL = 'mahfuzh74@gmail.com'` is a constant in
 `lib/sera/access.ts`, not an env var; `isSeraUser(email)` matches it trimmed and case-insensitively.
 The same check shows the Sera link on Seer's desktop rail (`components/Nav.tsx`).
+
+`requireSera` is for *navigations*. The one `/api/sera/**` route — `POST /api/sera/journal/seen` —
+deliberately does not call it: a `redirect('/signin?next=…')` answered to a `fetch` or a
+`sendBeacon` would be a 307 that discloses the section exists. It re-derives the same rule from
+`isAllowed` + `isSeraUser` and answers `404` to everyone it rejects, revealing nothing.
 
 ### Data source and how it stays current
 
@@ -408,6 +425,42 @@ skill session (explore / sera) -> lab/lab.sqlite
   the Overview headline on the next push; method analyses and insights come from
   `/explore-and-experiment-new-method`, written in plain language with a closing `My opinion:`.
 
+
+### What the reader has seen (journal_seen)
+
+Lab facts are read-only and come from the snapshot. The single exception in all of Sera is
+**reader** state: which Journal entries have been looked at. It lives in Neon, in `journal_seen`
+(`db/migrations/012_journal_seen.sql`), modelled on `action_dismissals`: `insight_id bigint`
+primary key, `seen_at`, and a `via` column saying how it was marked (`'view'` or `'click'`). No
+user column — Seer is one account — and no foreign key: insights live in the engine's SQLite lab
+store, not in Postgres, and their ids are append-only and never reused, so there is nothing to
+cascade from. `via` is diagnostics only: nothing reads it to decide seen-ness. A row existing is
+what "seen" means, so do not build a filter on it.
+
+- **Marked by.** A redirect-arrow click (`via: 'click'`), or the entry dwelling on screen in a
+  visible tab for long enough to have been read past (`via: 'view'`) — the five insights with no
+  `methodId` carry no arrow, so dwell is the only rule that reaches them. A background tab marks
+  nothing. `app/sera/journal/JournalSeen.tsx` observes, `seen-client.ts` holds the policy and the
+  queue, and ids are batched and flushed to `POST /api/sera/journal/seen` on an idle debounce, at
+  the batch cap, and on page-hide via `navigator.sendBeacon`.
+- **Additive and idempotent.** Nothing ever deletes a row or marks an entry unseen; posting an id
+  twice is a no-op. There is no "mark all as read" control by design.
+- **Counted off the snapshot, not off the table.** Unseen is always `lab.insights` minus the seen
+  set — never `count(*)`, never `insights.length - seen.size`. A row may name an id that is not
+  in the build's `data/lab.json`, and it must not move a badge.
+- **Frozen per page view.** The unseen/seen partition is computed once on the server from the set
+  as it stood when the page was requested. Marking an entry seen during a visit changes the
+  badges and the card's marker; it never moves a card out from under the reader.
+- **Degrades, and the two surfaces degrade differently on purpose.** Nothing ever 500s because
+  Postgres is unreachable. `/sera/journal` reads `seenInsightIds()`, whose failed query resolves
+  to an empty set: every entry unseen, the page still renders the list. The rail reads
+  `unseenCount()`, which returns `null` on a failed read and so shows **no badge** — a bare
+  notification number that is wrong is worse than none, while "everything is new to you" is the
+  safe reading for a list you are already looking at. The divergence is a decision, not a bug.
+- **The rail.** `app/sera/layout.tsx` calls `unseenCount(lab.insights.map(i => i.id))` and passes
+  the result to `SeraNav`, so the Journal tab carries a badge on every `/sera/*` page. It is
+  computed when the layout renders, so it is a per-load number, not a live one.
+
 ## Dependencies
 
 - `next` 16, `react` / `react-dom` 19: app router, server components, server actions.
@@ -415,16 +468,22 @@ skill session (explore / sera) -> lab/lab.sqlite
 - `@neondatabase/serverless`: `neon()` HTTP tagged-template `sql` for the app; `Pool` over websockets (`ws`) for the scripts, which need transactions.
 - `lucide-react`: icons (every button is icon-only with `aria-label` and a tooltip).
 - Dev: `typescript`, `vitest`, `ws`.
-- Internal: shares `db/migrations/*.sql` and `schema_migrations` with the engine; the engine owns writes to every table except `action_dismissals`.
+- Internal: shares `db/migrations/*.sql` and `schema_migrations` with the engine; the engine owns writes to every table except `action_dismissals` and `journal_seen` (`db/migrations/012_journal_seen.sql`), which only the web app writes.
 
 ## Concurrency
 
-No shared mutable state. Each request runs its own parallel queries; the only write is an
-idempotent `INSERT ... ON CONFLICT DO NOTHING`. Not a concern beyond that.
+No shared mutable state. Each request runs its own parallel queries; both writes
+(`action_dismissals`, `journal_seen`) are idempotent `INSERT ... ON CONFLICT DO NOTHING`, so a
+retried beacon or two tabs flushing the same ids cost nothing. Not a concern beyond that.
 
 ## Error Handling
 
-No custom error types. DB errors propagate to Next's error boundary. `dismiss` throws on a
+No custom error types. DB errors propagate to Next's error boundary — with one deliberate
+exception, the Journal's seen state. Its two reads swallow a failed query (`seenInsightIds` to an
+empty set, `unseenCount` to `null`) so neither `/sera/journal` nor the `/sera` layout can 500 over
+a badge, and its write is fire-and-forget from the browser: a failed POST is never surfaced, the
+ids are requeued, and the badge stays optimistically counted down. `markInsightsSeen` itself does
+throw, which the route answers as a bodiless 500 the island ignores. `dismiss` throws on a
 missing session or a bad order id. `seed-demo.mjs` throws (and writes nothing) when real engine
 runs exist, more than 100 bars exist (backfill ran), or real paper state exists, and when its
 window lacks two month starts.
@@ -432,10 +491,10 @@ window lacks two month starts.
 ## Configuration
 
 - `DATABASE_URL` (app, pooled HTTP), `DATABASE_URL_UNPOOLED` (scripts), `ALLOWED_EMAIL`, NextAuth Google credentials. Scripts read `web/.env.local` via `node --env-file`.
-- Sera needs no env var: `SERA_EMAIL` is a constant (`lib/sera/access.ts`), and its data is the committed `data/lab.json`. Regenerate the JSON with `python -m seer_engine lab stage` (writes and stages it with `lab/lab.sqlite`) or `lab export-json` (writes only). In a worktree, run them as `env -u SEER_LAB_DB PYTHONPATH=<worktree>/engine/src /home/miftah/seer/engine/.venv/bin/python -m seer_engine …`.
+- Sera needs no env var of its own: `SERA_EMAIL` is a constant (`lib/sera/access.ts`), and its lab data is the committed `data/lab.json`. It does share the app's `DATABASE_URL`, for `journal_seen` only. Regenerate the JSON with `python -m seer_engine lab stage` (writes and stages it with `lab/lab.sqlite`) or `lab export-json` (writes only). In a worktree, run them as `env -u SEER_LAB_DB PYTHONPATH=<worktree>/engine/src /home/miftah/seer/engine/.venv/bin/python -m seer_engine …`.
 - `npm run db:migrate`: apply new migrations in name order, one transaction each.
 - `npm run db:seed-demo [-- --dry-run]`: builds a 66-session demo (day 0 + paper start, at least three calendar months) ending at the last completed session, flagged `is_demo`. Roster: SPY (champion, buy and hold), A (bracket), F4-MOM12-N20-TREND and F1-SPY-SMA200-M (monthly book strategies, deciding on each month's first session), and C (bracket, its own younger clock, gate `applicable: false`). Needs migrations through 009 applied first (`npm run db:migrate`, then `npm run db:seed-demo`; it only runs on an empty database, never production). Writes strategies (with `engine`, `rules_id`, `paper_start`, `params.backtest_gate`), runs (with paper status), fx, bars, orders, equity snapshots, `paper_state`, `book_positions`, `book_targets` and `book_previews` (pending orders, targets and previews with demo `evidence`; A's CSCO has no explanation so its facts show), `book_trades`, and six `news_vetoes` rows for C's pending session. `--dry-run` builds every row and prints counts without connecting.
-- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`, `why`, `sera/*`), `components/roster`, `components/sera/charts`, `components/sera/diagrams/geometry`, `app/(app)/leaderboard/view` and the `app/sera/*/view` helpers.
+- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`, `why`, `sera/*`), `components/roster`, `components/sera/charts`, `components/sera/diagrams/geometry`, `app/(app)/leaderboard/view`, the `app/sera/*/view` helpers and `app/sera/journal/seen-client`.
 
 ## Gotchas
 
@@ -456,6 +515,11 @@ window lacks two month starts.
 - `StrategySwitch` takes `href` as a function, so it must stay a server component (functions cannot cross into a client component).
 - Sera access is two locks: sign-in still needs `ALLOWED_EMAIL`, and `/sera` additionally needs `SERA_EMAIL` (hard-coded). Any other signed-in account gets a 404, not a denial page, by design.
 - Every `SeraNav` destination now has a page (`/sera`, `/sera/methods`, `/sera/journal`, `/sera/ideas`, `/sera/how`); each page also calls `requireSera(<its path>)` so sign-in returns to it.
+- `/sera/journal` and `app/sera/layout.tsx` are the only Sera code that reads Neon, and only for `journal_seen`. Neither may throw: the layout wraps every `/sera` page, so a thrown seen-state read takes down the whole section over a badge. The page uses `seenInsightIds()`, which swallows its query failure and degrades to "nothing seen yet"; the layout uses `unseenCount()`, which returns `null` on failure so the rail shows no badge rather than the full inventory. Use `unseenCount` for anything that is just a number — an empty `Set` cannot tell you the read failed.
+- Unseen is always `lab.insights` minus the seen set. Never `SELECT count(*) FROM journal_seen` and never `insights.length - seen.size`: a row can name an id that is not in this build's snapshot (the table is in Neon, the snapshot is bundled at build time), and the rail's badge must agree with the seven on the page.
+- The rail's Journal badge is computed when the Sera layout renders. A soft client-side navigation inside `/sera` does not re-run the layout, so the rail number does not refresh mid-visit — the Journal page's own seven badges are the live ones, counted down by `JournalSeen`. A zero count renders no rail badge at all, while the Journal's seven keep a muted zero pill to keep the row even.
+- The two seen-state caps are different things and cannot share a constant: `MAX_SEEN_BATCH = 500` (`lib/sera/seen.ts`, server-only — it builds the Neon client at module scope) is the per-request id cap, enforced inside `normalizeSeenIds`; `MAX_BATCH = 50` (`seen-client.ts`) is the client's flush trigger. The invariant is `MAX_BATCH <= MAX_SEEN_BATCH`. Raise the client past 500 and every full flush becomes a **silent** 400 — the route answers with no body and the island swallows failures, so nothing would ever be marked seen and nothing would say so.
+- The POST route parses its body with `JSON.parse(await req.text())` and ignores `Content-Type` on purpose: `navigator.sendBeacon` sends a `Blob` typed `text/plain`, so narrowing the route to `application/json` would silently break every page-hide flush.
 - `Pipeline` uses fixed SVG marker ids: render at most one per page. Its stage text must be pre-broken (title lines <= 14 chars, detail <= 18, <= 26 on a weight-1.35 box) or it overflows the boxes.
 - `data/lab.json` is generated. Never edit it by hand or commit it without its database: the engine sync guard fails the build. A lab change reaches `/sera` only by being committed and pushed, because the snapshot is bundled at build time.
 - `lib/sera/*` and the page helper modules import each other relatively: vitest has no `@/` alias. Only `page.tsx` files and components use `@/`.

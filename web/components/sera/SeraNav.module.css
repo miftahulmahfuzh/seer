@@ -25,6 +25,7 @@
 }
 
 .tab, .active {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -42,6 +43,34 @@
 
 .back { margin-top: auto; }
 
+/* Unseen journal entries. A sibling of the Journal page's own badge
+   (app/sera/journal/journal.module.css .badge): same coral pill, same tabular numerals,
+   sized for the rail's 52 px tab and ringed so it reads off the tab strip. There is no
+   `.zero` variant on purpose — a zero count renders no badge at all (SeraNav.tsx). */
+.badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--coral);
+  color: var(--on-coral);
+  box-shadow: 0 0 0 2px var(--bar);
+  font-size: 11.5px;
+  line-height: 20px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+/* On the active tab the button is already --coral: invert, or the badge disappears into it. */
+.active .badge {
+  background: var(--on-coral);
+  color: var(--coral);
+  box-shadow: 0 0 0 2px var(--coral);
+}
+
 /* Below 1024 px: a top bar, not designed further (plan: desktop only for now). */
 @media (max-width: 1023.98px) {
   .rail {
@@ -56,4 +85,14 @@
   .tabs { flex-direction: row; padding: 5px; }
   .tab, .active { height: 44px; min-width: 44px; }
   .back { margin-top: 0; margin-left: auto; }
+  /* 44 px tab: a smaller pill, nudged out to sit on the rim rather than over the icon. */
+  .badge {
+    top: -3px;
+    right: -3px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 11px;
+    line-height: 18px;
+  }
 }

@@ -9,12 +9,20 @@ import { requireSera } from '@/lib/sera/gate';
 import { INSIGHT_KIND_LABEL } from '@/lib/sera/glossary';
 import { lab, methodById } from '@/lib/sera/lab';
 import { renderMarkdown } from '@/lib/sera/markdown';
+import { seenInsightIds } from '@/lib/sera/seen';
 import { INSIGHT_KINDS, type InsightKind, type LabInsight } from '@/lib/sera/types';
-import { dayLabel, journalGroups, journalHref, kindCounts, parseKind, type KindFilter } from './view';
+import {
+  SEEN_COPY, badgeTip, dayLabel, journalGroups, journalHref, kindCounts, parseKind, unseenCounts,
+  type KindFilter,
+} from './view';
+import { JournalSeen } from './JournalSeen';
 import s from './journal.module.css';
 
 // The layout's title template renders this as "Journal · Sera".
 export const metadata: Metadata = { title: 'Journal' };
+
+// The page reads journal_seen from Neon, so it is never cached — the (app) convention.
+export const dynamic = 'force-dynamic';
 
 const KIND_ICON: Record<InsightKind, LucideIcon> = {
   synthesis: Layers,
@@ -31,19 +39,47 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
   const q = await searchParams;
   const filter = parseKind(q.kind);
   await requireSera(journalHref(filter));
+  const seenIds = await seenInsightIds();
   const counts = kindCounts(lab.insights);
-  const groups = journalGroups(lab.insights, filter);
+  const fresh = unseenCounts(lab.insights, seenIds);
+  const groups = journalGroups(lab.insights, filter, seenIds);
   const total = lab.insights.length;
 
-  const options: { id: KindFilter; tip: string; n: number; Icon: LucideIcon }[] = [
-    { id: 'all', tip: `Everything · ${total}`, n: total, Icon: ListFilter },
+  // heading + total ride along on every option: they are badgeTip's other two arguments, and the
+  // client island (phase 4) reads them off this array to keep the tooltip honest as `n` falls.
+  const options: { id: KindFilter; heading: string; total: number; tip: string; n: number; Icon: LucideIcon }[] = [
+    {
+      id: 'all',
+      heading: 'Everything',
+      total,
+      tip: badgeTip('Everything', fresh.all, total),
+      n: fresh.all,
+      Icon: ListFilter,
+    },
     ...INSIGHT_KINDS.map(k => ({
       id: k as KindFilter,
-      tip: `${INSIGHT_KIND_LABEL[k].heading} · ${counts[k]}`,
-      n: counts[k],
+      heading: INSIGHT_KIND_LABEL[k].heading,
+      total: counts[k],
+      tip: badgeTip(INSIGHT_KIND_LABEL[k].heading, fresh[k], counts[k]),
+      n: fresh[k],
       Icon: KIND_ICON[k],
     })),
   ];
+
+  // The ids the server still calls unseen, per kind. This is all the client island needs to count
+  // the badges down, and it is one integer per unseen insight — 26 today — so lab.json's 0.89 MB
+  // of titles and markdown bodies still never reaches the browser. Derived straight from the
+  // snapshot and the seen-set, so the island takes no dependency on view.ts's partition shape.
+  const unseenByKind = Object.fromEntries(
+    INSIGHT_KINDS.map(k => [k, lab.insights.filter(i => i.kind === k && !seenIds.has(i.id)).map(i => i.id)]),
+  ) as Record<InsightKind, number[]>;
+
+  // The other two arguments badgeTip takes beside the live count, per tab. The island calls
+  // badgeTip itself, so the tooltip stays the same words as the server rendered — it just
+  // recomputes the number. Seven short strings and seven integers; nothing else crosses.
+  const badgeMeta = Object.fromEntries(
+    options.map(o => [o.id, { heading: o.heading, total: o.total }]),
+  ) as Record<KindFilter, { heading: string; total: number }>;
 
   return (
     <>
@@ -62,7 +98,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
                 <Link key={id} href={journalHref(id)} replace scroll={false} className={`icon-btn md ${s.segBtn}`}
                   data-tip={tip} aria-label={tip} aria-current={on ? 'true' : undefined}>
                   <Icon size={19} strokeWidth={on ? 2 : 1.5} />
-                  <span className={`${s.badge} ${n === 0 ? s.zero : ''}`} aria-hidden="true">{n}</span>
+                  <span className={`${s.badge} ${n === 0 ? s.zero : ''}`} data-badge-kind={id} aria-hidden="true">{n}</span>
                 </Link>
               );
             })}
@@ -72,33 +108,55 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
           </p>
         </div>
 
-        {groups.map(g => (
-          <Section
-            key={g.kind}
-            eyebrow={`${g.entries.length} ${g.entries.length === 1 ? 'entry' : 'entries'}`}
-            title={g.heading}
-            caption={g.caption}
-          >
-            {g.entries.length === 0 ? (
-              <p className={s.empty}>{g.empty}</p>
-            ) : (
-              <div className={s.cards}>
-                {g.entries.map(i => <InsightCard key={i.id} insight={i} tone={g.tone} />)}
-              </div>
-            )}
-          </Section>
-        ))}
+        {groups.map(g => {
+          const n = g.items.length;
+          return (
+            <Section
+              key={g.kind}
+              eyebrow={`${n} ${n === 1 ? 'entry' : 'entries'}`}
+              title={g.heading}
+              caption={g.caption}
+            >
+              {n === 0 ? (
+                <p className={s.empty}>{g.empty}</p>
+              ) : (
+                <div className={s.cards}>
+                  {g.unseen.map(e => (
+                    <InsightCard key={e.insight.id} insight={e.insight} tone={g.tone} unseen />
+                  ))}
+                  {g.unseenCount > 0 && g.unseenCount < n && (
+                    <p className={s.boundary}>{SEEN_COPY.boundary}</p>
+                  )}
+                  {g.seen.map(e => (
+                    <InsightCard key={e.insight.id} insight={e.insight} tone={g.tone} unseen={false} />
+                  ))}
+                </div>
+              )}
+            </Section>
+          );
+        })}
+
+        <JournalSeen unseenByKind={unseenByKind} badgeMeta={badgeMeta} zeroClass={s.zero} />
       </div>
     </>
   );
 }
 
-function InsightCard({ insight, tone }: { insight: LabInsight; tone: string }) {
+function InsightCard({ insight, tone, unseen }: { insight: LabInsight; tone: string; unseen: boolean }) {
   const method = insight.methodId ? methodById(insight.methodId) : undefined;
   return (
-    <article className={`${s.card} ${tone}`}>
+    <article
+      className={`${s.card} ${tone}`}
+      data-insight-id={insight.id}
+      data-unseen={unseen ? 'true' : 'false'}
+    >
       <header className={s.cardHead}>
-        <h3 className={s.cardTitle}>{insight.title}</h3>
+        <h3 className={s.cardTitle}>
+          <span className={s.new} data-tip={SEEN_COPY.marker}>
+            <span className={s.sr}>{SEEN_COPY.markerLabel}: </span>
+          </span>
+          {insight.title}
+        </h3>
         <time className={s.date} dateTime={insight.added}>{dayLabel(insight.added)}</time>
       </header>
       <div className={s.body} dangerouslySetInnerHTML={{ __html: renderMarkdown(insight.body) }} />
@@ -109,6 +167,7 @@ function InsightCard({ insight, tone }: { insight: LabInsight; tone: string }) {
           </span>
           {method && (
             <Link href={`/sera/methods/${encodeURIComponent(method.id)}`} className="icon-btn sm"
+              data-seen-click="true"
               aria-label={`Open ${method.id}, ${method.name}`} data-tip={`Open ${method.id}`}>
               <ArrowUpRight size={18} strokeWidth={1.5} />
             </Link>

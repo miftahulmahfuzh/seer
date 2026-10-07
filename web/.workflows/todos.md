@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 12
+- Completed: 17
 
 ---
 
@@ -35,6 +35,93 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-K3QM** Phase 1: Seen-state storage, server read/write, and the POST endpoint
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `db/migrations/012_journal_seen.sql` (`journal_seen`: `insight_id` PK, `seen_at`, a `via` column constrained to 'view' or 'click', no foreign key since insights live in the engine's SQLite lab store), new server-only `web/lib/sera/seen.ts` (`seenInsightIds`, `unseenCount` returning `null` on a failed read, `markInsightsSeen`, `normalizeSeenIds`/`parseSeenVia`, `MAX_SEEN_BATCH = 500`) and new `web/app/api/sera/journal/seen/route.ts` (Sera-gated POST that also accepts a `text/plain` sendBeacon body). Exit: the migration applies cleanly and idempotently on top of `011_rmw.sql`; the reads never throw against an unreachable database; `markInsightsSeen` is idempotent; the route answers 204 / 404 / 400; nothing in the app calls it yet, `journal_seen` stays out of `DEMO_TABLES`, and the tree builds.
+  - **Status**: done
+  - **Plan Set**: `JOURNAL_UNSEEN_BADGES_PLAN.md` (phase 1 of 5)
+  - **Satisfies**: R2 — A working definition and mechanism for "seen": a click on an item's redirect-arrow marks it seen, and items with no arrow are marked seen some other way
+  - **Plan**: `.workflows/plan/P1-WEB-K3QM.md`
+  - **Completed**: 2026-10-07 11:27
+  - **Method**: /do
+  - **Files**: db/migrations/012_journal_seen.sql, web/lib/sera/seen.ts, web/app/api/sera/journal/seen/route.ts, web/.workflows/todos.md, web/.workflows/plan/P1-WEB-K3QM.md, web/.workflows/plan/P1-WEB-M2WF.md, web/.workflows/plan/P1-WEB-Q8DV.md, web/.workflows/plan/P1-WEB-Z5LP.md
+  - **Drift**:
+    - None. The tree matched everything the plan quoted: db/migrations held 001-011 (011_rmw.sql highest), web/lib/sera had no seen.ts, web/app/api held only auth/[...nextauth]/route.ts, and every imported symbol existed (sql from @/lib/db, isAllowed from @/lib/allow, isSeraUser from @/lib/sera/access, auth from @/auth). The route's gate mirrors lib/sera/gate.ts's requireSera predicate pair exactly.
+  - **Decided**:
+    - Which package tracker holds the five tasks: phase 1's Package column names db/migrations, web/lib/sera and web/app/api, and only `web` has a .workflows/ tracker -> all five tasks in web/.workflows/todos.md (code WEB). Rung 6, surrounding code convention.
+    - engine/pyproject.toml's addopts is `-ra -n auto` and the main checkout's venv has no pytest-xdist, so the plan's migration-test command failed with `unrecognized arguments: -n` -> overrode with `-o addopts=-ra` rather than installing a package (the plan forbids installing). Rung 6, and the plan's own environment note.
+    - The migration tests skip without PG_TEST_URL, which would not establish the phase's apply-cleanly/idempotent exit criterion -> found the already-running seer-pg container and ran them for real against Postgres. Rung 2, phase exit criteria; a skipped check is not a passed one.
+
+- [x] **P1-WEB-SSGU** Phase 2: Unseen-aware pure view layer: counts and the unseen/seen partition
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `web/app/sera/journal/view.ts` (pure shaping: `unseenCounts`, `badgeTip`, `SEEN_COPY`, `journalGroups` with an optional trailing `ReadonlySet<number>` seen-set; `JournalGroup` gains `items`/`unseen`/`seen`/`unseenCount` and keeps `entries`) and `web/app/sera/journal/view.test.ts`. Exit: `npx vitest run app/sera/journal` passes with no DB and no DOM; those four symbols are exported with the signatures phase 3 consumes; `npx tsc --noEmit` is clean with `page.tsx` byte-identical to its pre-phase state; `view.ts` imports nothing beyond `lib/sera/glossary` and `lib/sera/types`.
+  - **Status**: done
+  - **Plan Set**: `JOURNAL_UNSEEN_BADGES_PLAN.md` (phase 2 of 5)
+  - **Satisfies**: R1 — Within every tab's content, unseen items sit at the top sorted newest-to-oldest, and seen items are pushed down below them; R3 — The notification number on each of the seven tab icons is the true count of unseen items for that tab, so a new number on a tab is a real signal worth getting excited about
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-WEB-SSGU.md`
+  - **Completed**: 2026-10-07 11:27
+  - **Method**: /do
+  - **Files**: web/app/sera/journal/view.ts, web/app/sera/journal/view.test.ts, web/.workflows/todos.md, web/.workflows/plan/P1-WEB-SSGU.md
+  - **Drift**: No code drift: `view.ts` and `page.tsx` were byte-identical to what phase-2.md quotes. One plan-prose miscount — phase-2.md's Impact and exit criteria say the suite goes to 29 cases, but its own verbatim code block yields 30. The code block was applied unchanged (ladder rung 3 outranks surrounding prose); the real number is 30.
+  - **Decided**: Step 3 scope in a concurrent swarm wave: mint tasks for all five phases, or only phase 2's? → only phase 2's (rung: tie-break "narrower blast radius" — ladder rungs 1-5 are silent on bookkeeping, and phase 1 was running Step 3 against the same web/.workflows/todos.md, so two sessions each writing five entries would duplicate every TaskID in the set).
+
+- [x] **P1-WEB-M2WF** Phase 3: The page renders unseen counts, the boundary, and per-card state
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `web/app/sera/journal/page.tsx` (force-dynamic, `await seenInsightIds()` into `seenIds`, the seven options carrying unseen counts plus `heading`/`total` fed to `badgeTip`, each section rendering `g.unseen` then the boundary then `g.seen`, and `InsightCard` carrying `data-insight-id`/`data-unseen` with a `data-seen-click` redirect arrow) and `journal.module.css` (the unseen marker, the boundary divider, and the `.card[data-seen-now] .new` fade phase 4 triggers). Exit: seen cards sit below the boundary inside their section and the badges drop by exactly that many; an all-seen or all-unseen section renders no stray boundary; the seven tabs keep their order, icons, `aria-current` and styling with `badgeTip`'s tooltips; `npx tsc --noEmit && npm test` clean.
+  - **Status**: done
+  - **Plan Set**: `JOURNAL_UNSEEN_BADGES_PLAN.md` (phase 3 of 5)
+  - **Satisfies**: R1 — Within every tab's content, unseen items sit at the top sorted newest-to-oldest, and seen items are pushed down below them; R3 — The notification number on each of the seven tab icons is the true count of unseen items for that tab, so a new number on a tab is a real signal worth getting excited about
+  - **Depends on**: P1-WEB-K3QM, P1-WEB-SSGU
+  - **Plan**: `.workflows/plan/P1-WEB-M2WF.md`
+  - **Completed**: 2026-10-07 11:39
+  - **Method**: /do
+  - **Files**: web/app/sera/journal/page.tsx, web/app/sera/journal/journal.module.css, web/.workflows/todos.md, JOURNAL_UNSEEN_BADGES_PLAN.md
+  - **Drift**:
+    - None. Phase 1's lib/sera/seen.ts and phase 2's view.ts both matched the plan's reconciled contract tables exactly (SEEN_COPY, badgeTip, unseenCounts, three-parameter journalGroups with unseen/seen/items/unseenCount, seenInsightIds). Step 7's shape check passed with no adaptation.
+  - **Decided**:
+    - `npx next build` (Turbopack) panics in this worktree with 'Symlink [project]/node_modules is invalid, it points out of the filesystem root' -> verified the build with `npx next build --webpack` instead, which passes and confirms /sera/journal renders as dynamic. Rung 2 (phase exit criteria are `npx tsc --noEmit && npm test`, both clean). Measured, not assumed: the same Turbopack panic reproduces on the base tree with both changed files reverted, so it tests the plan's mandated node_modules symlink rather than this phase's code. The plan's Environment note forbids npm ci/npm install, so the symlink stays.
+
+- [x] **P1-WEB-Q8DV** Phase 4: The client island: dwell, click, batch, flush, live countdown
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new pure `web/app/sera/journal/seen-client.ts` (the policy constants including `MAX_BATCH = 50`, which must stay at or below phase 1's `MAX_SEEN_BATCH = 500`, the dedupe queue, and the on-screen decision) with `seen-client.test.ts`, new `'use client'` `JournalSeen.tsx` (one IntersectionObserver, dwell timers cancelled when a card leaves or the tab goes hidden, arrow clicks marked `via: 'click'`, debounced and capped flushes plus `sendBeacon` on pagehide, and a live badge countdown rewritten through phase 2's `badgeTip`), and four surgical edits to `page.tsx` to mount the island. Exit: only entries actually on screen get marked and a background tab marks nothing; cards never move while the page is open and a retired marker fades without shifting its title; tooltips track their badges; `npx tsc --noEmit && npm test` clean.
+  - **Status**: done
+  - **Plan Set**: `JOURNAL_UNSEEN_BADGES_PLAN.md` (phase 4 of 5)
+  - **Satisfies**: R2 — A working definition and mechanism for "seen": a click on an item's redirect-arrow marks it seen, and items with no arrow are marked seen some other way; R3 — The notification number on each of the seven tab icons is the true count of unseen items for that tab, so a new number on a tab is a real signal worth getting excited about
+  - **Depends on**: P1-WEB-K3QM, P1-WEB-SSGU, P1-WEB-M2WF
+  - **Plan**: `.workflows/plan/P1-WEB-Q8DV.md`
+  - **Completed**: 2026-10-07 12:05
+  - **Method**: /do
+  - **Files**: web/app/sera/journal/seen-client.ts, web/app/sera/journal/seen-client.test.ts, web/app/sera/journal/JournalSeen.tsx, web/app/sera/journal/page.tsx, web/.workflows/todos.md, JOURNAL_UNSEEN_BADGES_PLAN.md
+  - **Decided**:
+    - The plan's `seen-client.test.ts` `unseen()` helper does not compile (TS2352: `Object.fromEntries` widens to a string index signature, which TS will not assert onto `Readonly<Record<InsightKind, readonly number[]>>`) -> built the record with an explicit loop over `INSIGHT_KINDS` plus one `{} as Record<...>` assertion. Rung 1: invariant 1 "the tree builds" outranks a code block that does not; the idiom matches `badgeCounts`' own `const out = {} as Record<BadgeKey, number>` in the same file. No assertion or intent in the test changed.
+
+- [x] **P1-WEB-Z5LP** Phase 5: The rail badge and the package readme
+  - **Difficulty**: EASY
+  - **Type**: Feature
+  - **Context**: Owns `web/app/sera/layout.tsx` (calls `unseenCount(lab.insights.map(i => i.id))` and renders no badge on `null` or `0`, never `seenInsightIds`), `web/components/sera/SeraNav.tsx` and `SeraNav.module.css` (the Journal tab's optional rail badge, correct in both layouts), and `web/package_readme.md` (the exception to the "Sera never reads Neon" sentence, plus every file this set added in the Layout tree). Exit: the rail's number equals the `all` badge on `/sera/journal`, including when `journal_seen` holds an id outside the snapshot; a failed read shows no badge rather than the full inventory; the rail renders in both the >=1024px rail and the below-1024px top bar; `npx tsc --noEmit && npm test` clean.
+  - **Status**: done
+  - **Plan Set**: `JOURNAL_UNSEEN_BADGES_PLAN.md` (phase 5 of 5)
+  - **Satisfies**: R3 — The notification number on each of the seven tab icons is the true count of unseen items for that tab, so a new number on a tab is a real signal worth getting excited about
+  - **Depends on**: P1-WEB-K3QM, P1-WEB-SSGU, P1-WEB-M2WF, P1-WEB-Q8DV
+  - **Plan**: `.workflows/plan/P1-WEB-Z5LP.md`
+  - **Note (from P1-WEB-M2WF readme check, 2026-10-07)**: readme-updater found four `web/package_readme.md` claims this set invalidates that are NOT in this task's Owns list — check them too: `:12` "plus one write (`action_dismissals`)" and `:418` "the engine owns writes to every table except `action_dismissals`" both omit `journal_seen` (strained by phase 1's `markInsightsSeen`, live once phase 4 lands); `:334` `journalGroups(insights, filter)` gained phase 2's trailing seen-set parameter; `:374` "`/sera/journal` ... newest first" becomes imprecise once phase 4 marks entries seen. `:422` ("the only write is an idempotent `INSERT ... ON CONFLICT DO NOTHING`") happens to stay true and needs no edit.
+  - **Note (from P1-WEB-Q8DV readme check, 2026-10-07)**: a second readme-updater pass found five MORE `web/package_readme.md` claims phase 4 invalidates, none overlapping the M2WF note above: `:438` the `npm test` enumeration lists only `view` helpers and now misses `app/sera/journal/seen-client` (32 new cases); `:343-348` the Data Flow block has no arrow for the Journal's write path (browser island -> `sendBeacon`/`fetch` POST `/api/sera/journal/seen` -> `markInsightsSeen` -> `journal_seen`), which is a route handler rather than a server action and hangs off `/sera`, not `app/(app)`; `:21` "each page keeps its logic in a pure, tested `view.ts`" — Journal now has two pure modules (`view.ts` + `seen-client.ts`) and `/sera/journal` is the first Sera page mounting a `'use client'` island, so `SeraNav.tsx` is no longer the section's only client component; `:325-339` Key modules has no bullet for `seen-client.ts` or `JournalSeen.tsx`, though every other `app/sera/*/view.ts` has one; `:426-429` Error Handling says failures propagate, but the seen write is the app's first deliberately silent path (a failed POST is swallowed and the ids requeue while the badge stays optimistically counted down). Borderline: `:420-422` "the only write" is now singular-but-two, and the client adds a `MAX_BATCH = 50` queue that a `pagehide` beacon can race. Candidate gotchas: the two caps (`MAX_BATCH = 50` client flush trigger vs `MAX_SEEN_BATCH = 500` server limit) are not the same thing; phase 1's route accepts `text/plain` ONLY because `sendBeacon` sends a Blob, so narrowing it to JSON would silently break unload flushes; the arrow-click listener is capture-phase on `document` so it fires before `Link` navigates away; and `view.ts` must stay server-free because `JournalSeen.tsx` imports `badgeTip` from it.
+  - **Completed**: 2026-10-07 12:00
+  - **Method**: /do
+  - **Files**: web/app/sera/layout.tsx, web/components/sera/SeraNav.tsx, web/components/sera/SeraNav.module.css, web/package_readme.md, web/.workflows/todos.md, JOURNAL_UNSEEN_BADGES_PLAN.md
+  - **Drift**:
+    - No code drift. layout.tsx, SeraNav.tsx and SeraNav.module.css were byte-identical to what the phase plan quoted, and phase 1's `unseenCount(ids): Promise<number | null>` and phase 2's view.ts exports matched their pinned contracts exactly.
+    - All eleven package_readme.md line anchors in the plan's Step 4 were stale by 3-6 lines (pre-flagged by phase 1's handoff). Every quoted before-string still existed verbatim; every edit was applied by grep-seek, not by line number.
+  - **Decided**:
+    - Last Updated phase id: the plan's literal after-block writes `P5-WEB-J4N8` but its own prefatory note says to use the card's TaskID if one was minted. `P1-WEB-Z5LP` was minted -> used it (rung 3, the code block read with the instruction attached to it; `P5-WEB-J4N8` is the fallback for an un-carded phase).
+    - Four readme edits corrected against the shipped code per phase 1's handoff findings: 4c now states the route's 500 and that it deliberately re-derives the gate from `isAllowed`+`isSeraUser` rather than calling `requireSera` (whose redirect would 307 and disclose the section, invariant 7); 4e no longer claims the module never throws, since `markInsightsSeen` throws by design; a Gotchas bullet now covers the `MAX_SEEN_BATCH = 500` / `MAX_BATCH = 50` cap pairing. Rung: the plan's own Handoffs line "fix the readme to match the code -- never the code to match the readme".
+    - Nine further stale readme claims named in the card's two Notes (not in the plan's Owns list) were also fixed: `:12`/`:418` omitting `journal_seen`, `:334` `journalGroups`' old signature, `:374` "newest first", `:438` test enumeration, `:343-348` data-flow write path, `:21` "one pure view.ts per page", `:325-339` missing Key-modules bullets, `:426-429` error handling vs the first deliberately-silent path. Plus the Access-gate paragraph, which claimed `requireSera` guards every `/sera/**` route while `/api/sera/**` deliberately does not. Rung 5 (task text) over silence in the plan.
 
 - [x] **P1-WEB-10T8** Phase 3: Positions page: monthly pick / weekly size copy and buy/add/trim cell
   - **Difficulty**: NORMAL

@@ -106,6 +106,12 @@ from decimal import Decimal
 from typing import Any, Literal, Protocol
 
 from seer_engine.backtest.registry import REGISTRY, candidate_digest
+from seer_engine.lab.methods.m0002_asymmetric_vol_regime import METHOD as M0002
+from seer_engine.lab.methods.m0002_asymmetric_vol_regime import REGIME
+from seer_engine.lab.methods.m0007_residual_momentum import METHOD as M0007
+from seer_engine.lab.methods.m0007_residual_momentum import RESIDMOM
+from seer_engine.lab.methods.m0008_min_variance_weighting import METHOD as M0008
+from seer_engine.lab.methods.m0008_min_variance_weighting import MINVAR
 from seer_engine.lab.methods.m0011_raw_residual_own_vol import METHOD as M0011
 from seer_engine.lab.methods.m0011_raw_residual_own_vol import RESIDVOL
 from seer_engine.lab.methods.m0022_weekly_brake_residual import METHOD as M0022
@@ -135,6 +141,11 @@ F4_FR_ID = "F4-MOM12-N20-TREND-FR"
 F1_FR_ID = "F1-SPY-SMA200-M-FR"
 RM_ID = "RM-FR"  # retired 2026-10-07 for RMW before its first paper session
 RMW_ID = "RMW-FR"  # lab M0022-W-TV16 in fractional shares (monthly pick, weekly brake)  # lab M0011-RAW20-TV14-N21 in fractional shares; replaces FND (owner, 2026-10-07)
+# 013, the roster the owner chose for the first paper night (2026-10-07). A, F4-FR and F1-FR go;
+# these three join RMW-FR and C. See the block comment above SEED_ROWS' 013 section for why each.
+RAW_ID = "RAW-FR"  # lab M0007-N20-RAW in fractional shares: RMW's engine with no brake
+MOM_ID = "MOM-FR"  # lab M0002-REL-85 in fractional shares; replaces F4-FR
+MVW_ID = "MVW-FR"  # lab M0008-N30-C07 in fractional shares; replaces F1-FR
 
 #: ``object_name`` of the benchmark: ``backtest.benchmark.buy_and_hold``, which is rules, not an object.
 BENCHMARK_OBJECT = "buy_and_hold"
@@ -318,6 +329,19 @@ RESIDVOL_PARAMS = next(c.params for c in M0011.candidates if c.id == "M0011-RAW2
 #: the frozen method file like RESIDVOL_PARAMS.
 WEEKLYBRAKE_PARAMS = next(c.params for c in M0022.candidates if c.id == "M0022-W-TV16")
 
+#: RAW's params: lab M0007's N20-RAW variant -- RMW's residual-momentum book ranked on the raw
+#: cumulative residual, with NO volatility brake. Read from the frozen method file like the two
+#: above, so the roster can never drift from the trial it records.
+RESIDMOM_PARAMS = next(c.params for c in M0007.candidates if c.id == "M0007-N20-RAW")
+
+#: MOM's params: lab M0002's REL-85 variant -- total-return momentum, own-vol scaling applied only
+#: when the book is jumpy relative to its own history (the 85th-percentile regime trigger).
+REGIME_PARAMS = next(c.params for c in M0002.candidates if c.id == "M0002-REL-85")
+
+#: MVW's params: lab M0008's N30-C07 variant -- the top-30 momentum book weighted for minimum
+#: variance at a 7% per-name cap, rather than equally.
+MINVAR_PARAMS = next(c.params for c in M0008.candidates if c.id == "M0008-N30-C07")
+
 
 #: The one code-side table (D2). **This is the extension point**: a new strategy is a row in
 #: ``strategies`` plus, if its object is not already here, one entry here. Nothing else in this
@@ -335,6 +359,14 @@ RESOLVER: dict[str, Binding] = {
     "RESIDVOL": Binding(obj=RESIDVOL, params=RESIDVOL_PARAMS),
     # Lab M0022's weekly-brake book, its W-TV16 variant (promoted 2026-10-07, replaces RM).
     "WEEKLYBRAKE": Binding(obj=WEEKLYBRAKE, params=WEEKLYBRAKE_PARAMS),
+    # Lab M0007's residual-momentum book, its N20-RAW variant: RMW's engine with no brake
+    # (promoted 2026-10-07, the controlled comparison against RMW-FR).
+    "RESIDMOM": Binding(obj=RESIDMOM, params=RESIDMOM_PARAMS),
+    # Lab M0002's regime-scaled momentum, its REL-85 variant (promoted 2026-10-07, replaces F4).
+    "REGIME": Binding(obj=REGIME, params=REGIME_PARAMS),
+    # Lab M0008's minimum-variance weighting, its N30-C07 variant (promoted 2026-10-07,
+    # replaces F1).
+    "MINVAR": Binding(obj=MINVAR, params=MINVAR_PARAMS),
 }
 
 
@@ -429,6 +461,48 @@ LAB_PROVENANCE: dict[str, LabProvenance] = {
         reason=(
             "it failed only the luck test -- recorded DSR 0.916 at its recorded N = 110 -- and "
             "passed every owner condition; on paper to test it forward"
+        ),
+    ),
+    RAW_ID: LabProvenance(
+        method_id="M0007",
+        candidate_id="M0007-N20-RAW",
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "it passes all five owner conditions -- max DD 19.6%, inside the revised 20% bar, "
+            "which is what newly admits it -- but NOT the lab's luck test: 0.914 at the N = 85 "
+            "it was scored at, 0.899 re-scored at today's N = 110, just under 0.90. It is "
+            "RMW-FR's own engine with the volatility brake removed, admitted as the controlled "
+            "forward comparison: whether the brake earns the 3.3 points of annual return it "
+            "costs. A luck score that falls as the lab keeps searching is a statement about "
+            "selection, not about this book, and the roster's admission rule has never been "
+            "the lab's gate -- forward paper is what settles it"
+        ),
+    ),
+    MOM_ID: LabProvenance(
+        method_id="M0002",
+        candidate_id="M0002-REL-85",
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "it passes all five owner conditions on the dev window and fails only the luck test "
+            "-- 0.854 at the N = 80 it was scored at and 0.828 at today's N = 110. It replaces F4-FR as the "
+            "total-return-momentum entry: the same bet, measured at 0.99 correlation with F4's "
+            "variant, but at max DD 18.4% against F4's 22.2%, which the revised 20% bar refuses"
+        ),
+    ),
+    MVW_ID: LabProvenance(
+        method_id="M0008",
+        candidate_id="M0008-N30-C07",
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "it passes all five owner conditions and fails only the luck test -- recorded DSR "
+            "0.817 at the N = 74 it was scored at and 0.780 at today's N = 110. It replaces F1-FR, which can never satisfy owner "
+            "condition 1 (11 trades in 22 dev years against the 100 required). At 0.81 it is "
+            "the least correlated with RMW-FR of any variant that passes the five, so it is the "
+            "board's one portfolio-construction bet rather than another ranking rule. Its max "
+            "DD is 20.0%, exactly the bar, with no margin: that is the risk of this admission"
         ),
     ),
 }
@@ -686,6 +760,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "P3 gate failed out of sample (2022-01-03..2026-10-02): -15.0% vs SPY TR +71.9%, "
             "PF 0.92, max DD 33.3%"
         ),
+        status="retired",  # 013: failed its own gate twice (P3, P3b); see the 013 note below
     ),
     RosterRow(
         id=F4_ID,
@@ -768,6 +843,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "Same method as the whole-share F4: P7a dev window only; failed max DD <= 15% (22.2%). "
             "Backtested in whole shares; this version trades fractional shares"
         ),
+        status="retired",  # 013: max DD 22.2% cannot pass owner condition 4 at the revised 20% bar
     ),
     RosterRow(
         id=F1_FR_ID,
@@ -785,6 +861,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "Same method as the whole-share F1: P7a dev window only; failed max DD <= 15% (18.7%) "
             "and >= 100 trades (11). Backtested in whole shares; this version trades fractional shares"
         ),
+        status="retired",  # 013: 11 dev-window trades cannot pass owner condition 1 (>= 100)
     ),
     RosterRow(
         id=RM_ID,
@@ -822,6 +899,90 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "Lab M0022 dev window only (1996-01-03..2015-10-16), in whole shares: beats SPY TR "
             "(+789.2% vs +351.4%), max DD 14.3%, PF 2.06 and 1,589 trades all pass; failed only "
             "DSR >= 0.95 (0.916 at N=110). On paper to test it forward"
+        ),
+    ),
+    # 013: the roster the owner chose for the first paper night (2026-10-07). A, F4-FR and F1-FR
+    # are retired and RAW-FR, MOM-FR and MVW-FR join RMW-FR and C.
+    #
+    # WHY THESE THREE GO. The screen is owner condition 5 read honestly: can this entry ever
+    # satisfy design section 1 at all? Re-run over the lab's 110 dev trials under the bars the
+    # owner revised on 2026-10-07 (max DD <= 20%), 27 trials pass all five. None of the three is
+    # among them. A failed its own gate out of sample and again after its one rework (-15.0% and
+    # +9.1% against SPY TR's +71.9% and +187.6%; design section 1 items 2, 3 and 4 all missed).
+    # F4-FR's max DD is 22.2%, outside the revised bar, so condition 4 refuses it permanently.
+    # F1-FR closed 11 trades in 22 dev-window years, so condition 1's 100 closed trades is roughly
+    # two centuries away. A paper slot is a ~15-month commitment at these books' ~80 trades a
+    # year, and a slot that cannot graduate spends that for nothing.
+    #
+    # WHY THESE THREE COME. Measured, not assumed: the whole passing set is one bet in several
+    # skins (the residual-momentum family runs 0.93-0.99 correlated), and blending it changes the
+    # combined MAR from 0.94 to 0.95 -- a wash. So the slots are not bought for ensemble
+    # performance, which is not on offer; they are bought as independent forward experiments that
+    # could each reach real money. RAW-FR is RMW-FR's own engine with the brake removed, the one
+    # controlled test of the dial that sets the whole risk profile (15.0%/19.6% against
+    # 11.7%/14.3%) and the entry the revised 20% bar newly admits. MOM-FR is F4's bet inside the
+    # bar. MVW-FR is the only non-ranking bet that passes, and the least correlated of any passer.
+    #
+    # Backtested in whole shares under monthly-hold; these trade fractional shares under
+    # monthly-hold-frac, as 010 did for F4 and F1. Rows below are byte for byte migration 013's.
+    RosterRow(
+        id=RAW_ID,
+        name="RAW · Unbraked momentum",
+        sub="Top 20 by rise beyond the market, no brake, monthly, fractional shares",
+        icon="zap",
+        is_champion=False,
+        is_benchmark=False,
+        sort=11,
+        engine="book",
+        rules_id="monthly-hold-frac",
+        object_name="RESIDMOM",
+        registry_id=None,
+        gate_note=(
+            "Lab M0007 dev window only (1996-01-03..2015-10-16), in whole shares: beats SPY TR "
+            "(+1,502.2% vs +351.4%), max DD 19.6%, PF 2.16 and 1,596 trades all pass. It does "
+            "NOT pass the luck test: 0.914 at the N=85 it was scored at, 0.899 re-scored at "
+            "today's N=110, just under the 0.90 bar. Never had a test-window look. On paper as "
+            "the controlled comparison against RMW-FR: the same book without the brake"
+        ),
+    ),
+    RosterRow(
+        id=MOM_ID,
+        name="MOM · Regime momentum",
+        sub="Top 20 by last year's rise, holds less when jumpy for itself, monthly, fractional shares",
+        icon="trending-up",
+        is_champion=False,
+        is_benchmark=False,
+        sort=12,
+        engine="book",
+        rules_id="monthly-hold-frac",
+        object_name="REGIME",
+        registry_id=None,
+        gate_note=(
+            "Lab M0002 dev window only (1996-01-03..2015-10-16), in whole shares: beats SPY TR "
+            "(+940.1% vs +351.4%), max DD 18.4%, PF 2.33 and 1,148 trades all pass; failed only "
+            "the luck test (0.854 at the N=80 it was scored at, 0.828 at today's N=110). "
+            "Replaces F4-FR: the same total-return-momentum bet, "
+            "inside the 20% drawdown bar that F4's 22.2% cannot meet. On paper to test it forward"
+        ),
+    ),
+    RosterRow(
+        id=MVW_ID,
+        name="MVW · Steady weights",
+        sub="Top 30 by last year's rise, weighted to swing least together, monthly, fractional shares",
+        icon="scale",
+        is_champion=False,
+        is_benchmark=False,
+        sort=13,
+        engine="book",
+        rules_id="monthly-hold-frac",
+        object_name="MINVAR",
+        registry_id=None,
+        gate_note=(
+            "Lab M0008 dev window only (1996-01-03..2015-10-16), in whole shares: beats SPY TR "
+            "(+726.7% vs +351.4%), max DD 20.0%, PF 2.14 and 1,223 trades all pass; failed only "
+            "the luck test (0.817 at the N=74 it was scored at, 0.780 at today's N=110). "
+            "Replaces F1-FR, which cannot reach 100 closed trades. "
+            "Its drawdown sits exactly on the 20% bar, with no margin. On paper to test it forward"
         ),
     ),
 )

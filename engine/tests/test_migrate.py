@@ -290,6 +290,7 @@ def test_004_on_a_fresh_schema_adds_c_last_and_the_news_vetoes_table(pg_empty):
     assert [r[0] for r in rows] == [
         "SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND",
         "F4-MOM12-N20-TREND-FR", "F1-SPY-SMA200-M-FR", "RM-FR", "RMW-FR",
+        "RAW-FR", "MOM-FR", "MVW-FR",
     ]
     # C is 004's last row; 007_fnd.sql appends FND behind it at sort 6; 010 F4-FR, F1-FR and RM-FR.
     assert rows[4] == (*C_ROW, {}, None)

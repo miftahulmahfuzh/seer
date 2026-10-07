@@ -157,7 +157,7 @@ def no_panel() -> Market:
 
 def test_fnd_is_the_sixth_roster_entry():
     assert ROSTER_IDS[5] == FND_ID == "FND"
-    assert len(ROSTER_IDS) == 10  # 010 appends fractional F4, F1 and RM; 011 appends RMW
+    assert len(ROSTER_IDS) == 13  # 010 appends fractional F4, F1 and RM; 011 RMW; 013 RAW, MOM, MVW
     e = entry(FND_ID)
     assert (e.sort, e.engine, e.rules_id, e.is_champion, e.is_benchmark) == (6, "book", "monthly-hold", False, False)
     assert e.obj is FUNDAMENTAL

@@ -49,10 +49,12 @@ NOV2 = date(2026, 11, 2)
 F4 = "F4-MOM12-N20-TREND-FR"
 F1 = "F1-SPY-SMA200-M-FR"
 # The active roster (the strategies a night steps), and every row in sort order: the whole-share
-# F4, F1 and FND are retired by 010 (RM-FR replaces FND) and never start in these worlds, but stay on the board.
-ROSTER_IDS = ("SPY", "A", "C", F4, F1, "RMW-FR")
+# The entries that actually step a night here: 013 retired A, F4-FR and F1-FR along with the
+# whole-share three, so what is left trading is C, the SPY yardstick and the four books.
+ROSTER_IDS = ("SPY", "A", "C", F4, F1, "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR")
 RETIRED_IDS = ("F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "FND")
-ALL_IDS = ("SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND", F4, F1, "RM-FR", "RMW-FR")
+ALL_IDS = ("SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND", F4, F1, "RM-FR",
+           "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR")
 
 
 # ---- the synthetic world -----------------------------------------------------------------------
@@ -81,6 +83,16 @@ def synthetic_bars() -> tuple[Bar, ...]:
 @pytest.fixture
 def world(pg):
     with db.transaction(pg, False):
+        # A, F4-FR and F1-FR are retired on the production roster since migration 013. This file
+        # tests paper-night and replay MECHANICS -- the bracket engine, the book engine, the idle
+        # instrument, the tamper-difference report -- and all of that is still live code reached
+        # by the entries that do trade. Keeping the three stepping here keeps that coverage
+        # instead of letting a roster decision quietly delete it. Which entries are actually on
+        # the production roster is pinned by tests/test_paper_roster.py, not by this fixture.
+        pg.execute(
+            "UPDATE strategies SET status = 'active' "
+            "WHERE id IN ('A', 'F4-MOM12-N20-TREND-FR', 'F1-SPY-SMA200-M-FR')"
+        )
         bars.upsert_bars(pg, synthetic_bars())
         fx.upsert_fx(pg, [(HIST_START, USD_IDR)])
         for s in MEMBERS:

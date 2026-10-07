@@ -26,8 +26,11 @@ from seer_engine.strategies.c import FROZEN_MODEL, PROMPT_VERSION, STRATEGY_C_PA
 
 UTC = timezone.utc
 C = "C"
-FOUR = ("SPY", "A", "F4-MOM12-N20-TREND-FR", "F1-SPY-SMA200-M-FR")  # the active book pair since 010
-ALL = FOUR + (C,)
+#: Everything that steps a night here besides C: the benchmark, A (which the ``world`` fixture
+#: reactivates so C has its control), and the four books 013 left active. Not a frozen list -- it
+#: is "the active roster minus C", and it moves whenever the roster does.
+OTHERS = ("SPY", "A", "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR")
+ALL = OTHERS + (C,)
 
 # (session, rank, symbol) -> the stored verdict, or None for no row. Only a tail of the ranked
 # list may be left without a row (write_vetoes takes ranks 1..n).
@@ -76,6 +79,12 @@ def land_c(conn, engine: str) -> None:
 @pytest.fixture
 def world(pg):
     with db.transaction(pg, False):
+        # A is retired on the production roster since migration 013 (it failed its own gate twice).
+        # This file's subject is C *relative to A* -- "the veto allowing everything leaves A's
+        # orders untouched" is what defines C -- so the comparison needs A stepping. That is a
+        # property of the two strategy objects, not of who happens to be on the live roster, so
+        # the fixture activates A here rather than the suite depending on production membership.
+        pg.execute("UPDATE strategies SET status = 'active' WHERE id = 'A'")
         bars.upsert_bars(pg, synthetic_bars())
         fx.upsert_fx(pg, [(HIST_START, USD_IDR)])
         for s in MEMBERS:
@@ -306,9 +315,9 @@ def test_c_starts_on_its_first_night_with_its_own_paper_start(world, monkeypatch
     for d in NIGHTS[3:]:
         night(world, d, allow_all)
 
-    four_start, c_start = session_of(NIGHTS[0]), session_of(NIGHTS[3])
+    others_start, c_start = session_of(NIGHTS[0]), session_of(NIGHTS[3])
     assert q(world, "SELECT id, paper_start FROM strategies WHERE id = ANY(%s) ORDER BY id", (list(ALL),)) == sorted(
-        [*[(i, four_start) for i in FOUR], (C, c_start)]
+        [*[(i, others_start) for i in OTHERS], (C, c_start)]
     )
     entry = roster.entry(C)
     assert q(world, "SELECT params->>'digest', params->'backtest_gate' FROM strategies WHERE id = %s", (C,)) == [
@@ -321,7 +330,7 @@ def test_c_starts_on_its_first_night_with_its_own_paper_start(world, monkeypatch
     for sid in ALL:
         assert found[sid].status == "ok", text(found)
     assert (found[C].paper_start, found[C].sessions) == (c_start, len(NIGHTS) - 4)
-    assert (found["A"].paper_start, found["A"].sessions) == (four_start, len(NIGHTS) - 1)
+    assert (found["A"].paper_start, found["A"].sessions) == (others_start, len(NIGHTS) - 1)
 
 
 # ---- same path: >= 5 nights replay from stored verdicts; all-allow equals A --------------------
@@ -360,7 +369,7 @@ def test_replay_reads_the_stored_verdicts(world):
         )
     found = results(world)
     assert found[C].status == "mismatch", text(found)
-    for sid in FOUR:
+    for sid in OTHERS:
         assert found[sid].status == "ok", text(found)
     assert paper_check.execute(world) == 1
 
@@ -457,7 +466,7 @@ def test_the_four_strategies_rows_are_identical_with_or_without_c(world, monkeyp
     c_engine = hide_c(world)
     for d in NIGHTS:
         night(world, d, None)
-    four_alone = content(world, FOUR)
+    others_alone = content(world, OTHERS)
     assert q(world, "SELECT count(*) FROM paper_state WHERE strategy_id = %s", (C,)) == [(0,)]
     assert q(world, "SELECT count(*) FROM orders WHERE strategy_id = %s", (C,)) == [(0,)]
     monkeypatch.undo()
@@ -468,7 +477,7 @@ def test_the_four_strategies_rows_are_identical_with_or_without_c(world, monkeyp
         veto(world, d, mixed)
         assert go(world, d) == 0
     assert q(world, "SELECT count(*) FROM orders WHERE strategy_id = %s", (C,))[0][0] >= 1
-    assert content(world, FOUR) == four_alone  # orders, snapshots, book rows, state, frozen specs
+    assert content(world, OTHERS) == others_alone  # orders, snapshots, book rows, state, frozen specs
 
 
 # ---- explain covers C --------------------------------------------------------------------------

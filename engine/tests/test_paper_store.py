@@ -57,7 +57,8 @@ def bar(symbol: str, d: date, o: str, h: str, low: str, c: str) -> Bar:
 def test_read_strategies_returns_the_roster_rows_in_sort_order(pg):
     rows = store.read_strategies(pg)
     assert [r.id for r in rows] == [
-        "SPY", "A", BOOK_ID, TIMING_ID, "C", "FND", f"{BOOK_ID}-FR", f"{TIMING_ID}-FR", "RM-FR", "RMW-FR"
+        "SPY", "A", BOOK_ID, TIMING_ID, "C", "FND", f"{BOOK_ID}-FR", f"{TIMING_ID}-FR", "RM-FR",
+        "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR",
     ]
     spy = rows[0]
     assert (spy.engine, spy.rules_id, spy.is_champion, spy.is_benchmark) == ("benchmark", None, True, True)
@@ -85,7 +86,16 @@ def test_freeze_spec_writes_params_and_start_once_and_check_digest_compares(pg):
         store.freeze_spec(pg, "A", spec=spec, digest="x", backtest_gate=gate, paper_start=date(2026, 10, 3))
 
 
+def _active_a(pg):
+    """A, active. Migration 013 retires A on the production roster; these tests are about what
+    ``retire``/``set_paper_end`` do to an ACTIVE row, and against an already-retired one they
+    would pass for the wrong reason (``retire`` no-ops and returns None whatever the history).
+    Nothing here cares which strategy it is, only that the row starts active."""
+    pg.execute("UPDATE strategies SET status = 'active', paper_end = NULL WHERE id = 'A'")
+
+
 def test_retire_stamps_paper_end_from_paper_state_and_keeps_every_history_row(pg):
+    _active_a(pg)
     store.init_paper_state(pg, "A", paper_start=S1, cash0=CASH0, usd_idr=RATE)
     store.write_paper_state(pg, "A", cash=CASH0, equity=CASH0, last_session=S2)
     before = pg.execute("SELECT count(*) FROM equity_snapshots WHERE strategy_id = 'A'").fetchone()[0]
@@ -101,6 +111,7 @@ def test_retire_stamps_paper_end_from_paper_state_and_keeps_every_history_row(pg
 
 
 def test_retire_of_a_strategy_that_never_traded_leaves_paper_end_null(pg):
+    _active_a(pg)
     assert store.retire(pg, "A") is None
     row = store.read_strategy(pg, "A")
     assert (row.status, row.paper_end, row.paper_start) == ("retired", None, None)
@@ -108,6 +119,7 @@ def test_retire_of_a_strategy_that_never_traded_leaves_paper_end_null(pg):
 
 
 def test_retire_is_a_no_op_on_an_already_retired_row_and_a_missing_row_is_an_error(pg):
+    _active_a(pg)
     store.init_paper_state(pg, "A", paper_start=S1, cash0=CASH0, usd_idr=RATE)
     assert store.retire(pg, "A") == dates.prev_session(S1)
     store.write_paper_state(pg, "A", cash=CASH0, equity=CASH0, last_session=S2)
@@ -120,6 +132,7 @@ def test_retire_is_a_no_op_on_an_already_retired_row_and_a_missing_row_is_an_err
 
 
 def test_set_paper_end_writes_only_a_retired_row_with_no_paper_end(pg):
+    _active_a(pg)
     with pytest.raises(store.StoreError, match="paper_end A"):
         store.set_paper_end(pg, "A", S2)  # still active
     pg.rollback()

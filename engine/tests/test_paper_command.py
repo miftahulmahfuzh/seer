@@ -54,7 +54,10 @@ F4 = "F4-MOM12-N20-TREND-FR"
 F1 = "F1-SPY-SMA200-M-FR"
 
 ENTRIES = {e.id: e for e in roster.ROSTER}
-IDS = tuple(sorted(e.id for e in roster.active(roster.ROSTER)))  # the whole-share F4, F1, FND are retired (010)
+# The active roster plus the three the `world` fixture reactivates (see its comment).
+IDS = tuple(sorted({
+    *(e.id for e in roster.active(roster.ROSTER)), "A", "F4-MOM12-N20-TREND-FR", "F1-SPY-SMA200-M-FR",
+}))
 
 
 # ---- the synthetic world -----------------------------------------------------------------------
@@ -103,6 +106,15 @@ def synthetic_bars() -> tuple[Bar, ...]:
 @pytest.fixture
 def world(pg):
     with db.transaction(pg, False):
+        # A, F4-FR and F1-FR are retired on the production roster since migration 013. This file
+        # tests the NIGHT itself -- starting, stepping, retiring, the digest check, the idle
+        # instrument, no look-ahead -- all of it live code reached by the entries that do trade.
+        # Keeping the three stepping here keeps that coverage instead of letting a roster
+        # decision delete it; the production roster is pinned by tests/test_paper_roster.py.
+        pg.execute(
+            "UPDATE strategies SET status = 'active' "
+            "WHERE id IN ('A', 'F4-MOM12-N20-TREND-FR', 'F1-SPY-SMA200-M-FR')"
+        )
         bars.upsert_bars(pg, synthetic_bars())
         fx.upsert_fx(pg, [(d, fx_rate(d)) for d in _sessions()])
         for s in STOCKS:

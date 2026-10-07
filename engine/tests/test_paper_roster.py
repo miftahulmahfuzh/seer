@@ -69,8 +69,15 @@ F4_FR = "F4-MOM12-N20-TREND-FR"
 F1_FR = "F1-SPY-SMA200-M-FR"
 RM = "RM-FR"  # lab M0011-RAW20-TV14-N21 in fractional shares; replaces FND (010), retired by 011
 RMW = "RMW-FR"  # lab M0022-W-TV16: RM with a weekly brake, split cadence; replaces RM (011)
-RETIRED = (F4, F1, FND, "RM-FR")  # whole-share F4, F1 and FND (010) and RM (011), none ever traded
-ACTIVE_IDS = ("SPY", "A", "C", F4_FR, F1_FR, RMW)
+# 013: the roster chosen for the first paper night. A, F4_FR and F1_FR are retired -- none of the
+# three can satisfy design section 1 (A failed its own gate twice; F4's 22.2% max DD is outside
+# the revised 20% bar; F1 closed 11 trades in 22 dev years against the 100 required) -- and these
+# three join. See the 013 block comment in paper/roster.py for the full screen.
+RAW = "RAW-FR"  # lab M0007-N20-RAW: RMW's engine with no brake, the controlled comparison
+MOM = "MOM-FR"  # lab M0002-REL-85: total-return momentum inside the 20% bar; replaces F4_FR
+MVW = "MVW-FR"  # lab M0008-N30-C07: minimum-variance weighting; replaces F1_FR
+RETIRED = (F4, F1, FND, "RM-FR", "A", F4_FR, F1_FR)  # none of them ever traded a paper session
+ACTIVE_IDS = ("SPY", "C", RMW, RAW, MOM, MVW)
 
 # 2026-10-07: every digest moved once, on purpose, when the paper books' starting cash went from
 # 20,000,000 to 10,000,000 IDR (spec "initial_idr"; the owner's own Gotrade money). Production's
@@ -90,6 +97,12 @@ PINS = {
     RM: "fb435dc8d0a5e372d137938b1881b4558c94639ca3483e56f225751b82535264",
     # 011: RM's book with its brake read weekly (lab M0022-W-TV16), split cadence, fractional.
     RMW: "375e6f63d4b6a00842b330b8bfc9405a2e204f50bf5dac65b6a7bb2a706729ce",
+    # 013: RAW (lab M0007-N20-RAW), MOM (lab M0002-REL-85) and MVW (lab M0008-N30-C07), all three
+    # under monthly-hold-frac. Adding them must never re-digest an earlier entry: the ten digests
+    # above are unchanged from 011, and that is what the pin proves.
+    RAW: "e772830d223c96b8547c8224ad2d6d17254c051f701015b6eff8f67d53a57c5b",
+    MOM: "7e027e48a405c73a619337bbd420f895e0663d295fd63f8dcb312f296b84480c",
+    MVW: "4f208ce2ce23691cc8e992aadf3cb9337f90a0946cac60c389f470b964ff502e",
 }
 
 FACTOR_PARAMS_AS_DICT = {
@@ -110,8 +123,8 @@ DISPLAY = ("id", "name", "sub", "icon", "is_champion", "is_benchmark", "sort", "
 
 
 def test_the_roster_is_the_handover_entries_in_sort_order():
-    assert ROSTER_IDS == ("SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, RM, RMW)
-    assert [e.sort for e in ROSTER] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    assert ROSTER_IDS == ("SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW)
+    assert [e.sort for e in ROSTER] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
     assert "B" not in ROSTER_IDS
 
 
@@ -126,7 +139,7 @@ def test_display_fields_equal_the_migration_rows(pg):
 
 
 def test_each_entry_is_the_named_object_params_and_rules():
-    spy, a, f4, f1, c, fnd, f4_fr, f1_fr, rm, rmw = (entry(i) for i in ROSTER_IDS)
+    spy, a, f4, f1, c, fnd, f4_fr, f1_fr, rm, rmw, raw, mom, mvw = (entry(i) for i in ROSTER_IDS)
     assert (spy.engine, spy.obj, spy.rules, spy.rules_id, spy.params) == ("benchmark", None, None, None, None)
     assert a.engine == "bracket"
     assert a.obj is STRATEGY_A and a.params is STRATEGY_A_PARAMS and a.rules is DESIGN_V0
@@ -250,7 +263,8 @@ def test_strategy_params_round_trip_through_jsonb(pg):
 
 def test_lookbacks():
     assert {e.id: e.lookback for e in ROSTER} == {
-        "SPY": 1, "A": 200, F4: 253, F1: 200, "C": 200, FND: 20, F4_FR: 253, F1_FR: 200, RM: 401, RMW: 426
+        "SPY": 1, "A": 200, F4: 253, F1: 200, "C": 200, FND: 20, F4_FR: 253, F1_FR: 200, RM: 401,
+        RMW: 426, RAW: 401, MOM: 379, MVW: 253,
     }
     # FND's lookback is the 20-bar dollar-volume window: a filing's availability is its `filed`
     # date, not a bar count. RM's 401 (a 378-session market-link estimate ending a month back)
@@ -431,15 +445,18 @@ def test_the_seed_roster_retires_the_whole_share_three_with_no_paper_end():
 
 
 def test_active_drops_retired_entries_and_keeps_order():
+    # RMW, not A: A is retired in SEED_ROWS itself since 013, so retiring it again would assert
+    # nothing. Retiring a live entry is the case that matters -- it is what `promote --retire`
+    # does on every future swap.
     rows = tuple(
-        dataclasses.replace(r, status="retired", paper_end=date(2026, 10, 2)) if r.id == "A" else r
+        dataclasses.replace(r, status="retired", paper_end=date(2026, 10, 2)) if r.id == RMW else r
         for r in SEED_ROWS
     )
     entries = from_rows(rows)
     assert [e.id for e in entries] == list(ROSTER_IDS)  # retired rows are never dropped from the roster
-    assert [e.id for e in active(entries)] == ["SPY", "C", F4_FR, F1_FR, RMW]
-    a = next(e for e in entries if e.id == "A")
-    assert (a.status, a.paper_end) == ("retired", date(2026, 10, 2))
+    assert [e.id for e in active(entries)] == ["SPY", "C", RAW, MOM, MVW]
+    rmw = next(e for e in entries if e.id == RMW)
+    assert (rmw.status, rmw.paper_end) == ("retired", date(2026, 10, 2))
 
 
 def test_retiring_a_strategy_does_not_move_its_digest():
@@ -478,9 +495,14 @@ def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
     # promoted_from defaults to NULL for every row 003/004 seeded; FND is the one row written
     # by a promotion (007_fnd.sql mirrors what `promote --method M0005` writes on the live
     # database), so it is the one row that names its provenance.
-    # RM-FR (010) is the second: lab M0011, promoted to replace FND.
-    assert {r.id for r in rows.values() if r.promoted_from is not None} == {FND, RM, RMW}
+    # RM-FR (010) is the second: lab M0011, promoted to replace FND. RMW-FR (011) and the three
+    # 013 rows are the rest -- every lab-derived row added after `promote` existed names its
+    # method here, and only F4, F1 and their fractional twins predate it.
+    assert {r.id for r in rows.values() if r.promoted_from is not None} == {FND, RM, RMW, RAW, MOM, MVW}
     assert (rows[FND].promoted_from, rows[RM].promoted_from) == ("M0005", "M0011")
+    assert (rows[RAW].promoted_from, rows[MOM].promoted_from, rows[MVW].promoted_from) == (
+        "M0007", "M0002", "M0008",
+    )
     assert (rows["A"].object_name, rows["A"].registry_id, rows["A"].gate_applicable) == ("STRATEGY_A", None, True)
     assert (rows[F4].object_name, rows[F4].registry_id) == ("FACTOR", F4)
     assert rows["C"].gate_applicable is False
@@ -488,7 +510,9 @@ def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
     pg.execute("UPDATE strategies SET status = 'retired', paper_end = %s WHERE id = 'A'", (date(2026, 10, 2),))
     retired = {r.id: r for r in store.read_roster_rows(pg)}["A"]
     assert (retired.status, retired.paper_end) == ("retired", date(2026, 10, 2))
-    assert [e.id for e in active(from_rows(store.read_roster_rows(pg)))] == ["SPY", "C", F4_FR, F1_FR, RMW]
+    # A is retired in SEED_ROWS since 013, so retiring it in the database changes nothing about
+    # who trades: the active set is still the five the owner chose plus the SPY yardstick.
+    assert [e.id for e in active(from_rows(store.read_roster_rows(pg)))] == list(ACTIVE_IDS)
     pg.rollback()
 
 
@@ -517,7 +541,7 @@ from seer_engine.paper.roster import (  # noqa: E402
 #: Every roster entry admitted from a recorded lab candidate. A promotion adds a SEED_ROWS row
 #: AND a LAB_PROVENANCE entry in the same commit; this tuple is the third place that has to name
 #: it, and that is the point -- forgetting is a failing test, not a silent gap.
-LAB_DERIVED = (F4, F1, FND, F4_FR, F1_FR, RM, RMW)
+LAB_DERIVED = (F4, F1, FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW)
 #: And the three that are not: SPY is the benchmark, C is the LLM strategy the quant gate does not
 #: apply to, and A predates the lab (H-A records the idea but has no trial).
 NOT_LAB_DERIVED = ("SPY", "A", "C")
@@ -649,6 +673,6 @@ def test_lab_provenance_agrees_with_the_promoted_from_column(pg):
     for sid, p in LAB_PROVENANCE.items():
         if rows[sid].promoted_from is not None:
             assert rows[sid].promoted_from == p.method_id, sid
-    # the three rows `promote` wrote are the only ones with a column to agree with; F4, F1 and
+    # the six rows `promote` wrote are the only ones with a column to agree with; F4, F1 and
     # their fractional twins were seeded by migration before `promote` existed.
-    assert {i for i, r in rows.items() if r.promoted_from is not None} == {FND, RM, RMW}
+    assert {i for i, r in rows.items() if r.promoted_from is not None} == {FND, RM, RMW, RAW, MOM, MVW}

@@ -295,6 +295,8 @@ def test_timing_reads_nothing_after_the_data_date():
 FND_SYMBOLS = ("AAA", "BBB", "CCC", "DDD", "EEE")
 FND_DAYS = session_days(230, date(2026, 1, 2))
 FND_DATE = date(2026, 10, 30)
+LAB_DATE = date(2015, 10, 16)  # DEV_END: labkit.smoke_market's last session
+
 
 
 def fnd_history() -> dict[str, History]:
@@ -426,3 +428,58 @@ def test_facts_are_plain_str(a_market, fnd_market):
         evidence.evidence_for("FUNDAMENTAL", fnd_market, FND, FND_DATE, ["AAA"]),
     ):
         assert out and all(type(f) is str for facts in out.values() for f in facts)
+
+
+# --------------------------------------------------------- the lab books (013: RAW, MOM, MVW)
+#
+# These three joined the paper roster for the first paper night, so their evidence is what the
+# site will print under "Why this pick" from tomorrow. The paper-night tests cannot reach them:
+# ``test_paper_check``'s synthetic world is ~30 sessions long and the residual books need a
+# 401-bar market-model lookback, so RAW decides nothing there and its function is never called.
+# ``labkit.smoke_market`` is 473 sessions, which is long enough for all three.
+
+
+@pytest.fixture(scope="module")
+def lab_market() -> Market:
+    import labkit
+
+    return labkit.smoke_market()
+
+
+LAB_BOOKS = (
+    ("RESIDMOM", roster.RESIDMOM_PARAMS),
+    ("REGIME", roster.REGIME_PARAMS),
+    ("MINVAR", roster.MINVAR_PARAMS),
+)
+
+
+@pytest.mark.parametrize("name, params", LAB_BOOKS, ids=[n for n, _ in LAB_BOOKS])
+def test_the_lab_books_explain_every_stock_they_pick(lab_market, name, params):
+    """Every name the allocator targets gets facts: a pick the site cannot explain is a hole."""
+    d = LAB_DATE
+    history = {s: h.upto(d) for s, h in lab_market.history.items()}
+    members = lab_market.membership.members_on(d)
+    targets = roster.RESOLVER[name].obj.targets(history, members, d, frozenset(), params)
+    assert targets, f"{name} picked nothing on {d}; the fixture no longer exercises it"
+    out = evidence.evidence_for(name, lab_market, params, d, [t.symbol for t in targets])
+    assert set(out) == {t.symbol for t in targets}
+    for facts in out.values():
+        assert 2 <= len(facts) <= evidence.MAX_FACTS
+        assert all(type(f) is str and f.strip() and f.endswith(".") for f in facts)
+    assert out == evidence.evidence_for(name, lab_market, params, d, [t.symbol for t in targets])
+
+
+def test_minvar_never_claims_a_cap_that_did_not_bind(lab_market):
+    """``min_var_weights`` solves under ``max(cap, 1/k)``. On a book too small for the parameter
+    to bite, every weight is 1/k -- 12.5% at eight names -- and naming the 7% cap anyway would
+    print a number the stock's own share contradicts in the same sentence."""
+    d = LAB_DATE
+    history = {s: h.upto(d) for s, h in lab_market.history.items()}
+    members = lab_market.membership.members_on(d)
+    params = roster.MINVAR_PARAMS
+    targets = roster.RESOLVER["MINVAR"].obj.targets(history, members, d, frozenset(), params)
+    assert len(targets) < 1 / float(params.cap)  # too few names for the cap to be reachable
+    out = evidence.evidence_for("MINVAR", lab_market, params, d, [t.symbol for t in targets])
+    size = next(f for f in next(iter(out.values())) if "of the money" in f)
+    assert "the same as every other holding" in size
+    assert "no stock allowed more than" not in size

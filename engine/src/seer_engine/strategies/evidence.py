@@ -48,7 +48,7 @@ from seer_engine.strategies.allocator import month_end_closes
 from seer_engine.strategies.base import History, as_day
 from seer_engine.strategies.c import CParams
 from seer_engine.strategies.f_factor import MAX_TOP as FACTOR_MAX_TOP
-from seer_engine.strategies.f_factor import FactorParams, factor_rows
+from seer_engine.strategies.f_factor import FACTOR, FactorParams, factor_rows
 from seer_engine.strategies.f_factor import rank_rows as factor_rank_rows
 from seer_engine.strategies.f_factor import trend_on as factor_trend_on
 from seer_engine.strategies.f_fundamental import FUNDAMENTAL, FundamentalParams, FundamentalRow, factors_read, fundamental_rows
@@ -405,6 +405,141 @@ def weeklybrake_evidence(market: Market, params: Any, data_date: date, symbols: 
     return out
 
 
+# --------------------------------------------------------------------------- RESIDMOM (lab M0007)
+
+
+def residmom_evidence(market: Market, params: Any, data_date: date, symbols: Sequence[str]) -> dict[str, Facts]:
+    """``RESIDMOM`` (lab M0007, unbraked residual momentum): the stock's rise beyond what the
+    market's move explains, its place among the stocks checked on that, and the market filter.
+
+    This is ``RESIDVOL``'s and ``WEEKLYBRAKE``'s own engine with the volatility brake taken off,
+    so there is deliberately no "how much of the money it holds" fact: it is always all of it.
+    The absence is the method, and saying so is what makes the forward comparison readable."""
+    # Imported here, not at module level, for the reason residvol_evidence gives.
+    from seer_engine.lab.methods.m0007_residual_momentum import ResidParams, build_grid, residual_scores
+
+    p: ResidParams = _typed("RESIDMOM", params, ResidParams)
+    wanted = _wanted(symbols)
+    history = _cut(market, data_date)
+    members = market.membership.members_on(data_date)
+    rows = factor_rows(history, members, data_date, p.inner)
+    grid = build_grid(history, p.market) if rows else None
+    if grid is None:
+        return {}
+    scores = residual_scores(grid, [r.symbol for r in rows], data_date, p)
+    ranked = sorted((s for s in scores if math.isfinite(scores[s])), key=lambda s: (-scores[s], s))
+    n = len(ranked)
+    if n == 0:
+        return {}
+    months = _span(p.mom_n)
+    skip = _span(p.skip)
+    on = factor_trend_on(history, data_date, p.inner)
+    out: dict[str, Facts] = {}
+    for symbol in wanted:
+        score = scores.get(symbol)
+        if score is None or not math.isfinite(score) or symbol not in ranked:
+            continue
+        direction = "gains" if score > 0 else "losses"
+        # scaled=False (the promoted variant) accumulates raw daily residuals, so the score is a
+        # running total of returns and reads as a percent. scaled=True divides by the stock's own
+        # residual swing, and a percent would then be a lie about the units.
+        beyond = (
+            f"Beyond what the market's own move explains, its daily {direction} from {months} ago to "
+            f"{skip} ago added up to about {_pct(score)}."
+            if not p.scaled
+            else f"Beyond what the market's own move explains, its {direction} from {months} ago to "
+            f"{skip} ago came to about {_num(score, 2)} times its own usual swing."
+        )
+        facts = [
+            beyond,
+            f"It ranked {_ordinal(ranked.index(symbol) + 1)} of {n} stocks checked on that, strongest first.",
+            "It holds every pick at the same size and never trims when its stocks get jumpy, which is "
+            "the one thing separating it from the braked version of the same book.",
+        ]
+        if p.inner.trend is not None:
+            facts.append(_trend_fact(history, data_date, p.inner.trend, on))
+        out[symbol] = tuple(facts[:MAX_FACTS])
+    return out
+
+
+# --------------------------------------------------------------------------- REGIME (lab M0002)
+
+
+def regime_evidence(market: Market, params: Any, data_date: date, symbols: Sequence[str]) -> dict[str, Facts]:
+    """``REGIME`` (lab M0002): the same facts as the plain momentum book it is built on, plus how
+    much of the money it holds tonight.
+
+    It trims only when its own picks are swinging harder than those picks normally do -- not
+    whenever the market is loud -- so the fact names both windows, the recent one and the long
+    one it is being compared against."""
+    from seer_engine.lab.methods.m0002_asymmetric_vol_regime import RegimeParams, regime_scale
+
+    p: RegimeParams = _typed("REGIME", params, RegimeParams)
+    picked = factor_evidence(market, p.inner_params, data_date, symbols)
+    if not picked:
+        return {}
+    history = _cut(market, data_date)
+    members = market.membership.members_on(data_date)
+    inner = FACTOR.targets(history, members, data_date, frozenset(), p.inner_params)
+    scale = regime_scale(history, inner, data_date, p)
+    short, reference = _span(p.n), _span(p.m)
+    brake = (
+        f"Over the last {short} its picks swung no harder than they usually have over the last "
+        f"{reference}, so it puts all its money in stocks."
+        if scale is None
+        else f"Over the last {short} its picks swung harder than they usually have over the last "
+        f"{reference}, so it puts {_pct(float(scale))} of its money in stocks and keeps the rest in cash."
+    )
+    return {symbol: tuple([*facts[:2], brake, *facts[2:]][:MAX_FACTS]) for symbol, facts in picked.items()}
+
+
+# --------------------------------------------------------------------------- MINVAR (lab M0008)
+
+
+def minvar_evidence(market: Market, params: Any, data_date: date, symbols: Sequence[str]) -> dict[str, Facts]:
+    """``MINVAR`` (lab M0008): the same facts as the plain momentum book it is built on, plus the
+    share of the money this stock gets.
+
+    The book picks its stocks exactly as the momentum book does; what differs is the sizing, so
+    the extra fact is the size and the reason for it. A stock whose size solved to zero is left
+    out, because the method is not buying it."""
+    from seer_engine.lab.methods.m0008_min_variance_weighting import MinVarParams, reweighted
+
+    p: MinVarParams = _typed("MINVAR", params, MinVarParams)
+    picked = factor_evidence(market, p.inner_params, data_date, symbols)
+    if not picked:
+        return {}
+    history = _cut(market, data_date)
+    members = market.membership.members_on(data_date)
+    inner = FACTOR.targets(history, members, data_date, frozenset(), p.inner_params)
+    weights = {t.symbol: float(t.weight) for t in reweighted(history, inner, data_date, p)}
+    total = sum(weights.values())
+    if total <= 0.0:
+        return {}
+    shares = {symbol: w / total for symbol, w in weights.items()}
+    # ``min_var_weights`` solves under ``max(cap, 1/k)``, not under ``cap``: with few enough names
+    # an even split already breaches the parameter and the cap cannot bind. Naming the parameter
+    # anyway would print "it gets 12.5% ... no stock allowed more than 7%" on such a night, which
+    # is a false statement about the method. So describe the weights that were actually produced.
+    even = max(shares.values()) - min(shares.values()) < 0.0005
+    out: dict[str, Facts] = {}
+    for symbol, facts in picked.items():
+        share = shares.get(symbol)
+        if share is None or share <= 0.0:
+            continue
+        size = (
+            f"It gets {_pct(share)} of the money the method puts in stocks, the same as every other "
+            f"holding: with only {len(shares)} stocks to spread across, an even split is already as "
+            f"spread out as the method's {_pct(float(p.cap))} limit per stock would let it be."
+            if even
+            else f"It gets {_pct(share)} of the money the method puts in stocks. Sizes are set so the "
+            f"basket as a whole swings as little as possible, judged over the last {_span(p.n)}, with "
+            f"no stock allowed more than {_pct(float(p.cap))}."
+        )
+        out[symbol] = tuple([*facts[:2], size, *facts[2:]][:MAX_FACTS])
+    return out
+
+
 # --------------------------------------------------------------------------- TIMING (F1/F10)
 
 
@@ -551,6 +686,9 @@ EVIDENCE: dict[str, EvidenceFn] = {
     "FUNDAMENTAL": fundamental_evidence,
     "RESIDVOL": residvol_evidence,
     "WEEKLYBRAKE": weeklybrake_evidence,
+    "RESIDMOM": residmom_evidence,
+    "REGIME": regime_evidence,
+    "MINVAR": minvar_evidence,
 }
 
 

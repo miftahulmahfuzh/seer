@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, FlaskConical, LayoutDashboard, Lightbulb, NotebookPen, Workflow } from 'lucide-react';
+import { Ban, Eye, FlaskConical, LayoutDashboard, Lightbulb, NotebookPen, Workflow } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import s from './SeraNav.module.css';
@@ -10,17 +10,18 @@ const TABS = [
   { href: '/sera/methods', icon: FlaskConical, tip: 'Methods' },
   { href: '/sera/journal', icon: NotebookPen, tip: 'Journal' },
   { href: '/sera/ideas', icon: Lightbulb, tip: 'Ideas' },
+  { href: '/sera/gotrade', icon: Ban, tip: 'Not on Gotrade' },
   { href: '/sera/how', icon: Workflow, tip: 'How it works' },
 ];
 
-/** The one tab that carries an unseen badge. The other four count nothing. */
+/** The one tab that carries an unseen badge. The others count nothing. */
 const BADGED = '/sera/journal';
 
 /** A count fit to print: a whole number above zero, or 0, which renders no badge at all. */
 const badgeCount = (n: number): number => (Number.isFinite(n) && n > 0 ? Math.floor(n) : 0);
 
 /**
- * Sera's rail: wordmark, five icon-only section tabs, and a way back to Seer. A top bar below 1024 px.
+ * Sera's rail: wordmark, six icon-only section tabs, and a way back to Seer. A top bar below 1024 px.
  *
  * `journalUnseen` is the number of journal entries not yet seen, read server-side in
  * app/sera/layout.tsx. It exists so a new entry is visible from the other Sera pages, not only

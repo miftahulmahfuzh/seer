@@ -74,7 +74,7 @@ import psycopg
 from seer_engine import dates, db, demo, http, runs
 from seer_engine.backtest.market import Market
 from seer_engine.commands.nightly import _parse_now
-from seer_engine.paper import roster, store
+from seer_engine.paper import roster, store, unavailable
 from seer_engine.paper.benchmark import SPY, step_benchmark
 from seer_engine.paper.book import decide_book, last_rank_session, needs_kickoff, rank_basket, settle_book
 from seer_engine.paper.bracket import decide_bracket, settle_bracket
@@ -83,6 +83,7 @@ from seer_engine.paper.roster import RosterEntry
 from seer_engine.paper.store import PaperState, StrategyRow
 from seer_engine.sim import initial_cash_usd, new_portfolio
 from seer_engine.sim.book import Position, Target
+from seer_engine.sim.model import Order
 from seer_engine.sim.rules import TradeRules, is_resize_session
 from seer_engine.strategies import evidence
 from seer_engine.strategies.base import History, Strategy
@@ -421,20 +422,11 @@ def _trade(conn: psycopg.Connection, rd: dates.RunDates, plan: NightPlan) -> Non
     since = store.market_window_since(earliest)  # earliest - store.MARKET_WINDOW_DAYS (640) days
     _check_window(since, earliest, list(plan.start) + [e for e, _ in plan.step])
 
-    market = store.load_market_window(conn, since)
-    window = dates.sessions(dates.next_session(earliest), rd.data_date)
-    tonight = _Tonight(
-        market=market,
-        splits={s: store.applied_splits_on(conn, s) for s in window},
-        dividends=store.dividends_between(conn, window[0], window[-1]) if window else {},
-    )
-    log.info(
-        "bars window since %s; %d session(s) to step (%s..%s)",
-        since,
-        len(window),
-        window[0] if window else "-",
-        window[-1] if window else "-",
-    )
+    tonight = _load_tonight(conn, since, earliest, rd.data_date)
+    starts = {row.id: row.paper_start for row in store.read_strategies(conn)}
+    # A stock added to the not-offered list since a pending decision was taken is re-picked
+    # before that decision settles (014, paper.unavailable).
+    repick(conn, [e for e, _ in plan.step], starts, tonight)
 
     for e in plan.start:
         _start(conn, e, rd, tonight)
@@ -449,6 +441,136 @@ def _trade(conn: psycopg.Connection, rd: dates.RunDates, plan: NightPlan) -> Non
             _step_benchmark(conn, e, sessions, tonight)
         else:
             raise PaperError(f"strategy {e.id!r} has unknown engine {e.engine!r}")
+
+
+def _load_tonight(conn: psycopg.Connection, since: date, earliest: date, through: date) -> _Tonight:
+    """The bars window since ``since``, with the splits and dividends of every session after
+    ``earliest`` through ``through``."""
+    market = store.load_market_window(conn, since)
+    window = dates.sessions(dates.next_session(earliest), through)
+    log.info(
+        "bars window since %s; %d session(s) to step (%s..%s)",
+        since,
+        len(window),
+        window[0] if window else "-",
+        window[-1] if window else "-",
+    )
+    return _Tonight(
+        market=market,
+        splits={s: store.applied_splits_on(conn, s) for s in window},
+        dividends=store.dividends_between(conn, window[0], window[-1]) if window else {},
+    )
+
+
+# ---- re-taking a waiting decision after the not-offered list changed --------------------------------
+
+
+def _book_key(targets: Sequence[Target] | None) -> tuple[tuple[str, Decimal], ...] | None:
+    return None if targets is None else tuple((t.symbol, t.weight) for t in targets)
+
+
+def _order_key(orders: Iterable[Order]) -> tuple[tuple[str, int, Decimal, Decimal, Decimal], ...]:
+    return tuple(sorted((o.symbol, o.shares, o.limit_price, o.tp_price, o.sl_price) for o in orders))
+
+
+def repick(
+    conn: psycopg.Connection,
+    entries: Sequence[RosterEntry],
+    starts: Mapping[str, date | None],
+    tonight: _Tonight | None = None,
+) -> list[str]:
+    """Re-take every waiting decision the not-offered list (014) changes; returns the ids rewritten.
+
+    A listed stock leaves the membership (``store.load_market_window``), and that moves more than
+    the decisions holding it: a method that scores stocks against the whole universe ranks the
+    rest differently too. So every pending decision taken on bars a listing covers is taken again
+    exactly as the night took it -- same bars (``state.last_session``), same settled book, same
+    kickoff and split-cadence inputs -- and rewritten only when the result differs from the stored
+    one. That is what the replay check computes from the same market, so the two agree, and a
+    second run (or the paper night that follows) writes nothing. Only pending decisions are
+    touched: nothing that has traded is rewritten.
+
+    A resize-only decision is left alone: it re-scales the basket its last rank chose and cannot
+    swap a stock, so a listed stock leaves that book at its next rank.
+    """
+    windows = store.read_unavailable(conn)
+    if not windows:
+        return []
+    todo: list[tuple[RosterEntry, PaperState]] = []
+    for e in entries:
+        if e.engine not in ("book", "bracket"):
+            continue
+        state = store.read_paper_state(conn, e.id)
+        if state is None or state.pending_session is None:
+            continue
+        if unavailable.excluded_on(windows, state.last_session):
+            todo.append((e, state))
+    if not todo:
+        return []
+    if tonight is None:
+        earliest = min(state.last_session for _, state in todo)
+        through = max(state.last_session for _, state in todo)
+        tonight = _load_tonight(conn, store.market_window_since(earliest), earliest, through)
+    done: list[str] = []
+    for e, state in todo:
+        d, p = state.last_session, state.pending_session
+        assert p is not None
+        view = tonight.view(d)
+        if e.engine == "book":
+            if not state.pending_decision:
+                continue
+            paper_start = starts.get(e.id)
+            if paper_start is None:
+                raise PaperError(f"strategy {e.id!r} has a pending decision but no paper_start")
+            rules = e.rules
+            book = store.load_book(conn, e.id, idle_symbol=rules.idle_symbol).book
+            kicked = None if state.kickoff_session == p else state.kickoff_session
+            kickoff = needs_kickoff(rules, paper_start, p, kicked)
+            if _resize_only(rules, p, kickoff):
+                continue
+            if rules.resize_cadence is None:
+                targets, _ = decide_book(view, e.obj, e.params, rules, d, book.held(), force=kickoff)
+            else:
+                last_rank, marks = _split_inputs(conn, e.id, rules, paper_start, kicked, p, book.positions)
+                targets, _ = decide_book(
+                    view, e.obj, e.params, rules, d, book.held(), force=kickoff, last_rank=last_rank, marks=marks
+                )
+            old = store.read_book_targets(conn, e.id, p)
+            if _book_key(targets) == _book_key(old):
+                continue
+            facts = None if targets is None else _evidence(e, view, d, (t.symbol for t in targets))
+            store.save_book_decision(conn, e.id, p, targets, evidence=facts)
+            preview, preview_facts = targets, facts
+            if preview is None:
+                preview, _ = decide_book(view, e.obj, e.params, rules, d, book.held(), force=True)
+                preview_facts = None if preview is None else _evidence(e, view, d, (t.symbol for t in preview))
+            store.save_book_preview(conn, e.id, d, preview, evidence=preview_facts)
+            before, after = [t.symbol for t in old], [t.symbol for t in targets or ()]
+        else:
+            pf = store.load_portfolio(conn, e.id)
+            waiting = [o for o in pf.orders if o.status == "pending" and o.session_date == p]
+            pf = replace(pf, orders=tuple(o for o in pf.orders if o not in waiting))
+            sized = decide_bracket(
+                pf, _bracket_strategy(conn, e, p, p), e.params, view.history, view.membership.members_on(d), d
+            )
+            if _order_key(sized.placed) == _order_key(waiting):
+                continue
+            conn.execute(
+                "DELETE FROM orders WHERE strategy_id = %s AND session_date = %s AND status = 'pending'", (e.id, p)
+            )
+            facts = _evidence(e, view, d, (o.symbol for o in sized.placed))
+            store.insert_pending_orders(conn, e.id, sized.placed, evidence=facts)
+            store.write_pending(conn, e.id, p, decision=False)
+            before, after = [o.symbol for o in waiting], [o.symbol for o in sized.placed]
+        log.info(
+            "%s: re-took the decision for %s after the not-offered list changed: out %s, in %s",
+            e.id,
+            p,
+            ", ".join(x for x in before if x not in after) or "-",
+            ", ".join(x for x in after if x not in before) or "-",
+        )
+        done.append(e.id)
+    return done
 
 
 _PAPER_ROWS_SQL = """

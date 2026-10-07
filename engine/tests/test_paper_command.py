@@ -618,3 +618,48 @@ def test_later_factors_multiply_splits_after_the_session():
     assert paper.later_factors(by_session, d1) == {"X": Decimal(6), "Y": Decimal("0.5")}
     assert paper.later_factors(by_session, d2) == {"X": Decimal(3), "Y": Decimal("0.5")}
     assert paper.later_factors(by_session, d3) == {}
+
+
+# ---- the not-offered list (014): re-taking a waiting decision -------------------------------------
+
+
+def test_repick_swaps_a_listed_stock_and_the_replay_agrees(world):
+    from seer_engine.commands import paper_check, repick
+
+    assert night(world, N0) == 0
+    before = dict(
+        ((sid, sym), w)
+        for sid, sym, w in q(world, "SELECT strategy_id, symbol, weight FROM book_targets WHERE session_date = %s", (PAPER_START,))
+    )
+    listed = next(sym for (_, sym) in sorted(before) if sym in STOCKS)
+    with db.transaction(world, False):
+        world.execute("INSERT INTO unavailable_symbols (symbol, since) VALUES (%s, %s)", (listed, N0))
+
+    assert repick.execute(world, dry_run=True) == 0
+    assert q(world, "SELECT count(*) FROM book_targets WHERE session_date = %s AND symbol = %s", (PAPER_START, listed))[0][0] > 0
+
+    assert repick.execute(world) == 0
+    assert q(world, "SELECT count(*) FROM book_targets WHERE session_date = %s AND symbol = %s", (PAPER_START, listed)) == [(0,)]
+    assert q(world, "SELECT count(*) FROM book_previews WHERE symbol = %s", (listed,)) == [(0,)]
+    assert q(world, "SELECT count(*) FROM orders WHERE session_date = %s AND symbol = %s", (PAPER_START, listed)) == [(0,)]
+    # The replay reads the same list, so it agrees with the re-taken decisions.
+    assert paper_check.execute(world) == 0
+
+    # Idempotent: a second pass, and the night's own pass before it settles, rewrite nothing.
+    entries = roster.active(roster.from_rows(paper.store.read_roster_rows(world)))
+    starts = {r.id: r.paper_start for r in paper.store.read_roster_rows(world)}
+    assert paper.repick(world, entries, starts) == []
+    world.rollback()
+    for d in NIGHTS[1:3]:
+        assert night(world, d) == 0
+    assert q(world, "SELECT count(*) FROM book_positions WHERE symbol = %s", (listed,)) == [(0,)]
+    assert paper_check.execute(world) == 0
+
+
+def test_repick_without_a_list_does_nothing(world):
+    from seer_engine.commands import repick
+
+    assert night(world, N0) == 0
+    snapshot = everything(world)
+    assert repick.execute(world) == 0
+    assert everything(world) == snapshot

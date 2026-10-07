@@ -49,6 +49,7 @@ from psycopg.types.json import Jsonb
 from seer_engine import dates
 from seer_engine.backtest import io as bio
 from seer_engine.backtest.market import Market, Membership
+from seer_engine.paper import unavailable
 from seer_engine.paper.benchmark import BenchmarkState
 from seer_engine.sim.book import WEIGHT_QUANTUM, Book, BookSnapshot, Fill, Position, Target, Trade
 from seer_engine.sim.model import Event, Order, Portfolio, Snapshot
@@ -1236,6 +1237,13 @@ def market_window_since(data_date: date) -> date:
     return _date("data_date", data_date) - timedelta(days=MARKET_WINDOW_DAYS)
 
 
+def read_unavailable(conn: psycopg.Connection) -> tuple[unavailable.Window, ...]:
+    """Every ``unavailable_symbols`` row (014) as a window, open and closed alike: the replay reads
+    old decisions back against the list as it stood when they were made."""
+    rows = conn.execute("SELECT symbol, since, until FROM unavailable_symbols ORDER BY symbol, since").fetchall()
+    return unavailable.windows_from_rows([(r[0], r[1], r[2]) for r in rows])
+
+
 def load_market_window(
     conn: psycopg.Connection, since: date, *, cache_dir: Path = bio.CACHE_DIR
 ) -> Market:
@@ -1269,9 +1277,12 @@ def load_market_window(
     _date("since", since)
     frame = bio.read_bars_frame(conn, since=since)
     history = bio.histories_from_frame(frame)
+    # Stocks the owner's broker does not offer leave the membership for the days they are listed
+    # (014, paper.unavailable), so every method picks its next-best stock instead.
+    intervals = unavailable.clip(bio.read_intervals(conn), read_unavailable(conn))
     return Market(
         history=history,
-        membership=Membership(intervals=bio.read_intervals(conn)),
+        membership=Membership(intervals=intervals),
         fx=bio.read_fx(conn),
         fundamentals=bio.load_panel(conn, cache_dir=cache_dir),
     )

@@ -1,0 +1,64 @@
+name: Repick
+
+# Re-takes the waiting paper decisions after the owner changes the not-offered list on
+# /sera/gotrade (migration 014). The site dispatches this right after a change, so the new picks
+# reach the website before the US open instead of after the next nightly run. The paper night runs
+# the same step before it settles anything, so a missed dispatch only delays the website.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Compute everything, then roll back (writes nothing)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seer-db-writer
+  cancel-in-progress: false
+
+jobs:
+  repick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+      DRY_RUN: ${{ inputs.dry_run == true }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: engine/pyproject.toml
+
+      - name: Install engine
+        run: python -m pip install -e engine
+
+      - name: Migrate
+        run: |
+          flags=()
+          if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
+          python -m seer_engine "${flags[@]}" migrate
+
+      - name: Repick
+        run: |
+          flags=(-v)
+          if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
+          python -m seer_engine "${flags[@]}" repick
+
+      # The re-picked stocks need their "why this pick" notes. Never fails the run.
+      - name: Explain
+        continue-on-error: true
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+          LLM_MODEL: ${{ secrets.LLM_MODEL }}
+        run: |
+          flags=(-v)
+          if [ "$DRY_RUN" = "true" ]; then flags+=(--dry-run); fi
+          python -m seer_engine "${flags[@]}" explain

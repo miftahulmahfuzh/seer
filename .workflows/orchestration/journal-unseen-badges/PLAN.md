@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/journal-unseen-badges`
 **Branch:** `feature/journal-unseen-badges` (base: `origin/main` @ `46c04b4`)
 **Phases:** 5
-**Status:** 3/5 phases complete (1, 2, 3); landing owned by the swarm coordinator
+**Status:** 4/5 phases complete (1, 2, 3, 4); landing owned by the swarm coordinator
 **Reconciled:** 2026-10-07 — 9 conflicts found, 9 resolved, 0 open questions
 **Coordinator:** `orch-journal-unseen-badges`
 
@@ -112,9 +112,9 @@ Every phase must leave all of these true.
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
 | 1 ✅ | Seen-state storage, server read/write, and the POST endpoint | R2 | `db/migrations`, `web/lib/sera`, `web/app/api` | 3 | — | NORMAL | `.workflows/plan/journal-unseen-badges/phase-1.md` | P1-WEB-K3QM (done 2026-10-07) | — |
-| 2 | Unseen-aware pure view layer: counts and the unseen/seen partition | R1, R3 | `web/app/sera/journal` | 2 | — | NORMAL | `.workflows/plan/journal-unseen-badges/phase-2.md` | P1-WEB-SSGU | — |
-| 3 | The page renders unseen counts, the boundary, and per-card state | R1, R3 | `web/app/sera/journal` | 2 | 1, 2 | NORMAL | `.workflows/plan/journal-unseen-badges/phase-3.md` | P1-WEB-M2WF | — |
-| 4 | The client island: dwell, click, batch, flush, live countdown | R2, R3 | `web/app/sera/journal` | 4 | 1, 2, 3 | HARD | `.workflows/plan/journal-unseen-badges/phase-4.md` | P1-WEB-Q8DV | — |
+| 2 ✅ | Unseen-aware pure view layer: counts and the unseen/seen partition | R1, R3 | `web/app/sera/journal` | 2 | — | NORMAL | `.workflows/plan/journal-unseen-badges/phase-2.md` | P1-WEB-SSGU | — |
+| 3 ✅ | The page renders unseen counts, the boundary, and per-card state | R1, R3 | `web/app/sera/journal` | 2 | 1, 2 | NORMAL | `.workflows/plan/journal-unseen-badges/phase-3.md` | P1-WEB-M2WF | — |
+| 4 ✅ | The client island: dwell, click, batch, flush, live countdown | R2, R3 | `web/app/sera/journal` | 4 | 1, 2, 3 | HARD | `.workflows/plan/journal-unseen-badges/phase-4.md` | P1-WEB-Q8DV (done 2026-10-07) | — |
 | 5 | The rail badge and the package readme | R3 | `web/components/sera`, `web/app/sera`, docs | 4 | 1, 2, 3, 4 | EASY | `.workflows/plan/journal-unseen-badges/phase-5.md` | P1-WEB-Z5LP | — |
 
 **Waves**, given those dependencies: phases **1 and 2** run concurrently (neither depends on

@@ -62,7 +62,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "493187b",
       "depends_on": [
         1,
         2,
@@ -70,16 +70,16 @@
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "Client island live: 2.5s dwell rule reaches the 5 arrow-less entries, arrow-click beacons via:click, badges count down through data-badge-kind calling phase 2's badgeTip. tsc clean, 343/343 tests (was 311), next build --webpack passes. One ladder decision: plan's seen-client.test.ts unseen() helper failed TS2352 (Object.fromEntries widens to a string index signature) -> explicit loop + one assertion, rung 1 (invariant 1 outranks a non-building code block); no test intent changed. journal.module.css and view.ts not opened.",
       "package": "web/app/sera/journal",
       "plan": ".workflows/plan/journal-unseen-badges/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T04:53:51+00:00",
       "satisfies": [
         "R2",
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-Q8DV",
       "title": "The client island: dwell, click, batch, flush, live countdown"
     },
     {
@@ -100,7 +100,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The rail badge and the package readme"
     }
@@ -108,7 +108,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/journal-unseen-badges/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "journal-unseen-badges",
-  "updated": "2026-10-07T04:43:57+00:00",
+  "updated": "2026-10-07T04:54:41+00:00",
   "verified_at": "2026-10-07T04:33:20+00:00",
   "worktree": "/home/miftah/.worktrees/seer/journal-unseen-badges"
 }

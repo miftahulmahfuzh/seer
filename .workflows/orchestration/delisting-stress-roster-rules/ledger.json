@@ -3,6 +3,12 @@
   "coordinator": "orch-delisting-stress-roster-rules",
   "coordinator_session_id": "12cd7508-1bda-4b0b-97bd-2aec6d0df72e",
   "created": "2026-10-07T11:04:36+00:00",
+  "landed": {
+    "at": "2026-10-07T12:43:27+00:00",
+    "base": "main",
+    "commit": "3f112cfff9f06a60065e81984a98c7b8f211f7a3",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -23,21 +29,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "869d041c63809bfd9bd52eef42849b8576b0fafc",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "No break-even on the grid for any of the four at the measured 4.002%/yr rate - all still beat SPY TR at r=-100% (+0.73/+3.69/+2.30/+0.11 pts/yr). Verdict branch 1. MVW-FR solves at -85.8% only under the pessimistic 5.091%/yr; RMW-FR falls to +0.01 there - kept branch 1's headline on the mean edge per rung 3 (phase 1's break_even is mean-defined) and stated the per-draw spread and sensitivity as their own sentences rather than hedging into branch 2. Thinning cost reported separately at 0.29-0.92 pts/yr: r=0 is not 'no stress'. Design section numbered 14 at write time, append-only (133 insertions, 0 deletions); insight row 33; lab.json regenerated in the same breath. lab 110/0/37/33. Suite 3229 passed, 0 failed, 0 skipped. Commit = my 3 paths + this task's own bookkeeping, 6 total. WARN for land: engine/.workflows/todos.md and 4 .workflows/plan/P1-*.md files are still UNCOMMITTED and 'land --step cleanup' force-removes the worktree - commit them first. Also unowned: engine/package_readme.md needs an engine-scoped edit (lines 1957-1959 D4 claim now answered by section 14; line 1932's flat '522 unserved' needs the 404/118 split).",
       "package": "docs/plans`, `lab`, `web/data",
       "plan": ".workflows/plan/delisting-stress-roster-rules/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T12:36:54+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-T8MK",
       "title": "Run it, and record what it found"
     },
     {
@@ -97,7 +103,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/delisting-stress-roster-rules/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "delisting-stress-roster-rules",
-  "updated": "2026-10-07T11:25:43+00:00",
+  "updated": "2026-10-07T12:43:27+00:00",
   "verified_at": "2026-10-07T11:24:29+00:00",
   "worktree": "/home/miftah/.worktrees/seer/delisting-stress-roster-rules"
 }

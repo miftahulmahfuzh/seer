@@ -324,7 +324,7 @@ def test_candidate_owner_inputs():
     assert candidate_owner_inputs(cand("A-5", allocator=HoldOne("B", "BIL"), rules=DAILY_SWITCH_TBILL)) == ("etf:BIL",)
     frac = replace(MONTHLY_HOLD, id="monthly-frac", fractional=True)
     assert candidate_owner_inputs(cand("A-6", allocator=HoldOne("L", "QLD"), rules=frac)) == (
-        "etf:QLD", "fractional", "leverage")
+        "etf:QLD", "leverage")  # fractional is owner-verified (2026-10-07)
     assert candidate_owner_inputs(cand("A-7", "REF", allocator=DipPicks(), rules=DESIGN_V0)) == ()
     with pytest.raises(TypeError):
         candidate_owner_inputs("A-1")

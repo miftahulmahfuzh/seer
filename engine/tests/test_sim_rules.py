@@ -240,7 +240,7 @@ def test_decision_session_rejects_non_sessions_and_bad_types():
 
 def test_owner_inputs_of_the_presets():
     for r in PRESETS:
-        expected = ("etf:BIL",) if r.idle_symbol == "BIL" else ("fractional",) if r.fractional else ()
+        expected = ("etf:BIL",) if r.idle_symbol == "BIL" else ()
         assert rule_owner_inputs(r) == expected, r.id
     assert rule_owner_inputs(V0_BOOK) == ()
 
@@ -249,9 +249,9 @@ def test_owner_inputs_every_lever_sorted():
     r = TradeRules(
         id="x", engine="book", entry="open", fractional=True, idle_symbol="IEF", cost_rate=Decimal("0.0005")
     )
-    assert rule_owner_inputs(r) == ("etf:IEF", "fee", "fractional", "market-on-open")
-    assert rule_owner_inputs(replace(r, idle_symbol="SPY")) == ("fee", "fractional", "market-on-open")
-    assert rule_owner_inputs(replace(r, cost_rate=Decimal("0.0010"))) == ("etf:IEF", "fractional", "market-on-open")
+    assert rule_owner_inputs(r) == ("etf:IEF", "fee", "market-on-open")  # fractional: owner-verified
+    assert rule_owner_inputs(replace(r, idle_symbol="SPY")) == ("fee", "market-on-open")
+    assert rule_owner_inputs(replace(r, cost_rate=Decimal("0.0010"))) == ("etf:IEF", "market-on-open")
     assert rule_owner_inputs(replace(MONTHLY_HOLD, entry="open_limit")) == ()
 
 
@@ -305,7 +305,7 @@ def test_describe_other_levers():
     assert lines[2] == "Decisions: the first session of each ISO week, from the previous session's close."
     assert lines[3] == "Re-scaling: only on the decision sessions above."
     assert lines[4] == "Entry: a market order at the next open (needs owner verification: market-on-open)."
-    assert lines[8] == "Shares: fractional, rounded down to 0.0001 share (needs owner verification)."
+    assert lines[8] == "Shares: fractional, rounded down to 0.0001 share (Gotrade fractional limit orders)."
     assert lines[11] == "Costs: 0.15% per side."
     assert describe_rules(replace(r, cost_rate=Decimal(0)))[11] == "Costs: 0% per side."
     assert describe_rules(SWING_T20)[6] == "Time stop: sell at the next open once a position has been held 20 sessions."
@@ -346,7 +346,7 @@ def test_monthly_rank_weekly_resize_frac_is_the_split_cadence_in_fractional_shar
     assert r == replace(MONTHLY_RANK_WEEKLY_RESIZE, id="monthly-rank-weekly-resize-frac", fractional=True)
     assert (r.cadence, r.resize_cadence, r.fractional, r.idle_symbol) == ("monthly", "weekly", True, None)
     assert PRESETS[-1] is r and sim.MONTHLY_RANK_WEEKLY_RESIZE_FRAC is r
-    assert rule_owner_inputs(r) == ("fractional",)
+    assert rule_owner_inputs(r) == ()  # fractional is owner-verified (2026-10-07)
 
 
 def test_a_rank_session_is_never_also_a_resize_session():

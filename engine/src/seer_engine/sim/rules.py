@@ -289,16 +289,16 @@ def is_decision_session(rules: TradeRules, session: date) -> bool:
 def rule_owner_inputs(rules: TradeRules) -> tuple[str, ...]:
     """The Gotrade features ``rules`` needs that the owner has not verified, sorted and unique.
 
-    ``market-on-open`` (entry "open"), ``fractional``, ``etf:<symbol>`` (an idle instrument
-    outside ``DEFAULT_ETFS``) and ``fee`` (a cost rate other than 0.1% per side). Empty means
-    executable under the conservative owner-input defaults.
+    ``market-on-open`` (entry "open"), ``etf:<symbol>`` (an idle instrument outside
+    ``DEFAULT_ETFS``) and ``fee`` (a cost rate other than 0.1% per side). Empty means executable
+    under the conservative owner-input defaults. Fractional shares are not on the list: the owner
+    verified that Gotrade takes fractional limit buys and sells (2026-10-07), and the paper roster
+    already trades its lab winners that way.
     """
     _rules(rules)
     out: set[str] = set()
     if rules.entry == "open":
         out.add("market-on-open")
-    if rules.fractional:
-        out.add("fractional")
     if rules.idle_symbol is not None and rules.idle_symbol not in DEFAULT_ETFS:
         out.add(f"etf:{rules.idle_symbol}")
     if rules.cost_rate != _DEFAULT_COST:
@@ -381,7 +381,7 @@ def describe_rules(rules: TradeRules) -> tuple[str, ...]:
     else:
         lines.append("Rebalance: none; a held position keeps its shares until it exits.")
     if rules.fractional:
-        lines.append(f"Shares: fractional, rounded down to {SHARE_QUANTUM} share (needs owner verification).")
+        lines.append(f"Shares: fractional, rounded down to {SHARE_QUANTUM} share (Gotrade fractional limit orders).")
     else:
         lines.append("Shares: whole shares only.")
     if rules.dividends:

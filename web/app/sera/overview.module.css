@@ -102,9 +102,13 @@
   .families { grid-column: span 5; }
   .latest { grid-column: span 7; }
 
-  .stateBody { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 36px; align-items: start; }
-  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stateBody { gap: 32px; }
+  .stats { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 24px; }
   .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) and (max-width: 1239.98px) {
+  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (min-width: 1360px) {

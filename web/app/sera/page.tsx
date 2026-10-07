@@ -73,14 +73,6 @@ export default async function SeraOverview() {
           caption={`The latest read on the search, then the numbers behind it. A try is one version of a method run once on ${dev}.`}
         >
           <div className={s.stateBody}>
-            <article className={s.story}>
-              <p className={s.storyMeta}>
-                {storyFrom}
-                {st.story.added ? ` · ${dayText(st.story.added)}` : ''}
-              </p>
-              <div className={s.prose} dangerouslySetInnerHTML={{ __html: renderMarkdown(st.story.body) }} />
-            </article>
-
             <div className={s.stats}>
               <Stat
                 label="Methods tried"
@@ -130,6 +122,14 @@ export default async function SeraOverview() {
                 }
               />
             </div>
+
+            <article className={s.story}>
+              <p className={s.storyMeta}>
+                {storyFrom}
+                {st.story.added ? ` · ${dayText(st.story.added)}` : ''}
+              </p>
+              <div className={s.prose} dangerouslySetInnerHTML={{ __html: renderMarkdown(st.story.body) }} />
+            </article>
           </div>
         </Section>
 

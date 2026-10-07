@@ -16,6 +16,12 @@
                                     committed pre-registration, refuses a method that is not
                                     promoted, and the database refuses a second look. --dry-run
                                     prints what would run and spends nothing
+    lab remeasure M0022 [--store DIR]
+                                    re-run a recorded method's variants on the dev window and
+                                    write back the DSR inputs (trial_moments) its trials predate.
+                                    Writes nothing else: no trials row, no status, no
+                                    pre-registration. Idempotent, and refuses a method that has
+                                    already had its test-window look
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
@@ -116,6 +122,21 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
                    help="print what would run -- the window, the store, the pre-registration and "
                         "the conditions that decide the verdict -- and stop. Loads nothing, runs "
                         "nothing, records nothing; the look is not spent")
+
+    s = sub.add_parser(
+        "remeasure",
+        help="recover the DSR inputs (trial_moments) of a method whose trials predate them",
+    )
+    s.add_argument("method", metavar="M0022",
+                   help="the lab method whose recorded dev trials get their moments back")
+    s.add_argument(
+        "--store",
+        type=Path,
+        default=Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR),
+        help=f"dev-window research store (default: {research.STORE_DIR}, or "
+             "$SEER_RESEARCH_STORE). A test store is refused by research.load_store before a "
+             "byte is read: this command never names a test window and never spends a look",
+    )
 
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
@@ -508,6 +529,59 @@ def _test(conn, args) -> int:
     return 0
 
 
+def _remeasure(conn, args) -> int:
+    """``lab remeasure M0022``: recover the DSR inputs of trials recorded before they were kept.
+
+    Re-runs the method's recorded variants on the **dev** window through the same
+    ``dev.run_registry`` path ``lab run`` uses, proves the re-run reproduces each trial's recorded
+    Sharpe and DSR, and appends ``trial_moments`` rows -- nothing else. No ``trials`` row is
+    inserted, updated or deleted; no status moves; no pre-registration is written.
+
+    The test window is unreachable from here by construction, not by care: a method with a
+    ``window='test'`` trial is refused by ``remeasure.preflight`` before this function opens
+    anything, ``research.load_store`` is called with no ``window`` so it defaults to ``DEV_WINDOW``
+    and refuses a test store by name, and ``remeasure.measure`` refuses a loaded store that is not
+    the dev window and calls ``dev.run_registry`` with no window argument at all.
+
+    When every dev trial already has its moments, this prints what it skipped and returns without
+    loading a research store: re-loading a 135 MB store and re-running backtests to write nothing
+    is not idempotence. (For scale, measured: the store load is ~11s and all 54 P7a seed
+    candidates re-run in ~52s. A method's two to five variants are seconds. Nothing here is an
+    hours-long job, and no doc in this set may say it is.)
+    """
+    from seer_engine.lab import remeasure as rm
+
+    method, path = rm.resolve_method(args.method)
+    plan = rm.preflight(conn, method, path)
+    if plan.nothing_to_do:
+        print(f"{method.id}: every dev trial already has its moments; nothing to do.")
+        print("  already recorded: " + ", ".join(f"#{n}" for n in plan.present))
+        print(f"\nLab N (dev trials) is still {store.dev_trial_count(conn)}; "
+              f"test-window looks used: {store.test_looks(conn)}")
+        return 0
+    if research.DEV_END != dev.DEV_END:
+        raise store.LabError("research.DEV_END differs from dev.DEV_END; refusing to run")
+    t0 = time.perf_counter()
+    try:
+        data = research.load_store(Path(args.store))
+    except FileNotFoundError as e:
+        raise store.LabError(
+            f"research store {args.store} is missing {e.filename or e}; build it with "
+            "`python -m seer_engine research_store`"
+        ) from e
+    except ValueError as e:
+        raise store.LabError(
+            f"{args.store}: {e}. `lab remeasure` asks load_store for the dev window and nothing "
+            f"else, so a test-window store is refused here rather than re-measured"
+        ) from e
+    log.info("research store %s loaded (%.1fs)", data.fingerprint[:12], time.perf_counter() - t0)
+    report = rm.remeasure(conn, method, path, data)
+    print(rm.format_report(report))
+    print(f"\nLab N (dev trials) is still {store.dev_trial_count(conn)}; "
+          f"test-window looks used: {store.test_looks(conn)}")
+    return 0
+
+
 def _idea(conn, args) -> int:
     store.begin_immediate(conn)  # the next id and its insert, atomic against parallel sessions
     with conn:
@@ -624,6 +698,7 @@ _HANDLERS = {
     "run": _run,
     "promote": _promote,
     "test": _test,
+    "remeasure": _remeasure,
     "idea": _idea,
     "note": _note,
     "block": _block,

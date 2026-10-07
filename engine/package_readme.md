@@ -131,6 +131,7 @@ engine/
       npolicy.py            the luck gate's N policy (lab-luck-gate phase 1): POLICIES all-trials / methods / effective, DEFAULT_POLICY, correlation(), participation_ratio(), effective_n() -> NCount. Pure, reads only, no callers yet
       runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4)
       prereg.py             the docs/lab/prereg/MNNNN.md pre-registration: Prereg, render()/parse(), require_committed(), check_digest(), check_source(), promote_method() (build-promotion-path phase 3)
+      remeasure.py          `lab remeasure`: re-runs a recorded method's variants on the dev window, proves the re-run reproduces each trial's recorded Sharpe and DSR, and appends trial_moments rows -- Batch, Plan, Reproduced, Report, resolve_method(), batches_of(), preflight(), measure(), check(), remeasure(), format_report() (lab-luck-gate phase 3)
       seed.py               one-time import of the pre-lab record (P7a's 54 candidates)
       methods/              one file per method, mNNNN_<slug>.py exporting METHOD
     commands/
@@ -142,7 +143,7 @@ engine/
       backtest_b.py         `backtest_b` command (P6a)
       research_store.py     `research_store` command (P7a)
       backtest_dev.py       `backtest_dev` command (P7a)
-      lab.py                `lab` command: the method lab (status / show / run / promote / test / idea / note / insight / stage / export ...)
+      lab.py                `lab` command: the method lab (status / show / run / promote / test / remeasure / idea / note / insight / stage / export ...)
       nightly.py            `nightly` command (P1; P4 adds dividends and held paper symbols)
       paper.py              `paper` command (P4)
       paper_check.py        `paper_check` command (P4)
@@ -696,6 +697,64 @@ file, so `lab test` runs the file, not a database row.
   and `Promoted (pre-registered)`. Against the real lab, `test-window looks used` reads **0**: this
   phase builds the mechanism and spends nothing.
 - Tests: `tests/test_lab_test_window.py`, with the fixtures in `tests/labkit.py`.
+
+### `lab remeasure` (lab-luck-gate phase 3)
+
+```
+python -m seer_engine lab remeasure M0022 [--store DIR]
+```
+
+Recovers the DSR's inputs for dev trials recorded before `trial_moments` existed. It re-runs the
+method's recorded variants on the **dev** window through the same `dev.run_registry` path `lab run`
+uses, proves the re-run *is* the recorded measurement, and appends `trial_moments` rows — and
+nothing else. It is addressed by **method**, one at a time, on demand.
+
+- **It writes `trial_moments` and nothing else.** There is no INSERT, UPDATE or DELETE against
+  `trials` or `methods` anywhere in `lab/remeasure.py`: no recorded `dsr`, `eligible`, `failed` or
+  `n_trials_at_run` moves, no status transition happens, no pre-registration is written. Each row
+  carries the trial's **recorded** `n_trials_at_run`, not today's dev trial count — the row
+  documents the measurement that was made — and a `measured` stamp of *this* backfill, not the old
+  trial's `run_at`, because the moments were measured today on today's store.
+- **Two checks, both aborting before a row is written** (`remeasure.check`, all or nothing): the
+  freshly measured annualized Sharpe reproduces the recorded `trials.sharpe` to `SHARPE_TOL` (1e-9
+  *relative* — full-precision engine floats, so only a last-ulp wobble is expected), and the DSR
+  recomputed from the fresh moments, at the trial's recorded `n_trials_at_run` and the
+  reconstructed `var_trials` of its run, reproduces the recorded `trials.dsr` to `DSR_TOL` (1e-6
+  *absolute* — a DSR is a probability). One divergent trial aborts the whole command: a partial
+  backfill would mix moments measured on two different stores inside a table whose point is that a
+  verdict can be recomputed from it.
+- **`var_trials` was never recorded and is still recovered exactly.** `remeasure.batches_of` groups
+  a method's dev trials into the `lab run` batches that wrote them — one batch is one
+  `BEGIN IMMEDIATE`, so its `trials.n` are contiguous — and rebuilds the prior daily Sharpes from
+  the `sharpe` column of every dev row with a lower `n`. It refuses a non-contiguous batch, and
+  refuses one where `(dev trials before it) + (batch size) != n_trials_at_run`, because then the
+  recorded N does not describe the batch and no honest `var_trials` can be rebuilt from it.
+- **It refuses before it loads anything** (`remeasure.preflight`, every one a `store.LabError`): the
+  method has a `window = 'test'` trial — the look is spent and nothing here may stand near it; the
+  method has no dev trial; a trial recorded no DSR or no Sharpe, so a re-run cannot be checked
+  against it; the method file is uncommitted, or no longer hashes to the `source_sha` its trials ran
+  under; a recorded configuration the method file no longer defines. `resolve_method` refuses an
+  `H-*` seed family by shape (no method file, no recorded DSR) and an unknown method id.
+- **The test window is unreachable by construction, not by care**: the test-window refusal is made
+  first, `research.load_store` is called with no window so it defaults to `DEV_WINDOW` and refuses a
+  test store **by name** before a byte is read, `measure` refuses a loaded store whose window is not
+  `research.DEV_WINDOW`, and `dev.run_registry` is called with no `window` keyword — neither
+  `measure` nor `remeasure` has a parameter with which to pass one. `--store` defaults to
+  `research.STORE_DIR` or `$SEER_RESEARCH_STORE`.
+- **Idempotent**: when every dev trial already has its moments it prints what it skipped and returns
+  *without loading a research store* — re-loading a 135 MB store and re-running backtests to write
+  nothing is not idempotence. `trial_moments` is append-only, so "already there" is the answer,
+  never a rewrite; `preflight` runs again inside the write lock so a parallel session that
+  backfilled the same method in between is not written over.
+- **`--dry-run` is ignored**, as it is for every `lab` subcommand but `test`.
+- **Output**: one line per trial with its fresh `(sr_daily, t, skew, kurt, var_trials)` at `N`,
+  the recorded vs measured Sharpe and the recorded vs recomputed DSR with both deltas and
+  tolerances, the trials left alone, and then `Lab N (dev trials) is still N; test-window looks
+  used: K` — both unchanged by this command.
+- **Exit codes**: 0 success (including the nothing-to-do run); 2 for any `store.LabError`, which is
+  every refusal above and an unknown method; 1 for anything else.
+- Measured: `lab remeasure M0022` reproduced all three recorded DSRs bit-identically.
+- Tests: `tests/test_lab_remeasure.py` (13), with the fixtures in `tests/labkit.py`.
 
 
 ## Exported API

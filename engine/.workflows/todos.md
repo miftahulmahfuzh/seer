@@ -3,7 +3,7 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-07
-**Total Active Tasks**: 4
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
@@ -13,8 +13,8 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 4
-- Completed: 87
+- Blocked: 3
+- Completed: 88
 
 ---
 
@@ -584,15 +584,31 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the recorded precedent of phases 1 and 6 of this same set, and of the BUILD_PROMOTION_PATH / ROSTER_PROMOTION_PIPELINE / FUNDAMENTAL_PANEL_COVERAGE swarms in this file). A cross-file block move is the one edit that reliably loses a peer's concurrent append.
     - Completion: no `**Commit**` field, and `LAB_LUCK_GATE_PLAN.md` left untouched (rung 6: phases 1 and 6's precedent; rung 3: the set is a swarm whose coordinator `orch-lab-luck-gate` owns the ledger at `.workflows/orchestration/lab-luck-gate/ledger.json`). The index's phase table has no tick column and seven peers hold it open; the sha goes to the coordinator instead. No peer phase's task was unblocked or altered — phase 3 (`P1-ENG-921N`) stays `blocked`; the coordinator releases it.
     - Quick Stats recounted from the file rather than blind-decremented (recount is idempotent under concurrency; a decrement compounds the race).
-- [ ] **P1-ENG-921N** Phase 3: `lab remeasure` — recover the inputs for a recorded method
+- [x] **P1-ENG-921N** Phase 3: `lab remeasure` — recover the inputs for a recorded method
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `lab remeasure <method>` in `commands/lab.py` and the new `lab/remeasure.py` module: re-runs *only* the dev window for a method whose trials predate phase 2, writes `trial_moments` rows and nothing else, and is idempotent; refuses any method with a test trial and refuses the test window by name. Does not touch `trials`, `methods.status`, the prereg files or the test-window store. Exit: `lab remeasure M0022` populates three `trial_moments` rows whose recomputed DSR reproduces each recorded `dsr` to within 1e-6 at the recorded `n_trials_at_run`; running it twice changes nothing; `pytest` green.
-  - **Status**: blocked
+  - **Status**: completed
   - **Plan Set**: `LAB_LUCK_GATE_PLAN.md` (phase 3 of 9)
   - **Satisfies**: R2 — A trial's verdict is frozen at the N of its run date, so verdicts are not comparable across time and a method can never be re-judged.
   - **Depends on**: P1-ENG-6134
   - **Plan**: `.workflows/plan/P1-ENG-921N.md`
+  - **Completed**: 2026-10-07 11:36
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/remeasure.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_remeasure.py, engine/.workflows/plan/P1-ENG-921N.md, engine/.workflows/todos.md
+  - **Verified**: all five exit criteria measured, not estimated. (1) `lab remeasure M0022` against a COPY of the committed database (`SEER_LAB_DB`, per D5 — the committed `lab/lab.sqlite` was never opened for writing) and the real 270MB dev research store wrote exactly three `trial_moments` rows — #108 M0022-W-TV14, #109 M0022-W-TV16, #110 M0022-W-TV14-SW — each reproducing its recorded DSR (0.912210222337 / 0.915623353658 / 0.764668011634) at the recorded N=110 with the reconstructed `var_trials` = 2.395048e-04; **every delta exactly 0.000e+00**, bit-identical rather than merely inside the mandated 1e-6, and the recorded annualized Sharpes reproduced bit-identically too. (2) A second run loaded no research store, wrote nothing and named the three trials it skipped — idempotent. (3) `lab remeasure H-P7A-F1` and `lab remeasure M9999` both exit 2; the test-trial and no-dev-trial refusals are covered by unit tests. (4) Invariants hold on the remeasured copy: the `trials` digest over (n, method_id, candidate_id, window, sharpe, dsr, eligible, failed, n_trials_at_run) identical before and after across all 110 rows (`dcd884b7c6f08a2f`), the `methods` digest identical across all 37 rows (`581de1c38996cff3`), `test_looks` = 0, `dev_trial_count` = 110, M0022 still `rejected`. (5) Full engine suite green: **3089 passed, 0 failed** (`pytest -q -o addopts="-ra"` with `PG_TEST_URL` set). Targeted group `test_lab_remeasure.py test_lab_runner.py test_lab_store.py test_lab_test_window.py`: 68 passed; the new file contributes 13 tests.
+  - **Drift**:
+    - No drift. Every symbol phase 2 was contracted to provide exists with the assumed shape (`store.MomentsRow` with its 8th no-default `measured: str` field — reconciliation conflict 4 — `store.insert_moments` called by attribute in `runner.py` so the test fixture can monkeypatch it, `store.moments_of`). All four `commands/lab.py` anchors matched the plan's quoted text exactly and all four edits were pure insertions, per the shared-file protocol (conflict 6/11).
+    - Verification environment: `pytest-xdist` is absent from the shared venv while `engine/pyproject.toml` sets `addopts = "-ra -n auto"`, so every suite ran with `-o addopts="-ra"` (serial). Pre-existing repo condition recorded independently by phases 1, 2 and 6; nothing was installed into the shared venv. `PG_TEST_URL` was set, which takes ~21 tests out of skip.
+    - Because phase 4's unfinished work is sitting uncommitted in this shared tree, the whole suite was re-run a second time against a pristine `git archive HEAD` extraction carrying ONLY this phase's three files, to prove the green is this phase's and not a peer's WIP propping it up: 3088 passed with a single failure, `test_lab_prereg.py::test_lab_promote_command_exits_2_when_the_lab_refuses`, which shells out to `git rev-parse HEAD` and therefore cannot pass inside a non-git /tmp extraction. It reproduces identically on bare HEAD with zero phase-3 files present — an artifact of the isolation harness, not a defect and not this phase's.
+  - **Decided**:
+    - The plan's code blocks embed two `NOTE TO THE IMPLEMENTER` paragraphs inside shipped docstrings (`remeasure.resolve_method` and `remeasure._moments_row`) → stripped them from the delivered code (rung 3, the plan set's code blocks): phase 9 quotes both docstrings as the left side of its diff WITHOUT those paragraphs, so shipping them verbatim would break the dependent phase's diff. Every other line of both code blocks is verbatim.
+    - Reconstructing a historical run's `var_trials`, which was never recorded: `trials.n` is a monotone AUTOINCREMENT and `run_method` writes a whole batch inside one `BEGIN IMMEDIATE`, so a batch's trial numbers are contiguous and "every dev trial that existed then" is exactly "every dev row with a lower n" — rebuilt from the append-only `sharpe` column and cross-checked against the recorded `n_trials_at_run` before anything is reconstructed. The cross-check refuses rather than guesses if the two disagree.
+    - Landing: not attempted, and `next_command` is empty. `swarm.py find --plan LAB_LUCK_GATE_PLAN.md --task P1-ENG-921N` returns `swarm: true` with coordinator `orch-lab-luck-gate`, so per `analyze-orchestrator` Step 5 the merge of `feature/lab-luck-gate` into `main` belongs to that coordinator, not to this session. Nothing merged, pushed to main, or deleted.
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks` (rung 6: the direct precedent recorded by phases 1, 2 and 6 of this same set, and by the BUILD_PROMOTION_PATH / ROSTER_PROMOTION_PIPELINE / FUNDAMENTAL_PANEL_COVERAGE swarms in this same file). A cross-file block move is the one edit that reliably loses a peer's concurrent append.
+    - Completion: no `**Commit**` field, and `LAB_LUCK_GATE_PLAN.md` left untouched (rung 6: phases 1, 2 and 6's precedent; rung 3: the set is a swarm whose coordinator owns the ledger at `.workflows/orchestration/lab-luck-gate/ledger.json`). The index's phase table has no tick column — its TaskID and Card columns are `—` for all nine rows — and six peers hold it open; the sha goes to the coordinator instead.
+    - No peer phase's task was unblocked or altered: phase 9 (`P1-ENG-ALY2`) stays `blocked` and the coordinator releases it; phase 4 (`P1-ENG-B6Y5`) is in flight in a peer session. `next_task_id` was deliberately empty.
+    - Quick Stats recounted from the file rather than blind-decremented (recount is idempotent under concurrency; a decrement compounds the race).
 - [ ] **P1-ENG-B6Y5** Phase 4: The verdict is derived under one policy, at the current N
   - **Difficulty**: HARD
   - **Type**: Feature

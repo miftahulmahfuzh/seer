@@ -54,6 +54,7 @@ def _args(**kw) -> argparse.Namespace:
         sub="Top 20 on filed fundamentals, monthly", icon="book-open", sort=None,
         gate_note="No backtest gate: the dev window predates usable XBRL coverage",
         gate_not_applicable=False, retire=None, lab_db=None, lab_status_stays=True,
+        lab_override_reason="the lab has not passed it; on paper to test it forward",
         dry_run=False, verbose=0,
     )
     base.update(kw)
@@ -314,6 +315,26 @@ def test_a_rejected_method_needs_the_acknowledgement(pg, monkeypatch, lab, tmp_p
     with pytest.raises(lab_store.LabError, match="--lab-status-stays"):
         promote._run(_args(lab_status_stays=False, lab_db=tmp_path / "lab.sqlite"))
     assert pg.execute("SELECT count(*) FROM strategies WHERE id = 'TEST-FND'").fetchone()[0] == 0
+
+
+def test_an_override_with_no_reason_is_refused_before_writing(pg, monkeypatch, lab, tmp_path):
+    """The roster may take a method the lab has not passed -- but not silently (D3)."""
+    _wire(monkeypatch, pg=pg, lab=lab)
+    with pytest.raises(promote.PromoteError, match="--lab-override-reason"):
+        promote._run(_args(lab_override_reason="", lab_db=tmp_path / "lab.sqlite"))
+    assert pg.execute("SELECT count(*) FROM strategies WHERE id = 'TEST-FND'").fetchone()[0] == 0
+    assert lab_store.PROMOTION_MARKER not in lab_store.get_method(lab, METHOD)["analysis"]
+
+
+def test_the_plan_prints_the_basis_and_the_roster_line_to_add(pg, monkeypatch, lab, tmp_path, capsys):
+    _wire(monkeypatch, pg=pg, lab=lab)
+    assert promote.run(_args(lab_db=tmp_path / "lab.sqlite")) == 0
+    text = capsys.readouterr().out
+    assert "basis           owner-override" in text
+    assert f"method/variant  {METHOD} / {VARIANT}" in text
+    # the `lab` fixture leaves the method at 'rejected' (the plan's prose said 'idea'); either way
+    # it is an owner-override, and what the printed line must name is the status actually read.
+    assert "LAB_PROVENANCE" in text and "lab_status='rejected'" in text
 
 
 @pytest.mark.parametrize("dry_run", [False, True])

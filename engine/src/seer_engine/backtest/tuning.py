@@ -13,7 +13,16 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from seer_engine.backtest.metrics import CheckItem, Metrics, checklist, fmt_pct, fmt_signed_pct
+from seer_engine.backtest import metrics as _metrics
+from seer_engine.backtest.metrics import (
+    MAX_DRAWDOWN_LABEL,
+    CheckItem,
+    Metrics,
+    checklist,
+    fmt_pct,
+    fmt_signed_pct,
+    to_fixed,
+)
 from seer_engine.strategies.a import DESIGN_PARAMS, AParams
 
 IS_START = date(2015, 10, 19)  # first session whose data_date has 200 bars of history
@@ -24,10 +33,14 @@ GRID_LIMIT: tuple[Decimal, ...] = (Decimal("0.25"), Decimal("0.5"), Decimal("0.7
 GRID_TP: tuple[Decimal, ...] = (Decimal("0.75"), Decimal("1.0"), Decimal("1.5"))
 GRID_SL: tuple[Decimal, ...] = (Decimal("1.0"), Decimal("1.5"), Decimal("2.0"))
 
-MAX_DRAWDOWN = 0.15  # go-live #4; equals the threshold in metrics.checklist
+# go-live #4, re-exported from ``metrics`` so ``checklist`` and this module cannot drift apart.
+# Every reader of the threshold (dev.make_row, lab.store.snapshot, dev_report, qualifies, gate)
+# goes through this name; the value lives in ``metrics.MAX_DRAWDOWN``. Raised 0.15 -> 0.20 by the
+# owner on 2026-10-07; design §11.
+MAX_DRAWDOWN = _metrics.MAX_DRAWDOWN
 MIN_PROFIT_FACTOR = 1.3  # go-live #3; equals the threshold in metrics.checklist
 
-_GATE_NAMES = ("beating total-return SPY", "profit factor ≥ 1.3", "max drawdown ≤ 15%")
+_GATE_NAMES = ("beating total-return SPY", "profit factor ≥ 1.3", MAX_DRAWDOWN_LABEL.lower())
 
 
 def grid() -> tuple[AParams, ...]:
@@ -60,12 +73,13 @@ class Selection:
 @dataclass(frozen=True)
 class Verdict:
     passed: bool
-    checks: tuple[CheckItem, ...]  # checklist items "Beats SPY", "Profit factor ≥ 1.3", "Max drawdown ≤ 15%"
+    checks: tuple[CheckItem, ...]  # checklist items "Beats SPY", "Profit factor ≥ 1.3", MAX_DRAWDOWN_LABEL
     sentence: str
 
 
 def qualifies(m: Metrics) -> bool:
-    """A grid run may be selected only if max DD ≤ 15% and PF ≥ 1.3 (infinite PF qualifies)."""
+    """A grid run may be selected only if max DD ≤ ``MAX_DRAWDOWN`` and PF ≥ ``MIN_PROFIT_FACTOR``
+    (infinite PF qualifies)."""
     return (
         m.total_return is not None
         and m.max_drawdown is not None
@@ -90,7 +104,8 @@ def select(rows: Sequence[GridRow], *, fallback: Any = DESIGN_PARAMS) -> Selecti
             params=fallback,
             qualified=False,
             reason=(
-                f"No in-sample grid run had max drawdown ≤ 15% and profit factor ≥ 1.3 (0 of {n}), "
+                f"No in-sample grid run had max drawdown ≤ {fmt_pct(MAX_DRAWDOWN, 0)} and profit "
+                f"factor ≥ {to_fixed(MIN_PROFIT_FACTOR, 1)} (0 of {n}), "
                 "so the design values are kept."
             ),
         )
@@ -105,7 +120,8 @@ def select(rows: Sequence[GridRow], *, fallback: Any = DESIGN_PARAMS) -> Selecti
     reason = (
         f"Grid run #{best_i + 1} has the highest in-sample total return "
         f"({fmt_signed_pct(best.metrics.total_return)}, max drawdown {fmt_pct(best.metrics.max_drawdown)}) "
-        f"among the {len(candidates)} of {n} runs with max drawdown ≤ 15% and profit factor ≥ 1.3"
+        f"among the {len(candidates)} of {n} runs with max drawdown ≤ {fmt_pct(MAX_DRAWDOWN, 0)} "
+        f"and profit factor ≥ {to_fixed(MIN_PROFIT_FACTOR, 1)}"
     )
     if tied > 1:
         reason += f"; {tied} runs tied on return, broken by the lower max drawdown, then grid order"
@@ -121,9 +137,9 @@ def _join(items: Sequence[str]) -> str:
 def gate(oos: Metrics, spy_tr_oos: Metrics) -> Verdict:
     """The P3 gate, decided by out-of-sample results only.
 
-    It passes when total return > total-return SPY (strict), profit factor ≥ 1.3 and max
-    drawdown ≤ 15%. The checks are ``checklist`` items 3–5, so the labels and value strings
-    match the web.
+    It passes when total return > total-return SPY (strict), profit factor ≥
+    ``MIN_PROFIT_FACTOR`` and max drawdown ≤ ``MAX_DRAWDOWN``. The checks are ``checklist``
+    items 3–5, so the labels and value strings match the web.
     """
     beats, pf, dd = checklist(oos, spy_tr_oos.total_return)[2:5]
     checks = (beats, pf, dd)

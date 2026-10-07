@@ -29,6 +29,7 @@ from typing import Any
 from seer_engine.backtest.benchmark import BenchmarkCurve
 from seer_engine.backtest.dev import (
     DEV_END,
+    FAILURE_LABELS,
     FX_START,
     MAX_CANDIDATES,
     MEMBERSHIP_START,
@@ -57,7 +58,7 @@ MIN_TRADES = 100  # design §1 item 2, applied on dev by D8 (phase 9's ">= 100 t
 MAX_FINALISTS = 3  # D8
 TOP_YEARS = 5  # §7.6: "year by year for the top candidates"; phase 12 picks them (finalists first)
 STORE_COUNT_KEYS: tuple[str, ...] = ("bar_rows", "symbols_requested", "symbols_served", "dividend_rows", "fx_rows")
-FAIL_ORDER: tuple[str, ...] = ("beats SPY TR", "max DD <= 15%", "PF >= 1.3", ">= 100 trades", "owner inputs")
+FAIL_ORDER: tuple[str, ...] = FAILURE_LABELS  # the engine's own labels; entry [1] follows MAX_DRAWDOWN (D13)
 ROWS_CSV_HEADER = (
     "id,family,allocator,rules,start,end,total_return,cagr,max_drawdown,profit_factor,trades,"
     "exposure,turnover,cost_drag,costs_usd,dividends_usd,sharpe,worst_year,worst_year_return,"
@@ -576,7 +577,8 @@ def _frontier_section(r: DevReport) -> list[str]:
         "",
         f"![CAGR against max drawdown for every candidate, SPY total-return marked]({stem}-frontier.svg)",
         "",
-        "Each dot is one candidate on its own window. Dots right of the dashed 15% line fail D8 on "
+        f"Each dot is one candidate on its own window. Dots right of the dashed "
+        f"{fmt_pct(MAX_DRAWDOWN, 0)} line fail D8 on "
         "drawdown. The diamond is total-return SPY on "
         f"{_span(r.spy_window[0], r.spy_window[1])}. Finalists are labelled.",
         "",
@@ -916,7 +918,7 @@ def _pct_tick(v: float, step: float) -> str:
 
 def frontier_svg(r: DevReport) -> str:
     """CAGR (y) against max drawdown (x), one dot per candidate with both, SPY total-return on
-    ``spy_window`` as a diamond, the 15% drawdown limit dashed, finalists labelled. Self-contained,
+    ``spy_window`` as a diamond, the ``MAX_DRAWDOWN`` limit dashed, finalists labelled. Self-contained,
     light and dark palettes, no script."""
     _validate(r)
     finalist_ids = {f.candidate.id for f in r.finalists}
@@ -961,7 +963,8 @@ def frontier_svg(r: DevReport) -> str:
         'font-family="system-ui, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">',
         f'<title id="title">{_esc(title)}</title>',
         '<desc id="desc">Scatter of CAGR against max drawdown for every P7a candidate on the '
-        "development window, with total-return SPY and the 15% drawdown limit marked. The values "
+        f"development window, with total-return SPY and the {fmt_pct(MAX_DRAWDOWN, 0)} drawdown "
+        "limit marked. The values "
         "are in the rows CSV next to this file.</desc>",
         f"<style>{_SVG_STYLE}</style>",
         f'<rect class="bg" x="0" y="0" width="{_SVG_W}" height="{_SVG_H}"/>',
@@ -1214,7 +1217,7 @@ def render_preregistration(r: DevReport) -> str:
             "- Data end is the last bar in Neon `bars` when P7b runs; P7b records it.",
             "- SPY price-only and total-return on the same windows and starting cash.",
             "",
-            "## Gate (design §1, thresholds unchanged)",
+            "## Gate (design §1)",
             "",
             "- Beats total-return SPY over the main test window.",
             f"- Max drawdown ≤ {fmt_pct(MAX_DRAWDOWN, 0)}.",

@@ -83,7 +83,7 @@ export function pipelineStages(snap: HowInput): PipelineStage[] {
       title: ['Tested on', `${year(g.devStart)}–${year(g.devEnd)}`],
       detail: ['Practice years.', 'Every variant run', 'is counted'],
       count: plural(c.devTrials, 'try', 'tries'),
-      countTip: `N = ${count(c.devTrials)}: every try on the practice years, the early Seer research included`,
+      countTip: `N = ${count(c.devTrials)}: every try on the practice years, the early Seer research included — and all ${count(g.dsrN)} of them discount the luck check`,
       fails: true,
     },
     {
@@ -200,7 +200,7 @@ export function hurdles(gate: Gate, tries: number): Hurdle[] {
     dsr: {
       title: 'Not just luck',
       target: `Luck check ≥ ${num(gate.dsrMin)}`,
-      plain: `Try enough ideas and one will look great by chance. The luck check discounts a result for every try ever made (N = ${count(tries)} so far), so the bar rises as the lab keeps searching.`,
+      plain: `Try enough ideas and one will look great by chance. The luck check discounts a result for every try ever made (N = ${count(gate.dsrN)} so far, out of ${count(tries)} runs on the practice years), so the bar rises as the lab keeps searching. How high it has to reach — ${num(gate.dsrMin)} — is the owner's call on how much doubt is acceptable.`,
     },
   };
   return CONDITION_KEYS.map(key => ({ key, term: CONDITION_TERM[key], ...text[key] }));
@@ -215,7 +215,7 @@ export function honestyRules(snap: Pick<HowInput, 'gate' | 'summary'>): Rule[] {
     {
       key: 'counted',
       title: 'Every try is counted',
-      body: `${plural(devTrials, 'try', 'tries')} so far, failures included. The luck check uses all of them, so trying more never makes a winner easier to find.`,
+      body: `${plural(devTrials, 'try', 'tries')} so far, failures included, and none is ever removed. The luck check uses all ${count(g.dsrN)} of them, so trying more never makes a winner easier to find — it makes it harder.`,
     },
     {
       key: 'first',

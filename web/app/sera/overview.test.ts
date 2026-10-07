@@ -84,10 +84,13 @@ const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
   version: 1,
   asOf: '2026-10-04T14:12:24+00:00',
   gate: {
-    maxDrawdown: 0.15,
+    maxDrawdown: 0.2,
     minProfitFactor: 1.3,
     minTrades: 100,
-    dsrMin: 0.95,
+    dsrMin: 0.9,
+    dsrPolicy: 'all-trials',
+    dsrN: 4,
+    dsrNBasis: '4 dev trials, every variant run counted as one independent look',
     devStart: '1993-01-29',
     devEnd: '2015-10-16',
     testStart: '2015-10-19',
@@ -155,10 +158,12 @@ describe('landing', () => {
   });
   it('shades the pass zone from the gate and keeps it visible', () => {
     const l = landing(snap());
-    expect(l.regions[0]).toMatchObject({ x1: 0.15, y0: 0, label: 'Pass zone' });
+    expect(l.regions[0]).toMatchObject({ x1: 0.2, y0: 0, label: 'Pass zone' });
     expect(l.refY[0].value).toBe(0);
     expect(l.yDomain[1]).toBeGreaterThan(0);
-    expect(l.inZone).toBe(1);
+    // H-B (fall 19%, +0.9pp a year over SPY) enters the pass zone at the 20% bar; at 15% only
+    // M0001-C4 was inside. This is the owner's 2026-10-07 change, seen on the landing chart.
+    expect(l.inZone).toBe(2);
     const base = snap();
     const none = landing({ ...base, trials: base.trials.filter(t => t.n === 1) });
     expect(none.yDomain[1]).toBeGreaterThan(0);
@@ -183,7 +188,7 @@ describe('state', () => {
   });
   it('reports no best beat when nothing beats SPY inside the gate', () => {
     const base = snap();
-    const s = state({ ...base, trials: base.trials.filter(t => t.n !== 4) });
+    const s = state({ ...base, trials: base.trials.filter(t => t.n !== 4 && t.n !== 2) });
     expect(s.bestBeat).toBeNull();
   });
   it('prefers the newest synthesis over newer insights of other kinds', () => {
@@ -247,10 +252,18 @@ describe('luck', () => {
   it('plots only tries with a DSR against the gate line', () => {
     const l = luck(snap())!;
     expect(l.points).toHaveLength(2);
-    expect(l.refY[0].value).toBe(0.95);
-    expect(l.above).toBe(1);
+    expect(l.refY[0].value).toBe(0.9);
+    expect(l.above).toBe(2); // 0.90 and 0.97 both clear a 0.90 bar
     expect(l.points.map(p => p.x)).toEqual([4, 4]);
     expect(l.yTicks.map(t => t.label)).toEqual(['0.00', '0.25', '0.50', '0.75', '1.00']);
+  });
+  it('marks the N the gate deflates by today, with its evidence', () => {
+    const l = luck(snap())!;
+    expect(l.refX[0].value).toBe(4);
+    expect(l.refX[0].label).toBe('N = 4 today');
+    expect(l.refX[0].tip).toBe('4 dev trials, every variant run counted as one independent look');
+    expect(l.n).toBe(4);
+    expect(l.policy).toBe('all-trials');
   });
   it('is null when no try has a DSR', () => {
     const base = snap();

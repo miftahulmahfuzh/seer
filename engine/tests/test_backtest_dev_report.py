@@ -18,7 +18,7 @@ import pytest
 from seer_engine import dates
 from seer_engine.backtest.benchmark import BenchmarkCurve
 from seer_engine.backtest.book_runner import RunStats
-from seer_engine.backtest.dev import DEV_END, Candidate, DevRow, finalists
+from seer_engine.backtest.dev import DEV_END, FAILURE_LABELS, Candidate, DevRow, finalists
 from seer_engine.backtest.dev_report import (
     ROWS_CSV_HEADER,
     TEST_SLICE_START,
@@ -120,7 +120,7 @@ SPECS = (
         0.25,
         1.1,
         300,
-        ("beats SPY TR", "max DD <= 15%", "PF >= 1.3"),
+        ("beats SPY TR", FAILURE_LABELS[1], "PF >= 1.3"),
         (),
     ),
     ("F3-A", "F3", MONTHLY_HOLD, ETF, "SPY", SPY_START, 0.26, 0.10, 0.08, 2.0, 40, (">= 100 trades",), ()),
@@ -509,7 +509,7 @@ def test_rows_csv():
     assert by_id["F1-B"]["eligible"] == "true"
     assert by_id["F2-A"]["owner_inputs"] == "etf:IEF" and by_id["F2-A"]["failed"] == "owner inputs"
     assert by_id["REF-Z"]["cagr"] == "" and by_id["REF-Z"]["profit_factor"] == "" and by_id["REF-Z"]["mar"] == ""
-    assert by_id["F7-A"]["failed"] == "beats SPY TR;max DD <= 15%;PF >= 1.3"
+    assert by_id["F7-A"]["failed"] == f"beats SPY TR;{FAILURE_LABELS[1]};PF >= 1.3"
     assert by_id["F1-A"]["worst_year"] == "2015"
     assert by_id["F1-A"]["spy_tr_total_return"] == "0.250000" and by_id["F1-A"]["spy_tr_cagr"] == "0.100000"
 
@@ -539,7 +539,7 @@ def test_frontier_svg():
     texts = [t.text for t in root.iter(f"{ns}text")]
     assert "F1-A" in texts and "F4-A" in texts and "F1-B" not in texts
     assert "SPY total-return" in texts
-    assert any(t and t.startswith("max drawdown 15%") for t in texts)
+    assert any(t and t.startswith("max drawdown 20%") for t in texts)
     assert "Not plotted (no CAGR or drawdown): 1." in svg
     assert root.find(f"{ns}line[@class='lim']") is not None
 
@@ -576,7 +576,7 @@ def test_preregistration_names_each_finalist_exactly():
     assert "- Owner inputs: none" in text
     assert f"- Main: {TEST_START.isoformat()} → data end" in text
     assert f"{TEST_SLICE_START.isoformat()} → data end" in text
-    assert "- Max drawdown ≤ 15%." in text and "- Profit factor ≥ 1.3." in text and "- ≥ 100 closed trades." in text
+    assert "- Max drawdown ≤ 20%." in text and "- Profit factor ≥ 1.3." in text and "- ≥ 100 closed trades." in text
     assert "Beats total-return SPY" in text
     revision = text.split("## Proposed design-§5 revision (D10)")[1]
     for line in describe_rules(DESIGN_V0):

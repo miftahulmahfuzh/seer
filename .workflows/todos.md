@@ -2,7 +2,7 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-04 22:29:24
+**Last Updated**: 2026-10-07 14:16:00
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 4
+- Completed: 5
 
 ---
 
@@ -35,6 +35,26 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-FWWQ** Phase 7: Docs, the pre-registration wording, and the site's gate
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns design §3's definition of dev-eligible amended to both moved thresholds, with the correlation evidence and the date, and §7's dated revision (7.1 the luck bar, 7.2 the N left alone, 7.3 the deferred ratchet, 7.4 paper membership, 7.5 pointing at §1's drawdown change, 7.6 the seed re-run) in `docs/plans/2026-10-04-method-lab-design.md`; `prereg.py`'s baked N wording and `docs/lab/prereg/README.md`; `SKILL.md`; `engine/package_readme.md`; the snapshot `gate` block gaining the policy name, its N and its evidence; and the sera site's gate display, including matching both threshold-bearing failure labels by prefix in `derive.ts`. Does not touch engine behavior, either threshold, the policy default, any recorded trial, design §1 or `web/lib/metrics.ts` (both phase 8's). Shares seven files with phase 8, which lands first, and quotes the post-phase-8 state (`maxDrawdown: 0.2` already in place). Exit: no doc states a bar the lab does not apply; `derive.ts` reads both `DSR >= …` and `max DD <= …` by prefix and both prefixes are pinned to the engine; the sera site shows the policy and its N next to the luck bar; `npm run build` and `vitest` pass in `web/`; `pytest` green.
+  - **Status**: completed
+  - **Plan Set**: `LAB_LUCK_GATE_PLAN.md` (phase 7 of 9)
+  - **Satisfies**: R1 — The gate admits nothing at 110 trials and the bar rises with every exploration regardless of merit — 110 correlated variant rows deflated as 110 independent trials.
+  - **Depends on**: P1-ENG-B6Y5, P1-ENG-EH4K
+  - **Plan**: `.workflows/plan/P1-ROOT-FWWQ.md`
+  - **Completed**: 2026-10-07 14:16
+  - **Method**: /do
+  - **Files**: docs/plans/2026-10-04-method-lab-design.md, docs/lab/prereg/README.md, docs/ROADMAP.md, .claude/skills/explore-and-experiment-new-method/SKILL.md, engine/package_readme.md, engine/src/seer_engine/lab/prereg.py, engine/src/seer_engine/lab/store.py, engine/tests/test_lab_gate_wording.py, engine/tests/test_lab_prereg.py, engine/tests/test_lab_snapshot.py, web/lib/sera/types.ts, web/lib/sera/lab.ts, web/lib/sera/lab.test.ts, web/lib/sera/derive.ts, web/lib/sera/derive.test.ts, web/lib/sera/fixture.ts, web/lib/sera/glossary.ts, web/app/sera/overview.ts, web/app/sera/overview.test.ts, web/app/sera/page.tsx, web/app/sera/methods/view.ts, web/app/sera/methods/view.test.ts, web/app/sera/methods/[id]/page.tsx, web/app/sera/how/view.ts, web/app/sera/how/view.test.ts, web/data/lab.json, .workflows/todos.md, .workflows/plan/P1-ROOT-FWWQ.md
+  - **Drift**: engine/package_readme.md had already been rewritten by phase 4 at the two regions the plan quoted (:1868-1874 gate_text bullet and :2420). Applied the plan's reconciled wording onto phase 4's current text rather than the pre-phase-4 text the plan quoted; the plan's version is now the more accurate of the two because Step 2 stopped gate_text using store.DSR_LABEL.
+  - **Drift**: Plan Step 16's Impact note claimed glossary.test.ts asserts only that every condition key has a term. It also asserts exactly one sentence per entry, which the plan's two-sentence prose broke.
+  - **Drift**: Phase 8's H2 handoff named package_readme.md drawdown RULE lines by line number; phase 4's additions had shifted them. Classified by content instead: six rule statements moved 15%->20%, and the VERDICT/history lines plus every backticked recorded label left untouched, as H2 directed.
+  - **Decided**: SKILL.md's stale 15% drawdown guardrail row and its 'under the 15% limit' example, flagged by phase 8's H2 but not named in my plan's Step 7 -> fixed alongside the luck-bar row (rung 2: phase 7's exit criterion is 'no doc states a bar the lab does not apply', and SKILL.md is in this phase's Owns).
+  - **Decided**: Four phase-4 package_readme.md lines quoting the recorded 'DSR >= 0.95' label tripped Step 9's new guard -> the guard now skips matches inside backtick code spans, instead of rewriting phase 4's prose (rung 3: the guard's own docstring already exempts recorded strings as 'quoting data, not stating the rule'; rewriting them would falsify what the append-only rows hold).
+  - **Decided**: Step 16's glossary prose vs glossary.test.ts's one-sentence-per-entry assertion -> prose reworded to one sentence each, test untouched (tie-break rule: a failing verification is never settled by relaxing the check).
+  - **Decided**: docs/ROADMAP.md:75 stated 'DSR >= 0.95 at N joins the five D8 hurdles' as the live rule -> fixed to 0.90 with the date and a pointer to design 7.1 (rung 2: exit criterion 1 requires 0.95-as-the-gate to survive only in the design document). ROADMAP.md:78's 'DSR 0.90 at N = 58' left as history, exactly as the plan's Handoffs direct. ROADMAP.md was deliberately NOT added to the guard's SCANNED list, which the plan chose on purpose.
 
 - [x] **P1-ROOT-MO5N** Phase 7: Keep it current: CI, skills, docs
   - **Difficulty**: EASY

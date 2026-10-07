@@ -10,15 +10,34 @@ import type { Benchmark, Gate, LabMethod, LabTrial, Point } from './types';
 export const CONDITION_KEYS = ['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr'] as const;
 export type ConditionKey = (typeof CONDITION_KEYS)[number];
 
-/** The engine's label for each condition, exactly as it appears in `trial.failed`. */
-export const FAILURE_LABEL: Record<ConditionKey, string> = {
+/**
+ * The engine's label for each condition, exactly as it appears in `trial.failed`.
+ *
+ * The luck check is the exception and is matched by prefix instead (`DSR_FAILURE_PREFIX`):
+ * `trials` is append-only, so a trial judged before the owner moved the bar on 2026-10-07 carries
+ * `DSR >= 0.95` for ever and one judged after carries `DSR >= 0.90`. Both mean "missed the luck
+ * check", and matching one literal would quietly render the other as a pass.
+ */
+export const FAILURE_LABEL: Record<Exclude<ConditionKey, 'dsr' | 'drawdown'>, string> = {
   spy: 'beats SPY TR',
-  drawdown: 'max DD <= 15%',
   pf: 'PF >= 1.3',
   trades: '>= 100 trades',
   owner: 'owner inputs',
-  dsr: 'DSR >= 0.95',
 };
+
+/**
+ * The two labels that carry a threshold in their own text, and so must be matched by prefix.
+ *
+ * `trials` is append-only, so a row judged before 2026-10-07 carries `DSR >= 0.95` and
+ * `max DD <= 15%` for ever, while a row judged after carries `DSR >= 0.90` and `max DD <= 20%` —
+ * the owner moved both bars that day. Matching either literal would render the other as a
+ * **pass**, which is the worst failure this page has: a missed hurdle shown as a green tick.
+ *
+ * These mirror `store.LUCK_LABEL_PREFIX` and the live `dev.FAILURE_LABELS` drawdown entry; the
+ * engine-side pins in Steps 9 and 14 are what keep the mirror honest.
+ */
+export const DSR_FAILURE_PREFIX = 'DSR >= ';
+export const DRAWDOWN_FAILURE_PREFIX = 'max DD <= ';
 
 /** Plain-language name of each condition. */
 export const CONDITION_LABEL: Record<ConditionKey, string> = {
@@ -63,8 +82,14 @@ function marDesc(a: LabTrial, b: LabTrial): number {
 
 /** true = passed, false = missed, null = not measured. */
 export function conditionOk(trial: LabTrial, key: ConditionKey): boolean | null {
+  if (key === 'dsr') {
+    if (trial.failed.some((f) => f.startsWith(DSR_FAILURE_PREFIX))) return false;
+    return trial.dsr === null ? null : true;
+  }
+  if (key === 'drawdown') {
+    return !trial.failed.some((f) => f.startsWith(DRAWDOWN_FAILURE_PREFIX));
+  }
   if (trial.failed.includes(FAILURE_LABEL[key])) return false;
-  if (key === 'dsr' && trial.dsr === null) return null;
   return true;
 }
 

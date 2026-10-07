@@ -82,7 +82,7 @@ def test_thresholds_equal_the_web_checklist():
 
 def test_select_takes_the_highest_return_among_qualified_runs():
     rows = rows_with(
-        M(0.30, dd=0.16),  # higher return, drawdown too deep
+        M(0.30, dd=0.25),  # higher return, drawdown too deep
         M(0.25, pf=1.29),  # profit factor too low
         M(0.20),
         M(0.22, pf=math.inf),  # no loss: qualifies
@@ -97,7 +97,7 @@ def test_select_takes_the_highest_return_among_qualified_runs():
 
 
 def test_select_boundaries_are_inclusive():
-    s = select(rows_with(M(0.05, pf=1.3, dd=0.15)))
+    s = select(rows_with(M(0.05, pf=1.3, dd=MAX_DRAWDOWN)))
     assert s.qualified and s.params == grid()[0]
 
 
@@ -114,18 +114,18 @@ def test_select_negative_returns_still_pick_the_least_bad_qualified_run():
 
 
 def test_select_falls_back_to_design_values_when_nothing_qualifies():
-    s = select(rows_with(M(0.5, dd=0.2), M(0.4, pf=1.0), M(0.3, pf=None, trades=0)))
+    s = select(rows_with(M(0.5, dd=0.25), M(0.4, pf=1.0), M(0.3, pf=None, trades=0)))
     assert s.qualified is False
     assert s.params == DESIGN_PARAMS
     assert s.reason == (
-        "No in-sample grid run had max drawdown ≤ 15% and profit factor ≥ 1.3 (0 of 3), "
+        "No in-sample grid run had max drawdown ≤ 20% and profit factor ≥ 1.3 (0 of 3), "
         "so the design values are kept."
     )
     assert select([]).params == DESIGN_PARAMS
 
 
 def test_select_fallback_is_used_only_when_nothing_qualifies():
-    nothing = rows_with(M(0.5, dd=0.2), M(0.4, pf=1.0))
+    nothing = rows_with(M(0.5, dd=0.25), M(0.4, pf=1.0))
     sentinel = object()
     s = select(nothing, fallback=sentinel)
     assert s.params is sentinel
@@ -133,7 +133,7 @@ def test_select_fallback_is_used_only_when_nothing_qualifies():
     assert s.reason == select(nothing).reason  # same words whatever the fallback
     assert select([], fallback=sentinel).params is sentinel
     # With a qualifying row the fallback is ignored: same Selection as without it.
-    some = rows_with(M(0.5, dd=0.2), M(0.1), M(0.2))
+    some = rows_with(M(0.5, dd=0.25), M(0.1), M(0.2))
     assert select(some, fallback=sentinel) == select(some)
     assert select(some, fallback=sentinel).params == grid()[2]
     # The default is DESIGN_PARAMS, exactly as before.
@@ -156,7 +156,7 @@ def spy(ret):
 def test_gate_passes_only_when_all_three_hold():
     v = gate(M(0.40, pf=1.45, dd=0.098), spy(0.35))
     assert v.passed is True
-    assert [c.label for c in v.checks] == ["Beats SPY", "Profit factor ≥ 1.3", "Max drawdown ≤ 15%"]
+    assert [c.label for c in v.checks] == ["Beats SPY", "Profit factor ≥ 1.3", "Max drawdown ≤ 20%"]
     assert v.sentence == (
         "Strategy A passes the P3 gate: out of sample it returned +40.0% against +35.0% for "
         "total-return SPY, with profit factor 1.45 and max drawdown 9.8%."
@@ -167,7 +167,7 @@ def test_gate_fails_on_each_condition_alone():
     assert gate(M(0.30), spy(0.35)).passed is False
     assert gate(M(0.35), spy(0.35)).passed is False  # strict: a tie does not beat SPY
     assert gate(M(0.40, pf=1.29), spy(0.35)).passed is False
-    assert gate(M(0.40, dd=0.151), spy(0.35)).passed is False
+    assert gate(M(0.40, dd=math.nextafter(MAX_DRAWDOWN, 1)), spy(0.35)).passed is False
     assert gate(M(0.40, pf=None, trades=0), spy(0.35)).passed is False
     assert gate(M(0.40), spy(None)).passed is False
 
@@ -181,7 +181,7 @@ def test_gate_failure_sentence_names_every_failed_check_and_stops_p4():
         "beating total-return SPY and profit factor ≥ 1.3; P4 must not start until Strategy A is reworked."
     )
     v3 = gate(M(-0.1, pf=1.0, dd=0.3), spy(0.1))
-    assert "fails on beating total-return SPY, profit factor ≥ 1.3 and max drawdown ≤ 15%;" in v3.sentence
+    assert "fails on beating total-return SPY, profit factor ≥ 1.3 and max drawdown ≤ 20%;" in v3.sentence
 
 
 def test_gate_accepts_an_infinite_profit_factor():

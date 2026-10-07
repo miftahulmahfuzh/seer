@@ -496,3 +496,159 @@ def test_the_status_check_refuses_an_unknown_status(pg):
     with pytest.raises(psycopg.errors.CheckViolation):
         pg.execute("UPDATE strategies SET status = 'zombie' WHERE id = 'A'")
     pg.rollback()
+
+
+# ---- lab provenance (lab-luck-gate R4, phase 6) --------------------------------------------------
+#
+# The roster states where each of its lab-derived entries came from; these tests check that
+# statement against the committed lab database. Importing the lab here is free -- it is
+# `paper/roster.py` that must never do it (a lab-side edit would otherwise re-digest a started
+# paper strategy), which is exactly why the check lives in the test file and not in the module.
+
+import sqlite3  # noqa: E402
+
+from seer_engine.lab import store as lab_store  # noqa: E402
+from seer_engine.paper.roster import (  # noqa: E402
+    BASES,
+    LAB_PROVENANCE,
+    LabProvenance,
+)
+
+#: Every roster entry admitted from a recorded lab candidate. A promotion adds a SEED_ROWS row
+#: AND a LAB_PROVENANCE entry in the same commit; this tuple is the third place that has to name
+#: it, and that is the point -- forgetting is a failing test, not a silent gap.
+LAB_DERIVED = (F4, F1, FND, F4_FR, F1_FR, RM, RMW)
+#: And the three that are not: SPY is the benchmark, C is the LLM strategy the quant gate does not
+#: apply to, and A predates the lab (H-A records the idea but has no trial).
+NOT_LAB_DERIVED = ("SPY", "A", "C")
+
+
+def _lab_reachable(src: str) -> set[str]:
+    """Every lab status reachable from ``src`` along ``TRANSITIONS``, ``src`` included."""
+    seen, stack = {src}, [src]
+    while stack:
+        cur = stack.pop()
+        for a, b in lab_store.TRANSITIONS:
+            if a == cur and b not in seen:
+                seen.add(b)
+                stack.append(b)
+    return seen
+
+
+def test_every_entry_either_names_its_lab_candidate_or_has_none():
+    assert set(LAB_DERIVED) | set(NOT_LAB_DERIVED) == set(ROSTER_IDS)
+    assert not set(LAB_DERIVED) & set(NOT_LAB_DERIVED)
+    assert set(LAB_PROVENANCE) == set(LAB_DERIVED)
+    assert {e.id for e in ROSTER if e.lab_provenance is not None} == set(LAB_DERIVED)
+    assert all(entry(i).lab_provenance is None for i in NOT_LAB_DERIVED)
+
+
+def test_the_entries_name_the_variants_the_roster_advertises():
+    assert (entry(RM).lab_provenance.method_id, entry(RM).lab_provenance.candidate_id) == (
+        "M0011", "M0011-RAW20-TV14-N21")
+    assert (entry(RMW).lab_provenance.method_id, entry(RMW).lab_provenance.candidate_id) == (
+        "M0022", "M0022-W-TV16")
+    assert (entry(FND).lab_provenance.method_id, entry(FND).lab_provenance.candidate_id) == (
+        "M0005", "M0005-ALL")
+    # the fractional twins trade the same lab candidate as the whole-share entries they replaced
+    assert entry(F4_FR).lab_provenance.candidate_id == entry(F4).lab_provenance.candidate_id == F4
+    assert entry(F1_FR).lab_provenance.candidate_id == entry(F1).lab_provenance.candidate_id == F1
+
+
+def test_every_override_states_its_basis_and_a_reason():
+    for sid, p in LAB_PROVENANCE.items():
+        assert p.basis in BASES, sid
+        assert p.lab_status in lab_store.STATUSES, sid
+        if p.basis == "owner-override":
+            assert p.reason.strip(), f"{sid}: an override must say why"
+    # today every roster entry is an override admitted at 'rejected': not one of them has had a
+    # test-window look. When that stops being true, this assertion is the place to say so.
+    assert {p.basis for p in LAB_PROVENANCE.values()} == {"owner-override"}
+    assert {p.lab_status for p in LAB_PROVENANCE.values()} == {"rejected"}
+    assert set(BASES) == set(lab_store.PROMOTION_BASES)
+
+
+def test_a_malformed_provenance_is_refused_where_it_is_written():
+    with pytest.raises(ValueError, match="basis"):
+        LabProvenance(method_id="M0001", candidate_id="M0001-A", lab_status="rejected",
+                      basis="vibes", reason="r")
+    with pytest.raises(ValueError, match="reason"):
+        LabProvenance(method_id="M0001", candidate_id="M0001-A", lab_status="rejected",
+                      basis="owner-override", reason="   ")
+    with pytest.raises(ValueError, match="method_id"):
+        LabProvenance(method_id="", candidate_id="M0001-A", lab_status="rejected",
+                      basis="owner-override", reason="r")
+    passed = LabProvenance(method_id="M0001", candidate_id="M0001-A", lab_status="test-passed",
+                           basis="test-passed", reason="")
+    assert (passed.basis, passed.reason) == ("test-passed", "")
+
+
+def test_lab_provenance_is_not_in_the_spec():
+    """Invariant 5. Provenance is a recorded fact about admission, like gate_note -- never spec."""
+    other = LabProvenance(method_id="M0099", candidate_id="M0099-X", lab_status="test-passed",
+                          basis="test-passed", reason="")
+    for e in ROSTER:
+        moved = dataclasses.replace(e, lab_provenance=other)
+        assert spec_digest(spec(moved)) == PINS[e.id]
+        assert strategy_params(moved) == strategy_params(e)
+        assert set(strategy_params(e)) == {"spec", "digest", "backtest_gate"}
+
+
+def test_every_provenance_matches_the_committed_lab_database():
+    """The check that would have caught the RM/RMW divergence on the night it happened.
+
+    The committed database, not ``SEER_LAB_DB``: a sera worktree's shared database holds sibling
+    methods this tree does not have (the same reason ``test_lab_methods.py`` reads it this way).
+    """
+    if not lab_store.COMMITTED_DB.exists():
+        pytest.skip("no lab database")
+    conn = sqlite3.connect(f"file:{lab_store.COMMITTED_DB}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        for sid, p in sorted(LAB_PROVENANCE.items()):
+            method = conn.execute(
+                "SELECT id, status FROM methods WHERE id = ?", (p.method_id,)
+            ).fetchone()
+            assert method is not None, f"{sid}: no lab method {p.method_id} in the lab database"
+            dev = conn.execute(
+                "SELECT eligible, failed FROM trials WHERE method_id = ? AND candidate_id = ? "
+                "AND window = 'dev'",
+                (p.method_id, p.candidate_id),
+            ).fetchone()
+            assert dev is not None, (
+                f"{sid}: {p.candidate_id!r} is not a recorded dev trial of {p.method_id}"
+            )
+            # `lab_status` is the status AT ADMISSION and never tracks the live row. What the
+            # database can still prove is that the live status is that one or forward of it,
+            # because the lab's status machine moves forward only.
+            assert str(method["status"]) in _lab_reachable(p.lab_status), (
+                f"{sid}: admitted at lab status {p.lab_status!r}, but {p.method_id} now reads "
+                f"{method['status']!r}, which is not that status or forward of it"
+            )
+            if p.basis == "owner-override":
+                assert dev["eligible"] == 0, (
+                    f"{sid}: the basis says owner-override, but {p.candidate_id} passed the dev "
+                    f"gate (failed={dev['failed']!r}). Nothing was overridden -- fix the basis"
+                )
+            else:
+                passed = conn.execute(
+                    "SELECT eligible FROM trials WHERE candidate_id = ? AND window = 'test'",
+                    (p.candidate_id,),
+                ).fetchone()
+                assert passed is not None and passed["eligible"] == 1, (
+                    f"{sid}: the basis says test-passed, but no passed test-window trial for "
+                    f"{p.candidate_id} is recorded"
+                )
+    finally:
+        conn.close()
+
+
+def test_lab_provenance_agrees_with_the_promoted_from_column(pg):
+    """The roster's own record and the one column ``promote`` writes name the same method."""
+    rows = {r.id: r for r in store.read_roster_rows(pg)}
+    for sid, p in LAB_PROVENANCE.items():
+        if rows[sid].promoted_from is not None:
+            assert rows[sid].promoted_from == p.method_id, sid
+    # the three rows `promote` wrote are the only ones with a column to agree with; F4, F1 and
+    # their fractional twins were seeded by migration before `promote` existed.
+    assert {i for i, r in rows.items() if r.promoted_from is not None} == {FND, RM, RMW}

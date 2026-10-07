@@ -67,6 +67,7 @@ from seer_engine.backtest.report import (
 )
 from seer_engine.backtest.runner import INITIAL_IDR, RunResult, YearGap
 from seer_engine.backtest.tuning import (
+    MAX_DRAWDOWN,
     GRID_LIMIT,
     GRID_RSI,
     GRID_SL,
@@ -430,7 +431,8 @@ def _method_section(r: WalkForwardReport) -> list[str]:
         f"one continuous portfolio from {first}. Parameters switch at each year boundary, and an "
         "order already placed keeps the bracket it was placed with.",
         "- **Selection, per fold.** The fold takes the highest tuning-window total return among "
-        "combinations with max drawdown ≤ 15% and profit factor ≥ 1.3. Ties go to the lower max "
+        f"combinations with max drawdown ≤ {fmt_pct(MAX_DRAWDOWN, 0)} and profit factor ≥ 1.3. "
+        "Ties go to the lower max "
         "drawdown, then to combination order. If none qualifies, the fold trades `control` with "
         "the design values. Nothing is ever selected on traded data. The selection reasons below "
         "say \"in-sample\" and mean the fold's tuning window.",
@@ -466,7 +468,8 @@ def _method_section(r: WalkForwardReport) -> list[str]:
         "reason and by exit year (net of costs), the trades with fewer than 3 shares, and cost "
         "drag = Σ costs ÷ Σ gross P/L (both 0.1% sides).",
         "- **Gate (P3b).** A2 passes only if the walk-forward curve beats total-return SPY over the "
-        "same span, with profit factor ≥ 1.3 and max drawdown ≤ 15%. Nothing else decides it.",
+        f"same span, with profit factor ≥ 1.3 and max drawdown ≤ {fmt_pct(MAX_DRAWDOWN, 0)}. "
+        "Nothing else decides it.",
         f"- **Seen before.** P3 already judged Strategy A v1 on the window from "
         f"{SEEN_BEFORE_START.isoformat()} on, so that window is not out-of-sample any more. It is "
         "shown below only as a slice of the continuous curves, for information.",

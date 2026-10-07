@@ -69,7 +69,15 @@ value built from ``research.DEV_END``; ``tests/test_backtest_window.py`` pins th
 
 FAILURE_LABELS: tuple[str, ...] = (
     "beats SPY TR",
-    "max DD <= 15%",
+    # go-live #4's label, interpolated from the bar it names so the two can never disagree.
+    # Raised 0.15 -> 0.20 by the owner on 2026-10-07 (design §1 item 4, §11); at 0.15 this
+    # formats to "max DD <= 15%" byte-for-byte, which is what makes the change revertible and
+    # what keeps the 110 recorded rows comparable. The PREFIX is the stable part: `trials.failed`
+    # is append-only, so rows judged before that day keep "max DD <= 15%" for ever and rows
+    # judged after carry "max DD <= 20%". Both are misses, and every reader -- store.owner_failures
+    # in Python, DRAWDOWN_FAILURE_PREFIX in web/lib/sera/derive.ts -- matches on "max DD <= ",
+    # never on the whole string. See tests/test_lab_gate_wording.py (phase 7).
+    f"max DD <= {tuning.MAX_DRAWDOWN:.0%}",
     "PF >= 1.3",
     ">= 100 trades",
     "owner inputs",

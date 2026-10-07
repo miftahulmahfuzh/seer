@@ -5,11 +5,14 @@
 1. Refuse when the method file is not committed (its commit is the pre-registration), when the
    method has already run, or when any variant's configuration already has a dev trial.
 2. Run the variants through ``dev.run_registry`` on the research store (every D9 guard).
-3. Deflated Sharpe per trial with N = every dev trial in the lab, this batch included, and the
-   variance of the daily Sharpe across those trials.
-4. Eligible = the five P7a D8 conditions and DSR >= 0.95. Insert the trials, set the method's
-   ``source_sha`` and status (``dev-eligible`` when any trial is eligible, else ``rejected``),
-   all in one transaction.
+3. Deflated Sharpe per trial with N resolved by ``store.DSR_POLICY`` through
+   ``store.pending_gate`` -- shipped as ``all-trials``, so N = every dev trial in the lab, this
+   batch included -- and the variance of the daily Sharpe across those trials.
+4. Eligible = the five P7a D8 conditions and ``store.DSR_LABEL`` (DSR >= 0.90 since 2026-10-07;
+   LAB_LUCK_GATE_PLAN.md Decision D1). Insert the trials, set the method's ``source_sha`` and
+   status (``dev-eligible`` when any trial is eligible, else ``rejected``), all in one
+   transaction. ``store.verdict`` re-reads a recorded trial against the same threshold and N, so
+   a verdict is comparable across time rather than frozen at its run date.
 
 ``lab test`` (design §3) -- the one counted look:
 
@@ -27,6 +30,10 @@ are dev-only and stay dev-only: design §1 makes ``trials`` the multiple-testing
 *search*, and §3 makes the test window a *look* at one already-counted configuration. A dev trial
 recorded tomorrow is deflated by exactly the N it would have had if no look had ever been spent,
 so every recorded dev trial stays reproducible.
+
+Since LAB_LUCK_GATE_PLAN.md phase 4, *what* N counts is ``store.DSR_POLICY``'s business and need
+not be a row count at all; *which* trials it counts over is still dev trials only, and that is
+what this paragraph is about.
 """
 
 from __future__ import annotations
@@ -35,7 +42,7 @@ import logging
 import sqlite3
 import statistics
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -56,10 +63,18 @@ log = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class Ran:
-    """One finished variant: its database row and dev row."""
+    """One finished variant: its database row, its dev row, and the DSR's inputs.
+
+    ``moments`` carries ``trial_n=0`` until ``insert_trials`` assigns the real trial number;
+    ``run_method`` stamps it and records it. It is None exactly when ``daily_moments`` returned
+    None for this variant, which is exactly when ``trial.dsr`` is None -- a trial that never had
+    a deflated Sharpe has no inputs to keep. It defaults to None so a caller that only cares
+    about the trial can still build a ``Ran`` positionally.
+    """
 
     trial: store.TrialRow
     row: DevRow
+    moments: store.MomentsRow | None = None
 
 
 def git_head(cwd: Path) -> str:
@@ -163,18 +178,65 @@ def trial_rows(
     fingerprint: str,
     git_sha: str,
 ) -> list[Ran]:
-    """The trial rows for one method's dev results (``results``: (row, month-end curve))."""
+    """The trial rows for one method's dev results (``results``: (row, month-end curve)).
+
+    The luck test's N is ``store.pending_gate(conn, method.id, len(results)).n`` -- the N the
+    lab's ``store.DSR_POLICY`` resolves to, projected over this batch, which is the same N
+    ``store.verdict`` re-reads these trials under. A trial run tonight and one recorded six weeks
+    ago are therefore judged by one bar, which is R2. Under the shipped ``all-trials`` policy it
+    is ``dev_trial_count(conn) + len(results)``, exactly the expression this function used before
+    the policy existed.
+
+    ``n_trials_at_run`` records **the N the DSR was computed at**, which is what it has always
+    meant (``lab promote`` prints it as "DSR ... at N = ..."). The raw dev row count is always
+    ``store.dev_trial_count``. The variance is still the sample variance of the daily Sharpe
+    across every recorded dev trial plus this batch: only the *count* of looks is
+    policy-dependent, not the dispersion the expected maximum is drawn from. The threshold the
+    DSR is compared against is ``store.DSR_MIN`` -- 0.90 since 2026-10-07.
+
+    Each ``Ran`` also carries the deflated Sharpe's inputs (``store.MomentsRow``) so
+    ``run_method`` can record them beside the trial they judged: the daily Sharpe, the number of
+    daily returns, the skew and the kurtosis of the variant, plus the ``var_trials`` and the N
+    this batch was deflated by. ``trials`` is append-only and its ``dsr`` is frozen at the N of
+    its run date, so these are the only way a verdict can ever be recomputed without re-running
+    the backtest.
+
+    **The verdict is not changed by that bookkeeping.** ``n_trials`` and ``var_trials`` are the
+    same values, read the same way, in the same order; ``dsr`` is the same
+    ``dev.deflated_sharpe`` call on the same six arguments; ``failed`` and ``eligible`` are
+    unchanged. The only difference from the previous version is that ``daily_moments`` is
+    evaluated once per variant and reused, instead of once for the batch Sharpe and again inside
+    ``_dsr`` -- it is a pure function of the variant's daily returns, so hoisting it cannot move
+    a number.
+    """
     prior = store.dev_daily_sharpes(conn)
-    new_sharpes = [m[0] for m in (daily_moments(r.stats.daily_returns) for r, _ in results) if m is not None]
+    moments = [daily_moments(r.stats.daily_returns) for r, _ in results]
+    new_sharpes = [m[0] for m in moments if m is not None]
     all_sharpes = prior + new_sharpes
-    n_trials = store.dev_trial_count(conn) + len(results)
+    gate = store.pending_gate(conn, method.id, len(results))
+    n_trials = gate.n
     var_trials = statistics.variance(all_sharpes) if len(all_sharpes) >= 2 else None
     run_at = store.now_iso()
     out: list[Ran] = []
-    for row, curve in results:
+    for (row, curve), m in zip(results, moments, strict=True):
         c = row.candidate
-        m = row.stats.metrics
-        dsr = _dsr(row, n_trials, var_trials)
+        met = row.stats.metrics
+        t = len(row.stats.daily_returns)
+        if m is None or var_trials is None:
+            dsr = None
+            mom = None
+        else:
+            dsr = dev.deflated_sharpe(m[0], n_trials, var_trials, t, m[1], m[2])
+            mom = store.MomentsRow(
+                trial_n=0,  # insert_trials assigns it; run_method stamps this row with it
+                sr_daily=float(m[0]),
+                t=t,
+                skew=float(m[1]),
+                kurt=float(m[2]),
+                var_trials=float(var_trials),
+                n_at_run=n_trials,
+                measured=run_at,
+            )
         failed = list(row.failed)
         if dsr is None or dsr < store.DSR_MIN:
             failed.append(store.DSR_LABEL)
@@ -192,11 +254,11 @@ def trial_rows(
             store_fingerprint=fingerprint,
             git_sha=git_sha,
             run_at=run_at,
-            total_return=_f(m.total_return),
-            cagr=_f(m.cagr),
-            max_drawdown=_f(m.max_drawdown),
-            profit_factor=_f(m.profit_factor),
-            trades=int(m.trades),
+            total_return=_f(met.total_return),
+            cagr=_f(met.cagr),
+            max_drawdown=_f(met.max_drawdown),
+            profit_factor=_f(met.profit_factor),
+            trades=int(met.trades),
             sharpe=_f(row.stats.sharpe),
             exposure=_f(row.stats.exposure),
             turnover=_f(row.stats.turnover),
@@ -211,7 +273,7 @@ def trial_rows(
             n_trials_at_run=n_trials,
             curve_json=store.curve_json(curve),
         )
-        out.append(Ran(trial, row))
+        out.append(Ran(trial=trial, row=row, moments=mom))
     return out
 
 
@@ -264,7 +326,16 @@ def run_method(
                     source_ref=method.source_ref, parent_id=method.parent_id,
                 )
                 store.update_method(conn, method.id, status="registered")
-        store.insert_trials(conn, [r.trial for r in ran])
+        ns = store.insert_trials(conn, [r.trial for r in ran])
+        # The DSR's inputs, stamped with the trial numbers SQLite just assigned, in this same
+        # transaction: a trial and the measurement that judged it are recorded together or not
+        # at all. A variant with no computable moments contributes no row, exactly as it
+        # contributes no dsr.
+        store.insert_moments(conn, [
+            replace(r.moments, trial_n=n)
+            for n, r in zip(ns, ran, strict=True)
+            if r.moments is not None
+        ])
         store.update_method(conn, method.id, source_sha=source_sha(path), status=status)
         for key in method.seen_keys:
             store.mark_seen(conn, key, method.id)

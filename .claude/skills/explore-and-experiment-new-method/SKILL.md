@@ -83,10 +83,13 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
 7. **Analyze honestly** in a scratch file, then `lab note MNNNN --file F --verdict "<one line>"`.
    The owner reads the analysis and the verdict on seertrade.site/sera (the method's page),
    and is not a quant. Write plainly: short sentences, everyday words, numbers with their meaning ("lost
-   at most 13% from a peak, under the 15% limit"), and a plain gloss on any term you can't avoid
+   at most 13% from a peak, under the 20% limit"), and a plain gloss on any term you can't avoid
    (CAGR, drawdown, profit factor, DSR). Markdown is fine. Cover:
    - result vs total-return SPY, and which conditions failed and by how much
-   - DSR at N, in words: how likely the result is real rather than luck after N tries
+   - DSR at N, in words: how likely the result is real rather than luck after N tries. Say the N
+     and the bar it was judged against — the bar is `DSR >= 0.90`, the owner's risk appetite since
+     2026-10-07 (design §7.1), and N is every dev trial in the lab (§7.2). Both are printed by
+     `lab status`; neither is yours to change.
    - worst year and when the drawdown hit
    - **why**: the mechanism, not just the numbers
    - whether the hypothesis held and whether the expected failure happened
@@ -126,9 +129,11 @@ Nobody approves this; you do it. Both commands exist — do not build them:
 
 - **`lab promote <method>`:** picks the method's best eligible **dev** trial by MAR (one variant
   per method), writes `docs/lab/prereg/MNNNN.md` with the `config_digest` **copied from that
-  recorded trial**, and moves the method `dev-eligible → promoted`. It is written once and never
-  rewritten: a re-run with a better-looking variant available is a refusal, not an update. It
-  loads no store, runs no backtest and spends no look.
+  recorded trial**, and moves the method `dev-eligible → promoted`. The file records the gate it
+  passed — the five conditions, the DSR threshold in force and the N the multiple-testing policy
+  resolved to that day — so the rule is pinned in git before any test number exists. It is written
+  once and never rewritten: a re-run with a better-looking variant available is a refusal, not an
+  update. It loads no store, runs no backtest and spends no look.
 - **`lab test <candidate>`:** takes the *variant* id (`M0007-RESID`), not the method id. It
   refuses a method that is not `promoted`, refuses a pre-registration that is missing,
   uncommitted, modified or names another configuration, refuses a configuration with no dev
@@ -173,7 +178,8 @@ Then:
 | "Re-run it, the store changed" | A configuration runs once per window. Renaming doesn't help: digests ignore the id. |
 | "Peek at 2016–2026" | Only through Promotion. Never edit `DEV_END`. |
 | "Delete that embarrassing trial" | Trials and insights are append-only (triggers). |
-| "Max DD 16% is basically 15%" | Design §1 is fixed. Never edit §1/§5, `tuning` thresholds or the P7a registry. |
+| "Max DD 21% is basically 20%" | The bar is 20% since 2026-10-07 (design §1 item 4, the owner's call) and "basically" is not a comparison. Never edit §1/§5, `tuning` thresholds or the P7a registry — they are the owner's dials, not yours. |
+| "The luck bar is still too high; nudge it" | Never. `DSR_MIN` is the owner's risk appetite and `DSR_POLICY` is the owner's call on what counts as an independent look (design §7). Run `lab luck` to see the sensitivity, journal what you found, and leave both alone. |
 | "Nothing worked, stop here" | Journal the insight and queue the next idea. |
 | "Child: commit lab.sqlite too" | Never, and never `web/data/lab.json` either. A binary file committed by two sessions is a conflict nobody can merge. |
 | "Solo: `git add lab/lab.sqlite` is quicker" | Always `lab stage`. It is the only thing that keeps `web/data/lab.json` in sync, and CI fails a lab commit without it. |

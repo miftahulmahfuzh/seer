@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from labkit import smoke_data
 
-from seer_engine.backtest.dev import Candidate
+from seer_engine.backtest.dev import Candidate, deflated_sharpe
 from seer_engine.backtest.market import Market
 from seer_engine.fundamentals import Fact, FundamentalPanel, coverage
 from seer_engine.lab import runner, store
@@ -67,6 +67,44 @@ def test_run_records_trials_with_lab_wide_n(conn, data, tmp_path):
     assert method["status"] in ("rejected", "dev-eligible")
     assert method["source_sha"]
     assert "Expected failure: f" in method["hypothesis"]
+
+
+def test_a_run_records_the_dsrs_inputs_beside_every_trial(conn, data):
+    """R2: the four inputs a re-evaluation needs are kept, and they are the ones that were used.
+
+    Feeding the recorded moments back into ``deflated_sharpe`` at the recorded N must reproduce
+    the recorded ``dsr`` exactly -- that equality is what makes a later re-evaluation at a
+    different N the *same measurement under a different bar* rather than a new one.
+    """
+    runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False)
+    rows = store.trials_of(conn, "M0001")
+    assert [r["n"] for r in rows] == [55, 56]
+    for r in rows:
+        mom = store.moments_of(conn, r["n"])
+        assert mom is not None, "every dev trial with a dsr keeps its inputs"
+        assert mom["n_at_run"] == r["n_trials_at_run"] == 56
+        assert mom["measured"] == r["run_at"]  # one measurement, one stamp
+        assert mom["t"] >= 2 and mom["var_trials"] is not None
+        again = deflated_sharpe(
+            mom["sr_daily"], mom["n_at_run"], mom["var_trials"], mom["t"], mom["skew"], mom["kurt"]
+        )
+        assert again == r["dsr"]  # pins t, skew and kurt too: any of them wrong moves the DSR
+
+
+def test_recording_the_inputs_did_not_move_the_verdict(conn, data):
+    """The eligibility decision reads exactly as it did before this phase.
+
+    ``trial_rows`` is called directly here so the comparison is against the numbers the gate
+    actually used: ``dsr`` is the recorded ``dsr``, and ``failed`` carries the luck label if and
+    only if that ``dsr`` is below ``DSR_MIN``.
+    """
+    runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False)
+    for r in store.trials_of(conn, "M0001"):
+        below = r["dsr"] is None or r["dsr"] < store.DSR_MIN
+        assert (store.DSR_LABEL in r["failed"]) is below
+        assert bool(r["eligible"]) is (r["failed"] == "")
+    assert store.get_method(conn, "M0001")["status"] in ("rejected", "dev-eligible")
+    assert store.test_looks(conn) == 0
 
 
 def test_a_method_runs_once_and_configs_never_repeat(conn, data):

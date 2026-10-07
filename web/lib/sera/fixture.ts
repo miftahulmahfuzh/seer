@@ -2,10 +2,13 @@
 import type { Gate, LabMethod, LabTrial } from './types';
 
 export const GATE: Gate = {
-  maxDrawdown: 0.15,
+  maxDrawdown: 0.2,
   minProfitFactor: 1.3,
   minTrades: 100,
-  dsrMin: 0.95,
+  dsrMin: 0.9,
+  dsrPolicy: 'all-trials',
+  dsrN: 110,
+  dsrNBasis: '110 dev trials, every variant run counted as one independent look',
   devStart: '1993-01-29',
   devEnd: '2015-10-16',
   testStart: '2015-10-19',

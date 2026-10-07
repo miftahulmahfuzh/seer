@@ -15,6 +15,7 @@ import { requireSera } from '@/lib/sera/gate';
 import { GLOSSARY, type GlossaryKey, STATUS_LABEL } from '@/lib/sera/glossary';
 import { lab } from '@/lib/sera/lab';
 import { renderMarkdown } from '@/lib/sera/markdown';
+import { DSR_POLICY_LABEL } from '@/lib/sera/types';
 import {
   ABOVE_COLOR,
   dayText,
@@ -86,7 +87,7 @@ export default async function SeraOverview() {
                   </>
                 }
                 value={String(st.tries)}
-                sub="Every try raises the bar for luck"
+                sub={`All ${g.dsrN} are counted, and every new one raises the bar`}
               />
               <Stat
                 label={
@@ -233,13 +234,18 @@ export default async function SeraOverview() {
           className={s.luck}
           eyebrow="The luck bar"
           title={lk ? `${lk.above} of ${lk.total} cleared the luck bar` : 'No luck scores yet'}
-          caption={`The more tries we run, the likelier one looks good by chance, so each try's luck score is judged against everything tried before it and must reach ${ratioText(g.dsrMin)}.`}
+          caption={
+            lk
+              ? `The more we try, the likelier one looks good by chance, so each try's luck score must reach ${ratioText(g.dsrMin)} — the owner's call on how much doubt is acceptable. The discount counts ${DSR_POLICY_LABEL[lk.policy]}: N = ${lk.n} today (${lk.basis}). Each dot sits at the N it was scored at on the day it ran, so the cloud drifts right as the search goes on.`
+              : `Each try's luck score must reach ${ratioText(g.dsrMin)}, discounted by ${DSR_POLICY_LABEL[g.dsrPolicy]}.`
+          }
         >
           {lk ? (
             <ScatterChart
-              ariaLabel={`Luck score of ${lk.total} tries against the number of tries counted, with the ${ratioText(g.dsrMin)} line`}
+              ariaLabel={`Luck score of ${lk.total} tries against the number of tries counted, with the ${ratioText(g.dsrMin)} bar and the N = ${lk.n} the gate deflates by today`}
               points={lk.points}
               refY={lk.refY}
+              refX={lk.refX}
               yDomain={[0, 1]}
               yTicks={lk.yTicks}
               includeZeroX

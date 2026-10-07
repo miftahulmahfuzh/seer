@@ -54,16 +54,34 @@ back from ``strategies.params->'spec'`` recomputes to the same digest -- which i
 makes a database-stored roster *checkable*. The digests are pinned in
 ``tests/test_paper_roster.py``: a changed strategy needs a **new id** with its own paper clock,
 never an edited entry (``paper`` refuses a started id whose stored digest differs). ``status``,
-``paper_end``, ``gate_note`` and ``gate_applicable`` are **not** in the spec, deliberately:
-retiring a strategy or correcting a note must not move a live digest.
+``paper_end``, ``gate_note``, ``gate_applicable`` and ``lab_provenance`` are **not** in the spec,
+deliberately: retiring a strategy, correcting a note, or recording why an entry was admitted must
+not move a live digest.
 
 ``backtest_gate`` is a display fact for the go-live checklist (D12), not part of the spec:
 correcting its note does not reset a paper clock. Every entry is ``passed: false`` today.
-``FND`` is on the roster having failed its gate too (six M0005 dev-window trials, all six failed,
-all six recorded in ``lab/lab.sqlite``): passing a gate has never been this roster's admission
-criterion, and the gates bind the real-money decision, not paper membership.
 An entry with ``gate_applicable=False`` (C, an LLM strategy: design §1 item 5, handover D9)
 also says ``applicable: false``; the four quant/benchmark entries' gate dicts are unchanged.
+
+**Admission, and the deliberate divergence from the method lab's design (lab-luck-gate D3).**
+Passing a gate has never been this roster's admission criterion, and it still is not: the gates
+bind the real-money decision (design §1), not paper membership. ``FND`` joined having failed its
+gate (six ``M0005`` dev-window trials, all six failed, all six in ``lab/lab.sqlite``), and
+``RMW-FR`` trades today while lab method ``M0022`` reads ``rejected``. The method lab's design
+reads the other way -- §3 ("Pass -> ``test-passed``, and the skill stops for the owner: a paper
+roster entry (new id, own clock) is the owner's call") and §6 ("on a test pass, a paper-roster
+entry with its own clock") both put a test pass on the path to this roster. **That divergence is
+deliberate, not an oversight.** The rule here is the owner's: a lab test pass is a *sufficient*
+basis for a paper entry, never a necessary one, because paper trading is how a near-miss earns
+the right to be taken seriously and the lab's gate is tuned for the money decision, not for that.
+
+What changed on 2026-10-07 is that the basis stopped being prose in a commit message.
+:data:`LAB_PROVENANCE` gives every lab-derived entry its method, its variant, the lab status it
+was admitted under, and the basis -- ``test-passed``, or ``owner-override`` with a one-line
+reason -- and ``tests/test_paper_roster.py`` checks all of it against the committed
+``lab/lab.sqlite``: the method exists, the variant is one of its recorded trials, and an override
+names a trial the lab did not pass. ``lab.store.record_promotion`` writes the same fact onto the
+method, so the two databases tell one story. The policy did not move; the silence did.
 
 ``status`` is lifecycle, not definition (D3, invariants 3 and 4): a retired entry keeps every
 row it ever wrote and stays on the leaderboard: it only stops trading. :func:`active` is the
@@ -105,6 +123,7 @@ from seer_engine.strategies.f_index import TIMING
 
 Engine = Literal["bracket", "book", "benchmark"]
 Status = Literal["active", "retired"]
+Basis = Literal["test-passed", "owner-override"]
 
 BENCHMARK_ID = "SPY"
 F4_ID = "F4-MOM12-N20-TREND"
@@ -125,6 +144,12 @@ ENGINES: tuple[Engine, ...] = ("bracket", "book", "benchmark")
 
 #: ``strategies.status``'s CHECK, as a Python value.
 STATUSES: tuple[Status, ...] = ("active", "retired")
+
+#: :class:`LabProvenance`'s ``basis`` vocabulary, as a Python value. Two bases and no third:
+#: either the lab's own test window passed the variant (``test-passed``), or the owner admitted
+#: it anyway and said why (``owner-override``). ``lab.store.PROMOTION_BASES`` is the same tuple
+#: on the lab's side of the bridge; ``tests/test_paper_roster.py`` checks they agree.
+BASES: tuple[Basis, ...] = ("test-passed", "owner-override")
 
 
 # --------------------------------------------------------------------------- errors
@@ -155,6 +180,51 @@ class BadRosterRow(RosterError):
 
 
 @dataclass(frozen=True, slots=True)
+class LabProvenance:
+    """Where a roster entry came from in ``lab/lab.sqlite``, and on what basis it was admitted.
+
+    ``method_id`` and ``candidate_id`` name a row of the lab's append-only ``trials`` table --
+    the exact backtest this entry is. ``lab_status`` is the method's status **at the moment of
+    admission**, which is a fact about that night and never tracks the live row: the lab's status
+    machine moves forward only, so a method admitted at ``'rejected'`` that is later re-judged
+    still *was* ``'rejected'`` when the roster took it.
+
+    ``basis`` is the admission rule that was used. ``'test-passed'`` is the lab's own route
+    (design §3). ``'owner-override'`` is the roster's: paper membership has never required a gate
+    pass, and when it is used ``reason`` must carry the one line that says why -- "the owner
+    decided", with no why, is exactly the silence this field exists to end.
+
+    Not part of :func:`spec`, deliberately and for the same reason ``gate_note`` is not:
+    recording why an entry was admitted must never move a started entry's frozen digest.
+    """
+
+    method_id: str
+    candidate_id: str
+    lab_status: str
+    basis: Basis
+    reason: str
+
+    def __post_init__(self) -> None:
+        for name in ("method_id", "candidate_id", "lab_status"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(
+                    f"LabProvenance.{name} must be a non-empty string, got {value!r}"
+                )
+        if self.basis not in BASES:
+            raise ValueError(f"LabProvenance.basis {self.basis!r} is not one of {BASES}")
+        if not isinstance(self.reason, str):
+            raise ValueError(f"LabProvenance.reason must be a string, got {self.reason!r}")
+        if self.basis == "owner-override" and not self.reason.strip():
+            raise ValueError(
+                f"{self.candidate_id}: an owner-override admission must carry a one-line reason. "
+                f"The roster's admission rule is the owner's, not the lab's gate, but the basis "
+                f"goes on the record -- an unexplained override is the divergence this field "
+                f"exists to end"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class RosterEntry:
     """One paper portfolio.
 
@@ -169,6 +239,13 @@ class RosterEntry:
     ``status`` and ``paper_end`` are lifecycle, carried here so one value answers "what is this
     portfolio and is it still trading?". Neither is in :func:`spec`: retiring a strategy must
     not move its frozen digest.
+
+    ``lab_provenance`` is admission history: the lab method and variant this entry is, the lab
+    status it was admitted under, and on what basis (:class:`LabProvenance`). ``None`` for an
+    entry that did not come from a recorded lab candidate -- the benchmark, the LLM strategy,
+    and ``A``, which predates the lab. It is not in :func:`spec` either, for the same reason
+    ``gate_note`` is not: a recorded fact about *why* an entry was admitted must never move the
+    digest of a strategy that is already running.
     """
 
     id: str
@@ -189,6 +266,7 @@ class RosterEntry:
     gate_applicable: bool = True
     status: Status = "active"
     paper_end: date | None = None
+    lab_provenance: LabProvenance | None = None
 
     @property
     def rules_id(self) -> str | None:
@@ -257,6 +335,102 @@ RESOLVER: dict[str, Binding] = {
     "RESIDVOL": Binding(obj=RESIDVOL, params=RESIDVOL_PARAMS),
     # Lab M0022's weekly-brake book, its W-TV16 variant (promoted 2026-10-07, replaces RM).
     "WEEKLYBRAKE": Binding(obj=WEEKLYBRAKE, params=WEEKLYBRAKE_PARAMS),
+}
+
+
+#: Where each roster entry came from in the lab, keyed by roster id (lab-luck-gate R4, D3).
+#:
+#: **The second code-side table, and for the same reason as the first.** A promoted ``strategies``
+#: row carries ``promoted_from`` -- the method id and nothing else -- and the rest of the fact
+#: (which variant, what the lab said at the time, on what basis, and why) has nowhere on the row
+#: to live. Nor could it be read out of ``lab/lab.sqlite`` here: **this module must never import
+#: the lab** (see the comment above ``FUNDAMENTAL_PARAMS`` -- a lab import would let a lab-side
+#: edit silently re-digest a started paper strategy). So the roster states its own provenance, in
+#: its own file, exactly as it states its own params; and ``tests/test_paper_roster.py`` -- where
+#: importing the lab is free -- checks every line of it against the committed database.
+#:
+#: An entry that did not come from a recorded lab candidate has **no key here**: ``SPY`` is the
+#: benchmark, ``C`` is the LLM strategy the quant gate does not apply to (design §1 item 5), and
+#: ``A`` predates the lab (``H-A`` records the idea but has no trial, so there is no candidate for
+#: ``A`` to name; ``H-P7A-REF``'s ``REF-A-V0`` is a reference run, not an admission basis).
+#:
+#: **Append; never edit a started entry's line to make it read better.** The whole point of the
+#: field is that it says what was true on the night of the admission. ``lab_status`` in
+#: particular is frozen at that moment and does not follow the method's live status, which the
+#: lab's forward-only machine may move later.
+LAB_PROVENANCE: dict[str, LabProvenance] = {
+    F4_ID: LabProvenance(
+        method_id="H-P7A-F4",
+        candidate_id=F4_ID,
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "P7a dev-window candidate, on the roster as the book engine's yardstick; it failed "
+            "max DD <= 15% (22.2%) and has never had a test-window look"
+        ),
+    ),
+    F1_ID: LabProvenance(
+        method_id="H-P7A-F1",
+        candidate_id=F1_ID,
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "P7a dev-window candidate, on the roster as the trend yardstick; it failed max DD "
+            "<= 15% (18.7%) and >= 100 trades (11), and has never had a test-window look"
+        ),
+    ),
+    FND_ID: LabProvenance(
+        method_id="M0005",
+        candidate_id="M0005-ALL",
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "the a-priori four-factor blend, chosen before the numbers rather than as the best "
+            "of six; it failed beats SPY TR, >= 100 trades and DSR >= 0.95 on the dev window, "
+            "and went on paper to be watched forward"
+        ),
+    ),
+    F4_FR_ID: LabProvenance(
+        method_id="H-P7A-F4",
+        candidate_id=F4_ID,
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "the same method and variant as the whole-share F4 it replaced, traded in fractional "
+            "shares; the lab trial behind it is that one dev-window row, run in whole shares"
+        ),
+    ),
+    F1_FR_ID: LabProvenance(
+        method_id="H-P7A-F1",
+        candidate_id=F1_ID,
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "the same method and variant as the whole-share F1 it replaced, traded in fractional "
+            "shares; the lab trial behind it is that one dev-window row, run in whole shares"
+        ),
+    ),
+    RM_ID: LabProvenance(
+        method_id="M0011",
+        candidate_id="M0011-RAW20-TV14-N21",
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "it failed only the luck test -- recorded DSR 0.897 at its recorded N = 90 -- and "
+            "passed every owner condition; on paper to test it forward. Retired for RMW-FR "
+            "before its first session"
+        ),
+    ),
+    RMW_ID: LabProvenance(
+        method_id="M0022",
+        candidate_id="M0022-W-TV16",
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "it failed only the luck test -- recorded DSR 0.916 at its recorded N = 110 -- and "
+            "passed every owner condition; on paper to test it forward"
+        ),
+    ),
 }
 
 
@@ -455,6 +629,12 @@ def from_row(row: Row) -> RosterEntry:
         gate_applicable=bool(row.gate_applicable),
         status=status,
         paper_end=paper_end,
+        # Keyed by roster id, not read off the row: the ``strategies`` table has one provenance
+        # column (``promoted_from``, the method id) and no room for the rest, and this module may
+        # not read ``lab/lab.sqlite`` to fill it in. A row whose id is not in the table gets
+        # ``None`` -- correct for SPY, C and A, and caught for anything else by
+        # ``tests/test_paper_roster.py``, which pins the set of ids that must carry one.
+        lab_provenance=LAB_PROVENANCE.get(sid),
     )
 
 

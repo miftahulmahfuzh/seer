@@ -69,7 +69,7 @@ from seer_engine.backtest.report import (
     _usd,
 )
 from seer_engine.backtest.runner import INITIAL_IDR, RunResult, YearGap
-from seer_engine.backtest.tuning import Verdict
+from seer_engine.backtest.tuning import MAX_DRAWDOWN, Verdict
 from seer_engine.backtest.walkforward import (
     COMBINED,
     SEEN_BEFORE_START,
@@ -492,10 +492,11 @@ def _method_section(r: BReport) -> list[str]:
         "Σ gross P/L (both 0.1% sides), the share of nights the model passed, and a calibration "
         "table of mean prediction against mean realized label by prediction decile.",
         "- **Gate (P6a).** Strategy B passes only if the gated curve beats total-return SPY over the "
-        "same span, with profit factor ≥ 1.3 and max drawdown ≤ 15%. Nothing else decides it. The "
+        f"same span, with profit factor ≥ 1.3 and max drawdown ≤ {fmt_pct(MAX_DRAWDOWN, 0)}. "
+        "Nothing else decides it. The "
         f"bar is high: total-return SPY made {fmt_signed_pct(tm.total_return)} over this span, with "
         f"a {fmt_pct(tm.max_drawdown)} max drawdown of its own, and the gate asks for more return "
-        "than that with at most a 15% drawdown.",
+        f"than that with at most a {fmt_pct(MAX_DRAWDOWN, 0)} drawdown.",
         probe,
         f"- **Seen before.** P3 already judged Strategy A v1 on the window from "
         f"{SEEN_BEFORE_START.isoformat()} on, so that window is not out-of-sample any more. It is "

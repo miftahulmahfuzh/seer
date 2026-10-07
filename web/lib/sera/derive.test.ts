@@ -36,16 +36,17 @@ describe('gateChecks', () => {
       target: 'more than +7.9% a year',
       ok: false,
     });
-    expect(checks[1]).toMatchObject({ value: '12.0% at worst', target: '15% or less', ok: true });
+    expect(checks[1]).toMatchObject({ value: '12.0% at worst', target: '20% or less', ok: true });
     expect(checks[2]).toMatchObject({ value: '1.50', target: '1.3 or more', ok: true });
     expect(checks[3]).toMatchObject({ value: '240', target: '100 or more', ok: true });
     expect(checks[4]).toMatchObject({ value: 'none needed', target: 'none needed', ok: true });
-    expect(checks[5]).toMatchObject({ value: '0.97', target: '0.95 or more', ok: true });
+    expect(checks[5]).toMatchObject({ value: '0.97', target: '0.9 or more', ok: true });
   });
 
   it('reads targets from the gate, not constants', () => {
-    const checks = gateChecks(trial(), { ...GATE, maxDrawdown: 0.2, minProfitFactor: 1.5, minTrades: 50 });
-    expect(checks[1].target).toBe('20% or less');
+    // 0.3 rather than 0.2: at 0.2 the override would equal GATE and prove nothing.
+    const checks = gateChecks(trial(), { ...GATE, maxDrawdown: 0.3, minProfitFactor: 1.5, minTrades: 50 });
+    expect(checks[1].target).toBe('30% or less');
     expect(checks[2].target).toBe('1.5 or more');
     expect(checks[3].target).toBe('50 or more');
   });
@@ -59,11 +60,16 @@ describe('gateChecks', () => {
     expect(checks[4]).toMatchObject({ value: 'needs owner input', ok: false });
   });
 
-  it('marks an unmeasured luck check as null, and a failed one as false', () => {
+  it('marks an unmeasured luck check as null, and a failed one as false under either bar', () => {
     const historical = trial({ dsr: null, failed: ['beats SPY TR'] });
     expect(gateChecks(historical, GATE)[5]).toMatchObject({ value: 'not measured', ok: null });
-    const unlucky = trial({ dsr: 0.4, failed: ['DSR >= 0.95'] });
-    expect(gateChecks(unlucky, GATE)[5]).toMatchObject({ value: '0.40', ok: false });
+    // `trials` is append-only: rows judged before 2026-10-07 keep `DSR >= 0.95` for ever, and
+    // rows judged after carry `DSR >= 0.90`. Both are misses; matching one literal would show
+    // the other as a tick.
+    const old = trial({ dsr: 0.4, failed: ['DSR >= 0.95'] });
+    expect(gateChecks(old, GATE)[5]).toMatchObject({ value: '0.40', ok: false });
+    const recent = trial({ dsr: 0.4, failed: ['DSR >= 0.90'] });
+    expect(gateChecks(recent, GATE)[5]).toMatchObject({ value: '0.40', ok: false });
   });
 });
 

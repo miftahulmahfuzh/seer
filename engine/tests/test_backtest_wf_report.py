@@ -348,7 +348,7 @@ def test_method_lists_everything_tried():
     assert "the same 12 combinations" in md
     assert "Folds: 2021, 2022" in md
     assert "trades `control` with the design values" in md
-    assert "max drawdown ≤ 15% and profit factor ≥ 1.3" in md
+    assert "max drawdown ≤ 20% and profit factor ≥ 1.3" in md
     assert "20,000,000 IDR" in md and "Actual/365.25" in md
     assert "One round only" in md
 

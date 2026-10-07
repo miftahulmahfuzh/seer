@@ -156,7 +156,7 @@ export function conditionTip(key: ConditionKey, gate: Gate): string {
     case 'pf': return `Money won on winners is at least ${gate.minProfitFactor}× the money lost on losers`;
     case 'trades': return `At least ${count(gate.minTrades)} trades, so the result is not a handful of lucky bets`;
     case 'owner': return 'Needs no setting that only the owner can decide';
-    case 'dsr': return `A luck-adjusted score of at least ${gate.dsrMin}, counting every try the lab has made`;
+    case 'dsr': return `A luck-adjusted score of at least ${fixed(gate.dsrMin, 2)}, discounted by all ${count(gate.dsrN)} tries counted so far (${gate.dsrNBasis})`;
   }
 }
 
@@ -177,7 +177,7 @@ export function conditionSentence(key: ConditionKey, ok: boolean | null, t: LabT
     case 'owner':
       return ok ? `${label}: yes (none needed).` : `${label}: no (needs a setting only the owner can decide).`;
     case 'dsr':
-      return `${label}: ${yn} (${fixed(t.dsr, 2)} ${ok ? '≥' : '<'} ${gate.dsrMin}, after ${count(t.nTrialsAtRun)} tries).`;
+      return `${label}: ${yn} (${fixed(t.dsr, 3)} ${ok ? '≥' : '<'} ${fixed(gate.dsrMin, 2)}, scored at N = ${count(t.nTrialsAtRun)}).`;
   }
 }
 

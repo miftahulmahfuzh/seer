@@ -1,4 +1,5 @@
 import type { Gate } from './strategy';
+import { MAX_DRAWDOWN, MAX_DRAWDOWN_LABEL } from './golive';
 
 export type Snapshot = { date: string; equity: number };
 
@@ -71,9 +72,9 @@ export function checklist(m: Metrics, spyReturn: number | null, gate: Gate): Che
       ok: (m.profitFactor ?? 0) >= 1.3,
     },
     {
-      label: 'Max drawdown ≤ 15%',
+      label: MAX_DRAWDOWN_LABEL,
       val: m.maxDrawdown === null ? '—' : (m.maxDrawdown * 100).toFixed(1) + '%',
-      ok: m.maxDrawdown !== null && m.maxDrawdown <= 0.15,
+      ok: m.maxDrawdown !== null && m.maxDrawdown <= MAX_DRAWDOWN,
     },
     gateItem(gate),
   ];

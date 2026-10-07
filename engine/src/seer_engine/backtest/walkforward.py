@@ -38,6 +38,7 @@ from seer_engine.backtest.benchmark import BenchmarkCurve
 from seer_engine.backtest.market import Market
 from seer_engine.backtest.metrics import (
     EXIT_REASONS,
+    MAX_DRAWDOWN_LABEL,
     Metrics,
     avg_days_held,
     checklist,
@@ -56,7 +57,7 @@ SEEN_BEFORE_START = tuning.OOS_START  # 2022-01-03: the burned P3 out-of-sample 
 COMBINED = "walk-forward"  # name of the curve whose variant is chosen per fold
 
 _ZERO = Decimal("0.0000")
-_GATE_NAMES = ("beating total-return SPY", "profit factor ≥ 1.3", "max drawdown ≤ 15%")
+_GATE_NAMES = ("beating total-return SPY", "profit factor ≥ 1.3", MAX_DRAWDOWN_LABEL.lower())
 
 
 @dataclass(frozen=True)
@@ -351,7 +352,8 @@ def gate_p3b(wf: Metrics, spy_tr: Metrics, start: date, end: date) -> Verdict:
     """The P3b gate on the walk-forward curve over ``[start, end]``.
 
     Passes when the walk-forward total return beats total-return SPY (strict), profit factor
-    ≥ 1.3 and max drawdown ≤ 15%: ``checklist`` items 3–5, the same labels and values as the web.
+    ≥ 1.3 and max drawdown ≤ ``tuning.MAX_DRAWDOWN``: ``checklist`` items 3–5, the same labels
+    and values as the web.
     """
     if not isinstance(wf, Metrics) or not isinstance(spy_tr, Metrics):
         raise TypeError("gate_p3b takes two Metrics")

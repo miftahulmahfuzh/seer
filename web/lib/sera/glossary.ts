@@ -53,11 +53,17 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
   },
   dsr: {
     term: 'Luck check (DSR)',
-    plain: 'The chance a result is real skill rather than the luckiest of many tries, after counting every try the lab has made.',
+    plain:
+      'The chance a result is real skill rather than the luckiest of many tries, after discounting ' +
+      'for how many tries have been counted, against a bar that is the owner’s call on how much ' +
+      'doubt is acceptable.',
   },
   tries: {
     term: 'N (tries)',
-    plain: 'Every test the lab has ever run, counted so the luck check can discount a winner found by trying many things.',
+    plain:
+      'Every test the lab has ever run, all kept on the record and all counted so the luck check ' +
+      'can discount a winner found by trying many things, which means trying more raises the bar ' +
+      'for everyone.',
   },
   exposure: {
     term: 'Exposure',

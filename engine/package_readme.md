@@ -132,7 +132,7 @@ engine/
       npolicy.py            the luck gate's N policy (lab-luck-gate phase 1): POLICIES all-trials / methods / effective, DEFAULT_POLICY, correlation(), participation_ratio(), effective_n() -> NCount. Pure, reads only; `store.gate` is its one caller since lab-luck-gate phase 4
       runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4). The luck test's N comes from store.pending_gate since lab-luck-gate phase 4
       prereg.py             the docs/lab/prereg/MNNNN.md pre-registration: Prereg, render()/parse(), require_committed(), check_digest(), check_source(), promote_method() (build-promotion-path phase 3)
-      remeasure.py          `lab remeasure`: re-runs a recorded method's variants on the dev window, proves the re-run reproduces each trial's recorded Sharpe and DSR, and appends trial_moments rows -- Batch, Plan, Reproduced, Report, resolve_method(), batches_of(), preflight(), measure(), check(), remeasure(), format_report() (lab-luck-gate phase 3)
+      remeasure.py          `lab remeasure`: re-runs a recorded method's variants on the dev window, proves the re-run reproduces each trial's recorded Sharpe and DSR, and appends trial_moments rows -- Batch, Plan, Reproduced, Report, resolve_method(), batches_of(), preflight(), measure(), check(), remeasure(), format_report() (lab-luck-gate phase 3); plus the P7a seed path, resumable and chunk-invariant -- SEED_PREFIX, SEED_METRICS, METRIC_TOL, SeedTrial, SeedPlan, SeedReport, SeedVerdict, is_seed_id(), seed_var_trials(), seed_preflight(), observe(), run_chunk(), reproduce(), remeasure_seed(), seed_verdicts(), format_seed_report() (lab-luck-gate phase 9)
       seed.py               one-time import of the pre-lab record (P7a's 54 candidates)
       methods/              one file per method, mNNNN_<slug>.py exporting METHOD
     commands/
@@ -756,6 +756,55 @@ nothing else. It is addressed by **method**, one at a time, on demand.
   every refusal above and an unknown method; 1 for anything else.
 - Measured: `lab remeasure M0022` reproduced all three recorded DSRs bit-identically.
 - Tests: `tests/test_lab_remeasure.py` (13), with the fixtures in `tests/labkit.py`.
+
+### `lab remeasure H-P7A` — the seed path (lab-luck-gate phase 9)
+
+```
+python -m seer_engine lab remeasure H-P7A | H-P7A-F9 [--store DIR] [--only IDS] [--chunk N]
+```
+
+The same command, addressed at the **P7a seed** instead of a lab method. Fifty-four of the lab's
+110 dev trials were imported from the P7a exploration with `dsr IS NULL` (`lab/seed.py`: "P7a
+reported it for one row only"), so they paid the full multiple-testing penalty and received no
+verdict in return — permanently ineligible by *data gap* rather than by merit. This path measures
+their daily moments and writes `trial_moments` rows, so the gate can finally judge them.
+`H-P7A` is every family; `H-P7A-F9` is one.
+
+- **It raises the bar for nobody, and that is the point** (design §7.6, invariant 7). The 54 are
+  *already* inside `dev_trial_count`, and this writes **no `trials` row** — only
+  `store.insert_moments`. Phase 9 asserted all four quantities before and after a full 54-row
+  batch: `dev_trial_count`, `npolicy.effective_n(conn, 'all-trials').n`, `dev_sharpe_variance`
+  and `dev_daily_sharpes` are identical, and the committed `lab/lab.sqlite` is byte-unchanged.
+- **Resumable, idempotent and chunk-invariant** (`remeasure_seed`, `run_chunk`). Each chunk is
+  re-run, verified and committed before the next starts, so an interrupt loses at most the chunk
+  in flight. `plan.todo` holds only trials with no moments row and is re-read inside each chunk's
+  write lock, so a parallel explorer that wrote the same rows is a **skip**, not a conflict.
+  `plan.var_trials` is read off the database once in `seed_preflight` and never off the re-run,
+  which is what makes the output independent of where the chunk boundaries fall. A second run
+  writes nothing and loads no research store. `--chunk` defaults to `dev.MAX_CANDIDATES` (60).
+- **A divergent trial is reported, not raised, and is not written** — the one deliberate
+  difference from phase 3's all-or-nothing `check`. Phase 3 measures two to five trials of one
+  method together; here a single drifted ETF would otherwise sink fifty-three sound
+  re-measurements across eleven unrelated families.
+- **The tolerance is absolute, not relative** (`METRIC_TOL = 1e-6`, over the six metrics in
+  `SEED_METRICS`). The recorded rows come from a CSV written to six decimal places, which bounds
+  the recorded-vs-true error at 5e-7 *absolute* regardless of magnitude; a relative bound would be
+  the wrong shape at both ends of the range. Measured worst delta across all 54: **4.986e-07**.
+- **It reads the frozen P7a registry and never writes it** (`REGISTRY_FILE`); it refuses the test
+  window by name, like every other `remeasure` path.
+- **The report prints two DSRs side by side, and only one is a verdict** (`seed_verdicts`,
+  **Decision D12**). `v.dsr` is the gate's number — `store.dsr_at` deflating by
+  `store.dev_sharpe_variance(conn)`, today's variance over all 110 dev trials, on both routes.
+  `dsr_recorded_var` is the same measured moments deflated by the `var_trials` recorded beside
+  the trial, and **must never be read as a verdict**; it is printed so the size of the choice
+  stays on the terminal. The seed rows are the only place in the lab where the two differ
+  materially — 2.0067e-04 against 2.3950e-04 — and they move `F9-SPY200M70-MOM30` from
+  **0.8567** (the gate's number, which fails) to 0.9031 (which would have passed).
+- **Net effect**: `F9-SPY200M70-MOM30` passes every owner condition at the new 20% bar and is now
+  held out **on a luck test it finally received**, rather than on a data gap — which is R6
+  satisfied either way. The eligible set stays **three**.
+- Measured: all 54 in ~65 seconds (10.8s to load the store, 51.5s of backtests).
+- Tests: `tests/test_lab_remeasure_seed.py` (16).
 
 ### `lab reevaluate` (lab-luck-gate phase 4)
 

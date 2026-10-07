@@ -46,7 +46,12 @@ same semantics the backtest runner (`run_book`) uses, so it is not a bug.
 - the params (for `C` also: the candidate cap, the news window and headline cap, the prompt version
   and full prompt text, the LLM call settings and the LLM model `glm-5.3`);
 - a sha256 `digest` of the canonical spec text;
-- the `backtest_gate` note the app shows.
+- `backtest_gate`: the verdict the go-live checklist shows (`passed`, and `applicable` for C).
+  The roster's `gate_note` is **not** written here. It was until 2026-10-07, when the owner
+  purged the prose from the site: the leaderboard printed it under the five checks and it read
+  as clutter beside a method page that tells the same story in full. The note is still required
+  of every `strategies` row and still echoed by `promote` — it is a record of why an entry was
+  admitted, not a display string.
 
 `paper` fails the night when a started strategy's stored digest differs from the code's
 (`paper/roster.py`): `store.SpecMismatch`, everything rolled back, `runs.paper_status = failed`,

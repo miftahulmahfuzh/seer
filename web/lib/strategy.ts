@@ -8,8 +8,12 @@ export type Engine = 'bracket' | 'book' | 'benchmark';
  * `strategies.params->'backtest_gate'` (contract C2): did the strategy pass its backtest gate?
  * `applicable` is false only for a strategy the backtest item does not apply to (design §1 item 5:
  * C, an LLM strategy, cannot be backtested without look-ahead). Not applicable never counts as passed.
+ *
+ * The verdict only. The prose `note` the engine used to ship alongside it is deliberately dropped
+ * here and never reaches a payload or a page (owner, 2026-10-07): the checklist states the verdict,
+ * and the reasoning behind it belongs on the method's own Sera page, one click from the pick's name.
  */
-export type Gate = { passed: boolean; applicable: boolean; note: string | null };
+export type Gate = { passed: boolean; applicable: boolean };
 
 const ENGINES: readonly string[] = ['bracket', 'book', 'benchmark'];
 
@@ -22,13 +26,14 @@ export function engineOf(engine: unknown, isBenchmark: boolean): Engine {
 /**
  * Reads the gate from params. Missing or malformed reads as not passed and applicable: a pass is
  * never assumed, and only an explicit `applicable: false` marks the backtest item not applicable.
+ * A `note` on the stored jsonb is ignored: rows written before 2026-10-07 still carry one, and
+ * this is the boundary where it stops — nothing downstream can render what it never receives.
  */
 export function parseGate(raw: unknown): Gate {
-  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return { passed: false, applicable: true, note: null };
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return { passed: false, applicable: true };
   const g = raw as Record<string, unknown>;
-  const note = typeof g.note === 'string' && g.note.trim() !== '' ? g.note : null;
   const applicable = g.applicable !== false;
-  return { passed: applicable && g.passed === true, applicable, note };
+  return { passed: applicable && g.passed === true, applicable };
 }
 
 /** 'F4 · Momentum' -> 'F4', 'A · Quant' -> 'A', 'SPY' -> 'SPY'; the id when the name has no head. */

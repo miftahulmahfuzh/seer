@@ -59,9 +59,12 @@ deliberately: retiring a strategy, correcting a note, or recording why an entry 
 not move a live digest.
 
 ``backtest_gate`` is a display fact for the go-live checklist (D12), not part of the spec:
-correcting its note does not reset a paper clock. Every entry is ``passed: false`` today.
-An entry with ``gate_applicable=False`` (C, an LLM strategy: design §1 item 5, handover D9)
-also says ``applicable: false``; the four quant/benchmark entries' gate dicts are unchanged.
+it never reset a paper clock. Every entry is ``passed: false`` today. An entry with
+``gate_applicable=False`` (C, an LLM strategy: design §1 item 5, handover D9) also says
+``applicable: false``. It carries the **verdict only** -- ``gate_note`` is no longer written
+into it (owner, 2026-10-07), because the leaderboard printed that prose under the go-live
+checks and the method's own Sera page already tells it better. The note remains a recorded
+admission fact on the row; it is simply no longer a display one.
 
 **Admission, and the deliberate divergence from the method lab's design (lab-luck-gate D3).**
 Passing a gate has never been this roster's admission criterion, and it still is not: the gates
@@ -1085,11 +1088,20 @@ def backtest_gate(e: RosterEntry) -> dict[str, Any]:
 
     An entry the gate does not apply to (C: design §1 item 5, handover D9) also says
     ``"applicable": False``; it still counts as not passed. The applicable entries' dict is
-    exactly ``{"passed": False, "note": ...}``, as before C existed.
+    exactly ``{"passed": False}``.
+
+    **The verdict only.** This dict used to carry ``e.gate_note`` as well, and that prose was
+    what the leaderboard's go-live sheet printed under the five checks. The owner purged it
+    (2026-10-07): a sheet of ticks reads clean, and a paragraph of dev-window numbers under it
+    does not, when the picked strategy's name already links to the method's Sera page where the
+    same numbers live in full. So the note stops here and never enters the app's data path.
+    ``e.gate_note`` itself stays exactly where it is -- a recorded fact about why the entry was
+    admitted (see :class:`RosterEntry`), echoed by ``promote``, and required of every row by
+    :func:`from_row`. Purged from display is not purged from the record.
     """
     if not e.gate_applicable:
-        return {"passed": False, "applicable": False, "note": e.gate_note}
-    return {"passed": False, "note": e.gate_note}
+        return {"passed": False, "applicable": False}
+    return {"passed": False}
 
 
 def strategy_params(e: RosterEntry) -> dict[str, Any]:

@@ -38,16 +38,17 @@ export function strategyMetrics(snaps: Snapshot[], pnls: number[]): Metrics {
   };
 }
 
-/** One go-live rule. `note` explains a backtest-gate verdict when the roster gives one. */
-export type CheckItem = { label: string; val: string; ok: boolean; note?: string };
+/** One go-live rule: its label, its value and whether it holds. A verdict, never an explanation. */
+export type CheckItem = { label: string; val: string; ok: boolean };
 
-/** The fifth rule: "Backtest gate passed", or "Not applicable" for C (design §1 item 5), which never counts as passed. */
+/**
+ * The fifth rule: "Backtest gate passed", or "Not applicable" for C (design §1 item 5), which never
+ * counts as passed. The verdict stands alone — why a gate failed is the method's Sera page to tell.
+ */
 export function gateItem(gate: Gate): CheckItem {
-  const item: CheckItem = gate.applicable
+  return gate.applicable
     ? { label: 'Backtest gate passed', val: gate.passed ? 'Passed' : 'Not passed', ok: gate.passed }
     : { label: 'Backtest gate', val: 'Not applicable', ok: false };
-  if (gate.note !== null) item.note = gate.note;
-  return item;
 }
 
 /**

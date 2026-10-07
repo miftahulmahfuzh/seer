@@ -156,7 +156,6 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
           <span className={`chip num ${s.itemVal}`}>{c.val}</span>
         </div>
       ))}
-      {gate?.note && <p className={s.note}>{gate.note}</p>}
     </section>
   );
 

@@ -170,7 +170,7 @@ def test_fnd_is_the_sixth_roster_entry():
 def test_fnd_claims_no_backtest_gate_pass():
     e = entry(FND_ID)
     gate = backtest_gate(e)
-    assert gate == {"passed": False, "note": e.gate_note}
+    assert gate == {"passed": False}  # the verdict alone since the 2026-10-07 note purge
     assert e.gate_applicable is True  # the quant gate DOES apply to it; it simply has not passed
     assert "failed" in e.gate_note
     for word in ("passed", "pass ", "beat SPY"):

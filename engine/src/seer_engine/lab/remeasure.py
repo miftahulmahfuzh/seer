@@ -1280,7 +1280,7 @@ def format_seed_report(
         + (": " + ", ".join(v.candidate_id for v in eligible) if eligible else "")
     )
     out.append(
-        f"  no trials row was inserted, updated or deleted; no method status moved; "
-        f"trials.dsr is still NULL on every seed row and stays that way"
+        "  no trials row was inserted, updated or deleted; no method status moved; "
+        "trials.dsr is still NULL on every seed row and stays that way"
     )
     return "\n".join(out)

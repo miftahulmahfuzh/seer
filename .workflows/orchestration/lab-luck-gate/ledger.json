@@ -118,22 +118,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "d2ee303778643d68951b7cabb7a0e91292aa4ae6",
       "depends_on": [
         4,
         8
       ],
       "difficulty": "NORMAL",
       "n": 7,
-      "note": null,
+      "note": "docs+web gate wording; derive.ts matches BOTH DSR>= and max DD<= by prefix (literal match would have rendered a missed luck check as a tick); snapshot gate gains dsrPolicy/dsrN/dsrNBasis, lab.json regenerated last; SKILL.md 15% guardrail + ROADMAP:75 rule line fixed per exit criterion; package_readme H2 line numbers were STALE after phase 4 -- classified by content, 6 rule lines moved to 20%, history left",
       "package": "docs` + `web",
       "plan": ".workflows/plan/lab-luck-gate/phase-7.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T07:22:09+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-FWWQ",
       "title": "Docs, the pre-registration wording, and the site's gate"
     },
     {
@@ -155,7 +155,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "a17df19",
       "depends_on": [
         2,
         3,
@@ -163,22 +163,22 @@
       ],
       "difficulty": "NORMAL",
       "n": 9,
-      "note": null,
+      "note": "VERIFIED: 5 files all phase-9-owned; lab.sqlite byte-identical to phase 4's committed 5b94f444 so invariant 6 holds (phase 9 ran its batch on a copy via SEER_LAB_DB). Hunk-level stage of commands/lab.py confirmed by me: 0 phase-5 symbols in the commit, 18 still dirty in the tree -- phase 5 lost nothing; staged via git hash-object + update-index which does not touch the working tree. INVARIANT 7 MEASURED not assumed, all four identical committed-vs-remeasured: dev_trial_count 110/110, effective_n 110/110, dev_sharpe_variance 0.00023950479947117267 both, dev_daily_sharpes len 110 sum 4.5469122331089125 both. Invariant 3: sha256 over every column of every row -- trials and methods IDENTICAL, dsr still NULL on all 54, test_looks 0. D12 HEADLINE: F9-SPY200M70-MOM30 = 0.85665110202 at today's variance vs 0.903053194698 at the recorded as-of-P7a one; stays ineligible but on a luck test it RECEIVED, not a data gap -- R6 satisfied. Eligible set still THREE. Both phase-3 docstring diffs applied byte-for-byte: the cross-phase contract held. Suite 3186 passed/0 failed; new test_lab_remeasure_seed.py 16 passed. FIVE test-side plan defects fixed, none in implementation: research.TEST_WINDOW absent; a test did UPDATE trials which invariant 3's trigger refuses; D12 variance-contrast assertion vacuous on a seed-only fixture; a DSR assertion re-rounded at 4dp where the report prints 12 sig digits (F6-ML-P50-N20-TREND 0.840199760046 sits on the boundary); one test called run_chunk after monkeypatching it away. Plan prose said 14 tests, contract said 16, 16 shipped. COORDINATOR CORRECTION to phase 9's point 3: it checked the worktree's LAB_LUCK_GATE_PLAN.md (0 ticks) not the orchestration PLAN.md that spawn hands children, where phase 8's tick IS present -- cross-file ticks are NOT being lost. NOTE FOR LANDING: branch ahead 8 / behind 20 of origin/main, so Step 5 is a real merge, not a fast-forward.",
       "package": "engine/lab",
       "plan": ".workflows/plan/lab-luck-gate/phase-9.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T07:22:02+00:00",
       "satisfies": [
         "R6"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-ALY2",
       "title": "Luck-test the P7a seed"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-luck-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-luck-gate",
-  "updated": "2026-10-07T06:54:01+00:00",
+  "updated": "2026-10-07T07:22:09+00:00",
   "verified_at": "2026-10-07T03:59:26+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-luck-gate"
 }

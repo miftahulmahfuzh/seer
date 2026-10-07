@@ -101,19 +101,19 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "11b802a",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 6,
-      "note": null,
+      "note": "verified: dev.py/research.py byte-identical to base at commit; lab.sqlite md5 unchanged; test_paper_roster PINS only gains an assertion, no digest edited. Commit carries phase 2's trial_moments anchors in store.py/test_lab_store.py -- ACCEPTED, not contamination: phase-6 plan's reconciled shared-file protocol rule 3 ('a commit of a shared file may legitimately carry another phase's work at other anchors. Keep it; never git add -A'). COORDINATOR DECISION: engine/package_readme.md schema-v3 half assigned to phase 2 -- whichever phase changed the inputs closes the projection (rung 6, precedent D10 for web/data/lab.json). Phase 6 grew 6->7 files: third promote call site test_paper_split_cadence.py:555 landed in 06d12ea after the analysis was taken.",
       "package": "engine/paper",
       "plan": ".workflows/plan/lab-luck-gate/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T04:09:38+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-CA69",
       "title": "Every roster entry carries its lab provenance"
     },
     {
@@ -178,7 +178,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-luck-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-luck-gate",
-  "updated": "2026-10-07T04:00:53+00:00",
+  "updated": "2026-10-07T04:09:38+00:00",
   "verified_at": "2026-10-07T03:59:26+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-luck-gate"
 }

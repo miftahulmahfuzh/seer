@@ -20,7 +20,9 @@ from typing import Any
 from seer_engine.backtest.dev import Candidate
 from seer_engine.lab.method import Method
 from seer_engine.sim.book import Target, equal_weight
-from seer_engine.sim.rules import MONTHLY_HOLD  # DAILY_SWITCH, WEEKLY_HOLD, SWING_T20, ...
+# Fractional by default: paper trades books in fractional shares, and a 20M IDR book cannot fill
+# whole-share slots at 2016+ prices (M0021). Whole-share presets: MONTHLY_HOLD, WEEKLY_HOLD, ...
+from seer_engine.sim.rules import MONTHLY_HOLD_FRAC
 from seer_engine.strategies.allocator import last_close, target_from_close
 from seer_engine.strategies.base import History
 
@@ -84,7 +86,7 @@ class Alloc:
 ALLOC = Alloc()
 
 
-def _v(suffix: str, params: Params, rationale: str, rules=MONTHLY_HOLD) -> Candidate:
+def _v(suffix: str, params: Params, rationale: str, rules=MONTHLY_HOLD_FRAC) -> Candidate:
     return Candidate(id=f"MNNNN-{suffix}", family="MNNNN", rules=rules, allocator=ALLOC,
                      params=params, rationale=rationale, added=ADDED, owner_inputs=())
 

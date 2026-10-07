@@ -48,7 +48,8 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
    push, and run the tests again. Always test after staging, never before. `engine/.research/`
    present (build it if not). Then check `$TMUX`. If there is **no tmux**, don't stop: run the
    explore skill **solo, sequentially**, num-methods times in this session, then do step 7.
-3. **Choose the first slate** of `min(4, num-methods)` ideas from `lab status`, recent insights
+3. **Choose the first slate** (and when you reserve a book idea, write in its hypothesis that it
+   runs in fractional shares, so the child builds it that way) of `min(4, num-methods)` ideas from `lab status`, recent insights
    and closest-to-eligible trials, plus fresh web research. Rules for a slate:
    - **Diverse:** no two in the same family or the same mechanism. Mix sources: backlog,
      variation of a near miss, and at least one new web-researched idea per slate.
@@ -76,6 +77,9 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
      Whatever is missing, finish it yourself from the scrollback and the data. If the method
      never ran, relaunch it once; if it fails again, `lab drop MNNNN --why "<reason>"` plus a `risk` insight.
    - **dev-eligible:** run the explore skill's **Promotion** yourself, now, in `$REPO`, one at a time.
+     Start with its step 0, the fit check. If the eligible variant trades whole shares, first run
+     its fractional twin as a one-variant variation method. Promote the twin, never the whole-share
+     original. The look is spent on the configuration paper would trade, or not at all.
    - **Close it out:**
      - Save the scrollback: `tmux capture-pane -p -S - -t <window> > $LOGS/explore-MNNNN.log`.
      - Kill the window, but only if it is still named `explore-MNNNN`.
@@ -111,4 +115,5 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
 | "`git add lab/lab.sqlite`" | Always `lab stage`. A child may be mid-write, and only `lab stage` keeps `web/data/lab.json` in sync. |
 | "A child failed, pause the batch" | Never. Close it out, record it, refill the slot. |
 | "Kill that window, it looks done" | Verify first, capture the scrollback, check the name. |
+| "Promote the whole-share winner, it passed dev" | Never. A 20M IDR book can't buy 2016+ stocks in whole shares, so the look measures cash. Run the fractional twin first (M0021's lesson). |
 | "Promote in parallel" | Promotions are serial and done by Sera. Each spends one counted test-window look. |

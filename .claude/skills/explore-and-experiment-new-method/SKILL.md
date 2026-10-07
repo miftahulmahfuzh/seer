@@ -74,6 +74,15 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    - New logic is an `Allocator` with `id = "MNNNN"`. Reuse `f_factor`, `f_index`,
      `f_rotation`, `f_swing`, `allocator.VOLTARGET`/`BLEND` where you can.
      `TradeRules` presets live in `sim/rules.py`.
+   - **Trade it the way paper would: fractional shares.** A book (many stocks, equal or weighted
+     slots) uses `MONTHLY_HOLD_FRAC` or `MONTHLY_RANK_WEEKLY_RESIZE_FRAC`, never the whole-share
+     `MONTHLY_HOLD`. Gotrade takes fractional limit orders (owner, 2026-10-07), and the paper roster
+     trades every book that way. The lab starts at 20M IDR (about $1,450). Split 20–40 ways, that is
+     a $22–70 slot, and at 2016+ share prices most stocks cost more than that. A whole-share book
+     then sits in cash, and its test-window look measures the account size, not the method. The
+     dev window hides this because its back-adjusted 1990s prices are tiny. M0021 spent a look
+     learning this: 18% invested, +3.3% a year vs SPY +13.6%. Whole shares are only for a strategy
+     holding a few names, and only when you say why in the hypothesis.
    - Pure. Reads only bars dated ≤ `data_date`. Set `seen_keys`.
 5. **Test, then commit** only the method file. Run `pytest -q tests/test_lab_methods.py` and
    `ruff check src tests`. If the contract test fails, fix the method; never weaken the test.
@@ -149,6 +158,13 @@ Nobody approves this; you do it. Both commands exist — do not build them:
   one, so the two can never be swapped by accident.
 
 Then:
+0. **Fit check, before anything is promoted.** The candidate's `rules` must be fractional
+   (`fractional=True`, a `-frac` preset) whenever it holds more than a handful of names. If the
+   best eligible variant is whole-share, do not promote it. Register a new variation method with
+   one variant, the same config on the `-frac` twin, run it on dev, and promote that one if it is
+   still eligible. A look spent on a configuration that could not buy its own picks is wasted and
+   can never be retaken. Read the test trial's `exposure` against the dev trial's afterwards. A
+   test exposure far below dev exposure means the look measured cash, and the analysis must say so.
 1. `python -m seer_engine lab promote MNNNN`. Read what it printed, then **commit and push
    `docs/lab/prereg/MNNNN.md` before any test number exists** (design §3) — the command prints the
    exact `git add` / `git commit` lines. `lab test` refuses while the file is uncommitted, so this
@@ -178,6 +194,7 @@ Then:
 | "Re-run it, the store changed" | A configuration runs once per window. Renaming doesn't help: digests ignore the id. |
 | "Peek at 2016–2026" | Only through Promotion. Never edit `DEV_END`. |
 | "Delete that embarrassing trial" | Trials and insights are append-only (triggers). |
+| "It's eligible on dev, promote it as is" | Not in whole shares. Promote only the fractional configuration paper would trade (Promotion step 0). |
 | "Max DD 21% is basically 20%" | The bar is 20% since 2026-10-07 (design §1 item 4, the owner's call) and "basically" is not a comparison. Never edit §1/§5, `tuning` thresholds or the P7a registry — they are the owner's dials, not yours. |
 | "The luck bar is still too high; nudge it" | Never. `DSR_MIN` is the owner's risk appetite and `DSR_POLICY` is the owner's call on what counts as an independent look (design §7). Run `lab luck` to see the sensitivity, journal what you found, and leave both alone. |
 | "Nothing worked, stop here" | Journal the insight and queue the next idea. |

@@ -6,37 +6,37 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "2be3b63",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": null,
+      "note": "journal_seen table + lib/sera/seen.ts + POST /api/sera/journal/seen; nothing calls them yet. Verified: tsc clean, 311 vitest pass, 31 test_migrate pass vs real Postgres, idempotence checked directly in SQL. Readme deferred to phase 5 by design -- readme-updater run read-only, its findings appended to P1-WEB-Z5LP.md: all 11 line anchors stale by 3-6 lines (grep, don't seek), edit 4c omits the 500 and misstates the gate as requireSera, edit 4e's 'never a throw' is false (markInsightsSeen throws), and no bullet covers MAX_SEEN_BATCH=500 vs client MAX_BATCH=50.",
       "package": "db/migrations`, `web/lib/sera`, `web/app/api",
       "plan": ".workflows/plan/journal-unseen-badges/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T04:34:25+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-K3QM",
       "title": "Seen-state storage, server read/write, and the POST endpoint"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "7665b19",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "view.ts gains SEEN_COPY, NOTHING_SEEN, UnseenCounts/unseenCounts, badgeTip, JournalEntry and a partitioning journalGroups with an optional third ReadonlySet<number>; page.tsx byte-identical, nothing consumes the new exports yet. view.test.ts 8 -> 30 cases. tsc clean, npm test 311 passed. DECISION: Step 3 minted ONLY phase 2's task, not all five (tie-break 'narrower blast radius' -- phase 1 was running Step 3 against the same web/.workflows/todos.md concurrently; five-each would duplicate every TaskID). DRIFT: phase-2.md prose says the suite reaches 29 cases, its own verbatim code block yields 30; code block applied unchanged (rung 3 > prose), 30 is correct. NOTE for p3: todos.md raced with p1, so commit 7665b19 also carries p1's bookkeeping lines for P1-WEB-K3QM -- bookkeeping text only, no p1 code.",
       "package": "web/app/sera/journal",
       "plan": ".workflows/plan/journal-unseen-badges/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T04:32:47+00:00",
       "satisfies": [
         "R1",
         "R3"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-SSGU",
       "title": "Unseen-aware pure view layer: counts and the unseen/seen partition"
     },
     {
@@ -56,7 +56,7 @@
         "R1",
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The page renders unseen counts, the boundary, and per-card state"
     },
@@ -108,6 +108,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/journal-unseen-badges/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "journal-unseen-badges",
-  "updated": "2026-10-07T04:20:33+00:00",
+  "updated": "2026-10-07T04:35:44+00:00",
+  "verified_at": "2026-10-07T04:33:20+00:00",
   "worktree": "/home/miftah/.worktrees/seer/journal-unseen-badges"
 }

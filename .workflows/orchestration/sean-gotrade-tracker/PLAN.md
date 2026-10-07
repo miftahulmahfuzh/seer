@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/sean-gotrade-tracker`
 **Branch:** `feature/sean-gotrade-tracker` (base: `origin/main` @ `c2d2891`)
 **Phases:** 7
-**Status:** planned
+**Status:** 4/7 phases complete (1, 2, 4, 6 done; 3, 5, 7 open) -- phase 2 completed last
 **Coordinator:** —
 
 ---
@@ -160,13 +160,13 @@ Request JSON `{ "image": "<base64 JPEG, no data: prefix>", "sha256": "<hex>" }` 
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Sean core: schema, screenshot reader, ledger | R2, R3 | `db/migrations`, `web/lib/sean` | 20 | — | HARD | `.workflows/plan/sean-gotrade-tracker/phase-1.md` | — | — |
-| 2 | Sean section, Sean buttons (rail + phone header), Trades upload | R1, R3 | `web/app/sean`, `web/components`, `web/app/api/sean`, `web/lib/sean` | 25 + Vercel env | 1 | HARD | `.workflows/plan/sean-gotrade-tracker/phase-2.md` | — | — |
-| 3 | Overview: P&L graph and holdings | R2 | `web/app/sean`, `web/lib/sean/overviewData.ts` | 7 | 1, 2 | NORMAL | `.workflows/plan/sean-gotrade-tracker/phase-3.md` | — | — |
-| 4 | Engine: marks and the daily P&L series | R2 | `engine/src/seer_engine/sean`, `.github/workflows` | 10 | 1 | NORMAL | `.workflows/plan/sean-gotrade-tracker/phase-4.md` | — | — |
-| 5 | Plan: link a roster method, buy/sell reminders | R4 | `web/app/sean/plan`, `web/lib/sean`, `web/components` | 16 | 1, 2 | HARD | `.workflows/plan/sean-gotrade-tracker/phase-5.md` | — | — |
-| 6 | Engine: Gotrade fee schedule as a cost-model lever | R5 | `engine/src/seer_engine/sim`, `backtest` | 14 | — | HARD | `.workflows/plan/sean-gotrade-tracker/phase-6.md` | — | — |
-| 7 | Lab: calibrate from real orders, measure methods at real cost | R5 | `engine/src/seer_engine/lab`, `sean`, `sim/rules.py`, `.claude/skills`, `docs`, `web/lib/cadence.ts` | 16 | 4, 6 | NORMAL | `.workflows/plan/sean-gotrade-tracker/phase-7.md` | — | — |
+| 1 | Sean core: schema, screenshot reader, ledger | R2, R3 | `db/migrations`, `web/lib/sean` | 20 | — | HARD | `.workflows/plan/sean-gotrade-tracker/phase-1.md` | P1-ROOT-AUY5 | — |
+| 2 | Sean section, Sean buttons (rail + phone header), Trades upload | R1, R3 | `web/app/sean`, `web/components`, `web/app/api/sean`, `web/lib/sean` | 25 + Vercel env | 1 | HARD | `.workflows/plan/sean-gotrade-tracker/phase-2.md` | P1-ROOT-UNS5 | — |
+| 3 | Overview: P&L graph and holdings | R2 | `web/app/sean`, `web/lib/sean/overviewData.ts` | 7 | 1, 2 | NORMAL | `.workflows/plan/sean-gotrade-tracker/phase-3.md` | P1-ROOT-8JIM | — |
+| 4 | Engine: marks and the daily P&L series | R2 | `engine/src/seer_engine/sean`, `.github/workflows` | 10 | 1 | NORMAL | `.workflows/plan/sean-gotrade-tracker/phase-4.md` | P1-ROOT-5YLK | — |
+| 5 | Plan: link a roster method, buy/sell reminders | R4 | `web/app/sean/plan`, `web/lib/sean`, `web/components` | 16 | 1, 2 | HARD | `.workflows/plan/sean-gotrade-tracker/phase-5.md` | P1-ROOT-XA2W | — |
+| 6 | Engine: Gotrade fee schedule as a cost-model lever | R5 | `engine/src/seer_engine/sim`, `backtest` | 14 | — | HARD | `.workflows/plan/sean-gotrade-tracker/phase-6.md` | P1-ROOT-8S6O | — |
+| 7 | Lab: calibrate from real orders, measure methods at real cost | R5 | `engine/src/seer_engine/lab`, `sean`, `sim/rules.py`, `.claude/skills`, `docs`, `web/lib/cadence.ts` | 16 | 4, 6 | NORMAL | `.workflows/plan/sean-gotrade-tracker/phase-7.md` | P1-ROOT-GB56 | — |
 
 Run order: 1 and 6 first (independent); then 2 and 4 (after 1); then 3 and 5 in parallel (after 2; they share no file); 7 after 4 and 6. Phase 1 serves R2 and R3 together because the ledger and the reader share one type and one migration. Phase 2 serves R1 and R3 because the buttons and the upload are the same section shell.
 

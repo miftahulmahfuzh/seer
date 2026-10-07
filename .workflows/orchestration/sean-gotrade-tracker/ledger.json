@@ -24,22 +24,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "1ed80fd65530035aec7694f149ac16c6636f02a7",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 2,
-      "note": "live; coordinator keeps running over verify's no-commit pending",
+      "note": "Sean rail+phone buttons, /sean shell, Trades upload route+uploader, data.ts (ledgerOrders for 3/5); Vercel LLM_* added prod+preview; no decisions",
       "package": "web/app/sean`, `web/components`, `web/app/api/sean`, `web/lib/sean",
       "plan": ".workflows/plan/sean-gotrade-tracker/phase-2.md",
-      "reported_at": "2026-10-07T16:32:31+00:00",
+      "reported_at": "2026-10-07T16:33:22+00:00",
       "satisfies": [
         "R1",
         "R3"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-UNS5",
       "title": "Sean section, Sean buttons (rail + phone header), Trades upload"
     },
     {
@@ -58,27 +58,27 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Overview: P&L graph and holdings"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "3d88739",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 4,
-      "note": "live; coordinator keeps running over verify's no-commit pending",
+      "note": "commit on branch before its report arrived; recorded by coordinator from git",
       "package": "engine/src/seer_engine/sean`, `.github/workflows",
       "plan": ".workflows/plan/sean-gotrade-tracker/phase-4.md",
-      "reported_at": "2026-10-07T16:32:31+00:00",
+      "reported_at": "2026-10-07T16:33:43+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-5YLK",
       "title": "Engine: marks and the daily P&L series"
     },
     {
@@ -97,7 +97,7 @@
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Plan: link a roster method, buy/sell reminders"
     },
@@ -134,7 +134,7 @@
       "satisfies": [
         "R5"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Lab: calibrate from real orders, measure methods at real cost"
     }
@@ -142,7 +142,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/sean-gotrade-tracker/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sean-gotrade-tracker",
-  "updated": "2026-10-07T16:32:31+00:00",
-  "verified_at": "2026-10-07T16:24:31+00:00",
+  "updated": "2026-10-07T16:33:46+00:00",
+  "verified_at": "2026-10-07T16:33:40+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sean-gotrade-tracker"
 }

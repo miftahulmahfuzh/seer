@@ -2,7 +2,7 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-07 14:16:00
+**Last Updated**: 2026-10-07 19:32
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 5
+- Completed: 8
 
 ---
 
@@ -35,6 +35,63 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-T8MK** Phase 2: Run it, and record what it found
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns the actual Monte Carlo run and its results: a new section appended at the tail of `docs/plans/2026-10-03-seer-design.md` in §12's voice (expected §14, numbered at write time), one `kind='risk'` `insights` row in `lab/lab.sqlite`, and `web/data/lab.json` regenerated with `lab export-json` because `engine/tests/test_lab_snapshot.py:449` pins it byte-for-byte to the database. It appends only — no edit to design §1, §5, §11, §12 or §13, and no code. Exit: a break-even delisting return — or an explicit "not reached on this grid", which is an expected result and not a stop condition — for each of RMW-FR, RAW-FR, MOM-FR and MVW-FR, with the assumed hazard, seed count and spread shown; the true unstressed run and the `r = 0` run reported as separate rows with the gap named as the cost of a thinner ranking pool; the section says the harness injects the historical rate into the ~409 priced survivors rather than restoring the historical count, states plainly whether the break-even is plausible and what the test cannot answer; the insight and `lab.json` land in the same breath; `lab status` reads 110 / 0 / 37 / 33; the full suite passes at 0 failed, 0 skipped.
+  - **Status**: completed
+  - **Plan Set**: `DELISTING_STRESS_ROSTER_RULES_PLAN.md` (phase 2 of 5)
+  - **Satisfies**: R1 — Q1 — settle where the delisting stress test lives and what it needs, build it, run it, and report the break-even delisting return with a judgement on whether that number is plausible
+  - **Depends on**: P1-ENG-D7XQ
+  - **Unblocked**: 2026-10-07 18:16 — P1-ENG-D7XQ (phase 1) landed; the harness, its CLI spellings and the `--csv` schema phase 2 consumes now exist on `feature/delisting-stress-roster-rules`.
+  - **Plan**: `.workflows/plan/P1-ROOT-T8MK.md`
+  - **Completed**: 2026-10-07 19:32
+  - **Method**: /do
+  - **Files**: docs/plans/2026-10-03-seer-design.md, lab/lab.sqlite, web/data/lab.json
+  - **Verified**: Full suite with worktree `PYTHONPATH` + `PG_TEST_URL` -> 3229 passed, 0 failed, 0 skipped, 58.09s (>= the 3197 branch baseline; xdist active). `ruff check --no-cache src tests` -> All checks passed. `lab status` -> 110 dev trials / 0 test-window looks / 37 methods / 33 insights (insights was 32; everything else unmoved, so no trial recorded and no test-window look spent). `grep -c '{{'` on the design doc -> 0, no placeholder survived; `git diff --numstat` on it -> `133 0`, append-only, and SS1, SS11, SS12, SS13 are untouched. `engine/.research` does not exist in the worktree, so nothing was written to the research store and there is no symlink to commit.
+  - **Drift**: No drift. Every flag in phase 2's Interface Contract matched `delisting_stress.py --help` verbatim (--entry repeatable, --hazard unserved|all|NUMBER, --returns, --seeds, --seed0, --jobs default 1, --store, --csv, --decline-sessions, --smoke), and the --csv column names/order/units matched phase 1's declared schema exactly, including the empty delisting_return/seed on the unstressed row.
+  - **Drift**: Step 0c's symlink fallback was NOT needed: --store plus SEER_RESEARCH_STORE were both honoured, so no untracked engine/.research exists in the worktree.
+  - **Drift**: Runtime came in well under budget: the machine was idle, so each of the two 3,204-run jobs took 29.9 min at --jobs 6 against the plan's 50 min - 1 h 45 estimate. Peak RSS measured at 1.01 GB/worker, so --jobs 6 was kept as planned.
+  - **Decided**: Phase plan Step 9 says commit here; /implement Step 4 says the main context performs no git operations and pusher commits from the modified_files allowlist -> delegated the commit to pusher with the path allowlist (rung: /implement Step 4 is the governing command spec, and invariant 8's 'explicit path allowlist, never git add -A' is satisfied exactly by pusher's paths).
+  - **Decided**: MVW-FR's base run is NONE on the mean edge (+0.11 pts/yr at r=-100%) but 45 of its 100 draws DO break even, and the 5.1%/yr sensitivity solves it at -85.8% -> kept Step 6's branch-1 headline ('No - it cannot be reached at all') and stated the per-draw and sensitivity caveats in their own sentences rather than softening the headline or hedging into branch 2 (rung 3: phase 1's break_even() is defined on the mean edge across seeds; rung 2: exit criterion 1 requires the across-seed spread be shown).
+  - **Decided**: The insight body's VERDICT_SENTENCE runs to two sentences rather than one, to carry the 5.1%/yr exception for the two thin-margin entries (rung 1: invariant 7 - numbers only with their meaning; a flat one-sentence 'impossible' would have overstated MVW-FR's margin).
+  - **Decided**: `engine/package_readme.md` is NOT edited by this phase and the debt is carried to the set's coordinator, following phase 1's recorded precedent in this same set (rung 4: the index's phase-2 row declares Files: 3 and the plan's Files table states no file outside the three paths is touched; rung 6: phase 1 left the same debt with a detailed coordinator note). `readme-updater` therefore ran in **advisory mode** and wrote nothing. The outstanding debt is phase 1's list (`delisting.py` missing from the Layout tree, its eight-name `__all__` missing an Exported API H3, and an internal-module-graph bullet) PLUS one line this phase now answers: `engine/package_readme.md:1957` says 'yfinance has no delisted tickers, so ... single-stock dev results are optimistic (D4)' - that claim now has its measured answer in design SS14 and should be revised to point at it.
+  - **Decided**: This phase's commit sweeps the root bookkeeping its four siblings deliberately left uncommitted - `.workflows/todos.md` (phases 2, 3 and 5's rows) and the plan index's row/Status ticks - because phase 2 is the set's last unfinished phase and the deferral reason is gone. MEASURED at `swarm.py:1413-1421`: `land --step cleanup` writes only a *filename list* of dirt to `worktree-dirt.txt` and then force-removes the worktree, so it commits nothing; 'left for land to sweep' had no sweeper but this one (rung 1: the dispatching constraint permits the bookkeeping lines and forbids only a peer's *in-flight* edit, and no peer is in flight - phases 1, 3, 4, 5 are all `done`; rung 2: phases 3 and 5 named land as the sweeper). `engine/.workflows/todos.md` and the four peer `P1-*.md` plan files stay OUT, being another package's file and other phases' documents, and are reported to the coordinator as still-uncommitted instead.
+  - **Decided**: `.workflows/plan/P1-ROOT-T8MK.md` IS included in the allowlist though it is untracked. It is this task's own plan file, it is the path this row's `**Plan**` field cites, and the repo tracks all 116 of its siblings - leaving it untracked means `land --step cleanup` force-deletes the only record of what phase 2 was asked to do, and the row would cite a path that does not exist (tie-break: asymmetric cost - one extra small markdown file in the commit is recoverable, a destroyed plan file is not). The four peer plan files are not mine and stay out.
+
+- [x] **P1-ROOT-W5GD** Phase 5: MOM-FR, judged under the rule
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns a new `docs/handover/2026-10-07-mom-fr-under-the-replacement-rule.md` carrying the verdict on MOM-FR and the evidence behind it; it edits `paper/roster.py` only if the verdict is "swap", and then only under a new id with its own paper clock. It does not amend phase 3's rule, `lab/lab.sqlite` or any started entry's `spec_digest`. Exit: the verdict is stated plainly with the lab evidence (26 candidates clear all five owner conditions today; MOM-FR is 12th by DSR and 8th by MAR); it records that Q3's "slowest path to a verdict (20.7 months)" indictment is now void, since every entry reaches a verdict at 18 months flat; it weighs the family diversity MOM-FR alone holds against the higher lab scores of the weekly-brake alternatives; and it applies phase 3's rule by name at the real section number read from the file, with every `§<RULE>` / `<RULE-TITLE>` placeholder resolved so `grep -n 'RULE'` returns nothing. The full suite passes at 0 failed, 0 skipped.
+  - **Status**: completed
+  - **Plan Set**: `DELISTING_STRESS_ROSTER_RULES_PLAN.md` (phase 5 of 5)
+  - **Satisfies**: R3 — Q3 — settle whether `MOM-FR` is the weakest of the five, and whether a better occupant of that slot exists in the lab
+  - **Depends on**: P1-ROOT-K3VD
+  - **Plan**: `.workflows/plan/P1-ROOT-W5GD.md`
+  - **Completed**: 2026-10-07 18:22
+  - **Method**: /implement
+  - **Files**: docs/handover/2026-10-07-mom-fr-under-the-replacement-rule.md
+  - **Decided**: The plan's verbatim §3 profit-factor gloss carried a corrupted currency glyph ('it makes ₂.33 on winners for every ₂ lost on losers') → written as '$2.33 on winners for every $1 lost on losers' (rung 1: invariant 7, prose the owner reads stays plain — over rung 3's instruction to reproduce the plan's code block verbatim)
+  - **Decided**: Phase 3's rule resolved by reading the file, not assumed: §8, 'The roster replacement rule (2026-10-07)', refusals R1–R3 (§8.2) and triggers T1–T5 (§8.3) — all eight carried into the document's §2 table under phase 3's own names (rung 3: the plan's Step 1 code block)
+  - **Decided**: Step 4 (the conditional roster edit) did NOT fire: the verdict is keep. paper/roster.py, engine/tests/test_paper_roster.py and db/migrations/ are unchanged, verified with git status
+
+- [x] **P1-ROOT-K3VD** Phase 3: The roster replacement rule
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns a new top-level section (expected §8) of `docs/plans/2026-10-04-method-lab-design.md` stating when a paper roster entry may be replaced, extending §7.4's recorded paper-vs-lab divergence. Touches no code, no database, no lab trial; N stays 110. Exit: the rule names its own triggers (T1-T5) and refusals (R1-R3); is built on 18 months flat (the owner's revised item 1), not the superseded 14.9/19.4/20.7-month table; states that a falling DSR alone is never a reason to replace an entry, citing lab design §7.3's measured ratchet; says what happens to the replaced entry's record; is dated and attributed; names NO roster entry as a thing to be replaced (judging MOM-FR is phase 5's work under R3). Full suite passes 0 failed / 0 skipped.
+  - **Status**: completed
+  - **Plan Set**: `DELISTING_STRESS_ROSTER_RULES_PLAN.md` (phase 3 of 5)
+  - **Satisfies**: R4 — Q4: write the rule for when a roster entry may be replaced, before the first one looks bad
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ROOT-K3VD.md`
+  - **Completed**: 2026-10-07 18:11
+  - **Method**: /do
+  - **Files**: docs/plans/2026-10-04-method-lab-design.md
+  - **Decided**: Section number for the appended rule: §8, text used verbatim with no renumbering (rung 3, the plan's code block — confirmed by measurement: highest existing top-level heading was `## 7.`, file was 281 lines, exactly the plan's expected output)
+  - **Decided**: Step 3 task creation scoped to phase 3's task only, not all five phases (rung 1, invariant 8 — phases 1 and 4 are spawned concurrently and would race on the same todos.md; tie-break: narrower blast radius)
+  - **Decided**: Phase 3's package `docs/plans` has no own .workflows/todos.md, so the task lives in the ROOT package (rung 6, existing convention — the prior docs phase landed as P1-ROOT-FWWQ there)
+  - **Decided**: Commit allowlist is the one docs path alone; `.workflows/todos.md` excluded despite holding this task's row (rung 2, phase 3 exit criterion 9 — committing it would sweep two siblings' concurrently-written entries)
 
 - [x] **P1-ROOT-FWWQ** Phase 7: Docs, the pre-registration wording, and the site's gate
   - **Difficulty**: NORMAL

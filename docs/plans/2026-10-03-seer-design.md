@@ -282,3 +282,136 @@ survivors are not yet known.
   conditions are weaker evidence than their phrasing suggests, and the lab's dev-window work and
   its luck test carry more of the real weight than §1 implies. That is worth knowing before anyone
   reads a passing checklist as proof.
+
+## 14. Measured 2026-10-07: how bad a delisting would have to be before the edge goes
+
+§12 measured the hole and ended by naming the test it could not do: *"injecting synthetic
+delistings at the historical rate and solving for the break-even delisting return — remains unrun
+and is the right next step if a decision ever turns on this."* This section is that test. It was
+run because the era contrast in §12 is confounded with market regime and therefore cannot tell
+"better data" from "different market"; this one is not, because it changes the data and holds the
+market fixed.
+
+**The question, in plain words.** Our price history is missing 522 companies that were in the index
+and have since vanished. The worry is that the books look good only because the companies that went
+to zero are invisible to them. We cannot buy the missing prices, so we ask the question backwards:
+**how much would each of those companies have had to lose, on the day it disappeared, before the
+book's advantage over the market disappears too?** That number is the break-even delisting return.
+If it is a loss so severe that no plausible set of real delistings reaches it, the hole does not
+explain the edge.
+
+**What was injected, and at what rate.** Companies were killed off at random inside the ranking
+universe — the name stops being priced from its death date, and any position in it is closed at a
+rewritten final mark. The rate was **measured, not assumed**: from the store's own point-in-time
+membership, 514 symbols left the index inside the dev window across roughly **10,096 member-years**,
+which is an exit rate of **5.1% a year**; **4.0% a year** of it is the part a free feed drops
+entirely (404 names with no bars at all). The main run injects at **4.0%/yr** — the rate at which
+the universe lost a name we could never have watched die. **5.1%/yr** is carried as the pessimistic
+sensitivity. Each book was re-run **100 times** at each assumed loss, because which names die is
+random and the answer must not be one draw's luck.
+
+**First, the part that costs something even when nobody loses anything.** Taking companies out of
+the pool at the historical rate makes the books worse **before any assumed loss is applied at
+all**, simply because there are fewer names left to choose from. The table below therefore shows
+three different things and they must not be read as one: what each book returned untouched, what it
+returned once companies started disappearing but every holder was paid the last price anyone saw,
+and how bad the loss would have to get before the advantage runs out.
+
+| entry | the book | return/yr untouched | return/yr with companies vanishing, paid in full | the cost of a thinner pool |
+|---|---|---|---|---|
+| RMW-FR | weekly brake | +11.68%/yr | +10.86%/yr | −0.82 points a year |
+| RAW-FR | raw momentum | +15.05%/yr | +14.13%/yr | −0.92 points a year |
+| MOM-FR | regime-scaled momentum | +12.56%/yr | +12.27%/yr | −0.29 points a year |
+| MVW-FR | min-variance weights | +11.27%/yr | +10.72%/yr | −0.55 points a year |
+
+The last column is roughly a third of a percentage point to nine-tenths of one a year, and **none
+of it is a delisting loss**. It is the price of ranking from a pool that keeps losing names — about
+**159 companies** removed over the twenty years, out of the 409 that were both priced and still in
+the index. It matters here because it is easy to mistake the middle column for "no stress", and it
+is not: **no stress is the first column.**
+
+**Then, the break-even.** Break-even delisting return per roster entry, 100 random draws of
+who dies per assumed return:
+
+| entry | the book | break-even at 4.0%/yr | spread across draws | break-even at 5.1%/yr |
+|---|---|---|---|---|
+| RMW-FR | weekly brake | not reached: worse than −100%, i.e. never (still +0.73 points a year ahead at a total loss) | median draw −83.8%, p10 −97.7%, p90 −69.8%; 80 of 100 draws never break even anywhere | not reached, but only just: +0.01 points a year ahead at a total loss, and 48 of 100 draws never break even |
+| RAW-FR | raw momentum | not reached: worse than −100%, i.e. never (still +3.69 points a year ahead at a total loss) | no draw breaks even anywhere, in any of the 100 | not reached: still +2.86 points a year ahead at a total loss, and again no draw breaks even |
+| MOM-FR | regime-scaled momentum | not reached: worse than −100%, i.e. never (still +2.30 points a year ahead at a total loss) | median draw −99.7%, p10 and p90 both −99.7%; 99 of 100 draws never break even | not reached: still +1.75 points a year ahead at a total loss, and 95 of 100 draws never break even |
+| MVW-FR | min-variance weights | not reached: worse than −100%, i.e. never (still +0.11 points a year ahead at a total loss) | median draw −73.0%, p10 −95.7%, p90 −57.7%; 55 of 100 draws never break even | **−85.8%** — the one cell in this table where the break-even is reached; 38 of 100 draws never break even |
+
+Read a row like this. RAW-FR's says that no assumption about delisting losses reaches its
+break-even: even if **every** disappearing company it ever held had been worth nothing at all on
+the way out, every time, across twenty years, the book still beats the market by 3.69 points a
+year. That is what "worse than −100%" means — the break-even is off the end of the scale, because
+a shareholder cannot lose more than everything. The break-even is measured against the market, so
+the cost of the thinner pool is already inside it.
+
+Two honest qualifications to that table, both visible in the spread column. **First, these are
+averages over 100 draws, and the average is what "break-even" is defined on.** For MVW-FR the
+average is +0.11 points a year at a total loss — the thinnest margin on the board — and 45 of its
+100 draws *do* break even somewhere on the grid. Its result is "not reached" on the mean and a
+coin-flip draw by draw, and those are different statements. **Second, RMW-FR and MVW-FR are the two
+entries whose margin is thin enough for the pessimistic rate to matter**; RAW-FR and MOM-FR keep
+multiple points of headroom under both.
+
+**Is a loss that bad plausible? No — it cannot be reached at all.**
+At the measured rate at which our universe lost companies we could never have watched die, there is
+no assumption about delisting losses, however extreme, under which the missing companies account
+for these four books' advantage over the market. All four are still ahead at a delisting return of
+−100%, which is the worst loss that can exist: a shareholder cannot lose more than everything. This
+is the strongest answer the test can give, and it closes the question §12 left open — the hole is
+real and it costs something, but it is not what produces the edge. **The pessimistic 5.1%/yr
+sensitivity does not change that answer, with one exception it is worth naming: at that rate
+MVW-FR's break-even does come onto the scale, at −85.8%**, and RMW-FR's margin falls to +0.01
+points a year — so for the two weakest-edge entries the conclusion rests on the rate being the
+measured 4.0%/yr rather than the pessimistic 5.1%/yr, while RAW-FR and MOM-FR hold under either.
+Even −85.8% remains an implausible average: most index exits are not deaths but mergers,
+acquisitions and buyouts, which pay shareholders and often at a premium, and only 32 of the 522
+missing names carry the `Q` bankruptcy suffix. Thirty-two names cannot carry an average loss of
+that size across 404 exits.
+
+**What the backtest has been assuming all along, now visible.** When a company stops being priced
+mid-run, the simulator closes the position **at its last known price** and calls the trade forced
+(`sim/book.py`, `close_book_unpriced`). That is a delisting return of exactly **0%** — sold whole at
+the last close. It has been invisible until now only because no symbol in the store disappears
+mid-window. It is the zero on the left-hand end of the grid above, and it is the assumption this
+whole section is stress-testing. **It is not the same thing as "no delistings":** the zero column
+still has companies disappearing out of the ranking pool, which is what the first table above
+measures. Nothing in this section should be read as saying a 0% delisting return is free.
+
+**The limits of this test, stated rather than buried — four of them.**
+
+1. **The death is abrupt.** The injected company goes from fully priced to gone with no warning, so
+   the book gets no chance to sell it on the way down. Every one of these strategies has a trend
+   gate that would, in reality, have been pushing it out of a falling name for weeks. So the
+   break-even above is an **upper bound on the damage**: reality is kinder than this test, and the
+   real break-even is a *worse* loss than the number printed. We chose it that way on purpose — a
+   test meant to reassure should be run in the direction that makes reassurance hard.
+2. **It cannot touch 118 of the 522 missing names.** The hole splits in two, which §12 could not
+   see because it counted the 522 as one number. **404** names left the index inside the window and
+   have no bars — those are the survivorship case proper, and those are what this test injects.
+   The other **118 were still index members on the last day of the dev window and have no bars at
+   all.** They never died inside the window; they died afterwards, and the free data source dropped
+   them retroactively. **No delisting injection can model those 118**, because the thing that is
+   missing is a twenty-year price path, not a death. Their effect is not flattery — it is a thinner
+   pool to rank from, for twenty years — and it stays unmeasured by this section.
+3. **It injects the historical *rate*, not the historical *count*.** The hazard is applied to the
+   409 priced survivors over 5,416 member-years — the only companies a simulation can take away —
+   which kills about 159 of them per draw. History actually lost 404 unpriced names. The test says
+   what that rate of disappearance costs inside the universe the books could really rank from; it
+   does not and cannot restore the 404, because there are not that many priced names left to
+   remove.
+4. **It is the dev window only.** This changes nothing about the test window, which is still
+   completely unspent.
+
+**What this cost.** Nothing that matters. The stress harness re-runs the backtest in memory against
+a perturbed copy of the price history; it **records no lab trial**, so the luck test's trial count
+**N stays at 110**; it **spends no test-window look**, so the count stays at 0; and it writes
+nothing to `engine/.research`, so no recorded trial's configuration fingerprint moves. It can be
+re-run any time the question comes back. The two runs behind this section took half an hour each.
+
+**What it does not change.** The decision not to buy survivorship-free data (§12) stands or falls on
+this number, and the owner should reread §12's last paragraph with it in hand — the number argues
+for leaving that decision where it is. Nothing on the paper roster moves on the strength of a
+diagnostic.

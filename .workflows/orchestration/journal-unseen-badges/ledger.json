@@ -1,0 +1,113 @@
+{
+  "branch": "feature/journal-unseen-badges",
+  "coordinator": "orch-journal-unseen-badges",
+  "coordinator_session_id": "7d5e1078-05ba-4679-baea-d1591ccf945c",
+  "created": "2026-10-07T04:20:33+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 1,
+      "note": null,
+      "package": "db/migrations`, `web/lib/sera`, `web/app/api",
+      "plan": ".workflows/plan/journal-unseen-badges/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Seen-state storage, server read/write, and the POST endpoint"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 2,
+      "note": null,
+      "package": "web/app/sera/journal",
+      "plan": ".workflows/plan/journal-unseen-badges/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Unseen-aware pure view layer: counts and the unseen/seen partition"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "web/app/sera/journal",
+      "plan": ".workflows/plan/journal-unseen-badges/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The page renders unseen counts, the boundary, and per-card state"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2,
+        3
+      ],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": null,
+      "package": "web/app/sera/journal",
+      "plan": ".workflows/plan/journal-unseen-badges/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The client island: dwell, click, batch, flush, live countdown"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "difficulty": "EASY",
+      "n": 5,
+      "note": null,
+      "package": "web/components/sera`, `web/app/sera`, docs",
+      "plan": ".workflows/plan/journal-unseen-badges/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The rail badge and the package readme"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/journal-unseen-badges/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "journal-unseen-badges",
+  "updated": "2026-10-07T04:20:33+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/journal-unseen-badges"
+}

@@ -3,7 +3,7 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-07
-**Total Active Tasks**: 2
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
@@ -13,8 +13,8 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 2
-- Completed: 89
+- Blocked: 1
+- Completed: 90
 
 ---
 
@@ -672,15 +672,36 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and no `**Commit**` field (rung 6: the direct precedent recorded by phases 1, 2 and 6 of this same swarm in this same file -- a cross-file block move is the one edit that reliably loses a peer's concurrent append, and this file is committed by whichever session commits it, so a sha field cannot stay consistent).
     - Quick Stats recounted from the file rather than blind-decremented (rung 6: same precedent -- a recount is idempotent under concurrency, a decrement compounds the race).
     - Plan index: ticked phase 8's TaskID cell `(done 2026-10-07)` and left `**Status:** reconciled` alone (rung 6: phases 1 and 6 ticked exactly that way and touched neither; in a swarm the phases finish out of order, so a `phase N/9 complete` line would assert an order that does not exist).
-- [ ] **P1-ENG-ALY2** Phase 9: Luck-test the P7a seed
+- [x] **P1-ENG-ALY2** Phase 9: Luck-test the P7a seed
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns extending `seer_engine.lab.remeasure` (phase 3's module) with a seed-specific path and a resumable batch mode over all 54 P7a trials, recovering their daily moments and writing only `trial_moments` rows. Does not touch `trials` — not one row, by invariant 7 — `methods.status`, the P7a `REGISTRY`, the test window or any constant; it changes runtime data, not any phase's logic. Exit: all 54 seed trials have `trial_moments` and therefore a real luck verdict; `store.dev_trial_count`, `npolicy.effective_n(conn, "all-trials").n`, `store.dev_sharpe_variance` and `store.dev_daily_sharpes` identical before and after; the batch is resumable, idempotent and ~65 seconds (10.8s store load + 51.5s of backtests), chunk-invariant; `test_looks` 0; `pytest` green. It makes nothing eligible — the report names `F9-SPY200M70-MOM30`'s resolved DSR at the gate's N (0.856651 under D12's today's-variance rule) with the as-of-P7a figure (0.903053) beside it in brackets, and reads `luck: fail` / `not eligible`; the eligible set stays three, but F9 is now held out by a luck test it received rather than by a data gap.
-  - **Status**: blocked
+  - **Status**: completed
   - **Plan Set**: `LAB_LUCK_GATE_PLAN.md` (phase 9 of 9)
   - **Satisfies**: R6 — Half the lab's trials have never been luck-tested; they pay into N and get no verdict for it.
   - **Depends on**: P1-ENG-6134, P1-ENG-921N, P1-ENG-B6Y5
   - **Plan**: `.workflows/plan/P1-ENG-ALY2.md`
+  - **Completed**: 2026-10-07 14:17
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/remeasure.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_remeasure_seed.py, engine/.workflows/plan/P1-ENG-ALY2.md, engine/.workflows/todos.md
+  - **Verified**: full engine suite with `PYTHONPATH=.../engine/src`, `PG_TEST_URL` set, `-o addopts="-ra"` (serial, main checkout's venv) -> **3186 passed, 0 failed**, 153 warnings in 419s. New `tests/test_lab_remeasure_seed.py`: 16 passed; targeted group (seed + remeasure + store + runner + test_window + registry) 158 passed. Real 54-trial batch against a COPY of the committed database (`SEER_LAB_DB` pointed at a scratch copy; the committed file never opened for write): exit 0, 54 `trial_moments` rows written, **zero blocked**. Invariant 7 proved by measurement, committed file vs fully-remeasured copy, all four quantities identical: `dev_trial_count` 110/110, `npolicy.effective_n(conn,'all-trials').n` 110/110, `dev_sharpe_variance` 0.00023950479947117267 on both, `dev_daily_sharpes` len 110 and sum 4.5469122331089125 on both. Invariant 3: sha256 over every column of every row -- `trials` IDENTICAL (`6bfc3a9e952987d7`), `methods` IDENTICAL (`2826262fe63b6d46`) before vs after the batch; `trials.dsr` still NULL on all 54 seed rows and every H-P7A method status still `rejected`. Invariant 2: `test_looks` reads 0 after the batch. D12 headline exactly as the plan predicted: `#53 F9-SPY200M70-MOM30 DSR @ N=110 = 0.85665110202 luck: fail (bar 0.9) [with the recorded as-of-P7a variance: 0.903053194698]`, `owner conditions: all pass MAR 0.635164 -> not eligible`. The eligible set is unchanged at THREE on both the committed file and the remeasured copy (M0020-W-NOSTOP, M0022-W-TV14, M0022-W-TV16) -- this phase makes nothing eligible, which is the intended outcome. Idempotent: the second run prints "every seed trial already has its moments; nothing to do", loads no research store, writes nothing, exit 0. Committed `lab/lab.sqlite` byte-untouched (md5 `5b94f444d69e7af262b1c815e84346c9`, unchanged) -- phase 4 owns that binary per D5/invariant 6. The staged-only build of `commands/lab.py` (without phase 5's in-flight work) was verified to import, parse and wire the CLI standalone: `lab remeasure --help` renders the widened positional plus `--only`/`--chunk`.
+  - **Drift**:
+    - The plan's Step 5 prose says "14 tests" while its Interface Contract and its own code block say 16. The code block is the artifact; the file has 16 and all 16 pass.
+    - The plan's test code block referenced `research.TEST_WINDOW`, which does not exist in the module. Four further defects were test-side only; the implementation code blocks (Steps 1-4) applied verbatim with no changes.
+    - Both phase-3 contract diffs (`resolve_method`'s docstring + message, `_moments_row`'s annotation) applied exactly as written, as phase 3 promised.
+    - `readme-updater` deliberately skipped: `engine/package_readme.md` is already dirty with phase 7's in-flight edits, so editing and staging it would commit a peer's work under this phase's name.
+  - **Decided**:
+    - `research.TEST_WINDOW` does not exist -> used `research.test_window(research.TEST_WINDOW_START)`, the module's real API (rung 6: the surrounding code's convention; the guard reads `w.name`/`w.start`/`w.end`, so a genuine test `Window` is what the assertion needs).
+    - The registry-drift test did `UPDATE trials SET config_digest` -> moved the mismatch to the REGISTRY side by monkeypatching `remeasure.config_digest` (rung 1: invariant 3, `trials` is append-only and the `trials_no_update` trigger refuses the write outright; the guard's intent, a digest mismatch, is preserved).
+    - The D12 variance-contrast test asserted the two variances differ on a seed-only fixture where they are computed over the same 54 rows by construction -> the fixture now appends two non-seed dev trials carrying a `dsr`, reproducing the committed lab's 2.0067e-04 vs 2.3950e-04 contrast (rung 2: the phase's exit criteria -- D12's contrast is the thing under test, and a fixture where the two numbers coincide proves nothing).
+    - The report assertion `f'{v.dsr:.6f}'[:6] in text` rounds at the 4th decimal while `format_seed_report` prints `_g(v.dsr)` at 12 significant digits; F6-ML-P50-N20-TREND is 0.840199760046 and sits exactly on that boundary -> assert against the report's own formatter (rung 3: the plan's code blocks are the reconciled artifact; the assertion was commentary on it).
+    - `test_no_window_can_be_selected_anywhere_in_the_seed_path` called `remeasure.run_chunk` after monkeypatching it away, so it captured zero calls -> the real function is captured before the seam is substituted (rung 3).
+    - The shared `engine/src/seer_engine/commands/lab.py` is staged at HUNK level, not wholesale, because phase 5's uncommitted +631-line `_status`/`_luck` rewrite is interleaved in the same file (rung: /implement Step 4's own rule that a peer's work must never be committed under my name; tie-break: the narrower blast radius). The working tree was not modified, so phase 5 loses nothing.
+    - Landing: not attempted, and `next_command` is empty. `swarm.py find --plan LAB_LUCK_GATE_PLAN.md --task P1-ENG-ALY2` returns `swarm: true` with coordinator `orch-lab-luck-gate`, so per `analyze-orchestrator` Step 5 the merge of `feature/lab-luck-gate` into `main` belongs to that coordinator, not to this session -- even though this is phase 9 of 9. Nothing merged, pushed to main, or deleted; the branch itself was pushed.
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and no `**Commit**` field (rung 6: the direct precedent recorded by phases 1, 2, 3, 4, 6 and 8 of this same set in this same file -- a cross-file block move is the one edit that reliably loses a peer's concurrent append, and the file is committed by whichever session commits it, so a sha field cannot stay consistent).
+    - `LAB_LUCK_GATE_PLAN.md` left untouched, including phase 9's row (rung 6 + measurement: the index's TaskID and Card columns read `--` for all nine rows and `git log -- LAB_LUCK_GATE_PLAN.md` shows exactly one commit, the plan's own creation -- so phase 8's recorded "ticked phase 8's TaskID cell" never survived, which is direct evidence that a cross-file tick in this shared worktree is lost. The set is a swarm whose coordinator owns the ledger at `.workflows/orchestration/lab-luck-gate/ledger.json`; the sha goes there instead).
+    - No peer phase was unblocked or altered: phase 5 (`P1-ENG-QM5I`) stays `blocked` and in flight in a peer session; `next_task_id` was empty and phase 9 is the last phase, so there is no successor to release.
+    - Quick Stats recounted from the file rather than blind-decremented (recount is idempotent under concurrency; a decrement compounds the race).
 
 ### [P2] Medium
 

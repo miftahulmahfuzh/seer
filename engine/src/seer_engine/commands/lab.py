@@ -22,12 +22,18 @@
                                     committed pre-registration, refuses a method that is not
                                     promoted, and the database refuses a second look. --dry-run
                                     prints what would run and spends nothing
-    lab remeasure M0022 [--store DIR]
+    lab remeasure M0022 | H-P7A | H-P7A-F9 [--store DIR] [--only IDS] [--chunk N]
                                     re-run a recorded method's variants on the dev window and
                                     write back the DSR inputs (trial_moments) its trials predate.
                                     Writes nothing else: no trials row, no status, no
                                     pre-registration. Idempotent, and refuses a method that has
                                     already had its test-window look
+                                    H-P7A re-measures all 54 P7a seed trials out of the frozen
+                                    registry and reports the DSR each now computes at the current
+                                    gate N; H-P7A-F9 does one family. A seed trial has no recorded
+                                    DSR, so the re-run is verified against the six metrics the lab
+                                    did record, and a trial that does not reproduce them is
+                                    reported and not written (exit 1)
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
@@ -143,8 +149,9 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
         "remeasure",
         help="recover the DSR inputs (trial_moments) of a method whose trials predate them",
     )
-    s.add_argument("method", metavar="M0022",
-                   help="the lab method whose recorded dev trials get their moments back")
+    s.add_argument("method", metavar="M0022|H-P7A",
+                   help="the lab method whose recorded dev trials get their moments back, or "
+                        "H-P7A for all 54 P7a seed trials / H-P7A-F9 for one seed family")
     s.add_argument(
         "--store",
         type=Path,
@@ -153,6 +160,14 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
              "$SEER_RESEARCH_STORE). A test store is refused by research.load_store before a "
              "byte is read: this command never names a test window and never spends a look",
     )
+    s.add_argument("--only", default=None, metavar="IDS",
+                   help="seed path only: a comma-separated list of candidate ids to re-measure "
+                        "instead of the whole set, for re-trying a handful after a divergence")
+    s.add_argument("--chunk", type=int, default=dev.MAX_CANDIDATES, metavar="N",
+                   help="seed path only: commit after every N backtests, so an interrupted job "
+                        f"loses at most N (default: {dev.MAX_CANDIDATES}, i.e. one call). "
+                        "Chunking is bit-identical to one call and costs only allocator "
+                        "re-preparation; the whole 54-trial batch takes about a minute")
 
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
@@ -637,6 +652,8 @@ def _remeasure(conn, args) -> int:
     """
     from seer_engine.lab import remeasure as rm
 
+    if rm.is_seed_id(args.method):
+        return _remeasure_seed(conn, args)
     method, path = rm.resolve_method(args.method)
     plan = rm.preflight(conn, method, path)
     if plan.nothing_to_do:
@@ -666,6 +683,87 @@ def _remeasure(conn, args) -> int:
     print(f"\nLab N (dev trials) is still {store.dev_trial_count(conn)}; "
           f"test-window looks used: {store.test_looks(conn)}")
     return 0
+
+
+def _remeasure_seed(conn, args) -> int:
+    """``lab remeasure H-P7A``: give the 54 P7a seed trials their DSR inputs, and say what follows.
+
+    The lab's first 54 dev trials were imported from P7a's report files as summary rows, so their
+    daily moments were never captured and ``trials.dsr`` is NULL for every one. They count toward
+    N all the same -- 54 of the lab's 110 dev trials -- so they pay the full multiple-testing
+    penalty and, under the rule that a DSR which cannot be evaluated fails the luck test, can
+    never pass it. This re-runs them out of the frozen registry so the luck test they pay for is
+    one they actually receive.
+
+    **It writes ``trial_moments`` rows and nothing else.** No ``trials`` row is inserted, updated
+    or deleted; ``trials.dsr`` stays NULL on these rows forever; no ``methods.status`` moves; no
+    pre-registration is written. The verdict is not recorded here -- it is phase 4's
+    ``store.verdict`` computing it from the moments at the current gate N, which is why there is
+    no DSR backfill and why re-running this command can never change a recorded number.
+
+    **N does not move.** Adding ``trial_moments`` rows adds no ``trials`` row, so
+    ``store.dev_trial_count`` and ``npolicy.effective_n(conn, "all-trials")`` read the same before
+    and after; and ``store.dev_daily_sharpes`` reads ``trials.sharpe``, which these rows already
+    carry, so the trial-Sharpe variance does not move either. Both are printed at the end, before
+    and after, so the invariant is visible rather than merely asserted in a test.
+
+    The test window is unreachable from here by construction, not by care: ``seed_preflight``
+    refuses before anything is opened if any seed family has a test trial, ``research.load_store``
+    is called with no ``window`` so it defaults to ``DEV_WINDOW`` and refuses a test store by name,
+    and ``remeasure_seed`` refuses a loaded store that is not the dev window and reaches
+    ``dev.run_registry`` through ``run_chunk``, which has no window argument at all.
+
+    Exit 0 when every re-run reproduced; **1 when any trial diverged** and was therefore not
+    written -- the run is not a failure (the rest were written and the finding is printed per
+    trial), but it is not a clean success either and an unattended caller should notice.
+    """
+    from seer_engine.lab import npolicy, remeasure as rm
+
+    only = tuple(x for x in (args.only or "").split(",") if x.strip())
+    plan = rm.seed_preflight(conn, args.method, only=only)
+    n_before = store.dev_trial_count(conn)
+    var_before = store.dev_sharpe_variance(conn)
+    if plan.nothing_to_do:
+        print(f"{plan.method_id}: every seed trial already has its moments; nothing to do.")
+        print("  already recorded: " + ", ".join(f"#{n}" for n in plan.present))
+        print(f"\nLab N (dev trials) is still {n_before}; test-window looks used: "
+              f"{store.test_looks(conn)}")
+        return 0
+    if research.DEV_END != dev.DEV_END:
+        raise store.LabError("research.DEV_END differs from dev.DEV_END; refusing to run")
+    t0 = time.perf_counter()
+    try:
+        data = research.load_store(Path(args.store))
+    except FileNotFoundError as e:
+        raise store.LabError(
+            f"research store {args.store} is missing {e.filename or e}; build it with "
+            "`python -m seer_engine research_store`"
+        ) from e
+    except ValueError as e:
+        raise store.LabError(
+            f"{args.store}: {e}. `lab remeasure` asks load_store for the dev window and nothing "
+            f"else, so a test-window store is refused here rather than re-measured"
+        ) from e
+    log.info("research store %s loaded (%.1fs)", data.fingerprint[:12], time.perf_counter() - t0)
+    log.info(
+        "re-measuring %d seed trial(s); the P7a trials recorded store %s, this store is %s",
+        len(plan.todo), "5451195f", data.fingerprint[:8],
+    )
+
+    def progress(index: int, total: int, written: int, blocked: int) -> None:
+        log.info("chunk %d/%d committed: %d written, %d blocked", index, total, written, blocked)
+
+    report = rm.remeasure_seed(conn, plan, data, chunk=args.chunk, on_chunk=progress)
+    print(rm.format_seed_report(conn, report, rm.seed_verdicts(conn, report)))
+    n_after = store.dev_trial_count(conn)
+    var_after = store.dev_sharpe_variance(conn)
+    print(
+        f"\nLab N (dev trials): {n_before} before, {n_after} after "
+        f"({npolicy.effective_n(conn, 'all-trials').n} under the all-trials policy); "
+        f"trial-Sharpe variance: {var_before!r} before, {var_after!r} after; "
+        f"test-window looks used: {store.test_looks(conn)}"
+    )
+    return 1 if report.blocked else 0
 
 
 def _idea(conn, args) -> int:

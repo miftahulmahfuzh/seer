@@ -49,9 +49,10 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 import sqlite3
 import statistics
-from collections.abc import Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -60,6 +61,7 @@ from seer_engine import research
 from seer_engine.backtest import dev
 from seer_engine.backtest.book_runner import TRADING_DAYS
 from seer_engine.backtest.dev import Candidate, DevRow
+from seer_engine.backtest.registry import REGISTRY
 from seer_engine.commands.backtest_dev import daily_moments, registry_problem
 from seer_engine.lab import store
 from seer_engine.lab.method import METHOD_ID, Method, config_digest, source_sha
@@ -189,17 +191,19 @@ class Report:
 def resolve_method(method_id: str) -> tuple[Method, Path]:
     """``(METHOD, its file)`` for a lab method id (``store.LabError`` otherwise).
 
-    ``H-*`` ids -- the P7a seed families -- are refused by shape. Their trials carry
-    ``dsr IS NULL`` by construction (``lab/seed.py:136``, "P7a reported it for one row only"), so
-    there is no recorded verdict for a re-run to reproduce and no method file to re-run.
+    ``H-*`` ids -- the P7a seed families -- are refused *here* by shape, because they have no
+    method file: their candidates live in the frozen ``backtest/registry.py``, not in
+    ``lab/methods/``. They are not unreachable. ``seed_preflight`` below takes them, re-runs them
+    out of the REGISTRY and verifies the re-run against the six metrics the lab recorded, because
+    their ``dsr`` is NULL by construction (``lab/seed.py:136``) and cannot be the check.
     """
     from seer_engine.lab.method import discover
 
     if METHOD_ID.fullmatch(method_id) is None:
         raise store.LabError(
             f"{method_id!r} is not a lab method id; `lab remeasure` takes a method like M0022. "
-            f"The P7a seed families (H-*) recorded no DSR and have no method file, so there is "
-            f"nothing to re-run and nothing to reproduce"
+            f"For the P7a seed families, name them instead: `lab remeasure H-P7A` re-measures all "
+            f"54 seed trials out of the frozen registry, and `lab remeasure H-P7A-F9` one family"
         )
     methods = discover()
     if method_id not in methods:
@@ -462,8 +466,13 @@ def check(method_id: str, measured: Sequence[Reproduced]) -> None:
     raise store.LabError("\n".join(lines))
 
 
-def _moments_row(r: Reproduced, measured: str) -> "store.MomentsRow":
+def _moments_row(r: Reproduced | SeedReproduced, measured: str) -> "store.MomentsRow":
     """One ``trial_moments`` row from a reproduced trial (phase 2 owns the dataclass).
+
+    Takes either kind of reproduction: a lab-method one, verified by reproducing the recorded
+    ``dsr``, or a P7a seed one, verified by reproducing the six recorded metrics. Both expose the
+    same seven attributes, and the row this builds says nothing about which check was used --
+    deliberately, because the row is the measurement, not the audit of it.
 
     ``n_at_run`` is the trial's **recorded** ``n_trials_at_run``, not today's dev trial count: the
     row documents the measurement that was made, and phase 4 derives a verdict under the current
@@ -561,5 +570,717 @@ def format_report(report: Report) -> str:
     out.append(
         f"  wrote {len(report.written)} trial_moments row(s). No trials row was inserted, updated "
         f"or deleted; no method status moved; no pre-registration was written"
+    )
+    return "\n".join(out)
+
+
+# =========================================================================== the P7a seed
+#
+# The lab's first 54 dev trials were not run by the lab. `lab seed` imported them from P7a's
+# committed report files as summary rows (`lab/seed.py`), so their daily moments -- the Sharpe,
+# the number of returns, the skew and the kurtosis the deflated Sharpe needs -- were never
+# captured, and `trials.dsr` is NULL for every one of them ("P7a reported it for one row only",
+# `seed.py:136`). They nonetheless count toward N: `dev_trial_count` is 110, and 54 of those 110
+# are these. They pay the full multiple-testing penalty and receive no luck verdict in return.
+# Under phase 4's rule a NULL DSR fails the luck test, so they are permanently ineligible by data
+# gap rather than by merit.
+#
+# This section closes the gap the only honest way: re-run them. Every one of the 54 is still in
+# the frozen `backtest/registry.py` (design §2), and every one of their `config_digest` values
+# still matches the candidate there, so the configuration is provably the one that was measured.
+#
+# **The check cannot be phase 3's.** A lab-method re-run is verified by reproducing the recorded
+# `dsr` to 1e-6; a seed trial has no recorded `dsr`, so that check does not exist. It is replaced
+# by reproduction of the six metrics the lab *did* record -- `sharpe`, `cagr`, `max_drawdown`,
+# `profit_factor`, `total_return` and `trades` -- at `METRIC_TOL`, and a trial that misses on any
+# of them is reported and **not written**. A trial whose re-run does not reproduce its recorded
+# numbers is not the same measurement, and luck-testing it as though it were would launder a
+# different backtest into the lab's history.
+#
+# **What it writes:** `trial_moments` rows, and nothing else -- the same single write phase 3
+# makes. `trials.dsr` stays NULL on these rows forever. There is no DSR backfill: the verdict is
+# phase 4's `store.verdict` computing it from the moments at the current gate N, which is the
+# whole point of deriving a verdict instead of recording one.
+#
+# **N does not move.** These 54 trials are already inside `dev_trial_count`. Adding
+# `trial_moments` rows adds no `trials` row, so neither `store.dev_trial_count` nor
+# `npolicy.effective_n(conn, "all-trials")` can observe this command. Nor does the trial-Sharpe
+# variance: `store.dev_daily_sharpes` reads `trials.sharpe`, which these rows already carry and
+# this code never writes.
+
+
+SEED_PREFIX = "H-P7A"
+SEED_ALL = SEED_PREFIX  # `lab remeasure H-P7A` = every seed family
+SEED_METHOD = re.compile(r"H-P7A(?:-([A-Z0-9]+))?\Z")
+
+# The file the 54 candidates come out of. Frozen and append-only by its own rules (handover D6);
+# this module reads it and never writes it.
+REGISTRY_FILE = Path(dev.__file__).with_name("registry.py")
+
+# The tolerance on a seed re-run, and the reason for its shape.
+#
+# These rows were imported from `docs/backtests/2026-10-04-p7a-dev-exploration-rows.csv`, whose
+# every float is written to six decimal places. Decimal rounding to 6 dp bounds the
+# recorded-vs-true error at 5e-7 **absolute**, independent of magnitude -- which is why this is an
+# absolute tolerance and not the relative one phase 3's `SHARPE_TOL` uses on full-precision
+# engine output. A relative bound would be the wrong shape at both ends of the range present here:
+# `cagr = 0.031191` needs 1.6e-5 relative to survive the same rounding, while `total_return =
+# 18.648246` at 1e-6 relative would admit 1.9e-5, which is 37x the rounding bound and wide enough
+# for a real divergence to pass.
+#
+# 1e-6 is 2x the rounding bound. Measured across all 54 on the committed database and today's dev
+# store, the worst delta on any metric is 4.986e-07 -- under the bound, with no exceptions -- so
+# the headroom exists for a libm or platform ulp and for nothing larger. A genuine divergence is
+# orders of magnitude bigger: a changed research store moves these metrics in the third decimal.
+METRIC_TOL = 1e-6  # absolute, per metric
+
+# The six recorded metrics a seed re-run must reproduce, each paired with how to read it off a
+# fresh `Observed`. `trades` is compared exactly, as an integer; the five floats at METRIC_TOL.
+#
+# `mar`, `spy_tr_return` and `spy_tr_cagr` are deliberately absent. `mar` is
+# `cagr / max_drawdown`, algebraically implied by two entries already here; the two `spy_tr_*`
+# columns are the benchmark and are identical across all 54, so they carry no per-candidate
+# information. Checking them would add arithmetic, not evidence.
+SEED_METRICS: tuple[str, ...] = (
+    "sharpe",
+    "cagr",
+    "max_drawdown",
+    "profit_factor",
+    "total_return",
+    "trades",
+)
+
+
+@dataclass(frozen=True)
+class Observed:
+    """What one re-run says about one candidate: the four DSR inputs and the six checked metrics.
+
+    This is the seam the tests replace (``run_chunk``), so the whole verification, chunking,
+    idempotence and reporting path can be exercised without a 135 MB research store. ``t``,
+    ``sr_daily``, ``skew`` and ``kurt`` are ``daily_moments`` on the run's daily returns; the six
+    metrics are read straight off ``DevRow.stats``.
+    """
+
+    t: int
+    sr_daily: float
+    skew: float
+    kurt: float
+    sharpe: float | None
+    cagr: float | None
+    max_drawdown: float | None
+    profit_factor: float | None
+    total_return: float | None
+    trades: int
+
+
+@dataclass(frozen=True)
+class MetricCheck:
+    """One recorded metric against its re-measured value.
+
+    ``ok`` is the whole rule, in one place:
+
+    - ``trades`` is an **exact** integer comparison. It is the sharpest of the six, because it
+      pins the trade sequence itself: a changed universe, signal or fill rule cannot reproduce a
+      trade count by coincidence.
+    - a metric recorded NULL reproduces only as ``None``, and one recorded non-NULL only as
+      non-``None``. ``REF-SPY-HOLD`` is the real case -- a 0-trade buy-and-hold reference whose
+      ``profit_factor`` is NULL in the P7a file and ``None`` on the re-run. That is a match.
+    - every other float: ``abs(measured - recorded) <= METRIC_TOL``.
+    """
+
+    name: str
+    recorded: float | int | None
+    measured: float | int | None
+
+    @property
+    def delta(self) -> float | None:
+        if self.recorded is None or self.measured is None:
+            return None
+        return abs(float(self.measured) - float(self.recorded))
+
+    @property
+    def ok(self) -> bool:
+        if (self.recorded is None) != (self.measured is None):
+            return False
+        if self.recorded is None:
+            return True
+        if self.name == "trades":
+            return int(self.measured) == int(self.recorded)
+        delta = self.delta
+        return delta is not None and delta <= METRIC_TOL
+
+
+@dataclass(frozen=True)
+class SeedTrial:
+    """One recorded seed trial beside the frozen REGISTRY candidate that produced it."""
+
+    trial: sqlite3.Row
+    candidate: Candidate
+
+    @property
+    def n(self) -> int:
+        return int(self.trial["n"])
+
+    @property
+    def candidate_id(self) -> str:
+        return str(self.trial["candidate_id"])
+
+
+@dataclass(frozen=True)
+class SeedReproduced:
+    """One seed trial, re-measured: its fresh moments and every metric check.
+
+    Exposes the same seven attributes ``_moments_row`` reads off phase 3's ``Reproduced``
+    (``trial_n``, ``sr_daily``, ``t``, ``skew``, ``kurt``, ``var_trials``, ``n_at_run``), so the
+    one row-builder serves both paths.
+    """
+
+    trial_n: int
+    candidate_id: str
+    n_at_run: int
+    t: int
+    sr_daily: float
+    skew: float
+    kurt: float
+    var_trials: float | None
+    checks: tuple[MetricCheck, ...]
+
+    @property
+    def ok(self) -> bool:
+        """True when every one of the six recorded metrics was reproduced."""
+        return all(c.ok for c in self.checks)
+
+    @property
+    def misses(self) -> tuple[MetricCheck, ...]:
+        return tuple(c for c in self.checks if not c.ok)
+
+
+@dataclass(frozen=True)
+class SeedPlan:
+    """What a seed re-measurement would do, decided from the database and the REGISTRY alone."""
+
+    method_id: str  # "H-P7A" for all families, "H-P7A-F9" for one
+    todo: tuple[SeedTrial, ...]  # trials with no moments row yet, in trial order
+    present: tuple[int, ...]  # trial numbers that already have one
+    var_trials: float | None  # the P7a search's own trial-Sharpe variance (see seed_var_trials)
+    n_at_run: int  # the N every seed row records: 54
+
+    @property
+    def nothing_to_do(self) -> bool:
+        return not self.todo
+
+
+@dataclass(frozen=True)
+class SeedReport:
+    """What one seed re-measurement did."""
+
+    method_id: str
+    measured: tuple[SeedReproduced, ...]
+    written: tuple[int, ...]
+    blocked: tuple[int, ...]  # re-ran, did not reproduce, deliberately not written
+    skipped: tuple[int, ...]  # already had moments when this started
+    var_trials: float | None
+    chunks: int
+
+
+@dataclass(frozen=True)
+class SeedVerdict:
+    """One re-measured seed trial as the gate now reads it (phase 4 decides; this only prints)."""
+
+    trial_n: int
+    candidate_id: str
+    dsr: float | None  # store.verdict's number: today's lab-wide variance, at the gate's N (D12)
+    dsr_recorded_var: float | None  # the same moments deflated by the recorded var_trials, for
+    #                                 contrast only -- never a verdict (D12)
+    luck_ok: bool
+    owner_misses: tuple[str, ...]  # every failure label that is not the luck label
+    eligible: bool
+    mar: float | None
+
+
+def is_seed_id(method_id: str) -> bool:
+    """True for ``H-P7A`` and ``H-P7A-<FAM>``: the ids ``lab remeasure`` routes to the seed path."""
+    return SEED_METHOD.fullmatch(method_id.strip().upper()) is not None
+
+
+def seed_var_trials(conn: sqlite3.Connection) -> float | None:
+    """The trial-Sharpe variance the P7a search was its own population of: the 54 seed trials'
+    recorded daily Sharpes.
+
+    ``runner.trial_rows`` computes ``var_trials`` as ``statistics.variance(prior + new_sharpes)``
+    where ``prior`` is every dev trial that already existed. The seed import is the lab's first
+    batch -- ``prior`` is empty and the batch is all 54 -- so this is literally the number
+    ``lab run`` would have computed had P7a been run through the lab. It is a reconstruction of a
+    historical fact, the same quantity phase 3's ``batches_of`` rebuilds for a lab method.
+
+    **Read off the recorded ``trials.sharpe`` column, not off the re-run**, for three reasons and
+    the first is decisive:
+
+    1. it makes the value a constant settled in ``seed_preflight``, identical whether the batch
+       runs as one call or as six interrupted ones. That is what makes this command resumable:
+       computing it from fresh daily Sharpes would require all 54 re-runs in hand before the first
+       row could be written;
+    2. ``trials.sharpe`` *is* P7a's measurement of record. The re-run is evidence that the record
+       is sound, not a replacement for it;
+    3. the difference is immaterial -- measured, the recorded column gives 2.006690619e-04 and the
+       fresh daily Sharpes give 2.006691421e-04, a gap of 8.0e-11, four orders of magnitude below
+       anything the deflated Sharpe can resolve.
+
+    None when fewer than two seed rows carry a Sharpe -- the same condition under which
+    ``trials.dsr`` is NULL, and under which phase 2's ``MomentsRow.var_trials`` is None.
+    """
+    sharpes = [
+        float(r[0]) / math.sqrt(TRADING_DAYS)
+        for r in conn.execute(
+            "SELECT sharpe FROM trials WHERE window = 'dev' AND dsr IS NULL AND sharpe IS NOT NULL "
+            "ORDER BY n"
+        )
+    ]
+    return statistics.variance(sharpes) if len(sharpes) >= 2 else None
+
+
+def seed_preflight(
+    conn: sqlite3.Connection,
+    method_id: str,
+    *,
+    only: Sequence[str] = (),
+    require_commit: bool = True,
+) -> SeedPlan:
+    """Every refusal the seed path makes from the database and the REGISTRY alone.
+
+    Nothing here opens a research store, runs a backtest or writes a row, and the test-window
+    refusal is made first -- the mirror of ``preflight``'s, and of ``runner.run_test`` refusing a
+    dev store.
+
+    ``method_id`` is ``H-P7A`` (every family) or ``H-P7A-<FAM>`` (one). ``only`` further narrows
+    to named candidate ids, for re-trying a handful after a divergence.
+
+    The guard that the re-run measures the same configuration is **per-trial
+    ``config_digest`` equality** against the REGISTRY candidate, not a hash of the registry file.
+    That is both stronger and more durable: the digest covers the candidate's trial-defining parts
+    exactly (``lab/method.py``'s ``config_text``), and it stays true when the registry legitimately
+    gains entries 55 and beyond, which a file hash would not.
+
+    ``require_commit=False`` skips only the git cleanliness check on ``registry.py``; it never
+    relaxes the digest comparison, which is the stronger of the two.
+    """
+    wanted = method_id.strip().upper()
+    match = SEED_METHOD.fullmatch(wanted)
+    if match is None:
+        raise store.LabError(
+            f"{method_id!r} is not a P7a seed id. `lab remeasure H-P7A` re-measures all 54 seed "
+            f"trials; `lab remeasure H-P7A-F9` re-measures one family"
+        )
+    family = match.group(1)
+    looks = conn.execute(
+        "SELECT candidate_id, run_at FROM trials WHERE window = 'test' "
+        "AND method_id LIKE 'H-P7A%' ORDER BY n"
+    ).fetchall()
+    if looks:
+        spent = ", ".join(f"{r['candidate_id']} on {r['run_at']}" for r in looks)
+        raise store.LabError(
+            f"a P7a seed family has already had a look at the test window ({spent}). "
+            f"`lab remeasure` re-runs the dev window and will not run anything beside a spent "
+            f"look: the one look is never given back"
+        )
+    if family is None:
+        rows = conn.execute(
+            "SELECT * FROM trials WHERE window = 'dev' AND method_id LIKE 'H-P7A-%' ORDER BY n"
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM trials WHERE window = 'dev' AND method_id = ? ORDER BY n", (wanted,)
+        ).fetchall()
+    if not rows:
+        known = ", ".join(
+            str(r[0])
+            for r in conn.execute(
+                "SELECT DISTINCT method_id FROM trials WHERE method_id LIKE 'H-P7A-%' "
+                "ORDER BY method_id"
+            )
+        )
+        raise store.LabError(
+            f"no dev trial for {wanted} in this lab. Seed families present: {known or '(none)'}"
+        )
+    if only:
+        picked = {c.strip().upper() for c in only}
+        unknown = picked - {str(r["candidate_id"]).upper() for r in rows}
+        if unknown:
+            raise store.LabError(
+                f"--only names {', '.join(sorted(unknown))}, which {wanted} has no trial for"
+            )
+        rows = [r for r in rows if str(r["candidate_id"]).upper() in picked]
+    scored = [r for r in rows if r["dsr"] is not None]
+    if scored:
+        names = ", ".join(str(r["candidate_id"]) for r in scored)
+        raise store.LabError(
+            f"{wanted}: {names} already has a recorded DSR, so it is not a seed row and the seed "
+            f"path's metric check is the wrong verification for it. `lab remeasure <method>` "
+            f"re-measures a recorded lab method against its recorded DSR"
+        )
+    unverifiable = [r for r in rows if r["sharpe"] is None]
+    if unverifiable:
+        names = ", ".join(str(r["candidate_id"]) for r in unverifiable)
+        raise store.LabError(
+            f"{wanted}: {names} recorded no Sharpe, so a re-run cannot be checked against what "
+            f"the lab recorded. Nothing is backfilled for a trial whose numbers cannot be "
+            f"reproduced"
+        )
+    if require_commit:
+        problem = registry_problem(REGISTRY_FILE)
+        if problem is not None:
+            raise store.LabError(
+                f"{wanted}: {problem}. `lab remeasure` re-runs the committed registry -- the same "
+                f"frozen file the P7a trials ran under (design §2) -- and nothing else"
+            )
+    by_id = {c.id: c for c in REGISTRY}
+    pairs: list[SeedTrial] = []
+    for row in rows:
+        cid = str(row["candidate_id"])
+        cand = by_id.get(cid)
+        if cand is None:
+            raise store.LabError(
+                f"{wanted}: {cid} is recorded as a trial but is not in backtest/registry.py, so "
+                f"there is nothing to re-run. The registry is append-only (handover D6); an entry "
+                f"has gone missing and that is a bigger problem than this command"
+            )
+        if config_digest(cand) != str(row["config_digest"]):
+            raise store.LabError(
+                f"{wanted}: {cid}'s registry entry hashes {config_digest(cand)[:12]} but its trial "
+                f"ran under {str(row['config_digest'])[:12]}. The registry entry changed after it "
+                f"ran, so the re-run would measure a different configuration"
+            )
+        pairs.append(SeedTrial(trial=row, candidate=cand))
+    n_at_run = {int(r["n_trials_at_run"]) for r in rows}
+    if len(n_at_run) != 1:
+        raise store.LabError(
+            f"{wanted}: the seed rows record more than one N ({sorted(n_at_run)}), but the seed "
+            f"import writes one batch with one N. The database has been edited"
+        )
+    have = {p.n for p in pairs if store.moments_of(conn, p.n) is not None}
+    return SeedPlan(
+        method_id=wanted,
+        todo=tuple(p for p in pairs if p.n not in have),
+        present=tuple(sorted(have)),
+        var_trials=seed_var_trials(conn),
+        n_at_run=n_at_run.pop(),
+    )
+
+
+def observe(row: DevRow) -> Observed | None:
+    """``Observed`` for one fresh ``DevRow``; None when it produced no usable daily moments."""
+    moments = daily_moments(row.stats.daily_returns)
+    if moments is None:
+        return None
+    sr, skew, kurt = moments
+    m = row.stats.metrics
+    return Observed(
+        t=len(row.stats.daily_returns),
+        sr_daily=sr,
+        skew=skew,
+        kurt=kurt,
+        sharpe=None if row.stats.sharpe is None else float(row.stats.sharpe),
+        cagr=None if m.cagr is None else float(m.cagr),
+        max_drawdown=None if m.max_drawdown is None else float(m.max_drawdown),
+        profit_factor=None if m.profit_factor is None else float(m.profit_factor),
+        total_return=None if m.total_return is None else float(m.total_return),
+        trades=int(m.trades),
+    )
+
+
+def run_chunk(
+    data: research.ResearchData, candidates: Sequence[Candidate]
+) -> dict[str, Observed | None]:
+    """Re-run ``candidates`` on the dev window; ``{candidate id: Observed}``.
+
+    The dev window is not a parameter and not a choice: this function has no ``window``
+    parameter, and ``dev.run_registry`` is called with no ``window`` keyword, so the run is
+    bounded by ``DEV_WINDOW`` by construction. ``remeasure_seed`` has already refused any ``data``
+    that is not the dev window before this is reached.
+
+    Splitting the 54 into chunks is free of correctness cost. ``run_registry`` rebuilds its
+    per-allocator ``prepare_for`` cache per call, so a chunk pays re-preparation time, but the
+    measurement is identical: re-running ``F1-SPY-SMA200-M``, ``F3-SEC-TOP3-6M-TREND``,
+    ``F4-MOM12-N20-TREND`` and ``F9-SPY200M70-MOM30`` alone and inside the full 54-candidate call
+    gives **bit-identical** annualized Sharpes and ``t``. That is what makes it safe for the batch
+    to be interrupted and resumed at any boundary.
+
+    This is the seam the tests replace. Everything above it -- the refusals, the digest guard --
+    and everything below it -- the metric checks, the chunked write, the report -- is exercised
+    against a substituted ``run_chunk`` without a research store.
+    """
+    out: dict[str, Observed | None] = {}
+
+    def on_result(i: int, result: Any, row: DevRow) -> None:
+        out[row.candidate.id] = observe(row)
+
+    dev.run_registry(
+        data.market, data.dividends, data.spy_dividends, list(candidates), on_result=on_result
+    )
+    return out
+
+
+def reproduce(seed: SeedTrial, obs: Observed, var_trials: float | None) -> SeedReproduced:
+    """One recorded seed trial beside its re-run, with every metric check decided.
+
+    The recorded ``dsr`` is NULL by construction, so phase 3's check -- reproduce the recorded
+    DSR to 1e-6 -- does not exist here. These six metrics are its replacement: six independent
+    properties of one equity curve, each of which a changed store, method or engine would move far
+    outside ``METRIC_TOL``.
+    """
+    t = seed.trial
+    checks = tuple(
+        MetricCheck(name=name, recorded=t[name], measured=getattr(obs, name))
+        for name in SEED_METRICS
+    )
+    return SeedReproduced(
+        trial_n=seed.n,
+        candidate_id=seed.candidate_id,
+        n_at_run=int(t["n_trials_at_run"]),
+        t=obs.t,
+        sr_daily=obs.sr_daily,
+        skew=obs.skew,
+        kurt=obs.kurt,
+        var_trials=var_trials,
+        checks=checks,
+    )
+
+
+def remeasure_seed(
+    conn: sqlite3.Connection,
+    plan: SeedPlan,
+    data: research.ResearchData,
+    *,
+    chunk: int = 54,
+    on_chunk: Any = None,
+) -> SeedReport:
+    """Re-run ``plan.todo`` on the dev window in chunks and append the ``trial_moments`` rows.
+
+    **Resumable and idempotent, by construction.** Each chunk is re-run, verified and committed
+    before the next begins, so an interrupt loses at most the chunk in flight and nothing that was
+    already written. ``plan.todo`` holds only trials with no moments row, and the set is re-read
+    inside each chunk's write lock, so a parallel explorer session that wrote the same rows in
+    between is a skip rather than a conflict -- ``trial_moments`` is append-only (phase 2's
+    triggers) and "already there" is always the answer. Running the whole command a second time
+    writes nothing and loads no research store (``commands/lab.py`` checks ``nothing_to_do``
+    first).
+
+    ``plan.var_trials`` is the same number for every chunk because it is read off the database in
+    ``seed_preflight``, never off the re-run. That is what makes the output independent of where
+    the chunk boundaries fall, and independent of how many times the job was interrupted.
+
+    **A divergent trial is reported, not raised, and is not written.** This is the one deliberate
+    difference from phase 3's ``check``, which aborts the whole command on one bad trial. Phase 3
+    can be all-or-nothing because a lab method is two to five trials measured together; here one
+    drifted ETF would sink fifty-three sound re-measurements across eleven unrelated families. The
+    rule the brief sets is kept exactly: a trial whose re-run does not reproduce its recorded
+    numbers is not the same measurement and **must not** be luck-tested as though it were -- so it
+    is named in the report, counted in ``blocked``, and no moments row is written for it.
+
+    ``on_chunk(index, total, written, blocked)``, when given, is called after each chunk commits;
+    ``commands/lab.py`` uses it to print progress on a job that has no other output until the end.
+    """
+    if data.window != research.DEV_WINDOW:
+        w = data.window
+        raise store.LabError(
+            f"{plan.method_id}: this research store was built for the {w.name!r} window "
+            f"({w.start}..{w.end}); `lab remeasure` re-runs the dev window and nothing else. "
+            f"Build it with `python -m seer_engine research_store`"
+        )
+    size = max(1, min(int(chunk), dev.MAX_CANDIDATES))
+    groups: list[tuple[SeedTrial, ...]] = [
+        tuple(plan.todo[i : i + size]) for i in range(0, len(plan.todo), size)
+    ]
+    stamp = store.now_iso()  # when this backfill measured, not when P7a ran
+    measured: list[SeedReproduced] = []
+    written: list[int] = []
+    blocked: list[int] = []
+    for index, group in enumerate(groups):
+        fresh = run_chunk(data, [s.candidate for s in group])
+        here: list[SeedReproduced] = []
+        for seed in group:
+            obs = fresh.get(seed.candidate_id)
+            if obs is None:
+                raise store.LabError(
+                    f"{plan.method_id}: {seed.candidate_id} produced no usable daily moments on "
+                    f"the re-run but recorded a Sharpe of {_g(seed.trial['sharpe'])}; the re-run "
+                    f"is not the recorded measurement. Nothing is written for this chunk"
+                )
+            here.append(reproduce(seed, obs, plan.var_trials))
+        good = [r for r in here if r.ok]
+        bad = [r for r in here if not r.ok]
+        store.begin_immediate(conn)
+        with conn:
+            have = {
+                r.trial_n for r in good if store.moments_of(conn, r.trial_n) is not None
+            }  # a parallel session may have won the race
+            rows = [_moments_row(r, stamp) for r in good if r.trial_n not in have]
+            store.insert_moments(conn, rows)
+        measured.extend(here)
+        written.extend(r.trial_n for r in rows)
+        blocked.extend(r.trial_n for r in bad)
+        if on_chunk is not None:
+            on_chunk(index + 1, len(groups), len(rows), len(bad))
+    return SeedReport(
+        method_id=plan.method_id,
+        measured=tuple(measured),
+        written=tuple(written),
+        blocked=tuple(blocked),
+        skipped=plan.present,
+        var_trials=plan.var_trials,
+        chunks=len(groups),
+    )
+
+
+def seed_verdicts(
+    conn: sqlite3.Connection, report: SeedReport
+) -> tuple[SeedVerdict, ...]:
+    """How the gate now reads every seed trial this run wrote moments for.
+
+    Phase 4 decides; this only asks and prints. ``store.verdict`` re-derives the four threshold
+    owner conditions from the trial's recorded columns against today's constants (so phase 8's 20%
+    drawdown bar applies), carries ``owner inputs`` from the recorded string, and decides the luck
+    test on the trial's DSR **at the gate's current N** -- which, now that these rows have moments,
+    is a real number for the first time.
+
+    ``v.dsr`` is **the gate's number**: `store.dsr_at` deflates by
+    ``store.dev_sharpe_variance(conn)`` -- the trial-Sharpe variance over all 110 dev trials as the
+    lab stands now -- on both of its routes, at the gate's current N (**Decision D12**).
+
+    ``dsr_recorded_var`` is the same measured moments deflated instead by the ``var_trials``
+    written beside the trial (the P7a search's own 54). **It is not a verdict and must never be
+    read as one.** It is printed only so the size of the choice is on the terminal: the 54 seed
+    rows are the only place in the lab where the two variances differ materially -- 2.0067e-04
+    against 2.3950e-04 -- and they differ by enough to move ``F9-SPY200M70-MOM30`` from 0.8567
+    (the gate's number, which fails) to 0.9031 (which would have passed). D12 settled that on the
+    index's R2: pairing today's N with a variance frozen at the run date mixes bars on the other
+    axis of the same formula. Showing both is what keeps the settled choice inspectable rather
+    than buried in a constant nobody looked at.
+    """
+    g = store.gate(conn)
+    out: list[SeedVerdict] = []
+    for n in sorted(set(report.written)):
+        trial = conn.execute("SELECT * FROM trials WHERE n = ?", (n,)).fetchone()
+        if trial is None:  # unreachable: trial_moments has a foreign key onto trials(n)
+            continue
+        v = store.verdict(conn, trial, at=g)
+        moments = store.moments_of(conn, n)
+        alt: float | None = None
+        if moments is not None and moments["var_trials"] is not None:
+            alt = dev.deflated_sharpe(
+                float(moments["sr_daily"]),
+                g.n,
+                float(moments["var_trials"]),
+                int(moments["t"]),
+                float(moments["skew"]),
+                float(moments["kurt"]),
+            )
+        out.append(
+            SeedVerdict(
+                trial_n=n,
+                candidate_id=str(trial["candidate_id"]),
+                dsr=v.dsr,
+                dsr_recorded_var=alt,
+                luck_ok=v.dsr is not None and v.dsr >= store.DSR_MIN,
+                owner_misses=tuple(f for f in v.failed if not f.startswith("DSR ")),
+                eligible=v.eligible,
+                mar=None if trial["mar"] is None else float(trial["mar"]),
+            )
+        )
+    return out
+
+
+def format_seed_report(
+    conn: sqlite3.Connection, report: SeedReport, verdicts: Sequence[SeedVerdict]
+) -> str:
+    """The seed re-measurement report: what reproduced, what did not, and what the gate now says.
+
+    The outcome is whatever it is. Nothing here rounds a candidate toward eligibility, and the
+    second DSR column exists so that a candidate sitting on the bar is visibly sitting on the bar
+    rather than quietly on one side of it.
+    """
+    from seer_engine.lab import seed as seed_mod
+
+    g = store.gate(conn)
+    today_var = store.dev_sharpe_variance(conn)
+    out: list[str] = [
+        f"{report.method_id}: {len(report.measured)} P7a seed trial(s) re-measured on the dev "
+        f"window in {report.chunks} chunk(s)",
+        "",
+        f"  reproduction: the six recorded metrics ({', '.join(SEED_METRICS)}), "
+        f"{METRIC_TOL:g} absolute on the floats and exact on trades. These rows came from "
+        f"{seed_mod.P7A_REPORT} rounded to 6 dp, so the rounding bound is 5e-07 and the tolerance "
+        f"is twice it",
+        f"  store: the seed trials recorded {seed_mod.P7A_FINGERPRINT[:12]}..., this re-run "
+        f"measured on a store the loader reported to the caller; a metric that did not reproduce "
+        f"is listed below and was not written",
+        f"  variance the GATE uses: {_e(today_var)} -- all {g.n} dev trials as the lab stands "
+        f"now. Both of store.dsr_at's routes deflate by this (Decision D12)",
+        f"  var_trials WRITTEN:     {_e(report.var_trials)} -- the 54 seed trials' own "
+        f"daily-Sharpe variance, the number `lab run` would have computed for P7a's batch. "
+        f"Historical record; shown in brackets below for contrast and never used as a verdict",
+        f"  gate: N = {g.n} under policy {g.policy!r}, luck bar DSR >= {store.DSR_MIN:g}",
+        "",
+    ]
+    if report.written:
+        out.append(f"  wrote {len(report.written)} trial_moments row(s):")
+        by_n = {v.trial_n: v for v in verdicts}
+        for r in report.measured:
+            if r.trial_n not in set(report.written):
+                continue
+            out.append(
+                f"    #{r.trial_n} {r.candidate_id}  t={r.t}  sr_daily={_g(r.sr_daily)}  "
+                f"skew={_g(r.skew)}  kurt={_g(r.kurt)}  N_at_run={r.n_at_run}"
+            )
+            v = by_n.get(r.trial_n)
+            if v is None:
+                continue
+            luck = "PASS" if v.luck_ok else "fail"
+            out.append(
+                f"          DSR @ N={g.n} = {_g(v.dsr)}  luck: {luck} (bar {store.DSR_MIN:g})"
+                f"   [with the recorded as-of-P7a variance: {_g(v.dsr_recorded_var)}]"
+            )
+            owner = "all pass" if not v.owner_misses else "; ".join(v.owner_misses)
+            out.append(
+                f"          owner conditions: {owner}   MAR {_g(v.mar)}   "
+                f"-> {'ELIGIBLE' if v.eligible else 'not eligible'}"
+            )
+    if report.blocked:
+        out.append("")
+        out.append(
+            f"  {len(report.blocked)} trial(s) did NOT reproduce what the lab recorded and were "
+            f"deliberately NOT written -- a re-run that does not land on the recorded numbers is "
+            f"not the same measurement:"
+        )
+        for r in report.measured:
+            if r.ok:
+                continue
+            out.append(f"    #{r.trial_n} {r.candidate_id}")
+            for c in r.misses:
+                out.append(
+                    f"          {c.name}: recorded {_g(c.recorded)}, measured {_g(c.measured)} "
+                    f"(delta {_e(c.delta)}, tolerance "
+                    f"{'exact' if c.name == 'trades' else f'{METRIC_TOL:g} absolute'})"
+                )
+        out.append(
+            "    Rebuild the dev store these were measured on and try again, or leave them: a "
+            "trial with no moments keeps the verdict it already has."
+        )
+    if report.skipped:
+        out.append("")
+        out.append(
+            "  already recorded, left alone: " + ", ".join(f"#{n}" for n in report.skipped)
+        )
+    eligible = [v for v in verdicts if v.eligible]
+    passing = [v for v in verdicts if v.luck_ok]
+    out.append("")
+    out.append(
+        f"  of {len(report.written)} written: {len(passing)} now pass the luck bar, "
+        f"{len(eligible)} pass every owner condition as well and are eligible"
+        + (": " + ", ".join(v.candidate_id for v in eligible) if eligible else "")
+    )
+    out.append(
+        f"  no trials row was inserted, updated or deleted; no method status moved; "
+        f"trials.dsr is still NULL on every seed row and stays that way"
     )
     return "\n".join(out)

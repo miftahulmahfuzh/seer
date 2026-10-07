@@ -809,3 +809,62 @@ def test_v0_book_replays_size_picks_and_step(seed):
     assert sorted(book_closed) == sorted(sim_closed)
     assert len(sim_closed) >= 20
     assert {r[5] for r in sim_closed} == {"gap", "sl", "time", "tp"}
+
+
+# ============================================================== the Gotrade cost model
+
+GOTRADE_FRAC = replace(FRACTIONAL, id="fractional-gotrade", cost_model="gotrade")
+SLOTS_28 = (T("A", "0.028", "10"), T("B", "0.028", "10"), T("C", "0.028", "10"))
+
+
+def _slot_bars(session: str, open_: str, close: str) -> dict[str, Bar]:
+    return day(*(bar(s, session, open_, "10.6", "10", close) for s in ("A", "B", "C")))
+
+
+def test_gotrade_buys_pay_the_schedule_and_never_overspend_the_slot():
+    out = go(new_book(W(1000)), TUE, _slot_bars(TUE, "10.1", "10.2"), SLOTS_28, GOTRADE_FRAC)
+    # budget q(1000 × 0.028) = 28 at the limit q(10 × 1.02) = 10.2: 2.7323 shares cost 27.9995
+    # there (2.7324 would cost 28.0005). Filled at the open 10.1: q(10.1 × 2.7323) = 27.5962,
+    # fees on $27.60: trading 0.10 (minimum) + regulatory 0.02 + PPN 0.01 = 0.13.
+    assert [(f.symbol, f.shares, f.price, f.cash_usd, f.cost_usd) for f in out.fills] == [
+        (s, W("2.7323"), P("10.1"), P("-27.7262"), P("0.13")) for s in ("A", "B", "C")
+    ]
+    assert out.snapshot.cash_usd == P("916.8214")
+
+
+def test_gotrade_pays_more_than_flat_on_28_dollar_slots():
+    flat_buy = go(new_book(W(1000)), TUE, _slot_bars(TUE, "10.1", "10.2"), SLOTS_28, FRACTIONAL)
+    real_buy = go(new_book(W(1000)), TUE, _slot_bars(TUE, "10.1", "10.2"), SLOTS_28, GOTRADE_FRAC)
+    flat_sell = go(flat_buy.book, WED, _slot_bars(WED, "10.5", "10.5"), (), FRACTIONAL)
+    real_sell = go(real_buy.book, WED, _slot_bars(WED, "10.5", "10.5"), (), GOTRADE_FRAC)
+    # flat: 2.7423 shares, fee q(10.1 × 2.7423 × 0.001) = 0.0277 a buy
+    assert [f.cost_usd for f in flat_buy.fills] == [P("0.0277")] * 3
+    # gotrade sell: q(10.5 × 2.7323) = 28.6892, fees on $28.69: 0.10 + (0.02 + 0.02) + 0.02 = 0.16
+    assert [(f.cash_usd, f.cost_usd) for f in real_sell.fills] == [(P("28.5292"), P("0.16"))] * 3
+    flat_fees = sum(f.cost_usd for f in flat_buy.fills + flat_sell.fills)
+    real_fees = sum(f.cost_usd for f in real_buy.fills + real_sell.fills)
+    assert real_fees == P("0.87") and real_fees > 5 * flat_fees
+    assert real_sell.snapshot.equity_usd < flat_sell.snapshot.equity_usd
+    assert [t.pnl_usd for t in real_sell.trades] == [P("0.8030")] * 3  # 28.5292 − 27.7262
+
+
+def test_gotrade_whole_shares_and_forced_close():
+    rules = replace(DAILY_SWITCH, id="daily-switch-gotrade", cost_model="gotrade")
+    bars = day(bar("XYZ", TUE, "101", "103", "100", "102"))
+    out = go(new_book(W(1000)), TUE, bars, (T("XYZ", "1", "100"),), rules)
+    # limit 102: 9 shares cost 918 + fees(1.84 + 0.11 + 0.22) = 920.17 <= 1000; filled at 101:
+    # 909 + fees on $909: 1.82 + 0.11 + q½↓(1.93 × 0.11 = 0.2123) 0.21 = 2.14
+    (f,) = out.fills
+    assert (f.shares, f.cash_usd, f.cost_usd) == (W(9), P("-911.14"), P("2.14"))
+    nb, fills, trades = close_book_unpriced(out.book, ["XYZ"], rules)
+    # at the mark 102: 918 − fees on $918 (1.84 + (0.11 + 0.37) + 0.26) = 918 − 2.58
+    (s,) = fills
+    assert (s.cash_usd, s.cost_usd) == (P("915.42"), P("2.58"))
+    assert trades[0].pnl_usd == P("915.42") - P("911.14")
+
+
+def test_flat_rules_are_unchanged_by_the_cost_model_lever():
+    bars = day(bar("XYZ", TUE, "301", "305", "299", "304"))
+    out = go(new_book(W(1000)), TUE, bars, (T("XYZ", "1", "300"),), replace(FRACTIONAL, cost_model="flat"))
+    (f,) = out.fills
+    assert (f.shares, f.cash_usd, f.cost_usd) == (W("3.2647"), P("-983.6574"), P("0.9827"))

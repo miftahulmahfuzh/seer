@@ -66,5 +66,28 @@
   letter-spacing: -0.05em;
 }
 
-/* Desktop rail only: the way into Sera, at the foot of the rail, for the Sera account. */
-.sera { margin-top: auto; }
+/* Desktop rail only: the ways into Sean (real trades) and Sera (the lab), at the foot of the
+   rail, for the owner account. Sean sits directly above Sera. */
+.foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* The Sean button: positioned so Phase 5 can pin its "you need to act" dot to it. */
+.sean { position: relative; }
+
+/* Sean has plan reminders waiting: a coral dot on the rail button (phase 5). Coral = you need to act. */
+.seanDot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--coral);
+  box-shadow: 0 0 0 2px var(--bg);
+  pointer-events: none;
+}

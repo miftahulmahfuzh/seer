@@ -49,12 +49,16 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
    present (build it if not). Then check `$TMUX`. If there is **no tmux**, don't stop: run the
    explore skill **solo, sequentially**, num-methods times in this session, then do step 7.
 3. **Choose the first slate** (and when you reserve a book idea, write in its hypothesis that it
-   runs in fractional shares, so the child builds it that way) of `min(4, num-methods)` ideas from `lab status`, recent insights
+   runs in fractional shares at Gotrade's real fees, a `-frac-gotrade` preset, so the child builds
+   it that way) of `min(4, num-methods)` ideas from `lab status`, recent insights
    and closest-to-eligible trials, plus fresh web research. Rules for a slate:
    - **Diverse:** no two in the same family or the same mechanism. Mix sources: backlog,
      variation of a near miss, and at least one new web-researched idea per slate.
    - **Testable on the store's data** (daily OHLCV, dividends, membership, ≤ 2015-10-16) and not
      already in `lab seen`.
+   - **Survives real fees?** Before reserving a variation of a near miss from M0030 or earlier,
+     run `lab costs <near miss>` (a minute or less, report only, N unchanged). A near miss whose
+     edge the real fees erase is not worth a variation; journal that and pick another.
    - **Reserve** each new idea with `lab idea …`, which prints its id. A backlog row keeps its id.
      The hypothesis can be a draft; the child sharpens it before its pre-registration commit.
    - Then `lab stage` + commit (`lab/lab.sqlite` and `web/data/lab.json`) + push ("lab: sera <stamp> reserves M00xx, M00yy").
@@ -77,8 +81,9 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
      Whatever is missing, finish it yourself from the scrollback and the data. If the method
      never ran, relaunch it once; if it fails again, `lab drop MNNNN --why "<reason>"` plus a `risk` insight.
    - **dev-eligible:** run the explore skill's **Promotion** yourself, now, in `$REPO`, one at a time.
-     Start with its step 0, the fit check. If the eligible variant trades whole shares, first run
-     its fractional twin as a one-variant variation method. Promote the twin, never the whole-share
+     Start with its step 0, the fit check. If the eligible variant trades whole shares, or is a
+     method from M0030 or earlier measured at the flat 0.1%, first run `lab costs` on it and then
+     its fractional, real-fee twin as a one-variant variation method. Promote the twin, never the
      original. The look is spent on the configuration paper would trade, or not at all.
    - **Close it out:**
      - Save the scrollback: `tmux capture-pane -p -S - -t <window> > $LOGS/explore-MNNNN.log`.
@@ -96,6 +101,8 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
    - what the batch taught across methods
    - which directions look alive and which look dead
    - what data or features would unlock the most
+   - what Gotrade's real fees did to the batch, when any `lab costs` ran or a method lost its
+     edge to them
    - what the next batch should try
 
    Then `lab stage`, commit (`lab/lab.sqlite` and `web/data/lab.json`), push. The site picks the
@@ -116,4 +123,5 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
 | "A child failed, pause the batch" | Never. Close it out, record it, refill the slot. |
 | "Kill that window, it looks done" | Verify first, capture the scrollback, check the name. |
 | "Promote the whole-share winner, it passed dev" | Never. A 20M IDR book can't buy 2016+ stocks in whole shares, so the look measures cash. Run the fractional twin first (M0021's lesson). |
+| "Promote that old flat-fee winner, it passed dev" | Never as is. Run `lab costs` first, then its real-fee twin as a one-variant variation method; promote the twin. |
 | "Promote in parallel" | Promotions are serial and done by Sera. Each spends one counted test-window look. |

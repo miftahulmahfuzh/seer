@@ -84,6 +84,8 @@ def test_preset_values_are_pinned():
             assert r.engine == "book"
             assert r.dividends is True
             assert r.cost_rate == Decimal("0.001")
+    # The 13 presets that predate Gotrade's measured schedule all keep the flat 0.1% model.
+    assert [r.cost_model for r in PRESETS[:13]] == ["flat"] * 13
 
 
 def test_preset_ids_are_unique_and_in_order():
@@ -102,6 +104,8 @@ def test_preset_ids_are_unique_and_in_order():
         "monthly-rank-weekly-resize-tbill",
         "monthly-hold-frac",
         "monthly-rank-weekly-resize-frac",
+        "monthly-hold-frac-gotrade",
+        "monthly-rank-weekly-resize-frac-gotrade",
     ]
     assert len(set(ids)) == len(ids)
 
@@ -345,7 +349,7 @@ def test_monthly_rank_weekly_resize_frac_is_the_split_cadence_in_fractional_shar
     r = MONTHLY_RANK_WEEKLY_RESIZE_FRAC
     assert r == replace(MONTHLY_RANK_WEEKLY_RESIZE, id="monthly-rank-weekly-resize-frac", fractional=True)
     assert (r.cadence, r.resize_cadence, r.fractional, r.idle_symbol) == ("monthly", "weekly", True, None)
-    assert PRESETS[-1] is r and sim.MONTHLY_RANK_WEEKLY_RESIZE_FRAC is r
+    assert PRESETS[12] is r and sim.MONTHLY_RANK_WEEKLY_RESIZE_FRAC is r
     assert rule_owner_inputs(r) == ()  # fractional is owner-verified (2026-10-07)
 
 
@@ -401,4 +405,48 @@ def test_a_lever_added_after_the_pins_is_left_out_of_canonical_text_at_its_defau
     assert is_pinned_default("resize_cadence", None) is True
     assert is_pinned_default("resize_cadence", "weekly") is False
     assert is_pinned_default("cadence", "monthly") is False  # only post-pin levers are skippable
-    assert LEVERS_SINCE_PINS == {"resize_cadence": None}
+    assert is_pinned_default("cost_model", "flat") is True
+    assert is_pinned_default("cost_model", "gotrade") is False
+    assert LEVERS_SINCE_PINS == {"resize_cadence": None, "cost_model": "flat"}
+
+
+# ============================================================== the Gotrade cost model
+
+
+GOTRADE_HOLD = replace(MONTHLY_HOLD, id="monthly-hold-gotrade", cost_model="gotrade")
+
+
+def test_cost_model_defaults_to_flat_and_design_v0_keeps_it():
+    assert TradeRules(id="x", engine="book").cost_model == "flat"
+    assert DESIGN_V0.cost_model == "flat" and V0_BOOK.cost_model == "flat"
+    assert GOTRADE_HOLD.cost_model == "gotrade" and GOTRADE_HOLD.cost_rate == Decimal("0.001")
+    with pytest.raises(ValueError, match="reserved for DESIGN_V0"):
+        replace(DESIGN_V0, cost_model="gotrade")
+
+
+def test_cost_model_validation():
+    with pytest.raises(ValueError, match="unknown cost_model"):
+        TradeRules(id="x", engine="book", cost_model="ibkr")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="cost_model"):
+        TradeRules(id="x", engine="book", cost_model=None)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="cost_rate must stay at its default"):
+        TradeRules(id="x", engine="book", cost_model="gotrade", cost_rate=Decimal("0.002"))
+    assert TradeRules(id="x", engine="book", cost_model="gotrade", cost_rate=Decimal("0.0010")).cost_model == "gotrade"
+
+
+def test_gotrade_is_not_an_owner_input_but_a_flat_fee_still_is():
+    assert rule_owner_inputs(GOTRADE_HOLD) == ()
+    assert rule_owner_inputs(replace(GOTRADE_HOLD, idle_symbol="IEF")) == ("etf:IEF",)
+    assert rule_owner_inputs(replace(MONTHLY_HOLD, id="x", cost_rate=Decimal("0.002"))) == ("fee",)
+
+
+def test_describe_gotrade_costs():
+    lines = describe_rules(GOTRADE_HOLD)
+    assert len(lines) == 12
+    assert lines[:11] == describe_rules(replace(MONTHLY_HOLD, id="monthly-hold-gotrade"))[:11]
+    assert lines[11] == (
+        "Costs: Gotrade's fee schedule measured from the owner's receipts (in force since 2026-06-16): "
+        "a trading fee of 0.2% of each order, at least $0.10; a regulatory fee of 0.054% rounded up "
+        "to the cent, at most $0.11, plus 0.04% more on sells; and 11% VAT (PPN) on those two fees."
+    )
+    assert describe_rules(MONTHLY_HOLD)[11] == "Costs: 0.1% per side."

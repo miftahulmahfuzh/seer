@@ -18,6 +18,10 @@ Rules, identical for both curves:
   with ``sim.buy_cost``. A dividend on ``start`` itself is not credited (bought at the open,
   not a holder at the previous close). Price-only (``spy_price``) ignores dividends.
 - Every NYSE session in the window must have a SPY bar; a missing one raises ``ValueError``.
+- ``cost_model="gotrade"`` (a lab method on Gotrade's measured fees, ``sim.costs``): every buy
+  above, the first one and each dividend reinvestment, pays Gotrade's schedule instead of 0.1%,
+  and the share count is the most whose rounded cash fits (``sim.costs.gotrade_shares_for``), so
+  a method and its benchmark pay alike. The default "flat" is every curve above, unchanged.
 """
 
 from __future__ import annotations
@@ -30,6 +34,7 @@ from decimal import ROUND_FLOOR, Decimal, InvalidOperation
 from seer_engine.dates import prev_session, sessions
 from seer_engine.prices import Bar
 from seer_engine.sim import COST_RATE, Snapshot, buy_cost, q
+from seer_engine.sim.costs import COST_MODELS, CostModel, gotrade_cash, gotrade_shares_for
 from seer_engine.sim.rules import SHARE_QUANTUM
 
 DIVIDENDS_HEADER = "ex_date,amount_usd"
@@ -101,8 +106,11 @@ def parse_dividends(text: str) -> tuple[Dividend, ...]:
     return tuple(rows)
 
 
-def _whole_shares(cash: Decimal, price: Decimal) -> int:
-    """The most whole shares ``cash`` buys at ``price`` after the 0.1% cost."""
+def _whole_shares(cash: Decimal, price: Decimal, cost_model: CostModel = "flat") -> int:
+    """The most whole shares ``cash`` buys at ``price`` after the 0.1% cost (or, under
+    "gotrade", after Gotrade's fees)."""
+    if cost_model == "gotrade":
+        return int(gotrade_shares_for(cash, price, Decimal(1)))
     n = int(cash // (price * (1 + COST_RATE)))
     # q() rounds half-up; never let the rounded cost exceed the cash.
     while n > 0 and buy_cost(price, n) > cash:
@@ -110,9 +118,13 @@ def _whole_shares(cash: Decimal, price: Decimal) -> int:
     return n
 
 
-def _fractional_shares(cash: Decimal, price: Decimal) -> Decimal:
-    """The most shares ``cash`` buys at ``price`` after the 0.1% cost, in multiples of
-    ``SHARE_QUANTUM`` (0.0001): the paper benchmark (Gotrade sells SPY in fractions)."""
+def _fractional_shares(cash: Decimal, price: Decimal, cost_model: CostModel = "flat") -> Decimal:
+    """The most shares ``cash`` buys at ``price`` after the 0.1% cost (or, under "gotrade",
+    after Gotrade's fees), in multiples of ``SHARE_QUANTUM`` (0.0001): the paper benchmark
+    (Gotrade sells SPY in fractions)."""
+    if cost_model == "gotrade":
+        n = gotrade_shares_for(cash, price, SHARE_QUANTUM)
+        return n if n > 0 else Decimal(0)
     unit = price * (1 + COST_RATE)
     n = (cash / unit).quantize(SHARE_QUANTUM, rounding=ROUND_FLOOR)
     while n > 0 and fractional_buy_cost(price, n) > cash:
@@ -120,9 +132,19 @@ def _fractional_shares(cash: Decimal, price: Decimal) -> Decimal:
     return n if n > 0 else Decimal(0)
 
 
-def fractional_buy_cost(price: Decimal, shares: Decimal) -> Decimal:
-    """``buy_cost`` for a fractional share count: ``q(price × n × 1.001)``."""
+def fractional_buy_cost(price: Decimal, shares: Decimal, cost_model: CostModel = "flat") -> Decimal:
+    """``buy_cost`` for a fractional share count: ``q(price × n × 1.001)``, or under "gotrade"
+    ``q(price × n)`` plus Gotrade's fees (nothing for 0 shares)."""
+    if cost_model == "gotrade":
+        return gotrade_cash("buy", price, shares)[0]
     return q(price * shares * (1 + COST_RATE))
+
+
+def _whole_buy_cost(price: Decimal, shares: int, cost_model: CostModel) -> Decimal:
+    """``sim.buy_cost`` for whole shares, or under "gotrade" ``q(price × n)`` plus Gotrade's fees."""
+    if cost_model == "gotrade":
+        return gotrade_cash("buy", price, shares)[0]
+    return buy_cost(price, shares)
 
 
 def _bar(spy: Mapping[date, Bar], d: date) -> Bar:
@@ -145,6 +167,7 @@ def buy_and_hold(
     dividends: Sequence[Dividend] = (),
     name: str,
     fractional: bool = False,
+    cost_model: CostModel = "flat",
 ) -> BenchmarkCurve:
     """Buy SPY at ``start``'s open, hold, mark every close through ``end``.
 
@@ -155,7 +178,13 @@ def buy_and_hold(
 
     ``fractional`` buys in multiples of ``SHARE_QUANTUM`` instead of whole shares (the paper
     benchmark since 2026-10-07; every backtest keeps the whole-share default).
+
+    ``cost_model`` "gotrade" prices every buy with Gotrade's measured schedule (``sim.costs``)
+    instead of 0.1%: the benchmark a ``cost_model="gotrade"`` lab method is measured against.
+    ValueError for any other value than "flat"/"gotrade".
     """
+    if cost_model not in COST_MODELS:
+        raise ValueError(f"unknown cost_model {cost_model!r}; expected one of {COST_MODELS}")
     if not isinstance(initial_cash, Decimal):
         raise TypeError(f"initial_cash must be a Decimal, got {type(initial_cash).__name__}")
     cash0 = q(initial_cash)
@@ -182,11 +211,11 @@ def buy_and_hold(
     snaps: list[Snapshot] = [Snapshot(date=prev_session(start), cash_usd=cash0, equity_usd=cash0)]
     first = _bar(spy, start)
     if fractional:
-        shares: int | Decimal = _fractional_shares(cash0, first.open)
-        cash = cash0 - fractional_buy_cost(first.open, shares)
+        shares: int | Decimal = _fractional_shares(cash0, first.open, cost_model)
+        cash = cash0 - fractional_buy_cost(first.open, shares, cost_model)
     else:
-        shares = _whole_shares(cash0, first.open)
-        cash = cash0 - buy_cost(first.open, shares)
+        shares = _whole_shares(cash0, first.open, cost_model)
+        cash = cash0 - _whole_buy_cost(first.open, shares, cost_model)
     credited = Decimal("0.0000")
     for d in window:
         bar = _bar(spy, d)
@@ -196,12 +225,12 @@ def buy_and_hold(
             cash += income
             credited += income
             if fractional:
-                extra = _fractional_shares(cash, bar.close)
-                cash -= fractional_buy_cost(bar.close, extra)
+                extra = _fractional_shares(cash, bar.close, cost_model)
+                cash -= fractional_buy_cost(bar.close, extra, cost_model)
                 shares += extra
             else:
-                more = _whole_shares(cash, bar.close)
-                cash -= buy_cost(bar.close, more)
+                more = _whole_shares(cash, bar.close, cost_model)
+                cash -= _whole_buy_cost(bar.close, more, cost_model)
                 shares += more
         snaps.append(Snapshot(date=d, cash_usd=cash, equity_usd=q(cash + shares * bar.close)))
     return BenchmarkCurve(
@@ -219,8 +248,13 @@ def spy_curves(
     end: date,
     initial_cash: Decimal,
     dividends: Sequence[Dividend],
+    *,
+    cost_model: CostModel = "flat",
 ) -> tuple[BenchmarkCurve, BenchmarkCurve]:
-    """``(spy_price, spy_tr)``: the price-only and total-return SPY curves over one window."""
-    price = buy_and_hold(spy, start, end, initial_cash, name=PRICE_CURVE)
-    total = buy_and_hold(spy, start, end, initial_cash, dividends=dividends, name=TOTAL_RETURN_CURVE)
+    """``(spy_price, spy_tr)``: the price-only and total-return SPY curves over one window,
+    both paying ``cost_model`` (see ``buy_and_hold``)."""
+    price = buy_and_hold(spy, start, end, initial_cash, name=PRICE_CURVE, cost_model=cost_model)
+    total = buy_and_hold(
+        spy, start, end, initial_cash, dividends=dividends, name=TOTAL_RETURN_CURVE, cost_model=cost_model
+    )
     return price, total

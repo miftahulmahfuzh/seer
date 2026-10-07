@@ -430,7 +430,9 @@ def _run(
         dividends=dividends if c.rules.engine == "book" else {},
         usd_idr=rate,
     )
-    price, total = spy_curves(spy, start, end, result.initial_cash, spy_dividends)
+    # The benchmark pays what the candidate pays: Gotrade's schedule for a cost_model="gotrade"
+    # rule set, the flat 0.1% (unchanged) otherwise.
+    price, total = spy_curves(spy, start, end, result.initial_cash, spy_dividends, cost_model=c.rules.cost_model)
     row = make_row(
         c,
         start,

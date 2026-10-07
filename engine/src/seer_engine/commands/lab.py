@@ -42,6 +42,12 @@
                                     DSR, so the re-run is verified against the six metrics the lab
                                     did record, and a trial that does not reproduce them is
                                     reported and not written (exit 1)
+    lab costs M0007 [--candidate M0007-N20-RAW] [--store DIR]
+                                    report only: re-run a recorded method's best dev variant (by
+                                    MAR, or --candidate) at the flat 0.1% and at Gotrade's real
+                                    fees (sim/costs.py, measured from the owner's receipts), print
+                                    both and journal the difference as an observation. No trial
+                                    row, no moments, no status change: N and the looks do not move
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
@@ -224,6 +230,27 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
                         f"loses at most N (default: {dev.MAX_CANDIDATES}, i.e. one call). "
                         "Chunking is bit-identical to one call and costs only allocator "
                         "re-preparation; the whole 54-trial batch takes about a minute")
+
+    s = sub.add_parser(
+        "costs",
+        help="report only: a recorded method at Gotrade's real fees vs the flat 0.1%, journaled",
+        description=(
+            "Re-run a recorded method's best dev variant (by MAR) twice on the dev window -- at "
+            "the lab's flat 0.1% a trade and at Gotrade's real fees -- print both side by side and "
+            "append one observation to the lab journal. Records no trial, so the lab's N and the "
+            "test-window looks do not move; the test window is never read."
+        ),
+    )
+    s.add_argument("method", metavar="M0007")
+    s.add_argument("--candidate", default=None, metavar="M0007-N20-RAW",
+                   help="re-measure this recorded variant instead of the best one by MAR")
+    s.add_argument(
+        "--store",
+        type=Path,
+        default=Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR),
+        help=f"dev-window research store (default: {research.STORE_DIR}, or $SEER_RESEARCH_STORE); "
+             "a test-window store is refused",
+    )
 
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
@@ -1447,6 +1474,53 @@ def _remeasure_seed(conn, args) -> int:
     return 1 if report.blocked else 0
 
 
+def _costs(conn, args) -> int:
+    """``lab costs M0007``: a recorded method at Gotrade's real fees. Report only.
+
+    Every refusal that needs no data -- not a method id, no method file, no dev trial, no such
+    variant, a bracket or custom-rate variant with no real-fee twin -- is made before the research
+    store is loaded. Then ``real_costs.measure`` runs the variant at both cost models on the dev
+    window and ``real_costs.journal`` appends one observation. Nothing else is written: N and the
+    test-window looks are printed before and after so the invariant is visible, not just tested.
+    """
+    from seer_engine.lab import real_costs
+
+    method, _path = real_costs.resolve_method(args.method)
+    candidate, trial = real_costs.pick_candidate(conn, method, args.candidate)
+    real_costs.twins(candidate)  # refuses a variant with no real-fee twin before the store loads
+    if research.DEV_END != dev.DEV_END:
+        raise store.LabError("research.DEV_END differs from dev.DEV_END; refusing to run")
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+    t0 = time.perf_counter()
+    try:
+        data = research.load_store(Path(args.store))
+    except FileNotFoundError as e:
+        raise store.LabError(
+            f"research store {args.store} is missing {e.filename or e}; build it with "
+            "`python -m seer_engine research_store`"
+        ) from e
+    except ValueError as e:
+        raise store.LabError(
+            f"{args.store}: {e}. `lab costs` re-runs the dev window and nothing else, so a "
+            f"test-window store is refused here"
+        ) from e
+    log.info("research store %s loaded (%.1fs)", data.fingerprint[:12], time.perf_counter() - t0)
+    cmp = real_costs.measure(method, candidate, trial, data)
+    print(real_costs.format_report(cmp))
+    with conn:
+        entry = real_costs.journal(conn, cmp)
+    print(
+        f"\njournal entry #{entry} written (an observation on {method.id}). Lab N (dev trials): "
+        f"{n_before} before, {store.dev_trial_count(conn)} after; test-window looks used: "
+        f"{looks_before} before, {store.test_looks(conn)} after."
+    )
+    print("Solo: `python -m seer_engine lab stage` so seertrade.site/sera shows it. "
+          "A Sera child leaves staging to the coordinator.")
+    log.info("%s: lab costs done (%.1fs)", method.id, time.perf_counter() - t0)
+    return 0
+
+
 def _idea(conn, args) -> int:
     store.begin_immediate(conn)  # the next id and its insert, atomic against parallel sessions
     with conn:
@@ -1566,6 +1640,7 @@ _HANDLERS = {
     "reevaluate": _reevaluate,
     "test": _test,
     "remeasure": _remeasure,
+    "costs": _costs,
     "idea": _idea,
     "note": _note,
     "block": _block,

@@ -20,9 +20,10 @@ from typing import Any
 from seer_engine.backtest.dev import Candidate
 from seer_engine.lab.method import Method
 from seer_engine.sim.book import Target, equal_weight
-# Fractional by default: paper trades books in fractional shares, and a 20M IDR book cannot fill
-# whole-share slots at 2016+ prices (M0021). Whole-share presets: MONTHLY_HOLD, WEEKLY_HOLD, ...
-from seer_engine.sim.rules import MONTHLY_HOLD_FRAC
+# Fractional and at Gotrade's real fees by default: paper trades books in fractional shares, a 20M
+# IDR book cannot fill whole-share slots at 2016+ prices (M0021), and from M0031 on `lab run`
+# refuses a variant at the old flat 0.1%. Other real-fee preset: MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE.
+from seer_engine.sim.rules import MONTHLY_HOLD_FRAC_GOTRADE
 from seer_engine.strategies.allocator import last_close, target_from_close
 from seer_engine.strategies.base import History
 
@@ -86,7 +87,7 @@ class Alloc:
 ALLOC = Alloc()
 
 
-def _v(suffix: str, params: Params, rationale: str, rules=MONTHLY_HOLD_FRAC) -> Candidate:
+def _v(suffix: str, params: Params, rationale: str, rules=MONTHLY_HOLD_FRAC_GOTRADE) -> Candidate:
     return Candidate(id=f"MNNNN-{suffix}", family="MNNNN", rules=rules, allocator=ALLOC,
                      params=params, rationale=rationale, added=ADDED, owner_inputs=())
 

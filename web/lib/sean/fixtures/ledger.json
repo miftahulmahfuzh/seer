@@ -1,0 +1,345 @@
+{
+  "about": "Shared ledger fixture (contract B): web/lib/sean/ledger.test.ts and engine/tests/test_sean_ledger.py both replay it. Synthetic orders, not the owner's. Keys are sean_orders / sean_equity column names; every number is a string so Python reads it as Decimal. Expected values were computed with Decimal and ROUND_HALF_UP. Covers: an after-midnight-WIB fill that belongs to the previous New York session (id 3), a sell of more shares than held (id 5), a sell of a stock never seen bought (id 10), a holding with no closes (CCC, valued at its last order price), two orders at the same instant replayed by id (7 before 8), a weekend date (2026-01-10), a date before any order, and a half-cent tie in realized (26.125 -> 26.13 on 2026-01-12).",
+  "orders": [
+    {
+      "id": 1,
+      "side": "buy",
+      "symbol": "AAA",
+      "executed_at": "2026-01-05T21:30:00+07:00",
+      "price": "100",
+      "shares": "2",
+      "amount_usd": "200.00",
+      "trading_fee_usd": "0.40",
+      "regulatory_fee_usd": "0.05",
+      "ppn_usd": "0.05",
+      "total_usd": "200.50"
+    },
+    {
+      "id": 2,
+      "side": "buy",
+      "symbol": "BBB",
+      "executed_at": "2026-01-06T22:00:00+07:00",
+      "price": "50.5",
+      "shares": "0.5",
+      "amount_usd": "25.25",
+      "trading_fee_usd": "0.10",
+      "regulatory_fee_usd": "0.02",
+      "ppn_usd": "0.01",
+      "total_usd": "25.38"
+    },
+    {
+      "id": 3,
+      "side": "buy",
+      "symbol": "AAA",
+      "executed_at": "2026-01-08T03:30:00+07:00",
+      "price": "110",
+      "shares": "1",
+      "amount_usd": "110.00",
+      "trading_fee_usd": "0.22",
+      "regulatory_fee_usd": "0.05",
+      "ppn_usd": "0.03",
+      "total_usd": "110.30"
+    },
+    {
+      "id": 4,
+      "side": "sell",
+      "symbol": "AAA",
+      "executed_at": "2026-01-09T21:45:00+07:00",
+      "price": "120",
+      "shares": "1.5",
+      "amount_usd": "180.00",
+      "trading_fee_usd": "0.36",
+      "regulatory_fee_usd": "0.06",
+      "ppn_usd": "0.05",
+      "total_usd": "179.53"
+    },
+    {
+      "id": 5,
+      "side": "sell",
+      "symbol": "BBB",
+      "executed_at": "2026-01-12T21:40:00+07:00",
+      "price": "55",
+      "shares": "0.6",
+      "amount_usd": "33.00",
+      "trading_fee_usd": "0.10",
+      "regulatory_fee_usd": "0.04",
+      "ppn_usd": "0.01",
+      "total_usd": "32.85"
+    },
+    {
+      "id": 6,
+      "side": "buy",
+      "symbol": "CCC",
+      "executed_at": "2026-01-12T21:50:00+07:00",
+      "price": "10.123456",
+      "shares": "2.963",
+      "amount_usd": "29.99",
+      "trading_fee_usd": "0.10",
+      "regulatory_fee_usd": "0.02",
+      "ppn_usd": "0.01",
+      "total_usd": "30.12"
+    },
+    {
+      "id": 8,
+      "side": "sell",
+      "symbol": "DDD",
+      "executed_at": "2026-01-13T22:00:00+07:00",
+      "price": "20",
+      "shares": "1",
+      "amount_usd": "20.00",
+      "trading_fee_usd": "0.10",
+      "regulatory_fee_usd": "0.02",
+      "ppn_usd": "0.01",
+      "total_usd": "19.87"
+    },
+    {
+      "id": 7,
+      "side": "buy",
+      "symbol": "DDD",
+      "executed_at": "2026-01-13T22:00:00+07:00",
+      "price": "20",
+      "shares": "1",
+      "amount_usd": "20.00",
+      "trading_fee_usd": "0.10",
+      "regulatory_fee_usd": "0.02",
+      "ppn_usd": "0.01",
+      "total_usd": "20.13"
+    },
+    {
+      "id": 10,
+      "side": "sell",
+      "symbol": "ZZZ",
+      "executed_at": "2026-01-13T21:35:00+07:00",
+      "price": "15",
+      "shares": "2",
+      "amount_usd": "30.00",
+      "trading_fee_usd": "0.10",
+      "regulatory_fee_usd": "0.02",
+      "ppn_usd": "0.01",
+      "total_usd": "29.87"
+    },
+    {
+      "id": 9,
+      "side": "buy",
+      "symbol": "EEE",
+      "executed_at": "2026-01-13T23:00:00+07:00",
+      "price": "33.333",
+      "shares": "0.300003",
+      "amount_usd": "10.00",
+      "trading_fee_usd": "0.10",
+      "regulatory_fee_usd": "0.01",
+      "ppn_usd": "0.01",
+      "total_usd": "10.12"
+    }
+  ],
+  "closes": {
+    "AAA": [
+      {
+        "date": "2026-01-05",
+        "close": "101"
+      },
+      {
+        "date": "2026-01-06",
+        "close": "102.5"
+      },
+      {
+        "date": "2026-01-07",
+        "close": "108"
+      },
+      {
+        "date": "2026-01-08",
+        "close": "115"
+      },
+      {
+        "date": "2026-01-09",
+        "close": "119.25"
+      },
+      {
+        "date": "2026-01-12",
+        "close": "121"
+      },
+      {
+        "date": "2026-01-13",
+        "close": "118.4"
+      }
+    ],
+    "BBB": [
+      {
+        "date": "2026-01-06",
+        "close": "51"
+      },
+      {
+        "date": "2026-01-07",
+        "close": "50"
+      },
+      {
+        "date": "2026-01-08",
+        "close": "52"
+      },
+      {
+        "date": "2026-01-09",
+        "close": "53.3"
+      }
+    ],
+    "EEE": [
+      {
+        "date": "2026-01-13",
+        "close": "34.1"
+      }
+    ]
+  },
+  "sessions": [
+    {
+      "executed_at": "2026-01-05T21:30:00+07:00",
+      "session": "2026-01-05"
+    },
+    {
+      "executed_at": "2026-01-06T22:00:00+07:00",
+      "session": "2026-01-06"
+    },
+    {
+      "executed_at": "2026-01-08T03:30:00+07:00",
+      "session": "2026-01-07"
+    },
+    {
+      "executed_at": "2026-01-09T21:45:00+07:00",
+      "session": "2026-01-09"
+    },
+    {
+      "executed_at": "2026-01-12T21:40:00+07:00",
+      "session": "2026-01-12"
+    },
+    {
+      "executed_at": "2026-01-12T21:50:00+07:00",
+      "session": "2026-01-12"
+    },
+    {
+      "executed_at": "2026-01-13T22:00:00+07:00",
+      "session": "2026-01-13"
+    },
+    {
+      "executed_at": "2026-01-13T22:00:00+07:00",
+      "session": "2026-01-13"
+    },
+    {
+      "executed_at": "2026-01-13T21:35:00+07:00",
+      "session": "2026-01-13"
+    },
+    {
+      "executed_at": "2026-01-13T23:00:00+07:00",
+      "session": "2026-01-13"
+    },
+    {
+      "executed_at": "2026-03-09T03:59:00+07:00",
+      "session": "2026-03-08"
+    },
+    {
+      "executed_at": "2026-07-01T20:30:00+07:00",
+      "session": "2026-07-01"
+    }
+  ],
+  "expected": {
+    "positions": [
+      {
+        "symbol": "AAA",
+        "shares": "1.500000000",
+        "cost_usd": "155.40"
+      },
+      {
+        "symbol": "CCC",
+        "shares": "2.963000000",
+        "cost_usd": "30.12"
+      },
+      {
+        "symbol": "EEE",
+        "shares": "0.300003000",
+        "cost_usd": "10.12"
+      }
+    ],
+    "realized_usd": "25.87",
+    "fees_usd": "2.19",
+    "points": [
+      {
+        "date": "2026-01-02",
+        "value_usd": "0.00",
+        "cost_usd": "0.00",
+        "realized_usd": "0.00",
+        "unrealized_usd": "0.00",
+        "pnl_usd": "0.00",
+        "fees_usd": "0.00"
+      },
+      {
+        "date": "2026-01-05",
+        "value_usd": "202.00",
+        "cost_usd": "200.50",
+        "realized_usd": "0.00",
+        "unrealized_usd": "1.50",
+        "pnl_usd": "1.50",
+        "fees_usd": "0.50"
+      },
+      {
+        "date": "2026-01-06",
+        "value_usd": "230.50",
+        "cost_usd": "225.88",
+        "realized_usd": "0.00",
+        "unrealized_usd": "4.62",
+        "pnl_usd": "4.62",
+        "fees_usd": "0.63"
+      },
+      {
+        "date": "2026-01-07",
+        "value_usd": "349.00",
+        "cost_usd": "336.18",
+        "realized_usd": "0.00",
+        "unrealized_usd": "12.82",
+        "pnl_usd": "12.82",
+        "fees_usd": "0.93"
+      },
+      {
+        "date": "2026-01-08",
+        "value_usd": "371.00",
+        "cost_usd": "336.18",
+        "realized_usd": "0.00",
+        "unrealized_usd": "34.82",
+        "pnl_usd": "34.82",
+        "fees_usd": "0.93"
+      },
+      {
+        "date": "2026-01-09",
+        "value_usd": "205.53",
+        "cost_usd": "180.78",
+        "realized_usd": "24.13",
+        "unrealized_usd": "24.75",
+        "pnl_usd": "48.88",
+        "fees_usd": "1.40"
+      },
+      {
+        "date": "2026-01-10",
+        "value_usd": "205.53",
+        "cost_usd": "180.78",
+        "realized_usd": "24.13",
+        "unrealized_usd": "24.75",
+        "pnl_usd": "48.88",
+        "fees_usd": "1.40"
+      },
+      {
+        "date": "2026-01-12",
+        "value_usd": "211.50",
+        "cost_usd": "185.52",
+        "realized_usd": "26.13",
+        "unrealized_usd": "25.98",
+        "pnl_usd": "52.10",
+        "fees_usd": "1.68"
+      },
+      {
+        "date": "2026-01-13",
+        "value_usd": "217.83",
+        "cost_usd": "195.64",
+        "realized_usd": "25.87",
+        "unrealized_usd": "22.19",
+        "pnl_usd": "48.05",
+        "fees_usd": "2.19"
+      }
+    ]
+  }
+}

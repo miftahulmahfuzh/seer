@@ -30,6 +30,7 @@ from decimal import Decimal
 from typing import Literal
 
 from seer_engine import dates
+from seer_engine.sim.costs import COST_MODELS, GOTRADE, CostModel
 
 Engine = Literal["bracket_v0", "book"]
 Cadence = Literal["daily", "weekly", "monthly"]
@@ -84,6 +85,7 @@ class TradeRules:
     dividends: bool = True
     idle_symbol: str | None = None
     cost_rate: Decimal = _DEFAULT_COST
+    cost_model: CostModel = "flat"
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, str):
@@ -122,6 +124,15 @@ class TradeRules:
             raise TypeError(f"cost_rate must be a Decimal, got {type(self.cost_rate).__name__}")
         if not self.cost_rate.is_finite() or not (0 <= self.cost_rate < _MAX_COST):
             raise ValueError(f"cost_rate must be in [0, {_MAX_COST}), got {self.cost_rate}")
+        if not isinstance(self.cost_model, str):
+            raise TypeError(f"cost_model must be a str, got {type(self.cost_model).__name__}")
+        if self.cost_model not in COST_MODELS:
+            raise ValueError(f"unknown cost_model {self.cost_model!r}; expected one of {COST_MODELS}")
+        if self.cost_model == "gotrade" and self.cost_rate != _DEFAULT_COST:
+            raise ValueError(
+                f"cost_model 'gotrade' prices every order from Gotrade's measured fee schedule "
+                f"(sim.costs); cost_rate must stay at its default {_DEFAULT_COST}, got {self.cost_rate}"
+            )
         is_v0 = _lever_values(self) == _V0_LEVERS
         if self.engine == "bracket_v0" and not is_v0:
             raise ValueError("engine 'bracket_v0' is reserved for DESIGN_V0 (the unchanged §5 simulator)")
@@ -147,6 +158,7 @@ _V0_LEVERS: tuple[object, ...] = (
     False,
     None,
     _DEFAULT_COST,
+    "flat",
 )
 
 DESIGN_V0 = TradeRules(
@@ -185,6 +197,13 @@ MONTHLY_RANK_WEEKLY_RESIZE_TBILL = replace(
 MONTHLY_RANK_WEEKLY_RESIZE_FRAC = replace(
     MONTHLY_RANK_WEEKLY_RESIZE, id="monthly-rank-weekly-resize-frac", fractional=True
 )
+# The two fractional book presets at Gotrade's real fees (sim/costs.py, fitted to the owner's
+# receipts; Sean, 2026-10-07). Lab methods from M0031 on are built on these (lab/real_costs.py),
+# and `promote` needs a preset of the variant's own id, so a real-fee winner can reach paper.
+MONTHLY_HOLD_FRAC_GOTRADE = replace(MONTHLY_HOLD_FRAC, id="monthly-hold-frac-gotrade", cost_model="gotrade")
+MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE = replace(
+    MONTHLY_RANK_WEEKLY_RESIZE_FRAC, id="monthly-rank-weekly-resize-frac-gotrade", cost_model="gotrade"
+)
 
 PRESETS: tuple[TradeRules, ...] = (
     DESIGN_V0,
@@ -200,6 +219,8 @@ PRESETS: tuple[TradeRules, ...] = (
     MONTHLY_RANK_WEEKLY_RESIZE_TBILL,
     MONTHLY_HOLD_FRAC,
     MONTHLY_RANK_WEEKLY_RESIZE_FRAC,
+    MONTHLY_HOLD_FRAC_GOTRADE,
+    MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE,
 )
 
 
@@ -212,6 +233,7 @@ PRESETS: tuple[TradeRules, ...] = (
 # which is the whole point. Append only, and only for a lever whose default is a true no-op.
 LEVERS_SINCE_PINS: dict[str, object] = {
     "resize_cadence": None,  # the rank/resize cadence split, 2026-10-05
+    "cost_model": "flat",  # Gotrade's measured fee schedule (sim.costs), 2026-10-07
 }
 
 
@@ -290,10 +312,12 @@ def rule_owner_inputs(rules: TradeRules) -> tuple[str, ...]:
     """The Gotrade features ``rules`` needs that the owner has not verified, sorted and unique.
 
     ``market-on-open`` (entry "open"), ``etf:<symbol>`` (an idle instrument outside
-    ``DEFAULT_ETFS``) and ``fee`` (a cost rate other than 0.1% per side). Empty means executable
-    under the conservative owner-input defaults. Fractional shares are not on the list: the owner
-    verified that Gotrade takes fractional limit buys and sells (2026-10-07), and the paper roster
-    already trades its lab winners that way.
+    ``DEFAULT_ETFS``) and ``fee`` (a flat cost rate other than 0.1% per side). Empty means
+    executable under the conservative owner-input defaults. Fractional shares are not on the
+    list: the owner verified that Gotrade takes fractional limit buys and sells (2026-10-07), and
+    the paper roster already trades its lab winners that way. Neither is ``cost_model="gotrade"``:
+    its schedule is fitted to the owner's own Gotrade receipts (``sim.costs``), and it requires
+    the default ``cost_rate``, so it never raises ``fee`` either.
     """
     _rules(rules)
     out: set[str] = set()
@@ -301,7 +325,7 @@ def rule_owner_inputs(rules: TradeRules) -> tuple[str, ...]:
         out.add("market-on-open")
     if rules.idle_symbol is not None and rules.idle_symbol not in DEFAULT_ETFS:
         out.add(f"etf:{rules.idle_symbol}")
-    if rules.cost_rate != _DEFAULT_COST:
+    if rules.cost_model == "flat" and rules.cost_rate != _DEFAULT_COST:
         out.add("fee")
     return tuple(sorted(out))
 
@@ -392,5 +416,32 @@ def describe_rules(rules: TradeRules) -> tuple[str, ...]:
         lines.append("Idle cash: held as cash, earning nothing.")
     else:
         lines.append(f"Idle cash: the unallocated weight is held in {rules.idle_symbol} on decision sessions.")
-    lines.append(f"Costs: {_pct(rules.cost_rate)} per side.")
+    if rules.cost_model == "gotrade":
+        lines.append(_gotrade_costs_line())
+    else:
+        lines.append(f"Costs: {_pct(rules.cost_rate)} per side.")
     return tuple(lines)
+
+
+def _usd(x: Decimal) -> str:
+    """``x`` dollars to the cent: Decimal('0.1') -> '$0.10'."""
+    return f"${x:.2f}"
+
+
+def _gotrade_costs_line() -> str:
+    """The plain-English line for ``cost_model="gotrade"``, read off the current regime so it
+    can never drift from the numbers the simulator charges."""
+    r = GOTRADE.current
+    trading = f"a trading fee of {_pct(r.trading_rate)} of each order"
+    if r.trading_min > 0:
+        trading += f", at least {_usd(r.trading_min)}"
+    regulatory = f"a regulatory fee of {_pct(r.regulatory_rate)} rounded up to the cent"
+    if r.regulatory_cap is not None:
+        regulatory += f", at most {_usd(r.regulatory_cap)}"
+    if r.sell_extra_rate > 0:
+        regulatory += f", plus {_pct(r.sell_extra_rate)} more on sells"
+    return (
+        f"Costs: Gotrade's fee schedule measured from the owner's receipts (in force since "
+        f"{r.since.isoformat()}): {trading}; {regulatory}; and {_pct(r.ppn_rate)} VAT (PPN) on "
+        f"those two fees."
+    )

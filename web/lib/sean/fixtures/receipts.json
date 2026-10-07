@@ -1,0 +1,163 @@
+{
+  "about": "Four of the owner's real Gotrade Order Summary receipts, transcribed by hand and checked (2026-10-07), in the shape the model is asked to return (prompt.ts ORDER_SHAPE), each with the SeanOrder toOrder must produce. The screenshots themselves are not in the repo.",
+  "receipts": [
+    {
+      "label": "PLTR buy, average price with two partial fills, June 2025 (no trading fee yet)",
+      "raw": {
+        "isOrderSummary": true,
+        "status": "Filled",
+        "date": "June 10, 2025",
+        "time": "21:34 WIB",
+        "orderType": "Market Buy",
+        "ticker": "PLTR",
+        "priceLabel": "Average price",
+        "price": "$131.47",
+        "fills": [
+          { "shares": "0.38", "price": "$131.47" },
+          { "shares": "5", "price": "$131.47" }
+        ],
+        "filledShares": "5.38",
+        "tradeAmount": "$707.31",
+        "tradingFee": "+$0.00",
+        "regulatoryFee": "+$2.13",
+        "ppn": "+$0.00",
+        "total": "$709.44",
+        "netProfit": null,
+        "netProfitColor": null
+      },
+      "expected": {
+        "side": "buy",
+        "orderType": "Market Buy",
+        "status": "Filled",
+        "symbol": "PLTR",
+        "executedAt": "2025-06-10T21:34:00+07:00",
+        "price": 131.47,
+        "shares": 5.38,
+        "amountUsd": 707.31,
+        "tradingFeeUsd": 0,
+        "regulatoryFeeUsd": 2.13,
+        "ppnUsd": 0,
+        "totalUsd": 709.44,
+        "netProfitUsd": null,
+        "fills": [
+          { "shares": 0.38, "price": 131.47 },
+          { "shares": 5, "price": 131.47 }
+        ]
+      }
+    },
+    {
+      "label": "MU buy, $27.90 fractional slot at a four-figure price, October 2026",
+      "raw": {
+        "isOrderSummary": true,
+        "status": "Filled",
+        "date": "October 07, 2026",
+        "time": "22:00 WIB",
+        "orderType": "Market Buy",
+        "ticker": "MU",
+        "priceLabel": "Execution price",
+        "price": "$1,063.886",
+        "fills": [],
+        "filledShares": "0.026224614",
+        "tradeAmount": "$27.90",
+        "tradingFee": "+$0.10",
+        "regulatoryFee": "+$0.02",
+        "ppn": "+$0.01",
+        "total": "$28.03",
+        "netProfit": null,
+        "netProfitColor": null
+      },
+      "expected": {
+        "side": "buy",
+        "orderType": "Market Buy",
+        "status": "Filled",
+        "symbol": "MU",
+        "executedAt": "2026-10-07T22:00:00+07:00",
+        "price": 1063.886,
+        "shares": 0.026224614,
+        "amountUsd": 27.9,
+        "tradingFeeUsd": 0.1,
+        "regulatoryFeeUsd": 0.02,
+        "ppnUsd": 0.01,
+        "totalUsd": 28.03,
+        "netProfitUsd": null,
+        "fills": []
+      }
+    },
+    {
+      "label": "SPY buy, whole shares, amount rounded from 1832.895, June 2025",
+      "raw": {
+        "isOrderSummary": true,
+        "status": "Filled",
+        "date": "June 26, 2025",
+        "time": "23:12 WIB",
+        "orderType": "Market Buy",
+        "ticker": "SPY",
+        "priceLabel": "Execution price",
+        "price": "$610.965",
+        "fills": [],
+        "filledShares": "3",
+        "tradeAmount": "$1,832.90",
+        "tradingFee": "+$5.50",
+        "regulatoryFee": "+$0.10",
+        "ppn": "+$0.62",
+        "total": "$1,839.12",
+        "netProfit": null,
+        "netProfitColor": null
+      },
+      "expected": {
+        "side": "buy",
+        "orderType": "Market Buy",
+        "status": "Filled",
+        "symbol": "SPY",
+        "executedAt": "2025-06-26T23:12:00+07:00",
+        "price": 610.965,
+        "shares": 3,
+        "amountUsd": 1832.9,
+        "tradingFeeUsd": 5.5,
+        "regulatoryFeeUsd": 0.1,
+        "ppnUsd": 0.62,
+        "totalUsd": 1839.12,
+        "netProfitUsd": null,
+        "fills": []
+      }
+    },
+    {
+      "label": "PLTR sell, fees printed with minus signs, Net Profit in green, October 2026",
+      "raw": {
+        "isOrderSummary": true,
+        "status": "Filled",
+        "date": "October 07, 2026",
+        "time": "21:55 WIB",
+        "orderType": "Market Sell",
+        "ticker": "PLTR",
+        "priceLabel": "Execution price",
+        "price": "$190.81",
+        "fills": [],
+        "filledShares": "0.38",
+        "tradeAmount": "$72.51",
+        "tradingFee": "-$0.15",
+        "regulatoryFee": "-$0.07",
+        "ppn": "-$0.02",
+        "total": "$72.27",
+        "netProfit": "$22.31",
+        "netProfitColor": "green"
+      },
+      "expected": {
+        "side": "sell",
+        "orderType": "Market Sell",
+        "status": "Filled",
+        "symbol": "PLTR",
+        "executedAt": "2026-10-07T21:55:00+07:00",
+        "price": 190.81,
+        "shares": 0.38,
+        "amountUsd": 72.51,
+        "tradingFeeUsd": 0.15,
+        "regulatoryFeeUsd": 0.07,
+        "ppnUsd": 0.02,
+        "totalUsd": 72.27,
+        "netProfitUsd": 22.31,
+        "fills": []
+      }
+    }
+  ]
+}

@@ -53,6 +53,7 @@ from seer_engine.commands.backtest_dev import daily_moments, month_end_curve, re
 from seer_engine.fundamentals import coverage
 from seer_engine.lab import store
 from seer_engine.lab.method import METHOD_ID, Method, config_digest, config_text, source_sha
+from seer_engine.lab.real_costs import real_cost_problem
 from seer_engine.strategies.allocator import MarketAware
 
 if TYPE_CHECKING:  # typing only: prereg is imported inside the functions that use it, so
@@ -83,13 +84,20 @@ def git_head(cwd: Path) -> str:
 
 
 def preflight(conn: sqlite3.Connection, method: Method, path: Path, *, require_commit: bool = True) -> None:
-    """Every refusal ``lab run`` makes before loading data (``store.LabError``)."""
+    """Every refusal ``lab run`` makes before loading data (``store.LabError``).
+
+    From M0031 on that includes a variant not priced at Gotrade's real fees
+    (``real_costs.real_cost_problem``); methods up to M0030 are unaffected.
+    """
     if require_commit:
         problem = registry_problem(path)
         if problem is not None:
             raise store.LabError(
                 f"{method.id}: {problem}. Commit the method file first: the commit is its pre-registration"
             )
+    cost_problem = real_cost_problem(method)
+    if cost_problem is not None:
+        raise store.LabError(f"{method.id}: {cost_problem}")
     row = store.get_method(conn, method.id)
     if row is not None and row["status"] not in ("idea", "registered"):
         raise store.LabError(

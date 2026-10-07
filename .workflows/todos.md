@@ -2,7 +2,7 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-07 19:32
+**Last Updated**: 2026-10-07 23:39
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 8
+- Completed: 15
 
 ---
 
@@ -35,6 +35,115 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-GB56** Phase 7: Lab: calibrate from real orders, measure methods at real cost
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/sean/calibrate.py` + `commands/sean.py` subcommand `calibrate` (replays `fee_parts` on each receipt's WIB date; exit 1 when an order since `GOTRADE.current.since` is off by more than a cent); `engine/src/seer_engine/lab/real_costs.py` + `lab costs MNNNN` (report only: no trial, N unchanged, one journal observation); `runner.preflight` refuses a flat-cost variant from M0031; the two real-fee presets `MONTHLY_HOLD_FRAC_GOTRADE` / `MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE` appended to `PRESETS` (rules.py after Phase 6) with their pins in `test_sim_rules.py` and Phase 6's `test_cost_model_pins.py`; `web/lib/cadence.ts` `SPLIT_CADENCE_RULES` + test learn `monthly-rank-weekly-resize-frac-gotrade`; tests `test_sean_calibrate.py`, `test_lab_costs.py`; both lab skills + `method_template.py`; design doc costs line + §15. Does not touch `sim/costs.py` numbers, `sim/book.py`, `backtest/*` (Phase 6); Phase 4's `marks` code; other web files; existing trial rows; `lab/lab.sqlite`. Exit: ruff + full pytest green (DB tests with `PG_TEST_URL`); `web/lib/cadence.test.ts` green; `sean calibrate` exits 0 on the fee fixture and 1 on a drifted receipt; `lab costs` writes exactly one insight and leaves trials, moments, methods, N and looks unchanged; `lab run` refuses a flat-cost M0031 and accepts one on `MONTHLY_HOLD_FRAC_GOTRADE`; `lab costs M0007` runs locally (`SEER_LAB_COSTS_LIVE=1`, skipped in CI).
+  - **Status**: completed
+  - **Plan Set**: `SEAN_GOTRADE_TRACKER_PLAN.md` (phase 7 of 7)
+  - **Satisfies**: R5 — Real Gotrade costs feed method exploration and the Sera lab's profit-and-loss
+  - **Depends on**: P1-ROOT-5YLK, P1-ROOT-8S6O
+  - **Unblocked**: 2026-10-07 - P1-ROOT-5YLK (phase 4) and P1-ROOT-8S6O (phase 6) completed; `sean/` ledger and `sim/costs.py` + the `cost_model` lever now exist on `feature/sean-gotrade-tracker`.
+  - **Plan**: `.workflows/plan/P1-ROOT-GB56.md`
+  - **Completed**: 2026-10-07 23:39
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/sean/calibrate.py, engine/src/seer_engine/lab/real_costs.py, engine/tests/test_sean_calibrate.py, engine/tests/test_lab_costs.py, engine/src/seer_engine/commands/sean.py, engine/src/seer_engine/commands/lab.py, engine/src/seer_engine/lab/runner.py, engine/src/seer_engine/sim/rules.py, engine/tests/test_sim_rules.py, engine/tests/test_cost_model_pins.py, web/lib/cadence.ts, web/lib/cadence.test.ts, .claude/skills/explore-and-experiment-new-method/SKILL.md, .claude/skills/explore-and-experiment-new-method/method_template.py, .claude/skills/sera-the-explorer/SKILL.md, docs/plans/2026-10-03-seer-design.md
+  - **Drift**: Line numbers in the plan for the skill files and commands/lab.py had shifted slightly; edits applied by anchor text, intent unchanged.
+
+- [x] **P1-ROOT-XA2W** Phase 5: Plan: link a roster method, buy/sell reminders
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `web/lib/sean/reminders.ts` + test (pure: plan orders = New York trade date on/after `since`; sells for plan holdings no longer picked, buys sized `weight × planSize`, add/trim only for resizing rule sets — incl. the two `-gotrade` presets — when the gap ≥ max($10, 1% of the plan); done = a matching order whose New York trade date is on/after the decision session, or a mark); `web/lib/sean/planData.ts` (new: `linkableMethods`, `link`, `latestTargets`, `reminderMarks`, `latestCloses`, `planState`, React-`cache`d `openReminderCount`); `web/app/sean/plan/{page, view(+test), actions (via isSeanCaller), LinkPicker, PlanSettings, plan.module.css}` (replaces the placeholder); `planOpen` into `SeanNav`; the coral dot + "· N to do" words on both Sean buttons — `Nav.tsx` (`seanOpen` prop via `(app)/layout.tsx`) and `AppHeader.tsx` (reads the cached count). Rules: only active, non-benchmark `engine='book'` roster rows are linkable; `since` defaults to the method's latest decision session; pre-plan holdings never get a sell reminder; plain sentences, no ids. Does not touch `data.ts`, Overview files, `overviewData.ts`, Trades upload, `cadence.ts`, engine. Exit: reminder and view tests green (fresh link, the real Oct 7 follow-through, month turnover, partial follow-through, an after-midnight-WIB order, resize band, pre-plan holdings untouched, marked done); `tsc`, full vitest, `next build` green.
+  - **Status**: completed
+  - **Plan Set**: `SEAN_GOTRADE_TRACKER_PLAN.md` (phase 5 of 7)
+  - **Satisfies**: R4 — Connect Sean to one roster method (RAW today); Sean reminds the owner to buy / sell by it
+  - **Depends on**: P1-ROOT-AUY5, P1-ROOT-UNS5
+  - **Unblocked**: 2026-10-07 - P1-ROOT-UNS5 (phase 2) completed; `web/lib/sean/data.ts` (`ledgerOrders()`/`LedgerRow`), `gate.ts` and the `/sean` section now exist on `feature/sean-gotrade-tracker`.
+  - **Plan**: `.workflows/plan/P1-ROOT-XA2W.md`
+  - **Completed**: 2026-10-07 23:55
+  - **Method**: /do
+  - **Files**: web/lib/sean/reminders.ts, web/lib/sean/reminders.test.ts, web/lib/sean/planData.ts, web/app/sean/plan/page.tsx, web/app/sean/plan/view.ts, web/app/sean/plan/view.test.ts, web/app/sean/plan/actions.ts, web/app/sean/plan/LinkPicker.tsx, web/app/sean/plan/PlanSettings.tsx, web/app/sean/plan/plan.module.css, web/app/sean/layout.tsx, web/components/Nav.tsx, web/components/Nav.module.css, web/components/AppHeader.tsx, web/components/AppHeader.module.css, web/app/(app)/layout.tsx
+
+- [x] **P1-ROOT-8JIM** Phase 3: Overview: P&L graph and holdings
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `web/app/sean/page.tsx` (replaces Phase 2's placeholder), `web/app/sean/overview.ts` + `overview.test.ts` (pure view model over Phase 1's ledger), `web/app/sean/OverviewBody.tsx` + `OverviewBody.test.tsx`, `web/app/sean/overview.module.css`, `web/lib/sean/overviewData.ts` (new: `equity()`, `marks()`); reads orders through Phase 2's `ledgerOrders()`. Content: stats row (total P&L, realized, unrealized, fees paid, fees as % of money traded); `LineChart` of daily `pnl_usd` from `sean_equity` (faint dashed cumulative fees, break-even line) plus a live point for today (New York date) when an order is newer than the last nightly session; when `sean_equity` is empty, `pnlSeries` over the orders' New York trade dates at last order prices with a caption that prices come nightly; holdings table (shares, average cost with buying fees, last price — italic when it is the order price — value, P&L `.pos/.neg`); empty state with an icon button to Trades. Does not touch `data.ts`, Trades, Plan, `Nav`, `AppHeader`, engine; shares no file with Phase 5. Exit: `tsc`, vitest (`overview.test.ts`, `OverviewBody.test.tsx`: zero, one, many orders; nightly series with and without a live point) and `next build` green; `/sean` no longer shows the placeholder.
+  - **Status**: completed
+  - **Plan Set**: `SEAN_GOTRADE_TRACKER_PLAN.md` (phase 3 of 7)
+  - **Satisfies**: R2 — Sean tracks all of the owner's Gotrade trading activity and shows a profit-and-loss graph
+  - **Depends on**: P1-ROOT-AUY5, P1-ROOT-UNS5
+  - **Unblocked**: 2026-10-07 - P1-ROOT-UNS5 (phase 2) completed; `web/lib/sean/data.ts` (`ledgerOrders()`/`LedgerRow`), `gate.ts` and the `/sean` section now exist on `feature/sean-gotrade-tracker`.
+  - **Plan**: `.workflows/plan/P1-ROOT-8JIM.md`
+  - **Completed**: 2026-10-07 23:45
+  - **Method**: /do
+  - **Files**: web/lib/sean/overviewData.ts, web/app/sean/overview.ts, web/app/sean/overview.test.ts, web/app/sean/OverviewBody.tsx, web/app/sean/OverviewBody.test.tsx, web/app/sean/overview.module.css, web/app/sean/page.tsx
+
+- [x] **P1-ROOT-UNS5** Phase 2: Sean section, Sean buttons (rail + phone header), Trades upload
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `web/components/Nav.tsx` + `Nav.module.css` (Sean `icon-btn` class `.sean` directly above Sera, Lucide `Wallet`, tip/aria "Sean, your real trades", both in a `.foot` wrapper taking over `margin-top:auto`; `.sera` deleted); `web/components/AppHeader.tsx` + `.module.css` (now `async`; owner-only, mobile-only `Wallet` icon button beside Sign out, class `.sean`; call sites unchanged); `web/app/(app)/layout.tsx` (`owner` = Sera's check, `showSean`); `web/lib/sean/gate.ts` (`requireSean`, `isSeanCaller`); `web/lib/sean/data.ts` (server-only, owned by this phase alone: `orders()`, `ledgerOrders()`/`LedgerRow` for Phases 3 and 5, `ownerSymbols()`, `orderById()`, `orderIdBySha()`, `saveOrder()`, `removeOrder()`); `web/lib/sean/dispatch.ts` (`dispatchSeanMarks()`, best effort); `web/components/sean/SeanNav.tsx` + css; `web/app/sean/{layout,not-found,sean.module.css,page (placeholder),plan/page (placeholder)}`; `web/app/api/sean/orders/route.ts` (contract C); `web/app/sean/trades/{page, Uploader, DeleteOrder, actions, view(+test), upload(+test), trades.module.css}`; Vercel env `LLM_API_KEY`/`LLM_VISION_BASE_URL`/`LLM_VISION_MODEL` if missing. Uploader: browser unzips with `readZip`, re-encodes only non-JPEGs or JPEGs over ~1 MB (long side ≤ 2400 px, short side never under 560 px), hashes, posts three at a time; reader/network failures kept and re-sent by a retry icon button. Does not touch Phase 1's `web/lib/sean` modules, `reminders.ts`, `overviewData.ts`, `planData.ts`; engine. Exit: `tsc`, vitest, `next build` green; owner sees Sean above Sera on desktop and the Sean header button on a phone, and the three tabs; images or the zip upload with per-file status three at a time; duplicates report as already saved; a reader/network failure can be retried; delete works; a non-owner gets 404 on `/sean/*` and the API; `vercel env ls` lists the three `LLM_*` names.
+  - **Status**: completed
+  - **Plan Set**: `SEAN_GOTRADE_TRACKER_PLAN.md` (phase 2 of 7)
+  - **Satisfies**: R1 — A new system called Sean, reached by a Sean button placed above the Sera button in the Seer UI; R3 — Upload Buy/Sell Order Summary screenshots; Sean parses them with glm-4.6v, the run-insights way
+  - **Depends on**: P1-ROOT-AUY5
+  - **Unblocked**: 2026-10-07 - P1-ROOT-AUY5 (phase 1) completed; its `web/lib/sean` modules and migration 015 now exist on `feature/sean-gotrade-tracker`.
+  - **Plan**: `.workflows/plan/P1-ROOT-UNS5.md`
+
+  - **Completed**: 2026-10-07 23:30
+  - **Method**: /implement
+  - **Files**: web/components/Nav.tsx, web/components/Nav.module.css, web/components/AppHeader.tsx, web/components/AppHeader.module.css, web/app/(app)/layout.tsx, web/lib/sean/gate.ts, web/lib/sean/data.ts, web/lib/sean/dispatch.ts, web/components/sean/SeanNav.tsx, web/components/sean/SeanNav.module.css, web/app/sean/layout.tsx, web/app/sean/not-found.tsx, web/app/sean/sean.module.css, web/app/sean/page.tsx, web/app/sean/plan/page.tsx, web/app/api/sean/orders/route.ts, web/app/sean/trades/page.tsx, web/app/sean/trades/Uploader.tsx, web/app/sean/trades/DeleteOrder.tsx, web/app/sean/trades/actions.ts, web/app/sean/trades/view.ts, web/app/sean/trades/view.test.ts, web/app/sean/trades/upload.ts, web/app/sean/trades/upload.test.ts, web/app/sean/trades/trades.module.css
+  - **Verified**: `npx tsc --noEmit` clean; vitest 509/510 (only the known-red `lib/sera/lab.test.ts` M0021-B70-RAW, red on main at c2d2891); `next build` green with `/sean`, `/sean/trades`, `/sean/plan`, `/api/sean/orders`; `next start` smoke: unsigned POST `/api/sean/orders` -> 404, `/sean` signed out -> 307 `/signin?next=%2Fsean`; Vercel `LLM_API_KEY` (sensitive), `LLM_VISION_BASE_URL`, `LLM_VISION_MODEL` added to production and preview, listed by `vercel env ls`.
+  - **Drift**: none - code matched the plan's quotes; plan code applied verbatim
+
+- [x] **P1-ROOT-8S6O** Phase 6: Engine: Gotrade fee schedule as a cost-model lever
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/sim/costs.py` (`GOTRADE` schedule of four dated `FeeRegime`s fitted to the receipts — current regime since 2026-06-16: trading 0.2% half-up, min $0.10; regulatory 0.054% rounded up, cap $0.11, sells +0.04% up; PPN 11% of the printed fees, half-down; `fee_parts(side, amount, on=None)`, `GOTRADE.current`, `gotrade_cash`, `gotrade_shares_for`); `TradeRules.cost_model: Literal['flat','gotrade'] = 'flat'` in `LEVERS_SINCE_PINS`, validated (`gotrade` needs the default `cost_rate`; never for `DESIGN_V0`); `rule_owner_inputs` does not flag it; `describe_rules` line; `sim/book.py` money functions dispatch on the model (every simulated fill at the current regime); lab SPY benchmark and `dev._run` pay the candidate's model; `engine/tests/fixtures/gotrade_fees.json` (fee-only rows); tests incl. `test_sim_costs.py` and `test_cost_model_pins.py` (every committed lab digest recomputes byte for byte). Adds no preset. Does not touch `DESIGN_V0`/bracket engine (`sim/model.py`, `sizing.py`, `lifecycle.py`), `paper/` (paper benchmark stays flat), web. Exit: ruff + full pytest green incl. `test_registry`, `test_lab_methods`, `test_paper_roster`, `test_cost_model_pins`; every current-regime receipt reproduced to the cent; a gotrade book run on $28 slots pays more than flat.
+  - **Status**: completed
+  - **Plan Set**: `SEAN_GOTRADE_TRACKER_PLAN.md` (phase 6 of 7)
+  - **Satisfies**: R5 — Real Gotrade costs feed method exploration and the Sera lab's profit-and-loss
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ROOT-8S6O.md`
+  - **Completed**: 2026-10-07 23:29
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/sim/costs.py, engine/src/seer_engine/sim/rules.py, engine/src/seer_engine/sim/book.py, engine/src/seer_engine/backtest/benchmark.py, engine/src/seer_engine/backtest/dev.py, engine/src/seer_engine/backtest/book_runner.py, engine/tests/fixtures/gotrade_fees.json, engine/tests/test_sim_costs.py, engine/tests/test_cost_model_pins.py, engine/tests/test_sim_rules.py, engine/tests/test_sim_book.py, engine/tests/test_benchmark.py, engine/tests/test_backtest_dev.py, engine/tests/test_backtest_dev_report.py
+  - **Verified**: `ruff check .` clean; full pytest with `PG_TEST_URL` 3330 passed, 1 skipped, 0 failed; `test_cost_model_pins` recomputes every committed lab trial digest byte for byte; all 23 current-regime receipts reproduced to the cent; a gotrade book on $28 slots pays $0.87 vs flat < $0.18.
+  - **Drift**: none - every quoted anchor matched exactly; code applied verbatim from the plan
+
+- [x] **P1-ROOT-5YLK** Phase 4: Engine: marks and the daily P&L series
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/sean/{__init__,ledger,marks,equity}.py`, `engine/src/seer_engine/commands/sean.py` (subcommand `marks`; `_HANDLERS = {"marks": _marks}` of `(conn, args) -> int`), tests `test_sean_{ledger,marks,command}.py` (ledger against Phase 1's `fixtures/ledger.json`, pro-rata oversell), `.github/workflows/sean.yml` (`workflow_dispatch`, optional `dry_run` input, no required input, group `sean-writer`, runs migrate + `sean marks`), one `Sean marks` step at the end of `nightly.yml` (`continue-on-error: true`). Does not touch `sim/`, `lab/`, `paper/`, web, migrations. Exit: ruff + full pytest green with nothing skipped; `python -m seer_engine sean marks` against an empty `sean_orders` exits 0 with no network call; both workflow files parse.
+  - **Status**: completed
+  - **Plan Set**: `SEAN_GOTRADE_TRACKER_PLAN.md` (phase 4 of 7)
+  - **Satisfies**: R2 — Sean tracks all of the owner's Gotrade trading activity and shows a profit-and-loss graph
+  - **Depends on**: P1-ROOT-AUY5
+  - **Unblocked**: 2026-10-07 - P1-ROOT-AUY5 (phase 1) completed; its `web/lib/sean` modules and migration 015 now exist on `feature/sean-gotrade-tracker`.
+  - **Plan**: `.workflows/plan/P1-ROOT-5YLK.md`
+  - **Completed**: 2026-10-07 23:29
+  - **Method**: /do
+  - **Verified**: `ruff check .` clean; Sean/cli/migrate pytest subset 67 passed; full pytest (PG_TEST_URL) 3330 passed, 1 skipped (`tests/test_lab_npolicy.py:319` "lab has moved past 110 dev trials", pre-existing, unrelated); `sean.yml` + `nightly.yml` parse as YAML
+  - **Files**: engine/src/seer_engine/sean/__init__.py, engine/src/seer_engine/sean/ledger.py, engine/src/seer_engine/sean/marks.py, engine/src/seer_engine/sean/equity.py, engine/src/seer_engine/commands/sean.py, engine/tests/test_sean_ledger.py, engine/tests/test_sean_marks.py, engine/tests/test_sean_command.py, .github/workflows/sean.yml, .github/workflows/nightly.yml
+  - **Decided**: Manual dry-run against production Neon skipped → migration 015 is not applied there yet (index follow-up: no phase migrates production); the empty-DB exit-0/no-network criterion is covered by test_cli_end_to_end_on_an_empty_database (rung 2: exit criteria)
+
+- [x] **P1-ROOT-AUY5** Phase 1: Sean core: schema, screenshot reader, ledger
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `db/migrations/015_sean.sql` (contract A verbatim + header comment); `web/lib/sean/` pure modules: `types.ts`, `money.ts` (receipt text → numbers, `roundHalfUp`/`cents`/`fixed`, WIB date+time → ISO `…+07:00`), `extractJson.ts` (verbatim port), `prompt.ts` (model transcribes printed strings; code converts), `vision.ts` (`visionConfigFromEnv`, `callVisionWithFetch`, `readOrderWithFetch`, `repairOrderWithFetch`, text-aware token floor `ceil(text chars / 3) + 150 per image` that fails closed, `VisionTokenFloorError`, `VisionTransportError`), `order.ts` (`toOrder(raw)`; checks total = amount ± fees within $0.01, amount ≈ price × shares within `$0.01 + shares × $0.005`, partial fills sum to shares; refuses every status but Filled), `readOrder.ts` (`readOrder(visionDeps(cfg), imageB64, budgetMs = 55_000)`, never throws for a model problem; one repair that re-sends the image, budget-gated; `isReaderDown(code)` splits 502 from 422; `READ_MESSAGES` plain words), `ledger.ts` (contract B: `LedgerOrder`, `Close`, `Holding`, `PnlPoint`, `orderSession`, `buildLedger`, `pnlSeries`, `pnlAt`), `unzip.ts` (`readZip`, `ZipError`, stored + deflate, CRC-checked, skips folders/`__MACOSX`/`.DS_Store`), `fixtures/ledger.json` (shared with Phase 4's pytest), `fixtures/receipts.json` (4 real receipts), seven colocated test files (92 tests), live smoke script `web/scripts/sean-vision-smoke.mjs` (not CI). Does not touch any page, route, component, Nav; engine; `web/package.json`. Exit: `tsc` clean; vitest green (all 4 fixture receipts convert; the ledger reproduces `fixtures/ledger.json` to the cent); `015_sean.sql` applies after 001–014 on a fresh schema and re-applies as a no-op (`engine/tests/test_migrate.py`); `next build` green; nothing outside `db/migrations/015_sean.sql`, `web/lib/sean/`, `web/scripts/sean-vision-smoke.mjs` changed.
+  - **Status**: completed
+  - **Plan Set**: `SEAN_GOTRADE_TRACKER_PLAN.md` (phase 1 of 7)
+  - **Satisfies**: R2 — Sean tracks all of the owner's Gotrade trading activity and shows a profit-and-loss graph; R3 — Upload Buy/Sell Order Summary screenshots; Sean parses them with glm-4.6v, the run-insights way
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ROOT-AUY5.md`
+  - **Completed**: 2026-10-07 23:21
+  - **Method**: /do
+  - **Files**: db/migrations/015_sean.sql, web/lib/sean/types.ts, web/lib/sean/money.ts, web/lib/sean/money.test.ts, web/lib/sean/extractJson.ts, web/lib/sean/extractJson.test.ts, web/lib/sean/prompt.ts, web/lib/sean/vision.ts, web/lib/sean/vision.test.ts, web/lib/sean/order.ts, web/lib/sean/order.test.ts, web/lib/sean/fixtures/receipts.json, web/lib/sean/readOrder.ts, web/lib/sean/readOrder.test.ts, web/lib/sean/ledger.ts, web/lib/sean/ledger.test.ts, web/lib/sean/fixtures/ledger.json, web/lib/sean/unzip.ts, web/lib/sean/unzip.test.ts, web/scripts/sean-vision-smoke.mjs
+  - **Verified**: `tsc --noEmit` clean; `vitest run lib/sean` 7 files, 92/92 passed; full vitest 472 passed, 1 failed (`lib/sera/lab.test.ts` 'publishes a verdict that agrees with the gate' - the known-red at base c2d2891 named in plan invariant 1, not caused by this phase); `next build` green; `engine/tests/test_migrate.py` 31 passed (015 applies after 001-014 and re-applies as a no-op).
+  - **Drift**: none - all 20 files written verbatim from the plan's code blocks; no existing file modified
+  - **Decided**: Step 3 task creation with phase 6 running concurrently in the same worktree -> phase 1 created all 7 tasks, phase 6 acked and skipped (tie-break: narrower blast radius, one writer)
+  - **Decided**: Optional live smoke script (costs vision tokens) -> not run; the plan measured 30/30 while planning and it is marked optional, not an exit criterion (rung 2)
+
 
 - [x] **P1-ROOT-T8MK** Phase 2: Run it, and record what it found
   - **Difficulty**: NORMAL

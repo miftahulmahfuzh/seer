@@ -54,3 +54,20 @@
   .date { font-size: 16px; }
   .title { font-size: 40px; letter-spacing: -0.035em; }
 }
+
+/* Mobile only, owner only: the way into Sean (the rail has it on desktop). Positioned so Phase 5
+   can pin its "you need to act" dot to it. */
+.sean { position: relative; }
+
+/* Sean has plan reminders waiting: the phone's twin of the rail's coral dot. */
+.seanDot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--coral);
+  box-shadow: 0 0 0 2px var(--bg);
+  pointer-events: none;
+}

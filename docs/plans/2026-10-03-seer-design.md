@@ -26,7 +26,8 @@ paper before real money (20,000,000 IDR) is risked.
 - **Whole shares only** for limit orders.
 - No time-based exit → time stop is a manual action Seer reminds about.
 - "Trade in all market hours" stays **off** (regular session only).
-- Unverified, **assumed** (user, 2026-10-03): unfilled limit orders expire end of day; fees + slippage = 0.1% per side.
+- Unverified, **assumed** (user, 2026-10-03): unfilled limit orders expire end of day.
+- Fees, **measured** 2026-10-07 from the owner's own order receipts (§15): a trading fee (0.2% of the order since 2026-06-16, at least $0.10), a small regulatory fee, and 11% VAT on both. The original assumption, preserved: *"fees + slippage = 0.1% per side"* — still what every lab trial up to M0030 and every paper strategy on the roster that day was measured with.
 
 ## 3. Architecture
 
@@ -415,3 +416,47 @@ re-run any time the question comes back. The two runs behind this section took h
 this number, and the owner should reread §12's last paragraph with it in hand — the number argues
 for leaving that decision where it is. Nothing on the paper roster moves on the strength of a
 diagnostic.
+```markdown
+
+## 15. Measured 2026-10-07: what Gotrade really charges
+
+§2 assumed 0.1% of every trade for fees and slippage together. The owner's own order receipts —
+30 Gotrade "Order Summary" screens from 2025-06-10 to 2026-10-07, now stored by Sean in
+`sean_orders` — show what an order actually pays. Every receipt itemises three fees, and every
+total reconciles to the cent (a buy pays the amount plus the fees; a sell receives the amount
+minus the fees):
+
+| Dates | Orders | Trading fee | Regulatory fee | PPN (VAT) |
+|---|---|---|---|---|
+| 2025-06-10 | 2 buys ($707, $1,429) | none | 0.3% of the amount ($2.13, $4.29) | none |
+| 2025-06-26 → 2026-03-25 | 5 buys ($105 – $1,833) | 0.3% of the amount | $0.06 – $0.11 | 11% of the two fees |
+| 2026-06-16 → 2026-10-07 | 22 buys, 1 sell ($27.90 – $1,673) | 0.2% of the amount, at least $0.10 | $0.02 on $27.90, $0.07 on a $72.51 sell, $0.11 on the two orders over $1,000 | 11% of the two fees |
+
+What that means at the sizes the owner trades:
+
+| Order | Fees paid | Share of the order | The old assumption |
+|---|---|---|---|
+| $27.90 buy (one slot of a 20-way book) | $0.13 | 0.47% | $0.03 (0.1%) |
+| $72.51 sell | $0.24 | 0.33% | $0.07 |
+| $1,673.14 buy | $3.84 | 0.23% | $1.67 |
+
+A round trip on a $28 slot costs about 0.9% instead of 0.2%. Small orders pay several times the
+assumption because of the $0.10 minimum and the near-flat regulatory fee.
+
+**What changed.**
+- `engine/src/seer_engine/sim/costs.py` holds the schedule, dated by regime, and the book engine
+  prices a trade with it when the rule set says `cost_model="gotrade"`. The SPY benchmark in the
+  same run pays the same fees. A backtest prices every trade at the regime in force today: the lab
+  asks what a method would cost to run now, not what it cost in 1998.
+- Lab methods from M0031 on are measured at these fees; `lab run` refuses a flat-cost variant.
+  `MONTHLY_HOLD_FRAC_GOTRADE` and `MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE` are the presets.
+- `python -m seer_engine sean calibrate` replays the schedule over every order Sean has stored and
+  exits 1 when an order since the current regime is off by more than a cent — the signal that
+  Gotrade changed its fees and the schedule needs a new dated regime.
+- `python -m seer_engine lab costs MNNNN` re-runs a recorded method at both costs and journals the
+  difference. It records no trial, so the lab's N does not move and no verdict changes.
+
+**What did not change.** Every lab trial up to M0030, every pre-registration and every paper
+strategy on the roster keeps the flat 0.1% it was measured and frozen under, so no recorded number
+and no pinned digest moves. The §5 bracket simulator keeps 0.1% too. Slippage is not modelled
+separately: fills still happen at the open or the limit, as before.

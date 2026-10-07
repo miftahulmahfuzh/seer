@@ -1,7 +1,7 @@
 # Package: seer-web
 
 **Location**: `web` (Next.js app router; package name `seer-web`, private)
-**Last Updated**: 2026-10-07 (P1-ROOT-AUY5, Sean phase 1: migration `015_sean.sql` and the pure, DB-free foundation of Sean, the owner's real Gotrade trade tracker, under `lib/sean/` — receipt parsing and checking, the glm-4.6v screenshot reader, the shared ledger, a dependency-free zip reader — plus the live smoke script `scripts/sean-vision-smoke.mjs`. No route or page uses them yet)
+**Last Updated**: 2026-10-07 (P1-ROOT-XA2W, Sean phase 5: the `/sean/plan` tab — follow one roster book method (`sean_link`), buy/sell/add/trim reminders against the plan's holdings (pure `lib/sean/reminders.ts`, server reads in `lib/sean/planData.ts`), hand-made done marks (`sean_reminder_marks`), the Plan tab badge and a coral reminder dot on Seer's Sean buttons (`Nav`, `AppHeader`). Earlier: P1-ROOT-8JIM, Sean phase 3: the `/sean` Overview — stats row, daily profit-and-loss line from `sean_equity` with a live point or an order-only fallback, holdings table, empty state — via `app/sean/overview.ts` and `lib/sean/overviewData.ts`. Earlier: P1-ROOT-AUY5, Sean phase 1: migration `015_sean.sql` and the pure, DB-free foundation of Sean, the owner's real Gotrade trade tracker, under `lib/sean/` — receipt parsing and checking, the glm-4.6v screenshot reader, the shared ledger, a dependency-free zip reader — plus the live smoke script `scripts/sean-vision-smoke.mjs`. No route or page uses them yet)
 
 ## Overview
 
@@ -18,8 +18,9 @@ the Journal's tabs count what is new instead of what exists.
 
 A third section, **Sean**, is being built (plan `sean-gotrade-tracker`, 7 phases): it tracks the
 owner's *real* Gotrade trades from "Order Summary" screenshots and shows real profit and loss.
-Phase 1 landed only its schema (`db/migrations/015_sean.sql`) and pure modules (`lib/sean/`); there
-is no Sean route, page or Neon read in the app yet. See [Sean (lib/sean, phase 1)](#sean-libsean-phase-1).
+Phase 1 landed its schema (`db/migrations/015_sean.sql`) and pure modules (`lib/sean/`); phase 2
+the owner-only section and Trades upload; phase 3 the Overview (`/sean`); phase 5 the Plan
+(`/sean/plan`: follow one roster method, buy/sell reminders). See [Sean](#sean-sean-libsean).
 
 **Key Responsibilities:**
 - Google sign-in locked to exactly one allowlisted account (`auth.ts`, `lib/allow.ts`)
@@ -129,6 +130,9 @@ web/
       unzip.ts              readZip (stored + deflate, CRC-checked), ZipError, inflateRawWeb, IMAGE_NAME, baseName, isJunkEntry, crc32
       fixtures/receipts.json  four real receipts transcribed by hand, raw + expected SeanOrder
       fixtures/ledger.json    shared ledger fixture (contract B), replayed by web and engine tests alike
+      overviewData.ts       phase 3, server only (Neon): equity() -> EquityRow[] (sean_equity, oldest first), marks() -> LatestMark[] (newest sean_marks close per symbol)
+      reminders.ts          phase 5, pure: buildReminders (sell/trim/buy/add vs the plan), planOrders, sharesBySymbol, outsideShares, resizes, RESIZING_RULES, MIN_TRADE_USD
+      planData.ts           phase 5, server only (Neon): linkableMethods, link, latestTargets, reminderMarks, latestCloses, planState, openReminderCount (React cache, 0 on any failure)
     *.test.ts               vitest suites for every pure module
   scripts/
     migrate.mjs             applies ../db/migrations/*.sql once each (schema_migrations)
@@ -364,7 +368,7 @@ function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null befo
 - `app/sera/ideas/view.ts` (pure): `methodsWithStatus(methods, status)` (numeric-aware id order; page uses `idea` and `blocked-data`), `needs(blockedOn)`, `sourceLabel`, `sourceLink` (http(s) only, else null), `urlParts` (safe flag, host, 72-char display), `readingList(ideasSeen)`: `url:` keys become links newest first, every other key is a concept (`concept:` prefix dropped) grouped by method id, untied last.
 - `app/sera/how/view.ts` (pure, takes a structurally narrowed `HowInput`): `stageCounts`, `pipelineStages` / `pipelineLabel` (Pipeline model), `windowsModel` (Windows model; `paperSince` = earliest `updated` of a `paper` method; `asOf` falls back to `gate.testStart` for an empty lab), `hurdles(gate, tries)` (the six `CONDITION_KEYS` in plain words), `honestyRules`, `dataFacts(data, gate)` (has / lacks), `BEARS` (2000-02, 2008-09) and `PAPER_MONTHS = 3` / `PAPER_TRADES = 100` (design section 1's paper bar; not in `snapshot.gate`).
 - `auth.ts`: `handlers, auth, signIn, signOut`, `currentUser()`.
-- `lib/sean/*`: see [Sean (lib/sean, phase 1)](#sean-libsean-phase-1).
+- `lib/sean/*`, `app/sean/overview.ts`: see [Sean](#sean-sean-libsean).
 - `app/(app)/actions.ts`: server action `dismiss(formData)` (auth check, validates `orderId`, revalidates `/`).
 
 ## Data Flow
@@ -379,6 +383,8 @@ reader reads /sera/journal -> JournalSeen (dwell on screen, or arrow click) -> P
 Sean (phase 1, no route yet): screenshot (or a .zip of them, unzip.readZip) -> readOrder (vision.ts glm-4.6v
   -> extractJson -> order.toOrder, one repair on "unreadable") -> SeanOrder -> [phase 2: sean_orders]
   sean_orders + sean_marks -> ledger.pnlSeries (web) == engine sean/ledger.py -> [phase 4: sean_equity]
+/sean (phase 3): data.ledgerOrders + overviewData.equity + overviewData.marks -> app/sean/overview.ts (pnlAt, buildLedger,
+  pnlSeries) -> OverviewBody (Stat row, LineChart, holdings table | empty state)
 journal_seen -> sera/seen.seenInsightIds -> journal/view.ts (unseen counts, unseen-then-seen order) -> the seven badges
              -> sera/seen.unseenCount(lab ids) -> app/sera/layout.tsx -> the SeraNav Journal badge (null = no badge)
 ```
@@ -546,8 +552,8 @@ roster method. Phase 1 is the schema and the pure modules only.
 - `extractJson.ts`: ported verbatim from run-insights; strips a ```json fence, takes first `{` to last `}`.
 
 **Section (phase 2, owner only).** `app/sean/layout.tsx` gives Sean its own rail (`SeanNav`:
-Overview, Trades, Plan; `planOpen` badge is 0 until phase 5). Overview (`/sean`) and Plan
-(`/sean/plan`) are placeholders pointing at Trades. `/sean/trades` lists every order (`orders()`,
+Overview, Trades, Plan; `planOpen` badge is 0 until phase 5). Plan (`/sean/plan`) is a
+placeholder pointing at Trades; Overview (`/sean`) is phase 3 (below). `/sean/trades` lists every order (`orders()`,
 newest first, `null` on a failed read so the page says so) with a per-row delete
 (`DeleteOrder` -> `deleteOrder` server action), and `Uploader` takes screenshots or a zip
 (unzipped in the browser by `lib/sean/unzip.ts`), re-encodes large or non-JPEG pictures to JPEG
@@ -570,6 +576,35 @@ above Sera) and `AppHeader` (phone only); `(app)/layout.tsx` shows both to the o
 - `lib/sean/dispatch.ts`: `dispatchSeanMarks()` POSTs a `workflow_dispatch` for `sean.yml` on
   `main` so marks and P&L catch up before the nightly. Best effort, never throws: no
   `GITHUB_DISPATCH_TOKEN`, a 404 (workflow not on main yet) or any error returns `false`.
+
+**Overview (phase 3, `/sean`).** `app/sean/page.tsx` (`force-dynamic`, `requireSean('/sean')`)
+reads `ledgerOrders()`, `equity()` and `marks()` in parallel and passes them, with today as a New
+York date (`orderSession(now)`), to `overview()`; `OverviewBody` renders the result with Sera's
+`Section`, `Stat`, `LineChart` and `Legend` (styles in `overview.module.css`).
+- `lib/sean/overviewData.ts` (server only, Neon): `equity()` -> `EquityRow[]` (`date`, `valueUsd`,
+  `costUsd`, `realizedUsd`, `unrealizedUsd`, `pnlUsd`, `feesUsd`; empty until the engine's
+  `sean marks` runs); `marks()` -> `LatestMark[]` (`DISTINCT ON (symbol)`, newest close). Both throw
+  on a failed read. `overview.ts` only `import type`s from it.
+- `app/sean/overview.ts` (pure, relative imports only): `overview({ orders, equity, marks, today })`
+  -> `{ empty: true }` with no orders, else `{ orderCount, firstDay, stats, chart, holdings, total,
+  closed }`. All money math is the shared ledger's (`pnlAt` for "now", `buildLedger` for open
+  positions, `pnlSeries` for the fallback line); this module only picks and words numbers.
+  - `stats(now, sorted)`: five tiles — total, realized, unrealized, fees paid, fees as a share of
+    money traded (sum of `amountUsd`) — each with a plain-words `sub` and `tip`; `toneOf` colours
+    only gains and losses.
+  - `holdings(sorted, marks)`: open positions priced at the latest close, else the owner's last
+    order price (`estimate: true`, tooltip says so), biggest value first, plus `total` and the
+    `closed` symbols sold out of.
+  - `pnlChart(...)`: `source: 'nightly'` draws `sean_equity` and, when an order is newer than its
+    last session, appends a `live` point for today; with no `sean_equity` rows it falls back to
+    `source: 'orders'` (the ledger on each trade date, at order prices). Two series (P&L solid,
+    cumulative fees dashed), a break-even ref line, `monthTicks` x-axis, a one-week `xDomain` for a
+    single-day series, dots up to 40 points.
+  - Formatters: `usdText`, `signedUsdText`, `pctText`, `signedPctText`, `sharesText`, `priceText`,
+    `usdTick`, `dayText`, `monthYearText`, `orderDay`, `round2` (true minus sign `−`).
+- `OverviewBody({ v })`: empty state is a "No trades yet" sheet with one icon-only link to
+  `/sean/trades` (`TRADES_HREF`); otherwise the P&L section (stats over the chart) and a holdings
+  table.
 
 ## Dependencies
 
@@ -607,7 +642,7 @@ window lacks two month starts.
 - `npx vite-node scripts/sean-vision-smoke.mjs -- <zip | folder | image ...> [--truth <json>] [--env .env.local] [--limit N]` (from `web/`): runs the real `readOrder` against real screenshots, prints prompt tokens vs the floor, tries and seconds per picture, and with `--truth` compares every field to a hand-checked transcription; exits 1 on any failure. Spends tokens; never in CI. Re-run it after any change to `prompt.ts`.
 - `npm run db:migrate`: apply new migrations in name order, one transaction each.
 - `npm run db:seed-demo [-- --dry-run]`: builds a 66-session demo (day 0 + paper start, at least three calendar months) ending at the last completed session, flagged `is_demo`. Roster: SPY (champion, buy and hold), A (bracket), F4-MOM12-N20-TREND and F1-SPY-SMA200-M (monthly book strategies, deciding on each month's first session), and C (bracket, its own younger clock, gate `applicable: false`). Needs migrations through 009 applied first (`npm run db:migrate`, then `npm run db:seed-demo`; it only runs on an empty database, never production). Writes strategies (with `engine`, `rules_id`, `paper_start`, `params.backtest_gate`), runs (with paper status), fx, bars, orders, equity snapshots, `paper_state`, `book_positions`, `book_targets` and `book_previews` (pending orders, targets and previews with demo `evidence`; A's CSCO has no explanation so its facts show), `book_trades`, and six `news_vetoes` rows for C's pending session. `--dry-run` builds every row and prints counts without connecting.
-- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`, `why`, `sera/*`), `components/roster`, `components/sera/charts`, `components/sera/diagrams/geometry`, `app/(app)/leaderboard/view`, the `app/sera/*/view` helpers, `app/sera/journal/seen-client` and `lib/sean/*` (receipts and ledger fixtures included; no network).
+- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`, `why`, `sera/*`), `components/roster`, `components/sera/charts`, `components/sera/diagrams/geometry`, `app/(app)/leaderboard/view`, the `app/sera/*/view` helpers, `app/sera/journal/seen-client`, `lib/sean/*` (receipts and ledger fixtures included; no network) and `app/sean/overview` / `OverviewBody`.
 
 ## Gotchas
 

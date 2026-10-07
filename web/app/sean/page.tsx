@@ -1,33 +1,29 @@
-import { ReceiptText } from 'lucide-react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { PageHeader } from '@/components/sera/PageHeader';
-import { Section } from '@/components/sera/Section';
+import { ledgerOrders } from '@/lib/sean/data';
 import { requireSean } from '@/lib/sean/gate';
+import { orderSession } from '@/lib/sean/ledger';
+import { equity, marks } from '@/lib/sean/overviewData';
+import { overview } from './overview';
+import { OverviewBody } from './OverviewBody';
 
 export const metadata: Metadata = { title: 'Overview' };
+export const dynamic = 'force-dynamic';
 
-// Placeholder until Phase 3 draws the profit-and-loss graph here.
-export default async function SeanOverviewPage() {
+export default async function SeanOverview() {
   await requireSean('/sean');
+  const [os, eq, mk] = await Promise.all([ledgerOrders(), equity(), marks()]);
+  // Today as a New York date: the date every order placed so far counts on (plan Decisions).
+  const v = overview({ orders: os, equity: eq, marks: mk, today: orderSession(new Date().toISOString()) });
+
   return (
     <>
       <PageHeader
-        eyebrow="Overview"
-        title="Your real money"
-        lede="Sean keeps every trade you make on Gotrade and will show how much you have made or lost, after every fee."
+        eyebrow="Sean · your real trades"
+        title="Overview"
+        lede="Every order you have made on Gotrade, added up: what you have made or lost after fees, and what you hold now."
       />
-      <Section
-        bg="butter"
-        eyebrow="Coming next"
-        title="Your profit and loss will be drawn here."
-        caption="Start by giving Sean your Order Summary screenshots on the Trades tab."
-        aside={
-          <Link href="/sean/trades" className="icon-btn" data-tip="Go to Trades" aria-label="Go to Trades">
-            <ReceiptText size={21} strokeWidth={1.5} />
-          </Link>
-        }
-      />
+      <OverviewBody v={v} />
     </>
   );
 }

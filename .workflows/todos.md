@@ -2,19 +2,19 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-07 23:30
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-07 23:55
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 12
+- Completed: 14
 
 ---
 
@@ -23,28 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-
-- [ ] **P1-ROOT-8JIM** Phase 3: Overview: P&L graph and holdings
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `web/app/sean/page.tsx` (replaces Phase 2's placeholder), `web/app/sean/overview.ts` + `overview.test.ts` (pure view model over Phase 1's ledger), `web/app/sean/OverviewBody.tsx` + `OverviewBody.test.tsx`, `web/app/sean/overview.module.css`, `web/lib/sean/overviewData.ts` (new: `equity()`, `marks()`); reads orders through Phase 2's `ledgerOrders()`. Content: stats row (total P&L, realized, unrealized, fees paid, fees as % of money traded); `LineChart` of daily `pnl_usd` from `sean_equity` (faint dashed cumulative fees, break-even line) plus a live point for today (New York date) when an order is newer than the last nightly session; when `sean_equity` is empty, `pnlSeries` over the orders' New York trade dates at last order prices with a caption that prices come nightly; holdings table (shares, average cost with buying fees, last price — italic when it is the order price — value, P&L `.pos/.neg`); empty state with an icon button to Trades. Does not touch `data.ts`, Trades, Plan, `Nav`, `AppHeader`, engine; shares no file with Phase 5. Exit: `tsc`, vitest (`overview.test.ts`, `OverviewBody.test.tsx`: zero, one, many orders; nightly series with and without a live point) and `next build` green; `/sean` no longer shows the placeholder.
-  - **Status**: open
-  - **Plan Set**: `SEAN_GOTRADE_TRACKER_PLAN.md` (phase 3 of 7)
-  - **Satisfies**: R2 — Sean tracks all of the owner's Gotrade trading activity and shows a profit-and-loss graph
-  - **Depends on**: P1-ROOT-AUY5, P1-ROOT-UNS5
-  - **Unblocked**: 2026-10-07 - P1-ROOT-UNS5 (phase 2) completed; `web/lib/sean/data.ts` (`ledgerOrders()`/`LedgerRow`), `gate.ts` and the `/sean` section now exist on `feature/sean-gotrade-tracker`.
-  - **Plan**: `.workflows/plan/P1-ROOT-8JIM.md`
-
-- [ ] **P1-ROOT-XA2W** Phase 5: Plan: link a roster method, buy/sell reminders
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `web/lib/sean/reminders.ts` + test (pure: plan orders = New York trade date on/after `since`; sells for plan holdings no longer picked, buys sized `weight × planSize`, add/trim only for resizing rule sets — incl. the two `-gotrade` presets — when the gap ≥ max($10, 1% of the plan); done = a matching order whose New York trade date is on/after the decision session, or a mark); `web/lib/sean/planData.ts` (new: `linkableMethods`, `link`, `latestTargets`, `reminderMarks`, `latestCloses`, `planState`, React-`cache`d `openReminderCount`); `web/app/sean/plan/{page, view(+test), actions (via isSeanCaller), LinkPicker, PlanSettings, plan.module.css}` (replaces the placeholder); `planOpen` into `SeanNav`; the coral dot + "· N to do" words on both Sean buttons — `Nav.tsx` (`seanOpen` prop via `(app)/layout.tsx`) and `AppHeader.tsx` (reads the cached count). Rules: only active, non-benchmark `engine='book'` roster rows are linkable; `since` defaults to the method's latest decision session; pre-plan holdings never get a sell reminder; plain sentences, no ids. Does not touch `data.ts`, Overview files, `overviewData.ts`, Trades upload, `cadence.ts`, engine. Exit: reminder and view tests green (fresh link, the real Oct 7 follow-through, month turnover, partial follow-through, an after-midnight-WIB order, resize band, pre-plan holdings untouched, marked done); `tsc`, full vitest, `next build` green.
-  - **Status**: open
-  - **Plan Set**: `SEAN_GOTRADE_TRACKER_PLAN.md` (phase 5 of 7)
-  - **Satisfies**: R4 — Connect Sean to one roster method (RAW today); Sean reminds the owner to buy / sell by it
-  - **Depends on**: P1-ROOT-AUY5, P1-ROOT-UNS5
-  - **Unblocked**: 2026-10-07 - P1-ROOT-UNS5 (phase 2) completed; `web/lib/sean/data.ts` (`ledgerOrders()`/`LedgerRow`), `gate.ts` and the `/sean` section now exist on `feature/sean-gotrade-tracker`.
-  - **Plan**: `.workflows/plan/P1-ROOT-XA2W.md`
 
 - [ ] **P1-ROOT-GB56** Phase 7: Lab: calibrate from real orders, measure methods at real cost
   - **Difficulty**: NORMAL
@@ -68,6 +46,34 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-XA2W** Phase 5: Plan: link a roster method, buy/sell reminders
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `web/lib/sean/reminders.ts` + test (pure: plan orders = New York trade date on/after `since`; sells for plan holdings no longer picked, buys sized `weight × planSize`, add/trim only for resizing rule sets — incl. the two `-gotrade` presets — when the gap ≥ max($10, 1% of the plan); done = a matching order whose New York trade date is on/after the decision session, or a mark); `web/lib/sean/planData.ts` (new: `linkableMethods`, `link`, `latestTargets`, `reminderMarks`, `latestCloses`, `planState`, React-`cache`d `openReminderCount`); `web/app/sean/plan/{page, view(+test), actions (via isSeanCaller), LinkPicker, PlanSettings, plan.module.css}` (replaces the placeholder); `planOpen` into `SeanNav`; the coral dot + "· N to do" words on both Sean buttons — `Nav.tsx` (`seanOpen` prop via `(app)/layout.tsx`) and `AppHeader.tsx` (reads the cached count). Rules: only active, non-benchmark `engine='book'` roster rows are linkable; `since` defaults to the method's latest decision session; pre-plan holdings never get a sell reminder; plain sentences, no ids. Does not touch `data.ts`, Overview files, `overviewData.ts`, Trades upload, `cadence.ts`, engine. Exit: reminder and view tests green (fresh link, the real Oct 7 follow-through, month turnover, partial follow-through, an after-midnight-WIB order, resize band, pre-plan holdings untouched, marked done); `tsc`, full vitest, `next build` green.
+  - **Status**: completed
+  - **Plan Set**: `SEAN_GOTRADE_TRACKER_PLAN.md` (phase 5 of 7)
+  - **Satisfies**: R4 — Connect Sean to one roster method (RAW today); Sean reminds the owner to buy / sell by it
+  - **Depends on**: P1-ROOT-AUY5, P1-ROOT-UNS5
+  - **Unblocked**: 2026-10-07 - P1-ROOT-UNS5 (phase 2) completed; `web/lib/sean/data.ts` (`ledgerOrders()`/`LedgerRow`), `gate.ts` and the `/sean` section now exist on `feature/sean-gotrade-tracker`.
+  - **Plan**: `.workflows/plan/P1-ROOT-XA2W.md`
+  - **Completed**: 2026-10-07 23:55
+  - **Method**: /do
+  - **Files**: web/lib/sean/reminders.ts, web/lib/sean/reminders.test.ts, web/lib/sean/planData.ts, web/app/sean/plan/page.tsx, web/app/sean/plan/view.ts, web/app/sean/plan/view.test.ts, web/app/sean/plan/actions.ts, web/app/sean/plan/LinkPicker.tsx, web/app/sean/plan/PlanSettings.tsx, web/app/sean/plan/plan.module.css, web/app/sean/layout.tsx, web/components/Nav.tsx, web/components/Nav.module.css, web/components/AppHeader.tsx, web/components/AppHeader.module.css, web/app/(app)/layout.tsx
+
+- [x] **P1-ROOT-8JIM** Phase 3: Overview: P&L graph and holdings
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `web/app/sean/page.tsx` (replaces Phase 2's placeholder), `web/app/sean/overview.ts` + `overview.test.ts` (pure view model over Phase 1's ledger), `web/app/sean/OverviewBody.tsx` + `OverviewBody.test.tsx`, `web/app/sean/overview.module.css`, `web/lib/sean/overviewData.ts` (new: `equity()`, `marks()`); reads orders through Phase 2's `ledgerOrders()`. Content: stats row (total P&L, realized, unrealized, fees paid, fees as % of money traded); `LineChart` of daily `pnl_usd` from `sean_equity` (faint dashed cumulative fees, break-even line) plus a live point for today (New York date) when an order is newer than the last nightly session; when `sean_equity` is empty, `pnlSeries` over the orders' New York trade dates at last order prices with a caption that prices come nightly; holdings table (shares, average cost with buying fees, last price — italic when it is the order price — value, P&L `.pos/.neg`); empty state with an icon button to Trades. Does not touch `data.ts`, Trades, Plan, `Nav`, `AppHeader`, engine; shares no file with Phase 5. Exit: `tsc`, vitest (`overview.test.ts`, `OverviewBody.test.tsx`: zero, one, many orders; nightly series with and without a live point) and `next build` green; `/sean` no longer shows the placeholder.
+  - **Status**: completed
+  - **Plan Set**: `SEAN_GOTRADE_TRACKER_PLAN.md` (phase 3 of 7)
+  - **Satisfies**: R2 — Sean tracks all of the owner's Gotrade trading activity and shows a profit-and-loss graph
+  - **Depends on**: P1-ROOT-AUY5, P1-ROOT-UNS5
+  - **Unblocked**: 2026-10-07 - P1-ROOT-UNS5 (phase 2) completed; `web/lib/sean/data.ts` (`ledgerOrders()`/`LedgerRow`), `gate.ts` and the `/sean` section now exist on `feature/sean-gotrade-tracker`.
+  - **Plan**: `.workflows/plan/P1-ROOT-8JIM.md`
+  - **Completed**: 2026-10-07 23:45
+  - **Method**: /do
+  - **Files**: web/lib/sean/overviewData.ts, web/app/sean/overview.ts, web/app/sean/overview.test.ts, web/app/sean/OverviewBody.tsx, web/app/sean/OverviewBody.test.tsx, web/app/sean/overview.module.css, web/app/sean/page.tsx
 
 - [x] **P1-ROOT-UNS5** Phase 2: Sean section, Sean buttons (rail + phone header), Trades upload
   - **Difficulty**: HARD

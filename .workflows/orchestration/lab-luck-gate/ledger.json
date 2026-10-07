@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "35d89597cb735b966df40c76da9ba2f3447fd24c",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": null,
+      "note": "verified: 4 files, all phase-1-owned (npolicy.py + test + adopted plan + package_readme); dev.py/research.py byte-identical to base a95126a at the commit; lab.sqlite md5 unchanged bd038a70. COORDINATOR DECISION: pytest-xdist absent from engine/.venv while pyproject addopts='-ra -n auto' -> every phase overrides with -o addopts='-ra' rather than pip-installing into a venv 4 sessions share (rung 6, surrounding convention). Broadcast to p2/p6/p8.",
       "package": "engine/lab",
       "plan": ".workflows/plan/lab-luck-gate/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-07T04:00:53+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-FNKE",
       "title": "The N policy and the effective-N estimator"
     },
     {
@@ -178,6 +178,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-luck-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-luck-gate",
-  "updated": "2026-10-07T03:41:48+00:00",
+  "updated": "2026-10-07T04:00:53+00:00",
+  "verified_at": "2026-10-07T03:59:26+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-luck-gate"
 }

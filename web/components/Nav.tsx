@@ -15,10 +15,13 @@ const TABS = [
 /**
  * Floating pill tab bar on mobile, vertical rail on desktop. Icon-only.
  * `showSean` and `showSera` add the ways into Sean (the owner's real trades) and Sera (the method
- * lab) to the foot of the desktop rail, Sean above Sera.
+ * lab) to the foot of the desktop rail, Sean above Sera; `seanOpen` (Sean's open plan reminders)
+ * puts a coral dot on the Sean button.
  */
-export function Nav({ showSera = false, showSean = false }: { showSera?: boolean; showSean?: boolean }) {
+export function Nav({ showSera = false, showSean = false, seanOpen = 0 }: { showSera?: boolean; showSean?: boolean; seanOpen?: number }) {
   const path = usePathname();
+  const open = Number.isFinite(seanOpen) && seanOpen > 0 ? Math.floor(seanOpen) : 0;
+  const seanTip = open > 0 ? `Sean, your real trades · ${open} to do` : 'Sean, your real trades';
   return (
     <>
       <aside className={`${s.rail} desk-only`}>
@@ -27,8 +30,9 @@ export function Nav({ showSera = false, showSean = false }: { showSera?: boolean
         {(showSean || showSera) && (
           <div className={s.foot}>
             {showSean && (
-              <Link href="/sean" className={`icon-btn ${s.sean}`} data-tip="Sean, your real trades" aria-label="Sean, your real trades">
+              <Link href="/sean" className={`icon-btn ${s.sean}`} data-tip={seanTip} aria-label={seanTip}>
                 <Wallet size={21} strokeWidth={1.5} />
+                {open > 0 && <span className={s.seanDot} aria-hidden="true" />}
               </Link>
             )}
             {showSera && (

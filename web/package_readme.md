@@ -358,7 +358,7 @@ function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null befo
 - `lib/sera/glossary.ts` (pure): `GLOSSARY` / `GLOSSARY_ORDER` plain-language definitions, `CONDITION_TERM`, `STATUS_LABEL` (label, meaning, tone), `INSIGHT_KIND_LABEL`, `SOURCE_KIND_LABEL`.
 - `lib/sera/markdown.ts` (pure): `escapeHtml`, `renderInline`, `renderMarkdown`. Escapes all source first, then adds only headings (`#`..`###` -> h3..h5), paragraphs, bold/italic/code, lists, pipe tables and http(s) links; raw HTML always renders as text.
 - `lib/sera/fixture.ts`: test builders `GATE`, `trial(over)`, `method(over)`; not for runtime code.
-- `components/Nav.tsx`: `Nav({ showSera })`; the `(app)` layout passes `isSeraUser(user.email)`, which adds a `Telescope` link to `/sera` at the foot of the desktop rail only (no mobile entry).
+- `components/Nav.tsx`: `Nav({ showSera, showSean, seanOpen })`; the `(app)` layout passes `isSeraUser(user.email)` for both flags, which adds Sean (`Wallet`, above) and Sera (`Telescope`) links at the foot of the desktop rail only (no mobile entry; the phone's Sean way in is `AppHeader`). `seanOpen` (the layout's `openReminderCount()`, owner only) puts a coral dot (`.seanDot`, `aria-hidden`) on the Sean button and adds "· N to do" to its tooltip; non-finite or non-positive values show no dot.
 - `components/tooltip.ts`: short tips stay one-line pills; long tips wrap in a box (max 340px); a `\n` in the text forces a line break (`pre-line`).
 - `components/sera/charts/`: server-renderable inline-SVG charts, no chart library. `LineChart` (series of `[x, y|null, tip?]` points, numeric or date x, reference lines), `ScatterChart` (points plus shaded regions), `BarChart` (groups; `barGroups` lifts a flat list), `Legend` (`line|dash|dot|ring|zone` shapes). Point and bar tooltips use the shared `data-tip` layer. `scale.ts` is pure and unit-tested.
 - `components/sera/diagrams/`: server-rendered inline SVG on a fixed 1240-wide viewBox, no library. `Pipeline({ stages, failLabel, label })` lays `PipelineStage` boxes out by `weight` (SVG text does not wrap, so titles/details arrive pre-broken into short lines; `fails` stages draw a dashed arrow into the journal lane; `final` gets the accent fill). `Windows({ start, devEnd, testStart, today, testNote, paperSince, bears, label })` draws the dev and test bands, the paper strip and `Era` shading over a year axis. `label` is the accessible summary of each diagram. Geometry is pure in `geometry.ts`.
@@ -385,6 +385,10 @@ Sean (phase 1, no route yet): screenshot (or a .zip of them, unzip.readZip) -> r
   sean_orders + sean_marks -> ledger.pnlSeries (web) == engine sean/ledger.py -> [phase 4: sean_equity]
 /sean (phase 3): data.ledgerOrders + overviewData.equity + overviewData.marks -> app/sean/overview.ts (pnlAt, buildLedger,
   pnlSeries) -> OverviewBody (Stat row, LineChart, holdings table | empty state)
+/sean/plan (phase 5): sean_link + book_targets (newest session) + data.ledgerOrders (split at `since`) + sean_marks
+  + sean_reminder_marks -> planData.planState -> reminders.buildReminders -> plan page (to do / done, holdings)
+  owner taps link / settings / done / undo -> plan/actions.ts -> sean_link | sean_reminder_marks -> revalidatePath('/sean', 'layout')
+  planData.openReminderCount -> SeanNav Plan badge, Nav rail dot, AppHeader phone dot
 journal_seen -> sera/seen.seenInsightIds -> journal/view.ts (unseen counts, unseen-then-seen order) -> the seven badges
              -> sera/seen.unseenCount(lab ids) -> app/sera/layout.tsx -> the SeraNav Journal badge (null = no badge)
 ```
@@ -552,8 +556,8 @@ roster method. Phase 1 is the schema and the pure modules only.
 - `extractJson.ts`: ported verbatim from run-insights; strips a ```json fence, takes first `{` to last `}`.
 
 **Section (phase 2, owner only).** `app/sean/layout.tsx` gives Sean its own rail (`SeanNav`:
-Overview, Trades, Plan; `planOpen` badge is 0 until phase 5). Plan (`/sean/plan`) is a
-placeholder pointing at Trades; Overview (`/sean`) is phase 3 (below). `/sean/trades` lists every order (`orders()`,
+Overview, Trades, Plan; the Plan tab's `planOpen` badge is `openReminderCount()`, phase 5).
+Overview (`/sean`) is phase 3 and Plan (`/sean/plan`) phase 5 (both below). `/sean/trades` lists every order (`orders()`,
 newest first, `null` on a failed read so the page says so) with a per-row delete
 (`DeleteOrder` -> `deleteOrder` server action), and `Uploader` takes screenshots or a zip
 (unzipped in the browser by `lib/sean/unzip.ts`), re-encodes large or non-JPEG pictures to JPEG
@@ -606,6 +610,48 @@ York date (`orderSession(now)`), to `overview()`; `OverviewBody` renders the res
   `/sean/trades` (`TRADES_HREF`); otherwise the P&L section (stats over the chart) and a holdings
   table.
 
+**Plan (phase 5, `/sean/plan`).** Sean can follow one roster method and remind the owner what to
+buy and sell to copy it. `app/sean/plan/page.tsx` (`force-dynamic`, `requireSean`) loads
+`planState()` and `linkableMethods()` in parallel; with nothing followed it shows `LinkPicker`,
+otherwise the method, its newest picks (`picksLine`), the to-do reminders (each with an icon-only
+"done" button), the done ones (with undo when the owner marked them), the plan's holdings, stocks
+held from outside the plan, `PlanSettings` and an unlink button.
+- `lib/sean/reminders.ts` (pure, relative imports only): `buildReminders(input: ReminderInput) ->
+  ReminderPlan` (`planValue`, `planSize`, `holdings`, `reminders`, `open`, `done`). The plan is the
+  orders whose New York trade date (`orderSession`) is on or after `sean_link.since`
+  (`planOrders`), run through the one ledger (`sharesBySymbol`); everything bought before is
+  `outsideShares` and is never sold by Sean. Rules: **sell** the whole plan position of a stock the
+  picks no longer name; **buy** a pick the plan does not hold, `weight × planSize` dollars (no amount
+  without a plan size); **add / trim** only when `resizes(rulesId)` (the `RESIZING_RULES` mirror of
+  the engine's `resize=True` presets), measured at the pick's decision price, and only when the gap
+  is at least `max(MIN_TRADE_USD` ($10), `RESIZE_BAND × planSize)`; no picks at all -> no reminders.
+  Order: sells, trims, buys, adds. A reminder is **done** (`'order'`) when an uploaded order of the
+  same side and stock has a NY trade date on or after the decision session, or (`'mark'`) when the
+  owner marked it for that decision. `planSize` = `budgetUsd` when set, else the plan's current value.
+  Keys are `${sessionDate}:${symbol}:${side}`.
+- `lib/sean/planData.ts` (server only, Neon; untested by design, the logic is in `reminders.ts`):
+  `linkableMethods()` (active, `engine = 'book'`, not benchmark, with `lastPick`), `link()`
+  (`sean_link` joined to `strategies`; `retired` when the method left the roster),
+  `latestTargets(id)` (`book_targets` at its newest session, `pending` from `paper_state`),
+  `reminderMarks`, `latestCloses(symbols)` (newest `sean_marks` close; named apart from phase 3's
+  `marks()`), `planState()` (null when nothing is followed; a retired method yields no picks), and
+  `openReminderCount` — React-`cache`d so `(app)/layout.tsx`, `AppHeader` and `app/sean/layout.tsx`
+  share one `planState()` per request, returning 0 when nothing is followed **or anything throws**.
+- `app/sean/plan/actions.ts` (server actions, each gated by `isSeanCaller()`): `linkMethod(prev,
+  formData)` with `op = 'link'` (upserts the singleton, re-checking the method is an active
+  non-benchmark book method) or `'edit'` (since and budget only), returning a `FormState`;
+  `unlinkMethod()` (done marks are kept, keyed by method and decision); `markDone` / `undoDone`
+  (insert / delete a `sean_reminder_marks` row for the followed method). All revalidate
+  `/sean` as a layout so the badge refreshes.
+- `app/sean/plan/view.ts` (pure, tested): `FormState` messages (`IDLE`, `SAVED`, `BAD_DATE`, ...),
+  input guards `parseSince`, `parseBudget` (empty -> null, cap `MAX_BUDGET`), `parseSymbol`,
+  `parseSide`, and the plain-words strings (`reminderTitle`, `reminderDetail`, `doneLine`,
+  `picksLine`, `nextPickWords` via `cadenceOf(rulesId)`, `methodTitle`, `aboutUsd`, `todoLabel`, ...).
+- `LinkPicker` / `PlanSettings` (client, `useActionState(linkMethod)`): the picker's start date
+  defaults to the method's newest pick, so orders placed to follow it count.
+- The way the owner notices: `Nav` (desktop rail) and `AppHeader` (phone) put a coral dot on their
+  Sean button when `openReminderCount() > 0`; both read it only for the owner.
+
 ## Dependencies
 
 - `next` 16, `react` / `react-dom` 19: app router, server components, server actions.
@@ -642,7 +688,7 @@ window lacks two month starts.
 - `npx vite-node scripts/sean-vision-smoke.mjs -- <zip | folder | image ...> [--truth <json>] [--env .env.local] [--limit N]` (from `web/`): runs the real `readOrder` against real screenshots, prints prompt tokens vs the floor, tries and seconds per picture, and with `--truth` compares every field to a hand-checked transcription; exits 1 on any failure. Spends tokens; never in CI. Re-run it after any change to `prompt.ts`.
 - `npm run db:migrate`: apply new migrations in name order, one transaction each.
 - `npm run db:seed-demo [-- --dry-run]`: builds a 66-session demo (day 0 + paper start, at least three calendar months) ending at the last completed session, flagged `is_demo`. Roster: SPY (champion, buy and hold), A (bracket), F4-MOM12-N20-TREND and F1-SPY-SMA200-M (monthly book strategies, deciding on each month's first session), and C (bracket, its own younger clock, gate `applicable: false`). Needs migrations through 009 applied first (`npm run db:migrate`, then `npm run db:seed-demo`; it only runs on an empty database, never production). Writes strategies (with `engine`, `rules_id`, `paper_start`, `params.backtest_gate`), runs (with paper status), fx, bars, orders, equity snapshots, `paper_state`, `book_positions`, `book_targets` and `book_previews` (pending orders, targets and previews with demo `evidence`; A's CSCO has no explanation so its facts show), `book_trades`, and six `news_vetoes` rows for C's pending session. `--dry-run` builds every row and prints counts without connecting.
-- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`, `why`, `sera/*`), `components/roster`, `components/sera/charts`, `components/sera/diagrams/geometry`, `app/(app)/leaderboard/view`, the `app/sera/*/view` helpers, `app/sera/journal/seen-client`, `lib/sean/*` (receipts and ledger fixtures included; no network) and `app/sean/overview` / `OverviewBody`.
+- `npm test`: vitest over the pure modules (`strategy`, `metrics`, `vetoes`, `monthly`, `slots`, `session`, `format`, `allow`, `why`, `sera/*`), `components/roster`, `components/sera/charts`, `components/sera/diagrams/geometry`, `app/(app)/leaderboard/view`, the `app/sera/*/view` helpers, `app/sera/journal/seen-client`, `lib/sean/*` (receipts and ledger fixtures included; no network) and `app/sean/overview` / `OverviewBody`, `app/sean/plan/view` (`lib/sean/reminders` is among `lib/sean/*`).
 
 ## Gotchas
 
@@ -677,6 +723,8 @@ window lacks two month starts.
 - Sean's realized profit is not Gotrade's "Net Profit": Gotrade leaves buy fees out of its basis. Keep both; never reconcile one to the other.
 - Sean never stores a screenshot. `image_sha256` and the `(symbol, side, executed_at, shares)` key are the only dedupe.
 - `lib/sean/vision.ts` and `readOrder.ts` take their config and `fetch` as arguments and never read a server env module, so they stay importable from vitest and the smoke script; keep the server-only part in the (phase 2) route.
+- `RESIZING_RULES` in `lib/sean/reminders.ts` is a hand mirror of the engine presets with `resize=True` (`engine/src/seer_engine/sim/rules.py`), like `SPLIT_CADENCE_RULES`; a resizing preset missing there silently gets no add/trim reminders. Its size band is `lib/cadence.ts`'s `RESIZE_BAND`.
+- `openReminderCount()` runs inside `(app)/layout.tsx`, which wraps every Seer page: it must never throw (it returns 0), and it relies on React `cache` so the layout and `AppHeader` do not each run `planState()`. A reminder only clears from an uploaded order dated on or after the decision session, so an order placed earlier needs a hand "done" mark.
 - The paper bar (3 months, 100 trades) on How it works is a constant in `app/sera/how/view.ts`, not snapshot data; change it there if design section 1 changes.
 
 ## Notes

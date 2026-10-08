@@ -2,7 +2,7 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-07 23:39
+**Last Updated**: 2026-10-08 10:49
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 15
+- Completed: 16
 
 ---
 
@@ -23,6 +23,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+
 
 ### [P2] Medium
 
@@ -35,6 +36,28 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-B4DL** Phase 11: One daily line: stepped, published, green, paused
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns a new `.github/workflows/watch.yml` and a new `docs/runbooks/monitoring.md`. Does not touch `nightly.yml` (phase 12 owns its comment; this phase only `sed`s the `PAPER_PAUSED` value out of it), `engine-ci.yml` (phase 1), `docs/runbooks/paper-trading.md` (phase 12), or any engine/web/db source. Exit: one line a day reaches the owner carrying four facts — session stepped y/n, picks published y/n, CI green y/n, paper paused y/n — living outside `nightly.yml` because a step inside the nightly structurally cannot report "the nightly did not run". Times in WIB beside UTC. It must not call a permanently-queued orphan run "running" (handover §6c). Its words for the two states phase 9 also renders are `none due` and `PAUSED` (D17).
+  - **Status**: completed
+  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 11 of 12)
+  - **Satisfies**: R8 — One daily line: session stepped y/n, picks published y/n, CI green y/n, paper paused y/n
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ROOT-B4DL.md`
+  - **Completed**: 2026-10-08 10:49
+  - **Method**: /do
+  - **Files**: `.github/workflows/watch.yml`, `docs/runbooks/monitoring.md`, `.workflows/todos.md`, `.workflows/plan/P1-ROOT-B4DL.md`
+  - **Drift**:
+    - No code drift: both files are new, and every fact the plan quoted was re-verified on disk — `PAPER_PAUSED: 'true'` at `nightly.yml:70`, crons `17 6 * * 2-6` / `41 9 * * 2-6` / `41 12 * * 2-6`, `timeout-minutes: 45` at `nightly.yml:40`, and `sean.yml:8-10`'s one-pending-run-per-group rule.
+    - Plan-internal contradiction, resolved: exit criterion 7 requires `grep -c 'status == "completed"' watch.yml` to return 1, but the plan's own Step 1 code block contains that literal string twice — once in the jq query, once in the comment quoting it. Reworded that comment to "The status filter in the --jq below is the orphan guard: ...", preserving the explanation. The grep now returns 1 and the sole remaining occurrence is the query itself.
+    - The live-Neon manual check (plan Verification, manual check 1) could not run locally: `DATABASE_URL_UNPOOLED` exists as a repository secret (confirmed via `gh secret list`, set 2026-10-03) but GitHub never discloses secret values and no local .env carries it. Compensated by driving every branch with `psql`/`gh`/`date` stubbed — the same method the planner used.
+    - Engine suite showed 1 failed / 3370 passed / 1 skipped: `test_sim_rules.py::test_unknown_literal_values[engine-bracket]`. NOT this phase's — `sim/rules.py` and `test_sim_rules.py` are phase 4's Owns and that peer session wrote both during the 5m37s run, so pytest collected the old parametrize against the new rules.py. Re-running the file afterwards gave 52 passed. Phase 11 adds zero Python and zero TypeScript.
+  - **Decided**:
+    - Step 3 says create todos entries for all 12 phases → created phase 11's only (tie-break: narrower blast radius; 12 concurrent sessions in one worktree would each write 12 entries into todos.md files they do not own).
+    - Plan's manual check 2 flips `PAPER_PAUSED` in the real `nightly.yml` and restores it → ran the non-paused cases against a scratch copy in a temp dir instead (invariant 2: `PAPER_PAUSED` stays `'true'`; plus tie-break: take the reversible option — a peer committing mid-flip would land the flip). Real `nightly.yml` verified byte-for-byte unchanged by `git diff --exit-code`.
+    - Exit criterion 7's grep count (rung 2, exit criteria) vs the plan's code-block comment (rung 3) → rung 2 wins; comment reworded so the literal string appears only in the one query.
 
 - [x] **P1-ROOT-GB56** Phase 7: Lab: calibrate from real orders, measure methods at real cost
   - **Difficulty**: NORMAL

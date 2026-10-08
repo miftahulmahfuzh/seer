@@ -2,7 +2,7 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-10-07
+**Last Updated**: 2026-10-08
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 17
+- Completed: 18
 
 ---
 
@@ -35,6 +35,26 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-4TQ7** Phase 9: The blank panel says which of five things it means
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns `web/lib/decision.ts` (new classifier, pure and tested) and `web/lib/decision.test.ts`; `web/lib/session.ts` and `session.test.ts`; `web/app/(app)/positions/page.tsx`; `web/app/(app)/page.tsx`; the two CSS modules. Exit: the five states are distinguished in plain words — (a) holding, nothing was due, (b) expired at the New York close, (c) never produced, (d) failed, and (e) paper is paused. The next decision's time is stated in WIB, derived from nightly.yml's cron slots. Nothing rendered is mistakable for a live instruction. A RETIRED strategy's pending decision never renders as live (D16/D9.6).
+  - **Status**: done
+  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 9 of 12)
+  - **Satisfies**: R5 — the blank pending-picks panel must say which of its five causes it is, and never read as a live instruction
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-WEB-4TQ7.md`
+  - **Completed**: 2026-10-08 10:44
+  - **Method**: /do
+  - **Files**: web/lib/session.ts, web/lib/session.test.ts, web/lib/decision.ts, web/lib/decision.test.ts, web/app/(app)/positions/page.tsx, web/app/(app)/positions/positions.module.css, web/app/(app)/page.tsx, web/app/(app)/today.module.css, web/.workflows/todos.md, web/.workflows/plan/P1-WEB-4TQ7.md
+  - **Drift**:
+    - No drift. Every line, anchor and lucide/CSS-variable the phase-9 plan quotes matched the tree exactly: session.ts:15 addDays, session.test.ts:17-19, positions/page.tsx:1-16/25-147/noOrders ending :182, page.tsx:1-19/31-154, positions.module.css .warnText + the .warn desktop line, today.module.css .alarmSub + the .alarm desktop line.
+  - **Decided**:
+    - Step 3 says mint a task for all 12 phases, but 6 wave-1 swarm sessions share this worktree and would race on web/.workflows/todos.md -> minted only phase 9's task (P1-WEB-4TQ7); each peer mints its own (tie-break rung: narrower blast radius).
+    - npx tsc --noEmit reports 3 errors, all in web/app/sera/* (methods/view.test.ts:20, overview.test.ts:41 and :88) -> not chased. Phase 2 has half-landed its `luckGated: boolean` (now required) in web/lib/sera/types.ts without yet updating those fixtures, and all three files are in phase 2's own Owns list. Phase 9's eight files produce zero tsc errors (rung: the phase plan's 'Leaves alone (owned by others)' section, plus the rule that widening scope to settle an ambiguity is drift, not a decision).
+    - The plan index `GOTRADE_FEE_REBUILD_PLAN.md` was deliberately NOT ticked: this is a coordinated swarm (`swarm.py find` -> coordinator `orch-gotrade-fee-rebuild`), 11 peers share the worktree, and the set-level Status/TaskID columns are the coordinator's ledger to write. Editing it here would both race the peers and commit a file outside this phase's allowlist (rung: narrower blast radius).
+  - **Verified**: `cd web && npx vitest run` -> 47 files, 606 tests, 0 failed (lib/decision.test.ts 20, lib/session.test.ts 12 green). Exit criterion 6: `git diff --stat -- .github/workflows/nightly.yml` empty, `PAPER_PAUSED: 'true'` intact at :70. Exit criterion 7 (D9.6): positions/page.tsx:49 passes `strat?.status === 'retired'` as panelState's 4th argument.
 
 - [x] **P1-WEB-K3QM** Phase 1: Seen-state storage, server read/write, and the POST endpoint
   - **Difficulty**: NORMAL

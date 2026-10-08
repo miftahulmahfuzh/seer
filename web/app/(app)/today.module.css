@@ -25,6 +25,29 @@
 .alarmTitle { font-size: 46px; line-height: 1; letter-spacing: -0.04em; text-wrap: pretty; }
 .alarmSub { font-size: 16px; line-height: 1.45; opacity: 0.8; }
 
+/* ---- Waiting: the routine daily expiry (handover Q5) ---- */
+/* Not an alarm, and deliberately not the full-bleed `.alarm` sheet: the last session closed and the
+   next run is not due yet. Stone, a clock, and the time the next picks arrive -- in WIB, because the
+   schedule is UTC and the owner is not. */
+.waiting { gap: 10px; padding: 30px 24px 150px; min-height: 420px; }
+.waitingHead { display: flex; align-items: center; gap: 12px; }
+.waitingIcon {
+  flex: none; width: 52px; height: 52px; border-radius: 999px; border: 1.5px solid var(--outline);
+  display: flex; align-items: center; justify-content: center; color: var(--ink-2);
+}
+.waitingTitle { font-size: 40px; line-height: 1; letter-spacing: -0.04em; text-wrap: pretty; }
+.waitingSub { max-width: 42ch; font-size: 16px; line-height: 1.45; color: var(--ink-2); text-wrap: pretty; }
+
+/* ---- Paper paused (nightly.yml's PAPER_PAUSED) ---- */
+.paused { flex-direction: row; align-items: flex-start; gap: 14px; padding: 22px 22px 62px 24px; }
+.pausedIcon {
+  flex: none; width: 40px; height: 40px; border-radius: 999px; border: 1.5px solid var(--outline);
+  display: flex; align-items: center; justify-content: center;
+}
+.pausedText { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pausedTitle { font-size: 21px; line-height: 1.25; letter-spacing: -0.01em; }
+.pausedSub { font-size: 15px; line-height: 1.45; color: var(--ink-2); text-wrap: pretty; }
+
 /* ---- No setups ---- */
 .none {
   gap: 4px; padding: 32px 24px 150px; min-height: 480px;
@@ -88,6 +111,9 @@
 /* ---- Desktop ---- */
 @media (min-width: 1024px) {
   .alarm { border-radius: 40px; flex: none; }
+  .waiting { border-radius: 40px; min-height: 0; padding: 32px 32px 36px; }
+  .waitingTitle { font-size: 44px; }
+  .paused { margin-top: 12px; border-radius: 40px; padding: 20px 30px; }
   /* No nav to clear and no stack to fill: the sheet is only as tall as what it says. */
   .none { border-radius: 40px; min-height: 0; padding: 36px 32px 40px; }
 

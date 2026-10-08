@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isStale, nextUsSession, wibDate } from './session';
+import { addDays, isStale, nextUsSession, wibDate, wibTime } from './session';
 
 // Instants are given in UTC. In October, ET = UTC-4 and WIB = UTC+7.
 describe('nextUsSession', () => {
@@ -14,7 +14,9 @@ describe('nextUsSession', () => {
     expect(nextUsSession(new Date('2026-10-10T15:00:00Z'))).toBe('2026-10-12'); // Sat
     expect(nextUsSession(new Date('2026-10-11T15:00:00Z'))).toBe('2026-10-12'); // Sun
   });
-  it('handles the 06:00 WIB nightly run (19:00 ET previous day)', () => {
+  // 23:00 UTC was the old nightly slot; the real one is 06:17 UTC (13:17 WIB). Either way an
+  // instant after the US close targets the next session.
+  it('rolls to the next session for an instant after the close', () => {
     expect(nextUsSession(new Date('2026-10-06T23:00:00Z'))).toBe('2026-10-07'); // Tue 19:00 ET
   });
 });
@@ -38,5 +40,25 @@ describe('isStale', () => {
 describe('wibDate', () => {
   it('uses the Jakarta calendar day', () => {
     expect(wibDate(new Date('2026-10-06T23:00:00Z'))).toBe('2026-10-07');
+  });
+});
+
+describe('wibTime', () => {
+  it('reads the three nightly slots in Jakarta, 24-hour', () => {
+    expect(wibTime(new Date('2026-10-08T06:17:00Z'))).toBe('13:17');
+    expect(wibTime(new Date('2026-10-08T09:41:00Z'))).toBe('16:41');
+    expect(wibTime(new Date('2026-10-08T12:41:00Z'))).toBe('19:41');
+  });
+  it('is 00:00, not 24:00, at the WIB day boundary', () => {
+    expect(wibTime(new Date('2026-10-07T17:00:00Z'))).toBe('00:00');
+  });
+});
+
+describe('addDays', () => {
+  it('steps the calendar forwards and backwards', () => {
+    expect(addDays('2026-10-08', 1)).toBe('2026-10-09');
+    expect(addDays('2026-10-12', -2)).toBe('2026-10-10');
+    expect(addDays('2026-11-01', -1)).toBe('2026-10-31');
+    expect(addDays('2027-03-01', -1)).toBe('2027-02-28');
   });
 });

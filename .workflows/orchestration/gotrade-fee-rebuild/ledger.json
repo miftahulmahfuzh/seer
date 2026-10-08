@@ -13,11 +13,11 @@
       "note": null,
       "package": ".github`, `engine/tests`, `engine.lab",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T03:51:55+00:00",
       "satisfies": [
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The CI guard catches what it was written for"
     },
@@ -30,11 +30,11 @@
       "note": null,
       "package": "engine.lab`, `web/lib/sera`, `web/app/sera",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T03:51:55+00:00",
       "satisfies": [
         "R7"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "A test-window look is not luck-gated, and says so"
     },
@@ -47,11 +47,11 @@
       "note": null,
       "package": "engine.paper",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T03:51:55+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The live SPY benchmark pays what the methods pay"
     },
@@ -64,11 +64,11 @@
       "note": null,
       "package": "engine.sim`, `engine.paper",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T03:51:55+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The bracket path can express and charge Gotrade's fees"
     },
@@ -151,19 +151,19 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "f696364ee6206cb156ad50f04d0bca60c11ba2d8",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 9,
-      "note": null,
+      "note": "verified by coordinator: commit on branch, files all within phase-9 Owns; PAPER_PAUSED:'true' intact at nightly.yml:70 and sim/costs.py untouched, both re-checked from the branch tip. COORDINATOR DECISION (rung 6, surrounding convention / swarm skill): phase sessions do NOT tick the plan index Status/TaskID rows -- the ledger is the record and the index is the coordinator's; p9 was right not to. OPEN: npx tsc --noEmit has 3 errors in web/app/sera/* from phase 2's half-landed required luckGated; expected mid-flight, to be re-checked when p2 reports.",
       "package": "web/app/(app)`, `web/lib",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-9.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T03:51:55+00:00",
       "satisfies": [
         "R5"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-4TQ7",
       "title": "The blank panel says which of five things it means"
     },
     {
@@ -194,11 +194,11 @@
       "note": null,
       "package": ".github`, `docs",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-11.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T03:51:55+00:00",
       "satisfies": [
         "R8"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "One daily line: stepped, published, green, paused"
     },
@@ -230,6 +230,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/gotrade-fee-rebuild/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "gotrade-fee-rebuild",
-  "updated": "2026-10-08T03:34:20+00:00",
+  "updated": "2026-10-08T03:51:55+00:00",
+  "verified_at": "2026-10-08T03:50:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/gotrade-fee-rebuild"
 }

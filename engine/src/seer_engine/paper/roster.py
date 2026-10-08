@@ -585,8 +585,8 @@ LAB_PROVENANCE: dict[str, LabProvenance] = {
         basis="owner-override",
         reason=(
             "it passes all five owner conditions -- max DD 19.6%, inside the revised 20% bar, "
-            "which is what newly admits it -- but NOT the lab's luck test: 0.914 at the N = 85 "
-            "it was scored at, 0.899 re-scored at today's N = 110, just under 0.90. It is "
+            "which is what newly admits it -- on a recorded DSR of 0.914 at its recorded N = 85, "
+            "its method rejected under the older 15% bar and never given a test-window look. It is "
             "RMW-FR's own engine with the volatility brake removed, admitted as the controlled "
             "forward comparison: whether the brake earns the 3.3 points of annual return it "
             "costs. A luck score that falls as the lab keeps searching is a statement about "
@@ -601,7 +601,7 @@ LAB_PROVENANCE: dict[str, LabProvenance] = {
         basis="owner-override",
         reason=(
             "it passes all five owner conditions on the dev window and fails only the luck test "
-            "-- 0.854 at the N = 80 it was scored at and 0.828 at today's N = 110. It replaces F4-FR as the "
+            "-- recorded DSR 0.854 at its recorded N = 80. It replaces F4-FR as the "
             "total-return-momentum entry: the same bet, measured at 0.99 correlation with F4's "
             "variant, but at max DD 18.4% against F4's 22.2%, which the revised 20% bar refuses"
         ),
@@ -613,7 +613,7 @@ LAB_PROVENANCE: dict[str, LabProvenance] = {
         basis="owner-override",
         reason=(
             "it passes all five owner conditions and fails only the luck test -- recorded DSR "
-            "0.817 at the N = 74 it was scored at and 0.780 at today's N = 110. It replaces F1-FR, which can never satisfy owner "
+            "0.817 at its recorded N = 74. It replaces F1-FR, which can never satisfy owner "
             "condition 1 (11 trades in 22 dev years against the 100 required). At 0.81 it is "
             "the least correlated with RMW-FR of any variant that passes the five, so it is the "
             "board's one portfolio-construction bet rather than another ranking rule. Its max "
@@ -644,8 +644,8 @@ LAB_PROVENANCE: dict[str, LabProvenance] = {
         reason=(
             "the same method and variant as RAW-FR, which it replaces, now paying Gotrade's "
             "measured fee schedule. It passes all five owner conditions -- max DD 19.6%, inside "
-            "the revised 20% bar -- but NOT the lab's luck test: 0.914 at the N = 85 it was scored "
-            "at, 0.899 at today's N = 110. It is RMW-FR-GT's own engine with the volatility brake "
+            "the revised 20% bar -- on a recorded DSR of 0.914 at its recorded N = 85, its method "
+            "rejected under the older 15% bar. It is RMW-FR-GT's own engine with the volatility brake "
             "removed, admitted as the controlled forward comparison at real fees: whether the "
             "brake earns what it costs once the fees are the owner's actual fees"
         ),
@@ -658,8 +658,8 @@ LAB_PROVENANCE: dict[str, LabProvenance] = {
         reason=(
             "the same method and variant as MOM-FR, which it replaces, now paying Gotrade's "
             "measured fee schedule. It passes all five owner conditions on the dev window and "
-            "fails only the luck test -- 0.854 at the N = 80 it was scored at, 0.828 at today's "
-            "N = 110. It is the board's total-return-momentum bet, at max DD 18.4% inside the 20% "
+            "fails only the luck test -- recorded DSR 0.854 at its recorded N = 80. "
+            "It is the board's total-return-momentum bet, at max DD 18.4% inside the 20% "
             "bar"
         ),
     ),
@@ -671,7 +671,7 @@ LAB_PROVENANCE: dict[str, LabProvenance] = {
         reason=(
             "the same method and variant as MVW-FR, which it replaces, now paying Gotrade's "
             "measured fee schedule. It passes all five owner conditions and fails only the luck "
-            "test -- recorded DSR 0.817 at the N = 74 it was scored at, 0.780 at today's N = 110. "
+            "test -- recorded DSR 0.817 at its recorded N = 74. "
             "It is the board's one portfolio-construction bet rather than another ranking rule, "
             "and the least correlated with RMW-FR-GT of any variant that passes the five. Its max "
             "DD is 20.0%, exactly the bar, with no margin: that is the risk of this admission"
@@ -1006,8 +1006,8 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         gate_note=(
             "Lab M0007 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
             "0.1% a side: beats SPY TR (+1,502.2% vs +351.4%), max DD 19.6%, PF 2.16 and 1,596 "
-            "trades all pass. It does NOT pass the luck test: 0.914 at the N=85 it was scored at, "
-            "0.899 re-scored at today's N=110, just under the 0.90 bar. Never had a test-window "
+            "trades all pass, on a recorded DSR of 0.914 at its recorded N=85; its method was "
+            "rejected under the older 15% drawdown bar. Never had a test-window "
             "look. Re-measured at Gotrade's real fees (449fa34, report only) it returns +1,126% "
             "against SPY's +350% at the same fees. Successor of RAW-FR, which paid the assumed "
             "rate. On paper as the controlled comparison against RMW-FR-GT: the same book without "
@@ -1032,8 +1032,8 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         gate_note=(
             "Lab M0002 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
             "0.1% a side: beats SPY TR (+940.1% vs +351.4%), max DD 18.4%, PF 2.33 and 1,148 "
-            "trades all pass; failed only the luck test (0.854 at the N=80 it was scored at, 0.828 "
-            "at today's N=110). Re-measured at Gotrade's real fees (449fa34, report only) it "
+            "trades all pass; failed only the luck test, on a recorded DSR of 0.854 at its "
+            "recorded N=80. Re-measured at Gotrade's real fees (449fa34, report only) it "
             "returns +763% against SPY's +350% at the same fees. Successor of MOM-FR, which paid "
             "the assumed rate. On paper to test it forward"
         ),
@@ -1056,8 +1056,8 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         gate_note=(
             "Lab M0008 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
             "0.1% a side: beats SPY TR (+726.7% vs +351.4%), max DD 20.0%, PF 2.14 and 1,223 "
-            "trades all pass; failed only the luck test (0.817 at the N=74 it was scored at, 0.780 "
-            "at today's N=110). Re-measured at Gotrade's real fees (449fa34, report only) it "
+            "trades all pass; failed only the luck test, on a recorded DSR of 0.817 at its "
+            "recorded N=74. Re-measured at Gotrade's real fees (449fa34, report only) it "
             "returns +536% against SPY's +350% at the same fees. Successor of MVW-FR, which paid "
             "the assumed rate. Its drawdown sits exactly on the 20% bar, with no margin. On paper "
             "to test it forward"
@@ -1275,9 +1275,9 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         registry_id=None,
         gate_note=(
             "Lab M0007 dev window only (1996-01-03..2015-10-16), in whole shares: beats SPY TR "
-            "(+1,502.2% vs +351.4%), max DD 19.6%, PF 2.16 and 1,596 trades all pass. It does "
-            "NOT pass the luck test: 0.914 at the N=85 it was scored at, 0.899 re-scored at "
-            "today's N=110, just under the 0.90 bar. Never had a test-window look. On paper as "
+            "(+1,502.2% vs +351.4%), max DD 19.6%, PF 2.16 and 1,596 trades all pass, on a "
+            "recorded DSR of 0.914 at its recorded N=85; its method was rejected under the older "
+            "15% drawdown bar. Never had a test-window look. On paper as "
             "the controlled comparison against RMW-FR: the same book without the brake"
         ),
         status="retired",  # 017: superseded by RAW-FR-GT, which pays Gotrade's measured fees
@@ -1297,7 +1297,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         gate_note=(
             "Lab M0002 dev window only (1996-01-03..2015-10-16), in whole shares: beats SPY TR "
             "(+940.1% vs +351.4%), max DD 18.4%, PF 2.33 and 1,148 trades all pass; failed only "
-            "the luck test (0.854 at the N=80 it was scored at, 0.828 at today's N=110). "
+            "the luck test, on a recorded DSR of 0.854 at its recorded N=80. "
             "Replaces F4-FR: the same total-return-momentum bet, "
             "inside the 20% drawdown bar that F4's 22.2% cannot meet. On paper to test it forward"
         ),
@@ -1318,7 +1318,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         gate_note=(
             "Lab M0008 dev window only (1996-01-03..2015-10-16), in whole shares: beats SPY TR "
             "(+726.7% vs +351.4%), max DD 20.0%, PF 2.14 and 1,223 trades all pass; failed only "
-            "the luck test (0.817 at the N=74 it was scored at, 0.780 at today's N=110). "
+            "the luck test, on a recorded DSR of 0.817 at its recorded N=74. "
             "Replaces F1-FR, which cannot reach 100 closed trades. "
             "Its drawdown sits exactly on the 20% bar, with no margin. On paper to test it forward"
         ),

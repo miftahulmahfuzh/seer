@@ -264,6 +264,22 @@ to 2. The DSR bar is a *dev-window* multiple-testing correction; a pre-registere
 is not luck-gated the same way, which is why `failedNow` correctly omits a DSR failure. The data
 looks right and the test encodes a dev-only assumption that has expired.
 
+### 6c. The nightly queued since 2026-10-07 is an orphan, not a concurrency block — SETTLED, do not re-investigate
+
+Run `37655513074` has sat `queued` since 2026-10-07T16:54:08Z. It looked like it might be holding
+the `seer-db-writer` concurrency group and delaying later nightlies. It is not, and this was
+measured via the GitHub API by the analysis session that ran on 2026-10-08 before being killed:
+
+- `37655513074`: `status queued`, `run_attempt 1`, `jobs []` — **no job was ever created**, and
+  `updated_at` still equals `created_at`.
+- `37671609872`, the next Nightly **in the same concurrency group**, was created 2h09m later, started
+  immediately and completed successfully in 92 seconds while the stuck run stayed queued.
+
+A group wait would have blocked that later run; it did not. GitHub's own rule — one pending run per
+group, a newer pending run cancelling the older — would have cancelled the stuck one; it did not do
+that either. So the run is an orphan stuck *before* job creation, sitting outside the group's pending
+queue. **It cannot delay a future nightly.** Cancel it for tidiness if you like; it changes nothing.
+
 ## 7. Sean, as shipped (verified)
 
 7 phases, 116 files, ~40k insertions, merged `b16cffd`, migration 015 applied, set pruned. `/sean`

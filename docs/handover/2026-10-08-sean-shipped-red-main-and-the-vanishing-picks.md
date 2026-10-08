@@ -68,6 +68,11 @@ Gotrade's genuine asymptotic cost is ~2.5× the assumed 0.1%/side. Everything ab
 $0.10 minimum, which binds below ~$50 an order. The owner's book is 560.5067 USD across 20 names =
 $28 a slot.
 
+**The fee model is validated against real receipts.** `costs.fee_parts` reproduces the owner's
+actual 2026-10-07 Gotrade charges to the cent: a $27.90 buy is charged $0.13 (receipt: $28.03 paid)
+and a $72.51 sell is charged $0.24 (receipt: $72.27 received). Both sides, exactly. Trust the
+schedule.
+
 ### 2a. Turnover is about one third, not full (verified)
 
 `sim.book.Trade` is *"one closed holding episode: shares went 0 → >0 → 0"*, i.e. a completed round
@@ -374,14 +379,25 @@ Settle:
   the floor does not stop binding until ~$50 (§2), so a small add can cost more in fees than the
   tracking error it corrects. Re-tune it against the fee curve rather than leaving it at a round
   number.
-- **Settlement.** US equities are T+1. Confirm Gotrade permits reusing sale proceeds the same day
-  for buys; if it does not, the owner's 1-2-3 becomes sell-Monday / buy-Tuesday and the reminder
-  list has to say so.
+- **Settlement — partly answered, and the timing makes it moot for 2026-11-02.** US equities are
+  T+1. The owner's own `sean_orders` show he sold PLTR at 21:55 WIB on 2026-10-07 ($72.51 →
+  $72.27 received) and placed 20 buys between 21:57 and 22:08 that all filled, so a sale does not
+  block buying. It is **not proof the proceeds were spendable**: the 20 buys cost $560.60 and his
+  10,000,000 IDR deposit was ~$560.51, so the deposit alone covered them. Sean cannot settle the
+  question because `sean/ledger.ts` notes receipts never show the cash balance.
+  **It matters less than it looks.** The owner has decided the monthly 5,000,000 IDR lands on the
+  **25th**, a week before a month-start rotation, so that contribution is settled cash by the
+  rotation. At 15,000,000 IDR total (~$841, ~$42 a slot), replacing five names needs ~$210 of buys
+  against ~$280 of settled deposit — funded without touching the day's sale proceeds. Design the
+  reminder list so the rotation works either way, and treat same-day reuse as a bonus rather than
+  a dependency.
 - **Orders stay dollar-denominated, never share counts.** Prices drift between the decision close
   and execution at the open; a fractional dollar order absorbs that drift and a share count does
   not. The roster's book rules are already `-frac`.
-- **Deposit timing.** The owner has mentioned both ~25 October and "at rotation". Whichever he
-  does, the lab's contribution schedule must match it, or paper and reality diverge on idle cash.
+- **Deposit timing — DECIDED: the 25th of each month.** Confirmed by the owner 2026-10-08. The
+  lab's contribution schedule must use that date, not the rotation date, or paper and reality
+  diverge on roughly a week of idle cash every month. It is also the operationally safer choice,
+  for the settlement reason above.
 
 **Q5 — the blank panel has four causes and one rendering.** §5. Whatever is shown must distinguish
 (a) holding/nothing due — the common case — from (b) expired, (c) never produced and (d) failed, and

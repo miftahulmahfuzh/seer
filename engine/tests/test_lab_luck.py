@@ -151,11 +151,21 @@ def test_recover_dsr_is_none_where_the_inversion_is_undefined(kw):
 def test_d1_three_candidates_clear_the_owners_bar_at_the_live_n_and_all_seven_at_n_23():
     """Decisions D1 and D6's evidence, and D1's reason for leaving the N lever alone.
 
-    At the live N of 110 the two owner-set bars admit **three** candidates across the whole lab
-    -- the three highest-MAR books, asserted by name. Pulling the N lever as well (N = 23) would
-    admit **every one of this sample's seven**, including `M0011-RAW20-TV12` at MAR 0.60; over the
-    full database it admits 18 of the 25 luck-only trials rather than 3. Either way it is far more
-    than the owner asked for, which is why `DSR_POLICY` stays at `all-trials`.
+    At N = 110 -- what `all-trials` resolved to on the 110-trial lab this sample was measured
+    from -- the two owner-set bars admit **three** candidates across the whole lab, the three
+    highest-MAR books, asserted by name. Pulling the N lever as well (N = 23, the distinct-method
+    count of that same lab) admits **every one of this sample's seven**, including
+    `M0011-RAW20-TV12` at MAR 0.60; over the full database it admits 18 of the 25 luck-only
+    trials rather than 3.
+
+    **That was the argument for leaving the lever alone, and the lever has since been pulled.**
+    `DSR_POLICY` moved to `methods` on 2026-10-08 (lab-realistic-gate R1) -- not because the
+    number of admissions became acceptable, but because `all-trials` asserts an independence the
+    lab's own estimator contradicts (participation ratio 2.34 over 126 curves, mean pairwise
+    correlation 0.612) and because counting one look per variant *run* is what made re-running a
+    method perturb every other method's verdict. This test is therefore the measured record of
+    what that move costs, stated in advance, and both literals below are deliberate: 110 and 23
+    are the two N's of the lab this sample was taken from, not the live gate's.
     """
     at110 = [c for c, s, d, n in LUCK_ONLY if _at(s, d, n, 110) >= OWNER_BAR]
     at23 = [c for c, s, d, n in LUCK_ONLY if _at(s, d, n, 23) >= OWNER_BAR]

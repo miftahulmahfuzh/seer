@@ -1131,3 +1131,73 @@ def test_rescaled_never_weighs_more_than_the_allocator_wants():
     out = book_runner._rescaled(market, RANK, (Target(symbol="CCC", weight=Decimal("0.8"), last=P("30")),),
                                 frozenset({"AAA"}), day, {})
     assert sum(t.weight for t in out) == Decimal("0.4")
+
+
+# ---- R2: deposits are not returns (lab-realistic-gate phase 2) --------------------------------
+
+_TW_DAYS = (date(2015, 1, 5), date(2015, 1, 6), date(2015, 1, 7), date(2015, 1, 8), date(2015, 1, 9))
+
+
+def _steady_curve():
+    """A book that grows EXACTLY 1% a session, with 50.00 deposited at the open of day 3.
+
+    Its true return is constant, so its return series has zero dispersion and therefore no Sharpe
+    at all. That is the sharpest possible statement of the property under test: the deposit must
+    not create dispersion where the strategy has none.
+    """
+    flows = {_TW_DAYS[3]: 50.0}
+    equity, value = [(_TW_DAYS[0], 100.0)], 100.0
+    for d in _TW_DAYS[1:]:
+        value = (value + flows.get(d, 0.0)) * 1.01
+        equity.append((d, value))
+    return equity, ((_TW_DAYS[3], 50.0),)
+
+
+def test_a_deposit_is_not_a_return_in_the_daily_series():
+    equity, cashflows = _steady_curve()
+    adjusted = book_runner._daily_returns(equity, cashflows)
+    assert adjusted == pytest.approx((0.01, 0.01, 0.01, 0.01), abs=1e-12)
+    # Zero dispersion -> no Sharpe. The strategy earns a constant rate; there is nothing to
+    # annualize a ratio over.
+    assert book_runner._sharpe(adjusted) is None
+
+    # The defect this pins, stated as what it would do: without the cashflow term the deposit
+    # session reads as a ~+50% return -- dispersion the strategy never had -- and the Sharpe stops
+    # being None. `trials.dsr` is computed from exactly this series and IS a gate condition
+    # (`store.verdict`'s luck test), so an inflated Sharpe is an inflated verdict.
+    naive = book_runner._daily_returns(equity)
+    assert max(naive) > 0.4
+    assert book_runner._sharpe(naive) is not None
+
+
+def test_a_deposit_is_not_a_return_in_the_year_series():
+    equity, cashflows = _steady_curve()
+    (year, ret), = book_runner._year_returns(equity, cashflows)
+    assert year == 2015 and ret == pytest.approx(1.01 ** 4 - 1.0, abs=1e-12)
+    # Naively the deposit is growth: the year reads ~+58% instead of ~+4%.
+    (_, naive_ret), = book_runner._year_returns(equity)
+    assert naive_ret > 0.5
+
+
+def test_a_deposit_does_not_damp_the_measured_drawdown():
+    """A deposit that lands mid-drawdown refills the trough and hides the second leg.
+
+    -20%, then 100.00 deposited at the open of the next session, then another -10%. The strategy
+    is down 1 - 0.8 * 0.9 = 28%. Measured on raw equity the final mark (162) is above the old peak
+    (100), so the fall reads as 20% and the method looks safer than it was -- against
+    `tuning.MAX_DRAWDOWN`, which `lab.store.owner_failures` and `_blocking` re-derive as a GATE
+    CONDITION.
+    """
+    d0, d1, d2, d3 = _TW_DAYS[:4]
+    snaps = [(d0, 100.0), (d1, 100.0), (d2, 80.0), (d3, 162.0)]
+    cashflows = ((d3, 100.0),)
+    assert strategy_metrics(snaps, [], cashflows).max_drawdown == pytest.approx(0.28, abs=1e-12)
+    assert strategy_metrics(snaps, []).max_drawdown == pytest.approx(0.20, abs=1e-12)
+
+
+def test_an_unfunded_run_is_byte_identical():
+    """Every expression above reduces to the original one when there is no deposit."""
+    equity = [(d, 100.0 * 1.01 ** i) for i, d in enumerate(_TW_DAYS)]
+    assert book_runner._daily_returns(equity, ()) == book_runner._daily_returns(equity)
+    assert book_runner._year_returns(equity, ()) == book_runner._year_returns(equity)
+    assert strategy_metrics(equity, [], ()).max_drawdown == strategy_metrics(equity, []).max_drawdown

@@ -16,9 +16,19 @@ will ever write -- files that are committed before a test number exists and are 
 
 Two things this test deliberately does **not** do:
 
-- It does not forbid "every dev trial" or "N = all lab trials". ``DSR_POLICY`` ships as
-  ``all-trials`` (design §7.2), so those phrases are *correct*; the N lever was measured and
-  deliberately left alone, and a test that scrubbed the wording would make the design document lie.
+- It does not forbid "every dev trial" or "N = all lab trials", and it still does not, even
+  though ``DSR_POLICY`` moved from ``all-trials`` to ``methods`` on 2026-10-08
+  (lab-realistic-gate R1) and those phrases stopped being true of the live gate. The reason is
+  the same one that keeps the design document out of ``SCANNED``: this guard's subject is the
+  **threshold**, which is a number a document can state and get wrong, and it compares what it
+  finds against ``store.DSR_MIN``. The policy has no number to compare -- it is a name -- and the
+  documents that state it are swept for it by
+  ``test_the_gate_text_is_built_from_the_constants_that_decide_the_verdict``, which requires the
+  live ``store.DSR_POLICY`` to appear in the text rather than forbidding the dead one. Prose that
+  still describes N as the row count is stale and was corrected where it states a live rule
+  (``lab/prereg.py``'s ``gate_text`` docstring, ``docs/lab/prereg/README.md``, the explorer
+  skill); extending this guard to policy *names* is a separate, bigger piece of work than a
+  constant move, and is recorded as such rather than half-done here.
 - It does not scan ``docs/plans/2026-10-04-method-lab-design.md``. That document records decisions
   by appending dated revisions, so §3 keeps its original sentence and §7 quotes it as the thing it
   supersedes. Deleting it there would destroy the record this test exists to protect.

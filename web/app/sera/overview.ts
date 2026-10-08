@@ -337,8 +337,10 @@ export function luck(snap: LabSnapshot): Luck | null {
   // Position is the record (the score at the N of its run date, which is what makes the cloud
   // drift right); colour is the verdict (does it clear the bar at today's N). A dot above the
   // line in plain lab colour is a try that looked clear when it ran and no longer is — the
-  // ratchet, drawn. Under `all-trials` N only grows and the DSR falls with it, so an eligible
-  // dot is always above the line: the colours can disagree with the line, never contradict it.
+  // ratchet, drawn. N only ever grows under every policy the gate ships -- `all-trials` counts
+  // rows, `methods` (in force since 2026-10-08) counts distinct methods, and neither can shrink
+  // -- and the DSR falls with it, so an eligible dot is always above the line: the colours can
+  // disagree with the line, never contradict it.
   const points: ScatterPoint[] = rows.map(t => ({
     id: `t${t.n}`,
     x: t.nTrialsAtRun,

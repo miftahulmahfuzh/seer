@@ -20,6 +20,36 @@ from seer_engine.lab import prereg, store
 from seer_engine.lab.method import config_digest, discover, source_sha
 
 
+@pytest.fixture(autouse=True)
+def _at_the_policy_these_fixtures_were_recorded_under(monkeypatch):
+    """Judge every lab in this module under ``all-trials``, the policy its rows were stamped with.
+
+    Not a convenience and not a workaround for the shipped policy: it is the one assumption these
+    fixtures already encode. Every trial they insert carries ``n_trials_at_run`` equal to the
+    fixture's dev row count, which is what a lab recorded under ``all-trials`` looks like and
+    nothing else. ``store.verdict`` re-evaluates a recorded DSR **at the gate's current N**, so
+    the re-evaluation is the identity -- and an eligibility assertion means what it says -- only
+    while the gate resolves to the N stamped on the rows. Judging a recorded lab under the policy
+    it was recorded under is the condition, and naming it here is strictly more honest than
+    inheriting it from whatever ``store.DSR_POLICY`` happens to be.
+
+    Since 2026-10-08 it no longer is: ``DSR_POLICY`` is ``methods`` (lab-realistic-gate R1), which
+    on a one-method lab resolves to ``max(1, ceil(participation ratio))`` -- 1 when the fixtures
+    record no curves -- and ``dev.deflated_sharpe`` is undefined below two looks. Every derived
+    verdict here would then collapse to "no evaluable luck test" for a reason that has nothing to
+    do with this module's subject. What the shipped policy resolves to is pinned where it belongs,
+    in ``test_lab_gate_policy.py`` and ``test_lab_npolicy.py``.
+
+    Autouse rather than folded into a connection fixture, because the paths under test resolve the
+    gate themselves -- ``prereg.promote_method`` and the ``lab promote`` CLI both call
+    ``store.best_dev_eligible`` with no ``at=``, and several tests here open their own database.
+    """
+    monkeypatch.setattr(store, "DSR_POLICY", "all-trials")
+    store._GATE_CACHE.clear()
+    yield
+    store._GATE_CACHE.clear()
+
+
 @pytest.fixture()
 def conn(tmp_path):
     c = store.connect(tmp_path / "lab.sqlite")

@@ -7,8 +7,9 @@ DSR inputs construct ``trial_moments`` rows directly, because the backfill that 
 
 The claims this module exists to hold:
 
-1. the shipped defaults -- DSR_MIN 0.90, DSR_POLICY "all-trials" -- resolve to N = 110 on the
-   committed lab, which is today's N, so only the threshold moved;
+1. the shipped defaults -- DSR_MIN 0.90, DSR_POLICY "methods" -- resolve to N = 23 on the
+   ``lab_n110`` fixture, which is its distinct-method count, and ``npolicy.DEFAULT_POLICY``
+   agrees with ``store.DSR_POLICY`` by assertion from both sides;
 2. at (110, 0.90, max DD 20%) exactly **three** candidates become eligible -- M0022-W-TV14,
    M0022-W-TV16 and M0020-W-NOSTOP -- and ``best_dev_eligible`` returns W-TV14 for M0022 because
    MAR decides; M0007-N20-RAW does NOT, on 0.8985 re-evaluated at N=110;
@@ -24,6 +25,18 @@ The claims this module exists to hold:
    reach the recorded rows rather than tripping over their own labels;
 8. ``Verdict.failed`` is a tuple of label strings, and the gate's estimator runs once per dev
    trial set rather than once per method.
+
+**A note on the policy these fixtures are judged under.** ``store.DSR_POLICY`` shipped as
+``all-trials`` until 2026-10-08 and is ``methods`` since (lab-realistic-gate R1). Every claim
+below about ``lab_n110.sqlite`` -- the three eligible candidates, M0007-N20-RAW's 0.8985,
+F9's NULL DSR, M0011's divergence -- is a claim **at N = 110**, which is what ``all-trials``
+resolves to on that frozen database and what its 110 rows were stamped with. The ``committed``
+fixture therefore pins ``all-trials`` beside the database it describes; ``committed_unpinned``
+is the same copy under the shipped policy and is used by exactly one test, the one whose
+subject IS the shipped default. The hand-built labs below pin nothing and the few that need a
+row-counting N take ``at_all_trials`` explicitly. Re-pointing the N=110 claims at the new
+policy would delete the record of what the two moved bars did rather than test anything; the
+new policy's verdict is measured on the LIVE database and published by ``lab stage``.
 
 **A note on the fixtures, and why most of them insert two trials.** ``store.dsr_at`` deflates by
 ``store.dev_sharpe_variance(conn)`` (Decision D12), which is the *sample* variance of the dev
@@ -65,6 +78,23 @@ def _clean_gate_cache():
     store._GATE_CACHE.clear()
     yield
     store._GATE_CACHE.clear()
+
+
+@pytest.fixture()
+def at_all_trials(monkeypatch):
+    """Judge this test's hand-built lab by its **row count** rather than by the shipped policy.
+
+    For the tests whose fixture is two or three dev trials of one method, recorded at
+    ``n_trials_at_run=2`` and judged at ``Gate(n=2)`` so that ``verdict``'s re-evaluation is the
+    identity. The shipped ``methods`` policy resolves a one-method lab to
+    ``max(1, ceil(participation ratio))``, which is 1 on two correlated curves -- and
+    ``dev.deflated_sharpe`` is undefined below two looks, so the derived verdict would collapse
+    to "no evaluable luck test" for a reason that has nothing to do with the rule under test.
+
+    ``_clean_gate_cache`` is autouse and clears the memo at both ends, so nothing has to be
+    cleared here.
+    """
+    monkeypatch.setattr(store, "DSR_POLICY", "all-trials")
 
 
 @pytest.fixture()
@@ -412,7 +442,7 @@ def test_an_owner_condition_is_never_re_decided_by_the_n_policy(conn):
 # --------------------------------------------------------------------------- best_dev_eligible
 
 
-def test_best_dev_eligible_keeps_its_contract_on_the_derived_verdict(conn):
+def test_best_dev_eligible_keeps_its_contract_on_the_derived_verdict(conn, at_all_trials):
     _method(conn)
     with conn:
         ns = store.insert_trials(conn, [
@@ -472,7 +502,7 @@ def _luck_only_method(conn, mid="M0001"):
         ])
 
 
-def test_reevaluate_takes_the_edge_for_a_luck_only_rejection(conn):
+def test_reevaluate_takes_the_edge_for_a_luck_only_rejection(conn, at_all_trials):
     _luck_only_method(conn)
     with conn:
         r = store.reevaluate_method(conn, "M0001")
@@ -511,7 +541,7 @@ def test_reevaluate_will_not_move_a_method_that_failed_an_owner_condition(conn):
     assert store.get_method(conn, "M0002")["status"] == "rejected"
 
 
-def test_reevaluate_does_move_a_method_the_moved_drawdown_bar_unblocks(conn):
+def test_reevaluate_does_move_a_method_the_moved_drawdown_bar_unblocks(conn, at_all_trials):
     """The counterpart, and the shape ``M0020-W-NOSTOP`` has on the committed database.
 
     A recorded failure of ``max DD <= 15%; DSR >= 0.95`` is **not** a reason to refuse the edge
@@ -590,7 +620,7 @@ def test_the_independent_check_refuses_a_recorded_owner_inputs_whatever_the_verd
     assert store.OWNER_INPUTS_LABEL in "; ".join(store._blocking(row))
 
 
-def test_reevaluate_is_idempotent_and_moves_only_from_rejected(conn):
+def test_reevaluate_is_idempotent_and_moves_only_from_rejected(conn, at_all_trials):
     _luck_only_method(conn)
     with conn:
         assert store.reevaluate_method(conn, "M0001").moved is True
@@ -601,7 +631,7 @@ def test_reevaluate_is_idempotent_and_moves_only_from_rejected(conn):
     assert store.get_method(conn, "M0001")["analysis"] == before
 
 
-def test_reevaluate_sweeps_every_rejected_method(conn):
+def test_reevaluate_sweeps_every_rejected_method(conn, at_all_trials):
     _luck_only_method(conn, "M0001")
     _method(conn, "M0002")
     with conn:
@@ -616,17 +646,26 @@ def test_reevaluate_sweeps_every_rejected_method(conn):
 
 
 def test_pending_gate_reproduces_todays_n_under_the_shipped_policy(conn, monkeypatch):
+    """What a batch about to be recorded is deflated by, under the policy the lab ships.
+
+    This is R1's whole point, as one assertion: under ``methods`` a batch of variants of a
+    method the lab already holds adds **nothing** to N, and a brand-new method adds exactly
+    **one** -- so re-running a method no longer moves every other method's verdict. Under the
+    policy that shipped until 2026-10-08 the same batch added one per candidate.
+    """
     _method(conn, "M0001")
     with conn:
         store.insert_trials(conn, [_trial(method_id="M0001", candidate_id="M0001-A")])
-    assert store.DSR_POLICY == "all-trials"
-    # exactly the expression runner.trial_rows used before this phase
-    assert store.pending_gate(conn, "M0001", 3).n == store.dev_trial_count(conn) + 3
-    assert store.pending_gate(conn, "M0009", 3).n == store.dev_trial_count(conn) + 3
-    assert store.pending_gate(conn, "M0009", 0).n == store.gate(conn).n
-    monkeypatch.setattr(store, "DSR_POLICY", "methods")
+    assert store.DSR_POLICY == "methods"
     assert store.pending_gate(conn, "M0001", 3).n == store.gate(conn).n      # known method
     assert store.pending_gate(conn, "M0009", 3).n == store.gate(conn).n + 1  # new method
+    assert store.pending_gate(conn, "M0009", 0).n == store.gate(conn).n
+    # ...and under `all-trials` it is still the row count: exactly the expression
+    # `runner.trial_rows` used before the policy existed, kept here because the projection
+    # machinery must keep working for every policy in POLICIES and not only for the shipped one.
+    monkeypatch.setattr(store, "DSR_POLICY", "all-trials")
+    assert store.pending_gate(conn, "M0001", 3).n == store.dev_trial_count(conn) + 3
+    assert store.pending_gate(conn, "M0009", 3).n == store.dev_trial_count(conn) + 3
     for policy in npolicy.POLICIES:
         monkeypatch.setattr(store, "DSR_POLICY", policy)
         assert store.pending_gate(conn, "M0009", 5).n >= store.gate(conn).n, policy
@@ -694,8 +733,13 @@ LAB_AT_PHASE_4 = Path(__file__).parent / "fixtures" / "lab_n110.sqlite"
 
 
 @pytest.fixture()
-def committed(tmp_path):
-    """A writable copy of the lab at phase 4, migrated. The original is never opened for writing."""
+def committed_unpinned(tmp_path):
+    """A writable copy of the lab at phase 4, migrated, judged under the **shipped** policy.
+
+    The original is never opened for writing. Exactly one test wants this -- the one whose
+    subject is what the shipped defaults resolve to. Everything else wants ``committed``, which
+    is this copy with the policy its 110 rows were recorded under pinned beside it.
+    """
     path = tmp_path / "lab.sqlite"
     shutil.copyfile(LAB_AT_PHASE_4, path)
     c = store.connect(path)
@@ -704,12 +748,34 @@ def committed(tmp_path):
     c.close()
 
 
-def test_the_shipped_defaults_reproduce_todays_n(committed):
-    """Nobody should have to reason about which module's default wins."""
-    assert store.DSR_POLICY == "all-trials"
-    g = store.gate(committed)
-    assert g.policy == "all-trials"
-    assert g.n == 110 == store.dev_trial_count(committed)
+@pytest.fixture()
+def committed(committed_unpinned, monkeypatch):
+    """``committed_unpinned``, judged under ``all-trials``: the policy this database describes.
+
+    ``lab_n110.sqlite`` is frozen at commit feed608 -- 110 dev trials over 23 methods, every
+    ``dsr`` and ``n_trials_at_run`` stamped by a ``lab run`` whose gate was the row count. Every
+    claim the tests below make about it is a claim at N = 110. The shipped policy moved to
+    ``methods`` on 2026-10-08 (lab-realistic-gate R1), which on this fixture resolves to N = 23
+    and admits far more candidates; that is the new lab's verdict, measured on the live database
+    and published by ``lab stage``, not a correction to this record.
+    """
+    monkeypatch.setattr(store, "DSR_POLICY", "all-trials")
+    store._GATE_CACHE.clear()
+    return committed_unpinned
+
+
+def test_the_shipped_defaults_reproduce_todays_n(committed_unpinned):
+    """Nobody should have to reason about which module's default wins.
+
+    Both sides of the agreement, and what the shipped policy counts: one look per distinct
+    method with a dev trial, floored at ceil(participation ratio). On this fixture that is 23
+    methods across 110 trial rows (the floor, ceil 2.44 = 3, does not bind).
+    """
+    assert store.DSR_POLICY == "methods" == npolicy.DEFAULT_POLICY
+    g = store.gate(committed_unpinned)
+    assert g.policy == "methods"
+    assert g.n == 23 == npolicy.dev_method_count(committed_unpinned)
+    assert store.dev_trial_count(committed_unpinned) == 110, "the row count is unchanged"
 
 
 def test_the_committed_lab_keeps_every_recorded_verdict_and_spends_no_look(committed):

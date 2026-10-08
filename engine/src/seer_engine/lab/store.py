@@ -32,12 +32,14 @@ money-weighted return of a trial that received deposits, and of the SPY fed the 
 ``connect`` migrates an older database in place; ``connect_readonly`` never does.
 
 The **verdict** a trial reads is derived, not frozen: ``DSR_MIN`` is the threshold (0.90 since
-2026-10-07) and ``DSR_POLICY`` names the multiple-testing N (``all-trials`` today, so N is every
-dev trial, as it has always been). ``verdict`` re-decides every condition at call time -- the four
-threshold owner conditions from the trial's own recorded columns against the live constants, the
-luck test on the trial's DSR at the gate's current N -- and carries only ``owner inputs`` from the
-record, because no constant re-decides it. Recorded rows keep the labels of the bars they were
-judged under, so every reader uses ``is_luck_label`` rather than comparing to ``DSR_LABEL``, and
+2026-10-07) and ``DSR_POLICY`` names the multiple-testing N (``methods`` since 2026-10-08, so N is
+the number of distinct methods the lab has looked at -- 28 today -- floored at the measured
+participation ratio; it was ``all-trials``, one look per dev trial row, until then). ``verdict``
+re-decides every condition at call time -- the four threshold owner conditions from the trial's own
+recorded columns against the live constants, the luck test on the trial's DSR at the gate's current
+N -- and carries only ``owner inputs`` from the record, because no constant re-decides it.
+Recorded rows keep the labels of the bars they were judged under, so every reader uses
+``is_luck_label`` rather than comparing to ``DSR_LABEL``, and
 ``owner_failures`` rather than parsing a ``failed`` string.
 
 ``snapshot`` / ``snapshot_json`` turn a database (v1, v2 or v3) into the web's ``web/data/lab.json``
@@ -152,17 +154,25 @@ def is_luck_label(label: str) -> bool:
 # only place in the lab where the multiple-testing count is decided, read at call time by
 # ``gate`` below rather than frozen into a row at run time.
 #
-# **Shipped as "all-trials" deliberately, and NOT inherited from npolicy's own default.**
-# Decision D1: the owner moved the threshold, not N, so N stays at every dev trial -- 110 today,
-# the same number ``runner.trial_rows`` used before this phase existed. The policy module, its
-# correlation evidence (mean pairwise rho 0.595 across the 110 recorded curves, effective N 2.4,
-# 23 distinct methods) and phase 5's read-only ``lab luck`` are all built, so the second lever
-# is measured and ready -- it is simply not pulled.
+# **Shipped as "methods" since 2026-10-08** (lab-realistic-gate R1), and NOT inherited from
+# npolicy's own default. It was ``"all-trials"`` until then -- LAB_LUCK_GATE_PLAN.md Decision D1
+# moved the threshold and deliberately left N alone, with the lever measured and ready.
+#
+# What pulled it is the owner's own observation: under ``all-trials`` every new variant run is
+# counted as another independent look, so re-running one method moves every other method's
+# verdict. That is a true statement about the policy, not about the methods -- and the lab's own
+# estimator contradicts the independence it asserts. Measured on the committed database:
+# 126 dev trial rows, 28 distinct methods, participation ratio 2.34, mean pairwise correlation
+# 0.612. ``methods`` counts one look per distinct method, floored at ceil(participation ratio),
+# so it can never claim fewer independent looks than the curves themselves show:
+#     all-trials  N = 126     methods  N = 28     effective  N = 2
+# Under ``methods`` a new variation twin of an existing method adds 0 to N and a brand-new method
+# adds 1, instead of one per candidate -- which is what makes re-running a method honest.
 #
 # Set explicitly, and always passed as an argument to ``npolicy.effective_n``, so that nobody has
 # to reason about which module's default wins. ``test_the_shipped_defaults_reproduce_todays_n``
-# holds it to 110.
-DSR_POLICY = "all-trials"
+# holds it to the distinct-method count of the fixture it reads.
+DSR_POLICY = "methods"
 
 # The first words of the analysis section `record_promotion` appends, and its idempotence key:
 # a method whose analysis already names this roster id has been recorded and is not recorded twice.

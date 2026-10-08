@@ -63,8 +63,9 @@ from seer_engine.backtest.book_runner import TRADING_DAYS
 from seer_engine.backtest.dev import Candidate, DevRow
 from seer_engine.backtest.registry import REGISTRY
 from seer_engine.commands.backtest_dev import daily_moments, registry_problem
-from seer_engine.lab import store
+from seer_engine.lab import npolicy, store
 from seer_engine.lab.method import METHOD_ID, Method, config_digest, source_sha
+from seer_engine.sim.contributions import OWNER_MONTHLY
 
 log = logging.getLogger(__name__)
 
@@ -223,10 +224,24 @@ def batches_of(conn: sqlite3.Connection, trials: Sequence[sqlite3.Row]) -> tuple
     1. a batch's trial numbers are contiguous. One ``lab run`` writes its whole batch inside one
        ``BEGIN IMMEDIATE`` transaction (``runner.run_method``), so a gap means the rows were not
        written by one run and "what existed then" cannot be read off ``n``.
-    2. ``count(dev trials with n < the batch's first n) + len(batch) == n_trials_at_run``. That
-       equality *is* ``store.dev_trial_count(conn) + len(results)``, the line that produced the
-       recorded N. If it does not hold, the recorded N does not describe this batch and no honest
-       ``var_trials`` can be rebuilt from it.
+    2. ``1 <= n_trials_at_run <= count(dev trials with n < the batch's first n) + len(batch)``.
+       The upper bound is the number of looks that existed when the batch was judged, which is
+       exactly what the ``all-trials`` policy resolves to and is the ceiling of every other
+       policy (``methods`` is ``max(distinct methods, ceil(participation ratio))`` and
+       ``effective`` is ``max(2, round(participation ratio))``, and neither counts more than one
+       look per row). A recorded N above it cannot describe this batch.
+
+       **This was an equality until 2026-10-08** and had to stop being one when
+       ``store.DSR_POLICY`` moved to ``"methods"`` (lab-realistic-gate R1): the row-count
+       expression is the all-trials projection, so every batch recorded under any other policy
+       would be refused by a guard that is testing the policy rather than the batch. The quantity
+       this function actually reconstructs -- ``prior_sharpes``, and through it ``var_trials`` --
+       is read from the rows with ``n < first`` and never from ``n_trials_at_run``, so widening
+       the bound loses nothing: the recorded N is carried through verbatim into the rebuilt
+       ``MomentsRow``, and ``remeasure`` already refuses and writes nothing when the DSR it
+       recomputes from it does not reproduce the recorded one (``SHARPE_TOL``/``DSR_TOL``).
+       ``npolicy.DSR_MIN_N`` widens the ceiling on the degenerate one-trial lab, where
+       ``effective`` floors at 2 and the row count is 1.
     """
     groups: dict[tuple[str, int], list[sqlite3.Row]] = {}
     for row in trials:
@@ -247,11 +262,13 @@ def batches_of(conn: sqlite3.Connection, trials: Sequence[sqlite3.Row]) -> tuple
                 "SELECT count(*) FROM trials WHERE window = 'dev' AND n < ?", (first,)
             ).fetchone()[0]
         )
-        if before + len(ns) != n_at_run:
+        ceiling = max(before + len(ns), npolicy.DSR_MIN_N)
+        if not 1 <= n_at_run <= ceiling:
             raise store.LabError(
-                f"{method_id}: trial #{first} records N = {n_at_run}, but {before} dev trials "
-                f"precede it and its batch holds {len(ns)}. The recorded N does not describe this "
-                f"batch, so the var_trials it was deflated by cannot be reconstructed honestly. "
+                f"{method_id}: trial #{first} records N = {n_at_run}, but only {before} dev "
+                f"trials precede it and its batch holds {len(ns)}, so at most {ceiling} looks "
+                f"existed when it was judged. The recorded N does not describe this batch, so "
+                f"the var_trials it was deflated by cannot be reconstructed honestly. "
                 f"Nothing is backfilled"
             )
         prior = tuple(
@@ -364,6 +381,14 @@ def measure(
     The dev window is not a parameter and not a choice. ``data`` is refused unless it *is* the dev
     window -- the mirror of ``runner.run_test``'s refusal of a dev store -- and ``dev.run_registry``
     is called with no ``window`` keyword, so the run is bounded by ``DEV_WINDOW`` by construction.
+
+    The **funding** is not a parameter either: it is read off the trials being reproduced. A trial
+    with a ``trial_funding`` row was run on ``sim.contributions.OWNER_MONTHLY`` and is re-run on
+    it; a trial without one was run on a lump sum and is re-run on a lump sum. Getting this wrong
+    is not a small error -- measured, an unfunded re-run of a funded trial reports an annualized
+    Sharpe of 0.26 against a recorded 2.65 and this module correctly refuses to write anything. A
+    plan that mixes the two is refused outright, because one ``run_registry`` call runs every
+    candidate on one schedule and there is no answer that reproduces both.
     """
     if data.window != research.DEV_WINDOW:
         w = data.window
@@ -372,13 +397,23 @@ def measure(
             f"({w.start}..{w.end}); `lab remeasure` re-runs the dev window and nothing else. "
             f"Build it with `python -m seer_engine research_store`"
         )
+    ns = tuple(sorted(plan.missing + plan.present))
+    funded = tuple(n for n in ns if store.funding_of(conn, n) is not None)
+    if funded and len(funded) != len(ns):
+        raise store.LabError(
+            f"{method.id}: trials {funded} received deposits and "
+            f"{tuple(n for n in ns if n not in funded)} did not, so one re-run cannot reproduce "
+            f"both. Nothing is backfilled"
+        )
+    contributions = OWNER_MONTHLY if funded else None
     rows: dict[str, DevRow] = {}
 
     def on_result(i: int, result: Any, row: DevRow) -> None:
         rows[config_digest(row.candidate)] = row
 
     dev.run_registry(
-        data.market, data.dividends, data.spy_dividends, plan.candidates, on_result=on_result
+        data.market, data.dividends, data.spy_dividends, plan.candidates,
+        on_result=on_result, contributions=contributions,
     )
     out: list[Reproduced] = []
     for batch in plan.batches:

@@ -86,6 +86,14 @@ def test_remeasure_backfills_moments_and_reproduces_the_recorded_dsr(conn, data,
     numbers = [int(r["n"]) for r in store.trials_of(conn, "M0001")]
     assert numbers == [55, 56]
     assert all(store.moments_of(conn, n) is None for n in numbers)
+    # The N to reproduce is the one the run recorded, whatever `store.DSR_POLICY` resolved to --
+    # read back off the rows rather than typed, because it is the row count only under
+    # `all-trials` and `methods` has shipped since 2026-10-08 (lab-realistic-gate R1). The whole
+    # point of `remeasure` is to rebuild inputs that reproduce the RECORDED dsr, so the recorded
+    # N is the only honest source for it.
+    recorded = {int(r["n_trials_at_run"]) for r in store.trials_of(conn, "M0001")}
+    assert len(recorded) == 1, f"one batch, one N: {recorded}"
+    (n_at_run,) = recorded
 
     report = remeasure.remeasure(conn, m, HERE, data, require_commit=False)
 
@@ -96,10 +104,10 @@ def test_remeasure_backfills_moments_and_reproduces_the_recorded_dsr(conn, data,
         assert r.ok
         assert r.sharpe_delta <= remeasure.SHARPE_TOL * max(abs(r.recorded_sharpe), 1.0)
         assert r.dsr_delta <= remeasure.DSR_TOL
-        assert r.n_at_run == 56
+        assert r.n_at_run == n_at_run
     for n in numbers:
         row = store.moments_of(conn, n)
-        assert row is not None and row["n_at_run"] == 56 and row["t"] > 2
+        assert row is not None and row["n_at_run"] == n_at_run and row["t"] > 2
     assert store.test_looks(conn) == 0
     text = remeasure.format_report(report)
     assert "re-measured on the dev window" in text and "No trials row was inserted" in text
@@ -299,3 +307,32 @@ def test_the_cli_refuses_with_exit_2_and_loads_no_store(tmp_path, conn):
     )
     assert lab_cmd.run(args) == 2
     assert not (tmp_path / "nowhere").exists()
+
+
+def test_a_plan_that_mixes_funded_and_unfunded_trials_is_refused(conn, data, tmp_path):
+    """One `run_registry` call runs every candidate on one schedule, so a mixed plan has no
+    answer that reproduces both. It is refused before anything is re-run or written."""
+    import sqlite3 as _sqlite3
+
+    m = _method()
+    runner.run_method(conn, m, HERE, data, git_sha="x", require_commit=False)
+    ns = sorted(int(r["n"]) for r in store.trials_of(conn, m.id))
+    assert len(ns) >= 2 and all(store.funding_of(conn, n) is not None for n in ns)
+    # Drop one trial's funding row the only way the schema allows it to be absent: a database
+    # where it was never written. `trial_funding` has no-delete and no-update triggers, so this
+    # test builds the mixed state by copying the lab to a file and deleting with the triggers
+    # dropped -- a state a real run cannot produce, which is the point of refusing it.
+    path = tmp_path / "mixed.sqlite"
+    other = _sqlite3.connect(path)
+    conn.backup(other)
+    other.execute("DROP TRIGGER trial_funding_no_delete")
+    other.execute("DELETE FROM trial_funding WHERE trial_n = ?", (ns[0],))
+    other.commit()
+    other.close()
+    mixed = store.connect(path)
+    try:
+        plan = remeasure.preflight(mixed, m, HERE, require_commit=False)
+        with pytest.raises(store.LabError, match="received deposits"):
+            remeasure.measure(mixed, m, plan, data)
+    finally:
+        mixed.close()

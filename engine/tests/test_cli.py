@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 import textwrap
@@ -111,3 +112,58 @@ def test_config_require_raises(monkeypatch):
     monkeypatch.delenv("SEER_T_MISSING", raising=False)
     with pytest.raises(config.ConfigError):
         config.require("SEER_T_MISSING")
+
+
+# --------------------------------------------------------------- every --help must format
+
+
+def _every_parser(parser: argparse.ArgumentParser) -> list[argparse.ArgumentParser]:
+    """``parser`` and every subparser reachable from it, depth-first.
+
+    Subparsers are only reachable through the ``choices`` mapping of the ``_SubParsersAction``
+    that created them, and the action list is private. That is the whole public surface argparse
+    offers for walking a parser tree, and a test is the right place to use it: the alternative is
+    to maintain a hand-written list of command names, which is exactly the thing that goes stale.
+    """
+    out = [parser]
+    for action in parser._actions:
+        choices = getattr(action, "choices", None)
+        if isinstance(choices, dict):
+            for child in choices.values():
+                if isinstance(child, argparse.ArgumentParser):
+                    out.extend(_every_parser(child))
+    return out
+
+
+def test_every_parsers_help_text_formats_without_raising():
+    """`lab --help` crashed with `ValueError: unsupported format character ','`.
+
+    argparse runs every ``help=`` string through %-interpolation in
+    ``HelpFormatter._expand_help``, so a help string that writes a percentage as ``0.1%`` is
+    read as a format spec and the whole ``--help`` dies. Nothing catches it: the string is only
+    interpolated when that particular parser's help is rendered, so the bug sits in a subparser
+    until somebody runs ``--help`` on it. One did, in ``lab costs``, for about a week.
+
+    This walks every parser the CLI builds and formats each one's help. ``format_help()`` is the
+    call ``--help`` makes just before it exits, so it does the interpolation without printing or
+    raising ``SystemExit`` -- which is why this asserts on the formatting rather than on output.
+    """
+    parsers = _every_parser(cli.build_parser())
+    assert len(parsers) > 10, (
+        "the parser walk found almost nothing, so this test is not covering the subparsers it "
+        "exists for -- check _every_parser against the argparse version in use"
+    )
+    broken = []
+    for p in parsers:
+        try:
+            text = p.format_help()
+        except Exception as exc:  # noqa: BLE001 -- the point is that NOTHING may escape
+            broken.append(f"  {p.prog}: {type(exc).__name__}: {exc}")
+            continue
+        if not text.strip():
+            broken.append(f"  {p.prog}: formatted to nothing")
+    assert not broken, (
+        "`--help` raises or renders empty for these parsers. A bare `%` in a `help=` string is "
+        "the usual cause -- write it `%%`; `description=` and `epilog=` are not interpolated and "
+        "must stay single:\n" + "\n".join(broken)
+    )

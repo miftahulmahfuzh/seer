@@ -6,14 +6,14 @@
   "phases": [
     {
       "card": null,
-      "commit": "424adae",
+      "commit": "214312d",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": "DSR_POLICY+DEFAULT_POLICY -> methods (N=28, was 126); remeasure.batches_of guard widened from equality to bounded range at the source (phase 2 depends on this); lab --help %-escape fixed + parser-walk regression test. Engine 3079 passed/0 failed, web 626 passed. Data committed separately in fa8fa2e per invariant 3 (lab.sqlite + lab.json together). Trials still 128, digest unchanged, test looks still 2; six methods moved rejected->dev-eligible (M0002,M0007,M0011,M0019,M0024,M0030). Decision: plan's Verification header says 'after Step 10' but Step 13 is the data step -> ran data verification after Step 13, rung 3 (plan's own code blocks). Follow-up for a card, outside phase 1 Owns: name_count.py:27 and lab names still label dev_trial_count as 'the lab's N'. Plan index edit is uncommitted in the MAIN checkout for the coordinator to land.",
+      "note": "Follow-up to 424adae after coordinator review. Fixed the store.py module docstring defect inside phase 1's Owns (lines 34-35 still said all-trials 'as it has always been'). Decision, rung 3: docs/plans/2026-10-04-method-lab-design.md 7.2 KEEPS its text including '(in force)' -- the phase plan's Handoffs section decides this fork by name, the doc records decisions by appending dated revisions, so a dated 7.3 is the honest repair; carded as P3-ENG-V2KQ. Also carded P2-ENG-N3LB for name_count.py:27. Correction to the coordinator's sweep: name_count.py:477 is NOT a defect -- 'the lab's N and the test-window looks do not move' is a claim about lab names writing nothing and is true under every policy; only :27 mislabels the quantity, and the card says so. Prose only, no suite re-run per coordinator instruction; import check green.",
       "package": "engine.lab`, `engine.commands`, `web/data",
       "plan": ".workflows/plan/lab-realistic-gate/phase-1.md",
-      "reported_at": "2026-10-08T08:04:20+00:00",
+      "reported_at": "2026-10-08T08:08:50+00:00",
       "satisfies": [
         "R1"
       ],
@@ -64,6 +64,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-realistic-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-realistic-gate",
-  "updated": "2026-10-08T08:07:29+00:00",
+  "updated": "2026-10-08T08:08:50+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-realistic-gate"
 }

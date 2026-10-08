@@ -509,18 +509,28 @@ def test_the_marker_names_the_same_split_published_verdict_makes(lab):
     assert windows == {"dev", "test"}  # neither branch was vacuous
 
 
-def test_the_paper_block_is_the_rosters_provenance_verbatim(lab):
+def test_the_paper_block_is_the_active_rosters_provenance(lab):
     """``paper`` is the only block that is not a read of the lab database.
 
     It exists so the web can answer "which method is this roster entry?", which nothing else in
     the snapshot can: ``rules_id`` is shared by a dozen methods. Asserted against
     ``LAB_PROVENANCE`` itself rather than against a copied list of ids, so promoting a strategy
     does not break this test -- the roster is the source and this only checks it arrives whole.
+
+    ACTIVE entries only, narrowed 2026-10-08. ``LAB_PROVENANCE`` keeps retired entries as lineage,
+    which is right on the roster and wrong in the snapshot: the site reads this block to say a
+    method is "on paper", so a retired -- or, after the Gotrade rebuild, a deleted -- entry would
+    go on claiming a paper seat it does not hold. The retired half of the map stays where it
+    belongs and simply stops being published.
     """
     from seer_engine.paper import roster
 
     paper = store.snapshot(lab)["paper"]
-    assert [p["strategyId"] for p in paper] == sorted(roster.LAB_PROVENANCE)
+    active = {e.id for e in roster.active()}
+    assert [p["strategyId"] for p in paper] == sorted(set(roster.LAB_PROVENANCE) & active)
+    # Not vacuous at either end: something is published, and something is deliberately withheld.
+    assert paper
+    assert set(roster.LAB_PROVENANCE) - active
     for p in paper:
         assert set(p) == {"strategyId", "methodId", "candidateId", "labStatus", "basis"}
         prov = roster.LAB_PROVENANCE[p["strategyId"]]

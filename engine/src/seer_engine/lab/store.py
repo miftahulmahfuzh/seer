@@ -2166,10 +2166,16 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
             for s in _dicts(conn, "SELECT * FROM ideas_seen ORDER BY key")
         ],
         # Not from the database: the roster's own record of where each paper entry came from.
+        # Active entries only. ``LAB_PROVENANCE`` is keyed by roster id and keeps retired entries
+        # as lineage, which is right for the roster and wrong here: the site reads this block to
+        # say a method is "on paper", and a purged entry would keep claiming a paper seat it no
+        # longer holds. The 2026-10-08 Gotrade rebuild retired six predecessors and deleted them
+        # outright (db/ops/2026-10-08-purge-retired.sql), which is what made the staleness visible.
         "paper": [
             {"strategyId": sid, "methodId": p.method_id, "candidateId": p.candidate_id,
              "labStatus": p.lab_status, "basis": p.basis}
             for sid, p in sorted(roster.LAB_PROVENANCE.items())
+            if sid in {e.id for e in roster.active()}
         ],
     }
 

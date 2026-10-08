@@ -225,7 +225,7 @@ def test_markdown_method_states_cagr_convention_and_grid():
     md = _section(render_markdown(build_report()), "## Method")
     assert "Actual/365.25" in md
     assert "RSI {5, 10, 15} × limit {0.25, 0.5, 0.75} × TP {0.75, 1.0, 1.5} × SL {1.0, 1.5, 2.0} ATR" in md
-    assert "20,000,000 IDR" in md
+    assert "10,000,000 IDR" in md
 
 
 def test_markdown_lists_all_81_grid_rows_in_order():

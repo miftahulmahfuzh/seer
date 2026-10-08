@@ -38,6 +38,7 @@ from seer_engine.backtest.runner import (
 )
 from seer_engine.prices import Bar
 from seer_engine.sim import Pick, Snapshot
+from seer_engine.sim.contributions import OWNER_MONTHLY, ContributionSchedule
 from seer_engine.strategies.a import DESIGN_PARAMS, STRATEGY_A
 from seer_engine.strategies.base import History, history_from_bars
 
@@ -83,6 +84,10 @@ class FixedPicks:
 # Sessions (March 2025, no holidays): 03-03 (data_date of the first session), then the window
 # 03-04, 03-05, 03-06, 03-07, 03-10, 03-11, 03-12, 03-13, 03-14.
 # USD/IDR on 03-04 = the 03-03 row, 16000 -> cash0 = q(20,000,000 / 16,000) = 1250.0000.
+
+# The scenario below is hand-derived at 1250.0000 USD; it checks the simulator's arithmetic, not
+# the lab's capital, so it pins its own 20,000,000 IDR rather than following INITIAL_IDR.
+SCENARIO_IDR = Decimal("20000000")
 
 START, END = D("2025-03-04"), D("2025-03-14")
 
@@ -156,7 +161,7 @@ def run_scenario(prepared: bool = False) -> tuple[RunResult, FixedPicks]:
     market = scenario_market()
     strategy = FixedPicks(TABLE)
     prep = strategy.prepare(market.history) if prepared else None
-    return run_backtest(market, strategy, None, START, END, prepared=prep), strategy
+    return run_backtest(market, strategy, None, START, END, prepared=prep, initial_idr=SCENARIO_IDR), strategy
 
 
 def test_scenario_final_cash_equity_and_trades():
@@ -299,8 +304,130 @@ def test_run_rejects_bad_windows_and_missing_fx():
         run_backtest(no_fx, FixedPicks(TABLE), None, START, END)
 
 
-def test_initial_idr_default():
-    assert INITIAL_IDR == Decimal("20000000")
+def test_initial_idr_is_the_owners_real_capital():
+    """10,000,000 IDR, the same number ``paper.capital.PAPER_INITIAL_IDR`` holds.
+
+    It used to be 20,000,000 on the ground that only percentages matter in a closed record.
+    That is true of a flat percentage fee and false of Gotrade's, whose $0.10 per-order floor
+    makes the rate depend on the slot: measured at 17,841 IDR/USD over 20 names, a 10M book
+    pays 1.035% round trip and a 20M book 0.660%. Measuring at 20M would price a cheaper world
+    than the owner lives in.
+    """
+    from seer_engine.paper.capital import PAPER_INITIAL_IDR
+
+    assert INITIAL_IDR == Decimal("10000000")
+    assert INITIAL_IDR == PAPER_INITIAL_IDR
+
+
+# --------------------------------------------------------------------------- contributions
+
+
+def test_no_schedule_leaves_the_run_exactly_as_it_was():
+    market, start, end = smoke_market()
+    prepared = STRATEGY_A.prepare(market.history)
+    plain = run_backtest(market, STRATEGY_A, DESIGN_PARAMS, start, end, prepared=prepared)
+    assert plain.contributions is None
+    assert plain.cashflows == ()
+    explicit = run_backtest(
+        market, STRATEGY_A, DESIGN_PARAMS, start, end, prepared=prepared, contributions=None
+    )
+    assert explicit == plain
+
+
+def test_a_contribution_is_credited_on_the_first_session_on_or_after_its_date():
+    """The calendar date is the owner's; the NYSE calendar produces the lag.
+
+    The smoke window is 2024-10-17 .. 2025-03-31 and holds six contributions. Four fall on a
+    session (2024-10-25 Fri, 2024-11-25 Mon, 2025-02-25 Tue, 2025-03-25 Tue) and are credited
+    that day. Two do not and are credited on the next session: 2024-12-25 is Christmas Day, an
+    NYSE holiday, so it lands on 12-26; 2025-01-25 is a Saturday, so it lands on Monday 01-27.
+    A schedule with a baked-in lag could not produce both the 1-day and the 2-day case.
+    """
+    market, start, end = smoke_market()
+    prepared = STRATEGY_A.prepare(market.history)
+    r = run_backtest(
+        market, STRATEGY_A, DESIGN_PARAMS, start, end, prepared=prepared, contributions=OWNER_MONTHLY
+    )
+    assert r.contributions is OWNER_MONTHLY
+    want = [
+        (d if dates.is_session(d) else dates.next_session(d))
+        for d in OWNER_MONTHLY.dates_in(start, end)
+    ]
+    assert [session for session, _ in r.cashflows] == want
+    assert want == [D("2024-10-25"), D("2024-11-25"), D("2024-12-26"),
+                    D("2025-01-27"), D("2025-02-25"), D("2025-03-25")]
+    one = OWNER_MONTHLY.usd_at(r.usd_idr)
+    assert one == P("312.5")
+    assert all(amount == one for _, amount in r.cashflows)
+
+
+def test_a_contribution_raises_cash_and_equity_on_its_session_and_is_not_a_return():
+    """The deposit is money arriving, not a gain: cash and equity both rise by exactly it."""
+    market, start, end = smoke_market()
+    prepared = STRATEGY_A.prepare(market.history)
+    plain = run_backtest(market, STRATEGY_A, DESIGN_PARAMS, start, end, prepared=prepared)
+    fed = run_backtest(
+        market, STRATEGY_A, DESIGN_PARAMS, start, end, prepared=prepared, contributions=OWNER_MONTHLY
+    )
+    assert fed.initial_cash == plain.initial_cash  # the start is unchanged
+    assert fed.snapshots[0] == plain.snapshots[0]
+    deposited = sum((amount for _, amount in fed.cashflows), Decimal("0"))
+    assert deposited == OWNER_MONTHLY.usd_at(fed.usd_idr) * len(fed.cashflows)
+    assert len(fed.cashflows) >= 6
+    assert fed.snapshots[-1].equity_usd > plain.snapshots[-1].equity_usd
+
+
+def test_the_first_sessions_credit_window_opens_after_data_date():
+    """A contribution dated on or before ``prev_session(start)`` belongs to the run before this
+    one: the first session credits only what is dated strictly after its data date."""
+    market, _, _ = smoke_market()
+    sessions = dates.sessions(D("2024-01-02"), D("2025-03-31"))
+    start = D("2024-10-28")  # data_date 2024-10-25, a Friday session: that deposit is NOT ours
+    end = D("2024-11-29")
+    assert start in sessions and dates.prev_session(start) == D("2024-10-25")
+    r = run_backtest(market, STRATEGY_A, DESIGN_PARAMS, start, end, contributions=OWNER_MONTHLY)
+    assert [session for session, _ in r.cashflows] == [D("2024-11-25")]
+
+
+def test_contributions_must_be_a_schedule():
+    market, start, end = smoke_market()
+    with pytest.raises(TypeError, match="contributions must be a ContributionSchedule"):
+        run_backtest(market, STRATEGY_A, DESIGN_PARAMS, start, end, contributions="monthly")
+    with pytest.raises(TypeError, match="contributions must be a ContributionSchedule"):
+        run_backtest(market, STRATEGY_A, DESIGN_PARAMS, start, end, contributions=Decimal("5000000"))
+
+
+def test_a_schedule_with_another_day_and_amount_is_honoured():
+    market, start, end = smoke_market()
+    tenth = ContributionSchedule(Decimal("1000000"), 10)
+    r = run_backtest(market, STRATEGY_A, DESIGN_PARAMS, start, end, contributions=tenth)
+    want = [
+        (d if dates.is_session(d) else dates.next_session(d)) for d in tenth.dates_in(start, end)
+    ]
+    assert [session for session, _ in r.cashflows] == want
+    assert all(amount == P("62.5") for _, amount in r.cashflows)  # 1,000,000 / 16,000
+
+
+def test_a_record_of_deposits_funds_a_run_identically_to_the_plan_that_made_it():
+    """D18, and the round trip phase 12's replay depends on.
+
+    Re-feeding a run its own ``cashflows`` -- the RECORD form, ``(session, usd)`` pairs already
+    converted -- must reproduce the run exactly. The record's dollars are credited as given and
+    never re-converted at the run's rate, which is what lets a replay rebuild a stepped book's
+    history after the rupiah has moved.
+    """
+    market, start, end = smoke_market()
+    prepared = STRATEGY_A.prepare(market.history)
+    fed = run_backtest(
+        market, STRATEGY_A, DESIGN_PARAMS, start, end, prepared=prepared, contributions=OWNER_MONTHLY
+    )
+    replayed = run_backtest(
+        market, STRATEGY_A, DESIGN_PARAMS, start, end, prepared=prepared, contributions=fed.cashflows
+    )
+    assert replayed.snapshots == fed.snapshots
+    assert replayed.events == fed.events
+    assert replayed.cashflows == fed.cashflows
+    assert replayed.contributions == fed.cashflows  # the record, not the schedule
 
 
 # --------------------------------------------------------------------------- survivorship

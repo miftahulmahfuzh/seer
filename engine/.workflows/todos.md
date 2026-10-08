@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 97
+- Completed: 98
 
 ---
 
@@ -797,6 +797,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - No peer phase was unblocked or altered: phase 5 (`P1-ENG-QM5I`) stays `blocked` and in flight in a peer session; `next_task_id` was empty and phase 9 is the last phase, so there is no successor to release.
     - Quick Stats recounted from the file rather than blind-decremented (recount is idempotent under concurrency; a decrement compounds the race).
 
+
 ### [P2] Medium
 
 ### [P3] Low
@@ -808,6 +809,29 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-HPOI** Phase 5: A contribution schedule, and the lab's real capital
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/sim/contributions.py` (new: ContributionSchedule, OWNER_MONTHLY, dates_in, due, usd_at, credit_usd, MAX_DAY_OF_MONTH, the alias Contributions and credit_for), `backtest/runner.py` (INITIAL_IDR, session loop, and its `rules` keyword — phase 4's H1), `backtest/book_runner.py` (and its is_bracket dispatch + order_fee — phase 4's H1/H2), new `engine/tests/test_sim_contributions.py`, plus test_backtest_runner.py, test_book_runner.py, test_backtest_report.py, test_backtest_b_report.py, test_backtest_wf_report.py, test_backtest_labels.py, and engine/package_readme.md. Exit: +5,000,000 IDR on the 25th of each month is expressible as a value object and honoured by both backtest runners; INITIAL_IDR is the real 10,000,000 IDR; the schedule deposits on a calendar date and lets the NYSE calendar produce the lag; run_backtest(..., rules=DESIGN_V0_GOTRADE) ends with strictly less equity than at DESIGN_V0; run_rules sends a "bracket" rule set to run_backtest rather than step_book.
+  - **Status**: completed
+  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 5 of 12)
+  - **Satisfies**: R3 — Measure what the owner will actually do: 10,000,000 IDR start, +5,000,000 IDR on the 25th of each month — contributions in backtest and paper, a money-weighted return, a dollar-cost-averaged SPY, every CAGR-phrased gate restated
+  - **Depends on**: P1-ENG-F6QN
+  - **Plan**: `.workflows/plan/P1-ENG-HPOI.md`
+  - **Completed**: 2026-10-08 11:28
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/sim/contributions.py, engine/src/seer_engine/backtest/runner.py, engine/src/seer_engine/backtest/book_runner.py, engine/tests/test_sim_contributions.py, engine/tests/test_backtest_runner.py, engine/tests/test_book_runner.py, engine/tests/test_backtest_labels.py, engine/tests/test_backtest_report.py, engine/tests/test_backtest_b_report.py, engine/tests/test_backtest_wf_report.py, engine/tests/test_paper_bracket.py, engine/package_readme.md, engine/.workflows/todos.md, engine/.workflows/plan/P1-ENG-HPOI.md
+  - **Verified**: `cd engine && python -m ruff check src tests` -> All checks passed!. `PYTHONPATH=engine/src PG_TEST_URL=... python -m pytest engine/tests -q -n auto` -> **3413 passed, 1 skipped, 0 failed** against a coordinator-measured baseline of 3388 passed / 1 skipped / 0 failed taken minutes earlier with nothing else writing: +25 tests, zero new failures. `cd web && npx tsc --noEmit` exit 0; `npx vitest run` 47 files / 606 tests passed. All six exit criteria verified, including criterion 5 (ending equity 1273.4568 flat vs 1249.5128 gotrade -- strictly less; `run_rules` returns a RunResult for a `"bracket"` rule set) and criterion 6 (D18 round trip: re-feeding a run its own `cashflows` reproduces snapshots, events and cashflows exactly).
+  - **Drift**:
+    - Phase 5's "moving INITIAL_IDR breaks 10 tests in 5 files, and nothing else" was measured at 485d416, BEFORE phase 4 landed. Phase 4 added `engine/tests/test_paper_bracket.py`, whose fixture funds from INITIAL_IDR and whose price ladder is calibrated to a 1250 USD book, so halving the capital broke `test_a_gotrade_night_keeps_the_shape_and_pays_strictly_more`. Fixed with this phase's own documented remedy, already applied three times in Steps 5/6/7: pin the fixture at its own `Decimal('20000000')` (BRACKET_IDR) and pass it at the four funding/comparison sites. Measured and written into the comment: at 20M both runs place 215 events with identical shape; at 10M the slot halves, `lt_one_share` rejections go 26 -> 123, and Gotrade's $0.10 floor rejects five more names than flat (128 vs 123). No assertion was relaxed.
+    - Step 2b's H2 one-liner `cost = order_fee(side, price, shares, rules)` was written against line numbers pointing at `book_runner.py`'s private `_fee` helper, and names `cost`/`side`/`rules` that exist at no call site there. Implemented as described under Decided.
+    - Step 4's test block predates the reconciler's D18 and imports no `credit_for`, but exit criterion 6 requires the record form to be asserted. Added `credit_for` to the import plus 3 tests for it (14 tests in the file, not the plan's 11), and one round-trip test in `test_backtest_runner.py`.
+  - **Decided**:
+    - Step 2b's `order_fee` site needs a rule set `RunResult` does not carry -> threaded `rules: TradeRules = DESIGN_V0` as a keyword-with-default through `run_stats` / `_run_result_stats` / `_fee`, rather than adding a third field to `RunResult` (rung 3: the plan's Interface Contract lists RunResult's new fields exhaustively as two, and phases 6/7/8/12 quote it; keyword-with-default is D10's own pattern). Measured bit-identical under the default; costs 14.6854 flat vs 42.43 gotrade on the seeded fixture.
+    - Phase 4's `test_paper_bracket.py` broke on the INITIAL_IDR move -> pinned its fixture at its own 20,000,000 IDR (rung 3: the plan's own "pin the fixture rather than loosen the tolerance"). See Drift above.
+    - The plan's Verification prescribes `git stash && pytest && git stash pop` for the before/after failure sets -> skipped; used the coordinator's measured baseline instead (engine 3388 passed / 1 skipped / 0 failed, taken minutes before this phase started with nothing else writing). Rung 1: bare `git stash` is a tree-wide git command, banned in this shared worktree.
+    - `GOTRADE_FEE_REBUILD_PLAN.md` left untouched, phase 5's row not ticked (rung 1 + the direct precedent of phases 1, 2, 3, 9 and 11 of this same set): the set is a coordinated swarm whose `ledger.json` owns set-level progress, the index is outside this phase's commit allowlist, and a cross-file tick races eleven peers.
+    - The `[x]` block moved into `## Completed Tasks` and Quick Stats recounted from the file rather than blind-decremented (recount is idempotent under concurrency; a decrement compounds the race).
 - [x] **P1-ENG-KQRW** Phase 2: A test-window look is not luck-gated, and says so
   - **Difficulty**: HARD
   - **Type**: Bug

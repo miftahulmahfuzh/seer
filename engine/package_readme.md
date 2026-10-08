@@ -80,6 +80,7 @@ engine/
       sizing.py             Pick, Rejection, SizingResult, size_picks()
       split_adjust.py       apply_split()
       costs.py              Gotrade's measured fee schedule: FeeParts, FeeRegime, GotradeSchedule, GOTRADE, fee_parts(), gotrade_cash(), gotrade_shares_for() (Sean phase 6)
+      contributions.py      the owner's recurring deposit as a value: ContributionSchedule, OWNER_MONTHLY, MAX_DAY_OF_MONTH, Contributions, credit_for (plan phase 5)
       rules.py              TradeRules, DESIGN_V0, V0_BOOK, the presets, the rank/resize cadence split (P7a)
       book.py               the book engine: Target, Book, Position, Fill, Trade, step_book(), close_book_unpriced() (P7a); apply_book_split(), BookSplit (P4)
     paper/                  nightly paper trading (P4); every module but store.py is pure
@@ -1421,13 +1422,31 @@ the database.
   field order. The panel is deliberately **independent of `history`**: a symbol may have facts and
   no bars (a delisted ever-member) or bars and no facts (every ETF), and nothing cross-checks the
   two. `__post_init__` type-checks it like the other fields.
-- **`backtest.runner`**: `INITIAL_IDR = Decimal("20000000")`.
-  `run_backtest(market, strategy, params, start, end, *, prepared=None, initial_idr=INITIAL_IDR) -> RunResult`
+- **`backtest.runner`**: `INITIAL_IDR = Decimal("10000000")` — the owner's real Gotrade capital, the
+  same number `paper.capital.PAPER_INITIAL_IDR` holds. It was 20,000,000 while every simulated fee
+  was a flat percentage, where only ratios matter; Gotrade's measured schedule has a $0.10
+  per-order floor, so the rate depends on the slot (at 17,841 IDR/USD over 20 names a 10M book pays
+  1.035% round trip and a 20M book 0.660%) and a 20M lump would price a cheaper world than the owner
+  lives in.
+  `run_backtest(market, strategy, params, start, end, *, prepared=None, initial_idr=INITIAL_IDR, contributions=None, rules=DESIGN_V0) -> RunResult`
   is the "P3 backtest loop" below: each session `size_picks(picks(prev_session(S)))` → `step` →
   `close_unpriced` for held symbols whose bars ended for good (`last_bar_date < S`; a halt whose
   bars resume is left to the simulator's missing-bar rule). `RunResult` holds `snapshots`
   (`[0] = Snapshot(prev_session(start), cash0, cash0)`, then one per session), `events`, `closed`,
   `open_at_end` (marked at the last close, never liquidated) and rejection counts.
+  `rules` prices every buy, fill and exit — `DESIGN_V0` (the default) is the flat 0.1% a side every
+  closed §5 record was run at, `DESIGN_V0_GOTRADE` Gotrade's measured schedule including its $0.10
+  per-order minimum — and is passed straight to `sim.size_picks`, `sim.step` and
+  `sim.close_unpriced`; `run_rules` dispatches a `"bracket"` rule set here (`sim.rules.is_bracket`)
+  rather than to the book engine.
+  `contributions` is a `sim.contributions.Contributions` or None (the default, and every closed
+  record) — either the owner's `ContributionSchedule`, whose calendar dates are credited at the open
+  of the first NYSE session on or after each of them and converted at this run's single rate, or a
+  **record** of `(session, usd)` deposits already made and already converted, which are credited
+  unchanged (that is what a paper replay passes, so it reproduces the dollars the night wrote). A
+  credit raises cash **and** equity before that session sizes anything, and `RunResult` records what
+  it was funded with plus `cashflows` — `(session, usd)` per credited deposit, the dated series a
+  money-weighted return is computed from. A deposit is money arriving, never a return.
   `survivorship(market, start, end) -> tuple[YearGap, ...]`: per year, the (member, session) pairs
   with no bar, split into never-fetched symbols and other gaps.
 - **`backtest.benchmark`**: `parse_dividends(text)`, `buy_and_hold(spy, start, end, initial_cash, *, dividends=(), name)`
@@ -1896,6 +1915,59 @@ receipt in `tests/fixtures/gotrade_fees.json`.
 - Every backtest prices every simulated date at the current regime (`on=None`). The lab asks what a
   method would cost the owner now, not what it would have cost in 2012.
 
+### sim: the owner's contribution schedule (plan phase 5)
+
+`sim/contributions.py` is pure in the same sense as `sim/costs.py`: no clock, no I/O, no floats and
+no market calendar. Until it existed every simulated book was a lump sum that never grew —
+`backtest.runner` converted `INITIAL_IDR` once and that was all the money there would ever be. The
+owner's real plan is 10,000,000 IDR to start and **5,000,000 IDR more on the 25th of every month,
+indefinitely** (decided 2026-10-08). This module is that plan as one frozen value; tests in
+`tests/test_sim_contributions.py`.
+
+- `ContributionSchedule(amount_idr, day_of_month=25)`: frozen, slotted and hashable. `amount_idr` is
+  a finite `Decimal` > 0 and `day_of_month` is 1..`MAX_DAY_OF_MONTH` (28), so a schedule can never
+  silently skip February. Anything else is a `TypeError` or a `ValueError`.
+- `OWNER_MONTHLY` is the owner's plan as a value: `Decimal("5000000")` on the 25th.
+- **The schedule names CALENDAR dates, never sessions.** The 25th is a date on the owner's bank
+  statement; whether the NYSE is open that day is the market's business, not the schedule's. A
+  runner credits a contribution dated `d` at the OPEN of the first session on or after `d`, which it
+  gets by asking `due(previous session, this session)` once per session — so the settlement lag is
+  the market calendar's answer rather than a number baked into the schedule.
+- `dates_in(first, last)` is every contribution date in the window, both ends inclusive, ascending.
+  `due(after, through)` is `dates_in(after + 1 day, through)`: the per-session form, exclusive of
+  `after` and inclusive of `through`, so a long gap carries more than one month.
+- `usd_at(usd_idr)` converts one deposit, `q(amount_idr / usd_idr)` half-up at `PRICE_QUANTUM` —
+  `sim.initial_cash_usd`'s own rounding, so the contributed dollars and the starting dollars are
+  measured on one rate and the result is about the strategy rather than about the rupiah.
+  `credit_usd(after, through, usd_idr)` is one `usd_at` per due date, each converted and rounded on
+  its own, so the book receives the sum of the deposits the owner actually makes and not a rounded
+  multiple.
+- `Contributions = ContributionSchedule | Sequence[tuple[date, Decimal]]` is what a runner accepts:
+  the owner's forward-looking PLAN, or a RECORD of deposits that have already landed and already
+  been converted. `credit_for(contributions, after, session, usd_idr)` is where the two become one
+  answer to "how many dollars arrive at the open of this session":
+  - a **plan** names calendar dates and is priced here at `usd_idr`, this run's single rate — right
+    for a backtest, which asks about the strategy and not about the rupiah;
+  - a **record** of `(session, usd)` pairs is returned unchanged and `usd_idr` is not consulted at
+    all, because each deposit was already converted at the rate of the day it landed. That is right
+    for a replay, which must reproduce the dollars a paper night actually wrote; recomputing them at
+    one rate would move a stepped book's history the first time the rupiah did. The pairs must be
+    strictly ascending dates with `Decimal` amounts > 0, or the record is refused. A record's dates
+    are already landing sessions, so the window `after < d ≤ session` selects exactly `d == session`.
+- **The lag was measured, not assumed.** Rank sessions are month-start, so a deposit on the 25th
+  waits for the next rotation before it can be invested: over the twelve months from 2026-10 the gap
+  averages 7.0 calendar days (range 4, February 2027, to 10, December 2026) and 4.2 idle NYSE
+  sessions (range 2 to 5). A schedule that baked in a fixed seven-day lag would be wrong in ten
+  months of twelve, and one that deposited at the rotation instead would hold a week less idle cash
+  every month and so quietly OVERSTATE returns. Reproducing the idle cash is the point.
+- **Both runners honour a schedule the same way.** `run_backtest` and `run_book` take
+  `contributions=None` by default, so every closed record is a lump sum and unchanged. When one is
+  given, each session first asks `credit_for(contributions, data_date, session, usd_idr)`; a
+  positive credit raises cash **and** equity before the session sizes anything, and
+  `(session, usd)` is appended to `cashflows`. `RunResult` and `BookResult` each gained exactly two fields for this —
+  `contributions` (what the run was funded with) and `cashflows` (the dated series a money-weighted
+  return is computed from). A deposit is money arriving, never a return.
+
 ### strategies: allocators and the P7a families
 
 The new modules are pure and flat in `strategies/`, so the purity glob covers them.
@@ -2144,7 +2216,7 @@ the injected death is abrupt, which makes the whole result an **upper bound** on
 `backtest/book_runner.py` is pure (covered by `tests/test_strategy_purity.py`); tests in
 `tests/test_book_runner.py`.
 
-- **`run_book(market, allocator, params, rules, start, end, *, prepared=None, dividends=..., initial_idr=INITIAL_IDR, usd_idr=None) -> BookResult`**:
+- **`run_book(market, allocator, params, rules, start, end, *, prepared=None, dividends=..., initial_idr=INITIAL_IDR, usd_idr=None, kickoff=None, contributions=None) -> BookResult`**:
   drives an `Allocator` under book `TradeRules` (`rules.engine == "book"`) through `sim.book.step_book`
   over every NYSE session in `[start, end]`, in `run_backtest`'s shape. On a rank session
   (`sim.rules.is_rank_session`) the allocator maps history through `data_date = prev_session(S)`

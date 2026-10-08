@@ -476,7 +476,7 @@ def test_method_states_the_preregistered_design():
     assert "Folds: 2021, 2022" in md
     assert "the two model digests are identical" in md
     assert "One round only" in md
-    assert "20,000,000 IDR" in md and "Actual/365.25" in md
+    assert "10,000,000 IDR" in md and "Actual/365.25" in md
 
 
 def test_determinism_switch_gates_b_linear():

@@ -20,7 +20,7 @@ from stratkit import mutate_from
 
 from seer_engine import dates
 from seer_engine.backtest.market import Market, Membership
-from seer_engine.backtest.runner import INITIAL_IDR, RunResult, run_backtest
+from seer_engine.backtest.runner import RunResult, run_backtest
 from seer_engine.paper.bracket import BracketNight, decide_bracket, settle_bracket
 from seer_engine.prices import Bar
 from seer_engine.sim import DESIGN_V0, Event, Snapshot, TradeRules, initial_cash_usd, new_portfolio
@@ -89,6 +89,16 @@ def market(cut: date | None = None) -> Market:
 START, END = SESSIONS[200], SESSIONS[-1]  # data_date SESSIONS[199] has exactly 200 bars
 
 
+# This fixture's price ladder is calibrated to a 1250 USD book, so it pins its own 20,000,000 IDR
+# rather than following backtest.runner.INITIAL_IDR, which plan phase 5 moved to the owner's real
+# 10,000,000. Measured at 10,000,000: the slot halves, lt_one_share rejections go 26 -> 123, and
+# Gotrade's $0.10 per-order floor then rejects five names the flat rate still affords (128 vs 123),
+# so the two runs stop being identical in shape and the test below has nothing left to compare.
+# At 20,000,000 both runs place 215 events with the same shape and the assertion keeps its full
+# strength -- which is the point: this test is about the fee model, not about the lab's capital.
+BRACKET_IDR = Decimal("20000000")
+
+
 def run_nights(
     m: Market, start: date, end: date, *, rules: TradeRules = DESIGN_V0
 ) -> tuple[RunResult, list[BracketNight]]:
@@ -97,7 +107,7 @@ def run_nights(
     ``rules`` defaults to ``DESIGN_V0``, so every existing caller is byte-for-byte unchanged.
     """
     usd_idr = m.usd_idr_on(start)
-    cash0 = initial_cash_usd(INITIAL_IDR, usd_idr)
+    cash0 = initial_cash_usd(BRACKET_IDR, usd_idr)
     pf = new_portfolio(cash0)
     data_date = dates.prev_session(start)
     snapshots = [Snapshot(data_date, pf.cash, pf.equity)]
@@ -136,7 +146,7 @@ def run_nights(
 def _cut_while_held() -> date:
     """A session on whose close UPC is open in the uncut run (so cutting its bars there forces a
     close on the next session)."""
-    full = run_backtest(market(), STRATEGY_A, STRATEGY_A_PARAMS, START, END)
+    full = run_backtest(market(), STRATEGY_A, STRATEGY_A_PARAMS, START, END, initial_idr=BRACKET_IDR)
     for e in full.events:
         o = e.order
         if e.kind == "fill" and o.symbol == "UPC":
@@ -155,7 +165,7 @@ def test_window_has_at_least_300_sessions():
 
 def test_nights_equal_run_backtest():
     m = market()
-    expected = run_backtest(m, STRATEGY_A, STRATEGY_A_PARAMS, START, END)
+    expected = run_backtest(m, STRATEGY_A, STRATEGY_A_PARAMS, START, END, initial_idr=BRACKET_IDR)
     got, nights = run_nights(m, START, END)
     assert got.snapshots == expected.snapshots
     assert got.events == expected.events
@@ -174,7 +184,7 @@ def test_nights_equal_run_backtest():
 def test_nights_equal_run_backtest_with_a_forced_close():
     cut = _cut_while_held()
     m = market(cut)
-    expected = run_backtest(m, STRATEGY_A, STRATEGY_A_PARAMS, START, END)
+    expected = run_backtest(m, STRATEGY_A, STRATEGY_A_PARAMS, START, END, initial_idr=BRACKET_IDR)
     forced = [e for e in expected.events if e.forced]
     assert len(forced) == 1
     assert forced[0].order.symbol == "UPC"
@@ -287,7 +297,7 @@ def test_settle_rejects_bad_input():
 def test_decide_cuts_history_at_data_date_no_look_ahead():
     """Changing every bar dated on or after S leaves the decision for S unchanged."""
     m = market()
-    cash0 = initial_cash_usd(INITIAL_IDR, m.usd_idr_on(START))
+    cash0 = initial_cash_usd(BRACKET_IDR, m.usd_idr_on(START))
     seen_picks = 0
     for data_date in SESSIONS[199::7]:
         s = dates.next_session(data_date)

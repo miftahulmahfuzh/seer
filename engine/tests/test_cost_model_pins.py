@@ -56,13 +56,28 @@ def test_every_committed_lab_trial_recomputes_its_config_digest_byte_for_byte():
     assert checked > 0
 
 
+def _asserts_cost_model(text: str, c) -> None:
+    """``flat`` is left out of a canonical form; ``gotrade`` names itself, so it digests apart.
+
+    The second branch is not an exemption: from M0031 on ``lab.real_costs.real_cost_problem``
+    REQUIRES every lab candidate to be at ``cost_model="gotrade"``, so a method that omitted it
+    could not run at all. Asserting absence unconditionally would have pinned the lab to the old
+    flat cost -- the opposite of invariant 2, which is that the lever moves no digest *at its
+    no-op value*.
+    """
+    if c.rules.cost_model == "flat":
+        assert "cost_model" not in text, c.id
+    else:
+        assert f"cost_model='{c.rules.cost_model}'" in text, c.id
+
+
 def test_flat_is_absent_from_every_canonical_form():
     for c in REGISTRY:
-        assert "cost_model" not in candidate_text(c), c.id
-        assert "cost_model" not in config_text(c), c.id
+        _asserts_cost_model(candidate_text(c), c)
+        _asserts_cost_model(config_text(c), c)
     for m, _ in discover().values():
         for c in m.candidates:
-            assert "cost_model" not in config_text(c), c.id
+            _asserts_cost_model(config_text(c), c)
     for r in PRESETS:
         if r.cost_model == "flat":
             assert "cost_model" not in roster.rules_dict(r), r.id

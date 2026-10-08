@@ -26,11 +26,13 @@ from seer_engine.sim import (
     Target,
     apply_split,
     close_unpriced,
+    initial_cash_usd,
     size_picks,
     step,
     step_book,
 )
 from seer_engine.sim.book import BookSnapshot, Fill, Trade
+from seer_engine.sim.contributions import OWNER_MONTHLY
 
 D = Decimal
 S0, S1, S2, S3, S4, S5 = (
@@ -56,13 +58,16 @@ def bar(symbol: str, d: date, o: str, h: str, low: str, c: str) -> Bar:
 
 def test_read_strategies_returns_the_roster_rows_in_sort_order(pg):
     rows = store.read_strategies(pg)
+    # 017 put the six Gotrade-fee successors at the head and moved the thirteen below them.
     assert [r.id for r in rows] == [
+        "SPY-GT", "C-GT", "RMW-FR-GT", "RAW-FR-GT", "MOM-FR-GT", "MVW-FR-GT",
         "SPY", "A", BOOK_ID, TIMING_ID, "C", "FND", f"{BOOK_ID}-FR", f"{TIMING_ID}-FR", "RM-FR",
         "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR",
     ]
-    spy = rows[0]
+    spy = next(r for r in rows if r.id == "SPY-GT")
     assert (spy.engine, spy.rules_id, spy.is_champion, spy.is_benchmark) == ("benchmark", None, True, True)
-    assert rows[1].engine == "bracket" and rows[1].rules_id == "design-v0"
+    c_gt = next(r for r in rows if r.id == "C-GT")
+    assert c_gt.engine == "bracket" and c_gt.rules_id == "design-v0-gotrade"
     assert all(r.paper_start is None and r.params == {} for r in rows)
     assert store.read_strategy(pg, "nope") is None
 
@@ -655,3 +660,144 @@ def test_market_window_panel_is_empty_when_no_facts_are_stored(pg, tmp_path):
     assert window.fundamentals is EMPTY_PANEL
     assert list(window.history) == ["AAA", "NEW", "SPY"]
     pg.rollback()
+
+
+# --------------------------------------------------------------------------- contributions
+
+# The owner's deposit (his decision, relayed 2026-10-08): 5,000,000 IDR on the 25th of each month.
+CONTRIB_IDR = D("5000000.00")
+DUE_WEEKEND = date(2026, 9, 26)   # a Saturday -> lands on S0, 2026-09-28
+DUE_SESSION = date(2026, 9, 30)   # a Wednesday -> lands on itself, S2
+DUE_LATE = date(2026, 10, 3)      # a Saturday -> lands on S5, 2026-10-05
+
+
+def test_contribution_session_lands_on_the_date_itself_or_the_next_session():
+    assert store.contribution_session(DUE_SESSION) == S2
+    assert store.contribution_session(DUE_WEEKEND) == S0
+    assert store.contribution_session(DUE_LATE) == S5
+    # Measured 2026-10-08: five of the twelve 25ths from 2026-10-25 are not NYSE sessions, so the
+    # landing date has to be computed. December's is the widest gap in the year.
+    assert store.contribution_session(date(2026, 10, 25)) == date(2026, 10, 26)
+    assert store.contribution_session(date(2026, 11, 25)) == date(2026, 11, 25)
+    assert store.contribution_session(date(2026, 12, 25)) == date(2026, 12, 28)
+    with pytest.raises(TypeError):
+        store.contribution_session("2026-09-30")
+
+
+def test_the_owner_monthly_schedule_lands_where_the_calendar_says_it_does():
+    """The schedule phase 5 defines, read through this phase's landing rule. One schedule only."""
+    due = OWNER_MONTHLY.dates_in(date(2026, 10, 1), date(2027, 9, 30))
+    assert len(due) == 12
+    assert due[0] == date(2026, 10, 25) and due[-1] == date(2027, 9, 25)
+    assert all(d.day == 25 for d in due)
+    landed = [store.contribution_session(d) for d in due]
+    assert sum(1 for d, s in zip(due, landed) if s != d) == 5  # five 25ths are not sessions
+    assert landed[0] == date(2026, 10, 26)
+    assert landed[2] == date(2026, 12, 28)
+
+
+def test_record_contribution_freezes_the_rate_and_the_dollars(pg):
+    c = store.record_contribution(pg, "A", due_date=DUE_WEEKEND, amount_idr=CONTRIB_IDR, usd_idr=RATE)
+    assert (c.strategy_id, c.due_date, c.session_date) == ("A", DUE_WEEKEND, S0)
+    assert (c.amount_idr, c.usd_idr, c.amount_usd) == (CONTRIB_IDR, RATE, D("312.5000"))
+    assert c.applied is False
+    # Writing it again at another rate changes nothing: fx_rates is backfilled and a recorded
+    # deposit must not move under it.
+    again = store.record_contribution(
+        pg, "A", due_date=DUE_WEEKEND, amount_idr=CONTRIB_IDR, usd_idr=D("17841.0000")
+    )
+    assert again == c
+    assert store.read_contributions(pg, "A") == (c,)
+    assert store.read_contribution(pg, "A", DUE_SESSION) is None
+
+
+def test_record_contribution_converts_as_day_zero_does(pg):
+    # 17841.0000 is the rate the frozen production book started at: 10,000,000 IDR -> 560.5067 USD.
+    c = store.record_contribution(
+        pg, "A", due_date=DUE_SESSION, amount_idr=CONTRIB_IDR, usd_idr=D("17841.0000")
+    )
+    assert c.amount_usd == D("280.2533")
+    assert c.amount_usd == initial_cash_usd(CONTRIB_IDR, D("17841.0000"))
+
+
+def test_record_contribution_refuses_what_the_columns_cannot_hold(pg):
+    with pytest.raises(ValueError):
+        store.record_contribution(pg, "A", due_date=DUE_SESSION, amount_idr=D("5000000.001"), usd_idr=RATE)
+    with pytest.raises(ValueError):
+        store.record_contribution(pg, "A", due_date=DUE_SESSION, amount_idr=D("0.00"), usd_idr=RATE)
+    with pytest.raises(ValueError):
+        store.record_contribution(pg, "A", due_date=DUE_SESSION, amount_idr=CONTRIB_IDR, usd_idr=D("0.0000"))
+    with pytest.raises(TypeError):
+        store.record_contribution(pg, "A", due_date=DUE_SESSION, amount_idr=5000000.0, usd_idr=RATE)
+    assert store.read_contributions(pg, "A") == ()
+
+
+def test_accrue_records_only_what_has_landed_and_keeps_the_rate_it_was_written_at(pg):
+    rates = {S0: RATE, S2: D("17841.0000"), S5: D("16500.0000")}
+    due = [DUE_LATE, DUE_WEEKEND, DUE_SESSION]  # out of order on purpose
+    rows = store.accrue_contributions(
+        pg, BOOK_ID, due, CONTRIB_IDR, through=S2, usd_idr_on=rates.__getitem__
+    )
+    assert [c.due_date for c in rows] == [DUE_WEEKEND, DUE_SESSION]
+    assert [c.session_date for c in rows] == [S0, S2]
+    assert [c.amount_usd for c in rows] == [D("312.5000"), D("280.2533")]
+    # DUE_LATE lands on S5, after tonight: not recorded yet.
+    assert [c.due_date for c in store.read_contributions(pg, BOOK_ID)] == [DUE_WEEKEND, DUE_SESSION]
+
+    later = store.accrue_contributions(
+        pg, BOOK_ID, due, CONTRIB_IDR, through=S5, usd_idr_on=rates.__getitem__
+    )
+    assert [c.due_date for c in later] == [DUE_WEEKEND, DUE_SESSION, DUE_LATE]
+    assert later[0].usd_idr == RATE and later[1].usd_idr == D("17841.0000")
+    assert later[2].amount_usd == D("303.0303")  # 5,000,000 / 16,500
+
+
+def test_accrue_does_not_read_the_rate_for_a_date_it_already_has(pg):
+    store.record_contribution(pg, BOOK_ID, due_date=DUE_SESSION, amount_idr=CONTRIB_IDR, usd_idr=RATE)
+
+    def boom(_d):
+        raise AssertionError("usd_idr_on must not be called for an already-recorded date")
+
+    rows = store.accrue_contributions(pg, BOOK_ID, [DUE_SESSION], CONTRIB_IDR, through=S2, usd_idr_on=boom)
+    assert [c.usd_idr for c in rows] == [RATE]
+
+
+def test_apply_contributions_credits_once_and_never_a_settled_session(pg):
+    store.init_paper_state(pg, BOOK_ID, paper_start=S1, cash0=CASH0, usd_idr=RATE)  # last_session = S0
+    store.record_contribution(pg, BOOK_ID, due_date=DUE_WEEKEND, amount_idr=CONTRIB_IDR, usd_idr=RATE)
+    store.record_contribution(pg, BOOK_ID, due_date=DUE_SESSION, amount_idr=CONTRIB_IDR, usd_idr=RATE)
+
+    # S0 is the day-0 session: already settled, so its deposit cannot be credited to it.
+    with pytest.raises(store.StoreError):
+        store.apply_contributions(pg, BOOK_ID, S0)
+    assert store.apply_contributions(pg, BOOK_ID, S1) == D("0.0000")   # nothing lands on S1
+    assert store.apply_contributions(pg, BOOK_ID, S2) == D("312.5000")
+    assert [c.applied for c in store.read_contributions(pg, BOOK_ID)] == [False, True]
+    # A second pass over the same session credits nothing twice.
+    assert store.apply_contributions(pg, BOOK_ID, S2) == D("0.0000")
+    assert store.due_contributions(pg, BOOK_ID, S2) == ()
+    # paper_state is untouched: the night's own save is the only writer of cash_usd.
+    state = store.read_paper_state(pg, BOOK_ID)
+    assert (state.cash_usd, state.equity_usd, state.initial_cash_usd) == (CASH0, CASH0, CASH0)
+
+
+def test_two_deposits_landing_on_one_session_are_credited_together(pg):
+    store.init_paper_state(pg, BOOK_ID, paper_start=S1, cash0=CASH0, usd_idr=RATE)
+    # A Saturday and the Sunday after it both land on the Monday.
+    store.record_contribution(pg, BOOK_ID, due_date=date(2026, 10, 3), amount_idr=CONTRIB_IDR, usd_idr=RATE)
+    store.record_contribution(pg, BOOK_ID, due_date=date(2026, 10, 4), amount_idr=CONTRIB_IDR, usd_idr=RATE)
+    assert [c.session_date for c in store.read_contributions(pg, BOOK_ID)] == [S5, S5]
+    assert store.apply_contributions(pg, BOOK_ID, S5) == D("625.0000")
+
+
+def test_contributions_are_per_strategy(pg):
+    store.record_contribution(pg, "A", due_date=DUE_SESSION, amount_idr=CONTRIB_IDR, usd_idr=RATE)
+    assert len(store.read_contributions(pg, "A")) == 1
+    assert store.read_contributions(pg, BOOK_ID) == ()
+    assert store.read_contributions(pg, "SPY") == ()
+
+
+def test_apply_contributions_without_a_paper_state_row_is_a_store_error(pg):
+    store.record_contribution(pg, "A", due_date=DUE_SESSION, amount_idr=CONTRIB_IDR, usd_idr=RATE)
+    with pytest.raises(store.StoreError):
+        store.apply_contributions(pg, "A", S2)

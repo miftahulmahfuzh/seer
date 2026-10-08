@@ -62,13 +62,34 @@ jobs:
         # Rules live in engine/pyproject.toml [tool.ruff.lint]: bugs only (E9, F minus F401).
         run: python -m ruff check engine
 
-      - name: Test engine (DB tests must run, not skip)
+      - name: Test engine (the Postgres tests must run, not skip)
         shell: bash
         run: |
           set -o pipefail
+
+          # This step guards against exactly one failure: PG_TEST_URL never reached pytest, so
+          # every database test "passed" by not running. conftest.py's pg_url fixture skips with
+          # the reason matched below and nothing else in the suite uses that wording.
+          #
+          # It used to grep for any '^SKIPPED' line, which cannot tell that failure from a
+          # deliberate skipif and so failed the build while printing a message that was false.
+          # Measured 2026-10-08 on a correctly configured run: 3362 passed, 2 skipped, 0 failed --
+          # the two being an opt-in live-store test and an aged pin, neither of them a
+          # misconfiguration.
+          #
+          # The signature check comes first: if conftest.py's reason is ever reworded, the grep
+          # below would stop matching and the guard would disarm itself in silence. Failing here
+          # instead makes the two move together.
+          signature='PG_TEST_URL is not set; start Postgres with'
+          if ! grep -qF "$signature" engine/tests/conftest.py; then
+            echo "::error file=engine/tests/conftest.py::the pg_url skip reason no longer contains \"$signature\", which this step greps for; update conftest.py and this guard together"
+            exit 1
+          fi
+
           python -m pytest engine/tests -q -rs | tee pytest.out
-          if grep -q '^SKIPPED' pytest.out; then
-            echo "::error::engine tests were skipped; PG_TEST_URL did not reach pytest"
+
+          if grep -q "^SKIPPED .*: $signature" pytest.out; then
+            echo "::error::PG_TEST_URL did not reach pytest, so the database tests skipped instead of running; check the postgres service and the job's env"
             exit 1
           fi
 

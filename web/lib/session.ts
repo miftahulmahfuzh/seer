@@ -7,12 +7,19 @@ const ET = new Intl.DateTimeFormat('en-US', {
   hour: '2-digit', hourCycle: 'h23', weekday: 'short',
 });
 
+// 24-hour on purpose: the owner reads WIB and every schedule in this repo is UTC, so the two are
+// always printed side by side and an am/pm would be one more thing to translate.
+const WIB_TIME = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+});
+
 function etParts(now: Date) {
   const p = Object.fromEntries(ET.formatToParts(now).map(x => [x.type, x.value]));
   return { ymd: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour), weekday: p.weekday as string };
 }
 
-function addDays(ymd: string, n: number): string {
+/** `ymd` moved `n` calendar days; `n` may be negative. Pure date arithmetic, no timezone. */
+export function addDays(ymd: string, n: number): string {
   const d = new Date(`${ymd}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
@@ -36,4 +43,9 @@ export function isStale(latestSessionDate: string | null, now: Date): boolean {
 /** Today's calendar date in Jakarta (WIB). */
 export function wibDate(now: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now);
+}
+
+/** The clock time in Jakarta (WIB), 24-hour: '13:17'. */
+export function wibTime(at: Date): string {
+  return WIB_TIME.format(at);
 }

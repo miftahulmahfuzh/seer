@@ -32,6 +32,7 @@ from decimal import Decimal
 
 from seer_engine import dates
 from seer_engine.prices import Bar
+from seer_engine.sim.charges import bracket_rules, buy_cash, sell_cash
 from seer_engine.sim.model import (
     TIME_STOP_DAYS,
     Event,
@@ -40,10 +41,9 @@ from seer_engine.sim.model import (
     Portfolio,
     Snapshot,
     StepResult,
-    buy_cost,
     q,
-    sell_proceeds,
 )
+from seer_engine.sim.rules import DESIGN_V0, TradeRules
 
 
 def _check_bar(symbol: str, bar: object, session_date: date) -> Bar:
@@ -62,16 +62,24 @@ def _check_bar(symbol: str, bar: object, session_date: date) -> Bar:
     return bar
 
 
-def _close(order: Order, when: date, price: Decimal, reason: ExitReason, days_held: int) -> tuple[Order, Decimal]:
+def _close(
+    order: Order,
+    when: date,
+    price: Decimal,
+    reason: ExitReason,
+    days_held: int,
+    rules: TradeRules,
+) -> tuple[Order, Decimal]:
     """The closed order and the cash its sale brings in.
 
-    ``pnl_usd = sell_proceeds - buy_cost`` so the sum of pnl reconciles with cash exactly.
+    ``pnl_usd = sell_cash - buy_cash`` under ``rules``, both priced the way the cash actually
+    moved, so the sum of pnl reconciles with cash exactly under either cost model.
     """
     if order.fill_price is None:
         raise ValueError(f"{order.symbol} has no fill price")
     exit_price = q(price)
-    proceeds = sell_proceeds(exit_price, order.shares)
-    pnl = proceeds - buy_cost(order.fill_price, order.shares)
+    proceeds = sell_cash(exit_price, order.shares, rules)
+    pnl = proceeds - buy_cash(order.fill_price, order.shares, rules)
     closed = replace(
         order,
         status="closed",
@@ -125,19 +133,30 @@ def _rebuild(
     )
 
 
-def step(portfolio: Portfolio, session_date: date, bars: Mapping[str, Bar]) -> StepResult:
+def step(
+    portfolio: Portfolio,
+    session_date: date,
+    bars: Mapping[str, Bar],
+    *,
+    rules: TradeRules = DESIGN_V0,
+) -> StepResult:
     """Advance ``portfolio`` through the NYSE session ``session_date``.
 
     ``bars`` maps symbol → that session's split-adjusted ``Bar``; a symbol absent from it
     has no bar this session. Only bars for symbols with a live order are read (and
     validated); the rest are ignored.
 
+    ``rules`` prices every fill and exit: ``DESIGN_V0`` (the default) charges the flat 0.1% a
+    side the §5 records were closed at, ``DESIGN_V0_GOTRADE`` charges Gotrade's measured
+    schedule including its $0.10 per-order minimum (``sim.charges``).
+
     Raises TypeError on a non-Decimal price or a wrong type, and ValueError when
     ``session_date`` is not an NYSE session, is not after ``portfolio.last_session``,
-    or differs from a pending order's ``session_date``.
+    differs from a pending order's ``session_date``, or ``rules`` are not a bracket rule set.
     """
     if not isinstance(portfolio, Portfolio):
         raise TypeError(f"portfolio must be a Portfolio, got {type(portfolio).__name__}")
+    bracket_rules(rules)
     if isinstance(session_date, datetime) or not isinstance(session_date, date):
         raise TypeError(f"session_date must be a date, got {type(session_date).__name__}")
     if not isinstance(bars, Mapping):
@@ -176,7 +195,7 @@ def step(portfolio: Portfolio, session_date: date, bars: Mapping[str, Bar]) -> S
             marks[o.symbol] = bar.close
             continue
         price, reason, days_held = hit
-        closed, proceeds = _close(o, session_date, price, reason, days_held)
+        closed, proceeds = _close(o, session_date, price, reason, days_held, rules)
         cash += proceeds
         del marks[o.symbol]
         exits.append(Event(session_date, "exit", closed, cash_usd=proceeds))
@@ -186,7 +205,7 @@ def step(portfolio: Portfolio, session_date: date, bars: Mapping[str, Bar]) -> S
         bar = day.get(o.symbol)
         if bar is not None and bar.low < o.limit_price:
             fill_price = q(bar.open if bar.open < o.limit_price else o.limit_price)
-            cost = buy_cost(fill_price, o.shares)
+            cost = buy_cash(fill_price, o.shares, rules)
             cash -= cost
             filled = replace(o, status="open", fill_date=session_date, fill_price=fill_price, days_held=1)
             marks[o.symbol] = bar.close
@@ -205,18 +224,25 @@ def step(portfolio: Portfolio, session_date: date, bars: Mapping[str, Bar]) -> S
     )
 
 
-def close_unpriced(portfolio: Portfolio, symbols: Iterable[str]) -> tuple[Portfolio, tuple[Event, ...]]:
+def close_unpriced(
+    portfolio: Portfolio,
+    symbols: Iterable[str],
+    *,
+    rules: TradeRules = DESIGN_V0,
+) -> tuple[Portfolio, tuple[Event, ...]]:
     """Force-close open positions that will never get another bar (delisted, halted for good).
 
     Each named position exits at its last known close (its mark), reason ``time``,
     ``exit_date = portfolio.last_session``, ``days_held`` unchanged, with ``forced=True``
-    on its event. Cash takes the proceeds net of the 0.1% cost, and ``equity`` is
+    on its event. Cash takes the proceeds net of ``rules``' cost (the flat rate by default,
+    Gotrade's measured schedule under ``cost_model="gotrade"``), and ``equity`` is
     recomputed as ``cash + Σ shares × mark`` for what is still open. Events are in slot
     order. Every symbol must belong to an open position; the caller decides that no
     further bar will come (a pure step cannot know it).
     """
     if not isinstance(portfolio, Portfolio):
         raise TypeError(f"portfolio must be a Portfolio, got {type(portfolio).__name__}")
+    bracket_rules(rules)
     if isinstance(symbols, str):
         raise TypeError("symbols must be an iterable of symbols, not a single str")
     wanted: list[str] = []
@@ -243,7 +269,7 @@ def close_unpriced(portfolio: Portfolio, symbols: Iterable[str]) -> tuple[Portfo
         if o.status != "open" or o.symbol not in wanted:
             live.append(o)
             continue
-        closed, proceeds = _close(o, when, marks[o.symbol], "time", o.days_held)
+        closed, proceeds = _close(o, when, marks[o.symbol], "time", o.days_held, rules)
         cash += proceeds
         del marks[o.symbol]
         events.append(Event(when, "exit", closed, forced=True, cash_usd=proceeds))

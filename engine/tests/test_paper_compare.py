@@ -516,3 +516,122 @@ def test_require_window_exits_1_without_a_common_window(pg, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["window"] is None
     assert all(r["status"] == "insufficient" for r in payload["rows"])
+
+
+# --------------------------------------------------------------------------- contributions
+#
+# Money the owner adds is not a return. He deposits 5,000,000 IDR on the 25th of each month on
+# top of a 10,000,000 IDR start (his decision, relayed 2026-10-08), and a book that is handed it
+# would otherwise report the deposit as performance. Inert today: zero sessions stepped and
+# paper_contributions is empty, so every figure below is bit-identical without the argument.
+
+
+def test_a_deposit_is_not_a_return():
+    # 1000 -> 1312.50 on the session a 312.50 deposit lands: the strategy returned 0%, not +31%.
+    points = ((date(2026, 9, 28), 1000.0), (date(2026, 9, 29), 1312.50))
+    assert cmp._returns(points) == (0.3125,)                                   # today: wrong
+    assert cmp._returns(points, {date(2026, 9, 29): 312.50}) == (0.0,)         # with the deposit out
+    # And an unfunded curve is untouched, which is every strategy on the roster today.
+    assert cmp._returns(points, {}) == cmp._returns(points)
+
+
+def test_a_deposit_on_the_opening_session_is_the_baseline_not_a_return():
+    """``_returns`` starts at the second point, so ``_deposited`` must skip the first too."""
+    points = ((date(2026, 9, 28), 1000.0), (date(2026, 9, 29), 1010.0))
+    opening = {date(2026, 9, 28): 500.0}
+    assert cmp._deposited(points, opening) == 0.0
+    assert cmp._returns(points, opening) == cmp._returns(points)
+    assert cmp.performance(points, opening).cagr is not None
+
+
+def test_performance_suppresses_cagr_for_a_window_that_was_fed():
+    points = tuple(curve(D, [1000.0, 1312.50, 1325.0, 1330.0]))
+    deposits = {points[1][0]: 312.50}
+
+    clean = cmp.performance(points)
+    assert clean.deposited == 0.0
+    assert clean.cagr is not None
+
+    fed = cmp.performance(points, deposits)
+    assert fed.deposited == 312.50
+    # Compound growth off the endpoints would count the owner's own money as growth.
+    assert fed.cagr is None
+    # The session returns -- and so Sharpe -- have it removed; the raw curve figures do not.
+    assert fed.sharpe != clean.sharpe
+    assert fed.total_return == clean.total_return
+    assert fed.max_drawdown == clean.max_drawdown
+
+
+def test_compare_threads_deposits_per_strategy_and_leaves_the_others_alone():
+    series = {"A": curve(D, [100.0 * 1.002 ** i for i in range(80)]),
+              "B": curve(D, [100.0 * 1.001 ** i for i in range(80)])}
+    fed_day = series["A"][40][0]
+    series["A"] = [(d, e + (50.0 if d >= fed_day else 0.0)) for d, e in series["A"]]
+
+    plain = cmp.compare(series)
+    with_deposit = cmp.compare(series, deposits={"A": {fed_day: 50.0}})
+
+    rows = {r.strategy_id: r for r in with_deposit.rows}
+    assert rows["A"].window.deposited == 50.0
+    assert rows["A"].window.cagr is None
+    # B received nothing, so every one of its figures is bit-identical to the no-deposit run.
+    before = {r.strategy_id: r for r in plain.rows}["B"]
+    assert rows["B"].window == before.window
+    assert rows["B"].inception == before.inception
+    assert rows["B"].window.deposited == 0.0
+
+
+def test_an_empty_deposits_mapping_changes_nothing_at_all():
+    series = {"A": curve(D, [100.0 * 1.002 ** i for i in range(80)]),
+              "B": curve(D, [100.0 * 1.001 ** i for i in range(80)])}
+    assert cmp.compare(series, deposits={}) == cmp.compare(series)
+
+
+def test_render_says_when_a_figure_carries_money_the_owner_added():
+    series = {"A": curve(D, [100.0 * 1.002 ** i for i in range(80)]),
+              "B": curve(D, [100.0 * 1.001 ** i for i in range(80)])}
+    fed_day = series["A"][40][0]
+    lines = cmp.render(cmp.compare(series, deposits={"A": {fed_day: 50.0}}))
+    note = [ln for ln in lines if "money added during the window" in ln]
+    assert len(note) == 1 and "A (+50.00 USD)" in note[0]
+    assert any("money-weighted return" in ln for ln in lines)
+    # Nothing is said when nobody was fed.
+    assert not [ln for ln in cmp.render(cmp.compare(series)) if "money added" in ln]
+
+
+def test_as_json_shape_is_unchanged_by_deposits():
+    """The published shape is pinned and ported to TypeScript: ``deposited`` stays Python-side."""
+    series = {"A": curve(D, [100.0 * 1.002 ** i for i in range(80)]),
+              "B": curve(D, [100.0 * 1.001 ** i for i in range(80)])}
+    fed_day = series["A"][40][0]
+    payload = cmp.as_json(cmp.compare(series, deposits={"A": {fed_day: 50.0}}))
+    for row in payload["rows"]:
+        for block in (row["window"], row["inception"]):
+            if block is None:
+                continue
+            assert set(block) == {
+                "start", "end", "sessions", "totalReturn", "cagr", "maxDrawdown", "sharpe",
+            }
+
+
+def test_read_deposits_takes_credited_rows_only(pg):
+    """An accrued-but-uncredited row has reached no equity snapshot, so it must not be subtracted."""
+    from seer_engine.paper import store as paper_store
+
+    due, settled = date(2026, 9, 26), date(2026, 9, 30)
+    paper_store.record_contribution(
+        pg, "A", due_date=due, amount_idr=Decimal("5000000.00"), usd_idr=Decimal("16000.0000")
+    )
+    assert cli_compare.read_deposits(pg, ["A"]) == {"A": {}}  # recorded, not yet credited
+
+    paper_store.init_paper_state(
+        pg, "A", paper_start=date(2026, 9, 29), cash0=Decimal("1250.0000"), usd_idr=Decimal("16000.0000")
+    )
+    pg.execute(
+        "UPDATE paper_contributions SET applied_at = now() WHERE strategy_id = %s AND due_date = %s",
+        ("A", due),
+    )
+    landed = paper_store.read_contribution(pg, "A", due).session_date
+    assert cli_compare.read_deposits(pg, ["A"]) == {"A": {landed: 312.50}}
+    assert cli_compare.read_deposits(pg, ["B"]) == {"B": {}}
+    assert settled > landed  # the deposit landed before the window this book will report on

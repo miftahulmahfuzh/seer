@@ -7,6 +7,9 @@ frozen value:
 - ``DESIGN_V0`` is §5 exactly. It is the only rule set with ``engine="bracket_v0"``, and it is
   executed by the unchanged ``sim.size_picks`` + ``sim.step`` path (``backtest.runner``), so the
   closed A, A2 and B records stay byte-identical by construction.
+- ``engine="bracket"`` is that same simulator under a rule set that is not §5 -- today only
+  ``DESIGN_V0_GOTRADE``, which is §5 paying Gotrade's measured fee schedule instead of the
+  assumed 0.1% a side. ``BRACKET_ENGINES`` is the two of them; ``is_bracket`` is the test.
 - Every other rule set has ``engine="book"`` and is executed by ``sim.book.step_book``.
   ``V0_BOOK`` is §5 replayed by the book engine; it exists only for the parity test.
 
@@ -32,7 +35,7 @@ from typing import Literal
 from seer_engine import dates
 from seer_engine.sim.costs import COST_MODELS, GOTRADE, CostModel
 
-Engine = Literal["bracket_v0", "book"]
+Engine = Literal["bracket_v0", "bracket", "book"]
 Cadence = Literal["daily", "weekly", "monthly"]
 Entry = Literal["limit", "open_limit", "open"]
 
@@ -42,7 +45,9 @@ SHARE_QUANTUM = Decimal("0.0001")
 DEFAULT_ETFS: frozenset[str] = frozenset({"SPY", "QQQ"})
 LEVERAGED_ETFS: frozenset[str] = frozenset({"SSO", "QLD", "UPRO", "TQQQ"})
 
-_ENGINES: tuple[str, ...] = ("bracket_v0", "book")
+_ENGINES: tuple[str, ...] = ("bracket_v0", "bracket", "book")
+#: The engines run by ``sim.size_picks`` + ``sim.step`` + ``sim.apply_split`` (not the book).
+BRACKET_ENGINES: tuple[str, ...] = ("bracket_v0", "bracket")
 _CADENCES: tuple[str, ...] = ("daily", "weekly", "monthly")
 # Slower cadences sort higher: a resize cadence must be strictly below its rank cadence.
 _CADENCE_ORDER: dict[str, int] = {"daily": 0, "weekly": 1, "monthly": 2}
@@ -204,6 +209,13 @@ MONTHLY_HOLD_FRAC_GOTRADE = replace(MONTHLY_HOLD_FRAC, id="monthly-hold-frac-got
 MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE = replace(
     MONTHLY_RANK_WEEKLY_RESIZE_FRAC, id="monthly-rank-weekly-resize-frac-gotrade", cost_model="gotrade"
 )
+# Design §5 at Gotrade's real fees: the daily-trading control the owner requires on the roster
+# permanently ("I want to see how bad it got if I had used daily trading on Gotrade like my
+# initial plan", 2026-10-08). Every lever is DESIGN_V0's; only the cost model differs, which is
+# why it cannot be engine "bracket_v0" (that id and that engine are reserved for §5 exactly).
+# Measured at Gotrade's current schedule: a $28 order pays $0.13 to buy and $0.16 to sell --
+# 1.036% the round trip, against the flat model's 0.2%.
+DESIGN_V0_GOTRADE = replace(DESIGN_V0, id="design-v0-gotrade", engine="bracket", cost_model="gotrade")
 
 PRESETS: tuple[TradeRules, ...] = (
     DESIGN_V0,
@@ -219,6 +231,7 @@ PRESETS: tuple[TradeRules, ...] = (
     MONTHLY_RANK_WEEKLY_RESIZE_TBILL,
     MONTHLY_HOLD_FRAC,
     MONTHLY_RANK_WEEKLY_RESIZE_FRAC,
+    DESIGN_V0_GOTRADE,
     MONTHLY_HOLD_FRAC_GOTRADE,
     MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE,
 )
@@ -246,6 +259,17 @@ def _rules(x: object) -> TradeRules:
     if not isinstance(x, TradeRules):
         raise TypeError(f"rules must be a TradeRules, got {type(x).__name__}")
     return x
+
+
+def is_bracket(rules: TradeRules) -> bool:
+    """True when ``rules`` run the design §5 bracket simulator rather than the book engine.
+
+    ``engine="bracket_v0"`` (``DESIGN_V0``) or ``engine="bracket"`` (a §5 rule set that differs
+    from §5 in a lever -- today only the cost model). The dispatch every caller that has to pick
+    between ``sim.size_picks`` + ``sim.step`` and ``sim.book.step_book`` should use.
+    """
+    _rules(rules)
+    return rules.engine in BRACKET_ENGINES
 
 
 def _first_of(cadence: str, session: date) -> bool:
@@ -342,7 +366,7 @@ def describe_rules(rules: TradeRules) -> tuple[str, ...]:
     """
     _rules(rules)
     lines: list[str] = [f"Rule set: {rules.id}."]
-    if rules.engine == "bracket_v0":
+    if is_bracket(rules):
         lines.append("Engine: the design §5 bracket simulator, unchanged.")
     else:
         lines.append(
@@ -370,7 +394,7 @@ def describe_rules(rules: TradeRules) -> tuple[str, ...]:
             "and every weight is rescaled by the ratio of what the strategy wants today to what it "
             "wanted then; nothing is ranked, entered or signal-exited."
         )
-    if rules.entry == "limit" and rules.engine == "bracket_v0":
+    if rules.entry == "limit" and is_bracket(rules):
         lines.append(
             "Entry: a buy limit at the strategy's limit price for the next session; it fills only "
             "when the low trades below the limit, at the lower of the open and the limit."

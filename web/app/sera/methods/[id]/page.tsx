@@ -18,9 +18,9 @@ import { childrenOf, insightsOf, lab, methodById, trialsOf } from '@/lib/sera/la
 import { collapseRepeatedHeadings, renderMarkdown } from '@/lib/sera/markdown';
 import type { LabMethod, LabTrial } from '@/lib/sera/types';
 import {
-  BEST_COLOR, conditionTip, count, fixed, growthFmt, growthLines, hurdlePoints, longDate, markLabel, marks, pct1,
-  pfText, signed1, SOURCE_ICON, sourceHref, SPY_COLOR, SPY_DASH, techRows, untestedNote, windowText, workedSummary,
-  yearPairs, type Mark,
+  BEST_COLOR, conditionTip, count, dsrNote, fixed, growthFmt, growthLines, hurdlePoints, longDate, markLabel, marks,
+  pct1, pfText, signed1, SOURCE_ICON, sourceHref, SPY_COLOR, SPY_DASH, techRows, untestedNote, windowText,
+  workedSummary, yearPairs, type Mark,
 } from '../view';
 import s from './method.module.css';
 
@@ -315,31 +315,37 @@ function Tested({ m, trials, best }: { m: LabMethod; trials: LabTrial[]; best: L
               </tr>
             </thead>
             <tbody>
-              {trials.map(t => (
-                <tr key={t.n} className={t.n === best.n ? s.bestRow : undefined}>
-                  <th scope="row" className={s.variant}>{t.candidateId}</th>
-                  <td><span className={s.window} data-window={t.window}>{t.window === 'dev' ? 'Dev' : 'Test'}</span> {windowText(t)}</td>
-                  <td className={s.r}>
-                    <span className="num">{pct1(t.cagr)}</span>
-                    <span className={s.vs}> vs {pct1(t.spyTrCagr)}</span>
-                  </td>
-                  <td className={`num ${s.r}`}>{signed1(t.totalReturn)}</td>
-                  <td className={`num ${s.r}`}>{pct1(t.maxDrawdown)}</td>
-                  <td className={`num ${s.r}`}>{pfText(t)}</td>
-                  <td className={`num ${s.r}`}>{count(t.trades)}</td>
-                  <td className={`num ${s.r}`}>{fixed(t.sharpe, 2)}</td>
-                  <td className={`num ${s.r}`}>{fixed(t.mar, 2)}</td>
-                  {/* The score at today's N, beside ticks decided at today's N. The run-date
-                      pair (t.dsr at t.nTrialsAtRun) is the record and lives in Technical detail. */}
-                  <td className={`num ${s.r}`}>
-                    {fixed(t.dsrNow, 2)}
-                    {t.dsrNow !== null && <span className={s.vs}> at N {count(gate.dsrN)}</span>}
-                  </td>
-                  {marks(t).map(x => (
-                    <td key={x.key} className={s.c}><MarkIcon mark={x} size={14} /></td>
-                  ))}
-                </tr>
-              ))}
+              {trials.map(t => {
+                const note = dsrNote(t, gate);
+                return (
+                  <tr key={t.n} className={t.n === best.n ? s.bestRow : undefined}>
+                    <th scope="row" className={s.variant}>{t.candidateId}</th>
+                    <td><span className={s.window} data-window={t.window}>{t.window === 'dev' ? 'Dev' : 'Test'}</span> {windowText(t)}</td>
+                    <td className={s.r}>
+                      <span className="num">{pct1(t.cagr)}</span>
+                      <span className={s.vs}> vs {pct1(t.spyTrCagr)}</span>
+                    </td>
+                    <td className={`num ${s.r}`}>{signed1(t.totalReturn)}</td>
+                    <td className={`num ${s.r}`}>{pct1(t.maxDrawdown)}</td>
+                    <td className={`num ${s.r}`}>{pfText(t)}</td>
+                    <td className={`num ${s.r}`}>{count(t.trades)}</td>
+                    <td className={`num ${s.r}`}>{fixed(t.sharpe, 2)}</td>
+                    <td className={`num ${s.r}`}>{fixed(t.mar, 2)}</td>
+                    {/* The score at today's N, beside ticks decided at today's N — but only where
+                        today's N is the N it was scored at. A test run's DSR is a measurement with
+                        no bar beside it, so it is annotated as such rather than as `at N 126`. The
+                        run-date pair (t.dsr at t.nTrialsAtRun) is the record and lives in
+                        Technical detail. */}
+                    <td className={`num ${s.r}`}>
+                      {fixed(t.dsrNow, 2)}
+                      {note !== null && <span className={s.vs}> {note}</span>}
+                    </td>
+                    {marks(t).map(x => (
+                      <td key={x.key} className={s.c}><MarkIcon mark={x} size={14} /></td>
+                    ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

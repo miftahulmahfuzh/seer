@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
 
 import pytest
 from simkit import D, P, bar, opened, pending, portfolio
 
+from seer_engine.sim.charges import buy_cash, sell_cash, whole_shares_for
 from seer_engine.sim.lifecycle import step
 from seer_engine.sim.model import buy_cost, new_portfolio, sell_proceeds
+from seer_engine.sim.rules import DESIGN_V0, DESIGN_V0_GOTRADE, MONTHLY_HOLD
 from seer_engine.sim.sizing import Pick, Rejection, size_picks
 
 PREV = D("2026-10-02")  # Friday, last stepped session (data_date)
@@ -402,3 +405,60 @@ def test_stale_pending_order_for_another_session_is_an_error() -> None:
     )
     with pytest.raises(ValueError):
         size_picks(pf, [pick("AAA", "10")], SESSION)
+
+
+# --- the cost model lever (phase 4) -------------------------------------------------------------
+
+
+def test_the_flat_path_is_byte_identical_to_the_old_module_constants() -> None:
+    """charges with DESIGN_V0 == sim.model's constants, which is what keeps the closed records."""
+    for price, shares in (("50", 100), ("12.3457", 7), ("33", 75), ("10", 99), ("0.0001", 1), ("10", 0)):
+        p, n = P(price), shares
+        assert buy_cash(p, n, DESIGN_V0) == buy_cost(p, n)
+        assert sell_cash(p, n, DESIGN_V0) == sell_proceeds(p, n)
+    for budget, limit in (("2500", "33"), ("1000", "10"), ("2000", "10"), ("0", "10"), ("9.99", "10")):
+        b, l = P(budget), P(limit)  # noqa: E741
+        shares = whole_shares_for(b, l, DESIGN_V0)
+        assert shares == 0 or buy_cost(l, shares) <= b
+        assert buy_cost(l, shares + 1) > b
+
+
+def test_gotrade_sizing_charges_the_measured_schedule() -> None:
+    # The owner's book: equity 560 -> slot budget 140. Measured from sim.costs.
+    res = size_picks(flat("560"), [pick("AAA", "10")], SESSION, rules=DESIGN_V0_GOTRADE)
+    (o,) = res.placed
+    assert o.shares == 13
+    assert buy_cash(P("10"), 13, DESIGN_V0_GOTRADE) == P("130.3800")  # 130.00 + 0.38 of fees
+    assert buy_cost(P("10"), 13) == P("130.1300")  # the flat model charged 0.13
+
+
+def test_the_gotrade_fee_can_drop_a_share_the_flat_model_bought() -> None:
+    # equity 520.80 -> slot budget 130.20. Flat buys 13 at 130.13; Gotrade's 13 cost 130.38.
+    pf = portfolio(P("130.20"), equity=P("520.80"), last_session=PREV)
+    flat_res = size_picks(pf, [pick("AAA", "10")], SESSION)
+    gt_res = size_picks(pf, [pick("AAA", "10")], SESSION, rules=DESIGN_V0_GOTRADE)
+    assert flat_res.placed[0].shares == 13
+    assert gt_res.placed[0].shares == 12
+    assert buy_cash(P("10"), 12, DESIGN_V0_GOTRADE) == P("120.3400")
+
+
+def test_the_ten_cent_floor_can_reject_a_pick_the_flat_model_bought() -> None:
+    # The counterfactual C exists to produce: at a 28 dollar slot a 27.90 pick does not fit,
+    # because Gotrade charges 0.13 on top of it (the owner's own receipt: 27.90 -> 28.03 paid).
+    pf = portfolio(P("28"), equity=P("112"), last_session=PREV)
+    assert size_picks(pf, [pick("AAA", "27.90")], SESSION).placed[0].shares == 1
+    gt = size_picks(pf, [pick("AAA", "27.90")], SESSION, rules=DESIGN_V0_GOTRADE)
+    assert gt.placed == ()
+    assert gt.rejected == (Rejection(symbol="AAA", reason="lt_one_share"),)
+    assert buy_cash(P("27.90"), 1, DESIGN_V0_GOTRADE) == P("28.0300")
+
+
+def test_size_picks_refuses_a_book_or_fractional_rule_set() -> None:
+    with pytest.raises(ValueError, match="book rule set"):
+        size_picks(flat(), [pick("AAA", "10")], SESSION, rules=MONTHLY_HOLD)
+    with pytest.raises(ValueError, match="whole share count"):
+        size_picks(
+            flat(), [pick("AAA", "10")], SESSION, rules=replace(DESIGN_V0_GOTRADE, id="x", fractional=True)
+        )
+    with pytest.raises(TypeError, match="TradeRules"):
+        size_picks(flat(), [pick("AAA", "10")], SESSION, rules="design-v0")

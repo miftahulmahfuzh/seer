@@ -31,11 +31,13 @@ from seer_engine.backtest.metrics import (
     checklist,
     curve_metrics,
     exit_reason_counts,
+    external_cashflows,
     fmt_pct,
     fmt_pf,
     fmt_signed_pct,
     forced_closes,
     metrics_through,
+    money_weighted_return,
     run_metrics,
     strategy_metrics,
     to_fixed,
@@ -379,3 +381,114 @@ def test_metrics_through_rejects_an_end_outside_the_run_or_not_a_session():
         metrics_through(full, datetime(2025, 3, 6))
     with pytest.raises(TypeError):
         metrics_through(run_metrics(full), END)
+
+
+# --------------------------------------------------------------------------- money-weighted return
+#
+# The measure R3 asks for: the interest rate a savings account would have had to pay to turn the
+# same deposits, paid in on the same days, into the same final balance. Every number below was
+# produced by the code under test; the +600.9% figure is the reason this phase exists.
+
+
+def _flat_curve(start: date, end: date, v0: float, v1: float) -> list[tuple[date, float]]:
+    """Two snapshots: the opening cash and the final mark. Enough for every IRR property."""
+    return [(start, v0), (end, v1)]
+
+
+def test_with_no_deposits_the_money_weighted_return_is_exactly_cagr():
+    """IRR is a strict generalisation of CAGR: with one sum in and one valuation out, the root of
+    -V0 + V1(1+r)^-T is (V1/V0)^(365.25/T) - 1, which is cagr_between."""
+    for start, end, v0, v1 in (
+        (date(1993, 2, 1), date(2015, 10, 16), 1419.0, 9000.0),
+        (date(2005, 1, 3), date(2015, 10, 16), 2000.0, 1200.0),
+        (date(2020, 1, 2), date(2026, 10, 8), 100000.0, 180000.0),
+        (date(2020, 1, 1), date(2020, 6, 1), 100.0, 100000.0),  # 1.6e7 %/yr: the bracket expands
+    ):
+        snaps = _flat_curve(start, end, v0, v1)
+        mwr = money_weighted_return(snaps, ())
+        cagr = cagr_between((start, v0), (end, v1))
+        assert mwr is not None and cagr is not None
+        assert abs(mwr - cagr) <= 1e-12 * max(1.0, abs(cagr)), (start, end, mwr, cagr)
+
+
+def test_a_book_that_earns_nothing_on_the_owners_real_plan_reports_zero():
+    """The measurement this phase exists for (plan set Decision D4, handover section 4).
+
+    10,000,000 IDR on 2026-11-02 and +5,000,000 IDR on the 25th of each month for twelve months,
+    at 16,300 IDR/USD: 613.50 USD then 306.75 USD a month. A book that earns nothing at all ends
+    holding exactly what was paid in.
+    """
+    start, end = date(2026, 11, 2), date(2027, 11, 2)
+    deposits: list[tuple[date, float]] = []
+    when = date(2026, 11, 25)
+    for i in range(12):
+        year = when.year + (when.month + i - 1) // 12
+        month = (when.month + i - 1) % 12 + 1
+        deposits.append((date(year, month, 25), 306.75))
+    paid_in = 613.50 + 306.75 * 12
+    snaps = _flat_curve(start, end, 613.50, paid_in)
+
+    mwr = money_weighted_return(snaps, deposits)
+    assert mwr is not None and abs(mwr) < 1e-9, "a book that earns nothing earned nothing"
+
+    # ...and this is what the two numbers the lab records today would have said instead.
+    m = strategy_metrics(snaps, (), deposits)
+    assert m.total_return is not None and m.total_return > 5.99  # +600.0%
+    assert m.cagr is not None and m.cagr > 6.00                  # +600.9%
+    assert m.mwr is not None and abs(m.mwr) < 1e-9
+
+
+def test_the_sign_of_the_money_weighted_return_follows_the_money():
+    start, end = date(2026, 11, 2), date(2027, 11, 2)
+    deposits = [(date(2027, 1, 25), 306.75), (date(2027, 4, 26), 306.75)]
+    paid_in = 613.50 + 306.75 * 2
+    up = money_weighted_return(_flat_curve(start, end, 613.50, paid_in * 1.10), deposits)
+    down = money_weighted_return(_flat_curve(start, end, 613.50, paid_in * 0.90), deposits)
+    assert up is not None and up > 0
+    assert down is not None and down < 0
+
+
+def test_strategy_metrics_leaves_mwr_none_without_deposits():
+    """None means "no deposits, so CAGR already is the money-weighted return" -- and it is what
+    keeps dev.make_row's MAR bit-for-bit what it is today on every unfunded run."""
+    snaps = _flat_curve(date(2020, 1, 2), date(2026, 10, 8), 100000.0, 180000.0)
+    m = strategy_metrics(snaps, ())
+    assert m.mwr is None and m.cagr is not None
+
+
+def test_the_money_weighted_return_is_none_where_cagr_is_none():
+    d = date(2026, 11, 2)
+    assert money_weighted_return([(d, 100.0)], ()) is None                       # one snapshot
+    assert money_weighted_return([(d, 100.0), (d, 120.0)], ()) is None           # zero days
+    assert money_weighted_return([(d, 0.0), (date(2027, 1, 2), 120.0)], ()) is None   # no capital
+    wiped = [(d, 613.50), (date(2027, 11, 2), 0.0)]
+    assert money_weighted_return(wiped, [(date(2027, 1, 25), 306.75)]) is None   # -100%, unbracketed
+
+
+def test_a_cashflow_outside_the_curve_is_a_programming_error():
+    snaps = _flat_curve(date(2026, 11, 2), date(2027, 11, 2), 613.50, 1000.0)
+    with pytest.raises(ValueError, match="outside the curve"):
+        money_weighted_return(snaps, [(date(2026, 11, 2), 306.75)])  # on the opening snapshot
+    with pytest.raises(ValueError, match="outside the curve"):
+        money_weighted_return(snaps, [(date(2027, 11, 3), 306.75)])  # after the last mark
+    with pytest.raises(ValueError, match="ascend strictly"):
+        money_weighted_return(snaps, [(date(2027, 4, 26), 1.0), (date(2027, 1, 25), 1.0)])
+    with pytest.raises(ValueError, match="> 0"):
+        money_weighted_return(snaps, [(date(2027, 1, 25), -1.0)])
+
+
+def test_external_cashflows_reads_the_runners_field_as_floats():
+    """The one place that reads phase 5's ``cashflows``: a rename is a one-line fix here and
+    nowhere else. Decimals in, floats out, because the IRR is float arithmetic."""
+
+    class _Result:
+        cashflows = ((date(2026, 11, 25), Decimal("306.7500")), (date(2026, 12, 29), Decimal("306.7500")))
+
+    flows = external_cashflows(_Result())
+    assert flows == ((date(2026, 11, 25), 306.75), (date(2026, 12, 29), 306.75))
+    assert all(isinstance(a, float) for _, a in flows)
+
+    class _Unfunded:
+        cashflows = ()
+
+    assert external_cashflows(_Unfunded()) == ()

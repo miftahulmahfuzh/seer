@@ -252,6 +252,46 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
              "a test-window store is refused",
     )
 
+    s = sub.add_parser(
+        "names",
+        help="report only: how many names the book should hold, swept at Gotrade's real fees",
+        description=(
+            "Run lab M0007-N20-RAW's book -- what the roster's RAW-FR entry trades -- at several "
+            "name counts over the dev window, at Gotrade's measured fees and on the owner's real "
+            "contribution schedule, and print the grid. Records no trial, so the lab's N and the "
+            "test-window looks do not move; the test window is never read. The fee case for "
+            "holding fewer names is settled (handover 2b, CORRECTED) and is not what this "
+            "measures: by month three of the funding plan twenty names cost 0.614% an order and "
+            "eleven cost 0.612%. This measures what concentration does to the returns."
+        ),
+    )
+    s.add_argument(
+        "--ns", default=None, metavar="5,10,15,20,25,30",
+        help="the name counts to sweep (default: 5,10,15,20,25,30)",
+    )
+    s.add_argument(
+        "--gotrade-only", action="store_true",
+        help="drop the flat-fee control column and run Gotrade's fees alone (half the runs)",
+    )
+    s.add_argument(
+        "--lump", action="store_true",
+        help="fund the book once and never feed it, instead of the owner's real schedule. The "
+             "control for the funding axis, not the answer: under Gotrade's $0.10 floor a book "
+             "that ramps from 10,000,000 IDR pays a different rate from one that starts full",
+    )
+    s.add_argument(
+        "--csv", type=Path, default=None, metavar="PATH",
+        help="also write the grid to PATH as CSV, at full precision",
+    )
+    s.add_argument(
+        "--store",
+        type=Path,
+        default=Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR),
+        help=f"dev-window research store (default: {research.STORE_DIR}, or $SEER_RESEARCH_STORE); "
+             "a test-window store is refused. The store is gitignored, so a fresh worktree has "
+             "none -- point this at a checkout that does rather than rebuilding it",
+    )
+
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
     s.add_argument("--family", required=True)
@@ -1521,6 +1561,57 @@ def _costs(conn, args) -> int:
     return 0
 
 
+def _names(conn, args) -> int:
+    """``lab names``: how many names the book should hold, swept. Report only.
+
+    Every refusal that needs no data -- a bad ``--ns``, a missing contribution schedule, a
+    ``dev.run_registry`` that cannot be fed one -- is made before the research store is loaded.
+    Then ``name_count.measure`` runs the grid on the dev window and prints it. Nothing is
+    written to the lab database: N and the test-window looks are printed before and after so the
+    invariant is visible, not just asserted in a test.
+    """
+    from seer_engine.lab import name_count
+
+    counts = name_count.check_names(args.ns)
+    if research.DEV_END != dev.DEV_END:
+        raise store.LabError("research.DEV_END differs from dev.DEV_END; refusing to run")
+    if not args.lump:
+        name_count.check_schedule_support()
+        name_count.owner_schedule()  # refuse a missing schedule before the store loads
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+    t0 = time.perf_counter()
+    try:
+        data = research.load_store(Path(args.store))
+    except FileNotFoundError as e:
+        raise store.LabError(
+            f"research store {args.store} is missing {e.filename or e}. Build it with "
+            f"`python -m seer_engine research_store` (about 30 minutes plus a yfinance crawl), "
+            f"or point --store at a checkout that already has one -- `.research/` is gitignored, "
+            f"so a fresh worktree never does"
+        ) from e
+    except ValueError as e:
+        raise store.LabError(
+            f"{args.store}: {e}. `lab names` sweeps the dev window and nothing else, so a "
+            f"test-window store is refused here"
+        ) from e
+    log.info("research store %s loaded (%.1fs)", data.fingerprint[:12], time.perf_counter() - t0)
+    sweep = name_count.measure(
+        data, ns=counts, control=not args.gotrade_only, lump=args.lump
+    )
+    print(name_count.format_report(sweep))
+    if args.csv is not None:
+        written = name_count.write_csv(sweep, Path(args.csv))
+        print(f"\ngrid written to {written}")
+    print(
+        f"\nnothing was recorded. Lab N (dev trials): {n_before} before, "
+        f"{store.dev_trial_count(conn)} after; test-window looks used: {looks_before} before, "
+        f"{store.test_looks(conn)} after. No journal entry, so seertrade.site/sera is unchanged "
+        f"and `lab stage` is not needed."
+    )
+    log.info("lab names: %d runs done (%.1fs)", len(sweep.points), time.perf_counter() - t0)
+    return 0
+
 def _idea(conn, args) -> int:
     store.begin_immediate(conn)  # the next id and its insert, atomic against parallel sessions
     with conn:
@@ -1641,6 +1732,7 @@ _HANDLERS = {
     "test": _test,
     "remeasure": _remeasure,
     "costs": _costs,
+    "names": _names,
     "idea": _idea,
     "note": _note,
     "block": _block,

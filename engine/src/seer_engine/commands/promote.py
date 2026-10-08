@@ -72,7 +72,7 @@ from seer_engine import config, dates, db
 from seer_engine.lab import store as lab_store
 from seer_engine.paper import roster
 from seer_engine.paper import store as paper_store
-from seer_engine.sim.rules import PRESETS, TradeRules
+from seer_engine.sim.rules import PRESETS, TradeRules, is_bracket
 from seer_engine.strategies import evidence
 
 log = logging.getLogger(__name__)
@@ -272,7 +272,7 @@ def build_promotion(
     _check_rules(rules)
     object_name = object_name_of(obj)
     _check_evidence(object_name)
-    engine = "bracket" if rules.engine == "bracket_v0" else "book"
+    engine = "bracket" if is_bracket(rules) else "book"
     lookback = obj.lookback if engine == "bracket" else obj.lookback(candidate.params)
     check_lookback(int(lookback), data_date)
     entry = roster.RosterEntry(

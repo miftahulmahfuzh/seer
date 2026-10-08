@@ -1,0 +1,275 @@
+name: Daily watch
+
+# One line a day, to the owner's phone. Four facts: session stepped, picks published, CI green,
+# paper paused.
+#
+# WHY THIS IS NOT A STEP INSIDE nightly.yml. A step inside the nightly cannot report "the nightly
+# did not run" -- if the nightly never starts, its own steps never run either. That is the single
+# reason this is a separate workflow.
+#
+# WHY IT READS NEON AND NOT THE ACTIONS API FOR THE NIGHTLY. handover 2026-10-08 section 6c: run
+# 37655513074 has been `queued` since 2026-10-07T16:54:08Z with no jobs, stuck before job creation.
+# Anything reading `gh run list` naively would call it "running" forever. `paper_state`, `runs` and
+# `book_targets` are the outcome, not the attempt: a run that created no job wrote no row. The one
+# place this workflow does read the Actions API (CI's colour) takes only runs whose status is
+# `completed`, so a queued orphan is never selected and the word "running" never appears in a line.
+#
+# TIMES. The owner reads WIB; every cron in this repo is UTC. WIB is UTC+7.
+
+on:
+  schedule:
+    # 14:23 UTC = 21:23 WIB, every day.
+    #
+    # It must be able to observe the nightly's outcome, so it sits after the LAST retry slot, not
+    # before. nightly.yml's slots are 06:17, 09:41 and 12:41 UTC (13:17, 16:41 and 19:41 WIB) with
+    # timeout-minutes: 45, so the latest an on-time last-retry run can still be going is 13:26 UTC
+    # (20:26 WIB). This is 57 minutes after that, and 1h42m after the slot itself.
+    #
+    # Minutes off :00 and :30 on purpose -- nightly.yml:11 records that GitHub's scheduler runs
+    # hours late on those.
+    #
+    # Seven days a week, though the nightly is Tue-Sat UTC: on Sunday and Monday the line still
+    # arrives and says the nightly was not due. Quiet-because-nothing-was-due and
+    # quiet-because-it-broke must not look the same.
+    - cron: '23 14 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read     # `gh run list` on engine-ci.yml
+
+concurrency:
+  # NOT seer-db-writer. This workflow only reads. sean.yml:8-10 records the rule: GitHub keeps one
+  # pending run per group, so a watcher queued in seer-db-writer could cancel a pending nightly
+  # retry. The four members of seer-db-writer stay four: nightly, backfill, repick, universe.
+  #
+  # cancel-in-progress: false -- the job is about 30 seconds, so queueing costs nothing, and `true`
+  # would let a manual dispatch cancel the scheduled run and silently eat that day's line.
+  group: seer-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+      GH_TOKEN: ${{ github.token }}
+      # Deliberately NOT a failure when unset -- the compose step still runs and prints the line,
+      # and the send step turns the run red with the line in the error annotation, so GitHub's
+      # existing red-run email carries it. See docs/runbooks/monitoring.md (Owner steps).
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      # Month and weekday abbreviations must not drift with the runner's locale.
+      LC_ALL: C
+
+    steps:
+      - name: Check secrets
+        run: |
+          if [ -z "$DATABASE_URL_UNPOOLED" ]; then
+            echo "::error::Repository secret DATABASE_URL_UNPOOLED is not set. See docs/runbooks/monitoring.md (Owner steps)."
+            exit 1
+          fi
+
+      # Needed only to read PAPER_PAUSED out of .github/workflows/nightly.yml. This workflow never
+      # writes that file; phase 12 of GOTRADE_FEE_REBUILD_PLAN.md owns its comment.
+      - uses: actions/checkout@v4
+
+      - name: Ensure psql
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends postgresql-client
+          fi
+          psql --version
+
+      - name: Read the four facts and compose the line
+        id: compose
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          now_utc="$(date -u '+%Y-%m-%d %H:%M')"
+          now_wib="$(TZ=Asia/Jakarta date '+%Y-%m-%d %H:%M')"
+          day_wib="$(TZ=Asia/Jakarta date '+%a %d %b')"
+          dow_utc="$(date -u '+%u')"          # 1 = Monday .. 7 = Sunday, UTC
+
+          # ---------------------------------------------------------------- fact 4: paper paused
+          # Read, never written. An unquoted, single- or double-quoted value all parse.
+          pause_value="$(
+            sed -n "s/^[[:space:]]*PAPER_PAUSED:[[:space:]]*['\"]\{0,1\}\([A-Za-z]*\)['\"]\{0,1\}[[:space:]]*\$/\1/p" \
+              .github/workflows/nightly.yml | head -n 1
+          )"
+          if [ -z "$pause_value" ]; then
+            echo "::error::PAPER_PAUSED was not found in .github/workflows/nightly.yml -- the watcher cannot read the pause switch, so it cannot tell a deliberate pause from a broken nightly."
+            exit 1
+          fi
+          case "$pause_value" in
+            true|True|TRUE) paused=yes ;;
+            *)              paused=no  ;;
+          esac
+
+          # ------------------------------------------------------- facts 1 and 2: Neon, read-only
+          # stepped_session : paper_state.last_session, the last session paper actually stepped.
+          # latest_data     : runs.data_date of the newest successful real run -- the last session
+          #                   whose prices the nightly used. paper/bracket.py:182 enforces
+          #                   pf.last_session == data_date, so these two are directly comparable.
+          # due_session     : the pending session that IS a decision session. NULL on the roughly
+          #                   three weeks in four when a monthly book is only holding, and no picks
+          #                   are due at all (003_paper.sql:25).
+          # due_rows        : book_targets rows published for that due session.
+          # last_ok_wib     : when the nightly last finished successfully, in WIB.
+          read_sql="
+            SELECT
+              coalesce((SELECT max(last_session)::text FROM paper_state), ''),
+              coalesce((SELECT max(data_date)::text FROM runs
+                         WHERE status = 'success' AND NOT is_demo), ''),
+              coalesce((SELECT max(pending_session)::text FROM paper_state
+                         WHERE pending_decision), ''),
+              (SELECT count(*) FROM book_targets
+                WHERE session_date = (SELECT max(pending_session) FROM paper_state
+                                       WHERE pending_decision)),
+              coalesce((SELECT to_char(max(finished_at) AT TIME ZONE 'Asia/Jakarta',
+                                       'YYYY-MM-DD HH24:MI')
+                          FROM runs WHERE status = 'success' AND NOT is_demo), '')
+          "
+          row="$(psql "$DATABASE_URL_UNPOOLED" -v ON_ERROR_STOP=1 -At -F '|' -c "$read_sql")"
+          IFS='|' read -r stepped_session latest_data due_session due_rows last_ok_wib <<<"$row"
+          due_rows="${due_rows:-0}"
+
+          # ---------------------------------------------------------------------- fact 3: CI green
+          # The status filter in the --jq below is the orphan guard: a run stuck `queued` (handover
+          # section 6c, run 37655513074) is never selected, so it can never be reported as a colour
+          # and never as "running".
+          ci_json="$(
+            gh run list --workflow engine-ci.yml --branch main --limit 20 \
+              --json status,conclusion,updatedAt,url \
+              --jq '[.[] | select(.status == "completed")] | first' \
+            || echo ''
+          )"
+          if [ -z "$ci_json" ] || [ "$ci_json" = "null" ]; then
+            ci="?"
+            ci_why="no completed run of engine-ci.yml on main in the last 20 runs"
+          else
+            ci_conclusion="$(jq -r '.conclusion' <<<"$ci_json")"
+            ci_url="$(jq -r '.url' <<<"$ci_json")"
+            ci_at="$(jq -r '.updatedAt' <<<"$ci_json")"
+            ci_when="$(TZ=Asia/Jakarta date -d "$ci_at" '+%Y-%m-%d %H:%M')"
+            case "$ci_conclusion" in
+              success)
+                ci="green"
+                ci_why="the last finished run on main passed, $ci_when WIB"
+                ;;
+              cancelled|skipped)
+                ci="?"
+                ci_why="the last finished run on main was $ci_conclusion, $ci_when WIB -- $ci_url"
+                ;;
+              *)
+                ci="RED"
+                ci_why="the last finished run on main did not pass ($ci_conclusion), $ci_when WIB -- $ci_url"
+                ;;
+            esac
+          fi
+
+          # ------------------------------------------------------------------- facts 1 and 2: read
+          if [ "$paused" = yes ]; then
+            # The state today. A deliberate pause is not a failure, and must never read as one.
+            stepped="n/a"
+            stepped_why="paper is paused on purpose, so no session can be stepped (last stepped: ${stepped_session:-none})"
+            picks="n/a"
+            picks_why="paper is paused on purpose, so no picks can be published"
+          elif [ "$dow_utc" -lt 2 ] || [ "$dow_utc" -gt 6 ]; then
+            stepped="n/a"
+            stepped_why="no nightly runs today -- the nightly runs Tue-Sat UTC, 06:17 UTC / 13:17 WIB, reading Mon-Fri's session"
+            picks="n/a"
+            picks_why="no nightly runs today, so nothing was due"
+          else
+            stepped="no"
+            stepped_why="paper_state.last_session is ${stepped_session:-none}, behind the night's data at ${latest_data:-none}; the nightly last succeeded ${last_ok_wib:-never} WIB"
+            if [ -n "$stepped_session" ] && [ -n "$latest_data" ]; then
+              if [[ "$stepped_session" == "$latest_data" || "$stepped_session" > "$latest_data" ]]; then
+                stepped="yes"
+                stepped_why="paper_state.last_session is $stepped_session, level with the night's data; the nightly finished ${last_ok_wib:-unknown} WIB"
+              fi
+            fi
+
+            if [ -z "$due_session" ]; then
+              picks="none due"
+              picks_why="no strategy has a decision session waiting -- a monthly book only decides on its own cadence, which is most days"
+            elif [ "$due_rows" -gt 0 ]; then
+              picks="yes"
+              picks_why="$due_rows picks published for $due_session"
+            else
+              picks="NO"
+              picks_why="a decision is due for $due_session and book_targets has no rows for it"
+            fi
+          fi
+
+          if [ "$paused" = yes ]; then
+            paper="PAUSED"
+            paper_why="PAPER_PAUSED is 'true' in .github/workflows/nightly.yml -- deliberate, while the roster is rebuilt to pay Gotrade's real fees"
+          else
+            paper="live"
+            paper_why="PAPER_PAUSED is '$pause_value' in .github/workflows/nightly.yml"
+          fi
+
+          # --------------------------------------------------------------- the headline, and only it
+          # The first line is what a phone's lock screen shows without being unlocked, so the first
+          # line carries all four facts. Everything below it is for when he opens the message.
+          status="OK"
+          if [ "$ci" != "green" ]; then status="CHECK"; fi
+          if [ "$stepped" = "no" ];  then status="CHECK"; fi
+          if [ "$picks" = "NO" ];    then status="CHECK"; fi
+
+          headline="Seer $status | $day_wib | stepped $stepped | picks $picks | CI $ci | paper $paper"
+
+          {
+            printf '%s\n\n' "$headline"
+            printf 'Session stepped: %s -- %s\n' "$stepped" "$stepped_why"
+            printf 'Picks published: %s -- %s\n'  "$picks"   "$picks_why"
+            printf 'CI on main: %s -- %s\n'       "$ci"      "$ci_why"
+            printf 'Paper trading: %s -- %s\n'    "$paper"   "$paper_why"
+            printf '\nChecked %s WIB (%s UTC). What to do: docs/runbooks/monitoring.md\n' \
+              "$now_wib" "$now_utc"
+          } > "$RUNNER_TEMP/body.txt"
+
+          cat "$RUNNER_TEMP/body.txt"
+
+          {
+            echo '## Daily watch'
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/body.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Send the line
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "::error::TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID are not set, so today's line could not be delivered. Set them once -- docs/runbooks/monitoring.md (Owner steps). Today's line follows."
+            cat "$RUNNER_TEMP/body.txt"
+            exit 1
+          fi
+
+          # Plain text, no parse_mode: nothing in the body needs escaping and a stray character must
+          # never cost the owner a day's line. --data-urlencode name@file reads the value from the
+          # file, so newlines survive.
+          curl -sS --fail-with-body \
+            -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "disable_web_page_preview=true" \
+            --data-urlencode "text@${RUNNER_TEMP}/body.txt" \
+            -o "$RUNNER_TEMP/telegram.json"
+
+          if ! jq -e '.ok == true' "$RUNNER_TEMP/telegram.json" >/dev/null; then
+            echo "::error::Telegram rejected the message. Today's line follows."
+            jq -r '.description // "no description"' "$RUNNER_TEMP/telegram.json"
+            cat "$RUNNER_TEMP/body.txt"
+            exit 1
+          fi
+
+          echo "Sent."

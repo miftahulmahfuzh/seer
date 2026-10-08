@@ -17,24 +17,38 @@ for watching, not for deciding.
 
 ## The roster
 
-Fixed on 2026-10-04, before any paper result (D1). `C` was added by the Strategy C set (P6), also
-before any paper result. Every entry starts from 10,000,000 IDR (20,000,000 before 2026-10-07), converted at the latest `fx_rates`
-rate on or before its first paper night's `data_date`; the rate is stored in `paper_state.usd_idr`.
-The four P4 entries share one first paper session (`strategies.paper_start`). `C` has its own: the
-session decided on the first scheduled night after the Strategy C merge (see
-[Strategy C: the news check](#strategy-c-the-news-check)).
+Every entry starts from 10,000,000 IDR, converted at the latest `fx_rates` rate on or before its
+first paper night's `data_date`; the rate is stored in `paper_state.usd_idr`. From migration 017
+every entry also receives **5,000,000 IDR on the 25th of each month**, which is what the owner
+actually does. The deposit lands on the calendar date and sits until the next decision session —
+measured, a mean of 7.0 days later, ranging 4 to 10 — and that idle week is modelled on purpose,
+because a book that was funded exactly at its rotation would look better than the owner's will.
+
+These six trade. Each pays Gotrade's measured fee schedule (`sim/costs.py`), not the flat 0.1% a
+side every earlier entry assumed:
 
 | Id | What it is | Engine | Rules | Backtest gate |
 |---|---|---|---|---|
-| `SPY` | Buy and hold SPY, dividends reinvested at the ex-date close (`benchmark.buy_and_hold` rules) | benchmark | — | champion and yardstick; not a strategy |
-| `A` | Strategy A, `STRATEGY_A_PARAMS` (frozen in P3); 5-day brackets, 4 slots | bracket | `design-v0` | failed (P3, and the P3b rework) |
-| `F4-MOM12-N20-TREND` | Top 20 S&P 500 ∪ NDX members by 12-1 momentum, SPY 200-day filter, monthly | book | `monthly-hold` | not passed: P7a dev window only, max DD 22.2% > 15% |
-| `F1-SPY-SMA200-M` | Hold SPY while it closes above its 200-day average, checked monthly; else cash | book | `monthly-hold` | not passed: P7a dev window only, max DD 18.7% > 15%, 11 trades |
-| `C` | Strategy C: A's first 10 ranked candidates for the session, minus every symbol whose nightly news check did not say `allow` (Finnhub headlines and earnings dates, LLM `glm-5.3`, prompt `c-veto-v1`); 5-day brackets, 4 slots | bracket | `design-v0` | not applicable: an LLM strategy (design §1 item 5); counted as not passed |
+| `SPY-GT` | Buy and hold SPY, dividends reinvested at the ex-date close | benchmark | — | champion and yardstick; not a strategy |
+| `C-GT` | Strategy C: A's first 10 ranked candidates for the session, minus every symbol whose nightly news check did not say `allow`; 5-day brackets, 4 slots, **daily** | bracket | `design-v0-gotrade` | not applicable: an LLM strategy (design §1 item 5) |
+| `RMW-FR-GT` | Top 20 by rise beyond the market, picked monthly; holds less when jumpy, checked weekly | book | `monthly-rank-weekly-resize-frac-gotrade` | not passed: lab M0022 dev window only |
+| `RAW-FR-GT` | The same book as RMW with the volatility brake removed | book | `monthly-hold-frac-gotrade` | not passed: lab M0007 dev window only |
+| `MOM-FR-GT` | Top 20 by last year's rise, holding less when jumpy for itself | book | `monthly-hold-frac-gotrade` | not passed: lab M0002 dev window only |
+| `MVW-FR-GT` | Top 30 by last year's rise, weighted to swing least together | book | `monthly-hold-frac-gotrade` | not passed: lab M0008 dev window only |
+
+Thirteen earlier entries are **retired**. A retired entry keeps every row it ever wrote and stays on
+the leaderboard; it only stops trading. None of the thirteen ever stepped a paper session.
+
+**`C-GT` is permanent.** It is the daily-trading control: the owner's original plan was to trade
+daily on Gotrade, and `C-GT` is how he finds out how that would have gone. It is expensive — daily
+trading costs roughly 26% a year on a book this size at $28 slots — and that is the finding, not a
+reason to remove it. It is never retired on cost grounds, and it only answers the question while it
+runs on the same starting capital, the same monthly deposits and the same fees as the books beside
+it.
 
 Monthly entries decide only on the first session of a month. A paper start in early October means
-F4 and F1 hold cash until the open of Monday 2026-11-02, and their October shows 0%. That is the
-same semantics the backtest runner (`run_book`) uses, so it is not a bug.
+the four books hold cash until the open of the next month's first session, and their October shows
+0%. That is the same semantics the backtest runner (`run_book`) uses, so it is not a bug.
 
 ### Frozen means frozen: a change is a new id
 
@@ -73,7 +87,10 @@ never a reason to change a running entry.
 ## The night
 
 ```
-GitHub Actions nightly.yml   cron 23:00 UTC Mon-Fri (06:00 WIB), retry 01:00 UTC; group seer-db-writer
+GitHub Actions nightly.yml   cron '17 6 * * 2-6' = 06:17 UTC Tue-Sat = 13:17 WIB, reading Mon-Fri's
+│                            session; retries '41 9' and '41 12' UTC = 16:41 and 19:41 WIB.
+│                            Concurrency group seer-db-writer. The full table, with New York times
+│                            as well, is in data-pipeline.md under "Workflows and schedule".
 │
 ├─ Check secrets             DATABASE_URL_UNPOOLED, MASSIVE_API_KEY (FINNHUB_API_KEY and LLM_* are optional)
 ├─ Migrate                   db/migrations/*.sql not yet applied
@@ -284,6 +301,61 @@ headline count) and a line "`n` checked · `k` allowed".
 
 `paper` never fails because of C's verdicts, and `paper_check` replays C from exactly the rows Paper
 used.
+
+### The roster pays Gotrade's real fees (migration 017, 2026-10-08)
+
+Every entry before this assumed trading cost 0.1% of each order, on each side. Sean measured what
+Gotrade actually charges against 30 of the owner's own receipts and fitted `sim/costs.py` to them.
+The model reproduces both sides of his 2026-10-07 activity to the cent: a $27.90 buy is charged
+$0.13 (his receipt says $28.03 paid), a $72.51 sell is charged $0.24 (his receipt says $72.27
+received).
+
+What a full round trip really costs, by order size — measured by calling `sim.costs.fee_parts`:
+
+| Order | Round trip | Against the 0.200% assumed |
+|---|---|---|
+| $10 | 2.500% | 12.5× |
+| $28 (the owner's slot today) | 1.036% | 5.2× |
+| $50 | 0.620% | 3.1× |
+| $560 (the whole book today) | 0.534% | 2.7× |
+| $5,000 | 0.493% | 2.5× |
+
+Two different things are going on. About 2.5× is the schedule itself and never goes away. Everything
+above that is a **$0.10 minimum per order**, which stops mattering above roughly $50 an order. That
+floor is why the owner's own 20 real buys cost $2.60 to put $558 to work — 0.47% of the book gone
+before a single round trip.
+
+**What it costs the strategies.** The monthly books turn over about a third of themselves a month,
+not all of it (measured over the lab's window: RAW 33.6% a month, RMW 33.5%, MVW 25.8%, MOM 24.2%),
+so a monthly rotation moves roughly 13 or 14 orders, not 40. At today's slot size that is about 4% a
+year of drag, not the 12% a full-turnover reading would suggest.
+
+**What it does to the results.** Re-measured at real fees (a report only — the lab's own scoring is
+unchanged), RAW goes from +1,502% to +1,126%, MOM from +940% to +763%, MVW from +727% to +536%, RMW
+from +789% to +543%, and SPY at the same fees returns +350%. All four still beat SPY, so nothing
+that was decided gets undecided. **One caveat belongs with those numbers**: they average over a
+growth path that ends at +1,126%, so the $0.10 floor bites hard in the early years and is irrelevant
+later. The owner is at the expensive end of that path today, so those figures understate what he
+will pay in the next few months. The backtest average and today's rate are two different numbers and
+should not be read as one.
+
+**Why six new entries and not six edits.** `cost_model` is a lever added after the roster's digests
+were pinned, so changing it on a running entry changes its frozen spec and `paper` refuses that
+entry's next night. The rule above — *a change is a new id* — is exactly this case, so the six live
+entries got successors with fresh clocks: `SPY-GT`, `C-GT`, `RMW-FR-GT`, `RAW-FR-GT`, `MOM-FR-GT`
+and `MVW-FR-GT`. It cost nothing, because no paper session had ever been stepped: the clocks were
+frozen at zero, which is what the pause since 2026-10-08 was for.
+
+**Paper is still paused, deliberately.** `PAPER_PAUSED` is still `'true'` in `nightly.yml`. Migrate
+runs while paused, so migration 017 applies on the next nightly and the rebuilt roster simply sits
+there — no `paper_start` is written and no session is stepped. The owner flips the switch when he
+wants the clocks to start; until then the rebuild stays free. The resume conditions written above
+the switch say what holds and what is left.
+
+**The name count did not change.** The books still hold 20. The fee case for holding fewer vanishes
+by month three of the funding plan: 20 names cost 0.614% and 11 names cost 0.612%. How many names to
+hold is a question about returns, measured separately; if the answer ever differs it arrives as
+another roster entry, under the same rule.
 
 ### Paper trading was paused, then resumed with RMW (2026-10-07)
 

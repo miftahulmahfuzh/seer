@@ -1,14 +1,15 @@
-import { Check, Crown, TriangleAlert } from 'lucide-react';
+import { Check, Clock, Crown, Pause, TriangleAlert } from 'lucide-react';
 import { AppHeader } from '@/components/AppHeader';
 import { CopyButton } from '@/components/CopyButton';
 import { RefreshButton } from '@/components/RefreshButton';
 import { WhyToggle } from '@/components/WhyToggle';
 import {
   champion, picks as getPicks, positions as getPositions, runStatus,
-  type Holding, type Pick, type Strategy,
+  type Holding, type Pick, type RunStatus, type Strategy,
 } from '@/lib/data';
+import { PAPER_PAUSED, pipelineState, timing, type PipelineState, type Timing } from '@/lib/decision';
 import { companyName, money, monthDay, rp, shortDate, signedRp, signedUsd, usd } from '@/lib/format';
-import { wibDate } from '@/lib/session';
+import { wibDate, wibTime } from '@/lib/session';
 import { SLOT_BG, SLOT_LETTERS, slotBg, slotLetter } from '@/lib/slots';
 import { dismiss } from './actions';
 import s from './today.module.css';
@@ -16,7 +17,6 @@ import s from './today.module.css';
 export const dynamic = 'force-dynamic';
 
 const ORDINAL = ['first', 'second', 'third', 'fourth'];
-const WIB_TIME = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' });
 
 /** Only a bracket champion that is not the benchmark makes buy picks. With SPY as champion (D2), none does. */
 const picksChampion = (c: Strategy | null): Strategy | null =>
@@ -36,6 +36,12 @@ export default async function Today() {
     pc && run.sessionDate && !run.stale ? getPicks(pc.id, run.sessionDate) : Promise.resolve([] as Pick[]),
     pc ? getPositions(pc.id) : Promise.resolve([] as Holding[]),
   ]);
+  // Handover Q5: `run.stale` alone used to raise a coral alarm on the ordinary day after the New
+  // York close. Only two of its states are actually wrong — no run has ever finished, or the run
+  // that owed today's picks missed its last retry at 19:41 WIB.
+  const pipeline = pipelineState(run.sessionDate, run.finishedAt, now);
+  const when = timing(now);
+  const alarm = pipeline === 'never' || pipeline === 'late';
   // Phase 10's guard, kept: only a bracket holding with an order id and a time exit has a day-5 action.
   const actions = open.filter(p => p.orderId !== null && p.maxDays !== null && p.day >= p.maxDays && !p.dismissed);
   const filled = new Set(picks.map(p => p.slot));
@@ -77,20 +83,31 @@ export default async function Today() {
           </div>
         </section>
 
-        {run.stale ? (
+        {PAPER_PAUSED && <PausedNote />}
+
+        {alarm ? (
           <section className={`sheet over ${s.alarm}`}>
             <div className={s.between}>
               <span className={s.alarmIcon}><TriangleAlert size={28} /></span>
               <RefreshButton className={`icon-btn ${s.alarmBtn}`} />
             </div>
-            <span className={s.alarmTitle}>
-              {run.dataDate ? `Data is from ${monthDay(run.dataDate)}. Do not trade today.` : 'No data yet. Do not trade today.'}
+            <span className={s.alarmTitle}>{alarmTitle(pipeline, when)}</span>
+            <span className={s.alarmSub}>{alarmSub(pipeline, run, when)}</span>
+          </section>
+        ) : pipeline === 'waiting' ? (
+          <section className={`sheet over bg-stone ${s.waiting}`} role="status">
+            <div className={s.waitingHead}>
+              <span className={s.waitingIcon} aria-hidden="true"><Clock size={24} /></span>
+              <span className="eyebrow">Nothing to do yet</span>
+            </div>
+            <span className={s.waitingTitle}>
+              {run.sessionDate ? `The ${shortDate(run.sessionDate)} US session has closed.` : 'The last US session has closed.'}
             </span>
-            <span className={s.alarmSub}>
-              {run.finishedAt
-                ? `Last good run ${shortDate(wibDate(run.finishedAt))} at ${WIB_TIME.format(run.finishedAt)} WIB. Picks stay hidden until fresh prices arrive.`
-                : 'The nightly engine has not completed a run yet. Picks stay hidden until it does.'}
+            <span className={s.waitingSub}>
+              The next picks are due {shortDate(wibDate(when.dueAt))} at {wibTime(when.dueAt)} WIB.
+              {run.finishedAt ? ` The last good run finished ${shortDate(wibDate(run.finishedAt))} at ${wibTime(run.finishedAt)} WIB.` : ''}
             </span>
+            <span className={s.waitingSub}>Nothing on this page is a live instruction until then.</span>
           </section>
         ) : !pc ? (
           <section className={`sheet over bg-stone ${s.none}`}>
@@ -146,10 +163,51 @@ export default async function Today() {
             )}
           </div>
         )}
-        {/* The stale sheet runs to the bottom edge itself; a spacer under it would only show page background. */}
-        {!run.stale && <div className="nav-clear" />}
+        {/* The alarm sheet runs to the bottom edge itself; a spacer under it would only show page
+            background. Every other branch, the `waiting` sheet included, needs the spacer. */}
+        {!alarm && <div className="nav-clear" />}
       </div>
     </>
+  );
+}
+
+/**
+ * The coral alarm is for the two states that are actually wrong: no run has ever finished, or the
+ * run that owed today's picks missed its last retry. Routine daily expiry is the `waiting` sheet
+ * instead, which says when the next picks arrive. The old single alarm read "Data is from Oct 7. Do
+ * not trade today." at 08:17 WIB on a morning when the run was not due until 13:17 WIB.
+ */
+function alarmTitle(pipeline: PipelineState, when: Timing): string {
+  if (pipeline === 'never') return 'No data yet. Do not trade today.';
+  return `No picks for ${monthDay(when.target)}. Do not trade today.`;
+}
+
+function alarmSub(pipeline: PipelineState, run: RunStatus, when: Timing): string {
+  if (pipeline === 'never') return 'The nightly engine has not completed a run yet. Picks stay hidden until it does.';
+  const due = `The run was due at ${wibTime(when.dueAt)} WIB and its last retry was ${wibTime(when.lateAfter)} WIB.`;
+  const last = run.finishedAt
+    ? ` Last good run ${shortDate(wibDate(run.finishedAt))} at ${wibTime(run.finishedAt)} WIB${run.dataDate ? `, from the ${monthDay(run.dataDate)} closes` : ''}.`
+    : '';
+  return `${due}${last} Picks stay hidden until fresh prices arrive.`;
+}
+
+/**
+ * Paper trading is switched off (`PAPER_PAUSED` in `.github/workflows/nightly.yml`). The fifth state
+ * of handover Q5. The nightly's price step still runs, so this page's data is unaffected; what is
+ * frozen is every paper order and paper session behind Positions.
+ */
+function PausedNote() {
+  return (
+    <section className={`sheet over bg-butter ${s.paused}`} role="status">
+      <span className={s.pausedIcon} aria-hidden="true"><Pause size={20} /></span>
+      <div className={s.pausedText}>
+        <span className={s.pausedTitle}>Paper trading is paused</span>
+        <span className={s.pausedSub}>
+          No paper orders are placed and no paper session is stepped while the roster is rebuilt to
+          pay the real broker fees. Prices are still updated every night.
+        </span>
+      </div>
+    </section>
   );
 }
 

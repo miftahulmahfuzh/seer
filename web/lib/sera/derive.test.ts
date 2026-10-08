@@ -74,6 +74,28 @@ describe('gateChecks', () => {
     expect(gateChecks(recent, GATE)[5]).toMatchObject({ value: '0.40', ok: false });
   });
 
+  it('shows a test look as not applicable, never as a cleared hurdle', () => {
+    // M0021-B70-RAW exactly: a pre-registered test look scoring 0.513 against a published bar of
+    // 0.90, with no luck label in `failedNow` because the gate does not apply to it. Read without
+    // `luckGated` this rendered a green tick, which is the whole of R7.
+    const look = trial({
+      window: 'test', dsr: 0.513013, dsrNow: 0.513013,
+      failed: ['beats SPY TR'], failedNow: ['beats SPY TR'],
+    });
+    expect(look.luckGated).toBe(false);
+    expect(gateChecks(look, GATE)[5]).toMatchObject({
+      value: '0.51', target: 'does not apply to a test look', ok: null,
+    });
+    // Not applicable is neither a pass nor a miss: it does not count toward the tally and it does
+    // not appear in the misses list.
+    expect(conditionsPassed(look)).toBe(4);
+    expect(misses(look)).toEqual(['spy']);
+    // And the other side of the distinction is untouched: a gated row with no score is a MISS.
+    const seed = trial({ dsr: null, dsrNow: null, failed: ['beats SPY TR'], failedNow: ['beats SPY TR', 'DSR >= 0.90'] });
+    expect(seed.luckGated).toBe(true);
+    expect(gateChecks(seed, GATE)[5]).toMatchObject({ value: 'not measured', ok: false });
+  });
+
   it('judges by the verdict and never by the record, and shows the score at the gate\'s N', () => {
     // M0022-W-TV14 exactly: recorded `DSR >= 0.95` at N = 110 on the day it ran, re-read against
     // today's 0.90 bar and eligible. Judging it by `failed` while printing the target out of

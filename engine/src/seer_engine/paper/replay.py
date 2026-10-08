@@ -6,7 +6,9 @@ records, the windowed market and the dividends, and hands them in.
 
 Expected records, per engine, over ``[paper_start, last_session]``:
 
-- ``bracket`` (A): ``run_rules(market', strategy, params, DESIGN_V0, paper_start, last_session)``
+- ``bracket`` (C, C-GT): ``run_rules(market', strategy, params, rules, paper_start, last_session)``
+  under the ENTRY'S OWN rule set -- ``DESIGN_V0`` for C, the Gotrade bracket preset for C-GT, so a
+  Gotrade entry is never reconstructed at the flat rate (017) --
   where ``market'`` is the market with ``fx = ((paper_start, usd_idr),)``. ``run_backtest``
   converts at ``market.usd_idr_on(start)``; paper converted at the stored rate (plan Decisions
   "Initial FX"). Expected orders: the run's closed, expired and open orders, plus the pending
@@ -20,8 +22,15 @@ Expected records, per engine, over ``[paper_start, last_session]``:
   split-cadence rules a resize-only session is decided from the replay's OWN last rank basket
   (``paper.book.rank_basket`` of its latest rank or kickoff decision) and marks (``last_close``
   of each held symbol), never from the stored rows.
-- ``benchmark`` (SPY): ``buy_and_hold(market.spy(), paper_start, last_session, cash0,
+- ``benchmark`` (SPY, SPY-GT): ``buy_and_hold(market.spy(), paper_start, last_session, cash0,
   dividends=SPY's)``; the holding is ``(SPY, whole shares, last close)``.
+
+All three also take ``contributions``: the owner's deposits as the record of what was credited --
+``(session, usd)`` pairs off ``store.read_contributions``, applied rows only -- never the schedule
+that produced them (plan set Decision D18). Each stored amount was frozen at the USD/IDR of the
+session it landed on, so re-deriving it at one rate would disagree with the stored record the first
+time the rupiah moved. It is ``()`` for every entry that has received none, which is every entry
+while paper is paused, and the replay is then bit-identical to what it was before 017.
 
 The first night steps no session (``last_session == prev_session(paper_start)``): the expected
 record is the day-0 snapshot plus the first decision.
@@ -199,6 +208,10 @@ class Records:
     trades: tuple[Trade, ...] = ()
     targets: tuple[tuple[date, tuple[Target, ...]], ...] = ()
     holdings: tuple[Holding, ...] = ()
+    #: The owner's deposits credited so far, in USD (017). Published beside ``initial_cash``,
+    #: which is capital on day 0 and not capital in. ``compare`` names the fields it checks and
+    #: does not check this one: it annotates the stored record rather than being replayed.
+    deposited: Decimal = Decimal("0.0000")
 
 
 @dataclass(frozen=True, slots=True)
@@ -275,8 +288,26 @@ def _order_key(o: Order) -> tuple[date, int, str]:
 # --------------------------------------------------------------------------- expected records
 
 
-def expected_bracket(market: Market, strategy: Strategy, params: Any, head: PaperHead) -> Records:
-    """The bracket record ``run_rules(DESIGN_V0)`` gives over the head's window, plus the next decision."""
+def expected_bracket(
+    market: Market,
+    strategy: Strategy,
+    params: Any,
+    head: PaperHead,
+    *,
+    rules: TradeRules = DESIGN_V0,
+    contributions: Sequence[tuple[date, Decimal]] = (),
+) -> Records:
+    """The bracket record ``run_rules(rules)`` gives over the head's window, plus the next decision.
+
+    ``rules`` is the entry's own rule set -- ``DESIGN_V0`` for C, the Gotrade bracket preset for
+    C-GT. Replaying a Gotrade entry at the flat rate disagrees with the stored record on every
+    session.
+
+    ``contributions`` is the deposits this entry has ALREADY received, as ``(session, usd)`` pairs
+    from ``store.read_contributions`` -- the record, never the schedule. Each amount was frozen at
+    the rate of the day it landed; re-deriving it here at one rate would disagree with the stored
+    record the first time the rupiah moved (plan set Decision D18).
+    """
     if head.engine != "bracket":
         raise ValueError(f"{head.strategy_id} is a {head.engine} strategy, not bracket")
     start, last = head.paper_start, head.last_session
@@ -287,9 +318,18 @@ def expected_bracket(market: Market, strategy: Strategy, params: Any, head: Pape
         snapshots: tuple[Snapshot, ...] = (_day0(start, cash0),)
     else:
         fixed = replace(market, fx=((start, head.usd_idr),))
-        run = run_rules(fixed, strategy, params, DESIGN_V0, start, last, initial_idr=PAPER_INITIAL_IDR)
+        run = run_rules(
+            fixed,
+            strategy,
+            params,
+            rules,
+            start,
+            last,
+            initial_idr=PAPER_INITIAL_IDR,
+            contributions=contributions,
+        )
         if not isinstance(run, RunResult):
-            raise TypeError(f"DESIGN_V0 replay of {head.strategy_id} returned {type(run).__name__}")
+            raise TypeError(f"{rules.id} replay of {head.strategy_id} returned {type(run).__name__}")
         snapshots = run.snapshots
         expired = tuple(e.order for e in run.events if e.kind == "expire")
         settled = run.closed + expired + run.open_at_end
@@ -322,8 +362,14 @@ def expected_book(
     rules: TradeRules,
     head: PaperHead,
     dividends: DividendMap,
+    *,
+    contributions: Sequence[tuple[date, Decimal]] = (),
 ) -> Records:
-    """The book record ``run_rules(rules)`` gives over the head's window, plus every decision."""
+    """The book record ``run_rules(rules)`` gives over the head's window, plus every decision.
+
+    ``contributions`` is the stored, dated, already-converted deposits (D18), as for
+    :func:`expected_bracket`.
+    """
     if head.engine != "book":
         raise ValueError(f"{head.strategy_id} is a {head.engine} strategy, not book")
     if not isinstance(rules, TradeRules) or rules.engine != "book":
@@ -355,6 +401,7 @@ def expected_book(
             usd_idr=head.usd_idr,
             kickoff=head.kickoff,
             initial_idr=PAPER_INITIAL_IDR,
+            contributions=contributions,
         )
         if not isinstance(run, BookResult):
             raise TypeError(f"book replay of {head.strategy_id} returned {type(run).__name__}")
@@ -403,8 +450,18 @@ def expected_book(
     )
 
 
-def expected_benchmark(market: Market, head: PaperHead, dividends: DividendMap) -> Records:
-    """The SPY buy-and-hold record over the head's window (dividends reinvested at the ex-date close)."""
+def expected_benchmark(
+    market: Market,
+    head: PaperHead,
+    dividends: DividendMap,
+    *,
+    contributions: Sequence[tuple[date, Decimal]] = (),
+) -> Records:
+    """The SPY buy-and-hold record over the head's window (dividends reinvested at the ex-date close).
+
+    ``contributions`` is the stored, dated, already-converted deposits (D18): the yardstick is fed
+    the same money on the same dates as the books it is measured against.
+    """
     if head.engine != "benchmark":
         raise ValueError(f"{head.strategy_id} is a {head.engine} strategy, not benchmark")
     start, last = head.paper_start, head.last_session
@@ -416,7 +473,16 @@ def expected_benchmark(market: Market, head: PaperHead, dividends: DividendMap) 
     else:
         by_date = dividends.get(BENCHMARK_SYMBOL, {})
         paid = tuple(Dividend(ex_date=d, amount=by_date[d]) for d in sorted(by_date))
-        curve = buy_and_hold(market.spy(), start, last, cash0, dividends=paid, name=BENCHMARK_SYMBOL, fractional=True)
+        curve = buy_and_hold(
+            market.spy(),
+            start,
+            last,
+            cash0,
+            dividends=paid,
+            name=BENCHMARK_SYMBOL,
+            fractional=True,
+            contributions=contributions,
+        )
         snapshots = curve.snapshots
         cash = curve.cash
         holdings = ()

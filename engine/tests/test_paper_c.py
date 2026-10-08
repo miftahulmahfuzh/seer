@@ -79,12 +79,17 @@ def land_c(conn, engine: str) -> None:
 @pytest.fixture
 def world(pg):
     with db.transaction(pg, False):
-        # A is retired on the production roster since migration 013 (it failed its own gate twice).
         # This file's subject is C *relative to A* -- "the veto allowing everything leaves A's
-        # orders untouched" is what defines C -- so the comparison needs A stepping. That is a
+        # orders untouched" is what defines C -- so the comparison needs both stepping. That is a
         # property of the two strategy objects, not of who happens to be on the live roster, so
-        # the fixture activates A here rather than the suite depending on production membership.
-        pg.execute("UPDATE strategies SET status = 'active' WHERE id = 'A'")
+        # the fixture pins its OWN world here rather than following production membership: 013
+        # retired A, and 017 retired C itself in favour of the Gotrade-fee successor C-GT.
+        pg.execute("UPDATE strategies SET status = 'retired'")
+        pg.execute(
+            "UPDATE strategies SET status = 'active' WHERE id IN "
+            "('SPY', 'A', 'C', 'F4-MOM12-N20-TREND-FR', 'F1-SPY-SMA200-M-FR', "
+            "'RMW-FR', 'RAW-FR', 'MOM-FR', 'MVW-FR')"
+        )
         bars.upsert_bars(pg, synthetic_bars())
         fx.upsert_fx(pg, [(HIST_START, USD_IDR)])
         for s in MEMBERS:

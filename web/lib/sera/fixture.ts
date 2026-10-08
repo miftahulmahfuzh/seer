@@ -53,6 +53,7 @@ export function trial(over: Partial<LabTrial> = {}): LabTrial {
     eligible: false,
     dsr: 0.97,
     nTrialsAtRun: 55,
+    luckGated: true,
     failedNow: [] as string[],
     eligibleNow: false,
     dsrNow: null as number | null,
@@ -67,12 +68,17 @@ export function trial(over: Partial<LabTrial> = {}): LabTrial {
  * mirrors `dsr`, and a row with no score picks up the luck label — the engine's own rule, that a
  * luck test which cannot be scored was not passed. Shared by the test-local trial builders so
  * all three agree. A test about the record/verdict split passes the fields explicitly instead.
+ *
+ * `luckGated` follows the window unless the test sets it, which is `store.luck_gated` exactly: a
+ * `{ window: 'test' }` trial comes back ungated and carries no luck label, so a test does not
+ * have to remember to say both things.
  */
 export function withVerdict(t: LabTrial, over: Partial<LabTrial>): LabTrial {
+  const luckGated = over.luckGated ?? t.window === 'dev';
   const dsrNow = 'dsrNow' in over ? (over.dsrNow as number | null) : t.dsr;
-  const unscored = dsrNow === null && !t.failed.some((f) => f.startsWith('DSR >= '));
+  const unscored = luckGated && dsrNow === null && !t.failed.some((f) => f.startsWith('DSR >= '));
   const failedNow = over.failedNow ?? (unscored ? [...t.failed, 'DSR >= 0.90'] : t.failed);
-  return { ...t, failedNow, eligibleNow: over.eligibleNow ?? failedNow.length === 0, dsrNow };
+  return { ...t, luckGated, failedNow, eligibleNow: over.eligibleNow ?? failedNow.length === 0, dsrNow };
 }
 
 export function method(over: Partial<LabMethod> = {}): LabMethod {

@@ -335,6 +335,11 @@ PARITY_DAYS = dates.sessions(date(2024, 1, 2), date(2024, 6, 28))
 PARITY_SYMBOLS = tuple(f"S{i:02d}" for i in range(40))
 RUN_SESSIONS = 14  # each sim run covers S1 and the next 13 sessions; later resolutions are skipped
 
+# The parity check is about the labeler agreeing with the simulator, not about the lab's capital:
+# pin the 20,000,000 IDR this fixture's share counts were tuned at (backtest.runner.INITIAL_IDR is
+# now the owner's real 10,000,000, which rounds a share off some slots and moves a return by ~1e-6).
+PARITY_IDR = Decimal("20000000")
+
 
 def _ticks(x: np.ndarray) -> np.ndarray:
     """Prices as exact 4-dp floats (integer ten-thousandths / 1e4: the float's repr is the 4-dp value)."""
@@ -431,7 +436,7 @@ def test_sim_parity_on_a_seeded_market():
     for i, (s, d, p) in enumerate(rows):
         s1 = dates.next_session(d)
         stop = PARITY_DAYS[min(PARITY_DAYS.index(s1) + RUN_SESSIONS - 1, len(PARITY_DAYS) - 1)]
-        run = run_backtest(market, OnePick(d, p), None, s1, stop, prepared=())
+        run = run_backtest(market, OnePick(d, p), None, s1, stop, prepared=(), initial_idr=PARITY_IDR)
         assert run.rejections == ()
         code = int(out.reason[i])
         terminal = [e for e in run.events if e.kind in ("expire", "exit")]

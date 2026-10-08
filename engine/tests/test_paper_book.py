@@ -48,6 +48,7 @@ from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.paper.book import (
     BookNight,
     decide_book,
+    deposit_book,
     last_rank_session,
     needs_kickoff,
     rank_basket,
@@ -1072,3 +1073,68 @@ def test_rank_basket_refuses_what_no_decision_writes():
         rank_basket(("AAA",), None)
     with pytest.raises(TypeError, match="sequence"):
         rank_basket({"AAA": 1}, None)
+
+
+# ============================================================== contributions
+
+
+def _funded_book() -> Book:
+    """A book holding 10 AAA at 15 with 100 in cash: equity 250, settled on 2026-09-30."""
+    held = Position(
+        symbol="AAA",
+        shares=P("10"),
+        mark=P("15"),
+        entry_date=D("2026-09-28"),
+        entry_price=P("14"),
+        days_held=2,
+        cost_usd=P("140.14"),
+        income_usd=P("0"),
+        stop=None,
+        take=None,
+    )
+    return Book(cash=P("100"), equity=P("250"), positions=(held,), last_session=D("2026-09-30"))
+
+
+def test_deposit_book_raises_cash_and_equity_and_moves_nothing_else():
+    book = _funded_book()
+    out = deposit_book(book, P("280.2533"))  # 5,000,000 IDR at 17,841
+    assert out.cash == P("380.2533")
+    assert out.equity == P("530.2533")
+    assert out.positions == book.positions
+    assert out.last_session == book.last_session
+    assert book.cash == P("100") and book.equity == P("250")  # the input is untouched
+
+
+def test_deposit_book_argument_checks():
+    book = _funded_book()
+    with pytest.raises(TypeError):
+        deposit_book(book, 280.2533)
+    with pytest.raises(TypeError):
+        deposit_book("not a book", P("100"))
+    with pytest.raises(ValueError):
+        deposit_book(book, Decimal("0"))
+    with pytest.raises(ValueError):
+        deposit_book(book, Decimal("-100.0000"))
+    with pytest.raises(ValueError):
+        deposit_book(book, Decimal("100.00001"))
+
+
+def test_a_deposit_on_a_non_decision_session_sits_as_cash_and_is_not_a_fill():
+    """The idle week, in one session: the money arrives, raises equity, buys nothing."""
+    funded = deposit_book(_funded_book(), P("280.2533"))
+    night = settle_book(
+        funded,
+        D("2026-10-01"),
+        {"AAA": Bar("AAA", D("2026-10-01"), P("15"), P("15"), P("15"), P("15"), 1_000_000)},
+        None,  # not a decision session: nothing is ranked, so nothing is bought
+        False,
+        MONTHLY_HOLD,
+        {},
+        (),
+        lambda _symbol: D("2026-10-01"),
+    )
+    assert night.snapshot.cash_usd == P("380.2533")     # the deposit is still cash
+    assert night.snapshot.equity_usd == P("530.2533")   # 380.2533 + 10 x 15
+    assert night.snapshot.invested_usd == P("150")
+    assert night.fills == () and night.trades == ()     # a deposit is not a fill and not a trade
+    assert night.book.positions[0].days_held == 3

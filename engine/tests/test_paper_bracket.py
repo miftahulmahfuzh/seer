@@ -20,10 +20,11 @@ from stratkit import mutate_from
 
 from seer_engine import dates
 from seer_engine.backtest.market import Market, Membership
-from seer_engine.backtest.runner import INITIAL_IDR, RunResult, run_backtest
+from seer_engine.backtest.runner import RunResult, run_backtest
 from seer_engine.paper.bracket import BracketNight, decide_bracket, settle_bracket
 from seer_engine.prices import Bar
-from seer_engine.sim import Event, Snapshot, initial_cash_usd, new_portfolio
+from seer_engine.sim import DESIGN_V0, Event, Snapshot, TradeRules, initial_cash_usd, new_portfolio
+from seer_engine.sim.rules import DESIGN_V0_GOTRADE
 from seer_engine.strategies.a import STRATEGY_A, STRATEGY_A_PARAMS
 from seer_engine.strategies.base import history_from_bars
 
@@ -88,10 +89,25 @@ def market(cut: date | None = None) -> Market:
 START, END = SESSIONS[200], SESSIONS[-1]  # data_date SESSIONS[199] has exactly 200 bars
 
 
-def run_nights(m: Market, start: date, end: date) -> tuple[RunResult, list[BracketNight]]:
-    """The paper loop over ``[start, end]``, shaped as a ``RunResult`` for comparison."""
+# This fixture's price ladder is calibrated to a 1250 USD book, so it pins its own 20,000,000 IDR
+# rather than following backtest.runner.INITIAL_IDR, which plan phase 5 moved to the owner's real
+# 10,000,000. Measured at 10,000,000: the slot halves, lt_one_share rejections go 26 -> 123, and
+# Gotrade's $0.10 per-order floor then rejects five names the flat rate still affords (128 vs 123),
+# so the two runs stop being identical in shape and the test below has nothing left to compare.
+# At 20,000,000 both runs place 215 events with the same shape and the assertion keeps its full
+# strength -- which is the point: this test is about the fee model, not about the lab's capital.
+BRACKET_IDR = Decimal("20000000")
+
+
+def run_nights(
+    m: Market, start: date, end: date, *, rules: TradeRules = DESIGN_V0
+) -> tuple[RunResult, list[BracketNight]]:
+    """The paper loop over ``[start, end]``, shaped as a ``RunResult`` for comparison.
+
+    ``rules`` defaults to ``DESIGN_V0``, so every existing caller is byte-for-byte unchanged.
+    """
     usd_idr = m.usd_idr_on(start)
-    cash0 = initial_cash_usd(INITIAL_IDR, usd_idr)
+    cash0 = initial_cash_usd(BRACKET_IDR, usd_idr)
     pf = new_portfolio(cash0)
     data_date = dates.prev_session(start)
     snapshots = [Snapshot(data_date, pf.cash, pf.equity)]
@@ -100,12 +116,12 @@ def run_nights(m: Market, start: date, end: date) -> tuple[RunResult, list[Brack
     nights: list[BracketNight] = []
     for session in dates.sessions(start, end):
         sized = decide_bracket(
-            pf, STRATEGY_A, STRATEGY_A_PARAMS, m.history, m.membership.members_on(data_date), data_date
+            pf, STRATEGY_A, STRATEGY_A_PARAMS, m.history, m.membership.members_on(data_date), data_date, rules=rules
         )
         for r in sized.rejected:
             rejections[r.reason] += 1
         pf = sized.portfolio
-        night = settle_bracket(pf, session, m.bars_on(session, pf.held_symbols()), (), m.last_bar_date)
+        night = settle_bracket(pf, session, m.bars_on(session, pf.held_symbols()), (), m.last_bar_date, rules=rules)
         nights.append(night)
         pf = night.portfolio
         events.extend(night.events)
@@ -130,7 +146,7 @@ def run_nights(m: Market, start: date, end: date) -> tuple[RunResult, list[Brack
 def _cut_while_held() -> date:
     """A session on whose close UPC is open in the uncut run (so cutting its bars there forces a
     close on the next session)."""
-    full = run_backtest(market(), STRATEGY_A, STRATEGY_A_PARAMS, START, END)
+    full = run_backtest(market(), STRATEGY_A, STRATEGY_A_PARAMS, START, END, initial_idr=BRACKET_IDR)
     for e in full.events:
         o = e.order
         if e.kind == "fill" and o.symbol == "UPC":
@@ -149,7 +165,7 @@ def test_window_has_at_least_300_sessions():
 
 def test_nights_equal_run_backtest():
     m = market()
-    expected = run_backtest(m, STRATEGY_A, STRATEGY_A_PARAMS, START, END)
+    expected = run_backtest(m, STRATEGY_A, STRATEGY_A_PARAMS, START, END, initial_idr=BRACKET_IDR)
     got, nights = run_nights(m, START, END)
     assert got.snapshots == expected.snapshots
     assert got.events == expected.events
@@ -168,7 +184,7 @@ def test_nights_equal_run_backtest():
 def test_nights_equal_run_backtest_with_a_forced_close():
     cut = _cut_while_held()
     m = market(cut)
-    expected = run_backtest(m, STRATEGY_A, STRATEGY_A_PARAMS, START, END)
+    expected = run_backtest(m, STRATEGY_A, STRATEGY_A_PARAMS, START, END, initial_idr=BRACKET_IDR)
     forced = [e for e in expected.events if e.forced]
     assert len(forced) == 1
     assert forced[0].order.symbol == "UPC"
@@ -281,7 +297,7 @@ def test_settle_rejects_bad_input():
 def test_decide_cuts_history_at_data_date_no_look_ahead():
     """Changing every bar dated on or after S leaves the decision for S unchanged."""
     m = market()
-    cash0 = initial_cash_usd(INITIAL_IDR, m.usd_idr_on(START))
+    cash0 = initial_cash_usd(BRACKET_IDR, m.usd_idr_on(START))
     seen_picks = 0
     for data_date in SESSIONS[199::7]:
         s = dates.next_session(data_date)
@@ -307,3 +323,46 @@ def test_decide_sizes_for_the_next_session_and_checks_the_portfolio():
         decide_bracket(stepped, STRATEGY_A, STRATEGY_A_PARAMS, m.history, frozenset(), data_date)
     with pytest.raises(ValueError, match="not an NYSE session"):
         decide_bracket(pf, STRATEGY_A, STRATEGY_A_PARAMS, m.history, frozenset(), D("2025-03-15"))
+
+
+# --------------------------------------------------------------------------- the cost model lever
+
+
+def test_a_gotrade_night_keeps_the_shape_and_pays_strictly_more():
+    """Phase 4: the same window under ``DESIGN_V0_GOTRADE``.
+
+    The signature change moves nothing structural -- same sessions, same fills, same symbols and
+    slots -- it only charges Gotrade's measured schedule, so the book ends strictly poorer. That
+    is the counterfactual strategy C exists to produce, not a defect.
+    """
+    m = market()
+    flat, _ = run_nights(m, START, END)
+    gt, _ = run_nights(m, START, END, rules=DESIGN_V0_GOTRADE)
+
+    def shape(r):
+        return [(e.session_date, e.kind, e.order.symbol, e.order.slot) for e in r.events]
+
+    # (i) identical in shape: every event, on the same session, same symbol, same slot.
+    assert shape(gt) == shape(flat)
+    assert [s.date for s in gt.snapshots] == [s.date for s in flat.snapshots]
+    assert gt.rejections == flat.rejections
+    assert gt.initial_cash == flat.initial_cash
+    # Not vacuous: the window really does fill, reject and exit every way.
+    assert sum(1 for e in flat.events if e.kind == "fill") == 85
+    assert {o.exit_reason for o in gt.closed} == {"tp", "sl", "gap", "time"}
+
+    # (ii) and strictly poorer, because the fees are strictly higher. Measured on this fixture.
+    assert flat.snapshots[-1].equity_usd == Decimal("978.5054")
+    assert gt.snapshots[-1].equity_usd == Decimal("912.3158")
+    assert gt.snapshots[-1].equity_usd < flat.snapshots[-1].equity_usd
+
+
+def test_the_default_rules_are_design_v0_so_the_parity_test_is_the_proof():
+    """``rules`` is keyword-only with ``DESIGN_V0`` as its default at both entry points, which is
+    what lets phase 12 wire ``commands/paper.py`` later without this phase changing any number."""
+    import inspect
+
+    for fn in (settle_bracket, decide_bracket):
+        p = inspect.signature(fn).parameters["rules"]
+        assert p.kind is inspect.Parameter.KEYWORD_ONLY, fn.__name__
+        assert p.default is DESIGN_V0, fn.__name__

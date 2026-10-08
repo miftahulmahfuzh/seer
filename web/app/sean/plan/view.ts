@@ -2,7 +2,7 @@
 // input rules. No data access; relative imports only (vitest has no `@/` alias).
 import { sharesLabel } from '../../../components/roster';
 import { picksMonthlySizesWeekly } from '../../../lib/cadence';
-import { shortDate, usd } from '../../../lib/format';
+import { shortDate, signedUsd, usd } from '../../../lib/format';
 import type { Reminder } from '../../../lib/sean/reminders';
 
 /** What a form shows after the owner saves. */
@@ -148,13 +148,30 @@ export function todoLabel(n: number): string {
   return n === 1 ? '1 thing to do' : `${n} things to do`;
 }
 
-/** The caption of "Your plan": where the plan size comes from. */
-export function planSizeLine(planSize: number | null, budgetUsd: number | null): string {
+/** Cash, with its sign kept: usd() takes an absolute value, and the wallet can be below zero. */
+const cashAmount = (v: number): string => (v < 0 ? signedUsd(v) : usd(v));
+
+/** The caption of "Your plan": where the plan size comes from, in the owner's own terms. */
+export function planSizeLine(
+  planSize: number | null, budgetUsd: number | null, cashUsd: number | null,
+): string {
   if (budgetUsd !== null) return `Plan size ${usd(budgetUsd)}, the amount you set. Each pick gets its share of it.`;
+  if (planSize !== null && cashUsd !== null) {
+    return `Plan size ${usd(planSize)}: ${usd(planSize - cashUsd)} in stocks and ${cashAmount(cashUsd)} in cash. Each pick gets its share of the whole amount, so the cash gets used. Set an amount below to override it.`;
+  }
   if (planSize !== null) {
     return `Plan size ${usd(planSize)}, what the plan holds now. Set an amount to size buys differently.`;
   }
   return 'Set how much you want to put into this plan, and Sean will say how much of each stock to buy.';
+}
+
+/**
+ * The line under the Plan size tile: what it is made of. null when there is no plan size, or when
+ * the owner typed one in (then the tile already says so and the split would be a guess).
+ */
+export function cashLine(planSize: number | null, cashUsd: number | null, budgetUsd: number | null): string | null {
+  if (planSize === null || cashUsd === null || budgetUsd !== null) return null;
+  return `${usd(planSize - cashUsd)} in stocks + ${cashAmount(cashUsd)} cash`;
 }
 
 /** The note about holdings from before the plan; null when there are none. */

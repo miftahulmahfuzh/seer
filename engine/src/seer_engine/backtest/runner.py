@@ -22,7 +22,8 @@ from __future__ import annotations
 
 from bisect import bisect_right
 from collections import Counter
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -41,9 +42,20 @@ from seer_engine.sim import (
     size_picks,
     step,
 )
+from seer_engine.sim.contributions import (
+    ContributionSchedule,
+    Contributions,
+    credit_for,
+)
+from seer_engine.sim.rules import DESIGN_V0, TradeRules
 from seer_engine.strategies.base import Strategy
 
-INITIAL_IDR = Decimal("20000000")
+#: The owner's real Gotrade capital, the same number ``paper.capital.PAPER_INITIAL_IDR`` holds.
+#: It was 20,000,000 while every simulated fee was a flat percentage, where only ratios matter.
+#: Gotrade's measured schedule has a $0.10 per-order floor, so the rate depends on the slot:
+#: at 17,841 IDR/USD over 20 names a 10M book pays 1.035% round trip and a 20M book 0.660%.
+#: Measuring at 20M would price a cheaper world than the owner lives in.
+INITIAL_IDR = Decimal("10000000")
 
 
 @dataclass(frozen=True)
@@ -55,6 +67,11 @@ class RunResult:
     included. ``closed`` is every closed order in exit order; ``open_at_end`` the positions
     still open after ``end``. ``rejections`` counts ``size_picks`` rejections by reason,
     sorted by reason.
+
+    ``contributions`` is the schedule the run was funded on, or None (the default, and every
+    closed record). ``cashflows`` is ``(session, usd)`` per credited contribution in session
+    order -- the dated series a money-weighted return is computed from. A contribution is money
+    arriving, never a return: it raises cash and equity on its session and nothing else.
     """
 
     strategy_id: str
@@ -68,6 +85,8 @@ class RunResult:
     closed: tuple[Order, ...]
     open_at_end: tuple[Order, ...]
     rejections: tuple[tuple[str, int], ...]
+    contributions: Contributions | None = None
+    cashflows: tuple[tuple[date, Decimal], ...] = ()
 
 
 def _session(name: str, d: object) -> date:
@@ -135,6 +154,8 @@ def run_backtest(
     *,
     prepared: Any = None,
     initial_idr: Decimal = INITIAL_IDR,
+    contributions: Contributions | None = None,
+    rules: TradeRules = DESIGN_V0,
 ) -> RunResult:
     """Run ``strategy`` with ``params`` on a fresh portfolio over every session in ``[start, end]``.
 
@@ -150,6 +171,20 @@ def run_backtest(
     traded, not by ``data_date``. Orders keep the bracket they were placed with; the simulator
     never rewrites one. ``RunResult.params`` is the schedule itself. Any other ``params`` value
     is handed to the strategy unchanged for every session.
+
+    ``contributions``: the owner's recurring deposit (``sim.contributions``), or None for a lump
+    sum -- the default, so every existing caller and every closed record is unchanged. A
+    contribution dated ``d`` is credited at the OPEN of the first session on or after ``d``,
+    before that session's sizing, so the money is deployable the moment it lands and sits as idle
+    cash until the strategy next buys. It raises cash AND equity (the slot budget is
+    ``q(equity / SLOTS)``: crediting cash alone would leave the deposit under-deployed for good).
+    It is converted at this run's single ``usd_idr``, the rate the starting capital used.
+
+    ``rules`` prices every buy, fill and exit: ``DESIGN_V0`` (the default) is the flat 0.1% a side
+    every closed §5 record was run at, ``DESIGN_V0_GOTRADE`` is Gotrade's measured schedule
+    including its $0.10 per-order minimum. It is passed straight to ``sim.size_picks``,
+    ``sim.step`` and ``sim.close_unpriced``; a book or fractional rule set raises there
+    (``sim.charges.bracket_rules``).
     """
     if not isinstance(market, Market):
         raise TypeError(f"market must be a Market, got {type(market).__name__}")
@@ -157,6 +192,14 @@ def run_backtest(
     _session("end", end)
     if end < start:
         raise ValueError(f"end {end} is before start {start}")
+    if contributions is not None and (
+        isinstance(contributions, (str, Mapping))
+        or not isinstance(contributions, (ContributionSchedule, Sequence))
+    ):
+        raise TypeError(
+            "contributions must be a ContributionSchedule, a sequence of (date, Decimal) "
+            f"pairs or None, got {type(contributions).__name__}"
+        )
     schedule = params if isinstance(params, ParamsSchedule) else None
     if schedule is not None and start < schedule.segments[0][0]:
         raise ValueError(f"start {start} is before the schedule's first session {schedule.segments[0][0]}")
@@ -168,8 +211,14 @@ def run_backtest(
     snapshots: list[Snapshot] = [Snapshot(data_date, pf.cash, pf.equity)]
     events: list[Event] = []
     rejections: Counter[str] = Counter()
+    cashflows: list[tuple[date, Decimal]] = []
 
     for session in dates.sessions(start, end):
+        if contributions is not None:
+            credit = credit_for(contributions, data_date, session, usd_idr)
+            if credit > 0:
+                pf = replace(pf, cash=pf.cash + credit, equity=pf.equity + credit)
+                cashflows.append((session, credit))
         members = market.membership.members_on(data_date)
         session_params = params if schedule is None else schedule.at(session)
         if prepared is None:
@@ -178,12 +227,12 @@ def run_backtest(
         else:
             picks = strategy.picks_prepared(prepared, members, data_date, session_params)
 
-        sized = size_picks(pf, picks, session)
+        sized = size_picks(pf, picks, session, rules=rules)
         for r in sized.rejected:
             rejections[r.reason] += 1
         pf = sized.portfolio
 
-        result = step(pf, session, market.bars_on(session, pf.held_symbols()))
+        result = step(pf, session, market.bars_on(session, pf.held_symbols()), rules=rules)
         pf = result.portfolio
         events.extend(result.events)
         snapshots.append(result.snapshot)
@@ -194,7 +243,7 @@ def run_backtest(
             if last is None or last < session:
                 gone.append(o.symbol)
         if gone:
-            pf, forced = close_unpriced(pf, gone)
+            pf, forced = close_unpriced(pf, gone, rules=rules)
             events.extend(forced)
             snapshots[-1] = Snapshot(session, pf.cash, pf.equity)
 
@@ -212,6 +261,8 @@ def run_backtest(
         closed=tuple(e.order for e in events if e.kind == "exit"),
         open_at_end=pf.open_orders(),
         rejections=tuple(sorted(rejections.items())),
+        contributions=contributions,
+        cashflows=tuple(cashflows),
     )
 
 

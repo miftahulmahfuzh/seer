@@ -3,9 +3,10 @@
 export type LabSnapshot = {
   /**
    * 2 added the derived verdict to every trial (`failedNow` / `eligibleNow` / `dsrNow`);
-   * 3 added `paper`, which names the lab method behind each roster entry.
+   * 3 added `paper`, which names the lab method behind each roster entry;
+   * 4 added `luckGated`, which says whether the luck hurdle applies to a trial at all.
    */
-  version: 3;
+  version: 4;
   asOf: string;
   gate: {
     maxDrawdown: number;
@@ -151,10 +152,27 @@ export type LabTrial = {
   eligibleNow: boolean;
   /**
    * The verdict: this trial's deflated Sharpe re-evaluated at `gate.dsrN`, or null when it
-   * cannot be — the 54 P7a seed rows have no recorded DSR. Null is a **missed** luck check, not
-   * an excused one: the engine puts the luck label in `failedNow` for exactly those rows.
+   * cannot be — the 54 P7a seed rows have no recorded DSR. On a `luckGated` row, null is a
+   * **missed** luck check, not an excused one: the engine puts the luck label in `failedNow` for
+   * exactly those rows. On a row that is not `luckGated` this is a measurement with no hurdle
+   * attached, and must never be compared against `gate.dsrMin`.
    */
   dsrNow: number | null;
+  /**
+   * **Does the luck hurdle apply to this trial at all?** True for a development row, false for a
+   * test-window look (`lab.store.luck_gated`). The web reads this; it must never re-derive it.
+   *
+   * A test look is one pre-registered confirmatory run, so there is no selection among results to
+   * deflate and the engine applies the four owner thresholds and nothing else. `failedNow`
+   * therefore has no luck label on such a row — which, read without this marker, is
+   * indistinguishable from a cleared hurdle. That is how `M0021-B70-RAW` came to render a green
+   * tick on a score of 0.513 against a published bar of 0.90.
+   *
+   * Three states, and the page must show three: `luckGated && conditionOk === true` (cleared),
+   * `luckGated && conditionOk === false` (missed, possibly because `dsrNow` is null and nothing
+   * could be scored), and `!luckGated` (does not apply).
+   */
+  luckGated: boolean;
   curve: [string, number][];
 };
 

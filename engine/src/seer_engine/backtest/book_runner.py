@@ -59,8 +59,21 @@ from seer_engine.sim.book import (
     step_book,
     to_weight,
 )
-from seer_engine.sim.model import COST_RATE, initial_cash_usd, q
-from seer_engine.sim.rules import TradeRules, is_rank_session, is_resize_session
+from seer_engine.sim.charges import order_fee
+from seer_engine.sim.contributions import (
+    ContributionSchedule,
+    Contributions,
+    credit_for,
+)
+from seer_engine.sim.costs import Side
+from seer_engine.sim.model import initial_cash_usd, q
+from seer_engine.sim.rules import (
+    DESIGN_V0,
+    TradeRules,
+    is_bracket,
+    is_rank_session,
+    is_resize_session,
+)
 from seer_engine.strategies.allocator import Allocator, scale_weight
 from seer_engine.strategies.base import Strategy
 
@@ -85,6 +98,10 @@ class BookResult:
     positions still held after ``end`` (marked, never liquidated). ``dividends_usd`` is the cash
     credited by dividends, ``costs_usd`` the sum of ``Fill.cost_usd``. ``rejections`` counts
     ``step_book`` rejections by reason, sorted by reason.
+
+    ``contributions`` is the schedule the run was funded on, or None (the default, and every
+    closed record). ``cashflows`` is ``(session, usd)`` per credited contribution in session
+    order -- the dated series a money-weighted return is computed from.
     """
 
     allocator_id: str
@@ -101,6 +118,8 @@ class BookResult:
     dividends_usd: Decimal
     costs_usd: Decimal
     rejections: tuple[tuple[str, int], ...]
+    contributions: Contributions | None = None
+    cashflows: tuple[tuple[date, Decimal], ...] = ()
 
 
 def _session(name: str, d: object) -> date:
@@ -230,6 +249,7 @@ def run_book(
     initial_idr: Decimal = INITIAL_IDR,
     usd_idr: Decimal | None = None,
     kickoff: date | None = None,
+    contributions: Contributions | None = None,
 ) -> BookResult:
     """Run ``allocator`` with ``params`` under the book rules ``rules`` over every session in ``[start, end]``.
 
@@ -246,6 +266,14 @@ def run_book(
 
     ``kickoff``: one extra rank session, off the cadence (paper trading's first decision, see
     ``paper.book.needs_kickoff``). None, the default and every backtest, ranks on the cadence only.
+
+    ``contributions``: the owner's recurring deposit (``sim.contributions``), or None for a lump
+    sum -- the default, so every closed record is unchanged. A contribution dated ``d`` is
+    credited at the OPEN of the first session on or after ``d``, before ``step_book`` sizes
+    anything, so a deposit that lands between rotations sits as idle cash until the next rank
+    session -- which is the point: the owner's 25th is a mean of 4.2 sessions before a month-start
+    rotation. It raises cash AND equity, because ``step_book`` sizes every target from
+    ``book.equity``. It is converted at this run's single rate.
     """
     if not isinstance(market, Market):
         raise TypeError(f"market must be a Market, got {type(market).__name__}")
@@ -257,6 +285,14 @@ def run_book(
         raise TypeError(f"allocator must be an Allocator, got {type(allocator).__name__}")
     if not isinstance(dividends, Mapping):
         raise TypeError(f"dividends must be a Mapping, got {type(dividends).__name__}")
+    if contributions is not None and (
+        isinstance(contributions, (str, Mapping))
+        or not isinstance(contributions, (ContributionSchedule, Sequence))
+    ):
+        raise TypeError(
+            "contributions must be a ContributionSchedule, a sequence of (date, Decimal) "
+            f"pairs or None, got {type(contributions).__name__}"
+        )
     _session("start", start)
     _session("end", end)
     if end < start:
@@ -275,8 +311,14 @@ def run_book(
     rejections: Counter[str] = Counter()
     dividends_usd = _ZERO
     costs_usd = _ZERO
+    cashflows: list[tuple[date, Decimal]] = []
 
     for session in dates.sessions(start, end):
+        if contributions is not None:
+            credit = credit_for(contributions, data_date, session, rate)
+            if credit > 0:
+                book = replace(book, cash=book.cash + credit, equity=book.equity + credit)
+                cashflows.append((session, credit))
         held = book.held()
         targets: tuple[Target, ...] | None = None
         idle_added = False
@@ -347,6 +389,8 @@ def run_book(
         dividends_usd=dividends_usd,
         costs_usd=costs_usd,
         rejections=tuple(sorted(rejections.items())),
+        contributions=contributions,
+        cashflows=tuple(cashflows),
     )
 
 
@@ -363,6 +407,7 @@ def run_rules(
     usd_idr: Decimal | None = None,
     kickoff: date | None = None,
     initial_idr: Decimal = INITIAL_IDR,
+    contributions: Contributions | None = None,
 ) -> RunResult | BookResult:
     """Run under ``rules``: the single dispatch every P7a caller uses.
 
@@ -377,7 +422,7 @@ def run_rules(
     """
     if not isinstance(rules, TradeRules):
         raise TypeError(f"rules must be TradeRules, got {type(rules).__name__}")
-    if rules.engine == "bracket_v0":
+    if is_bracket(rules):
         if not isinstance(strategy_or_allocator, Strategy):
             raise TypeError(
                 f"rules {rules.id!r} run a bracket Strategy, got {type(strategy_or_allocator).__name__}"
@@ -391,7 +436,15 @@ def run_rules(
         if kickoff is not None:
             raise ValueError(f"rules {rules.id!r} rank no book; kickoff must be None, got {kickoff}")
         return run_backtest(
-            market, strategy_or_allocator, params, start, end, prepared=prepared, initial_idr=initial_idr
+            market,
+            strategy_or_allocator,
+            params,
+            start,
+            end,
+            prepared=prepared,
+            initial_idr=initial_idr,
+            contributions=contributions,
+            rules=rules,
         )
     if not isinstance(strategy_or_allocator, Allocator):
         raise TypeError(f"rules {rules.id!r} run an Allocator, got {type(strategy_or_allocator).__name__}")
@@ -407,6 +460,7 @@ def run_rules(
         usd_idr=usd_idr,
         kickoff=kickoff,
         initial_idr=initial_idr,
+        contributions=contributions,
     )
 
 
@@ -516,10 +570,17 @@ def _turnover(notional: Decimal, equity: Sequence[tuple[date, float]]) -> float:
     return float(notional) / mean_equity / years
 
 
-def _fee(price: Decimal, shares: Decimal | int) -> Decimal:
-    """The fee part of one bracket-simulator fill (``DESIGN_V0`` only, always flat):
-    ``q(price x shares x COST_RATE)``. Book fills carry their own ``Fill.cost_usd``."""
-    return q(price * shares * COST_RATE)
+def _fee(side: Side, price: Decimal, shares: Decimal | int, rules: TradeRules = DESIGN_V0) -> Decimal:
+    """The fee part of one bracket-simulator fill, priced by ``rules``.
+
+    An ``Order`` has no cost column, so a bracket run's fees are re-derived here for the metrics.
+    Under ``DESIGN_V0`` -- the default and every caller until phase 12 wires a Gotrade entry --
+    ``sim.charges.order_fee`` is ``q(price x shares x rules.cost_rate)`` with
+    ``cost_rate == COST_RATE``, so this is bit-identical to the flat form it replaces. Under
+    ``cost_model="gotrade"`` the flat form understates, and ``side`` starts to matter: Gotrade
+    charges more on a sell. Book fills carry their own ``Fill.cost_usd`` and never come here.
+    """
+    return order_fee(side, price, int(shares), rules)
 
 
 def _assemble(
@@ -551,7 +612,7 @@ def _assemble(
     )
 
 
-def _run_result_stats(r: RunResult) -> RunStats:
+def _run_result_stats(r: RunResult, rules: TradeRules = DESIGN_V0) -> RunStats:
     equity = _equities([(s.date, s.cash_usd, s.equity_usd) for s in r.snapshots])
     exposures = [float(s.equity_usd - s.cash_usd) / float(s.equity_usd) for s in r.snapshots[1:]]
     notional = _ZERO
@@ -564,14 +625,16 @@ def _run_result_stats(r: RunResult) -> RunStats:
         else:
             continue
         notional += price * e.order.shares
-        costs += _fee(price, e.order.shares)
+        costs += _fee("buy" if e.kind == "fill" else "sell", price, e.order.shares, rules)
     trade_pnl = _ZERO
     trade_fees = _ZERO
     for o in r.closed:
         if o.fill_price is None or o.exit_price is None or o.pnl_usd is None:
             raise ValueError(f"closed order {o.symbol} lacks a fill, an exit or a pnl")
         trade_pnl += o.pnl_usd
-        trade_fees += _fee(o.fill_price, o.shares) + _fee(o.exit_price, o.shares)
+        trade_fees += _fee("buy", o.fill_price, o.shares, rules) + _fee(
+            "sell", o.exit_price, o.shares, rules
+        )
     return _assemble(run_metrics(r), equity, exposures, notional, costs, trade_pnl, trade_fees, _ZERO)
 
 
@@ -614,10 +677,16 @@ def _book_result_stats(r: BookResult) -> RunStats:
     )
 
 
-def run_stats(r: RunResult | BookResult) -> RunStats:
-    """``RunStats`` of a ``run_backtest`` or ``run_book`` result (see ``RunStats``)."""
+def run_stats(r: RunResult | BookResult, rules: TradeRules = DESIGN_V0) -> RunStats:
+    """``RunStats`` of a ``run_backtest`` or ``run_book`` result (see ``RunStats``).
+
+    ``rules`` prices a ``RunResult``'s fees, which the bracket simulator does not record per
+    fill. It defaults to ``DESIGN_V0``, the rule set every closed record ran at, so every number
+    is bit-identical unless a caller passes the Gotrade schedule. A ``BookResult`` carries its own
+    ``rules`` and its fills carry their own cost, so the argument is ignored for one.
+    """
     if isinstance(r, BookResult):
         return _book_result_stats(r)
     if isinstance(r, RunResult):
-        return _run_result_stats(r)
+        return _run_result_stats(r, rules)
     raise TypeError(f"r must be a RunResult or a BookResult, got {type(r).__name__}")

@@ -29,7 +29,7 @@ const PRE_PLAN = new Map<string, number>([
 function input(over: Partial<ReminderInput> = {}): ReminderInput {
   return {
     sessionDate: OCT, targets: RAW, resizes: true, held: new Map(), outside: new Map(), closes: new Map(),
-    budgetUsd: null, orders: [], marks: [], ...over,
+    budgetUsd: null, cashUsd: null, orders: [], marks: [], ...over,
   };
 }
 
@@ -53,6 +53,60 @@ describe('buildReminders: fresh link', () => {
     expect(r.planSize).toBeNull();
     expect(r.open).toHaveLength(20);
     expect(r.open.every(x => x.usd === null)).toBe(true);
+  });
+});
+
+describe('buildReminders: the plan size is holdings plus cash', () => {
+  /**
+   * 2026-11-02, measured. Deposited by then: 15,000,000 IDR at 17,841 = $840.76. Spent: the 20 real
+   * Oct 7 buys, $560.60 including $2.60 of fees. So cash = $280.16, holdings = $558.00, and the
+   * plan size is $838.16 -- which is the deposits less the fees, exactly.
+   */
+  const NOV_CASH = 280.16;
+
+  it('sizes buys from holdings + cash, not holdings alone', () => {
+    const r = buildReminders(input({ held: followed(), orders: octBuys, cashUsd: NOV_CASH }));
+    expect(r.planValue).toBeCloseTo(558, 6);
+    expect(r.cashUsd).toBe(NOV_CASH);
+    expect(r.planSize).toBeCloseTo(838.16, 6);
+    // the identity: holdings + cash = deposits - fees paid
+    expect(r.planValue + NOV_CASH).toBeCloseTo(840.76 - 2.6, 2);
+  });
+
+  it('a rotation is funded by the deposit alone: five new names cost less than the cash', () => {
+    const picks: Target[] = [
+      ...RAW.filter(t => !['DOW', 'BAX', 'UPS', 'BMY', 'TGT'].includes(t.symbol)),
+      ...['AAA', 'BBB', 'CCC', 'DDD', 'EEE'].map(symbol => ({ symbol, weight: 0.05, last: 100 })),
+    ];
+    const r = buildReminders(input({
+      sessionDate: NOV, targets: picks, held: followed(), orders: octBuys, cashUsd: NOV_CASH,
+    }));
+    const sells = r.open.filter(x => x.action === 'sell');
+    const buys = r.open.filter(x => x.action === 'buy');
+    expect(sells).toHaveLength(5);
+    expect(buys).toHaveLength(5);
+    // sells come first: ACTION_ORDER, and the owner's own stated sequence
+    expect(r.open.slice(0, 5).every(x => x.action === 'sell')).toBe(true);
+    const needed = buys.reduce((sum, x) => sum + (x.usd ?? 0), 0);
+    expect(needed).toBeCloseTo(209.54, 2);
+    // D7: the buys are covered by settled cash, with no sale proceeds reused the same day
+    expect(needed).toBeLessThan(NOV_CASH);
+  });
+
+  it('cash the owner has spent beyond his deposits reads negative, and still sizes the plan', () => {
+    const r = buildReminders(input({ held: followed(), orders: octBuys, cashUsd: -0.09 }));
+    expect(r.cashUsd).toBe(-0.09);
+    expect(r.planSize).toBeCloseTo(557.91, 6);
+  });
+
+  it('the owner’s typed plan size still overrides the derived one', () => {
+    const r = buildReminders(input({ held: followed(), orders: octBuys, cashUsd: NOV_CASH, budgetUsd: 1000 }));
+    expect(r.planSize).toBe(1000);
+  });
+
+  it('without cash it falls back to holdings, exactly as before', () => {
+    const r = buildReminders(input({ held: followed(), orders: octBuys, cashUsd: null }));
+    expect(r.planSize).toBeCloseTo(558, 6);
   });
 });
 
@@ -113,35 +167,46 @@ describe('buildReminders: month turnover', () => {
 });
 
 describe('buildReminders: resizing', () => {
+  /** The owner's real 2026-11-02 plan size: $558.00 of stock + $280.16 of cash. Slot: $41.908. */
+  const NOV_SIZE = 838.16;
+  const SLOT = NOV_SIZE * 0.05; // 41.908
+
   const drifted = (): Map<string, number> => {
     const held = followed();
-    held.set('MU', 45 / 1045.56); // $45 at the decision price: $17 above its $28 share
-    held.set('BAX', 33 / 24.36); // $33: $5 above, under the $10 floor
+    held.set('MU', 80 / 1045.56); // $80 at the decision price: $38.09 above its $41.91 share
+    held.set('BAX', 60 / 24.36); // $60: $18.09 above, under the $25 floor
     return held;
   };
 
-  it('trims a pick above its share, ignores gaps under $10', () => {
-    const r = buildReminders(input({ held: drifted(), budgetUsd: 560 }));
+  it('trims a pick above its share, ignores gaps under $25', () => {
+    const r = buildReminders(input({ held: drifted(), budgetUsd: NOV_SIZE }));
     expect(r.open).toHaveLength(1);
     expect(r.open[0]).toMatchObject({ action: 'trim', side: 'sell', symbol: 'MU' });
-    expect(r.open[0].usd).toBeCloseTo(17, 6);
+    expect(r.open[0].usd).toBeCloseTo(80 - SLOT, 6);
   });
 
   it('adds to a pick below its share', () => {
     const held = followed();
-    held.set('MU', 10 / 1045.56);
-    const r = buildReminders(input({ held, budgetUsd: 560 }));
+    held.set('MU', 10 / 1045.56); // $31.91 below its $41.91 share
+    const r = buildReminders(input({ held, budgetUsd: NOV_SIZE }));
     expect(r.open).toHaveLength(1);
     expect(r.open[0]).toMatchObject({ action: 'add', side: 'buy', symbol: 'MU' });
-    expect(r.open[0].usd).toBeCloseTo(18, 6);
+    expect(r.open[0].usd).toBeCloseTo(SLOT - 10, 6);
   });
 
-  it('never adds or trims for rules that do not resize', () => {
-    const r = buildReminders(input({ held: drifted(), budgetUsd: 560, resizes: false }));
+  it('a gap that would have traded at the old $10 floor is left alone at $25', () => {
+    const held = followed();
+    held.set('MU', 28 / 1045.56); // $13.91 below its share: over $10, under $25
+    const r = buildReminders(input({ held, budgetUsd: NOV_SIZE }));
     expect(r.reminders).toHaveLength(0);
   });
 
-  it('a big plan uses the engine 1% band, not the $10 floor', () => {
+  it('never adds or trims for rules that do not resize', () => {
+    const r = buildReminders(input({ held: drifted(), budgetUsd: NOV_SIZE, resizes: false }));
+    expect(r.reminders).toHaveLength(0);
+  });
+
+  it('a big plan uses the engine 1% band, not the $25 floor', () => {
     const held = new Map(RAW.map(t => [t.symbol, 250 / t.last]));
     held.set('MU', 220 / 1045.56); // $30 below its $250 share: under 1% of $5,000
     held.set('DELL', 190 / 574); // $60 below: over the band

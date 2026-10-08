@@ -12,6 +12,13 @@
  * says it is showing the record (the technical detail block). The web still does not re-judge
  * anything — it must not, because the luck test is not `dsr >= gate.dsrMin`; re-scoring a DSR
  * at today's N is arithmetic the engine holds (`store.dsr_at`).
+ *
+ * The same rule covers **which hurdles a row has**, not only how it did on them. A hurdle the
+ * engine never applied is absent from `failedNow`, and absence read as a pass is the worst
+ * failure this page has: a missed hurdle shown as a green tick. So the one hurdle that does not
+ * apply to every row — the luck check, which a pre-registered test look has no selection to
+ * deflate — is read off the engine's own marker, `trial.luckGated`, and never inferred from the
+ * shape of `failedNow`.
  */
 import { pct, signedPct } from '../format';
 import type { Benchmark, Gate, LabMethod, LabTrial, Point } from './types';
@@ -94,14 +101,23 @@ function marDesc(a: LabTrial, b: LabTrial): number {
 }
 
 /**
- * Does this trial clear `key` **as the bars read now**? true = cleared, false = missed.
+ * Does this trial clear `key` **as the bars read now**? true = cleared, false = missed,
+ * null = the hurdle does not apply to this row.
  *
- * Reads `failedNow`, never `failed`. The engine decided all six there (`store.published_verdict`)
- * against the same gate the snapshot publishes, so this is a lookup, not a judgement — which is
- * what keeps a tick and the target printed beside it from describing two different days.
+ * Reads `failedNow` and `luckGated`, never `failed`. The engine decided all six there
+ * (`store.published_verdict`) against the same gate the snapshot publishes, and said which rows
+ * the luck hurdle applies to (`store.luck_gated`), so this is a lookup, not a judgement — which
+ * is what keeps a tick and the target printed beside it from describing two different days.
+ *
+ * `null` means **not applicable**, never "not measured". A gated row whose DSR could not be
+ * scored still comes back `false`: the engine puts the luck label in `failedNow` for exactly
+ * those rows, because nothing is admitted for being unmeasurable (its D11).
  */
 export function conditionOk(trial: LabTrial, key: ConditionKey): boolean | null {
-  if (key === 'dsr') return !trial.failedNow.some((f) => f.startsWith(DSR_FAILURE_PREFIX));
+  if (key === 'dsr') {
+    if (!trial.luckGated) return null;
+    return !trial.failedNow.some((f) => f.startsWith(DSR_FAILURE_PREFIX));
+  }
   if (key === 'drawdown') return !trial.failedNow.some((f) => f.startsWith(DRAWDOWN_FAILURE_PREFIX));
   return !trial.failedNow.includes(FAILURE_LABEL[key]);
 }
@@ -156,13 +172,19 @@ export function gateChecks(trial: LabTrial, gate: Gate): GateCheck[] {
       // `dsrNow`, not `dsr`: the score at the gate's N, which is the N `gate.dsrMin` is the bar
       // for. The recorded `dsr` belongs to the N of its own run date and is shown as the record.
       value: trial.dsrNow === null ? 'not measured' : trial.dsrNow.toFixed(2),
-      target: `${num(gate.dsrMin)} or more`,
+      // A test look is scored but not gated, so quoting the bar beside its number would invent a
+      // hurdle the lab never set it.
+      target: trial.luckGated ? `${num(gate.dsrMin)} or more` : 'does not apply to a test look',
       ok: conditionOk(trial, 'dsr'),
     },
   ];
 }
 
-/** How many of the six hurdles the trial cleared (not-measured counts as not cleared). */
+/**
+ * How many of the six hurdles the trial cleared. Not-measured counts as not cleared (the engine
+ * already listed it as a failure); a hurdle that does not apply counts as neither cleared nor
+ * missed, so a test look reads 5 of 5 rather than 5 of 6.
+ */
 export function conditionsPassed(trial: LabTrial): number {
   return CONDITION_KEYS.filter((k) => conditionOk(trial, k) === true).length;
 }
@@ -201,6 +223,11 @@ export function bestVariant(trials: LabTrial[]): LabTrial | null {
  * the luck check — nothing is admitted for being unmeasurable, and `passing` counts them as
  * misses — but saying "1 of the 56 it was checked on" rather than "1 of 110" is the honest
  * denominator, and the page's tip names the gap.
+ *
+ * `luckGated` is checked alongside the score for the same reason the denominator exists at all:
+ * a row the hurdle does not apply to was not "checked and unscorable", it was not checked. Every
+ * dev row is gated today, so this changes no published number — it stops the count being wrong
+ * if that ever stops being true.
  */
 export function funnel(trials: LabTrial[]): FunnelRow[] {
   const dev = devTrials(trials);
@@ -208,7 +235,7 @@ export function funnel(trials: LabTrial[]): FunnelRow[] {
     key,
     label: CONDITION_LABEL[key],
     passing: dev.filter((t) => conditionOk(t, key) === true).length,
-    measured: key === 'dsr' ? dev.filter((t) => t.dsrNow !== null).length : dev.length,
+    measured: key === 'dsr' ? dev.filter((t) => t.luckGated && t.dsrNow !== null).length : dev.length,
     total: dev.length,
   }));
 }

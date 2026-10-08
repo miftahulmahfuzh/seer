@@ -1,4 +1,4 @@
-import { Crown, Gavel, Landmark, TriangleAlert } from 'lucide-react';
+import { Clock, Crown, Gavel, Landmark, Pause, TriangleAlert } from 'lucide-react';
 import { AppHeader } from '@/components/AppHeader';
 import { PaperChip } from '@/components/PaperChip';
 import { selectStrategy, sharesLabel, strategyIcon } from '@/components/roster';
@@ -9,8 +9,12 @@ import {
   bookPreview, pendingOrders, positions as getPositions, runStatus, strategies, vetoes as getVetoes,
   type Holding, type Pending, type PendingOrder, type Preview, type RunStatus, type Strategy, type Veto,
 } from '@/lib/data';
+import {
+  PAPER_PAUSED, panelState, pipelineState, timing,
+  type PanelState, type PipelineState, type Timing,
+} from '@/lib/decision';
 import { companyName, monthDay, pct, shortDate, signedPct, signedRp, signedUsd, usd } from '@/lib/format';
-import { wibDate } from '@/lib/session';
+import { wibDate, wibTime } from '@/lib/session';
 import { cardBg } from '@/lib/slots';
 import { checkedLine, headlinesLabel, noCheckLine, vetoSheet, type VetoSheet } from '@/lib/vetoes';
 import s from './positions.module.css';
@@ -27,13 +31,24 @@ export default async function Positions({ searchParams }: { searchParams: Promis
   const q = await searchParams;
   const [roster, run] = await Promise.all([strategies(), runStatus(now)]);
   const strat = selectStrategy(roster, q.s);
-  // Paper orders exist for research strategies only; hidden while the data is stale.
-  const showOrders = !!strat && !strat.isBenchmark && !run.stale;
+  // Paper orders exist for research strategies only. They are now fetched whatever session they are
+  // for: an expired decision is shown as a spent record (handover Q5), never left as a blank panel.
+  const asksOrders = !!strat && !strat.isBenchmark;
   const [open, pending, preview] = await Promise.all([
     strat ? getPositions(strat.id) : Promise.resolve([] as Holding[]),
-    showOrders && strat ? pendingOrders(strat.id) : Promise.resolve(NO_PENDING),
-    showOrders && strat?.engine === 'book' ? bookPreview(strat.id) : Promise.resolve(NO_PREVIEW),
+    asksOrders && strat ? pendingOrders(strat.id) : Promise.resolve(NO_PENDING),
+    asksOrders && strat?.engine === 'book' ? bookPreview(strat.id) : Promise.resolve(NO_PREVIEW),
   ]);
+
+  // Which of the five the blank used to be (web/lib/decision.ts). `panel` is this strategy's own
+  // decision; `pipeline` is the nightly behind it; the paused note is page-level and sits above both.
+  const when = timing(now);
+  // The fourth argument is D9.6 and is NOT optional here, whatever its default says: a retired
+  // strategy's pending row is a record, never an instruction. Drop it and a superseded entry
+  // renders a live order on the night its successor starts.
+  const panel = panelState(pending.sessionDate, pending.decision, now, strat?.status === 'retired');
+  const pipeline = pipelineState(run.sessionDate, run.finishedAt, now);
+  const live = asksOrders && panel === 'live';
 
   const bracket = open.filter(p => p.kind === 'bracket');
   const book = open.filter(p => p.kind !== 'bracket');
@@ -47,7 +62,7 @@ export default async function Positions({ searchParams }: { searchParams: Promis
   const StratIcon = strat ? strategyIcon(strat.icon) : Landmark;
   const href = (id: string) => `/positions?s=${encodeURIComponent(id)}`;
   const [noneTitle, noneSub] = emptyState(strat);
-  const orderSession = showOrders ? pending.sessionDate : null;
+  const orderSession = live ? pending.sessionDate : null;
   // Monthly pick, weekly size check (web/lib/cadence.ts): only these strategies show the change per order.
   const splitCadence = !!strat && picksMonthlySizesWeekly(strat.rulesId);
   const held = heldUsd(book);
@@ -91,6 +106,8 @@ export default async function Positions({ searchParams }: { searchParams: Promis
           )}
         </section>
 
+        {PAPER_PAUSED && <PausedNote />}
+
         {paperWarn && run.sessionDate && (
           <section className={`sheet over bg-coral ${s.warn}`} role="status">
             <div className={s.warnHead}>
@@ -115,7 +132,7 @@ export default async function Positions({ searchParams }: { searchParams: Promis
           </div>
         )}
 
-        {strat && orderSession && (
+        {strat && live && orderSession && (
           <section className={`sheet over bg-sheet ${s.orders}`}>
             <div className={s.between}>
               <span className="eyebrow">Paper orders for {shortDate(orderSession)}</span>
@@ -135,11 +152,20 @@ export default async function Positions({ searchParams }: { searchParams: Promis
           </section>
         )}
 
+        {/* Q5: where the page used to render nothing at all, it now says which of the five it is. */}
+        {strat && asksOrders && !live && (
+          <Standing st={strat} state={panel} pipeline={pipeline} when={when} pending={pending} />
+        )}
+
+        {strat && panel === 'spent' && pending.sessionDate && pending.orders.length > 0 && (
+          <SpentDecision st={strat} session={pending.sessionDate} orders={pending.orders} />
+        )}
+
         {strat && !pending.decision && preview.picks.length > 0 && preview.dataDate && (
           <WouldPick st={strat} preview={preview} />
         )}
 
-        {strat && orderSession && sheet && <VetoedTonight st={strat} session={orderSession} sheet={sheet} />}
+        {strat && live && orderSession && sheet && <VetoedTonight st={strat} session={orderSession} sheet={sheet} />}
         <div className="nav-clear" />
       </div>
     </>
@@ -179,6 +205,134 @@ function noOrders(st: Strategy, p: Pending, sheet: VetoSheet | null): string {
   if (sheet && sheet.state === 'failed') return `No orders. ${st.short} sits this session out.`;
   if (sheet && sheet.allowed === 0) return 'No orders. Nothing passed the news check.';
   return 'No setups tonight. Cash is a position.';
+}
+
+/**
+ * Paper trading is switched off (`PAPER_PAUSED` in `.github/workflows/nightly.yml`). The fifth state
+ * of handover Q5, and the one nothing in the app used to say anywhere. While it holds, no paper
+ * order is placed and no paper session is stepped, so every panel below stays on the last decision;
+ * the nightly's price step still runs, so marks and positions are current.
+ */
+function PausedNote() {
+  return (
+    <section className={`sheet over bg-butter ${s.paused}`} role="status">
+      <span className={s.pausedIcon} aria-hidden="true"><Pause size={20} /></span>
+      <div className={s.pausedText}>
+        <span className={s.pausedTitle}>Paper trading is paused</span>
+        <span className={s.pausedSub}>
+          No paper orders are placed and no paper session is stepped while the roster is rebuilt to
+          pay the real broker fees. Prices and positions below are still updated every night.
+        </span>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Why there is nothing to act on, in plain words (handover Q5), for everything that is not a live
+ * decision. The cadence sentence comes from `noOrders()` so the vocabulary lives in one place. The
+ * "next run is due" line is suppressed while paper is paused: the next run will not produce a
+ * decision, and saying it would is the kind of sentence this panel exists to delete.
+ */
+function standingWords(
+  st: Strategy, state: PanelState, pipeline: PipelineState, when: Timing, p: Pending,
+): { title: string; body: string; next: string | null } {
+  const dueLine = `The next nightly run is due ${shortDate(wibDate(when.dueAt))} at ${wibTime(when.dueAt)} WIB.`;
+  const nextLine = PAPER_PAUSED ? null : dueLine;
+
+  // A retired strategy is finished: it will never decide again, so a "next run is due" line would
+  // be false for it even when paper is running. Its last decision is shown as the record it is.
+  if (st.status === 'retired') {
+    const was = p.sessionDate ? shortDate(p.sessionDate) : 'an earlier session';
+    return {
+      title: `${st.short} has been replaced`,
+      body: p.orders.length > 0
+        ? `${st.short} is retired. The ${p.orders.length} ${p.orders.length === 1 ? 'position' : 'positions'} below are what it decided for the ${was} US session before it was replaced — a record of what it decided, never an order to place. Its successor runs in its place.`
+        : `${st.short} is retired and decides nothing further. Its successor runs in its place.`,
+      next: null,
+    };
+  }
+
+  if (state === 'never') {
+    return {
+      title: 'Paper trading has not started',
+      body: `${st.short} places its first paper orders at its first paper session. Nothing is pending.`,
+      next: nextLine,
+    };
+  }
+  if (pipeline === 'late') {
+    return {
+      title: 'The nightly run is late',
+      body: `A decision for the ${shortDate(when.target)} US session was due at ${wibTime(when.dueAt)} WIB, and the last retry ran at ${wibTime(when.lateAfter)} WIB. Nothing new has arrived.`,
+      next: 'Nothing on this page is an instruction to trade.',
+    };
+  }
+  if (state === 'spent') {
+    const was = p.sessionDate ? shortDate(p.sessionDate) : 'an earlier session';
+    const body = p.orders.length > 0
+      ? `${st.short} decided ${p.orders.length} ${p.orders.length === 1 ? 'position' : 'positions'} for the ${was} US session. That session has closed, so they are a record of what it decided — not an order to place.`
+      : `${st.short} had nothing to decide for the ${was} US session, and that session has closed.`;
+    return { title: 'The last decision has expired', body, next: nextLine };
+  }
+  // 'holding' — the common state, roughly three weeks in four for a monthly book.
+  return {
+    title: `Nothing was due for ${p.sessionDate ? shortDate(p.sessionDate) : 'the next session'}`,
+    body: noOrders(st, p, null),
+    next: nextLine,
+  };
+}
+
+function Standing({ st, state, pipeline, when, pending }: {
+  st: Strategy; state: PanelState; pipeline: PipelineState; when: Timing; pending: Pending;
+}) {
+  const w = standingWords(st, state, pipeline, when, pending);
+  const late = pipeline === 'late';
+  return (
+    <section className={`sheet over bg-sheet ${s.standing} ${late ? s.standingLate : ''}`} role="status">
+      <div className={s.standingHead}>
+        <span className={s.standingIcon} aria-hidden="true">
+          {late ? <TriangleAlert size={22} /> : <Clock size={22} />}
+        </span>
+        <span className="eyebrow">{late ? 'Nightly run' : 'Nothing to act on'}</span>
+      </div>
+      <span className={s.standingTitle}>{w.title}</span>
+      <span className={s.standingBody}>{w.body}</span>
+      {w.next && <span className={s.standingNext}>{w.next}</span>}
+    </section>
+  );
+}
+
+/**
+ * The decision whose session has closed, kept visible rather than removed. Removing it is what
+ * caused the incident: on 2026-10-08 the owner read the blank page as data loss while 80
+ * `book_targets` rows and four orders sat untouched. Shown as a record and nothing else — rank,
+ * ticker, and for a book its target share of the portfolio. Every field that reads like an order
+ * ticket (limit, stop, take-profit, share count, dollar size) and every copy button is deliberately
+ * absent, so no row here can be mistaken for something to place.
+ */
+function SpentDecision({ st, session, orders }: { st: Strategy; session: string; orders: PendingOrder[] }) {
+  return (
+    <section className={`sheet over bg-stone ${s.spent}`}>
+      <div className={`${s.between} ${s.spentHead}`}>
+        <span className="eyebrow">What {st.short} decided for {shortDate(session)}</span>
+        <span className={`chip ${s.spentChip}`} data-tip="That US session has closed: a record, not an order">Expired</span>
+      </div>
+      <span className={s.spentNote}>
+        The {shortDate(session)} US session has closed. This is the record of what {st.short} decided
+        that night. Prices, limits and sizes are not shown, because none of it is a live instruction.
+      </span>
+      <ul className={s.spentList}>
+        {orders.map(o => (
+          <li key={o.key} className={s.spentRow}>
+            <span className={s.rank}>{o.rank}</span>
+            <span className={s.spentSym}>{o.symbol}</span>
+            <span className={s.spentGap} />
+            {o.weight !== null && <span className={`num ${s.spentWeight}`}>{pct(o.weight, 1)}</span>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 /**

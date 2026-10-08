@@ -10,7 +10,9 @@ events and snapshot -> ``size_picks(..., next session)``. See engine/package_rea
 P7a adds trade rules as a value (``sim.rules``: ``TradeRules``, ``DESIGN_V0`` and the presets)
 and the book engine every non-default rule set runs on (``sim.book``: ``step_book``, and
 ``apply_book_split`` for splits on live book positions).
-``DESIGN_V0`` keeps running on ``size_picks`` + ``step`` above, unchanged.
+``DESIGN_V0`` keeps running on ``size_picks`` + ``step`` above, unchanged. A second bracket rule
+set is expressible as ``engine="bracket"`` (``DESIGN_V0_GOTRADE``, §5 at Gotrade's measured fee
+schedule); ``sim.charges`` prices the bracket path's money from whichever rule set it is handed.
 """
 
 from seer_engine.sim.book import (
@@ -30,6 +32,7 @@ from seer_engine.sim.book import (
     step_book,
     to_weight,
 )
+from seer_engine.sim.charges import bracket_rules, buy_cash, order_fee, sell_cash, whole_shares_for
 from seer_engine.sim.lifecycle import close_unpriced, step
 from seer_engine.sim.model import (
     COST_RATE,
@@ -50,10 +53,12 @@ from seer_engine.sim.model import (
     sell_proceeds,
 )
 from seer_engine.sim.rules import (
+    BRACKET_ENGINES,
     DAILY_SWITCH,
     DAILY_SWITCH_TBILL,
     DEFAULT_ETFS,
     DESIGN_V0,
+    DESIGN_V0_GOTRADE,
     LEVERAGED_ETFS,
     MONTHLY_HOLD,
     MONTHLY_HOLD_FRAC,
@@ -72,6 +77,7 @@ from seer_engine.sim.rules import (
     WEEKLY_HOLD,
     TradeRules,
     describe_rules,
+    is_bracket,
     is_decision_session,
     is_rank_session,
     is_resize_session,
@@ -81,11 +87,13 @@ from seer_engine.sim.sizing import Pick, RejectReason, Rejection, SizingResult, 
 from seer_engine.sim.split_adjust import apply_split
 
 __all__ = [
+    "BRACKET_ENGINES",
     "COST_RATE",
     "DAILY_SWITCH",
     "DAILY_SWITCH_TBILL",
     "DEFAULT_ETFS",
     "DESIGN_V0",
+    "DESIGN_V0_GOTRADE",
     "LEVERAGED_ETFS",
     "MONTHLY_HOLD",
     "MONTHLY_HOLD_FRAC",
@@ -128,22 +136,28 @@ __all__ = [
     "TradeRules",
     "apply_book_split",
     "apply_split",
+    "bracket_rules",
+    "buy_cash",
     "buy_cost",
     "close_book_unpriced",
     "close_unpriced",
     "describe_rules",
     "equal_weight",
     "initial_cash_usd",
+    "is_bracket",
     "is_decision_session",
     "is_rank_session",
     "is_resize_session",
     "new_book",
     "new_portfolio",
+    "order_fee",
     "q",
     "rule_owner_inputs",
+    "sell_cash",
     "sell_proceeds",
     "size_picks",
     "step",
     "step_book",
     "to_weight",
+    "whole_shares_for",
 ]

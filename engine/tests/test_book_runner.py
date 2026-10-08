@@ -56,11 +56,13 @@ from seer_engine.prices import to_decimal
 from seer_engine.sim import Event, Snapshot, q
 from seer_engine.sim.book import BookSnapshot, Fill, Target, Trade
 from seer_engine.sim.book import step_book as real_step_book
+from seer_engine.sim.contributions import OWNER_MONTHLY
 from seer_engine.sim.rules import (
     MONTHLY_RANK_WEEKLY_RESIZE,
     DAILY_SWITCH,
     DAILY_SWITCH_TBILL,
     DESIGN_V0,
+    DESIGN_V0_GOTRADE,
     MONTHLY_HOLD,
     V0_BOOK,
     WEEKLY_HOLD,
@@ -79,6 +81,12 @@ from seer_engine.strategies.base import History
 # 2019-10-17 .. 2020-07-06. Prices span 12 .. 700, so with 20,000,000 IDR at 16000 (1250 USD,
 # a 312.5 slot) the dear names are rejected lt_one_share. Seven names stop trading inside the
 # window (forced closes when held); two have short halts. Gaps of 3-6 % on ~4 % of opens.
+
+# Both fixtures below are calibrated to a 1250 USD book (a 312.5 slot): the price ladder is what
+# makes the dear names reject lt_one_share, and the wiring window's numbers are written out by
+# hand. They pin their own 20,000,000 IDR rather than following INITIAL_IDR, which is now the
+# owner's real 10,000,000.
+FIXTURE_IDR = Decimal("20000000")
 
 N_SESSIONS = 380
 WARMUP = 200
@@ -173,7 +181,8 @@ def picks_prepared(seed: int) -> Any:
 def sim_run(seed: int, key: str) -> RunResult:
     strategy, params = STRATEGIES[key]
     return run_backtest(
-        seeded_market(seed), strategy, params, SEED_START, SEED_END, prepared=strategy_prepared(seed, key)
+        seeded_market(seed), strategy, params, SEED_START, SEED_END,
+        prepared=strategy_prepared(seed, key), initial_idr=FIXTURE_IDR
     )
 
 
@@ -188,6 +197,7 @@ def book_run(seed: int, key: str) -> BookResult:
         SEED_START,
         SEED_END,
         prepared=picks_prepared(seed),
+        initial_idr=FIXTURE_IDR,
     )
 
 
@@ -272,16 +282,20 @@ def test_run_rules_design_v0_is_run_backtest(key):
     market = seeded_market(39)
     strategy, params = STRATEGIES[key]
     prepared = strategy_prepared(39, key)
-    got = run_rules(market, strategy, params, DESIGN_V0, SEED_START, SEED_END, prepared=prepared)
+    got = run_rules(
+        market, strategy, params, DESIGN_V0, SEED_START, SEED_END, prepared=prepared, initial_idr=FIXTURE_IDR
+    )
     assert isinstance(got, RunResult)
-    assert got == run_backtest(market, strategy, params, SEED_START, SEED_END, prepared=prepared)
+    assert got == run_backtest(
+        market, strategy, params, SEED_START, SEED_END, prepared=prepared, initial_idr=FIXTURE_IDR
+    )
     assert got == sim_run(39, key)
 
 
 def test_run_rules_design_v0_plain_path_is_run_backtest():
     market = seeded_market(39)
-    got = run_rules(market, STRATEGY_A, DESIGN_PARAMS, DESIGN_V0, SEED_START, SEED_END)
-    assert got == run_backtest(market, STRATEGY_A, DESIGN_PARAMS, SEED_START, SEED_END)
+    got = run_rules(market, STRATEGY_A, DESIGN_PARAMS, DESIGN_V0, SEED_START, SEED_END, initial_idr=FIXTURE_IDR)
+    assert got == run_backtest(market, STRATEGY_A, DESIGN_PARAMS, SEED_START, SEED_END, initial_idr=FIXTURE_IDR)
     assert got == sim_run(39, "A")  # and the prepared path agrees (the Strategy contract)
 
 
@@ -291,11 +305,14 @@ def test_run_rules_design_v0_ignores_dividends_and_checks_usd_idr():
     divs = {s: {SEED_DAYS[WARMUP + k]: Decimal("0.5") for k in range(0, 180, 7)} for s in SEED_SYMBOLS}
     got = run_rules(
         market, STRATEGY_A, DESIGN_PARAMS, DESIGN_V0, SEED_START, SEED_END,
-        prepared=prepared, dividends=divs, usd_idr=Decimal("16000"),
+        prepared=prepared, dividends=divs, usd_idr=Decimal("16000"), initial_idr=FIXTURE_IDR,
     )
     assert got == sim_run(39, "A")
     with pytest.raises(ValueError, match="usd_idr_on"):
-        run_rules(market, STRATEGY_A, DESIGN_PARAMS, DESIGN_V0, SEED_START, SEED_END, usd_idr=Decimal("15000"))
+        run_rules(
+            market, STRATEGY_A, DESIGN_PARAMS, DESIGN_V0, SEED_START, SEED_END,
+            usd_idr=Decimal("15000"), initial_idr=FIXTURE_IDR,
+        )
 
 
 def test_run_rules_rejects_mismatched_pairings():
@@ -318,7 +335,7 @@ def test_run_rules_book_engine_is_run_book():
     want = run_book(market, Scripted(spec), None, DAILY_SWITCH, W_START, W_END, dividends=divs, usd_idr=Decimal("8000"))
     assert isinstance(got, BookResult)
     assert got == want
-    assert got.initial_cash == P("2500")
+    assert got.initial_cash == P("1250")  # 10,000,000 / 8,000: this test pins no fixture
 
 
 # =========================================================================== 2. the V0 parity
@@ -372,8 +389,10 @@ def test_v0_book_hand_checked_scenario():
     mark (BBB on 03-06). Every number below is the hand-checked one from that file.
     """
     market = scenario_market()
-    sim = run_backtest(market, FixedPicks(V0_TABLE), None, V0_START, V0_END)
-    book = run_book(market, PICKS, PicksParams(FixedPicks(V0_TABLE), None), V0_BOOK, V0_START, V0_END)
+    sim = run_backtest(market, FixedPicks(V0_TABLE), None, V0_START, V0_END, initial_idr=FIXTURE_IDR)
+    book = run_book(
+        market, PICKS, PicksParams(FixedPicks(V0_TABLE), None), V0_BOOK, V0_START, V0_END, initial_idr=FIXTURE_IDR
+    )
     assert book_snaps(book) == sim_snaps(sim)
     assert book.snapshots[0] == BookSnapshot(D("2025-03-03"), P("1250"), P("1250"), P("0"))
     assert book.snapshots[-1] == BookSnapshot(D("2025-03-14"), P("940.5647"), P("1286.1647"), P("345.6"))  # 64 x 5.4
@@ -394,7 +413,10 @@ def test_v0_book_hand_checked_scenario():
 
 def test_v0_book_prepared_equals_plain():
     strategy, params = STRATEGIES["A"]
-    plain = run_book(seeded_market(39), PICKS, PicksParams(strategy, params), V0_BOOK, SEED_START, SEED_END)
+    plain = run_book(
+        seeded_market(39), PICKS, PicksParams(strategy, params), V0_BOOK, SEED_START, SEED_END,
+        initial_idr=FIXTURE_IDR,
+    )
     assert plain == book_run(39, "A")
 
 
@@ -576,7 +598,7 @@ def test_run_book_type_and_window_checks():
 
 def test_run_book_first_snapshot_and_cash():
     market = wiring_market()
-    r = run_book(market, Scripted(), None, DAILY_SWITCH, W_START, W_END)
+    r = run_book(market, Scripted(), None, DAILY_SWITCH, W_START, W_END, initial_idr=FIXTURE_IDR)
     assert (r.allocator_id, r.params, r.rules, r.start, r.end) == ("SCRIPTED", None, DAILY_SWITCH, W_START, W_END)
     assert (r.usd_idr, r.initial_cash) == (Decimal("16000"), P("1250"))
     assert r.snapshots[0] == BookSnapshot(D("2025-02-21"), P("1250"), P("1250"), P("0"))
@@ -585,9 +607,73 @@ def test_run_book_first_snapshot_and_cash():
     # Nothing targeted: nothing traded, cash flat.
     assert r.fills == () and r.trades == () and r.open_at_end == () and r.rejections == ()
     assert all(s == BookSnapshot(s.date, P("1250"), P("1250"), P("0")) for s in r.snapshots)
-    other = run_book(market, Scripted(), None, DAILY_SWITCH, W_START, W_END, usd_idr=Decimal("8000"))
+    other = run_book(
+        market, Scripted(), None, DAILY_SWITCH, W_START, W_END, usd_idr=Decimal("8000"), initial_idr=FIXTURE_IDR
+    )
     assert (other.usd_idr, other.initial_cash) == (Decimal("8000"), P("2500"))
     assert other.snapshots[0] == BookSnapshot(D("2025-02-21"), P("2500"), P("2500"), P("0"))
+
+
+def test_run_book_credits_a_contribution_on_its_session_and_run_rules_passes_it_through():
+    """Nothing is targeted here, so the deposit shows as pure cash: the idle money, visible.
+
+    The wiring window is 2025-02-24 .. 2025-03-14 at 16,000 IDR/USD, so the owner's 5,000,000
+    IDR is $312.50 and the only contribution in the window is 2025-02-25, a Tuesday session.
+    Cash and equity both rise by it on that session and on no other.
+    """
+    market = wiring_market()
+    plain = run_book(market, Scripted(), None, DAILY_SWITCH, W_START, W_END, initial_idr=FIXTURE_IDR)
+    assert plain.contributions is None and plain.cashflows == ()
+    fed = run_book(
+        market, Scripted(), None, DAILY_SWITCH, W_START, W_END,
+        initial_idr=FIXTURE_IDR, contributions=OWNER_MONTHLY,
+    )
+    assert fed.contributions is OWNER_MONTHLY
+    assert fed.cashflows == ((D("2025-02-25"), P("312.5")),)
+    assert fed.initial_cash == plain.initial_cash == P("1250")
+    by_date = {s.date: s for s in fed.snapshots}
+    assert by_date[D("2025-02-24")] == BookSnapshot(D("2025-02-24"), P("1250"), P("1250"), P("0"))
+    assert by_date[D("2025-02-25")] == BookSnapshot(D("2025-02-25"), P("1562.5"), P("1562.5"), P("0"))
+    assert by_date[W_END] == BookSnapshot(W_END, P("1562.5"), P("1562.5"), P("0"))
+    # run_rules hands the schedule to whichever engine the rules name.
+    assert run_rules(
+        market, Scripted(), None, DAILY_SWITCH, W_START, W_END,
+        initial_idr=FIXTURE_IDR, contributions=OWNER_MONTHLY,
+    ) == fed
+
+
+def test_run_book_refuses_a_contribution_that_is_not_a_schedule():
+    with pytest.raises(TypeError, match="contributions must be a ContributionSchedule"):
+        run_book(
+            wiring_market(), Scripted(), None, DAILY_SWITCH, W_START, W_END, contributions="monthly"
+        )
+
+
+def test_run_rules_sends_a_bracket_rule_set_to_the_bracket_simulator():
+    """A `"bracket"` rule set is §5, not a book: it must not be dispatched to step_book."""
+    market = seeded_market(39)
+    prepared = strategy_prepared(39, "A")
+    got = run_rules(
+        market, STRATEGY_A, DESIGN_PARAMS, DESIGN_V0_GOTRADE, SEED_START, SEED_END,
+        prepared=prepared, initial_idr=FIXTURE_IDR,
+    )
+    assert isinstance(got, RunResult)  # not a BookResult
+    assert got == run_backtest(
+        market, STRATEGY_A, DESIGN_PARAMS, SEED_START, SEED_END,
+        prepared=prepared, initial_idr=FIXTURE_IDR, rules=DESIGN_V0_GOTRADE,
+    )
+    # Gotrade is strictly dearer than flat, so the same strategy ends with less.
+    assert got.snapshots[-1].equity_usd < sim_run(39, "A").snapshots[-1].equity_usd
+
+
+def test_the_default_rule_set_leaves_every_closed_record_untouched():
+    """`rules` defaults to DESIGN_V0, which is what every caller ran before the lever existed."""
+    market = seeded_market(39)
+    prepared = strategy_prepared(39, "A")
+    assert run_backtest(
+        market, STRATEGY_A, DESIGN_PARAMS, SEED_START, SEED_END,
+        prepared=prepared, initial_idr=FIXTURE_IDR, rules=DESIGN_V0,
+    ) == sim_run(39, "A")
 
 
 @pytest.mark.parametrize(

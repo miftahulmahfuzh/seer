@@ -1,7 +1,7 @@
 # Package: seer-web
 
 **Location**: `web` (Next.js app router; package name `seer-web`, private)
-**Last Updated**: 2026-10-07 (P1-ROOT-XA2W, Sean phase 5: the `/sean/plan` tab — follow one roster book method (`sean_link`), buy/sell/add/trim reminders against the plan's holdings (pure `lib/sean/reminders.ts`, server reads in `lib/sean/planData.ts`), hand-made done marks (`sean_reminder_marks`), the Plan tab badge and a coral reminder dot on Seer's Sean buttons (`Nav`, `AppHeader`). Earlier: P1-ROOT-8JIM, Sean phase 3: the `/sean` Overview — stats row, daily profit-and-loss line from `sean_equity` with a live point or an order-only fallback, holdings table, empty state — via `app/sean/overview.ts` and `lib/sean/overviewData.ts`. Earlier: P1-ROOT-AUY5, Sean phase 1: migration `015_sean.sql` and the pure, DB-free foundation of Sean, the owner's real Gotrade trade tracker, under `lib/sean/` — receipt parsing and checking, the glm-4.6v screenshot reader, the shared ledger, a dependency-free zip reader — plus the live smoke script `scripts/sean-vision-smoke.mjs`. No route or page uses them yet)
+**Last Updated**: 2026-10-08 (P1-WEB-V7XD: Sean's rotation plan is sized on holdings **plus cash**. A new pure module `lib/sean/cash.ts` derives the wallet — the owner's contribution schedule (10,000,000 IDR to start, +5,000,000 IDR on the 25th; `OWNER_MONTHLY`, deliberately the engine's own name) less what the plan's own orders spent — because a Gotrade receipt never shows a balance, so no code path reads one (`ledger.ts` is untouched); `planData.latestUsdIdr()` reads `fx_rates` and falls back to the measured `OWNER_USD_IDR` = 17,841. `buildReminders` sizes picks against `planValue + cashUsd` (`sean_link.budget_usd` survives as the manual override), `MIN_TRADE_USD` moves from a guessed $10 to a measured $25 (`trading_min / (2 × trading_rate)` from the engine's own fee constants), every amount is in dollars and never a share count, and the Plan tile now reads "Plan size" with its stocks-plus-cash split (`planSizeLine`, `cashLine`). Measured on the owner's real 2 November rotation: plan size $558.00 -> $838.16, each of 20 slots $27.90 -> $41.91. No migration, no schema change, no engine file touched. Earlier: P1-WEB-4TQ7: the blank panel is gone. A new pure, tested classifier `lib/decision.ts` names which of five situations "nothing to act on" is — paper paused, never started, the nightly late, the last decision spent, nothing due — and says in WIB when the next decision is due, from the cron slots of `.github/workflows/nightly.yml`. Positions renders a `Standing` sheet for each, keeps an expired decision visible as a `SpentDecision` record stripped of every order-ticket field, and never lets a retired strategy's pending row read as a live instruction; Today splits the old single coral alarm into a real alarm (never ran / late) and a calm `waiting` sheet. `lib/session.ts` gains `wibTime` and exports `addDays`. Earlier: P1-ROOT-XA2W, Sean phase 5: the `/sean/plan` tab — follow one roster book method (`sean_link`), buy/sell/add/trim reminders against the plan's holdings (pure `lib/sean/reminders.ts`, server reads in `lib/sean/planData.ts`), hand-made done marks (`sean_reminder_marks`), the Plan tab badge and a coral reminder dot on Seer's Sean buttons (`Nav`, `AppHeader`). Earlier: P1-ROOT-8JIM, Sean phase 3: the `/sean` Overview — stats row, daily profit-and-loss line from `sean_equity` with a live point or an order-only fallback, holdings table, empty state — via `app/sean/overview.ts` and `lib/sean/overviewData.ts`. Earlier: P1-ROOT-AUY5, Sean phase 1: migration `015_sean.sql` and the pure, DB-free foundation of Sean, the owner's real Gotrade trade tracker, under `lib/sean/` — receipt parsing and checking, the glm-4.6v screenshot reader, the shared ledger, a dependency-free zip reader — plus the live smoke script `scripts/sean-vision-smoke.mjs`. No route or page uses them yet)
 
 ## Overview
 
@@ -20,12 +20,13 @@ A third section, **Sean**, is being built (plan `sean-gotrade-tracker`, 7 phases
 owner's *real* Gotrade trades from "Order Summary" screenshots and shows real profit and loss.
 Phase 1 landed its schema (`db/migrations/015_sean.sql`) and pure modules (`lib/sean/`); phase 2
 the owner-only section and Trades upload; phase 3 the Overview (`/sean`); phase 5 the Plan
-(`/sean/plan`: follow one roster method, buy/sell reminders). See [Sean](#sean-sean-libsean).
+(`/sean/plan`: follow one roster method, buy/sell reminders sized on holdings plus derived cash).
+See [Sean](#sean-sean-libsean).
 
 **Key Responsibilities:**
 - Google sign-in locked to exactly one allowlisted account (`auth.ts`, `lib/allow.ts`)
 - One data layer (`lib/data.ts`) that turns rows of all three engines (`bracket`, `book`, `benchmark`) into typed view models
-- Pure, DB-free logic that tests run without a connection: metrics and the go-live checklist (`lib/metrics.ts`), month-by-month paper performance (`lib/monthly.ts`), strategy row helpers (`lib/strategy.ts`), split-cadence wording and per-order size change (`lib/cadence.ts`), slot letters and card colours (`lib/slots.ts`), session freshness (`lib/session.ts`), number/date formatting (`lib/format.ts`)
+- Pure, DB-free logic that tests run without a connection: metrics and the go-live checklist (`lib/metrics.ts`), month-by-month paper performance (`lib/monthly.ts`), strategy row helpers (`lib/strategy.ts`), split-cadence wording and per-order size change (`lib/cadence.ts`), slot letters and card colours (`lib/slots.ts`), session freshness and WIB clock (`lib/session.ts`), why there is nothing to act on and when the next decision is due (`lib/decision.ts`), number/date formatting (`lib/format.ts`)
 - Four pages: Today, Positions, History, Leaderboard
 - Sera (`/sera`), the method lab section: gated to one account (`lib/sera/`), its own desktop shell and rail (`app/sera/layout.tsx`, `components/sera/`), a dependency-free SVG chart kit (`components/sera/charts/`), hand-built SVG diagrams for How it works (`components/sera/diagrams/`), and a pure data layer over the bundled lab snapshot `data/lab.json` (`lib/sera/types.ts`, `lab.ts`, `derive.ts`, `glossary.ts`, `markdown.ts`). Pages: Overview, Methods list + detail, Journal, Ideas, How it works; each page keeps its logic in a pure, tested `view.ts` (`overview.ts` for the Overview, and the Journal a second one, `seen-client.ts`, beside it). The Journal is the one Sera page that also touches Neon, for reader state only: `lib/sera/seen.ts` over `journal_seen` decides which entries are unseen, which orders them and fills the badges; it is also the only Sera page to mount a `'use client'` island of its own (`JournalSeen.tsx`), so `SeraNav.tsx` is no longer the section's sole client component. See [Sera](#sera-sera)
 - Sean foundation (`lib/sean/`, phase 1, pure): Gotrade receipt text -> numbers (`money.ts`), the arithmetic check that turns the model's JSON into one `SeanOrder` (`order.ts`), the glm-4.6v vision client with its token floor (`vision.ts`, `prompt.ts`, `extractJson.ts`), the read-and-one-repair flow (`readOrder.ts`), the average-cost ledger shared with the engine (`ledger.ts`), and a browser zip reader (`unzip.ts`)
@@ -53,8 +54,8 @@ web/
     (app)/
       layout.tsx            signed-in shell
       actions.ts            server action dismiss(formData)
-      page.tsx              Today: champion's picks + day-5 bracket actions; no-buys state for a SPY/non-bracket champion
-      positions/page.tsx    any strategy's holdings (?s=), cards by Holding.kind, next-session paper orders, paper-step warning
+      page.tsx              Today: champion's picks + day-5 bracket actions; no-buys state for a SPY/non-bracket champion; paused note, and the coral alarm split from the calm "waiting" sheet by lib/decision.ts
+      positions/page.tsx    any strategy's holdings (?s=), cards by Holding.kind, next-session paper orders, paper-step warning, the paused note, the Standing sheet naming why there is nothing to act on, and SpentDecision (an expired decision kept as a record)
       history/page.tsx      closed trades of both engines, filter by research strategy (?s=) and win/loss (?o=)
       leaderboard/page.tsx  roster-driven equity curves, champion crown, common-window ranking + window line, retired/not-ranked chips, per-strategy go-live checklist (?s=), month-by-month sheet
       leaderboard/view.ts   looks, researchOf, compare, windowLine, spyOverSpan, pickResearch, retiredLabel, scoreOf, monthLines, sinceStartLine  (pure)
@@ -105,7 +106,9 @@ web/
     cadence.ts              SPLIT_CADENCE_RULES, picksMonthlySizesWeekly, RESIZE_BAND, sizeChange, sizeLabel (pure)
     monthly.ts              monthlyTable, monthOf                                  (pure)
     slots.ts                slot letters/sheets, slotCount, cardBg                 (pure)
-    session.ts              nextUsSession, isStale, wibDate                        (pure)
+    session.ts              addDays, nextUsSession, isStale, wibDate, wibTime      (pure)
+    decision.ts             PAPER_PAUSED, NIGHTLY_SLOTS_UTC/DAYS_UTC, publishDay,
+                            timing, pipelineState, panelState                      (pure)
     format.ts               money/usd/rp/pct and date formatters                   (pure)
     allow.ts                isAllowed, safeNext                                    (pure)
     sera/access.ts          SERA_EMAIL, isSeraUser                                 (pure)
@@ -131,8 +134,9 @@ web/
       fixtures/receipts.json  four real receipts transcribed by hand, raw + expected SeanOrder
       fixtures/ledger.json    shared ledger fixture (contract B), replayed by web and engine tests alike
       overviewData.ts       phase 3, server only (Neon): equity() -> EquityRow[] (sean_equity, oldest first), marks() -> LatestMark[] (newest sean_marks close per symbol)
-      reminders.ts          phase 5, pure: buildReminders (sell/trim/buy/add vs the plan), planOrders, sharesBySymbol, outsideShares, resizes, RESIZING_RULES, MIN_TRADE_USD
-      planData.ts           phase 5, server only (Neon): linkableMethods, link, latestTargets, reminderMarks, latestCloses, planState, openReminderCount (React cache, 0 on any failure)
+      cash.ts               phase 10, pure: the derived wallet — OWNER_MONTHLY (mirrors the engine's schedule), OWNER_USD_IDR, depositDates, depositedIdr, depositedUsd, netSpentUsd, cashUsd
+      reminders.ts          phase 5, pure: buildReminders (sell/trim/buy/add vs the plan, sized on holdings + cash), planOrders, sharesBySymbol, outsideShares, resizes, RESIZING_RULES, MIN_TRADE_USD ($25, derived)
+      planData.ts           phase 5, server only (Neon): linkableMethods, link, latestTargets, reminderMarks, latestCloses, latestUsdIdr, planState, openReminderCount (React cache, 0 on any failure)
     *.test.ts               vitest suites for every pure module
   scripts/
     migrate.mjs             applies ../db/migrations/*.sql once each (schema_migrations)
@@ -247,6 +251,42 @@ function sizeTip(c: SizeChange): string;        // plain-words tooltip
 - `sizeChange`: target = `weight × equity`. Not held -> `buy` the whole target; held and off by less than `RESIZE_BAND × equity` -> `none` (the engine skips such a trade); else `add` / `trim` the gap. Approximate on purpose: the engine sizes at the open's equity, the page at tonight's equity and marks.
 - `orderSizeChange` returns null when the weight or paper equity is unknown; `heldUsd` sums `Holding.value` per symbol.
 
+### lib/decision.ts (pure)
+
+Why there is nothing to act on, in one word, and when the next decision is due. Renders nothing: it
+only names the state and the times, so Today and Positions say the same words and a test can pin
+them.
+
+```ts
+const PAPER_PAUSED: boolean;                                  // true while the roster is rebuilt at Gotrade's real fees
+const NIGHTLY_SLOTS_UTC: readonly (readonly [number, number])[];  // [[6,17],[9,41],[12,41]] = 13:17 / 16:41 / 19:41 WIB
+const NIGHTLY_DAYS_UTC: readonly number[];                    // [2,3,4,5,6] — cron's 2-6, Tue..Sat; Date.getUTCDay() numbering
+function publishDay(session: string): string;                 // the latest Tue..Sat on or before `session`
+type Timing = { target: string; dueAt: Date; lateAfter: Date };
+function timing(now: Date): Timing;
+type PipelineState = 'never' | 'late' | 'waiting' | 'current';
+function pipelineState(runSession: string | null, lastGoodRun: Date | null, now: Date): PipelineState;
+type PanelState = 'never' | 'live' | 'holding' | 'spent';
+function panelState(pendingSession: string | null, pendingDecision: boolean, now: Date, retired?: boolean): PanelState;
+```
+
+- `.github/workflows/nightly.yml` is the source of truth for all three constants, and `decision.test.ts`
+  reads that file and fails when they drift from it: the three cron slots in order, `2-6` as
+  Tuesday-to-Saturday, and `PAPER_PAUSED`.
+- `PAPER_PAUSED` is a constant on purpose, not derived from the database. The only candidate
+  signature ("the latest run succeeded and its paper step never ran") is both late (a run from
+  before the pause still carries `paper_status = 'success'`) and ambiguous (it also describes a
+  strategy whose paper had not started yet).
+- `publishDay` is why a Monday evening does not read as late: Monday's picks come from Saturday's
+  run, because a session only becomes fetchable at ET midnight. The window is keyed to the nightly
+  that *owes* `target` its decision, never to "the last slot that fired".
+- `pipelineState` is the nightly behind the page. `waiting` is the routine daily state — the last
+  good run is spent and the next is not due yet — and it is what used to render as a coral alarm.
+  `late` requires the final retry slot (19:41 WIB) to have passed.
+- `panelState` is one strategy's own decision. `holding` is read from the engine's recorded answer
+  (`paper_state.pending_decision`), never re-derived: those boundaries are NYSE trading sessions and
+  this module has no trading calendar. The fourth argument is not optional in practice — see Gotchas.
+
 ### lib/data.ts (server only; every function queries Neon)
 
 Types:
@@ -347,7 +387,7 @@ function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null befo
 
 ### Other modules
 
-- `lib/session.ts`: `nextUsSession(now)`, `isStale(latestSessionDate, now)`, `wibDate(now)`. Weekends only; holidays are the engine's job.
+- `lib/session.ts`: `addDays(ymd, n)` (pure date arithmetic, no timezone; `n` may be negative), `nextUsSession(now)`, `isStale(latestSessionDate, now)`, `wibDate(now)`, `wibTime(at)` (the Jakarta clock time, 24-hour: `'13:17'`; 24-hour on purpose because the owner reads WIB and every schedule in this repo is UTC, so the two are always printed side by side). Weekends only; holidays are the engine's job. `addDays` and `wibTime` exist for `lib/decision.ts` and the two pages' "next run is due" lines.
 - `lib/format.ts`: `money, usd, signedUsd, rp, signedRp, pct, signedPct, shortDate, monthDay, monthName` (true minus sign, IDR rounded to Rp 1,000, dates parsed at UTC noon).
 - `lib/allow.ts`: `isAllowed(email, allowed)`, case/space-insensitive exact match. `safeNext(next, fallback = '/')`: returns `next` (first value if an array) only when it is an internal path: starts with `/`, not `//` or `/\`, no control characters or backslashes; else `fallback`. Sign-in uses it for its post-login redirect.
 - `lib/sera/access.ts`: `SERA_EMAIL = 'mahfuzh74@gmail.com'`; `isSeraUser(email)` trimmed, case-insensitive equality with it.
@@ -375,7 +415,9 @@ function sinceStartLine(t: MonthlyTable): MonthLine | null;         // null befo
 
 ```
 engine (Python, nightly) -> Neon tables -> lib/data.ts (SQL, row -> view model)
-                                              |-> pure lib/* (metrics, monthly, strategy, slots, format)
+                                              |-> pure lib/* (metrics, monthly, strategy, slots, format, decision)
+.github/workflows/nightly.yml (cron slots, PAPER_PAUSED) -> lib/decision.ts (mirrored, test-pinned)
+                                              -> Today's alarm/waiting sheets, Positions' Standing sheet
                                               -> server components in app/(app)/* -> HTML
 engine `lab stage` -> web/data/lab.json (committed) -> lib/sera/lab.ts -> pure lib/sera/derive.ts -> /sera server components
 user "Mark as done" -> actions.dismiss -> data.dismissAction -> action_dismissals
@@ -387,6 +429,9 @@ Sean (phase 1, no route yet): screenshot (or a .zip of them, unzip.readZip) -> r
   pnlSeries) -> OverviewBody (Stat row, LineChart, holdings table | empty state)
 /sean/plan (phase 5): sean_link + book_targets (newest session) + data.ledgerOrders (split at `since`) + sean_marks
   + sean_reminder_marks -> planData.planState -> reminders.buildReminders -> plan page (to do / done, holdings)
+  cash (phase 10): OWNER_MONTHLY schedule (dated from sean_link.since) + fx_rates (planData.latestUsdIdr,
+    else OWNER_USD_IDR) − the plan's own orders -> cash.cashUsd -> planSize = planValue + cashUsd
+    (sean_link.budget_usd overrides); no receipt is ever read for a balance
   owner taps link / settings / done / undo -> plan/actions.ts -> sean_link | sean_reminder_marks -> revalidatePath('/sean', 'layout')
   planData.openReminderCount -> SeanNav Plan badge, Nav rail dot, AppHeader phone dot
 journal_seen -> sera/seen.seenInsightIds -> journal/view.ts (unseen counts, unseen-then-seen order) -> the seven badges
@@ -398,8 +443,8 @@ parallel (`Promise.all`). Dates are selected as `::text` and sliced to `YYYY-MM-
 timezone never shifts them.
 
 Page consumers:
-- Today: `champion`, `runStatus`, then `picks` and `positions` only for a picks champion (not benchmark, engine `bracket`); actions are holdings with an `orderId`, a `maxDays` and `day >= maxDays`, not dismissed. Any other champion (SPY under D2) shows the no-buys sheet: "Seer recommends no buys", research strategies trade on paper only and their orders live in Positions. `PickCard`'s 'Why this pick' uses the same fallback.
-- Positions: `strategies`, `runStatus`, then `positions(strat)` and `pendingOrders(strat)` for `selectStrategy(roster, ?s)`. Pending orders are skipped (empty `Pending`) for the benchmark and while the run is stale. Holdings split by `Holding.kind` into `BracketCard` (stop/target range, days), `BookCard` (weight, stop/target only when set) and `BenchmarkCard`; cards keyed by `Holding.key`. The orders sheet lists bracket orders by slot or book targets by rank with weight; empty-state copy depends on engine and `Pending.decision`. A paper-step warning shows when `paperStatus !== 'success'` (failed / running / not yet run). `PaperChip` and a "on paper since" line mark `isPaper` strategies. For a `checksNews` bracket strategy (C) with a pending session it also calls `vetoes(strat, session)` and renders `vetoSheet` as a stone "Vetoed tonight" sheet; each vetoed/failed row reuses `WhyToggle` (new optional `label`/`missing` props) as "Why vetoed" / "Why it failed". Every order row's `WhyToggle` gets `facts={o.evidence}`: it shows the explanation, else the facts as a list, else 'unavailable'; C's 'Why it passed the news check' line follows unchanged. For a book strategy between decisions, `bookPreview` feeds 'would pick now'; each row with stored facts has a 'Why it's on the list' toggle showing them (no LLM). For a split-cadence book strategy (`picksMonthlySizesWeekly(strat.rulesId)`) the empty-state, no-orders and 'would pick now' sentences say it picks its stocks monthly and checks how much to hold weekly (instead of "rebalances on the first session of each month"), and each book order row adds a full-width `SizeCell` ("Against what it holds now", `.cellWide`): `sizeLabel(orderSizeChange(o.weight, pending.equity, o.symbol, heldUsd(book)))` with `sizeTip` as its tooltip, `—` when paper equity is unknown.
+- Today: `champion`, `runStatus`, then `picks` and `positions` only for a picks champion (not benchmark, engine `bracket`); actions are holdings with an `orderId`, a `maxDays` and `day >= maxDays`, not dismissed. The page branches on `pipelineState(run.sessionDate, run.finishedAt, now)`, not on `run.stale`: only `never` and `late` raise the coral alarm (`alarmTitle` / `alarmSub` name which, and print the due and last-retry slots in WIB), while `waiting` renders a calm stone sheet saying the last session has closed and when the next picks are due. `run.stale` alone used to raise the alarm on the ordinary morning after the New York close, hours before the run was due. A `PausedNote` (butter) sits above all of them while `PAPER_PAUSED`; the nav spacer is dropped only for `alarm`, which runs to the bottom edge itself. Any other champion (SPY under D2) shows the no-buys sheet: "Seer recommends no buys", research strategies trade on paper only and their orders live in Positions. `PickCard`'s 'Why this pick' uses the same fallback.
+- Positions: `strategies`, `runStatus`, then `positions(strat)` and `pendingOrders(strat)` for `selectStrategy(roster, ?s)`. Pending orders are skipped (empty `Pending`) for the benchmark only — they are now fetched whatever session they are for, so an expired decision can be shown as a record instead of leaving a blank panel. The page then classifies with `lib/decision.ts`: `panel = panelState(pending.sessionDate, pending.decision, now, strat?.status === 'retired')` is this strategy's own decision, `pipeline = pipelineState(...)` is the nightly behind it, and `PAPER_PAUSED` renders a page-level `PausedNote` above both. The live orders sheet shows only for `panel === 'live'`; every other case renders the `Standing` sheet (`standingWords`: retired / `never` / `late` / `spent` / `holding`, with the cadence sentence borrowed from `noOrders()` so the vocabulary lives in one place, and the "next nightly run is due …" line suppressed while paper is paused or the strategy is retired). `panel === 'spent'` with orders additionally renders `SpentDecision`, a stone record of rank, ticker and target weight with every order-ticket field (limit, stop, take-profit, share count, dollar size) and every copy button deliberately absent. Holdings split by `Holding.kind` into `BracketCard` (stop/target range, days), `BookCard` (weight, stop/target only when set) and `BenchmarkCard`; cards keyed by `Holding.key`. The orders sheet lists bracket orders by slot or book targets by rank with weight; empty-state copy depends on engine and `Pending.decision`. A paper-step warning shows when `paperStatus !== 'success'` (failed / running / not yet run). `PaperChip` and a "on paper since" line mark `isPaper` strategies. For a `checksNews` bracket strategy (C) with a pending session it also calls `vetoes(strat, session)` and renders `vetoSheet` as a stone "Vetoed tonight" sheet; each vetoed/failed row reuses `WhyToggle` (new optional `label`/`missing` props) as "Why vetoed" / "Why it failed". Every order row's `WhyToggle` gets `facts={o.evidence}`: it shows the explanation, else the facts as a list, else 'unavailable'; C's 'Why it passed the news check' line follows unchanged. For a book strategy between decisions, `bookPreview` feeds 'would pick now'; each row with stored facts has a 'Why it's on the list' toggle showing them (no LLM). For a split-cadence book strategy (`picksMonthlySizesWeekly(strat.rulesId)`) the empty-state, no-orders and 'would pick now' sentences say it picks its stocks monthly and checks how much to hold weekly (instead of "rebalances on the first session of each month"), and each book order row adds a full-width `SizeCell` ("Against what it holds now", `.cellWide`): `sizeLabel(orderSizeChange(o.weight, pending.equity, o.symbol, heldUsd(book)))` with `sizeTip` as its tooltip, `—` when paper equity is unknown.
 - History: `strategies`, `closedTrades`, `runStatus`. Filters are `StrategySwitch` over non-benchmark strategies with an `ALL` button (`?s=`, unknown ids read as all) and win/loss icon buttons (`?o=`); defaults are dropped from the URL. Exit-reason icons cover `tp`, `sl`, `time`, `gap`, `signal` (rules said sell, sold at the open) and `forced` (forced close, no more prices), with a fallback for unknown reasons. Rows keyed by `Trade.key`; each shows the strategy tag (`strategyShort`) and a small `PaperChip` when the strategy is paper or missing from the roster.
 - Leaderboard: `leaderboard`, `runStatus`, then `monthly(pick.id, run.sessionDate)`. Every card, chart line and legend entry comes from the roster via `looks`. The big figure is the champion (crowned; SPY today); the second figure is `compare(board.rows).best` — the best research strategy **over the common window** — while the champion is the benchmark, else SPY; with no common window there is no second figure, only `windowLine`'s label. `windowLine` prints under the chart. The checklist and month sheet follow `pick = pickResearch(researchOf(roster), ?s)`; a `StrategySwitch` over research strategies shows when there are two or more (SPY is not selectable here, it is the SPY column). Checklist is `checklist(pick.metrics, spyOverSpan(spy.curve, pick.curve), pick.strategy.gate)` scored by `scoreOf`; the gate's `note` prints under it. "Month by month" lists the since-start row then months newest first, with a `CircleDashed` partial-month marker while the next session is in that month.
 
@@ -624,17 +669,42 @@ held from outside the plan, `PlanSettings` and an unlink button.
   picks no longer name; **buy** a pick the plan does not hold, `weight × planSize` dollars (no amount
   without a plan size); **add / trim** only when `resizes(rulesId)` (the `RESIZING_RULES` mirror of
   the engine's `resize=True` presets), measured at the pick's decision price, and only when the gap
-  is at least `max(MIN_TRADE_USD` ($10), `RESIZE_BAND × planSize)`; no picks at all -> no reminders.
+  is at least `max(MIN_TRADE_USD` ($25, derived — see Gotchas), `RESIZE_BAND × planSize)`; no picks at
+  all -> no reminders.
   Order: sells, trims, buys, adds. A reminder is **done** (`'order'`) when an uploaded order of the
   same side and stock has a NY trade date on or after the decision session, or (`'mark'`) when the
-  owner marked it for that decision. `planSize` = `budgetUsd` when set, else the plan's current value.
+  owner marked it for that decision. **`planSize` is holdings plus cash**: `budgetUsd` when the owner
+  set one, else `planValue + cashUsd`, else `planValue` alone when the wallet cannot be derived (what
+  this did before phase 10), else null and buys carry no amount. `cashUsd` comes in from `./cash` and
+  is passed back out on the `ReminderPlan` for the page; it may be negative. Every amount is in
+  dollars and Sean never asks for a share count: prices drift between the decision's close and the
+  next open, and a fractional-dollar order absorbs that drift where a share count does not (the
+  roster's book rules are already `-frac`).
   Keys are `${sessionDate}:${symbol}:${side}`.
+- `lib/sean/cash.ts` (phase 10, pure): the wallet, **derived, never read**. A Gotrade receipt has no
+  balance printed on it, so no code path reads one and `lib/sean/ledger.ts` is unmodified. `cashUsd({
+  schedule, through, usdIdr, orders })` = `depositedUsd` − `netSpentUsd`, each to the cent: the
+  contribution schedule from `sean_link.since` through today's New York date (`orderSession`, the same
+  calendar plan membership is counted in), less what the plan's own orders took out (buys out, sells
+  in, fees already inside `totalUsd`) over the SAME `planOrders(all, since)` slice the reminders use.
+  `OWNER_MONTHLY` is the owner's own plan — 10,000,000 IDR to start, +5,000,000 IDR on `dayOfMonth` 25
+  (1–28, so every month has the day) — and carries **the engine's name on purpose**
+  (`engine/src/seer_engine/sim/contributions.py`), so one `grep -rn OWNER_MONTHLY` finds both halves of
+  the one schedule. `OWNER_USD_IDR` (17,841) is the rate the owner's real 10,000,000 IDR was actually
+  converted at, a fallback only. A schedule self-corrects where a number precomputed into
+  `budget_usd` cannot: the orders he uploads are subtracted from the same deposits, so next month's
+  cash is right even when his fills diverged from the plan. The wallet is left negative rather than
+  clamped — below zero means the schedule and the uploaded orders disagree, and hiding that would be
+  worse than showing it. Also `depositDates` / `depositedIdr` / `depositedUsd` / `netSpentUsd`.
 - `lib/sean/planData.ts` (server only, Neon; untested by design, the logic is in `reminders.ts`):
   `linkableMethods()` (active, `engine = 'book'`, not benchmark, with `lastPick`), `link()`
   (`sean_link` joined to `strategies`; `retired` when the method left the roster),
   `latestTargets(id)` (`book_targets` at its newest session, `pending` from `paper_state`),
   `reminderMarks`, `latestCloses(symbols)` (newest `sean_marks` close; named apart from phase 3's
-  `marks()`), `planState()` (null when nothing is followed; a retired method yields no picks), and
+  `marks()`), `latestUsdIdr()` (the newest `fx_rates` row, falling back to `cash.ts`'s `OWNER_USD_IDR`
+  so a missing row costs accuracy and never the page), `planState()` (null when nothing is followed; a
+  retired method yields no picks; it derives the wallet with `cashUsd` and hands it to
+  `buildReminders`), and
   `openReminderCount` — React-`cache`d so `(app)/layout.tsx`, `AppHeader` and `app/sean/layout.tsx`
   share one `planState()` per request, returning 0 when nothing is followed **or anything throws**.
 - `app/sean/plan/actions.ts` (server actions, each gated by `isSeanCaller()`): `linkMethod(prev,
@@ -647,6 +717,11 @@ held from outside the plan, `PlanSettings` and an unlink button.
   input guards `parseSince`, `parseBudget` (empty -> null, cap `MAX_BUDGET`), `parseSymbol`,
   `parseSide`, and the plain-words strings (`reminderTitle`, `reminderDetail`, `doneLine`,
   `picksLine`, `nextPickWords` via `cadenceOf(rulesId)`, `methodTitle`, `aboutUsd`, `todoLabel`, ...).
+  `planSizeLine(planSize, budgetUsd, cashUsd)` and `cashLine(planSize, cashUsd, budgetUsd)` word the
+  stocks-plus-cash split; both fall back (or go quiet) when the owner set a budget, since then the
+  split would be a guess, and both print cash through `signedUsd` when it is negative because `usd`
+  takes an absolute value. The page's middle tile is **Plan size** — what the picks are sized against
+  — not the old "Plan value", with `cashLine` beneath it.
 - `LinkPicker` / `PlanSettings` (client, `useActionState(linkMethod)`): the picker's start date
   defaults to the method's newest pick, so orders placed to follow it count.
 - The way the owner notices: `Nav` (desktop rail) and `AppHeader` (phone) put a coral dot on their
@@ -699,6 +774,10 @@ window lacks two month starts.
 - C's gate is `applicable: false`: its checklist reads 5/6 at best forever, and the score line says real money needs an owner decision (D9).
 - Positions for C shows "Vetoed tonight" for the pending session. No rows there means A had no candidates or the news check did not run; the app cannot tell which (`noCheckLine`).
 - `runStatus` mixes two runs: freshness from the latest successful run, `latestStatus`/`paperStatus` from the most recent run of any outcome.
+- `panelState`'s fourth argument (`retired`) defaults to `false`, but it is not optional at the call site — `app/(app)/positions/page.tsx` passes `strat?.status === 'retired'`. Drop it and a superseded entry renders a live order ticket on the night its successor starts: a retired strategy's `pending_session` can still be the coming session, and those `book_targets` and `orders` rows are deliberately kept as the record of a decision that was made and never acted on. The page is the only thing between them and the owner's order ticket.
+- `NIGHTLY_SLOTS_UTC`, `NIGHTLY_DAYS_UTC` and `PAPER_PAUSED` in `lib/decision.ts` are hand mirrors of `.github/workflows/nightly.yml`, like `SPLIT_CADENCE_RULES` mirrors the engine presets. `decision.test.ts` reads the workflow file and fails on drift, so change the cron or un-pause the paper step there first — never only in the TypeScript.
+- Do not branch a page on `run.stale` for anything the owner reads as an alarm. It is true from the New York close until the next nightly finishes, which is most of the owner's waking day; `pipelineState` is the one that can tell "not due yet" (`waiting`) from "missed its last retry" (`late`).
+- `lib/decision.ts` never re-derives whether tonight is a decision session. It reads the engine's recorded `paper_state.pending_decision`: the boundaries are NYSE trading sessions and the web package has no trading calendar (`lib/session.ts` models weekends only).
 - Leaderboard win rate and trade counts only use the strategy's own engine's trade table; SPY has no trades.
 - The Leaderboard never says "Ready for real money" unless all six checklist items pass (`scoreOf`); a missing gate yields no items and a 0/6 "Paper only" line.
 - The Leaderboard never ranks on raw total return: with promotable strategies the paper starts differ, so `compare` ranks only over the sessions the live strategies share and `windowLine` always says which. `MIN_COMMON_SESSIONS` / `MIN_RANKED` and the rank key must stay equal to `engine/src/seer_engine/paper/compare.py`'s — the port is only honest while it tracks the engine.
@@ -724,6 +803,19 @@ window lacks two month starts.
 - Sean never stores a screenshot. `image_sha256` and the `(symbol, side, executed_at, shares)` key are the only dedupe.
 - `lib/sean/vision.ts` and `readOrder.ts` take their config and `fetch` as arguments and never read a server env module, so they stay importable from vitest and the smoke script; keep the server-only part in the (phase 2) route.
 - `RESIZING_RULES` in `lib/sean/reminders.ts` is a hand mirror of the engine presets with `resize=True` (`engine/src/seer_engine/sim/rules.py`), like `SPLIT_CADENCE_RULES`; a resizing preset missing there silently gets no add/trim reminders. Its size band is `lib/cadence.ts`'s `RESIZE_BAND`.
+- `OWNER_MONTHLY` in `lib/sean/cash.ts` is a hand mirror of the engine's contribution schedule
+  (`engine/src/seer_engine/sim/contributions.py`), the way `RESIZING_RULES` mirrors `sim/rules.py`. It
+  carries the engine's name deliberately so one `grep -rn OWNER_MONTHLY` finds both halves; change the
+  amounts, the day of the month, or the rule that a deposit is dated on its calendar day in one place
+  and you must change the other. The one difference is on purpose: the engine lets the NYSE calendar
+  decide which session first spends the money, while Sean reports the wallet, where money counts from
+  the day it lands.
+- `MIN_TRADE_USD` is derived, not picked: `trading_min / (2 × trading_rate)` from the engine's own fee
+  constants (`sim/costs.py`; currently 0.10 and 0.002, so $25) — the point where the $0.10 floor stops
+  more than doubling the trading fee. Its comment states the derivation, not the number; if a fee
+  constant moves, redo the arithmetic instead of guessing a round number. Not $50 (where the floor
+  stops binding at all): an add's gap can never exceed its own slot, and the owner's slot is $41.91,
+  so a $50 floor would make an add structurally impossible rather than merely expensive.
 - `openReminderCount()` runs inside `(app)/layout.tsx`, which wraps every Seer page: it must never throw (it returns 0), and it relies on React `cache` so the layout and `AppHeader` do not each run `planState()`. A reminder only clears from an uploaded order dated on or after the decision session, so an order placed earlier needs a hand "done" mark.
 - The paper bar (3 months, 100 trades) on How it works is a constant in `app/sera/how/view.ts`, not snapshot data; change it there if design section 1 changes.
 

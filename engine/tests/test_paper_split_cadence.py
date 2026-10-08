@@ -37,7 +37,7 @@ from seer_engine.backtest.book_runner import run_rules
 from seer_engine.backtest.market import Market, Membership
 from seer_engine.commands import paper, paper_check, promote
 from seer_engine.lab import store as lab_store
-from seer_engine.paper import replay, roster
+from seer_engine.paper import replay, roster, store as paper_store
 from seer_engine.paper.capital import PAPER_INITIAL_IDR
 from seer_engine.prices import Bar
 from seer_engine.sim.book import Target, to_weight
@@ -284,6 +284,18 @@ def _seed(conn, rows, members) -> None:
             )
 
 
+def deposits(conn, sid: str = None) -> tuple[tuple[date, Decimal], ...]:
+    """The deposits the night credited, in the shape `run_rules` takes them.
+
+    017 wired the owner's funding plan into the night (5,000,000 IDR on the 25th of each month),
+    so a book the night stepped holds money a runner started from cash0 alone does not -- these
+    worlds span 2026-10-25. The RECORD, not the schedule: each amount was frozen at the rate of
+    the session it landed on (plan set Decision D18).
+    """
+    rows = [c for c in paper_store.read_contributions(conn, sid or SID) if c.applied]
+    return tuple((c.session_date, c.amount_usd) for c in sorted(rows, key=lambda c: c.session_date))
+
+
 def _only(conn, sid: str) -> None:
     """Retire every other roster row before it starts: only ``sid`` trades in these worlds."""
     with db.transaction(conn, False):
@@ -417,7 +429,8 @@ def test_split_cadence_nights_equal_the_runner_and_the_replay(world, tmp_path):
 
     market, _ = bio.load_market(world, cache_dir=tmp_path)
     result = run_rules(
-        market, SCRIPTED, PARAMS, RULES, PAPER_START, LAST, usd_idr=usd, kickoff=kickoff, initial_idr=PAPER_INITIAL_IDR
+        market, SCRIPTED, PARAMS, RULES, PAPER_START, LAST, usd_idr=usd, kickoff=kickoff,
+        initial_idr=PAPER_INITIAL_IDR, contributions=deposits(world),
     )
     assert q(
         world, "SELECT date, cash_usd, equity_usd FROM equity_snapshots WHERE strategy_id = %s ORDER BY date", (SID,)
@@ -493,6 +506,7 @@ def test_a_split_inside_the_month_on_a_held_symbol(split_world):
     unsplit = run_rules(
         memory_market(), SCRIPTED, PARAMS, RULES, PAPER_START, LAST,
         usd_idr=USD_IDR, kickoff=PAPER_START, initial_idr=PAPER_INITIAL_IDR,
+        contributions=deposits(split_world),
     )
     got = q(split_world, "SELECT date, equity_usd FROM equity_snapshots WHERE strategy_id = %s ORDER BY date", (SID,))
     assert [d for d, _ in got] == [s.date for s in unsplit.snapshots]

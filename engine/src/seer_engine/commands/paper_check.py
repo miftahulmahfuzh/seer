@@ -27,6 +27,8 @@ import logging
 from collections.abc import Sequence
 from datetime import date, timedelta
 
+from decimal import Decimal
+
 import psycopg
 from psycopg.pq import TransactionStatus
 
@@ -195,9 +197,26 @@ def _disagreement(paper_start: date | None, state: PaperState | None) -> str:
     return f"strategies.paper_start is {paper_start} but paper_state has no row"
 
 
+def _deposits(conn: psycopg.Connection, strategy_id: str) -> tuple[tuple[date, Decimal], ...]:
+    """The deposits this entry has actually been credited, ascending: ``(session, usd)`` pairs.
+
+    The RECORD, never the schedule (plan set Decision D18). Each amount was frozen at the USD/IDR
+    of the session it landed on, so re-deriving it from ``OWNER_MONTHLY`` would give a different
+    number the first time the rupiah moved -- and the replay would then disagree with the stored
+    record on every session after it. ``applied`` only: an accrued row no session has credited is
+    in no stored snapshot either.
+    """
+    rows = [c for c in store.read_contributions(conn, strategy_id) if c.applied]
+    return tuple((c.session_date, c.amount_usd) for c in sorted(rows, key=lambda c: c.session_date))
+
+
 def _stored_records(conn: psycopg.Connection, engine: str, strategy_id: str, state: PaperState) -> Records:
+    deposited = _deposits(conn, strategy_id)
     common = {
+        # Capital on day 0, NOT capital in: once the owner's deposits exist the two differ, so
+        # the money that arrived afterwards is published beside it rather than folded into it.
         "initial_cash": state.initial_cash_usd,
+        "deposited": sum((usd for _, usd in deposited), Decimal("0.0000")),
         "cash": state.cash_usd,
         "equity": state.equity_usd,
         "pending_session": state.pending_session,
@@ -239,9 +258,15 @@ def _expected(
         # The replay decides paper_start .. next_session(last_session): C carries the verdicts
         # stored for exactly those sessions (read in this read-only transaction).
         strategy = _bracket_strategy(conn, entry, head.paper_start, dates.next_session(head.last_session))
-        return replay.expected_bracket(market, strategy, entry.params, head)
+        # The entry's OWN rule set, not a module constant: C replays at DESIGN_V0 and C-GT at the
+        # Gotrade bracket preset, so a Gotrade entry is not reconstructed at the flat rate.
+        return replay.expected_bracket(
+            market, strategy, entry.params, head, rules=entry.rules, contributions=_deposits(conn, entry.id)
+        )
     if entry.engine == "book":
-        return replay.expected_book(market, entry.obj, entry.params, entry.rules, head, dividends)
+        return replay.expected_book(
+            market, entry.obj, entry.params, entry.rules, head, dividends, contributions=_deposits(conn, entry.id)
+        )
     if entry.engine == "benchmark":
-        return replay.expected_benchmark(market, head, dividends)
+        return replay.expected_benchmark(market, head, dividends, contributions=_deposits(conn, entry.id))
     raise ValueError(f"{entry.id}: unknown engine {entry.engine!r}")

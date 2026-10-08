@@ -5,7 +5,7 @@ import { DSR_POLICIES, INSIGHT_KINDS, METHOD_STATUSES, SOURCE_KINDS } from './ty
 
 describe('lab snapshot (web/data/lab.json)', () => {
   it('has exactly the contract keys', () => {
-    expect(lab.version).toBe(3);
+    expect(lab.version).toBe(4);
     expect(Object.keys(lab).sort()).toEqual(
       ['asOf', 'benchmark', 'data', 'gate', 'ideasSeen', 'insights', 'methods', 'paper', 'summary',
         'trials', 'version'].sort(),
@@ -52,17 +52,46 @@ describe('lab snapshot (web/data/lab.json)', () => {
     // "Luck check: no (0.912 < 0.90)": the cross came from the trial's recorded `DSR >= 0.95`
     // and the number from the live gate. Both halves of every hurdle must now come from the
     // same day, so a scored trial misses the luck check exactly when its score is under the bar.
+    //
+    // Which rows that applies to is the engine's answer, read here and not re-derived: a
+    // pre-registered test look has no selection to deflate, so `published_verdict` applies the
+    // owner thresholds and nothing else and `luckGated` is false. Before the marker existed this
+    // branch had to be either a failure (it was) or an exception that also excused the live page.
     for (const t of lab.trials) {
       const missedLuck = t.failedNow.some((f) => f.startsWith(DSR_FAILURE_PREFIX));
-      if (t.dsrNow !== null) expect([t.candidateId, missedLuck]).toEqual([t.candidateId, t.dsrNow < lab.gate.dsrMin]);
-      // A trial with no score cannot pass a luck test it never had.
-      else expect([t.candidateId, missedLuck]).toEqual([t.candidateId, true]);
+      if (!t.luckGated) {
+        // No hurdle, whatever the score. M0021-B70-RAW: 0.513013, and correctly not a failure.
+        expect([t.candidateId, missedLuck]).toEqual([t.candidateId, false]);
+      } else if (t.dsrNow !== null) {
+        expect([t.candidateId, missedLuck]).toEqual([t.candidateId, t.dsrNow < lab.gate.dsrMin]);
+      } else {
+        // A trial with no score cannot pass a luck test it never had.
+        expect([t.candidateId, missedLuck]).toEqual([t.candidateId, true]);
+      }
 
       const missedDd = t.failedNow.some((f) => f.startsWith(DRAWDOWN_FAILURE_PREFIX));
       if (t.maxDrawdown !== null) {
         expect([t.candidateId, missedDd]).toEqual([t.candidateId, t.maxDrawdown > lab.gate.maxDrawdown]);
       }
       expect(t.eligibleNow).toBe(t.failedNow.length === 0);
+    }
+  });
+
+  it('says per trial whether the luck gate applies, and the ungated branch is not empty', () => {
+    // The marker's contract, pinned on the real snapshot: it is window-shaped, it agrees with
+    // `summary.testLooks`, and there is at least one row where it actually changes the answer —
+    // a scored row, under the bar, that is correctly not a failure. Without that last pin the
+    // branch above could pass vacuously the day the lab's test looks are rewritten.
+    expect(lab.trials.every((t) => t.luckGated === (t.window === 'dev'))).toBe(true);
+    const ungated = lab.trials.filter((t) => !t.luckGated);
+    expect(ungated.length).toBe(lab.summary.testLooks);
+    expect(ungated.length).toBeGreaterThan(0);
+    const underTheBarAnyway = ungated.filter(
+      (t) => t.dsrNow !== null && t.dsrNow < lab.gate.dsrMin,
+    );
+    expect(underTheBarAnyway.length).toBeGreaterThan(0);
+    for (const t of underTheBarAnyway) {
+      expect(t.failedNow.some((f) => f.startsWith(DSR_FAILURE_PREFIX))).toBe(false);
     }
   });
 

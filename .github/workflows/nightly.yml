@@ -48,25 +48,35 @@ jobs:
       # 'true' skips Veto, Paper, Paper check and Explain; Migrate and Nightly (bars) always run.
       #
       # Paused again 2026-10-08 (owner's call) to hold the paper clock at ZERO stepped sessions
-      # while the roster is rebuilt to pay Gotrade's real fees (sim/costs.py, measured from the
-      # owner's own receipts: ~2.5x the assumed 0.1%/side, and 5x at today's $28 slots because of
-      # the $0.10 per-order floor). cost_model lives in sim.rules.LEVERS_SINCE_PINS at "flat", so
-      # moving a STARTED entry to "gotrade" changes its spec digest and store.check_digest refuses
-      # its next night -- compliance therefore means new roster entries with fresh paper clocks.
-      # Right now that is free: paper_state.last_session is 2026-10-06, the 10-07 session has not
-      # been stepped, and equity_snapshots holds only the starting 560.5067. Every night this runs
-      # unpaused costs one more session of history that the rebuild would throw away.
+      # while the roster was rebuilt to pay Gotrade's real fees. STILL PAUSED, deliberately: the
+      # owner flips this switch, not a merge. Migration 017 has landed and the rebuilt roster --
+      # SPY-GT, C-GT, RMW-FR-GT, RAW-FR-GT, MOM-FR-GT, MVW-FR-GT -- sits inert while this reads
+      # 'true'. No paper_start is written and no session is stepped, so the rebuild stays free.
       #
-      # Do not resume until all three hold, or the rebuilt roster is not actually clean:
-      #   1. paper/benchmark.py threads cost_model into fractional_buy_cost (today it takes the
-      #      "flat" default at :250 and :278, so SPY would pay 0.1% while the methods pay Gotrade
-      #      -- an asymmetric "beats SPY TR" gate);
-      #   2. C is decided -- the bracket path has no gotrade branch at all (sim/sizing.py
-      #      precomputes _ONE_PLUS_COST from the flat COST_RATE), so C cannot comply without new
-      #      code, and daily trading costs ~26%/yr on this book;
-      #   3. the lab has answered how many names to hold and has a capital model matching reality
-      #      (10M IDR start + 5M monthly; today backtest/runner.py INITIAL_IDR is a 20M lump and
-      #      nothing in the engine models contributions at all).
+      # THE THREE RESUME CONDITIONS WRITTEN HERE ON 2026-10-08 NOW ALL HOLD:
+      #   1. DONE. paper/benchmark.py threads cost_model through all three of its flat sites, so
+      #      the SPY yardstick pays Gotrade's measured schedule and "beats SPY TR" compares two
+      #      books paying the same fees. SPY-GT is the entry that uses it.
+      #   2. DONE, and C STAYS. The bracket path takes its rule set and charges Gotrade's schedule,
+      #      including the $0.10 per-order floor. C-GT is on the roster PERMANENTLY as the
+      #      daily-trading control -- the owner's original plan was daily trading, and this is how
+      #      he finds out how that would have gone. Daily trading is expensive (~26%/yr on this
+      #      book at $28 slots); that is the finding it exists to produce, never a reason to
+      #      retire it.
+      #   3. DONE for the capital model: the lab starts at the real 10,000,000 IDR, the
+      #      +5,000,000 IDR deposit on the 25th of each month is modelled end to end (including
+      #      the ~7 idle days before the next rotation), returns are reported money-weighted, and
+      #      SPY is fed the same money on the same dates. The rebuilt entries carry that plan in
+      #      their frozen specs from their first night, so it never needs a second rebuild.
+      #      The NAME COUNT is settled separately and is NOT a blocker: it stays at 20. Measured,
+      #      by month 3 of the funding plan 20 names cost 0.614% and 11 names cost 0.612%, so the
+      #      fee case for cutting it is gone. If the lab's merits answer ever differs it lands as a
+      #      FURTHER roster entry with its own clock, never as an edit to a running one.
+      #
+      # WHAT REMAINS, and it is the owner's call alone: set this to 'false', commit and push. The
+      # first scheduled night after that writes each -GT entry's spec and paper_start and the six
+      # clocks start together. The six predecessors are retired, so they stop trading that night;
+      # their rows, their specs and their un-stepped 2026-10-07 decisions are kept, never deleted.
       PAPER_PAUSED: 'true'
     steps:
       - name: Check secrets

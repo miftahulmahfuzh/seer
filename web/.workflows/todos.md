@@ -2,7 +2,7 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-10-07
+**Last Updated**: 2026-10-08
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 17
+- Completed: 19
 
 ---
 
@@ -35,6 +35,47 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-V7XD** Phase 10: Sean sizes a rotation from cash, not from holdings
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `web/lib/sean/reminders.ts` + `reminders.test.ts`; `web/lib/sean/cash.ts` (new) + `cash.test.ts`; `web/lib/sean/planData.ts`; `web/app/sean/plan/` (`view.ts`, `view.test.ts`, `page.tsx`). Exit criteria: planSize is holdings + cash when cash is derivable, holdings when it is not, and budget_usd whenever the owner set one; cash derived from the contribution schedule and the plan's own orders with no balance read off a receipt (`ledger.ts` unmodified); `MIN_TRADE_USD` is 25 with its comment stating the derivation `trading_min / (2 x trading_rate)` rather than the number; every reminder amount in dollars, never share counts; the rotation list works without same-day reuse of sale proceeds (test asserts needed $209.54 < cash $280.16); `npx tsc --noEmit` clean and `npx vitest run lib/sean app/sean` 0 failed.
+  - **Status**: done
+  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 10 of 12)
+  - **Satisfies**: R9 — The owner executes a rotation without arithmetic: Sean sizes buys from cash
+  - **Depends on**: P1-ENG-HPOI (phase 5, complete)
+  - **Plan**: `.workflows/plan/P1-WEB-V7XD.md`
+  - **Completed**: 2026-10-08 11:43
+  - **Method**: /do
+  - **Files**: web/lib/sean/cash.ts, web/lib/sean/cash.test.ts, web/lib/sean/reminders.ts, web/lib/sean/reminders.test.ts, web/lib/sean/planData.ts, web/app/sean/plan/view.ts, web/app/sean/plan/view.test.ts, web/app/sean/plan/page.tsx, web/.workflows/todos.md, web/.workflows/plan/P1-WEB-V7XD.md
+  - **Drift**:
+    - No code drift: every line the plan quotes matched the tree exactly (reminders.ts :25/:92/:113/:196-198, view.ts :152, page.tsx :113-114/:144, planData.ts :138-164). Phase 5's contributions.py confirms all four mirror assumptions — OWNER_MONTHLY, amount_idr Decimal('5000000'), day_of_month=25 capped at 28, calendar dates.
+    - Prose-only count drift in the plan: its Step 7 says cash.test.ts is '12 tests'; the file it specifies contains 13 `it` blocks. Wrote the file as specified; 13 is the real count.
+    - The plan's expected totals (47 files / 596 tests) were measured against a 46-file/578-test baseline that has since moved as peer phases landed. Measured now: baseline 47 files/606 tests (coordinator, at phase 5's landing) -> 48 files/625 tests after this phase. The arithmetic is exact: 606 + 13 (cash.test.ts) + 5 (the 'holdings plus cash' block) + 1 (the new $25-floor test) = 625.
+  - **Decided**:
+    - Reuse lib/data.ts:137's existing fx_rates read, or add the plan's dedicated latestUsdIdr()? -> Added latestUsdIdr() as the plan specifies (rung 3: the phase plan's code blocks). runStatus() fires three queries and falls back to 16500, where this needs one query and the measured OWNER_USD_IDR = 17,841 fallback — the rate the owner's real 10,000,000 IDR was actually converted at.
+    - Mint the TaskID in web/.workflows/todos.md only, and leave the shared plan index untouched? -> Yes (rung: narrower blast radius; the same call phases 1, 2, 3 and 9 recorded, and the swarm ledger owns set progress).
+  - **Verified**: In `/home/miftah/.worktrees/seer/gotrade-fee-rebuild/web` — `npx tsc --noEmit` exit 0, clean; `npx vitest run lib/sean app/sean` -> 15 files, 217 tests, 0 failed; `npx vitest run` -> 48 files, 625 tests, 0 failed. Exit criterion 2: `web/lib/sean/ledger.ts` unmodified (empty `git status`). Exit criterion 5: the rotation test asserts needed $209.54 < cash $280.16.
+
+- [x] **P1-WEB-4TQ7** Phase 9: The blank panel says which of five things it means
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns `web/lib/decision.ts` (new classifier, pure and tested) and `web/lib/decision.test.ts`; `web/lib/session.ts` and `session.test.ts`; `web/app/(app)/positions/page.tsx`; `web/app/(app)/page.tsx`; the two CSS modules. Exit: the five states are distinguished in plain words — (a) holding, nothing was due, (b) expired at the New York close, (c) never produced, (d) failed, and (e) paper is paused. The next decision's time is stated in WIB, derived from nightly.yml's cron slots. Nothing rendered is mistakable for a live instruction. A RETIRED strategy's pending decision never renders as live (D16/D9.6).
+  - **Status**: done
+  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 9 of 12)
+  - **Satisfies**: R5 — the blank pending-picks panel must say which of its five causes it is, and never read as a live instruction
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-WEB-4TQ7.md`
+  - **Completed**: 2026-10-08 10:44
+  - **Method**: /do
+  - **Files**: web/lib/session.ts, web/lib/session.test.ts, web/lib/decision.ts, web/lib/decision.test.ts, web/app/(app)/positions/page.tsx, web/app/(app)/positions/positions.module.css, web/app/(app)/page.tsx, web/app/(app)/today.module.css, web/.workflows/todos.md, web/.workflows/plan/P1-WEB-4TQ7.md
+  - **Drift**:
+    - No drift. Every line, anchor and lucide/CSS-variable the phase-9 plan quotes matched the tree exactly: session.ts:15 addDays, session.test.ts:17-19, positions/page.tsx:1-16/25-147/noOrders ending :182, page.tsx:1-19/31-154, positions.module.css .warnText + the .warn desktop line, today.module.css .alarmSub + the .alarm desktop line.
+  - **Decided**:
+    - Step 3 says mint a task for all 12 phases, but 6 wave-1 swarm sessions share this worktree and would race on web/.workflows/todos.md -> minted only phase 9's task (P1-WEB-4TQ7); each peer mints its own (tie-break rung: narrower blast radius).
+    - npx tsc --noEmit reports 3 errors, all in web/app/sera/* (methods/view.test.ts:20, overview.test.ts:41 and :88) -> not chased. Phase 2 has half-landed its `luckGated: boolean` (now required) in web/lib/sera/types.ts without yet updating those fixtures, and all three files are in phase 2's own Owns list. Phase 9's eight files produce zero tsc errors (rung: the phase plan's 'Leaves alone (owned by others)' section, plus the rule that widening scope to settle an ambiguity is drift, not a decision).
+    - The plan index `GOTRADE_FEE_REBUILD_PLAN.md` was deliberately NOT ticked: this is a coordinated swarm (`swarm.py find` -> coordinator `orch-gotrade-fee-rebuild`), 11 peers share the worktree, and the set-level Status/TaskID columns are the coordinator's ledger to write. Editing it here would both race the peers and commit a file outside this phase's allowlist (rung: narrower blast radius).
+  - **Verified**: `cd web && npx vitest run` -> 47 files, 606 tests, 0 failed (lib/decision.test.ts 20, lib/session.test.ts 12 green). Exit criterion 6: `git diff --stat -- .github/workflows/nightly.yml` empty, `PAPER_PAUSED: 'true'` intact at :70. Exit criterion 7 (D9.6): positions/page.tsx:49 passes `strat?.status === 'retired'` as panelState's 4th argument.
 
 - [x] **P1-WEB-K3QM** Phase 1: Seen-state storage, server read/write, and the POST endpoint
   - **Difficulty**: NORMAL

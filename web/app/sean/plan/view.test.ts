@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Reminder } from '../../../lib/sean/reminders';
 import {
-  aboutUsd, cadenceOf, doneLine, joinWords, methodTitle, nextPickWords, outsideLine, parseBudget, parseSide,
-  parseSince, parseSymbol, picksLine, planSizeLine, reminderDetail, reminderTitle, todoLabel,
+  aboutUsd, cadenceOf, cashLine, doneLine, joinWords, methodTitle, nextPickWords, outsideLine, parseBudget,
+  parseSide, parseSince, parseSymbol, picksLine, planSizeLine, reminderDetail, reminderTitle, todoLabel,
 } from './view';
 
 const r = (over: Partial<Reminder>): Reminder => ({
@@ -105,10 +105,22 @@ describe('words', () => {
     expect(todoLabel(4)).toBe('4 things to do');
   });
 
-  it('planSizeLine and outsideLine', () => {
-    expect(planSizeLine(560, 560)).toContain('the amount you set');
-    expect(planSizeLine(558, null)).toContain('what the plan holds now');
-    expect(planSizeLine(null, null)).toContain('Set how much');
+  it('planSizeLine, cashLine and outsideLine', () => {
+    expect(planSizeLine(560, 560, 280.16)).toContain('the amount you set');
+    expect(planSizeLine(838.16, null, 280.16)).toContain('$558.00 in stocks and $280.16 in cash');
+    expect(planSizeLine(558, null, null)).toContain('what the plan holds now');
+    expect(planSizeLine(null, null, null)).toContain('Set how much');
+
+    expect(cashLine(838.16, 280.16, null)).toBe('$558.00 in stocks + $280.16 cash');
+    expect(cashLine(838.16, 280.16, 560)).toBeNull(); // the owner typed a size: no split to show
+    expect(cashLine(558, null, null)).toBeNull();
+    expect(cashLine(null, null, null)).toBeNull();
+
+    // usd() takes an absolute value (format.ts:6): a negative wallet must keep its sign
+    // NOTE: the minus below is U+2212 (format.ts:1 MINUS), not a hyphen.
+    expect(cashLine(557.91, -0.09, null)).toBe('$558.00 in stocks + −$0.09 cash');
+    expect(planSizeLine(557.91, null, -0.09)).toContain('−$0.09 in cash');
+
     expect(outsideLine([], '2026-10-07')).toBeNull();
     expect(outsideLine(['NVDA', 'SPY'], '2026-10-07')).toBe(
       'You also hold NVDA and SPY from before Wed, Oct 7. They are not part of this plan, so Sean never asks you to sell them.',

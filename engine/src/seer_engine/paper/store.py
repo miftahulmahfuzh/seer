@@ -8,6 +8,11 @@ over values; this module turns those values into rows of the migration-003 table
   writers here: ``retire`` (``status`` + ``paper_end``, what ``promote --retire`` calls) and
   ``set_paper_end`` (the night's repair of a hand-written retirement). Retiring deletes nothing.
 - ``paper_state``: one row per paper strategy, the state between nights.
+- ``paper_contributions`` (migration 016): the owner's dated deposits, one row per (strategy,
+  calendar due date), with the IDR he sends, the rate it converted at and the dollars credited.
+  Below every engine: the four quant books, the bracket control C and the SPY benchmark all take
+  their deposits through ``accrue_contributions`` and ``apply_contributions``. A deposit is a
+  cashflow, never a fill and never a trade, so nothing in ``book_fills`` or ``orders`` records it.
 - Bracket (strategy A): a ``sim.Portfolio`` is ``paper_state`` plus the strategy's live
   ``orders`` rows (pending and open, by slot); open orders' marks live in ``orders.mark``, in
   the order's own units, and are never rebuilt from ``bars`` (a split would rescale them twice).
@@ -36,7 +41,7 @@ None of these functions commit or roll back; the caller's ``db.transaction`` dec
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -52,7 +57,8 @@ from seer_engine.backtest.market import Market, Membership
 from seer_engine.paper import unavailable
 from seer_engine.paper.benchmark import BenchmarkState
 from seer_engine.sim.book import WEIGHT_QUANTUM, Book, BookSnapshot, Fill, Position, Target, Trade
-from seer_engine.sim.model import Event, Order, Portfolio, Snapshot
+from seer_engine.sim.costs import CostModel
+from seer_engine.sim.model import Event, Order, Portfolio, Snapshot, initial_cash_usd
 from seer_engine.sim.rules import SHARE_QUANTUM
 from seer_engine.strategies.c import VERDICTS, allowed_map
 
@@ -488,6 +494,230 @@ def write_kickoff(conn: psycopg.Connection, strategy_id: str, session: date) -> 
             (session, strategy_id),
         )
         _one_row(cur, f"paper_state {strategy_id}")
+
+
+# --------------------------------------------------------------------------- contributions
+
+IDR_QUANTUM = Decimal("0.01")  # paper_contributions.amount_idr, numeric(18,2)
+
+_CONTRIBUTION_COLUMNS = (
+    "strategy_id, due_date, session_date, amount_idr, usd_idr, amount_usd, applied_at"
+)
+
+
+@dataclass(frozen=True)
+class Contribution:
+    """One ``paper_contributions`` row: money the owner added, dated.
+
+    ``due_date`` is his own calendar date (the 25th of the month); ``session_date`` is the first
+    NYSE session on or after it, the session the money reaches the book on. ``amount_idr`` is
+    what he sends, ``usd_idr`` the rate it converted at, ``amount_usd`` the dollars credited --
+    all three frozen when the row was written. ``applied`` is True once a stepped session took it.
+    """
+
+    strategy_id: str
+    due_date: date
+    session_date: date
+    amount_idr: Decimal
+    usd_idr: Decimal
+    amount_usd: Decimal
+    applied: bool
+
+
+def _contribution(row: Sequence[Any]) -> Contribution:
+    return Contribution(
+        strategy_id=row[0],
+        due_date=row[1],
+        session_date=row[2],
+        amount_idr=row[3],
+        usd_idr=row[4],
+        amount_usd=row[5],
+        applied=row[6] is not None,
+    )
+
+
+def contribution_session(due_date: date) -> date:
+    """The NYSE session a deposit dated ``due_date`` lands on.
+
+    ``due_date`` itself when it is a session, otherwise the next one. The owner deposits on a
+    calendar date and the exchange calendar produces the lag; no lag is baked in. Measured
+    2026-10-08 over the twelve months from 2026-10-25, five of the twelve 25ths are not sessions
+    and the gap from the 25th to the next month's first session is a mean of 7.0 calendar days
+    ranging 4 to 10, so a fixed lag would be wrong in ten months of twelve.
+
+    Pure, like ``market_window_since``. ``dates.next_session`` raises past the loaded calendar's
+    range, as it does everywhere else.
+    """
+    _date("due_date", due_date)
+    return due_date if dates.is_session(due_date) else dates.next_session(due_date)
+
+
+def read_contribution(conn: psycopg.Connection, strategy_id: str, due_date: date) -> Contribution | None:
+    """The contribution of ``strategy_id`` dated ``due_date``, or None."""
+    _date("due_date", due_date)
+    row = conn.execute(
+        f"SELECT {_CONTRIBUTION_COLUMNS} FROM paper_contributions "
+        "WHERE strategy_id = %s AND due_date = %s",
+        (strategy_id, due_date),
+    ).fetchone()
+    return None if row is None else _contribution(row)
+
+
+def read_contributions(conn: psycopg.Connection, strategy_id: str) -> tuple[Contribution, ...]:
+    """Every contribution of ``strategy_id``, ``due_date`` ascending.
+
+    These are the dated cashflows a money-weighted return integrates over. Equity alone cannot
+    say whether a rise was the book growing or the owner adding money; these rows can, which is
+    why the deposit is kept as rows and not as a running total.
+    """
+    rows = conn.execute(
+        f"SELECT {_CONTRIBUTION_COLUMNS} FROM paper_contributions "
+        "WHERE strategy_id = %s ORDER BY due_date",
+        (strategy_id,),
+    ).fetchall()
+    return tuple(_contribution(r) for r in rows)
+
+
+def record_contribution(
+    conn: psycopg.Connection,
+    strategy_id: str,
+    *,
+    due_date: date,
+    amount_idr: Decimal,
+    usd_idr: Decimal,
+) -> Contribution:
+    """Write down one deposit of ``amount_idr`` dated ``due_date``, converted at ``usd_idr``.
+
+    ``session_date`` is ``contribution_session(due_date)``. ``amount_usd`` is
+    ``sim.model.initial_cash_usd(amount_idr, usd_idr)`` -- the same conversion the day-0 start
+    uses, so a deposit and a start never round differently.
+
+    Writing the same ``(strategy_id, due_date)`` again changes nothing and returns the row
+    already stored. The rate a deposit converted at is frozen the first night it is recorded,
+    because ``fx_rates`` is backfilled and a stepped book's history must not move when an old
+    rate is corrected (``paper_state.usd_idr`` is the same convention).
+    """
+    _date("due_date", due_date)
+    _exact("amount_idr", amount_idr, IDR_QUANTUM)
+    _exact("usd_idr", usd_idr)
+    if amount_idr <= 0:
+        raise ValueError(f"amount_idr must be > 0, got {amount_idr}")
+    if usd_idr <= 0:
+        raise ValueError(f"usd_idr must be > 0, got {usd_idr}")
+    session_date = contribution_session(due_date)
+    amount_usd = initial_cash_usd(amount_idr, usd_idr)
+    conn.execute(
+        "INSERT INTO paper_contributions "
+        "(strategy_id, due_date, session_date, amount_idr, usd_idr, amount_usd) "
+        "VALUES (%s, %s, %s, %s, %s, %s) "
+        "ON CONFLICT (strategy_id, due_date) DO NOTHING",
+        (strategy_id, due_date, session_date, amount_idr, usd_idr, amount_usd),
+    )
+    stored = read_contribution(conn, strategy_id, due_date)
+    if stored is None:
+        raise StoreError(f"{strategy_id}: the contribution for {due_date} was not written")
+    return stored
+
+
+def accrue_contributions(
+    conn: psycopg.Connection,
+    strategy_id: str,
+    due_dates: Sequence[date],
+    amount_idr: Decimal,
+    *,
+    through: date,
+    usd_idr_on: Callable[[date], Decimal],
+) -> tuple[Contribution, ...]:
+    """Record every deposit in ``due_dates`` that has landed by ``through``; return them in date
+    order, newly written or already stored.
+
+    ``due_dates`` are the schedule's calendar dates. They are passed as plain dates on purpose:
+    the schedule itself is a pure value object in ``sim.contributions`` and the night reads it,
+    so this module never depends on the schedule's shape and there is exactly one schedule in
+    the system.
+
+    A date is recorded once its landing session (``contribution_session``) is on or before
+    ``through`` -- the session the night is about to step -- and never before, because the rate
+    is read **on the landing session**: ``usd_idr_on`` is the night's own
+    ``backtest.market.Market.usd_idr_on`` (the latest ``fx_rates`` row dated on or before that
+    date), the same source the day-0 start converts at. A date already recorded is left exactly
+    as it is and ``usd_idr_on`` is not called for it, so a backfill can never move it.
+    """
+    _session("through", through)
+    _exact("amount_idr", amount_idr, IDR_QUANTUM)
+    if isinstance(due_dates, (str, Mapping)) or not isinstance(due_dates, Sequence):
+        raise TypeError(f"due_dates must be a sequence of dates, got {type(due_dates).__name__}")
+    if not callable(usd_idr_on):
+        raise TypeError("usd_idr_on must be callable: date -> Decimal")
+    out: list[Contribution] = []
+    for due in sorted({_date("due_date", d) for d in due_dates}):
+        if contribution_session(due) > through:
+            continue
+        stored = read_contribution(conn, strategy_id, due)
+        if stored is not None:
+            out.append(stored)
+            continue
+        out.append(
+            record_contribution(
+                conn,
+                strategy_id,
+                due_date=due,
+                amount_idr=amount_idr,
+                usd_idr=usd_idr_on(contribution_session(due)),
+            )
+        )
+    return tuple(out)
+
+
+def due_contributions(
+    conn: psycopg.Connection, strategy_id: str, session: date
+) -> tuple[Contribution, ...]:
+    """The contributions landing on ``session`` that no session has credited yet, by ``due_date``."""
+    _session("session", session)
+    rows = conn.execute(
+        f"SELECT {_CONTRIBUTION_COLUMNS} FROM paper_contributions "
+        "WHERE strategy_id = %s AND session_date = %s AND applied_at IS NULL ORDER BY due_date",
+        (strategy_id, session),
+    ).fetchall()
+    return tuple(_contribution(r) for r in rows)
+
+
+def apply_contributions(conn: psycopg.Connection, strategy_id: str, session: date) -> Decimal:
+    """Credit ``session``'s contributions: stamp them applied and return the dollars to add to
+    the engine's cash. ``Decimal("0.0000")`` when none land on ``session``.
+
+    The night calls this for each session it is about to step, **before** the step, and adds the
+    result to the state it is stepping: ``paper.book.deposit_book`` for a book, the ``cash``
+    field for a bracket ``sim.Portfolio`` or a ``paper.benchmark.BenchmarkState``. The money is
+    then written by that engine's own ``save_*_night``, which is what it has always been for
+    ``cash_usd``: this function deliberately does NOT write ``paper_state``, so the deposit is
+    recorded once, carried once and written once, with no second bookkeeping to drift.
+
+    ``session`` must be after ``paper_state.last_session``. Crediting a session already stepped
+    would rewrite settled history (docs/runbooks/paper-trading.md:60-68), so it is a StoreError;
+    the row stays unapplied and visible rather than being silently dropped.
+
+    Calling it twice over the same session credits once: the second call sees no unapplied row.
+    """
+    _session("session", session)
+    state = _require_state(conn, strategy_id)
+    if session <= state.last_session:
+        raise StoreError(
+            f"{strategy_id}: {session} was already stepped (last_session {state.last_session}); "
+            "a contribution cannot be credited to a settled session"
+        )
+    rows = due_contributions(conn, strategy_id, session)
+    if not rows:
+        return Decimal("0.0000")
+    conn.execute(
+        "UPDATE paper_contributions SET applied_at = now() "
+        "WHERE strategy_id = %s AND session_date = %s AND applied_at IS NULL",
+        (strategy_id, session),
+    )
+    total = Decimal("0.0000")
+    for c in rows:
+        total += c.amount_usd
+    return _exact("credited", total)
 
 
 def save_book_preview(
@@ -1124,11 +1354,15 @@ def read_book_trades(conn: psycopg.Connection, strategy_id: str) -> tuple[Trade,
 # ``start`` is strategies.paper_start.
 
 
-def load_benchmark(conn: psycopg.Connection, strategy_id: str = BENCHMARK_ID) -> BenchmarkState:
+def load_benchmark(
+    conn: psycopg.Connection, strategy_id: str = BENCHMARK_ID, *, cost_model: CostModel = "flat"
+) -> BenchmarkState:
     """The benchmark's state: ``paper_state`` + its ``book_positions`` row (none before the
-    first session's buy), ``start`` from ``strategies.paper_start``. StoreError when there is
-    no ``paper_state`` row, no ``paper_start`` or more than one position;
-    ``BenchmarkState.__post_init__`` validates the rest."""
+    first session's buy), ``start`` from ``strategies.paper_start``, and ``cost_model`` from the
+    caller -- the roster's statement about THIS entry (``roster.benchmark_cost_model``), because
+    the fee model is not in ``paper_state`` and a benchmark stepped one night at a time must still
+    be paying Gotrade on its thousandth night. StoreError when there is no ``paper_state`` row, no
+    ``paper_start`` or more than one position; ``BenchmarkState.__post_init__`` validates the rest."""
     state = _require_state(conn, strategy_id)
     row = read_strategy(conn, strategy_id)
     if row is None or row.paper_start is None:
@@ -1142,6 +1376,7 @@ def load_benchmark(conn: psycopg.Connection, strategy_id: str = BENCHMARK_ID) ->
         equity=state.equity_usd,
         position=positions[0] if positions else None,
         last_session=state.last_session,
+        cost_model=cost_model,
     )
 
 

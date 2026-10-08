@@ -11,7 +11,9 @@ import pytest
 
 from seer_engine.prices import Bar
 from seer_engine.sim.lifecycle import step
+from seer_engine.sim.charges import buy_cash
 from seer_engine.sim.model import Event, Order, Portfolio
+from seer_engine.sim.rules import DESIGN_V0_GOTRADE
 from seer_engine.sim.split_adjust import apply_split
 from seer_engine.splits import Split
 from simkit import D, P
@@ -424,3 +426,30 @@ def test_pending_order_adjusted_by_split_fills_at_the_adjusted_limit():
     assert fill.order.fill_price == P("33.3333")
     assert fill.order.shares == 7
     assert result.portfolio.cash == P("766.4336")  # 1000 - 233.5664
+
+
+# ---- the cost model lever (phase 4) ----
+
+
+def test_a_liquidating_reverse_split_reconciles_pnl_against_the_rule_sets_buy_cash():
+    """Cash in lieu is identical under both models (a split pays no brokerage); only the pnl's
+    cost basis moves, because Gotrade charged more than 0.1% at the fill."""
+    abc = _open("ABC", slot=3, last="0.52", limit="0.51", fill="0.5", tp="0.55", sl="0.475", shares=20)
+    pf = _pf("100", abc, marks=[("ABC", "0.53")])
+
+    flat_out, flat_events = apply_split(pf, "ABC", ONE_FOR_32, TUE)
+    gt_out, gt_events = apply_split(pf, "ABC", ONE_FOR_32, TUE, rules=DESIGN_V0_GOTRADE)
+
+    (flat_ev,) = flat_events
+    (gt_ev,) = gt_events
+    in_lieu = P("10.6")
+    # The split pays no brokerage: the cash in lieu, and so the cash, is the same either way.
+    assert flat_ev.cash_usd == gt_ev.cash_usd == in_lieu
+    assert flat_out.cash == gt_out.cash == P("110.6")
+    # Only the cost basis differs: a $10 order pays $0.12 at Gotrade (plan fee table) against
+    # the flat model's $0.01.
+    assert gt_ev.order.pnl_usd == in_lieu - buy_cash(P("0.5"), 20, DESIGN_V0_GOTRADE)
+    assert buy_cash(P("0.5"), 20, DESIGN_V0_GOTRADE) == P("10.12")
+    assert flat_ev.order.pnl_usd == P("0.59")  # 10.6 - 10.01, unchanged
+    assert gt_ev.order.pnl_usd == P("0.48")  # 10.6 - 10.12
+    assert gt_ev.order.pnl_usd < flat_ev.order.pnl_usd

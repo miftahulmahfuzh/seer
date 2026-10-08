@@ -42,15 +42,16 @@ def boom(*args, **kwargs):
 def world(pg):
     """``test_paper_check.world``, declared here (bars, one FX row, 24 members, a SPY dividend)."""
     with db.transaction(pg, False):
-        # A is retired on the production roster since migration 013. This file tests paper-night
-        # mechanics through a live BRACKET strategy, which is still live code (C is one), so the
-        # fixture keeps A stepping rather than the coverage disappearing with a roster decision.
-        # ... and F4-FR/F1-FR alongside it: FACTOR's and TIMING's evidence functions are still
-        # live code (RESOLVER and EVIDENCE both name them, and the retired entries' stored facts
-        # were written by them), so their coverage should not vanish with a roster decision.
+        # This file tests paper-night mechanics through a live BRACKET strategy and through
+        # FACTOR's and TIMING's evidence functions -- all still live code (RESOLVER and EVIDENCE
+        # name them, and the retired entries' stored facts were written by them). So it pins its
+        # OWN world rather than following production membership: 013 retired A, F4-FR and F1-FR,
+        # and 017 retired the other six in favour of their Gotrade-fee successors.
+        pg.execute("UPDATE strategies SET status = 'retired'")
         pg.execute(
-            "UPDATE strategies SET status = 'active' "
-            "WHERE id IN ('A', 'F4-MOM12-N20-TREND-FR', 'F1-SPY-SMA200-M-FR')"
+            "UPDATE strategies SET status = 'active' WHERE id IN "
+            "('SPY', 'A', 'C', 'F4-MOM12-N20-TREND-FR', 'F1-SPY-SMA200-M-FR', "
+            "'RMW-FR', 'RAW-FR', 'MOM-FR', 'MVW-FR')"
         )
         bars.upsert_bars(pg, pc.synthetic_bars())
         fx.upsert_fx(pg, [(pc.HIST_START, pc.USD_IDR)])

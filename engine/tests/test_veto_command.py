@@ -49,6 +49,11 @@ VETO = '```json\n{"verdict": "veto", "reason": "Earnings are due inside the wind
 def world(pg):
     """`test_paper_command`'s bars, FX and universe (no dividends: `veto` never reads them)."""
     with db.transaction(pg, False):
+        # This file's subject is C's news veto against the night, so C must step. It pins the same
+        # world `test_paper_command` does rather than following production membership: 013 retired
+        # A, F4-FR and F1-FR, and 017 retired C itself in favour of the Gotrade-fee successor C-GT.
+        pg.execute("UPDATE strategies SET status = 'retired'")
+        pg.execute("UPDATE strategies SET status = 'active' WHERE id = ANY(%s)", (list(tp.IDS),))
         bars.upsert_bars(pg, tp.synthetic_bars())
         fx.upsert_fx(pg, [(d, tp.fx_rate(d)) for d in tp._sessions()])
         for s in tp.STOCKS:

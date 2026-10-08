@@ -168,21 +168,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "b97d06e",
       "depends_on": [
         5
       ],
       "difficulty": "NORMAL",
       "n": 10,
-      "note": null,
+      "note": "verified by coordinator: on branch; 11 paths exactly its Owns plus its own task artifacts; web/lib/sean/ledger.ts UNTOUCHED (its own claim, re-checked -- D7 says Sean can never settle T+1 from receipts); zero engine files swept in. D15 mirror verified by coordinator: one 'git grep -l OWNER_MONTHLY' finds BOTH halves -- sim/contributions.py and web/lib/sean/cash.ts -- which is the property D15 exists to produce. MIN_TRADE_USD = 25 at reminders.ts:51, derived from trading_min/(2*trading_rate) with the comment stating the derivation rather than the number. Web suite re-run by coordinator (web surface uncontended; phases 6/7 are engine-side): 48 files / 625 passed / 0 failed, tsc exit 0. DECISION (rung 3, the phase plan's code blocks): added a dedicated latestUsdIdr() rather than reusing lib/data.ts:137's runStatus(), which fires three queries and falls back to 16500 where this needs one query and the measured 17,841 IDR/USD -- the rate the owner's real 10,000,000 IDR was actually converted at. MEASURED OWNER IMPACT on the real 2 Nov rotation: plan size $558.00 -> $838.16, each of 20 slots $27.90 -> $41.91, five replacement buys $139.50 -> $209.54, funded entirely by the 25 Oct deposit ($280.16) with no same-day reuse of sale proceeds -- D7 now asserted in a test rather than argued. CARRY TO 8 AND 12: this plan set's test-count baselines are STALE and drifting (phase 10's plan predicted 47 files/596 from a 46/578 baseline; real was 47/606, now 48/625) -- an unexpected total is more likely stale plan arithmetic than a regression. CARRY TO 12: if its successor roster entries mint new rules_id values, they must be appended to web/lib/sean/reminders.ts RESIZING_RULES and web/lib/cadence.ts SPLIT_CADENCE_RULES, both hand mirrors of the engine; p10 correctly left them alone because phase 12's ids do not exist yet.",
       "package": "web/lib/sean`, `web/app/sean",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-10.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T04:50:02+00:00",
       "satisfies": [
         "R9"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-V7XD",
       "title": "Sean sizes a rotation from cash, not from holdings"
     },
     {
@@ -230,7 +230,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/gotrade-fee-rebuild/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "gotrade-fee-rebuild",
-  "updated": "2026-10-08T04:36:36+00:00",
+  "updated": "2026-10-08T04:50:02+00:00",
   "verified_at": "2026-10-08T03:50:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/gotrade-fee-rebuild"
 }

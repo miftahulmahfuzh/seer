@@ -20,10 +20,16 @@ Tables:
   number of daily returns, the skew, the kurtosis, and the ``var_trials`` and N it was judged
   against -- so a recorded verdict can be recomputed later without re-running the backtest.
   At most one row per trial, keyed by ``trials.n``. Triggers refuse every UPDATE and DELETE.
+- ``trial_funding``: the money-weighted return of one trial that received deposits, and of the
+  dollar-cost-averaged SPY it was measured against, with the deposits themselves. **A trial with
+  no row here received no deposits** -- true of every trial recorded before the contribution
+  schedule existed -- so its ``cagr`` already is its money-weighted return. At most one row per
+  trial, keyed by ``trials.n``. Triggers refuse every UPDATE and DELETE.
 
 Schema versions (``meta.schema_version``): 1 is the first lab; 2 adds the ``synthesis`` insight
-kind; 3 adds the ``trial_moments`` side table. ``connect`` migrates an older database in place;
-``connect_readonly`` never does.
+kind; 3 adds the ``trial_moments`` side table; 4 adds the ``trial_funding`` side table (the
+money-weighted return of a trial that received deposits, and of the SPY fed the same ones).
+``connect`` migrates an older database in place; ``connect_readonly`` never does.
 
 The **verdict** a trial reads is derived, not frozen: ``DSR_MIN`` is the threshold (0.90 since
 2026-10-07) and ``DSR_POLICY`` names the multiple-testing N (``all-trials`` today, so N is every
@@ -59,7 +65,7 @@ COMMITTED_DB = config.REPO_ROOT / "lab" / "lab.sqlite"
 # database through SEER_LAB_DB; only the coordinator commits it.
 DB_PATH = Path(os.environ.get("SEER_LAB_DB") or COMMITTED_DB)
 XLSX_PATH = config.REPO_ROOT / "lab" / "lab.xlsx"  # gitignored
-SCHEMA_VERSION = "3"  # 2: the synthesis insight kind; 3: the trial_moments side table (see _migrate)
+SCHEMA_VERSION = "4"  # 2: the synthesis insight kind; 3: trial_moments; 4: trial_funding (see _migrate)
 
 SOURCE_KINDS: tuple[str, ...] = ("paper", "blog", "github", "knowledge", "variation", "seed")
 STATUSES: tuple[str, ...] = (
@@ -228,6 +234,38 @@ BEGIN SELECT RAISE(ABORT, 'trial_moments are append-only: a moments row is never
 BEGIN SELECT RAISE(ABORT, 'trial_moments are append-only: a moments row is never deleted'); END""",
 )
 
+# The trial_funding side table and its two triggers, one statement each. ``_SCHEMA`` creates them
+# on a new database; ``_migrate`` creates them on a v3 database. Deliberately separate constants
+# rather than inline SQL, for the same reason ``_MOMENTS_TABLE`` is: exactly one definition of the
+# v4 table, so the migration cannot drift from the fresh schema.
+#
+# **Why a side table and not two columns on ``trials``.** ``trials`` is append-only and
+# ``test_lab_snapshot.py`` pins it byte-identical across a migration; ``ALTER TABLE trials ADD
+# COLUMN`` would break that and would put two permanently-NULL columns on 128 rows. Here, the
+# *existence* of a row is the funded flag: a trial with no funding row received no deposits, which
+# is true of every trial recorded before the contribution schedule existed, with no NULL to read
+# two ways. ``trial_n`` is the primary key, so a trial has at most one funding row and ``INSERT``
+# is the whole lifecycle.
+#
+# ``mwr`` and ``spy_tr_mwr`` are nullable for the same reason ``trials.cagr`` is: a run whose
+# money-weighted return is undefined (a book wiped out, a zero-day window) records NULL rather
+# than a wrong number.
+_FUNDING_TABLE = """CREATE TABLE IF NOT EXISTS trial_funding (
+    trial_n      INTEGER PRIMARY KEY REFERENCES trials(n),
+    mwr          REAL,
+    spy_tr_mwr   REAL,
+    deposits_usd REAL NOT NULL CHECK (deposits_usd > 0),
+    deposits_n   INTEGER NOT NULL CHECK (deposits_n >= 1),
+    schedule     TEXT NOT NULL CHECK (length(trim(schedule)) > 0),
+    measured     TEXT NOT NULL CHECK (length(trim(measured)) > 0)
+)"""
+_FUNDING_TRIGGERS: tuple[str, ...] = (
+    """CREATE TRIGGER IF NOT EXISTS trial_funding_no_update BEFORE UPDATE ON trial_funding
+BEGIN SELECT RAISE(ABORT, 'trial_funding are append-only: a funding row is never updated'); END""",
+    """CREATE TRIGGER IF NOT EXISTS trial_funding_no_delete BEFORE DELETE ON trial_funding
+BEGIN SELECT RAISE(ABORT, 'trial_funding are append-only: a funding row is never deleted'); END""",
+)
+
 _SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
@@ -311,6 +349,12 @@ CREATE TABLE IF NOT EXISTS ideas_seen (
 {_MOMENTS_TRIGGERS[0]};
 
 {_MOMENTS_TRIGGERS[1]};
+
+{_FUNDING_TABLE};
+
+{_FUNDING_TRIGGERS[0]};
+
+{_FUNDING_TRIGGERS[1]};
 
 CREATE TRIGGER IF NOT EXISTS trials_no_update BEFORE UPDATE ON trials
 BEGIN SELECT RAISE(ABORT, 'trials are append-only: a trial row is never updated'); END;
@@ -430,13 +474,31 @@ def _v2_to_v3(conn: sqlite3.Connection) -> None:
         conn.execute(trigger)
 
 
+def _v3_to_v4(conn: sqlite3.Connection) -> None:
+    """Add the ``trial_funding`` side table and its two append-only triggers.
+
+    Purely additive, exactly as ``_v2_to_v3`` was and for the same reason: no ``trials`` row is
+    read, written, rebuilt or re-keyed, no column is altered, and no verdict moves. A v3 database
+    that migrates and is then never written again differs from its v3 self only by an empty table,
+    two triggers and the ``schema_version`` string -- and ``trials`` is byte-identical, which
+    ``test_connect_migrates_a_v3_database_adding_trial_funding_and_touching_no_trial`` pins.
+
+    This is why the money-weighted return is a side table rather than two columns on ``trials``:
+    ``ALTER TABLE trials ADD COLUMN`` would move every recorded row's bytes.
+    """
+    conn.execute(_FUNDING_TABLE)
+    for trigger in _FUNDING_TRIGGERS:
+        conn.execute(trigger)
+
+
 def _migrate(conn: sqlite3.Connection) -> None:
     """Bring an older database up to ``SCHEMA_VERSION`` in one transaction under the write lock.
 
-    A ladder: each step moves the database up exactly one version, so a v1 database reaches v3 in
-    one open by running both steps in order. v1 -> v2 adds the ``synthesis`` insight kind
-    (``_v1_to_v2``); v2 -> v3 adds the ``trial_moments`` side table (``_v2_to_v3``). A version
-    this code does not know is refused rather than guessed at.
+    A ladder: each step moves the database up exactly one version, so a v1 database reaches v4 in
+    one open by running all three steps in order. v1 -> v2 adds the ``synthesis`` insight kind
+    (``_v1_to_v2``); v2 -> v3 adds the ``trial_moments`` side table (``_v2_to_v3``); v3 -> v4 adds
+    the ``trial_funding`` side table (``_v3_to_v4``). A version this code does not know is refused
+    rather than guessed at.
 
     Parallel sessions may connect at once, so the version is read again after
     ``BEGIN IMMEDIATE``: only the first one migrates, the others find the current version and do
@@ -454,6 +516,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
         if version == "2":
             _v2_to_v3(conn)
             version = "3"
+        if version == "3":
+            _v3_to_v4(conn)
+            version = "4"
         if version != SCHEMA_VERSION:
             raise LabError(
                 f"lab database schema version {found!r} is unknown to this code "
@@ -977,14 +1042,24 @@ def recorded_labels(failed: str) -> tuple[str, ...]:
     return tuple(f for f in str(failed or "").split("; ") if f)
 
 
-def owner_failures(trial: Mapping[str, Any] | sqlite3.Row) -> tuple[str, ...]:
+def _opt_float(x: Any) -> float | None:
+    """A recorded REAL as a float, or None. Unlike ``_num`` this does **not** round: it feeds a
+    gate comparison, not a JSON document."""
+    return None if x is None else float(x)
+
+
+def owner_failures(
+    trial: Mapping[str, Any] | sqlite3.Row,
+    funding: Mapping[str, Any] | sqlite3.Row | None = None,
+) -> tuple[str, ...]:
     """The five P7a D8 conditions ``trial`` misses **as they read now**, in FAILURE_LABELS order.
 
     **Four re-derived, one carried.** Four of the five are thresholds over numbers ``trials``
     already records, so they are recomputed here from the recorded columns against the live
     constants -- the same comparisons ``dev.py`` makes, on the same values:
 
-    - ``beats SPY TR``  ``total_return > spy_tr_return``
+    - ``beats SPY TR``  ``dev.beats_spy_tr`` -- money-weighted when ``funding`` carries both
+                        sides' rates, and ``total_return > spy_tr_return`` otherwise
     - ``max DD``        ``max_drawdown <= tuning.MAX_DRAWDOWN`` (0.20 since 2026-10-07, phase 8)
     - ``PF``            ``profit_factor >= tuning.MIN_PROFIT_FACTOR``
     - ``trades``        ``trades >= dev._MIN_TRADES``
@@ -993,6 +1068,15 @@ def owner_failures(trial: Mapping[str, Any] | sqlite3.Row) -> tuple[str, ...]:
     the one condition that is not a threshold: it asks whether a human hand-picked a parameter of
     the *candidate* (``dev.candidate_owner_inputs``), there is no column to recompute it from, and
     no constant re-decides it -- so its recorded label can never go stale.
+
+    **``funding`` is ``store.funding_of(conn, trial["n"])``**, or None. A trial has one exactly
+    when it received deposits. Once deposits exist, total return is not a return: measured on the
+    owner's real funding plan, a book that earns nothing at all records +600.0%. So a funded row
+    is judged on the money-weighted return of the book against the money-weighted return of a SPY
+    fed the identical dollars on the identical days. **Every one of the 128 recorded trials has no
+    funding row**, so every one of them is judged exactly as it was before this parameter existed
+    and no recorded verdict silently changes meaning. The comparison itself lives in
+    ``dev.beats_spy_tr`` and is written once.
 
     **Why nothing is parsed out of ``failed`` for the other four.** ``trials`` is append-only, so
     a recorded label names the bar in force on its run date. All 110 recorded rows carry
@@ -1008,9 +1092,13 @@ def owner_failures(trial: Mapping[str, Any] | sqlite3.Row) -> tuple[str, ...]:
 
     spy, drawdown, pf, trades, owner = dev.FAILURE_LABELS
     total, bench = trial["total_return"], trial["spy_tr_return"]
+    mwr = None if funding is None else funding["mwr"]
+    spy_mwr = None if funding is None else funding["spy_tr_mwr"]
     dd, factor, count = trial["max_drawdown"], trial["profit_factor"], trial["trades"]
     out: list[str] = []
-    if total is None or bench is None or float(total) <= float(bench):
+    if not dev.beats_spy_tr(
+        _opt_float(total), _opt_float(bench), _opt_float(mwr), _opt_float(spy_mwr)
+    ):
         out.append(spy)
     if dd is None or float(dd) > tuning.MAX_DRAWDOWN:
         out.append(drawdown)
@@ -1228,8 +1316,10 @@ def verdict(
     dsr = dsr_at(conn, trial, g.n)
     # Four re-derived from this row's columns against the live constants, one (`owner inputs`)
     # carried from the recorded string. Never parsed out of `failed` -- that string names the
-    # bars in force on the run date, which are not today's.
-    failed = owner_failures(trial)
+    # bars in force on the run date, which are not today's. `beats SPY TR` is money-weighted for
+    # a trial that received deposits (`trial_funding`) and the recorded total-return comparison
+    # for every one that did not, which is all 128 recorded trials.
+    failed = owner_failures(trial, funding_of(conn, trial["n"]))
     # The same rule runner.trial_rows applies to a new trial: a DSR that is None is a luck test
     # that was not passed. Nothing is admitted for being unmeasurable.
     if dsr is None or dsr < DSR_MIN:
@@ -1263,7 +1353,10 @@ def published_verdict(
     g = gate(conn) if at is None else at
     if str(trial["window"]) == "dev":
         return verdict(conn, trial, at=g)
-    failed = owner_failures(trial)
+    # `beats SPY TR` is money-weighted for a trial that received deposits (`trial_funding`) and
+    # the recorded total-return comparison for every one that did not, which is all 128 recorded
+    # trials.
+    failed = owner_failures(trial, funding_of(conn, trial["n"]))
     dsr = None if trial["dsr"] is None else float(trial["dsr"])
     return Verdict(
         dsr=dsr, failed=failed, eligible=not failed, n=g.n, policy=g.policy, derived=False
@@ -1313,14 +1406,18 @@ class Reevaluation:
     dev_trials: int
 
 
-def _blocking(trial: Mapping[str, Any] | sqlite3.Row) -> tuple[str, ...]:
+def _blocking(
+    trial: Mapping[str, Any] | sqlite3.Row,
+    funding: Mapping[str, Any] | sqlite3.Row | None = None,
+) -> tuple[str, ...]:
     """The second, independent no: why this trial may **not** take the ``rejected`` edge.
 
     ``owner_failures`` derives the same four conditions and ``verdict`` reads it, so these
     comparisons are written here a second time **on purpose**. Two owner-set bars moved in this
     plan set -- the luck threshold (phase 4) and the drawdown threshold (phase 8) -- and a gate
     that loosens on two axes at once should not be able to promote a method through a single
-    expression. A future change to ``owner_failures`` has to get past this too.
+    expression. A future change to ``owner_failures`` has to get past this too. That is also why
+    the money-weighted branch below is spelled out rather than delegated to ``dev.beats_spy_tr``.
 
     Phrased as sentences with the numbers in them, because this text goes into the refusal a
     human reads.
@@ -1328,9 +1425,18 @@ def _blocking(trial: Mapping[str, Any] | sqlite3.Row) -> tuple[str, ...]:
     from seer_engine.backtest import dev, tuning
 
     out: list[str] = []
-    total, bench = trial["total_return"], trial["spy_tr_return"]
-    if total is None or bench is None or float(total) <= float(bench):
-        out.append(f"total return {total!r} does not beat SPY TR {bench!r}")
+    mwr = None if funding is None else funding["mwr"]
+    spy_mwr = None if funding is None else funding["spy_tr_mwr"]
+    if mwr is not None and spy_mwr is not None:
+        if float(mwr) <= float(spy_mwr):
+            out.append(
+                f"money-weighted return {mwr!r} does not beat the SPY TR fed the same deposits "
+                f"{spy_mwr!r}"
+            )
+    else:
+        total, bench = trial["total_return"], trial["spy_tr_return"]
+        if total is None or bench is None or float(total) <= float(bench):
+            out.append(f"total return {total!r} does not beat SPY TR {bench!r}")
     dd = trial["max_drawdown"]
     if dd is None or float(dd) > tuning.MAX_DRAWDOWN:
         out.append(f"max drawdown {dd!r} is outside the {tuning.MAX_DRAWDOWN:.0%} bar")
@@ -1405,7 +1511,7 @@ def reevaluate_method(conn: sqlite3.Connection, method_id: str) -> Reevaluation:
         derived += 1 if v.derived else 0
         if not v.eligible:
             continue
-        blocking = _blocking(t)
+        blocking = _blocking(t, funding_of(conn, t["n"]))
         if blocking:
             raise LabError(
                 f"{t['candidate_id']} reads eligible at {DSR_LABEL} under the {g.policy} policy "
@@ -1581,6 +1687,102 @@ def moments_of(conn: sqlite3.Connection, trial_n: int) -> sqlite3.Row | None:
     return conn.execute(
         "SELECT * FROM trial_moments WHERE trial_n = ?", (int(trial_n),)
     ).fetchone()
+
+
+# --------------------------------------------------------------------------- trial funding
+
+
+@dataclass(frozen=True)
+class FundingRow:
+    """What one trial's deposits were, and what they earned (schema v4).
+
+    A trial has a row here **exactly when it received deposits**. Every trial recorded before the
+    contribution schedule existed has none, and for those ``trials.cagr`` already is the
+    money-weighted return: with no money going in or out after the start, the two are the same
+    number (measured: they agree to 5e-14).
+
+    - ``trial_n``      the ``trials.n`` this describes. ``insert_trials`` assigns it, so a row
+                       built before the insert carries ``0`` and is stamped with
+                       ``dataclasses.replace(row, trial_n=n)`` afterwards; ``insert_funding``
+                       refuses ``0``.
+    - ``mwr``          the **money-weighted return**: the interest rate a savings account would
+                       have had to pay to turn the same deposits, paid in on the same days, into
+                       the same final balance. ``backtest.metrics.money_weighted_return``. NULL
+                       when undefined (a book wiped out), never when merely unflattering.
+    - ``spy_tr_mwr``   the same measure for the **dollar-cost-averaged** total-return SPY curve --
+                       the same money, paid in on the same days, put into SPY instead. This is the
+                       number ``beats SPY TR`` compares against for a funded trial.
+    - ``deposits_usd`` the total deposited after the opening cash, in USD.
+    - ``deposits_n``   how many deposits that was.
+    - ``schedule``     the schedule in the owner's own words, e.g.
+                       ``"+5,000,000 IDR on the 25th of each month"``, so a reader of the row
+                       never has to reconstruct it from the dates.
+    - ``measured``     an ISO timestamp; for a trial recorded by ``lab run`` this is the trial's
+                       own ``run_at``, so the pair is one measurement with one stamp.
+    """
+
+    trial_n: int
+    mwr: float | None
+    spy_tr_mwr: float | None
+    deposits_usd: float
+    deposits_n: int
+    schedule: str
+    measured: str
+
+
+FUNDING_COLUMNS: tuple[str, ...] = tuple(f.name for f in fields(FundingRow))
+
+
+def funding_of(conn: sqlite3.Connection, trial_n: int) -> sqlite3.Row | None:
+    """The recorded funding for one trial, or None when it received no deposits.
+
+    None is the normal answer for every trial recorded before this table existed -- all 128 of
+    them -- and it means something definite rather than something missing: this run was not fed,
+    so its ``cagr`` is already its money-weighted return and ``total_return`` is already a return.
+    A caller must therefore have a fallback for None; it is never an error.
+
+    A database on schema v1, v2 or v3 has no ``trial_funding`` table at all, which is the limiting
+    case of "recorded before this table existed" and is answered the same way. ``connect``
+    migrates, so this can only be a ``connect_readonly`` caller -- ``snapshot`` is one, and its
+    promise to work on an unmigrated read-only connection is what this branch keeps. ``moments_of``
+    carries the same branch for the same reason.
+    """
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'trial_funding'"
+    ).fetchone() is None:
+        return None
+    return conn.execute(
+        "SELECT * FROM trial_funding WHERE trial_n = ?", (int(trial_n),)
+    ).fetchone()
+
+
+def insert_funding(conn: sqlite3.Connection, rows: Sequence[FundingRow]) -> None:
+    """Record the deposits and the money-weighted returns for trials that already exist (the
+    caller holds the transaction).
+
+    Append-only and one row per trial: a trial that already has funding is refused rather than
+    overwritten, so a backfill can be made idempotent by skipping what ``funding_of`` already
+    returns instead of racing the triggers. ``trial_n`` must be a real trial number -- the foreign
+    key enforces that the trial exists, and the explicit check below turns the pre-insert sentinel
+    ``0`` into a readable refusal rather than a foreign-key error from inside a long run.
+    """
+    cols = ", ".join(f'"{c}"' for c in FUNDING_COLUMNS)
+    marks = ", ".join("?" for _ in FUNDING_COLUMNS)
+    for r in rows:
+        if r.trial_n <= 0:
+            raise LabError(
+                f"funding needs the trial number insert_trials assigned, got {r.trial_n!r}: "
+                "insert the trial first, then stamp its funding with dataclasses.replace"
+            )
+        if funding_of(conn, r.trial_n) is not None:
+            raise LabError(
+                f"trial {r.trial_n} already has recorded funding: trial_funding is append-only, "
+                "and a second measurement of the same trial would be a second verdict"
+            )
+        conn.execute(
+            f"INSERT INTO trial_funding ({cols}) VALUES ({marks})",
+            [getattr(r, c) for c in FUNDING_COLUMNS],
+        )
 
 
 # --------------------------------------------------------------------------- ideas_seen

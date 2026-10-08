@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-08
-**Total Active Tasks**: 1
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 99
+- Completed: 100
 
 ---
 
@@ -23,15 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ENG-MWRQ** Phase 7: Money-weighted return, and a SPY fed the same money
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `engine/src/seer_engine/backtest/metrics.py`; `backtest/benchmark.py` (the schedule reaches `buy_and_hold` / `spy_curves`); `backtest/dev.py` (the gate restated); `engine/src/seer_engine/lab/store.py` (the trial schema and `owner_failures`); `engine/tests/test_backtest_metrics.py`, `test_backtest_benchmark.py`. Also owns `dev.run_registry` / `dev._run`'s `contributions` keyword and `dev.py`'s `is_bracket` dispatch, plus `engine/tests/test_lab_snapshot.py`'s six `SCHEMA_VERSION` string pins and the new v3->v4 migration test. Exit criteria: a contribution-fed book reports a money-weighted return beside its CAGR, and every gate phrased in CAGR terms is restated in it; SPY is dollar-cost-averaged on the identical schedule, so "beats SPY TR" compares two books holding the same money at the same times.
-  - **Status**: in_progress
-  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 7 of 12)
-  - **Satisfies**: R3 — Measure what the owner will actually do: 10,000,000 IDR start, +5,000,000 IDR on the 25th of each month — contributions in backtest and paper, a money-weighted return, a dollar-cost-averaged SPY, every CAGR-phrased gate restated
-  - **Depends on**: phase 2 (P1-ENG-KQRW), phase 5
-  - **Plan**: `.workflows/plan/P1-ENG-MWRQ.md`
 - [x] **P1-ENG-F6QN** Phase 4: The bracket path can express and charge Gotrade's fees
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -818,6 +809,35 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-MWRQ** Phase 7: Money-weighted return, and a SPY fed the same money
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/backtest/metrics.py`; `backtest/benchmark.py` (the schedule reaches `buy_and_hold` / `spy_curves`); `backtest/dev.py` (the gate restated); `engine/src/seer_engine/lab/store.py` (the trial schema and `owner_failures`); `engine/tests/test_backtest_metrics.py`, `test_backtest_benchmark.py`. Also owns `dev.run_registry` / `dev._run`'s `contributions` keyword and `dev.py`'s `is_bracket` dispatch, plus `engine/tests/test_lab_snapshot.py`'s six `SCHEMA_VERSION` string pins and the new v3->v4 migration test. Exit criteria: a contribution-fed book reports a money-weighted return beside its CAGR, and every gate phrased in CAGR terms is restated in it; SPY is dollar-cost-averaged on the identical schedule, so "beats SPY TR" compares two books holding the same money at the same times.
+  - **Status**: completed
+  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 7 of 12)
+  - **Satisfies**: R3 — Measure what the owner will actually do: 10,000,000 IDR start, +5,000,000 IDR on the 25th of each month — contributions in backtest and paper, a money-weighted return, a dollar-cost-averaged SPY, every CAGR-phrased gate restated
+  - **Depends on**: phase 2 (P1-ENG-KQRW), phase 5
+  - **Plan**: `.workflows/plan/P1-ENG-MWRQ.md`
+  - **Completed**: 2026-10-08 11:58
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/metrics.py, engine/src/seer_engine/backtest/benchmark.py, engine/src/seer_engine/backtest/dev.py, engine/src/seer_engine/lab/store.py, engine/tests/test_backtest_metrics.py, engine/tests/test_lab_snapshot.py, engine/tests/test_backtest_benchmark.py (new), engine/.workflows/plan/P1-ENG-MWRQ.md (new), engine/.workflows/todos.md
+  - **Verified**: engine suite `PYTHONPATH=engine/src PG_TEST_URL=... python -m pytest engine/tests -q -n auto` -> **3456 passed, 1 skipped, 0 failed**, re-run on top of phase 6's `ca75a96`. Web `npx vitest run` -> 625 passed / 48 files / 0 failed; `npx tsc --noEmit` -> exit 0. `python -m ruff check engine` -> all checks passed. Import build clears the metrics <-> book_runner cycle. Exit criterion 9: `grep -n 'bracket_v0' engine/src/seer_engine/backtest/dev.py` returns nothing. `git diff --stat` shows no change to `backtest/runner.py`, `backtest/book_runner.py`, `sim/`, `paper/`, `web/` or `lab/lab.sqlite`.
+  - **Drift**:
+    - `engine/.workflows/todos.md` already carried this phase's task row: it was swept into phase 6's commit `27a9a17`, which documented doing so. The row was on the branch before this phase committed; flipping it to completed is the new edit, and that is the only reason todos.md is in this phase's allowlist.
+    - The plan's manual check expected `money-weighted +0.00%`; the code prints `-0.00%`. The value is zero to 13 decimal places (bisection lands a hair under zero) and the pinned test asserts `abs(mwr) < 1e-9` and passes. Formatting artefact, not a behaviour difference.
+  - **Decided**:
+    - Step 10's code block feeds `external_cashflows(result)` (floats, per its own Step 4 definition) into `spy_curves`, but Step 6 requires Decimal amounts — the two code blocks contradict, and the registry run raised TypeError. -> Pass `result.cashflows` straight through. Rung 2 (the phase's exit criteria): criterion 3 says `spy_curves` is fed `result.cashflows`, which is already Decimal. Phase 5's own handoff independently says the benchmark takes the dated Decimal half. Keeping Decimal also avoids rounding real money through binary floats, so the benchmark pays the same sum as the book it benchmarks.
+    - A funded BOOK run reported `mwr=None`, because `book_runner._book_metrics` calls `strategy_metrics` without cashflows — so `make_row` ranked a deposit-fed book on its inflated CAGR (measured: MAR 113.8 on a book whose money actually lost 64.7%). That is the +600.9% lie this phase exists to end, surviving on the engine four of the roster's six entries run. The one-keyword fix belongs to `book_runner.py`, which is phase 5's file and which this phase's Interface Contract says to leave alone. -> Computed it in `dev._funded_stats`, inside this phase's own Owns. Tie-break: take the narrower blast radius — a change inside the phase's Owns beats an equivalent change outside it, even when the outside one is tidier. Handed off below.
+    - `GOTRADE_FEE_REBUILD_PLAN.md` left untouched — no phase-7 row tick, no `**Status:**` change. This set is a coordinated swarm whose ledger owns set-level progress; phases 1, 2, 3, 5 and 6 all recorded the same decision, and the repo-root index is outside this phase's commit allowlist.
+    - No Step 5a landing, no merge to `main`, no branch or worktree deletion: the coordinator lands the set (analyze-orchestrator Step 5). Landing here too is the double-merge that rule exists to prevent.
+    - `engine/.workflows/plan/P1-ENG-KQRW.md` (phase 2's untracked leftover in this shared worktree) deliberately left alone — not added, not committed, not deleted.
+    - `engine/package_readme.md` NOT updated, and `readme-updater` not dispatched. Phase 7's Owns does not name it (phase 5's did, and phase 5 updated it), and this phase's commit allowlist is fixed at its eight files plus this one. In a worktree three peers are writing concurrently, a readme edit that cannot be committed is worse than no readme edit: it leaves a dirty shared file for a peer's stage to sweep up. Same call phase 6 recorded.
+  - **Handoffs**:
+    - **`book_runner._book_metrics` should take the cashflows (phase 5's file).** It calls `strategy_metrics(snaps, pnls)` with no cashflows, so a `BookResult` carries no `mwr` of its own and `dev._funded_stats` fills it in. The tidier fix is one keyword there; whoever next owns `book_runner.py` should make it and delete `_funded_stats`'s fallback branch. Harmless until then: `dev` is the only caller that passes a schedule, so every other `run_stats` caller runs unfunded.
+    - **Phase 8 writes the first funded trials.** `store.insert_funding` exists for the writer; `trial_funding` is correctly empty today because nothing in the lab has ever been fed. Stamp it with the trial's own `run_at` and the schedule's own words.
+    - **Phase 8 — `config_digest`.** `trials` carries `UNIQUE(config_digest, window)`. If the schedule does not reach `lab/runner.config_digest`, a funded and an unfunded run of the same method collide and the second insert is refused. Flagged, not decided here; `lab/runner.py` is not phase 7's file.
+    - **`lab/lab.sqlite` is v3 and is NOT touched here.** It migrates itself to v4 on its next `lab` write (an empty table, two triggers, no recorded value changes). Whoever first runs a `lab` command that writes should commit the migrated file in that commit.
+    - **The web has nothing to publish yet.** `_snapshot_trial` / `TRIAL_KEYS` are untouched by design (the side table is why). Once funded trials exist, `/sera` will want `mwr` / `spyTrMwr` beside `cagr` / `spyTrCagr` with the plain gloss.
 - [x] **P1-ENG-R7MD** Phase 6: Paper accepts a deposit
   - **Difficulty**: HARD
   - **Type**: Feature

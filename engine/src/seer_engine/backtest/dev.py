@@ -47,10 +47,16 @@ from seer_engine.backtest import tuning
 from seer_engine.backtest.benchmark import Dividend, spy_curves
 from seer_engine.backtest.book_runner import BookResult, DividendMap, RunStats, run_rules, run_stats
 from seer_engine.backtest.market import SPY, Market
-from seer_engine.backtest.metrics import Metrics, curve_metrics
+from seer_engine.backtest.metrics import (
+    Metrics,
+    curve_metrics,
+    external_cashflows,
+    money_weighted_return,
+)
 from seer_engine.backtest.runner import RunResult
 from seer_engine.backtest.window import Window
-from seer_engine.sim.rules import DEFAULT_ETFS, LEVERAGED_ETFS, TradeRules, rule_owner_inputs
+from seer_engine.sim.contributions import ContributionSchedule
+from seer_engine.sim.rules import DEFAULT_ETFS, LEVERAGED_ETFS, TradeRules, is_bracket, rule_owner_inputs
 from seer_engine.strategies.allocator import Allocator, prepare_for
 from seer_engine.strategies.base import Strategy
 
@@ -160,8 +166,8 @@ class Candidate:
     """One registry entry (handover D6): a family, a rule set, an allocator or strategy, fixed
     params, a one-line rationale, the date it was appended, and its declared owner inputs.
 
-    ``allocator`` is a ``strategies.base.Strategy`` exactly when ``rules`` is ``DESIGN_V0``
-    (``engine == "bracket_v0"``), and an ``Allocator`` otherwise. ``owner_inputs`` is sorted
+    ``allocator`` is a ``strategies.base.Strategy`` exactly when ``rules`` run the bracket
+    simulator (``sim.rules.is_bracket``), and an ``Allocator`` otherwise. ``owner_inputs`` is sorted
     and unique; the registry test checks it equals ``candidate_owner_inputs(self)``, and D8
     always uses the computed value.
     """
@@ -182,7 +188,7 @@ class Candidate:
             raise ValueError(f"{self.id}: family must be F1..F11, REF or a lab method id, got {self.family!r}")
         if not isinstance(self.rules, TradeRules):
             raise TypeError(f"{self.id}: rules must be a TradeRules, got {type(self.rules).__name__}")
-        if self.rules.engine == "bracket_v0":
+        if is_bracket(self.rules):
             if not isinstance(self.allocator, Strategy) or isinstance(self.allocator, Allocator):
                 raise TypeError(f"{self.id}: rules {self.rules.id} need a bracket Strategy, got {type(self.allocator).__name__}")
         elif not isinstance(self.allocator, Allocator):
@@ -203,7 +209,7 @@ class Candidate:
 
 def _reads(c: Candidate) -> tuple[tuple[str, ...], int, bool]:
     """(symbols the window must cover, sorted and including SPY; lookback; reads members)."""
-    if c.rules.engine == "bracket_v0":
+    if is_bracket(c.rules):
         lookback: object = c.allocator.lookback
         symbols: tuple[str, ...] = ()
         members = True
@@ -220,7 +226,7 @@ def _reads(c: Candidate) -> tuple[tuple[str, ...], int, bool]:
 
 
 def _holds(c: Candidate) -> tuple[str, ...]:
-    if c.rules.engine == "bracket_v0":
+    if is_bracket(c.rules):
         return ()
     return tuple(sorted(set(c.allocator.holds(c.params))))
 
@@ -281,6 +287,38 @@ def candidate_window(market: Market, c: Candidate, *, window: Window = DEV_WINDO
     if start > window.end:
         raise DevWindowError(f"{c.id}: its {window.name} window would start on {start}, after the {window.name} window end {window.end} (D9)")
     return start, window.end
+
+
+def beats_spy_tr(
+    total_return: float | None,
+    spy_total_return: float | None,
+    mwr: float | None = None,
+    spy_mwr: float | None = None,
+) -> bool:
+    """``FAILURE_LABELS[0]``: does this run beat total-return SPY? The single definition.
+
+    **Money-weighted when both sides have one**, and the total-return comparison otherwise.
+
+    Once a book receives deposits, its total return is not a return: measured on the owner's real
+    funding plan, a book that earns nothing at all reports +600.0%. So when both the run and its
+    benchmark carry a money-weighted return -- which happens exactly when both were fed a
+    contribution schedule -- the comparison is made in that, the rate the money actually earned.
+
+    The fallback is not a second bar, it is the same condition in the only number the row has.
+    Every one of the 128 recorded lab trials ran with no deposits and has no money-weighted
+    return, so every one of them is judged exactly as it is today and no recorded verdict changes
+    meaning. ``lab.store.owner_failures`` calls this rather than writing the comparison again, so
+    the gate cannot drift between the runner and the re-read.
+
+    Worth knowing: when SPY is dollar-cost-averaged on the identical schedule from the identical
+    opening cash, the two branches agree in direction anyway -- both sides divide by the same
+    opening cash, so comparing total returns *is* comparing ending equity. The money-weighted
+    branch is what makes the number a human reads true, and what keeps the comparison right if
+    the two sides are ever fed differently.
+    """
+    if mwr is not None and spy_mwr is not None:
+        return mwr > spy_mwr
+    return total_return is not None and spy_total_return is not None and total_return > spy_total_return
 
 
 # --------------------------------------------------------------------------- rows
@@ -360,9 +398,16 @@ def make_row(
 ) -> DevRow:
     """The ``DevRow`` for ``candidate``: SPY comparison, MAR and the D8 eligibility checks.
 
-    MAR = CAGR / max drawdown (None when either is None or the drawdown is 0). Thresholds are
-    read from ``tuning`` at call time; owner inputs are ``candidate_owner_inputs(candidate)``.
-    ``window`` defaults to ``DEV_WINDOW`` and is carried onto the row.
+    MAR = rate / max drawdown (None when either is None or the drawdown is 0). The rate is the
+    **money-weighted return** when the run received deposits, and the CAGR otherwise -- which is
+    the same number, because with no deposits CAGR *is* the money-weighted return. Without the
+    switch, a book fed 5,000,000 IDR a month would rank on a CAGR that counts its own deposits as
+    growth: measured, a book that earns nothing reports +600.9%, which would outrank every honest
+    candidate in the registry.
+
+    Thresholds are read from ``tuning`` at call time; owner inputs are
+    ``candidate_owner_inputs(candidate)``. ``window`` defaults to ``DEV_WINDOW`` and is carried
+    onto the row.
     """
     if not isinstance(candidate, Candidate):
         raise TypeError(f"expected a Candidate, got {type(candidate).__name__}")
@@ -371,11 +416,12 @@ def make_row(
     if not isinstance(spy_tr, Metrics):
         raise TypeError(f"spy_tr must be a Metrics, got {type(spy_tr).__name__}")
     m = stats.metrics
-    beats = m.total_return is not None and spy_tr.total_return is not None and m.total_return > spy_tr.total_return
-    if m.cagr is None or m.max_drawdown is None or m.max_drawdown == 0:
+    beats = beats_spy_tr(m.total_return, spy_tr.total_return, m.mwr, spy_tr.mwr)
+    rate = m.cagr if m.mwr is None else m.mwr
+    if rate is None or m.max_drawdown is None or m.max_drawdown == 0:
         mar: float | None = None
     else:
-        mar = float(m.cagr / m.max_drawdown)
+        mar = float(rate / m.max_drawdown)
     passed = (
         beats,
         m.max_drawdown is not None and m.max_drawdown <= tuning.MAX_DRAWDOWN,
@@ -402,6 +448,37 @@ def make_row(
 # --------------------------------------------------------------------------- running
 
 
+def _funded_stats(result: RunResult | BookResult) -> RunStats:
+    """``run_stats(result)``, with the money-weighted return filled in for a funded **book** run.
+
+    ``metrics.run_metrics`` reads ``RunResult.cashflows``, so a bracket run already carries its
+    IRR. A ``BookResult`` does not: ``book_runner._book_result_stats`` builds its ``Metrics``
+    through ``_book_metrics``, which calls ``strategy_metrics`` without cashflows. Measured on the
+    dev registry, a book candidate run on ``OWNER_MONTHLY`` reported ``mwr=None`` while its
+    dollar-cost-averaged SPY reported 0.345 -- so ``make_row`` ranked it on a CAGR that counts the
+    owner's own deposits as growth, which is the +600.9% lie this phase exists to end, surviving on
+    the engine four of the roster's six entries actually run.
+
+    The gap is one keyword in ``book_runner._book_metrics``, which belongs to phase 5 and which
+    this phase leaves alone (Interface Contract, "Leaves alone"); see Handoffs. Filling it here
+    keeps the change inside this phase's Owns and is complete for every funded run that can exist
+    today, because ``dev`` is the only caller that passes a schedule -- every other ``run_stats``
+    caller runs unfunded, where ``cashflows`` is ``()`` and this is a no-op.
+
+    The equity curve is the one ``_book_result_stats`` itself measured (``_equities`` is
+    ``(date, float(equity))`` per snapshot), so the IRR and the CAGR beside it are taken over the
+    same points.
+    """
+    stats = run_stats(result)
+    cashflows = external_cashflows(result)
+    if not cashflows or stats.metrics.mwr is not None:
+        return stats
+    snaps = [(s.date, float(s.equity_usd)) for s in result.snapshots]
+    return replace(
+        stats, metrics=replace(stats.metrics, mwr=money_weighted_return(snaps, cashflows))
+    )
+
+
 def _run(
     market: Market,
     spy: Mapping[date, Any],
@@ -410,6 +487,8 @@ def _run(
     c: Candidate,
     prepared: Any,
     window: Window,
+    *,
+    contributions: ContributionSchedule | None = None,
 ) -> tuple[RunResult | BookResult, DevRow]:
     start, end = candidate_window(market, c, window=window)
     check_dev_session(end, window)
@@ -429,15 +508,38 @@ def _run(
         prepared=prepared,
         dividends=dividends if c.rules.engine == "book" else {},
         usd_idr=rate,
+        contributions=contributions,
     )
-    # The benchmark pays what the candidate pays: Gotrade's schedule for a cost_model="gotrade"
-    # rule set, the flat 0.1% (unchanged) otherwise.
-    price, total = spy_curves(spy, start, end, result.initial_cash, spy_dividends, cost_model=c.rules.cost_model)
+    # The benchmark pays what the candidate pays and is fed what the candidate is fed: Gotrade's
+    # schedule for a cost_model="gotrade" rule set, the flat 0.1% (unchanged) otherwise, and the
+    # candidate's own deposits on the candidate's own dates.
+    #
+    # `result.cashflows` are already in USD and already dated by the session they landed on, so
+    # SPY receives the identical dollars on the identical days however the runner resolved the
+    # IDR schedule and the FX. "Beats SPY TR" only means anything when it does: SPY buy-and-hold
+    # of a single opening sum against a book fed 5,000,000 IDR a month flatters the book in a
+    # rising market and punishes it in a falling one, because the two are holding different
+    # amounts of money at different times.
+    #
+    # The field is passed straight through rather than via `metrics.external_cashflows`, which
+    # converts it to float for the IRR: `buy_and_hold` requires Decimal amounts and moves real
+    # money through `q()`, so rounding the deposits to binary floats and back would make the
+    # benchmark pay a different sum from the book it is benchmarking. The two readers of this
+    # field are here and `metrics.external_cashflows`; a rename touches both.
+    price, total = spy_curves(
+        spy,
+        start,
+        end,
+        result.initial_cash,
+        spy_dividends,
+        cost_model=c.rules.cost_model,
+        contributions=result.cashflows,
+    )
     row = make_row(
         c,
         start,
         end,
-        run_stats(result),
+        _funded_stats(result),
         spy_tr=curve_metrics(total),
         spy_price=curve_metrics(price),
         window=window,
@@ -477,6 +579,7 @@ def run_registry(
     *,
     on_result: Callable[[int, RunResult | BookResult, DevRow], None] | None = None,
     window: Window = DEV_WINDOW,
+    contributions: ContributionSchedule | None = None,
 ) -> tuple[DevRow, ...]:
     """Every candidate, sequentially, in registry order; one row each, in that order.
 
@@ -486,6 +589,12 @@ def run_registry(
     ``allocator.prepare(market.history)`` for every other. Two different objects sharing an id
     are refused. ``on_result(index, result, row)``, when given, is called after each candidate.
     ``window`` defaults to ``DEV_WINDOW``; ``lab test`` is the only caller that passes another.
+
+    ``contributions`` is the funding schedule every candidate is run on
+    (``sim.contributions.ContributionSchedule``), or None -- the default, and what every caller in
+    the tree passes, so every recorded trial and every gate run is byte-for-byte unchanged. When it
+    is given, the book is fed the deposits AND ``spy_curves`` receives the same dollars on the same
+    sessions, so "beats SPY TR" stays a comparison of two books holding the same money.
     """
     _check_market(market, window)
     spy_divs = _check_dividends(dividends, spy_dividends, window)
@@ -516,7 +625,9 @@ def run_registry(
         key = c.allocator.id
         if key not in cache:
             cache[key] = prepare_for(c.allocator, market)
-        result, row = _run(market, spy, dividends, spy_divs, c, cache[key], window)
+        result, row = _run(
+            market, spy, dividends, spy_divs, c, cache[key], window, contributions=contributions
+        )
         if last_use[key] == i:
             del cache[key]
         rows.append(row)

@@ -22,13 +22,19 @@ Rules, identical for both curves:
   above, the first one and each dividend reinvestment, pays Gotrade's schedule instead of 0.1%,
   and the share count is the most whose rounded cash fits (``sim.costs.gotrade_shares_for``), so
   a method and its benchmark pay alike. The default "flat" is every curve above, unchanged.
+- ``contributions`` makes the curve **dollar-cost-averaged**: the same deposits the book received,
+  landing as cash at the close of the first session on or after each calendar date and spent at
+  that close through the same buy the dividend path uses. Empty (the default) is every curve
+  above, unchanged. Without it, "beats SPY TR" compares a book fed 5,000,000 IDR a month against
+  a single opening sum -- two books holding different money at different times.
 """
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import ROUND_FLOOR, Decimal, InvalidOperation
 
 from seer_engine.dates import prev_session, sessions
@@ -57,6 +63,11 @@ class BenchmarkCurve:
     ``snapshots[0]`` is ``Snapshot(prev_session(start), cash0, cash0)``; then one per session
     ``start..end``. ``shares`` and ``cash`` are the holding after ``end``; ``dividends_usd`` is
     the total cash dividends credited (0 for the price-only curve).
+
+    ``cashflows`` are the deposits this curve received, summed per landing session and ascending:
+    ``()`` for a plain buy-and-hold, and the dollar-cost-averaging schedule for a curve built with
+    ``contributions``. ``metrics.curve_metrics`` reads it, so the money-weighted return of the
+    benchmark is computed from the same dollars on the same days as the book's.
     """
 
     name: str
@@ -64,6 +75,7 @@ class BenchmarkCurve:
     shares: int | Decimal  # whole shares, or a multiple of SHARE_QUANTUM when fractional
     cash: Decimal
     dividends_usd: Decimal
+    cashflows: tuple[tuple[date, Decimal], ...] = ()
 
 
 def parse_dividends(text: str) -> tuple[Dividend, ...]:
@@ -158,6 +170,17 @@ def _bar(spy: Mapping[date, Bar], d: date) -> Bar:
     return bar
 
 
+def _landing(window: Sequence[date], d: date) -> date | None:
+    """The first session in ``window`` on or after ``d``; None when ``d`` is after the window.
+
+    Resolved against the window already in hand rather than through ``dates.next_session``, so a
+    deposit can never land outside the curve it funds. ``next_session`` is also strictly *after*
+    its argument, which would push a deposit dated on a trading day to the following one.
+    """
+    i = bisect_left(window, d)
+    return window[i] if i < len(window) else None
+
+
 def buy_and_hold(
     spy: Mapping[date, Bar],
     start: date,
@@ -168,6 +191,7 @@ def buy_and_hold(
     name: str,
     fractional: bool = False,
     cost_model: CostModel = "flat",
+    contributions: Sequence[tuple[date, Decimal]] = (),
 ) -> BenchmarkCurve:
     """Buy SPY at ``start``'s open, hold, mark every close through ``end``.
 
@@ -182,6 +206,24 @@ def buy_and_hold(
     ``cost_model`` "gotrade" prices every buy with Gotrade's measured schedule (``sim.costs``)
     instead of 0.1%: the benchmark a ``cost_model="gotrade"`` lab method is measured against.
     ValueError for any other value than "flat"/"gotrade".
+
+    ``contributions`` are ``(date, amount)`` deposits in USD, strictly ascending, each amount a
+    ``Decimal`` > 0. This is the **dollar-cost-averaged** benchmark: the same money, paid in on
+    the same days, put into SPY instead -- without it, "beats SPY TR" compares a book fed
+    5,000,000 IDR a month against a single opening sum, which flatters the book in a rising
+    market and punishes it in a falling one, because the two are holding different amounts at
+    different times.
+
+    Each deposit lands as cash at the close of the first session **on or after** its calendar
+    date, and is spent at that close. The owner's schedule deposits on the 25th and the NYSE
+    calendar produces the gap to the next session -- measured, a mean of 7.0 calendar days
+    ranging 4 (Feb 2027) to 10 (Dec 2026) -- so the idle cash is reproduced rather than assumed
+    away. A deposit whose landing session is on or before ``start``, or after ``end``, is
+    dropped: the opening cash is the opening cash, exactly as a dividend dated on ``start`` is
+    not credited. Two deposits landing on one session are summed and spent in one buy.
+
+    SPY buys as the money arrives, while a book waits for its rotation, so SPY's idle gap is the
+    shorter of the two and the benchmark is the harder to beat. That direction is deliberate.
     """
     if cost_model not in COST_MODELS:
         raise ValueError(f"unknown cost_model {cost_model!r}; expected one of {COST_MODELS}")
@@ -208,6 +250,23 @@ def buy_and_hold(
                 raise ValueError(f"dividend ex_date {div.ex_date} is not an NYSE session")
             paid[div.ex_date] = div.amount
 
+    deposits: dict[date, Decimal] = {}
+    previous: date | None = None
+    for when, amount in contributions:
+        if isinstance(when, datetime) or not isinstance(when, date):
+            raise TypeError(f"a contribution date must be a date, got {type(when).__name__}")
+        if not isinstance(amount, Decimal):
+            raise TypeError(f"a contribution amount must be a Decimal, got {type(amount).__name__}")
+        if amount <= 0:
+            raise ValueError(f"a contribution must be > 0, got {amount} on {when}")
+        if previous is not None and when <= previous:
+            raise ValueError(f"contributions not strictly ascending at {when}")
+        previous = when
+        session = _landing(window, when)
+        if session is None or session <= start:
+            continue
+        deposits[session] = deposits.get(session, Decimal("0.0000")) + q(amount)
+
     snaps: list[Snapshot] = [Snapshot(date=prev_session(start), cash_usd=cash0, equity_usd=cash0)]
     first = _bar(spy, start)
     if fractional:
@@ -219,11 +278,18 @@ def buy_and_hold(
     credited = Decimal("0.0000")
     for d in window:
         bar = _bar(spy, d)
+        reinvest = False
         amount = paid.get(d)
         if amount is not None:
             income = q(shares * amount)
             cash += income
             credited += income
+            reinvest = True
+        deposit = deposits.get(d)
+        if deposit is not None:
+            cash += deposit
+            reinvest = True
+        if reinvest:
             if fractional:
                 extra = _fractional_shares(cash, bar.close, cost_model)
                 cash -= fractional_buy_cost(bar.close, extra, cost_model)
@@ -239,6 +305,7 @@ def buy_and_hold(
         shares=shares,
         cash=cash,
         dividends_usd=credited,
+        cashflows=tuple(sorted(deposits.items())),
     )
 
 
@@ -250,11 +317,21 @@ def spy_curves(
     dividends: Sequence[Dividend],
     *,
     cost_model: CostModel = "flat",
+    contributions: Sequence[tuple[date, Decimal]] = (),
 ) -> tuple[BenchmarkCurve, BenchmarkCurve]:
     """``(spy_price, spy_tr)``: the price-only and total-return SPY curves over one window,
-    both paying ``cost_model`` (see ``buy_and_hold``)."""
-    price = buy_and_hold(spy, start, end, initial_cash, name=PRICE_CURVE, cost_model=cost_model)
+    both paying ``cost_model`` and both receiving ``contributions`` (see ``buy_and_hold``).
+
+    Both curves get the deposits, not just the total-return one: ``spy_price`` is the same
+    comparison with dividends withheld, and a price-only curve fed differently from the
+    total-return one would not be that.
+    """
+    price = buy_and_hold(
+        spy, start, end, initial_cash, name=PRICE_CURVE, cost_model=cost_model,
+        contributions=contributions,
+    )
     total = buy_and_hold(
-        spy, start, end, initial_cash, dividends=dividends, name=TOTAL_RETURN_CURVE, cost_model=cost_model
+        spy, start, end, initial_cash, dividends=dividends, name=TOTAL_RETURN_CURVE,
+        cost_model=cost_model, contributions=contributions,
     )
     return price, total

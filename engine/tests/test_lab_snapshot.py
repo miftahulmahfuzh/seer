@@ -84,7 +84,7 @@ def test_connect_migrates_a_v1_database_keeping_rows_and_triggers(tmp_path):
     conn = store.connect(tmp_path / "lab.sqlite")
     fresh = store.connect(tmp_path / "fresh.sqlite")
     try:
-        assert store.schema_version(conn) == "3"
+        assert store.schema_version(conn) == store.SCHEMA_VERSION
         rows = conn.execute("SELECT id, kind, title, body, method_id, added FROM insights ORDER BY id").fetchall()
         assert [tuple(r) for r in rows] == V1_INSIGHTS
         assert _insights_schema(conn) == _insights_schema(fresh)  # same table and triggers as a new v2 db
@@ -102,7 +102,7 @@ def test_connect_migrates_a_v1_database_keeping_rows_and_triggers(tmp_path):
         fresh.close()
     again = store.connect(tmp_path / "lab.sqlite")  # a second connect is a no-op
     try:
-        assert store.schema_version(again) == "3"
+        assert store.schema_version(again) == store.SCHEMA_VERSION
         assert again.execute("SELECT count(*) FROM insights").fetchone()[0] == 4
     finally:
         again.close()
@@ -111,7 +111,7 @@ def test_connect_migrates_a_v1_database_keeping_rows_and_triggers(tmp_path):
 def test_a_new_database_starts_at_the_current_schema_version(tmp_path):
     conn = store.connect(tmp_path / "lab.sqlite")
     try:
-        assert store.schema_version(conn) == store.SCHEMA_VERSION == "3"
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "4"
         assert "synthesis" in store.INSIGHT_KINDS
         with conn:
             assert store.add_insight(conn, kind="synthesis", title="t", body="b") == 1
@@ -168,7 +168,7 @@ def test_connect_migrates_a_v2_database_adding_trial_moments_and_touching_no_tri
 
     The ``trials`` table is byte-identical across the migration -- same rows, same order, same
     ``dsr``, ``failed``, ``eligible`` and ``n_trials_at_run`` -- and the new table arrives empty
-    with the same definition a fresh v3 database gets.
+    with the same definition a fresh database gets.
     """
     db = tmp_path / "lab.sqlite"
     _v2_db(db)
@@ -178,7 +178,7 @@ def test_connect_migrates_a_v2_database_adding_trial_moments_and_touching_no_tri
     conn = store.connect(db)
     fresh = store.connect(tmp_path / "fresh.sqlite")
     try:
-        assert store.schema_version(conn) == "3"
+        assert store.schema_version(conn) == store.SCHEMA_VERSION
         assert _trials_bytes(db) == before  # no verdict moved
         assert conn.execute("SELECT count(*) FROM trial_moments").fetchone()[0] == 0
         assert _moments_schema(conn) == _moments_schema(fresh)
@@ -205,10 +205,84 @@ def test_connect_migrates_a_v2_database_adding_trial_moments_and_touching_no_tri
 
     again = store.connect(db)  # idempotent: a second connect migrates nothing
     try:
-        assert store.schema_version(again) == "3"
+        assert store.schema_version(again) == store.SCHEMA_VERSION
         assert _trials_bytes(db) == before
     finally:
         again.close()
+
+
+def _funding_schema(conn) -> list[tuple[str, str, str]]:
+    return [tuple(r) for r in conn.execute(
+        "SELECT type, name, sql FROM sqlite_master WHERE tbl_name = 'trial_funding' ORDER BY type, name"
+    )]
+
+
+def test_connect_migrates_a_v3_database_adding_trial_funding_and_touching_no_trial(tmp_path):
+    """Phase 7's exit criterion: v3 -> v4 is purely additive, exactly as v2 -> v3 was.
+
+    This is *why* the money-weighted return is a side table rather than two columns on ``trials``:
+    ``ALTER TABLE trials ADD COLUMN`` would move every recorded row's bytes and this assertion
+    would fail. The ladder also carries a v2 fixture all the way to v4 in one open.
+    """
+    db = tmp_path / "lab.sqlite"
+    _v2_db(db)
+    store.connect(db).close()          # v2 -> v3 -> v4
+    before = _trials_bytes(db)
+
+    conn = store.connect(db)
+    fresh = store.connect(tmp_path / "fresh.sqlite")
+    try:
+        assert store.schema_version(conn) == store.SCHEMA_VERSION
+        assert _trials_bytes(db) == before          # no recorded trial moved
+        assert conn.execute("SELECT count(*) FROM trial_funding").fetchone()[0] == 0
+        assert _funding_schema(conn) == _funding_schema(fresh)
+        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+
+        # A trial with no funding row received no deposits -- true of all 128 recorded trials --
+        # and that is what funding_of answers, never an error.
+        assert store.funding_of(conn, 1) is None
+
+        # The triggers are row-level, so prove they bite on a row that arrived by migration.
+        with conn:
+            store.insert_funding(conn, [store.FundingRow(
+                trial_n=1, mwr=0.0712, spy_tr_mwr=0.0689, deposits_usd=3681.00, deposits_n=12,
+                schedule="+5,000,000 IDR on the 25th of each month",
+                measured="2026-10-08T00:00:00+00:00",
+            )])
+        assert store.funding_of(conn, 1)["deposits_n"] == 12
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            conn.execute("UPDATE trial_funding SET mwr = 9")
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            conn.execute("DELETE FROM trial_funding")
+        with pytest.raises(store.LabError, match="already has recorded funding"):
+            with conn:
+                store.insert_funding(conn, [store.FundingRow(
+                    trial_n=1, mwr=0.1, spy_tr_mwr=0.1, deposits_usd=1.0, deposits_n=1,
+                    schedule="s", measured="2026-10-08T00:00:00+00:00",
+                )])
+        assert _trials_bytes(db) == before          # and recording funding still moved no trial
+    finally:
+        conn.close()
+        fresh.close()
+
+
+def test_a_funded_trial_is_judged_money_weighted_and_an_unfunded_one_is_not(tmp_path):
+    """The restated gate (R3). The same recorded row reads two ways depending on whether it was
+    fed: by total return when it was not, by the money-weighted return when it was."""
+    db = tmp_path / "lab.sqlite"
+    _v2_db(db)
+    conn = store.connect(db)
+    try:
+        row = dict(conn.execute("SELECT * FROM trials WHERE n = 1").fetchone())
+        row["total_return"], row["spy_tr_return"] = 6.00, 0.40   # "+600%" vs SPY: beats it today
+        row["max_drawdown"], row["profit_factor"] = 0.10, 2.0
+        assert dev.FAILURE_LABELS[0] not in store.owner_failures(row)
+
+        # ...but the money it was fed earned less than the SPY fed the same money.
+        funding = {"mwr": 0.004, "spy_tr_mwr": 0.071}
+        assert dev.FAILURE_LABELS[0] in store.owner_failures(row, funding)
+    finally:
+        conn.close()
 
 
 def test_an_unknown_schema_version_is_refused(tmp_path):
@@ -236,7 +310,7 @@ def test_the_snapshot_reads_a_v1_database_read_only_and_migration_does_not_chang
     store.connect(db).close()  # migrates to v2
     ro = store.connect_readonly(db)
     try:
-        assert store.schema_version(ro) == "3"
+        assert store.schema_version(ro) == store.SCHEMA_VERSION
         assert store.snapshot_json(ro) == v1_text
     finally:
         ro.close()

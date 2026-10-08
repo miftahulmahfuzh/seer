@@ -2,10 +2,16 @@
 looped over a window equal ``buy_and_hold`` with dividends exactly; the persisted shape
 (``Position``, ``Fill``); the split rule.
 
-Arithmetic: ``fractional_buy_cost(p, n) = q(p × n × 1.001)``; shares ``cash / (price × 1.001)``
+Arithmetic: ``fractional_buy_cost(p, n) = q(p x n x 1.001)``; shares ``cash / (price x 1.001)``
 floored to 0.0001 (``backtest.benchmark._fractional_shares``: the paper benchmark is fractional
-since 2026-10-07, when the paper books went to 10,000,000 IDR); dividend credit ``q(shares × amount)``.
+since 2026-10-07, when the paper books went to 10,000,000 IDR); dividend credit ``q(shares x amount)``.
 The loops compare against ``buy_and_hold(..., fractional=True)``.
+
+Under ``cost_model="gotrade"`` the same loops compare against
+``buy_and_hold(..., fractional=True, cost_model="gotrade")``: the share count is
+``sim.costs.gotrade_shares_for`` and the cash is ``q(p x n)`` plus Gotrade's printed fee. The
+benchmark pays what a ``cost_model="gotrade"`` method pays, which is what makes "beats SPY TR"
+a fair gate.
 """
 
 from __future__ import annotations
@@ -26,7 +32,7 @@ from seer_engine.paper.benchmark import (
     step_benchmark,
 )
 from seer_engine.prices import Bar
-from seer_engine.sim import Fill, Position, Snapshot
+from seer_engine.sim import Fill, Position, Snapshot, q
 
 # --------------------------------------------------------------------------- synthetic SPY
 
@@ -68,8 +74,15 @@ DIVIDENDS = tuple(
 PAID = {d.ex_date: d.amount for d in DIVIDENDS}
 
 
-def run_nights(spy: dict[date, Bar], start: date, end: date, cash0: Decimal, paid: dict[date, Decimal]):
-    state = start_benchmark(cash0, start)
+def run_nights(
+    spy: dict[date, Bar],
+    start: date,
+    end: date,
+    cash0: Decimal,
+    paid: dict[date, Decimal],
+    cost_model: str = "flat",
+):
+    state = start_benchmark(cash0, start, cost_model=cost_model)
     snaps = [state.snapshot()]
     fills: list[Fill] = []
     states = [state]
@@ -238,6 +251,50 @@ def test_step_validation():
         step_benchmark(s, MON, WEEK_BARS[MON], Decimal("0"))
     with pytest.raises(TypeError):
         step_benchmark(s, MON, WEEK_BARS[MON], 2.5)
+
+
+# --------------------------------------------------------------------------- Gotrade's fees
+
+
+def test_gotrade_nights_equal_buy_and_hold_at_the_same_cost_model():
+    curve = buy_and_hold(
+        SPY_BARS, START, END, CASH0, dividends=DIVIDENDS, name="spy_tr",
+        fractional=True, cost_model="gotrade",
+    )
+    state, snaps, fills, _ = run_nights(SPY_BARS, START, END, CASH0, PAID, "gotrade")
+    assert snaps == curve.snapshots
+    assert state.shares == curve.shares
+    assert state.cash == curve.cash
+    assert state.income_usd == curve.dividends_usd
+    assert state.equity == curve.snapshots[-1].equity_usd
+
+
+def test_gotrade_position_and_fills_by_hand():
+    s = start_benchmark(P("1000"), MON, cost_model="gotrade")
+    s, snap, fills = step_benchmark(s, MON, WEEK_BARS[MON], None)
+    assert snap.cash_usd >= 0
+    assert len(fills) == 1
+    assert fills[0].symbol == SPY
+
+
+def test_the_recorded_fee_is_the_fee_inside_the_cash_that_moved():
+    _, _, fills, _ = run_nights(SPY_BARS, START, END, CASH0, PAID, "gotrade")
+    assert fills
+    for f in fills:
+        assert -f.cash_usd - f.cost_usd == q(f.price * f.shares) or abs((-f.cash_usd - f.cost_usd) - q(f.price * f.shares)) < Decimal("0.0001"), f
+
+
+def test_cost_model_survives_the_night():
+    s = start_benchmark(P("1000"), MON, cost_model="gotrade")
+    for d in (MON, TUE, WED):
+        s, _, _ = step_benchmark(s, d, WEEK_BARS[d], Decimal("2.5") if d == WED else None)
+    assert s.cost_model == "gotrade"
+
+
+def test_cost_model_validation():
+    assert start_benchmark(P("1000"), MON).cost_model == "flat"
+    with pytest.raises(ValueError, match="unknown cost_model"):
+        start_benchmark(P("1000"), MON, cost_model="percent")
 
 
 # --------------------------------------------------------------------------- splits

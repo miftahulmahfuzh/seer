@@ -1439,8 +1439,9 @@ the database.
   under `"gotrade"` every buy (the first one and each dividend reinvestment, whole or fractional)
   pays `sim.costs.gotrade_cash` instead of 0.1%, with the share count from
   `sim.costs.gotrade_shares_for` (the most whose rounded cash fits). Any other value is a
-  `ValueError`. `"flat"` leaves every curve unchanged; the paper benchmark (`paper/benchmark.py`)
-  stays flat.
+  `ValueError`. `"flat"` leaves every curve unchanged. The paper benchmark
+  (`paper/benchmark.py`) can be asked for the same two models since the fee rebuild's phase 3,
+  but nothing passes it `"gotrade"` yet, so every live paper night is still flat.
 - **`backtest.metrics`**: `strategy_metrics(snaps, pnls) -> Metrics` and `checklist(m, spy_return)`,
   identical to `web/lib/metrics.ts` (a loss is `pnl ≤ 0`; PF = gross win / gross loss, `inf` with
   no loss; max drawdown on per-session equity; total return = last / first − 1;

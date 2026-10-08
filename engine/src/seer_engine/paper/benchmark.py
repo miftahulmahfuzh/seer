@@ -15,6 +15,15 @@ return, dividends reinvested):
   ``q(shares × amount)`` and buy ``_fractional_shares(cash, close)`` more at that close.
 - Every session is marked at its close: ``equity = q(cash + shares × close)``. Nothing is sold.
 
+``cost_model`` ("flat", the default, or "gotrade") says what a buy pays and rides in
+:class:`BenchmarkState`, so it survives between nights. "flat" is 0.1% of the notional, every
+rule above unchanged. "gotrade" is Gotrade's measured schedule (``sim.costs``, fitted to the
+owner's receipts): the share count is the most whose rounded cash fits
+(``sim.costs.gotrade_shares_for``) and the cash paid is ``q(price x n)`` plus the printed fee,
+exactly as ``backtest.benchmark.buy_and_hold(..., cost_model="gotrade")``) prices it. A method
+measured against this benchmark and the benchmark itself then pay alike -- without it SPY pays
+0.1% while the methods pay Gotrade, and "beats SPY TR" is an asymmetric gate.
+
 The holding is a ``sim.book.Position`` (symbol ``SPY``, shares as a Decimal, no stop or
 take), so the store persists it as one ``book_positions`` row; ``cost_usd`` is every buy's cash,
 ``income_usd`` every dividend credited (plus any split cash in lieu). Each buy is a
@@ -43,6 +52,7 @@ from seer_engine.backtest.benchmark import _fractional_shares, fractional_buy_co
 from seer_engine.prices import Bar
 from seer_engine.sim import COST_RATE, Fill, Position, Snapshot, q
 from seer_engine.sim.book import _split_position_shares
+from seer_engine.sim.costs import COST_MODELS, CostModel, gotrade_cash
 from seer_engine.sim.rules import SHARE_QUANTUM
 from seer_engine.sim.split_adjust import _q_exact, _rescale_price, _split_ratio
 
@@ -75,9 +85,13 @@ class BenchmarkState:
     - ``equity``: equity at ``last_session``'s close (``cash0`` before the first session).
     - ``position``: the SPY holding, or None (before ``start``, or when cash never bought a share).
     - ``last_session``: the last session stepped; ``prev_session(start)`` before the first.
+    - ``cost_model``: what a buy pays -- "flat" (0.1%) or "gotrade" (``sim.costs``). It is part of
+      the state because the benchmark is stepped one night at a time: an entry that pays Gotrade
+      must still be paying Gotrade on its thousandth night.
 
     Persisted as ``paper_state`` (``last_session``, ``cash_usd``, ``equity_usd``) plus one
-    ``book_positions`` row from ``position``; ``start`` comes back from ``paper_start``.
+    ``book_positions`` row from ``position``; ``start`` comes back from ``paper_start``, and
+    ``cost_model`` from the entry's frozen spec (``paper.roster.spec``'s ``params``).
     """
 
     start: date
@@ -85,9 +99,12 @@ class BenchmarkState:
     equity: Decimal
     position: Position | None
     last_session: date
+    cost_model: CostModel = "flat"
 
     def __post_init__(self) -> None:
         _session("start", self.start)
+        if self.cost_model not in COST_MODELS:
+            raise ValueError(f"unknown cost_model {self.cost_model!r}; expected one of {COST_MODELS}")
         if _money("cash", self.cash) < 0:
             raise ValueError(f"cash must be >= 0, got {self.cash}")
         _money("equity", self.equity)
@@ -127,18 +144,25 @@ class BenchmarkState:
         return Snapshot(date=self.last_session, cash_usd=self.cash, equity_usd=self.equity)
 
 
-def start_benchmark(cash0: Decimal, start: date) -> BenchmarkState:
-    """The benchmark the night before ``start``: ``q(cash0)`` in cash, nothing held.
+def start_benchmark(cash0: Decimal, start: date, *, cost_model: CostModel = "flat") -> BenchmarkState:
+    """The benchmark the night before ``start``: ``q(cash0)`` in cash, nothing held, paying
+    ``cost_model`` ("flat", 0.1%, or "gotrade", ``sim.costs``) on every buy from then on.
 
-    Raises TypeError when ``cash0`` is not a Decimal and ValueError when it is not > 0 or
-    ``start`` is not an NYSE session (``buy_and_hold``'s checks).
+    Raises TypeError when ``cash0`` is not a Decimal and ValueError when it is not > 0,
+    ``start`` is not an NYSE session (``buy_and_hold``'s checks), or ``cost_model`` is neither
+    "flat" nor "gotrade".
     """
     cash = q(_money("cash0", cash0))
     if cash <= 0:
         raise ValueError(f"cash0 must be > 0, got {cash0}")
     _session("start", start)
     return BenchmarkState(
-        start=start, cash=cash, equity=cash, position=None, last_session=dates.prev_session(start)
+        start=start,
+        cash=cash,
+        equity=cash,
+        position=None,
+        last_session=dates.prev_session(start),
+        cost_model=cost_model,
     )
 
 
@@ -158,16 +182,28 @@ def _check_bar(bar: object, session: date) -> Bar:
     return bar
 
 
-def _buy_fill(session: date, price: Decimal, shares: Decimal, cost: Decimal, reason: str) -> Fill:
-    n = shares
+def _buy(price: Decimal, shares: Decimal, cost_model: CostModel) -> tuple[Decimal, Decimal]:
+    """``(cash out, fee)`` of one benchmark buy of ``shares`` at ``price``, both priced by
+    ``cost_model`` on the same unrounded ``price``, so the recorded fee is the fee inside the
+    cash that moved. The fee rule is ``sim.book._fee``'s: ``q(price x n x 0.001)`` under
+    "flat", Gotrade's printed fee under "gotrade"."""
+    cost = fractional_buy_cost(price, shares, cost_model)
+    if cost_model == "gotrade":
+        return cost, gotrade_cash("buy", price, shares)[1]
+    return cost, q(price * shares * COST_RATE)
+
+
+def _buy_fill(
+    session: date, price: Decimal, shares: Decimal, cost: Decimal, fee: Decimal, reason: str
+) -> Fill:
     return Fill(
         session_date=session,
         symbol=SPY,
         side="buy",
-        shares=n,
+        shares=shares,
         price=price,
         cash_usd=-cost,
-        cost_usd=q(price * n * COST_RATE),
+        cost_usd=fee,
         reason=reason,  # type: ignore[arg-type]
     )
 
@@ -242,12 +278,13 @@ def step_benchmark(
     if split is not None:
         state, _ = split_benchmark(state, split, session)
 
+    model = state.cost_model
     cash = state.cash
     pos = state.position
     fills: list[Fill] = []
     if session == state.start:
-        shares = _fractional_shares(cash, b.open)
-        cost = fractional_buy_cost(b.open, shares)
+        shares = _fractional_shares(cash, b.open, model)
+        cost, fee = _buy(b.open, shares, model)
         cash -= cost
         if shares > 0:
             price = q(b.open)
@@ -263,7 +300,7 @@ def step_benchmark(
                 stop=None,
                 take=None,
             )
-            fills.append(_buy_fill(session, price, shares, cost, "entry"))
+            fills.append(_buy_fill(session, price, shares, cost, fee, "entry"))
     else:
         if pos is not None:
             pos = replace(pos, days_held=pos.days_held + 1)
@@ -273,9 +310,9 @@ def step_benchmark(
             cash += income
             if pos is not None:
                 pos = replace(pos, income_usd=pos.income_usd + income)
-            more = _fractional_shares(cash, b.close)
+            more = _fractional_shares(cash, b.close, model)
             if more > 0:
-                cost = fractional_buy_cost(b.close, more)
+                cost, fee = _buy(b.close, more, model)
                 cash -= cost
                 price = q(b.close)
                 if pos is None:
@@ -291,14 +328,21 @@ def step_benchmark(
                         stop=None,
                         take=None,
                     )
-                    fills.append(_buy_fill(session, price, more, cost, "entry"))
+                    fills.append(_buy_fill(session, price, more, cost, fee, "entry"))
                 else:
                     pos = replace(pos, shares=pos.shares + more, cost_usd=pos.cost_usd + cost)
-                    fills.append(_buy_fill(session, price, more, cost, "add"))
+                    fills.append(_buy_fill(session, price, more, cost, fee, "add"))
 
     if pos is not None:
         pos = replace(pos, mark=b.close)
     held = Decimal(0) if pos is None else pos.shares
     equity = q(cash + held * b.close)
-    new = BenchmarkState(start=state.start, cash=cash, equity=equity, position=pos, last_session=session)
+    new = BenchmarkState(
+        start=state.start,
+        cash=cash,
+        equity=equity,
+        position=pos,
+        last_session=session,
+        cost_model=model,
+    )
     return new, Snapshot(date=session, cash_usd=cash, equity_usd=equity), tuple(fills)

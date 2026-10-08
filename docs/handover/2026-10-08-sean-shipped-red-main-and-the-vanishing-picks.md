@@ -324,6 +324,49 @@ C would understate daily trading's cost and the control would be worse than usel
 what the control is *compared against* — it only answers the owner's question if it runs on the same
 starting capital, the same monthly contributions and the same fee schedule as the monthly books.
 
+**Q9 — the owner must be able to execute a rotation without doing arithmetic.** His stated
+sequence for a rotation day (2026-10-08, for Monday 2026-11-02):
+
+> *"1. I will first [sell] all these 5 stocks, then I would get real money CURRENT-WALLET.
+> 2. now, my money that I have (TOTAL-WALLET) is CURRENT-WALLET + 5 million IDR.
+> 3. then, RAW need to consider from this TOTAL-WALLET, how much is to be allocated to the new 20
+> stocks, maybe we buy more of the existing stocks (e.g. buy 30usd worth of DELL) or buy the new 5
+> stocks (e.g. buy 100usd worth of NVDA). ... I don't have to recalculate shit."*
+
+**Most of this already exists** in `web/lib/sean/reminders.ts` (Sean phase 5) and should be extended
+rather than rebuilt: `ACTION_ORDER = {sell:0, trim:1, buy:2, add:3}` already renders sells before
+buys; a dropped pick produces a whole-position sell; a new pick produces a dollar-denominated buy at
+`weight × planSize`; adds/trims fire only when the gap clears `max(MIN_TRADE_USD, RESIZE_BAND ×
+plan)`; and uploaded screenshots tick reminders off as they are executed.
+
+**The gap is cash.** `planValue` is the sum of *holdings* value and `planSize = budgetUsd ?? planValue`
+— cash appears nowhere, and `sean/ledger.ts` explains why it cannot: *"receipts never show the cash
+balance."* Sean reconstructs positions from order screenshots, so it cannot know the wallet. The
++5,000,000 IDR is therefore invisible on 2 November and every buy is sized ~$280 short, with
+`budgetUsd` — a hand-edited number — as the only lever. That manual step is precisely what the owner
+is asking to remove.
+
+Settle:
+
+- **Where cash comes from.** Recommended: record the contribution as a recurring **schedule**
+  ("+5,000,000 IDR monthly"), not a monthly manual entry, so that one object serves both this and
+  Q3's lab contribution model. Then `planSize = holdings value + cash`, where cash is derivable as
+  deposits − net buys + net sells from the ledger. Keep `budgetUsd` as a manual override for when
+  reality diverges. A schedule also self-corrects when actual fills differ from the plan, which a
+  pre-computed budget does not.
+- **`MIN_TRADE_USD` under Gotrade's floor.** It is $10 today. A $10 order costs ~2.5% round trip and
+  the floor does not stop binding until ~$50 (§2), so a small add can cost more in fees than the
+  tracking error it corrects. Re-tune it against the fee curve rather than leaving it at a round
+  number.
+- **Settlement.** US equities are T+1. Confirm Gotrade permits reusing sale proceeds the same day
+  for buys; if it does not, the owner's 1-2-3 becomes sell-Monday / buy-Tuesday and the reminder
+  list has to say so.
+- **Orders stay dollar-denominated, never share counts.** Prices drift between the decision close
+  and execution at the open; a fractional dollar order absorbs that drift and a share count does
+  not. The roster's book rules are already `-frac`.
+- **Deposit timing.** The owner has mentioned both ~25 October and "at rotation". Whichever he
+  does, the lab's contribution schedule must match it, or paper and reality diverge on idle cash.
+
 **Q5 — the blank panel has four causes and one rendering.** §5. Whatever is shown must distinguish
 (a) holding/nothing due — the common case — from (b) expired, (c) never produced and (d) failed, and
 must never be mistakable for a live instruction. While paper is paused there is a fifth state to

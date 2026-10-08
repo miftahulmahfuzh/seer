@@ -164,6 +164,31 @@ export const DEPOSITS_TIP =
   'Money was added to this run every month, so these two count your own deposits as if they were ' +
   'gains. What the money actually earned is in the next column.';
 
+/**
+ * The children of a method that were **actually run on deposits**, ordered by id.
+ *
+ * `/redo-sera-experiments` mints a pre-registered variation twin rather than rewriting its parent:
+ * the lab's rows are append-only, and deleting a method's trials to "redo" it would *lower* the
+ * multiple-testing N and retroactively flatter every other method in the lab. So the honest redo
+ * of a method is always a different method with a page of its own, and this is how the parent's
+ * page finds it and brings the result back.
+ *
+ * The test is `moneyWeighted`, never `sourceKind === 'variation'`. 22 of the lab's 45 methods are
+ * already variations and not one of them was fed, so keying off `sourceKind` would claim two dozen
+ * redos that never happened.
+ */
+export function redoneOf(children: LabMethod[], trialsOf: (id: string) => LabTrial[]): Redone[] {
+  const out: Redone[] = [];
+  for (const method of children) {
+    const trial = bestVariant(trialsOf(method.id));
+    if (trial && moneyWeighted(trial) !== null) out.push({ method, trial });
+  }
+  return out.sort((a, b) => a.method.id.localeCompare(b.method.id));
+}
+
+/** A child method that is this one redone on real money, with the trial that says so. */
+export type Redone = { method: LabMethod; trial: LabTrial };
+
 /* ---- The six hurdles ----------------------------------------------------------------------- */
 
 /**

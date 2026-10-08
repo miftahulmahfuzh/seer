@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/gotrade-fee-rebuild`
 **Branch:** `feature/gotrade-fee-rebuild` (base: `origin/main` @ `485d416`)
 **Phases:** 12
-**Status:** in flight — 10/12 landed (waves 0-2 complete). Final wave (8, 12) running. This file is the coordinator's copy.
+**Status:** in flight — 11/12 landed. Phase 12 (the wiring layer) is the last. This file is the coordinator's copy.
 **Coordinator:** `orch-gotrade-fee-rebuild` (owns the landing; ledger.json is the record)
 
 ---
@@ -137,7 +137,7 @@ carried over from the draft.
 | 9 | The blank panel says which of five things it means | R5 | `web/app/(app)`, `web/lib` | 8 | — | NORMAL | `.workflows/plan/gotrade-fee-rebuild/phase-9.md` | P1-WEB-4TQ7 | — |
 | 10 | Sean sizes a rotation from cash, not from holdings | R9 | `web/lib/sean`, `web/app/sean` | 8 | 5 | NORMAL | `.workflows/plan/gotrade-fee-rebuild/phase-10.md` | — | — |
 | 11 | One daily line: stepped, published, green, paused | R8 | `.github`, `docs` | 2 | — | NORMAL | `.workflows/plan/gotrade-fee-rebuild/phase-11.md` | P1-ROOT-B4DL | — |
-| 12 | The rebuilt roster, and the wiring layer | R1, R4, R3 | `engine.paper`, `engine.commands`, `db`, `docs`, `.github` | 10 | 3, 4, 6, 7 | HARD | `.workflows/plan/gotrade-fee-rebuild/phase-12.md` | — | — |
+| 12 | The rebuilt roster, and the wiring layer | R1, R4, R3 | `engine.paper`, `engine.commands`, `db`, `docs`, `.github` | 10 | 3, 4, 6, 7 | HARD | `.workflows/plan/gotrade-fee-rebuild/phase-12.md` | P1-ENG-U9XK | — |
 
 **Waves** (what `/analyze-orchestrator` will run concurrently):
 W1 = 1, 2, 3, 4, 9, 11 · W2 = 5 · W3 = 6, 7, 10 · W4 = 8, 12

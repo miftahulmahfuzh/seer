@@ -2,18 +2,18 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-08 10:49
-**Total Active Tasks**: 0
+**Last Updated**: 2026-10-08 14:40
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 0
+- Blocked: 1
 - Completed: 16
 
 ---
@@ -23,6 +23,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [ ] **P1-ROOT-RDX2** Phase 3: `/redo-sera-experiments` — honest twins of named methods, in a batch
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `.claude/skills/redo-sera-experiments/SKILL.md`. The skill takes a COMMA-SEPARATED LIST of methods — `/redo-sera-experiments M0022,M0020,M0019` — each item a bare `MNNNN`, a `seertrade.site/sera/methods/MNNNN` URL, or a mix; a single method is the one-element case, not a separate path. For each it resolves the parent, reserves a variation twin (`lab idea --parent <original>`, `source_kind='variation'`), writes the twin's method file at fractional + `cost_model="gotrade"` on the funding phase 2 provides, commits the file as its pre-registration, runs `lab run`, and reports every twin beside its parent in one batch table. **Per-item isolation is the key property:** one method's failure or refusal is journaled and never aborts the batch. Refusals are per-item (a parent already fractional+Gotrade has no honest twin; a pre-M0031 parent whose edge the real fees erase is skipped). Runs SERIAL in the main checkout, deliberately not sera-the-explorer's 4-way worktree fan-out. Does not touch any engine source, `sera-the-explorer/SKILL.md` or `explore-and-experiment-new-method/SKILL.md` (read for shape, do not edit), or the lab database beyond what `lab idea` / `lab run` / `lab stage` legitimately write. Exit criteria: the skill file exists and documents the refusal to purge in plain, non-technical language, with the twin presented as the thing the owner actually gets; it names the variation route and the "promote the twin, never the original" rule; it parses a comma-separated batch, dedupes repeats, and skips a bad or un-twinnable item without discarding the rest; it states how an interrupted batch resumes without duplicating; every CLI command and flag it names is verified against the live CLI (`lab idea`'s flag is `--parent`, NOT `--parent-id`); the batch report is written in everyday words with no column names or backticks in the prose.
+  - **Status**: blocked
+  - **Plan Set**: `LAB_REALISTIC_GATE_PLAN.md` (phase 3 of 3)
+  - **Satisfies**: R3 — A `/redo-sera-experiments <methods>` skill that cleanly redoes one or SEVERAL named existing methods under the realistic configuration
+  - **Depends on**: P1-ENG-L4ND, P1-ENG-FND7
+  - **Plan**: `.workflows/plan/P1-ROOT-RDX2.md`
 
 
 ### [P2] Medium

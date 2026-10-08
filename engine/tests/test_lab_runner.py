@@ -51,12 +51,25 @@ def data():
 
 
 def test_run_records_trials_with_lab_wide_n(conn, data, tmp_path):
+    """``n_trials_at_run`` is the lab-wide gate N projected over the batch -- NOT the row count.
+
+    Derived from ``store.pending_gate`` rather than typed, because the two are only the same
+    number under the ``all-trials`` policy. ``store.DSR_POLICY`` is ``methods``
+    (lab-realistic-gate R1), so on this seeded lab the batch is judged at the distinct-method
+    count plus one for M0001, while the row count goes to 56. Asserting the projection keeps
+    this test about what ``trial_rows`` records -- the N the DSR was actually deflated by -- and
+    keeps it true under whichever policy the lab ships next.
+
+    The row count is asserted separately, so the two cannot be silently conflated again.
+    """
     m = _method()
+    projected = store.pending_gate(conn, m.id, len(m.candidates))
     ran = runner.run_method(conn, m, Path(__file__), data, git_sha="deadbeef", require_commit=False)
     assert [r.trial.candidate_id for r in ran] == ["M0001-A", "M0001-B"]
     rows = store.trials_of(conn, "M0001")
     assert [r["n"] for r in rows] == [55, 56]
-    assert {r["n_trials_at_run"] for r in rows} == {56}
+    assert {r["n_trials_at_run"] for r in rows} == {projected.n}
+    assert store.dev_trial_count(conn) == 56, "the row count is still the row count"
     assert all(r["git_sha"] == "deadbeef" and r["window"] == "dev" for r in rows)
     for r in rows:
         assert r["end"] == "2015-10-16"
@@ -82,7 +95,11 @@ def test_a_run_records_the_dsrs_inputs_beside_every_trial(conn, data):
     for r in rows:
         mom = store.moments_of(conn, r["n"])
         assert mom is not None, "every dev trial with a dsr keeps its inputs"
-        assert mom["n_at_run"] == r["n_trials_at_run"] == 56
+        # The EQUALITY is the claim, not the number: the moments row and the trial row must
+        # name the same N or the re-evaluation below is not the same measurement. The number
+        # itself is whatever `store.DSR_POLICY` resolved to and is pinned in
+        # `test_run_records_trials_with_lab_wide_n` against `store.pending_gate`.
+        assert mom["n_at_run"] == r["n_trials_at_run"]
         assert mom["measured"] == r["run_at"]  # one measurement, one stamp
         assert mom["t"] >= 2 and mom["var_trials"] is not None
         again = deflated_sharpe(

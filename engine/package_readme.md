@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (src layout: `engine/src/seer_engine`)
-**Last Updated**: 2026-10-07 (lab-luck-gate, phase 6 (P1-ENG-CA69): every lab-derived roster entry states its lab provenance — `paper.roster.LabProvenance` / `LAB_PROVENANCE`, the same fact written onto the method by `lab.store.record_promotion`, and `promote --lab-override-reason`)
+**Last Updated**: 2026-10-08 (lab-realistic-gate, R1 (P1-ENG-L4ND): the luck gate deflates by distinct **methods**, not trial rows — `store.DSR_POLICY` and `npolicy.DEFAULT_POLICY` move `"all-trials"` -> `"methods"`, `remeasure.batches_of`'s N guard widens to a bounded range, and `lab --help` is un-broken)
 
 ## Overview
 
@@ -45,6 +45,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - Gotrade's real fees as a cost model (Sean plan, phase 6): `sim/costs.py` holds `GOTRADE`, a schedule of four dated fee regimes fitted to the owner's 30 Gotrade order receipts (`tests/fixtures/gotrade_fees.json`, fee columns only). `TradeRules` gains `cost_model: Literal["flat", "gotrade"] = "flat"`, a lever in `LEVERS_SINCE_PINS`, so at "flat" no registry, lab-trial or paper-spec digest moves (`tests/test_cost_model_pins.py` recomputes every committed lab digest byte for byte). Under "gotrade" the book engine prices every fill from today's regime, and the lab's SPY benchmark (`backtest.dev._run` → `spy_curves`) pays the candidate's own cost model. (The paper benchmark stayed flat until phase 12 of the Gotrade fee rebuild wired it, below)
 - Real fees become the lab's rule (Sean plan, phase 7): `sim.rules` gains the two real-fee presets `MONTHLY_HOLD_FRAC_GOTRADE` (`monthly-hold-frac-gotrade`) and `MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE` (`monthly-rank-weekly-resize-frac-gotrade`), appended to `PRESETS` so `promote` can map a real-fee winner to a preset of its own id; they name `cost_model` in their canonical form and digest apart, while every flat preset still omits it. `lab/runner.preflight` now also raises `lab/real_costs.real_cost_problem`: from **M0031** on (`REAL_COST_SINCE = 31`) every variant must be a book rule set at `cost_model="gotrade"`, and methods up to M0030 keep their flat cost and pinned digests. For those older methods the new report-only `lab costs MNNNN` re-runs the best recorded dev variant (by MAR, or `--candidate`) at both cost models and journals one `observation` — no `trials` or `trial_moments` row, no status change, so the lab's N and `test_looks` do not move. On the Sean side, `sean/calibrate.py` and the read-only `sean calibrate` replay `sim.costs.fee_parts` over every stored `sean_orders` receipt (on its WIB date) and exit 1 when an order since the current fee regime is off by more than a cent in any part — the signal to add a new dated regime to `sim/costs.py`
 - The rebuilt roster, and the wiring layer (GOTRADE_FEE_REBUILD, phase 12): every live entry is replaced by a successor paying Gotrade's **measured** fees — `SPY-GT`, `C-GT`, `RMW-FR-GT`, `RAW-FR-GT`, `MOM-FR-GT`, `MVW-FR-GT` — as **new ids with fresh paper clocks** (`cost_model` is a `LEVERS_SINCE_PINS` lever, so editing a started entry would move its digest and `store.check_digest` would refuse its next night), with the six predecessors **retired, not deleted**. Migration 017 writes them; `paper/roster.py` gains the six ids, `BENCHMARK_SYMBOL`, `OWNER_FUNDING`, `PRE_FUNDING_IDS`, `BENCHMARK_COST_MODEL` / `benchmark_cost_model`, and a `spec` whose `funding` and benchmark cost keys are conditional so no pinned digest moves. The wiring: the night passes each entry's **own** `rules` into `settle_bracket` / `decide_bracket` / `repick`, `_step_benchmark` loads `SPY-GT` at its roster-stated cost model, the night accrues and credits the owner's contribution schedule (10,000,000 IDR to start, +5,000,000 IDR on the 25th) raising cash and equity together on all three engines, `paper/replay.py` replays the stored dated deposits instead of hard-coding `DESIGN_V0`, and `promote` dispatches the engine on `sim.rules.is_bracket`. `PAPER_PAUSED` stays `'true'`: the rebuilt roster sits inert, no `paper_start` is written and no session is stepped until the owner flips the switch himself
+- The gate counts the looks the data supports (lab-realistic-gate, R1): `store.DSR_POLICY` and `npolicy.DEFAULT_POLICY` move `"all-trials"` -> `"methods"`, so the luck test deflates by the number of **distinct methods** the lab has looked at — **N = 28** on the committed `lab/lab.sqlite`, not the 126 dev trial rows — floored at the measured participation ratio (`max(distinct_methods, ceil(participation_ratio))`; `ceil(2.338) = 3`, so the floor does not bind). The reason is not that 126 is a big number: a lab of 126 rows holds 28 ideas, and mean pairwise correlation 0.612 across them says the row count asserts an independence the curves contradict. The consequence that matters operationally is **locality** — a variation twin of an existing method adds 0 to N and a brand-new method adds 1, so re-running one method no longer perturbs every other method's verdict, which is what made the all-trials gate unusable as exploration continued. Nothing recorded is rewritten (`trials` still 128 rows, `test_looks` still 2, every row keeps the label of the bar it was judged under): the verdict is *derived*, so only the published verdicts move — six methods go `rejected` -> `dev-eligible` (M0002, M0007, M0011, M0019, M0024, M0030), `dev-eligible` 2 -> 8 and `rejected` 27 -> 21. Two consequences elsewhere in the package: `remeasure.batches_of`'s second guard had to widen from an equality to a bounded range, because the equality *was* the all-trials projection and would have refused every batch recorded under any other policy; and the lab test modules whose fixtures stamp `n_trials_at_run` with their own dev row count (`test_lab_prereg.py`, `test_lab_status.py`) now pin `DSR_POLICY = "all-trials"` in an autouse fixture, naming the assumption they already encoded rather than inheriting whatever the shipped constant happens to be. Shipped in the same phase: `lab --help`, dead on `main` since a bare `%` entered an argparse `help=` string, is fixed — see the Command contract
 
 ## Layout
 
@@ -214,6 +215,21 @@ def run(args: argparse.Namespace) -> int               # args.dry_run, args.verb
 
 To add a command, add a module. `cli.py` never changes. `discover()` raises `TypeError` if a
 module has no callable `run`.
+
+**A literal `%` in a `help=` string must be written `%%`.** argparse runs every `help=` value
+through %-interpolation in `HelpFormatter._expand_help`, so `help="... the flat 0.1%, journaled"`
+is read as a format spec and the whole `--help` dies with
+`ValueError: unsupported format character ','`. `description=` and `epilog=` are **not**
+interpolated and must stay single. The failure is as quiet as it is total: a help string is only
+expanded when that particular parser's help is rendered, so a bad `%` sits in one subparser doing
+nothing until somebody runs `--help` on it — `lab costs` carried one for about a week and `lab
+--help` was dead the whole time, with no test, import or lint catching it (lab-realistic-gate R1).
+`tests/test_cli.py::test_every_parsers_help_text_formats_without_raising` now walks every parser
+reachable from `cli.build_parser()` through the `_SubParsersAction.choices` mapping and calls
+`format_help()` on each — the same interpolation `--help` does, without printing or exiting — and
+names every parser that raises. It walks rather than listing command names, because a hand-written
+list is exactly the thing that goes stale. A one-off AST sweep of every `help=` string under
+`engine/src/seer_engine/` at the time found exactly one bad `%`.
 
 ### Commands (phase 1)
 
@@ -694,7 +710,10 @@ file, so `lab test` runs the file, not a database row.
   the same path, the same `prepare_for` dispatch and the same D8 row as `lab run`, with the window
   as the only difference.
 - **It does not move the lab's N.** `n_trials_at_run` is `store.dev_trial_count` as it already
-  stands: `trials` counts the multiple testing of the *search*, and a pre-registered look at an
+  stands — still, after lab-realistic-gate R1, because this row is a `window = 'test'` row whose
+  verdict has no DSR condition at all, so nothing ever deflates by the number stamped on it; only
+  `runner.trial_rows`'s **dev** path went through `pending_gate`. `trials` counts the multiple
+  testing of the *search*, and a pre-registered look at an
   already-counted configuration is not a new search. `dev_trial_count` and `dev_daily_sharpes` stay
   dev-only, so every recorded dev trial stays reproducible and a later dev trial is deflated by
   exactly the N it would have had if this look had never happened.
@@ -753,8 +772,20 @@ nothing else. It is addressed by **method**, one at a time, on demand.
   a method's dev trials into the `lab run` batches that wrote them — one batch is one
   `BEGIN IMMEDIATE`, so its `trials.n` are contiguous — and rebuilds the prior daily Sharpes from
   the `sharpe` column of every dev row with a lower `n`. It refuses a non-contiguous batch, and
-  refuses one where `(dev trials before it) + (batch size) != n_trials_at_run`, because then the
-  recorded N does not describe the batch and no honest `var_trials` can be rebuilt from it.
+  refuses one whose recorded N falls outside
+  `1 <= n_trials_at_run <= max((dev trials before it) + (batch size), npolicy.DSR_MIN_N)`, because
+  then the recorded N does not describe the batch and no honest `var_trials` can be rebuilt from
+  it. **The upper bound was an equality until 2026-10-08** (lab-realistic-gate R1): the row-count
+  expression is the `all-trials` projection, so once `store.DSR_POLICY` moved to `"methods"` an
+  equality would have refused every batch recorded under any policy but that one — testing the
+  policy rather than the batch. As a bound it still says the only thing the rows can prove: a
+  recorded N above the number of looks that existed when the batch was judged cannot describe it,
+  and no policy counts more than one look per row. Widening it loses nothing, because the quantity
+  this function reconstructs — `prior_sharpes`, and through it `var_trials` — is read from the rows
+  with `n < first` and never from `n_trials_at_run`, which is carried through verbatim into the
+  rebuilt `MomentsRow`; and the DSR check below already refuses and writes nothing when the
+  recomputed DSR does not reproduce the recorded one. The `DSR_MIN_N` term widens the ceiling only
+  on the degenerate one-trial lab, where `effective` floors at 2 and the row count is 1.
 - **It refuses before it loads anything** (`remeasure.preflight`, every one a `store.LabError`): the
   method has a `window = 'test'` trial — the look is spent and nothing here may stand near it; the
   method has no dev trial; a trial recorded no DSR or no Sharpe, so a re-run cannot be checked
@@ -887,7 +918,16 @@ Re-judges recorded dev trials against the bars in force **now** — `store.DSR_M
   `store.LabError`, which is every refusal above; 1 for anything else.
 - Tests: `tests/test_lab_gate_policy.py` (33) — the derived verdict, the two routes to a DSR, the
   three unblocked candidates, the near misses that stay out, and the proof that
-  `(all-trials, 0.95, 15%)` reproduces the previous verdicts exactly.
+  `(all-trials, 0.95, 15%)` reproduces the previous verdicts exactly. Since lab-realistic-gate R1
+  the `lab_n110.sqlite` fixture is judged under the policy its 110 rows were **recorded** under:
+  the `committed` fixture pins `DSR_POLICY = "all-trials"` beside the database it describes, the
+  hand-built one- and two-method labs take an explicit `at_all_trials` where the rule under test
+  needs a row-counting N, and exactly one test — the one whose subject *is* the shipped default —
+  uses the unpinned `committed_unpinned` copy. Re-pointing the N = 110 claims at the new policy
+  would delete the record of what the two moved bars did rather than test anything; what the
+  shipped policy resolves to is pinned in `test_lab_npolicy.py` and in
+  `test_pending_gate_reproduces_todays_n_under_the_shipped_policy`, which is R1 as one assertion —
+  a batch of variants of a known method adds **0** to N and a brand-new method adds exactly **1**.
 
 
 ### `lab luck` (lab-luck-gate phase 5)
@@ -933,8 +973,16 @@ database and nothing else.
 - **Read-only, by measurement.** No research store is loaded, no backtest runs, no row is
   inserted, updated or deleted, no status moves: `lab/lab.sqlite`'s md5 is unchanged across a run
   and `store.test_looks` still reads 0.
-- Measured: on the committed lab exactly three candidates clear the bar at the live N = 110 —
-  `M0022-W-TV14`, `M0022-W-TV16` and `M0020-W-NOSTOP`.
+- Measured, **at the lab of 110 trials this was written against**: exactly three candidates clear
+  the bar at N = 110 — `M0022-W-TV14`, `M0022-W-TV16` and `M0020-W-NOSTOP` — and pulling the N
+  lever to that lab's distinct-method count of 23 admits all seven of the luck-only sample, 18 of
+  25 over the whole database. That was phase 5's argument for leaving the lever alone, and
+  **lab-realistic-gate R1 pulled it anyway** on 2026-10-08: not because the admission count became
+  acceptable, but because `all-trials` asserts an independence the lab's own estimator contradicts
+  and because one look per variant *run* made re-running a method perturb every other method's
+  verdict. `tests/test_lab_luck.py` keeps both literals deliberately — they are the two N's of the
+  lab the sample was taken from, the measured record of what the move costs, stated in advance, and
+  not the live gate's N (28 under `methods`).
 - **Exit codes**: 0 success; 2 for any `store.LabError`; 1 for anything else.
 - Tests: `tests/test_lab_luck.py` (17).
 
@@ -1006,8 +1054,11 @@ python -m seer_engine lab names [--ns 5,10,15,20,25,30] [--gotrade-only] [--lump
 ```
 
 Report only, and the most report-only command in the lab: it writes **nothing at all** — no
-`trials` row, no `trial_moments` row, no `insights` journal entry and no status — so the lab's N
-and the test-window looks do not move (126 and 2 at the time of writing), and `lab/lab.sqlite` is
+`trials` row, no `trial_moments` row, no `insights` journal entry and no status — so the lab's dev
+trial count and the test-window looks do not move (126 and 2 at the time of writing; since the
+`methods` policy of 2026-10-08 that row count is no longer the gate's N, which is 28 — the
+invariant this command asserts is still the right one, but `name_count.py`'s docstring and this
+command's output call `dev_trial_count` "the lab's N" and now say so loosely), and `lab/lab.sqlite` is
 byte-identical afterwards. Unlike `lab costs` it does not even journal an observation, so
 `lab stage` is not needed and seertrade.site/sera does not change. The command prints N and
 `test_looks` before and after, so the invariant is visible and not merely asserted in a test.
@@ -2439,8 +2490,9 @@ committed-file gate. Nothing in it loads a research store, runs a backtest or wr
   stopped applying, a bar the owner has moved, or an N the gate stopped deflating by. What it
   states is the **dev** gate the variant passed to become `dev-eligible`: the five P7a D8
   conditions plus `DSR >= DSR_MIN` (0.90 since 2026-10-07, the owner's risk appetite — design
-  §7.1), deflated by the N the policy in `store.DSR_POLICY` resolves to (`all-trials` = every dev
-  trial in the lab, left there deliberately — §7.2). `promote_method` always passes the
+  §7.1), deflated by the N the policy in `store.DSR_POLICY` resolves to (`methods` = one look per
+  distinct method, floored at the measured participation ratio, since 2026-10-08; it was
+  `all-trials` = every dev trial in the lab before that). `promote_method` always passes the
   connection, so every committed file carries the threshold, the policy name *and* the count it
   resolved to that day; the `conn=None` form stops short of the count and exists for refusal
   messages and for tests that build a `Prereg` with no database. It is *not* the gate the one
@@ -2478,8 +2530,10 @@ lab ships is `store.DSR_POLICY`.
 - `Policy` / `POLICIES`: the three named answers, and what each measures on the committed
   `lab/lab.sqlite` — `all-trials` = **126**, `methods` = **28**, `effective` = **2**.
   - `all-trials` — one look per dev trial row, the literal reading of the design and what the lab
-    does today. Deliberately **unfloored**, so an empty lab reads 0 rather than a fabricated 2.
-  - `methods` — one look per distinct method with a dev trial, floored at the measured participation
+    **did until 2026-10-08**. Deliberately **unfloored**, so an empty lab reads 0 rather than a
+    fabricated 2.
+  - `methods` — **in force since 2026-10-08** (lab-realistic-gate R1). One look per distinct method
+    with a dev trial, floored at the measured participation
     ratio: `max(distinct_methods, ceil(participation_ratio))`. Counts a family of variants as the one
     idea it is, while the floor guarantees the policy can never claim fewer independent looks than
     the curves measurably show. The floor does not bind on the committed database (ceil(2.34) = 3
@@ -2489,8 +2543,12 @@ lab ships is `store.DSR_POLICY`.
     for that reason not a count of how many times the search looked: every lab strategy holds US
     large-cap equities, so the streams collapse onto the market factor. Kept live so the gate's
     sensitivity stays inspectable.
-- `DEFAULT_POLICY = "all-trials"` — deliberately the policy the lab actually ships, so a caller that
-  forgets to name one cannot be deflated by an N the gate does not use.
+- `DEFAULT_POLICY = "methods"` — deliberately the policy the lab actually ships
+  (`store.DSR_POLICY`; it was `"all-trials"` until 2026-10-08), so a caller that forgets to name one
+  cannot be deflated by an N the gate does not use. It moves whenever that constant moves, and only
+  then — `test_the_policy_names_are_a_closed_set` now asserts it as an **equality to
+  `store.DSR_POLICY`** rather than as two literals, so the next move of the lever cannot separate
+  the two silently, with the literal kept beside it so that a move is still a deliberate edit.
 - `effective_n(conn, policy=DEFAULT_POLICY) -> NCount`: the N and the evidence behind it. `NCount.n`
   is the int to hand `dev.deflated_sharpe`; the rest is why — `trial_rows`, `distinct_methods`,
   `participation_ratio`, `mean_pairwise_corr`, `curves_used`, `month_ends`. `NCount.basis` is a
@@ -2528,8 +2586,22 @@ cannot be read. `lab/store.py` owns the whole of it — the two constants, the d
 one write path that acts on it.
 
 - **The two constants, and nothing else decides the gate.** `DSR_MIN` is the threshold (0.95 ->
-  0.90, the owner's stated risk appetite, Decision D1) and `DSR_POLICY = "all-trials"` is the
-  single name that decides N (Decision D2). There is no policy over the threshold and no second
+  0.90, the owner's stated risk appetite, Decision D1) and `DSR_POLICY = "methods"` is the
+  single name that decides N (Decision D2; `"all-trials"` until 2026-10-08, moved by
+  lab-realistic-gate R1 because counting one look per variant *run* made re-running one method
+  perturb every other method's verdict — N = 28 on the committed database, not 126). Moving either
+  constant moves published verdicts without rewriting a row: R1's move took `dev-eligible` from 2
+  to 8 and `rejected` from 27 to 21 (M0002, M0007, M0011, M0019, M0024 and M0030 crossed), with
+  `trials` still 128 rows and `test_looks` still 2. The two constants are also guarded differently
+  in prose, and deliberately: `tests/test_lab_gate_wording.py` sweeps the documents an unattended
+  session acts on for a **stale threshold**, because a threshold is a number a document can state
+  and get wrong, and it compares what it finds against `DSR_MIN`. A policy is a *name* with no
+  number to compare, so it is swept instead by
+  `test_the_gate_text_is_built_from_the_constants_that_decide_the_verdict`, which requires the live
+  `DSR_POLICY` to appear rather than forbidding the dead one. Prose that still describes N as the
+  row count was corrected where it states a live rule (`prereg.gate_text`'s docstring,
+  `docs/lab/prereg/README.md`, the explorer skill); extending the wording guard to policy names is
+  recorded as larger work than a constant move rather than half-done. There is no policy over the threshold and no second
   place either number is written. `DSR_LABEL` is **derived** from `DSR_MIN`
   (`LUCK_LABEL_PREFIX + f"{DSR_MIN:.2f}"`), so the label and the threshold can never disagree.
 - `is_luck_label(label) -> bool`: true for a luck-test failure label recorded under *any*
@@ -2614,6 +2686,13 @@ one write path that acts on it.
   still records **the N the DSR was computed at**, which is what it has always meant, and the
   variance is still the sample variance across every recorded dev trial plus the batch — only the
   *count* of looks is policy-dependent, never the dispersion the expected maximum is drawn from.
+  Since lab-realistic-gate R1 the two **diverge**: under `methods` a batch of variants of a method
+  the lab already holds projects to the lab's current N (it adds 0), and a brand-new method adds
+  exactly 1, while `dev_trial_count` keeps climbing by one per candidate. So a reader of
+  `trials.n_trials_at_run` must stop treating it as a row count — it is the gate's N on that run
+  date, and that is the only thing `remeasure` may reproduce it from. `test_lab_runner.py` asserts
+  the projection against `store.pending_gate` and the row count separately, so the two cannot be
+  conflated again.
 - **Imports stay inside the functions.** `store.gate` imports `lab.npolicy` inside itself, and
   `owner_failures` / `dsr_at` / `_blocking` import `backtest.dev` and `backtest.tuning` inside
   themselves, so `import store` — which the whole lab does — still drags in neither the estimator's

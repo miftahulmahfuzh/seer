@@ -45,12 +45,16 @@ Policy = Literal["all-trials", "methods", "effective"]
 POLICIES: tuple[Policy, ...] = ("all-trials", "methods", "effective")
 
 # The policy a caller that does not name one gets. It is deliberately the same policy the lab
-# actually ships -- ``store.DSR_POLICY = "all-trials"`` (LAB_LUCK_GATE_PLAN.md Decisions D1: the
-# owner moved the threshold, not N) -- so that no code path can ever be deflated by an N the gate
+# actually ships -- ``store.DSR_POLICY = "methods"`` (lab-realistic-gate R1; it was
+# ``"all-trials"`` until 2026-10-08) -- so that no code path can ever be deflated by an N the gate
 # does not use. ``store`` sets its own constant explicitly and passes it to ``effective_n`` on
 # every call, so this default is a belt beside that brace rather than the thing the gate relies
 # on; the two agreeing is what makes a mistaken inheritance harmless instead of silent.
-DEFAULT_POLICY: Policy = "all-trials"
+#
+# **This constant moves whenever ``store.DSR_POLICY`` moves, and only then.**
+# ``test_the_policy_names_are_a_closed_set`` pins the equality from this side and
+# ``test_the_shipped_defaults_reproduce_todays_n`` from the other.
+DEFAULT_POLICY: Policy = "methods"
 
 # A curve needs this many month-ends to yield a variance, and the aligned grid this many to
 # yield one return per trial that is worth correlating.

@@ -86,6 +86,14 @@ def test_remeasure_backfills_moments_and_reproduces_the_recorded_dsr(conn, data,
     numbers = [int(r["n"]) for r in store.trials_of(conn, "M0001")]
     assert numbers == [55, 56]
     assert all(store.moments_of(conn, n) is None for n in numbers)
+    # The N to reproduce is the one the run recorded, whatever `store.DSR_POLICY` resolved to --
+    # read back off the rows rather than typed, because it is the row count only under
+    # `all-trials` and `methods` has shipped since 2026-10-08 (lab-realistic-gate R1). The whole
+    # point of `remeasure` is to rebuild inputs that reproduce the RECORDED dsr, so the recorded
+    # N is the only honest source for it.
+    recorded = {int(r["n_trials_at_run"]) for r in store.trials_of(conn, "M0001")}
+    assert len(recorded) == 1, f"one batch, one N: {recorded}"
+    (n_at_run,) = recorded
 
     report = remeasure.remeasure(conn, m, HERE, data, require_commit=False)
 
@@ -96,10 +104,10 @@ def test_remeasure_backfills_moments_and_reproduces_the_recorded_dsr(conn, data,
         assert r.ok
         assert r.sharpe_delta <= remeasure.SHARPE_TOL * max(abs(r.recorded_sharpe), 1.0)
         assert r.dsr_delta <= remeasure.DSR_TOL
-        assert r.n_at_run == 56
+        assert r.n_at_run == n_at_run
     for n in numbers:
         row = store.moments_of(conn, n)
-        assert row is not None and row["n_at_run"] == 56 and row["t"] > 2
+        assert row is not None and row["n_at_run"] == n_at_run and row["t"] > 2
     assert store.test_looks(conn) == 0
     text = remeasure.format_report(report)
     assert "re-measured on the dev window" in text and "No trials row was inserted" in text

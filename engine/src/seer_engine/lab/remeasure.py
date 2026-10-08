@@ -63,7 +63,7 @@ from seer_engine.backtest.book_runner import TRADING_DAYS
 from seer_engine.backtest.dev import Candidate, DevRow
 from seer_engine.backtest.registry import REGISTRY
 from seer_engine.commands.backtest_dev import daily_moments, registry_problem
-from seer_engine.lab import store
+from seer_engine.lab import npolicy, store
 from seer_engine.lab.method import METHOD_ID, Method, config_digest, source_sha
 
 log = logging.getLogger(__name__)
@@ -223,10 +223,24 @@ def batches_of(conn: sqlite3.Connection, trials: Sequence[sqlite3.Row]) -> tuple
     1. a batch's trial numbers are contiguous. One ``lab run`` writes its whole batch inside one
        ``BEGIN IMMEDIATE`` transaction (``runner.run_method``), so a gap means the rows were not
        written by one run and "what existed then" cannot be read off ``n``.
-    2. ``count(dev trials with n < the batch's first n) + len(batch) == n_trials_at_run``. That
-       equality *is* ``store.dev_trial_count(conn) + len(results)``, the line that produced the
-       recorded N. If it does not hold, the recorded N does not describe this batch and no honest
-       ``var_trials`` can be rebuilt from it.
+    2. ``1 <= n_trials_at_run <= count(dev trials with n < the batch's first n) + len(batch)``.
+       The upper bound is the number of looks that existed when the batch was judged, which is
+       exactly what the ``all-trials`` policy resolves to and is the ceiling of every other
+       policy (``methods`` is ``max(distinct methods, ceil(participation ratio))`` and
+       ``effective`` is ``max(2, round(participation ratio))``, and neither counts more than one
+       look per row). A recorded N above it cannot describe this batch.
+
+       **This was an equality until 2026-10-08** and had to stop being one when
+       ``store.DSR_POLICY`` moved to ``"methods"`` (lab-realistic-gate R1): the row-count
+       expression is the all-trials projection, so every batch recorded under any other policy
+       would be refused by a guard that is testing the policy rather than the batch. The quantity
+       this function actually reconstructs -- ``prior_sharpes``, and through it ``var_trials`` --
+       is read from the rows with ``n < first`` and never from ``n_trials_at_run``, so widening
+       the bound loses nothing: the recorded N is carried through verbatim into the rebuilt
+       ``MomentsRow``, and ``remeasure`` already refuses and writes nothing when the DSR it
+       recomputes from it does not reproduce the recorded one (``SHARPE_TOL``/``DSR_TOL``).
+       ``npolicy.DSR_MIN_N`` widens the ceiling on the degenerate one-trial lab, where
+       ``effective`` floors at 2 and the row count is 1.
     """
     groups: dict[tuple[str, int], list[sqlite3.Row]] = {}
     for row in trials:
@@ -247,11 +261,13 @@ def batches_of(conn: sqlite3.Connection, trials: Sequence[sqlite3.Row]) -> tuple
                 "SELECT count(*) FROM trials WHERE window = 'dev' AND n < ?", (first,)
             ).fetchone()[0]
         )
-        if before + len(ns) != n_at_run:
+        ceiling = max(before + len(ns), npolicy.DSR_MIN_N)
+        if not 1 <= n_at_run <= ceiling:
             raise store.LabError(
-                f"{method_id}: trial #{first} records N = {n_at_run}, but {before} dev trials "
-                f"precede it and its batch holds {len(ns)}. The recorded N does not describe this "
-                f"batch, so the var_trials it was deflated by cannot be reconstructed honestly. "
+                f"{method_id}: trial #{first} records N = {n_at_run}, but only {before} dev "
+                f"trials precede it and its batch holds {len(ns)}, so at most {ceiling} looks "
+                f"existed when it was judged. The recorded N does not describe this batch, so "
+                f"the var_trials it was deflated by cannot be reconstructed honestly. "
                 f"Nothing is backfilled"
             )
         prior = tuple(

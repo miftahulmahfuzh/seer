@@ -90,9 +90,15 @@ def test_best_dev_eligible_is_the_highest_mar_and_breaks_ties_on_the_trial_numbe
             _trial(candidate_id="M0001-E", config_digest="de", window="test", mar=2.0,
                    eligible=True, failed=""),
         ])
-    best = store.best_dev_eligible(conn, "M0001")
+    # Judge at the N these rows were RECORDED at -- `n_trials_at_run=4`, which is the dev row
+    # count -- rather than at whatever `store.DSR_POLICY` resolves to. That is what makes
+    # `store.verdict`'s re-evaluation the identity here, which is the condition the comment above
+    # describes and which every assertion below rests on. Derived from the data, not typed, and
+    # it names no shipped constant: the subject is `best_dev_eligible`'s ordering, not the gate.
+    at = store.Gate(n=store.dev_trial_count(conn), policy="all-trials")
+    best = store.best_dev_eligible(conn, "M0001", at=at)
     assert best["candidate_id"] == "M0001-A"  # the tie breaks on n, and the test trial is not it
-    assert store.best_dev_eligible(conn, "M0002") is None
+    assert store.best_dev_eligible(conn, "M0002", at=at) is None
 
 
 def _moments(**kw) -> store.MomentsRow:

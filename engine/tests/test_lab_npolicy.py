@@ -96,9 +96,13 @@ def _independent(count: int, months: int = 120, seed: int = 7) -> list[str]:
 def test_the_policy_names_are_a_closed_set():
     assert npolicy.POLICIES == ("all-trials", "methods", "effective")
     assert npolicy.DEFAULT_POLICY in npolicy.POLICIES
-    # Reconciled: this module's default is the policy the lab ships (store.DSR_POLICY, phase 4),
-    # so no caller can be deflated by an N the gate does not use. Phase 4 pins the other side.
-    assert npolicy.DEFAULT_POLICY == "all-trials"
+    # Reconciled: this module's default is the policy the lab ships (store.DSR_POLICY), so no
+    # caller can be deflated by an N the gate does not use. `test_the_shipped_defaults_
+    # reproduce_todays_n` pins the other side. Asserted as an EQUALITY to the store's constant
+    # rather than as two literals, so the next move of the lever cannot separate them silently;
+    # the literal is kept beside it so that a move is still a deliberate edit here.
+    assert npolicy.DEFAULT_POLICY == store.DSR_POLICY
+    assert npolicy.DEFAULT_POLICY == "methods"
     for name in npolicy.POLICIES:
         assert npolicy.check_policy(name) == name
     with pytest.raises(npolicy.UnknownPolicy, match="unknown N policy"):

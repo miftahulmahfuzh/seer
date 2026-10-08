@@ -157,9 +157,11 @@ def gate_text(conn: sqlite3.Connection | None = None) -> str:
     other. The **threshold** moved on 2026-10-07 (design §7.1: the owner set ``DSR_MIN`` to 0.90),
     and a pre-registration written at 0.90 records a different claim from one written at 0.95, so
     the file has to say which. The **N** is whatever the policy named in ``store.DSR_POLICY``
-    resolves to -- ``all-trials``, every dev trial in the lab, as design §3 has always said and
-    §7.2 deliberately left it -- and the number it came to that day is the multiple-testing count
-    the deflation actually used.
+    resolves to -- ``methods`` since 2026-10-08 (lab-realistic-gate R1): one look per distinct
+    method with a dev trial, floored at the measured participation ratio, where it was one look
+    per trial *row* before. Committed files written under either policy are correct records,
+    because each names the policy it was written under; the number it came to that day is the
+    multiple-testing count the deflation actually used.
 
     ``conn`` resolves that N and the one-line evidence behind it. ``promote_method`` always passes
     one, so **every committed pre-registration carries both numbers for the day it was written**,

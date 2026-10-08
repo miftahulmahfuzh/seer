@@ -109,8 +109,11 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    - result vs total-return SPY, and which conditions failed and by how much
    - DSR at N, in words: how likely the result is real rather than luck after N tries. Say the N
      and the bar it was judged against — the bar is `DSR >= 0.90`, the owner's risk appetite since
-     2026-10-07 (design §7.1), and N is every dev trial in the lab (§7.2). Both are printed by
-     `lab status`; neither is yours to change.
+     2026-10-07 (design §7.1), and N is one look per distinct method in the lab, floored at the
+     measured participation ratio (`DSR_POLICY = "methods"` since 2026-10-08; it was one look per
+     dev trial row before). Both are printed by `lab status`; neither is yours to change. Read
+     the N off `lab status` rather than counting trials: a method's variants are one look, so the
+     trial-row count is no longer the N.
    - worst year and when the drawdown hit
    - **why**: the mechanism, not just the numbers
    - whether the hypothesis held and whether the expected failure happened

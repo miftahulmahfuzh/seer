@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-08
-**Total Active Tasks**: 0
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 102
+- Completed: 103
 
 ---
 
@@ -23,6 +23,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [ ] **P1-ENG-FND7** Phase 2: The lab's search is funded like the owner's account
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `lab/runner.py:310` (`lab run`) and `:612` (`lab test`) passing `contributions=OWNER_MONTHLY`; the `FundingRow` construction and `store.insert_funding` call inside `run_method`'s existing `BEGIN IMMEDIATE`, stamped with the trial number `insert_trials` assigned; and the now-false docstring claim at `backtest/dev.py:594`. Per the index's reconciliation log it also takes the two GATE conditions funding would otherwise inflate — the Sharpe behind the DSR (`book_runner.py:536`) and max drawdown (`metrics.py:261`) — with unfunded paths taking today's code verbatim so unfunded runs stay byte-identical. Does not touch `sim/contributions.py`, `backtest/dev.py`'s behaviour (only its docstring), `store.py`'s funding API (already built and tested), any recorded row, or phase 1's constant. Exit criteria: a newly run method records one `trial_funding` row per trial with a non-null `deposits_usd`/`deposits_n` and an `mwr`; `funding_of` still returns None for all 128 pre-existing trials; the gate's money-weighted branch at `store.py:1428` is reachable and exercised by a test; `SELECT count(*) FROM trials` unchanged by the phase itself; both suites green.
+  - **Status**: in_progress
+  - **Plan Set**: `LAB_REALISTIC_GATE_PLAN.md` (phase 2 of 3)
+  - **Satisfies**: R2 — Make the lab's own search measure the owner's real funding (+5,000,000 IDR monthly on a 10,000,000 IDR start), not a book that never grows
+  - **Depends on**: P1-ENG-L4ND
+  - **Plan**: `.workflows/plan/P1-ENG-FND7.md`
 - [x] **P1-ENG-U9XK** Phase 12: The rebuilt roster, and the wiring layer
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -836,6 +845,20 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-L4ND** Phase 1: Count the looks the data supports, and publish today's verdict
+  - **Difficulty**: HARD
+  - **Type**: Update
+  - **Context**: Owns `store.DSR_POLICY` -> `"methods"`, with `npolicy.DEFAULT_POLICY` moved with it, and every test and prose line pinning `"all-trials"`, N=110 or the recorded verdict digest (`test_lab_gate_policy.py:622,709`, `test_lab_snapshot.py:373`, `test_lab_prereg.py:439`, `test_lab_gate_wording.py:188`, `test_lab_luck.py:158`, `test_lab_npolicy.py:99`); the `lab reevaluate` sweep; the `lab stage` republish of `lab/lab.sqlite` + `web/data/lab.json`. **Also owns a live bug on main:** `lab --help` raises `ValueError: unsupported format character ','` from a bare percent in an argparse help string at `commands/lab.py:236` — a one-character fix, plus a sweep of every other argparse help/epilog string under `engine/src/seer_engine/commands/` for unescaped `%`, plus a regression test exercising help formatting for the top-level parser and every subparser. Does not touch `lab/runner.py` (phase 2's), `DSR_MIN`, any `tuning.*` bar, any recorded row, or the paper roster's composition. Exit criteria: `store.gate(conn).policy == "methods"` and `.n == 28` on the committed database; **SIX methods move `rejected -> dev-eligible` — M0002, M0007, M0011, M0019, M0024, M0030 — taking dev-eligible from 2 to 8** (measured; the brief predicted two and was wrong), with `M0008` still rejected and `M0022` already dev-eligible; the FULL engine suite green on phase 1's files alone, since phase 1 owns every one of the 8 test modules its change breaks (41 failures); `remeasure.batches_of`'s guard widened at the source; `lab --help` no longer raises; `web/data/lab.json` agrees with `store.gate` and no longer publishes a method as `rejected` whose dev trials clear; trials count still 128; test looks still 2; both suites green.
+  - **Status**: completed
+  - **Plan Set**: `LAB_REALISTIC_GATE_PLAN.md` (phase 1 of 3)
+  - **Satisfies**: R1 — Correct the luck gate's N so re-running a method stops perturbing every other method's verdict, and publish verdicts that reflect the bars in force now
+  - **Plan**: `.workflows/plan/P1-ENG-L4ND.md`
+  - **Completed**: 2026-10-08 14:56
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/store.py, engine/src/seer_engine/lab/npolicy.py, engine/src/seer_engine/lab/remeasure.py, engine/src/seer_engine/lab/prereg.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_gate_policy.py, engine/tests/test_lab_npolicy.py, engine/tests/test_lab_gate_wording.py, engine/tests/test_lab_luck.py, engine/tests/test_lab_runner.py, engine/tests/test_lab_remeasure.py, engine/tests/test_lab_store.py, engine/tests/test_lab_prereg.py, engine/tests/test_lab_status.py, engine/tests/test_cli.py, engine/package_readme.md, .claude/skills/explore-and-experiment-new-method/SKILL.md, docs/lab/prereg/README.md, web/app/sera/overview.ts, engine/.workflows/todos.md, .workflows/todos.md, engine/.workflows/plan/P1-ENG-L4ND.md, engine/.workflows/plan/P1-ENG-FND7.md, .workflows/plan/P1-ROOT-RDX2.md
+  - **Verified**: engine suite `PYTHONPATH=<worktree>/engine/src` with the main checkout's venv -> 3079 passed, 406 skipped, 0 failed (baseline 3078; the extra test is the `--help` regression). Web suite 48 files / 626 tests, all passed. `lab --help` prints usage instead of raising. Data exit criteria all asserted on the committed database: `store.gate(conn)` is `("methods", 28)`; `count(*) FROM trials` is 128 and the recorded-column digest `6137e3ded7ac5bd4360b2c4fd061054cca76a9b1e4d0896610d56230f129e13e` unchanged; `store.test_looks` is 2; six methods moved rejected -> dev-eligible (M0002, M0007, M0011, M0019, M0024, M0030), dev-eligible 2 -> 8 and rejected 27 -> 21; M0008 still rejected, M0022 already dev-eligible; no method published `rejected` has a dev trial that clears; `web/data/lab.json` agrees with `store.gate`; the `paper[]` block's frozen promotion provenance unchanged (all four still `rejected`). All six `reevaluate` writes are strict appends (`new.startswith(old)` true for each), each naming N = 28 and every candidate it unblocked.
+  - **Decided**: The phase plan's Verification section is headed 'The data, after Step 10' while Step 13 is the step that actually writes lab/lab.sqlite -> ran the data verification after Step 13 (rung 3: the plan's own code blocks, where Step 13 is labelled 'the only step that writes lab/lab.sqlite')
+  - **Data commit**: `fa8fa2e` — `lab/lab.sqlite` + `web/data/lab.json` were committed together by pathspec immediately after `lab stage` (invariant 3), so they are deliberately not in the Files list above.
 - [x] **P1-ENG-N8SW** Phase 8: How many names, measured at real fees and real funding
   - **Difficulty**: NORMAL
   - **Type**: Feature

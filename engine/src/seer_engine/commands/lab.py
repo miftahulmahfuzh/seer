@@ -233,7 +233,11 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
 
     s = sub.add_parser(
         "costs",
-        help="report only: a recorded method at Gotrade's real fees vs the flat 0.1%, journaled",
+        # `0.1%%`, not `0.1%`: argparse runs every `help=` string through %-interpolation
+        # (`HelpFormatter._expand_help`), so a bare `%` is read as a format spec and
+        # `lab --help` died with "unsupported format character ','". A doubled `%%` renders as
+        # one `%`. `description=` below is NOT interpolated and must stay single.
+        help="report only: a recorded method at Gotrade's real fees vs the flat 0.1%%, journaled",
         description=(
             "Re-run a recorded method's best dev variant (by MAR) twice on the dev window -- at "
             "the lab's flat 0.1% a trade and at Gotrade's real fees -- print both side by side and "

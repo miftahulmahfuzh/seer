@@ -3,15 +3,15 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-08
-**Total Active Tasks**: 1
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
 - P1 High: 1
-- P2 Medium: 0
-- P3 Low: 0
+- P2 Medium: 1
+- P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
 - Completed: 103
@@ -835,6 +835,20 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 
 ### [P2] Medium
+- [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"
+  - **Difficulty**: EASY
+  - **Type**: Bug
+  - **Context**: `engine/src/seer_engine/lab/name_count.py:27` (module docstring) equates the two quantities outright — ``store.dev_trial_count`` **(the lab's N)**. That was true under `DSR_POLICY = "all-trials"`, where N was one look per dev trial row. Since 2026-10-08 the shipped policy is `methods` (lab-realistic-gate R1, `P1-ENG-L4ND`) and N is the distinct-method count floored at the measured participation ratio — 28, against 126 dev trial rows. The parenthetical now names the wrong quantity, and it sits in the docstring a reader consults to learn what the module guarantees. The fix is the wording: `dev_trial_count` is still the right number for that sentence's purpose (it is what stays unchanged), it is simply no longer "the lab's N" — that is `store.gate(conn).n`. Found during phase 1 and deliberately left: `name_count.py` is outside that phase's Owns, so it is carded rather than edited. **Checked and NOT a defect — do not "fix" it:** `:477`, the `format_report` footer, says "the lab's N and the test-window looks do not move". That is a claim about `lab names` writing nothing, and it stays true under every policy. `:27` is the only site that mislabels the quantity.
+  - **Status**: pending
+  - **Found by**: `P1-ENG-L4ND` (lab-realistic-gate phase 1)
+
+### [P3] Low
+- [ ] **P3-ENG-V2KQ** Append a dated §7.3 revision recording the N policy move to the lab design doc
+  - **Difficulty**: EASY
+  - **Type**: Update
+  - **Context**: `docs/plans/2026-10-04-method-lab-design.md` §7.2 is headed "deliberately left at `all-trials`" and its table row reads "| **`all-trials`** (in force) | every dev trial row | **110** |". The "(in force)" is false since 2026-10-08, when `DSR_POLICY` moved to `methods` (lab-realistic-gate R1, `P1-ENG-L4ND`). That document records decisions by **appending dated revisions** rather than editing older ones — §3 keeps its original sentence and §7 quotes it as the thing it supersedes — so the honest repair is a new dated §7.3 stating that the lever was pulled, why (the policy asserted an independence the lab's own estimator contradicts: participation ratio 2.34 over 126 curves, mean pairwise correlation 0.612) and what it cost (six methods moved `rejected -> dev-eligible`; `dev-eligible` 2 -> 8). §7.2's argument must NOT be rewritten — it is a true record of the 2026-10-07 decision. Phase 1 decided this explicitly rather than editing in place (its Handoffs section, "To nobody, deliberately").
+  - **Status**: pending
+  - **Found by**: `P1-ENG-L4ND` (lab-realistic-gate phase 1)
 
 ### [P3] Low
 

@@ -32,12 +32,14 @@ money-weighted return of a trial that received deposits, and of the SPY fed the 
 ``connect`` migrates an older database in place; ``connect_readonly`` never does.
 
 The **verdict** a trial reads is derived, not frozen: ``DSR_MIN`` is the threshold (0.90 since
-2026-10-07) and ``DSR_POLICY`` names the multiple-testing N (``all-trials`` today, so N is every
-dev trial, as it has always been). ``verdict`` re-decides every condition at call time -- the four
-threshold owner conditions from the trial's own recorded columns against the live constants, the
-luck test on the trial's DSR at the gate's current N -- and carries only ``owner inputs`` from the
-record, because no constant re-decides it. Recorded rows keep the labels of the bars they were
-judged under, so every reader uses ``is_luck_label`` rather than comparing to ``DSR_LABEL``, and
+2026-10-07) and ``DSR_POLICY`` names the multiple-testing N (``methods`` since 2026-10-08, so N is
+the number of distinct methods the lab has looked at -- 28 today -- floored at the measured
+participation ratio; it was ``all-trials``, one look per dev trial row, until then). ``verdict``
+re-decides every condition at call time -- the four threshold owner conditions from the trial's own
+recorded columns against the live constants, the luck test on the trial's DSR at the gate's current
+N -- and carries only ``owner inputs`` from the record, because no constant re-decides it.
+Recorded rows keep the labels of the bars they were judged under, so every reader uses
+``is_luck_label`` rather than comparing to ``DSR_LABEL``, and
 ``owner_failures`` rather than parsing a ``failed`` string.
 
 ``snapshot`` / ``snapshot_json`` turn a database (v1, v2 or v3) into the web's ``web/data/lab.json``

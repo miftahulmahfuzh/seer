@@ -36,7 +36,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The lab's search is funded like the owner's account"
     },
@@ -64,6 +64,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-realistic-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-realistic-gate",
-  "updated": "2026-10-08T08:04:20+00:00",
+  "updated": "2026-10-08T08:07:29+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-realistic-gate"
 }

@@ -3,6 +3,12 @@
   "coordinator": "orch-lab-realistic-gate",
   "coordinator_session_id": "53326c75-8555-45d7-b0d6-7a18c2bebbfb",
   "created": "2026-10-08T07:45:49+00:00",
+  "landed": {
+    "at": "2026-10-08T08:41:42+00:00",
+    "base": "main",
+    "commit": "e8a35530a254a961d59b6c84a98ab527bb5ae233",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -64,6 +70,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-realistic-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-realistic-gate",
-  "updated": "2026-10-08T08:38:23+00:00",
+  "updated": "2026-10-08T08:41:42+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-realistic-gate"
 }

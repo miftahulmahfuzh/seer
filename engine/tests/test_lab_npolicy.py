@@ -7,6 +7,7 @@ Pure reads throughout: no backtest runs here and no test-window look is spent.
 
 from __future__ import annotations
 
+import json
 import math
 import sqlite3
 from datetime import date
@@ -15,14 +16,6 @@ import numpy as np
 import pytest
 
 from seer_engine.lab import npolicy, store
-
-# The committed database as this phase measured it (lab-luck-gate analysis, "Measured
-# Evidence"). The lab grows, so the pinned assertions below skip once it does; the ordering
-# assertions hold for every lab, forever.
-COMMITTED_DEV_TRIALS = 110
-COMMITTED_METHODS = 23
-COMMITTED_PR = 2.442
-COMMITTED_RHO = 0.595
 
 
 @pytest.fixture()
@@ -290,6 +283,45 @@ def _committed():
     return conn
 
 
+def _reference_correlation(conn: sqlite3.Connection) -> tuple[float, float, int, int]:
+    """Recompute the dev trials' co-movement here, from the raw ``trials.curve_json`` rows.
+
+    Calls none of ``npolicy``'s helpers, so the test below compares two independent routes to the
+    same four figures: (participation ratio, mean pairwise correlation, curves used, common
+    month-ends).
+
+    This replaced four typed constants (a participation ratio pinned at 2.442, and friends). A
+    typed number is a
+    property of one set of curves, and Sera adds curves: by the time the lab reached 126 dev trials
+    the pin said 110 and the test that held it had turned itself into a skip, so CI was asserting
+    nothing while reporting a pass. There is no number for which "the ratio is 2.44" survives the
+    lab growing -- but the arithmetic that produces it is the same at any size, so the arithmetic
+    is what this pins. The filters mirror ``npolicy._dev_curves`` and ``_return_matrix``: a curve
+    too short to carry a variance, with a non-positive level, or perfectly flat is dropped rather
+    than correlated. If those rules ever change, this changes with them -- deliberately.
+    """
+    curves: list[dict[str, float]] = []
+    for (text,) in conn.execute("SELECT curve_json FROM trials WHERE window = 'dev' ORDER BY n"):
+        curve = {str(day): float(level) for day, level in json.loads(text or "[]")}
+        if len(curve) >= 3:  # npolicy._MIN_POINTS: fewer points carry no variance
+            curves.append(curve)
+    assert len(curves) >= 2, "the committed database must hold at least two usable dev curves"
+    days = sorted(set.intersection(*(set(c) for c in curves)))
+    assert len(days) >= 3, "the dev curves must share at least three month-ends"
+    rows: list[np.ndarray] = []
+    for curve in curves:
+        levels = np.asarray([curve[d] for d in days], dtype=float)
+        returns = levels[1:] / levels[:-1] - 1.0
+        if np.all(levels > 0.0) and np.all(np.isfinite(returns)) and float(np.std(returns)) > 0.0:
+            rows.append(returns)
+    matrix = np.vstack(rows)
+    corr = np.corrcoef(matrix)
+    eigenvalues = np.linalg.eigvalsh(corr)
+    ratio = float(np.sum(eigenvalues)) ** 2 / float(np.sum(eigenvalues**2))
+    upper = np.triu_indices(len(rows), k=1)
+    return ratio, float(np.mean(corr[upper])), len(rows), len(days)
+
+
 def test_the_committed_database_orders_the_three_policies():
     """Holds for every lab: the measured independence never exceeds the ideas, which never
     exceed the rows. This is the whole claim behind choosing ``methods``."""
@@ -307,28 +339,54 @@ def test_the_committed_database_orders_the_three_policies():
         conn.close()
 
 
-def test_the_committed_evidence_at_110_dev_trials():
-    """The three numbers this phase was specified against, pinned to the database it measured.
+def test_the_committed_evidence_is_recomputed_from_the_database_that_holds_it():
+    """The gate's N and the evidence behind it, asserted against the lab as it stands today.
 
-    Skips once Sera records more trials -- the invariant that outlives the counts is the
-    ordering asserted above.
+    Nothing here is a typed number, so nothing here can age. This test used to carry four
+    ``COMMITTED_*`` constants measured at 110 dev trials and skip itself once the lab moved past
+    them; the lab now holds 126 dev trials (plus 2 in the test window, 128 rows in all), so it had
+    been skipping -- asserting nothing -- while CI failed on the skip itself with a message about
+    PG_TEST_URL that was false. Every expected value below is either read from the database or
+    recomputed from its raw curves by ``_reference_correlation``, which keeps the test's teeth at
+    any lab size.
     """
     conn = _committed()
     try:
-        if store.dev_trial_count(conn) != COMMITTED_DEV_TRIALS:
-            pytest.skip(f"the lab has moved past {COMMITTED_DEV_TRIALS} dev trials")
-        assert npolicy.dev_method_count(conn) == COMMITTED_METHODS
-        assert npolicy.effective_n(conn, "all-trials").n == 110
-        assert npolicy.effective_n(conn, "methods").n == 23
-        assert npolicy.effective_n(conn, "effective").n == 2
+        trials = store.dev_trial_count(conn)
+        methods = npolicy.dev_method_count(conn)
         corr = npolicy.correlation(conn)
-        assert corr.curves_used == COMMITTED_DEV_TRIALS
-        assert corr.month_ends == 102
-        assert corr.participation_ratio == pytest.approx(COMMITTED_PR, abs=5e-3)
-        assert corr.mean_pairwise == pytest.approx(COMMITTED_RHO, abs=5e-3)
-        # The line phase 7 commits into every pre-registration and into web/data/lab.json.
+        ratio, rho, curves_used, month_ends = _reference_correlation(conn)
+
+        # The estimator agrees with the arithmetic, curve for curve and month-end for month-end.
+        assert corr.curves_used == curves_used
+        assert corr.month_ends == month_ends
+        assert corr.participation_ratio == pytest.approx(ratio, rel=1e-9)
+        assert corr.mean_pairwise == pytest.approx(rho, rel=1e-9)
+
+        # No dev trial's curve is dropped on the way into the measurement. If this fails, the
+        # gate's N rests on fewer curves than the lab recorded, which is worth a look before it
+        # is accepted.
+        assert corr.curves_used == trials, (
+            f"{trials - corr.curves_used} of {trials} dev curves were dropped before the "
+            "measurement; find which trial and why rather than loosening this"
+        )
+
+        # The trials are not independent, and it is measurable: the claim npolicy exists to make.
+        # A correlation matrix regressed to the identity would put the ratio at `trials` and rho
+        # at 0, and both of these would catch it.
+        assert 1.0 <= corr.participation_ratio < float(trials)
+        assert corr.mean_pairwise is not None and 0.0 < corr.mean_pairwise < 1.0
+
+        # Each policy resolves to exactly what it is defined as, on this database.
+        assert npolicy.effective_n(conn, "all-trials").n == trials
+        assert npolicy.effective_n(conn, "methods").n == max(methods, math.ceil(ratio))
+        assert npolicy.effective_n(conn, "effective").n == max(npolicy.DSR_MIN_N, round(ratio))
+
+        # The one line committed into every docs/lab/prereg/MNNNN.md and published as
+        # web/data/lab.json's gate.dsrNBasis. Built from the measured count, so it can never
+        # quote a count the lab has outgrown -- which is the bug this whole test is the fix for.
         assert npolicy.effective_n(conn, "all-trials").basis == (
-            "110 dev trials, every variant run counted as one independent look"
+            f"{trials} dev trials, every variant run counted as one independent look"
         )
     finally:
         conn.close()

@@ -14,11 +14,11 @@ nothing in the lab calls it until the gate is wired to it.
 The policies:
 
 - ``all-trials`` -- one look per dev trial row. The literal reading of design §3 and what the
-  lab did before this module existed. 110 on the committed database.
+  lab did before this module existed. 126 on the committed database.
 - ``methods`` -- one look per distinct method with a dev trial, floored at the measured
   participation ratio: ``N = max(distinct_methods, ceil(participation_ratio))``. Counts a
   family of variants as the one idea it is, and the floor guarantees the policy can never
-  assert fewer independent looks than the curves themselves show. 23 on the committed database.
+  assert fewer independent looks than the curves themselves show. 28 on the committed database.
 - ``effective`` -- the measured participation ratio alone, rounded, floored at 2 (below 2 the
   deflated Sharpe is undefined). 2 on the committed database. The honest measure of how many
   independent *return streams* exist, and for that reason not a count of how many times the
@@ -96,8 +96,8 @@ class NCount:
         """True when the ``methods`` policy's participation-ratio floor is what decided ``n``.
 
         The floor is the policy's justification: it cannot assert fewer independent looks than
-        the curves measurably have. On the committed database it does not bind (ceil(2.44) = 3
-        against 23 methods); a lab of one method with many uncorrelated variants is where it does.
+        the curves measurably have. On the committed database it does not bind (ceil(2.34) = 3
+        against 28 methods); a lab of one method with many uncorrelated variants is where it does.
         """
         return self.policy == "methods" and math.ceil(self.participation_ratio) > self.distinct_methods
 

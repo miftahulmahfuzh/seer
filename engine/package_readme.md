@@ -2339,18 +2339,18 @@ lab ships is `store.DSR_POLICY`.
 - **Why it exists.** `backtest.dev.deflated_sharpe` assumes `n_trials` *independent* trial Sharpes.
   The lab hands it one per dev `trials` row, and those rows are not independent: measured over the
   month-end equity curves already stored in `trials.curve_json`, the mean pairwise correlation across
-  the dev trials is 0.595 and the participation ratio of their correlation matrix is 2.44, over 102
+  the dev trials is 0.612 and the participation ratio of their correlation matrix is 2.338, over 102
   common month-ends. Deflating by the row count therefore asserts an independence the data
   contradicts, and overstates the hurdle.
 - `Policy` / `POLICIES`: the three named answers, and what each measures on the committed
-  `lab/lab.sqlite` — `all-trials` = **110**, `methods` = **23**, `effective` = **2**.
+  `lab/lab.sqlite` — `all-trials` = **126**, `methods` = **28**, `effective` = **2**.
   - `all-trials` — one look per dev trial row, the literal reading of the design and what the lab
     does today. Deliberately **unfloored**, so an empty lab reads 0 rather than a fabricated 2.
   - `methods` — one look per distinct method with a dev trial, floored at the measured participation
     ratio: `max(distinct_methods, ceil(participation_ratio))`. Counts a family of variants as the one
     idea it is, while the floor guarantees the policy can never claim fewer independent looks than
-    the curves measurably show. The floor does not bind on the committed database (ceil(2.44) = 3
-    against 23 methods); `NCount.floored` says when it does.
+    the curves measurably show. The floor does not bind on the committed database (ceil(2.34) = 3
+    against 28 methods); `NCount.floored` says when it does.
   - `effective` — the participation ratio alone, rounded, floored at `DSR_MIN_N = 2` (below two
     trials the deflated Sharpe is undefined). The honest count of independent *return streams*, and
     for that reason not a count of how many times the search looked: every lab strategy holds US
@@ -2376,6 +2376,15 @@ lab ships is `store.DSR_POLICY`.
   gives `participation_ratio = 1.0` and `mean_pairwise = None` — one look is still one look — rather
   than an exception, because the module must never raise on data it only reads.
 - `dev_method_count(conn) -> int`: distinct `method_id` over `window = 'dev'` trials.
+- **The numbers above age; the test of them does not.** `tests/test_lab_npolicy.py` used to pin the
+  committed-database measurements as four `COMMITTED_*` constants, which meant every new dev trial
+  falsified the test — so it had been given a `skipif` that quietly switched it off once the lab
+  outgrew 110 trials, leaving the module unchecked against the only database it is ever run on.
+  Those constants are gone. `_reference_correlation` now recomputes the participation ratio and the
+  mean pairwise correlation straight from the raw `trials.curve_json` rows and asserts the library
+  agrees to `|delta| < 1e-12`: the pin is the arithmetic, not the answer, so growth in the lab can
+  no longer age it out. On the lab as committed that is 126 dev + 2 test = 128 rows, ratio
+  2.338473061106947, rho 0.6124884723866705.
 
 ### lab: the derived verdict (lab-luck-gate phase 4)
 
@@ -2898,7 +2907,15 @@ export PG_TEST_URL=postgresql://postgres:pg@localhost:55432/postgres
 engine/.venv/bin/pytest engine/tests
 ```
 
-DB tests skip without `PG_TEST_URL`, and CI should treat skips as failures. Each DB test gets
+DB tests skip without `PG_TEST_URL`, and CI fails the build if they do — but only for *that*
+reason. `engine-ci.yml`'s `Test engine` step greps `pytest -rs` output for the `pg_url` fixture's
+own skip message (`PG_TEST_URL is not set; start Postgres with`), not for any `^SKIPPED` line as it
+once did: the blanket grep could not tell a misconfigured service from a deliberate `skipif`, so it
+reddened the build while printing the false message "PG_TEST_URL did not reach pytest". The step
+first asserts that reason string still exists in `conftest.py` and fails loudly if it does not, so
+rewording the fixture cannot silently disarm the guard — the two have to move together. A correctly
+configured run is expected to skip a couple of tests (an opt-in live-store test and the like) and
+that is not a failure. Each DB test gets
 a throwaway schema `t_<hex>`. The fixtures are `pg` (migrated), `pg_empty`, `pg_schema`,
 `pg_url` and `utc(y, m, d, h=0, mi=0)`. An autouse `_isolated_env` fixture points
 `SEER_ENV_FILE` at a missing file and `DATABASE_URL_UNPOOLED` at a `.invalid` host, so no test

@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 96
+- Completed: 97
 
 ---
 
@@ -776,6 +776,25 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-R4XB** Phase 1: The CI guard catches what it was written for
+  - **Difficulty**: NORMAL
+  - **Type**: Bug
+  - **Context**: Narrow `.github/workflows/engine-ci.yml`'s `^SKIPPED` guard to conftest's `pg_url` skip reason only, so deliberate skipifs stop turning the build red with a false "PG_TEST_URL did not reach pytest" message; and replace `engine/tests/test_lab_npolicy.py`'s four aged `COMMITTED_*` constants with a recomputation from the committed lab database so the pinned-evidence test asserts instead of skipping. Plus three comment-only number fixes in `lab/npolicy.py` (D11). Exit: guard fires only on the real misconfiguration, `test_lab_npolicy.py` reports 0 skipped, engine suite 0 failed, `ruff check engine` passes.
+  - **Status**: completed
+  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 1 of 12)
+  - **Satisfies**: R6 — Narrow the CI skip-guard; put `COMMITTED_DEV_TRIALS` in a form that cannot age again
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-R4XB.md`
+  - **Completed**: 2026-10-08 10:48
+  - **Method**: /do
+  - **Files**: .github/workflows/engine-ci.yml, engine/tests/test_lab_npolicy.py, engine/src/seer_engine/lab/npolicy.py, engine/.workflows/todos.md, engine/.workflows/plan/P1-ENG-R4XB.md
+  - **Drift**: No code drift: all three files matched the plan's quotes byte-for-byte at 485d416/12d563e.
+  - **Drift**: The plan's exit criterion 4 predicted `3362 passed, 1 skipped`; measured `3363 passed, 1 skipped, 0 failed`. The old pinned test counted as a skip and the new one passes, so passes rise by one. The invariants the criterion named (0 failed, 1 skipped) hold.
+  - **Drift**: The shared worktree's full suite reports 5 failures, ALL in peer territory (phase 4's gotrade presets and `bracket` engine in sim/rules.py + sim/charges.py; phase 2's web/data/lab.json export vs lab/store.py). Verified by re-running the whole engine suite in a throwaway worktree cut from HEAD with ONLY this phase's three files applied: 3363 passed, 1 skipped, 0 failed, ruff clean.
+  - **Drift**: The plan's 'eight skip sites' is nine (the phase plan's own Handoff 2 records this); it changes no code because the narrowed guard keys on one reason string.
+  - **Decided**: Step 3 says create every phase's task, but six wave-1 sessions share this worktree and would each write all 12 into the same todos.md -> created phase 1's task only (tie-break: narrower blast radius; in a swarm the ledger, not todos.md, unblocks phases).
+  - **Decided**: The plan's exit criterion 3 requires `grep -c 'COMMITTED_DEV_TRIALS\|COMMITTED_METHODS\|COMMITTED_PR\|COMMITTED_RHO'` to return 0, but its own Step 3 code block puts `COMMITTED_PR = 2.442` inside the new docstring -> the exit criterion wins and the docstring was reworded to 'a participation ratio pinned at 2.442, and friends' (rung 2, the phase's exit criteria, outranks rung 3, the code blocks). The history is kept, only the identifier goes; the check is satisfied, not loosened.
+  - **Decided**: engine/.workflows/todos.md carries peers' task entries as well as mine -> included in the allowlist anyway, because completion-handler must write the completion into it and excluding it would mean the task record never lands (tie-break: take the reversible option).
 - [x] **P1-ENG-GX63** Phase 2: Nightly wiring and end-to-end tests (paper night, paper_check, promote)
   - **Difficulty**: HARD
   - **Type**: Feature

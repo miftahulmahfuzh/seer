@@ -170,11 +170,31 @@ The owner's words: *"we should finetune the lab to do the experiment as close as
 I plan to do the real trade (so, the lab must consider my plan to put in 5 million monthly as
 well)"*.
 
-Note for whoever plans this: **CAGR is not well defined once contributions exist.** A deposit raises
-ending equity without being a return. This needs a money-weighted measure (IRR / modified Dietz),
-and every gate phrased against CAGR or "beats SPY TR" has to be restated in whatever measure is
-chosen, for the methods *and* the benchmark. That is a design question, not an implementation
-detail.
+**Verified 2026-10-08, in answer to the owner asking directly whether every roster method accounts
+for his monthly contribution — none of them do, and the concept does not exist:**
+
+- `grep -rniE "deposit|contribut|top.?up|cashflow|add_cash" engine/src web/lib web/app db/migrations`
+  returns only the English word "contributes" in unrelated docstrings. There is no deposit path in
+  the engine, the site, or the schema.
+- `paper_state.initial_cash_usd` is written **once**, at `paper/store.py:417` when a strategy
+  starts, and never updated. The only later `UPDATE` (`:449`) sets `cash_usd`, `equity_usd` and
+  `last_session` from stepping a session. Paper cannot accept a deposit.
+
+So this is not a per-method gap to be fixed method by method. **It applies identically to the four
+quant books, to C, and to SPY**, and it has to be built once, below them.
+
+Two consequences that are design questions, not implementation details:
+
+1. **CAGR stops being well defined.** A deposit raises ending equity without being a return, so a
+   contribution-fed book will show a flattering CAGR for doing nothing. This needs a money-weighted
+   measure (IRR / modified Dietz), and every gate phrased against CAGR has to be restated in it.
+2. **The benchmark has to receive the same contributions.** SPY is currently buy-and-hold of a
+   single opening sum. Against a book fed 5,000,000 IDR a month, that is not a fair comparison in
+   either direction — it flatters the book in a rising market and punishes it in a falling one,
+   because the two are holding different amounts of money at different times. "Beats SPY TR" only
+   means something if SPY is **dollar-cost-averaged on the identical schedule**. The same applies to
+   C: a daily control only answers the owner's counterfactual if it runs on the same starting
+   capital, the same monthly deposits and the same fee schedule as the monthly books.
 
 ## 5. The picks did not vanish, and they are absent 3 weeks in 4 by design (verified)
 
@@ -282,11 +302,18 @@ transient under the owner's funding plan (§2b) and should not drive this. The r
 whether concentration helps or hurts a monthly momentum book over 18 months, and it is a lab
 question. Note `M0007-N20-RAW`'s `N20` is a parameter, so variants are cheap to express.
 
-**Q3 — make the lab measure what the owner will actually do.** 10,000,000 IDR start, 5,000,000
-monthly, Gotrade fees with the floor. Requires: contribution support in the backtest (none exists),
-`INITIAL_IDR` matching reality, and a money-weighted return measure plus the restatement of every
-gate that is phrased in CAGR terms — for methods and benchmark alike (§4). This is the largest piece
-of work in this handover and the one the owner asked for most directly.
+**Q3 — make the whole system measure what the owner will actually do: 10,000,000 IDR start,
++5,000,000 IDR every month.** Verified that *nothing* models this — not the four quant books, not C,
+not SPY, and paper cannot even accept a deposit (§4). Requires, in rough dependency order:
+contribution support in the backtest and in paper (`initial_cash_usd` is write-once today); a
+contribution schedule that is part of a method's spec rather than a global constant;
+`INITIAL_IDR` matching the real 10M; a **money-weighted** return measure, since CAGR stops being
+meaningful once deposits exist; a **dollar-cost-averaged SPY** on the identical schedule, or
+"beats SPY TR" compares two books holding different money at different times; and the restatement
+of every gate phrased in CAGR terms. This is the largest piece of work in this handover, the one the
+owner has asked for most directly, and it is almost certainly its own plan set rather than a phase
+inside the rebuild. Note it interacts with Q1: the rebuilt roster entries should carry the
+contribution schedule from their first night, or they will need rebuilding again.
 
 **Q4 — make the bracket path pay Gotrade fees, so the daily control is honest.** C **stays** — the
 owner requires a daily entry on the roster permanently, as the measured counterfactual for the

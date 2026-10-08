@@ -33,7 +33,14 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Depends on**: —
   - **Plan**: `.workflows/plan/P1-ENG-F6QN.md`
   - **Completed**: 2026-10-08 10:52
-  - **Method**: /do
+  - **Method**: /implement
+  - **Commit**: `836d1a5` — all thirteen phase 4 files are inside it. That commit's own message
+    names phase 3 only: twelve sessions share one worktree and therefore one git index, and a
+    peer's `git commit` drained the index between this session's `git add` and its `git commit`,
+    taking phase 4's staged files with it. The code is correct and complete on the branch; only
+    the attribution is scrambled, and `836d1a5` is pushed, so it was not rewritten. The safe
+    pattern is `git commit -- <paths>` (stage and commit as one atomic step), not `git add` by
+    explicit path followed by a separate `git commit`, which the allowlist does not protect.
   - **Files**: engine/src/seer_engine/sim/charges.py, engine/src/seer_engine/sim/rules.py, engine/src/seer_engine/sim/sizing.py, engine/src/seer_engine/sim/lifecycle.py, engine/src/seer_engine/sim/split_adjust.py, engine/src/seer_engine/sim/__init__.py, engine/src/seer_engine/paper/bracket.py, engine/tests/test_sim_rules.py, engine/tests/test_sim_sizing.py, engine/tests/test_sim_lifecycle.py, engine/tests/test_sim_split.py, engine/tests/test_paper_bracket.py, engine/tests/test_cost_model_pins.py, engine/.workflows/todos.md, engine/.workflows/plan/P1-ENG-F6QN.md
   - **Verified**: `ruff check engine/src engine/tests` -> All checks passed! Full engine suite from the worktree root with `PYTHONPATH=engine/src` and `PG_TEST_URL` -> 3388 passed, 1 skipped, 0 failed (111s); pre-edit baseline on this branch 3362 passed, 2 skipped, 0 failed, failing-node set identical (empty). `import seer_engine.commands.paper, seer_engine.commands.promote, seer_engine.paper.replay` -> ok, so the unwired callers still import and the capability is complete and INERT until phase 12 wires it (D10). All seven exit criteria verified: `git diff` shows no change under `commands/`, nor to `backtest/runner.py`, `paper/replay.py`, `sim/costs.py` (invariant 5), `sim/model.py`, `sim/book.py` or `paper/roster.py`; `PAPER_PAUSED` is still `'true'` (invariant 2); no roster entry added, edited or retired (invariants 3 and 4); every added `rules` parameter is KEYWORD_ONLY with `DESIGN_V0` as its default; `roster.rules_dict(DESIGN_V0)` is byte-identical to before, so live strategy C's frozen spec digest has not moved. Measured and reproduced: the owner's two real receipts to the cent (a 1-share buy at $27.90 costs $28.03; a 1-share sell at $72.51 returns $72.27); at a $28 slot a $27.90 pick sizes to 1 share flat and 0 under Gotrade; the flat branch of `charges.py` is bit-identical to `sim.model`'s old arithmetic over 40,000 random cases (0 mismatches).
   - **Drift**:

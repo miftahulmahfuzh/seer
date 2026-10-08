@@ -252,6 +252,7 @@ def step_benchmark(
     dividend: Decimal | None,
     *,
     split: Decimal | None = None,
+    deposit: Decimal = _ZERO,
 ) -> tuple[BenchmarkState, Snapshot, tuple[Fill, ...]]:
     """Step the benchmark through ``session`` (which must be ``next_session(state.last_session)``:
     the benchmark is stepped on every session, like ``buy_and_hold``).
@@ -260,6 +261,14 @@ def step_benchmark(
     ex-date ``session`` (None when there is none; ignored on ``start``). ``split`` is the factor
     of a SPY split executing on ``session`` that was applied to the stored bars (None when there
     is none); it is applied first (:func:`split_benchmark`).
+
+    ``deposit`` is the owner's contribution landing on ``session`` (017; zero, the default, on
+    every session that receives none, and the whole history before the funding plan existed). It
+    is **spent at this session's close, through the same buy the dividend path uses**, because
+    that is what ``backtest.benchmark.buy_and_hold`` does with it and this stepper exists to
+    track that curve session by session: a yardstick that banked the owner's deposits as idle
+    cash would drift below the dollar-cost-averaged SPY it is supposed to be, and ``paper check``
+    would report a mismatch on every session after the first deposit.
 
     Returns the new state, the session's snapshot and the buys made (``entry`` at ``start``'s
     open, ``add`` for a reinvestment at the close, or ``entry`` when a reinvestment opens the
@@ -275,6 +284,8 @@ def step_benchmark(
     if dividend is not None:
         if _money("dividend", dividend) <= 0:
             raise ValueError(f"dividend must be > 0, got {dividend}")
+    if _money("deposit", deposit) < 0:
+        raise ValueError(f"deposit must be >= 0, got {deposit}")
     if split is not None:
         state, _ = split_benchmark(state, split, session)
 
@@ -304,11 +315,14 @@ def step_benchmark(
     else:
         if pos is not None:
             pos = replace(pos, days_held=pos.days_held + 1)
-        if dividend is not None:
+        if dividend is not None or deposit > 0:
             held = Decimal(0) if pos is None else pos.shares
-            income = q(held * dividend)
-            cash += income
-            if pos is not None:
+            # A dividend is income the holding earned; a deposit is the owner's own money. Both
+            # land as cash at this close and are spent through the one buy below, which is how
+            # buy_and_hold prices them -- but only the dividend is recorded as income.
+            income = _ZERO if dividend is None else q(held * dividend)
+            cash += income + deposit
+            if pos is not None and income > 0:
                 pos = replace(pos, income_usd=pos.income_usd + income)
             more = _fractional_shares(cash, b.close, model)
             if more > 0:

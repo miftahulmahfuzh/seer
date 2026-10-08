@@ -58,13 +58,16 @@ def bar(symbol: str, d: date, o: str, h: str, low: str, c: str) -> Bar:
 
 def test_read_strategies_returns_the_roster_rows_in_sort_order(pg):
     rows = store.read_strategies(pg)
+    # 017 put the six Gotrade-fee successors at the head and moved the thirteen below them.
     assert [r.id for r in rows] == [
+        "SPY-GT", "C-GT", "RMW-FR-GT", "RAW-FR-GT", "MOM-FR-GT", "MVW-FR-GT",
         "SPY", "A", BOOK_ID, TIMING_ID, "C", "FND", f"{BOOK_ID}-FR", f"{TIMING_ID}-FR", "RM-FR",
         "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR",
     ]
-    spy = rows[0]
+    spy = next(r for r in rows if r.id == "SPY-GT")
     assert (spy.engine, spy.rules_id, spy.is_champion, spy.is_benchmark) == ("benchmark", None, True, True)
-    assert rows[1].engine == "bracket" and rows[1].rules_id == "design-v0"
+    c_gt = next(r for r in rows if r.id == "C-GT")
+    assert c_gt.engine == "bracket" and c_gt.rules_id == "design-v0-gotrade"
     assert all(r.paper_start is None and r.params == {} for r in rows)
     assert store.read_strategy(pg, "nope") is None
 

@@ -76,12 +76,20 @@ from seer_engine.backtest.market import Market
 from seer_engine.commands.nightly import _parse_now
 from seer_engine.paper import roster, store, unavailable
 from seer_engine.paper.benchmark import SPY, step_benchmark
-from seer_engine.paper.book import decide_book, last_rank_session, needs_kickoff, rank_basket, settle_book
+from seer_engine.paper.book import (
+    decide_book,
+    deposit_book,
+    last_rank_session,
+    needs_kickoff,
+    rank_basket,
+    settle_book,
+)
 from seer_engine.paper.bracket import decide_bracket, settle_bracket
 from seer_engine.paper.capital import PAPER_INITIAL_IDR
 from seer_engine.paper.roster import RosterEntry
 from seer_engine.paper.store import PaperState, StrategyRow
 from seer_engine.sim import initial_cash_usd, new_portfolio
+from seer_engine.sim.contributions import OWNER_MONTHLY
 from seer_engine.sim.book import Position, Target
 from seer_engine.sim.model import Order
 from seer_engine.sim.rules import TradeRules, is_resize_session
@@ -433,6 +441,23 @@ def _trade(conn: psycopg.Connection, rd: dates.RunDates, plan: NightPlan) -> Non
     starts = {row.id: row.paper_start for row in store.read_strategies(conn)}
     for e, state in plan.step:
         sessions = dates.sessions(dates.next_session(state.last_session), rd.data_date)
+        # The owner's deposits, recorded once per entry per night before anything steps: every
+        # scheduled date (the 25th of each month) whose landing session has arrived by the last
+        # session about to be stepped. store.accrue_contributions freezes each at the USD/IDR of
+        # its own landing session and leaves an already-recorded one alone, so a backfilled
+        # fx_rates can never move a stepped book's history (phase 6, D6a). The three session loops
+        # below credit what has landed. `tonight.market` rather than a per-session view: the
+        # accrual runs before any loop, and usd_idr_on reads the latest fx row on or before the
+        # date asked for, which is the same row either way for every date <= sessions[-1].
+        if sessions:
+            store.accrue_contributions(
+                conn,
+                e.id,
+                OWNER_MONTHLY.dates_in(starts[e.id], sessions[-1]),
+                OWNER_MONTHLY.amount_idr,
+                through=sessions[-1],
+                usd_idr_on=tonight.market.usd_idr_on,
+            )
         if e.engine == "bracket":
             _step_bracket(conn, e, sessions, tonight)
         elif e.engine == "book":
@@ -551,7 +576,13 @@ def repick(
             waiting = [o for o in pf.orders if o.status == "pending" and o.session_date == p]
             pf = replace(pf, orders=tuple(o for o in pf.orders if o not in waiting))
             sized = decide_bracket(
-                pf, _bracket_strategy(conn, e, p, p), e.params, view.history, view.membership.members_on(d), d
+                pf,
+                _bracket_strategy(conn, e, p, p),
+                e.params,
+                view.history,
+                view.membership.members_on(d),
+                d,
+                rules=e.rules,
             )
             if _order_key(sized.placed) == _order_key(waiting):
                 continue
@@ -731,6 +762,7 @@ def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight
             view.history,
             view.membership.members_on(rd.data_date),
             rd.data_date,
+            rules=e.rules,
         )
         facts = _evidence(e, view, rd.data_date, (o.symbol for o in sized.placed))
         store.insert_pending_orders(conn, e.id, sized.placed, evidence=facts)
@@ -774,9 +806,29 @@ def _step_bracket(conn: psycopg.Connection, e: RosterEntry, sessions: Sequence[d
     strategy = _bracket_strategy(conn, e, dates.next_session(sessions[0]), dates.next_session(sessions[-1]))
     for s in sessions:
         view = tonight.view(s)
-        night = settle_bracket(pf, s, view.bars_on(s, pf.held_symbols()), tonight.splits_on(s), view.last_bar_date)
+        # Cash AND equity: sizing reads the last snapshot's equity (sim/sizing.py), so a deposit
+        # credited to cash alone would sit in the book permanently under-deployed.
+        credited = store.apply_contributions(conn, e.id, s)
+        if credited:
+            pf = replace(pf, cash=pf.cash + credited, equity=pf.equity + credited)
+        night = settle_bracket(
+            pf,
+            s,
+            view.bars_on(s, pf.held_symbols()),
+            tonight.splits_on(s),
+            view.last_bar_date,
+            rules=e.rules,
+        )
         store.save_bracket_night(conn, e.id, night.portfolio, night.events, night.snapshot)
-        sized = decide_bracket(night.portfolio, strategy, e.params, view.history, view.membership.members_on(s), s)
+        sized = decide_bracket(
+            night.portfolio,
+            strategy,
+            e.params,
+            view.history,
+            view.membership.members_on(s),
+            s,
+            rules=e.rules,
+        )
         facts = _evidence(e, view, s, (o.symbol for o in sized.placed))
         store.insert_pending_orders(conn, e.id, sized.placed, evidence=facts)
         store.write_pending(conn, e.id, dates.next_session(s), decision=False)
@@ -798,6 +850,10 @@ def _step_book(
     kicked = state.kickoff_session
     for s in sessions:
         view = tonight.view(s)
+        # deposit_book raises cash and equity together (phase 6): sim/book.py sizes from equity.
+        credited = store.apply_contributions(conn, e.id, s)
+        if credited:
+            book = deposit_book(book, credited)
         symbols = set(book.held())
         if targets is not None:
             symbols.update(t.symbol for t in targets)
@@ -864,15 +920,26 @@ def _step_book(
 
 
 def _step_benchmark(conn: psycopg.Connection, e: RosterEntry, sessions: Sequence[date], tonight: _Tonight) -> None:
-    bench = store.load_benchmark(conn, e.id)
+    # The cost model is the roster's statement about THIS entry (roster.BENCHMARK_COST_MODEL), not a
+    # module default: SPY was started on a flat 0.1% a side and keeps it (invariants 3 and 8), SPY-GT
+    # pays Gotrade's measured schedule. The frozen spec records the same value, so what is pinned and
+    # what is charged are one statement (017).
+    bench = store.load_benchmark(conn, e.id, cost_model=roster.benchmark_cost_model(e.id))
     for s in sessions:
         view = tonight.view(s)
+        # The yardstick is fed the same money on the same dates as the books it is measured
+        # against. It goes through step_benchmark's `deposit`, not a cash+equity bump: the
+        # benchmark never rotates, so banked cash would stay uninvested forever and drift below
+        # the dollar-cost-averaged SPY that backtest.benchmark.buy_and_hold defines -- which is
+        # also what paper/replay.expected_benchmark replays, so a bump would make `paper check`
+        # mismatch on every session after the first deposit. Measured, 2026-10-08.
+        credited = store.apply_contributions(conn, e.id, s)
         bar = view.bar(SPY, s)
         if bar is None:
             raise PaperError(f"no {SPY} bar on {s}; the benchmark is marked every session")
         split = dict(tonight.splits_on(s)).get(SPY)  # an applied SPY split goes through split_benchmark (C3)
         dividend = tonight.dividends_on(s).get(SPY, {}).get(s)
-        bench, snapshot, fills = step_benchmark(bench, s, bar, dividend, split=split)
+        bench, snapshot, fills = step_benchmark(bench, s, bar, dividend, split=split, deposit=credited)
         store.save_benchmark_night(conn, e.id, bench, snapshot, fills)
         store.write_pending(conn, e.id, dates.next_session(s), decision=False)
         log.info("%s %s: equity %s", e.id, s, snapshot.equity_usd)

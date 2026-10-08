@@ -287,17 +287,24 @@ def test_004_on_a_fresh_schema_adds_c_last_and_the_news_vetoes_table(pg_empty):
         "SELECT id, name, sub, icon, is_champion, is_benchmark, sort, engine, rules_id, params, paper_start "
         "FROM strategies ORDER BY sort"
     ).fetchall()
+    # 017 renumbered `sort`: the six Gotrade-fee successors that trade come first, then the
+    # thirteen it and its predecessors retired, in the order they were added.
     assert [r[0] for r in rows] == [
+        "SPY-GT", "C-GT", "RMW-FR-GT", "RAW-FR-GT", "MOM-FR-GT", "MVW-FR-GT",
         "SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND",
         "F4-MOM12-N20-TREND-FR", "F1-SPY-SMA200-M-FR", "RM-FR", "RMW-FR",
         "RAW-FR", "MOM-FR", "MVW-FR",
     ]
-    # C is 004's last row; 007_fnd.sql appends FND behind it at sort 6; 010 F4-FR, F1-FR and RM-FR.
-    assert rows[4] == (*C_ROW, {}, None)
-    assert rows[5][:9] == FND_ROW
-    assert rows[5][9:] == ({}, None)  # no frozen spec and no paper clock until the first night
-    assert all(r[9:] == ({}, None) for r in rows[6:])
-    assert pg_empty.execute("SELECT id FROM strategies WHERE is_champion").fetchall() == [("SPY",)]
+    by_id = {r[0]: r for r in rows}
+    # C is 004's last row and FND 007's, both now behind 017's six; their columns are untouched
+    # except the `sort` 017 renumbered (5 -> 11 and 6 -> 12), which is display order, not spec.
+    assert by_id["C"] == (*C_ROW[:6], 11, *C_ROW[7:], {}, None)
+    assert by_id["FND"][:6] == FND_ROW[:6] and by_id["FND"][7:9] == FND_ROW[7:]
+    assert by_id["FND"][6] == 12
+    assert by_id["FND"][9:] == ({}, None)  # no frozen spec and no paper clock until the first night
+    assert all(r[9:] == ({}, None) for r in rows)
+    # 017 moved both display flags from the retired SPY to its successor.
+    assert pg_empty.execute("SELECT id FROM strategies WHERE is_champion").fetchall() == [("SPY-GT",)]
     assert [c for c in _columns(pg_empty) if c[0] == "news_vetoes"] == NEWS_VETOES_COLUMNS
     assert pg_empty.execute("SELECT count(*) FROM news_vetoes").fetchone()[0] == 0
 
@@ -342,7 +349,18 @@ def test_004_sql_is_idempotent(pg):
     rows = pg.execute("SELECT x::text FROM news_vetoes x").fetchall()
     pg.execute((MIGRATIONS_DIR / "004_news_veto.sql").read_text(encoding="utf-8"))
     pg.commit()
-    assert (_columns(pg), _constraints(pg), _tables(pg), _strategies(pg)) == before
+    after = (_columns(pg), _constraints(pg), _tables(pg), _strategies(pg))
+    assert after[:3] == before[:3]  # schema, constraints and tables untouched
+    # Every strategies row is unchanged but one. 004 re-asserts C's display row with ON CONFLICT
+    # DO UPDATE, `sort = 5` included, and 017 renumbered C to 11 (the live six first, the thirteen
+    # retired below them). So replaying 004 ALONE drags that one display field back to the value
+    # 004 itself writes; nothing else moves, and no spec or paper clock is touched. The migrator
+    # applies each file once and in order, so this is reachable only from a test like this one.
+    moved = [(b, a) for b, a in zip(before[3], after[3]) if b != a]
+    assert [b[0] for b, _ in moved] == ["C"]
+    [(was, now)] = moved
+    assert (was[6], now[6]) == (11, 5)
+    assert was[:6] == now[:6] and was[7:] == now[7:]
     assert pg.execute("SELECT x::text FROM news_vetoes x").fetchall() == rows
 
 

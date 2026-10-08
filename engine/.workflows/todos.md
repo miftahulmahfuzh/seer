@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-08
-**Total Active Tasks**: 1
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 101
+- Completed: 102
 
 ---
 
@@ -23,15 +23,33 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ENG-U9XK** Phase 12: The rebuilt roster, and the wiring layer
+- [x] **P1-ENG-U9XK** Phase 12: The rebuilt roster, and the wiring layer
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns the roster proper — `engine/src/seer_engine/paper/roster.py` (the successor `SEED_ROWS` entries, `OWNER_FUNDING`, `BENCHMARK_COST_MODEL`, `PRE_FUNDING_IDS`); `db/migrations/017_roster_real_fees.sql` (**this number**; phase 6 holds 016); `engine/tests/test_paper_roster.py`; `docs/runbooks/paper-trading.md`; and `.github/workflows/nightly.yml` — **the comment block at :46-69 only**, because phase 9's drift test and phase 11's `sed` both parse the `PAPER_PAUSED:` line's exact text. Also owns the **wiring layer** assigned by D10 and extended by D13, where phases 3, 4 and 6 each left their only production call site as a handoff: `commands/paper.py` (four `rules=e.rules`, `_step_benchmark`'s cost model, `accrue_contributions` + `apply_contributions` + the three engines' deposits), `commands/promote.py:275`'s `is_bracket` dispatch, `paper/store.py`'s `load_benchmark` at `:1127-1145` only, `paper/replay.py` (`:290` stops hard-coding `DESIGN_V0`; the three `expected_*` builders take the **stored dated deposits**, never the schedule — D18), and `commands/paper_check.py:200`. Does not touch `PAPER_PAUSED`'s value (invariant 2), does not retire C (invariant 4), does not edit a started entry (invariant 3), and touches nothing under `web/` — including phase 9's classifier, which it **verifies** and does not patch. Exit criteria: successor entries for all six live rows — the four quant books, **C**, and SPY — each paying Gotrade's measured fees and carrying the contribution schedule from their first night, as new ids with fresh clocks in the 010/011/013 migration style; N stays 20 (D3); the predecessors are marked retired, not deleted; `docs/runbooks/paper-trading.md:76`'s stale `cron 23:00 UTC Mon-Fri` fixed against the real `17 6 * * 2-6` (13:17 WIB); the resume-condition comment above `PAPER_PAUSED` rewritten to state what now holds — **the switch is not flipped** (D1). The wiring layer's own exits: `grep -c 'rules=e.rules' commands/paper.py` is **4** and `promote.py:275` reads `is_bracket(rules)`; `_step_benchmark` gets `SPY-GT`'s model through `roster.benchmark_cost_model(e.id)`, which takes the **id** and raises rather than defaulting; the night accrues once per entry and credits before each session, **raising cash and equity together** on all three engines; `paper/replay.py` carries no literal `DESIGN_V0` and replays the stored dated deposits; and a **retired** entry's pending decision renders as a record, never a live instruction (D16).
-  - **Status**: in_progress
+  - **Status**: completed
   - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 12 of 12)
   - **Satisfies**: R1, R4, R3 — rebuild the roster so every entry pays Gotrade's measured fees, SPY included, as new entries with fresh paper clocks; make the bracket path pay Gotrade's fees so the daily control C is honest, with C staying permanently; and measure what the owner will actually do — 10,000,000 IDR start, +5,000,000 IDR on the 25th of each month, contributions in backtest and paper, a money-weighted return, a dollar-cost-averaged SPY, every CAGR-phrased gate restated
   - **Depends on**: P1-ENG-H2VK, P1-ENG-F6QN, P1-ENG-R7MD, P1-ENG-MWRQ
   - **Plan**: `.workflows/plan/P1-ENG-U9XK.md`
+  - **Completed**: 2026-10-08 13:05
+  - **Method**: /do
+  - **Files**: .github/workflows/nightly.yml, docs/runbooks/paper-trading.md, db/migrations/017_roster_real_fees.sql, engine/src/seer_engine/paper/roster.py, engine/src/seer_engine/paper/benchmark.py, engine/src/seer_engine/paper/replay.py, engine/src/seer_engine/paper/store.py, engine/src/seer_engine/commands/paper.py, engine/src/seer_engine/commands/paper_check.py, engine/src/seer_engine/commands/promote.py, engine/tests/test_paper_roster.py, engine/tests/test_paper_check.py, engine/tests/test_paper_c.py, engine/tests/test_paper_command.py, engine/tests/test_paper_evidence.py, engine/tests/test_paper_split_cadence.py, engine/tests/test_paper_store.py, engine/tests/test_paper_fnd.py, engine/tests/test_veto_command.py, engine/tests/test_migrate.py, engine/.workflows/plan/P1-ENG-U9XK.md
+  - **Verified**: engine suite `PYTHONPATH=engine/src PG_TEST_URL=... python -m pytest engine/tests -q -n auto` -> 3481 passed, 2 skipped, 1 failed (the pre-existing lab-snapshot failure below, not this phase's). Web `npx vitest run` -> 48 files, 625 passed; `npx tsc --noEmit` -> exit 0; `ruff check engine` -> all checks passed. Invariant 2: `PAPER_PAUSED: 'true'` still at nightly.yml:80 and `git diff` shows no change to that line, only the comment block above it. Invariant 5: `git diff origin/main -- engine/src/seer_engine/sim/costs.py` is empty. The sharpest check: `git diff origin/main -- engine/tests/test_paper_roster.py | grep '^-.*"[0-9a-f]\{64\}"'` is EMPTY -- not one legacy digest pin moved; all thirteen recomputed byte-identical. Exit criterion 13 verified against phase 9's landed classifier (web/lib/decision.ts:132 `if (retired) return 'spent'`; positions/page.tsx:49 passes `strat?.status === 'retired'`). docs/runbooks/paper-trading.md: 0 hits for the stale "23:00 UTC", 1 for the real "13:17 WIB".
+  - **Drift**:
+    - `paper/store.py`'s `load_benchmark` is at `:1356`, not the plan's `:1127` (phase 6 inserted above it). Region otherwise clean; the diff is 3 hunks.
+    - The plan's Files table lists only `test_paper_roster.py`, but the roster rebuild and the deposit wire broke 46 tests across 9 further test files; all were updated. Most pinned production roster membership (ids, sort order, positional indexes); those fixtures now pin their own world and say so, which is what their own comments already said they wanted.
+    - `engine/tests/test_lab_snapshot.py::test_the_committed_snapshot_is_the_export_of_the_committed_database` FAILS and is NOT this phase's: `web/data/lab.json` is not the export of `engine/lab/lab.sqlite`. Neither file is modified by this phase; `lab.sqlite` was last written by commit `86ae23f`. Needs `python -m seer_engine lab stage` by whoever owns the lab. Engine suite is otherwise 3481 passed / 2 skipped / 1 failed.
+    - This phase's todos.md task row (P1-ENG-U9XK) was swept into peer commit `0d78b08` by the shared index; phase 8 noticed and documented it. Not re-done, history not rewritten.
+  - **Decided**:
+    - `step_benchmark` gains a keyword-only `deposit=` and the night passes it, INSTEAD of the plan's `bench = replace(bench, cash=.., equity=..)` adapter -> rung 2 (exit criterion 12) + rung 4 (R3's dollar-cost-averaged SPY). MEASURED: `buy_and_hold` spends each deposit at that session's close, and `paper/replay.expected_benchmark` replays through `buy_and_hold`, so the cash+equity bump would leave the yardstick's deposits uninvested forever (the benchmark never rotates) and make `paper check` mismatch on every session after the first deposit. This is a cross-phase edit into phase 3's `paper/benchmark.py`, additive and keyword-with-default.
+    - `engine/tests/test_paper_command.py`'s `reset()` (the plan index's "reset the paper clock") now truncates `paper_contributions` too -> without it a reset clock is re-funded from deposits the previous run already spent.
+    - The accrual uses `tonight.market.usd_idr_on`, not phase 6's handoff `view.usd_idr_on` -> rung 3: it runs once per entry BEFORE any session loop, where no view exists, and `usd_idr_on` returns the same fx row for every date <= `sessions[-1]`.
+    - `replay.expected_bracket`'s rules come from `entry.rules` at the call site, not `roster.rules_for(head.rules_id)` -> `PaperHead` has no `rules_id` field (Step 7's "the tree wins").
+    - Wrote `test_the_benchmark_entry_and_the_stepper_agree`, which exit criterion 10 names but Step 8(j) never lists -> rung 2 over rung 3.
+    - Step 6's second docstring edit cites both "append to the frozen-spec paragraph" and `:50`, which disagree; appended after the paragraph (`:59`) -> rung 6 + invariant 7, since splitting it mid-run reads worse.
+    - No `ruff format` run: CI runs only `ruff check engine` and origin/main's own files already fail `format --check` -> rung 6.
+    - No `web/` change needed: phase 10 had already added both Gotrade preset ids to `web/lib/sean/reminders.ts` RESIZING_RULES and `web/lib/cadence.ts` SPLIT_CADENCE_RULES, and `design-v0-gotrade` is a bracket rule set neither book-only list covers.
 - [x] **P1-ENG-F6QN** Phase 4: The bracket path can express and charge Gotrade's fees
   - **Difficulty**: HARD
   - **Type**: Feature

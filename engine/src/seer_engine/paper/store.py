@@ -57,6 +57,7 @@ from seer_engine.backtest.market import Market, Membership
 from seer_engine.paper import unavailable
 from seer_engine.paper.benchmark import BenchmarkState
 from seer_engine.sim.book import WEIGHT_QUANTUM, Book, BookSnapshot, Fill, Position, Target, Trade
+from seer_engine.sim.costs import CostModel
 from seer_engine.sim.model import Event, Order, Portfolio, Snapshot, initial_cash_usd
 from seer_engine.sim.rules import SHARE_QUANTUM
 from seer_engine.strategies.c import VERDICTS, allowed_map
@@ -1353,11 +1354,15 @@ def read_book_trades(conn: psycopg.Connection, strategy_id: str) -> tuple[Trade,
 # ``start`` is strategies.paper_start.
 
 
-def load_benchmark(conn: psycopg.Connection, strategy_id: str = BENCHMARK_ID) -> BenchmarkState:
+def load_benchmark(
+    conn: psycopg.Connection, strategy_id: str = BENCHMARK_ID, *, cost_model: CostModel = "flat"
+) -> BenchmarkState:
     """The benchmark's state: ``paper_state`` + its ``book_positions`` row (none before the
-    first session's buy), ``start`` from ``strategies.paper_start``. StoreError when there is
-    no ``paper_state`` row, no ``paper_start`` or more than one position;
-    ``BenchmarkState.__post_init__`` validates the rest."""
+    first session's buy), ``start`` from ``strategies.paper_start``, and ``cost_model`` from the
+    caller -- the roster's statement about THIS entry (``roster.benchmark_cost_model``), because
+    the fee model is not in ``paper_state`` and a benchmark stepped one night at a time must still
+    be paying Gotrade on its thousandth night. StoreError when there is no ``paper_state`` row, no
+    ``paper_start`` or more than one position; ``BenchmarkState.__post_init__`` validates the rest."""
     state = _require_state(conn, strategy_id)
     row = read_strategy(conn, strategy_id)
     if row is None or row.paper_start is None:
@@ -1371,6 +1376,7 @@ def load_benchmark(conn: psycopg.Connection, strategy_id: str = BENCHMARK_ID) ->
         equity=state.equity_usd,
         position=positions[0] if positions else None,
         last_session=state.last_session,
+        cost_model=cost_model,
     )
 
 

@@ -48,12 +48,17 @@ DAY0 = date(2026, 10, 23)
 NOV2 = date(2026, 11, 2)
 F4 = "F4-MOM12-N20-TREND-FR"
 F1 = "F1-SPY-SMA200-M-FR"
-# The active roster (the strategies a night steps), and every row in sort order: the whole-share
-# The entries that actually step a night here: 013 retired A, F4-FR and F1-FR along with the
-# whole-share three, so what is left trading is C, the SPY yardstick and the four books.
+# The entries that actually step a night here. This file tests paper-night and replay MECHANICS,
+# so it pins its OWN world rather than following the production roster: `world` activates exactly
+# these and retires everything else. 017 retired all nine in production (the Gotrade-fee rebuild
+# replaced them with -GT successors), which is precisely why this list is stated here and the
+# fixture is explicit -- a roster decision must not quietly delete this file's coverage.
 ROSTER_IDS = ("SPY", "A", "C", F4, F1, "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR")
 RETIRED_IDS = ("F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "FND")
-ALL_IDS = ("SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND", F4, F1, "RM-FR",
+#: Every row the board shows, in `sort` order -- including the six 017 added, which are retired in
+#: this world and so are checked but never stepped.
+ALL_IDS = ("SPY-GT", "C-GT", "RMW-FR-GT", "RAW-FR-GT", "MOM-FR-GT", "MVW-FR-GT",
+           "SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND", F4, F1, "RM-FR",
            "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR")
 
 
@@ -83,16 +88,16 @@ def synthetic_bars() -> tuple[Bar, ...]:
 @pytest.fixture
 def world(pg):
     with db.transaction(pg, False):
-        # A, F4-FR and F1-FR are retired on the production roster since migration 013. This file
-        # tests paper-night and replay MECHANICS -- the bracket engine, the book engine, the idle
-        # instrument, the tamper-difference report -- and all of that is still live code reached
-        # by the entries that do trade. Keeping the three stepping here keeps that coverage
-        # instead of letting a roster decision quietly delete it. Which entries are actually on
-        # the production roster is pinned by tests/test_paper_roster.py, not by this fixture.
-        pg.execute(
-            "UPDATE strategies SET status = 'active' "
-            "WHERE id IN ('A', 'F4-MOM12-N20-TREND-FR', 'F1-SPY-SMA200-M-FR')"
-        )
+        # This file tests paper-night and replay MECHANICS -- the bracket engine, the book engine,
+        # the idle instrument, the tamper-difference report -- and all of that is live code
+        # whichever entries happen to be on the roster this month. So the world is pinned HERE:
+        # exactly ROSTER_IDS step, everything else is retired. 013 retired A, F4-FR and F1-FR and
+        # 017 retired the other six in favour of their Gotrade-fee successors; re-activating them
+        # keeps this coverage instead of letting a roster decision quietly delete it. Which
+        # entries are actually on the production roster is pinned by tests/test_paper_roster.py,
+        # not by this fixture.
+        pg.execute("UPDATE strategies SET status = 'retired'")
+        pg.execute("UPDATE strategies SET status = 'active' WHERE id = ANY(%s)", (list(ROSTER_IDS),))
         bars.upsert_bars(pg, synthetic_bars())
         fx.upsert_fx(pg, [(HIST_START, USD_IDR)])
         for s in MEMBERS:

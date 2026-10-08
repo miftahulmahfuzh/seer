@@ -54,10 +54,14 @@ F4 = "F4-MOM12-N20-TREND-FR"
 F1 = "F1-SPY-SMA200-M-FR"
 
 ENTRIES = {e.id: e for e in roster.ROSTER}
-# The active roster plus the three the `world` fixture reactivates (see its comment).
-IDS = tuple(sorted({
-    *(e.id for e in roster.active(roster.ROSTER)), "A", "F4-MOM12-N20-TREND-FR", "F1-SPY-SMA200-M-FR",
-}))
+# The entries this file's world steps, stated here rather than read off `roster.active`: this file
+# tests the NIGHT, not who is on the roster this month. 013 retired A, F4-FR and F1-FR, and 017
+# retired the other six in favour of their Gotrade-fee successors; the `world` fixture activates
+# exactly these nine. The production roster is pinned by tests/test_paper_roster.py.
+IDS = tuple(sorted((
+    "SPY", "A", "C", "F4-MOM12-N20-TREND-FR", "F1-SPY-SMA200-M-FR",
+    "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR",
+)))
 
 
 # ---- the synthetic world -----------------------------------------------------------------------
@@ -106,15 +110,14 @@ def synthetic_bars() -> tuple[Bar, ...]:
 @pytest.fixture
 def world(pg):
     with db.transaction(pg, False):
-        # A, F4-FR and F1-FR are retired on the production roster since migration 013. This file
-        # tests the NIGHT itself -- starting, stepping, retiring, the digest check, the idle
-        # instrument, no look-ahead -- all of it live code reached by the entries that do trade.
-        # Keeping the three stepping here keeps that coverage instead of letting a roster
-        # decision delete it; the production roster is pinned by tests/test_paper_roster.py.
-        pg.execute(
-            "UPDATE strategies SET status = 'active' "
-            "WHERE id IN ('A', 'F4-MOM12-N20-TREND-FR', 'F1-SPY-SMA200-M-FR')"
-        )
+        # This file tests the NIGHT itself -- starting, stepping, retiring, the digest check, the
+        # idle instrument, no look-ahead -- all of it live code whichever entries are on the
+        # roster this month. So it pins its OWN world: 013 retired A, F4-FR and F1-FR, and 017
+        # retired the other six in favour of their Gotrade-fee successors. Keeping these nine
+        # stepping keeps the coverage instead of letting a roster decision delete it; the
+        # production roster is pinned by tests/test_paper_roster.py, not by this fixture.
+        pg.execute("UPDATE strategies SET status = 'retired'")
+        pg.execute("UPDATE strategies SET status = 'active' WHERE id = ANY(%s)", (list(IDS),))
         bars.upsert_bars(pg, synthetic_bars())
         fx.upsert_fx(pg, [(d, fx_rate(d)) for d in _sessions()])
         for s in STOCKS:
@@ -230,11 +233,26 @@ def reset(conn) -> None:
     """The plan index Rollback's "reset the paper clock" (the bars, runs rows and universe stay)."""
     with db.transaction(conn, False):
         conn.execute(
+            # paper_contributions too (017): the deposits belong to the clock being reset, so
+            # leaving them would re-fund the next run from money the first one already spent.
             "TRUNCATE paper_state, book_positions, book_targets, book_fills, book_trades, "
-            "action_dismissals, orders, equity_snapshots RESTART IDENTITY"
+            "action_dismissals, orders, equity_snapshots, paper_contributions RESTART IDENTITY"
         )
         conn.execute("UPDATE strategies SET paper_start = NULL, params = '{}'::jsonb")
         conn.execute("UPDATE runs SET paper_status = NULL, paper_error = NULL, paper_finished_at = NULL")
+
+
+def deposits(conn, strategy_id: str) -> tuple[tuple[date, Decimal], ...]:
+    """The deposits the night credited ``strategy_id``, in the shape the runners take them.
+
+    017 wired the owner's funding plan into the night (5,000,000 IDR on the 25th of each month),
+    so a book the night stepped holds money a runner started from cash0 alone does not. The RECORD
+    is passed, not the schedule: each amount was frozen at the rate of the session it landed on.
+    """
+    from seer_engine.paper import store as paper_store
+
+    rows = [c for c in paper_store.read_contributions(conn, strategy_id) if c.applied]
+    return tuple((c.session_date, c.amount_usd) for c in sorted(rows, key=lambda c: c.session_date))
 
 
 def snaps(conn, strategy_id):
@@ -333,7 +351,7 @@ def test_seven_nights_step_every_session_and_equal_the_runners(world, tmp_path):
     market, _ = bio.load_market(world, cache_dir=tmp_path)
     spy = buy_and_hold(
         market.spy(), PAPER_START, OCT1, cash0, dividends=(Dividend(DIV_DATE, DIV_AMT),), name="spy_tr",
-        fractional=True,
+        fractional=True, contributions=deposits(world, "SPY"),
     )
     assert snaps(world, "SPY") == [(s.date, s.cash_usd, s.equity_usd) for s in spy.snapshots]
     for sid in (F4, F1):
@@ -349,6 +367,7 @@ def test_seven_nights_step_every_session_and_equal_the_runners(world, tmp_path):
             usd_idr=usd,
             kickoff=PAPER_START,
             initial_idr=PAPER_INITIAL_IDR,
+            contributions=deposits(world, sid),
         )
         assert snaps(world, sid) == [(s.date, s.cash_usd, s.equity_usd) for s in result.snapshots]
         assert q(

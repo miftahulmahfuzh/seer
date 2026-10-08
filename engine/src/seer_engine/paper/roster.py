@@ -19,9 +19,10 @@ All three are :class:`RosterError`, all three stop the night, and all three name
 and the offending value**. A typo must never quietly drop a portfolio and leave a hole in its
 equity curve, and the message must say which portfolio.
 
-:data:`SEED_ROWS` is the six rows ``db/migrations/003_paper.sql``, ``004_news_veto.sql``,
-``006_roster.sql`` and ``007_fnd.sql`` write, as data; :data:`ROSTER` is ``from_rows(SEED_ROWS)``. The compiled roster
-and the stored roster therefore travel the *same* builder, and
+:data:`SEED_ROWS` is every row ``db/migrations/003_paper.sql`` through ``017_roster_real_fees.sql``
+write, as data, in ``sort`` order -- the six entries that trade first, then the thirteen the
+Gotrade-fee rebuild and its predecessors retired. :data:`ROSTER` is ``from_rows(SEED_ROWS)``. The
+compiled roster and the stored roster therefore travel the *same* builder, and
 ``tests/test_paper_roster.py`` checks both against a migrated database.
 
 - ``SPY``: buy-and-hold SPY with dividends reinvested (``backtest.benchmark.buy_and_hold``
@@ -57,6 +58,12 @@ never an edited entry (``paper`` refuses a started id whose stored digest differ
 ``paper_end``, ``gate_note``, ``gate_applicable`` and ``lab_provenance`` are **not** in the spec,
 deliberately: retiring a strategy, correcting a note, or recording why an entry was admitted must
 not move a live digest.
+
+Two parts of the spec are stated by this module rather than read off the row, because the row has no
+column for them: :data:`OWNER_FUNDING` (the money that arrives after the start -- 5,000,000 IDR on
+the 25th of each month) and :data:`BENCHMARK_COST_MODEL` (what a benchmark entry's fills cost, where
+there is no ``TradeRules`` to carry ``cost_model``). Both are conditional in :func:`spec` so that no
+entry digested before they existed moves: see :data:`PRE_FUNDING_IDS`.
 
 ``backtest_gate`` is a display fact for the go-live checklist (D12), not part of the spec:
 it never reset a paper clock. Every entry is ``passed: false`` today. An entry with
@@ -121,6 +128,7 @@ from seer_engine.lab.methods.m0022_weekly_brake_residual import METHOD as M0022
 from seer_engine.lab.methods.m0022_weekly_brake_residual import WEEKLYBRAKE
 from seer_engine.paper.capital import PAPER_INITIAL_IDR
 from seer_engine.sim import COST_RATE
+from seer_engine.sim.costs import CostModel
 from seer_engine.sim.rules import PRESETS, TradeRules, is_pinned_default
 from seer_engine.strategies.a import STRATEGY_A, STRATEGY_A_PARAMS
 from seer_engine.strategies.allocator import Allocator
@@ -143,15 +151,40 @@ FND_ID = "FND"
 F4_FR_ID = "F4-MOM12-N20-TREND-FR"
 F1_FR_ID = "F1-SPY-SMA200-M-FR"
 RM_ID = "RM-FR"  # retired 2026-10-07 for RMW before its first paper session
-RMW_ID = "RMW-FR"  # lab M0022-W-TV16 in fractional shares (monthly pick, weekly brake)  # lab M0011-RAW20-TV14-N21 in fractional shares; replaces FND (owner, 2026-10-07)
+RMW_ID = "RMW-FR"  # lab M0022-W-TV16 in fractional shares (monthly pick, weekly brake)
 # 013, the roster the owner chose for the first paper night (2026-10-07). A, F4-FR and F1-FR go;
 # these three join RMW-FR and C. See the block comment above SEED_ROWS' 013 section for why each.
 RAW_ID = "RAW-FR"  # lab M0007-N20-RAW in fractional shares: RMW's engine with no brake
 MOM_ID = "MOM-FR"  # lab M0002-REL-85 in fractional shares; replaces F4-FR
 MVW_ID = "MVW-FR"  # lab M0008-N30-C07 in fractional shares; replaces F1-FR
 
+# 017, the Gotrade-fee rebuild (2026-10-08). Every one of the six live entries above assumed a flat
+# 0.1% a side. Sean measured what Gotrade actually charges against 30 of the owner's own receipts
+# (sim/costs.py, validated to the cent on both sides) and it is ~2.5x that at best and 5.2x at the
+# owner's current $28 slots, because of a $0.10 per-order floor. `cost_model` sits in
+# sim.rules.LEVERS_SINCE_PINS at its no-op "flat", so moving a STARTED entry to "gotrade" moves its
+# spec digest and store.check_digest refuses its next night. Compliance is therefore SIX NEW IDS
+# with fresh clocks -- the rule docs/runbooks/paper-trading.md states and 010, 011 and 013 followed.
+# It costs nothing: zero sessions have been stepped, so a fresh clock throws no history away.
+BENCHMARK_GT_ID = "SPY-GT"  # the yardstick pays what the methods pay (resume condition 1)
+C_GT_ID = "C-GT"  # the DAILY-TRADING CONTROL, permanently (owner, 2026-10-08; resume condition 2)
+RMW_GT_ID = "RMW-FR-GT"
+RAW_GT_ID = "RAW-FR-GT"
+MOM_GT_ID = "MOM-FR-GT"
+MVW_GT_ID = "MVW-FR-GT"
+
+#: The bracket rule set the daily control trades under: design section 5's shape, charging Gotrade's
+#: measured schedule instead of a flat 0.1% a side. Added by the bracket-path work; this module only
+#: names it, and `rules_for` raises UnknownRules if it is not a `sim.rules` preset.
+BRACKET_GOTRADE_RULES_ID = "design-v0-gotrade"
+
 #: ``object_name`` of the benchmark: ``backtest.benchmark.buy_and_hold``, which is rules, not an object.
 BENCHMARK_OBJECT = "buy_and_hold"
+
+#: The ticker the benchmark entries hold. Split off from :data:`BENCHMARK_ID` by 017: that constant
+#: is an entry ID and there are now two benchmark entries, while the SYMBOL is and always was SPY.
+#: :func:`spec` writes this, so the retired SPY entry's spec text does not move.
+BENCHMARK_SYMBOL = "SPY"
 
 #: ``strategies.engine``'s CHECK, as a Python value.
 ENGINES: tuple[Engine, ...] = ("bracket", "book", "benchmark")
@@ -346,6 +379,85 @@ REGIME_PARAMS = next(c.params for c in M0002.candidates if c.id == "M0002-REL-85
 MINVAR_PARAMS = next(c.params for c in M0008.candidates if c.id == "M0008-N30-C07")
 
 
+#: The owner's funding plan, as the roster's own statement of it (owner's decision, 2026-10-08).
+#:
+#: The paper books start at :data:`PAPER_INITIAL_IDR` (10,000,000 IDR) and 5,000,000 IDR more
+#: arrives on the **25th of every calendar month**. The 25th is a calendar date, not a session: the
+#: deposit lands and then sits until the next month's first session, which is a mean of 7.0 calendar
+#: days later and ranges 4 to 10. That idle cash is part of what the owner will actually experience,
+#: so it is modelled rather than smoothed away.
+#:
+#: **Written out here, not imported from ``sim.contributions``,** for the reason given above
+#: ``FUNDAMENTAL_PARAMS``: anything this module imports becomes an input to a started paper
+#: strategy's spec digest. ``tests/test_paper_roster.py`` -- where importing the backtest side is
+#: free -- pins this equal to the schedule ``sim.contributions`` defines, so the two cannot drift
+#: apart in silence. It is a dict of plain strings because :func:`spec` is strings and nulls only.
+OWNER_FUNDING: dict[str, str] = {
+    "amount_idr": "5000000",
+    "cadence": "monthly",
+    "day_of_month": "25",
+}
+
+#: The thirteen entries that existed before the funding plan was modelled (migrations 003-013).
+#:
+#: Their specs are already written to ``strategies.params`` and their digests are pinned, so they
+#: must keep the spec shape they were digested under. :func:`spec` therefore leaves ``funding`` out
+#: for exactly these ids and includes it for every other entry -- including every entry ``promote``
+#: writes in future, which is the point of stating the exemption rather than the inclusion: a new
+#: entry cannot be silently born without its funding plan recorded.
+#:
+#: **Closed. Never append to it.** An entry funded by some other plan needs a second funding dict
+#: that says what that plan is, not an exemption that says nothing.
+PRE_FUNDING_IDS: frozenset[str] = frozenset(
+    {
+        BENCHMARK_ID,
+        "A",
+        F4_ID,
+        F1_ID,
+        "C",
+        FND_ID,
+        F4_FR_ID,
+        F1_FR_ID,
+        RM_ID,
+        RMW_ID,
+        RAW_ID,
+        MOM_ID,
+        MVW_ID,
+    }
+)
+
+#: The cost model each BENCHMARK entry's simulated fills pay, keyed by roster id.
+#:
+#: A benchmark row carries no ``rules_id`` -- :func:`from_row` refuses one -- so there is no column
+#: on the row for the lever and no :class:`TradeRules` to read it off. It is stated here, as
+#: :data:`LAB_PROVENANCE` is, and unlike provenance it **is** part of :func:`spec`: a yardstick that
+#: silently changed what its fills cost would turn "beats SPY TR" into a different comparison
+#: without moving a digest, and that is precisely what 017 exists to stop.
+#:
+#: ``SPY`` keeps ``"flat"`` forever: it is retired, it was started on a flat 0.1% a side, and its
+#: digest is pinned. ``SPY-GT`` pays Gotrade's measured schedule, the same one the methods pay.
+BENCHMARK_COST_MODEL: dict[str, CostModel] = {
+    BENCHMARK_ID: "flat",
+    BENCHMARK_GT_ID: "gotrade",
+}
+
+
+def benchmark_cost_model(entry_id: str) -> CostModel:
+    """The cost model benchmark entry ``entry_id``'s fills pay (:data:`BENCHMARK_COST_MODEL`).
+
+    :class:`BadRosterRow` when the id is not there. Never defaults: a benchmark that quietly fell
+    back to ``"flat"`` while every method paid Gotrade is the asymmetric yardstick 017 removes, and
+    an unnamed benchmark must stop the night rather than produce a flattering comparison.
+    """
+    model = BENCHMARK_COST_MODEL.get(entry_id)
+    if model is None:
+        raise BadRosterRow(
+            f"{entry_id!r}: a benchmark entry must name its cost model in "
+            f"paper.roster.BENCHMARK_COST_MODEL; known: {', '.join(sorted(BENCHMARK_COST_MODEL))}"
+        )
+    return model
+
+
 #: The one code-side table (D2). **This is the extension point**: a new strategy is a row in
 #: ``strategies`` plus, if its object is not already here, one entry here. Nothing else in this
 #: module changes to add a strategy. Keys are stable forever -- a stored spec names one, so
@@ -505,6 +617,63 @@ LAB_PROVENANCE: dict[str, LabProvenance] = {
             "condition 1 (11 trades in 22 dev years against the 100 required). At 0.81 it is "
             "the least correlated with RMW-FR of any variant that passes the five, so it is the "
             "board's one portfolio-construction bet rather than another ranking rule. Its max "
+            "DD is 20.0%, exactly the bar, with no margin: that is the risk of this admission"
+        ),
+    ),
+    # 017: the Gotrade-fee successors. Each trades the SAME lab method and the SAME recorded
+    # variant as the entry it replaces -- the trial behind it is unchanged, and it is still a
+    # dev-window row run at the assumed 0.1% a side. What is new is what the PAPER entry pays.
+    RMW_GT_ID: LabProvenance(
+        method_id="M0022",
+        candidate_id="M0022-W-TV16",
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "the same method and variant as RMW-FR, which it replaces, now paying Gotrade's "
+            "measured fee schedule instead of the assumed 0.1% a side. It failed only the luck "
+            "test -- recorded DSR 0.916 at its recorded N = 110 -- and passed every owner "
+            "condition. Re-measured at real fees the dev window returns +543% against SPY's +350% "
+            "at the same fees, so the admission is the same admission at an honest price"
+        ),
+    ),
+    RAW_GT_ID: LabProvenance(
+        method_id="M0007",
+        candidate_id="M0007-N20-RAW",
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "the same method and variant as RAW-FR, which it replaces, now paying Gotrade's "
+            "measured fee schedule. It passes all five owner conditions -- max DD 19.6%, inside "
+            "the revised 20% bar -- but NOT the lab's luck test: 0.914 at the N = 85 it was scored "
+            "at, 0.899 at today's N = 110. It is RMW-FR-GT's own engine with the volatility brake "
+            "removed, admitted as the controlled forward comparison at real fees: whether the "
+            "brake earns what it costs once the fees are the owner's actual fees"
+        ),
+    ),
+    MOM_GT_ID: LabProvenance(
+        method_id="M0002",
+        candidate_id="M0002-REL-85",
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "the same method and variant as MOM-FR, which it replaces, now paying Gotrade's "
+            "measured fee schedule. It passes all five owner conditions on the dev window and "
+            "fails only the luck test -- 0.854 at the N = 80 it was scored at, 0.828 at today's "
+            "N = 110. It is the board's total-return-momentum bet, at max DD 18.4% inside the 20% "
+            "bar"
+        ),
+    ),
+    MVW_GT_ID: LabProvenance(
+        method_id="M0008",
+        candidate_id="M0008-N30-C07",
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "the same method and variant as MVW-FR, which it replaces, now paying Gotrade's "
+            "measured fee schedule. It passes all five owner conditions and fails only the luck "
+            "test -- recorded DSR 0.817 at the N = 74 it was scored at, 0.780 at today's N = 110. "
+            "It is the board's one portfolio-construction bet rather than another ranking rule, "
+            "and the least correlated with RMW-FR-GT of any variant that passes the five. Its max "
             "DD is 20.0%, exactly the bar, with no margin: that is the risk of this admission"
         ),
     ),
@@ -733,10 +902,32 @@ def from_rows(rows: Iterable[Row]) -> tuple[RosterEntry, ...]:
 #: The rows ``003_paper.sql``, ``004_news_veto.sql`` and ``006_roster.sql`` write, as data.
 #: ``tests/test_paper_roster.py`` checks this equals a migrated database's ``strategies`` rows.
 SEED_ROWS: tuple[RosterRow, ...] = (
+    # 017, the Gotrade-fee rebuild (2026-10-08). Every entry below this block assumed a flat 0.1%
+    # a side. Measured from the owner's own Gotrade receipts (sim/costs.py, exact to the cent on
+    # both sides of his 2026-10-07 activity), the real schedule is a round trip of 2.500% at $10,
+    # 1.036% at his current $28 slot, 0.620% at $50 and 0.493% at $5,000 -- 12.5x, 5.2x, 3.1x and
+    # 2.5x the 0.200% assumed. The asymptote is ~2.5x; everything above it is the $0.10 per-order
+    # floor, which binds below about $50 an order. His own 20 real buys cost $2.60 to deploy $558
+    # -- 0.47% of the book gone before a single round trip.
+    #
+    # WHY SIX NEW IDS AND NOT SIX EDITS. `cost_model` sits in sim.rules.LEVERS_SINCE_PINS at its
+    # no-op "flat", so moving a STARTED entry to "gotrade" changes its spec digest and
+    # store.check_digest refuses its next night with a SpecMismatch. That is the rule
+    # docs/runbooks/paper-trading.md states and 010, 011 and 013 followed. It costs nothing here:
+    # zero paper sessions have ever been stepped, so a fresh clock throws no history away.
+    #
+    # WHAT ELSE TRAVELS WITH THEM. All six carry the owner's funding plan (OWNER_FUNDING) in their
+    # spec from their first night -- 10,000,000 IDR to start and 5,000,000 IDR more on the 25th of
+    # each month. Adding that later would have moved their digests and forced a second rebuild.
+    #
+    # WHAT DOES NOT CHANGE. The books still hold 20 names. The fee case for holding fewer is a
+    # two-month transient under the funding plan: measured, by month 3 a 20-name book pays 0.614%
+    # and an 11-name book 0.612%. How many names to hold is a question about returns, not fees, and
+    # if it is ever answered differently the answer lands as a FURTHER entry under this same rule.
     RosterRow(
-        id=BENCHMARK_ID,
+        id=BENCHMARK_GT_ID,
         name="SPY",
-        sub="S&P 500, buy and hold",
+        sub="S&P 500, buy and hold, real Gotrade fees",
         icon="landmark",
         is_champion=True,
         is_benchmark=True,
@@ -745,7 +936,147 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         rules_id=None,
         object_name=BENCHMARK_OBJECT,
         registry_id=None,
+        gate_note=(
+            "Benchmark, not a strategy: it has no backtest gate and is never a Seer pick. It "
+            "replaces SPY, which bought at a flat 0.1% a side while every method now pays "
+            "Gotrade's measured schedule -- a yardstick cheaper than the thing it measures. Over "
+            "the lab's dev window at the same real fees SPY returns +350%"
+        ),
+    ),
+    RosterRow(
+        id=C_GT_ID,
+        name="C · News veto",
+        sub="A's picks, LLM can veto on news, daily, real Gotrade fees",
+        icon="gavel",
+        is_champion=False,
+        is_benchmark=False,
+        sort=2,
+        engine="bracket",
+        rules_id=BRACKET_GOTRADE_RULES_ID,
+        object_name="STRATEGY_C",
+        registry_id=None,
+        gate_note=(
+            "Backtest gate: not applicable (LLM strategy, design section 1 item 5). On the roster "
+            "PERMANENTLY as the daily-trading control (owner, 2026-10-08): it measures how bad "
+            "daily trading on Gotrade would have been, which was the owner's original plan. Being "
+            "expensive is the finding it exists to produce, so it is never retired on cost "
+            "grounds. It answers that question only if it runs on the same starting capital, the "
+            "same monthly contributions and the same fee schedule as the monthly books, and it "
+            "carries all three"
+        ),
+        gate_applicable=False,
+    ),
+    RosterRow(
+        id=RMW_GT_ID,
+        name="RMW · Braked momentum",
+        sub=(
+            "Top 20 by rise beyond the market, picked monthly; holds less when jumpy, checked "
+            "weekly; fractional shares, real Gotrade fees"
+        ),
+        icon="activity",
+        is_champion=False,
+        is_benchmark=False,
+        sort=3,
+        engine="book",
+        rules_id="monthly-rank-weekly-resize-frac-gotrade",
+        object_name="WEEKLYBRAKE",
+        registry_id=None,
+        gate_note=(
+            "Lab M0022 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
+            "0.1% a side: beats SPY TR (+789.2% vs +351.4%), max DD 14.3%, PF 2.06 and 1,589 "
+            "trades all pass; failed only DSR >= 0.95 (0.916 at N=110). Re-measured at Gotrade's "
+            "real fees (449fa34, report only -- the lab's own N is unchanged) it returns +543% "
+            "against SPY's +350% at the same fees, so no verdict moves. Successor of RMW-FR, which "
+            "paid the assumed rate; this entry pays Gotrade's measured schedule from its first "
+            "night. On paper to test it forward"
+        ),
+    ),
+    RosterRow(
+        id=RAW_GT_ID,
+        name="RAW · Unbraked momentum",
+        sub="Top 20 by rise beyond the market, no brake, monthly, fractional shares, real Gotrade fees",
+        icon="zap",
+        is_champion=False,
+        is_benchmark=False,
+        sort=4,
+        engine="book",
+        rules_id="monthly-hold-frac-gotrade",
+        object_name="RESIDMOM",
+        registry_id=None,
+        gate_note=(
+            "Lab M0007 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
+            "0.1% a side: beats SPY TR (+1,502.2% vs +351.4%), max DD 19.6%, PF 2.16 and 1,596 "
+            "trades all pass. It does NOT pass the luck test: 0.914 at the N=85 it was scored at, "
+            "0.899 re-scored at today's N=110, just under the 0.90 bar. Never had a test-window "
+            "look. Re-measured at Gotrade's real fees (449fa34, report only) it returns +1,126% "
+            "against SPY's +350% at the same fees. Successor of RAW-FR, which paid the assumed "
+            "rate. On paper as the controlled comparison against RMW-FR-GT: the same book without "
+            "the brake"
+        ),
+    ),
+    RosterRow(
+        id=MOM_GT_ID,
+        name="MOM · Regime momentum",
+        sub=(
+            "Top 20 by last year's rise, holds less when jumpy for itself, monthly, fractional "
+            "shares, real Gotrade fees"
+        ),
+        icon="trending-up",
+        is_champion=False,
+        is_benchmark=False,
+        sort=5,
+        engine="book",
+        rules_id="monthly-hold-frac-gotrade",
+        object_name="REGIME",
+        registry_id=None,
+        gate_note=(
+            "Lab M0002 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
+            "0.1% a side: beats SPY TR (+940.1% vs +351.4%), max DD 18.4%, PF 2.33 and 1,148 "
+            "trades all pass; failed only the luck test (0.854 at the N=80 it was scored at, 0.828 "
+            "at today's N=110). Re-measured at Gotrade's real fees (449fa34, report only) it "
+            "returns +763% against SPY's +350% at the same fees. Successor of MOM-FR, which paid "
+            "the assumed rate. On paper to test it forward"
+        ),
+    ),
+    RosterRow(
+        id=MVW_GT_ID,
+        name="MVW · Steady weights",
+        sub=(
+            "Top 30 by last year's rise, weighted to swing least together, monthly, fractional "
+            "shares, real Gotrade fees"
+        ),
+        icon="scale",
+        is_champion=False,
+        is_benchmark=False,
+        sort=6,
+        engine="book",
+        rules_id="monthly-hold-frac-gotrade",
+        object_name="MINVAR",
+        registry_id=None,
+        gate_note=(
+            "Lab M0008 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
+            "0.1% a side: beats SPY TR (+726.7% vs +351.4%), max DD 20.0%, PF 2.14 and 1,223 "
+            "trades all pass; failed only the luck test (0.817 at the N=74 it was scored at, 0.780 "
+            "at today's N=110). Re-measured at Gotrade's real fees (449fa34, report only) it "
+            "returns +536% against SPY's +350% at the same fees. Successor of MVW-FR, which paid "
+            "the assumed rate. Its drawdown sits exactly on the 20% bar, with no margin. On paper "
+            "to test it forward"
+        ),
+    ),
+    RosterRow(
+        id=BENCHMARK_ID,
+        name="SPY",
+        sub="S&P 500, buy and hold",
+        icon="landmark",
+        is_champion=False,
+        is_benchmark=False,
+        sort=7,
+        engine="benchmark",
+        rules_id=None,
+        object_name=BENCHMARK_OBJECT,
+        registry_id=None,
         gate_note="Benchmark, not a strategy: it has no backtest gate and is never a Seer pick",
+        status="retired",  # 017: superseded by SPY-GT, which pays Gotrade's measured fees
     ),
     RosterRow(
         id="A",
@@ -754,7 +1085,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         icon="sigma",
         is_champion=False,
         is_benchmark=False,
-        sort=2,
+        sort=8,
         engine="bracket",
         rules_id="design-v0",
         object_name="STRATEGY_A",
@@ -772,7 +1103,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         icon="trending-up",
         is_champion=False,
         is_benchmark=False,
-        sort=3,
+        sort=9,
         engine="book",
         rules_id="monthly-hold",
         object_name="FACTOR",
@@ -787,7 +1118,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         icon="shield",
         is_champion=False,
         is_benchmark=False,
-        sort=4,
+        sort=10,
         engine="book",
         rules_id="monthly-hold",
         object_name="TIMING",
@@ -802,13 +1133,14 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         icon="gavel",
         is_champion=False,
         is_benchmark=False,
-        sort=5,
+        sort=11,
         engine="bracket",
         rules_id="design-v0",
         object_name="STRATEGY_C",
         registry_id=None,
         gate_note="Backtest gate: not applicable (LLM strategy, design §1 item 5)",
         gate_applicable=False,
+        status="retired",  # 017: superseded by C-GT, which pays Gotrade's measured fees
     ),
     RosterRow(
         id=FND_ID,
@@ -817,7 +1149,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         icon="book-open",
         is_champion=False,
         is_benchmark=False,
-        sort=6,
+        sort=12,
         engine="book",
         rules_id="monthly-hold",
         object_name="FUNDAMENTAL",
@@ -837,7 +1169,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         icon="trending-up",
         is_champion=False,
         is_benchmark=False,
-        sort=7,
+        sort=13,
         engine="book",
         rules_id="monthly-hold-frac",
         object_name="FACTOR",
@@ -855,7 +1187,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         icon="shield",
         is_champion=False,
         is_benchmark=False,
-        sort=8,
+        sort=14,
         engine="book",
         rules_id="monthly-hold-frac",
         object_name="TIMING",
@@ -873,7 +1205,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         icon="activity",
         is_champion=False,
         is_benchmark=False,
-        sort=9,
+        sort=15,
         engine="book",
         rules_id="monthly-hold-frac",
         object_name="RESIDVOL",
@@ -893,7 +1225,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         icon="activity",
         is_champion=False,
         is_benchmark=False,
-        sort=10,
+        sort=16,
         engine="book",
         rules_id="monthly-rank-weekly-resize-frac",
         object_name="WEEKLYBRAKE",
@@ -903,6 +1235,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "(+789.2% vs +351.4%), max DD 14.3%, PF 2.06 and 1,589 trades all pass; failed only "
             "DSR >= 0.95 (0.916 at N=110). On paper to test it forward"
         ),
+        status="retired",  # 017: superseded by RMW-FR-GT, which pays Gotrade's measured fees
     ),
     # 013: the roster the owner chose for the first paper night (2026-10-07). A, F4-FR and F1-FR
     # are retired and RAW-FR, MOM-FR and MVW-FR join RMW-FR and C.
@@ -935,7 +1268,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         icon="zap",
         is_champion=False,
         is_benchmark=False,
-        sort=11,
+        sort=17,
         engine="book",
         rules_id="monthly-hold-frac",
         object_name="RESIDMOM",
@@ -947,6 +1280,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "today's N=110, just under the 0.90 bar. Never had a test-window look. On paper as "
             "the controlled comparison against RMW-FR: the same book without the brake"
         ),
+        status="retired",  # 017: superseded by RAW-FR-GT, which pays Gotrade's measured fees
     ),
     RosterRow(
         id=MOM_ID,
@@ -955,7 +1289,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         icon="trending-up",
         is_champion=False,
         is_benchmark=False,
-        sort=12,
+        sort=18,
         engine="book",
         rules_id="monthly-hold-frac",
         object_name="REGIME",
@@ -967,6 +1301,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "Replaces F4-FR: the same total-return-momentum bet, "
             "inside the 20% drawdown bar that F4's 22.2% cannot meet. On paper to test it forward"
         ),
+        status="retired",  # 017: superseded by MOM-FR-GT, which pays Gotrade's measured fees
     ),
     RosterRow(
         id=MVW_ID,
@@ -975,7 +1310,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         icon="scale",
         is_champion=False,
         is_benchmark=False,
-        sort=13,
+        sort=19,
         engine="book",
         rules_id="monthly-hold-frac",
         object_name="MINVAR",
@@ -987,6 +1322,7 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "Replaces F1-FR, which cannot reach 100 closed trades. "
             "Its drawdown sits exactly on the 20% bar, with no margin. On paper to test it forward"
         ),
+        status="retired",  # 017: superseded by MVW-FR-GT, which pays Gotrade's measured fees
     ),
 )
 
@@ -1043,15 +1379,33 @@ def rules_dict(rules: TradeRules) -> dict[str, str | None]:
 
 
 def spec(e: RosterEntry) -> dict[str, Any]:
-    """The frozen spec of ``e`` (contract C2 ``params.spec``): JSON-ready, strings and nulls only."""
+    """The frozen spec of ``e`` (contract C2 ``params.spec``): JSON-ready, strings and nulls only.
+
+    Two keys are conditional, and both are conditional for the same reason the levers in
+    ``sim.rules.LEVERS_SINCE_PINS`` are: a fact added after an entry's digest was pinned must not
+    move that digest, or ``store.check_digest`` refuses the entry's next paper night.
+
+    - ``funding`` (017) is present for every entry except the thirteen in :data:`PRE_FUNDING_IDS`,
+      which were digested before the owner's contribution plan was modelled. Stating the exemption
+      rather than the inclusion means a future promoted entry carries its funding plan by default
+      and cannot be born without it.
+    - a ``benchmark`` entry states what its fills cost: ``cost_rate`` while it is on the old flat
+      rate, ``cost_model`` once it is on Gotrade's measured schedule
+      (:data:`BENCHMARK_COST_MODEL`). The retired ``SPY`` keeps ``cost_rate``, so its spec text is
+      unchanged to the byte.
+    """
     if e.engine == "benchmark":
         params: dict[str, str] = {
-            "symbol": BENCHMARK_ID,
+            "symbol": BENCHMARK_SYMBOL,
             "entry": "open",
             "shares": "whole",
             "dividends": "reinvest",
-            "cost_rate": str(COST_RATE),
         }
+        model = benchmark_cost_model(e.id)
+        if model == "flat":
+            params["cost_rate"] = str(COST_RATE)
+        else:
+            params["cost_model"] = model
         object_id = None
     else:
         params = dict(e.params.as_dict())
@@ -1059,7 +1413,7 @@ def spec(e: RosterEntry) -> dict[str, Any]:
     registry_digest = None
     if e.registry_id is not None:
         registry_digest = candidate_digest(next(c for c in REGISTRY if c.id == e.registry_id))
-    return {
+    out: dict[str, Any] = {
         "id": e.id,
         "engine": e.engine,
         "object": e.object_name,
@@ -1071,7 +1425,9 @@ def spec(e: RosterEntry) -> dict[str, Any]:
         "params": params,
         "initial_idr": str(PAPER_INITIAL_IDR),
     }
-
+    if e.id not in PRE_FUNDING_IDS:
+        out["funding"] = dict(OWNER_FUNDING)
+    return out
 
 def spec_text(s: Mapping[str, Any]) -> str:
     """The canonical text of a spec: JSON with sorted keys, no whitespace, ASCII only."""

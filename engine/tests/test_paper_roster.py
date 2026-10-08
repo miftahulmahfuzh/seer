@@ -23,9 +23,12 @@ from psycopg.types.json import Jsonb
 from seer_engine import dates
 from seer_engine.backtest.registry import REGISTRY, candidate_digest
 from seer_engine.paper.roster import (
+    BENCHMARK_COST_MODEL,
     BENCHMARK_ID,
     BENCHMARK_OBJECT,
     MAX_LOOKBACK_BARS,
+    OWNER_FUNDING,
+    PRE_FUNDING_IDS,
     RESOLVER,
     ROSTER,
     ROSTER_IDS,
@@ -36,6 +39,7 @@ from seer_engine.paper.roster import (
     UnknownRules,
     active,
     backtest_gate,
+    benchmark_cost_model,
     entry,
     from_row,
     from_rows,
@@ -76,8 +80,20 @@ RMW = "RMW-FR"  # lab M0022-W-TV16: RM with a weekly brake, split cadence; repla
 RAW = "RAW-FR"  # lab M0007-N20-RAW: RMW's engine with no brake, the controlled comparison
 MOM = "MOM-FR"  # lab M0002-REL-85: total-return momentum inside the 20% bar; replaces F4_FR
 MVW = "MVW-FR"  # lab M0008-N30-C07: minimum-variance weighting; replaces F1_FR
-RETIRED = (F4, F1, FND, "RM-FR", "A", F4_FR, F1_FR)  # none of them ever traded a paper session
-ACTIVE_IDS = ("SPY", "C", RMW, RAW, MOM, MVW)
+# 017: the Gotrade-fee rebuild. Every entry above assumed a flat 0.1% a side; these six pay the
+# schedule measured from the owner's own receipts (sim/costs.py). New ids with fresh clocks,
+# because cost_model is a LEVERS_SINCE_PINS lever and moving a started entry's digest would fail
+# its next night. Zero sessions had been stepped, so the fresh clocks cost no history.
+SPY_GT = "SPY-GT"
+C_GT = "C-GT"
+RMW_GT = "RMW-FR-GT"
+RAW_GT = "RAW-FR-GT"
+MOM_GT = "MOM-FR-GT"
+MVW_GT = "MVW-FR-GT"
+#: every entry that ever traded under the assumed flat rate, plus the three 013 retired; none of
+#: them ever stepped a paper session, and every one of them keeps every row it wrote.
+RETIRED = (F4, F1, FND, RM, "A", F4_FR, F1_FR, "SPY", "C", RMW, RAW, MOM, MVW)
+ACTIVE_IDS = (SPY_GT, C_GT, RMW_GT, RAW_GT, MOM_GT, MVW_GT)
 
 # 2026-10-07: every digest moved once, on purpose, when the paper books' starting cash went from
 # 20,000,000 to 10,000,000 IDR (spec "initial_idr"; the owner's own Gotrade money). Production's
@@ -103,6 +119,17 @@ PINS = {
     RAW: "e772830d223c96b8547c8224ad2d6d17254c051f701015b6eff8f67d53a57c5b",
     MOM: "7e027e48a405c73a619337bbd420f895e0663d295fd63f8dcb312f296b84480c",
     MVW: "4f208ce2ce23691cc8e992aadf3cb9337f90a0946cac60c389f470b964ff502e",
+    # 017: the Gotrade-fee successors. They digest differently from their predecessors for two
+    # reasons at once -- rules.cost_model is "gotrade" (SPY-GT: a "cost_model" param instead of a
+    # "cost_rate"), and the spec carries the owner's funding plan. The thirteen pins above are
+    # UNCHANGED, which is the thing this block has to prove: adding six entries and renumbering
+    # every `sort` must not move one live digest.
+    SPY_GT: "20eb3b5b157871658a3055aa646c9ff7b2a77dcd32dc76fdf1b8a90b4df4f8aa",
+    C_GT: "4dc9e5a9eb1d3f4df07b98f844fd025cf347b9eac1ee4c6c90a213345898358e",
+    RMW_GT: "26f37c2ea1e06fec3560a153d27aa2463651f76f91db2c93f287a466e8e5bb27",
+    RAW_GT: "21947eef1b8f1c9060fc3bd0af8be34d764b18041fd8f6c79bd720788575f822",
+    MOM_GT: "0551e953ea8b62fe7bb1b12852f8f549ad9353b99d15f5090d9a8e2ca591f503",
+    MVW_GT: "f463f4af9aeb3157029979df64e4923a55ea675991d4fddbfe992a3a685f4df2",
 }
 
 FACTOR_PARAMS_AS_DICT = {
@@ -123,14 +150,19 @@ DISPLAY = ("id", "name", "sub", "icon", "is_champion", "is_benchmark", "sort", "
 
 
 def test_the_roster_is_the_handover_entries_in_sort_order():
-    assert ROSTER_IDS == ("SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW)
-    assert [e.sort for e in ROSTER] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+    assert ROSTER_IDS == (
+        SPY_GT, C_GT, RMW_GT, RAW_GT, MOM_GT, MVW_GT,
+        "SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW,
+    )
+    assert [e.sort for e in ROSTER] == list(range(1, 20))
     assert "B" not in ROSTER_IDS
 
 
 def test_spy_is_the_only_champion_and_the_only_benchmark():
-    assert [e.id for e in ROSTER if e.is_champion] == [BENCHMARK_ID]
-    assert [e.id for e in ROSTER if e.is_benchmark] == [BENCHMARK_ID]
+    assert [e.id for e in ROSTER if e.is_champion] == [SPY_GT]
+    assert [e.id for e in ROSTER if e.is_benchmark] == [SPY_GT]
+    # 017 moved both flags off the retired SPY. Neither is in the spec, so its digest did not move.
+    assert spec_digest(spec(entry("SPY"))) == PINS["SPY"]
 
 
 def test_display_fields_equal_the_migration_rows(pg):
@@ -139,7 +171,10 @@ def test_display_fields_equal_the_migration_rows(pg):
 
 
 def test_each_entry_is_the_named_object_params_and_rules():
-    spy, a, f4, f1, c, fnd, f4_fr, f1_fr, rm, rmw, raw, mom, mvw = (entry(i) for i in ROSTER_IDS)
+    # By id, not by position: 017 put the six Gotrade successors at the head of ROSTER_IDS, so a
+    # positional unpack of the roster no longer lines up with the thirteen this test names.
+    spy, a, f4, f1, c, fnd = (entry(i) for i in ("SPY", "A", F4, F1, "C", FND))
+    f4_fr, f1_fr, rm, rmw, raw, mom, mvw = (entry(i) for i in (F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW))
     assert (spy.engine, spy.obj, spy.rules, spy.rules_id, spy.params) == ("benchmark", None, None, None, None)
     assert a.engine == "bracket"
     assert a.obj is STRATEGY_A and a.params is STRATEGY_A_PARAMS and a.rules is DESIGN_V0
@@ -281,13 +316,14 @@ def test_strategy_params_round_trip_through_jsonb(pg):
 
 def test_lookbacks():
     assert {e.id: e.lookback for e in ROSTER} == {
-        "SPY": 1, "A": 200, F4: 253, F1: 200, "C": 200, FND: 20, F4_FR: 253, F1_FR: 200, RM: 401,
-        RMW: 426, RAW: 401, MOM: 379, MVW: 253,
+        SPY_GT: 1, C_GT: 200, RMW_GT: 426, RAW_GT: 401, MOM_GT: 379, MVW_GT: 253,
+        "SPY": 1, "A": 200, F4: 253, F1: 200, "C": 200, FND: 20, F4_FR: 253, F1_FR: 200,
+        RM: 401, RMW: 426, RAW: 401, MOM: 379, MVW: 253,
     }
     # FND's lookback is the 20-bar dollar-volume window: a filing's availability is its `filed`
-    # date, not a bar count. RM's 401 (a 378-session market-link estimate ending a month back)
-    # is the roster's longest, which is why the night loads 640 calendar days, not 550.
-    assert MAX_LOOKBACK_BARS == 426  # RMW: RM's 401 plus the month's anchor, up to ~23 sessions back
+    # date, not a bar count. RMW's 426 is the roster's longest, which is why the night loads 640
+    # calendar days, not 550 -- unchanged by 017, which adds no new object.
+    assert MAX_LOOKBACK_BARS == 426
 
 
 def test_the_night_window_holds_the_longest_lookback():
@@ -464,29 +500,34 @@ def test_the_seed_roster_retires_the_whole_share_three_with_no_paper_end():
 
 
 def test_active_drops_retired_entries_and_keeps_order():
-    # RMW, not A: A is retired in SEED_ROWS itself since 013, so retiring it again would assert
-    # nothing. Retiring a live entry is the case that matters -- it is what `promote --retire`
-    # does on every future swap.
+    # RAW_GT, not A or RMW: both are retired in SEED_ROWS already, so retiring them again would
+    # assert nothing. Retiring a LIVE entry is the case that matters -- it is what
+    # `promote --retire` does on every future swap.
     rows = tuple(
-        dataclasses.replace(r, status="retired", paper_end=date(2026, 10, 2)) if r.id == RMW else r
+        dataclasses.replace(r, status="retired", paper_end=date(2026, 10, 2)) if r.id == RAW_GT else r
         for r in SEED_ROWS
     )
     entries = from_rows(rows)
     assert [e.id for e in entries] == list(ROSTER_IDS)  # retired rows are never dropped from the roster
-    assert [e.id for e in active(entries)] == ["SPY", "C", RAW, MOM, MVW]
-    rmw = next(e for e in entries if e.id == RMW)
-    assert (rmw.status, rmw.paper_end) == ("retired", date(2026, 10, 2))
+    assert [e.id for e in active(entries)] == [SPY_GT, C_GT, RMW_GT, MOM_GT, MVW_GT]
+    raw = next(e for e in entries if e.id == RAW_GT)
+    assert (raw.status, raw.paper_end) == ("retired", date(2026, 10, 2))
+
+
+def _seed(sid: str) -> RosterRow:
+    """The seed row with id ``sid``. By id, not by index: 017 put the live six at the head."""
+    return next(r for r in SEED_ROWS if r.id == sid)
 
 
 def test_retiring_a_strategy_does_not_move_its_digest():
     """Invariant 2 and 3: status and paper_end are lifecycle, never spec."""
-    retired = from_row(dataclasses.replace(SEED_ROWS[1], status="retired", paper_end=date(2026, 10, 2)))
+    retired = from_row(dataclasses.replace(_seed("A"), status="retired", paper_end=date(2026, 10, 2)))
     assert spec_digest(spec(retired)) == PINS["A"]
     assert strategy_params(retired) == strategy_params(entry("A"))
 
 
 def test_a_corrected_gate_note_does_not_move_a_digest():
-    corrected = from_row(dataclasses.replace(SEED_ROWS[1], gate_note="corrected, still failed"))
+    corrected = from_row(dataclasses.replace(_seed("A"), gate_note="corrected, still failed"))
     assert spec_digest(spec(corrected)) == PINS["A"]
     # The correction lands on the entry's record. It does not move the digest, and since the
     # 2026-10-07 purge it does not reach `params` either -- it has no display path left at all.
@@ -521,11 +562,18 @@ def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
     # RM-FR (010) is the second: lab M0011, promoted to replace FND. RMW-FR (011) and the three
     # 013 rows are the rest -- every lab-derived row added after `promote` existed names its
     # method here, and only F4, F1 and their fractional twins predate it.
-    assert {r.id for r in rows.values() if r.promoted_from is not None} == {FND, RM, RMW, RAW, MOM, MVW}
+    assert {r.id for r in rows.values() if r.promoted_from is not None} == {
+        FND, RM, RMW, RAW, MOM, MVW, RMW_GT, RAW_GT, MOM_GT, MVW_GT,
+    }
     assert (rows[FND].promoted_from, rows[RM].promoted_from) == ("M0005", "M0011")
     assert (rows[RAW].promoted_from, rows[MOM].promoted_from, rows[MVW].promoted_from) == (
         "M0007", "M0002", "M0008",
     )
+    # 017's four book successors name the same four methods as the entries they replace.
+    assert (rows[RAW_GT].promoted_from, rows[MOM_GT].promoted_from, rows[MVW_GT].promoted_from) == (
+        "M0007", "M0002", "M0008",
+    )
+    assert rows[RMW_GT].promoted_from == "M0022"
     assert (rows["A"].object_name, rows["A"].registry_id, rows["A"].gate_applicable) == ("STRATEGY_A", None, True)
     assert (rows[F4].object_name, rows[F4].registry_id) == ("FACTOR", F4)
     assert rows["C"].gate_applicable is False
@@ -564,10 +612,10 @@ from seer_engine.paper.roster import (  # noqa: E402
 #: Every roster entry admitted from a recorded lab candidate. A promotion adds a SEED_ROWS row
 #: AND a LAB_PROVENANCE entry in the same commit; this tuple is the third place that has to name
 #: it, and that is the point -- forgetting is a failing test, not a silent gap.
-LAB_DERIVED = (F4, F1, FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW)
-#: And the three that are not: SPY is the benchmark, C is the LLM strategy the quant gate does not
-#: apply to, and A predates the lab (H-A records the idea but has no trial).
-NOT_LAB_DERIVED = ("SPY", "A", "C")
+LAB_DERIVED = (F4, F1, FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW, RMW_GT, RAW_GT, MOM_GT, MVW_GT)
+#: And the five that are not: the two benchmark entries, C and its Gotrade successor (the LLM
+#: strategy the quant gate does not apply to), and A, which predates the lab.
+NOT_LAB_DERIVED = ("SPY", SPY_GT, "A", "C", C_GT)
 
 
 def _lab_reachable(src: str) -> set[str]:
@@ -696,6 +744,127 @@ def test_lab_provenance_agrees_with_the_promoted_from_column(pg):
     for sid, p in LAB_PROVENANCE.items():
         if rows[sid].promoted_from is not None:
             assert rows[sid].promoted_from == p.method_id, sid
-    # the six rows `promote` wrote are the only ones with a column to agree with; F4, F1 and
-    # their fractional twins were seeded by migration before `promote` existed.
-    assert {i for i, r in rows.items() if r.promoted_from is not None} == {FND, RM, RMW, RAW, MOM, MVW}
+    # the rows `promote` wrote are the only ones with a column to agree with; F4, F1 and
+    # their fractional twins were seeded by migration before `promote` existed. 017's four book
+    # successors carry the method of the entry each replaces.
+    assert {i for i, r in rows.items() if r.promoted_from is not None} == {
+        FND, RM, RMW, RAW, MOM, MVW, RMW_GT, RAW_GT, MOM_GT, MVW_GT,
+    }
+
+
+# ---- 017: the Gotrade-fee rebuild ---------------------------------------------------------------
+
+
+def test_every_active_entry_pays_gotrade_and_nothing_retired_changed():
+    """R1: every entry that trades pays the fees the owner actually pays, SPY included.
+
+    The thing the whole rebuild exists for, asserted as one statement. A book or bracket entry says
+    so through its rule set's `cost_model`; the benchmark, which has no rule set, says so through
+    `BENCHMARK_COST_MODEL`, and both end up in the spec.
+    """
+    for e in active(ROSTER):
+        if e.engine == "benchmark":
+            assert benchmark_cost_model(e.id) == "gotrade", e.id
+            assert spec(e)["params"]["cost_model"] == "gotrade", e.id
+            assert "cost_rate" not in spec(e)["params"], e.id
+        else:
+            assert e.rules is not None and e.rules.cost_model == "gotrade", e.id
+            assert spec(e)["rules"]["cost_model"] == "gotrade", e.id
+    # and the six predecessors are retired, not deleted: every one keeps its row and its digest.
+    for old, new in (("SPY", SPY_GT), ("C", C_GT), (RMW, RMW_GT), (RAW, RAW_GT),
+                     (MOM, MOM_GT), (MVW, MVW_GT)):
+        assert entry(old).status == "retired", old
+        assert spec_digest(spec(entry(old))) == PINS[old], old
+        assert entry(new).status == "active", new
+        assert spec_digest(spec(entry(new))) != PINS[old], new
+
+
+def test_the_daily_control_stays_and_is_funded_like_the_books():
+    """The owner's standing instruction, 2026-10-08, as a test rather than a comment.
+
+    C exists to measure how bad daily trading on Gotrade would have been -- it was his original
+    plan. Being expensive is the finding, so it is never retired on cost grounds. It only answers
+    the question if it runs on the same money as the books it is compared against: the same start,
+    the same deposits and the same fee schedule.
+    """
+    c = entry(C_GT)
+    assert c.status == "active" and c.engine == "bracket"
+    assert c.rules is not None and c.rules.cadence == "daily"
+    assert c.rules.cost_model == "gotrade"
+    assert c.gate_applicable is False and backtest_gate(c) == {"passed": False, "applicable": False}
+    s = spec(c)
+    books = [spec(e) for e in active(ROSTER) if e.engine == "book"]
+    assert books, "the control needs books to be a control of"
+    assert all(s["initial_idr"] == b["initial_idr"] for b in books)
+    assert all(s["funding"] == b["funding"] for b in books)
+
+
+def test_the_funding_plan_is_the_schedule_the_engine_actually_runs():
+    """`OWNER_FUNDING` is written out in `paper/roster.py` and must never drift from the object.
+
+    The roster may not import `sim.contributions` -- anything it imports becomes an input to a
+    started paper strategy's digest, and an edit made for a backtest reason would silently
+    re-digest a live entry (the same rule as `FUNDAMENTAL_PARAMS`). So the equality is pinned
+    HERE, where importing the backtest side is free.
+    """
+    from seer_engine.sim.contributions import OWNER_MONTHLY
+
+    assert OWNER_FUNDING["amount_idr"] == str(OWNER_MONTHLY.amount_idr)
+    assert OWNER_FUNDING["day_of_month"] == str(OWNER_MONTHLY.day_of_month)
+    # `cadence` has no counterpart on the object: `ContributionSchedule` is monthly BY
+    # CONSTRUCTION -- it has a `day_of_month` and nothing else -- so the spec's "monthly" is this
+    # roster's own prose for a reader of the frozen spec, not a field that can drift. Asserted as a
+    # literal so it cannot quietly become something the object does not mean.
+    assert OWNER_FUNDING["cadence"] == "monthly"
+    assert OWNER_MONTHLY.dates_in(date(2026, 10, 1), date(2026, 12, 31)) == (
+        date(2026, 10, 25), date(2026, 11, 25), date(2026, 12, 25),
+    )
+    # and the funding plan is in the spec of every entry that is not grandfathered, and of none
+    # that is -- which is what keeps the thirteen pinned digests where they are.
+    assert set(PRE_FUNDING_IDS) == {
+        "SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW,
+    }
+    for e in ROSTER:
+        assert ("funding" in spec(e)) == (e.id not in PRE_FUNDING_IDS), e.id
+
+
+def test_a_benchmark_entry_must_name_its_cost_model():
+    with pytest.raises(BadRosterRow, match="BENCHMARK_COST_MODEL"):
+        benchmark_cost_model("SPY-NOT-A-REAL-ENTRY")
+    # the two that are named, and nothing else: SPY keeps the flat rate it was started on.
+    assert BENCHMARK_COST_MODEL == {"SPY": "flat", SPY_GT: "gotrade"}
+
+
+def test_the_benchmark_entry_and_the_stepper_agree():
+    """Exit criterion 10: what the frozen spec names is what the night's fills actually pay.
+
+    The roster is the only place that knows which model a benchmark entry is on -- a benchmark row
+    carries no `rules_id`, so there is no `TradeRules` to hold the lever. `spec` writes that
+    statement into the frozen digest and `commands.paper._step_benchmark` hands the same statement
+    to `store.load_benchmark`, which puts it on `BenchmarkState` so it survives between nights.
+    This pins the two ends together: a benchmark that silently stepped at "flat" while every method
+    paid Gotrade is the asymmetric yardstick 017 exists to remove.
+    """
+    import inspect
+
+    from seer_engine.commands import paper as paper_cmd
+    from seer_engine.paper import store as paper_store
+
+    # the load path takes the model, keyword-only, and defaults to the old flat rate
+    p = inspect.signature(paper_store.load_benchmark).parameters["cost_model"]
+    assert p.kind is inspect.Parameter.KEYWORD_ONLY and p.default == "flat"
+
+    # the night supplies it FROM THE ROSTER, per entry -- never a module default
+    src = inspect.getsource(paper_cmd._step_benchmark)
+    assert "cost_model=roster.benchmark_cost_model(e.id)" in src
+
+    # and the roster's statement is the one the frozen spec publishes, for both benchmark entries
+    for e in ROSTER:
+        if e.engine != "benchmark":
+            continue
+        model = benchmark_cost_model(e.id)
+        params = spec(e)["params"]
+        if model == "flat":
+            assert params["cost_rate"] == "0.001" and "cost_model" not in params, e.id
+        else:
+            assert params["cost_model"] == model and "cost_rate" not in params, e.id

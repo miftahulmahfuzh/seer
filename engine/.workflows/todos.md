@@ -829,6 +829,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Plan**: `.workflows/plan/P1-ENG-R7MD.md`
   - **Completed**: 2026-10-08 11:52
   - **Method**: /do
+  - **Commit**: `ca75a96` — all ten phase 6 files are inside it and nothing else is; verified
+    with `git show --stat --format="" ca75a96` against the allowlist before the push. Committed
+    as `git commit -F <msgfile> -- <ten paths>`, the atomic stage-and-commit form phase 4 above
+    records as the only one the allowlist actually protects in this shared index. This sha is
+    recorded by a second, todos-only commit, since a commit cannot name itself.
   - **Files**: db/migrations/016_contributions.sql, engine/src/seer_engine/paper/store.py, engine/src/seer_engine/paper/book.py, engine/src/seer_engine/paper/compare.py, engine/src/seer_engine/commands/compare.py, engine/tests/test_paper_store.py, engine/tests/test_paper_book.py, engine/tests/test_paper_compare.py, engine/.workflows/plan/P1-ENG-R7MD.md, engine/.workflows/todos.md
   - **Verified**: engine suite `PYTHONPATH=engine/src PG_TEST_URL=... python -m pytest engine/tests -q -n auto` -> **3454 passed, 1 skipped, 0 failed**. `ruff` clean on all seven changed source and test files.
   - **Drift**:

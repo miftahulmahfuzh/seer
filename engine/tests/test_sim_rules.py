@@ -10,11 +10,13 @@ from decimal import Decimal
 import pytest
 
 from seer_engine import dates, sim
+from seer_engine.paper import roster
 from seer_engine.sim import model, rules
 from seer_engine.sim.rules import (
     DAILY_SWITCH,
     DAILY_SWITCH_TBILL,
     DESIGN_V0,
+    DESIGN_V0_GOTRADE,
     MONTHLY_HOLD,
     MONTHLY_HOLD_TBILL,
     PRESETS,
@@ -29,6 +31,7 @@ from seer_engine.sim.rules import (
     WEEKLY_HOLD,
     TradeRules,
     describe_rules,
+    is_bracket,
     is_decision_session,
     is_pinned_default,
     is_rank_session,
@@ -80,7 +83,7 @@ def test_preset_values_are_pinned():
     assert SWING_T20.time_stop == 20 and SWING_T20.entry == "limit"
     assert SWING_T20_OPEN.time_stop == 20 and SWING_T20_OPEN.entry == "open_limit"
     for r in PRESETS:
-        if r is not DESIGN_V0:
+        if r is not DESIGN_V0 and r is not DESIGN_V0_GOTRADE:
             assert r.engine == "book"
             assert r.dividends is True
             assert r.cost_rate == Decimal("0.001")
@@ -104,6 +107,7 @@ def test_preset_ids_are_unique_and_in_order():
         "monthly-rank-weekly-resize-tbill",
         "monthly-hold-frac",
         "monthly-rank-weekly-resize-frac",
+        "design-v0-gotrade",
         "monthly-hold-frac-gotrade",
         "monthly-rank-weekly-resize-frac-gotrade",
     ]
@@ -154,7 +158,9 @@ def test_id_must_be_a_str():
 
 @pytest.mark.parametrize(
     "field,value",
-    [("engine", "bracket"), ("cadence", "yearly"), ("entry", "market")],
+    # "bracket" was an unknown engine until DESIGN_V0_GOTRADE needed a second bracket engine
+    # (phase 4); "brackets" keeps the guard pointed at a value that is still not one.
+    [("engine", "brackets"), ("cadence", "yearly"), ("entry", "market")],
 )
 def test_unknown_literal_values(field, value):
     kwargs = {"id": "x", "engine": "book", field: value}
@@ -450,3 +456,60 @@ def test_describe_gotrade_costs():
         "to the cent, at most $0.11, plus 0.04% more on sells; and 11% VAT (PPN) on those two fees."
     )
     assert describe_rules(MONTHLY_HOLD)[11] == "Costs: 0.1% per side."
+
+
+def test_bracket_is_a_second_bracket_engine_and_bracket_v0_stays_reserved():
+    assert rules.BRACKET_ENGINES == ("bracket_v0", "bracket")
+    assert rules._ENGINES == ("bracket_v0", "bracket", "book")
+    assert is_bracket(DESIGN_V0) and is_bracket(DESIGN_V0_GOTRADE)
+    assert not is_bracket(MONTHLY_HOLD) and not is_bracket(V0_BOOK)
+    # The new engine does not loosen the reservation: §5's id and engine are still §5's alone.
+    with pytest.raises(ValueError, match="reserved for DESIGN_V0"):
+        replace(DESIGN_V0, cost_model="gotrade")
+    with pytest.raises(ValueError, match="reserved for DESIGN_V0"):
+        TradeRules(id="x", engine="bracket_v0")
+    with pytest.raises(ValueError, match="reserved for DESIGN_V0"):
+        TradeRules(id="design-v0", engine="bracket")
+    with pytest.raises(ValueError, match="unknown engine"):
+        TradeRules(id="x", engine="brackets")
+
+
+def test_design_v0_gotrade_is_section_5_at_gotrades_real_fees():
+    g = DESIGN_V0_GOTRADE
+    assert g.id == "design-v0-gotrade" and g.engine == "bracket" and g.cost_model == "gotrade"
+    # Every other lever is DESIGN_V0's, to the field.
+    assert replace(g, id="design-v0", engine="bracket_v0", cost_model="flat") == DESIGN_V0
+    assert g.cost_rate == DESIGN_V0.cost_rate  # the schedule prices it; the rate stays at default
+    assert rule_owner_inputs(g) == ()  # fitted to the owner's own receipts
+    assert PRESETS[13] is g and sim.DESIGN_V0_GOTRADE is g
+    assert roster.rules_for("design-v0-gotrade") is g
+
+
+def test_design_v0_still_constructs_and_digests_identically():
+    # Strategy C is live with rules_id "design-v0" and a frozen spec: this digest may not move.
+    assert DESIGN_V0.engine == "bracket_v0"
+    assert roster.rules_dict(DESIGN_V0) == {
+        "id": "design-v0",
+        "engine": "bracket_v0",
+        "cadence": "daily",
+        "entry": "limit",
+        "max_positions": "4",
+        "time_stop": "5",
+        "resize": "false",
+        "fractional": "false",
+        "dividends": "false",
+        "idle_symbol": None,
+        "cost_rate": "0.001",
+    }
+    assert "cost_model" not in roster.rules_dict(DESIGN_V0)  # the lever's pinned default
+    assert roster.rules_dict(DESIGN_V0_GOTRADE)["cost_model"] == "gotrade"
+
+
+def test_a_bracket_rule_set_is_described_as_the_bracket_simulator():
+    lines = describe_rules(DESIGN_V0_GOTRADE)
+    assert lines[1] == "Engine: the design §5 bracket simulator, unchanged."
+    assert lines[1] == describe_rules(DESIGN_V0)[1]
+    assert lines[4] == describe_rules(DESIGN_V0)[4]  # no open_limit fallback paragraph
+    assert lines[11].startswith("Costs: Gotrade's fee schedule measured from the owner's receipts")
+    assert "$0.10" in lines[11]
+    assert describe_rules(DESIGN_V0)[11] == "Costs: 0.1% per side."

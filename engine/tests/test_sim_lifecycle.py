@@ -18,17 +18,21 @@ from seer_engine import dates
 from seer_engine.prices import Bar
 from seer_engine.sim import (
     COST_RATE,
+    DESIGN_V0_GOTRADE,
+    MONTHLY_HOLD,
     SLOTS,
     TIME_STOP_DAYS,
     Event,
     Order,
     Portfolio,
     Snapshot,
+    buy_cash,
     buy_cost,
     close_unpriced,
     initial_cash_usd,
     new_portfolio,
     q,
+    sell_cash,
     sell_proceeds,
     step,
 )
@@ -671,3 +675,53 @@ def test_close_unpriced_needs_a_stepped_session():
     p = portfolio("899.9", opened("AAA", MON, "10", "11", "9", 10, days_held=1))
     with pytest.raises(ValueError):
         close_unpriced(p, ["AAA"])
+
+
+# --- the cost model lever (phase 4) -------------------------------------------------------------
+
+
+def test_gotrade_buy_and_sell_cash_reproduce_the_owners_receipts() -> None:
+    # sim/costs.py is fitted to these two real Gotrade receipts; the bracket path must charge them.
+    assert buy_cash(P("27.90"), 1, DESIGN_V0_GOTRADE) == Decimal("28.0300")
+    assert sell_cash(P("72.51"), 1, DESIGN_V0_GOTRADE) == Decimal("72.2700")
+    # The flat model, for scale.
+    assert buy_cost(P("27.90"), 1) == Decimal("27.9279")
+    assert sell_proceeds(P("72.51"), 1) == Decimal("72.4375")
+
+
+def test_a_gotrade_round_trip_reconciles_pnl_with_cash() -> None:
+    # 5 shares in at 27.90, out at the 30.10 open (a gap through the 30.00 take-profit).
+    p = portfolio("1000", opened("AAA", MON, "27.90", "30", "25", 5, 1), last_session=MON)
+    bars = day(bar("AAA", TUE, "30.10", "30.20", "29.50", "29.80"))
+    r = step(p, D(TUE), bars, rules=DESIGN_V0_GOTRADE)
+    o = _only(r.events).order
+    assert (o.exit_reason, o.exit_price) == ("tp", Decimal("30.1000"))
+    assert r.portfolio.cash == Decimal("1000") + sell_cash(P("30.10"), 5, DESIGN_V0_GOTRADE)
+    assert o.pnl_usd == sell_cash(P("30.10"), 5, DESIGN_V0_GOTRADE) - buy_cash(P("27.90"), 5, DESIGN_V0_GOTRADE)
+    # The same trade on the flat model keeps more of the gain.
+    flat_r = step(p, D(TUE), bars)
+    assert flat_r.events[0].order.pnl_usd > o.pnl_usd
+
+
+def test_a_gotrade_fill_pays_the_schedule_not_the_flat_rate() -> None:
+    p = portfolio("1000", pending("AAA", TUE, "10", "11", "9", 13), last_session=MON)
+    r = step(p, D(TUE), day(bar("AAA", TUE, "9.95", "10.50", "9.80", "10.20")), rules=DESIGN_V0_GOTRADE)
+    fill = _only(r.events)
+    assert fill.kind == "fill" and fill.order.fill_price == Decimal("9.9500")
+    assert fill.cash_usd == -buy_cash(P("9.95"), 13, DESIGN_V0_GOTRADE)
+    assert r.portfolio.cash == Decimal("1000") - buy_cash(P("9.95"), 13, DESIGN_V0_GOTRADE)
+
+
+def test_close_unpriced_charges_the_rule_sets_cost_model() -> None:
+    p = portfolio("100", opened("AAA", MON, "10", "12", "9", 20, 2), marks={"AAA": "11"}, last_session=TUE)
+    _, (ev,) = close_unpriced(p, ["AAA"], rules=DESIGN_V0_GOTRADE)
+    assert ev.forced and ev.cash_usd == sell_cash(P("11"), 20, DESIGN_V0_GOTRADE)
+    assert ev.order.pnl_usd == sell_cash(P("11"), 20, DESIGN_V0_GOTRADE) - buy_cash(P("10"), 20, DESIGN_V0_GOTRADE)
+
+
+def test_the_bracket_path_refuses_a_book_rule_set() -> None:
+    p = portfolio("1000", last_session=MON)
+    with pytest.raises(ValueError, match="book rule set"):
+        step(p, D(TUE), {}, rules=MONTHLY_HOLD)
+    with pytest.raises(ValueError, match="book rule set"):
+        close_unpriced(p, [], rules=MONTHLY_HOLD)

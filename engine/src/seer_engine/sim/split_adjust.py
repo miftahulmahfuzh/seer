@@ -14,7 +14,8 @@ Rules (plan Decisions, "Reverse-split rounding" and "Split factor convention"):
   with no cost and outside ``pnl_usd``. The amount is on the ``split`` event's ``cash_usd``.
 - An open position whose shares floor to 0 is paid out entirely in lieu. It closes with a forced
   ``exit`` event in pre-split units (reason ``time``, exit at the last mark, ``pnl_usd`` = cash in
-  lieu - buy cost), so the sum of ``pnl_usd`` still reconciles with cash for that trade.
+  lieu - the buy cash ``rules`` charged at fill), so the sum of ``pnl_usd`` still reconciles with
+  cash for that trade.
 - A pending order whose shares floor to 0 expires (``expire`` event, the order as it was).
 - The symbol's mark is rescaled. Other symbols, ``equity`` and ``last_session`` are untouched.
 
@@ -32,7 +33,9 @@ from fractions import Fraction
 
 from seer_engine import dates
 from seer_engine.prices import PRICE_QUANTUM
-from seer_engine.sim.model import Event, Order, Portfolio, buy_cost
+from seer_engine.sim.charges import bracket_rules, buy_cash
+from seer_engine.sim.model import Event, Order, Portfolio
+from seer_engine.sim.rules import DESIGN_V0, TradeRules
 
 _MAX_SPLIT_DENOMINATOR = 1_000_000
 _RATIO_TOLERANCE = Fraction(1, 10**20)
@@ -111,7 +114,12 @@ def _rescale_order(order: Order, ratio: Fraction, shares: int) -> Order:
 
 
 def apply_split(
-    portfolio: Portfolio, symbol: str, factor: Decimal, session_date: date
+    portfolio: Portfolio,
+    symbol: str,
+    factor: Decimal,
+    session_date: date,
+    *,
+    rules: TradeRules = DESIGN_V0,
 ) -> tuple[Portfolio, tuple[Event, ...]]:
     """Rewrite ``symbol``'s live orders and mark in post-split units for a split executing on
     ``session_date``.
@@ -124,6 +132,7 @@ def apply_split(
     """
     if not isinstance(portfolio, Portfolio):
         raise TypeError(f"portfolio must be a Portfolio, got {type(portfolio).__name__}")
+    bracket_rules(rules)
     if not isinstance(symbol, str):
         raise TypeError(f"symbol must be a str, got {type(symbol).__name__}")
     if not symbol:
@@ -172,7 +181,7 @@ def apply_split(
                 exit_date=session_date,
                 exit_price=old_mark,
                 exit_reason="time",
-                pnl_usd=in_lieu - buy_cost(order.fill_price, order.shares),
+                pnl_usd=in_lieu - buy_cash(order.fill_price, order.shares, rules),
             )
             events.append(
                 Event(session_date=session_date, kind="exit", order=closed, forced=True, cash_usd=in_lieu)

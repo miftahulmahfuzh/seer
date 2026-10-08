@@ -5,11 +5,17 @@ Each night, after session S's close, a strategy hands over its ranked picks for 
 
 * slot budget = equity ÷ 4, using the equity at the last snapshot (S's close), so it is recomputed
   every session;
-* budget = min(slot budget, cash − buy cost of every pending order already placed for that
+* budget = min(slot budget, cash − buy cash of every pending order already placed for that
   session), so a position that has risen in value cannot lend new picks cash that does not exist;
-* shares = floor(budget / (limit × 1.001)), so the buy cost including the 0.1 % charge fits;
+* shares = the most whole shares whose buy cash fits the budget, priced by ``rules`` --
+  ``floor(budget / (limit × (1 + cost_rate)))`` under the flat model, and under
+  ``cost_model="gotrade"`` the count solved against Gotrade's measured schedule, whose $0.10
+  per-order minimum makes the cost non-proportional (``sim.charges.whole_shares_for``);
 * fewer than 1 share → rejected ``lt_one_share``; a symbol already live (open or pending) or
   repeated in the picks → rejected ``held`` (no adding to a holding); no free slot → ``no_slot``.
+
+``rules`` defaults to ``DESIGN_V0``, which is what every caller ran before the lever existed, so
+its numbers are unchanged to the last digit.
 
 Picks are handled in the given order (the strategy's rank), and each placed pick takes the lowest
 free slot. Pure and deterministic: no I/O, no clock, no randomness, Decimal only.
@@ -20,15 +26,15 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
-from decimal import ROUND_FLOOR, Decimal
+from decimal import Decimal
 from typing import Literal
 
 from seer_engine.dates import is_session
-from seer_engine.sim.model import COST_RATE, SLOTS, Order, Portfolio, buy_cost, q
+from seer_engine.sim.charges import bracket_rules, buy_cash, whole_shares_for
+from seer_engine.sim.model import SLOTS, Order, Portfolio, q
+from seer_engine.sim.rules import DESIGN_V0, TradeRules
 
 RejectReason = Literal["no_slot", "held", "lt_one_share"]
-
-_ONE_PLUS_COST = Decimal(1) + COST_RATE
 
 
 def _price(name: str, value: object) -> Decimal:
@@ -92,29 +98,27 @@ def _check_session_date(portfolio: Portfolio, session_date: object) -> None:
         )
 
 
-def _whole_shares(budget: Decimal, limit_price: Decimal) -> int:
-    """floor(budget / (limit × 1.001)), never letting limit × shares × 1.001 exceed ``budget``."""
-    if budget <= 0:
-        return 0
-    unit = limit_price * _ONE_PLUS_COST
-    shares = int((budget / unit).to_integral_value(rounding=ROUND_FLOOR))
-    # Decimal division rounds to 28 significant digits; a quotient a hair under an integer could
-    # round up to it. Step back so the exact cost always fits.
-    while shares > 0 and unit * shares > budget:
-        shares -= 1
-    return max(shares, 0)
-
-
-def size_picks(portfolio: Portfolio, picks: Sequence[Pick], session_date: date) -> SizingResult:
+def size_picks(
+    portfolio: Portfolio,
+    picks: Sequence[Pick],
+    session_date: date,
+    *,
+    rules: TradeRules = DESIGN_V0,
+) -> SizingResult:
     """Size ``picks`` (in rank order) into ``portfolio``'s free slots for ``session_date``.
 
     ``session_date`` is the session the brackets are placed for (the next session after the
-    portfolio's last stepped one). Returns the portfolio with the new pending orders added, the
-    orders placed (in pick order), and the picks rejected (in pick order). Cash is not touched:
-    a pending order reserves cash only through the sizing cap, and pays at fill.
+    portfolio's last stepped one). ``rules`` prices every buy: ``DESIGN_V0`` (the default) is the
+    flat 0.1% a side the §5 records were closed at; ``DESIGN_V0_GOTRADE`` is Gotrade's measured
+    schedule. Returns the portfolio with the new pending orders added, the orders placed (in pick
+    order), and the picks rejected (in pick order). Cash is not touched: a pending order reserves
+    cash only through the sizing cap, and pays at fill.
+
+    Raises ValueError when ``rules`` are a book or fractional rule set (``sim.charges``).
     """
     if not isinstance(portfolio, Portfolio):
         raise TypeError(f"portfolio must be a Portfolio, got {type(portfolio).__name__}")
+    bracket_rules(rules)
     _check_session_date(portfolio, session_date)
     picks = tuple(picks)
     for p in picks:
@@ -133,7 +137,7 @@ def size_picks(portfolio: Portfolio, picks: Sequence[Pick], session_date: date) 
     free = list(portfolio.free_slots())
     taken = set(portfolio.held_symbols())  # every live order, pending included (no adding)
     seen: set[str] = set()
-    committed = sum((buy_cost(o.limit_price, o.shares) for o in pending), Decimal(0))
+    committed = sum((buy_cash(o.limit_price, o.shares, rules) for o in pending), Decimal(0))
     slot_budget = q(portfolio.equity / SLOTS)
 
     placed: list[Order] = []
@@ -148,7 +152,7 @@ def size_picks(portfolio: Portfolio, picks: Sequence[Pick], session_date: date) 
             rejected.append(Rejection(symbol=pick.symbol, reason="no_slot"))
             continue
         budget = min(slot_budget, portfolio.cash - committed)
-        shares = _whole_shares(budget, pick.limit_price)
+        shares = whole_shares_for(budget, pick.limit_price, rules)
         if shares < 1:
             rejected.append(Rejection(symbol=pick.symbol, reason="lt_one_share"))
             continue
@@ -163,7 +167,7 @@ def size_picks(portfolio: Portfolio, picks: Sequence[Pick], session_date: date) 
             shares=shares,
         )
         placed.append(order)
-        committed += buy_cost(order.limit_price, order.shares)
+        committed += buy_cash(order.limit_price, order.shares, rules)
 
     if not placed:
         return SizingResult(portfolio=portfolio, placed=(), rejected=tuple(rejected))

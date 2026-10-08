@@ -33,12 +33,15 @@ from typing import Any
 from seer_engine import dates
 from seer_engine.prices import Bar
 from seer_engine.sim import (
+    DESIGN_V0,
     Event,
     Order,
     Portfolio,
     SizingResult,
     Snapshot,
+    TradeRules,
     apply_split,
+    bracket_rules,
     close_unpriced,
     size_picks,
     step,
@@ -111,6 +114,8 @@ def settle_bracket(
     bars: Mapping[str, Bar],
     splits: Sequence[tuple[str, Decimal]],
     last_bar_date: LastBarDate,
+    *,
+    rules: TradeRules = DESIGN_V0,
 ) -> BracketNight:
     """Settle ``session`` for a bracket portfolio, exactly like one ``run_backtest`` iteration
     after its ``size_picks``.
@@ -125,6 +130,10 @@ def settle_bracket(
     its mark after the step (``sim.close_unpriced``), and the snapshot is replaced by the
     post-close one.
 
+    ``rules`` prices every fill, exit and forced close, and the buy cost a reverse split's
+    liquidation reconciles against: ``DESIGN_V0`` (the default) is the flat 0.1% a side,
+    ``DESIGN_V0_GOTRADE`` is Gotrade's measured schedule. Pass the roster entry's own rules.
+
     Raises what the simulator raises: TypeError on wrong types, ValueError when ``session`` is
     not a session after ``pf.last_session``, a pending order is for another session, or a split
     factor is not a split ratio.
@@ -134,14 +143,15 @@ def settle_bracket(
     _session("session", session)
     if not callable(last_bar_date):
         raise TypeError("last_bar_date must be callable: symbol -> date | None")
+    bracket_rules(rules)
     ordered = _splits(splits)
 
     events: list[Event] = []
     for symbol, factor in ordered:
-        pf, split_events = apply_split(pf, symbol, factor, session)
+        pf, split_events = apply_split(pf, symbol, factor, session, rules=rules)
         events.extend(split_events)
 
-    result = step(pf, session, bars)
+    result = step(pf, session, bars, rules=rules)
     pf = result.portfolio
     events.extend(result.events)
     snapshot = result.snapshot
@@ -152,7 +162,7 @@ def settle_bracket(
         if last is None or last < session:
             gone.append(o.symbol)
     if gone:
-        pf, forced = close_unpriced(pf, gone)
+        pf, forced = close_unpriced(pf, gone, rules=rules)
         events.extend(forced)
         snapshot = Snapshot(session, pf.cash, pf.equity)
 
@@ -166,6 +176,8 @@ def decide_bracket(
     history: Mapping[str, History],
     members: Set[str],
     data_date: date,
+    *,
+    rules: TradeRules = DESIGN_V0,
 ) -> SizingResult:
     """The pending orders for ``next_session(data_date)``: ``strategy.picks`` on ``history`` cut
     at ``data_date`` (the ``prepared=None`` path of ``run_backtest``), sized into ``pf`` with
@@ -175,9 +187,14 @@ def decide_bracket(
     after ``data_date`` was settled (``pf.last_session == data_date``), or a fresh portfolio
     (``last_session`` None) on the night before the first paper session. Bars dated after
     ``data_date`` are never read (no look-ahead).
+
+    ``rules`` prices the sizing: under ``cost_model="gotrade"`` the share count is solved against
+    Gotrade's schedule, whose $0.10 per-order minimum can reject a pick the flat model would have
+    bought. Pass the roster entry's own rules.
     """
     if not isinstance(pf, Portfolio):
         raise TypeError(f"pf must be a Portfolio, got {type(pf).__name__}")
+    bracket_rules(rules)
     _session("data_date", data_date)
     if pf.last_session is not None and pf.last_session != data_date:
         raise ValueError(
@@ -187,4 +204,4 @@ def decide_bracket(
         raise TypeError(f"history must be a Mapping, got {type(history).__name__}")
     cut = {s: h.upto(data_date) for s, h in history.items()}
     picks = strategy.picks(cut, members, data_date, params)
-    return size_picks(pf, picks, dates.next_session(data_date))
+    return size_picks(pf, picks, dates.next_session(data_date), rules=rules)

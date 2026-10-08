@@ -69,6 +69,7 @@ def test_flat_is_absent_from_every_canonical_form():
         else:  # the real-fee presets (Sean phase 7) name their model, so they digest apart
             assert roster.rules_dict(r)["cost_model"] == "gotrade", r.id
     assert [r.id for r in PRESETS if r.cost_model != "flat"] == [
+        "design-v0-gotrade",
         "monthly-hold-frac-gotrade",
         "monthly-rank-weekly-resize-frac-gotrade",
     ]

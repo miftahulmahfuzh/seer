@@ -7,6 +7,7 @@ import {
   longDate,
   markLabel, marks, methodRows, parseShow, pct1, pfText, showCounts, showHref, signed1, sortMethods, sourceHref,
   SPY_COLOR, SPY_DASH, techRows, untestedNote, windowText, workedSummary, yearPairs,
+  redoneOf,
 } from './view';
 
 const method = (over: Partial<LabMethod> = {}): LabMethod => ({
@@ -306,5 +307,40 @@ describe('text', () => {
     const clean = Object.fromEntries(techRows(trial({ failed: [], failedNow: [] })));
     expect(clean['Missed when run']).toBe('nothing: eligible');
     expect(clean['Missed by today\u2019s bars']).toBe('nothing: eligible');
+  });
+});
+
+describe('redoneOf', () => {
+  const fed = { mwr: 0.0764, spyTrMwr: 0.0712 };
+
+  it('finds a child that was actually run on deposits', () => {
+    const kid = method({ id: 'M0046', parentId: 'M0022', sourceKind: 'variation' });
+    const t = trial({ methodId: 'M0046', ...fed });
+    expect(redoneOf([kid], () => [t])).toEqual([{ method: kid, trial: t }]);
+  });
+
+  it('does NOT treat an ordinary variation as a redo', () => {
+    // 22 of the lab's 45 methods are `variation` and not one was fed. Keying off `sourceKind`
+    // instead of the money-weighted pair would claim two dozen redos that never happened.
+    const kid = method({ id: 'M0019', parentId: 'M0011', sourceKind: 'variation' });
+    expect(redoneOf([kid], () => [trial({ methodId: 'M0019' })])).toEqual([]);
+  });
+
+  it('needs both halves of the pair, mirroring derive.moneyWeighted', () => {
+    // The engine falls back to the total-return comparison the moment either is missing, so a
+    // row with one of the two is not a funded row and must not be headlined as one.
+    const kid = method({ id: 'M0046', parentId: 'M0022' });
+    expect(redoneOf([kid], () => [trial({ mwr: 0.0764, spyTrMwr: null })])).toEqual([]);
+    expect(redoneOf([kid], () => [trial({ mwr: null, spyTrMwr: 0.0712 })])).toEqual([]);
+  });
+
+  it('skips a child that has no trial at all', () => {
+    expect(redoneOf([method({ id: 'M0046', status: 'registered' })], () => [])).toEqual([]);
+  });
+
+  it('orders by id so the panel is stable across republishes', () => {
+    const of = (id: string) => [trial({ methodId: id, ...fed })];
+    expect(redoneOf([method({ id: 'M0047' }), method({ id: 'M0046' })], of).map(r => r.method.id))
+      .toEqual(['M0046', 'M0047']);
   });
 });

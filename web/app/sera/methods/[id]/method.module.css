@@ -129,3 +129,48 @@
   .twoUp { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .textSheet, .chartSheet, .proseSheet { padding: 28px 30px 30px; border-radius: 40px; }
 }
+
+/* ---- Redone realistically -------------------------------------------------------------------
+   Parent and twin are stacked rows, never columns of one table: a funded run's earned rate and an
+   unfunded one's total return are different measures that differ by two orders of magnitude on the
+   same run, so a shared column would invite exactly the comparison that is wrong. Each row names
+   its own measure for that reason. */
+.redone {
+  display: flex;
+  flex-direction: column;
+  margin-block: 0.75rem 1rem;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.redoneRow {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(0, 1.4fr) auto;
+  gap: 0.35rem 1rem;
+  align-items: baseline;
+  padding: 0.7rem 0.9rem;
+}
+
+.redoneRow + .redoneRow { border-top: 1px solid var(--rule); }
+.redoneTwin { background: color-mix(in srgb, var(--ink) 3%, transparent); }
+
+.redoneWho { font-weight: 600; }
+.redoneMeasure { color: var(--ink-3); font-size: 0.85em; }
+.redoneValue { font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; }
+.redoneVs { color: var(--ink-3); font-weight: 400; }
+.redoneNote { grid-column: 1 / -1; color: var(--ink-3); font-size: 0.85em; }
+
+.redoneLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 34rem) {
+  .redoneRow { grid-template-columns: 1fr; }
+  .redoneValue { text-align: left; }
+}

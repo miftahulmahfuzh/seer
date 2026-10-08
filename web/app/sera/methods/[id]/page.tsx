@@ -19,6 +19,7 @@ import { collapseRepeatedHeadings, renderMarkdown } from '@/lib/sera/markdown';
 import type { LabMethod, LabTrial } from '@/lib/sera/types';
 import {
   anyMoneyWeighted, BEST_COLOR, conditionTip, count, DEPOSITS_TIP, dsrNote, earned, earnedVs, fixed, growthFmt,
+  redoneOf, type Redone,
   growthLines, hurdlePoints, longDate, markLabel, marks, pct1, pfText, signed1, SOURCE_ICON, sourceHref, SPY_COLOR,
   SPY_DASH, techRows, untestedNote, windowText, workedSummary, yearPairs, type Mark,
 } from '../view';
@@ -52,6 +53,7 @@ export default async function MethodPage({ params }: { params: Promise<Params> }
   const best = bestVariant(trials);
   const parent = m.parentId ? methodById(m.parentId) : undefined;
   const children = childrenOf(m.id);
+  const redone = redoneOf(children, trialsOf);
   const insights = insightsOf(m.id);
   const nAtRun = trials.length ? Math.max(...trials.map(t => t.nTrialsAtRun)) : null;
   const srcHref = sourceHref(m.sourceRef);
@@ -125,6 +127,8 @@ export default async function MethodPage({ params }: { params: Promise<Params> }
           </Section>
         )}
 
+        {redone.length > 0 && <RedonePanel parent={m} best={best} redone={redone} />}
+
         <Section eyebrow="Analysis" title="Sera's analysis and opinion" caption="Sera's own reading of the result: what happened, why, and what to try next." className={s.proseSheet}>
           {m.analysis.trim() ? (
             // Escape-first rendering (lib/sera/markdown): all text is HTML-escaped before markup is added.
@@ -181,6 +185,79 @@ function MarkIcon({ mark, size }: { mark: Mark; size: number }) {
     </span>
   );
 }
+
+/**
+ * This method, run again the way the owner actually trades — and shown here, on the method he was
+ * already reading, rather than only on a page he has to go and find.
+ *
+ * The redo is necessarily a separate method. The lab's rows are append-only, and deleting a
+ * method's trials to "redo" it would *lower* the multiple-testing N and retroactively flatter
+ * every other method in the lab — the exact self-deception the gate exists to prevent. So
+ * `/redo-sera-experiments` mints a pre-registered twin with its own page, and this panel carries
+ * its result back to the parent.
+ *
+ * **Parent and twin are stacked rows with their own measure named on each, never two cells of one
+ * column**, and that is not a layout preference. A run that was fed reports a total return that is
+ * mostly the owner's own deposits: one measured run reports +1078% beside an earned rate of 7.6%.
+ * The engine leaves `totalReturn` contaminated deliberately — the recorded trials depend on its
+ * shape — and publishes the money-weighted pair beside it, so the parent is headlined by what it
+ * returned and the twin by what the money earned against a SPY fed the same deposits.
+ */
+function RedonePanel(
+  { parent, best, redone }: { parent: LabMethod; best: LabTrial | null; redone: Redone[] },
+) {
+  return (
+    <Section
+      eyebrow="Redone realistically"
+      title="The same idea, run the way you actually trade"
+      caption="Gotrade's real fees, fractional shares, and your standing monthly top-up. Kept as a separate pre-registered method, because redoing one in place would quietly flatter everything else in the lab."
+      className={s.textSheet}
+    >
+      <div className={s.redone}>
+        <div className={s.redoneRow}>
+          <span className={s.redoneWho}>{parent.id} · as first run</span>
+          <span className={s.redoneMeasure}>no top-up — judged on what it returned</span>
+          <span className={s.redoneValue}>
+            {best?.totalReturn != null ? signed1(best.totalReturn) : '—'}
+            {best?.spyTrReturn != null && (
+              <span className={s.redoneVs}> vs SPY {signed1(best.spyTrReturn)}</span>
+            )}
+          </span>
+        </div>
+
+        {redone.map(({ method, trial }) => (
+          <div key={method.id} className={`${s.redoneRow} ${s.redoneTwin}`}>
+            <span className={s.redoneWho}>
+              <Link className={s.redoneLink} href={`/sera/methods/${method.id}`}>
+                {method.id} · redone <ChevronRight size={14} aria-hidden="true" />
+              </Link>
+            </span>
+            <span className={s.redoneMeasure}>
+              fed every month — judged on what the money earned
+            </span>
+            <span className={s.redoneValue}>
+              {earned(trial)}
+              {earnedVs(trial) && (
+                <span className={s.redoneVs}> {earnedVs(trial)} from the same deposits in SPY</span>
+              )}
+            </span>
+            {!trial.eligibleNow && (
+              <span className={s.redoneNote}>Still misses: {trial.failedNow.join(', ')}.</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <p className={s.body}>
+        These are not two versions of one number. The first line is what the method returned on a
+        book that never grew. The second is what your money earned once it was fed the way you
+        really feed it — held against a SPY given the same money on the same days, which is the
+        only fair thing to compare it with.
+      </p>
+    </Section>
+  );
+}
+
 
 function Tested({ m, trials, best }: { m: LabMethod; trials: LabTrial[]; best: LabTrial }) {
   const gate = lab.gate;

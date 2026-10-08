@@ -92,6 +92,14 @@ class Performance:
     ``None`` when the span covers zero calendar days; ``sharpe`` is ``None`` when the span has
     fewer than two returns or zero variance. ``sessions`` counts snapshot dates, so the span holds
     ``sessions - 1`` returns.
+
+    ``deposited`` is the dollars the owner added over the span -- money arriving, not performance.
+    It is 0.0 for every strategy that received nothing, which is every strategy on the roster
+    today. When it is non-zero ``cagr`` is ``None``: compound growth over a book that was fed
+    cannot be read off the endpoints, and the honest figure is a money-weighted return, which
+    lives in ``backtest.metrics`` and is deliberately not imported into this pure module.
+    ``total_return`` and ``max_drawdown`` still read the raw curve and so still carry the
+    deposit; ``render`` says so in a line beneath the table rather than quoting them as clean.
     """
 
     start: date
@@ -101,6 +109,7 @@ class Performance:
     cagr: float | None
     max_drawdown: float
     sharpe: float | None
+    deposited: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,9 +198,36 @@ def _points(strategy_id: str, raw: Sequence[Any]) -> tuple[Point, ...]:
     return tuple(out)
 
 
-def _returns(points: Sequence[Point]) -> tuple[float, ...]:
-    """Session returns: ``equity[i] / equity[i - 1] - 1`` over consecutive points."""
-    return tuple(points[i][1] / points[i - 1][1] - 1.0 for i in range(1, len(points)))
+def _returns(points: Sequence[Point], deposits: Mapping[date, float] = {}) -> tuple[float, ...]:
+    """Session returns over consecutive points, with external deposits removed.
+
+    ``equity[i]`` includes any money the owner added on that session, and money arriving is not a
+    return -- a book that earns nothing and is handed 5,000,000 IDR would otherwise report the
+    deposit as performance (plan set Decision D4, measured in phase 7 as +600.9% over a year).
+    So the credited dollars are taken out of the ending equity before the ratio:
+    ``(equity[i] - deposit[i]) / equity[i - 1] - 1``.
+
+    ``deposits`` maps a session date to the dollars credited at the OPEN of that session
+    (``paper.store.read_contributions``, whose ``session_date`` is exactly this key, and whose
+    ``amount_usd`` is exactly this value). Empty -- the default, and every strategy that has
+    received nothing -- leaves every number bit-for-bit as it was.
+    """
+    out: list[float] = []
+    for i in range(1, len(points)):
+        day, equity = points[i]
+        out.append((equity - deposits.get(day, 0.0)) / points[i - 1][1] - 1.0)
+    return tuple(out)
+
+
+def _deposited(points: Sequence[Point], deposits: Mapping[date, float] = {}) -> float:
+    """The dollars added over ``points``, counting the same sessions ``_returns`` corrects.
+
+    The first point is the span's opening equity, so a deposit dated on it is part of the
+    baseline rather than something that happened during the span -- exactly the sessions
+    ``_returns`` skips, and the same rule, so the two can never disagree about whether a window
+    was fed.
+    """
+    return _sum(deposits.get(day, 0.0) for day, _ in points[1:])
 
 
 def _max_drawdown(points: Sequence[Point]) -> float:
@@ -232,18 +268,26 @@ def _sharpe(returns: Sequence[float]) -> float | None:
     return mean / math.sqrt(variance) * math.sqrt(SESSIONS_PER_YEAR)
 
 
-def performance(points: Sequence[Point]) -> Performance | None:
-    """Every figure over ``points``; ``None`` when there are fewer than two (no return exists)."""
+def performance(points: Sequence[Point], deposits: Mapping[date, float] = {}) -> Performance | None:
+    """Every figure over ``points``; ``None`` when there are fewer than two (no return exists).
+
+    ``deposits`` is this strategy's session-dated dollars (see ``_returns``). With none -- the
+    default -- every field is bit-for-bit what it was before deposits existed. With some, the
+    session returns and therefore ``sharpe`` have the money taken out, and ``cagr`` is ``None``
+    because an endpoint ratio counts the owner's own money as growth.
+    """
     if len(points) < 2:
         return None
+    deposited = _deposited(points, deposits)
     return Performance(
         start=points[0][0],
         end=points[-1][0],
         sessions=len(points),
         total_return=points[-1][1] / points[0][1] - 1.0,
-        cagr=_cagr(points),
+        cagr=None if deposited else _cagr(points),
         max_drawdown=_max_drawdown(points),
-        sharpe=_sharpe(_returns(points)),
+        sharpe=_sharpe(_returns(points, deposits)),
+        deposited=deposited,
     )
 
 
@@ -324,12 +368,21 @@ def _rank_key(row: Row) -> tuple[Any, ...]:
 
 
 def compare(
-    series: Mapping[str, Sequence[Any]], *, min_sessions: int = MIN_COMMON_SESSIONS
+    series: Mapping[str, Sequence[Any]],
+    *,
+    min_sessions: int = MIN_COMMON_SESSIONS,
+    deposits: Mapping[str, Mapping[date, float]] = {},
 ) -> Comparison:
     """Compare every curve in ``series`` over the window they share.
 
     ``series`` maps a strategy id to its ``(date, equity)`` snapshots in date order; the equity may
     be anything ``float()`` accepts, so ``equity_snapshots``' ``Decimal`` rows go straight in.
+
+    ``deposits`` maps a strategy id to the dollars the owner added, by the session they were
+    credited on (``paper.store.read_contributions``' ``session_date`` -> ``amount_usd``, applied
+    rows only). A strategy absent from it received nothing, which is every strategy on the roster
+    today and is the default; money arriving is not a return, so for one that is present the
+    session returns have it removed and its ``cagr`` is suppressed. See ``_returns``.
 
     Every id handed in comes back as exactly one :class:`Row`. A strategy that cannot be ranked --
     too short on its own, too little overlap, or an unusable curve -- comes back
@@ -359,8 +412,8 @@ def compare(
                 status="ranked",
                 rank=None,
                 reason=None,
-                window=performance(in_window),
-                inception=performance(points),
+                window=performance(in_window, deposits.get(strategy_id, {})),
+                inception=performance(points, deposits.get(strategy_id, {})),
             )
         )
     ranked.sort(key=_rank_key)
@@ -385,7 +438,7 @@ def compare(
                 rank=None,
                 reason=unusable.get(strategy_id) or dropped[strategy_id],
                 window=None,
-                inception=performance(points_by_id.get(strategy_id, ())),
+                inception=performance(points_by_id.get(strategy_id, ()), deposits.get(strategy_id, {})),
             )
         )
 
@@ -440,6 +493,17 @@ def render(c: Comparison) -> tuple[str, ...]:
         )
     for r in c.insufficient:
         lines.append(f"{'-':>2}  {r.strategy_id:<{width}}  not ranked: {r.reason}")
+
+    fed = [r for r in ranked if r.window is not None and r.window.deposited]
+    if fed:
+        lines.append(
+            "money added during the window, so CAGR is not shown for "
+            + ", ".join(f"{r.strategy_id} (+{r.window.deposited:,.2f} USD)" for r in fed)
+        )
+        lines.append(
+            "    total and max DD still count that money; the figure that does not is the "
+            "money-weighted return"
+        )
 
     lines.append("inception to date (its own window; never ranked)")
     for r in sorted(c.rows, key=lambda x: x.strategy_id):

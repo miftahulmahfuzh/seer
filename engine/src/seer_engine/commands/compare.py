@@ -7,8 +7,13 @@ the common window, the ranking over it, what could not be ranked and why, and in
 as a separate block. ``--json`` prints ``paper.compare.as_json`` instead -- the exact shape the
 leaderboard's TypeScript port is pinned against.
 
-Reads one table and nothing else: no ``strategies`` row, no roster, no clock. Everything happens
-in one REPEATABLE READ, READ ONLY transaction that is always rolled back, so ``--dry-run``
+It also reads ``paper_contributions`` (migration 016), because money the owner added is not a
+return: without the deposits a book handed 5,000,000 IDR would report it as performance. This is
+the impure edge that fetches them; ``paper.compare`` stays pure and takes them as an argument,
+exactly as the equity rows already are.
+
+Reads those two tables and nothing else: no ``strategies`` row, no roster, no clock. Everything
+happens in one REPEATABLE READ, READ ONLY transaction that is always rolled back, so ``--dry-run``
 changes nothing because there is nothing to change.
 
 Because it does not read ``strategies``, it does not know which strategies are retired, and that
@@ -35,6 +40,7 @@ from psycopg.pq import TransactionStatus
 
 from seer_engine import db
 from seer_engine.paper import compare as compare_
+from seer_engine.paper import store
 
 log = logging.getLogger(__name__)
 
@@ -111,6 +117,28 @@ def read_series(
     return series
 
 
+def read_deposits(
+    conn: psycopg.Connection, strategy_ids: Sequence[str]
+) -> dict[str, dict[date, float]]:
+    """Each strategy's credited deposits as ``{session_date: dollars}``.
+
+    ``if c.applied`` matters: an accrued-but-not-yet-credited row has not reached any
+    ``equity_snapshots`` row, so subtracting it would under-report the session's return. The
+    paper night's ``store.apply_contributions`` is what stamps a row applied.
+
+    A strategy that has received nothing gets an empty mapping, which is every strategy on the
+    roster today -- ``paper_contributions`` lands empty and stays empty until the owner resumes.
+    """
+    return {
+        sid: {
+            c.session_date: float(c.amount_usd)
+            for c in store.read_contributions(conn, sid)
+            if c.applied
+        }
+        for sid in strategy_ids
+    }
+
+
 def execute(
     conn: psycopg.Connection,
     *,
@@ -129,10 +157,11 @@ def execute(
     try:
         conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
         series = read_series(conn, exclude=exclude)
+        deposits = read_deposits(conn, sorted(series))
     finally:
         conn.rollback()
 
-    result = compare_.compare(series, min_sessions=min_sessions)
+    result = compare_.compare(series, min_sessions=min_sessions, deposits=deposits)
     if as_json:
         print(json.dumps(compare_.as_json(result), indent=2, sort_keys=True))
     else:

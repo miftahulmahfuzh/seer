@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-08
-**Total Active Tasks**: 0
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 98
+- Completed: 99
 
 ---
 
@@ -23,6 +23,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [ ] **P1-ENG-MWRQ** Phase 7: Money-weighted return, and a SPY fed the same money
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/backtest/metrics.py`; `backtest/benchmark.py` (the schedule reaches `buy_and_hold` / `spy_curves`); `backtest/dev.py` (the gate restated); `engine/src/seer_engine/lab/store.py` (the trial schema and `owner_failures`); `engine/tests/test_backtest_metrics.py`, `test_backtest_benchmark.py`. Also owns `dev.run_registry` / `dev._run`'s `contributions` keyword and `dev.py`'s `is_bracket` dispatch, plus `engine/tests/test_lab_snapshot.py`'s six `SCHEMA_VERSION` string pins and the new v3->v4 migration test. Exit criteria: a contribution-fed book reports a money-weighted return beside its CAGR, and every gate phrased in CAGR terms is restated in it; SPY is dollar-cost-averaged on the identical schedule, so "beats SPY TR" compares two books holding the same money at the same times.
+  - **Status**: in_progress
+  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 7 of 12)
+  - **Satisfies**: R3 — Measure what the owner will actually do: 10,000,000 IDR start, +5,000,000 IDR on the 25th of each month — contributions in backtest and paper, a money-weighted return, a dollar-cost-averaged SPY, every CAGR-phrased gate restated
+  - **Depends on**: phase 2 (P1-ENG-KQRW), phase 5
+  - **Plan**: `.workflows/plan/P1-ENG-MWRQ.md`
 - [x] **P1-ENG-F6QN** Phase 4: The bracket path can express and charge Gotrade's fees
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -809,6 +818,30 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-R7MD** Phase 6: Paper accepts a deposit
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `db/migrations/016_contributions.sql` (**this number, not another**), `engine/src/seer_engine/paper/store.py` (a deposit path beside the write-once `initial_cash_usd`), `paper/book.py`, `engine/tests/test_paper_store.py`, `test_paper_book.py`, and — reconciler decision **D12** — `paper/compare.py` plus its impure edge `commands/compare.py`, so a deposit is not read as a return. Does not touch `paper/roster.py` or `db/migrations/017_*` (phase 12), `paper/benchmark.py` (phase 3), `paper/bracket.py` (phase 4), or `store.py:1127-1145` (`load_benchmark`), which is phase 12's single hunk in this phase's file (D10 + D13) — the two regions are line-disjoint and phase 6 lands first. Exit: paper can record money arriving and apply it on its session, where today `initial_cash_usd` is written once at `store.py:417` and the only later UPDATE (`:449`) writes `cash_usd`, `equity_usd` and `last_session`; deposits reach every engine — the four quant books, C and SPY — because the gap is below all of them, not per-method; a deposit landing between sessions raises cash on its session and is **not** counted as a return; **a credit raises CASH AND EQUITY by the same amount, asserted not assumed**, since both engines size from the last snapshot's equity (`sim/sizing.py:137`, `sim/book.py:536`) and crediting cash alone would leave every deposit permanently under-deployed — `paper.book.deposit_book` does both; and `paper.compare._returns` removes the session's deposit before taking the ratio, so a book that earns nothing and is handed $312.50 reports 0%, not +31% (D12).
+  - **Status**: completed
+  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 6 of 12)
+  - **Satisfies**: R3 — Measure what the owner will actually do: 10,000,000 IDR start, +5,000,000 IDR on the 25th of each month — contributions in backtest and paper, a money-weighted return, a dollar-cost-averaged SPY, every CAGR-phrased gate restated
+  - **Depends on**: P1-ENG-HPOI
+  - **Plan**: `.workflows/plan/P1-ENG-R7MD.md`
+  - **Completed**: 2026-10-08 11:52
+  - **Method**: /do
+  - **Files**: db/migrations/016_contributions.sql, engine/src/seer_engine/paper/store.py, engine/src/seer_engine/paper/book.py, engine/src/seer_engine/paper/compare.py, engine/src/seer_engine/commands/compare.py, engine/tests/test_paper_store.py, engine/tests/test_paper_book.py, engine/tests/test_paper_compare.py, engine/.workflows/plan/P1-ENG-R7MD.md, engine/.workflows/todos.md
+  - **Verified**: engine suite `PYTHONPATH=engine/src PG_TEST_URL=... python -m pytest engine/tests -q -n auto` -> **3454 passed, 1 skipped, 0 failed**. `ruff` clean on all seven changed source and test files.
+  - **Drift**:
+    - No code drift: every anchor the plan quotes (store.py:39/:55 imports, `write_kickoff`/`save_book_preview`, book.py:50, `rank_basket`/`settle_book`, the test import blocks) matched the tree exactly.
+    - The plan's test snippet for `test_paper_compare.py` used `D("2026-09-28")` as a date helper, but in that file `D` is a date CONSTANT (`date(2026, 1, 5)`). Adapted to `date(...)` and the file's own `curve()` builder.
+  - **Decided**:
+    - Plan prose says "four of the twelve 25ths are not sessions"; its own measured table and the live NYSE calendar both say five -> corrected to five in all four places (migration comment, `store.contribution_session` docstring, two test comments, and the assertion). Rung 1: invariant 6, every number measured with its command recoverable.
+    - `Performance` gains a `deposited` field but `_performance_json` keeps its exact seven keys -> `as_json` shape unchanged. Rung 2: this phase's exit criterion "with no deposits every ranked figure is bit-identical", plus narrower blast radius — the shape is pinned by `test_as_json_field_names_units_and_nulls` and ported to TypeScript by a different plan set.
+    - `engine/package_readme.md` NOT updated, and `readme-updater` not dispatched. Rung 3: phase 6's Files table names exactly seven files and the readme is not among them, while phase 5's plan explicitly did list its readme lines. Never widen scope.
+    - `engine/.workflows/todos.md` also carries phase 7's task row P1-ENG-MWRQ, minted by that concurrent session in this shared worktree; a single file cannot be committed line-by-line, so that row is swept into this phase's commit. It is a correct task record, not code. Noted so phase 7's handler sees its row already committed.
+    - `GOTRADE_FEE_REBUILD_PLAN.md` left untouched — no phase-6 row tick, no `**Status:**` change — and `.workflows/orchestration/gotrade-fee-rebuild/ledger.json` left untouched too. This set is a coordinated swarm whose ledger owns set-level progress; phases 1-5 all deliberately left the index alone, the repo-root index is outside this phase's commit allowlist, and `**Status:**` is one field eleven concurrent sessions would each overwrite.
+    - No Step 5a landing, no merge to `main`, no branch or worktree deletion: the coordinator lands the set (analyze-orchestrator Step 5). Landing here too is the double-merge that rule exists to prevent.
+    - The `[x]` block moved into `## Completed Tasks` and Quick Stats recounted from the file rather than blind-decremented (recount is idempotent under concurrency; a decrement compounds the race).
 - [x] **P1-ENG-HPOI** Phase 5: A contribution schedule, and the lab's real capital
   - **Difficulty**: HARD
   - **Type**: Feature

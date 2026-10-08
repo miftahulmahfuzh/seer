@@ -33,6 +33,15 @@ prev_session(start)`` and no splits reproduces ``run_book`` field for field
 and the book's ``marks``. ``last_bar_date`` is ``Market.last_bar_date`` in a replay; at night
 it is the latest bar date the database holds, so a halted symbol is force-closed on the first
 session it misses (plan Decisions, "Force-close rule live").
+
+``deposit_book`` is the third piece: the owner adds 5,000,000 IDR on the 25th of each month, and
+``paper.store.apply_contributions`` converts and dates it. The night credits it to the book with
+``deposit_book`` **before** ``settle_book`` for the session it lands on, so that session's buys can
+spend it. A deposit raises cash and equity and nothing else: it is not a fill, not a trade, and
+leaves no ``book_fills`` row, because a rise in equity that is not a return has to stay
+distinguishable from one that is. The money then sits as cash until the next decision session
+deploys it -- measured, 2 to 5 sessions over the twelve months from 2026-10-25 -- and that idle
+cash is reproduced, not smoothed away.
 """
 
 from __future__ import annotations
@@ -47,7 +56,7 @@ from typing import Any
 from seer_engine import dates
 from seer_engine.backtest.book_runner import DividendMap, _dividends_on, _invested, _rescaled, _with_idle
 from seer_engine.backtest.market import Market
-from seer_engine.prices import Bar
+from seer_engine.prices import PRICE_QUANTUM, Bar
 from seer_engine.sim.book import (
     Book,
     BookSnapshot,
@@ -324,6 +333,36 @@ def rank_basket(targets: Sequence[Target], idle_symbol: str | None) -> tuple[Tar
     if idle_symbol is not None and any(t.symbol == idle_symbol for t in rows):
         raise ValueError(f"the idle symbol {idle_symbol} is targeted before the last row; not a book decision")
     return rows
+
+
+def deposit_book(book: Book, amount_usd: Decimal) -> Book:
+    """``book`` with ``amount_usd`` of new money in cash, before the session it lands on.
+
+    Cash and equity both rise by the amount -- the book really is worth that much more the moment
+    the money arrives -- and nothing else moves: no position, no mark, no ``last_session``. The
+    deposit is a cashflow, not a fill and not a trade, so it produces no ``Fill`` and no
+    ``Trade`` and ``paper_contributions`` is the only record of it.
+
+    ``settle_book`` recomputes equity from cash and the marks (``sim.book.step_book``'s
+    ``_valuation``), so the session's snapshot carries the deposit with no further help; crediting
+    equity here keeps the book self-consistent for a caller that reads it before stepping.
+
+    ``amount_usd`` must be a positive Decimal the cash column holds exactly (4 dp). Pure, like the
+    rest of this module.
+    """
+    if not isinstance(book, Book):
+        raise TypeError(f"book must be a Book, got {type(book).__name__}")
+    if not isinstance(amount_usd, Decimal):
+        raise TypeError(f"amount_usd must be a Decimal, got {type(amount_usd).__name__}")
+    if not amount_usd.is_finite():
+        raise ValueError(f"amount_usd must be finite, got {amount_usd!r}")
+    if amount_usd <= 0:
+        raise ValueError(f"amount_usd must be > 0, got {amount_usd}")
+    if amount_usd.quantize(PRICE_QUANTUM) != amount_usd:
+        raise ValueError(
+            f"amount_usd {amount_usd} has more decimals than cash holds ({PRICE_QUANTUM})"
+        )
+    return replace(book, cash=book.cash + amount_usd, equity=book.equity + amount_usd)
 
 
 def settle_book(

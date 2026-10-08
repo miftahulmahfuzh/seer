@@ -54,6 +54,7 @@ from seer_engine import dates
 from seer_engine.backtest.benchmark import Dividend, buy_and_hold
 from seer_engine.backtest.book_runner import BookResult, DividendMap, run_rules
 from seer_engine.backtest.market import SPY, Market
+from seer_engine.sim.costs import CostModel
 from seer_engine.backtest.runner import RunResult
 from seer_engine.paper.book import decide_book, rank_basket
 from seer_engine.paper.bracket import decide_bracket
@@ -455,12 +456,20 @@ def expected_benchmark(
     head: PaperHead,
     dividends: DividendMap,
     *,
+    cost_model: CostModel,
     contributions: Sequence[tuple[date, Decimal]] = (),
 ) -> Records:
     """The SPY buy-and-hold record over the head's window (dividends reinvested at the ex-date close).
 
     ``contributions`` is the stored, dated, already-converted deposits (D18): the yardstick is fed
     the same money on the same dates as the books it is measured against.
+
+    ``cost_model`` is what the entry's fills pay (``roster.benchmark_cost_model``), and it is
+    REQUIRED rather than defaulted: a benchmark entry carries no ``TradeRules``, so there is
+    nothing here to read it off, and a default would silently reconstruct a Gotrade entry at the
+    flat rate. That is exactly the mismatch SPY-GT hit on its first night -- the live buy paid
+    Gotrade's fee and bought 0.7207 shares, this replay assumed 0.1% and expected 0.7217 -- and it
+    is the same trap ``expected_bracket`` already avoids by taking the entry's own rules.
     """
     if head.engine != "benchmark":
         raise ValueError(f"{head.strategy_id} is a {head.engine} strategy, not benchmark")
@@ -481,6 +490,7 @@ def expected_benchmark(
             dividends=paid,
             name=BENCHMARK_SYMBOL,
             fractional=True,
+            cost_model=cost_model,
             contributions=contributions,
         )
         snapshots = curve.snapshots

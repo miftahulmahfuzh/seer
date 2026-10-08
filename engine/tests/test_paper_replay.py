@@ -131,8 +131,8 @@ def _book(head: PaperHead = BOOK_HEAD) -> Records:
     return replay.expected_book(market(), FIXED, FIXED_PARAMS, MONTHLY_HOLD, head, DIVIDENDS)
 
 
-def _benchmark(head: PaperHead = SPY_HEAD) -> Records:
-    return replay.expected_benchmark(market(), head, DIVIDENDS)
+def _benchmark(head: PaperHead = SPY_HEAD, cost_model: str = "flat") -> Records:
+    return replay.expected_benchmark(market(), head, DIVIDENDS, cost_model=cost_model)
 
 
 # ---- expected records --------------------------------------------------------------------------
@@ -223,6 +223,27 @@ def test_expected_benchmark_is_buy_and_hold_with_spy_dividends():
     assert curve.shares == P("1.2499")
 
 
+def test_expected_benchmark_replays_at_the_entrys_own_cost_model():
+    """SPY-GT's first night: the live buy paid Gotrade's fee, the replay assumed the flat rate.
+
+    ``expected_benchmark`` defaulted ``cost_model`` away, so a Gotrade benchmark was reconstructed
+    at 0.1% and ``paper_check`` reported a mismatch against a correct run (stored 0.7207 shares and
+    0.0393 cash, replay 0.7217 and 0.0736). Each model must replay as ``buy_and_hold`` prices it,
+    and the two must differ -- without the second assertion this test passes on the bug.
+    """
+    m = market()
+    for model in ("flat", "gotrade"):
+        curve = buy_and_hold(
+            m.spy(), SPY_HEAD.paper_start, SPY_HEAD.last_session, CASH0,
+            dividends=(Dividend(D("2025-03-05"), Decimal("1.5")),), name="SPY", fractional=True,
+            cost_model=model,
+        )
+        got = _benchmark(cost_model=model)
+        assert got.cash == curve.cash, model
+        assert got.holdings == (Holding("SPY", curve.shares, P("501")),), model
+    assert _benchmark(cost_model="flat").cash != _benchmark(cost_model="gotrade").cash
+
+
 def test_expected_benchmark_first_night_holds_cash_only():
     got = _benchmark(replace(SPY_HEAD, last_session=D("2025-02-28")))
     assert got.snapshots == (Snapshot(D("2025-02-28"), CASH0, CASH0),)
@@ -249,7 +270,7 @@ def test_wrong_engine_is_refused():
     with pytest.raises(ValueError, match="not book"):
         replay.expected_book(market(), FIXED, FIXED_PARAMS, MONTHLY_HOLD, SPY_HEAD, DIVIDENDS)
     with pytest.raises(ValueError, match="not benchmark"):
-        replay.expected_benchmark(market(), BRACKET_HEAD, DIVIDENDS)
+        replay.expected_benchmark(market(), BRACKET_HEAD, DIVIDENDS, cost_model="flat")
 
 
 # ---- comparison ---------------------------------------------------------------------------------

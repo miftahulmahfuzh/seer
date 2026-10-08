@@ -268,5 +268,13 @@ def _expected(
             market, entry.obj, entry.params, entry.rules, head, dividends, contributions=_deposits(conn, entry.id)
         )
     if entry.engine == "benchmark":
-        return replay.expected_benchmark(market, head, dividends, contributions=_deposits(conn, entry.id))
+        # The entry's own cost model, for the same reason the bracket branch above passes its
+        # rules: a benchmark has no TradeRules, and SPY-GT pays Gotrade's measured schedule.
+        return replay.expected_benchmark(
+            market,
+            head,
+            dividends,
+            cost_model=roster.benchmark_cost_model(entry.id),
+            contributions=_deposits(conn, entry.id),
+        )
     raise ValueError(f"{entry.id}: unknown engine {entry.engine!r}")

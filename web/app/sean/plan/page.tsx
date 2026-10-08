@@ -145,7 +145,7 @@ function Linked({ state }: { state: PlanState }) {
 
         <Section eyebrow={`Since ${shortDate(link.since)}`} title="Your plan"
           caption={planSizeLine(plan.planSize, link.budgetUsd, plan.cashUsd)}>
-          <PlanSettings since={link.since} budget={link.budgetUsd} />
+          <PlanSettings since={link.since} budget={link.budgetUsd} opening={link.openingUsd} />
           {plan.holdings.length === 0 ? (
             <p className={s.empty}>
               Nothing bought for this plan yet. Upload your order screenshots on the Trades tab and they show up here.

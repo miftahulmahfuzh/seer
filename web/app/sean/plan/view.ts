@@ -20,6 +20,10 @@ export const BAD_DATE: FormState = { tone: 'error', message: 'Pick the day your 
 export const BAD_BUDGET: FormState = {
   tone: 'error', message: 'Type the plan size in dollars, like 560, or leave it empty.',
 };
+export const BAD_OPENING: FormState = {
+  tone: 'error',
+  message: 'Type the cash you started with in dollars, like 555.69, or leave it empty.',
+};
 export const NOT_LINKED: FormState = { tone: 'error', message: 'Sean is not following a method right now. Pick one first.' };
 export const SAVED: FormState = { tone: 'ok', message: 'Saved. The reminders below use it now.' };
 

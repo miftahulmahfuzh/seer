@@ -6,8 +6,16 @@ import { linkMethod } from './actions';
 import { IDLE } from './view';
 import s from './plan.module.css';
 
-/** Change the followed plan's start date and plan size. An empty size means "what it holds now". */
-export function PlanSettings({ since, budget }: { since: string; budget: number | null }) {
+/**
+ * Change the followed plan's start date, the cash it opened with, and its plan size.
+ *
+ * An empty plan size means "what it holds plus the wallet". An empty opening means "convert the
+ * 10,000,000 IDR at the latest rate" -- which carries the broker's FX spread, so typing the figure
+ * off the Gotrade balance is what makes the wallet match the app to the cent.
+ */
+export function PlanSettings(
+  { since, budget, opening }: { since: string; budget: number | null; opening: number | null },
+) {
   const [state, action, pending] = useActionState(linkMethod, IDLE);
   return (
     <form action={action} className={s.settingsForm}>
@@ -16,6 +24,11 @@ export function PlanSettings({ since, budget }: { since: string; budget: number 
         <label className={s.field}>
           <span className={s.fieldLabel}>Counting your orders from</span>
           <input type="date" name="since" defaultValue={since} required className={s.input} disabled={pending} />
+        </label>
+        <label className={s.field}>
+          <span className={s.fieldLabel}>Cash you started with</span>
+          <input name="opening" inputMode="decimal" defaultValue={opening === null ? '' : opening.toFixed(2)}
+            placeholder="Work it out" className={s.input} autoComplete="off" disabled={pending} />
         </label>
         <label className={s.field}>
           <span className={s.fieldLabel}>Plan size in dollars</span>

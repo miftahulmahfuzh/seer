@@ -5,8 +5,8 @@ import { sql } from '@/lib/db';
 import { isSeanCaller } from '@/lib/sean/gate';
 import { shortLabel } from '@/lib/strategy';
 import {
-  BAD_BUDGET, BAD_DATE, BAD_METHOD, linkedState, NOT_ALLOWED, NOT_LINKED, parseBudget, parseSide, parseSince,
-  parseSymbol, SAVED, WRITE_FAILED, type FormState,
+  BAD_BUDGET, BAD_DATE, BAD_METHOD, BAD_OPENING, linkedState, NOT_ALLOWED, NOT_LINKED, parseBudget,
+  parseSide, parseSince, parseSymbol, SAVED, WRITE_FAILED, type FormState,
 } from './view';
 
 /** The Plan page and the Plan tab badge read these rows: refresh the whole /sean section. */
@@ -16,7 +16,11 @@ function refresh(): void {
 
 /**
  * The picker and the settings form both post here. `op` 'link' (strategyId, since, budget) follows
- * a method, replacing any other; 'edit' (since, budget) changes the followed one.
+ * a method, replacing any other; 'edit' (since, budget, opening) changes the followed one.
+ *
+ * `opening_usd` is deliberately NOT touched by 'link': it is a fact about the owner's own account
+ * -- the cash the plan opened with, read off his broker balance -- not about which method he
+ * follows, so switching methods must not silently drop it. Only the settings form sets it.
  */
 export async function linkMethod(_prev: FormState, formData: FormData): Promise<FormState> {
   if (!(await isSeanCaller())) return NOT_ALLOWED;
@@ -24,6 +28,9 @@ export async function linkMethod(_prev: FormState, formData: FormData): Promise<
   if (!since) return BAD_DATE;
   const budget = parseBudget(formData.get('budget'));
   if (!budget.ok) return BAD_BUDGET;
+  // Same shape as a plan size: a positive amount of dollars, or empty for "work it out".
+  const opening = parseBudget(formData.get('opening'));
+  if (!opening.ok) return BAD_OPENING;
   const op = formData.get('op');
 
   try {
@@ -36,12 +43,13 @@ export async function linkMethod(_prev: FormState, formData: FormData): Promise<
       await sql`INSERT INTO sean_link (id, strategy_id, since, budget_usd)
         VALUES (1, ${id}, ${since}::date, ${budget.value}::numeric)
         ON CONFLICT (id) DO UPDATE SET strategy_id = EXCLUDED.strategy_id, since = EXCLUDED.since,
-          budget_usd = EXCLUDED.budget_usd, linked_at = now()`;
+          budget_usd = EXCLUDED.budget_usd, linked_at = now()`;  // opening_usd kept: see above
       refresh();
       return linkedState(shortLabel(m.name, m.id));
     }
     if (op === 'edit') {
-      const rows = await sql`UPDATE sean_link SET since = ${since}::date, budget_usd = ${budget.value}::numeric
+      const rows = await sql`UPDATE sean_link SET since = ${since}::date,
+          budget_usd = ${budget.value}::numeric, opening_usd = ${opening.value}::numeric
         WHERE id = 1 RETURNING id`;
       if (rows.length === 0) return NOT_LINKED;
       refresh();

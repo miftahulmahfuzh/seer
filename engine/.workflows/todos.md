@@ -829,6 +829,13 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Plan**: `.workflows/plan/P1-ENG-N8SW.md`
   - **Completed**: 2026-10-08 12:20
   - **Method**: /do
+  - **Commit**: `0d78b08` — all eight phase 8 files are inside it and nothing else is. Committed as
+    `git add -- <the five new files>` then `git commit -F <msgfile> -- <all eight paths>`, the pathspec form
+    phases 4, 6 and 7 record as the only one the allowlist actually protects in this shared index. Verified two
+    ways: `git show --name-only` lists exactly the eight, and each path's `git hash-object` taken **before** the
+    commit matches `git rev-parse 0d78b08:<path>` **after** it — so no peer's content entered a file of ours
+    between the add and the commit. All twelve of phase 12's dirty paths were still dirty and intact afterwards.
+    This sha is recorded by a second, todos-only commit, since a commit cannot name itself.
   - **Files**: engine/src/seer_engine/lab/name_count.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_name_count.py, docs/backtests/2026-10-08-how-many-names.md, docs/backtests/2026-10-08-how-many-names-grid.csv, engine/.workflows/todos.md, engine/.workflows/plan/P1-ENG-N8SW.md, engine/package_readme.md
   - **Verified**: Phase tests `PYTHONPATH=engine/src python -m pytest engine/tests/test_lab_name_count.py -q` -> **21 passed, 1 skipped** (the skip is the env-gated live sweep). Live sweep un-gated with `SEER_LAB_NAMES_LIVE=1 SEER_RESEARCH_STORE=/home/miftah/seer/engine/.research ... -k research_store` -> **1 passed in 34s**. Full engine suite measured in a **throwaway worktree** rather than this shared one, because 31 failures are present here from a peer's uncommitted work: at HEAD -> **3456 passed, 1 skipped, 0 failed** (matches the coordinator's baseline); HEAD plus only this phase's three code files -> **3477 passed, 2 skipped, 0 failed**. Zero regressions from phase 8. Web untouched and confirmed so: `npx vitest run` -> 48 files / 625 tests passed, `npx tsc --noEmit` -> exit 0. Side-effect checks: `git status --porcelain lab/lab.sqlite web/data/lab.json` -> empty, and `cmp` against `git show HEAD:lab/lab.sqlite` -> identical. `grep '«' docs/backtests/2026-10-08-how-many-names.md` -> no match (no unfilled slot). The real sweep ran against research store fingerprint `399d0d254c7a` in 29s and reported "Lab N (dev trials): 126 before, 126 after; test-window looks used: 2 before, 2 after" — the report-only exit criterion holds.
   - **Drift**:

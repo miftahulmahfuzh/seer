@@ -74,21 +74,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "d79fc83",
       "depends_on": [
         4
       ],
       "difficulty": "HARD",
       "n": 5,
-      "note": null,
+      "note": "verified by coordinator: on branch; 14 paths, commit scoped by pathspec with no peer file swept in. D15 shape confirmed in sim/contributions.py (ContributionSchedule, OWNER_MONTHLY, dates_in, due, usd_at, credit_usd, Contributions alias, credit_for); INITIAL_IDR = 10000000. Engine suite re-run by coordinator with nothing writing: 3413 passed / 1 skipped / 0 failed vs the 3388/1/0 wave-0 baseline (+25, zero new failures). ACCEPTED CROSS-PHASE EDIT: phase 5 edited phase 4's engine/tests/test_paper_bracket.py, which is outside its Owns. Allowed under rung 1 (invariant 1, the tree builds and both suites pass at the end of each phase) -- halving INITIAL_IDR broke that fixture, whose price ladder is calibrated to a 1250 USD book. Coordinator verified the remedy did NOT weaken the test: it pins a local BRACKET_IDR=20M and threads it through 4 call sites; the assertion still demands exact shape equality, exact snapshot dates, exact rejections, a non-vacuous 85 fills, all four exit reasons and exact measured equities with strict inequality. INTERFACE: RunResult gained exactly contributions and cashflows as published -- no quote moved; rules threaded as keyword-with-default through run_stats/_run_result_stats/_fee instead (phases 7/8 pass run_stats(result, rules) for Gotrade-priced metrics off a bracket run). PLAN DEFECT FOUND: phase-5.md's Verification section instructed 'git stash && pytest && git stash pop', which is banned here; p5 correctly refused and used the coordinator's measured baseline. Coordinator checked phases 6/7/8/10/12 -- none contains a tree-wide git command, so no landmine remains.",
       "package": "engine.sim`, `engine.backtest",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T04:36:33+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-HPOI",
       "title": "A contribution schedule, and the lab's real capital"
     },
     {
@@ -106,7 +106,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Paper accepts a deposit"
     },
@@ -126,7 +126,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Money-weighted return, and a SPY fed the same money"
     },
@@ -181,7 +181,7 @@
       "satisfies": [
         "R9"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Sean sizes a rotation from cash, not from holdings"
     },
@@ -230,7 +230,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/gotrade-fee-rebuild/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "gotrade-fee-rebuild",
-  "updated": "2026-10-08T04:12:48+00:00",
+  "updated": "2026-10-08T04:36:36+00:00",
   "verified_at": "2026-10-08T03:50:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/gotrade-fee-rebuild"
 }

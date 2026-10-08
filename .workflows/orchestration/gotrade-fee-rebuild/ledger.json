@@ -3,6 +3,12 @@
   "coordinator": "orch-gotrade-fee-rebuild",
   "coordinator_session_id": "fb277ee1-77ab-47a2-b7e4-6d7bb0ac5782",
   "created": "2026-10-08T03:34:20+00:00",
+  "landed": {
+    "at": "2026-10-08T06:01:29+00:00",
+    "base": "main",
+    "commit": "13aded10348244eb39610073b230bac6268eb33a",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -204,7 +210,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "26e55f8",
       "depends_on": [
         3,
         4,
@@ -213,24 +219,24 @@
       ],
       "difficulty": "HARD",
       "n": 12,
-      "note": null,
+      "note": "verified by coordinator: on branch; 24 paths, pathspec commit, no peer work swept in. INVARIANTS RE-CHECKED INDEPENDENTLY BY COORDINATOR, by content not line number: PAPER_PAUSED: 'true' intact (now at :80, displaced by the comment rewrite D1 permits; 'git diff origin/main <tip> -- nightly.yml' shows the VALUE line never changed); sim/costs.py byte-identical to origin/main; ZERO removed 64-hex digest lines in 26e55f8 (invariant 8); C still on the roster (invariant 4); lab/lab.sqlite byte-identical to base across all 12 phases. CROSS-BOUNDARY EDIT FLAGGED AND ACCEPTED: the plan's benchmark adapter was wrong and the suite proved it -- 'replace(bench, cash=..., equity=...)' banks a deposit as cash, but the benchmark never rotates, so it would sit uninvested forever while expected_benchmark replays through buy_and_hold which SPENDS each deposit at that session's close. Left as written, 'seer paper check' would mismatch on SPY-GT every session after the first deposit and the yardstick would drift below the DCA SPY it exists to be. p12 added a keyword-only deposit= to phase 3's paper/benchmark.py, which its own plan fences off, and flagged rather than buried it. Accepted: rung 2 (exit criterion 12) + rung 4 (R3's dollar-cost-averaged SPY); additive keyword-with-default, D10's own pattern. SCOPE: the plan's Files table listed only test_paper_roster.py but the rebuild broke 46 tests across 9 further files; all fixed, none weakened -- fixtures that pinned production roster membership now pin their own world, which their own comments already said they wanted. COORDINATOR FIX, not p12's: test_lab_snapshot was red because the six successor entries changed the snapshot's paper section and web/data/lab.json was not regenerated. Coordinator restaged it -- four pure additions (MOM-FR-GT, MVW-FR-GT, RAW-FR-GT, RMW-FR-GT), zero removals, zero changes to existing entries. lab/lab.sqlite deliberately excluded and restored byte-identical (sha 3028e8ba... before and after) because lab export-json migrates on connect.",
       "package": "engine.paper`, `engine.commands`, `db`, `docs`, `.github",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-12.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T05:58:44+00:00",
       "satisfies": [
         "R1",
         "R4",
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-U9XK",
       "title": "The rebuilt roster, and the wiring layer"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/gotrade-fee-rebuild/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "gotrade-fee-rebuild",
-  "updated": "2026-10-08T05:28:38+00:00",
+  "updated": "2026-10-08T06:01:29+00:00",
   "verified_at": "2026-10-08T03:50:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/gotrade-fee-rebuild"
 }

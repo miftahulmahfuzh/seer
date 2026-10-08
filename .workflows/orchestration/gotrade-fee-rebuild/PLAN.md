@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/gotrade-fee-rebuild`
 **Branch:** `feature/gotrade-fee-rebuild` (base: `origin/main` @ `485d416`)
 **Phases:** 12
-**Status:** in flight — 11/12 landed. Phase 12 (the wiring layer) is the last. This file is the coordinator's copy.
+**Status:** LANDED — 12/12 merged to main @ 13aded1, migrations 016 and 017 applied and verified against production.
 **Coordinator:** `orch-gotrade-fee-rebuild` (owns the landing; ledger.json is the record)
 
 ---

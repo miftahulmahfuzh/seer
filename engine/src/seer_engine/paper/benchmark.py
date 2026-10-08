@@ -20,7 +20,7 @@ return, dividends reinvested):
 rule above unchanged. "gotrade" is Gotrade's measured schedule (``sim.costs``, fitted to the
 owner's receipts): the share count is the most whose rounded cash fits
 (``sim.costs.gotrade_shares_for``) and the cash paid is ``q(price x n)`` plus the printed fee,
-exactly as ``backtest.benchmark.buy_and_hold(..., cost_model="gotrade")``) prices it. A method
+exactly as ``backtest.benchmark.buy_and_hold(..., cost_model="gotrade")`` prices it. A method
 measured against this benchmark and the benchmark itself then pay alike -- without it SPY pays
 0.1% while the methods pay Gotrade, and "beats SPY TR" is an asymmetric gate.
 

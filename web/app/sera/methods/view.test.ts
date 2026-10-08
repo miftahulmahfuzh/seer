@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { GATE, withVerdict } from '../../../lib/sera/fixture';
 import type { LabMethod, LabTrial } from '../../../lib/sera/types';
 import {
-  BEST_COLOR, conditionSentence, count, filterRows, fixed, growthFmt, growthLines, hurdlePoints, isAlive, longDate,
+  BEST_COLOR, conditionSentence, count, dsrNote, filterRows, fixed, growthFmt, growthLines, hurdlePoints, isAlive,
+  longDate,
   markLabel, marks, methodRows, parseShow, pct1, pfText, showCounts, showHref, signed1, sortMethods, sourceHref,
   SPY_COLOR, SPY_DASH, techRows, untestedNote, windowText, workedSummary, yearPairs,
 } from './view';
@@ -24,7 +25,7 @@ const trial = (over: Partial<LabTrial> = {}): LabTrial => {
     pfInfinite: false, trades: 1130, sharpe: 0.71, exposure: 0.48, turnover: 3.1, worstYear: 2015,
     worstYearReturn: -0.023, spyTrReturn: 3.514, spyTrCagr: 0.079, mar: 0.59,
     failed: ['beats SPY TR', 'DSR >= 0.95'], eligible: false, dsr: 0.899, nTrialsAtRun: 58,
-    failedNow: [], eligibleNow: false, dsrNow: null,
+    luckGated: true, failedNow: [], eligibleNow: false, dsrNow: null,
     curve: [['1996-01-31', 1], ['1996-02-29', 1.02], ['1997-01-31', 1.1]],
     ...over,
   };
@@ -145,6 +146,39 @@ describe('marks / workedSummary', () => {
     expect(markLabel(dsr)).toBe('Luck check: missed');
     expect(conditionSentence('dsr', false, seed, GATE)).toBe(
       'Luck check: no (not measured — the luck test cannot be scored for this trial, so it cannot pass it).',
+    );
+  });
+  it('calls a test run\'s luck check not applicable, and never missed', () => {
+    // M0021-B70-RAW's shape: a test look scoring 0.513 with no luck label in `failedNow`, because
+    // a single pre-registered try has nothing to discount. Rendered without the engine's marker,
+    // this was a green tick against a published bar of 0.90.
+    const look = trial({
+      window: 'test', start: '2015-10-19', end: '2026-10-01',
+      dsr: 0.513013, dsrNow: 0.513013, failed: ['beats SPY TR'], failedNow: ['beats SPY TR'],
+    });
+    const dsr = marks(look).find(x => x.key === 'dsr')!;
+    expect(dsr.ok).toBe(null);
+    expect(markLabel(dsr)).toBe('Luck check: not applicable');
+    expect(conditionSentence('dsr', null, look, GATE)).toBe(
+      'Luck check: does not apply. A test run is a single try booked in advance, so there is ' +
+      'nothing to discount for luck (it scored 0.513).',
+    );
+    // The number is still annotated, but not with an N it was never scored at.
+    expect(dsrNote(look, GATE)).toBe('not a hurdle on a test run');
+    expect(dsrNote(trial({ dsrNow: 0.9122 }), GATE)).toBe('at N 110');
+    expect(dsrNote(trial({ dsr: null, dsrNow: null }), GATE)).toBe(null);
+    // And it is counted out of five, not scored 5 of 6 for a hurdle it never had.
+    expect(workedSummary(look, GATE).headline).toBe(
+      'Not yet. Its best variant, M0001-TV12, cleared 4 of 5 hurdles on 2015–2026 data.',
+    );
+  });
+
+  it('records whether the luck bar applied, from the engine and not from the window', () => {
+    const rows = Object.fromEntries(techRows(trial()));
+    expect(rows['Luck bar applies']).toBe('yes');
+    const look = techRows(trial({ window: 'test', failedNow: ['beats SPY TR'] }));
+    expect(Object.fromEntries(look)['Luck bar applies']).toBe(
+      'no — a test run has nothing to discount for luck',
     );
   });
   it('quotes the luck score at the gate\'s N, not at the N of the run date', () => {

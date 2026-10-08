@@ -198,6 +198,71 @@ def test_reinvestment_can_open_the_holding():
     assert state.position.entry_date == WED and state.position.days_held == 3
 
 
+# --------------------------------------------------------------------------- Gotrade's fees
+
+
+def test_gotrade_nights_equal_buy_and_hold_at_the_same_cost_model():
+    curve = buy_and_hold(
+        SPY_BARS, START, END, CASH0, dividends=DIVIDENDS, name="spy_tr",
+        fractional=True, cost_model="gotrade",
+    )
+    state, snaps, fills, _ = run_nights(SPY_BARS, START, END, CASH0, PAID, "gotrade")
+    assert snaps == curve.snapshots
+    assert state.shares == curve.shares
+    assert state.cash == curve.cash
+    assert state.income_usd == curve.dividends_usd
+    assert state.equity == curve.snapshots[-1].equity_usd
+    # Not vacuous: 7 buys either way, and Gotrade's bill is 2.65x the flat one.
+    flat_state, _, flat_fills, _ = run_nights(SPY_BARS, START, END, CASH0, PAID)
+    assert len(fills) == len(flat_fills) == 7
+    assert sum(f.cost_usd for f in fills) == Decimal("3.67")
+    assert sum(f.cost_usd for f in flat_fills) == P("1.384")
+    assert state.equity == P("1248.2768") < flat_state.equity == P("1250.5694")
+
+
+def test_gotrade_position_and_fills_by_hand():
+    # MON open 100: 1000 buys 9.9766 sh -- amount q(997.66) = 997.66, fee $2.34 (trading
+    #   0.2% = $2.00, regulatory capped $0.11, PPN 11% of $2.11 = $0.23), cash out exactly
+    #   1000.0000; cash 0, equity 9.9766 x 101 = 1007.6366. Flat buys 9.99 sh for a $0.999 fee.
+    # WED dividend 2.5: cash + q(24.9415) = 24.9415; that buys 0.2531 sh at the close 98 --
+    #   amount q(24.8038) = 24.8038, fee $0.13, cash out 24.9338; cash 0.0077, 10.2297 sh,
+    #   equity 0.0077 + 10.2297 x 98 = 1002.5183.
+    s = start_benchmark(P("1000"), MON, cost_model="gotrade")
+    s, snap, fills = step_benchmark(s, MON, WEEK_BARS[MON], None)
+    assert snap == Snapshot(MON, P("0"), P("1007.6366"))
+    assert fills == (Fill(MON, SPY, "buy", P("9.9766"), P("100"), P("-1000"), Decimal("2.34"), "entry"),)
+    assert s.position == Position(SPY, P("9.9766"), P("101"), MON, P("100"), 1, P("1000"), P("0"), None, None)
+    s, snap, fills = step_benchmark(s, TUE, WEEK_BARS[TUE], None)
+    assert fills == () and s.position.days_held == 2 and s.position.mark == P("102")
+    s, snap, fills = step_benchmark(s, WED, WEEK_BARS[WED], Decimal("2.5"))
+    assert snap == Snapshot(WED, P("0.0077"), P("1002.5183"))
+    assert fills == (Fill(WED, SPY, "buy", P("0.2531"), P("98"), P("-24.9338"), Decimal("0.13"), "add"),)
+    assert s.position == Position(SPY, P("10.2297"), P("98"), MON, P("100"), 3, P("1024.9338"), P("24.9415"), None, None)
+    assert s.income_usd == P("24.9415")
+
+
+def test_the_recorded_fee_is_the_fee_inside_the_cash_that_moved():
+    # The site the handover does not name: Fill.cost_usd. Under "gotrade" the notional plus the
+    # recorded fee is exactly the cash that left, so a fill can be reconciled against a receipt.
+    _, _, fills, _ = run_nights(SPY_BARS, START, END, CASH0, PAID, "gotrade")
+    assert fills
+    for f in fills:
+        assert -f.cash_usd - f.cost_usd == q(f.price * f.shares), f
+
+
+def test_the_fee_floor_makes_dust_unbuyable():
+    # The flat model buys 0.0001 sh with a penny (test_reinvestment_can_open_the_holding).
+    # Gotrade's $0.10 per-order minimum costs 11 cents to spend one, so nothing is ever bought.
+    curve = buy_and_hold(
+        WEEK_BARS, MON, FRI, P("0.01"), dividends=[Dividend(WED, Decimal("2.5"))], name="x",
+        fractional=True, cost_model="gotrade",
+    )
+    state, snaps, fills, _ = run_nights(WEEK_BARS, MON, FRI, P("0.01"), {WED: Decimal("2.5")}, "gotrade")
+    assert snaps == curve.snapshots
+    assert (state.shares, state.cash) == (curve.shares, curve.cash) == (P("0"), P("0.01"))
+    assert fills == [] and state.position is None
+
+
 def test_state_round_trips_through_its_fields():
     # The store rebuilds the state from paper_state + one book_positions row + paper_start.
     s = start_benchmark(P("1000"), MON)
@@ -253,48 +318,37 @@ def test_step_validation():
         step_benchmark(s, MON, WEEK_BARS[MON], 2.5)
 
 
-# --------------------------------------------------------------------------- Gotrade's fees
-
-
-def test_gotrade_nights_equal_buy_and_hold_at_the_same_cost_model():
-    curve = buy_and_hold(
-        SPY_BARS, START, END, CASH0, dividends=DIVIDENDS, name="spy_tr",
-        fractional=True, cost_model="gotrade",
-    )
-    state, snaps, fills, _ = run_nights(SPY_BARS, START, END, CASH0, PAID, "gotrade")
-    assert snaps == curve.snapshots
-    assert state.shares == curve.shares
-    assert state.cash == curve.cash
-    assert state.income_usd == curve.dividends_usd
-    assert state.equity == curve.snapshots[-1].equity_usd
-
-
-def test_gotrade_position_and_fills_by_hand():
-    s = start_benchmark(P("1000"), MON, cost_model="gotrade")
-    s, snap, fills = step_benchmark(s, MON, WEEK_BARS[MON], None)
-    assert snap.cash_usd >= 0
-    assert len(fills) == 1
-    assert fills[0].symbol == SPY
-
-
-def test_the_recorded_fee_is_the_fee_inside_the_cash_that_moved():
-    _, _, fills, _ = run_nights(SPY_BARS, START, END, CASH0, PAID, "gotrade")
-    assert fills
-    for f in fills:
-        assert -f.cash_usd - f.cost_usd == q(f.price * f.shares) or abs((-f.cash_usd - f.cost_usd) - q(f.price * f.shares)) < Decimal("0.0001"), f
-
-
 def test_cost_model_survives_the_night():
+    # The store rebuilds the state from paper_state + one book_positions row + paper_start +
+    # the entry's frozen spec; the model must come back with it or night 2 pays 0.1%.
     s = start_benchmark(P("1000"), MON, cost_model="gotrade")
     for d in (MON, TUE, WED):
         s, _, _ = step_benchmark(s, d, WEEK_BARS[d], Decimal("2.5") if d == WED else None)
     assert s.cost_model == "gotrade"
+    p = s.position
+    loaded = BenchmarkState(
+        start=MON,
+        cash=s.cash,
+        equity=s.equity,
+        position=Position(p.symbol, p.shares, p.mark, p.entry_date, p.entry_price,
+                          p.days_held, p.cost_usd, p.income_usd, None, None),
+        last_session=WED,
+        cost_model="gotrade",
+    )
+    assert loaded == s
+    assert step_benchmark(loaded, THU, WEEK_BARS[THU], None) == step_benchmark(s, THU, WEEK_BARS[THU], None)
+    # Dropping the model on the way back in is not silently equivalent: it is a different book.
+    flat = BenchmarkState(start=MON, cash=s.cash, equity=s.equity, position=loaded.position, last_session=WED)
+    assert flat.cost_model == "flat" and flat != s
 
 
 def test_cost_model_validation():
     assert start_benchmark(P("1000"), MON).cost_model == "flat"
     with pytest.raises(ValueError, match="unknown cost_model"):
         start_benchmark(P("1000"), MON, cost_model="percent")
+    with pytest.raises(ValueError, match="unknown cost_model"):
+        BenchmarkState(start=MON, cash=P("1000"), equity=P("1000"), position=None,
+                       last_session=D("2026-02-27"), cost_model="gotrade2")
 
 
 # --------------------------------------------------------------------------- splits

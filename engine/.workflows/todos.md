@@ -3,13 +3,13 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-08
-**Total Active Tasks**: 1
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
@@ -23,6 +23,31 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [x] **P1-ENG-F6QN** Phase 4: The bracket path can express and charge Gotrade's fees
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/sim/rules.py`, `model.py`, `sizing.py`, `lifecycle.py`, `split_adjust.py`, `__init__.py`, the **new** `sim/charges.py`, `engine/src/seer_engine/paper/bracket.py` and the matching tests — 13 files. Does not touch `sim/book.py`, `sim/costs.py`, `paper/benchmark.py` (phase 3), `paper/roster.py` (phase 12), any file under `commands/`, or `backtest/runner.py` (phase 5 owns its `rules` keyword, D10). It adds **no** roster entry — it makes one expressible; every parameter it adds is keyword-only with `DESIGN_V0` as the default, which is what keeps the tree green with the wiring absent. Exit: `TradeRules(id="design-v0-gotrade", engine="bracket", cost_model="gotrade", …)` constructs, is `PRESETS[13]`, and `paper.roster.rules_for("design-v0-gotrade")` returns it; `size_picks` / `step` / `close_unpriced` / `apply_split` / `decide_bracket` / `settle_bracket` each take a `rules` keyword and charge Gotrade's measured schedule including the $0.10 per-order floor — both owner receipts reproduced to the cent (buy $27.90 → 28.0300, sell $72.51 → 72.2700) and a $28 slot rejecting a $27.90 pick; `DESIGN_V0` still constructs, is still `engine="bracket_v0"`, and `roster.rules_dict(DESIGN_V0)` is byte-identical to today, so C's frozen spec digest has not moved; `git diff --stat` shows no `commands/` file at all and `backtest/runner.py` unmodified; the engine suite's failing-node set is identical to the pre-edit one (`main` is RED for two known reasons phases 1 and 2 own); `PAPER_PAUSED` is still `'true'` and no roster entry was added, edited or retired. This is **resume condition 2** of three.
+  - **Status**: completed
+  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 4 of 12)
+  - **Satisfies**: R4 — Make the bracket path pay Gotrade's fees so the daily control C is honest. C stays permanently
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-F6QN.md`
+  - **Completed**: 2026-10-08 10:52
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/sim/charges.py, engine/src/seer_engine/sim/rules.py, engine/src/seer_engine/sim/sizing.py, engine/src/seer_engine/sim/lifecycle.py, engine/src/seer_engine/sim/split_adjust.py, engine/src/seer_engine/sim/__init__.py, engine/src/seer_engine/paper/bracket.py, engine/tests/test_sim_rules.py, engine/tests/test_sim_sizing.py, engine/tests/test_sim_lifecycle.py, engine/tests/test_sim_split.py, engine/tests/test_paper_bracket.py, engine/tests/test_cost_model_pins.py, engine/.workflows/todos.md, engine/.workflows/plan/P1-ENG-F6QN.md
+  - **Verified**: `ruff check engine/src engine/tests` -> All checks passed! Full engine suite from the worktree root with `PYTHONPATH=engine/src` and `PG_TEST_URL` -> 3388 passed, 1 skipped, 0 failed (111s); pre-edit baseline on this branch 3362 passed, 2 skipped, 0 failed, failing-node set identical (empty). `import seer_engine.commands.paper, seer_engine.commands.promote, seer_engine.paper.replay` -> ok, so the unwired callers still import and the capability is complete and INERT until phase 12 wires it (D10). All seven exit criteria verified: `git diff` shows no change under `commands/`, nor to `backtest/runner.py`, `paper/replay.py`, `sim/costs.py` (invariant 5), `sim/model.py`, `sim/book.py` or `paper/roster.py`; `PAPER_PAUSED` is still `'true'` (invariant 2); no roster entry added, edited or retired (invariants 3 and 4); every added `rules` parameter is KEYWORD_ONLY with `DESIGN_V0` as its default; `roster.rules_dict(DESIGN_V0)` is byte-identical to before, so live strategy C's frozen spec digest has not moved. Measured and reproduced: the owner's two real receipts to the cent (a 1-share buy at $27.90 costs $28.03; a 1-share sell at $72.51 returns $72.27); at a $28 slot a $27.90 pick sizes to 1 share flat and 0 under Gotrade; the flat branch of `charges.py` is bit-identical to `sim.model`'s old arithmetic over 40,000 random cases (0 mismatches).
+  - **Drift**:
+    - `test_sim_rules.py`'s `test_unknown_literal_values` parametrized `('engine', 'bracket')` as an UNKNOWN engine -- the exact value Step 1 makes valid. The plan's Files table did not foresee it. Repointed that case to `'brackets'`, which the plan's own 12c test already asserts raises "unknown engine". The guard is repointed, not relaxed.
+    - `sizing.py`'s `from decimal import ROUND_FLOOR, Decimal` left `ROUND_FLOOR` unused once `_whole_shares` moved to `charges.py`; dropped it from the import. The plan's import block did not mention it.
+    - Pre-edit baseline measured 3362 passed / 2 skipped / 0 FAILED -- the plan's exit criterion 6 anticipated "two known main failures", but this branch is already green (phases 1 and 2 own those, and one surfaced as a skip). Held the stronger bar of zero failures instead.
+    - simkit helper signatures differ from the plan's illustrative 12e snippets (`portfolio` takes `marks=` as a Mapping; `opened` takes `days_held` positionally). Adapted as the plan's own note sanctions; every asserted money figure is unchanged and measured.
+    - My hand-worked literal in the new 12f split test was wrong (I guessed a $0.10 Gotrade fee on a $10 order); measured it is $0.12, matching the plan's own fee table. Corrected the two pins to the measured 10.12 / 0.48.
+  - **Decided**:
+    - Step 3 says create every phase's task, but six wave-1 sessions share this worktree -> created phase 4's task only (tie-break: narrower blast radius; twelve concurrent writers on one todos.md is a guaranteed race).
+    - `test_unknown_literal_values` pins `'bracket'` as unknown, which Step 1 makes known -> repointed the case to `'brackets'` (rung 3: the phase plan's own 12c code block uses exactly that spelling for a still-invalid engine).
+    - `ruff format --check` fails on 237 pre-existing files repo-wide and `engine/pyproject.toml` deliberately selects only E9+F because "closed records must not be reformatted" -> treated `ruff check` as the real lint gate (it passes) and reverted an accidental `ruff-format` pass over `test_paper_bracket.py` (rung 6: the surrounding code's existing convention).
+    - Completion: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: the recorded precedent in this same file from P1-ENG-D7XQ, T4KD and 7V3C). Five peer sessions are appending to this file concurrently; a cross-section block move is the one edit that silently loses a peer's append, and a decrement compounds the race where a recount is idempotent. A peer landed P1-ENG-KQRW in this file between my first and second read of it, which is the race in question, observed.
+
 - [x] **P1-ENG-D7XQ** Phase 1: The delisting stress harness
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -776,6 +801,54 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-KQRW** Phase 2: A test-window look is not luck-gated, and says so
+  - **Difficulty**: HARD
+  - **Type**: Bug
+  - **Context**: Owns `engine/src/seer_engine/lab/store.py` (`luck_gated()` after `published_verdict`, `SNAPSHOT_VERSION` 3→4, the `"luckGated"` key in `_snapshot_trial` — and nothing else in that file); `web/lib/sera/{types,derive,fixture,lab.test,derive.test}.ts`; `web/app/sera/methods/{view.ts,view.test.ts,[id]/page.tsx,page.tsx}`; `web/app/sera/overview.test.ts`; `web/data/lab.json` (regenerated); `engine/tests/test_lab_snapshot.py` (the `TRIAL_KEYS` set, the int `s["version"]` pin at :280, and two new tests only). Exit criteria: `cd web && npx vitest run` reports 0 failed (today 1 failed | 9 passed in lib/sera/lab.test.ts); `npx tsc --noEmit` clean; the engine suite reports 0 failed for test_lab_snapshot.py; `web/data/lab.json` has `"version":4` and exactly 2 trials with `"luckGated":false`, both `window: "test"`, both still carrying `dsrNow`; a test-window row renders "not applicable" rather than a green tick and prints no `at N 126`; `lab.test.ts` decides the luck branch by reading `t.luckGated`; `lab/lab.sqlite` is byte-identical.
+  - **Status**: completed
+  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 2 of 12)
+  - **Satisfies**: R7 — Settle how a test-window look relates to the luck gate; make snapshot, pages and test agree
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-KQRW.md`
+  - **Completed**: 2026-10-08 10:51
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/store.py, engine/tests/test_lab_snapshot.py, web/data/lab.json, web/lib/sera/types.ts, web/lib/sera/derive.ts, web/lib/sera/fixture.ts, web/lib/sera/lab.test.ts, web/lib/sera/derive.test.ts, web/app/sera/methods/view.ts, web/app/sera/methods/view.test.ts, web/app/sera/methods/[id]/page.tsx, web/app/sera/methods/page.tsx, web/app/sera/overview.test.ts, engine/.workflows/todos.md, engine/.workflows/plan/P1-ENG-KQRW.md
+  - **Drift**: web/app/sera/overview.test.ts pinned `version: 3` in a LabSnapshot fixture literal at :89 that the plan's Files table did not list (it listed only the trial() literal at :41-76). The LabSnapshot.version type change from Step 5 forces it. Moved to 4; same forced-by-the-type-change class as the luckGated literals, in a file the phase already owns.
+  - **Drift**: `luck_gated()` landed at store.py:1273 rather than the plan's quoted :1272 — it is immediately after `published_verdict`'s closing paren and before the REEVALUATION_MARKER block, exactly as specified. A one-line offset in the plan's quote, not a code difference.
+  - **Decided**: Step 3 says create tasks for all 12 phases, but five peer /implement sessions are running against this same plan and worktree concurrently and would each do the same -> duplicate rows and a 6-way concurrent write to one todos.md. Created phase 2's task only. (Rung 1: invariant 1, the tree builds and both suites pass at the end of each phase.)
+  - **Decided**: Phase 2's task was filed in the `engine` package rather than `web`, though 10 of its 13 files are under web/. (Rung 6, the surrounding convention: the plan index's Package column and the phase plan's own header both name `engine.lab` first, and the published marker originates in the engine.)
+  - **Decided**: web/app/sera/overview.test.ts version pin 3 -> 4, not listed in the plan's Files table. (Rung 2: phase 2's exit criterion 2, `npx tsc --noEmit` is clean.)
+  - **Decided**: `GOTRADE_FEE_REBUILD_PLAN.md` left untouched — no phase-2 row tick, no `**Status:**` change. This set is a swarm (`swarm.py find` -> coordinator `orch-gotrade-fee-rebuild`), so the ledger at `.workflows/orchestration/gotrade-fee-rebuild/ledger.json` owns progress, not the index. Same call phases 1 and 3 of this set recorded minutes earlier: the repo-root index is outside this phase's commit allowlist, `**Status:**` is one field six concurrent wave-1 sessions would each overwrite, and engine/.workflows/todos.md already records a measured case of such a cross-file tick being lost in this shared worktree.
+  - **Decided**: engine/.workflows/todos.md is in the commit allowlist even though it currently also carries peer phases 1, 3 and 4's uncommitted rows — excluding it would mean this task's record never lands, and the swept-in rows are correct task records, not code (tie-break: take the reversible option). Noted so the peers' handlers see their rows already committed.
+  - **Verified**: `PYTHONPATH=engine/src PG_TEST_URL=postgresql://postgres:pg@localhost:55432/postgres python -m pytest engine/tests -q -n auto` -> 3385 passed, 1 skipped, 0 failed (the skip is the deliberate SEER_LAB_COSTS_LIVE live-store gate).
+  - **Verified**: `cd web && npx vitest run` -> 47 files, 606 tests passed, 0 failed (was `1 failed | 9 passed` in lib/sera/lab.test.ts; that file is now 11 passing).
+  - **Verified**: `cd web && npx tsc --noEmit` -> clean.
+  - **Verified**: `lab export-json` re-run is idempotent; `lab/lab.sqlite` byte-identical (git status clean for it). web/data/lab.json: version 4, 126 gated, 2 ungated, both window=test, both still carrying dsrNow.
+  - **Verified**: Rendered against the real committed snapshot through the real render functions: M0021-B70-RAW -> `Luck check: not applicable`, mark ok=null (dashed), DSR cell `0.51 not a hurdle on a test run`; M0029-B70-RAW-FRAC -> same at 0.39; dev control M0001-TV10 unchanged at `Luck check: missed` / `at N 126`.
+- [x] **P1-ENG-H2VK** Phase 3: The live SPY benchmark pays what the methods pay
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/paper/benchmark.py` and `engine/tests/test_paper_benchmark.py`. Does not touch `backtest/benchmark.py` (it already carries the cost_model lever), anything in `sim/`, `commands/paper.py` or `paper/store.py` (phase 12's wiring under D10). Exit: all three flat sites take the cost model — the recorded `Fill.cost_usd` at :170, the entry buy at :249-250 and the reinvestment buy at :276-279 — and the recorded fee equals the cash actually moved; `BenchmarkState` carries the model so it survives between nights; the default stays "flat" and the 16 pre-existing tests pass bit-identically. This is resume condition 1 of three.
+  - **Status**: completed
+  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 3 of 12)
+  - **Satisfies**: R1 (Q1) — Rebuild the roster so every entry pays Gotrade's measured fees, SPY included — as new entries with fresh paper clocks
+  - **Plan**: `.workflows/plan/P1-ENG-H2VK.md`
+  - **Completed**: 2026-10-08 10:49
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/paper/benchmark.py, engine/tests/test_paper_benchmark.py, engine/.workflows/todos.md, engine/.workflows/plan/P1-ENG-H2VK.md
+  - **Drift**: No code drift: engine/src/seer_engine/paper/benchmark.py matched every line the plan quoted, at the quoted line numbers.
+  - **Drift**: Plan prose nit, no code impact: the Manual check snippet's expected output says 'flat fee 0.9990, ratio 2.34' for the $1,000-at-$100 case; the actual is 'flat fee 0.9977, ratio 2.35'. Both are correct about different things — the plan's Goal table's $0.9990 is the FLAT model buying its own 9.99 shares, while the snippet prices the flat fee on gotrade's 9.9766-share count. The first line printed exactly as the plan says (0.9352 sh, gotrade fee 1.45, flat fee 0.5985, ratio 2.42). The authoritative figures ($3.67 vs $1.3840 of fees; $1,248.2768 vs $1,250.5694 ending equity) are asserted by test_gotrade_nights_equal_buy_and_hold_at_the_same_cost_model, which passes.
+  - **Drift**: Shared-worktree noise: the full engine suite in this worktree reports 140 failed / 43 errors, every one of them from peer phases 1, 2 and 4's in-flight edits to sim/rules.py, sim/sizing.py, sim/lifecycle.py, sim/split_adjust.py, sim/__init__.py, lab/npolicy.py and lab/store.py. None is phase 3's. Proven by isolation, see Verified below.
+  - **Decided**: Step 3 says create all 12 phases' tasks, but 5 peer sessions run that same step concurrently in this shared worktree -> created only phase 3's task (P1-ENG-H2VK). Rung 6, the surrounding convention: engine/.workflows/todos.md:60 and :993 record exactly this call made in two earlier swarms, and a shared package counter is a lost-update race.
+  - **Decided**: The plan's full-suite verification command is unusable in a shared worktree mid-wave (140 peer-caused failures) -> ran it against a pristine `git archive HEAD` copy carrying ONLY phase 3's two files instead of relaxing or skipping the check. Result 3367 passed / 1 failed, the single failure being the isolation harness itself (`git rev-parse HEAD` exits 128 because the scratch copy is not a git repo), not code. Rung 1, invariant 1 (both suites pass at the end of each phase) read together with the tie-break that a failing verification is never settled by relaxing the check.
+  - **Decided**: The `[x]` block is moved into `## Completed Tasks` and Quick Stats recounted from the file rather than blind-decremented — following phase 1 (P1-ENG-R4XB) of this same set, which moved its block minutes earlier; a recount is idempotent under concurrency where a decrement compounds the race.
+  - **Decided**: `GOTRADE_FEE_REBUILD_PLAN.md` left untouched — no phase-3 row tick, no `**Status:**` change -> the swarm ledger owns progress, not the index. Three reasons: the commit allowlist for this phase is four paths and excludes the repo-root index, so the edit could never land and would sit dirty in a worktree five peers are staging from; `**Status:**` is a single field six concurrent wave-1 sessions would each overwrite with a different `phase N/12`; and `engine/.workflows/todos.md:776` records the measurement that a cross-file index tick in this shared worktree was already lost once (`git log -- LAB_LUCK_GATE_PLAN.md` showed only the plan's creation commit).
+  - **Verified**: `python -m ruff check engine` -> All checks passed!
+  - **Verified**: `PYTHONPATH=engine/src PG_TEST_URL=postgresql://postgres:pg@localhost:55432/postgres python -m pytest engine/tests/test_paper_benchmark.py -q -n auto` -> 22 passed (16 pre-existing, bit-identical at the "flat" default, plus the 6 new ones).
+  - **Verified**: The three paper files the plan names: `test_paper_benchmark.py test_paper_store.py test_paper_command.py` -> 76 passed.
+  - **Verified**: Full engine suite, isolated from peers (pristine `git archive HEAD` copy + only phase 3's two files, PYTHONPATH at that copy's engine/src) -> 3367 passed, 1 failed, 2 skipped in 274.56s; the 1 failure is `test_lab_prereg.py::test_lab_promote_command_exits_2_when_the_lab_refuses`, failing on `git rev-parse HEAD` exit 128 because the scratch tree is not a git repo — a harness artifact, not a code failure.
+  - **Verified**: Manual check reproduced: `0.9352 sh, gotrade fee 1.45, flat fee 0.5985, ratio 2.42`.
+  - **Verified**: Exit criterion 5 fences all hold: `git diff --name-only` shows NO change to `sim/costs.py` (invariant 5), `.github/workflows/nightly.yml` (`PAPER_PAUSED` still `'true'` at :70, invariant 2), `paper/roster.py`, `commands/paper.py`, `paper/store.py` or `backtest/benchmark.py`. No roster entry added, edited or retired (invariants 3, 4, 8). Phase 3's own diff is exactly 2 files, +178/-23.
 - [x] **P1-ENG-R4XB** Phase 1: The CI guard catches what it was written for
   - **Difficulty**: NORMAL
   - **Type**: Bug

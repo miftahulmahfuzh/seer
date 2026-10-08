@@ -50,7 +50,8 @@ METHOD_KEYS = {"id", "name", "family", "parentId", "sourceKind", "sourceRef", "h
 TRIAL_KEYS = {"n", "methodId", "candidateId", "rulesId", "allocatorId", "configText", "window", "start", "end",
               "gitSha", "runAt", "totalReturn", "cagr", "maxDrawdown", "profitFactor", "pfInfinite", "trades",
               "sharpe", "exposure", "turnover", "worstYear", "worstYearReturn", "spyTrReturn", "spyTrCagr", "mar",
-              "failed", "eligible", "dsr", "nTrialsAtRun", "failedNow", "eligibleNow", "dsrNow", "curve"}
+              "failed", "eligible", "dsr", "nTrialsAtRun", "luckGated", "failedNow", "eligibleNow", "dsrNow",
+              "curve"}
 
 
 def _v1_db(path):
@@ -277,7 +278,7 @@ def test_the_snapshot_follows_the_contract(lab):
     s = store.snapshot(lab)
     assert list(s) == ["version", "asOf", "gate", "data", "summary", "benchmark", "methods", "trials",
                        "insights", "ideasSeen", "paper"]
-    assert s["version"] == 3
+    assert s["version"] == 4
     gate = s["gate"]
     assert list(gate) == [
         "maxDrawdown", "minProfitFactor", "minTrades", "dsrMin",
@@ -357,6 +358,81 @@ def test_the_snapshot_follows_the_contract(lab):
     stamps = ([m["updated"] for m in s["methods"]] + [t["runAt"] for t in s["trials"]]
               + [i["added"] for i in s["insights"]] + [x["added"] for x in s["ideasSeen"]])
     assert s["asOf"] == max(stamps)
+
+
+def test_a_test_window_row_publishes_that_the_luck_gate_does_not_apply(lab):
+    """R7: the snapshot says, per trial, whether the luck hurdle applies -- it is not re-derived.
+
+    A test-window look is one pre-registered confirmatory run with no selection among results to
+    deflate, so ``published_verdict`` applies the four owner thresholds and nothing else and its
+    recorded ``dsr`` rides through as a measurement. Published with no marker, that verdict read
+    on the site as a *cleared* luck check: ``M0021-B70-RAW`` scored 0.513013 against a published
+    bar of 0.90 and rendered a green tick.
+    """
+    with lab:
+        store.insert_trials(lab, [store.TrialRow(
+            method_id="M0001", candidate_id="M0001-A", config_digest="d2", config_text="t", rules_id="r",
+            allocator_id="a", window="test", start="2015-10-19", end="2026-10-01", store_fingerprint="fp",
+            git_sha="abc", run_at="2026-10-06T00:00:00+00:00", total_return=0.2, cagr=0.02,
+            max_drawdown=0.1, profit_factor=1.4, trades=150, sharpe=0.3, exposure=0.9, turnover=1.0,
+            worst_year=2018, worst_year_return=-0.1, spy_tr_return=0.5, spy_tr_cagr=0.07, mar=0.2,
+            failed="beats SPY TR", eligible=False, dsr=0.513013, n_trials_at_run=56,
+            curve_json='[["2015-10-30",1.0],["2015-11-30",1.01]]',
+        )])
+    s = store.snapshot(lab)
+    by_window = {t["window"]: t for t in s["trials"] if t["n"] in (55, 56)}
+
+    look = by_window["test"]
+    assert look["luckGated"] is False
+    # The score is still published -- it is a measurement, not a hurdle. Dropping it would make
+    # "not applicable" and "not measured" indistinguishable, which is the defect, not the fix.
+    assert look["dsrNow"] == 0.513013
+    assert not any(store.is_luck_label(f) for f in look["failedNow"])
+    # The owner thresholds still apply to a test row and are still re-derived from its columns.
+    assert look["failedNow"] == ["beats SPY TR"] and look["eligibleNow"] is False
+
+    dev_row = by_window["dev"]
+    assert dev_row["luckGated"] is True
+    # The gated row with no clearable score is the other side of the distinction: a MISS, with
+    # the luck label present, not an exemption.
+    assert any(store.is_luck_label(f) for f in dev_row["failedNow"])
+
+    assert s["summary"]["testLooks"] == 1
+    assert [t["luckGated"] for t in s["trials"]].count(False) == s["summary"]["testLooks"]
+
+
+def test_the_marker_names_the_same_split_published_verdict_makes(lab):
+    """``luck_gated`` and ``published_verdict`` are one rule, written in two places on purpose.
+
+    ``published_verdict`` is correct and this phase does not touch it; the marker is published
+    beside it. This test is what stops the two drifting: if ``published_verdict`` ever started
+    luck-gating a test look -- or stopped gating a dev row -- the marker would be telling the site
+    something the verdict no longer does, and the site would print a tick on it.
+    """
+    with lab:
+        store.insert_trials(lab, [store.TrialRow(
+            method_id="M0001", candidate_id="M0001-A", config_digest="d2", config_text="t", rules_id="r",
+            allocator_id="a", window="test", start="2015-10-19", end="2026-10-01", store_fingerprint="fp",
+            git_sha="abc", run_at="2026-10-06T00:00:00+00:00", total_return=0.2, cagr=0.02,
+            max_drawdown=0.1, profit_factor=1.4, trades=150, sharpe=0.3, exposure=0.9, turnover=1.0,
+            worst_year=2018, worst_year_return=-0.1, spy_tr_return=0.5, spy_tr_cagr=0.07, mar=0.2,
+            failed="beats SPY TR", eligible=False, dsr=0.1, n_trials_at_run=56,
+            curve_json='[["2015-10-30",1.0]]',
+        )])
+    windows = set()
+    for row in lab.execute("SELECT * FROM trials ORDER BY n").fetchall():
+        gated = store.luck_gated(row)
+        windows.add(str(row["window"]))
+        assert gated == (str(row["window"]) == "dev")
+        v = store.published_verdict(lab, row)
+        if gated:
+            # A gated row's luck test is decided: it is in `failed` exactly when it was not passed.
+            assert (v.dsr is None or v.dsr < store.DSR_MIN) == any(store.is_luck_label(f) for f in v.failed)
+        else:
+            # An ungated row never carries a luck failure, whatever its score says.
+            assert not any(store.is_luck_label(f) for f in v.failed)
+            assert v.dsr == 0.1  # carried verbatim, and still under the 0.90 bar
+    assert windows == {"dev", "test"}  # neither branch was vacuous
 
 
 def test_the_paper_block_is_the_rosters_provenance_verbatim(lab):

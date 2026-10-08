@@ -171,7 +171,9 @@ function Row({ r }: { r: MethodRow }) {
 
 function Dots({ best, passed }: { best: LabTrial; passed: number }) {
   const ms = marks(best);
-  const missed = ms.filter(x => x.ok !== true).map(markLabel);
+  // `=== false`, not `!== true`: a hurdle that does not apply to this row was not missed, and
+  // listing it under "missed" is the same wrong answer as ticking it, one column over.
+  const missed = ms.filter(x => x.ok === false).map(markLabel);
   const tip = missed.length ? missed.join(' · ') : 'Cleared every hurdle';
   return (
     <span className={s.dots} role="img" aria-label={`Cleared ${passed} of 6 hurdles. ${tip}`} data-tip={tip}>

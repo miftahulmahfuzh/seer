@@ -1270,6 +1270,28 @@ def published_verdict(
     )
 
 
+def luck_gated(trial: Mapping[str, Any] | sqlite3.Row) -> bool:
+    """Does the luck gate apply to ``trial``? True for a dev row, False for a test look.
+
+    The same split :func:`published_verdict` makes, named once so that no reader downstream has to
+    re-derive it. A dev row is one result selected from many, so its Sharpe is deflated by the
+    number of looks; a test-window row is a single pre-registered confirmatory look with no
+    selection to deflate, so its recorded ``dsr`` is a measurement and not a condition.
+
+    **This is not ``Verdict.derived``.** ``derived`` is False for a test row *and* for a dev row
+    whose DSR could not be evaluated -- and those two are opposites. The first is a hurdle that
+    does not apply; the second is a hurdle that was missed because nothing could be measured
+    (the 54 P7a seed rows, whose ``dsr`` is NULL by construction). A reader that cannot tell them
+    apart prints a pass where there is none: ``web/lib/sera/derive.conditionOk`` returned a green
+    tick on ``M0021-B70-RAW``'s 0.513013 against a published bar of 0.90, which is R7.
+
+    Published as ``trials[].luckGated`` from snapshot v4 so the web reads this answer rather than
+    guessing at it. ``test_the_marker_names_the_same_split_published_verdict_makes`` holds this
+    function and ``published_verdict`` to one rule, so the two cannot drift apart.
+    """
+    return str(trial["window"]) == "dev"
+
+
 # The first words of the analysis section ``reevaluate_method`` appends. Not an idempotence key:
 # the edge it guards can be taken at most once, because it leads out of the only status it may
 # be taken from.
@@ -1684,7 +1706,15 @@ def as_mapping(row: sqlite3.Row) -> Mapping[str, Any]:
 # 3 adds ``paper``: which roster entry is which lab method (``paper.roster.LAB_PROVENANCE``). The
 # web had no way to answer that -- ``rules_id`` is shared by a dozen methods, so it is not a key --
 # and a map hand-written in the site would drift the next promotion night in silence.
-SNAPSHOT_VERSION = 3
+#
+# 4 adds ``luckGated``: does the luck gate apply to this row at all. The lab produced its first two
+# test-window looks on 2026-10-07, and ``published_verdict`` rightly does not luck-gate them -- a
+# pre-registered confirmatory look has no selection to deflate. Nothing said so, so every consumer
+# re-derived the rule and the web derived it wrongly: a score of 0.513013 rendered as a cleared
+# hurdle against a published bar of 0.90. The marker is a third state, not a second one: it
+# separates "this hurdle does not apply" from "this hurdle could not be measured, so it was
+# missed", which ``Verdict.derived`` conflates (R7).
+SNAPSHOT_VERSION = 4
 EXPECTED_FAILURE_SEP = "\n\nExpected failure: "  # how lab ideas write their hypothesis
 
 
@@ -1755,6 +1785,13 @@ def _snapshot_trial(t: Mapping[str, Any], v: Verdict) -> dict[str, Any]:
     gate block beside it is resolved live (``_gate_n``, ``DSR_MIN``), so a page that took its
     ticks from ``failed`` and its numbers from ``gate`` was reading two different days at once.
     A page must take **both** from the ``Now`` fields; ``failed`` is for the record panel only.
+
+    ``luckGated`` says whether the luck hurdle applies to this row at all (:func:`luck_gated`).
+    Without it the verdict is ambiguous in exactly one place: a test look's ``failedNow`` omits
+    the luck label because the gate does not apply, and a reader with only ``failedNow`` to go on
+    cannot tell that from a hurdle that was cleared. It published a tick on 0.513013 against a
+    bar of 0.90. **Three states, not two**: gated and cleared, gated and missed (``dsrNow`` may be
+    null -- nothing is admitted for being unmeasurable), and not gated at all.
     """
     pf = t["profit_factor"]
     return {
@@ -1788,6 +1825,9 @@ def _snapshot_trial(t: Mapping[str, Any], v: Verdict) -> dict[str, Any]:
         "eligible": bool(t["eligible"]),
         "dsr": _num(t["dsr"]),
         "nTrialsAtRun": int(t["n_trials_at_run"]),
+        # Whether the luck hurdle applies to this row at all. Published so the web never has to
+        # re-derive the dev/test rule -- which it did, and got wrong.
+        "luckGated": luck_gated(t),
         # The verdict: the same row by the bars in force now, at the gate's N (gate.dsrN).
         "failedNow": list(v.failed),
         "eligibleNow": v.eligible,

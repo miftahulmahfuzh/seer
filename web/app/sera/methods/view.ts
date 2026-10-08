@@ -140,9 +140,12 @@ export const windowText = (t: LabTrial): string => `${t.start.slice(0, 4)}–${t
 /* ---- The six hurdles ----------------------------------------------------------------------- */
 
 /**
- * true = cleared, false = missed (derive.conditionOk, which reads the engine's `failedNow`).
- * `null` is kept in the type as the not-decidable case, but no condition produces it today:
- * a luck test that cannot be scored is a luck test that was not passed.
+ * true = cleared, false = missed, null = the hurdle does not apply to this row
+ * (derive.conditionOk, which reads the engine's `failedNow` and `luckGated`).
+ *
+ * `null` is the luck check on a test-window look and nothing else. A luck test that *could not be
+ * scored* is still a miss — the engine lists it in `failedNow` — so a dashed mark always means
+ * "no such hurdle here", never "we did not look".
  */
 export type Mark = { key: ConditionKey; label: string; ok: boolean | null };
 
@@ -150,9 +153,9 @@ export type Mark = { key: ConditionKey; label: string; ok: boolean | null };
 export const marks = (t: LabTrial): Mark[] =>
   CONDITION_KEYS.map(key => ({ key, label: CONDITION_LABEL[key], ok: conditionOk(t, key) }));
 
-/** 'Beats SPY: cleared' / 'missed' / 'not measured'. */
+/** 'Beats SPY: cleared' / 'missed' / 'not applicable'. */
 export const markLabel = (m: Mark): string =>
-  `${m.label}: ${m.ok === null ? 'not measured' : m.ok ? 'cleared' : 'missed'}`;
+  `${m.label}: ${m.ok === null ? 'not applicable' : m.ok ? 'cleared' : 'missed'}`;
 
 /** One plain sentence per hurdle, with its threshold read from the gate. */
 export function conditionTip(key: ConditionKey, gate: Gate): string {
@@ -169,7 +172,13 @@ export function conditionTip(key: ConditionKey, gate: Gate): string {
 /** 'Beats SPY: no (7.6% vs 7.9% a year).' and so on, one per hurdle. */
 export function conditionSentence(key: ConditionKey, ok: boolean | null, t: LabTrial, gate: Gate): string {
   const label = CONDITION_LABEL[key];
-  if (ok === null) return `${label}: not measured.`;
+  if (ok === null) {
+    // Only the luck check reaches here, and only on a test look. Say which hurdle it is, say it
+    // does not apply, and still show the number — it was measured, it is simply not a bar.
+    return key === 'dsr'
+      ? `${label}: does not apply. A test run is a single try booked in advance, so there is nothing to discount for luck${t.dsrNow === null ? '' : ` (it scored ${fixed(t.dsrNow, 3)})`}.`
+      : `${label}: does not apply.`;
+  }
   const yn = ok ? 'yes' : 'no';
   switch (key) {
     case 'spy':
@@ -192,6 +201,16 @@ export function conditionSentence(key: ConditionKey, ok: boolean | null, t: LabT
   }
 }
 
+/**
+ * What follows the DSR number in the variants table: the N the score belongs to, or why there is
+ * no bar beside it. Null when there is no score to annotate.
+ *
+ * `at N 126` beside a test look's number is a false statement — that score was never computed at
+ * the gate's N and is not read against it — so the two cases carry different words.
+ */
+export const dsrNote = (t: LabTrial, gate: Gate): string | null =>
+  t.dsrNow === null ? null : t.luckGated ? `at N ${count(gate.dsrN)}` : 'not a hurdle on a test run';
+
 export type Worked = {
   headline: string;
   lines: { key: ConditionKey; ok: boolean | null; text: string }[];
@@ -203,10 +222,13 @@ export type Worked = {
 export function workedSummary(best: LabTrial, gate: Gate): Worked {
   const lines = marks(best).map(m => ({ key: m.key, ok: m.ok, text: conditionSentence(m.key, m.ok, best, gate) }));
   const passed = conditionsPassed(best);
+  // Hurdles that do not apply to this row are not hurdles it failed to clear. Every dev row has
+  // all six, so this reads "all six" exactly as before; a test look is counted out of five.
+  const applicable = lines.filter(l => l.ok !== null).length;
   const span = windowText(best);
-  const headline = passed === CONDITION_KEYS.length
-    ? `Yes. Its best variant, ${best.candidateId}, cleared all six hurdles on ${span} data.`
-    : `Not yet. Its best variant, ${best.candidateId}, cleared ${passed} of 6 hurdles on ${span} data.`;
+  const headline = passed === applicable
+    ? `Yes. Its best variant, ${best.candidateId}, cleared all ${applicable === CONDITION_KEYS.length ? 'six' : count(applicable)} hurdles on ${span} data.`
+    : `Not yet. Its best variant, ${best.candidateId}, cleared ${passed} of ${count(applicable)} hurdles on ${span} data.`;
   return { headline, lines, sentence: lines.map(l => l.text).join(' ') };
 }
 
@@ -318,6 +340,10 @@ export function techRows(t: LabTrial): [string, string][] {
     // verdict is the same row read against the bars in force now, which is what the page's ticks
     // show. They differ for every row recorded before the owner moved a bar on 2026-10-07.
     ['Luck score when run', t.dsr === null ? 'not measured' : `${fixed(t.dsr, 3)} at N = ${count(t.nTrialsAtRun)}`],
+    // Published by the engine (`store.luck_gated`), not worked out here: the luck bar applies to
+    // a development try, which is one of many results selected among, and not to a test run,
+    // which is a single try booked in advance.
+    ['Luck bar applies', t.luckGated ? 'yes' : 'no — a test run has nothing to discount for luck'],
     ['Missed when run', t.failed.length ? t.failed.join('; ') : 'nothing: eligible'],
     ['Missed by today’s bars', t.failedNow.length ? t.failedNow.join('; ') : 'nothing: eligible'],
   ];

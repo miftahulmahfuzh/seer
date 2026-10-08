@@ -42,28 +42,28 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "ee24f33884ee016cb0f3eab952e8413cb185a122",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "Skill written verbatim from the phase plan; 3089 passed, ruff clean, trials still 128, looks still 2. Decisions: (a) main checkout's lab.sqlite lacks trial_funding until the set merges -> no defensive guard added, verified on a scratch copy that the preflight's 'lab status' creates it on connect, so the verbatim text is correct by ordering (rung 3); (b) the remeasure funded/unfunded refusal needed no documenting -> the skill never invokes 'lab remeasure' at all (rung 3); (c) verified against the worktree, not /home/miftah/seer as the plan's commands literally read, since the new file exists only on this branch (rung 1, invariant 6). CLI verified live: lab idea uses --parent. PLAN.md is tracked on main not the branch, so its phase-3 tick is left UNCOMMITTED in the main checkout for your next orch commit.",
       "package": ".claude/skills",
       "plan": ".workflows/plan/lab-realistic-gate/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T08:38:23+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-RDX2",
       "title": "/redo-sera-experiments` \u2014 honest twins of named methods, in a batch"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-realistic-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-realistic-gate",
-  "updated": "2026-10-08T08:27:30+00:00",
+  "updated": "2026-10-08T08:38:23+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-realistic-gate"
 }

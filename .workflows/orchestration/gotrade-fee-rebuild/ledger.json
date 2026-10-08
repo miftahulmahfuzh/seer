@@ -93,21 +93,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "ca75a96",
       "depends_on": [
         5
       ],
       "difficulty": "HARD",
       "n": 6,
-      "note": null,
+      "note": "verified by coordinator: ca75a96 and follow-up 27a9a17 both on branch; 10 paths exactly its Owns (migration 016, paper/store.py, paper/book.py, paper/compare.py + commands/compare.py per D12, the three test files) plus its own task artifacts -- no peer file. D13 FENCE HELD, re-checked by coordinator: 'git diff 485d416 <tip> -- paper/store.py' touches load_benchmark in ZERO hunks; it has only displaced to :1356. Phase 12's region is clean. PLAN ARITHMETIC ERROR CONFIRMED BY INDEPENDENT MEASUREMENT: the plan's prose says 'four of the twelve 25ths are not sessions'; the correct count is FIVE. Coordinator re-measured against the live NYSE calendar via pandas_market_calendars and got exactly p6's five dates: 2026-10-25, 2026-12-25, 2027-04-25, 2027-07-25, 2027-09-25. The plan's own measured table said five; only its prose said four. p6 corrected the migration comment, the contribution_session docstring and the tests (rung 1, invariant 6). PHASE 12 AND ANY OTHER QUOTER MUST USE FIVE. Phase 5's landed sim/contributions.py does not carry the error. SCOPE CALLS ACCEPTED: (a) Performance gains 'deposited' but _performance_json keeps its exact seven keys -- that shape is pinned by test_as_json_field_names_units_and_nulls and ported to TypeScript by a different plan set, and no phase-6 exit criterion needs it published; (b) engine/package_readme.md deliberately not updated and readme-updater not dispatched, because it is not in phase 6's Files table where phase 5's plan explicitly did list its readme lines. HANDOFF TO PHASE 7: compare._max_drawdown and Performance.total_return still read the raw curve and so still carry a deposit -- the plan scoped Step 10 to _returns plus the CAGR suppression and p6 did not widen; render() now prints a line naming the dollars added and saying those two still count them. The honest replacement is phase 7's money-weighted return. Engine suite not re-run by coordinator yet: phase 7 is still writing lab/store.py and p6 measured transient test_lab_snapshot failures from exactly that race. Full gate deferred to phase 7's landing.",
       "package": "engine.paper`, `engine.commands`, `db",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T04:56:55+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-R7MD",
       "title": "Paper accepts a deposit"
     },
     {
@@ -230,7 +230,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/gotrade-fee-rebuild/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "gotrade-fee-rebuild",
-  "updated": "2026-10-08T04:50:02+00:00",
+  "updated": "2026-10-08T04:56:55+00:00",
   "verified_at": "2026-10-08T03:50:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/gotrade-fee-rebuild"
 }

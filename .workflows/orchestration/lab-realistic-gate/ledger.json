@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "424adae",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "DSR_POLICY+DEFAULT_POLICY -> methods (N=28, was 126); remeasure.batches_of guard widened from equality to bounded range at the source (phase 2 depends on this); lab --help %-escape fixed + parser-walk regression test. Engine 3079 passed/0 failed, web 626 passed. Data committed separately in fa8fa2e per invariant 3 (lab.sqlite + lab.json together). Trials still 128, digest unchanged, test looks still 2; six methods moved rejected->dev-eligible (M0002,M0007,M0011,M0019,M0024,M0030). Decision: plan's Verification header says 'after Step 10' but Step 13 is the data step -> ran data verification after Step 13, rung 3 (plan's own code blocks). Follow-up for a card, outside phase 1 Owns: name_count.py:27 and lab names still label dev_trial_count as 'the lab's N'. Plan index edit is uncommitted in the MAIN checkout for the coordinator to land.",
       "package": "engine.lab`, `engine.commands`, `web/data",
       "plan": ".workflows/plan/lab-realistic-gate/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T08:04:20+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-L4ND",
       "title": "Count the looks the data supports, and publish today's verdict"
     },
     {
@@ -64,6 +64,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-realistic-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-realistic-gate",
-  "updated": "2026-10-08T07:46:42+00:00",
+  "updated": "2026-10-08T08:04:20+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-realistic-gate"
 }

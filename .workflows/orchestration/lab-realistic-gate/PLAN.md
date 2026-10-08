@@ -6,8 +6,8 @@
 **Worktree:** `/home/miftah/.worktrees/seer/lab-realistic-gate`
 **Branch:** `feature/lab-realistic-gate` (base: `origin/main` @ `2b493ee`)
 **Phases:** 3
-**Status:** planned — reconciled, 6 conflicts resolved
-**Coordinator:** —
+**Status:** phase 1/3 complete (P1-ENG-L4ND, 2026-10-08) — reconciled, 6 conflicts resolved
+**Coordinator:** `orch-lab-realistic-gate`
 
 ---
 
@@ -100,9 +100,9 @@ cost previous sessions a night:
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Count the looks the data supports, and publish today's verdict | R1 | `engine.lab`, `engine.commands`, `web/data` | ~15 | — | HARD | `.workflows/plan/lab-realistic-gate/phase-1.md` | — | — |
-| 2 | The lab's search is funded like the owner's account | R2 | `engine.lab`, `engine.backtest` | ~9 | 1 | HARD | `.workflows/plan/lab-realistic-gate/phase-2.md` | — | — |
-| 3 | `/redo-sera-experiments` — honest twins of named methods, in a batch | R3 | `.claude/skills` | ~1 | 1, 2 | NORMAL | `.workflows/plan/lab-realistic-gate/phase-3.md` | — | — |
+| 1 | Count the looks the data supports, and publish today's verdict | R1 | `engine.lab`, `engine.commands`, `web/data` | ~15 | — | HARD | `.workflows/plan/lab-realistic-gate/phase-1.md` | P1-ENG-L4ND (done 2026-10-08) | — |
+| 2 | The lab's search is funded like the owner's account | R2 | `engine.lab`, `engine.backtest` | ~9 | 1 | HARD | `.workflows/plan/lab-realistic-gate/phase-2.md` | P1-ENG-FND7 | — |
+| 3 | `/redo-sera-experiments` — honest twins of named methods, in a batch | R3 | `.claude/skills` | ~1 | 1, 2 | NORMAL | `.workflows/plan/lab-realistic-gate/phase-3.md` | P1-ROOT-RDX2 | — |
 
 ### Phase 1 — Count the looks the data supports, and publish today's verdict
 **Satisfies:** R1

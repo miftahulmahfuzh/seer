@@ -23,53 +23,53 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "86ae23f",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "verified by coordinator BY CONTENT at branch tip (commit attribution unreliable in this set): store.luck_gated defined; web/lib/sera/types.ts has luckGated x7; web/data/lab.json = 126 gated / 2 ungated, matching its report exactly. NOTE 86ae23f carries phase 4's MESSAGE but phase 2's 17 files and no sim/ at all -- shared-index mis-attribution, content correct, not rewritten (published history). Phase 2 lost its first full application to the 10:55 reset and re-implemented all 13 files (~40 min).",
       "package": "engine.lab`, `web/lib/sera`, `web/app/sera",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-2.md",
-      "reported_at": "2026-10-08T03:51:55+00:00",
+      "reported_at": "2026-10-08T04:10:53+00:00",
       "satisfies": [
         "R7"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-KQRW",
       "title": "A test-window look is not luck-gated, and says so"
     },
     {
       "card": null,
-      "commit": "4c11623",
+      "commit": "836d1a5",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": "committed 4c11623 (branch tip) but NOT yet accepted: the 10:55:40 reset --hard sits between the rescue snapshot and this commit, and rescue/reset-casualty-c67d7b7 holds 86 more lines of test_paper_benchmark.py and 25 more of package_readme.md than 4c11623 does. Phase 3 asked to diff and decide -- it owns those files. Acceptance gated on that answer.",
+      "note": "verified by coordinator BY CONTENT at branch tip: paper/benchmark.py has 15 gotrade hits; test_the_fee_floor_makes_dust_unbuyable RESTORED; exit criterion 2 re-checked by coordinator -- the fee assertion is exact '==' and there is NO abs() tolerance anywhere in the file (the 8 remaining 0.0001 are the fractional-share quantum, legitimate). DAMAGE REPAIRED, not a decision: 4c11623 had silently lost a whole test plus weakened five more; restored verbatim from rescue/reset-casualty-c67d7b7 in 836d1a5. ROOT CAUSE CORRECTED by p3: the 10:53-10:55 reset cycle was ITS OWN pusher subagent, not phase 1's completion-handler. Both agents are now patched, so the fix holds either way.",
       "package": "engine.paper",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-3.md",
-      "reported_at": "2026-10-08T04:00:59+00:00",
+      "reported_at": "2026-10-08T04:10:53+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ENG-H2VK",
       "title": "The live SPY benchmark pays what the methods pay"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "836d1a5",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 4,
-      "note": "INCIDENT 2026-10-08 10:55:40 WIB: a tree-wide 'git reset --hard origin/feature/gotrade-fee-rebuild' in the shared worktree destroyed phase 4's 12 tracked files of finished, green, uncommitted work. Cause (from reflog, not from any report): phase 1 was undoing its OWN contaminated commits -- c67d7b7 at 10:53:48 carried phase 3's benchmark.py/test_paper_benchmark.py/package_readme.md under phase 1's message -- and reached for reset, which is tree-wide across 12 sessions sharing one checkout. The contamination guard WORKED: neither c67d7b7 nor c6ce225 is an ancestor of the branch; nothing bad landed. Only the cleanup method was destructive. Phase 4 re-implementing; untracked sim/charges.py survived. Casualties preserved as tags rescue/reset-casualty-c67d7b7 and rescue/reset-casualty-c6ce225. BAN broadcast to all live sessions: per-path ops only (git checkout -- <paths>, git restore --staged, git stash push -u -m <tag>); 'git reset --soft HEAD~1' is the safe way to undo one's own commit.",
+      "note": "verified by coordinator BY CONTENT at branch tip: sim/charges.py present (152 lines); sim/rules.py has 28 gotrade hits. Phase 4's code landed inside 836d1a5 under phase 3's MESSAGE (shared-index drain); bookkeeping-only follow-up 4d6acbf records that pointer. Phase 4 confirmed 'git diff 836d1a5 -- sim/ paper/bracket.py' is EMPTY -- it lost its first application to the reset, re-implemented, and the re-implementation is what landed; no duplicate work, no collision. Invariant 5 re-checked by coordinator: sim/costs.py byte-identical to base 485d416. C's spec digest unmoved (rules_dict(DESIGN_V0) byte-identical), so invariants 3/4/8 hold. Capability complete and deliberately INERT until phase 12 wires it (D10).",
       "package": "engine.sim`, `engine.paper",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-4.md",
-      "reported_at": "2026-10-08T04:00:59+00:00",
+      "reported_at": "2026-10-08T04:10:53+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-F6QN",
       "title": "The bracket path can express and charge Gotrade's fees"
     },
     {
@@ -87,7 +87,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "A contribution schedule, and the lab's real capital"
     },
@@ -230,7 +230,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/gotrade-fee-rebuild/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "gotrade-fee-rebuild",
-  "updated": "2026-10-08T04:04:09+00:00",
+  "updated": "2026-10-08T04:12:48+00:00",
   "verified_at": "2026-10-08T03:50:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/gotrade-fee-rebuild"
 }

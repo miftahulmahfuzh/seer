@@ -1515,6 +1515,8 @@ acquired; Yahoo no longer serves them), so the backtest cannot trade them (115 i
 collapses would have hurt, so the result is biased in Strategy A's favour; the report counts the
 gap per year.
 
+**Design §14 does not cover this.** The delisting stress test (delisting-stress-roster-rules) found no break-even for the four quant roster entries even at a total wipeout — but it ran on the **dev window (1996-01-02 → 2015-10-16)**, against the research store's own membership, on the F-family book strategies. This gate is Strategy A, a rule, on Neon bars from 2015-10-19 — a different strategy, a different window and a different data source. Its 115 unserved members are not the store's 404 in-window exits, and nothing measured there transfers to a dip-buying rule here. The harness could be pointed at this window, and has not been. Until it is, this gap stays **unquantified** — §14's number must not be read across.
+
 ### backtest walk-forward (P3b)
 
 This adds to P3 without changing it. Every v1 call takes its unchanged code path, and the
@@ -1606,6 +1608,8 @@ Strategy A's one rework has failed. Strategy A is not reworked again on this dat
 **Survivorship.** This is the same gap as P3: 115 index members in the window from
 2015-10-19 have no bars at all. It biases every variant in its favour, and the report counts the gap
 per year.
+
+**Design §14 does not cover this.** The delisting stress test (delisting-stress-roster-rules) found no break-even for the four quant roster entries even at a total wipeout — but it ran on the **dev window (1996-01-02 → 2015-10-16)**, against the research store's own membership, on the F-family book strategies. This gate is Strategy A2's four variants, on the same post-2015 Neon bars. A walk-forward that reselects on each fold can lean on the survivors harder than one fixed rule, so the bias here is if anything less bounded than P3's. The harness could be pointed at this window, and has not been. Until it is, this gap stays **unquantified** — §14's number must not be read across.
 
 ### backtest Strategy B walk-forward (P6a)
 
@@ -1718,6 +1722,8 @@ B's one round has failed on this data. B is not reworked on it, no model is froz
 2015-10-19 have no bars at all. A learned model can absorb that bias more than a rule can, because
 the losers it never saw are exactly the ones it would have needed to learn to avoid. The report says
 so.
+
+**Design §14 does not cover this.** The delisting stress test (delisting-stress-roster-rules) found no break-even for the four quant roster entries even at a total wipeout — but it ran on the **dev window (1996-01-02 → 2015-10-16)**, against the research store's own membership, on the F-family book strategies. This gate is Strategy B, a learned model, on the same post-2015 Neon bars. §14 perturbs a market a fixed rule trades; it cannot speak to what a model would have learned from losers absent from its training data, which is the sharper worry here. The harness could be pointed at this window, and has not been. Until it is, this gap stays **unquantified** — §14's number must not be read across.
 
 ### sim: trade rules and the book engine (P7a)
 

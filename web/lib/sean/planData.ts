@@ -5,7 +5,9 @@
  */
 import { cache } from 'react';
 import { sql } from '@/lib/db';
+import { cashUsd, OWNER_MONTHLY, OWNER_USD_IDR } from '@/lib/sean/cash';
 import { ledgerOrders } from '@/lib/sean/data';
+import { orderSession } from '@/lib/sean/ledger';
 import {
   buildReminders, outsideShares, planOrders, resizes, sharesBySymbol,
   type ReminderMark, type ReminderPlan, type Side, type Target,
@@ -124,6 +126,18 @@ export async function latestCloses(symbols: string[]): Promise<Map<string, numbe
   return out;
 }
 
+/**
+ * The newest USD/IDR rate the engine has stored (fx_rates, written by the data workflows), used to
+ * put the owner's rupiah contributions into dollars. Falls back to OWNER_USD_IDR -- the rate his
+ * real 10,000,000 IDR was converted at -- when the table is empty, so a missing row costs accuracy
+ * and never the page.
+ */
+export async function latestUsdIdr(): Promise<number> {
+  const [r] = await sql`SELECT usd_idr FROM fx_rates ORDER BY date DESC LIMIT 1`;
+  const rate = r === undefined ? NaN : Number(r.usd_idr);
+  return Number.isFinite(rate) && rate > 0 ? rate : OWNER_USD_IDR;
+}
+
 /** Everything /sean/plan shows once a method is followed. */
 export type PlanState = {
   link: SeanLink;
@@ -145,10 +159,21 @@ export async function planState(): Promise<PlanState | null> {
   const inPlan = planOrders(all, l.since);
   const held = sharesBySymbol(inPlan);
   const outside = outsideShares(sharesBySymbol(all), held);
-  const [marksDone, closes] = await Promise.all([
+  const [marksDone, closes, usdIdr] = await Promise.all([
     decision ? reminderMarks(l.strategyId, decision.sessionDate) : Promise.resolve([] as ReminderMark[]),
     latestCloses([...held.keys()]),
+    latestUsdIdr(),
   ]);
+  // The wallet, derived: the contribution schedule from the plan's own start date, less what the
+  // plan's orders have spent. `through` is today's New York date -- the same calendar plan
+  // membership is counted in (planOrders / orderSession), so the deposits and the orders are
+  // sliced consistently.
+  const cash = cashUsd({
+    schedule: { ...OWNER_MONTHLY, startDate: l.since },
+    through: orderSession(new Date().toISOString()),
+    usdIdr,
+    orders: inPlan.map(o => ({ side: o.side, totalUsd: o.totalUsd })),
+  });
   const plan = buildReminders({
     sessionDate: decision?.sessionDate ?? l.since,
     targets: decision?.targets ?? [],
@@ -157,6 +182,7 @@ export async function planState(): Promise<PlanState | null> {
     outside,
     closes,
     budgetUsd: l.budgetUsd,
+    cashUsd: cash,
     orders: inPlan.map(o => ({ symbol: o.symbol, side: o.side, executedAt: o.executedAt, price: o.price })),
     marks: marksDone,
   });

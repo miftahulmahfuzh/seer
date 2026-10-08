@@ -1,7 +1,7 @@
 # Package: seer-web
 
 **Location**: `web` (Next.js app router; package name `seer-web`, private)
-**Last Updated**: 2026-10-08 (P1-WEB-4TQ7: the blank panel is gone. A new pure, tested classifier `lib/decision.ts` names which of five situations "nothing to act on" is — paper paused, never started, the nightly late, the last decision spent, nothing due — and says in WIB when the next decision is due, from the cron slots of `.github/workflows/nightly.yml`. Positions renders a `Standing` sheet for each, keeps an expired decision visible as a `SpentDecision` record stripped of every order-ticket field, and never lets a retired strategy's pending row read as a live instruction; Today splits the old single coral alarm into a real alarm (never ran / late) and a calm `waiting` sheet. `lib/session.ts` gains `wibTime` and exports `addDays`. Earlier: P1-ROOT-XA2W, Sean phase 5: the `/sean/plan` tab — follow one roster book method (`sean_link`), buy/sell/add/trim reminders against the plan's holdings (pure `lib/sean/reminders.ts`, server reads in `lib/sean/planData.ts`), hand-made done marks (`sean_reminder_marks`), the Plan tab badge and a coral reminder dot on Seer's Sean buttons (`Nav`, `AppHeader`). Earlier: P1-ROOT-8JIM, Sean phase 3: the `/sean` Overview — stats row, daily profit-and-loss line from `sean_equity` with a live point or an order-only fallback, holdings table, empty state — via `app/sean/overview.ts` and `lib/sean/overviewData.ts`. Earlier: P1-ROOT-AUY5, Sean phase 1: migration `015_sean.sql` and the pure, DB-free foundation of Sean, the owner's real Gotrade trade tracker, under `lib/sean/` — receipt parsing and checking, the glm-4.6v screenshot reader, the shared ledger, a dependency-free zip reader — plus the live smoke script `scripts/sean-vision-smoke.mjs`. No route or page uses them yet)
+**Last Updated**: 2026-10-08 (P1-WEB-V7XD: Sean's rotation plan is sized on holdings **plus cash**. A new pure module `lib/sean/cash.ts` derives the wallet — the owner's contribution schedule (10,000,000 IDR to start, +5,000,000 IDR on the 25th; `OWNER_MONTHLY`, deliberately the engine's own name) less what the plan's own orders spent — because a Gotrade receipt never shows a balance, so no code path reads one (`ledger.ts` is untouched); `planData.latestUsdIdr()` reads `fx_rates` and falls back to the measured `OWNER_USD_IDR` = 17,841. `buildReminders` sizes picks against `planValue + cashUsd` (`sean_link.budget_usd` survives as the manual override), `MIN_TRADE_USD` moves from a guessed $10 to a measured $25 (`trading_min / (2 × trading_rate)` from the engine's own fee constants), every amount is in dollars and never a share count, and the Plan tile now reads "Plan size" with its stocks-plus-cash split (`planSizeLine`, `cashLine`). Measured on the owner's real 2 November rotation: plan size $558.00 -> $838.16, each of 20 slots $27.90 -> $41.91. No migration, no schema change, no engine file touched. Earlier: P1-WEB-4TQ7: the blank panel is gone. A new pure, tested classifier `lib/decision.ts` names which of five situations "nothing to act on" is — paper paused, never started, the nightly late, the last decision spent, nothing due — and says in WIB when the next decision is due, from the cron slots of `.github/workflows/nightly.yml`. Positions renders a `Standing` sheet for each, keeps an expired decision visible as a `SpentDecision` record stripped of every order-ticket field, and never lets a retired strategy's pending row read as a live instruction; Today splits the old single coral alarm into a real alarm (never ran / late) and a calm `waiting` sheet. `lib/session.ts` gains `wibTime` and exports `addDays`. Earlier: P1-ROOT-XA2W, Sean phase 5: the `/sean/plan` tab — follow one roster book method (`sean_link`), buy/sell/add/trim reminders against the plan's holdings (pure `lib/sean/reminders.ts`, server reads in `lib/sean/planData.ts`), hand-made done marks (`sean_reminder_marks`), the Plan tab badge and a coral reminder dot on Seer's Sean buttons (`Nav`, `AppHeader`). Earlier: P1-ROOT-8JIM, Sean phase 3: the `/sean` Overview — stats row, daily profit-and-loss line from `sean_equity` with a live point or an order-only fallback, holdings table, empty state — via `app/sean/overview.ts` and `lib/sean/overviewData.ts`. Earlier: P1-ROOT-AUY5, Sean phase 1: migration `015_sean.sql` and the pure, DB-free foundation of Sean, the owner's real Gotrade trade tracker, under `lib/sean/` — receipt parsing and checking, the glm-4.6v screenshot reader, the shared ledger, a dependency-free zip reader — plus the live smoke script `scripts/sean-vision-smoke.mjs`. No route or page uses them yet)
 
 ## Overview
 
@@ -20,7 +20,8 @@ A third section, **Sean**, is being built (plan `sean-gotrade-tracker`, 7 phases
 owner's *real* Gotrade trades from "Order Summary" screenshots and shows real profit and loss.
 Phase 1 landed its schema (`db/migrations/015_sean.sql`) and pure modules (`lib/sean/`); phase 2
 the owner-only section and Trades upload; phase 3 the Overview (`/sean`); phase 5 the Plan
-(`/sean/plan`: follow one roster method, buy/sell reminders). See [Sean](#sean-sean-libsean).
+(`/sean/plan`: follow one roster method, buy/sell reminders sized on holdings plus derived cash).
+See [Sean](#sean-sean-libsean).
 
 **Key Responsibilities:**
 - Google sign-in locked to exactly one allowlisted account (`auth.ts`, `lib/allow.ts`)
@@ -133,8 +134,9 @@ web/
       fixtures/receipts.json  four real receipts transcribed by hand, raw + expected SeanOrder
       fixtures/ledger.json    shared ledger fixture (contract B), replayed by web and engine tests alike
       overviewData.ts       phase 3, server only (Neon): equity() -> EquityRow[] (sean_equity, oldest first), marks() -> LatestMark[] (newest sean_marks close per symbol)
-      reminders.ts          phase 5, pure: buildReminders (sell/trim/buy/add vs the plan), planOrders, sharesBySymbol, outsideShares, resizes, RESIZING_RULES, MIN_TRADE_USD
-      planData.ts           phase 5, server only (Neon): linkableMethods, link, latestTargets, reminderMarks, latestCloses, planState, openReminderCount (React cache, 0 on any failure)
+      cash.ts               phase 10, pure: the derived wallet — OWNER_MONTHLY (mirrors the engine's schedule), OWNER_USD_IDR, depositDates, depositedIdr, depositedUsd, netSpentUsd, cashUsd
+      reminders.ts          phase 5, pure: buildReminders (sell/trim/buy/add vs the plan, sized on holdings + cash), planOrders, sharesBySymbol, outsideShares, resizes, RESIZING_RULES, MIN_TRADE_USD ($25, derived)
+      planData.ts           phase 5, server only (Neon): linkableMethods, link, latestTargets, reminderMarks, latestCloses, latestUsdIdr, planState, openReminderCount (React cache, 0 on any failure)
     *.test.ts               vitest suites for every pure module
   scripts/
     migrate.mjs             applies ../db/migrations/*.sql once each (schema_migrations)
@@ -427,6 +429,9 @@ Sean (phase 1, no route yet): screenshot (or a .zip of them, unzip.readZip) -> r
   pnlSeries) -> OverviewBody (Stat row, LineChart, holdings table | empty state)
 /sean/plan (phase 5): sean_link + book_targets (newest session) + data.ledgerOrders (split at `since`) + sean_marks
   + sean_reminder_marks -> planData.planState -> reminders.buildReminders -> plan page (to do / done, holdings)
+  cash (phase 10): OWNER_MONTHLY schedule (dated from sean_link.since) + fx_rates (planData.latestUsdIdr,
+    else OWNER_USD_IDR) − the plan's own orders -> cash.cashUsd -> planSize = planValue + cashUsd
+    (sean_link.budget_usd overrides); no receipt is ever read for a balance
   owner taps link / settings / done / undo -> plan/actions.ts -> sean_link | sean_reminder_marks -> revalidatePath('/sean', 'layout')
   planData.openReminderCount -> SeanNav Plan badge, Nav rail dot, AppHeader phone dot
 journal_seen -> sera/seen.seenInsightIds -> journal/view.ts (unseen counts, unseen-then-seen order) -> the seven badges
@@ -664,17 +669,42 @@ held from outside the plan, `PlanSettings` and an unlink button.
   picks no longer name; **buy** a pick the plan does not hold, `weight × planSize` dollars (no amount
   without a plan size); **add / trim** only when `resizes(rulesId)` (the `RESIZING_RULES` mirror of
   the engine's `resize=True` presets), measured at the pick's decision price, and only when the gap
-  is at least `max(MIN_TRADE_USD` ($10), `RESIZE_BAND × planSize)`; no picks at all -> no reminders.
+  is at least `max(MIN_TRADE_USD` ($25, derived — see Gotchas), `RESIZE_BAND × planSize)`; no picks at
+  all -> no reminders.
   Order: sells, trims, buys, adds. A reminder is **done** (`'order'`) when an uploaded order of the
   same side and stock has a NY trade date on or after the decision session, or (`'mark'`) when the
-  owner marked it for that decision. `planSize` = `budgetUsd` when set, else the plan's current value.
+  owner marked it for that decision. **`planSize` is holdings plus cash**: `budgetUsd` when the owner
+  set one, else `planValue + cashUsd`, else `planValue` alone when the wallet cannot be derived (what
+  this did before phase 10), else null and buys carry no amount. `cashUsd` comes in from `./cash` and
+  is passed back out on the `ReminderPlan` for the page; it may be negative. Every amount is in
+  dollars and Sean never asks for a share count: prices drift between the decision's close and the
+  next open, and a fractional-dollar order absorbs that drift where a share count does not (the
+  roster's book rules are already `-frac`).
   Keys are `${sessionDate}:${symbol}:${side}`.
+- `lib/sean/cash.ts` (phase 10, pure): the wallet, **derived, never read**. A Gotrade receipt has no
+  balance printed on it, so no code path reads one and `lib/sean/ledger.ts` is unmodified. `cashUsd({
+  schedule, through, usdIdr, orders })` = `depositedUsd` − `netSpentUsd`, each to the cent: the
+  contribution schedule from `sean_link.since` through today's New York date (`orderSession`, the same
+  calendar plan membership is counted in), less what the plan's own orders took out (buys out, sells
+  in, fees already inside `totalUsd`) over the SAME `planOrders(all, since)` slice the reminders use.
+  `OWNER_MONTHLY` is the owner's own plan — 10,000,000 IDR to start, +5,000,000 IDR on `dayOfMonth` 25
+  (1–28, so every month has the day) — and carries **the engine's name on purpose**
+  (`engine/src/seer_engine/sim/contributions.py`), so one `grep -rn OWNER_MONTHLY` finds both halves of
+  the one schedule. `OWNER_USD_IDR` (17,841) is the rate the owner's real 10,000,000 IDR was actually
+  converted at, a fallback only. A schedule self-corrects where a number precomputed into
+  `budget_usd` cannot: the orders he uploads are subtracted from the same deposits, so next month's
+  cash is right even when his fills diverged from the plan. The wallet is left negative rather than
+  clamped — below zero means the schedule and the uploaded orders disagree, and hiding that would be
+  worse than showing it. Also `depositDates` / `depositedIdr` / `depositedUsd` / `netSpentUsd`.
 - `lib/sean/planData.ts` (server only, Neon; untested by design, the logic is in `reminders.ts`):
   `linkableMethods()` (active, `engine = 'book'`, not benchmark, with `lastPick`), `link()`
   (`sean_link` joined to `strategies`; `retired` when the method left the roster),
   `latestTargets(id)` (`book_targets` at its newest session, `pending` from `paper_state`),
   `reminderMarks`, `latestCloses(symbols)` (newest `sean_marks` close; named apart from phase 3's
-  `marks()`), `planState()` (null when nothing is followed; a retired method yields no picks), and
+  `marks()`), `latestUsdIdr()` (the newest `fx_rates` row, falling back to `cash.ts`'s `OWNER_USD_IDR`
+  so a missing row costs accuracy and never the page), `planState()` (null when nothing is followed; a
+  retired method yields no picks; it derives the wallet with `cashUsd` and hands it to
+  `buildReminders`), and
   `openReminderCount` — React-`cache`d so `(app)/layout.tsx`, `AppHeader` and `app/sean/layout.tsx`
   share one `planState()` per request, returning 0 when nothing is followed **or anything throws**.
 - `app/sean/plan/actions.ts` (server actions, each gated by `isSeanCaller()`): `linkMethod(prev,
@@ -687,6 +717,11 @@ held from outside the plan, `PlanSettings` and an unlink button.
   input guards `parseSince`, `parseBudget` (empty -> null, cap `MAX_BUDGET`), `parseSymbol`,
   `parseSide`, and the plain-words strings (`reminderTitle`, `reminderDetail`, `doneLine`,
   `picksLine`, `nextPickWords` via `cadenceOf(rulesId)`, `methodTitle`, `aboutUsd`, `todoLabel`, ...).
+  `planSizeLine(planSize, budgetUsd, cashUsd)` and `cashLine(planSize, cashUsd, budgetUsd)` word the
+  stocks-plus-cash split; both fall back (or go quiet) when the owner set a budget, since then the
+  split would be a guess, and both print cash through `signedUsd` when it is negative because `usd`
+  takes an absolute value. The page's middle tile is **Plan size** — what the picks are sized against
+  — not the old "Plan value", with `cashLine` beneath it.
 - `LinkPicker` / `PlanSettings` (client, `useActionState(linkMethod)`): the picker's start date
   defaults to the method's newest pick, so orders placed to follow it count.
 - The way the owner notices: `Nav` (desktop rail) and `AppHeader` (phone) put a coral dot on their
@@ -768,6 +803,19 @@ window lacks two month starts.
 - Sean never stores a screenshot. `image_sha256` and the `(symbol, side, executed_at, shares)` key are the only dedupe.
 - `lib/sean/vision.ts` and `readOrder.ts` take their config and `fetch` as arguments and never read a server env module, so they stay importable from vitest and the smoke script; keep the server-only part in the (phase 2) route.
 - `RESIZING_RULES` in `lib/sean/reminders.ts` is a hand mirror of the engine presets with `resize=True` (`engine/src/seer_engine/sim/rules.py`), like `SPLIT_CADENCE_RULES`; a resizing preset missing there silently gets no add/trim reminders. Its size band is `lib/cadence.ts`'s `RESIZE_BAND`.
+- `OWNER_MONTHLY` in `lib/sean/cash.ts` is a hand mirror of the engine's contribution schedule
+  (`engine/src/seer_engine/sim/contributions.py`), the way `RESIZING_RULES` mirrors `sim/rules.py`. It
+  carries the engine's name deliberately so one `grep -rn OWNER_MONTHLY` finds both halves; change the
+  amounts, the day of the month, or the rule that a deposit is dated on its calendar day in one place
+  and you must change the other. The one difference is on purpose: the engine lets the NYSE calendar
+  decide which session first spends the money, while Sean reports the wallet, where money counts from
+  the day it lands.
+- `MIN_TRADE_USD` is derived, not picked: `trading_min / (2 × trading_rate)` from the engine's own fee
+  constants (`sim/costs.py`; currently 0.10 and 0.002, so $25) — the point where the $0.10 floor stops
+  more than doubling the trading fee. Its comment states the derivation, not the number; if a fee
+  constant moves, redo the arithmetic instead of guessing a round number. Not $50 (where the floor
+  stops binding at all): an add's gap can never exceed its own slot, and the owner's slot is $41.91,
+  so a $50 floor would make an add structurally impossible rather than merely expensive.
 - `openReminderCount()` runs inside `(app)/layout.tsx`, which wraps every Seer page: it must never throw (it returns 0), and it relies on React `cache` so the layout and `AppHeader` do not each run `planState()`. A reminder only clears from an uploaded order dated on or after the decision session, so an order placed earlier needs a hand "done" mark.
 - The paper bar (3 months, 100 trades) on How it works is a constant in `app/sera/how/view.ts`, not snapshot data; change it there if design section 1 changes.
 

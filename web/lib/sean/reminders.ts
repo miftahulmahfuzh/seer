@@ -1,5 +1,6 @@
 /**
- * Sean's buy/sell reminders (plan phase 5, requirement R4).
+ * Sean's buy/sell reminders (plan phase 5, requirement R4; cash added in the Gotrade fee rebuild,
+ * phase 10 / R9).
  *
  * The followed roster method's newest picks (`book_targets` at its latest session) against the
  * owner's PLAN holdings: the orders whose New York trade date (ledger orderSession) is on or after
@@ -16,13 +17,38 @@
  *    the decision session, or a row the owner marked done for that decision.
  *  - no picks at all: no reminders (an empty decision is not an order to sell everything).
  *
+ * PLAN SIZE IS HOLDINGS PLUS CASH. The owner adds 5,000,000 IDR to his wallet every month, and a
+ * plan size taken from holdings alone cannot see it: on 2026-11-02 that is $280.16 of real money
+ * and every buy would be sized about a third short. `cashUsd` comes from ./cash, which derives the
+ * wallet from the contribution schedule and the plan's own orders, because ./ledger can never read
+ * a balance off a receipt. `budgetUsd` (sean_link.budget_usd) still overrides everything when the
+ * owner types a number in.
+ *
+ * Orders are always DOLLAR-DENOMINATED, never share counts: prices drift between the decision's
+ * close and the next open, and a fractional dollar order absorbs that drift where a share count
+ * does not. The roster's book rules are already `-frac`.
+ *
  * Pure: no database, relative imports only (vitest has no `@/` alias).
  */
 import { RESIZE_BAND } from '../cadence';
 import { buildLedger, orderSession, type LedgerOrder } from './ledger';
 
-/** An add or trim smaller than this is not worth Gotrade's fees ($0.10 minimum + regulatory + PPN). */
-export const MIN_TRADE_USD = 10;
+/**
+ * An add or a trim smaller than this is not worth Gotrade's fees. Derived from the schedule's own
+ * two constants (engine sim/costs.py, current regime: `trading_rate = 0.002`, `trading_min = 0.10`),
+ * not chosen: the $0.10 floor charges a premium of `0.10 − 0.002 × amount` over what the rate alone
+ * would take, and that premium stops exceeding the rate's own charge at
+ * `0.10 / (2 × 0.002)` = $25. So at $25 the floor at most doubles the trading fee; below it, it
+ * more than doubles it, and at $10 it quintuples it ($0.10 charged where the rate earns $0.02).
+ *
+ * Measured round trip (buy fee + sell fee over the amount, `costs.fee_parts` on the current
+ * regime, 2026-10-08): $10 pays 2.500%, $25 pays 1.080%, $50 pays 0.620%, $560 pays 0.534%.
+ *
+ * Not $50, which is where the floor stops binding altogether (0.10 / 0.002): the owner's plan size
+ * on 2026-11-02 is $838.16 over 20 names, a $41.91 slot, and an add's gap can never exceed its own
+ * slot -- a $50 floor would make an add structurally impossible rather than merely expensive.
+ */
+export const MIN_TRADE_USD = 25;
 
 /** Shares below this are a closed position (contract B). */
 export const CLOSED_SHARES = 1e-9;
@@ -102,8 +128,14 @@ export type ReminderInput = {
   outside: ReadonlyMap<string, number>;
   /** Latest daily close per stock (sean_marks). */
   closes: ReadonlyMap<string, number>;
-  /** sean_link.budget_usd: the owner's plan size; null = what the plan holds now. */
+  /** sean_link.budget_usd: the owner's manual override; null = derive the plan size. */
   budgetUsd: number | null;
+  /**
+   * The wallet (./cash cashUsd): deposits so far less what the plan's orders spent. null when it
+   * cannot be derived, and then the plan size falls back to holdings alone, as it did before
+   * phase 10. May be negative.
+   */
+  cashUsd: number | null;
   /** The plan's orders, oldest first. */
   orders: readonly PlanOrderLite[];
   /** The owner's done marks (any decision; only this decision's count). */
@@ -113,7 +145,12 @@ export type ReminderInput = {
 export type ReminderPlan = {
   /** Σ plan shares × price. */
   planValue: number;
-  /** budgetUsd when set, else planValue when above zero, else null (buys carry no amount). */
+  /** The wallet as it was given (ReminderInput.cashUsd), passed through for the page. */
+  cashUsd: number | null;
+  /**
+   * What each pick's weight is multiplied by: budgetUsd when the owner set one, else
+   * planValue + cashUsd, else planValue, else null (and then buys carry no amount).
+   */
   planSize: number | null;
   /** The plan's open positions, largest first. */
   holdings: PlanHolding[];
@@ -194,8 +231,12 @@ export function buildReminders(input: ReminderInput): ReminderPlan {
   }
   holdings.sort((a, b) => b.value - a.value || a.symbol.localeCompare(b.symbol));
   const planValue = holdings.reduce((sum, h) => sum + h.value, 0);
+  // Holdings plus the wallet: the money that is going to be spread over the picks, not just the
+  // money already in them. The owner's override wins; cash that cannot be derived falls back to
+  // holdings alone, which is what this did before phase 10.
+  const funded = input.cashUsd === null ? planValue : planValue + input.cashUsd;
   const planSize =
-    input.budgetUsd !== null && input.budgetUsd > 0 ? input.budgetUsd : planValue > 0 ? planValue : null;
+    input.budgetUsd !== null && input.budgetUsd > 0 ? input.budgetUsd : funded > 0 ? funded : null;
 
   const drafts: Omit<Reminder, 'key' | 'done'>[] = [];
   if (targetBy.size > 0) {
@@ -234,6 +275,7 @@ export function buildReminders(input: ReminderInput): ReminderPlan {
   }));
   return {
     planValue,
+    cashUsd: input.cashUsd,
     planSize,
     holdings,
     reminders,

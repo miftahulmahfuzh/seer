@@ -13,7 +13,8 @@ import { markDone, undoDone, unlinkMethod } from './actions';
 import { LinkPicker } from './LinkPicker';
 import { PlanSettings } from './PlanSettings';
 import {
-  doneLine, methodTitle, outsideLine, picksLine, planSizeLine, reminderDetail, reminderTitle, todoLabel,
+  cashLine, doneLine, methodTitle, outsideLine, picksLine, planSizeLine, reminderDetail,
+  reminderTitle, todoLabel,
 } from './view';
 import s from './plan.module.css';
 
@@ -110,8 +111,9 @@ function Linked({ state }: { state: PlanState }) {
           </div>
           <div className={s.stats}>
             <Stat value={String(plan.open.length)} label="To do" size="md" tip="Reminders still waiting for you" />
-            <Stat value={usd(plan.planValue)} label="Plan value" size="md"
-              tip="What the stocks bought for this plan are worth, at the latest prices Sean has" />
+            <Stat value={plan.planSize === null ? '—' : usd(plan.planSize)} label="Plan size" size="md"
+              sub={cashLine(plan.planSize, plan.cashUsd, link.budgetUsd)}
+              tip="What the picks are sized against: the stocks this plan holds plus the cash you have added since it started" />
             <Stat value={`${heldPicks} of ${picks}`} label="Picks held" size="md"
               tip={`How many of ${link.short}'s picks your plan holds`} />
           </div>
@@ -141,7 +143,8 @@ function Linked({ state }: { state: PlanState }) {
           </Section>
         )}
 
-        <Section eyebrow={`Since ${shortDate(link.since)}`} title="Your plan" caption={planSizeLine(plan.planSize, link.budgetUsd)}>
+        <Section eyebrow={`Since ${shortDate(link.since)}`} title="Your plan"
+          caption={planSizeLine(plan.planSize, link.budgetUsd, plan.cashUsd)}>
           <PlanSettings since={link.since} budget={link.budgetUsd} />
           {plan.holdings.length === 0 ? (
             <p className={s.empty}>

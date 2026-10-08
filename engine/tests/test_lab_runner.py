@@ -10,12 +10,16 @@ from pathlib import Path
 import pytest
 from labkit import smoke_data
 
+from seer_engine.backtest import dev as dev_module
 from seer_engine.backtest.dev import Candidate, deflated_sharpe
 from seer_engine.backtest.market import Market
 from seer_engine.fundamentals import Fact, FundamentalPanel, coverage
+from seer_engine.commands.backtest_dev import month_end_curve
 from seer_engine.lab import runner, store
 from seer_engine.lab.method import Method, config_digest
+from seer_engine.lab.runner import OWNER_SCHEDULE_TEXT
 from seer_engine.lab.seed import seed
+from seer_engine.sim.contributions import OWNER_MONTHLY
 from seer_engine.sim.rules import DAILY_SWITCH, MONTHLY_HOLD
 from seer_engine.strategies.f_fundamental import FUNDAMENTAL, FundamentalParams
 from seer_engine.strategies.f_index import TIMING, TimingParams
@@ -271,3 +275,104 @@ def test_run_method_itself_does_not_gate(conn, data):
     """The gate lives in ``commands/lab._run``; ``run_method`` stays callable from a test."""
     ran = runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False)
     assert len(ran) == 2
+
+
+# ---- R2: the search is funded like the owner's account ---------------------------------------
+
+
+def test_a_run_records_one_funding_row_per_trial(conn, data):
+    """R2: every trial a funded run records carries what its deposits were and what they earned.
+
+    The existence of the row is the funded flag, so this asserts a row per trial and not a column
+    on `trials`. The numbers are the ones `trial_funding`'s CHECKs insist on -- deposits_usd > 0
+    and deposits_n >= 1 -- plus the money-weighted pair the gate reads.
+    """
+    ran = runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False)
+    rows = store.trials_of(conn, "M0001")
+    assert len(rows) == len(ran) == 2
+    assert conn.execute("SELECT count(*) FROM trial_funding").fetchone()[0] == 2
+    for r in rows:
+        f = store.funding_of(conn, r["n"])
+        assert f is not None, "a funded run records its funding beside the trial it judged"
+        assert f["trial_n"] == r["n"]
+        assert f["deposits_usd"] > 0 and f["deposits_n"] >= 1
+        assert f["mwr"] is not None and f["spy_tr_mwr"] is not None
+        assert f["schedule"] == OWNER_SCHEDULE_TEXT == "+5,000,000 IDR on the 25th of each month"
+        assert f["measured"] == r["run_at"]  # one measurement, one stamp
+        # The lie this phase ends: the total return counts the owner's own deposits as growth.
+        assert r["total_return"] > 1.0 and f["mwr"] < 1.0
+    # A second measurement of the same trial is refused by the store, not by luck.
+    with pytest.raises(store.LabError, match="already has recorded funding"):
+        with conn:
+            store.insert_funding(conn, [store.FundingRow(
+                trial_n=int(rows[0]["n"]), mwr=0.1, spy_tr_mwr=0.1, deposits_usd=1.0,
+                deposits_n=1, schedule="x", measured="2026-01-01T00:00:00Z",
+            )])
+
+
+def test_the_money_weighted_branch_judges_a_funded_trial(conn, data):
+    """The gate's money-weighted branch (`store._blocking`) is reachable and is what decides.
+
+    A funded trial is judged on `mwr` vs `spy_tr_mwr`; the same row with no funding falls back to
+    `total_return` vs `spy_tr_return`. Both branches are exercised on the same row, so this pins
+    that the switch is the funding row and nothing else.
+    """
+    runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False)
+    seen = set()
+    for r in store.trials_of(conn, "M0001"):
+        f = store.funding_of(conn, r["n"])
+        funded = store._blocking(r, f)
+        lump = store._blocking(r, None)
+        beats_mw = not any("money-weighted return" in m for m in funded)
+        beats_total = not any("total return" in m for m in lump)
+        seen.add((beats_mw, beats_total))
+        # Whichever way each decides, the funded branch must speak money-weighted and the
+        # unfunded one must speak total return. That is the branch, named.
+        assert all("total return" not in m for m in funded)
+        assert all("money-weighted return" not in m for m in lump)
+    assert seen, "at least one trial was judged"
+
+
+def test_the_recorded_trials_are_not_backfilled(conn, data):
+    """GOTRADE_FEE_REBUILD_PLAN.md D18: funding applies to newly run methods only.
+
+    The 54 seed rows this fixture carries stand in for the committed database's 128. A run must
+    add funding for its own trials and for nobody else's.
+    """
+    before = {r[0] for r in conn.execute("SELECT n FROM trials")}
+    assert before and all(store.funding_of(conn, n) is None for n in before)
+    runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False)
+    assert all(store.funding_of(conn, n) is None for n in before)
+    assert {r[0] for r in conn.execute("SELECT trial_n FROM trial_funding")}.isdisjoint(before)
+    assert store.test_looks(conn) == 0  # and no look was spent
+
+
+def test_the_recorded_funding_is_what_a_rerun_must_use(conn, data):
+    """`recorded_contributions` is the single answer every re-run path asks for.
+
+    `lab remeasure` and `lab costs` reproduce a recorded trial and refuse to write when the
+    re-run is not the same measurement; funding it wrongly is exactly that. The funded flag is the
+    row, so the answer is None for a seed trial and OWNER_MONTHLY for a trial this run recorded.
+    """
+    seeds = sorted(r[0] for r in conn.execute("SELECT n FROM trials"))
+    runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False)
+    for n in seeds:
+        assert runner.recorded_contributions(conn, n) is None
+    for r in store.trials_of(conn, "M0001"):
+        assert runner.recorded_contributions(conn, r["n"]) is OWNER_MONTHLY
+
+
+def test_trial_rows_with_no_deposits_records_no_funding(conn, data):
+    """The default is still a lump-sum book, and a lump-sum book has no funding row.
+
+    `deposits=()` is read as "no deposit anywhere", which is what makes every one of the 128
+    recorded trials describable by this code without a NULL to read two ways.
+    """
+    results: list = []
+    dev_rows = dev_module.run_registry(
+        data.market, data.dividends, data.spy_dividends, _method().candidates,
+        on_result=lambda i, result, row: results.append((row, month_end_curve(result.snapshots))),
+    )
+    assert len(dev_rows) == 2
+    ran = runner.trial_rows(conn, _method(), results, fingerprint="smoke", git_sha="x")
+    assert [r.funding for r in ran] == [None, None]

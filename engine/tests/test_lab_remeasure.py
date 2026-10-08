@@ -307,3 +307,32 @@ def test_the_cli_refuses_with_exit_2_and_loads_no_store(tmp_path, conn):
     )
     assert lab_cmd.run(args) == 2
     assert not (tmp_path / "nowhere").exists()
+
+
+def test_a_plan_that_mixes_funded_and_unfunded_trials_is_refused(conn, data, tmp_path):
+    """One `run_registry` call runs every candidate on one schedule, so a mixed plan has no
+    answer that reproduces both. It is refused before anything is re-run or written."""
+    import sqlite3 as _sqlite3
+
+    m = _method()
+    runner.run_method(conn, m, HERE, data, git_sha="x", require_commit=False)
+    ns = sorted(int(r["n"]) for r in store.trials_of(conn, m.id))
+    assert len(ns) >= 2 and all(store.funding_of(conn, n) is not None for n in ns)
+    # Drop one trial's funding row the only way the schema allows it to be absent: a database
+    # where it was never written. `trial_funding` has no-delete and no-update triggers, so this
+    # test builds the mixed state by copying the lab to a file and deleting with the triggers
+    # dropped -- a state a real run cannot produce, which is the point of refusing it.
+    path = tmp_path / "mixed.sqlite"
+    other = _sqlite3.connect(path)
+    conn.backup(other)
+    other.execute("DROP TRIGGER trial_funding_no_delete")
+    other.execute("DELETE FROM trial_funding WHERE trial_n = ?", (ns[0],))
+    other.commit()
+    other.close()
+    mixed = store.connect(path)
+    try:
+        plan = remeasure.preflight(mixed, m, HERE, require_commit=False)
+        with pytest.raises(store.LabError, match="received deposits"):
+            remeasure.measure(mixed, m, plan, data)
+    finally:
+        mixed.close()

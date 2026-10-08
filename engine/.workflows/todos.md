@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-08
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-08 15:18
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 103
+- Completed: 104
 
 ---
 
@@ -23,15 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ENG-FND7** Phase 2: The lab's search is funded like the owner's account
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `lab/runner.py:310` (`lab run`) and `:612` (`lab test`) passing `contributions=OWNER_MONTHLY`; the `FundingRow` construction and `store.insert_funding` call inside `run_method`'s existing `BEGIN IMMEDIATE`, stamped with the trial number `insert_trials` assigned; and the now-false docstring claim at `backtest/dev.py:594`. Per the index's reconciliation log it also takes the two GATE conditions funding would otherwise inflate — the Sharpe behind the DSR (`book_runner.py:536`) and max drawdown (`metrics.py:261`) — with unfunded paths taking today's code verbatim so unfunded runs stay byte-identical. Does not touch `sim/contributions.py`, `backtest/dev.py`'s behaviour (only its docstring), `store.py`'s funding API (already built and tested), any recorded row, or phase 1's constant. Exit criteria: a newly run method records one `trial_funding` row per trial with a non-null `deposits_usd`/`deposits_n` and an `mwr`; `funding_of` still returns None for all 128 pre-existing trials; the gate's money-weighted branch at `store.py:1428` is reachable and exercised by a test; `SELECT count(*) FROM trials` unchanged by the phase itself; both suites green.
-  - **Status**: in_progress
-  - **Plan Set**: `LAB_REALISTIC_GATE_PLAN.md` (phase 2 of 3)
-  - **Satisfies**: R2 — Make the lab's own search measure the owner's real funding (+5,000,000 IDR monthly on a 10,000,000 IDR start), not a book that never grows
-  - **Depends on**: P1-ENG-L4ND
-  - **Plan**: `.workflows/plan/P1-ENG-FND7.md`
 - [x] **P1-ENG-U9XK** Phase 12: The rebuilt roster, and the wiring layer
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -859,6 +850,25 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-FND7** Phase 2: The lab's search is funded like the owner's account
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `lab/runner.py:310` (`lab run`) and `:612` (`lab test`) passing `contributions=OWNER_MONTHLY`; the `FundingRow` construction and `store.insert_funding` call inside `run_method`'s existing `BEGIN IMMEDIATE`, stamped with the trial number `insert_trials` assigned; and the now-false docstring claim at `backtest/dev.py:594`. Per the index's reconciliation log it also takes the two GATE conditions funding would otherwise inflate — the Sharpe behind the DSR (`book_runner.py:536`) and max drawdown (`metrics.py:261`) — with unfunded paths taking today's code verbatim so unfunded runs stay byte-identical. Does not touch `sim/contributions.py`, `backtest/dev.py`'s behaviour (only its docstring), `store.py`'s funding API (already built and tested), any recorded row, or phase 1's constant. Exit criteria: a newly run method records one `trial_funding` row per trial with a non-null `deposits_usd`/`deposits_n` and an `mwr`; `funding_of` still returns None for all 128 pre-existing trials; the gate's money-weighted branch at `store.py:1428` is reachable and exercised by a test; `SELECT count(*) FROM trials` unchanged by the phase itself; both suites green.
+  - **Status**: completed
+  - **Plan Set**: `LAB_REALISTIC_GATE_PLAN.md` (phase 2 of 3)
+  - **Satisfies**: R2 — Make the lab's own search measure the owner's real funding (+5,000,000 IDR monthly on a 10,000,000 IDR start), not a book that never grows
+  - **Depends on**: P1-ENG-L4ND
+  - **Plan**: `.workflows/plan/P1-ENG-FND7.md`
+  - **Completed**: 2026-10-08 15:18
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/runner.py, engine/src/seer_engine/lab/remeasure.py, engine/src/seer_engine/lab/real_costs.py, engine/src/seer_engine/commands/lab.py, engine/src/seer_engine/backtest/dev.py, engine/src/seer_engine/backtest/book_runner.py, engine/src/seer_engine/backtest/metrics.py, engine/tests/test_lab_runner.py, engine/tests/test_lab_remeasure.py, engine/tests/test_lab_costs.py, engine/tests/test_lab_test_window.py, engine/tests/test_book_runner.py, engine/.workflows/todos.md, .workflows/todos.md
+  - **Verified**: `ruff check --select E9,F --ignore F401` over all 12 files -> All checks passed. Full engine suite in the worktree with `PYTHONPATH` set -> **3089 passed, 0 failed, 406 skipped** (phase 1 left 3079; +10 is exactly this phase's ten new tests, with no existing test changed, skipped or re-expected -- the suite-level proof that unfunded runs are byte-identical). Web suite: 48 files, 626 tests, all passed. Contamination check reproduced the plan's measured expectation character-for-character: unfunded `sharpe=0.2620 max_dd=0.1055 spy_tr_dd=0.2575 worst_day=+3.0697% deposits=0` / funded `sharpe=0.2904 max_dd=0.1034 spy_tr_dd=0.2555 worst_day=+3.0697% deposits=20`. End-to-end funded run on a throwaway database reproduced the plan's expected output exactly, including `schedule text: '+5,000,000 IDR on the 25th of each month'` and both `_blocking` branches. Committed database untouched: `lab/lab.sqlite` sha256 `6328a1fc4777107b1415734f5b73520ea51b2917b13a8df20c5a742e12221098`, unchanged from before the phase; read via `connect_readonly` so nothing migrated. trials 128, test-window looks 2, `trial_funding` rows 0, gate `methods` N=28. `git status --porcelain lab/ web/data/lab.json` is empty.
+  - **Drift**:
+    - Plan step 18 assumed a `remeasure.plan_for` helper; the module's real Plan builder is `remeasure.preflight(conn, method, path, require_commit=False)`. Used that, keeping the step's stated assertion `pytest.raises(store.LabError, match='received deposits')`. The plan's own implementer note on step 18 anticipated exactly this.
+    - Plan steps 2 and 4 quote `runner.py` line numbers measured before phase 1; every edit was re-located by function name as the plan's Baseline note instructs. Phase 1 had left `runner.py`'s three stale-policy prose lines untouched, as planned, so all three were corrected here.
+  - **Decided**:
+    - step 18's `remeasure.plan_for` does not exist -> used `remeasure.preflight`, the module's real Plan builder, assertion unchanged (rung 3: the plan's code blocks, including step 18's own implementer note)
+    - Verification names only the engine suite -> ran the web suite as well (rung 1: stated invariant 1, 'the tree builds and both suites pass at the end of each phase'). Web: 48 files / 626 tests passed.
 - [x] **P1-ENG-L4ND** Phase 1: Count the looks the data supports, and publish today's verdict
   - **Difficulty**: HARD
   - **Type**: Update

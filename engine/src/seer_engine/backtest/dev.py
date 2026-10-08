@@ -591,10 +591,15 @@ def run_registry(
     ``window`` defaults to ``DEV_WINDOW``; ``lab test`` is the only caller that passes another.
 
     ``contributions`` is the funding schedule every candidate is run on
-    (``sim.contributions.ContributionSchedule``), or None -- the default, and what every caller in
-    the tree passes, so every recorded trial and every gate run is byte-for-byte unchanged. When it
-    is given, the book is fed the deposits AND ``spy_curves`` receives the same dollars on the same
-    sessions, so "beats SPY TR" stays a comparison of two books holding the same money.
+    (``sim.contributions.ContributionSchedule``), or None -- the default, and a lump-sum book that
+    never grows. ``lab.runner.run_method`` and ``run_test`` pass ``OWNER_MONTHLY``, and
+    ``lab.name_count`` passes it unless ``--lump``; ``lab.remeasure`` and ``lab.real_costs`` pass
+    whatever the trial they are reproducing was recorded on
+    (``lab.runner.recorded_contributions``), so a recorded trial re-runs as the measurement it was.
+    Every one of the 128 trials recorded before the lab was funded has no ``trial_funding`` row and
+    re-runs unfunded, byte-for-byte as it did. When a schedule is given, the book is fed the
+    deposits AND ``spy_curves`` receives the same dollars on the same sessions, so "beats SPY TR"
+    stays a comparison of two books holding the same money.
     """
     _check_market(market, window)
     spy_divs = _check_dividends(dividends, spy_dividends, window)

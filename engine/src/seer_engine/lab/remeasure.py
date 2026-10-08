@@ -65,6 +65,7 @@ from seer_engine.backtest.registry import REGISTRY
 from seer_engine.commands.backtest_dev import daily_moments, registry_problem
 from seer_engine.lab import npolicy, store
 from seer_engine.lab.method import METHOD_ID, Method, config_digest, source_sha
+from seer_engine.sim.contributions import OWNER_MONTHLY
 
 log = logging.getLogger(__name__)
 
@@ -380,6 +381,14 @@ def measure(
     The dev window is not a parameter and not a choice. ``data`` is refused unless it *is* the dev
     window -- the mirror of ``runner.run_test``'s refusal of a dev store -- and ``dev.run_registry``
     is called with no ``window`` keyword, so the run is bounded by ``DEV_WINDOW`` by construction.
+
+    The **funding** is not a parameter either: it is read off the trials being reproduced. A trial
+    with a ``trial_funding`` row was run on ``sim.contributions.OWNER_MONTHLY`` and is re-run on
+    it; a trial without one was run on a lump sum and is re-run on a lump sum. Getting this wrong
+    is not a small error -- measured, an unfunded re-run of a funded trial reports an annualized
+    Sharpe of 0.26 against a recorded 2.65 and this module correctly refuses to write anything. A
+    plan that mixes the two is refused outright, because one ``run_registry`` call runs every
+    candidate on one schedule and there is no answer that reproduces both.
     """
     if data.window != research.DEV_WINDOW:
         w = data.window
@@ -388,13 +397,23 @@ def measure(
             f"({w.start}..{w.end}); `lab remeasure` re-runs the dev window and nothing else. "
             f"Build it with `python -m seer_engine research_store`"
         )
+    ns = tuple(sorted(plan.missing + plan.present))
+    funded = tuple(n for n in ns if store.funding_of(conn, n) is not None)
+    if funded and len(funded) != len(ns):
+        raise store.LabError(
+            f"{method.id}: trials {funded} received deposits and "
+            f"{tuple(n for n in ns if n not in funded)} did not, so one re-run cannot reproduce "
+            f"both. Nothing is backfilled"
+        )
+    contributions = OWNER_MONTHLY if funded else None
     rows: dict[str, DevRow] = {}
 
     def on_result(i: int, result: Any, row: DevRow) -> None:
         rows[config_digest(row.candidate)] = row
 
     dev.run_registry(
-        data.market, data.dividends, data.spy_dividends, plan.candidates, on_result=on_result
+        data.market, data.dividends, data.spy_dividends, plan.candidates,
+        on_result=on_result, contributions=contributions,
     )
     out: list[Reproduced] = []
     for batch in plan.batches:

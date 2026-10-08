@@ -249,8 +249,21 @@ def measure(
     candidate: Candidate,
     trial: Mapping[str, Any],
     data: research.ResearchData,
+    *,
+    contributions: Any = None,
 ) -> Comparison:
-    """Run ``candidate`` at both cost models on the dev window. Writes nothing anywhere."""
+    """Run ``candidate`` at both cost models on the dev window. Writes nothing anywhere.
+
+    ``contributions`` is the funding the **recorded** trial ran on -- resolve it with
+    ``lab.runner.recorded_contributions(conn, trial["n"])`` and pass it through, so the re-run is
+    the same measurement and ``Comparison.reproduced`` means what it says. Measured: re-running a
+    funded trial unfunded lands on a different total return, and the report then announces that
+    the store or the engine changed when neither did. None -- the default -- is right for every
+    trial recorded before the lab was funded, which is all 128 of them.
+
+    Both sides are fed the same schedule, so the flat/Gotrade comparison is still a comparison of
+    one variant at two fee models and nothing else.
+    """
     if data.window != research.DEV_WINDOW:
         w = data.window
         raise store.LabError(
@@ -264,7 +277,10 @@ def measure(
     def on_result(i: int, result: Any, row: DevRow) -> None:
         rows[row.candidate.id] = row
 
-    dev.run_registry(data.market, data.dividends, data.spy_dividends, (flat, real), on_result=on_result)
+    dev.run_registry(
+        data.market, data.dividends, data.spy_dividends, (flat, real),
+        on_result=on_result, contributions=contributions,
+    )
     f, g = rows[flat.id], rows[real.id]
     return Comparison(
         method_id=method.id,

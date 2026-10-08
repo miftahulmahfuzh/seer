@@ -45,7 +45,14 @@ from typing import Any
 
 from seer_engine import dates
 from seer_engine.backtest.market import Market
-from seer_engine.backtest.metrics import YEAR_DAYS, Metrics, run_metrics, strategy_metrics
+from seer_engine.backtest.metrics import (
+    YEAR_DAYS,
+    Metrics,
+    external_cashflows,
+    flow_map,
+    run_metrics,
+    strategy_metrics,
+)
 from seer_engine.backtest.runner import INITIAL_IDR, RunResult, run_backtest
 from seer_engine.sim.book import (
     Book,
@@ -533,8 +540,30 @@ def _equities(snapshots: Sequence[tuple[date, Decimal, Decimal]]) -> list[tuple[
     return out
 
 
-def _daily_returns(equity: Sequence[tuple[date, float]]) -> tuple[float, ...]:
-    return tuple(cur / prev - 1.0 for (_, prev), (_, cur) in zip(equity, equity[1:]))
+def _daily_returns(
+    equity: Sequence[tuple[date, float]], cashflows: Sequence[tuple[date, float]] = ()
+) -> tuple[float, ...]:
+    """The session-over-session returns of the equity curve, net of external deposits.
+
+    A deposit is credited at the OPEN of the session it lands on and earns that session, so it
+    belongs in the DENOMINATOR of the return into that session: ``cur / (prev + flow_t) - 1``.
+    Without that term a deposit is recorded as a return, and these returns feed ``_sharpe`` ->
+    ``runner.daily_moments`` -> ``dev.deflated_sharpe`` -> the ``dsr`` the luck gate reads.
+    Measured on the smoke fixture, the naive form reported a single +50.00% session and an
+    annualized Sharpe of 2.652 for a book whose honest Sharpe is 0.262 -- a 10.1x inflation of a
+    GATE CONDITION, which is why this is adjusted and ``total_return``/``cagr`` are deliberately
+    not (``metrics.strategy_metrics``).
+
+    ``cashflows`` empty -- the default, and every unfunded run -- takes the original expression
+    unchanged, so the 128 recorded trials and every existing test are byte-identical.
+    """
+    if not cashflows:
+        return tuple(cur / prev - 1.0 for (_, prev), (_, cur) in zip(equity, equity[1:]))
+    flows = flow_map(cashflows)
+    return tuple(
+        cur / (prev + flows.get(d, 0.0)) - 1.0
+        for (_, prev), (d, cur) in zip(equity, equity[1:])
+    )
 
 
 def _sharpe(returns: Sequence[float]) -> float | None:
@@ -549,17 +578,38 @@ def _sharpe(returns: Sequence[float]) -> float | None:
     return mean / sd * math.sqrt(TRADING_DAYS)
 
 
-def _year_returns(equity: Sequence[tuple[date, float]]) -> tuple[tuple[int, float], ...]:
-    last_of_year: dict[int, float] = {}
-    for d, value in equity[1:]:
-        last_of_year[d.year] = value  # snapshots ascend, so the last one of a year wins
-    out: list[tuple[int, float]] = []
-    base = equity[0][1]
-    for year in sorted(last_of_year):
-        value = last_of_year[year]
-        out.append((year, value / base - 1.0))
-        base = value
-    return tuple(out)
+def _year_returns(
+    equity: Sequence[tuple[date, float]], cashflows: Sequence[tuple[date, float]] = ()
+) -> tuple[tuple[int, float], ...]:
+    """Calendar-year returns of the curve; **time-weighted** when the run received deposits.
+
+    With no cashflows this is end-of-year over end-of-previous-year, exactly as it always was --
+    the original code path, taken verbatim, so an unfunded run is byte-identical.
+
+    With deposits that ratio is not a return: measured on the smoke fixture a funded book reported
+    a "worst year" of +74.3%, which is the deposits being counted as growth. The funded branch
+    chains the cashflow-adjusted session returns inside each calendar year instead, which is the
+    time-weighted return of that year and is what ``worst_year`` is trying to say. ``worst_year``
+    is recorded and displayed but is **not** a gate condition (``dev.make_row``'s five checks are
+    beats-SPY, drawdown, profit factor, trades and owner inputs), so this corrects a published
+    number rather than a verdict.
+    """
+    if not cashflows:
+        last_of_year: dict[int, float] = {}
+        for d, value in equity[1:]:
+            last_of_year[d.year] = value  # snapshots ascend, so the last one of a year wins
+        out: list[tuple[int, float]] = []
+        base = equity[0][1]
+        for year in sorted(last_of_year):
+            value = last_of_year[year]
+            out.append((year, value / base - 1.0))
+            base = value
+        return tuple(out)
+    flows = flow_map(cashflows)
+    growth: dict[int, float] = {}
+    for (_, prev), (d, cur) in zip(equity, equity[1:]):
+        growth[d.year] = growth.get(d.year, 1.0) * (cur / (prev + flows.get(d, 0.0)))
+    return tuple((year, growth[year] - 1.0) for year in sorted(growth))
 
 
 def _turnover(notional: Decimal, equity: Sequence[tuple[date, float]]) -> float:
@@ -592,10 +642,11 @@ def _assemble(
     trade_pnl: Decimal,
     trade_fees: Decimal,
     dividends: Decimal,
+    cashflows: Sequence[tuple[date, float]] = (),
 ) -> RunStats:
     gross = trade_pnl + trade_fees
-    returns = _daily_returns(equity)
-    years = _year_returns(equity)
+    returns = _daily_returns(equity, cashflows)
+    years = _year_returns(equity, cashflows)
     worst = min(years, key=lambda yr: (yr[1], yr[0])) if years else None
     return RunStats(
         metrics=metrics,
@@ -635,11 +686,18 @@ def _run_result_stats(r: RunResult, rules: TradeRules = DESIGN_V0) -> RunStats:
         trade_fees += _fee("buy", o.fill_price, o.shares, rules) + _fee(
             "sell", o.exit_price, o.shares, rules
         )
-    return _assemble(run_metrics(r), equity, exposures, notional, costs, trade_pnl, trade_fees, _ZERO)
+    return _assemble(
+        run_metrics(r), equity, exposures, notional, costs, trade_pnl, trade_fees, _ZERO,
+        cashflows=external_cashflows(r),
+    )
 
 
-def _book_metrics(snaps: Sequence[tuple[date, float]], trades: Sequence[Trade]) -> Metrics:
-    base = strategy_metrics(snaps, [float(t.pnl_usd) for t in trades])
+def _book_metrics(
+    snaps: Sequence[tuple[date, float]],
+    trades: Sequence[Trade],
+    cashflows: Sequence[tuple[date, float]] = (),
+) -> Metrics:
+    base = strategy_metrics(snaps, [float(t.pnl_usd) for t in trades], cashflows)
     counts = {reason: 0 for reason in BOOK_EXIT_REASONS}
     days = 0
     for t in trades:
@@ -672,8 +730,10 @@ def _book_result_stats(r: BookResult) -> RunStats:
         for d, fee in fees_by_symbol.get(t.symbol, ()):
             if t.entry_date <= d <= t.exit_date:
                 trade_fees += fee
+    cashflows = external_cashflows(r)
     return _assemble(
-        _book_metrics(equity, trades), equity, exposures, notional, r.costs_usd, trade_pnl, trade_fees, r.dividends_usd
+        _book_metrics(equity, trades, cashflows), equity, exposures, notional, r.costs_usd,
+        trade_pnl, trade_fees, r.dividends_usd, cashflows=cashflows,
     )
 
 

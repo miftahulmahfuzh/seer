@@ -252,6 +252,13 @@ def strategy_metrics(
     are then not returns at all -- they are the recorded shape of the curve, which readers of the
     128 historical trials depend on. ``mwr`` is the number that answers "what did the money
     earn". See ``money_weighted_return``.
+
+    ``max_drawdown`` is **not** in that amnesty, and the asymmetry is the point. ``total_return``
+    and ``cagr`` are left contaminated deliberately, because they are the recorded shape of the
+    curve that readers of the 128 historical trials depend on, and ``mwr`` stands beside them with
+    the honest number. The drawdown has no such companion and is read directly as a go-live
+    condition, so for a funded run it is measured on the time-weighted index instead of on raw
+    equity -- a deposit must not be allowed to make a method look safer than it was.
     """
     wins = [p for p in pnls if p > 0]
     losses = [p for p in pnls if p <= 0]
@@ -260,9 +267,27 @@ def strategy_metrics(
 
     peak = -math.inf
     max_dd = 0.0
-    for _, equity in snaps:
-        peak = max(peak, equity)
-        max_dd = max(max_dd, (peak - equity) / peak)
+    if cashflows:
+        # A deposit raises the peak and refills the trough, so a funded run's drawdown measured on
+        # raw equity reads SAFER than the strategy was -- and `max_drawdown` is a gate condition
+        # (`tuning.MAX_DRAWDOWN`, re-derived by `lab.store.owner_failures` and `_blocking`).
+        # Measured on the smoke fixture: 7.96% on raw equity against 10.55% honest, and the DCA'd
+        # SPY benchmark damped from 25.75% to 10.59%. So the drawdown of a funded run is taken on
+        # the time-weighted wealth index -- the curve the strategy would have traced on one
+        # unchanging dollar -- built from the same cashflow-adjusted session growth
+        # `book_runner._daily_returns` uses. With no cashflows the branch below is skipped and the
+        # original loop runs unchanged, so every unfunded run is byte-identical.
+        flows = flow_map(cashflows)
+        index = 1.0
+        peak = index
+        for (_, prev), (d, cur) in zip(snaps, snaps[1:]):
+            index *= cur / (prev + flows.get(d, 0.0))
+            peak = max(peak, index)
+            max_dd = max(max_dd, (peak - index) / peak)
+    else:
+        for _, equity in snaps:
+            peak = max(peak, equity)
+            max_dd = max(max_dd, (peak - equity) / peak)
 
     first = snaps[0] if snaps else None
     last = snaps[-1] if snaps else None
@@ -329,6 +354,19 @@ def external_cashflows(r: Any) -> tuple[tuple[date, float], ...]:
     is the only edit.
     """
     return tuple((when, float(amount)) for when, amount in r.cashflows)
+
+
+def flow_map(cashflows: Sequence[tuple[date, float]]) -> dict[date, float]:
+    """``{session: total deposited that session}`` -- the one place deposits become a lookup.
+
+    Several deposits can share a session (a schedule the calendar lagged onto one open), so they
+    are summed rather than overwritten. Used by the cashflow-adjusted return and drawdown
+    computations in this module and in ``book_runner``.
+    """
+    out: dict[date, float] = {}
+    for when, amount in cashflows:
+        out[when] = out.get(when, 0.0) + float(amount)
+    return out
 
 
 def run_metrics(r: RunResult) -> Metrics:

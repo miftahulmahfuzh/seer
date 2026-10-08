@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (src layout: `engine/src/seer_engine`)
-**Last Updated**: 2026-10-08 (lab-realistic-gate, R1 (P1-ENG-L4ND): the luck gate deflates by distinct **methods**, not trial rows — `store.DSR_POLICY` and `npolicy.DEFAULT_POLICY` move `"all-trials"` -> `"methods"`, `remeasure.batches_of`'s N guard widens to a bounded range, and `lab --help` is un-broken)
+**Last Updated**: 2026-10-08 (lab-realistic-gate, R2 (P1-ENG-FND7): `lab run` and `lab test` run every candidate on the owner's real funding (`sim.contributions.OWNER_MONTHLY`) and record a `trial_funding` row per funded trial, and the returns and the drawdown the gate reads are cashflow-adjusted — a deposit is no longer counted as a return. Before that, R1 (P1-ENG-L4ND): the luck gate deflates by distinct **methods**, not trial rows — `store.DSR_POLICY` and `npolicy.DEFAULT_POLICY` move `"all-trials"` -> `"methods"`, `remeasure.batches_of`'s N guard widens to a bounded range, and `lab --help` is un-broken)
 
 ## Overview
 
@@ -46,6 +46,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - Real fees become the lab's rule (Sean plan, phase 7): `sim.rules` gains the two real-fee presets `MONTHLY_HOLD_FRAC_GOTRADE` (`monthly-hold-frac-gotrade`) and `MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE` (`monthly-rank-weekly-resize-frac-gotrade`), appended to `PRESETS` so `promote` can map a real-fee winner to a preset of its own id; they name `cost_model` in their canonical form and digest apart, while every flat preset still omits it. `lab/runner.preflight` now also raises `lab/real_costs.real_cost_problem`: from **M0031** on (`REAL_COST_SINCE = 31`) every variant must be a book rule set at `cost_model="gotrade"`, and methods up to M0030 keep their flat cost and pinned digests. For those older methods the new report-only `lab costs MNNNN` re-runs the best recorded dev variant (by MAR, or `--candidate`) at both cost models and journals one `observation` — no `trials` or `trial_moments` row, no status change, so the lab's N and `test_looks` do not move. On the Sean side, `sean/calibrate.py` and the read-only `sean calibrate` replay `sim.costs.fee_parts` over every stored `sean_orders` receipt (on its WIB date) and exit 1 when an order since the current fee regime is off by more than a cent in any part — the signal to add a new dated regime to `sim/costs.py`
 - The rebuilt roster, and the wiring layer (GOTRADE_FEE_REBUILD, phase 12): every live entry is replaced by a successor paying Gotrade's **measured** fees — `SPY-GT`, `C-GT`, `RMW-FR-GT`, `RAW-FR-GT`, `MOM-FR-GT`, `MVW-FR-GT` — as **new ids with fresh paper clocks** (`cost_model` is a `LEVERS_SINCE_PINS` lever, so editing a started entry would move its digest and `store.check_digest` would refuse its next night), with the six predecessors **retired, not deleted**. Migration 017 writes them; `paper/roster.py` gains the six ids, `BENCHMARK_SYMBOL`, `OWNER_FUNDING`, `PRE_FUNDING_IDS`, `BENCHMARK_COST_MODEL` / `benchmark_cost_model`, and a `spec` whose `funding` and benchmark cost keys are conditional so no pinned digest moves. The wiring: the night passes each entry's **own** `rules` into `settle_bracket` / `decide_bracket` / `repick`, `_step_benchmark` loads `SPY-GT` at its roster-stated cost model, the night accrues and credits the owner's contribution schedule (10,000,000 IDR to start, +5,000,000 IDR on the 25th) raising cash and equity together on all three engines, `paper/replay.py` replays the stored dated deposits instead of hard-coding `DESIGN_V0`, and `promote` dispatches the engine on `sim.rules.is_bracket`. `PAPER_PAUSED` stays `'true'`: the rebuilt roster sits inert, no `paper_start` is written and no session is stepped until the owner flips the switch himself
 - The gate counts the looks the data supports (lab-realistic-gate, R1): `store.DSR_POLICY` and `npolicy.DEFAULT_POLICY` move `"all-trials"` -> `"methods"`, so the luck test deflates by the number of **distinct methods** the lab has looked at — **N = 28** on the committed `lab/lab.sqlite`, not the 126 dev trial rows — floored at the measured participation ratio (`max(distinct_methods, ceil(participation_ratio))`; `ceil(2.338) = 3`, so the floor does not bind). The reason is not that 126 is a big number: a lab of 126 rows holds 28 ideas, and mean pairwise correlation 0.612 across them says the row count asserts an independence the curves contradict. The consequence that matters operationally is **locality** — a variation twin of an existing method adds 0 to N and a brand-new method adds 1, so re-running one method no longer perturbs every other method's verdict, which is what made the all-trials gate unusable as exploration continued. Nothing recorded is rewritten (`trials` still 128 rows, `test_looks` still 2, every row keeps the label of the bar it was judged under): the verdict is *derived*, so only the published verdicts move — six methods go `rejected` -> `dev-eligible` (M0002, M0007, M0011, M0019, M0024, M0030), `dev-eligible` 2 -> 8 and `rejected` 27 -> 21. Two consequences elsewhere in the package: `remeasure.batches_of`'s second guard had to widen from an equality to a bounded range, because the equality *was* the all-trials projection and would have refused every batch recorded under any other policy; and the lab test modules whose fixtures stamp `n_trials_at_run` with their own dev row count (`test_lab_prereg.py`, `test_lab_status.py`) now pin `DSR_POLICY = "all-trials"` in an autouse fixture, naming the assumption they already encoded rather than inheriting whatever the shipped constant happens to be. Shipped in the same phase: `lab --help`, dead on `main` since a bare `%` entered an argparse `help=` string, is fixed — see the Command contract
+- The search is run on the owner's real money, and a deposit stops counting as a return (lab-realistic-gate, R2): `lab run` and `lab test` now fund every candidate with `sim.contributions.OWNER_MONTHLY` — 10,000,000 IDR to start and +5,000,000 IDR on the 25th of every month — and record one `trial_funding` row per funded trial inside the **same** `BEGIN IMMEDIATE` that records the trial, so the gate's money-weighted branch judges a newly run method on `mwr` against a dollar-cost-averaged SPY instead of on a total return that counts the owner's own deposits as growth. New in `lab/runner.py`: `OWNER_SCHEDULE_TEXT` (built from `OWNER_MONTHLY` rather than typed out, so a recorded row can never state a schedule the run was not fed), `recorded_contributions(conn, trial_n)` and `Ran.funding`; `trial_rows` gains keyword-only `deposits=` / `schedule=` whose defaults reproduce its old output byte for byte. **Every re-run path resolves its funding through `recorded_contributions`** — `lab remeasure` and `lab costs` reproduce a recorded trial on the funding it actually ran on, and `remeasure.measure` refuses outright a plan that mixes funded and unfunded trials, because one `dev.run_registry` call runs every candidate on one schedule and no schedule reproduces both. The second half of the phase is the correction funding made necessary: a deposit is not a return, and two gate conditions were being computed off raw equity. `book_runner._daily_returns` and `_year_returns` are now cashflow-adjusted (`cur / (prev + flow_t) - 1`, through the new `metrics.flow_map`) and `metrics.strategy_metrics` measures a funded run's `max_drawdown` on the time-weighted wealth index. Measured on the smoke fixture, uncorrected: an annualized Sharpe of 2.6524 for a book whose honest Sharpe is 0.2620 — a 10.1x inflation feeding `trials.dsr` and the luck test — and a max drawdown of 0.0796 against an honest 0.1055; corrected, 0.2904 and 0.1034. `total_return` and `cagr` are left contaminated deliberately, because they are the recorded shape of the curve that readers of the 128 historical trials depend on and `mwr` stands beside them with the honest number. Nothing recorded moves: the 128 pre-existing trials have no `trial_funding` row, `store.funding_of` still answers None for every one of them, and an unfunded run takes the original expressions verbatim and is byte-identical
 
 ## Layout
 
@@ -114,7 +115,7 @@ engine/
       market.py             Membership, Market: bars, universe, FX and the point-in-time SEC fact panel in memory; EMPTY_FUNDAMENTALS, Market.with_fundamentals() (edgar-fundamentals)
       runner.py             run_backtest(), RunResult, survivorship(), ParamsSchedule (P3b)
       benchmark.py          SPY buy-and-hold, price-only and total-return
-      metrics.py            Metrics, strategy_metrics(), checklist() (web/lib/metrics.ts parity), metrics_through() (P3b)
+      metrics.py            Metrics, strategy_metrics(), checklist() (web/lib/metrics.ts parity), metrics_through() (P3b); money_weighted_return(), external_cashflows(), flow_map() for a run that received deposits (lab-realistic-gate R2)
       tuning.py             windows, the 81-run grid, select(fallback=), gate()
       walkforward.py        folds, 324 combinations, tune(), select_fold(), walk_forward(), diagnostics(), gate_p3b() (P3b)
       report.py             BacktestReport, render_markdown(), equity_csv(), equity_svg()
@@ -140,7 +141,7 @@ engine/
       method.py             a lab method file: METHOD, Candidate, METHOD_ID, discover(), config_digest(), source_sha()
       store.py              lab/lab.sqlite: committed and append-only; methods, trials, ideas, insights; TRANSITIONS, record_promotion(), best_dev_eligible() (build-promotion-path phase 3); PROMOTION_BASES, promotion_basis() and record_promotion's basis= / reason= (lab-luck-gate phase 6); the append-only trial_moments side table with MomentsRow, MOMENTS_COLUMNS, insert_moments(), moments_of(), SCHEMA_VERSION now "3" and the _v1_to_v2 / _v2_to_v3 migration ladder (lab-luck-gate phase 2); the **derived verdict** (lab-luck-gate phase 4) — DSR_MIN and DSR_POLICY as the gate's two constants, LUCK_LABEL_PREFIX / is_luck_label(), recorded_labels(), OWNER_INPUTS_LABEL / owner_failures(), sr_star(), recover_dsr(), dev_sharpe_variance(), dsr_at(), Gate / gate() / pending_gate(), Verdict / verdict(), best_dev_eligible() now judging on it, and the twice-guarded REEVALUATION_MARKER / Reevaluation / reevaluate_method() / reevaluate() behind the one new ('rejected','dev-eligible') transition
       npolicy.py            the luck gate's N policy (lab-luck-gate phase 1): POLICIES all-trials / methods / effective, DEFAULT_POLICY, correlation(), participation_ratio(), effective_n() -> NCount. Pure, reads only; `store.gate` is its one caller since lab-luck-gate phase 4
-      runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4). The luck test's N comes from store.pending_gate since lab-luck-gate phase 4; preflight() refuses a flat-cost variant from M0031 on (real_costs.real_cost_problem, Sean phase 7)
+      runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4). The luck test's N comes from store.pending_gate since lab-luck-gate phase 4; preflight() refuses a flat-cost variant from M0031 on (real_costs.real_cost_problem, Sean phase 7). Since lab-realistic-gate R2 both halves run on sim.contributions.OWNER_MONTHLY and record a trial_funding row: OWNER_SCHEDULE_TEXT, recorded_contributions(), Ran.funding, trial_rows(deposits=, schedule=)
       prereg.py             the docs/lab/prereg/MNNNN.md pre-registration: Prereg, render()/parse(), require_committed(), check_digest(), check_source(), promote_method() (build-promotion-path phase 3)
       remeasure.py          `lab remeasure`: re-runs a recorded method's variants on the dev window, proves the re-run reproduces each trial's recorded Sharpe and DSR, and appends trial_moments rows -- Batch, Plan, Reproduced, Report, resolve_method(), batches_of(), preflight(), measure(), check(), remeasure(), format_report() (lab-luck-gate phase 3); plus the P7a seed path, resumable and chunk-invariant -- SEED_PREFIX, SEED_METRICS, METRIC_TOL, SeedTrial, SeedPlan, SeedReport, SeedVerdict, is_seed_id(), seed_var_trials(), seed_preflight(), observe(), run_chunk(), reproduce(), remeasure_seed(), seed_verdicts(), format_seed_report() (lab-luck-gate phase 9)
       real_costs.py         `lab costs` (Sean phase 7): REAL_COST_SINCE = 31, requires_real_cost(), real_cost_problem() (the M0031 rule runner.preflight raises); resolve_method(), pick_candidate(), twins(), Side, side_of(), Comparison, measure(), format_report(), insight_text(), journal(). Report only: writes one journal observation, never a trial
@@ -707,8 +708,17 @@ file, so `lab test` runs the file, not a database row.
 - **What a run records**: exactly one `trials` row with `window = 'test'`, appended with the status
   move in one `BEGIN IMMEDIATE` transaction, with `preflight_test` re-run inside the lock so a
   parallel session cannot win the same look twice. The candidate goes through `dev.run_registry` —
-  the same path, the same `prepare_for` dispatch and the same D8 row as `lab run`, with the window
-  as the only difference.
+  the same path, the same `prepare_for` dispatch and the same D8 row as `lab run`, and since
+  lab-realistic-gate R2 the same `sim.contributions.OWNER_MONTHLY` funding, with the window
+  as the only difference — so the look is judged money-weighted against a dollar-cost-averaged
+  SPY fed the identical dollars on the identical sessions. When the test window contains at least
+  one deposit date, a `trial_funding` row is written beside the trial **inside the same
+  transaction**: a raise there rolls the look back rather than spending it, and a spent look is
+  unrecoverable. The `if cash:` guard is load-bearing for the same reason — `trial_funding` CHECKs
+  `deposits_usd > 0`, so an unconditional insert would fail a look that had nothing wrong with it
+  on a window with no 25th in it. The funding changes nothing about when or whether the look is
+  spent: `insert_trials` is still the first write inside the one `BEGIN IMMEDIATE` and every
+  refusal is the same refusal in the same order.
 - **It does not move the lab's N.** `n_trials_at_run` is `store.dev_trial_count` as it already
   stands — still, after lab-realistic-gate R1, because this row is a `window = 'test'` row whose
   verdict has no DSR condition at all, so nothing ever deflates by the number stamped on it; only
@@ -768,6 +778,15 @@ nothing else. It is addressed by **method**, one at a time, on demand.
   *absolute* — a DSR is a probability). One divergent trial aborts the whole command: a partial
   backfill would mix moments measured on two different stores inside a table whose point is that a
   verdict can be recomputed from it.
+- **The funding is read off the trials, not chosen** (lab-realistic-gate R2). A trial with a
+  `trial_funding` row ran on `sim.contributions.OWNER_MONTHLY` and is re-run on it; a trial without
+  one ran on a lump sum and is re-run on a lump sum (`runner.recorded_contributions` is the same
+  answer by trial number). Getting this wrong is not a small error: an unfunded re-run of a funded
+  trial reports an annualized Sharpe of 0.26 against a recorded 2.65, and the Sharpe check above
+  then correctly refuses to write anything. A plan that **mixes** funded and unfunded trials is
+  refused outright, because one `dev.run_registry` call runs every candidate on one schedule and
+  there is no answer that reproduces both. All 128 trials recorded before R2 are unfunded, so every
+  backfill the command has ever done is unchanged.
 - **`var_trials` was never recorded and is still recovered exactly.** `remeasure.batches_of` groups
   a method's dev trials into the `lab run` batches that wrote them — one batch is one
   `BEGIN IMMEDIATE`, so its `trials.n` are contiguous — and rebuilds the prior daily Sharpes from
@@ -1038,7 +1057,14 @@ trade and at Gotrade's real fees (`sim/costs.py`) — prints both side by side, 
   changes.
 - The report says whether the recorded side reproduced the trial's total return (`REPRO_TOL`,
   relative 1e-9). If it did not, the store or engine changed, and the two re-runs still compare
-  with each other.
+  with each other. For that claim to mean anything the re-run must be the same measurement, so
+  since lab-realistic-gate R2 `real_costs.measure` takes a `contributions=` keyword and the command
+  fills it from `runner.recorded_contributions(conn, trial["n"])` — the funding the **recorded**
+  trial ran on, None for all 128 trials recorded before the lab was funded. Re-running a funded
+  trial unfunded lands on a different total return, and the report would then announce that the
+  store or the engine changed when neither did. Both cost models are fed the identical schedule, so
+  the flat/Gotrade comparison stays a comparison of one variant at two fee models and nothing
+  else.
 - Writes no `trials` or `trial_moments` row and no status. It prints the lab's N and
   `test_looks` before and after, and they are equal. A re-measure can never make a method
   eligible: a real-fee configuration is judged only through a new method (M0031 on).
@@ -1573,12 +1599,29 @@ the database.
   `ValueError`. `"flat"` leaves every curve unchanged. The paper benchmark
   (`paper/benchmark.py`) can be asked for the same two models since the fee rebuild's phase 3,
   but nothing passes it `"gotrade"` yet, so every live paper night is still flat.
-- **`backtest.metrics`**: `strategy_metrics(snaps, pnls) -> Metrics` and `checklist(m, spy_return)`,
+- **`backtest.metrics`**: `strategy_metrics(snaps, pnls, cashflows=()) -> Metrics` and
+  `checklist(m, spy_return)`,
   identical to `web/lib/metrics.ts` (a loss is `pnl ≤ 0`; PF = gross win / gross loss, `inf` with
   no loss; max drawdown on per-session equity; total return = last / first − 1;
   months = days / 30.44). Adds CAGR, average `days_held` and the exit-reason breakdown.
   `run_metrics(RunResult)`, `curve_metrics(BenchmarkCurve)`. `tests/test_backtest_metrics.py`
   replays every case in `web/lib/metrics.test.ts`.
+  A run that received deposits departs from that parity in exactly one place, and the asymmetry is
+  the point (lab-realistic-gate R2). `max_drawdown` is then measured on the **time-weighted wealth
+  index** — the curve the strategy would have traced on one unchanging dollar, chained from the
+  same `cur / (prev + flow_t) - 1` session growth `book_runner._daily_returns` uses — because a
+  deposit raises the peak and refills the trough, so raw equity reads *safer* than the strategy
+  was, and the drawdown is a go-live condition (`tuning.MAX_DRAWDOWN`, re-derived by
+  `lab.store.owner_failures`). Measured on the smoke fixture: 7.96% on raw equity against 10.55%
+  honest, with the DCA'd SPY benchmark damped from 25.75% to 10.59%. `total_return` and `cagr` are
+  *not* corrected, deliberately: they are the recorded shape of the curve that readers of the 128
+  historical trials depend on, and `mwr` (`money_weighted_return`, None exactly when the run
+  received no deposit) stands beside them as the number that answers what the money earned. The
+  drawdown has no such companion, which is why it is the one that moves. `external_cashflows(r)`
+  reads a result's deposits as `(session, usd)` pairs and `flow_map(cashflows)` is the shared
+  `{session: total deposited that session}` lookup, summing rather than overwriting when the
+  calendar lags two deposits onto one open. With no cashflows every expression above takes its
+  original form verbatim, so an unfunded run is byte-identical.
 - **`backtest.tuning`**: `IS_START = 2015-10-19` (the first session with 200 bars of history behind
   its `data_date`), `OOS_START = 2022-01-03` (in-sample ends 2021-12-31). `grid()`: the 81 params
   fixed before any result was seen — RSI `{5, 10, 15}` × limit `{0.25, 0.5, 0.75}` × TP
@@ -2079,6 +2122,10 @@ indefinitely** (decided 2026-10-08). This module is that plan as one frozen valu
   `(session, usd)` is appended to `cashflows`. `RunResult` and `BookResult` each gained exactly two fields for this —
   `contributions` (what the run was funded with) and `cashflows` (the dated series a money-weighted
   return is computed from). A deposit is money arriving, never a return.
+- **The lab is a caller since lab-realistic-gate R2.** `lab run` and `lab test` pass `OWNER_MONTHLY`
+  through `dev.run_registry`, so every newly recorded trial is a funded run; `lab remeasure` and
+  `lab costs` pass whatever the trial they are reproducing was recorded on
+  (`lab.runner.recorded_contributions`). `backtest_dev` and `lab names --lump` still pass None.
 
 ### strategies: allocators and the P7a families
 
@@ -2358,6 +2405,20 @@ the injected death is abrupt, which makes the whole result an **upper bound** on
   under `cost_model="gotrade"`; always the flat rate for a `DESIGN_V0` RunResult), `gross_pnl_usd`, `cost_drag`, `dividends_usd`,
   `daily_returns`, `sharpe` (population stdev, x sqrt(252)), `year_returns` and `worst_year`.
   Floats exist only here, summed left to right as in `backtest.metrics`.
+  For a **funded** run — `cashflows` non-empty, which since lab-realistic-gate R2 is every
+  `lab run` and `lab test` — `_daily_returns` and `_year_returns` are cashflow-adjusted:
+  a deposit is credited at the OPEN of the session it lands on and earns that session, so it
+  belongs in the DENOMINATOR of the return into that session (`cur / (prev + flow_t) - 1`,
+  `metrics.flow_map`), and a calendar year's return is chained from those session returns — the
+  time-weighted return of the year — instead of taken end-over-end. A deposit is money arriving,
+  never a return: uncorrected, the smoke fixture reported a single +50.00% session, an annualized
+  Sharpe of 2.6524 for a book whose honest Sharpe is 0.2620, and a "worst year" of +74.3%. The
+  Sharpe one is a **gate condition**, not a display number — these returns feed
+  `commands.backtest_dev.daily_moments` -> `dev.deflated_sharpe` -> the `trials.dsr` the luck gate
+  reads — while `worst_year` is recorded and displayed but is none of `dev.make_row`'s five
+  checks, so correcting it moves a published number rather than a verdict. With no cashflows both
+  functions take their original expressions verbatim, so every unfunded run, every existing test
+  and all 128 recorded trials are byte-identical.
 
 ### backtest: dev runner, report and registry (P7a)
 
@@ -2390,7 +2451,8 @@ here is pure, and the purity glob covers it; the one writer is `backtest.io.writ
     family also starts no earlier than `MEMBERSHIP_START`, and no candidate opens before
     `window.start` — a floor that can never bind on the dev window, whose start is `date.min`.
   - `run_candidate(market, dividends, spy_dividends, c, *, prepared=None, window=DEV_WINDOW)` and
-    `run_registry(market, dividends, spy_dividends, registry, *, on_result=None, window=DEV_WINDOW)`
+    `run_registry(market, dividends, spy_dividends, registry, *, on_result=None, window=DEV_WINDOW,
+    contributions=None)`
     run sequentially, in registry order, with one prepared value per allocator id — built by
     `strategies.allocator.prepare_for(allocator, market)` (edgar-fundamentals), so a `MarketAware`
     allocator gets the whole `Market` (fundamentals included) and every other one gets exactly the

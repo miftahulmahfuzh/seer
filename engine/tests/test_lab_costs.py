@@ -91,7 +91,10 @@ def test_measure_runs_the_variant_at_both_fees_and_writes_nothing(lab, data, rec
     conn, _ = lab
     before, notes = _untouched(conn), _insights(conn)
     c, trial = real_costs.pick_candidate(conn, recorded, None)
-    cmp = real_costs.measure(recorded, c, trial, data)
+    cmp = real_costs.measure(
+        recorded, c, trial, data,
+        contributions=runner.recorded_contributions(conn, int(trial["n"])),
+    )
     assert (cmp.flat.model, cmp.real.model) == ("flat", "gotrade")
     assert cmp.recorded_model == "flat" and cmp.reproduced is True
     assert cmp.real.candidate_id == f"{c.id}-GT"
@@ -147,7 +150,10 @@ def test_measure_refuses_a_test_window_store(lab, recorded):
 def test_the_journal_entry_is_one_plain_observation(lab, data, recorded):
     conn, _ = lab
     c, trial = real_costs.pick_candidate(conn, recorded, None)
-    cmp = real_costs.measure(recorded, c, trial, data)
+    cmp = real_costs.measure(
+        recorded, c, trial, data,
+        contributions=runner.recorded_contributions(conn, int(trial["n"])),
+    )
     before = _untouched(conn)
     with conn:
         entry = real_costs.journal(conn, cmp)

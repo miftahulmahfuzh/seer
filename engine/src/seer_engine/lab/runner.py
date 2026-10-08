@@ -4,10 +4,17 @@
 
 1. Refuse when the method file is not committed (its commit is the pre-registration), when the
    method has already run, or when any variant's configuration already has a dev trial.
-2. Run the variants through ``dev.run_registry`` on the research store (every D9 guard).
+2. Run the variants through ``dev.run_registry`` on the research store (every D9 guard), funded on
+   ``sim.contributions.OWNER_MONTHLY`` -- 10,000,000 IDR to start and +5,000,000 IDR on the 25th of
+   every month, the owner's real plan. The dollar-cost-averaged SPY TR curve receives the identical
+   dollars on the identical sessions, so "beats SPY TR" stays a comparison of two books holding the
+   same money, and one ``trial_funding`` row per variant records what the deposits earned. A trial
+   that received no deposit (a window with no 25th in it) gets no row, and no row means "this run
+   was not fed" -- which is true of all 128 trials recorded before this.
 3. Deflated Sharpe per trial with N resolved by ``store.DSR_POLICY`` through
-   ``store.pending_gate`` -- shipped as ``all-trials``, so N = every dev trial in the lab, this
-   batch included -- and the variance of the daily Sharpe across those trials.
+   ``store.pending_gate`` -- whatever that policy resolves to, projected over this batch -- and
+   the variance of the daily Sharpe across those trials. *What* N counts is the policy's business
+   and need not be a row count; this module never reads the policy's value, only the N it yields.
 4. Eligible = the five P7a D8 conditions and ``store.DSR_LABEL`` (DSR >= 0.90 since 2026-10-07;
    LAB_LUCK_GATE_PLAN.md Decision D1). Insert the trials, set the method's ``source_sha`` and
    status (``dev-eligible`` when any trial is eligible, else ``rejected``), all in one
@@ -42,18 +49,22 @@ import logging
 import sqlite3
 import statistics
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
+from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from seer_engine import research
 from seer_engine.backtest import dev
 from seer_engine.backtest.dev import Candidate, DevRow
+from seer_engine.backtest.metrics import external_cashflows
 from seer_engine.commands.backtest_dev import daily_moments, month_end_curve, registry_problem
 from seer_engine.fundamentals import coverage
 from seer_engine.lab import store
 from seer_engine.lab.method import METHOD_ID, Method, config_digest, config_text, source_sha
 from seer_engine.lab.real_costs import real_cost_problem
+from seer_engine.sim.contributions import OWNER_MONTHLY, ContributionSchedule
 from seer_engine.strategies.allocator import MarketAware
 
 if TYPE_CHECKING:  # typing only: prereg is imported inside the functions that use it, so
@@ -71,11 +82,43 @@ class Ran:
     None for this variant, which is exactly when ``trial.dsr`` is None -- a trial that never had
     a deflated Sharpe has no inputs to keep. It defaults to None so a caller that only cares
     about the trial can still build a ``Ran`` positionally.
+
+    ``funding`` is the same pattern for the same reason: ``trial_n=0`` until the insert, stamped
+    with ``dataclasses.replace`` afterwards, and None exactly when the variant received no
+    deposit. **The existence of the row is the funded flag** (``store.FundingRow``), so None here
+    must produce no row at all rather than a row of zeroes -- ``trial_funding`` CHECKs
+    ``deposits_usd > 0`` and ``deposits_n >= 1`` and would refuse one.
     """
 
     trial: store.TrialRow
     row: DevRow
     moments: store.MomentsRow | None = None
+    funding: store.FundingRow | None = None
+
+
+def _ordinal(n: int) -> str:
+    suffix = "th" if 11 <= n % 100 <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+#: The owner's funding in his own words, for ``trial_funding.schedule``. Built from
+#: ``OWNER_MONTHLY`` rather than typed out, so a reader of a recorded row can never be told a
+#: schedule the run was not actually fed. Measured: "+5,000,000 IDR on the 25th of each month".
+OWNER_SCHEDULE_TEXT = (
+    f"+{OWNER_MONTHLY.amount_idr:,.0f} IDR on the {_ordinal(OWNER_MONTHLY.day_of_month)} of each month"
+)
+
+
+def recorded_contributions(conn: sqlite3.Connection, trial_n: int) -> ContributionSchedule | None:
+    """The schedule trial ``trial_n`` was run on: ``OWNER_MONTHLY`` when funded, else None.
+
+    **Every path that re-runs a recorded trial must go through this**, because a re-run on the
+    wrong funding is not the same measurement: ``lab remeasure`` compares the re-run's annualized
+    Sharpe to the recorded one at 1e-9 relative, and ``lab costs`` compares total returns. The
+    funded flag is the existence of a ``trial_funding`` row (``store.funding_of``), not a column,
+    so None is the normal and meaningful answer for all 128 trials recorded before this phase.
+    """
+    return None if store.funding_of(conn, int(trial_n)) is None else OWNER_MONTHLY
 
 
 def git_head(cwd: Path) -> str:
@@ -185,15 +228,18 @@ def trial_rows(
     *,
     fingerprint: str,
     git_sha: str,
+    deposits: Sequence[Sequence[tuple[date, float]]] = (),
+    schedule: str = OWNER_SCHEDULE_TEXT,
 ) -> list[Ran]:
     """The trial rows for one method's dev results (``results``: (row, month-end curve)).
 
     The luck test's N is ``store.pending_gate(conn, method.id, len(results)).n`` -- the N the
     lab's ``store.DSR_POLICY`` resolves to, projected over this batch, which is the same N
     ``store.verdict`` re-reads these trials under. A trial run tonight and one recorded six weeks
-    ago are therefore judged by one bar, which is R2. Under the shipped ``all-trials`` policy it
-    is ``dev_trial_count(conn) + len(results)``, exactly the expression this function used before
-    the policy existed.
+    ago are therefore judged by one bar, which is R2. Under an ``all-trials`` policy that N is
+    ``dev_trial_count(conn) + len(results)``, the expression this function used before the policy
+    existed; under ``methods`` it is a count of distinct ideas. This function does not care which
+    -- it asks ``pending_gate`` and records the answer in ``n_trials_at_run``.
 
     ``n_trials_at_run`` records **the N the DSR was computed at**, which is what it has always
     meant (``lab promote`` prints it as "DSR ... at N = ..."). The raw dev row count is always
@@ -216,6 +262,19 @@ def trial_rows(
     evaluated once per variant and reused, instead of once for the batch Sharpe and again inside
     ``_dsr`` -- it is a pure function of the variant's daily returns, so hoisting it cannot move
     a number.
+
+    ``deposits`` is one ``metrics.external_cashflows(result)`` per entry of ``results``, in the
+    same order -- the deposits that run actually received, dated by the NYSE session they landed
+    on. A non-empty entry produces that trial's ``store.FundingRow``, carrying ``trial_n=0`` until
+    ``run_method`` stamps it, exactly as ``moments`` does. An empty entry produces None and
+    therefore no row, which is what "this run was not fed" is spelled as. ``deposits`` defaults to
+    ``()`` and is then read as "no deposit anywhere", so a caller that does not fund its runs gets
+    byte-for-byte what this function produced before the parameter existed.
+
+    ``schedule`` is the text written into ``trial_funding.schedule`` -- the owner's own words, so a
+    reader of the row never reconstructs the plan from the dates. It travels with ``deposits``
+    because the two describe one run: funding a batch on some other schedule and leaving this at
+    its default would record a sentence the run never obeyed.
     """
     prior = store.dev_daily_sharpes(conn)
     moments = [daily_moments(r.stats.daily_returns) for r, _ in results]
@@ -225,8 +284,11 @@ def trial_rows(
     n_trials = gate.n
     var_trials = statistics.variance(all_sharpes) if len(all_sharpes) >= 2 else None
     run_at = store.now_iso()
+    flows: list[Sequence[tuple[date, float]]] = list(deposits) if deposits else [()] * len(results)
+    if len(flows) != len(results):
+        raise ValueError(f"deposits has {len(flows)} entries for {len(results)} results")
     out: list[Ran] = []
-    for (row, curve), m in zip(results, moments, strict=True):
+    for (row, curve), m, cash in zip(results, moments, flows, strict=True):
         c = row.candidate
         met = row.stats.metrics
         t = len(row.stats.daily_returns)
@@ -281,7 +343,16 @@ def trial_rows(
             n_trials_at_run=n_trials,
             curve_json=store.curve_json(curve),
         )
-        out.append(Ran(trial=trial, row=row, moments=mom))
+        fund = None if not cash else store.FundingRow(
+            trial_n=0,  # insert_trials assigns it; run_method stamps this row with it
+            mwr=_f(met.mwr),
+            spy_tr_mwr=_f(row.spy_tr.mwr),
+            deposits_usd=float(sum(amount for _, amount in cash)),
+            deposits_n=len(cash),
+            schedule=schedule,
+            measured=run_at,
+        )
+        out.append(Ran(trial=trial, row=row, moments=mom, funding=fund))
     return out
 
 
@@ -297,21 +368,31 @@ def run_method(
     """Run ``method`` on the dev window and record it (see the module docstring)."""
     preflight(conn, method, path, require_commit=require_commit)
     results: list[tuple[DevRow, Any]] = []
+    deposits: list[Sequence[tuple[date, float]]] = []
 
     def on_result(i: int, result: Any, row: DevRow) -> None:
         results.append((row, month_end_curve(result.snapshots)))
+        cash = external_cashflows(result)
+        deposits.append(cash)
         m = row.stats.metrics
         log.info(
-            "[%d/%d] %s %s..%s: return %s vs SPY TR %s, max DD %s, PF %s, trades %d",
+            "[%d/%d] %s %s..%s: money-weighted %s vs DCA SPY TR %s (%d deposits, %.2f USD), "
+            "max DD %s, PF %s, trades %d",
             i + 1, len(method.candidates), row.candidate.id, row.start, row.end,
-            m.total_return, row.spy_tr.total_return, m.max_drawdown, m.profit_factor, m.trades,
+            m.mwr, row.spy_tr.mwr, len(cash), float(sum(a for _, a in cash)),
+            m.max_drawdown, m.profit_factor, m.trades,
         )
 
-    dev.run_registry(data.market, data.dividends, data.spy_dividends, method.candidates, on_result=on_result)
+    dev.run_registry(
+        data.market, data.dividends, data.spy_dividends, method.candidates,
+        on_result=on_result, contributions=OWNER_MONTHLY,
+    )
     store.begin_immediate(conn)  # lab-wide N and the inserts, atomic against parallel sessions
     with conn:
         preflight(conn, method, path, require_commit=False)  # a parallel session may have won a race
-        ran = trial_rows(conn, method, results, fingerprint=data.fingerprint, git_sha=git_sha)
+        ran = trial_rows(
+            conn, method, results, fingerprint=data.fingerprint, git_sha=git_sha, deposits=deposits
+        )
         status = "dev-eligible" if any(r.trial.eligible for r in ran) else "rejected"
         if store.get_method(conn, method.id) is None:
             store.add_method(
@@ -343,6 +424,16 @@ def run_method(
             replace(r.moments, trial_n=n)
             for n, r in zip(ns, ran, strict=True)
             if r.moments is not None
+        ])
+        # The deposits and what they earned, stamped the same way and in the same transaction, for
+        # the same reason: the money-weighted verdict and the trial it judges are one record. A
+        # variant that received no deposit contributes no row, and no row is how the lab says
+        # "this run was not fed" -- the answer `funding_of` gives for all 128 trials recorded
+        # before this, which this phase does not backfill (GOTRADE_FEE_REBUILD_PLAN.md D18).
+        store.insert_funding(conn, [
+            replace(r.funding, trial_n=n)
+            for n, r in zip(ns, ran, strict=True)
+            if r.funding is not None
         ])
         store.update_method(conn, method.id, source_sha=source_sha(path), status=status)
         for key in method.seen_keys:
@@ -582,10 +673,16 @@ def run_test(
     corrected.
 
     The candidate goes through ``dev.run_registry`` -- the same path, the same ``prepare_for``
-    dispatch and the same D8 row ``lab run`` uses, with the window as the only difference -- then
-    one ``trials`` row is appended and the method moves to ``test-passed`` or ``test-failed``, both
-    final, in one transaction. Every refusal is made before the store is loaded except the two the
-    store itself makes possible, and all of them spend nothing.
+    dispatch and the same D8 row ``lab run`` uses, on the same ``OWNER_MONTHLY`` funding, with the
+    window as the only difference -- then one ``trials`` row is appended, its ``trial_funding`` row
+    beside it, and the method moves to ``test-passed`` or ``test-failed``, both final, in one
+    transaction. Every refusal is made before the store is loaded except the two the store itself
+    makes possible, and all of them spend nothing.
+
+    **The funding changes nothing about when or whether the look is spent.** ``insert_trials`` is
+    still the first write inside the one ``BEGIN IMMEDIATE``, every refusal is the same refusal in
+    the same order, and the funding row is written inside that transaction -- so the look and its
+    record land together or not at all, exactly as the trial and the status move already did.
     """
     window = data.window
     if window.name != "test":
@@ -604,10 +701,10 @@ def run_test(
         )
     pre = preflight_test(conn, method, path, candidate, require_commit=require_commit)
 
-    captured: list[tuple[DevRow, Any]] = []
+    captured: list[tuple[DevRow, Any, Sequence[tuple[date, float]]]] = []
 
     def on_result(i: int, result: Any, row: DevRow) -> None:
-        captured.append((row, month_end_curve(result.snapshots)))
+        captured.append((row, month_end_curve(result.snapshots), external_cashflows(result)))
 
     dev.run_registry(
         data.market,
@@ -616,12 +713,15 @@ def run_test(
         (candidate,),
         on_result=on_result,
         window=window,
+        contributions=OWNER_MONTHLY,
     )
-    (row, curve), = captured
+    (row, curve, cash), = captured
     m = row.stats.metrics
     log.info(
-        "%s on the test window %s..%s: return %s vs SPY TR %s, max DD %s, PF %s, trades %d",
-        candidate.id, row.start, row.end, m.total_return, row.spy_tr.total_return,
+        "%s on the test window %s..%s: money-weighted %s vs DCA SPY TR %s (%d deposits, %.2f USD), "
+        "max DD %s, PF %s, trades %d",
+        candidate.id, row.start, row.end, m.mwr, row.spy_tr.mwr,
+        len(cash), float(sum(a for _, a in cash)),
         m.max_drawdown, m.profit_factor, m.trades,
     )
     store.begin_immediate(conn)  # the look and the status move, atomic against parallel sessions
@@ -632,6 +732,22 @@ def run_test(
         preflight_test(conn, method, path, candidate, pre=pre, require_commit=False)
         trial = test_trial_row(conn, method, row, curve, fingerprint=data.fingerprint, git_sha=git_sha)
         status = "test-passed" if row.eligible else "test-failed"
-        store.insert_trials(conn, [trial])
+        (n,) = store.insert_trials(conn, [trial])
+        # Inside this transaction on purpose: a raise here rolls the look back rather than
+        # spending it, and a spent test-window look is unrecoverable (`UNIQUE(config_digest,
+        # window)` plus the append-only triggers mean the configuration never gets a second one).
+        # The `if cash:` guard is load-bearing too -- an unconditional insert would hit
+        # `trial_funding`'s `deposits_usd > 0` CHECK on a window with no 25th in it and fail a
+        # look that had nothing wrong with it. Do not move either out of the transaction.
+        if cash:
+            store.insert_funding(conn, [store.FundingRow(
+                trial_n=n,
+                mwr=_f(m.mwr),
+                spy_tr_mwr=_f(row.spy_tr.mwr),
+                deposits_usd=float(sum(a for _, a in cash)),
+                deposits_n=len(cash),
+                schedule=OWNER_SCHEDULE_TEXT,
+                measured=trial.run_at,
+            )])
         store.update_method(conn, method.id, status=status)
     return Tested(trial=trial, row=row, status=status)

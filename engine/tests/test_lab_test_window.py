@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import date
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -20,8 +21,14 @@ from seer_engine.backtest.dev import Candidate, make_row
 from seer_engine.backtest.metrics import Metrics
 from seer_engine.lab import prereg, runner, store
 from seer_engine.lab.method import Method, config_digest, config_text
+from seer_engine.sim.contributions import OWNER_MONTHLY
 from seer_engine.sim.rules import MONTHLY_HOLD
 from seer_engine.strategies.f_index import TIMING, TimingParams
+
+#: Two deposits a funded look would have received, in the shape `BookResult.cashflows` carries:
+#: (session, Decimal USD), ascending, the opening cash excluded. The doubles return it so
+#: `metrics.external_cashflows` has something real to read and `run_test` writes a funding row.
+CASHFLOWS = ((date(2015, 10, 26), Decimal("2500.0000")), (date(2015, 11, 25), Decimal("2500.0000")))
 
 # ---- fixtures ---------------------------------------------------------------------------------
 
@@ -337,9 +344,11 @@ def test_a_passing_look_records_test_passed_and_a_dsr_that_is_not_a_condition(
     snaps = (SimpleNamespace(date=TEST_FIRST, equity_usd=100.0),
              SimpleNamespace(date=TEST_LAST, equity_usd=220.0))
 
-    def fake_run_registry(market, dividends, spy_dividends, registry, *, on_result=None, window=None):
+    def fake_run_registry(market, dividends, spy_dividends, registry, *,
+                          on_result=None, window=None, contributions=None):
         assert window.name == "test" and tuple(registry) == (c,)
-        on_result(0, SimpleNamespace(snapshots=snaps), row)
+        assert contributions is OWNER_MONTHLY  # the look is funded like the owner's account
+        on_result(0, SimpleNamespace(snapshots=snaps, cashflows=CASHFLOWS), row)
         return (row,)
 
     monkeypatch.setattr(runner.dev, "run_registry", fake_run_registry)
@@ -362,7 +371,7 @@ def test_a_passed_method_can_still_reach_paper(conn, monkeypatch, prereg_ok, pro
              SimpleNamespace(date=TEST_LAST, equity_usd=220.0))
     monkeypatch.setattr(
         runner.dev, "run_registry",
-        lambda *a, on_result=None, window=None, **k: (on_result(0, SimpleNamespace(snapshots=snaps), row), (row,))[1],
+        lambda *a, on_result=None, window=None, **k: (on_result(0, SimpleNamespace(snapshots=snaps, cashflows=CASHFLOWS), row), (row,))[1],
     )
     runner.run_test(conn, promoted, tmp_path / "x.py", c, smoke_test_data(),
                     git_sha="x", require_commit=False)
@@ -387,7 +396,7 @@ def test_the_promote_command_is_printed_filled_in(conn, monkeypatch, prereg_ok, 
              SimpleNamespace(date=TEST_LAST, equity_usd=220.0))
     monkeypatch.setattr(
         runner.dev, "run_registry",
-        lambda *a, on_result=None, window=None, **k: (on_result(0, SimpleNamespace(snapshots=snaps), row), (row,))[1],
+        lambda *a, on_result=None, window=None, **k: (on_result(0, SimpleNamespace(snapshots=snaps, cashflows=CASHFLOWS), row), (row,))[1],
     )
     tested = runner.run_test(conn, promoted, tmp_path / "x.py", c, smoke_test_data(),
                              git_sha="x", require_commit=False)

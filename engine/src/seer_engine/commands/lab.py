@@ -1527,7 +1527,7 @@ def _costs(conn, args) -> int:
     window and ``real_costs.journal`` appends one observation. Nothing else is written: N and the
     test-window looks are printed before and after so the invariant is visible, not just tested.
     """
-    from seer_engine.lab import real_costs
+    from seer_engine.lab import real_costs, runner
 
     method, _path = real_costs.resolve_method(args.method)
     candidate, trial = real_costs.pick_candidate(conn, method, args.candidate)
@@ -1550,7 +1550,10 @@ def _costs(conn, args) -> int:
             f"test-window store is refused here"
         ) from e
     log.info("research store %s loaded (%.1fs)", data.fingerprint[:12], time.perf_counter() - t0)
-    cmp = real_costs.measure(method, candidate, trial, data)
+    cmp = real_costs.measure(
+        method, candidate, trial, data,
+        contributions=runner.recorded_contributions(conn, int(trial["n"])),
+    )
     print(real_costs.format_report(cmp))
     with conn:
         entry = real_costs.journal(conn, cmp)

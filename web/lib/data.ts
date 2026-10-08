@@ -95,10 +95,15 @@ export async function strategies(): Promise<Strategy[]> {
       params->'backtest_gate' AS gate,
       COALESCE(params->'spec'->>'object', object_name) AS spec_object
     FROM strategies
-    -- A retired strategy that never traded on paper has no record to show (FND and the whole-share
-    -- F4/F1, retired 2026-10-07 before their first session): it is not part of the app at all.
-    -- A retired strategy WITH a paper record stays, marked, because the record is the evidence.
-    WHERE NOT (status = 'retired' AND paper_start IS NULL)
+    -- A retired strategy is not part of the app. The old rule kept one that had a paper_start,
+    -- on the reasoning that its paper record was the evidence -- but paper_start marks the night
+    -- an entry was CREATED, not a night it traded. Six entries retired by 017 had a start date and
+    -- zero stepped sessions, so all they held was the day-0 snapshot; the leaderboard computed a
+    -- return from that single unchanged point and rendered "+0.0% Total return" on 0 trades, which
+    -- reads as a result and means "never ran". Owner's call, 2026-10-08: purge them.
+    -- 018 deletes the rows as well, so this is the second of two locks: a future retirement can
+    -- never put a stale card back on the board.
+    WHERE status <> 'retired'
     ORDER BY sort, id`;
   return rows.map(toStrategy);
 }

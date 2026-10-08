@@ -75,9 +75,17 @@ jobs:
       #
       # WHAT REMAINS, and it is the owner's call alone: set this to 'false', commit and push. The
       # first scheduled night after that writes each -GT entry's spec and paper_start and the six
-      # clocks start together. The six predecessors are retired, so they stop trading that night;
-      # their rows, their specs and their un-stepped 2026-10-07 decisions are kept, never deleted.
-      PAPER_PAUSED: 'true'
+      # clocks start together. The six predecessors are retired, so they stop trading that night.
+      #
+      # RESUMED by the owner on 2026-10-08. All three conditions above held, the secrets are set,
+      # and CI on main is green. The six predecessors were purged rather than kept (migration 018):
+      # with zero stepped sessions they held no measurement, only a day-0 snapshot that the
+      # leaderboard was rendering as "+0.0% Total return" on 0 trades. Their 209 rows are backed up
+      # in .workflows/orchestration/gotrade-fee-rebuild/logs/pre-018-retired-purge.json.
+      #
+      # From here the clock runs. A full revert is no longer exact once a session has stepped --
+      # that property belonged to the pause and is now spent, by intent.
+      PAPER_PAUSED: 'false'
     steps:
       - name: Check secrets
         run: |

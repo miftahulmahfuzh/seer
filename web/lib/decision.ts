@@ -15,8 +15,10 @@
 import { addDays, nextUsSession } from './session';
 
 /**
- * Paper trading is switched off. Mirrors `PAPER_PAUSED` in `.github/workflows/nightly.yml`, which
- * stays the source of truth; `decision.test.ts` reads that file and fails when the two disagree.
+ * Whether paper trading is switched off. Mirrors `PAPER_PAUSED` in
+ * `.github/workflows/nightly.yml`, which stays the source of truth; `decision.test.ts` reads that
+ * file and fails when the two disagree — which is how this constant came to be flipped on
+ * 2026-10-08 rather than forgotten.
  *
  * It is deliberately NOT derived from the database. Measured against the live database on
  * 2026-10-08: the only candidate signature is "the latest run succeeded and its paper step never
@@ -26,7 +28,7 @@ import { addDays, nextUsSession } from './session';
  * exactly that signature for a different reason: paper had not started yet
  * (`strategies.paper_start = 2026-10-07`).
  */
-export const PAPER_PAUSED = true;
+export const PAPER_PAUSED = false;
 
 /**
  * The nightly's cron slots as UTC [hour, minute]: `17 6`, `41 9`, `41 12`. The first is when a

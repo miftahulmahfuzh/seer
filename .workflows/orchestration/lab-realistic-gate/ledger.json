@@ -1,0 +1,69 @@
+{
+  "branch": "feature/lab-realistic-gate",
+  "coordinator": "orch-lab-realistic-gate",
+  "coordinator_session_id": "53326c75-8555-45d7-b0d6-7a18c2bebbfb",
+  "created": "2026-10-08T07:45:49+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "engine.lab`, `engine.commands`, `web/data",
+      "plan": ".workflows/plan/lab-realistic-gate/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Count the looks the data supports, and publish today's verdict"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "engine.lab`, `engine.backtest",
+      "plan": ".workflows/plan/lab-realistic-gate/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The lab's search is funded like the owner's account"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": ".claude/skills",
+      "plan": ".workflows/plan/lab-realistic-gate/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "/redo-sera-experiments` \u2014 honest twins of named methods, in a batch"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/lab-realistic-gate/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "lab-realistic-gate",
+  "updated": "2026-10-08T07:45:49+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/lab-realistic-gate"
+}

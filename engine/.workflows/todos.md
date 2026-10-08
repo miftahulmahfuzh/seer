@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-08
-**Total Active Tasks**: 0
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 100
+- Completed: 101
 
 ---
 
@@ -23,6 +23,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [ ] **P1-ENG-U9XK** Phase 12: The rebuilt roster, and the wiring layer
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns the roster proper — `engine/src/seer_engine/paper/roster.py` (the successor `SEED_ROWS` entries, `OWNER_FUNDING`, `BENCHMARK_COST_MODEL`, `PRE_FUNDING_IDS`); `db/migrations/017_roster_real_fees.sql` (**this number**; phase 6 holds 016); `engine/tests/test_paper_roster.py`; `docs/runbooks/paper-trading.md`; and `.github/workflows/nightly.yml` — **the comment block at :46-69 only**, because phase 9's drift test and phase 11's `sed` both parse the `PAPER_PAUSED:` line's exact text. Also owns the **wiring layer** assigned by D10 and extended by D13, where phases 3, 4 and 6 each left their only production call site as a handoff: `commands/paper.py` (four `rules=e.rules`, `_step_benchmark`'s cost model, `accrue_contributions` + `apply_contributions` + the three engines' deposits), `commands/promote.py:275`'s `is_bracket` dispatch, `paper/store.py`'s `load_benchmark` at `:1127-1145` only, `paper/replay.py` (`:290` stops hard-coding `DESIGN_V0`; the three `expected_*` builders take the **stored dated deposits**, never the schedule — D18), and `commands/paper_check.py:200`. Does not touch `PAPER_PAUSED`'s value (invariant 2), does not retire C (invariant 4), does not edit a started entry (invariant 3), and touches nothing under `web/` — including phase 9's classifier, which it **verifies** and does not patch. Exit criteria: successor entries for all six live rows — the four quant books, **C**, and SPY — each paying Gotrade's measured fees and carrying the contribution schedule from their first night, as new ids with fresh clocks in the 010/011/013 migration style; N stays 20 (D3); the predecessors are marked retired, not deleted; `docs/runbooks/paper-trading.md:76`'s stale `cron 23:00 UTC Mon-Fri` fixed against the real `17 6 * * 2-6` (13:17 WIB); the resume-condition comment above `PAPER_PAUSED` rewritten to state what now holds — **the switch is not flipped** (D1). The wiring layer's own exits: `grep -c 'rules=e.rules' commands/paper.py` is **4** and `promote.py:275` reads `is_bracket(rules)`; `_step_benchmark` gets `SPY-GT`'s model through `roster.benchmark_cost_model(e.id)`, which takes the **id** and raises rather than defaulting; the night accrues once per entry and credits before each session, **raising cash and equity together** on all three engines; `paper/replay.py` carries no literal `DESIGN_V0` and replays the stored dated deposits; and a **retired** entry's pending decision renders as a record, never a live instruction (D16).
+  - **Status**: in_progress
+  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 12 of 12)
+  - **Satisfies**: R1, R4, R3 — rebuild the roster so every entry pays Gotrade's measured fees, SPY included, as new entries with fresh paper clocks; make the bracket path pay Gotrade's fees so the daily control C is honest, with C staying permanently; and measure what the owner will actually do — 10,000,000 IDR start, +5,000,000 IDR on the 25th of each month, contributions in backtest and paper, a money-weighted return, a dollar-cost-averaged SPY, every CAGR-phrased gate restated
+  - **Depends on**: P1-ENG-H2VK, P1-ENG-F6QN, P1-ENG-R7MD, P1-ENG-MWRQ
+  - **Plan**: `.workflows/plan/P1-ENG-U9XK.md`
 - [x] **P1-ENG-F6QN** Phase 4: The bracket path can express and charge Gotrade's fees
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -809,6 +818,29 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-N8SW** Phase 8: How many names, measured at real fees and real funding
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns the new `engine/src/seer_engine/lab/name_count.py` (the name-count sweep as a report-only module, not as registered lab variants, so the lab's N does not move); three additive hunks in `engine/src/seer_engine/commands/lab.py` (sole owner in this plan set — phase 7 does not touch that file); `engine/tests/test_lab_name_count.py`; and the measured answer written into `docs/backtests/` with its CSV — 5 files. Does not touch `engine/src/seer_engine/paper/roster.py` (phase 12; the rebuilt roster carries N = 20 whatever this measures, index Decision D3), promotes nothing, and does not write `lab/lab.sqlite`, so `web/data/lab.json` does not go stale. Borrows three names off the landed plans: phase 5's `sim.contributions.OWNER_MONTHLY`, phase 7's `dev.run_registry(contributions=…)` keyword and phase 7's `backtest.metrics.Metrics.mwr` field (D15). Exit: a measured comparison of name counts over the lab's dev window with `cost_model="gotrade"` **and** the owner's real contribution schedule both switched on, because the fee floor is size-dependent and the two interact; the answer written down in plain prose with the command that produced it. The fee argument is already settled and must not be re-run as the finding — by month 3 of the funding plan 20 names cost 0.614% and 11 names cost 0.612%; the merits question is whether concentration helps or hurts the returns.
+  - **Status**: completed
+  - **Plan Set**: `GOTRADE_FEE_REBUILD_PLAN.md` (phase 8 of 12)
+  - **Satisfies**: R2 — Decide how many names a monthly book holds on the merits, not on fee grounds — measured in the lab
+  - **Depends on**: P1-ENG-MWRQ (phase 7) — landed
+  - **Plan**: `.workflows/plan/P1-ENG-N8SW.md`
+  - **Completed**: 2026-10-08 12:20
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/name_count.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_name_count.py, docs/backtests/2026-10-08-how-many-names.md, docs/backtests/2026-10-08-how-many-names-grid.csv, engine/.workflows/todos.md, engine/.workflows/plan/P1-ENG-N8SW.md, engine/package_readme.md
+  - **Verified**: Phase tests `PYTHONPATH=engine/src python -m pytest engine/tests/test_lab_name_count.py -q` -> **21 passed, 1 skipped** (the skip is the env-gated live sweep). Live sweep un-gated with `SEER_LAB_NAMES_LIVE=1 SEER_RESEARCH_STORE=/home/miftah/seer/engine/.research ... -k research_store` -> **1 passed in 34s**. Full engine suite measured in a **throwaway worktree** rather than this shared one, because 31 failures are present here from a peer's uncommitted work: at HEAD -> **3456 passed, 1 skipped, 0 failed** (matches the coordinator's baseline); HEAD plus only this phase's three code files -> **3477 passed, 2 skipped, 0 failed**. Zero regressions from phase 8. Web untouched and confirmed so: `npx vitest run` -> 48 files / 625 tests passed, `npx tsc --noEmit` -> exit 0. Side-effect checks: `git status --porcelain lab/lab.sqlite web/data/lab.json` -> empty, and `cmp` against `git show HEAD:lab/lab.sqlite` -> identical. `grep '«' docs/backtests/2026-10-08-how-many-names.md` -> no match (no unfilled slot). The real sweep ran against research store fingerprint `399d0d254c7a` in 29s and reported "Lab N (dev trials): 126 before, 126 after; test-window looks used: 2 before, 2 after" — the report-only exit criterion holds.
+  - **Drift**:
+    - No drift. Every line number the plan quoted in `commands/lab.py` was still correct, and all three borrowed names from phases 5 and 7 (`sim.contributions.OWNER_MONTHLY`, `dev.run_registry(contributions=…)`, `backtest.metrics.Metrics.mwr`) existed exactly as the reconciler recorded them.
+  - **Decided**:
+    - `lab/lab.sqlite` went dirty when the read-only report opened it — phase 7's v3→v4 migration auto-applies on connect and adds an empty `trial_funding` table — so it was **restored to HEAD, byte-identical** (rung 2: phase 8's own exit criterion is "byte-identical to what the phase started with"; phase 7 deliberately did not commit a migrated database, and its own test asserts migration-on-connect).
+    - The sweep's mechanical findings line reports that the two cost models choose different name counts — the module was left **exactly as planned** and the write-up reports the margin (rung 3: the plan's code block defines `_findings` as the mechanical reading and `docs/backtests/` as the human one). The split is 0.004 MAR against a 0.35 spread across the name range, and the lump-sum control has both models picking 20.
+    - 31 engine-suite failures present in this shared worktree were **attributed to phase 12's uncommitted work and not fixed** (rung 2 plus measurement: a throwaway worktree at HEAD is 3456 passed / 0 failed; HEAD plus only this phase's three code files is 3477 passed / 0 failed).
+    - `engine/.workflows/todos.md` necessarily carries a peer's task entry (P1-ENG-U9XK, phase 12) appended concurrently — one shared append-only bookkeeping file. Including it is required for this phase's own task record; the extra line is correct bookkeeping a peer also wants.
+    - `GOTRADE_FEE_REBUILD_PLAN.md` left untouched — no phase-8 row tick, no `**Status:**` change, and `ledger.json` not touched. This set is a coordinated swarm whose coordinator (`orch-gotrade-fee-rebuild`) owns the index and the ledger; phases 1–7 all recorded the same decision.
+    - No landing: no merge to `main`, no branch or worktree deletion. The coordinator lands the whole set (analyze-orchestrator Step 5); landing here too is the double-merge that rule exists to prevent.
+    - `engine/package_readme.md` **is** in this phase's commit, unlike phase 7's. `readme-updater` was dispatched and wrote it (+54 insertions, 0 deletions: a `lab/name_count.py` line in the Layout tree and a `lab names` CLI section between `lab costs` and `sean marks`). It reported the path as **contended** — the file changed size under it mid-edit, so a peer had it open — but the working-tree diff against HEAD was measured immediately before the commit and contains exactly those two additive hunks and no peer content, and no peer phase's Owns names this file. Each allowlist path's blob was fingerprinted with `git hash-object` before the commit and re-checked against the commit afterwards.
 - [x] **P1-ENG-MWRQ** Phase 7: Money-weighted return, and a SPY fed the same money
   - **Difficulty**: HARD
   - **Type**: Feature

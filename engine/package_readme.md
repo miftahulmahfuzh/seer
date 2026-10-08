@@ -142,6 +142,7 @@ engine/
       prereg.py             the docs/lab/prereg/MNNNN.md pre-registration: Prereg, render()/parse(), require_committed(), check_digest(), check_source(), promote_method() (build-promotion-path phase 3)
       remeasure.py          `lab remeasure`: re-runs a recorded method's variants on the dev window, proves the re-run reproduces each trial's recorded Sharpe and DSR, and appends trial_moments rows -- Batch, Plan, Reproduced, Report, resolve_method(), batches_of(), preflight(), measure(), check(), remeasure(), format_report() (lab-luck-gate phase 3); plus the P7a seed path, resumable and chunk-invariant -- SEED_PREFIX, SEED_METRICS, METRIC_TOL, SeedTrial, SeedPlan, SeedReport, SeedVerdict, is_seed_id(), seed_var_trials(), seed_preflight(), observe(), run_chunk(), reproduce(), remeasure_seed(), seed_verdicts(), format_seed_report() (lab-luck-gate phase 9)
       real_costs.py         `lab costs` (Sean phase 7): REAL_COST_SINCE = 31, requires_real_cost(), real_cost_problem() (the M0031 rule runner.preflight raises); resolve_method(), pick_candidate(), twins(), Side, side_of(), Comparison, measure(), format_report(), insight_text(), journal(). Report only: writes one journal observation, never a trial
+      name_count.py         `lab names` (GOTRADE_FEE_REBUILD phase 8): NS = (5, 10, 15, 20, 25, 30), ROSTER_NAMES = 20, BASE_VARIANT = "M0007-N20-RAW", MIN_NAMES/MAX_NAMES = 2/60; check_names(), owner_schedule(), check_schedule_support(), variants(), Point, money_weighted(), point_of(), Sweep (of/best/clean/at/agrees), measure(), format_report(), csv_rows(), write_csv(). Sweeps M0007-N20-RAW's `inner.top` at Gotrade's real fees on the owner's contribution schedule, scored money-weighted against a dollar-cost-averaged SPY. Report only, and writes nothing at all: no trial, no moments, no journal entry, no status
       seed.py               one-time import of the pre-lab record (P7a's 54 candidates)
       methods/              one file per method, mNNNN_<slug>.py exporting METHOD
     sean/                   Sean: the owner's real Gotrade orders, marked to market (Sean phases 1 and 4) and replayed against the fee schedule (phase 7)
@@ -989,6 +990,59 @@ trade and at Gotrade's real fees (`sim/costs.py`) — prints both side by side, 
 - Afterwards, solo runs `lab stage` so seertrade.site/sera shows the observation. A Sera child
   leaves staging to its coordinator.
 - Tests: `tests/test_lab_costs.py` (15).
+
+### `lab names` (GOTRADE_FEE_REBUILD phase 8)
+
+```
+python -m seer_engine lab names [--ns 5,10,15,20,25,30] [--gotrade-only] [--lump]
+                                [--csv PATH] [--store DIR]
+```
+
+Report only, and the most report-only command in the lab: it writes **nothing at all** — no
+`trials` row, no `trial_moments` row, no `insights` journal entry and no status — so the lab's N
+and the test-window looks do not move (126 and 2 at the time of writing), and `lab/lab.sqlite` is
+byte-identical afterwards. Unlike `lab costs` it does not even journal an observation, so
+`lab stage` is not needed and seertrade.site/sera does not change. The command prints N and
+`test_looks` before and after, so the invariant is visible and not merely asserted in a test.
+
+What it sweeps is the roster's own book. `M0007-N20-RAW` is what the roster's RAW-FR entry trades,
+and its `20` is a *parameter* (`ResidParams.inner.top`), so `lab/name_count.py` imports `RESIDMOM`,
+`TREND` and `ResidParams` from the frozen method file and builds one in-memory `Candidate` per
+(cost model, name count) — `M0007-N<nn>-RAW-GT` and `-FLAT`. The method file, its `source_sha` and
+its recorded config digests are untouched, the same thing `paper.roster` does with that file.
+
+Both axes are on because they interact: the runs are at `cost_model="gotrade"` — the fee floor is
+size-dependent, so a sweep at the lab's old flat 0.1% would measure a world where a name is nearly
+free — and on the owner's real contribution schedule (`sim.contributions.OWNER_MONTHLY`: 10,000,000
+IDR at the start, +5,000,000 IDR on the 25th of every month), scored with the money-weighted return
+(`backtest.metrics.Metrics.mwr`) against a dollar-cost-averaged SPY, because a book that is fed
+money has no honest CAGR and no meaningful "beats SPY TR". `--gotrade-only` drops the flat control
+column; `--lump` funds the book once and never feeds it. Each is a control for one axis, not the
+answer.
+
+- Refusals (`store.LabError`, every one raised before the research store loads): an empty or
+  non-numeric `--ns`; a count outside 2..60; a missing `sim.contributions` or `OWNER_MONTHLY`; a
+  `dev.run_registry` that takes no `contributions` keyword; `research.DEV_END != dev.DEV_END`; a
+  missing store; and a test-window store — a name count has never been pre-registered, so it may
+  not spend a look.
+- `Sweep.best(model)` ranks by MAR, ties to the smaller book — the lab's own rank key, the one
+  `lab costs` and `dev.finalists` already use — so the grid is read on a measure chosen before
+  seeing it. `Sweep.agrees` says whether the two cost models pick the same count.
+- **The measured answer (2026-10-08, research store `399d0d254c7a`; write-up
+  `docs/backtests/2026-10-08-how-many-names.md`, full-precision grid
+  `docs/backtests/2026-10-08-how-many-names-grid.csv`): twenty names, on the merits and not on
+  fees.** Five names gives up 1.3 points of money-weighted return a year and falls 37% from a peak
+  against 20%; 25 and 30 land within half a point of 20. SPY fed the same money earned 7.19% a
+  year, and every count beat it. The two cost models split between 20 and 30 by 0.004 MAR against
+  a 0.35 spread across the range, so the fees do not choose the name count — what they do is cost
+  the book about 1.3 points a year at *every* count, which is the larger finding. The roster keeps
+  N = 20 regardless (GOTRADE_FEE_REBUILD Decision D3): this phase promotes nothing and proposes no
+  roster change.
+- Six free looks at six name counts is exactly the search the luck gate exists to charge for, so
+  this grid may *inform* a decision and may never *be* one. Acting on it means a new method that
+  pre-registers the count — which from M0031 on `real_costs.real_cost_problem` already forces to
+  run at Gotrade's real fees — and that method pays its trials like any other.
+- Tests: `tests/test_lab_name_count.py` (19).
 
 ### `sean marks` (Sean phase 4)
 

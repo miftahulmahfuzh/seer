@@ -46,7 +46,28 @@ jobs:
       # Paper trading switch. Paused 2026-10-07 until paper could run split-cadence rules and RM was
       # replaced by RMW; resumed the same day so every roster strategy starts on the same night.
       # 'true' skips Veto, Paper, Paper check and Explain; Migrate and Nightly (bars) always run.
-      PAPER_PAUSED: 'false'
+      #
+      # Paused again 2026-10-08 (owner's call) to hold the paper clock at ZERO stepped sessions
+      # while the roster is rebuilt to pay Gotrade's real fees (sim/costs.py, measured from the
+      # owner's own receipts: ~2.5x the assumed 0.1%/side, and 5x at today's $28 slots because of
+      # the $0.10 per-order floor). cost_model lives in sim.rules.LEVERS_SINCE_PINS at "flat", so
+      # moving a STARTED entry to "gotrade" changes its spec digest and store.check_digest refuses
+      # its next night -- compliance therefore means new roster entries with fresh paper clocks.
+      # Right now that is free: paper_state.last_session is 2026-10-06, the 10-07 session has not
+      # been stepped, and equity_snapshots holds only the starting 560.5067. Every night this runs
+      # unpaused costs one more session of history that the rebuild would throw away.
+      #
+      # Do not resume until all three hold, or the rebuilt roster is not actually clean:
+      #   1. paper/benchmark.py threads cost_model into fractional_buy_cost (today it takes the
+      #      "flat" default at :250 and :278, so SPY would pay 0.1% while the methods pay Gotrade
+      #      -- an asymmetric "beats SPY TR" gate);
+      #   2. C is decided -- the bracket path has no gotrade branch at all (sim/sizing.py
+      #      precomputes _ONE_PLUS_COST from the flat COST_RATE), so C cannot comply without new
+      #      code, and daily trading costs ~26%/yr on this book;
+      #   3. the lab has answered how many names to hold and has a capital model matching reality
+      #      (10M IDR start + 5M monthly; today backtest/runner.py INITIAL_IDR is a 20M lump and
+      #      nothing in the engine models contributions at all).
+      PAPER_PAUSED: 'true'
     steps:
       - name: Check secrets
         run: |

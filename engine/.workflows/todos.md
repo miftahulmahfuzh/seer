@@ -820,6 +820,12 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Plan**: `.workflows/plan/P1-ENG-MWRQ.md`
   - **Completed**: 2026-10-08 11:58
   - **Method**: /do
+  - **Commit**: `35e33e5` — all nine phase 7 files are inside it and nothing else is; verified
+    with `git show --stat --format="" 35e33e5` against the allowlist before the push. Committed
+    as `git add -- <the two new files>` then `git commit -F <msgfile> -- <nine paths>`, the
+    pathspec form phases 4 and 6 record as the only one the allowlist actually protects in this
+    shared index. This sha is recorded by a second, todos-only commit, since a commit cannot
+    name itself.
   - **Files**: engine/src/seer_engine/backtest/metrics.py, engine/src/seer_engine/backtest/benchmark.py, engine/src/seer_engine/backtest/dev.py, engine/src/seer_engine/lab/store.py, engine/tests/test_backtest_metrics.py, engine/tests/test_lab_snapshot.py, engine/tests/test_backtest_benchmark.py (new), engine/.workflows/plan/P1-ENG-MWRQ.md (new), engine/.workflows/todos.md
   - **Verified**: engine suite `PYTHONPATH=engine/src PG_TEST_URL=... python -m pytest engine/tests -q -n auto` -> **3456 passed, 1 skipped, 0 failed**, re-run on top of phase 6's `ca75a96`. Web `npx vitest run` -> 625 passed / 48 files / 0 failed; `npx tsc --noEmit` -> exit 0. `python -m ruff check engine` -> all checks passed. Import build clears the metrics <-> book_runner cycle. Exit criterion 9: `grep -n 'bracket_v0' engine/src/seer_engine/backtest/dev.py` returns nothing. `git diff --stat` shows no change to `backtest/runner.py`, `backtest/book_runner.py`, `sim/`, `paper/`, `web/` or `lab/lab.sqlite`.
   - **Drift**:

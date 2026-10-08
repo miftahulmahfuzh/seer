@@ -1,0 +1,235 @@
+{
+  "branch": "feature/gotrade-fee-rebuild",
+  "coordinator": "orch-gotrade-fee-rebuild",
+  "coordinator_session_id": "fb277ee1-77ab-47a2-b7e4-6d7bb0ac5782",
+  "created": "2026-10-08T03:34:20+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 1,
+      "note": null,
+      "package": ".github`, `engine/tests`, `engine.lab",
+      "plan": ".workflows/plan/gotrade-fee-rebuild/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The CI guard catches what it was written for"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "engine.lab`, `web/lib/sera`, `web/app/sera",
+      "plan": ".workflows/plan/gotrade-fee-rebuild/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R7"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "A test-window look is not luck-gated, and says so"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "engine.paper",
+      "plan": ".workflows/plan/gotrade-fee-rebuild/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The live SPY benchmark pays what the methods pay"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": null,
+      "package": "engine.sim`, `engine.paper",
+      "plan": ".workflows/plan/gotrade-fee-rebuild/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The bracket path can express and charge Gotrade's fees"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        4
+      ],
+      "difficulty": "HARD",
+      "n": 5,
+      "note": null,
+      "package": "engine.sim`, `engine.backtest",
+      "plan": ".workflows/plan/gotrade-fee-rebuild/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "A contribution schedule, and the lab's real capital"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        5
+      ],
+      "difficulty": "HARD",
+      "n": 6,
+      "note": null,
+      "package": "engine.paper`, `engine.commands`, `db",
+      "plan": ".workflows/plan/gotrade-fee-rebuild/phase-6.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Paper accepts a deposit"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2,
+        5
+      ],
+      "difficulty": "HARD",
+      "n": 7,
+      "note": null,
+      "package": "engine.backtest`, `engine.lab",
+      "plan": ".workflows/plan/gotrade-fee-rebuild/phase-7.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Money-weighted return, and a SPY fed the same money"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        7
+      ],
+      "difficulty": "NORMAL",
+      "n": 8,
+      "note": null,
+      "package": "engine.lab`, `engine.commands`, `docs",
+      "plan": ".workflows/plan/gotrade-fee-rebuild/phase-8.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "How many names, measured at real fees and real funding"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 9,
+      "note": null,
+      "package": "web/app/(app)`, `web/lib",
+      "plan": ".workflows/plan/gotrade-fee-rebuild/phase-9.md",
+      "reported_at": null,
+      "satisfies": [
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The blank panel says which of five things it means"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        5
+      ],
+      "difficulty": "NORMAL",
+      "n": 10,
+      "note": null,
+      "package": "web/lib/sean`, `web/app/sean",
+      "plan": ".workflows/plan/gotrade-fee-rebuild/phase-10.md",
+      "reported_at": null,
+      "satisfies": [
+        "R9"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Sean sizes a rotation from cash, not from holdings"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 11,
+      "note": null,
+      "package": ".github`, `docs",
+      "plan": ".workflows/plan/gotrade-fee-rebuild/phase-11.md",
+      "reported_at": null,
+      "satisfies": [
+        "R8"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "One daily line: stepped, published, green, paused"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        3,
+        4,
+        6,
+        7
+      ],
+      "difficulty": "HARD",
+      "n": 12,
+      "note": null,
+      "package": "engine.paper`, `engine.commands`, `db`, `docs`, `.github",
+      "plan": ".workflows/plan/gotrade-fee-rebuild/phase-12.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R4",
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The rebuilt roster, and the wiring layer"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/gotrade-fee-rebuild/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "gotrade-fee-rebuild",
+  "updated": "2026-10-08T03:34:20+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/gotrade-fee-rebuild"
+}

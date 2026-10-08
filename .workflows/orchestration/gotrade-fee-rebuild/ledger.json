@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "269782d",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": null,
+      "note": "verified by coordinator from git: on branch; 6 paths = its 3 Owns (engine-ci.yml, test_lab_npolicy.py, npolicy.py) + its own adopted plan, its own todos.md block, and package_readme.md (readme-updater, phase-1 content only). Grepped for sim/ paper/ web/ store.py benchmark -- no peer file. npolicy.py diff is docstring-only, exactly D11's three replacements (110->126, 23->28, ceil(2.44)->ceil(2.34)); aged-number grep returns nothing. COORDINATOR DECISION: commit left at 6 paths, NOT split to 3 (rung 6, surrounding convention -- every phase commits its own task artifacts; rewriting a pushed commit on a branch 3 sessions push to costs more than it buys and the audit shows no contamination). INDEX CORRECTIONS from p1, carried: phase 1's 'eight skip sites' is nine; exit criterion 4's '3362 passed, 1 skipped' is 3363 passed (the old pinned test counted as a skip, the new one passes). ROOT CAUSE of the 10:55:40 reset --hard, corrected by p1: it was run by its completion-handler subagent, not the main context, with an allowlist wider than phase 1's Owns. Skills patched across all six surfaces.",
       "package": ".github`, `engine/tests`, `engine.lab",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-1.md",
-      "reported_at": "2026-10-08T03:51:55+00:00",
+      "reported_at": "2026-10-08T04:04:09+00:00",
       "satisfies": [
         "R6"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-R4XB",
       "title": "The CI guard catches what it was written for"
     },
     {
@@ -40,19 +40,19 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "4c11623",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "committed 4c11623 (branch tip) but NOT yet accepted: the 10:55:40 reset --hard sits between the rescue snapshot and this commit, and rescue/reset-casualty-c67d7b7 holds 86 more lines of test_paper_benchmark.py and 25 more of package_readme.md than 4c11623 does. Phase 3 asked to diff and decide -- it owns those files. Acceptance gated on that answer.",
       "package": "engine.paper",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-3.md",
-      "reported_at": "2026-10-08T03:51:55+00:00",
+      "reported_at": "2026-10-08T04:00:59+00:00",
       "satisfies": [
         "R1"
       ],
       "status": "spawned",
-      "task_id": null,
+      "task_id": "P1-ENG-H2VK",
       "title": "The live SPY benchmark pays what the methods pay"
     },
     {
@@ -61,10 +61,10 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "INCIDENT 2026-10-08 10:55:40 WIB: a tree-wide 'git reset --hard origin/feature/gotrade-fee-rebuild' in the shared worktree destroyed phase 4's 12 tracked files of finished, green, uncommitted work. Cause (from reflog, not from any report): phase 1 was undoing its OWN contaminated commits -- c67d7b7 at 10:53:48 carried phase 3's benchmark.py/test_paper_benchmark.py/package_readme.md under phase 1's message -- and reached for reset, which is tree-wide across 12 sessions sharing one checkout. The contamination guard WORKED: neither c67d7b7 nor c6ce225 is an ancestor of the branch; nothing bad landed. Only the cleanup method was destructive. Phase 4 re-implementing; untracked sim/charges.py survived. Casualties preserved as tags rescue/reset-casualty-c67d7b7 and rescue/reset-casualty-c6ce225. BAN broadcast to all live sessions: per-path ops only (git checkout -- <paths>, git restore --staged, git stash push -u -m <tag>); 'git reset --soft HEAD~1' is the safe way to undo one's own commit.",
       "package": "engine.sim`, `engine.paper",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-4.md",
-      "reported_at": "2026-10-08T03:51:55+00:00",
+      "reported_at": "2026-10-08T04:00:59+00:00",
       "satisfies": [
         "R4"
       ],
@@ -230,7 +230,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/gotrade-fee-rebuild/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "gotrade-fee-rebuild",
-  "updated": "2026-10-08T03:53:38+00:00",
+  "updated": "2026-10-08T04:04:09+00:00",
   "verified_at": "2026-10-08T03:50:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/gotrade-fee-rebuild"
 }

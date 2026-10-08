@@ -7,7 +7,7 @@ import {
 
 const r = (over: Partial<Reminder>): Reminder => ({
   key: '2026-10-07:MU:buy', action: 'buy', side: 'buy', symbol: 'MU', usd: 28, shares: null, weight: 0.05,
-  alsoOutside: false, done: null, ...over,
+  alsoOutside: false, done: null, fundedUsd: null, ...over,
 });
 
 describe('form rules', () => {

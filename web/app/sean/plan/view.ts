@@ -140,6 +140,22 @@ export function reminderDetail(r: Reminder, short: string): string {
   return `${short} no longer picks it.${keep}`;
 }
 
+/**
+ * What the wallet can actually put into this one right now, in the owner's words; '' when the
+ * question does not apply (a sell, a trim, a reminder already done, or no wallet to spend).
+ *
+ * `Reminder.fundedUsd` is filled by `reminders.fund`, which walks the open buys in RANK ORDER and
+ * shrinks the one the cash runs out on -- the engine's own rule -- so the top picks go in whole and
+ * the tail is what waits. A remainder under the fee floor is left unspent on purpose: Gotrade's
+ * $0.10 minimum makes a tiny order mostly fee, and it is worth more rolled into the next deposit.
+ */
+export function fundedLine(r: Reminder): string {
+  if (r.fundedUsd === null || r.usd === null) return '';
+  if (r.fundedUsd <= 0) return 'Your spare cash will not stretch to this one. It waits for the next deposit, or for a sale to settle.';
+  if (r.fundedUsd >= r.usd) return 'Your spare cash covers this in full.';
+  return `Your spare cash covers about ${aboutUsd(r.fundedUsd)} of it. Buy that much now; the rest can wait for the next deposit or a sale to settle.`;
+}
+
 /** Why a done reminder is done. */
 export function doneLine(r: Reminder, sessionDate: string): string {
   if (r.done === 'mark') return 'You marked this done.';

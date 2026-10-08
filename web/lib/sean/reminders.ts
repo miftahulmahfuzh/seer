@@ -32,6 +32,7 @@
  */
 import { RESIZE_BAND } from '../cadence';
 import { buildLedger, orderSession, type LedgerOrder } from './ledger';
+import { cents } from './money';
 
 /**
  * An add or a trim smaller than this is not worth Gotrade's fees. Derived from the schedule's own
@@ -110,6 +111,17 @@ export type Reminder = {
   /** The owner also holds this stock from before the plan (not counted, never sold by Sean). */
   alsoOutside: boolean;
   done: Done;
+  /**
+   * What the wallet can actually put into this one right now, in dollars (see `fund`):
+   *
+   * - `usd` when the cash covers it in full;
+   * - less than `usd` when it is the one the cash runs out on (the engine's own rule: a fill cash
+   *   cannot cover is shrunk to what cash affords, `sim/book.py`);
+   * - 0 when the cash ran out before reaching it, or what is left is under `MIN_TRADE_USD`;
+   * - null for a sell or a trim (they RAISE cash), for a reminder already done, and when there is
+   *   no wallet to spend.
+   */
+  fundedUsd: number | null;
 };
 
 /** One stock the plan holds, valued at the decision price when picked, else the latest close. */
@@ -161,6 +173,44 @@ export type ReminderPlan = {
 };
 
 const ACTION_ORDER: Record<ReminderAction, number> = { sell: 0, trim: 1, buy: 2, add: 3 };
+
+/**
+ * Spread `cash` over the open buy and add reminders, in the order they are given, and write
+ * `fundedUsd` on each. Returns the reminders with that field set.
+ *
+ * RANK ORDER, LAST ONE PARTIAL -- not pro rata. `sim/book.py` buys "targets in rank order with the
+ * idle instrument last" and shrinks "a fill cash cannot cover ... to what cash affords", so the
+ * top picks are filled whole and the tail is what goes short. Spreading the shortfall evenly would
+ * leave every name underweight, which is not the book the backtest measured.
+ *
+ * FLOOR. A remainder under `MIN_TRADE_USD` is left unspent rather than placed: Gotrade charges a
+ * minimum of $0.10 an order, so a $0.50 buy pays 20% in fees. It rolls into next month's deposit,
+ * which is worth more than forcing the last cent in. Same floor the adds and trims use above.
+ *
+ * ONLY SETTLED CASH. `cash` is the derived wallet -- deposits less what the uploaded orders spent.
+ * It does NOT add the money this month's sells are about to raise, which is where this deliberately
+ * differs from the engine's `available = book.cash + planned`: the engine settles instantly, a real
+ * broker may not. So this answers "what can I place right now", and the next day, once the sells
+ * are uploaded and their proceeds are in the wallet, it answers it again with more money.
+ */
+export function fund(reminders: readonly Reminder[], cash: number | null): Reminder[] {
+  let left = cash === null || !Number.isFinite(cash) || cash <= 0 ? 0 : cash;
+  const spendable = left > 0;
+  return reminders.map(r => {
+    if (r.done !== null || (r.action !== 'buy' && r.action !== 'add') || !spendable) {
+      return { ...r, fundedUsd: null };
+    }
+    const want = r.usd;
+    if (want === null || want <= 0) return { ...r, fundedUsd: null };
+    if (left >= want) {
+      left = cents(left - want);
+      return { ...r, fundedUsd: want };
+    }
+    const part = left >= MIN_TRADE_USD ? left : 0;
+    left = cents(left - part);
+    return { ...r, fundedUsd: part };
+  });
+}
 
 /** The side an order must have to clear a reminder of this action. */
 export const sideOf = (action: ReminderAction): Side => (action === 'buy' || action === 'add' ? 'buy' : 'sell');
@@ -238,7 +288,7 @@ export function buildReminders(input: ReminderInput): ReminderPlan {
   const planSize =
     input.budgetUsd !== null && input.budgetUsd > 0 ? input.budgetUsd : funded > 0 ? funded : null;
 
-  const drafts: Omit<Reminder, 'key' | 'done'>[] = [];
+  const drafts: Omit<Reminder, 'key' | 'done' | 'fundedUsd'>[] = [];
   if (targetBy.size > 0) {
     for (const h of holdings) {
       if (h.picked) continue;
@@ -268,11 +318,15 @@ export function buildReminders(input: ReminderInput): ReminderPlan {
   }
   // Array.prototype.sort is stable: within one action, rank order (buys/adds) and size order (sells) hold.
   drafts.sort((a, b) => ACTION_ORDER[a.action] - ACTION_ORDER[b.action]);
-  const reminders: Reminder[] = drafts.map(d => ({
-    ...d,
-    key: `${input.sessionDate}:${d.symbol}:${d.side}`,
-    done: doneBy(d.symbol, d.side, input),
-  }));
+  const reminders: Reminder[] = fund(
+    drafts.map(d => ({
+      ...d,
+      key: `${input.sessionDate}:${d.symbol}:${d.side}`,
+      done: doneBy(d.symbol, d.side, input),
+      fundedUsd: null,
+    })),
+    input.cashUsd,
+  );
   return {
     planValue,
     cashUsd: input.cashUsd,

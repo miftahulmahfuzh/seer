@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildReminders, lastPrices, outsideShares, planOrders, resizes, sideOf,
-  type PlanOrderLite, type ReminderInput, type Target,
+  buildReminders, fund, lastPrices, MIN_TRADE_USD, outsideShares, planOrders, resizes, sideOf,
+  type PlanOrderLite, type Reminder, type ReminderInput, type Target,
 } from './reminders';
 
 const OCT = '2026-10-07';
@@ -276,6 +276,74 @@ describe('buildReminders: edges', () => {
   it('ignores dust below 1e-9 shares', () => {
     const r = buildReminders(input({ held: new Map([['DUST', 1e-12]]) }));
     expect(r.holdings).toHaveLength(0);
+  });
+});
+
+describe('fund: spending a leftover wallet, rank order, last one partial', () => {
+  const r = (over: Partial<Reminder>): Reminder => ({
+    key: 'k', action: 'buy', side: 'buy', symbol: 'X', usd: 45, shares: null, weight: 0.05,
+    alsoOutside: false, done: null, fundedUsd: null, ...over,
+  });
+  const three = [
+    r({ key: 'a', symbol: 'A' }),
+    r({ key: 'b', symbol: 'B' }),
+    r({ key: 'c', symbol: 'C' }),
+  ];
+
+  it('fills in order and shrinks the one the cash runs out on', () => {
+    // $100 over three $45 buys: two whole, $10 left -- under the floor, so nothing forced in.
+    expect(fund(three, 100).map(x => x.fundedUsd)).toEqual([45, 45, 0]);
+  });
+
+  it('places a partial only when the remainder clears the fee floor', () => {
+    // $75: one whole, $30 left, which is over MIN_TRADE_USD, so the second goes in partial.
+    expect(fund(three, 75).map(x => x.fundedUsd)).toEqual([45, 30, 0]);
+    // $45 + just under the floor: the second is not worth its minimum fee.
+    expect(fund(three, 45 + MIN_TRADE_USD - 0.01).map(x => x.fundedUsd)).toEqual([45, 0, 0]);
+  });
+
+  it('is rank order, not pro rata: the top picks are whole and the tail goes short', () => {
+    const got = fund(three, 90).map(x => x.fundedUsd);
+    expect(got).toEqual([45, 45, 0]);
+    expect(got).not.toEqual([30, 30, 30]); // what spreading the shortfall would have done
+  });
+
+  it('never exceeds the cash it was given', () => {
+    for (const cash of [0, 1, 25, 44.99, 45, 46, 89.99, 135, 1000]) {
+      const spent = fund(three, cash).reduce((t, x) => t + (x.fundedUsd ?? 0), 0);
+      expect(spent).toBeLessThanOrEqual(cash + 1e-9);
+    }
+  });
+
+  it('leaves sells, trims, done reminders and a missing wallet alone', () => {
+    const mixed = [
+      r({ key: 's', action: 'sell', side: 'sell', symbol: 'S', usd: 60 }),
+      r({ key: 't', action: 'trim', side: 'sell', symbol: 'T', usd: 20 }),
+      r({ key: 'd', symbol: 'D', done: 'order' }),
+      r({ key: 'o', symbol: 'O' }),
+    ];
+    expect(fund(mixed, 500).map(x => x.fundedUsd)).toEqual([null, null, null, 45]);
+    for (const cash of [null, 0, -5, Number.NaN]) {
+      expect(fund(three, cash).every(x => x.fundedUsd === null)).toBe(true);
+    }
+  });
+
+  it('buildReminders funds the open buys from the wallet it was given', () => {
+    // One name is missing from the book, so it is an open buy. Its target is about $28 (5% of a
+    // ~$560 plan), so $26 of settled cash is short of it but clears the fee floor: a partial.
+    const held = followed();
+    held.delete('LRCX');
+    const short = buildReminders(input({ held, cashUsd: 26, targets: RAW }));
+    const partial = short.reminders.find(x => x.symbol === 'LRCX' && x.action === 'buy');
+    expect(partial?.usd).toBeGreaterThan(26);    // the target wants more than the wallet holds
+    expect(partial?.fundedUsd).toBe(26);         // so it is shrunk to what the cash affords
+    expect(short.reminders.filter(x => x.action === 'sell').every(x => x.fundedUsd === null)).toBe(true);
+
+    // With the target comfortably covered, the buy is funded in full, not to the whole wallet.
+    const flush = buildReminders(input({ held, cashUsd: 500, targets: RAW }));
+    const whole = flush.reminders.find(x => x.symbol === 'LRCX' && x.action === 'buy');
+    expect(whole?.fundedUsd).toBe(whole?.usd);
+    expect(whole?.fundedUsd).toBeLessThan(500);
   });
 });
 

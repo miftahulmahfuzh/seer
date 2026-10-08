@@ -13,7 +13,7 @@ import { markDone, undoDone, unlinkMethod } from './actions';
 import { LinkPicker } from './LinkPicker';
 import { PlanSettings } from './PlanSettings';
 import {
-  cashLine, doneLine, methodTitle, outsideLine, picksLine, planSizeLine, reminderDetail,
+  cashLine, doneLine, fundedLine, methodTitle, outsideLine, picksLine, planSizeLine, reminderDetail,
   reminderTitle, todoLabel,
 } from './view';
 import s from './plan.module.css';
@@ -191,6 +191,7 @@ function ReminderRow({ r, short, sessionDate }: { r: Reminder; short: string; se
       <span className={s.rowText}>
         <span className={`num ${s.rowTitle}`}>{title}</span>
         <span className={s.rowDetail}>{reminderDetail(r, short)}</span>
+        {fundedLine(r) === '' ? null : <span className={s.rowDetail}>{fundedLine(r)}</span>}
       </span>
       <form action={markDone}>
         <input type="hidden" name="sessionDate" value={sessionDate} />

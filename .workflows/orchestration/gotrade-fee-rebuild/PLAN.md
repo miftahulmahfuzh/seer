@@ -6,8 +6,8 @@
 **Worktree:** `/home/miftah/.worktrees/seer/gotrade-fee-rebuild`
 **Branch:** `feature/gotrade-fee-rebuild` (base: `origin/main` @ `485d416`)
 **Phases:** 12
-**Status:** reconciled
-**Coordinator:** —
+**Status:** in flight — 2/12 landed (9, 11). Driven as a swarm; this file is the coordinator's copy.
+**Coordinator:** `orch-gotrade-fee-rebuild` (owns the landing; ledger.json is the record)
 
 ---
 
@@ -126,17 +126,17 @@ carried over from the draft.
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | The CI guard catches what it was written for | R6 | `.github`, `engine/tests`, `engine.lab` | 3 | — | NORMAL | `.workflows/plan/gotrade-fee-rebuild/phase-1.md` | — | — |
-| 2 | A test-window look is not luck-gated, and says so | R7 | `engine.lab`, `web/lib/sera`, `web/app/sera` | 13 | — | HARD | `.workflows/plan/gotrade-fee-rebuild/phase-2.md` | — | — |
-| 3 | The live SPY benchmark pays what the methods pay | R1 | `engine.paper` | 2 | — | NORMAL | `.workflows/plan/gotrade-fee-rebuild/phase-3.md` | — | — |
-| 4 | The bracket path can express and charge Gotrade's fees | R4 | `engine.sim`, `engine.paper` | 13 | — | HARD | `.workflows/plan/gotrade-fee-rebuild/phase-4.md` | — | — |
+| 1 | The CI guard catches what it was written for | R6 | `.github`, `engine/tests`, `engine.lab` | 3 | — | NORMAL | `.workflows/plan/gotrade-fee-rebuild/phase-1.md` | P1-ENG-R4XB | — |
+| 2 | A test-window look is not luck-gated, and says so | R7 | `engine.lab`, `web/lib/sera`, `web/app/sera` | 13 | — | HARD | `.workflows/plan/gotrade-fee-rebuild/phase-2.md` | P1-ENG-KQRW | — |
+| 3 | The live SPY benchmark pays what the methods pay | R1 | `engine.paper` | 2 | — | NORMAL | `.workflows/plan/gotrade-fee-rebuild/phase-3.md` | P1-ENG-H2VK | — |
+| 4 | The bracket path can express and charge Gotrade's fees | R4 | `engine.sim`, `engine.paper` | 13 | — | HARD | `.workflows/plan/gotrade-fee-rebuild/phase-4.md` | P1-ENG-F6QN | — |
 | 5 | A contribution schedule, and the lab's real capital | R3 | `engine.sim`, `engine.backtest` | 11 | 4 | HARD | `.workflows/plan/gotrade-fee-rebuild/phase-5.md` | — | — |
 | 6 | Paper accepts a deposit | R3 | `engine.paper`, `engine.commands`, `db` | 7 | 5 | HARD | `.workflows/plan/gotrade-fee-rebuild/phase-6.md` | — | — |
 | 7 | Money-weighted return, and a SPY fed the same money | R3 | `engine.backtest`, `engine.lab` | 7 | 2, 5 | HARD | `.workflows/plan/gotrade-fee-rebuild/phase-7.md` | — | — |
 | 8 | How many names, measured at real fees and real funding | R2 | `engine.lab`, `engine.commands`, `docs` | 5 | 7 | NORMAL | `.workflows/plan/gotrade-fee-rebuild/phase-8.md` | — | — |
-| 9 | The blank panel says which of five things it means | R5 | `web/app/(app)`, `web/lib` | 8 | — | NORMAL | `.workflows/plan/gotrade-fee-rebuild/phase-9.md` | — | — |
+| 9 | The blank panel says which of five things it means | R5 | `web/app/(app)`, `web/lib` | 8 | — | NORMAL | `.workflows/plan/gotrade-fee-rebuild/phase-9.md` | P1-WEB-4TQ7 | — |
 | 10 | Sean sizes a rotation from cash, not from holdings | R9 | `web/lib/sean`, `web/app/sean` | 8 | 5 | NORMAL | `.workflows/plan/gotrade-fee-rebuild/phase-10.md` | — | — |
-| 11 | One daily line: stepped, published, green, paused | R8 | `.github`, `docs` | 2 | — | NORMAL | `.workflows/plan/gotrade-fee-rebuild/phase-11.md` | — | — |
+| 11 | One daily line: stepped, published, green, paused | R8 | `.github`, `docs` | 2 | — | NORMAL | `.workflows/plan/gotrade-fee-rebuild/phase-11.md` | P1-ROOT-B4DL | — |
 | 12 | The rebuilt roster, and the wiring layer | R1, R4, R3 | `engine.paper`, `engine.commands`, `db`, `docs`, `.github` | 10 | 3, 4, 6, 7 | HARD | `.workflows/plan/gotrade-fee-rebuild/phase-12.md` | — | — |
 
 **Waves** (what `/analyze-orchestrator` will run concurrently):

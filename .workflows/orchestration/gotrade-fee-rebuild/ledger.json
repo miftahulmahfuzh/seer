@@ -187,19 +187,19 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "c2cc281",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 11,
-      "note": null,
+      "note": "verified by coordinator from git: commit on branch; files are exactly watch.yml + monitoring.md (its Owns) plus its own task artifacts; nightly.yml untouched and PAPER_PAUSED:'true' intact (invariant 2); exit criterion 7 re-run by coordinator -- 'status == \"completed\"' appears exactly once in watch.yml. OWNER ACTION OUTSTANDING (not a blocker, carry to termination block): repo secrets TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set, and watch.yml's cron only goes live once on the default branch. CROSS-PHASE: a full engine-suite run DURING this swarm yields phantom failures -- a peer rewriting source+test mid-run (measured: test_sim_rules.py[engine-bracket] failed under p11's run, 52 passed on immediate re-run). Gate the set on a clean suite at landing, when nothing is writing.",
       "package": ".github`, `docs",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-11.md",
-      "reported_at": "2026-10-08T03:51:55+00:00",
+      "reported_at": "2026-10-08T03:53:38+00:00",
       "satisfies": [
         "R8"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-B4DL",
       "title": "One daily line: stepped, published, green, paused"
     },
     {
@@ -230,7 +230,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/gotrade-fee-rebuild/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "gotrade-fee-rebuild",
-  "updated": "2026-10-08T03:51:55+00:00",
+  "updated": "2026-10-08T03:53:38+00:00",
   "verified_at": "2026-10-08T03:50:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/gotrade-fee-rebuild"
 }

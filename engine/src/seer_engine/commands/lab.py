@@ -1063,6 +1063,20 @@ def _show(conn, args) -> int:
             f"{fmt_num(t['dsr'], 3)} (N={t['n_trials_at_run']}), worst year {t['worst_year']} "
             f"{fmt_signed_pct(t['worst_year_return'])}; {'ELIGIBLE' if t['eligible'] else 'failed: ' + t['failed']}"
         )
+        # A funded trial needs a second line, because the first one is not a return. Once money
+        # goes in after the start, `total_return` and `cagr` count the owner's own deposits as
+        # gains -- 10.7821 beside an `mwr` of 0.0764 on one measured run. `mwr` is what the money
+        # actually earned, and `spy_tr_mwr` is the only honest thing to read it against: the same
+        # dollars, on the same days, put into SPY TR instead. None for every unfunded trial, which
+        # is the normal and definite answer for all 128 recorded ones -- so no line is printed.
+        f = store.funding_of(conn, t["n"])
+        if f is not None:
+            print(
+                f"      funded: your money earned {fmt_signed_pct(f['mwr'])} a year vs "
+                f"{fmt_signed_pct(f['spy_tr_mwr'])} for the same deposits put into SPY TR "
+                f"({f['deposits_n']} deposits, {f['schedule']}); the return and CAGR above count "
+                f"those deposits as gains"
+            )
     if m["verdict"]:
         print(f"\nVerdict: {m['verdict']}")
     if m["analysis"]:

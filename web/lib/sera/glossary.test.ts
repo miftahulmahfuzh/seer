@@ -18,6 +18,7 @@ describe('glossary', () => {
     expect(keys).toEqual(
       [
         'return',
+        'mwr',
         'cagr',
         'maxDrawdown',
         'profitFactor',

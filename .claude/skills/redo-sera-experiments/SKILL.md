@@ -509,24 +509,15 @@ $LAB luck --limit 0                 # read-only: every recorded DSR re-scored at
 for T in $TWINS; do $LAB show $T; done
 ```
 
-`lab show` does not print the money-weighted numbers and neither does the published snapshot. Read
-them for the whole batch in one **read-only** query, so the database is not migrated and dirtied by
-the read:
+`lab show` prints the money-weighted pair itself, on a second `funded:` line under each trial that
+received deposits — what the money earned, what the same deposits put into SPY TR earned, how many
+deposits there were and on what schedule. Read it off there; this step used to carry a raw SQL
+query against `trial_funding` and no longer needs one, because the numbers are published as well
+as printed (`trials[].mwr` and `trials[].spyTrMwr` in `web/data/lab.json`, snapshot v5, and a
+column of their own on the method page).
 
-```bash
-$PY - <<PY
-import sqlite3
-c = sqlite3.connect("file:$REPO/lab/lab.sqlite?mode=ro", uri=True); c.row_factory = sqlite3.Row
-for r in c.execute(
-    "SELECT t.method_id, t.candidate_id, f.mwr, f.spy_tr_mwr, f.deposits_usd, f.deposits_n "
-    "FROM trials t JOIN trial_funding f ON f.trial_n = t.n "
-    "WHERE t.window = 'dev' ORDER BY t.n"):
-    print(dict(r))
-PY
-```
-
-A twin with no row there received no deposits — the normal, definite answer for every trial recorded
-before the runner was funded, not a missing value. Say so rather than leaving a blank.
+A twin with no `funded:` line received no deposits — the normal, definite answer for every trial
+recorded before the runner was funded, not a missing value. Say so rather than leaving a blank.
 
 ### The one thing you must not get wrong in this report
 

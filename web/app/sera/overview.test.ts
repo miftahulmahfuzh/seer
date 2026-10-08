@@ -64,6 +64,8 @@ const trial = (n: number, methodId: string, over: Partial<LabTrial> = {}): LabTr
   spyTrReturn: 2,
   spyTrCagr: 0.08,
   mar: 0.2,
+  mwr: null,
+  spyTrMwr: null,
   failed: ['beats SPY TR', 'max DD <= 15%'],
   eligible: false,
   dsr: null,
@@ -86,7 +88,7 @@ const insight = (id: number, kind: LabInsight['kind'], added: string): LabInsigh
 });
 
 const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
-  version: 4,
+  version: 5,
   asOf: '2026-10-04T14:12:24+00:00',
   gate: {
     maxDrawdown: 0.2,

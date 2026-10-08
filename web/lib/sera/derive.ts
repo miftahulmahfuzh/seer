@@ -101,6 +101,24 @@ function marDesc(a: LabTrial, b: LabTrial): number {
 }
 
 /**
+ * The pair a **funded** trial is read on, or null when it is not one: what its money actually
+ * earned, against the same deposits put into SPY on the same days.
+ *
+ * Both or neither, and that is not tidiness — it is the engine's own branch. `dev.beats_spy_tr`
+ * uses the money-weighted pair only `if mwr is not None and spy_mwr is not None`, and otherwise
+ * decides `beats SPY TR` on total return exactly as it does for an unfunded row. A page that read
+ * one of the two alone would print a number the tick beside it was not decided on.
+ *
+ * Why anything reads this at all: once money goes in after the start, `totalReturn` and `cagr`
+ * stop being returns. On one measured funded run the engine reports a total return of +1078% and
+ * an earned rate of 7.6% for the *same* run; the difference is the owner's own deposits piling up.
+ */
+export function moneyWeighted(trial: LabTrial): { mwr: number; spyTrMwr: number } | null {
+  if (trial.mwr === null || trial.spyTrMwr === null) return null;
+  return { mwr: trial.mwr, spyTrMwr: trial.spyTrMwr };
+}
+
+/**
  * Does this trial clear `key` **as the bars read now**? true = cleared, false = missed,
  * null = the hurdle does not apply to this row.
  *
@@ -130,12 +148,21 @@ export function gateChecks(trial: LabTrial, gate: Gate): GateCheck[] {
       ? DASH
       : trial.profitFactor.toFixed(2);
   const ownerMissed = conditionOk(trial, 'owner') === false;
+  const money = moneyWeighted(trial);
   return [
     {
       key: 'spy',
       label: CONDITION_LABEL.spy,
-      value: perYear(trial.cagr),
-      target: trial.spyTrCagr === null ? 'more than SPY' : `more than ${perYear(trial.spyTrCagr)}`,
+      // A funded row is decided on what its money earned, not on its curve's shape, so those are
+      // the numbers printed beside the tick. Reading `cagr` here on such a row would quote a
+      // figure the engine never judged it by — the same defect as `0.912 < 0.90`, one field over.
+      value: perYear(money === null ? trial.cagr : money.mwr),
+      target:
+        money !== null
+          ? `more than ${perYear(money.spyTrMwr)} from the same deposits in SPY`
+          : trial.spyTrCagr === null
+            ? 'more than SPY'
+            : `more than ${perYear(trial.spyTrCagr)}`,
       ok: conditionOk(trial, 'spy'),
     },
     {

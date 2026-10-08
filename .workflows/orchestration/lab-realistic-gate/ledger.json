@@ -23,21 +23,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "55dd0f1",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "lab run/test funded on OWNER_MONTHLY, one trial_funding row per trial inside the existing BEGIN IMMEDIATE; remeasure/costs re-run on recorded funding via runner.recorded_contributions; mixed-funding plan refused. Also fixed both gate conditions funding inflates: book_runner._daily_returns/_year_returns cashflow-adjusted and strategy_metrics drawdown on the time-weighted index (Sharpe 2.6524 -> 0.2904 vs honest 0.2620; max_dd 0.0796 -> 0.1034 vs 0.1055). Engine 3089 passed (phase 1 left 3079, +10 = exactly the new tests, no existing test moved); web 626 passed. lab.sqlite byte-identical, trials 128, looks 2. Decided: step 18's remeasure.plan_for does not exist -> used remeasure.preflight, assertion unchanged (rung 3, the step's own implementer note); ran the web suite too though Verification names only engine (rung 1, invariant 1 says both suites).",
       "package": "engine.lab`, `engine.backtest",
       "plan": ".workflows/plan/lab-realistic-gate/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T08:25:37+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-FND7",
       "title": "The lab's search is funded like the owner's account"
     },
     {
@@ -56,7 +56,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "/redo-sera-experiments` \u2014 honest twins of named methods, in a batch"
     }
@@ -64,6 +64,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-realistic-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-realistic-gate",
-  "updated": "2026-10-08T08:08:50+00:00",
+  "updated": "2026-10-08T08:27:30+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-realistic-gate"
 }

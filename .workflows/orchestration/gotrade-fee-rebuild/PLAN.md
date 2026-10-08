@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/gotrade-fee-rebuild`
 **Branch:** `feature/gotrade-fee-rebuild` (base: `origin/main` @ `485d416`)
 **Phases:** 12
-**Status:** in flight — 9/12 landed (1, 2, 3, 4, 5, 6, 9, 10, 11). Phase 7 running; 8 and 12 behind it. This file is the coordinator's copy.
+**Status:** in flight — 10/12 landed (waves 0-2 complete). Final wave (8, 12) running. This file is the coordinator's copy.
 **Coordinator:** `orch-gotrade-fee-rebuild` (owns the landing; ledger.json is the record)
 
 ---

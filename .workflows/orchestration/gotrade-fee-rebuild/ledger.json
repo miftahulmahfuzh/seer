@@ -112,22 +112,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "35e33e5",
       "depends_on": [
         2,
         5
       ],
       "difficulty": "HARD",
       "n": 7,
-      "note": null,
+      "note": "verified by coordinator: 35e33e5 on branch (+ todos-only follow-up 86aefd1); 9 paths exactly its Owns; ZERO touches to runner.py, book_runner.py, sim/, paper/, web/ or lab/lab.sqlite -- its Interface Contract fences all held. bracket_v0 gone from dev.py (phase 4's H3 closed). FULL GATE RUN BY COORDINATOR with nothing writing: 3456 passed / 1 skipped / 0 failed. BUG FOUND AND FIXED BY p7, worth the phase on its own: a funded BOOK run reported mwr=None because book_runner._book_metrics calls strategy_metrics without cashflows, so make_row ranked a deposit-fed book on its inflated CAGR -- measured MAR 113.8 on a book whose money actually LOST 64.7%. That is a +600.9% lie on the engine four of the roster's six entries run. Fixed in dev._funded_stats (inside phase 7's Owns) rather than the tidier one-keyword change in book_runner.py, which is phase 5's file -- tie-break: narrower blast radius. HANDOFF: whoever next owns book_runner.py should take the keyword there and delete the fallback. DECISION (rung 2, exit criteria over the plan's Step 10 code block): the plan contradicts itself -- Step 10 feeds external_cashflows(result) (floats per its own Step 4) into spy_curves, which Step 6 requires to be Decimal, and the registry run raised TypeError. p7 passes result.cashflows straight through, keeping Decimal so real money is not rounded through binary floats. phase-7.md should be amended if anyone re-plans from it.",
       "package": "engine.backtest`, `engine.lab",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-7.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T05:04:45+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-MWRQ",
       "title": "Money-weighted return, and a SPY fed the same money"
     },
     {
@@ -138,14 +138,14 @@
       ],
       "difficulty": "NORMAL",
       "n": 8,
-      "note": null,
+      "note": "COORDINATOR DECISION on the fork phase 7 flagged rather than decided (config_digest and funded runs). D19: lab/runner.py's config_digest is NOT changed, and phase 8 does not need it changed. Rung 2 (phase 8's own exit criteria) + rung 3 (its plan's code block at :312). Evidence: config_digest(c: Candidate) hashes config_text(c), which covers the Candidate's configuration only -- contributions are a run-time parameter, so a funded and an unfunded run of one candidate DO collide on UNIQUE(config_digest, window). But phase 8 never reaches that path: its plan states 'A report, not a trial. Nothing here writes a trials row, a trial_moments row...' and its exit criteria require lab/lab.sqlite and web/data/lab.json byte-identical to what the phase started with. The collision is therefore unreachable in this set. AND the change must NOT be made opportunistically: adding contributions to config_text would alter every existing digest, breaking the identity of all 128 recorded trials and moving web/data/lab.json's gate.dsrNBasis -- the exact aging failure R6 just fixed. If a funded run is ever registered as a trial, that is a new method pre-registering its count (phase 8's own write-up says so), and the digest question belongs to that work, not here.",
       "package": "engine.lab`, `engine.commands`, `docs",
       "plan": ".workflows/plan/gotrade-fee-rebuild/phase-8.md",
-      "reported_at": null,
+      "reported_at": "2026-10-08T05:04:55+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "How many names, measured at real fees and real funding"
     },
@@ -222,7 +222,7 @@
         "R4",
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The rebuilt roster, and the wiring layer"
     }
@@ -230,7 +230,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/gotrade-fee-rebuild/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "gotrade-fee-rebuild",
-  "updated": "2026-10-08T04:56:55+00:00",
+  "updated": "2026-10-08T05:05:17+00:00",
   "verified_at": "2026-10-08T03:50:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/gotrade-fee-rebuild"
 }

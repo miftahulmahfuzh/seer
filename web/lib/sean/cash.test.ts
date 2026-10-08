@@ -38,6 +38,38 @@ describe('depositDates', () => {
   });
 });
 
+describe('openingUsd: the opening deposit read off the broker balance', () => {
+  // Measured against the owner's own Gotrade balance on 2026-10-08: the schedule's round
+  // 10,000,000 IDR at the market rate 17,871 gives $559.57, but his real opening cash was
+  // $555.69 -- a $3.88 overstatement, the broker's FX spread.
+  const EXACT: ContributionSchedule = { ...OWNER, openingUsd: 555.69 };
+
+  it('uses it verbatim for the opening and still converts the monthly deposits', () => {
+    expect(depositedUsd(EXACT, '2026-10-24', 17_871)).toBeCloseTo(555.69, 2);
+    // one 5,000,000 IDR deposit has landed by 2026-11-02
+    expect(depositedUsd(EXACT, '2026-11-02', 17_871)).toBeCloseTo(555.69 + 5_000_000 / 17_871, 2);
+  });
+
+  it('reproduces the real wallet, where the rupiah opening does not', () => {
+    // his 20 buys cost 560.60 and the PLTR sale returned 72.27
+    const orders: CashFlowOrder[] = [
+      ...Array.from({ length: 20 }, () => ({ side: 'buy' as const, totalUsd: 28.03 })),
+      { side: 'sell' as const, totalUsd: 72.27 },
+    ];
+    const args = { through: '2026-10-08', usdIdr: 17_871, orders };
+    expect(cashUsd({ schedule: EXACT, ...args })).toBeCloseTo(67.36, 2);   // Gotrade said $67.36
+    expect(cashUsd({ schedule: OWNER, ...args })).toBeCloseTo(71.24, 2);   // the old, spread-blind figure
+  });
+
+  it('null and absent both keep the pure-rupiah conversion', () => {
+    const absent = { ...OWNER } as ContributionSchedule;
+    delete (absent as { openingUsd?: unknown }).openingUsd;
+    for (const s of [OWNER, { ...OWNER, openingUsd: null }, absent]) {
+      expect(depositedUsd(s, '2026-10-24', OWNER_USD_IDR)).toBeCloseTo(560.51, 2);
+    }
+  });
+});
+
 describe('depositedIdr and depositedUsd', () => {
   it('the owner’s real rupiah: 10M to start, +5M on each 25th', () => {
     expect(depositedIdr(OWNER, '2026-10-24')).toBe(10_000_000);

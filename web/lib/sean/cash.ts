@@ -50,6 +50,20 @@ export type ContributionSchedule = {
   monthlyIdr: number;
   /** 1-28, so that every month has the day. */
   dayOfMonth: number;
+  /**
+   * The opening deposit in DOLLARS, when it is known exactly (`sean_link.opening_usd`). Set, it
+   * replaces `initialIdr / usdIdr` and nothing else; the monthly rupiah deposits still convert at
+   * the rate given. Null or absent keeps the pure-rupiah behaviour, so every existing schedule
+   * converts exactly as before.
+   *
+   * WHY. `initialIdr` is a round number (10,000,000) converted at the newest `fx_rates` row -- a
+   * MARKET mid. The rate the owner's transfer actually got includes Gotrade's spread, so the
+   * derived wallet is wrong by that spread for as long as the plan lives: measured 2026-10-08,
+   * 10,000,000 / 17,871 = $559.57 against a real opening of $555.69, an implied effective rate of
+   * about 17,996 and a standing $3.88 overstatement. The opening deposit is the one deposit the
+   * owner can read off his own balance, so it is the one worth recording in dollars.
+   */
+  openingUsd?: number | null;
 };
 
 /**
@@ -62,6 +76,7 @@ export const OWNER_MONTHLY: ContributionSchedule = {
   initialIdr: 10_000_000,
   monthlyIdr: 5_000_000,
   dayOfMonth: 25,
+  openingUsd: null,
 };
 
 /**
@@ -128,14 +143,22 @@ export function depositedIdr(s: ContributionSchedule, through: string): number {
 }
 
 /**
- * Dollars deposited from `startDate` through `through`, converted at `usdIdr` (rupiah per dollar),
- * to the cent. One rate for every deposit: the owner's wallet is in dollars once it reaches
- * Gotrade, and Sean has no record of the rate each transfer actually got. The override
- * (`sean_link.budget_usd`) is what corrects a rate that has drifted far enough to matter.
+ * Dollars deposited from `startDate` through `through`, to the cent. The monthly rupiah deposits
+ * convert at `usdIdr` (rupiah per dollar) -- one rate for all of them, because Sean has no record
+ * of the rate each transfer actually got.
+ *
+ * `schedule.openingUsd`, when set, is the opening deposit in dollars and is used verbatim instead
+ * of `initialIdr / usdIdr`: it is the one deposit the owner can read off his own balance, and
+ * taking it exactly removes the broker's FX spread from the wallet for the life of the plan. Unset,
+ * every deposit converts at `usdIdr` exactly as before.
  */
 export function depositedUsd(s: ContributionSchedule, through: string, usdIdr: number): number {
   if (!Number.isFinite(usdIdr) || usdIdr <= 0) throw new Error(`usdIdr must be > 0, got ${usdIdr}`);
-  return cents(depositedIdr(s, through) / usdIdr);
+  const n = depositDates(s, through).length;
+  if (n === 0) return 0;
+  const opening =
+    s.openingUsd === null || s.openingUsd === undefined ? s.initialIdr / usdIdr : s.openingUsd;
+  return cents(opening + (s.monthlyIdr * (n - 1)) / usdIdr);
 }
 
 /**

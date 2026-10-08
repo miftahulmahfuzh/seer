@@ -53,6 +53,8 @@ export type SeanLink = {
   since: string;
   /** The owner's plan size; null = what the plan holds now. */
   budgetUsd: number | null;
+  /** The opening deposit in dollars, read off the broker balance; null = convert initialIdr. */
+  openingUsd: number | null;
   short: string;
   name: string;
   sub: string;
@@ -63,7 +65,7 @@ export type SeanLink = {
 };
 
 export async function link(): Promise<SeanLink | null> {
-  const [r] = await sql`SELECT l.strategy_id, l.since::text AS since, l.budget_usd,
+  const [r] = await sql`SELECT l.strategy_id, l.since::text AS since, l.budget_usd, l.opening_usd,
       s.name, s.sub, s.icon, s.rules_id, s.status
     FROM sean_link l JOIN strategies s ON s.id = l.strategy_id
     WHERE l.id = 1`;
@@ -72,6 +74,7 @@ export async function link(): Promise<SeanLink | null> {
     strategyId: r.strategy_id,
     since: String(r.since).slice(0, 10),
     budgetUsd: r.budget_usd === null || r.budget_usd === undefined ? null : Number(r.budget_usd),
+    openingUsd: r.opening_usd === null || r.opening_usd === undefined ? null : Number(r.opening_usd),
     short: shortLabel(r.name, r.strategy_id),
     name: r.name,
     sub: r.sub ?? '',
@@ -169,7 +172,7 @@ export async function planState(): Promise<PlanState | null> {
   // membership is counted in (planOrders / orderSession), so the deposits and the orders are
   // sliced consistently.
   const cash = cashUsd({
-    schedule: { ...OWNER_MONTHLY, startDate: l.since },
+    schedule: { ...OWNER_MONTHLY, startDate: l.since, openingUsd: l.openingUsd },
     through: orderSession(new Date().toISOString()),
     usdIdr,
     orders: inPlan.map(o => ({ side: o.side, totalUsd: o.totalUsd })),

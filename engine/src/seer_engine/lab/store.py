@@ -1926,7 +1926,16 @@ def as_mapping(row: sqlite3.Row) -> Mapping[str, Any]:
 # hurdle against a published bar of 0.90. The marker is a third state, not a second one: it
 # separates "this hurdle does not apply" from "this hurdle could not be measured, so it was
 # missed", which ``Verdict.derived`` conflates (R7).
-SNAPSHOT_VERSION = 4
+#
+# 5 adds ``mwr`` and ``spyTrMwr``: what a **funded** trial's money actually earned, and what the
+# same deposits put into SPY TR would have earned. Null for every trial that received none, which
+# is all 128 recorded ones. The runner has fed the book on the owner's real schedule since
+# ``lab-realistic-gate`` phase 2, and once money goes in after the start ``total_return`` stops
+# being a return: on one measured funded run it reads 10.7821 (+1078%) beside an ``mwr`` of 0.0764
+# (7.6%), the difference being the owner's own deposits piling up. Nothing published them, so the
+# site could only show the flattering number -- and the one consumer that needed them read the
+# database directly with raw SQL.
+SNAPSHOT_VERSION = 5
 EXPECTED_FAILURE_SEP = "\n\nExpected failure: "  # how lab ideas write their hypothesis
 
 
@@ -1984,7 +1993,9 @@ def _snapshot_curve(text: str) -> list[list[Any]]:
     return out
 
 
-def _snapshot_trial(t: Mapping[str, Any], v: Verdict) -> dict[str, Any]:
+def _snapshot_trial(
+    t: Mapping[str, Any], v: Verdict, f: Mapping[str, Any] | sqlite3.Row | None = None
+) -> dict[str, Any]:
     """One ``trials`` row as the web reads it: the record, **and** the verdict it reads as now.
 
     Both, and labelled as such, because they answer different questions and the site asks both.
@@ -1997,6 +2008,15 @@ def _snapshot_trial(t: Mapping[str, Any], v: Verdict) -> dict[str, Any]:
     gate block beside it is resolved live (``_gate_n``, ``DSR_MIN``), so a page that took its
     ticks from ``failed`` and its numbers from ``gate`` was reading two different days at once.
     A page must take **both** from the ``Now`` fields; ``failed`` is for the record panel only.
+
+    ``f`` is this trial's :func:`funding_of` row, or None when it received no deposits -- the
+    normal answer for all 128 recorded trials. It publishes ``mwr`` and ``spyTrMwr``, and they are
+    the reason this row cannot be read off ``totalReturn`` alone once the book is fed: with money
+    going in after the start, ``total_return`` counts the owner's own deposits as gains (10.7821
+    beside an ``mwr`` of 0.0764 on one measured run). Both are published or neither is, because the
+    comparison ``beats SPY TR`` is decided on for such a row is the **pair** -- ``dev.beats_spy_tr``
+    falls back to the total-return comparison the moment either is missing, so a consumer that
+    showed one alone would contradict the verdict beside it.
 
     ``luckGated`` says whether the luck hurdle applies to this row at all (:func:`luck_gated`).
     Without it the verdict is ambiguous in exactly one place: a test look's ``failedNow`` omits
@@ -2032,6 +2052,10 @@ def _snapshot_trial(t: Mapping[str, Any], v: Verdict) -> dict[str, Any]:
         "spyTrReturn": _num(t["spy_tr_return"]),
         "spyTrCagr": _num(t["spy_tr_cagr"]),
         "mar": _num(t["mar"]),
+        # What the money actually earned on a funded run, and what the same deposits put into SPY
+        # TR earned. Null together for an unfunded trial, which is every recorded one.
+        "mwr": None if f is None else _num(f["mwr"]),
+        "spyTrMwr": None if f is None else _num(f["spy_tr_mwr"]),
         # The record: what the lab said on the run date, by the bars of that day.
         "failed": [f for f in t["failed"].split("; ") if f],
         "eligible": bool(t["eligible"]),
@@ -2083,7 +2107,9 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
     Deterministic: the same database gives the same value; there is no wall-clock time in it
     (``asOf`` is the latest timestamp found in the data, "" for an empty lab). Reads only what
     schema v1 and v2 share and never touches ``meta``, so it works on a read-only connection to
-    a database that has not been migrated. Gate and data facts come from the engine's constants;
+    a database that has not been migrated -- the one table added since, ``trial_funding``, is
+    reached only through ``funding_of``, which answers None when it does not exist. Gate and data
+    facts come from the engine's constants;
     the gate's ``dsrPolicy`` / ``dsrN`` / ``dsrNBasis`` are resolved from ``DSR_POLICY`` against
     ``trials`` at export time rather than stored, so the published gate follows the constant
     (design §7).
@@ -2163,7 +2189,7 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
         # One gate, resolved once and passed down: `published_verdict` judges every row against
         # the same N, which is also the `gate.dsrN` published above.
         "trials": [
-            _snapshot_trial(t, published_verdict(conn, t, at=g))
+            _snapshot_trial(t, published_verdict(conn, t, at=g), funding_of(conn, t["n"]))
             for t in _dicts(conn, "SELECT * FROM trials ORDER BY n")
         ],
         "insights": [

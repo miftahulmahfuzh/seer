@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { GATE, withVerdict } from '../../../lib/sera/fixture';
 import type { LabMethod, LabTrial } from '../../../lib/sera/types';
 import {
-  BEST_COLOR, conditionSentence, count, dsrNote, filterRows, fixed, growthFmt, growthLines, hurdlePoints, isAlive,
+  anyMoneyWeighted, BEST_COLOR, conditionSentence, count, dsrNote, earned, earnedVs, filterRows, fixed, growthFmt,
+  growthLines, hurdlePoints, isAlive,
   longDate,
   markLabel, marks, methodRows, parseShow, pct1, pfText, showCounts, showHref, signed1, sortMethods, sourceHref,
   SPY_COLOR, SPY_DASH, techRows, untestedNote, windowText, workedSummary, yearPairs,
@@ -23,7 +24,7 @@ const trial = (over: Partial<LabTrial> = {}): LabTrial => {
     configText: 'rules=TradeRules(...)', window: 'dev', start: '1996-01-03', end: '2015-10-16', gitSha: 'abc1234',
     runAt: '2026-10-04T12:00:00+07:00', totalReturn: 3.276, cagr: 0.076, maxDrawdown: 0.129, profitFactor: 2.27,
     pfInfinite: false, trades: 1130, sharpe: 0.71, exposure: 0.48, turnover: 3.1, worstYear: 2015,
-    worstYearReturn: -0.023, spyTrReturn: 3.514, spyTrCagr: 0.079, mar: 0.59,
+    worstYearReturn: -0.023, spyTrReturn: 3.514, spyTrCagr: 0.079, mar: 0.59, mwr: null, spyTrMwr: null,
     failed: ['beats SPY TR', 'DSR >= 0.95'], eligible: false, dsr: 0.899, nTrialsAtRun: 58,
     luckGated: true, failedNow: [], eligibleNow: false, dsrNow: null,
     curve: [['1996-01-31', 1], ['1996-02-29', 1.02], ['1997-01-31', 1.1]],
@@ -171,6 +172,36 @@ describe('marks / workedSummary', () => {
     expect(workedSummary(look, GATE).headline).toBe(
       'Not yet. Its best variant, M0001-TV12, cleared 4 of 5 hurdles on 2015–2026 data.',
     );
+  });
+
+  it('says what a funded run earned instead of quoting a curve the deposits lifted', () => {
+    // The whole point of publishing the pair: on a real funded run the engine reports a total
+    // return of +1078% beside an earned rate of 7.6%, and the +1078% is mostly the owner's own
+    // deposits. The sentence beside the tick must name the number the tick was decided on.
+    const funded = trial({ mwr: 0.0764, spyTrMwr: 0.0712, failed: [], failedNow: [] });
+    expect(conditionSentence('spy', true, funded, GATE)).toBe(
+      'Beats SPY: yes (your money earned 7.6% a year, against 7.1% from putting the same ' +
+      'deposits into SPY on the same days).',
+    );
+    // An unfunded row is untouched, which is all 128 recorded ones.
+    expect(conditionSentence('spy', false, trial(), GATE)).toBe('Beats SPY: no (7.6% vs 7.9% a year).');
+  });
+
+  it('gives a funded run its own cells, and leaves an unfunded one exactly as it was', () => {
+    const funded = trial({ mwr: 0.0764, spyTrMwr: 0.0712 });
+    expect(anyMoneyWeighted([trial(), funded])).toBe(true);
+    expect(anyMoneyWeighted([trial(), trial({ n: 2 })])).toBe(false);
+    expect(earned(funded)).toBe('+7.6%');
+    expect(earnedVs(funded)).toBe('vs +7.1%');
+    // Not a dash standing in for a number: an unfunded run has no earned rate to show, because
+    // its own return already is one.
+    expect(earned(trial())).toBe('—');
+    expect(earnedVs(trial())).toBeNull();
+
+    const rows = Object.fromEntries(techRows(funded));
+    expect(rows['What the money earned']).toBe('+7.6% a year');
+    expect(rows['The same deposits in SPY']).toBe('+7.1% a year');
+    expect(Object.keys(Object.fromEntries(techRows(trial())))).not.toContain('What the money earned');
   });
 
   it('records whether the luck bar applied, from the engine and not from the window', () => {

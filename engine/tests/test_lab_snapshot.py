@@ -5,6 +5,7 @@ the export of the committed database."""
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import math
@@ -16,6 +17,7 @@ import pytest
 
 from seer_engine import cli
 from seer_engine.backtest import dev, tuning
+from seer_engine.commands import lab as lab_cmd
 from seer_engine.lab import seed as seed_mod
 from seer_engine.lab import store
 from seer_engine.lab.seed import seed
@@ -51,7 +53,7 @@ TRIAL_KEYS = {"n", "methodId", "candidateId", "rulesId", "allocatorId", "configT
               "gitSha", "runAt", "totalReturn", "cagr", "maxDrawdown", "profitFactor", "pfInfinite", "trades",
               "sharpe", "exposure", "turnover", "worstYear", "worstYearReturn", "spyTrReturn", "spyTrCagr", "mar",
               "failed", "eligible", "dsr", "nTrialsAtRun", "luckGated", "failedNow", "eligibleNow", "dsrNow",
-              "curve"}
+              "mwr", "spyTrMwr", "curve"}
 
 
 def _v1_db(path):
@@ -352,7 +354,7 @@ def test_the_snapshot_follows_the_contract(lab):
     s = store.snapshot(lab)
     assert list(s) == ["version", "asOf", "gate", "data", "summary", "benchmark", "methods", "trials",
                        "insights", "ideasSeen", "paper"]
-    assert s["version"] == 4
+    assert s["version"] == 5
     gate = s["gate"]
     assert list(gate) == [
         "maxDrawdown", "minProfitFactor", "minTrades", "dsrMin",
@@ -409,6 +411,10 @@ def test_the_snapshot_follows_the_contract(lab):
         # verdict rather than a copy: `eligibleNow` follows `failedNow`, never `eligible`.
         assert set(t["failedNow"]) <= LIVE_LABELS
         assert t["eligibleNow"] == (not t["failedNow"])
+        # No trial in this fixture received deposits, which is the state of the real lab too: all
+        # 128 recorded trials are unfunded. Both fields are null, and null is the definite answer
+        # "this run was not fed", not a missing value.
+        assert t["mwr"] is None and t["spyTrMwr"] is None
         assert all(isinstance(p[0], str) and isinstance(p[1], float) for p in t["curve"])
     t55 = s["trials"][-1]
     assert t55["profitFactor"] is None and t55["pfInfinite"] is True
@@ -432,6 +438,62 @@ def test_the_snapshot_follows_the_contract(lab):
     stamps = ([m["updated"] for m in s["methods"]] + [t["runAt"] for t in s["trials"]]
               + [i["added"] for i in s["insights"]] + [x["added"] for x in s["ideasSeen"]])
     assert s["asOf"] == max(stamps)
+
+
+def test_a_funded_trial_publishes_what_its_money_earned(lab):
+    """A trial that received deposits publishes ``mwr`` and ``spyTrMwr``; one that did not
+    publishes both as null.
+
+    The two exist because ``totalReturn`` stops being a return once money goes in after the start:
+    this row records 1.0 while the money it was fed earned 0.0764. Publishing them is what lets a
+    page show the number the owner actually earned instead of the one his own deposits inflated --
+    and the only honest thing to read it against is the same dollars, on the same days, in SPY TR.
+
+    They move together on purpose. ``dev.beats_spy_tr`` falls back to the total-return comparison
+    the moment either is missing, so a consumer handed one alone would contradict the verdict
+    beside it.
+    """
+    assert all(t["mwr"] is None and t["spyTrMwr"] is None for t in store.snapshot(lab)["trials"])
+    with lab:
+        store.insert_funding(lab, [store.FundingRow(
+            trial_n=55, mwr=0.0764, spy_tr_mwr=0.0712, deposits_usd=3681.00, deposits_n=12,
+            schedule="+5,000,000 IDR on the 25th of each month",
+            measured="2026-10-08T00:00:00+00:00",
+        )])
+    trials = store.snapshot(lab)["trials"]
+    t55 = trials[-1]
+    assert t55["n"] == 55 and t55["mwr"] == 0.0764 and t55["spyTrMwr"] == 0.0712
+    # The record beside it is untouched: this trial still reports the +100% its curve shows, and
+    # publishing the earned rate neither rewrites nor hides it.
+    assert t55["totalReturn"] == 1.0
+    assert all(t["mwr"] is None and t["spyTrMwr"] is None for t in trials[:54])
+
+
+def test_lab_show_prints_what_a_funded_trials_money_earned(lab, capsys):
+    """The owner reads ``lab show`` before he reads anything else, and its first line is not a
+    return once the run was fed.
+
+    So a funded trial gets a second line naming what the money earned, what the same deposits put
+    into SPY TR earned, and on what schedule -- and saying in plain words that the numbers above
+    count those deposits as gains. An unfunded trial, which is every recorded one, prints nothing
+    extra: its ``total_return`` already is a return.
+    """
+    lab_cmd._show(lab, argparse.Namespace(method="M0001"))
+    assert "funded:" not in capsys.readouterr().out
+
+    with lab:
+        store.insert_funding(lab, [store.FundingRow(
+            trial_n=55, mwr=0.0764, spy_tr_mwr=0.0712, deposits_usd=3681.00, deposits_n=12,
+            schedule="+5,000,000 IDR on the 25th of each month",
+            measured="2026-10-08T00:00:00+00:00",
+        )])
+    lab_cmd._show(lab, argparse.Namespace(method="M0001"))
+    line = [ln for ln in capsys.readouterr().out.splitlines() if "funded:" in ln]
+    assert len(line) == 1
+    assert "your money earned +7.6% a year" in line[0]
+    assert "+7.1% for the same deposits put into SPY TR" in line[0]
+    assert "12 deposits, +5,000,000 IDR on the 25th of each month" in line[0]
+    assert "count those deposits as gains" in line[0]
 
 
 def test_a_test_window_row_publishes_that_the_luck_gate_does_not_apply(lab):

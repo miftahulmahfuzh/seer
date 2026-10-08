@@ -4,6 +4,7 @@ import type { InsightKind, LabStatus, SourceKind } from './types';
 
 export type GlossaryKey =
   | 'return'
+  | 'mwr'
   | 'cagr'
   | 'maxDrawdown'
   | 'profitFactor'
@@ -26,6 +27,14 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
   return: {
     term: 'Return',
     plain: 'How much the money grew or shrank over the whole test, as a share of what it started with.',
+  },
+  mwr: {
+    term: 'What your money earned',
+    plain:
+      'The rate your money actually earned, given you kept adding to it: what a savings account ' +
+      'would have had to pay to turn the same deposits, paid in on the same days, into the same ' +
+      'final balance, which is the honest number once you top the account up, because the plain ' +
+      'return counts the money you put in as if it were money you made.',
   },
   cagr: {
     term: 'CAGR',
@@ -99,6 +108,7 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
 export const GLOSSARY_ORDER: GlossaryKey[] = [
   'spyTr',
   'return',
+  'mwr',
   'cagr',
   'maxDrawdown',
   'profitFactor',

@@ -9,6 +9,7 @@ import {
   funnel,
   gateChecks,
   misses,
+  moneyWeighted,
   progress,
   spyForWindow,
   trialsByMethod,
@@ -17,7 +18,37 @@ import {
 import { GATE, method, trial } from './fixture';
 import type { Benchmark } from './types';
 
+describe('moneyWeighted', () => {
+  it('is null for a trial that received no deposits, which is every recorded one', () => {
+    expect(moneyWeighted(trial())).toBeNull();
+  });
+
+  it('is the pair, and only ever the pair', () => {
+    expect(moneyWeighted(trial({ mwr: 0.0764, spyTrMwr: 0.0712 }))).toEqual({ mwr: 0.0764, spyTrMwr: 0.0712 });
+    // Half a pair is not a funded reading. `dev.beats_spy_tr` falls back to the total-return
+    // comparison the moment either number is missing, so a page that showed the surviving half
+    // would print a figure the tick beside it was not decided on.
+    expect(moneyWeighted(trial({ mwr: 0.0764 }))).toBeNull();
+    expect(moneyWeighted(trial({ spyTrMwr: 0.0712 }))).toBeNull();
+  });
+});
+
 describe('gateChecks', () => {
+  it('reads a funded trial on what its money earned, not on its curve', () => {
+    // The row's own cagr (7.6%) and spyTrCagr (7.9%) are untouched and would read the old way.
+    // Once deposits arrive neither is a return, so the hurdle is printed on the pair the engine
+    // actually judged it by.
+    const funded = trial({ mwr: 0.0764, spyTrMwr: 0.0712, failedNow: [], failed: [] });
+    expect(gateChecks(funded, GATE)[0]).toEqual({
+      key: 'spy',
+      label: 'Beats SPY',
+      value: '+7.6% a year',
+      target: 'more than +7.1% a year from the same deposits in SPY',
+      ok: true,
+    });
+  });
+
+
   it('lists six hurdles in order with plain labels, values and targets from the gate', () => {
     const checks = gateChecks(trial(), GATE);
     expect(checks.map((c) => c.key)).toEqual(['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr']);

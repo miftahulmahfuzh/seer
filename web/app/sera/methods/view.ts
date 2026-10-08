@@ -9,8 +9,8 @@ import {
 } from 'lucide-react';
 import { pct } from '../../../lib/format';
 import {
-  bestVariant, CONDITION_KEYS, CONDITION_LABEL, conditionOk, conditionsPassed, excessCagr, misses, trialsByMethod,
-  type ConditionKey,
+  bestVariant, CONDITION_KEYS, CONDITION_LABEL, conditionOk, conditionsPassed, excessCagr, misses, moneyWeighted,
+  trialsByMethod, type ConditionKey,
 } from '../../../lib/sera/derive';
 import type { Gate, LabMethod, LabTrial, Point } from '../../../lib/sera/types';
 
@@ -137,6 +137,33 @@ export const longDate = (iso: string): string => {
 /** '1996-01-03'..'2015-10-16' -> '1996–2015'. */
 export const windowText = (t: LabTrial): string => `${t.start.slice(0, 4)}–${t.end.slice(0, 4)}`;
 
+/* ---- Funded runs --------------------------------------------------------------------------- */
+// A trial the lab fed deposits into is read differently from one it did not, and the difference
+// is not cosmetic: on one measured funded run the engine reports a total return of +1078% beside
+// an earned rate of 7.6%, almost all of the gap being the owner's own deposits piling up. So the
+// earned rate gets a column of its own and never shares one with an unfunded row's return, and
+// the two cells the deposits inflate are blanked rather than printed as if they meant something.
+
+/** Does any trial on this page carry a money-weighted pair? Decides whether the column shows. */
+export const anyMoneyWeighted = (trials: LabTrial[]): boolean => trials.some(t => moneyWeighted(t) !== null);
+
+/** '+7.6%' for a funded trial's earned rate, '—' for one that received no deposits. */
+export const earned = (t: LabTrial): string => {
+  const m = moneyWeighted(t);
+  return m === null ? '—' : signed1(m.mwr);
+};
+
+/** 'vs +7.1%' — the same deposits in SPY — or null when there is nothing to compare. */
+export const earnedVs = (t: LabTrial): string | null => {
+  const m = moneyWeighted(t);
+  return m === null ? null : `vs ${signed1(m.spyTrMwr)}`;
+};
+
+/** Why a funded row's return and growth-a-year cells are blank. Everyday words, no jargon. */
+export const DEPOSITS_TIP =
+  'Money was added to this run every month, so these two count your own deposits as if they were ' +
+  'gains. What the money actually earned is in the next column.';
+
 /* ---- The six hurdles ----------------------------------------------------------------------- */
 
 /**
@@ -180,9 +207,16 @@ export function conditionSentence(key: ConditionKey, ok: boolean | null, t: LabT
       : `${label}: does not apply.`;
   }
   const yn = ok ? 'yes' : 'no';
+  const money = moneyWeighted(t);
   switch (key) {
     case 'spy':
-      return `${label}: ${yn} (${pct1(t.cagr)} vs ${pct1(t.spyTrCagr)} a year).`;
+      // A funded run is judged on what its money earned, so that is what this sentence quotes.
+      // Its `cagr` is not a yearly return once deposits keep arriving — it is the shape of a
+      // curve that the deposits themselves lifted — and quoting it here would name a number the
+      // engine did not decide the tick by.
+      return money !== null
+        ? `${label}: ${yn} (your money earned ${pct1(money.mwr)} a year, against ${pct1(money.spyTrMwr)} from putting the same deposits into SPY on the same days).`
+        : `${label}: ${yn} (${pct1(t.cagr)} vs ${pct1(t.spyTrCagr)} a year).`;
     case 'drawdown':
       return `${label}: ${yn} (${pct1(t.maxDrawdown)} ${ok ? '≤' : '>'} ${pct(gate.maxDrawdown, 0)}).`;
     case 'pf':
@@ -346,5 +380,14 @@ export function techRows(t: LabTrial): [string, string][] {
     ['Luck bar applies', t.luckGated ? 'yes' : 'no — a test run has nothing to discount for luck'],
     ['Missed when run', t.failed.length ? t.failed.join('; ') : 'nothing: eligible'],
     ['Missed by today’s bars', t.failedNow.length ? t.failedNow.join('; ') : 'nothing: eligible'],
+    // Only for a run that was fed. An unfunded trial has nothing to say here and says nothing,
+    // which is why these are appended rather than dashed: every recorded trial is unfunded, and a
+    // row of em-dashes on all 128 of them would be noise standing in for a definite answer.
+    ...(moneyWeighted(t)
+      ? ([
+        ['What the money earned', `${earned(t)} a year`],
+        ['The same deposits in SPY', `${signed1(moneyWeighted(t)!.spyTrMwr)} a year`],
+      ] as [string, string][])
+      : []),
   ];
 }

@@ -4,9 +4,10 @@ export type LabSnapshot = {
   /**
    * 2 added the derived verdict to every trial (`failedNow` / `eligibleNow` / `dsrNow`);
    * 3 added `paper`, which names the lab method behind each roster entry;
-   * 4 added `luckGated`, which says whether the luck hurdle applies to a trial at all.
+   * 4 added `luckGated`, which says whether the luck hurdle applies to a trial at all;
+   * 5 added `mwr` / `spyTrMwr`, what a funded trial's money actually earned.
    */
-  version: 4;
+  version: 5;
   asOf: string;
   gate: {
     maxDrawdown: number;
@@ -123,6 +124,33 @@ export type LabTrial = {
   spyTrReturn: number | null;
   spyTrCagr: number | null;
   mar: number | null;
+  /**
+   * **What the money actually earned**, on a trial that was fed deposits after it started: the
+   * rate a savings account would have had to pay to turn the same deposits, paid in on the same
+   * days, into the same final balance (`lab.store.FundingRow.mwr`).
+   *
+   * `null` for a trial that received no deposits — all 128 recorded ones — and that null is a
+   * definite answer, "this run was not fed", not a missing value. For such a row `cagr` already
+   * *is* the money-weighted return, and `totalReturn` is already a return.
+   *
+   * On a funded row neither of those is true any more, and the gap is not a rounding difference:
+   * one measured funded run reports a `totalReturn` of 10.7821 (+1078%) beside an `mwr` of 0.0764
+   * (7.6%), the rest being the owner's own deposits piling up. So **never put this number in a
+   * column with an unfunded row's `totalReturn` or `cagr`** — they answer different questions and
+   * differ by two orders of magnitude.
+   */
+  mwr: number | null;
+  /**
+   * The same measure for the **dollar-cost-averaged** SPY total-return curve: the identical money,
+   * paid in on the identical days, put into SPY instead. The only like-for-like comparison a
+   * funded trial has, and the pair `beats SPY TR` is decided on for such a row.
+   *
+   * Always null exactly when `mwr` is null, and read as a pair: the engine's `dev.beats_spy_tr`
+   * falls back to the total-return comparison the moment either is missing, so a page showing one
+   * alone would contradict the tick printed beside it. `derive.moneyWeighted` is that branch, and
+   * is the only thing that should decide whether a row reads money-weighted.
+   */
+  spyTrMwr: number | null;
   /**
    * **The record, not the verdict.** The hurdles this trial missed *on the day it ran*, by the
    * bars of that day: `trials` is append-only, so 110 committed rows still say `DSR >= 0.95` and

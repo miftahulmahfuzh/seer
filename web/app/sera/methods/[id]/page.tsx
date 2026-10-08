@@ -11,16 +11,16 @@ import { ScatterChart, type ScatterPoint } from '@/components/sera/charts/Scatte
 import { PageHeader } from '@/components/sera/PageHeader';
 import { Section } from '@/components/sera/Section';
 import { Term } from '@/components/sera/Term';
-import { bestVariant, CONDITION_KEYS, CONDITION_LABEL, drawdownSeries, spyForWindow, yearlyReturns } from '@/lib/sera/derive';
+import { bestVariant, CONDITION_KEYS, CONDITION_LABEL, drawdownSeries, moneyWeighted, spyForWindow, yearlyReturns } from '@/lib/sera/derive';
 import { requireSera } from '@/lib/sera/gate';
 import { GLOSSARY, type GlossaryKey, INSIGHT_KIND_LABEL, SOURCE_KIND_LABEL, STATUS_LABEL } from '@/lib/sera/glossary';
 import { childrenOf, insightsOf, lab, methodById, trialsOf } from '@/lib/sera/lab';
 import { collapseRepeatedHeadings, renderMarkdown } from '@/lib/sera/markdown';
 import type { LabMethod, LabTrial } from '@/lib/sera/types';
 import {
-  BEST_COLOR, conditionTip, count, dsrNote, fixed, growthFmt, growthLines, hurdlePoints, longDate, markLabel, marks,
-  pct1, pfText, signed1, SOURCE_ICON, sourceHref, SPY_COLOR, SPY_DASH, techRows, untestedNote, windowText,
-  workedSummary, yearPairs, type Mark,
+  anyMoneyWeighted, BEST_COLOR, conditionTip, count, DEPOSITS_TIP, dsrNote, earned, earnedVs, fixed, growthFmt,
+  growthLines, hurdlePoints, longDate, markLabel, marks, pct1, pfText, signed1, SOURCE_ICON, sourceHref, SPY_COLOR,
+  SPY_DASH, techRows, untestedNote, windowText, workedSummary, yearPairs, type Mark,
 } from '../view';
 import s from './method.module.css';
 
@@ -192,6 +192,9 @@ function Tested({ m, trials, best }: { m: LabMethod; trials: LabTrial[]; best: L
   const ddSpy = drawdownSeries(spy);
   const years = yearPairs(yearlyReturns(best.curve), yearlyReturns(spy));
   const points = hurdlePoints(lab.trials, m.id);
+  // Only shown when some run on this page was fed deposits. Every one of the 128 recorded trials
+  // was not, so today this column never appears and the table reads exactly as it always has.
+  const funded = anyMoneyWeighted(trials);
 
   // Phase 3 chart-kit shapes. Dated points go in as ISO strings (date mode, year ticks).
   const ddSeries: LineSeries[] = [
@@ -291,7 +294,8 @@ function Tested({ m, trials, best }: { m: LabMethod; trials: LabTrial[]; best: L
       </Section>
 
       <Section eyebrow="Variants" title="Every variant"
-        caption="One row per test run. A tick means the hurdle was cleared. The best variant is highlighted."
+        caption={`One row per test run. A tick means the hurdle was cleared. The best variant is highlighted.${
+          funded ? ' Some runs here had money added every month, so their return and growth-a-year cells are left blank: with deposits arriving, neither is a return. What that money actually earned has a column of its own.' : ''}`}
         className={s.chartSheet}>
         <div className={s.tableWrap}>
           <table className={s.table}>
@@ -301,6 +305,9 @@ function Tested({ m, trials, best }: { m: LabMethod; trials: LabTrial[]; best: L
                 <th scope="col">Window</th>
                 <th scope="col" className={s.r}><T k="cagr">Growth a year</T> vs SPY</th>
                 <th scope="col" className={s.r}><T k="return">Return</T></th>
+                {funded && (
+                  <th scope="col" className={s.r}><T k="mwr">What your money earned</T> vs SPY</th>
+                )}
                 <th scope="col" className={s.r}><T k="maxDrawdown">Max DD</T></th>
                 <th scope="col" className={s.r}><T k="profitFactor">PF</T></th>
                 <th scope="col" className={s.r}><T k="trades">Trades</T></th>
@@ -317,15 +324,34 @@ function Tested({ m, trials, best }: { m: LabMethod; trials: LabTrial[]; best: L
             <tbody>
               {trials.map(t => {
                 const note = dsrNote(t, gate);
+                // The two cells the deposits inflate. They are blanked rather than printed,
+                // because a funded run's +1078% is mostly the owner's own money arriving and
+                // putting it in the same column as an unfunded run's return invites exactly the
+                // comparison that is not true.
+                const money = moneyWeighted(t);
                 return (
                   <tr key={t.n} className={t.n === best.n ? s.bestRow : undefined}>
                     <th scope="row" className={s.variant}>{t.candidateId}</th>
                     <td><span className={s.window} data-window={t.window}>{t.window === 'dev' ? 'Dev' : 'Test'}</span> {windowText(t)}</td>
                     <td className={s.r}>
-                      <span className="num">{pct1(t.cagr)}</span>
-                      <span className={s.vs}> vs {pct1(t.spyTrCagr)}</span>
+                      {money ? (
+                        <span className="num" data-tip={DEPOSITS_TIP}>—</span>
+                      ) : (
+                        <>
+                          <span className="num">{pct1(t.cagr)}</span>
+                          <span className={s.vs}> vs {pct1(t.spyTrCagr)}</span>
+                        </>
+                      )}
                     </td>
-                    <td className={`num ${s.r}`}>{signed1(t.totalReturn)}</td>
+                    <td className={`num ${s.r}`}>
+                      {money ? <span data-tip={DEPOSITS_TIP}>—</span> : signed1(t.totalReturn)}
+                    </td>
+                    {funded && (
+                      <td className={s.r}>
+                        <span className="num">{earned(t)}</span>
+                        {earnedVs(t) !== null && <span className={s.vs}> {earnedVs(t)}</span>}
+                      </td>
+                    )}
                     <td className={`num ${s.r}`}>{pct1(t.maxDrawdown)}</td>
                     <td className={`num ${s.r}`}>{pfText(t)}</td>
                     <td className={`num ${s.r}`}>{count(t.trades)}</td>

@@ -49,6 +49,10 @@ export function trial(over: Partial<LabTrial> = {}): LabTrial {
     spyTrReturn: 4.0,
     spyTrCagr: 0.079,
     mar: 0.63,
+    // Unfunded, like all 128 recorded trials. A test about a funded run sets both together —
+    // `derive.moneyWeighted` only reads a row money-weighted when neither is null.
+    mwr: null as number | null,
+    spyTrMwr: null as number | null,
     failed: ['beats SPY TR'],
     eligible: false,
     dsr: 0.97,

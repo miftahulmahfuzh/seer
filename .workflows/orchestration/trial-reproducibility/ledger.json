@@ -43,22 +43,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "4807d19d9ce5015848568e638b3b22f2eaf7428e",
       "depends_on": [
         2
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "gate refuses on price fingerprint (D10), reports warn, lab run pins store; committed lab strands 0",
       "package": "lab` (`hardgate`), `commands",
       "plan": ".workflows/plan/trial-reproducibility/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-09T13:41:45+00:00",
       "satisfies": [
         "R1",
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P2-ENG-0HTR",
       "title": "Compare like with like: gate refuses, reports warn, `lab run` pins the store"
     },
     {
@@ -88,6 +88,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/trial-reproducibility/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trial-reproducibility",
-  "updated": "2026-10-09T13:33:07+00:00",
+  "updated": "2026-10-09T13:41:45+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trial-reproducibility"
 }

@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-09 17:13
-**Total Active Tasks**: 4
+**Last Updated**: 2026-10-09 18:02
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 105
+- Completed: 106
 
 ---
 
@@ -844,20 +844,32 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - The completed block is left in place under `### [P1] High` marked `[x]`, not moved into `## Completed Tasks` → rung 6, the direct precedent of this same file: every phase of `gotrade-fee-rebuild` and `lab-luck-gate` did the same, because a cross-file block move is the one edit that reliably loses a peer's concurrent append in this shared worktree. Quick Stats recounted from the file rather than blind-decremented (recount is idempotent under concurrency).
     - Phase 2's status flipped to `pending`, not the handler's literal `open` → `open` appears nowhere in this file; `pending` is the value its other unblocked tasks carry (`P2-ENG-N3LB`, `P3-ENG-V2KQ`).
     - `readme-updater` not dispatched, and `engine/package_readme.md` deliberately untouched → rung 2. Phase 1's Owns lists `package_readme.md` under **does not touch**, and the index gives phase 3 (`P1-ENG-T6BJ`) the lab package map and the new `hardgate` API block, to be ‘checked against the modules as phases 1 and 2 actually built them’. Writing it here would both break this phase's exit criteria and put a second author in a file a later phase owns, in a shared worktree.
-- [ ] **P1-ENG-P3MF** Phase 2: The pre-registration records what it cleared, and `lab test` says what changed
+- [x] **P1-ENG-P3MF** Phase 2: The pre-registration records what it cleared, and `lab test` says what changed
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `lab/prereg.py`'s two new `FIELDS` — `folds` and `family_state` — written by `render`, tolerated as absent by `parse` for files that predate the gate (Decision D5), and populated by `promote_method` from `hardgate`; `render`'s prose stating what the fold record means and that it is the bar *this* method cleared; the two new lines `commands/lab.py:_promote` prints, appended to the block **phase 1 leaves behind**; `lab/runner.py`'s `kin_note` and one `print` in `preflight_test` before it returns — **Decision D3's promised line**, with no new refusal, no exit code change and no transition change, and `preflight_test`'s five existing refusals untouched; two rows in `docs/lab/prereg/README.md`'s Format table for `folds` and `family_state`; and eleven additions to `engine/tests/test_lab_prereg.py` (reusing phase 1's `_months` / `_curve` / `_benchmark` rather than redefining them) plus two to `engine/tests/test_lab_test_window.py`. Does not touch `hardgate.py`'s rule (it reads it), `lab/walkforward.py`, `lab status`, the skills, `package_readme.md`, `docs/plans/WALK_FORWARD_EVALUATION_PLAN.md`, any existing **test body**, phase 1's three fixture helpers, or the four committed `docs/lab/prereg/{M0002,M0021,M0022,M0029}.md` files. Exit criteria: a promotion that passes writes a pre-registration carrying `folds:` and `family_state:`; `parse(render(p, name)) == p` still holds exactly, including the new fields; `prereg.parse` reads all four committed files and reports the new fields as not recorded; `promote_method` still refuses to rewrite an existing file and a re-run still does not move the date line; `lab test` on a promoted method whose kin has since failed prints one line naming **every** failed relative and still runs — same exit code, same transition, no new refusal — and prints nothing extra with clean kin; the README Format table lists all seventeen keys, with no DSR threshold and no percentage typed as a literal (`test_lab_gate_wording.py` scans it); `test_lab_prereg.py` reads 42 and `test_lab_test_window.py` reads 19, with every pre-existing test body unmodified.
-  - **Status**: pending
+  - **Status**: completed
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/lab-hard-gate/PLAN.md` (phase 2 of 3)
   - **Satisfies**: R3, R3a, R6 — open question 2, is (K) evaluated at promote only: decide whether `lab test` re-checks it and say which was chosen; R3a, the printed `lab test` note that Decision D3 promises — one line, no new refusal, in `lab/runner.py:preflight_test`; and the pre-registration records the folds won and scored, pick stability, and the family's state at promotion
   - **Depends on**: P1-ENG-K7WZ
   - **Plan**: `.workflows/plan/P1-ENG-P3MF.md`
+  - **Completed**: 2026-10-09 18:02
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/prereg.py, engine/src/seer_engine/lab/runner.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_prereg.py, engine/tests/test_lab_test_window.py, docs/lab/prereg/README.md
+  - **Verified**: all in this worktree with `PYTHONPATH=$PWD/src` and the main checkout's interpreter (`/home/miftah/seer/engine/.venv/bin/python`); the worktree has no `.venv`, and without PYTHONPATH pytest silently tests main. Build: `python -c "from seer_engine.lab import prereg; print(len(prereg.FIELDS), len(prereg.REQUIRED))"` → `17 15` (expected). `pytest -q tests/test_lab_*.py` → **552 passed, 2 skipped** (both skips pre-existing live-store opt-ins). Counts: `test_lab_prereg.py` reads **42** (was 31) and `test_lab_test_window.py` reads **19** (was 17), exactly as the exit criteria demand. Every pre-existing test body byte-identical: `git diff -- engine/tests/test_lab_prereg.py engine/tests/test_lab_test_window.py | grep -c "^-[^-]"` → **0** deleted lines, additions only. `git status --porcelain docs/lab/prereg/` → only `M README.md`; the four committed records M0002/M0021/M0022/M0029 untouched. All seventeen keys appear in the README Format table, with no DSR threshold and no percentage literal added (`test_lab_gate_wording.py` green).
+  - **Drift**:
+    - No code drift. Every line number and anchor the phase-2 plan quoted matched the post-phase-1 tree exactly (`prereg.py` :43 / :54-61 / :72-97 / :287, `_promote`'s `gate` print line, `preflight_test`'s `return pre`, the README's `date` row). `hardgate`'s contract matched the plan's Requires table exactly — `MIN_FOLDS: int`, `fold_record(conn, mid, geo=None) -> wf.Record`, `failed_kin(conn, mid) -> tuple[str, ...]`.
+  - **Decided**:
+    - Step 2's render prose wrapped the phrase ‘never / a significance test’ across a line break, while Step 5's own new test asserts the unwrapped substring ‘never a significance test’ — two of the plan's own code blocks contradicting each other. Rewrapped the prose so the phrase is contiguous; did **not** touch the assertion. Rung 3 (the plan's own code blocks, both of them) plus the tie-break that a failing verification is never settled by relaxing the check. The prose is the deliverable R6 asks for; the wrap is cosmetic and changes no meaning.
+    - `prereg.py`'s module docstring stated ‘parse … requires every key in FIELDS’, which Step 2's `FIELDS`→`REQUIRED` change made false. Corrected that sentence in place, naming `REQUIRED` / `FIELDS` and the LEGACY tolerance. Rung 3: the step's own code block changes the behaviour the sentence describes. Inside this phase's owned file; no scope widened.
+    - The completed block is left in place under `### [P1] High` marked `[x]`, not moved into `## Completed Tasks` → rung 6, the direct precedent of this same file: every phase of `gotrade-fee-rebuild`, `lab-luck-gate` and this set's own phase 1 did the same, because a cross-file block move is the one edit that reliably loses a peer's concurrent append in this shared worktree. Quick Stats recounted from the file rather than blind-decremented.
+    - Phase 3's status flipped to `pending`, not the handler's literal `open` → `open` appears nowhere in this file; `pending` is the value its other unblocked tasks carry (`P2-ENG-N3LB`, `P3-ENG-V2KQ`), and phase 1 set this same field the same way.
+    - `readme-updater` not dispatched, and `engine/package_readme.md` deliberately untouched → rung 2. The plan index lists `package_readme.md` under phase 2's **does not touch** and under phase 3's Owns, where its lab package map and new `hardgate` API block are to be ‘checked against the modules as phases 1 and 2 actually built them’. Writing it here would break this phase's exit criteria and put a second author in a file a later phase owns, in a shared worktree.
 - [ ] **P1-ENG-T6BJ** Phase 3: Make the gate visible before it bites
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `commands/lab.py:_promotable_now`, so each listed method carries its fold record and kin state and "why can nothing be promoted" is answerable from `lab status` alone; `.claude/skills/explore-and-experiment-new-method/SKILL.md` step 0b (the gate **refuses**); `.claude/skills/sera-the-explorer/SKILL.md`'s promotion path and Never table; `engine/package_readme.md`'s lab package map (including `lab/walkforward.py`, missing from it entirely) and the new `hardgate` API block; `docs/plans/WALK_FORWARD_EVALUATION_PLAN.md` with phase 4 marked done and its stale cost paragraph corrected against this plan's measurement; and additions to `engine/tests/test_lab_status.py`. Does not touch the rule itself, `prereg.py`, `lab/runner.py` or `docs/lab/prereg/README.md` (phase 2), `lab/walkforward.py` and `commands/lab.py:_walkforward` (Decision D9 — it states the asymmetry in prose and changes neither), `backtest/walkforward.py`, or any existing test body. Exit criteria: `lab status` prints each dev-eligible method's fold record and, when blocked, the failed kin, and lists no method under "Promotable now" that `lab promote` would refuse; the empty `Promoted` section blames the gate rather than an unrun command; `lab status` exits 0 on a lab with no `REF-SPY-HOLD` dev trial and empty curves; the explore skill and the Sera skill both say the gate refuses, neither tells a child to expect an override, both count the buy signal's conditions at four, and the explore skill states the buy-signal / hard-gate asymmetry (Decision D9); `package_readme.md` describes `hardgate`, `lab/walkforward.py` and the two new pre-registration fields, checked against the modules as phases 1 and 2 actually built them; the walk-forward plan's phase 4 reads done, with the measured seven-method table, not the stale four-method list.
-  - **Status**: blocked
+  - **Status**: pending
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/lab-hard-gate/PLAN.md` (phase 3 of 3)
   - **Satisfies**: R7, R8, R9 — `lab status` shows the fold record beside the dev-eligible list; `explore-and-experiment-new-method` Promotion step 0b says the gate **refuses**, not advises; and `sera-the-explorer`'s promotion path and Never table say the same
   - **Depends on**: P1-ENG-K7WZ, P1-ENG-P3MF

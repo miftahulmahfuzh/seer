@@ -440,3 +440,44 @@ def test_the_dry_run_loads_nothing_and_spends_nothing(conn, prereg_ok, promoted,
     for label in dev.FAILURE_LABELS:
         assert label in text
     assert store.test_looks(conn) == 0
+
+
+# ---- the kin note: a sentence, never a refusal (plan Decision D3) -------------------------------
+
+
+def test_lab_test_prints_a_note_when_the_kin_failed_after_the_promise(
+    conn, prereg_ok, promoted, tmp_path, capsys
+):
+    """D3: the promise is not re-opened, so this is a line above the look and nothing else.
+
+    M0001 is promoted (the module's `promoted` fixture, family `trend`). A sibling in that same
+    family then reads `test-failed` -- after the promise was made, which is the whole point.
+
+    **One failed relative, deliberately.** `kin_note` says "has" for one and "have" for several,
+    and the assertion below reads the singular; adding a second kin to this fixture changes the
+    verb and breaks it. That the note names *every* failed relative is `kin_note`'s `", ".join`
+    and is covered where the join is -- `test_lab_hardgate.py`'s M0030 case (M0021 **and**
+    M0029) and `prereg.family_text`'s own test above.
+    """
+    with conn:
+        store.add_method(conn, id="M0090", name="n", family="trend", source_kind="knowledge",
+                         hypothesis="h", status="registered")
+        for s in ("dev-eligible", "promoted", "test-failed"):
+            store.update_method(conn, "M0090", status=s)
+
+    c = promoted.candidates[0]
+    pre = runner.preflight_test(conn, promoted, tmp_path / "x.py", c, require_commit=False)
+
+    out = capsys.readouterr().out
+    assert "M0090" in out
+    assert "has read test-failed since" in out
+    assert "not a refusal" in out
+    assert pre.candidate == c.id          # it returned, and refused nothing
+
+
+def test_a_clean_kin_prints_nothing_at_all(conn, prereg_ok, promoted, tmp_path, capsys):
+    """The normal case. A note that fires when there is nothing to say is noise, not information."""
+    assert runner.kin_note(conn, "M0001") is None
+    runner.preflight_test(conn, promoted, tmp_path / "x.py", promoted.candidates[0],
+                          require_commit=False)
+    assert capsys.readouterr().out == ""

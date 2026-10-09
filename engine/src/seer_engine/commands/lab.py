@@ -1190,6 +1190,8 @@ def _promote(conn, args) -> int:
     print(f"  dev window     {p.dev_window}  MAR {p.mar}  DSR {p.dsr} at N = {p.n_trials_at_run}")
     print(f"  test window    {p.test_window}")
     print(f"  gate           {p.gate}")
+    print(f"  folds          {p.folds}")
+    print(f"  family         {p.family_state}")
     print()
     print(f"Commit and push {rel} before the look is spent (design §3):")
     print(f"    git add {rel}")

@@ -317,12 +317,18 @@ the pointer. The full argument is in `docs/plans/LAB_HARD_GATE_PLAN.md`, Decisio
    says an argued change to the rule is the mechanism — a commit, in git, not a flag. When the
    need arrives, that is the shape of the work: change the rule and say why, do not add a door.
 
-**One asymmetry was left in deliberately.** `lab walkforward`'s buy signal checks the `family`
-string only, while the gate walks `family` ∪ ancestors — so `lab walkforward` reports M0030's
-family clean while `lab promote` refuses it on ancestry. The buy signal is a separate,
-owner-decided rule about when to *buy data*, not about when to promote, and widening it is beyond
-this phase's brief. It is stated in the explore skill's step 0b where a reader meets it, and
-changed nowhere (plan Decision D9).
+**One asymmetry was left in deliberately, and then resolved.** The implementers were forbidden to
+edit `lab/walkforward.py` — the buy signal is a separate, owner-decided rule about when to *buy
+data*, not about when to promote — so the gate walked `family` ∪ ancestors while the signal
+checked the `family` string only, and `lab walkforward` reported M0030's family clean while
+`lab promote` refused it on ancestry. That escalation was right.
+
+**Resolved the same day, by the owner's decision**: two commands giving opposite answers about one
+method is worse than either answer. `_walkforward` now calls `hardgate.failed_kin`, the same
+function the gate enforces, rather than keeping a second family-only query beside it — so they
+cannot drift again without one of them failing to import. M0030 now reads
+`kin already failed the test window (M0021, M0029)` from both. The signal's success line also
+counts `BUY_CONDITIONS` instead of saying "all three" for four conditions (Decision D9, closed).
 
 ## Also update, or the gate is invisible until it bites
 

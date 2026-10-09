@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-09 20:40
-**Total Active Tasks**: 4
+**Last Updated**: 2026-10-09 22:00
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
 - P1 High: 0
-- P2 Medium: 3
+- P2 Medium: 2
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 108
+- Blocked: 0
+- Completed: 109
 
 ---
 
@@ -891,20 +891,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 
 ### [P2] Medium
-- [ ] **P2-ENG-JC9B** Phase 2: Per-trial provenance, and re-runs at the recorded capital
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `research.py` (`price_fingerprint_of(files)` over the four `DATA_FILES`, fundamentals excluded; `ResearchData.price_fingerprint: str | None = None`, always set by `load_store`); `lab/store.py` (`SCHEMA_VERSION = "5"`; append-only table `trial_provenance(trial_n PK FK, initial_idr, price_fingerprint NULL, source IN ('recorded','backfill'), measured)` with no-update / no-delete triggers; `ProvenanceRow`, `PROVENANCE_COLUMNS`, `insert_provenance`, `provenance_of`, `P7A_PRICE_FINGERPRINT`, `BACKFILL_*`; migration `_v4_to_v5` backfilling every trial by the funding rule M3 and the known-fingerprint map, `source='backfill'`); `lab/runner.py` (`recorded_capital(conn, n)` refusing with `store.LabError` when no row; `run_method` / `run_test` pass `initial_idr=INITIAL_IDR` explicitly and write a `source='recorded'` row per trial in the same transaction); `lab/seed.py` (`P7A_INITIAL_IDR`; 54 seed trials get `backfill` rows); `lab/remeasure.py` (`plan_capital`, `Plan.initial_idr`; `preflight` and `seed_preflight` refuse missing or mixed recorded capital before any store loads; `measure` / `run_chunk` re-run at recorded capital; METRIC_TOL comment corrected with M4); `lab/real_costs.py` `measure(..., initial_idr=...)` and `commands/lab.py:_costs` only; `lab/hardgate.py:trial_deposits` only (`unit = amount_idr / recorded_capital`); `engine/tests/labkit.py` (smoke fingerprints, `LAB_PRICE_FINGERPRINT`, the one idempotent `stamp_provenance` helper); tests for all of it. Does not touch comparability checks, `lab run`'s store check, `_run` / `_walkforward` / `_regime` (phase 3), docs, skills or the committed database (phase 4). Exit criteria: on a scratch copy of the committed DB migrated to v5, exactly 152 provenance rows by the rule; `lab remeasure M0011`, `M0007` and `H-P7A` exit 0 on today's store at today's `INITIAL_IDR`; the committed DB untouched; the full engine suite passes.
-  - **Status**: pending
-  - **Plan Set**: `TRIAL_REPRODUCIBILITY_PLAN.md` (phase 2 of 4)
-  - **Satisfies**: R1 — Choose the policy among (a) pin store / (b) re-run benchmark / (c) refuse on fingerprint mismatch / (d) record enough to re-derive — measured by what each strands, and say why (d); R4 — Does the 58-trial `5451195fd552` cohort need re-running or marking (append-only) (marking the cohort by annotation)
-  - **Depends on**: P2-ENG-61GM
-  - **Plan**: `.workflows/plan/P2-ENG-JC9B.md`
 - [ ] **P2-ENG-0HTR** Phase 3: Compare like with like: gate refuses, reports warn, `lab run` pins the store
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `lab/hardgate.py` (module-docstring decision D10; `Geometry.bench_n`; `benchmark_n`, `mismatches`, `describe`, `comparability`, `pin_dev_store(conn, price_fingerprint: str | None)`; `fold_record` — hence `check`, `fold_summary`, `summary` — refuses with `store.LabError` when the benchmark's or any method dev trial's price fingerprint is missing, NULL or different; fail closed, no override); `commands/lab.py` (usage text; `_run` calls `hardgate.pin_dev_store` after the store loads and before any backtest — refuses an unknown store fingerprint always, a different one when the lab has a benchmark; `_comparability_warnings`; `_walkforward` / `_regime` print one `WARNING` line per incomparable method and still report); tests in `test_lab_hardgate.py` (fixtures stamp via `labkit.stamp_provenance`), `test_lab_prereg.py` and `test_lab_status.py` fixtures. Does not touch `walkforward.py`, `trial_deposits`, the provenance schema, `labkit.py`, docs or skills. Exit criteria: on a scratch copy of the committed DB, `lab status` and `lab walkforward` byte-identical to the base commit's (0 stranded, no `WARNING`); `hardgate.comparability` is `()` for all seven dev-eligible methods; a fixture on other prices is refused by `lab promote` and warned by `lab walkforward`; `lab run` on other prices exits 2 before any backtest and `pin_dev_store(conn, None)` refuses; the full engine suite passes.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `TRIAL_REPRODUCIBILITY_PLAN.md` (phase 3 of 4)
   - **Satisfies**: R2 — Is `trials.store_fingerprint` enough to detect it; should `lab walkforward`, `lab regime`, `hardgate` warn or refuse; R1 — Choose the policy among (a) pin store / (b) re-run benchmark / (c) refuse on fingerprint mismatch / (d) record enough to re-derive — measured by what each strands, and say why (policies (a) and (c′))
   - **Depends on**: P2-ENG-JC9B
@@ -933,6 +924,21 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P2-ENG-JC9B** Phase 2: Per-trial provenance, and re-runs at the recorded capital
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `research.py` (`price_fingerprint_of(files)` over the four `DATA_FILES`, fundamentals excluded; `ResearchData.price_fingerprint: str | None = None`, always set by `load_store`); `lab/store.py` (`SCHEMA_VERSION = "5"`; append-only table `trial_provenance(trial_n PK FK, initial_idr, price_fingerprint NULL, source IN ('recorded','backfill'), measured)` with no-update / no-delete triggers; `ProvenanceRow`, `PROVENANCE_COLUMNS`, `insert_provenance`, `provenance_of`, `P7A_PRICE_FINGERPRINT`, `BACKFILL_*`; migration `_v4_to_v5` backfilling every trial by the funding rule M3 and the known-fingerprint map, `source='backfill'`); `lab/runner.py` (`recorded_capital(conn, n)` refusing with `store.LabError` when no row; `run_method` / `run_test` pass `initial_idr=INITIAL_IDR` explicitly and write a `source='recorded'` row per trial in the same transaction); `lab/seed.py` (`P7A_INITIAL_IDR`; 54 seed trials get `backfill` rows); `lab/remeasure.py` (`plan_capital`, `Plan.initial_idr`; `preflight` and `seed_preflight` refuse missing or mixed recorded capital before any store loads; `measure` / `run_chunk` re-run at recorded capital; METRIC_TOL comment corrected with M4); `lab/real_costs.py` `measure(..., initial_idr=...)` and `commands/lab.py:_costs` only; `lab/hardgate.py:trial_deposits` only (`unit = amount_idr / recorded_capital`); `engine/tests/labkit.py` (smoke fingerprints, `LAB_PRICE_FINGERPRINT`, the one idempotent `stamp_provenance` helper); tests for all of it. Does not touch comparability checks, `lab run`'s store check, `_run` / `_walkforward` / `_regime` (phase 3), docs, skills or the committed database (phase 4). Exit criteria: on a scratch copy of the committed DB migrated to v5, exactly 152 provenance rows by the rule; `lab remeasure M0011`, `M0007` and `H-P7A` exit 0 on today's store at today's `INITIAL_IDR`; the committed DB untouched; the full engine suite passes.
+  - **Status**: completed
+  - **Plan Set**: `TRIAL_REPRODUCIBILITY_PLAN.md` (phase 2 of 4)
+  - **Satisfies**: R1 — Choose the policy among (a) pin store / (b) re-run benchmark / (c) refuse on fingerprint mismatch / (d) record enough to re-derive — measured by what each strands, and say why (d); R4 — Does the 58-trial `5451195fd552` cohort need re-running or marking (append-only) (marking the cohort by annotation)
+  - **Depends on**: P2-ENG-61GM
+  - **Plan**: `.workflows/plan/P2-ENG-JC9B.md`
+  - **Completed**: 2026-10-09 22:00
+  - **Method**: /do
+  - **Files**: `engine/src/seer_engine/research.py`, `engine/src/seer_engine/lab/store.py`, `engine/src/seer_engine/lab/runner.py`, `engine/src/seer_engine/lab/seed.py`, `engine/src/seer_engine/lab/remeasure.py`, `engine/src/seer_engine/lab/real_costs.py`, `engine/src/seer_engine/lab/hardgate.py`, `engine/src/seer_engine/commands/lab.py`, `engine/tests/labkit.py`, `engine/tests/test_research_store.py`, `engine/tests/test_lab_store.py`, `engine/tests/test_lab_snapshot.py`, `engine/tests/test_lab_runner.py`, `engine/tests/test_lab_test_window.py`, `engine/tests/test_lab_remeasure.py`, `engine/tests/test_lab_remeasure_seed.py`, `engine/tests/test_lab_hardgate.py`, `engine/tests/test_lab_costs.py`
+  - **Drift**: None in source. Line anchors matched the plan; `hardgate.fold_record` sits at :317 after the `trial_deposits` change, as phase 3 expects.
+  - **Decided**: The plan's v4->v5 migration test compared `sqlite3.Row` objects to plain tuples (always unequal) → compare `[tuple(r) ...]` on both sides; same strictness (rung 2: exit criterion "trials and trial_funding byte-identical across the migration").
+  - **Verified**: Full engine suite 3268 passed, 411 skipped, 0 failed. Scratch copy of the committed lab migrated to v5: 152 `trial_provenance` rows, all backfill; groups (10M,NULL)=2, (10M,5451195f)=22, (20M,5451195f)=126, (20M,56e83810)=2 — exactly the plan's expected counts. On that copy at `INITIAL_IDR`=10M: `lab remeasure M0011` exit 0 (Sharpe delta 0), `M0007` exit 0 (delta 0), `H-P7A` exit 0 (54 written). `lab costs M0011 --candidate M0011-RAW20-TV14-N21` on a second copy: flat +660.2% = trial #90, reproduced. `lab/lab.sqlite` and `web/data/lab.json` unchanged.
 - [x] **P2-ENG-61GM** Phase 1: Starting capital is a run input
   - **Difficulty**: EASY
   - **Type**: Feature

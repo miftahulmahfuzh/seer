@@ -113,12 +113,15 @@ def test_connect_migrates_a_v1_database_keeping_rows_and_triggers(tmp_path):
 def test_a_new_database_starts_at_the_current_schema_version(tmp_path):
     conn = store.connect(tmp_path / "lab.sqlite")
     try:
-        assert store.schema_version(conn) == store.SCHEMA_VERSION == "4"
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "5"
         assert "synthesis" in store.INSIGHT_KINDS
         with conn:
             assert store.add_insight(conn, kind="synthesis", title="t", body="b") == 1
         assert conn.execute(
             "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'trial_moments'"
+        ).fetchone()[0] == 1
+        assert conn.execute(
+            "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'trial_provenance'"
         ).fetchone()[0] == 1
     finally:
         conn.close()
@@ -266,6 +269,152 @@ def test_connect_migrates_a_v3_database_adding_trial_funding_and_touching_no_tri
     finally:
         conn.close()
         fresh.close()
+
+
+def _without_provenance(schema: str) -> str:
+    """``schema`` as it read at v4: the ``trial_provenance`` table and its triggers removed.
+
+    Derived from ``store._SCHEMA`` exactly as ``_without_moments`` is, for the same reason.
+    """
+    for ddl in (store._PROVENANCE_TABLE, *store._PROVENANCE_TRIGGERS):
+        assert f"{ddl};\n\n" in schema
+        schema = schema.replace(f"{ddl};\n\n", "")
+    assert "trial_provenance" not in schema
+    return schema
+
+
+V4_SCHEMA = _without_provenance(store._SCHEMA)
+P7A = "5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a"
+E597 = "e597367bb6806d7edc2f9af4033b26c366aae92517207b4e71daad96346fcca3"
+D399 = "399d0d254c7a90b8cdb49f7ce598269087d38730f795cae90453eeb580b07cf8"
+T568 = "56e83810e82ed59d0857f6851a638a96fc94fdbb8f781a3f4d56914dce8d141a"
+TBBE = "bbe7abfb4a127127be48f177268a39346f94c718a672dcf5dc7ca900fa5ebc4b"
+# One trial per (store, funded) case the committed lab holds, and what the backfill must give it.
+V4_TRIALS = (
+    # candidate, window, store_fingerprint, funded -> (initial_idr, price_fingerprint)
+    ("M0001-1", "dev", P7A, False, ("20000000", P7A)),
+    ("M0001-2", "dev", E597, False, ("20000000", P7A)),
+    ("M0001-3", "dev", D399, True, ("10000000", P7A)),
+    ("M0001-4", "test", T568, False, ("20000000", T568)),
+    ("M0001-5", "test", TBBE, True, ("10000000", None)),
+)
+
+
+def _v4_db(path):
+    """A schema-v4 database holding one trial for each store and funding case the lab has."""
+    c = sqlite3.connect(path)
+    c.executescript(V4_SCHEMA)
+    c.executemany("INSERT INTO transitions (src, dst) VALUES (?, ?)", store.TRANSITIONS)
+    c.execute("INSERT INTO meta (key, value) VALUES ('schema_version', '4')")
+    c.execute(
+        "INSERT INTO methods (id, name, family, source_kind, hypothesis, status, created, updated) "
+        "VALUES ('M0001', 'n', 'f', 'knowledge', 'h', 'rejected', '2026-10-01T00:00:00+00:00', "
+        "'2026-10-01T00:00:00+00:00')"
+    )
+    for i, (cid, window, fp, funded, _want) in enumerate(V4_TRIALS, start=1):
+        c.execute(
+            'INSERT INTO trials (method_id, candidate_id, config_digest, config_text, rules_id, '
+            'allocator_id, window, start, "end", store_fingerprint, git_sha, run_at, trades, '
+            'sharpe, mar, failed, eligible, dsr, n_trials_at_run, curve_json) VALUES '
+            "('M0001', ?, ?, 't', 'r', 'a', ?, '2000-01-03', '2015-10-16', ?, 'abc', "
+            "'2026-10-05T00:00:00+00:00', 200, 0.945, 0.82, '', 0, 0.9, 110, '[]')",
+            (cid, f"d{i}", window, fp),
+        )
+        if funded:
+            c.execute(
+                "INSERT INTO trial_funding (trial_n, mwr, spy_tr_mwr, deposits_usd, deposits_n, "
+                "schedule, measured) VALUES (?, 0.07, 0.06, 3681.0, 12, "
+                "'+5,000,000 IDR on the 25th of each month', '2026-10-08T00:00:00+00:00')",
+                (i,),
+            )
+    c.commit()
+    c.close()
+
+
+def _provenance_schema(conn) -> list[tuple[str, str, str]]:
+    return [tuple(r) for r in conn.execute(
+        "SELECT type, name, sql FROM sqlite_master WHERE tbl_name = 'trial_provenance' "
+        "ORDER BY type, name"
+    )]
+
+
+def test_connect_migrates_a_v4_database_backfilling_provenance_and_touching_no_trial(tmp_path):
+    """Phase 2's exit criterion: v4 -> v5 annotates, it never rewrites.
+
+    ``trials`` and ``trial_funding`` are byte-identical across the migration; every trial gains
+    exactly one ``source='backfill'`` row by the rules the analysis measured (M1, M3) -- capital
+    by the funding row, price fingerprint by the known-store map, NULL for a store never seen --
+    and the table that arrives is as append-only as one a fresh database creates.
+    """
+    db = tmp_path / "lab.sqlite"
+    _v4_db(db)
+    before = _trials_bytes(db)
+    funding_before = sqlite3.connect(db).execute("SELECT * FROM trial_funding ORDER BY trial_n").fetchall()
+
+    conn = store.connect(db)
+    fresh = store.connect(tmp_path / "fresh.sqlite")
+    try:
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "5"
+        assert _trials_bytes(db) == before
+        assert [tuple(r) for r in conn.execute("SELECT * FROM trial_funding ORDER BY trial_n")] == funding_before
+        assert _provenance_schema(conn) == _provenance_schema(fresh)
+        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+        got = {
+            int(r["trial_n"]): (r["initial_idr"], r["price_fingerprint"])
+            for r in conn.execute("SELECT * FROM trial_provenance")
+        }
+        assert got == {i: want for i, (*_rest, want) in enumerate(V4_TRIALS, start=1)}
+        assert {r[0] for r in conn.execute("SELECT source FROM trial_provenance")} == {"backfill"}
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            conn.execute("UPDATE trial_provenance SET initial_idr = '1'")
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            conn.execute("DELETE FROM trial_provenance")
+    finally:
+        conn.close()
+        fresh.close()
+
+    again = store.connect(db)  # idempotent: a second connect backfills nothing
+    try:
+        assert store.schema_version(again) == store.SCHEMA_VERSION
+        assert again.execute("SELECT count(*) FROM trial_provenance").fetchone()[0] == len(V4_TRIALS)
+        assert _trials_bytes(db) == before
+    finally:
+        again.close()
+
+
+@pytest.mark.skipif(not store.COMMITTED_DB.is_file(), reason="no committed lab database here")
+def test_every_committed_trial_gets_exactly_one_provenance_row_by_the_rule(tmp_path):
+    """On a copy of the committed lab (the original is never opened for writing): one row per
+    trial, every backfilled row follows the stated rule, and every dev trial -- all three store
+    fingerprints of them -- reads one price fingerprint, the P7a store's (analysis M1, M5 (c')).
+
+    The last clause also covers dev trials recorded *after* the migration (``source='recorded'``).
+    It holds because ``lab run`` refuses a dev store whose price fingerprint is not the
+    benchmark's (phase 3, ``hardgate.pin_dev_store``); until phase 3 lands, the committed lab in
+    this branch is still v4 and gains no trial (plan Invariant 3), so every row here is a backfill.
+    """
+    db = tmp_path / "lab.sqlite"
+    shutil.copyfile(store.COMMITTED_DB, db)
+    conn = store.connect(db)
+    try:
+        rows = conn.execute(
+            "SELECT p.*, t.store_fingerprint, t.window, "
+            "EXISTS (SELECT 1 FROM trial_funding f WHERE f.trial_n = t.n) AS funded "
+            "FROM trials t JOIN trial_provenance p ON p.trial_n = t.n ORDER BY t.n"
+        ).fetchall()
+        n_trials = conn.execute("SELECT count(*) FROM trials").fetchone()[0]
+        assert len(rows) == n_trials
+        assert conn.execute("SELECT count(*) FROM trial_provenance").fetchone()[0] == n_trials
+        for r in rows:
+            if r["source"] == "backfill":
+                assert r["initial_idr"] == ("10000000" if r["funded"] else "20000000"), r["trial_n"]
+                assert r["price_fingerprint"] == store.BACKFILL_PRICE_FINGERPRINTS.get(
+                    r["store_fingerprint"]
+                ), r["trial_n"]
+        dev_fps = {r["price_fingerprint"] for r in rows if r["window"] == "dev"}
+        assert dev_fps == {store.P7A_PRICE_FINGERPRINT}
+    finally:
+        conn.close()
 
 
 def test_a_funded_trial_is_judged_money_weighted_and_an_unfunded_one_is_not(tmp_path):

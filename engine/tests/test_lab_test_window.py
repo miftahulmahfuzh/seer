@@ -19,6 +19,7 @@ from seer_engine.backtest import dev
 from seer_engine.backtest.book_runner import RunStats
 from seer_engine.backtest.dev import Candidate, make_row
 from seer_engine.backtest.metrics import Metrics
+from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.lab import prereg, runner, store
 from seer_engine.lab.method import Method, config_digest, config_text
 from seer_engine.sim.contributions import OWNER_MONTHLY
@@ -254,6 +255,10 @@ def test_the_look_is_recorded_and_does_not_move_the_lab_s_n(conn, data, prereg_o
     assert row["config_digest"] == config_digest(c)
     assert row["git_sha"] == "cafe" and row["store_fingerprint"] == "smoke-test"
     assert row["n_trials_at_run"] == before_n
+    prov = store.provenance_of(conn, row["n"])
+    assert prov["source"] == "recorded" and prov["measured"] == row["run_at"]
+    assert Decimal(prov["initial_idr"]) == INITIAL_IDR
+    assert prov["price_fingerprint"] == "smoke-test"
     assert date.fromisoformat(row["start"]) >= TEST_FIRST
     assert row["end"] == TEST_LAST.isoformat()
     assert store.DSR_LABEL not in row["failed"]  # DSR is recorded, never a condition
@@ -345,9 +350,10 @@ def test_a_passing_look_records_test_passed_and_a_dsr_that_is_not_a_condition(
              SimpleNamespace(date=TEST_LAST, equity_usd=220.0))
 
     def fake_run_registry(market, dividends, spy_dividends, registry, *,
-                          on_result=None, window=None, contributions=None):
+                          on_result=None, window=None, contributions=None, initial_idr=None):
         assert window.name == "test" and tuple(registry) == (c,)
         assert contributions is OWNER_MONTHLY  # the look is funded like the owner's account
+        assert initial_idr == INITIAL_IDR  # and starts at the capital its provenance records
         on_result(0, SimpleNamespace(snapshots=snaps, cashflows=CASHFLOWS), row)
         return (row,)
 

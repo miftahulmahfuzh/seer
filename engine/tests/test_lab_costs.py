@@ -94,6 +94,7 @@ def test_measure_runs_the_variant_at_both_fees_and_writes_nothing(lab, data, rec
     cmp = real_costs.measure(
         recorded, c, trial, data,
         contributions=runner.recorded_contributions(conn, int(trial["n"])),
+        initial_idr=runner.recorded_capital(conn, int(trial["n"])),
     )
     assert (cmp.flat.model, cmp.real.model) == ("flat", "gotrade")
     assert cmp.recorded_model == "flat" and cmp.reproduced is True
@@ -144,6 +145,46 @@ def test_measure_refuses_a_test_window_store(lab, recorded):
         real_costs.measure(recorded, c, trial, smoke_test_data())
 
 
+def test_measure_runs_both_sides_at_the_capital_it_is_given(lab, data, recorded, monkeypatch):
+    """Analysis M2: trial #90 reads +660.2% at its recorded 20M and +545.3% at the live 10M.
+    The capital passed in is the one both fee models run at."""
+    conn, _ = lab
+    c, trial = real_costs.pick_candidate(conn, recorded, None)
+    seen: list = []
+    real = real_costs.dev.run_registry
+
+    def spy(*a, **k):
+        seen.append(k.get("initial_idr"))
+        return real(*a, **k)
+
+    monkeypatch.setattr(real_costs.dev, "run_registry", spy)
+    real_costs.measure(
+        recorded, c, trial, data,
+        contributions=runner.recorded_contributions(conn, int(trial["n"])),
+        initial_idr=Decimal("20000000"),
+    )
+    assert seen == [Decimal("20000000")]
+
+
+def test_cli_refuses_a_trial_with_no_recorded_capital_before_any_store(tmp_path, monkeypatch):
+    """`lab costs` resolves the recorded capital before the store loads; none is exit 2."""
+    path = tmp_path / "lab.sqlite"
+    c = store.connect(path)
+    seed(c)
+    m = _method()
+    monkeypatch.setattr(store, "insert_provenance", lambda conn, rows: None)
+    runner.run_method(c, m, HERE, smoke_data(), git_sha="x", require_commit=False)
+    monkeypatch.undo()
+    c.close()
+
+    def boom(*a, **k):
+        raise AssertionError("the store must not be loaded for a refusal")
+
+    monkeypatch.setattr(research, "load_store", boom)
+    monkeypatch.setattr(real_costs, "discover", lambda: {"M0001": (m, HERE)})
+    assert cli.main(["lab", "--db", str(path), "costs", "M0001", "--store", str(tmp_path)]) == 2
+
+
 # ---- the journal -----------------------------------------------------------------------------
 
 
@@ -153,6 +194,7 @@ def test_the_journal_entry_is_one_plain_observation(lab, data, recorded):
     cmp = real_costs.measure(
         recorded, c, trial, data,
         contributions=runner.recorded_contributions(conn, int(trial["n"])),
+        initial_idr=runner.recorded_capital(conn, int(trial["n"])),
     )
     before = _untouched(conn)
     with conn:

@@ -13,14 +13,16 @@ from __future__ import annotations
 import inspect
 import math
 import statistics
+from decimal import Decimal
 
 import pytest
+from labkit import stamp_provenance
 
 from seer_engine import research
 from seer_engine.backtest import dev
 from seer_engine.backtest.registry import REGISTRY
 from seer_engine.lab import npolicy, remeasure, store
-from seer_engine.lab.seed import seed
+from seer_engine.lab.seed import P7A_FINGERPRINT, seed
 
 TD = math.sqrt(252)
 
@@ -50,7 +52,10 @@ def perfect(conn, *, error: float = 0.0, drift: dict[str, tuple[str, float]] | N
     rows = _recorded(conn)
     drift = drift or {}
 
-    def run_chunk(data, candidates):
+    def run_chunk(data, candidates, *, initial_idr):
+        # Every seed trial ran at 20M (its provenance row); a chunk handed anything else is
+        # the failure analysis M4 measured, so the double refuses to "reproduce" it.
+        assert initial_idr == Decimal("20000000"), initial_idr
         out = {}
         for c in candidates:
             r = rows[c.id]
@@ -430,5 +435,44 @@ def test_no_window_can_be_selected_anywhere_in_the_seed_path(conn, monkeypatch):
         remeasure.dev, "run_registry",
         lambda *a, **k: (calls.append(dict(k)), [])[1],
     )
-    real_run_chunk(FakeData(), [])
+    real_run_chunk(FakeData(), [], initial_idr=Decimal("20000000"))
     assert calls and all("window" not in k for k in calls)
+    assert all(k["initial_idr"] == Decimal("20000000") for k in calls)
+
+
+# ---- trial-reproducibility phase 2: one recorded capital per chunk ----------------------------
+
+
+def _seeded_without_provenance(path, monkeypatch):
+    monkeypatch.setattr(store, "insert_provenance", lambda conn, rows: None)
+    c = store.connect(path)
+    seed(c)
+    monkeypatch.undo()
+    return c
+
+
+def test_seed_trials_recorded_at_two_capitals_are_refused_before_any_store_is_loaded(tmp_path, monkeypatch):
+    """One `run_registry` call runs one capital, so a mixed to-do set has no faithful re-run --
+    and it is refused by `seed_preflight`, from the database alone, as the dev path's
+    `preflight` refuses its own (phase 1's handoff: `run_registry` takes one capital per call)."""
+    c = _seeded_without_provenance(tmp_path / "mixed.sqlite", monkeypatch)
+    try:
+        with c:
+            stamp_provenance(c, range(1, 54), price_fingerprint=P7A_FINGERPRINT,
+                             initial_idr=Decimal("20000000"))
+            stamp_provenance(c, [54], price_fingerprint=P7A_FINGERPRINT,
+                             initial_idr=Decimal("10000000"))
+        with pytest.raises(store.LabError, match="different starting capitals"):
+            _plan(c)
+        assert c.execute("SELECT count(*) FROM trial_moments").fetchone()[0] == 0
+    finally:
+        c.close()
+
+
+def test_a_seed_trial_with_no_recorded_capital_is_refused_before_any_store_is_loaded(tmp_path, monkeypatch):
+    c = _seeded_without_provenance(tmp_path / "bare.sqlite", monkeypatch)
+    try:
+        with pytest.raises(store.LabError, match="no recorded starting capital"):
+            _plan(c)
+    finally:
+        c.close()

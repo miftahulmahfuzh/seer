@@ -3,6 +3,10 @@
 - P7a's 54 dev-window candidates become trials 1–54 (registry order), grouped into one closed
   method per P7a family (``H-P7A-F1`` …). Metrics and month-end curves come from the committed
   P7a report files; nothing is re-run. DSR is NULL (P7a reported it for one row only).
+- Each of the 54 gets a ``trial_provenance`` row: 20,000,000 IDR (``P7A_INITIAL_IDR``, the
+  engine's starting capital when P7a ran) and ``P7A_FINGERPRINT`` as its price fingerprint (a
+  four-file store, so the two fingerprints are one hash). ``source='backfill'``: P7a ran before
+  the lab, so these are a stated fact about that run, not something the run wrote.
 - Strategies A, A2 and B become closed methods without trials: they ran on windows after the
   dev window (P3's out-of-sample, P3b/P6a walk-forwards), not on the lab's dev window.
 
@@ -14,6 +18,7 @@ from __future__ import annotations
 import csv
 import json
 import sqlite3
+from decimal import Decimal
 from pathlib import Path
 
 from seer_engine import config
@@ -27,6 +32,10 @@ P7A_CURVES = BACKTESTS / "2026-10-04-p7a-dev-exploration-curves.csv"
 P7A_GIT_SHA = "b2ec090"  # the commit that registered entries 1-54
 P7A_FINGERPRINT = "5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a"
 P7A_RUN_AT = "2026-10-04T00:00:00+00:00"
+# The capital P7a's 54 candidates ran on: `backtest.runner.INITIAL_IDR` at b2ec090, before
+# d79fc83 (2026-10-08) moved it to 10,000,000 IDR. Re-run at this sum on today's store, all 54
+# reproduce all six recorded metrics (trial-reproducibility analysis M4); at 10M all 54 diverge.
+P7A_INITIAL_IDR = Decimal("20000000")
 P7A_REPORT = "docs/backtests/2026-10-04-p7a-dev-exploration.md"
 # The P7a research store behind fingerprint P7A_FINGERPRINT (P7A_REPORT, "Data"): shown on
 # seertrade.site/sera through store.snapshot. The store itself is local and gitignored.
@@ -150,7 +159,17 @@ def seed(conn: sqlite3.Connection) -> int:
                 conn, id=mid, name=name, family=family, source_kind="seed", source_ref="docs/ROADMAP.md",
                 hypothesis=hypothesis, status="rejected", verdict=verdict, allow_any_status=True,
             )
-        store.insert_trials(conn, trials)
+        ns = store.insert_trials(conn, trials)
+        store.insert_provenance(conn, [
+            store.ProvenanceRow(
+                trial_n=n,
+                initial_idr=P7A_INITIAL_IDR,
+                price_fingerprint=P7A_FINGERPRINT,
+                source="backfill",
+                measured=P7A_RUN_AT,
+            )
+            for n in ns
+        ])
         for c in REGISTRY:
             store.mark_seen(conn, f"concept:{c.id.lower()}", f"H-P7A-{c.family}", c.rationale)
     return len(trials)

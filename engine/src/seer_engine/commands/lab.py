@@ -1721,6 +1721,10 @@ def _costs(conn, args) -> int:
     method, _path = real_costs.resolve_method(args.method)
     candidate, trial = real_costs.pick_candidate(conn, method, args.candidate)
     real_costs.twins(candidate)  # refuses a variant with no real-fee twin before the store loads
+    # The capital the recorded trial ran on, resolved before the store loads: a trial with none
+    # recorded is refused here, and a re-run at the live INITIAL_IDR would not be the trial
+    # (trial #90: +545.3% at 10M against +660.2% recorded at 20M).
+    capital = runner.recorded_capital(conn, int(trial["n"]))
     if research.DEV_END != dev.DEV_END:
         raise store.LabError("research.DEV_END differs from dev.DEV_END; refusing to run")
     n_before = store.dev_trial_count(conn)
@@ -1742,6 +1746,7 @@ def _costs(conn, args) -> int:
     cmp = real_costs.measure(
         method, candidate, trial, data,
         contributions=runner.recorded_contributions(conn, int(trial["n"])),
+        initial_idr=capital,
     )
     print(real_costs.format_report(cmp))
     with conn:

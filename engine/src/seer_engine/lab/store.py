@@ -25,10 +25,17 @@ Tables:
   no row here received no deposits** -- true of every trial recorded before the contribution
   schedule existed -- so its ``cagr`` already is its money-weighted return. At most one row per
   trial, keyed by ``trials.n``. Triggers refuse every UPDATE and DELETE.
+- ``trial_provenance``: the two inputs that make a re-run of one trial the same measurement and
+  that no ``trials`` column carries -- the starting capital in IDR it ran on, and the price
+  fingerprint (``research.price_fingerprint_of``: the four price files, fundamentals excluded) of
+  the store it read. Exactly one row per trial: written by the run in its own transaction
+  (``source='recorded'``), or added after the fact by a stated rule (``source='backfill'``: the
+  v4 -> v5 migration and the seed import). Triggers refuse every UPDATE and DELETE.
 
 Schema versions (``meta.schema_version``): 1 is the first lab; 2 adds the ``synthesis`` insight
 kind; 3 adds the ``trial_moments`` side table; 4 adds the ``trial_funding`` side table (the
-money-weighted return of a trial that received deposits, and of the SPY fed the same ones).
+money-weighted return of a trial that received deposits, and of the SPY fed the same ones); 5 adds
+the ``trial_provenance`` side table and backfills it for every trial already recorded.
 ``connect`` migrates an older database in place; ``connect_readonly`` never does.
 
 The **verdict** a trial reads is derived, not frozen: ``DSR_MIN`` is the threshold (0.90 since
@@ -57,6 +64,7 @@ import sqlite3
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, fields
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -67,7 +75,7 @@ COMMITTED_DB = config.REPO_ROOT / "lab" / "lab.sqlite"
 # database through SEER_LAB_DB; only the coordinator commits it.
 DB_PATH = Path(os.environ.get("SEER_LAB_DB") or COMMITTED_DB)
 XLSX_PATH = config.REPO_ROOT / "lab" / "lab.xlsx"  # gitignored
-SCHEMA_VERSION = "4"  # 2: the synthesis insight kind; 3: trial_moments; 4: trial_funding (see _migrate)
+SCHEMA_VERSION = "5"  # 2: synthesis kind; 3: trial_moments; 4: trial_funding; 5: trial_provenance (see _migrate)
 
 SOURCE_KINDS: tuple[str, ...] = ("paper", "blog", "github", "knowledge", "variation", "seed")
 STATUSES: tuple[str, ...] = (
@@ -276,6 +284,82 @@ BEGIN SELECT RAISE(ABORT, 'trial_funding are append-only: a funding row is never
 BEGIN SELECT RAISE(ABORT, 'trial_funding are append-only: a funding row is never deleted'); END""",
 )
 
+# The trial_provenance side table and its two triggers -- one definition of the v5 table, shared
+# by ``_SCHEMA`` and ``_v4_to_v5`` for the same reason ``_FUNDING_TABLE`` is shared.
+#
+# **What it records and why (trial-reproducibility analysis, 2026-10-09).** A recorded trial can
+# only be re-run as the same measurement if every input the engine reads is known, and two were
+# not:
+#
+# - **the starting capital.** ``d79fc83`` (2026-10-08) moved ``backtest.runner.INITIAL_IDR`` from
+#   20,000,000 to 10,000,000 IDR. It is not part of ``config_digest``, not a ``trials`` column, and
+#   a recorded curve is normalised to its opening cash, so nothing said which capital a trial had
+#   used -- and whole-share lot rounding makes it result-moving. Measured (M2): ``lab remeasure
+#   M0011`` and ``M0007`` diverged at 10M by Sharpe deltas 9.5e-4 .. 5.2e-2 against a 1e-9
+#   tolerance, and reproduced *every* variant with delta 0.000e+00 at 20M; ``lab costs M0011``
+#   read +545.3% where trial #90 records +660.2% for the same reason.
+# - **the price data.** ``trials.store_fingerprint`` hashes the whole store, fundamentals panel
+#   included, so it over-reports drift: the three dev fingerprints carry byte-identical prices
+#   (M1, ``research.price_fingerprint_of``).
+#
+# A side table, not columns on ``trials``, for exactly the reason ``trial_funding`` is one:
+# ``trials`` is append-only and ``ALTER TABLE trials ADD COLUMN`` would move every recorded row's
+# bytes. The capital is TEXT so the ``Decimal`` the run was given round-trips exactly;
+# ``price_fingerprint`` is NULL when it is not known (a store whose file map this lab never saw),
+# which a comparison must read as "unknown", never as a match.
+PROVENANCE_SOURCES: tuple[str, ...] = ("recorded", "backfill")
+
+_PROVENANCE_TABLE = f"""CREATE TABLE IF NOT EXISTS trial_provenance (
+    trial_n           INTEGER PRIMARY KEY REFERENCES trials(n),
+    initial_idr       TEXT NOT NULL CHECK (CAST(initial_idr AS REAL) > 0),
+    price_fingerprint TEXT CHECK (price_fingerprint IS NULL OR length(trim(price_fingerprint)) > 0),
+    source            TEXT NOT NULL CHECK (source IN ({_quoted(PROVENANCE_SOURCES)})),
+    measured          TEXT NOT NULL CHECK (length(trim(measured)) > 0)
+)"""
+_PROVENANCE_TRIGGERS: tuple[str, ...] = (
+    """CREATE TRIGGER IF NOT EXISTS trial_provenance_no_update BEFORE UPDATE ON trial_provenance
+BEGIN SELECT RAISE(ABORT, 'trial_provenance is append-only: a provenance row is never updated'); END""",
+    """CREATE TRIGGER IF NOT EXISTS trial_provenance_no_delete BEFORE DELETE ON trial_provenance
+BEGIN SELECT RAISE(ABORT, 'trial_provenance is append-only: a provenance row is never deleted'); END""",
+)
+
+#: The backfill's capital rule, exact on every trial recorded before schema v5 (analysis M3).
+#: Cross-checked with ``git merge-base --is-ancestor d79fc83 <trials.git_sha>`` over all 26
+#: distinct ``git_sha`` values: the 20 shas behind trials #1..#128 predate ``d79fc83`` and none of
+#: those trials has a ``trial_funding`` row; the 6 shas behind #129..#152 follow it and every one
+#: of those trials has one. So "no funding row" and "ran at 20M" are the same set, and "funding
+#: row" and "ran at 10M" are the same set -- test trials included (#123 and #125 lump at 20M,
+#: #130 and #131 funded at 10M). This is a rule about the past; a trial recorded from v5 on
+#: carries the capital its run was actually given and never passes through it.
+BACKFILL_LUMP_SUM_IDR = Decimal("20000000")
+BACKFILL_FUNDED_IDR = Decimal("10000000")
+
+#: The price fingerprint of the P7a store -- a four-file store, so its whole fingerprint and its
+#: price fingerprint are the same hash -- and of every dev store the lab has recorded against.
+P7A_PRICE_FINGERPRINT = "5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a"
+
+#: ``trials.store_fingerprint`` -> price fingerprint, for the backfill (analysis M1). Only stores
+#: whose file map was actually seen are listed:
+#:
+#: - ``5451195f…`` (P7a, 2026-10-04, four files): itself.
+#: - ``e597367b…`` (2026-10-05, adds a 2015-only ``fundamentals.csv``): ``5451195f…`` -- the
+#:   ``399d0d25…`` refresh copied its four price files byte for byte (data-pipeline runbook).
+#: - ``399d0d25…`` (2026-10-05, the panel rebuilt from 2009; today's dev store):
+#:   ``5451195f…`` -- proven by ``research.price_fingerprint_of`` over its manifest.
+#: - ``56e83810…`` (a four-file test store, window end 2026-10-06): itself.
+#:
+#: Anything else -- ``bbe7abfb…``, the test store on the other laptop, whose file map is not here
+#: -- backfills NULL ("unknown"). No comparison reads a test trial against the dev benchmark, so
+#: that NULL affects nothing today, and a NULL is the honest answer rather than a guess.
+BACKFILL_PRICE_FINGERPRINTS: Mapping[str, str] = {
+    P7A_PRICE_FINGERPRINT: P7A_PRICE_FINGERPRINT,
+    "e597367bb6806d7edc2f9af4033b26c366aae92517207b4e71daad96346fcca3": P7A_PRICE_FINGERPRINT,
+    "399d0d254c7a90b8cdb49f7ce598269087d38730f795cae90453eeb580b07cf8": P7A_PRICE_FINGERPRINT,
+    "56e83810e82ed59d0857f6851a638a96fc94fdbb8f781a3f4d56914dce8d141a": (
+        "56e83810e82ed59d0857f6851a638a96fc94fdbb8f781a3f4d56914dce8d141a"
+    ),
+}
+
 _SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
@@ -365,6 +449,12 @@ CREATE TABLE IF NOT EXISTS ideas_seen (
 {_FUNDING_TRIGGERS[0]};
 
 {_FUNDING_TRIGGERS[1]};
+
+{_PROVENANCE_TABLE};
+
+{_PROVENANCE_TRIGGERS[0]};
+
+{_PROVENANCE_TRIGGERS[1]};
 
 CREATE TRIGGER IF NOT EXISTS trials_no_update BEFORE UPDATE ON trials
 BEGIN SELECT RAISE(ABORT, 'trials are append-only: a trial row is never updated'); END;
@@ -501,18 +591,72 @@ def _v3_to_v4(conn: sqlite3.Connection) -> None:
         conn.execute(trigger)
 
 
+def _v4_to_v5(conn: sqlite3.Connection) -> None:
+    """Add the ``trial_provenance`` side table and its two append-only triggers, and give every
+    trial that lacks a provenance row one, by the documented rules.
+
+    Additive in the sense that matters: no ``trials``, ``trial_moments`` or ``trial_funding`` row
+    is read-modified-written, rebuilt or re-keyed, no column is altered, and no verdict moves --
+    ``trials`` is byte-identical across it, which
+    ``test_connect_migrates_a_v4_database_backfilling_provenance_and_touching_no_trial`` pins.
+    Unlike v3 -> v4 it does write rows, because the table is only useful when it is complete:
+    ``lab remeasure`` / ``lab costs`` / the hard gate's de-funding refuse a trial with no
+    recorded capital, so an empty v5 table would close every one of them.
+
+    The rows are an **annotation, not a rewrite**: ``source='backfill'`` says they were added
+    after the fact, by a rule, and the rule is in this file --
+
+    - ``initial_idr``: ``BACKFILL_FUNDED_IDR`` (10M) when the trial has a ``trial_funding`` row,
+      ``BACKFILL_LUMP_SUM_IDR`` (20M) when it has none -- exact on all 152 trials recorded before
+      this version (analysis M3, cross-checked against git ancestry).
+    - ``price_fingerprint``: ``BACKFILL_PRICE_FINGERPRINTS[trials.store_fingerprint]``, or NULL
+      for a store whose file map this lab never saw (analysis M1).
+
+    This is also R4's answer for the 58-trial ``5451195f…`` cohort: it needs neither re-running
+    nor rewriting. Re-run on today's store at its recorded 20M, all 54 seed trials reproduce all
+    six recorded metrics within ``remeasure.METRIC_TOL`` (analysis M4), and the annotation gives
+    every one of them the same price fingerprint as the 84 trials recorded on ``399d0d25…``.
+
+    Only trials with no row are touched, so a database that somehow already carries some rows
+    (none should) keeps them. ``measured`` is the moment the annotation was made, not the run.
+    """
+    conn.execute(_PROVENANCE_TABLE)
+    for trigger in _PROVENANCE_TRIGGERS:
+        conn.execute(trigger)
+    stamp = now_iso()
+    rows = conn.execute(
+        "SELECT t.n AS n, t.store_fingerprint AS store_fingerprint, "
+        "       EXISTS (SELECT 1 FROM trial_funding f WHERE f.trial_n = t.n) AS funded "
+        "FROM trials t "
+        "WHERE NOT EXISTS (SELECT 1 FROM trial_provenance p WHERE p.trial_n = t.n) "
+        "ORDER BY t.n"
+    ).fetchall()
+    insert_provenance(conn, [
+        ProvenanceRow(
+            trial_n=int(r["n"]),
+            initial_idr=BACKFILL_FUNDED_IDR if r["funded"] else BACKFILL_LUMP_SUM_IDR,
+            price_fingerprint=BACKFILL_PRICE_FINGERPRINTS.get(str(r["store_fingerprint"])),
+            source="backfill",
+            measured=stamp,
+        )
+        for r in rows
+    ])
+
+
 def _migrate(conn: sqlite3.Connection) -> None:
     """Bring an older database up to ``SCHEMA_VERSION`` in one transaction under the write lock.
 
-    A ladder: each step moves the database up exactly one version, so a v1 database reaches v4 in
-    one open by running all three steps in order. v1 -> v2 adds the ``synthesis`` insight kind
+    A ladder: each step moves the database up exactly one version, so a v1 database reaches v5 in
+    one open by running all four steps in order. v1 -> v2 adds the ``synthesis`` insight kind
     (``_v1_to_v2``); v2 -> v3 adds the ``trial_moments`` side table (``_v2_to_v3``); v3 -> v4 adds
-    the ``trial_funding`` side table (``_v3_to_v4``). A version this code does not know is refused
-    rather than guessed at.
+    the ``trial_funding`` side table (``_v3_to_v4``); v4 -> v5 adds the ``trial_provenance`` side
+    table and backfills it (``_v4_to_v5``) -- after v3 -> v4, because the backfill reads
+    ``trial_funding``. A version this code does not know is refused rather than guessed at.
 
     Parallel sessions may connect at once, so the version is read again after
     ``BEGIN IMMEDIATE``: only the first one migrates, the others find the current version and do
-    nothing.
+    nothing. The backfill runs inside this same transaction, so a database is never seen at v5
+    with its provenance half-written.
     """
     if schema_version(conn) == SCHEMA_VERSION:
         return
@@ -529,6 +673,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
         if version == "3":
             _v3_to_v4(conn)
             version = "4"
+        if version == "4":
+            _v4_to_v5(conn)
+            version = "5"
         if version != SCHEMA_VERSION:
             raise LabError(
                 f"lab database schema version {found!r} is unknown to this code "
@@ -1792,6 +1939,110 @@ def insert_funding(conn: sqlite3.Connection, rows: Sequence[FundingRow]) -> None
         conn.execute(
             f"INSERT INTO trial_funding ({cols}) VALUES ({marks})",
             [getattr(r, c) for c in FUNDING_COLUMNS],
+        )
+
+
+# --------------------------------------------------------------------------- trial provenance
+
+
+@dataclass(frozen=True)
+class ProvenanceRow:
+    """What a re-run of one trial must be given to be the same measurement (schema v5).
+
+    Every trial has exactly one row. ``lab remeasure`` and ``lab costs`` re-run a recorded trial
+    at ``initial_idr`` (through ``runner.recorded_capital``), and the hard gate de-funds a funded
+    curve in units of it; a trial with no row is refused by all three rather than re-run or
+    de-funded at a guess.
+
+    - ``trial_n``           the ``trials.n`` this describes. ``insert_trials`` assigns it;
+                            ``insert_provenance`` refuses the pre-insert sentinel ``0``.
+    - ``initial_idr``       the starting capital in IDR the run was given, as a ``Decimal`` --
+                            the very value passed to ``dev.run_registry(initial_idr=...)``.
+                            Stored as TEXT (``format(d, "f")``) so it round-trips exactly.
+    - ``price_fingerprint`` ``research.price_fingerprint_of`` of the store the run read: the four
+                            price files, fundamentals excluded. None when it is not known; a
+                            reader must treat None as "unknown", never as a match.
+    - ``source``            ``"recorded"`` when the run wrote it in its own transaction;
+                            ``"backfill"`` when it was added after the fact by a rule stated in
+                            this module (the v4 -> v5 migration) or in ``lab.seed`` (the P7a
+                            import, whose run predates the lab).
+    - ``measured``          an ISO timestamp: the trial's own ``run_at`` for a recorded row, the
+                            moment of the annotation for a backfilled one.
+    """
+
+    trial_n: int
+    initial_idr: Decimal
+    price_fingerprint: str | None
+    source: str
+    measured: str
+
+
+PROVENANCE_COLUMNS: tuple[str, ...] = tuple(f.name for f in fields(ProvenanceRow))
+
+
+def provenance_of(conn: sqlite3.Connection, trial_n: int) -> sqlite3.Row | None:
+    """The recorded provenance of one trial, or None when it has none.
+
+    After the v4 -> v5 migration every trial has a row, so None on a migrated database means the
+    trial was inserted by something that skipped this table -- and every caller that needs the
+    capital refuses it (``runner.recorded_capital``) rather than assuming the live constant.
+
+    A database on schema v1-v4 has no ``trial_provenance`` table at all and answers None the same
+    way. ``connect`` migrates, so this can only be a ``connect_readonly`` caller; ``moments_of``
+    and ``funding_of`` carry the same branch for the same reason.
+    """
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'trial_provenance'"
+    ).fetchone() is None:
+        return None
+    return conn.execute(
+        "SELECT * FROM trial_provenance WHERE trial_n = ?", (int(trial_n),)
+    ).fetchone()
+
+
+def insert_provenance(conn: sqlite3.Connection, rows: Sequence[ProvenanceRow]) -> None:
+    """Record the capital and price fingerprint of trials that already exist (the caller holds
+    the transaction).
+
+    Append-only and one row per trial: a trial that already has provenance is refused rather
+    than overwritten -- a second capital for the same trial would make "re-run it as it was"
+    ambiguous. ``trial_n`` must be a real trial number (the foreign key enforces existence; the
+    explicit check turns the sentinel ``0`` into a readable refusal). The capital must be a
+    positive, finite ``Decimal``: a float would not round-trip, and zero or NaN is not a sum any
+    run could have started with.
+    """
+    cols = ", ".join(f'"{c}"' for c in PROVENANCE_COLUMNS)
+    marks = ", ".join("?" for _ in PROVENANCE_COLUMNS)
+    for r in rows:
+        if r.trial_n <= 0:
+            raise LabError(
+                f"provenance needs the trial number insert_trials assigned, got {r.trial_n!r}: "
+                "insert the trial first, then record its provenance"
+            )
+        capital = r.initial_idr
+        if not isinstance(capital, Decimal):
+            raise LabError(
+                f"trial {r.trial_n}: initial_idr must be a Decimal, got "
+                f"{type(capital).__name__} {capital!r}"
+            )
+        if not capital.is_finite() or capital <= 0:
+            raise LabError(
+                f"trial {r.trial_n}: initial_idr must be a positive, finite number of IDR, "
+                f"got {capital!r}"
+            )
+        if r.source not in PROVENANCE_SOURCES:
+            raise LabError(
+                f"trial {r.trial_n}: provenance source must be one of {PROVENANCE_SOURCES}, "
+                f"got {r.source!r}"
+            )
+        if provenance_of(conn, r.trial_n) is not None:
+            raise LabError(
+                f"trial {r.trial_n} already has recorded provenance: trial_provenance is "
+                "append-only, and a second capital for the same trial would make a re-run ambiguous"
+            )
+        conn.execute(
+            f"INSERT INTO trial_provenance ({cols}) VALUES ({marks})",
+            [int(r.trial_n), format(capital, "f"), r.price_fingerprint, r.source, r.measured],
         )
 
 

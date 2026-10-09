@@ -186,9 +186,19 @@ def trial_deposits(
     """What a funded trial received inside each curve step, in the curve's own units.
 
     A recorded curve is normalised to the opening cash, so one deposit is
-    ``amount_idr / INITIAL_IDR`` -- 0.5 for the owner's 5,000,000 against a 10,000,000 start --
-    and no exchange rate is involved, because the run converted both at the same rate. (M0032's
-    curve opens at 1.5 for exactly this reason: January's deposit is already in the first point.)
+    ``amount_idr / <the capital the trial ran on>`` -- 0.5 for the owner's 5,000,000 against the
+    10,000,000 start every funded trial has used so far -- and no exchange rate is involved,
+    because the run converted both at the same rate. (M0032's curve opens at 1.5 for exactly this
+    reason: January's deposit is already in the first point.)
+
+    **The divisor is the trial's recorded capital** (``runner.recorded_capital``: its
+    ``trial_provenance`` row), never the live ``backtest.runner.INITIAL_IDR``. For all 24 funded
+    trials recorded today the two are the same 10,000,000 IDR, which is why the switch moves no
+    verdict (trial-reproducibility analysis M5: 0 stranded). They stop being the same number the
+    moment the constant moves again -- ``d79fc83`` already moved it once, 20M to 10M, on
+    2026-10-08 -- and a de-funding that read the constant would then silently credit every
+    deposit of every funded trial at a size it never had. A funded trial with no recorded
+    capital is refused (``store.LabError``) rather than de-funded at a guess.
 
     ``{}`` for a lump-sum trial, which is every trial recorded before the contribution schedule
     existed. Without this, slicing a funded curve counts the owner's deposits as growth and
@@ -200,14 +210,14 @@ def trial_deposits(
     """
     from seer_engine import dates as nyse
     from seer_engine.backtest.regime import bucket
-    from seer_engine.backtest.runner import INITIAL_IDR
     from seer_engine.lab import runner as labrunner
 
     schedule = labrunner.recorded_contributions(conn, int(row["n"]))
     if schedule is None:
         return {}
     start, end = date.fromisoformat(row["start"]), date.fromisoformat(row["end"])
-    unit = float(schedule.amount_idr / INITIAL_IDR)
+    capital = labrunner.recorded_capital(conn, int(row["n"]))
+    unit = float(schedule.amount_idr / capital)
     due = schedule.dates_in(start, end)
     credited: dict[date, float] = {}
     for d in due:

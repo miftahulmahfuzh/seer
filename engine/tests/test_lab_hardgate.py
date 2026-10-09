@@ -9,10 +9,12 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import date, timedelta
+from decimal import Decimal
 from math import comb
 
 import pytest
 
+from labkit import stamp_provenance
 from seer_engine.backtest import regime
 from seer_engine.lab import hardgate, store
 from seer_engine.lab import walkforward as wf
@@ -311,7 +313,7 @@ def test_a_lump_sum_trial_has_no_deposits(conn):
 def test_a_funded_trial_is_de_funded_before_it_is_scored(conn):
     """Every trial from M0032 on is funded; reading a deposit as edge is insight 72/75's bug.
 
-    Two claims, both measured. The reconstruction credits ``amount_idr / INITIAL_IDR`` -- 0.5 --
+    Two claims, both measured. The reconstruction credits ``amount_idr / <recorded capital>`` -- 0.5 --
     per deposit, **except** the one landing on or before the curve's first point, which
     ``regime.bucket`` drops because it is already in the opening balance rather than growth over
     it: 237 deposits, 236 credited steps, 118.0 and not 118.5. And the de-funding reaches the
@@ -338,6 +340,8 @@ def test_a_funded_trial_is_de_funded_before_it_is_scored(conn):
             deposits_n=len(due),
             schedule="+5,000,000 IDR on the 25th of each month", measured="test",
         )])
+    with conn:
+        stamp_provenance(conn, [int(row["n"])])  # 10M: the 0.5-per-deposit unit asserted below
 
     curve = [(date.fromisoformat(d), float(v)) for d, v in json.loads(row["curve_json"])]
     deposits = hardgate.trial_deposits(conn, row, curve)
@@ -359,10 +363,52 @@ def test_a_moved_contribution_schedule_refuses_rather_than_guesses(conn):
             trial_n=int(row["n"]), mwr=0.11, spy_tr_mwr=0.08, deposits_usd=1.0, deposits_n=3,
             schedule="+5,000,000 IDR on the 25th of each month", measured="test",
         )])
+    with conn:
+        stamp_provenance(conn, [int(row["n"])])  # 10M: the 0.5-per-deposit unit asserted below
     curve = [(date.fromisoformat(d), float(v)) for d, v in json.loads(row["curve_json"])]
     with pytest.raises(store.LabError) as e:
         hardgate.trial_deposits(conn, row, curve)
     assert "cannot be de-funded safely" in str(e.value)
+
+
+def _funded_trial(conn, mid: str, *, capital: str | None):
+    """A funded dev trial built directly (not through ``_method``), recorded at ``capital``."""
+    from seer_engine.sim.contributions import OWNER_MONTHLY
+
+    due = OWNER_MONTHLY.dates_in(date(1996, 1, 2), date(2015, 10, 16))
+    with conn:
+        store.add_method(conn, id=mid, name=f"n{mid}", family="trend", source_kind="knowledge",
+                         hypothesis="h", status="registered")
+        (n,) = store.insert_trials(conn, [_trial(
+            method_id=mid, candidate_id=f"{mid}-A", config_digest=f"d-{mid}",
+            curve_json=_curve(_months(*DEV_SPAN), 0.15),
+        )])
+        store.insert_funding(conn, [store.FundingRow(
+            trial_n=n, mwr=0.11, spy_tr_mwr=0.08, deposits_usd=1.0, deposits_n=len(due),
+            schedule="+5,000,000 IDR on the 25th of each month", measured="test",
+        )])
+        if capital is not None:
+            stamp_provenance(conn, [n], initial_idr=Decimal(capital))
+    row = conn.execute(
+        'SELECT n, candidate_id, start, "end", curve_json FROM trials WHERE n = ?', (n,)
+    ).fetchone()
+    curve = [(date.fromisoformat(d), float(v)) for d, v in json.loads(row["curve_json"])]
+    return row, curve, due
+
+
+def test_a_deposit_is_measured_against_the_capital_the_trial_ran_on(conn):
+    """Recorded at 20M, each 5M deposit is 0.25 of the opening balance, not the 0.5 the live
+    INITIAL_IDR would say. The day the constant moves again, nothing recorded re-scales."""
+    row, curve, due = _funded_trial(conn, "M0002", capital="20000000")
+    deposits = hardgate.trial_deposits(conn, row, curve)
+    assert len(deposits) == len(due) - 1
+    assert set(deposits.values()) == {0.25}
+
+
+def test_a_funded_trial_with_no_recorded_capital_is_refused_not_guessed(conn):
+    row, curve, _due = _funded_trial(conn, "M0003", capital=None)
+    with pytest.raises(store.LabError, match="no recorded starting capital"):
+        hardgate.trial_deposits(conn, row, curve)
 
 
 # ------------------------------------------------------------------ what the gate judges

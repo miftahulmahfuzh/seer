@@ -536,9 +536,10 @@ def family_text(conn: sqlite3.Connection, method_id: str, family: str) -> str:
     """The state of ``method_id``'s kin at promotion, as the file states it.
 
     ``hardgate.failed_kin`` is the one definition of kin -- the method's ``family`` string together
-    with its transitive ancestors through ``parent_id`` (plan Decision D4), and its ingredients
-    with theirs (hardgate D12) -- and this line quotes its answer rather than re-deriving it, so
-    the file and the rule cannot disagree.
+    with its transitive ancestors through ``parent_id`` (plan Decision D4), its ingredients with
+    theirs (hardgate D12), and the test-failed books one of its variants moves with (hardgate
+    D14) -- and this line quotes its answer rather than re-deriving it, so the file and the rule
+    cannot disagree.
 
     ``family`` is passed in because every caller already holds the ``methods`` row and a second
     query inside the write lock would buy nothing. It is named in the line so a reader knows which
@@ -559,11 +560,11 @@ def family_text(conn: sqlite3.Connection, method_id: str, family: str) -> str:
     if not failed:
         return one_line(
             f"clean at promotion: no method in {method_id}'s family '{family}', ancestry or "
-            f"ingredients (or theirs) read test-failed"
+            f"ingredients (or theirs), or moving with it by behaviour, read test-failed"
         )
     return one_line(
         f"blocked at promotion: {', '.join(failed)} in {method_id}'s family '{family}', ancestry "
-        f"or ingredients (or theirs) read test-failed"
+        f"or ingredients (or theirs), or moving with it by behaviour, read test-failed"
     )
 
 

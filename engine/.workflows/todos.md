@@ -2,7 +2,7 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-09 22:45
+**Last Updated**: 2026-10-09 22:38
 **Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 111
+- Completed: 112
 
 ---
 
@@ -897,7 +897,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Context**: `engine/src/seer_engine/lab/name_count.py:27` (module docstring) equates the two quantities outright — ``store.dev_trial_count`` **(the lab's N)**. That was true under `DSR_POLICY = "all-trials"`, where N was one look per dev trial row. Since 2026-10-08 the shipped policy is `methods` (lab-realistic-gate R1, `P1-ENG-L4ND`) and N is the distinct-method count floored at the measured participation ratio — 28, against 126 dev trial rows. The parenthetical now names the wrong quantity, and it sits in the docstring a reader consults to learn what the module guarantees. The fix is the wording: `dev_trial_count` is still the right number for that sentence's purpose (it is what stays unchanged), it is simply no longer "the lab's N" — that is `store.gate(conn).n`. Found during phase 1 and deliberately left: `name_count.py` is outside that phase's Owns, so it is carded rather than edited. **Checked and NOT a defect — do not "fix" it:** `:477`, the `format_report` footer, says "the lab's N and the test-window looks do not move". That is a claim about `lab names` writing nothing, and it stays true under every policy. `:27` is the only site that mislabels the quantity.
   - **Status**: pending
   - **Found by**: `P1-ENG-L4ND` (lab-realistic-gate phase 1)
-
 ### [P3] Low
 - [ ] **P3-ENG-V2KQ** Append a dated §7.3 revision recording the N policy move to the lab design doc
   - **Difficulty**: EASY
@@ -915,6 +914,23 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P2-ENG-B4KN** Phase 1: Behavioural kin (D14), skill text, idea re-file
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns lab/hardgate.py (behavioural kin + D14 + rule summary + refusal text), tests/test_lab_hardgate.py, commands/lab.py (lab walkforward catches a kin LabError), kin wording in lab/prereg.py and lab/runner.py, the explore skill's kin paragraphs, idea rows M0060/M0062 + one insight. Exit: suite green; lab status prints Promotable now: (none); failed_kin on committed lab matches D14 table; D14 present; skill updated; M0060/M0062 handled and an insight records it; merged to main and pushed; db commit on main by pathspec.
+  - **Status**: completed
+  - **Plan Set**: `HARDGATE_BEHAVIOURAL_KIN_PLAN.md` (phase 1 of 1)
+  - **Satisfies**: R1, R2, R3, R4 — Kin follows what a method is (behavioural, D14), written as D14, idea rows handled, explore skill kin text updated
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P2-ENG-B4KN.md`
+  - **Completed**: 2026-10-09 22:38
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/hardgate.py, engine/src/seer_engine/lab/prereg.py, engine/src/seer_engine/lab/runner.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_hardgate.py, .claude/skills/explore-and-experiment-new-method/SKILL.md, HARDGATE_BEHAVIOURAL_KIN_PLAN.md, engine/.workflows/todos.md, engine/.workflows/plan/P2-ENG-B4KN.md
+  - **Verified**: full engine suite 3392 passed, 411 skipped (PG-only); focused `-W error` lab suites 176 passed; `lab status` on committed lab prints `Promotable now: (none)`; `lab walkforward` prints "No buy signal", 0 "kin unknown" rows; `walkforward.py` diff vs origin/main empty; no override grep hits.
+  - **Drift**:
+    - ruff reports a pre-existing F841 (unused `done`) at engine/tests/test_lab_prereg.py:722, untouched by this phase and outside its Owns; left alone. ruff on src + test_lab_hardgate.py is clean.
+    - Step 13 re-measure on origin/main lab.sqlite (@5da88b6) matched D14's tables exactly (76 methods; D4+D12 31; behavioural 26; union 43; dev-eligible blocked 8 -> 10 of 10; H-P7A-F4 to M0002 at 0.97), so D14 was left as written.
+    - Plan Step 15 (re-file M0060/M0062 on main's lab db + insight, db commit by pathspec) is not part of this branch; the main session runs it after landing.
 - [x] **P2-ENG-L1VT** Phase 1: Promoted variant's own folds (D11), ingredients as kin (D12), buy signal follows (D13)
   - **Difficulty**: NORMAL
   - **Type**: Update

@@ -23,8 +23,9 @@
                                     REFUSES a method that does not win a majority of its
                                     walk-forward folds, or that is scoreable on fewer than the
                                     folds the benchmark yields, or whose curves were measured on
-                                    prices other than the benchmark's, or whose family or ancestry
-                                    already reads test-failed (lab/hardgate.py). The refusal
+                                    prices other than the benchmark's, or whose kin -- family,
+                                    ancestry, blend ingredient or behaviour -- already reads
+                                    test-failed (lab/hardgate.py). The refusal
                                     comes before anything is written, and there is no override
     lab reevaluate [M0022 ...]      re-judge recorded dev trials against the bars in force now
                                     (store.DSR_MIN, store.DSR_POLICY, tuning.MAX_DRAWDOWN) and
@@ -1010,8 +1011,8 @@ def _promotable_now(
         out.append(
             "  Refused by the hard gate (dev-eligible, but `lab promote` exits 2 on these -- it "
             "wants a majority of walk-forward folds, won by the picks and by the variant it would "
-            "pre-register, and no kin -- family, ancestry or blend ingredient -- that has "
-            "test-failed; there is no override):"
+            "pre-register, and no kin -- family, ancestry, blend ingredient or behaviour -- that "
+            "has test-failed; there is no override):"
         )
         out += refused
     if held:
@@ -1305,7 +1306,8 @@ def _promote(conn, args) -> int:
 
     **The hard gate runs first.** `hardgate.check` refuses a method that lost a majority of its
     walk-forward folds, that is scoreable on fewer folds than the geometry yields, or whose
-    family or ancestry already reads `test-failed`. It raises `store.LabError`, which `run` turns
+    kin -- family, ancestry, blend ingredients or behaviour (hardgate D4, D12, D14) -- already
+    reads `test-failed`. It raises `store.LabError`, which `run` turns
     into exit 2, and it raises *before* `prereg.promote_method` writes the file or moves the
     status -- so a refused promote leaves the repository and the database byte-identical. There
     is no flag that skips it.
@@ -2048,12 +2050,24 @@ def _walkforward(conn, args) -> int:
         row = store.get_method(conn, mid)
         eligible = row is not None and row["status"] == "dev-eligible"
         # The SAME kin rule the promote gate uses (hardgate.failed_kin: family union transitive
-        # ancestors union blend ingredients and theirs, hardgate D12), not a second query beside
-        # it. Decision D9 is what happens when these two disagree: the signal said M0030's family
-        # was clean while the gate refused it on ancestry, which is a worse answer than either one
-        # alone. That the signal widens with D12 is recorded as hardgate Decision D13.
-        kin = hardgate.failed_kin(conn, mid) if row is not None else ()
-        signal, why = wf.buy_signal(eligible, rec, edge, ", ".join(kin) if kin else None)
+        # ancestors union blend ingredients and theirs, hardgate D12, union the tested books one
+        # of its variants moves with, hardgate D14), not a second query beside it. Decision D9 is
+        # what happens when these two disagree: the signal said M0030's family was clean while
+        # the gate refused it on ancestry, which is a worse answer than either one alone. That
+        # the signal widens with D12 and D14 is recorded as hardgate Decision D13. When the kin
+        # cannot be read -- D14 compares curves, and refuses on other or unknown prices (D10) --
+        # the reason goes in as the failed kin, so the signal cannot fire on a kin nobody could
+        # check, and the report still prints the row.
+        if row is None:
+            family_failed = None
+        else:
+            try:
+                kin = hardgate.failed_kin(conn, mid)
+            except store.LabError as e:
+                family_failed = f"kin unknown ({e})"
+            else:
+                family_failed = ", ".join(kin) if kin else None
+        signal, why = wf.buy_signal(eligible, rec, edge, family_failed)
         if signal:
             fired.append(f"{mid}: {why}")
         if rec.majority:

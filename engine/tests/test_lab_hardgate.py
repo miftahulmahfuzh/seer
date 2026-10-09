@@ -12,6 +12,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from math import comb
 
+import numpy as np
 import pytest
 
 from labkit import LAB_PRICE_FINGERPRINT, stamp_provenance
@@ -81,7 +82,8 @@ def _trial(**kw) -> store.TrialRow:
     return store.TrialRow(**base)
 
 
-def _benchmark(conn, *, prices: str | None = SAME_PRICES, stamped: bool = True) -> None:
+def _benchmark(conn, *, prices: str | None = SAME_PRICES, stamped: bool = True,
+               curve_json: str | None = None) -> None:
     """The lab's REF-SPY-HOLD dev trial, recorded -- like the real trial #1 -- under the P7a store
     fingerprint while every method below carries ``399d0d25``. Same prices, different store: the
     committed lab's own shape, and the case D10 says must stay comparable."""
@@ -91,7 +93,8 @@ def _benchmark(conn, *, prices: str | None = SAME_PRICES, stamped: bool = True) 
         ns = store.insert_trials(conn, [_trial(
             method_id="H-P7A-REF", candidate_id=regime.BENCH_CANDIDATE,
             config_digest="ref-spy-hold", start="1993-02-01", end="2015-10-16",
-            store_fingerprint="5451195f", curve_json=_curve(_months(*BENCH_SPAN), 0.08),
+            store_fingerprint="5451195f",
+            curve_json=_curve(_months(*BENCH_SPAN), 0.08) if curve_json is None else curve_json,
         )])
         if stamped:
             stamp_provenance(conn, ns, price_fingerprint=prices)
@@ -99,7 +102,7 @@ def _benchmark(conn, *, prices: str | None = SAME_PRICES, stamped: bool = True) 
 
 def _method(conn, mid="M0001", *, family="trend", parent=None, status="dev-eligible",
             annual=0.15, span=DEV_SPAN, curves=True, prices: str | None = SAME_PRICES,
-            stamped: bool = True) -> None:
+            stamped: bool = True, curve_json: str | None = None) -> None:
     """One method with one dev trial, walked to ``status`` through the real transitions.
 
     The trial is stamped with provenance on ``prices`` unless ``stamped`` is False -- the gate
@@ -111,7 +114,11 @@ def _method(conn, mid="M0001", *, family="trend", parent=None, status="dev-eligi
                          status="registered")
         ns = store.insert_trials(conn, [_trial(
             method_id=mid, candidate_id=f"{mid}-A", config_digest=f"d-{mid}",
-            curve_json=_curve(_months(*span), annual) if curves else "[]",
+            curve_json=(
+                "[]" if not curves
+                else curve_json if curve_json is not None
+                else _curve(_months(*span), annual)
+            ),
         )])
         if stamped:
             stamp_provenance(conn, ns, price_fingerprint=prices)
@@ -302,13 +309,17 @@ def test_a_parent_cycle_does_not_hang_the_kin_walk(conn):
 
 
 def _variant(conn, mid: str, suffix: str, *, annual: float, config_text: str = "t",
-             curves: bool = True) -> None:
+             curves: bool = True, curve_json: str | None = None) -> None:
     """A second dev trial of an existing method -- another variant -- stamped on the lab's prices."""
     with conn:
         ns = store.insert_trials(conn, [_trial(
             method_id=mid, candidate_id=f"{mid}-{suffix}", config_digest=f"d-{mid}-{suffix}",
             config_text=config_text,
-            curve_json=_curve(_months(*DEV_SPAN), annual) if curves else "[]",
+            curve_json=(
+                "[]" if not curves
+                else curve_json if curve_json is not None
+                else _curve(_months(*DEV_SPAN), annual)
+            ),
         )])
         stamp_provenance(conn, ns, price_fingerprint=SAME_PRICES)
 
@@ -928,3 +939,244 @@ def test_lab_walkforward_is_silent_when_everything_is_comparable(tmp_path, capsy
         db=db, lab_command="walkforward", method=[], min_train_years=None, eval_years=None,
     )) == 0
     assert "WARNING" not in capsys.readouterr().out
+
+
+# ------------------------------------------------------------------ (D14) behaviour is kin
+#
+# The fixtures above record constant-growth curves, whose monthly returns are flat: they have no
+# correlation with anything, which is exactly why every kin test before this section is untouched
+# by (D14). The curves here move. ``_MARKET`` is one seeded draw of monthly returns, the benchmark
+# is that draw alone, and a book is the market plus its own seeded "idea" -- two books that share
+# an idea move together once the market is taken out; two that do not, do not.
+
+_BENCH_MONTHS = _months(*BENCH_SPAN)
+
+
+def _draw(seed: int, *, mean: float, sd: float) -> dict[date, float]:
+    rng = np.random.default_rng(seed)
+    return dict(zip(_BENCH_MONTHS, (float(r) for r in rng.normal(mean, sd, len(_BENCH_MONTHS)))))
+
+
+_MARKET = _draw(0, mean=0.007, sd=0.04)
+_IDEA_A = _draw(1, mean=0.006, sd=0.03)     # the failed book's idea
+_IDEA_B = _draw(2, mean=0.006, sd=0.03)     # an unrelated idea
+_NOISE = _draw(3, mean=0.0, sd=0.006)       # small, so a copy of an idea still tracks it
+_EDGE = {d: 0.01 for d in _BENCH_MONTHS}    # a steady extra point a month: wins the folds, and
+                                            # moves nothing, so it changes no correlation
+
+
+def _moving(months: list[date], *ideas: dict[date, float]) -> str:
+    """A recorded monthly curve that moves: the market's return plus each idea's, every month."""
+    out, v = [], 1.0
+    for i, d in enumerate(months):
+        if i:
+            v *= 1.0 + _MARKET[d] + sum(idea[d] for idea in ideas)
+        out.append([d.isoformat(), round(v, 8)])
+    return json.dumps(out)
+
+
+def _moving_benchmark(conn) -> None:
+    _benchmark(conn, curve_json=_moving(_BENCH_MONTHS))
+
+
+def _tested(conn, mid: str) -> None:
+    """``mid``'s one look at the test window, spent on its ``-A`` variant (the look it lost)."""
+    with conn:
+        store.insert_trials(conn, [_trial(
+            method_id=mid, candidate_id=f"{mid}-A", config_digest=f"d-{mid}", window="test",
+            start="2016-01-04", end="2026-09-30", eligible=False,
+        )])
+
+
+def _failed_momentum(conn, *, prices: str | None = SAME_PRICES) -> None:
+    """M0002, a momentum book that read ``test-failed`` -- with the look it spent, recorded."""
+    _method(conn, "M0002", family="stock-momentum-risk-managed", status="test-failed",
+            curve_json=_moving(_months(*DEV_SPAN), _IDEA_A), prices=prices)
+    _tested(conn, "M0002")
+
+
+def test_the_module_records_the_behavioural_kin_decision():
+    """Insight 92: kin follows what a book does, argued and measured in the docstring (D14)."""
+    doc = hardgate.__doc__ or ""
+    assert "(D14)" in doc
+    assert "F4-MOM12-N20-TREND" in doc   # the plain momentum book it catches, named
+    assert "M0060" in doc and "M0062" in doc
+    assert hardgate.KIN_CORRELATION == 0.85
+    assert hardgate.MIN_KIN_MONTHS == 36
+
+
+def test_a_book_that_moves_with_a_failed_tested_book_is_kin_under_any_name(conn):
+    """Insight 92's shape: a momentum book under a brand-new family, its parent a non-momentum
+    method. Family, ancestry and ingredients all read clean; its curve does not."""
+    _moving_benchmark(conn)
+    _failed_momentum(conn)
+    _method(conn, "M0057", family="stock-short-term-momentum", status="rejected")
+    _method(conn, "M0060", family="stock-low-volume-momentum", parent="M0057",
+            curve_json=_moving(_months(*DEV_SPAN), _IDEA_A, _NOISE, _EDGE))
+    assert hardgate.fold_record(conn, "M0060").majority   # so the refusal below is (K), not (F)
+    twins = hardgate.behavioural_kin(conn, "M0060")
+    assert [(t.failed_id, t.candidate_id, t.failed_candidate_id) for t in twins] == [
+        ("M0002", "M0060-A", "M0002-A")
+    ]
+    assert twins[0].correlation >= hardgate.KIN_CORRELATION
+    assert hardgate.failed_kin(conn, "M0060") == ("M0002",)
+    assert hardgate.family_state(conn, "M0060") == "blocked: M0002 read test-failed"
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0060")
+    msg = str(e.value)
+    assert f"M0060-A moves with M0002's tested M0002-A at {twins[0].correlation:.2f}" in msg
+    assert "residual correlation" in msg and "D14" in msg
+    assert "override" in msg
+
+
+def test_a_book_with_its_own_idea_is_clean(conn):
+    _moving_benchmark(conn)
+    _failed_momentum(conn)
+    _method(conn, "M0060", family="stock-low-volume-momentum",
+            curve_json=_moving(_months(*DEV_SPAN), _IDEA_B))
+    assert hardgate.behavioural_kin(conn, "M0060") == ()
+    assert hardgate.failed_kin(conn, "M0060") == ()
+
+
+def test_every_dev_variant_is_compared_and_the_best_pair_is_named(conn):
+    """Kin is about a method, not one variant (D12's reason): a tracking variant anywhere in it
+    links the method, and the twin names that variant."""
+    _moving_benchmark(conn)
+    _failed_momentum(conn)
+    _method(conn, "M0060", family="new", curve_json=_moving(_months(*DEV_SPAN), _IDEA_B))
+    _variant(conn, "M0060", "MOM", annual=0.0,
+             curve_json=_moving(_months(*DEV_SPAN), _IDEA_A, _NOISE))
+    (twin,) = hardgate.behavioural_kin(conn, "M0060")
+    assert twin.candidate_id == "M0060-MOM"
+
+
+def test_a_failed_method_with_no_recorded_look_contributes_no_behaviour(conn):
+    """The tested variant is the one the look was spent on; with no test trial there is none to
+    compare -- the method is still kin by family, ancestry and ingredients (D4, D12)."""
+    _moving_benchmark(conn)
+    _method(conn, "M0002", family="momentum", status="test-failed",
+            curve_json=_moving(_months(*DEV_SPAN), _IDEA_A))
+    _method(conn, "M0060", family="new", curve_json=_moving(_months(*DEV_SPAN), _IDEA_A, _NOISE))
+    assert hardgate.behavioural_kin(conn, "M0060") == ()
+    assert hardgate.failed_kin(conn, "M0060") == ()
+
+
+def test_flat_curves_are_not_measured_and_raise_no_warning(conn):
+    """A constant-growth curve -- every fixture above -- has no variance, so no correlation. It is
+    "not measured", never kin, and it never reaches np.polyfit or np.corrcoef to warn."""
+    import warnings
+
+    _benchmark(conn)                      # flat benchmark
+    _method(conn, "M0002", family="momentum", status="test-failed",
+            curve_json=_moving(_months(*DEV_SPAN), _IDEA_A))
+    _tested(conn, "M0002")
+    _method(conn, "M0060", family="new", curve_json=_moving(_months(*DEV_SPAN), _IDEA_A))
+    _method(conn, "M0061", family="other", annual=0.15)  # flat book
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert hardgate.behavioural_kin(conn, "M0060") == ()   # the benchmark is flat
+        assert hardgate.behavioural_kin(conn, "M0061") == ()
+        flat = hardgate.monthly_returns(hardgate._curve_of(conn.execute(
+            "SELECT curve_json FROM trials WHERE candidate_id = 'M0061-A'").fetchone()))
+        moving = hardgate.monthly_returns([(d, 1.0 + 0.01 * (i % 7)) for i, d in
+                                           enumerate(_months(*DEV_SPAN))])
+        assert hardgate.residual(flat, moving) is None
+        assert hardgate.correlation(flat, moving) is None
+
+
+def test_fewer_than_the_minimum_common_months_is_not_measured(conn):
+    _moving_benchmark(conn)
+    _failed_momentum(conn)
+    short = _months(date(2013, 1, 1), date(2015, 10, 16))  # 34 points, 33 monthly returns
+    _method(conn, "M0060", family="new", span=(short[0], short[-1]),
+            curve_json=_moving(short, _IDEA_A, _NOISE))
+    assert len(short) - 1 < hardgate.MIN_KIN_MONTHS
+    assert hardgate.behavioural_kin(conn, "M0060") == ()
+    months = [(2000 + i // 12, 1 + i % 12) for i in range(hardgate.MIN_KIN_MONTHS)]
+    a = {m: float(i % 5) for i, m in enumerate(months)}
+    b = {m: float(i % 5) + 0.1 * (i % 3) for i, m in enumerate(months)}
+    assert hardgate.correlation(a, b) is not None
+    del a[months[0]]
+    assert hardgate.correlation(a, b) is None
+
+
+def test_behaviour_is_one_hop(conn):
+    """Only failed tested books are compared. M0070 is M0002's kin by family; M0080 moves with
+    M0070 and not with M0002, so it is nobody's kin -- kin of kin is (D4)'s blob."""
+    _moving_benchmark(conn)
+    _failed_momentum(conn)
+    _method(conn, "M0070", family="stock-momentum-risk-managed", status="rejected",
+            curve_json=_moving(_months(*DEV_SPAN), _IDEA_B))
+    _method(conn, "M0080", family="unrelated",
+            curve_json=_moving(_months(*DEV_SPAN), _IDEA_B, _NOISE))
+    assert hardgate.failed_kin(conn, "M0070") == ("M0002",)
+    assert hardgate.behavioural_kin(conn, "M0080") == ()
+    assert hardgate.failed_kin(conn, "M0080") == ()
+
+
+def test_a_failed_tested_book_on_other_prices_refuses_rather_than_reads_clean(conn):
+    """Fail closed (D10): a comparison across two price histories measures the data."""
+    _moving_benchmark(conn)
+    _failed_momentum(conn, prices=OTHER_PRICES)
+    _method(conn, "M0060", family="new", curve_json=_moving(_months(*DEV_SPAN), _IDEA_B))
+    with pytest.raises(store.LabError) as e:
+        hardgate.behavioural_kin(conn, "M0060")
+    assert "M0002-A" in str(e.value) and "D10" in str(e.value)
+    with pytest.raises(store.LabError):
+        hardgate.failed_kin(conn, "M0060")
+    with pytest.raises(store.LabError):
+        hardgate.check(conn, "M0060")
+    assert "kin unknown (" in hardgate.summary(conn, "M0060")
+
+
+def test_the_method_itself_is_never_its_own_behavioural_kin(conn):
+    _moving_benchmark(conn)
+    _failed_momentum(conn)
+    assert hardgate.behavioural_kin(conn, "M0002") == ()
+    assert hardgate.failed_kin(conn, "M0002") == ()
+
+
+def test_a_method_with_no_curve_has_nothing_measured(conn):
+    """Nothing to compare, so its kin is (D4) and (D12) alone -- and no benchmark is needed to
+    say so. The gate never reaches (K) for it anyway: (F) refuses a method with no curve."""
+    _failed_momentum(conn)                # no benchmark at all
+    _method(conn, "M0060", family="new", curves=False)
+    assert hardgate.behavioural_kin(conn, "M0060") == ()
+    assert hardgate.failed_kin(conn, "M0060") == ()
+    with pytest.raises(store.LabError):
+        hardgate.behavioural_kin(conn, "M9999")
+
+
+def test_lab_walkforward_prints_a_kin_it_cannot_read_and_fires_nothing(tmp_path, capsys):
+    """The report catches the kin's refusal (D10, D14) and hands it to the signal as the failed
+    kin, so the signal cannot fire on a kin nobody could check -- walkforward.py unedited (D13)."""
+    from seer_engine.commands import lab as lab_cmd
+
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _moving_benchmark(c)
+    _failed_momentum(c, prices=OTHER_PRICES)
+    _method(c, "M0060", family="new", curve_json=_moving(_months(*DEV_SPAN), _IDEA_B))
+    c.close()
+
+    rc = lab_cmd.run(argparse.Namespace(
+        db=db, lab_command="walkforward", method=[], min_train_years=None, eval_years=None,
+    ))
+    assert rc == 0
+    out = capsys.readouterr().out
+    row = next(line for line in out.splitlines() if line.strip().startswith("M0060"))
+    assert "kin unknown (" in row
+    assert "No buy signal" in out
+
+
+def test_lab_tests_note_says_when_the_kin_cannot_be_read(conn):
+    """A note, never a refusal (D3): a kin walk that cannot run is still information."""
+    from seer_engine.lab import runner
+
+    _moving_benchmark(conn)
+    _failed_momentum(conn, prices=OTHER_PRICES)
+    _method(conn, "M0060", family="new", status="promoted",
+            curve_json=_moving(_months(*DEV_SPAN), _IDEA_B))
+    note = runner.kin_note(conn, "M0060")
+    assert note is not None
+    assert "could not be read" in note and "not a refusal" in note

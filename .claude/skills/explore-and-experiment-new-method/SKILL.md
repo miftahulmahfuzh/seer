@@ -46,8 +46,11 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
 ## One run
 
 1. **Preflight.** Solo: if `main` has unrelated uncommitted changes, don't touch them; commit
-   only your own paths. Pull. If `engine/.research/` is missing, build it
-   (`python -m seer_engine research_store`, a few minutes).
+   only your own paths. Pull. If `engine/.research/` is missing, pull it with
+   `/sync-research-store` rather than building it: `lab run` refuses a dev store whose prices are
+   not the ones the lab's benchmark was measured on (D10 in `lab/hardgate.py`), and a fresh build
+   re-fetches prices. Build (`python -m seer_engine research_store`) only when no copy exists
+   anywhere; a refused build records nothing and spends no method id.
 2. **Read the lab.** `lab status` shows N, test looks, families, the trials closest to eligible,
    backlog, blocked ideas and the latest insights. Use `lab show <id>` for detail.
 3. **Choose one idea** (child: it was chosen; start from the reserved row's name and hypothesis).

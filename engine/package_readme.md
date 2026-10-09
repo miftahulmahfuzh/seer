@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (src layout: `engine/src/seer_engine`)
-**Last Updated**: 2026-10-08 (lab-realistic-gate, R2 (P1-ENG-FND7): `lab run` and `lab test` run every candidate on the owner's real funding (`sim.contributions.OWNER_MONTHLY`) and record a `trial_funding` row per funded trial, and the returns and the drawdown the gate reads are cashflow-adjusted — a deposit is no longer counted as a return. Before that, R1 (P1-ENG-L4ND): the luck gate deflates by distinct **methods**, not trial rows — `store.DSR_POLICY` and `npolicy.DEFAULT_POLICY` move `"all-trials"` -> `"methods"`, `remeasure.batches_of`'s N guard widens to a bounded range, and `lab --help` is un-broken)
+**Last Updated**: 2026-10-09 (trial-reproducibility: every trial records its starting capital and its price fingerprint in the append-only `trial_provenance` table (schema 5, 152 trials back-filled by an exact rule); `lab remeasure` and `lab costs` re-run a recorded trial at its recorded capital and `hardgate.trial_deposits` de-funds by it; the hard gate refuses a comparison across price fingerprints, `lab walkforward` / `lab regime` warn, and `lab run` refuses a rebuilt dev store. Before that, lab-realistic-gate R2 (P1-ENG-FND7): `lab run` and `lab test` run every candidate on the owner's real funding and record a `trial_funding` row per funded trial)
 
 ## Overview
 
@@ -47,6 +47,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - The rebuilt roster, and the wiring layer (GOTRADE_FEE_REBUILD, phase 12): every live entry is replaced by a successor paying Gotrade's **measured** fees — `SPY-GT`, `C-GT`, `RMW-FR-GT`, `RAW-FR-GT`, `MOM-FR-GT`, `MVW-FR-GT` — as **new ids with fresh paper clocks** (`cost_model` is a `LEVERS_SINCE_PINS` lever, so editing a started entry would move its digest and `store.check_digest` would refuse its next night), with the six predecessors **retired, not deleted**. Migration 017 writes them; `paper/roster.py` gains the six ids, `BENCHMARK_SYMBOL`, `OWNER_FUNDING`, `PRE_FUNDING_IDS`, `BENCHMARK_COST_MODEL` / `benchmark_cost_model`, and a `spec` whose `funding` and benchmark cost keys are conditional so no pinned digest moves. The wiring: the night passes each entry's **own** `rules` into `settle_bracket` / `decide_bracket` / `repick`, `_step_benchmark` loads `SPY-GT` at its roster-stated cost model, the night accrues and credits the owner's contribution schedule (10,000,000 IDR to start, +5,000,000 IDR on the 25th) raising cash and equity together on all three engines, `paper/replay.py` replays the stored dated deposits instead of hard-coding `DESIGN_V0`, and `promote` dispatches the engine on `sim.rules.is_bracket`. `PAPER_PAUSED` stays `'true'`: the rebuilt roster sits inert, no `paper_start` is written and no session is stepped until the owner flips the switch himself
 - The gate counts the looks the data supports (lab-realistic-gate, R1): `store.DSR_POLICY` and `npolicy.DEFAULT_POLICY` move `"all-trials"` -> `"methods"`, so the luck test deflates by the number of **distinct methods** the lab has looked at — **N = 28** on the committed `lab/lab.sqlite`, not the 126 dev trial rows — floored at the measured participation ratio (`max(distinct_methods, ceil(participation_ratio))`; `ceil(2.338) = 3`, so the floor does not bind). The reason is not that 126 is a big number: a lab of 126 rows holds 28 ideas, and mean pairwise correlation 0.612 across them says the row count asserts an independence the curves contradict. The consequence that matters operationally is **locality** — a variation twin of an existing method adds 0 to N and a brand-new method adds 1, so re-running one method no longer perturbs every other method's verdict, which is what made the all-trials gate unusable as exploration continued. Nothing recorded is rewritten (`trials` still 128 rows, `test_looks` still 2, every row keeps the label of the bar it was judged under): the verdict is *derived*, so only the published verdicts move — six methods go `rejected` -> `dev-eligible` (M0002, M0007, M0011, M0019, M0024, M0030), `dev-eligible` 2 -> 8 and `rejected` 27 -> 21. Two consequences elsewhere in the package: `remeasure.batches_of`'s second guard had to widen from an equality to a bounded range, because the equality *was* the all-trials projection and would have refused every batch recorded under any other policy; and the lab test modules whose fixtures stamp `n_trials_at_run` with their own dev row count (`test_lab_prereg.py`, `test_lab_status.py`) now pin `DSR_POLICY = "all-trials"` in an autouse fixture, naming the assumption they already encoded rather than inheriting whatever the shipped constant happens to be. Shipped in the same phase: `lab --help`, dead on `main` since a bare `%` entered an argparse `help=` string, is fixed — see the Command contract
 - The search is run on the owner's real money, and a deposit stops counting as a return (lab-realistic-gate, R2): `lab run` and `lab test` now fund every candidate with `sim.contributions.OWNER_MONTHLY` — 10,000,000 IDR to start and +5,000,000 IDR on the 25th of every month — and record one `trial_funding` row per funded trial inside the **same** `BEGIN IMMEDIATE` that records the trial, so the gate's money-weighted branch judges a newly run method on `mwr` against a dollar-cost-averaged SPY instead of on a total return that counts the owner's own deposits as growth. New in `lab/runner.py`: `OWNER_SCHEDULE_TEXT` (built from `OWNER_MONTHLY` rather than typed out, so a recorded row can never state a schedule the run was not fed), `recorded_contributions(conn, trial_n)` and `Ran.funding`; `trial_rows` gains keyword-only `deposits=` / `schedule=` whose defaults reproduce its old output byte for byte. **Every re-run path resolves its funding through `recorded_contributions`** — `lab remeasure` and `lab costs` reproduce a recorded trial on the funding it actually ran on, and `remeasure.measure` refuses outright a plan that mixes funded and unfunded trials, because one `dev.run_registry` call runs every candidate on one schedule and no schedule reproduces both. The second half of the phase is the correction funding made necessary: a deposit is not a return, and two gate conditions were being computed off raw equity. `book_runner._daily_returns` and `_year_returns` are now cashflow-adjusted (`cur / (prev + flow_t) - 1`, through the new `metrics.flow_map`) and `metrics.strategy_metrics` measures a funded run's `max_drawdown` on the time-weighted wealth index. Measured on the smoke fixture, uncorrected: an annualized Sharpe of 2.6524 for a book whose honest Sharpe is 0.2620 — a 10.1x inflation feeding `trials.dsr` and the luck test — and a max drawdown of 0.0796 against an honest 0.1055; corrected, 0.2904 and 0.1034. `total_return` and `cagr` are left contaminated deliberately, because they are the recorded shape of the curve that readers of the 128 historical trials depend on and `mwr` stands beside them with the honest number. Nothing recorded moves: the 128 pre-existing trials have no `trial_funding` row, `store.funding_of` still answers None for every one of them, and an unfunded run takes the original expressions verbatim and is byte-identical
+- Recorded trials reproduce, and the gate compares like with like (trial-reproducibility): the lab could not re-run its own record — `lab costs M0011` read +545.3% where trial #90 records +660.2%, and the 152 trials carried three store fingerprints. Measured, the store never moved its prices (the three fingerprints differ only in `fundamentals.csv`); what moved was `INITIAL_IDR`, 20,000,000 -> 10,000,000 in `d79fc83`, which no trial recorded and which whole-share rounding makes result-moving. `lab/store.py` schema 5 adds the append-only `trial_provenance` table (`initial_idr`, `price_fingerprint`, `source` `'recorded'`/`'backfill'`), written by `lab run` / `lab test` in the trial's own transaction and back-filled for every older trial (lump-sum -> 20M, funded -> 10M, exact on all 152); `research.price_fingerprint_of` hashes the four price files only. Every re-run of a recorded trial runs at `runner.recorded_capital`, which is how `lab remeasure M0007`, `M0011` and all 54 `H-P7A` seed trials reproduce exactly on today's store with `INITIAL_IDR` unchanged. Comparability is keyed on the price fingerprint, not the store fingerprint: `hardgate.fold_record` refuses a mismatch or an unknown, `lab walkforward` / `lab regime` warn, and `lab run` refuses a dev store whose price fingerprint is not the benchmark's. It strands 0 trials and changes 0 verdicts today. Recovered `trial_moments` were deliberately not written to the committed lab (they would move `H-P7A-F9` and two DSRs; that judgement belongs to the explore loop)
 
 ## Layout
 
@@ -1067,6 +1068,11 @@ trade and at Gotrade's real fees (`sim/costs.py`) — prints both side by side, 
   store or the engine changed when neither did. Both cost models are fed the identical schedule, so
   the flat/Gotrade comparison stays a comparison of one variant at two fee models and nothing
   else.
+- Since trial-reproducibility it also runs at the trial's **recorded capital**
+  (`runner.recorded_capital`), not the live `INITIAL_IDR`. Measured 2026-10-09: the +545.3% that
+  `lab costs M0011` printed against trial #90's +660.2% was the flat re-run starting at 10M where
+  the trial started at 20M; at the recorded capital the flat column reads +660.2% and the report
+  says the re-run reproduces it.
 - Writes no `trials` or `trial_moments` row and no status. It prints the lab's N and
   `test_looks` before and after, and they are equal. A re-measure can never make a method
   eligible: a real-fee configuration is judged only through a new method (M0031 on).
@@ -1567,7 +1573,9 @@ the database.
   was a flat percentage, where only ratios matter; Gotrade's measured schedule has a $0.10
   per-order floor, so the rate depends on the slot (at 17,841 IDR/USD over 20 names a 10M book pays
   1.035% round trip and a 20M book 0.660%) and a 20M lump would price a cheaper world than the owner
-  lives in.
+  lives in. Because it changed once, it is not the capital of a recorded trial: a trial's capital
+  is its `trial_provenance.initial_idr`, and every path that re-runs or de-funds a recorded trial
+  reads that (`lab.runner.recorded_capital`). `INITIAL_IDR` is only the default for a new run.
   `run_backtest(market, strategy, params, start, end, *, prepared=None, initial_idr=INITIAL_IDR, contributions=None, rules=DESIGN_V0) -> RunResult`
   is the "P3 backtest loop" below: each session `size_picks(picks(prev_session(S)))` → `step` →
   `close_unpriced` for held symbols whose bars ended for good (`last_bar_date < S`; a halt whose
@@ -2654,6 +2662,69 @@ and catches every `LabError`, so a lab with no benchmark — a new one, or any f
 `test_lab_status.py` — prints the refusal as a sentence instead of failing the command. Promoted
 methods are not re-judged there: the promise is not re-opened.
 
+
+### lab: per-trial provenance and comparability (trial-reproducibility)
+
+Two inputs make a re-run of a recorded trial the same measurement and no `trials` column carries
+them: the **starting capital** and the **price data**. Both are now recorded, once per trial, in an
+added table — `trials` itself is still append-only and was not touched.
+
+- **`trial_provenance`** (`lab/store.py`, schema 5): `trial_n` (primary key, foreign key to
+  `trials.n`), `initial_idr` (TEXT, NOT NULL), `price_fingerprint` (TEXT, NULL = unknown),
+  `source` (`'recorded'` | `'backfill'`), `measured`. Held append-only by
+  `trial_provenance_no_update` and `trial_provenance_no_delete`, the `trial_funding` precedent.
+  Surface: `store.ProvenanceRow`, `store.insert_provenance()`, `store.provenance_of()`.
+- **Written in the trial's own transaction.** `runner.run_method` and `runner.run_test` insert a
+  `source='recorded'` row beside every trial inside the same `BEGIN IMMEDIATE`, with the capital
+  the run was actually given (passed to `dev.run_registry(initial_idr=...)` explicitly) and
+  `ResearchData.price_fingerprint`. `lab.seed` writes a `source='backfill'` row for each of the 54
+  seed trials of a fresh database (20,000,000 IDR, the P7a price fingerprint): P7a ran before the
+  lab, so those are a stated fact about that run, not something the run wrote.
+- **Back-filled by migration 4 -> 5**, `source='backfill'`, for every trial without a row. Capital
+  by a rule that is exact on all 152 trials of the committed lab — checked with
+  `git merge-base --is-ancestor d79fc83 <git_sha>` over its 26 distinct shas: no `trial_funding`
+  row (trials #1..#128, all before `d79fc83`) -> 20,000,000; a `trial_funding` row (#129..#152,
+  all after) -> 10,000,000. Price fingerprint by the known map: `5451195f…`, `e597367b…` and
+  `399d0d25…` -> `5451195f…` (proven: the current store's four price files hash to it); the test
+  store `56e83810…` -> itself; anything else (the test store `bbe7abfb…`, whose file map is not
+  on this machine) -> NULL.
+- **`research.price_fingerprint_of(files)`** is `fingerprint_of` over the price files only
+  (`bars.csv`, `dividends.csv`, `fx.csv`, `unserved.csv`), and `ResearchData.price_fingerprint` is
+  it for a loaded store. The whole-store `fingerprint` still moves when `fundamentals.csv` is added
+  or refreshed; the price fingerprint does not. Use the store fingerprint to reproduce a method
+  that reads the fundamentals panel, the price fingerprint to compare recorded curves.
+- **`runner.recorded_capital(conn, n) -> Decimal`**, beside `recorded_contributions`. It raises
+  `store.LabError` for a trial with no provenance row rather than guess. `lab remeasure` (dev and
+  seed paths) and `lab costs` pass it to `dev.run_registry(initial_idr=...)`; `lab remeasure`
+  refuses, before loading any store, a set of trials recorded at two different capitals
+  (`remeasure.plan_capital`: one `run_registry` call runs one capital);
+  `hardgate.trial_deposits` divides a deposit by it, not by the live `INITIAL_IDR`, so the next
+  change to that constant cannot silently mis-de-fund every funded trial the gate reads.
+- **The comparability rule** — decision **(D10)** in `lab/hardgate.py`'s module docstring.
+  `hardgate.fold_record` — hence `check`, `fold_summary` and `summary` — refuses with
+  `store.LabError` when the `REF-SPY-HOLD` benchmark trial's price fingerprint (the row
+  `hardgate.benchmark_n` names and `Geometry.bench_n` carries), or any of the method's dev
+  trials', is unknown or differs from the benchmark's. Fail closed, no override. The check itself
+  is `hardgate.mismatches(conn, bench_n, rows)`, one sentence per incomparable trial;
+  `hardgate.comparability(conn, method_id, geo)` is that check over exactly the rows the gate
+  scores. The report-only commands reuse `mismatches` through
+  `commands/lab.py:_comparability_warnings`: `lab walkforward` and `lab regime` print one
+  `WARNING` line per such method and carry on. `lab run` calls `hardgate.pin_dev_store` and
+  refuses, before any backtest, a dev store whose price fingerprint differs from the benchmark
+  trial's or is unknown (the benchmark comparison is skipped only on a database with no benchmark
+  trial, which the gate refuses anyway). The key is deliberately **not**
+  `trials.store_fingerprint`: keyed on it, the rule would have refused every promotion, because the
+  benchmark was recorded on `5451195f…` and every M-method on `399d0d25…` or `e597367b…` with the
+  same prices.
+- **What it cost, measured 2026-10-09 on the committed lab.** 0 trials stranded, 0 verdicts
+  changed, `lab status` byte-identical (`Promotable now: (none)`); `lab remeasure M0007`, `M0011`
+  and `H-P7A` (54 of 54, six metrics within `METRIC_TOL`, trades exact) reproduce on today's store
+  with `INITIAL_IDR` at 10,000,000. At 10M without the recorded capital the same 54 all diverged.
+- **Deliberately not done.** The moments those re-runs recover were not written to the committed
+  lab. With them, `H-P7A-F9` becomes re-evaluable (`rejected` -> `dev-eligible` through
+  `lab reevaluate`) and `M0007-N20-RAW` reads DSR 0.978 (from 0.952), `M0011-RAW20-TV14-N21`
+  0.973 (from 0.943). No status moves by itself; the judgement is the explore loop's (insight of
+  2026-10-09, "Old results stopped matching because the starting amount changed, not the prices").
 
 ### lab: the N policy for the luck gate (lab-luck-gate phase 1)
 

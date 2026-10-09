@@ -984,9 +984,20 @@ def _promotable_now(
                 refused.append(head)
                 refused.append(f"           {detail}")
         else:
+            # `lab reevaluate` takes exactly one edge, `rejected -> dev-eligible`
+            # (store.reevaluate_method; TRANSITIONS has no edge out of `test-failed` at all).
+            # Offering it for a test-failed method advertised a way back that does not exist --
+            # and in the one direction that would matter, since un-failing a method would
+            # unblock the kin check on everything related to it.
+            if m["status"] == "rejected":
+                nudge = f"`lab reevaluate {m['id']}` re-judges it and moves it to dev-eligible"
+            else:
+                nudge = (
+                    "final -- the lab has no edge out of this status, so nothing re-judges it. "
+                    "A disproven configuration never gets a second look, on any window"
+                )
             held.append(
-                f"    {m['id']:<6} {best['candidate_id']:<28} status {m['status']!r}: "
-                f"`lab reevaluate {m['id']}` re-judges it and moves it to dev-eligible"
+                f"    {m['id']:<6} {best['candidate_id']:<28} status {m['status']!r}: {nudge}"
             )
     out = ["  Promotable now (`lab promote` would take these):"]
     out += ready or ["    (none)"]

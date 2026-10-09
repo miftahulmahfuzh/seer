@@ -91,6 +91,9 @@ def _method(c, mid: str, *, status: str, trials) -> None:
         "registered": ("registered",),
         "rejected": ("registered", "rejected"),
         "dev-eligible": ("registered", "dev-eligible"),
+        "promoted": ("registered", "dev-eligible", "promoted"),
+        "test-passed": ("registered", "dev-eligible", "promoted", "test-passed"),
+        "test-failed": ("registered", "dev-eligible", "promoted", "test-failed"),
     }[status]
     with c:
         store.add_method(c, id=mid, name=f"name {mid}", family="fam",
@@ -495,3 +498,22 @@ def test_status_runs_on_a_copy_of_the_committed_database(tmp_path, status):
     out = status(db)
     assert "Promotion path" in out
     assert f"Test-window looks used: {looks}" in out
+
+
+def test_a_test_failed_method_is_not_offered_a_way_back(tmp_path, status):
+    """`lab reevaluate` takes exactly one edge, `rejected -> dev-eligible`, and TRANSITIONS has
+    none at all out of `test-failed`. Offering it there advertised a way back that does not exist
+    -- and in the one direction that matters, since un-failing a method would unblock the hard
+    gate's kin check on every relative of it.
+    """
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _method(c, "M0001", status="test-failed", trials=[
+        _trial(method_id="M0001", candidate_id="M0001-A", config_digest="a",
+               failed="", eligible=True, dsr=0.99),
+    ])
+    c.close()
+    for line in status(db).splitlines():
+        if "status 'test-failed'" in line:
+            assert "lab reevaluate" not in line, line
+            assert "final" in line, line

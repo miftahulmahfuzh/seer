@@ -3,7 +3,7 @@
 **Slug:** walk-forward-evaluation
 **Date:** 2026-10-09
 **Branch:** not started (base: `main` @ `39d2927` or later)
-**Status:** phases 1-3 done 2026-10-09; phase 4 open
+**Status:** all four phases done 2026-10-09
 **Prerequisite:** none. No new data, no store rebuild, no test-window contact.
 
 ---
@@ -193,8 +193,13 @@ nobody anything.
    see below.
 4. **The hard gate.** Specified in full below. **The owner decided it on 2026-10-09**: a
    majority of folds AND a clean family, enforced as a refusal, not a report.
+   **Done 2026-10-09**, as `docs/plans/LAB_HARD_GATE_PLAN.md` — `engine/src/seer_engine/lab/
+   hardgate.py`, called from `lab promote` before the pre-registration is written; two new
+   pre-registration fields recording what the method cleared; and `lab status`, both skills and
+   this plan updated so the gate is visible before it bites.
 
-Phases 1-3 took an afternoon. Phase 4 is the next session's work.
+Phases 1-3 took an afternoon. Phase 4 took the next session, and all four of its open questions
+were answered rather than assumed — see below.
 
 ---
 
@@ -216,12 +221,34 @@ when it passes, and what happens to everything that now cannot move.
 
 ## What it costs, stated before anyone is surprised
 
-**It blocks every promotion in the lab as of today.** Every dev-eligible method -- M0007, M0019,
-M0020, M0033 -- is in a family that has already failed the test window, so every one fails (K).
-The lab will promote nothing until a genuinely new family appears.
+**It blocks every promotion in the lab as of today.** Measured 2026-10-09 against a copy of
+`lab/lab.sqlite`, on all **seven** dev-eligible methods — and the reason set is split, which is why
+only the conjunction gets there:
+
+| method | folds won | (F) majority | (K) kin |
+|---|---|---|---|
+| M0007 | 3 of 4 | pass | **fail** — family `stock-residual-momentum` (M0022) |
+| M0011 | 2 of 4 | **fail** | **fail** — family (M0022) |
+| M0019 | 3 of 4, pick changed | pass | **fail** — family `stock-momentum-risk-managed` (M0002) |
+| M0020 | 3 of 4 | pass | **fail** — family (M0002) |
+| M0024 | 2 of 4 | **fail** | pass — kin clean |
+| M0030 | 2 of 4 | **fail** | **fail** — family clean, but ancestors M0021 and M0029 both failed |
+| M0033 | 3 of 4 | pass | **fail** — family (M0022) |
+
+Four fail on kin alone, one on folds alone, two on both. **M0030 is the live case that decided the
+ancestry question** (open question 3): a family-only (K) would let it through the moment it wins a
+third fold, while its parent and grandparent have both already failed out of sample.
+
+**This is not a permanent stop, and the earlier draft of this paragraph was more pessimistic than
+the evidence.** It said every dev-eligible method was in a family that had already failed, so "the
+lab will promote nothing until a genuinely new family appears". That was written when the lab held
+four dev-eligible methods; it holds seven now, two of them with clean families. And **M0034 and
+M0035 each win 3 of 4 folds with clean kin** — they read `rejected` rather than `dev-eligible`,
+which is a bar the lab moves, not a family the evidence closed. The gate blocks everything today
+because of what is in the lab today, not because of its shape.
 
 That is the intended effect, not a side effect. Five out-of-sample results, five failures; and the
-surviving ideas are all cousins of the methods that produced them. A lab that keeps promoting
+surviving ideas are mostly cousins of the methods that produced them. A lab that keeps promoting
 cousins of disproven families is not learning. If this proves too strict in practice the answer is
 a recorded, argued change to the rule -- not an override path, which is precisely the mechanism
 that produced the 0-for-5 roster in the first place.
@@ -257,6 +284,45 @@ and the family's state at promotion.
 4. **Is there any path back?** `reevaluate` exists for `rejected -> dev-eligible` when the bars
    move. Nothing equivalent exists for a family unblocked by later evidence. Do not invent one in
    this phase; note whether it will be needed.
+
+## How the four open questions were answered
+
+Each was answered in `hardgate.py`'s own prose with the reason beside it; this is the summary and
+the pointer. The full argument is in `docs/plans/LAB_HARD_GATE_PLAN.md`, Decisions D2, D3, D4, D6.
+
+1. **The minimum is every fold the geometry yields, and at least `MIN_FOLDS = 4`.** The fold
+   geometry is cut from the benchmark curve, so it is global: `REF-SPY-HOLD` spans
+   1993-02-01..2015-10-16 and yields four folds, and every `M*` method in the lab is scoreable on
+   all four — so the minimum costs a real method nothing today. Why not 3: under a coin-flip null
+   a strict majority of an **odd** count is a coin flip at every odd count (n=2 → 0.2500,
+   n=3 → 0.5000, n=4 → 0.3125, n=5 → 0.5000), so "3 or more" would admit evidence strictly weaker
+   than 4 and no stronger than 1. A bound, not a p-value. The second clause is also a tripwire: if
+   `MIN_TRAIN_YEARS`, `EVAL_YEARS` or the dev window ever changes the geometry, a changed setting
+   cannot silently lower the bar.
+2. **(K) is checked at promote only.** The pre-registration is a promise and is not re-opened.
+   `promoted` has only two exits and both are final, so a refusal at `lab test` would strand a
+   method forever — the exact failure "Why at promote and not at test" rejects. What `lab test`
+   adds instead is one printed note when the kin has failed since the promotion: information
+   before the look is spent, no new exit code, no new transition.
+3. **Yes — (K) walks `parent_id`.** Kin is `family` ∪ transitive ancestors. Not the full connected
+   component: that blocks 36 of 63 methods in one 26-method blob and would refuse M0019 on account
+   of M0021, a multi-factor blend four hops away in an unrelated family. Descendants are left to
+   the `family` string, which by construction holds a variation twin.
+4. **No path back is built, and the need is real** — recorded as plan **Decision D6**.
+   `reevaluate` exists for `rejected -> dev-eligible` when the bars move; **nothing equivalent
+   exists for a method whose kin is blocked, and nothing was invented here.** Two shapes will
+   eventually be wanted and neither is built: a family whose failure is later attributed to
+   something other than the idea (a cost model, a fill assumption), and a method whose `parent_id`
+   links it to a failure it does not inherit. Both are *arguments*, and this brief's own sentence
+   says an argued change to the rule is the mechanism — a commit, in git, not a flag. When the
+   need arrives, that is the shape of the work: change the rule and say why, do not add a door.
+
+**One asymmetry was left in deliberately.** `lab walkforward`'s buy signal checks the `family`
+string only, while the gate walks `family` ∪ ancestors — so `lab walkforward` reports M0030's
+family clean while `lab promote` refuses it on ancestry. The buy signal is a separate,
+owner-decided rule about when to *buy data*, not about when to promote, and widening it is beyond
+this phase's brief. It is stated in the explore skill's step 0b where a reader meets it, and
+changed nowhere (plan Decision D9).
 
 ## Also update, or the gate is invisible until it bites
 

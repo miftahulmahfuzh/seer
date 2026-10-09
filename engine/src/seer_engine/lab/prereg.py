@@ -27,8 +27,10 @@ file whose whole value is that it was committed first.
 
 Format: a strict ``key: value`` block between two ``---`` lines at the very top of the file,
 then free markdown for a human reader. ``parse`` reads only the block; it requires every key in
-``FIELDS``, refuses an unknown one and refuses a repeated one, so a typo in ``config_digest``
-can never read as "no digest given". Every field is a ``str`` -- the file is the record, and
+``REQUIRED``, refuses a key outside ``FIELDS`` and refuses a repeated one, so a typo in
+``config_digest`` can never read as "no digest given". The two lists differ by the two fields that
+carry a default and so are tolerated absent in the four records committed before the hard gate
+existed (``LEGACY``). Every field is a ``str`` -- the file is the record, and
 ``parse(render(p, name)) == p`` exactly, with no number formatting in the round trip.
 
 Nothing here loads a research store, runs a backtest or writes a ``trials`` row: pre-registering
@@ -40,7 +42,7 @@ from __future__ import annotations
 import logging
 import re
 import sqlite3
-from dataclasses import dataclass, fields
+from dataclasses import MISSING, dataclass, fields
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -57,8 +59,16 @@ FENCE = "---"
 # method whose analysis already names a pre-registered candidate is not pre-registered twice.
 MARKER = "Pre-registered for the test window as "
 
+#: What ``folds`` and ``family_state`` read when a committed file predates the walk-forward hard
+#: gate (``lab/hardgate.py``). Four such files are in git -- M0002, M0021, M0022, M0029 -- and
+#: their whole value is that they were committed before a number existed, so they are never edited
+#: and never migrated. ``parse`` fills this in rather than refusing them, and ``render`` writes it
+#: back unchanged, which is why a legacy file still round-trips exactly.
+LEGACY = "not recorded: this pre-registration predates the walk-forward hard gate"
+
 _KEY = re.compile(r"[a-z_]+")
 _RECORDED = re.compile(re.escape(MARKER) + r"`([^`]+)`")
+_WS = re.compile(r"\s+")
 
 
 class PreregError(store.LabError):
@@ -75,6 +85,18 @@ class Prereg:
 
     Every field is the text that is in the file. The file is the record; this value is a reading
     of it, not a parallel source of truth, which is why nothing here is parsed into a number.
+
+    **A field with a default is a field written after some committed file already existed.** The
+    two at the bottom -- ``folds`` and ``family_state`` -- record what the walk-forward hard gate
+    (``lab/hardgate.py``) found at promotion, and the gate is younger than four committed records.
+    Making them required would invalidate those four, and migrating them is forbidden by this
+    module's own rule, so they default to ``LEGACY`` and ``parse`` demands only ``REQUIRED``.
+    They are appended rather than slotted beside ``gate`` because a frozen dataclass cannot put a
+    defaulted field before an undefaulted one.
+
+    Both are **single-line** values. ``parse`` splits the block on newlines and refuses a line that
+    is not ``key: value``, so a wrapped value would make the file unreadable; ``one_line`` is what
+    guarantees it, and ``gate`` has the same constraint for the same reason.
     """
 
     method: str
@@ -92,9 +114,19 @@ class Prereg:
     store_fingerprint: str
     git_sha: str
     date: str
+    folds: str = LEGACY
+    family_state: str = LEGACY
 
 
+#: Every key ``render`` writes, in file order.
 FIELDS: tuple[str, ...] = tuple(f.name for f in fields(Prereg))
+
+#: Every key ``parse`` refuses a file for missing -- the fields with no default, which is the
+#: original fifteen. Derived rather than retyped, so adding a defaulted field to ``Prereg`` can
+#: never accidentally tighten the parser, and removing a default can never silently loosen it.
+REQUIRED: tuple[str, ...] = tuple(
+    f.name for f in fields(Prereg) if f.default is MISSING and f.default_factory is MISSING
+)
 
 
 @dataclass(frozen=True)
@@ -144,6 +176,19 @@ def method_of(candidate_id: str) -> str:
             f"variant (MNNNN-SUFFIX, e.g. M0007-V2), not on a method id"
         )
     return head
+
+
+def one_line(text: str) -> str:
+    """``text`` with every whitespace run collapsed to one space, and the ends trimmed.
+
+    A ``key: value`` field in a committed file lives on one line: ``parse`` splits the block on
+    newlines and refuses anything that is not ``key: value``, so a value that wraps makes the file
+    unparseable -- and a pre-registration that cannot be read is a record the lab has lost.
+    ``gate_text`` states the same constraint in prose and relies on ``npolicy`` to honour it;
+    ``fold_text`` and ``family_text`` compose a message out of a database error's words, which are
+    not theirs to trust, so they enforce it instead of asking.
+    """
+    return _WS.sub(" ", str(text)).strip()
 
 
 def gate_text(conn: sqlite3.Connection | None = None) -> str:
@@ -233,6 +278,22 @@ line above, because both are settings the owner can move (design §7) and a numb
 not a record of a pass.
 Research store `{p.store_fingerprint}`, engine `{p.git_sha}`.
 
+**The hard gate, as it stood the day this was written.** Folds: {p.folds}. Family:
+{p.family_state}.
+
+The fold record is the lab's own selection rule scored out of sample several times over, on curves
+it already had (`lab/walkforward.py`). It costs no counted look, and it is a sanity check and
+never a significance test: the folds share training data, so they are not independent observations
+and nothing in them may be fed into a DSR. It is also **the bar this method cleared**, not today's
+bar. `lab/hardgate.py` holds the rule in force now; if the owner later argues the rule down or up,
+that is a commit in git and it does not reach back into this file.
+
+The family state is the state **at promotion**, and `lab test` does not re-check it. A
+pre-registration is a promise: re-opening it after the fact would strand a promoted method in a
+state it can never leave, which is the exact failure the gate was put at `promote` to avoid. If a
+relative of this method fails the test window after this file is written, `lab test` says so above
+the look and refuses nothing — the line above is still the true record of what was known here.
+
 **The look that follows.** `python -m seer_engine lab test {p.candidate}` runs this
 configuration once on the test window ({p.test_window}) and records one `trials` row with
 `window='test'`. The database refuses a second one (`UNIQUE(config_digest, window)`), so there
@@ -257,8 +318,16 @@ def parse(text: str) -> Prereg:
     """Read a pre-registration file's front-matter block.
 
     Strict on purpose. The block must be the first thing in the file, must be closed, must carry
-    every key in ``FIELDS`` exactly once, and must carry nothing else. An unknown key is an error
-    rather than a shrug: a misspelled ``config_digest`` must never be read as "no digest given".
+    every key in ``REQUIRED`` exactly once, and must carry nothing outside ``FIELDS``. An unknown
+    key is an error rather than a shrug: a misspelled ``config_digest`` must never be read as "no
+    digest given".
+
+    The two lists differ by exactly the two fields that carry a default (``folds``,
+    ``family_state``). They are younger than four committed records, and a file written before the
+    walk-forward hard gate existed is a correct record of what was claimed before a look -- not a
+    file to migrate, which this module's central rule forbids. Such a file parses, and both fields
+    read ``LEGACY``. Everything else is unchanged: the original fifteen are still demanded, an
+    unknown key is still refused, a repeat is still refused.
     """
     lines = text.split("\n")
     if lines[0].strip() != FENCE:
@@ -284,7 +353,7 @@ def parse(text: str) -> Prereg:
         values[key] = value.strip()
     else:
         raise PreregError(f"the pre-registration's {FENCE!r} block is not closed")
-    missing = [k for k in FIELDS if k not in values]
+    missing = [k for k in REQUIRED if k not in values]
     if missing:
         raise PreregError(f"the pre-registration is missing {', '.join(missing)}")
     return Prereg(**values)
@@ -419,6 +488,74 @@ def _fmt(x: Any) -> str:
     return "-" if x is None else f"{float(x):.6f}"
 
 
+def fold_text(conn: sqlite3.Connection, method_id: str) -> str:
+    """The walk-forward record this method was promoted on, as the file states it.
+
+    Built from ``lab/hardgate.py`` rather than retyped -- the same reasoning as ``gate_text``: a
+    file written next year must not be able to claim a fold record the code never computed, or a
+    minimum the owner has since moved. Three facts, which is exactly what the brief asks the
+    pre-registration to add: how many folds the pick won, how many could be scored at all, and
+    whether the training slice kept choosing the same variant.
+
+    ``Record.summary()`` is deliberately not used. It appends ", pick changed" only when the pick
+    moved, so a stable record says nothing about stability, and a record is not a record when one
+    of its three facts is conveyed by absence.
+
+    The minimum is named because it is the bar **this** method cleared. ``hardgate.MIN_FOLDS`` is
+    the bar in force the day this runs; a later commit may argue it elsewhere, and this line is
+    what lets a reader of the committed file tell the two apart.
+
+    Never raises, and always one line. See ``promote_method`` for why a refusal here would be in
+    the wrong place.
+    """
+    from seer_engine.lab import hardgate
+
+    try:
+        rec = hardgate.fold_record(conn, method_id)
+    except store.LabError as e:
+        return one_line(f"not recorded: the fold record could not be built ({e})")
+    scored = len(rec.scored)
+    return one_line(
+        f"{rec.won} of {scored} scoreable walk-forward fold(s) won, "
+        f"pick {'stable' if rec.stable else 'changed'} across folds; the bar this method cleared "
+        f"was a strict majority of at least {hardgate.MIN_FOLDS} scoreable folds"
+    )
+
+
+def family_text(conn: sqlite3.Connection, method_id: str, family: str) -> str:
+    """The state of ``method_id``'s kin at promotion, as the file states it.
+
+    ``hardgate.failed_kin`` is the one definition of kin -- the method's ``family`` string together
+    with its transitive ancestors through ``parent_id`` (plan Decision D4) -- and this line quotes
+    its answer rather than re-deriving it, so the file and the rule cannot disagree.
+
+    ``family`` is passed in because every caller already holds the ``methods`` row and a second
+    query inside the write lock would buy nothing. It is named in the line so a reader knows which
+    string the rule walked.
+
+    This is the state **at promotion** and nothing re-checks it afterwards (plan Decision D3);
+    ``render``'s prose says so to the file's reader, and this docstring says so to the next
+    implementer who wonders why ``lab test`` does not call it.
+
+    Never raises, and always one line.
+    """
+    from seer_engine.lab import hardgate
+
+    try:
+        failed = tuple(hardgate.failed_kin(conn, method_id))
+    except store.LabError as e:
+        return one_line(f"not recorded: the kin walk could not be run ({e})")
+    if not failed:
+        return one_line(
+            f"clean at promotion: no method in {method_id}'s family '{family}' or ancestry read "
+            f"test-failed"
+        )
+    return one_line(
+        f"blocked at promotion: {', '.join(failed)} in {method_id}'s family '{family}' or "
+        f"ancestry read test-failed"
+    )
+
+
 def _recorded_candidate(analysis: str) -> str | None:
     """The candidate a method's analysis already pre-registers, or None."""
     m = _RECORDED.search(analysis)
@@ -484,6 +621,15 @@ def promote_method(
     choice is the one the look is spent on; a genuinely better variant is a new method with its
     own dev trials, not an edit to this file.
 
+    **It records the hard gate; it does not apply it.** ``folds`` and ``family_state`` are read
+    from ``lab/hardgate.py`` here, but the refusal lives in ``commands/lab.py:_promote``, which
+    calls ``hardgate.check`` on this same connection *before* this function (plan Decision D1). So
+    by the time these two lines are built the gate has already passed, and ``fold_text`` and
+    ``family_text`` never raise: a refusal at this point would be after the decision, not before
+    it, and would leave the half-written state design §3 exists to forbid. A caller that reaches
+    ``promote_method`` without calling the gate gets a file that says what it could and could not
+    establish, which is the honest record of that caller's mistake.
+
     ``check_method_file=False`` skips ``check_source`` -- for tests, which build ``trials`` rows
     with no method file behind them. Nothing in the CLI passes it.
     """
@@ -524,6 +670,8 @@ def promote_method(
             store_fingerprint=str(trial["store_fingerprint"]),
             git_sha=git_sha,
             date=today.isoformat(),
+            folds=fold_text(conn, method_id),
+            family_state=family_text(conn, method_id, str(row["family"])),
         )
         path = path_for(method_id, directory)
         existing = _existing(path, method_id)

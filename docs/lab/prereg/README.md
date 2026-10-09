@@ -37,6 +37,8 @@ block is machine-read (`seer_engine.lab.prereg.parse`); the prose is not.
 | `mar`, `dsr`, `n_trials_at_run` | the dev numbers it passed with. `n_trials_at_run` is **the N that trial's DSR was deflated by**, whatever the policy in force on its run date resolved to — the trial-row count for every row recorded before 2026-10-08 (`all-trials`), the distinct-method count after it (`methods`). It is not the row count and must not be read as one; the N the gate used is the one stated in `gate` |
 | `store_fingerprint`, `git_sha` | the research store and the engine that produced them |
 | `date` | the day it was pre-registered; it does not move on a re-run |
+| `folds` | the walk-forward record at promotion: folds won, folds scoreable, whether the pick was stable, and the minimum in force that day (`seer_engine.lab.hardgate`). `not recorded: …` on a file written before the gate existed |
+| `family_state` | whether any method in this one's `family` or ancestry read `test-failed` when it was promoted. The state **at promotion**; `lab test` does not re-check it, it prints a note |
 
 Every value is read as text. The file is the record.
 

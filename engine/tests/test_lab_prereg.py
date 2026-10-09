@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import re
 import subprocess
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -132,21 +132,74 @@ def _eligible(conn, mid: str = "M0001", trials=None) -> None:
         store.update_method(conn, mid, status="dev-eligible")
 
 
+def _months(start: date, end: date) -> list[date]:
+    """Month-end dates in ``[start, end]`` -- the shape a recorded ``trials.curve_json`` has."""
+    out, d = [], date(start.year, start.month, 1)
+    while True:
+        nxt = date(d.year + (d.month == 12), (d.month % 12) + 1, 1)
+        last = nxt - timedelta(days=1)
+        if last > end:
+            return out
+        if last >= start:
+            out.append(last)
+        d = nxt
+
+
+def _curve(months: list[date], annual: float) -> str:
+    """A ``curve_json`` compounding at ``annual`` from 1.0, one point per month end."""
+    import json
+
+    out, v = [], 1.0
+    for d in months:
+        out.append([d.isoformat(), round(v, 8)])
+        v *= (1.0 + annual) ** (1.0 / 12.0)
+    return json.dumps(out)
+
+
+def _benchmark(conn) -> None:
+    """The lab's recorded SPY buy-and-hold dev trial (``regime.BENCH_CANDIDATE``).
+
+    Since the hard gate (`lab/hardgate.py`) a lab with no ``REF-SPY-HOLD`` dev trial can promote
+    nothing: there is no benchmark to cut folds from, so no fold can be scored, and the gate
+    fails closed rather than waving a method through. A fixture that wants a *promotable* method
+    therefore has to look like a lab that could have one -- the same reason `_ballast` exists one
+    gate earlier. Its span matches the real row's, 1993-02-01..2015-10-16, which is what yields
+    the four folds the gate requires.
+
+    Its own family and its own method id, so it is never kin to the method under test.
+    """
+    store.add_method(conn, id="H-P7A-REF", name="SPY buy and hold", family="reference",
+                     source_kind="seed", hypothesis="h", status="registered")
+    store.insert_trials(conn, [_trial(
+        method_id="H-P7A-REF", candidate_id="REF-SPY-HOLD", config_digest="ref-spy-hold",
+        start="1993-02-01", end="2015-10-16",
+        curve_json=_curve(_months(date(1993, 2, 1), date(2015, 10, 16)), 0.08),
+    )])
+
+
 def _real_method(conn, mid: str = "M0001"):
     """What `lab run` would have left behind for the committed `mNNNN_*.py` file `mid`.
 
     The real file is used so `check_source` has something true to check: the trial's digest is
     the file's own `config_digest` and `source_sha` is the file's sha256.
+
+    Its trial carries a real curve, and the lab carries a benchmark, because `lab promote` now
+    runs the hard gate before `prereg.promote_method`: a method with no curve is scoreable on no
+    fold and is refused. The curve compounds at 15% a year against the benchmark's 8%, so the
+    method wins all four folds -- which is what the brief means by "a method winning a majority
+    with a clean family promotes".
     """
     method, path = discover()[mid]
     c = method.candidates[0]
     with conn:
+        _benchmark(conn)
         store.add_method(conn, id=mid, name=method.name, family=method.family,
                          source_kind=method.source_kind, source_ref=method.source_ref,
                          hypothesis="h", status="registered")
         store.insert_trials(conn, [
             _trial(method_id=mid, candidate_id=c.id, config_digest=config_digest(c),
-                   rules_id=c.rules.id, allocator_id=str(c.allocator.id)),
+                   rules_id=c.rules.id, allocator_id=str(c.allocator.id),
+                   curve_json=_curve(_months(date(1996, 1, 2), date(2015, 10, 16)), 0.15)),
             _ballast(mid),
         ])
         store.update_method(conn, mid, source_sha=source_sha(path), status="dev-eligible")
@@ -520,3 +573,174 @@ def test_lab_promote_command_exits_2_when_the_lab_refuses(tmp_path, prereg_dir):
     args = argparse.Namespace(db=db, lab_command="promote", method="M0001", dir=prereg_dir)
     assert lab_cmd.run(args) == 2
     assert not prereg_dir.exists()
+
+
+# ------------------------------------------------------------------ the hard gate's two fields
+
+
+def _block(**over) -> str:
+    """A front-matter block carrying only the fifteen fields that predate the hard gate.
+
+    This is the shape of the four files committed under docs/lab/prereg/ before the gate existed,
+    rebuilt from `prereg.REQUIRED` rather than retyped so it cannot drift from the parser.
+    """
+    values = {k: f"<{k}>" for k in prereg.REQUIRED}
+    values.update(over)
+    body = "\n".join(f"{k}: {v}" for k, v in values.items())
+    return f"{prereg.FENCE}\n{body}\n{prereg.FENCE}\n\n# prose\n"
+
+
+def test_the_two_new_fields_are_written_and_round_trip(conn, prereg_dir):
+    _eligible(conn)
+    done = prereg.promote_method(conn, "M0001", git_sha="x", directory=prereg_dir,
+                                 check_method_file=False)
+    p = done.prereg
+    assert p.folds and p.family_state
+    assert "\n" not in p.folds and "\n" not in p.family_state  # one `key: value` line each
+    text = (prereg_dir / "M0001.md").read_text(encoding="utf-8")
+    assert f"folds: {p.folds}" in text
+    assert f"family_state: {p.family_state}" in text
+    assert prereg.parse(text) == p
+    assert prereg.parse(prereg.render(p, "SMA test")) == p
+
+
+def test_a_file_written_before_the_gate_still_parses_and_says_so(conn):
+    """Decision D5: the four committed records are never migrated, so `parse` tolerates absence."""
+    p = prereg.parse(_block(method="M0001", candidate="M0001-A"))
+    assert p.method == "M0001"
+    assert p.folds == prereg.LEGACY
+    assert p.family_state == prereg.LEGACY
+
+
+def test_a_legacy_file_read_back_and_re_rendered_round_trips_exactly(conn):
+    p = prereg.parse(_block(method="M0001", candidate="M0001-A"))
+    assert prereg.parse(prereg.render(p, "SMA test")) == p
+
+
+def test_parse_still_refuses_a_file_missing_any_of_the_original_fifteen():
+    for key in prereg.REQUIRED:
+        if key == "method":
+            continue  # the first line is what `_block` keys off; its absence is covered at :442
+        text = "\n".join(
+            line for line in _block().split("\n") if not line.startswith(f"{key}:")
+        )
+        with pytest.raises(prereg.PreregError, match=f"missing .*{key}"):
+            prereg.parse(text)
+
+
+def test_the_four_committed_pre_registrations_still_parse(conn):
+    """The reason this module exists: a committed record stays readable forever.
+
+    Not a fixture -- the real files in docs/lab/prereg/, which this phase must not edit. All four
+    predate the hard gate, so all four report both new fields as not recorded.
+    """
+    files = sorted(prereg.PREREG_DIR.glob("M[0-9][0-9][0-9][0-9].md"))
+    assert [f.stem for f in files] == ["M0002", "M0021", "M0022", "M0029"]
+    for path in files:
+        p = prereg.parse(path.read_text(encoding="utf-8"))
+        assert p.method == path.stem
+        assert p.folds == prereg.LEGACY
+        assert p.family_state == prereg.LEGACY
+        assert prereg.parse(prereg.render(p, "n")) == p
+
+
+def test_the_fold_line_names_the_folds_won_the_folds_scored_and_the_stability(conn, monkeypatch):
+    """R6's three facts, each present as a word rather than by absence."""
+    from seer_engine.lab import hardgate, walkforward as wf
+
+    def record(_conn, mid):
+        fold = wf.Fold(1, date(2006, 1, 1), date(2006, 1, 31), date(2008, 12, 31))
+        won = wf.Slice(36, 1.0, 0.2, 0.1, 2.0)
+        lost = wf.Slice(36, 0.1, 0.03, 0.1, 0.3)
+        return wf.Record(mid, (
+            wf.FoldPick(fold, "M0001-A", 1.0, won, lost),
+            wf.FoldPick(fold, "M0001-A", 1.0, won, lost),
+            wf.FoldPick(fold, "M0001-A", 1.0, lost, won),
+            wf.FoldPick(fold, "M0001-B", 1.0, won, lost),
+        ))
+
+    monkeypatch.setattr(hardgate, "fold_record", record)
+    line = prereg.fold_text(conn, "M0001")
+    assert line.startswith("3 of 4 ")
+    assert "pick changed across folds" in line
+    assert str(hardgate.MIN_FOLDS) in line
+    assert "\n" not in line
+
+
+def test_the_family_line_names_every_failed_relative(conn, monkeypatch):
+    from seer_engine.lab import hardgate
+
+    monkeypatch.setattr(hardgate, "failed_kin", lambda _c, _m: ("M0021", "M0029"))
+    blocked = prereg.family_text(conn, "M0030", "stock-core-satellite")
+    assert "blocked at promotion" in blocked
+    assert "M0021" in blocked and "M0029" in blocked  # D4's live case has two, not one
+    assert "stock-core-satellite" in blocked
+
+    monkeypatch.setattr(hardgate, "failed_kin", lambda _c, _m: ())
+    clean = prereg.family_text(conn, "M0030", "stock-core-satellite")
+    assert "clean at promotion" in clean
+    assert "test-failed" in clean
+
+
+def test_a_gate_that_cannot_answer_is_recorded_rather_than_invented(conn, prereg_dir, monkeypatch):
+    """The refusal belongs to `_promote` (Decision D1); this step records, and never raises.
+
+    A fixture lab has no REF-SPY-HOLD curve, which is exactly the shape of the real refusal, so
+    this also pins that a caller which reaches `promote_method` past the gate still writes a
+    readable file -- and that the 31 pre-existing tests in this file keep passing either way.
+    """
+    from seer_engine.lab import hardgate
+
+    def boom(_conn, _mid):
+        raise store.LabError("no REF-SPY-HOLD dev trial")
+
+    monkeypatch.setattr(hardgate, "fold_record", boom)
+    _eligible(conn)
+    done = prereg.promote_method(conn, "M0001", git_sha="x", directory=prereg_dir,
+                                 check_method_file=False)
+    assert done.prereg.folds.startswith("not recorded")
+    assert "REF-SPY-HOLD" in done.prereg.folds
+    assert "\n" not in done.prereg.folds
+    assert prereg.parse((prereg_dir / "M0001.md").read_text(encoding="utf-8")) == done.prereg
+
+
+def test_one_line_collapses_anything_a_refusal_message_can_carry():
+    assert prereg.one_line("a\nb") == "a b"
+    assert prereg.one_line("  a \n\n  b  ") == "a b"
+    assert prereg.one_line("a") == "a"
+
+
+def test_the_prose_says_the_family_state_is_not_rechecked_at_lab_test(conn, prereg_dir):
+    """Decision D3, stated to the file's reader and not only in a plan."""
+    _eligible(conn)
+    done = prereg.promote_method(conn, "M0001", git_sha="x", directory=prereg_dir,
+                                 check_method_file=False)
+    text = (prereg_dir / "M0001.md").read_text(encoding="utf-8")
+    assert "state **at promotion**" in text
+    assert "`lab test` does not re-check it" in text
+    assert "never a significance test" in text
+
+
+def test_the_promote_command_prints_the_fold_record_and_the_family_state(
+    tmp_path, prereg_dir, capsys, monkeypatch
+):
+    """The two lines phase 2 adds to `_promote`'s block, and nothing else in that file.
+
+    `hardgate.check` is stubbed out so this test pins *these two printed lines* rather than phase
+    1's refusal, which has its own tests in test_lab_hardgate.py.
+    """
+    from seer_engine.commands import lab as lab_cmd
+    from seer_engine.lab import hardgate, runner
+
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _real_method(c)
+    c.close()
+    monkeypatch.setattr(runner, "git_head", lambda cwd: "deadbeef")
+    monkeypatch.setattr(hardgate, "check", lambda _conn, _mid: None)
+    args = argparse.Namespace(db=db, lab_command="promote", method="M0001", dir=prereg_dir)
+    assert lab_cmd.run(args) == 0
+    out = capsys.readouterr().out
+    p = prereg.parse((prereg_dir / "M0001.md").read_text(encoding="utf-8"))
+    assert f"  folds          {p.folds}" in out
+    assert f"  family         {p.family_state}" in out

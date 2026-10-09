@@ -204,14 +204,37 @@ Then:
      whose edge lives in the low-coverage years and vanishes by 2009-2015 may be reading a hole in
      the data rather than the market.** Three of the four roster strategies were already negative
      in 2009-2015, on dev, years before the test window said so.
-   - `lab walkforward MNNNN` once it exists (`docs/plans/WALK_FORWARD_EVALUATION_PLAN.md`):
-     require a majority of folds beaten, not a good twenty-year average.
+   - `lab walkforward MNNNN` -- the fold record, and **the one item on this list that is not
+     advice**. Since 2026-10-09 `lab promote` *refuses* (`engine/src/seer_engine/lab/hardgate.py`):
+     it exits 2, writes no pre-registration and moves no status, unless **both** hold --
+     - **(F) folds.** The method beat the recorded SPY benchmark in a **majority** of its
+       scoreable walk-forward folds, **and** it is scoreable on every fold the geometry yields,
+       at least 4 of them. Fewer than 4 is refused as thin evidence, not waved through: a strict
+       majority of an *odd* fold count is a coin flip at every odd count (n=3 is 0.5000, n=4 is
+       0.3125), so "3 or more" would admit evidence weaker than 4 and no stronger than 1.
+     - **(K) kin.** **No kin reads `test-failed`** -- kin being the method's `family` *and* its
+       transitive ancestors through `parent_id`. A parent that failed out of sample disproves a
+       method as surely as a sibling that failed; M0032 is M0007's realistic twin by `parent_id`
+       and not by family string.
 
-   **THE BUY SIGNAL — say it loudly, do not sit on it.** The moment a method clears all three of:
+     **There is no override.** No `--force`, no environment variable, no "promote anyway". If the
+     rule proves too strict the answer is an argued commit that changes it, because an override
+     path is precisely the mechanism that produced the 0-for-5 roster. Do not look for one, do
+     not work around it, and do not treat a refusal as a bug.
 
-   > **(a)** dev-eligible at the bars in force, **(b)** a majority of walk-forward folds beaten,
-   > and **(c)** a *positive* edge in the highest-coverage era (2009-2015), so the edge is not an
-   > artefact of the missing half
+     **Read `lab status` before you plan a promotion**, not after the refusal. It prints each
+     dev-eligible method's fold record and, under "Refused by the hard gate", the exact reason --
+     so you can see a dead end before you spend a cycle walking into it.
+
+     **`lab test` does not re-check (K).** A pre-registration is a promise and is not re-opened:
+     if the family fails *after* the promotion but before the look, `lab test` prints a note and
+     spends the look anyway. The moment kin matters is before `lab promote`, never after it.
+
+   **THE BUY SIGNAL — say it loudly, do not sit on it.** The moment a method clears all four of:
+
+   > **(a)** dev-eligible at the bars in force, **(b)** no method in its family has test-failed,
+   > **(c)** a majority of walk-forward folds beaten, and **(d)** a *positive* edge in the
+   > highest-coverage era (2009-2015), so the edge is not an artefact of the missing half
 
    ...that is the moment survivorship-free price history becomes worth paying for, and not before.
    Until then the lab has enough free evidence to reject a method without it; after then, the next
@@ -221,9 +244,18 @@ Then:
    being wrong about either.
 
    When it fires: record a `lab insight --kind risk` titled "Buy signal: MNNNN cleared the
-   durability gate", name which of (a)(b)(c) it cleared with the numbers, and put it at the TOP of
+   durability gate", name which of (a)(b)(c)(d) it cleared with the numbers, and put it at the TOP of
    the batch report. **Do not block on it and do not ask** -- the iron rule still holds, you never
    wait for a human -- but the owner must not be able to miss it.
+
+   **The buy signal's (b) and the hard gate's (K) are not the same test, and that is deliberate.**
+   The buy signal checks the `family` string only (`lab/walkforward.py`'s `BUY_CONDITIONS`, and
+   `lab walkforward`'s own query); the gate also walks `parent_id`. A method can therefore read
+   clean in `lab walkforward` and still be refused by `lab promote` — M0030's family is clean while
+   its parent M0029 and grandparent M0021 both read `test-failed`. The gate is the stricter of the
+   two and it is the one that decides whether a look is spent. The buy signal is a separate,
+   owner-decided rule about when to **buy data**, not about when to promote, so it was left as it
+   is rather than quietly widened.
 
 1. `python -m seer_engine lab promote MNNNN`. Read what it printed, then **commit and push
    `docs/lab/prereg/MNNNN.md` before any test number exists** (design §3) — the command prints the

@@ -491,6 +491,42 @@ def resolve_candidate(candidate_id: str) -> tuple[Method, Path, Candidate]:
     return method, path, found[0]
 
 
+def kin_note(conn: sqlite3.Connection, method_id: str) -> str | None:
+    """One line for ``lab test`` when ``method_id``'s kin has failed since it was promoted.
+
+    ``None`` when the kin is clean, which is the normal case and prints nothing.
+
+    **This is a note and never a refusal** (plan Decision D3). The pre-registration is a promise:
+    ``promoted`` has only two exits and both are final, so refusing here would strand the method in
+    a state it can never leave -- the exact failure the gate was put at ``lab promote`` to avoid,
+    and the reason the hard gate refuses *before* the commitment rather than after it. What the
+    owner is owed is the information before the one look is spent, not a door that closes behind
+    them.
+
+    The method's ``family_state`` line in ``docs/lab/prereg/MNNNN.md`` records what was true the day
+    the promise was made; this says what is true today. When the two differ, that difference is the
+    whole content of the note, and the pre-registration is still the correct record of what was
+    known then.
+
+    Kin is ``hardgate.failed_kin``'s definition -- the ``family`` string union the transitive
+    ancestors through ``parent_id`` -- read from the one place that defines it, so the note and the
+    gate can never disagree about who counts as kin. It names **every** failed relative, not the
+    first: M0030's two are M0021 and M0029.
+    """
+    from seer_engine.lab import hardgate
+
+    failed = hardgate.failed_kin(conn, method_id)
+    if not failed:
+        return None
+    names = ", ".join(failed)
+    return (
+        f"note: {names} {'have' if len(failed) > 1 else 'has'} read test-failed since "
+        f"{method_id} was promoted. The pre-registration is a promise and is not re-opened, so "
+        f"this look still runs and its family_state line still records what was true the day it "
+        f"was written. This is information before the look is spent, not a refusal"
+    )
+
+
 def preflight_test(
     conn: sqlite3.Connection,
     method: Method,
@@ -584,6 +620,9 @@ def preflight_test(
             f"the database holds at most one test trial per configuration and trials are "
             f"append-only"
         )
+    note = kin_note(conn, method.id)
+    if note is not None:
+        print(note)
     return pre
 
 

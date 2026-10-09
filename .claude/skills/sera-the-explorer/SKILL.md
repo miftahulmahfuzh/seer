@@ -82,12 +82,22 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
      never ran, relaunch it once; if it fails again, `lab drop MNNNN --why "<reason>"` plus a `risk` insight.
    - **dev-eligible:** run the explore skill's **Promotion** yourself, now, in `$REPO`, one at a time.
      Start with its step 0, the fit check, then **step 0b, the durability check** -- `lab regime`,
-     `survivorship_coverage.py`, and `lab walkforward` once it exists. Four of four test looks
-     have failed on `beats SPY TR`; a good twenty-year average is not evidence any more. Step 0b
-     also carries the buy signal, which you report and never block on. If the eligible variant trades whole shares, or is a
-     method from M0030 or earlier measured at the flat 0.1%, first run `lab costs` on it and then
-     its fractional, real-fee twin as a one-variant variation method. Promote the twin, never the
-     original. The look is spent on the configuration paper would trade, or not at all.
+     `survivorship_coverage.py`, and `lab walkforward`. Four of four test looks have failed on
+     `beats SPY TR`; a good twenty-year average is not evidence any more.
+     **`lab promote` now refuses, it does not warn.** Since 2026-10-09 it exits 2 unless the method
+     beat SPY in a majority of at least four scoreable walk-forward folds **and** no kin reads
+     `test-failed` -- kin being its `family` plus every ancestor through `parent_id`. **There is no
+     override and no flag.** When it refuses: record it (`lab note`, and a `risk` insight if the
+     whole family is now closed), put the reason in the batch report, and move to the next idea.
+     You do not ask the owner, you do not pause the batch, and you do not go looking for a way
+     round -- the iron rules hold here exactly as everywhere else. `lab status` shows every
+     dev-eligible method's fold record and, under "Refused by the hard gate", the reason, so check
+     it *before* you plan a promotion.
+     Step 0b also carries the buy signal, which you report and never block on. If the eligible
+     variant trades whole shares, or is a method from M0030 or earlier measured at the flat 0.1%,
+     first run `lab costs` on it and then its fractional, real-fee twin as a one-variant variation
+     method. Promote the twin, never the original. The look is spent on the configuration paper
+     would trade, or not at all.
    - **Close it out:**
      - Save the scrollback: `tmux capture-pane -p -S - -t <window> > $LOGS/explore-MNNNN.log`.
      - Kill the window, but only if it is still named `explore-MNNNN`.
@@ -105,13 +115,16 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
    - which directions look alive and which look dead
    - what data or features would unlock the most
    - **the buy signal, every batch, even when the answer is no.** State plainly whether any
-     method this batch cleared all three of: dev-eligible at the bars in force; a majority of
-     walk-forward folds beaten (`lab walkforward`, once it exists); and a *positive* edge in the
-     highest-coverage era 2009-2015 (`engine/scripts/survivorship_coverage.py`). That conjunction
-     is the only moment survivorship-free price history is worth buying -- see the explore skill's
-     Promotion step 0b for why, and what it costs. If nothing cleared it, say "no buy signal this
-     batch" and why. If something did, it is the FIRST line of the report, not a footnote, and it
-     also goes in as a `lab insight --kind risk`.
+     method this batch cleared all four of: dev-eligible at the bars in force; no method in its
+     family has test-failed; a majority of walk-forward folds beaten (`lab walkforward`); and a
+     *positive* edge in the highest-coverage era 2009-2015
+     (`engine/scripts/survivorship_coverage.py`). That conjunction is the only moment
+     survivorship-free price history is worth buying -- see the explore skill's Promotion step 0b
+     for why, and what it costs. If nothing cleared it, say "no buy signal this batch" and why. If
+     something did, it is the FIRST line of the report, not a footnote, and it also goes in as a
+     `lab insight --kind risk`. Say too whether the hard gate refused anything this batch, and on
+     which of the two conditions -- a batch where every promotion was refused is a finding about
+     the lab, and the owner should read it in the synthesis rather than infer it from silence.
    - what Gotrade's real fees did to the batch, when any `lab costs` ran or a method lost its
      edge to them
    - what the next batch should try
@@ -138,3 +151,6 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
 | "Promote in parallel" | Promotions are serial and done by Sera. Each spends one counted test-window look. |
 | "It passed dev, that's the gate" | Not since 2026-10-09. Four of four test looks failed on `beats SPY TR`. Run Promotion step 0b before every look. |
 | "The buy signal fired, I'll ask the owner first" | Never ask, never block. Record the insight, put it first in the report, carry on. |
+| "`lab promote` refused it, I'll find a way round" | There is no way round. No `--force`, no environment variable, no editing the method to dodge the kin walk. Record the refusal, report it, take the next idea. |
+| "Its fold record is 2 of 4 but the twenty-year numbers are great" | That is the gate's entire point, and the 0-for-5 roster is what the twenty-year numbers bought. `lab promote` exits 2. |
+| "Its sibling test-failed, but this variant is genuinely different" | Kin is `family` plus every ancestor through `parent_id`. A disproven family does not get a retry under a new id — that is the mechanism the gate exists to close. |

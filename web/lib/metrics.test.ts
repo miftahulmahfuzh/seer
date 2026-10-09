@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checklist, gateItem, strategyMetrics } from './metrics';
+import { checklist, CHECKLIST_RULES, gateItem, strategyMetrics } from './metrics';
 
 const snaps = (vals: number[]) =>
   vals.map((equity, i) => ({ date: new Date(Date.UTC(2026, 6, 1 + i)).toISOString().slice(0, 10), equity }));
@@ -36,6 +36,16 @@ describe('strategyMetrics', () => {
 
 describe('checklist', () => {
   const base = { totalReturn: 0.068, winRate: 0.58, profitFactor: 1.42, maxDrawdown: 0.079, trades: 84, months: 3.0 };
+
+  // The coupling that did not exist on 2026-10-07. Design §13 shortened this list from six rows to
+  // five and nothing in TypeScript failed, so `leaderboard/view.ts`'s `CHECKS = 6` went on scoring
+  // five rendered rows out of six with "Ready for real money" unreachable. This is the test that
+  // would have caught that: the count and the list it counts can no longer drift apart in silence.
+  it('returns exactly CHECKLIST_RULES rows, whatever the gate says', () => {
+    expect(checklist(base, 0.046, PASSED)).toHaveLength(CHECKLIST_RULES);
+    expect(checklist(base, 0.046, FAILED)).toHaveLength(CHECKLIST_RULES);
+    expect(checklist(base, 0.046, NOT_APPLICABLE)).toHaveLength(CHECKLIST_RULES);
+  });
 
   // `base` is 3 months, which no longer passes item 1: design §13 (2026-10-07) raised it to 18
   // and DELETED the trades clause, so `trades` can no longer make or break any row here.

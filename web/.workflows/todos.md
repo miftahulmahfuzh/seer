@@ -2,7 +2,7 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-10-08
+**Last Updated**: 2026-10-09
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 19
+- Completed: 20
 
 ---
 
@@ -35,6 +35,21 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-H7RK** Phase 1: Count the rules once, where the rules are
+  - **Difficulty**: NORMAL
+  - **Type**: Bug
+  - **Context**: Owns web/lib/metrics.ts, web/lib/metrics.test.ts, web/lib/golive.ts, web/app/(app)/leaderboard/view.ts, web/app/(app)/leaderboard/view.test.ts, web/app/sera/how/view.ts, web/package_readme.md. Exit: lib/metrics.ts exports the rule count beside checklist and metrics.test.ts asserts checklist(...) has exactly that many items; view.ts's CHECKS is that constant, not a literal, and the "all six" strings are built from it; view.test.ts's scoreOf suite drives real checklist() output (five passing rules is ready, [] is 0/<count> and not ready) and the "never ready with fewer than six items" test is gone; /sera/how's paper stage states design §1's bar in months with no trades clause, reading MIN_PAPER_MONTHS; npx tsc --noEmit clean and npm test green in web/.
+  - **Status**: done
+  - **Plan Set**: `GOLIVE_CHECKLIST_COUNT_PLAN.md` (phase 1 of 1)
+  - **Satisfies**: R1 — Fix the reported bug: the Leaderboard scores out of 6 while rendering 5 rows, and can never reach "Ready for real money"; R2 — (inferred) /sera/how still says the paper bar is "At least 3 months and 100 trades"; fix it too, so the app does not state one rule two ways
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-WEB-H7RK.md`
+  - **Completed**: 2026-10-09 12:51
+  - **Method**: /do
+  - **Files**: web/lib/metrics.ts, web/lib/metrics.test.ts, web/lib/golive.ts, web/app/(app)/leaderboard/view.ts, web/app/(app)/leaderboard/view.test.ts, web/app/sera/how/view.ts, web/package_readme.md, GOLIVE_CHECKLIST_COUNT_PLAN.md, web/.workflows/todos.md, web/.workflows/plan/P1-WEB-H7RK.md
+  - **Decided**: The plan's manual check says `grep 'all six' leaderboard/` must return nothing, but its own Step 4 code block writes that phrase into a comment narrating the old bug — kept the comment (rung 3: code blocks outrank the prose around them; the string is in a comment, not in rendered copy)
+    The worktree has no .env.local (gitignored, lives only in the main checkout) — ran the dev server and `npm run shoot` with SEER_ENV_FILE=/home/miftah/seer/.env.local rather than copying or symlinking secrets into the worktree (rung 6: with-env.mjs already supports that override)
 
 - [x] **P1-WEB-V7XD** Phase 10: Sean sizes a rotation from cash, not from holdings
   - **Difficulty**: NORMAL

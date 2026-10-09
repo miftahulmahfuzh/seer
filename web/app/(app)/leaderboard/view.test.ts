@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { Snapshot } from '../../../lib/metrics';
+import { checklist, type Metrics, type Snapshot } from '../../../lib/metrics';
 import type { MonthlyTable } from '../../../lib/monthly';
 import {
   CHECKS, compare, LOOK_PERIOD, looks, MIN_COMMON_SESSIONS, MIN_RANKED, monthLabel, monthLines,
   NO_GATE, pickResearch, researchOf, retiredLabel, scoreOf, sinceStartLine, spyOverSpan,
-  windowLine, type RankIn, type RosterIn,
+  windowLine, type GateIn, type RankIn, type RosterIn,
 } from './view';
 
 const roster: RosterIn[] = [
@@ -274,35 +274,67 @@ describe('retiredLabel', () => {
 });
 
 describe('scoreOf', () => {
-  const items = (oks: boolean[]) => oks.map(ok => ({ ok }));
   const PASSED = { passed: true, applicable: true };
   const FAILED = { passed: false, applicable: true };
   const NOT_APPLICABLE = { passed: false, applicable: false };
-  it('scores out of six and says paper only while the gate has not passed', () => {
-    const sc = scoreOf(items([true, true, true, true, true, false]), FAILED);
-    expect(sc).toEqual({ passed: 5, total: CHECKS, ready: false, lines: ['Paper only.', 'Backtest gate not passed'] });
-    expect(scoreOf([], NO_GATE).lines).toEqual(['Paper only.', 'Backtest gate not passed']);
+
+  // Driven by the REAL `checklist()`, not by hand-built arrays. Hand-built fixtures are how the
+  // 2026-10-07 drift got through: six-element arrays agreed with `CHECKS = 6` for ever while
+  // production fed `scoreOf` five rows, so the suite stayed green over an unreachable `ready`.
+  // Whatever the rule count becomes next, these cases are built from the list itself.
+  const SPY = 0.046;
+  /** Passes all four forward rules: 24 months ≥ 18, +6.8% beats SPY's +4.6%, PF 1.42, drawdown 7.9%. */
+  const STRONG: Metrics = {
+    totalReturn: 0.068, winRate: 0.58, profitFactor: 1.42, maxDrawdown: 0.079, trades: 84, months: 24,
+  };
+  /** Fails two of them: 3.0 months (< 18) and a 1.10 profit factor (< 1.3). */
+  const WEAK: Metrics = { ...STRONG, months: 3.0, profitFactor: 1.1 };
+  const checks = (m: Metrics, gate: GateIn) => checklist(m, SPY, gate);
+
+  it('scores out of the rules the checklist returns, and says paper only while the gate has not passed', () => {
+    const sc = scoreOf(checks(STRONG, FAILED), FAILED);
+    expect(sc).toEqual({ passed: 4, total: CHECKS, ready: false, lines: ['Paper only.', 'Backtest gate not passed'] });
+    // A strategy with no gate row at all: page.tsx passes []. It must read 0 of CHECKS, never 0/0.
+    expect(scoreOf([], NO_GATE)).toEqual({
+      passed: 0, total: CHECKS, ready: false, lines: ['Paper only.', 'Backtest gate not passed'],
+    });
   });
-  it('says paper trading until all six pass when only the gate has passed', () => {
-    expect(scoreOf(items([false, false, true, true, true, true]), PASSED).lines).toEqual(['Paper trading until', 'all six pass']);
+
+  it('says paper trading until all five pass when the gate passed but a forward rule did not', () => {
+    const sc = scoreOf(checks(WEAK, PASSED), PASSED);
+    expect(sc.passed).toBe(3);
+    expect(sc.ready).toBe(false);
+    expect(sc.lines).toEqual(['Paper trading until', 'all five pass']);
   });
-  it('is ready only when all six pass', () => {
-    const sc = scoreOf(items([true, true, true, true, true, true]), PASSED);
+
+  // THE regression pin for the reported bug. On `main` at d8c0cab this read 5 of 6, ready: false,
+  // "Paper trading until / all six pass" — a strategy that passed every rule could never go live.
+  it('is ready when all five pass with a passed gate', () => {
+    const sc = scoreOf(checks(STRONG, PASSED), PASSED);
     expect(sc.ready).toBe(true);
-    expect(sc.lines).toEqual(['All six pass.', 'Ready for real money']);
+    expect(sc.passed).toBe(5);
+    expect(sc.total).toBe(5);
+    expect(sc.lines).toEqual(['All five pass.', 'Ready for real money']);
   });
-  it('is never ready with fewer than six items', () => {
-    expect(scoreOf(items([true, true, true, true, true]), PASSED).ready).toBe(false);
+
+  // Replaces 'is never ready with fewer than six items', which asserted that five passing rules are
+  // not ready — i.e. it pinned the bug, using production's own input as the counter-example. The
+  // real invariant is this one: the number the score divides by IS the number of rows rendered.
+  it('divides by the number of rows checklist actually returns', () => {
+    expect(scoreOf(checks(STRONG, PASSED), PASSED).total).toBe(checks(STRONG, PASSED).length);
+    expect(CHECKS).toBe(checks(STRONG, NOT_APPLICABLE).length);
   });
+
   it('says real money needs an owner decision when the gate is not applicable (C, handover D9)', () => {
-    const sc = scoreOf(items([true, true, true, true, true, false]), NOT_APPLICABLE);
+    const sc = scoreOf(checks(STRONG, NOT_APPLICABLE), NOT_APPLICABLE);
     expect(sc).toEqual({
-      passed: 5, total: CHECKS, ready: false,
+      passed: 4, total: CHECKS, ready: false,
       lines: ['Paper only. No backtest gate.', 'Real money needs an owner decision'],
     });
   });
-  it('is never ready when the gate is not applicable, whatever the items say', () => {
-    const sc = scoreOf(items([true, true, true, true, true, true]), NOT_APPLICABLE);
+
+  it('is never ready when the gate is not applicable, whatever the rules say', () => {
+    const sc = scoreOf(checks(STRONG, NOT_APPLICABLE), NOT_APPLICABLE);
     expect(sc.ready).toBe(false);
     expect(sc.lines[1]).toBe('Real money needs an owner decision');
   });

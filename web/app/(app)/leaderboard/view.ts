@@ -14,7 +14,7 @@
 // being wrong alone, because nothing says which one to believe. Pin new fixtures against
 // `compare --json`.
 import { monthDay, monthName, pct, signedPct } from '../../../lib/format';
-import type { Snapshot } from '../../../lib/metrics';
+import { CHECKLIST_RULES, type Snapshot } from '../../../lib/metrics';
 import type { MonthlyTable } from '../../../lib/monthly';
 
 /** The roster fields these helpers read (a structural subset of lib/data's Strategy). */
@@ -374,8 +374,26 @@ export function pickResearch<T extends RankIn>(research: T[], requested: string 
 export const retiredLabel = (paperEnd: string | null): string =>
   paperEnd === null ? 'Retired' : `Retired ${monthDay(paperEnd)}`;
 
-/** Design §1's five rules plus "Backtest gate passed". */
-export const CHECKS = 6;
+/**
+ * How many rules the score divides by: `lib/metrics.ts`'s `CHECKLIST_RULES`, never a literal.
+ *
+ * The old comment here said "§1's five rules plus Backtest gate passed", which is the fossil that
+ * produced the bug: that was true before design §13 (2026-10-07), when §1 had five forward clauses
+ * and the gate made six. Today §1 has five conditions and the backtest gate IS the fifth of them.
+ */
+export const CHECKS = CHECKLIST_RULES;
+
+/**
+ * 'five' for 5. Small on purpose — the verdict lines name the rule count in words, and words that
+ * are typed rather than derived are what outlived §13 here. Past the lookup it falls back to the
+ * digits, which reads oddly but can never be wrong.
+ */
+const NUMBER_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+const numberWord = (n: number): string => NUMBER_WORDS[n] ?? String(n);
+
+/** 'all five', continuing a line; and 'All five', leading one. */
+const ALL = `all ${numberWord(CHECKS)}`;
+const ALL_CAP = `${ALL[0].toUpperCase()}${ALL.slice(1)}`;
 
 export type Score = { passed: number; total: number; ready: boolean; lines: [string, string] };
 
@@ -386,9 +404,13 @@ export type GateIn = { passed: boolean; applicable: boolean };
 export const NO_GATE: GateIn = { passed: false, applicable: true };
 
 /**
- * The checklist score and its two-line verdict. Never "Ready for real money" unless all six pass,
- * and never for a strategy whose backtest item is not applicable (C, handover D9): real money for
- * it would need an explicit owner decision even if the five forward rules pass.
+ * The checklist score and its two-line verdict. Never "Ready for real money" unless every rule
+ * passes, and never for a strategy whose backtest item is not applicable (C, handover D9): real
+ * money for it would need an explicit owner decision even if the four forward rules pass.
+ *
+ * `items.length === CHECKS` is load-bearing and stays. `page.tsx` passes `items = []` for a
+ * strategy with no gate row at all; a denominator of `items.length` would render that as 0/0 and
+ * let a missing checklist read like a passing one. A fixed denominator makes it 0/5, "Paper only".
  */
 export function scoreOf(items: { ok: boolean }[], gate: GateIn): Score {
   const passed = items.filter(i => i.ok).length;
@@ -396,9 +418,9 @@ export function scoreOf(items: { ok: boolean }[], gate: GateIn): Score {
   const lines: [string, string] = !gate.applicable
     ? ['Paper only. No backtest gate.', 'Real money needs an owner decision']
     : ready
-      ? ['All six pass.', 'Ready for real money']
+      ? [`${ALL_CAP} pass.`, 'Ready for real money']
       : gate.passed
-        ? ['Paper trading until', 'all six pass']
+        ? ['Paper trading until', `${ALL} pass`]
         : ['Paper only.', 'Backtest gate not passed'];
   return { passed, total: CHECKS, ready, lines };
 }

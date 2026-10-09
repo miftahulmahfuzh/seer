@@ -6,14 +6,14 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "46a7512",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "hardgate.py lands the rule; _promote calls check() before promote_method; _trial_deposits moved to hardgate.trial_deposits (one de-funding path). 539 lab tests pass, 68 on the plan's trio, 31 prereg with every test body byte-identical, 24 new. DECIDED: kept test_there_is_no_override verbatim and reworded the module prose instead (rung 2 \u2014 the exit criteria name that test as the pin); the plan's docstring would have tripped it on 'an override is precisely' and on 'environ' inside 'environment variable'. Phase 2/3 note: hardgate prose may never contain force/override/skip_gate/SEER_SKIP/getenv/environ outside the phrase 'no override'. Real-lab read matches D8 on all seven dev-eligible methods, all seven refused; M0019 reads '3 of 4 folds, pick changed' where the plan's expected block said '3 of 4 folds' \u2014 Record.summary() adds it when the pick is unstable, lab/walkforward.py untouched. lab regime + lab walkforward output byte-identical before/after the move; lab.sqlite hash unchanged; slowest single check 689ms.",
       "package": "engine/lab`, `engine/commands",
       "plan": ".workflows/plan/lab-hard-gate/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-09T10:16:24+00:00",
       "satisfies": [
         "R1",
         "R2",
@@ -21,8 +21,8 @@
         "R4",
         "R5"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-K7WZ",
       "title": "The rule, and the refusal at `lab promote"
     },
     {
@@ -42,7 +42,7 @@
         "R3",
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The pre-registration records what it cleared, and `lab test` says what changed"
     },
@@ -72,6 +72,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-hard-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-hard-gate",
-  "updated": "2026-10-09T09:59:40+00:00",
+  "updated": "2026-10-09T10:17:54+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-hard-gate"
 }

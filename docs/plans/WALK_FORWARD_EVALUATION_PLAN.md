@@ -3,7 +3,7 @@
 **Slug:** walk-forward-evaluation
 **Date:** 2026-10-09
 **Branch:** not started (base: `main` @ `39d2927` or later)
-**Status:** proposed
+**Status:** phases 1-3 done 2026-10-09; phase 4 open
 **Prerequisite:** none. No new data, no store rebuild, no test-window contact.
 
 ---
@@ -136,6 +136,7 @@ computed, because condition (b) is the piece only this plan can supply.
 | | Condition | Where it comes from |
 |---|---|---|
 | **(a)** | dev-eligible at the bars in force | `lab show` / the lab's five conditions + DSR |
+| **(a2)** | **no method in the same family has test-failed** | `methods.family` + `status` |
 | **(b)** | beats SPY in a **majority of walk-forward folds** | `lab walkforward`, phase 2 of this plan |
 | **(c)** | a **positive edge in the highest-coverage era** (2009-2015) | `engine/scripts/survivorship_coverage.py` |
 
@@ -153,6 +154,13 @@ spent once and never returned -- and the owner's real money. Roughly $30-150 for
 download (Norgate, Sharadar via Nasdaq Data Link, or EOD Historical Data; all subscription, so
 pull the history and cancel, and read the licence before relying on continued use) is cheap against
 either.
+
+**Condition (a2) was added after running it, and it is the most important thing phase 3 found.**
+Without it the signal fired on M0007, M0019 and M0020, and every one of the three belongs to a
+family that had *already* failed out of sample. M0007 reads `dev-eligible` only because no formal
+look was ever spent on it, while its own realistic twin M0032 lost 415 million rupiah to a
+deposit-matched SPY over 2018-2026. A status column is not the evidence. With (a2) the answer
+across the whole lab today is **no buy signal**, which is what the evidence says.
 
 **Until the signal fires, do not buy.** That is the point of the rule: it stops the purchase being
 made out of enthusiasm, and it stops it being deferred out of thrift when it finally matters.
@@ -177,8 +185,12 @@ nobody anything.
    already does. Emit one obvious line per method -- `BUY SIGNAL: MNNNN cleared (a)(b)(c)` or
    `no buy signal (fails b: 1 of 4 folds)` -- so neither a human nor Sera has to assemble the
    judgement by hand.
-3. **Run it on all 29 methods and write the synthesis** as a `lab insight --kind synthesis`. Expect
-   the headline to be uncomfortable.
+3. **Run it on all methods and write the synthesis.** **Done 2026-10-09**, insight 76. Measured:
+   of the four methods already known to have failed the test window it flags three (M0021, M0022
+   and M0002 each won 2 of 4 folds); M0029 won 3 of 4 and slips through. Twelve of thirty-three
+   methods win a majority, so it is not a filter that rejects everything. The buy signal gained a
+   fourth condition because running it fired on three methods whose families had already failed --
+   see below.
 4. **Only if phase 3 justifies it:** make a walk-forward majority a *reported* condition on
    `lab status` and in the pre-registration gate line. Not a hard gate without the owner's say-so
    -- that is a policy change about what the lab is allowed to promote, and it belongs to him.

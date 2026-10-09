@@ -251,7 +251,7 @@ class Record:
 
 BUY_CONDITIONS = (
     "dev-eligible",
-    "no family member has test-failed",
+    "no kin has test-failed (family union ancestors)",
     "majority of folds",
     "positive 2009-2015 edge",
 )
@@ -270,13 +270,21 @@ def buy_signal(
     and its edge in the highest-coverage era (2009-2015) is positive, so the edge is not an
     artefact of the half of the universe the store cannot price.
 
-    **The family condition was added after running this.** Without it the signal fired on M0007,
+    **The kin condition was added after running this.** Without it the signal fired on M0007,
     M0019 and M0020 -- and every one of the three is in a family that had *already* failed out of
     sample (``stock-residual-momentum`` and ``stock-momentum-risk-managed``). M0007 in particular
     reads ``dev-eligible`` only because the lab never spent a formal look on it, while its own
     realistic twin M0032 lost 415 million rupiah to a deposit-matched SPY over 2018-2026. A status
     column is not the same thing as the evidence, and a new variant of a family that has been
     disproven is not a fresh candidate.
+
+    ``family_failed`` is whatever the caller's kin rule found. ``lab walkforward`` passes
+    ``hardgate.failed_kin``, the **same** rule the promote gate enforces -- family union transitive
+    ancestors. They were briefly different: the gate walked ancestry and this did not, so the
+    signal called M0030's family clean while the gate refused it on its parent M0029 and
+    grandparent M0021. Two commands giving opposite answers about one method is worse than either
+    answer, which is why Decision D9 was resolved by aligning them rather than documenting the
+    gap.
 
     The third is what makes the purchase about *data*. The dev store prices 48% of index members
     in 1996 and 74% in 2014, and the 522 it cannot price are disproportionately the companies that
@@ -290,7 +298,7 @@ def buy_signal(
     if not dev_eligible:
         return False, "not dev-eligible"
     if family_failed:
-        return False, f"family already failed the test window ({family_failed})"
+        return False, f"kin already failed the test window ({family_failed})"
     if not record.majority:
         return False, f"fails the folds: {record.summary()}"
     if high_coverage_edge is None:
@@ -298,6 +306,6 @@ def buy_signal(
     if high_coverage_edge <= 0:
         return False, f"negative 2009-2015 edge ({high_coverage_edge * 100:+.1f} pts)"
     return True, (
-        f"cleared all three: dev-eligible, {record.summary()}, "
+        f"cleared all {len(BUY_CONDITIONS)}: dev-eligible, kin clean, {record.summary()}, "
         f"2009-2015 edge {high_coverage_edge * 100:+.1f} pts"
     )

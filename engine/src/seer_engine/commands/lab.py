@@ -1967,11 +1967,12 @@ def _walkforward(conn, args) -> int:
         )
         row = store.get_method(conn, mid)
         eligible = row is not None and row["status"] == "dev-eligible"
-        kin = None if row is None else conn.execute(
-            "SELECT id FROM methods WHERE family = ? AND id != ? AND status = 'test-failed' "
-            "ORDER BY id LIMIT 1", (row["family"], mid),
-        ).fetchone()
-        signal, why = wf.buy_signal(eligible, rec, edge, None if kin is None else kin["id"])
+        # The SAME kin rule the promote gate uses (hardgate.failed_kin: family union transitive
+        # ancestors), not a second family-only query beside it. Decision D9 is what happens when
+        # these two disagree: the signal said M0030's family was clean while the gate refused it
+        # on ancestry, which is a worse answer than either one alone.
+        kin = hardgate.failed_kin(conn, mid) if row is not None else ()
+        signal, why = wf.buy_signal(eligible, rec, edge, ", ".join(kin) if kin else None)
         if signal:
             fired.append(f"{mid}: {why}")
         if rec.majority:

@@ -210,6 +210,14 @@ def test_buy_signal_says_what_it_cleared_so_a_report_can_quote_it():
     assert fired and "dev-eligible" in why and "folds" in why and "+2.6" in why
 
 
+def test_the_success_line_counts_the_conditions_it_actually_has():
+    """It said 'all three' for a while after a fourth condition was added."""
+    _fired, why = wf.buy_signal(True, winner(), 0.026)
+    assert f"cleared all {len(wf.BUY_CONDITIONS)}" in why
+    assert len(wf.BUY_CONDITIONS) == 4
+    assert "kin clean" in why
+
+
 def test_a_slice_that_never_fell_ranks_above_one_that_did():
     """Zero drawdown is infinite return per unit of fall, not an unrankable candidate."""
     ms = months(date(2000, 1, 1), 24)
@@ -229,7 +237,7 @@ def test_a_losing_slice_that_never_fell_cannot_happen_but_is_ranked_last_anyway(
     assert got.mar == float("-inf")
 
 
-def test_buy_signal_refuses_a_family_that_has_already_failed_out_of_sample():
+def test_buy_signal_refuses_kin_that_has_already_failed_out_of_sample():
     """Found by running it: all three firings were in families already disproven.
 
     A status column is not the evidence. M0007 read dev-eligible only because no formal look had
@@ -237,8 +245,8 @@ def test_buy_signal_refuses_a_family_that_has_already_failed_out_of_sample():
     """
     fired, why = wf.buy_signal(True, winner(), 0.03, family_failed="M0022")
     assert fired is False
-    assert "family already failed" in why and "M0022" in why
+    assert "kin already failed" in why and "M0022" in why
 
 
-def test_the_family_check_does_not_block_a_clean_family():
+def test_the_kin_check_does_not_block_clean_kin():
     assert wf.buy_signal(True, winner(), 0.03, family_failed=None)[0] is True

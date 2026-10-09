@@ -1,4 +1,13 @@
 .summary { padding-bottom: 64px; gap: 20px; }
+/* Trades | Activity. Text, not another icon pill: the filter row below already sizes its buttons
+   from the row width (--n), and two more would push every button under its 30px floor on a
+   phone. */
+.tabs { display: flex; gap: 6px; }
+.tab {
+  padding: 7px 16px; border-radius: 999px; font-size: 15px; color: var(--ink-2);
+  background: var(--chip); text-decoration: none; white-space: nowrap;
+}
+.tab[aria-current='true'] { background: var(--chip-solid); color: var(--ink); font-weight: 500; }
 .filters {
   /* Size each pill button from the row width: 20px = the 8px gap + two pills' 6px padding. */
   container-type: inline-size;
@@ -22,7 +31,14 @@
 .key svg { width: 1.1em; height: 1.1em; flex: none; }
 
 .list { padding: 16px 22px var(--nav-clear); gap: 0; flex: 1; }
-.none { padding: 32px 0; text-align: center; font-size: 17px; color: var(--ink-2); }
+/* Two lines, because one was not enough to say why: "No trades match these filters" blamed the
+   filters for a strategy that simply had not sold anything yet (2026-10-09). */
+.none {
+  padding: 32px 4px; text-align: center; font-size: 15px; color: var(--ink-2);
+  display: flex; flex-direction: column; gap: 6px; max-width: 46ch; margin: 0 auto;
+}
+.noneTitle { font-size: 19px; color: var(--ink); }
+.note { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ink-2); max-width: 62ch; }
 .row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--hair); }
 .reason {
   flex: none; width: 46px; height: 46px; border-radius: 999px; background: var(--chip-solid);
@@ -44,9 +60,14 @@
     border-radius: 40px; padding: 28px 30px; flex-direction: row; align-items: center;
     justify-content: space-between; flex-wrap: wrap; gap: 20px 32px;
   }
+  /* Its own row at the top: it chooses which page this is, so it reads before the numbers
+     that describe it. Without width:100% it lands between the stats and the filters. */
+  .tabs { order: 0; width: 100%; }
+  .stats { order: 1; }
   .filters { order: 2; gap: 14px; container-type: normal; }
   .filters > * { --seg-btn: 42px; }
   .key { order: 3; width: 100%; justify-content: flex-start; gap: 18px; }
+  .note { order: 3; width: 100%; }
   .list {
     margin-top: 12px; border-radius: 40px; padding: 8px 30px 20px;
     display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; align-content: start;

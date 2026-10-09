@@ -18,6 +18,54 @@ export function picksMonthlySizesWeekly(rulesId: string | null | undefined): boo
 }
 
 /**
+ * How often a rule set can act at all: `daily`, `weekly`, `monthly` (a basket picked on the first
+ * session of a month and held), `monthly-weekly` (picked monthly, resized weekly) or `unknown`.
+ *
+ * Mirrors `sim.rules.PRESETS`' `cadence` and `resize_cadence` for every preset the roster can
+ * carry (engine/src/seer_engine/sim/rules.py). This is a PLAIN ANSWER TO "when can this sell?",
+ * not a calendar: the NYSE holiday list lives in the engine and `lib/session.ts` deliberately
+ * does not model it, so nothing here ever names a date.
+ *
+ * `unknown` for a preset this table has not been taught and for the benchmark (rules_id null),
+ * and every caller must read it as "say nothing specific" rather than guess.
+ */
+export type Cadence = 'daily' | 'weekly' | 'monthly' | 'monthly-weekly' | 'unknown';
+
+const CADENCE: Record<string, Cadence> = {
+  'design-v0': 'daily',
+  'design-v0-gotrade': 'daily',
+  'daily-switch': 'daily',
+  'daily-switch-tbill': 'daily',
+  'swing-t10': 'daily',
+  'swing-t20': 'daily',
+  'swing-t20-open': 'daily',
+  'weekly-hold': 'weekly',
+  'monthly-hold': 'monthly',
+  'monthly-hold-tbill': 'monthly',
+  'monthly-hold-frac': 'monthly',
+  'monthly-hold-frac-gotrade': 'monthly',
+  'monthly-rank-weekly-resize': 'monthly-weekly',
+  'monthly-rank-weekly-resize-tbill': 'monthly-weekly',
+  'monthly-rank-weekly-resize-frac': 'monthly-weekly',
+  'monthly-rank-weekly-resize-frac-gotrade': 'monthly-weekly',
+};
+
+export function cadenceOf(rulesId: string | null | undefined): Cadence {
+  return (typeof rulesId === 'string' && CADENCE[rulesId]) || 'unknown';
+}
+
+/** When this rule set can next change what it holds, in words and without a date. */
+export function sellsWhen(c: Cadence): string | null {
+  if (c === 'daily') return 'it decides every session';
+  if (c === 'weekly') return 'it picks a new basket on the first session of each week';
+  if (c === 'monthly') return 'it picks a new basket on the first session of each month and holds it until then';
+  if (c === 'monthly-weekly') {
+    return 'it picks a new basket on the first session of each month and checks the sizes weekly';
+  }
+  return null;
+}
+
+/**
  * Mirror of the engine's `RESIZE_BAND = Decimal("0.01")` (engine/src/seer_engine/sim/rules.py):
  * a held position is only traded back to its target when it is off by at least this share of
  * paper equity (sim/book.py skips the trade when the gap is strictly smaller).

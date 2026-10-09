@@ -427,6 +427,64 @@ export async function closedTrades(strategyId: string | null, outcome: 'win' | '
   }));
 }
 
+export type Fill = {
+  /** Unique across sources: 'f:<book_fills.id>', 'ob:<orders.id>' (its buy) or 'os:<orders.id>' (its sell). */
+  key: string;
+  date: string;
+  strategyId: string;
+  strategyShort: string;
+  symbol: string;
+  side: 'buy' | 'sell';
+  shares: number;
+  price: number;
+  /** Cash that moved, fee included: negative on a buy, positive on a sell. */
+  cash: number;
+  /**
+   * The fee inside that cash. Null for a bracket order: `orders` keeps no per-fill fee column,
+   * and an invented one would read as measured. Book fills carry `book_fills.cost_usd`.
+   */
+  fee: number | null;
+  /** `sim.book.FillReason`, or a bracket order's exit reason on its sell. */
+  reason: string;
+};
+
+/**
+ * Every buy and sell the engine has made, newest first, at most 300.
+ *
+ * Three sources in one list, because "what did it do" is one question: `book_fills` (the book
+ * engines record every entry, add, trim and exit), plus a bracket order's own two events -- its
+ * fill and, once closed, its exit. Until 2026-10-09 nothing read `book_fills` at all, so twenty
+ * buys and $2.40 of fees existed in the database and on no page.
+ */
+export async function fills(strategyId: string | null, side: 'buy' | 'sell' | null): Promise<Fill[]> {
+  const rows = await sql`SELECT x.src, x.id, x.strategy_id, s.name, s.id AS sid, x.date::text AS date, x.symbol,
+      x.side, x.shares, x.price, x.cash_usd, x.cost_usd, x.reason
+    FROM (
+      SELECT 'f' AS src, f.id, f.strategy_id, f.session_date AS date, f.symbol, f.side,
+        f.shares::numeric AS shares, f.price, f.cash_usd, f.cost_usd, f.reason
+      FROM book_fills f
+      UNION ALL
+      SELECT 'ob' AS src, o.id, o.strategy_id, o.fill_date AS date, o.symbol, 'buy' AS side,
+        o.shares::numeric AS shares, o.fill_price AS price, -(o.fill_price * o.shares) AS cash_usd,
+        NULL::numeric AS cost_usd, 'entry' AS reason
+      FROM orders o WHERE o.status IN ('open', 'closed') AND o.fill_date IS NOT NULL
+      UNION ALL
+      SELECT 'os' AS src, o.id, o.strategy_id, o.exit_date AS date, o.symbol, 'sell' AS side,
+        o.shares::numeric AS shares, o.exit_price AS price, (o.exit_price * o.shares) AS cash_usd,
+        NULL::numeric AS cost_usd, COALESCE(o.exit_reason, 'signal') AS reason
+      FROM orders o WHERE o.status = 'closed' AND o.exit_date IS NOT NULL
+    ) x JOIN strategies s ON s.id = x.strategy_id
+    WHERE (${strategyId}::text IS NULL OR x.strategy_id = ${strategyId})
+      AND (${side}::text IS NULL OR x.side = ${side})
+    ORDER BY x.date DESC, x.src, x.id DESC LIMIT 300`;
+  return rows.map(r => ({
+    key: `${r.src}:${r.id}`, date: ymd(r.date), strategyId: r.strategy_id,
+    strategyShort: shortLabel(r.name, r.sid), symbol: r.symbol,
+    side: r.side === 'sell' ? 'sell' : 'buy', shares: n(r.shares), price: n(r.price),
+    cash: n(r.cash_usd), fee: nn(r.cost_usd), reason: String(r.reason),
+  }));
+}
+
 /** Which closed-trade rows count for a strategy: closed orders (bracket), non-idle book trades (book), none (benchmark). */
 const countsFor = (engine: Engine, src: unknown) => engine !== 'benchmark' && src === engine;
 

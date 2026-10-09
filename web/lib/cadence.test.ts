@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  heldUsd, orderSizeChange, picksMonthlySizesWeekly, RESIZE_BAND, sizeChange, sizeLabel, sizeTip, SPLIT_CADENCE_RULES,
+  cadenceOf, heldUsd, orderSizeChange, picksMonthlySizesWeekly, RESIZE_BAND, sellsWhen, sizeChange,
+  sizeLabel, sizeTip, SPLIT_CADENCE_RULES,
 } from './cadence';
 
 describe('picksMonthlySizesWeekly', () => {
@@ -76,5 +77,46 @@ describe('sizeLabel and sizeTip', () => {
       expect(sizeTip({ action, usd: 1 }).length).toBeGreaterThan(0);
     }
     expect(sizeTip({ action: 'none', usd: 0 })).toContain('1%');
+  });
+});
+
+describe('cadenceOf: when a rule set can act at all', () => {
+  // Every preset in engine/src/seer_engine/sim/rules.py PRESETS, by its own cadence and
+  // resize_cadence. A preset missing here answers 'unknown', which every caller reads as
+  // "say nothing specific" -- so a new engine preset degrades, it does not lie.
+  it('mirrors the engine presets', () => {
+    for (const id of ['design-v0', 'design-v0-gotrade', 'daily-switch', 'daily-switch-tbill',
+      'swing-t10', 'swing-t20', 'swing-t20-open']) {
+      expect(cadenceOf(id)).toBe('daily');
+    }
+    expect(cadenceOf('weekly-hold')).toBe('weekly');
+    for (const id of ['monthly-hold', 'monthly-hold-tbill', 'monthly-hold-frac', 'monthly-hold-frac-gotrade']) {
+      expect(cadenceOf(id)).toBe('monthly');
+    }
+    for (const id of SPLIT_CADENCE_RULES) expect(cadenceOf(id)).toBe('monthly-weekly');
+  });
+
+  it('is unknown for the benchmark and for a preset it has not been taught', () => {
+    expect(cadenceOf(null)).toBe('unknown');
+    expect(cadenceOf(undefined)).toBe('unknown');
+    expect(cadenceOf('')).toBe('unknown');
+    expect(cadenceOf('not-a-preset')).toBe('unknown');
+  });
+
+  it('agrees with picksMonthlySizesWeekly, which answers the narrower question', () => {
+    for (const id of ['monthly-hold', 'design-v0-gotrade', 'weekly-hold', ...SPLIT_CADENCE_RULES]) {
+      expect(picksMonthlySizesWeekly(id)).toBe(cadenceOf(id) === 'monthly-weekly');
+    }
+  });
+});
+
+describe('sellsWhen', () => {
+  it('never names a date -- the NYSE calendar is the engine\'s, not the web app\'s', () => {
+    for (const c of ['daily', 'weekly', 'monthly', 'monthly-weekly'] as const) {
+      expect(sellsWhen(c)).not.toMatch(/\d/);
+    }
+  });
+  it('says nothing at all for a cadence it does not know', () => {
+    expect(sellsWhen('unknown')).toBeNull();
   });
 });

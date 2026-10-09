@@ -3,6 +3,12 @@
   "coordinator": "orch-lab-hard-gate",
   "coordinator_session_id": "75d73823-9741-4764-ae3c-172681a065f7",
   "created": "2026-10-09T09:59:40+00:00",
+  "landed": {
+    "at": "2026-10-09T10:45:22+00:00",
+    "base": "main",
+    "commit": "2546e2f3ba66099a230510a8bb57fd34964768b4",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -48,30 +54,30 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "626ed4f50b11bcdca531242e6c4c5a6d79969c7a",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "lab status now prints every dev-eligible method's fold record and a 'Refused by the hard gate' block; both skills say the gate refuses and count the buy signal at four; package_readme covers hardgate + lab/walkforward.py + the two prereg fields; WF plan phase 4 marked done with the measured seven-method table. One ladder decision: the plan's _lab_with_a_benchmark fixture gave both dev trials sharpe=0.9, so dev_sharpe_variance was 0, dsr_at could recover no DSR and the method failed the LUCK test before reaching the gate (3 of 6 new tests failed) -- benchmark row given sharpe=0.7 per rung 6, the module's own _method 0.9/0.7 convention. D9 honoured: lab/walkforward.py and _walkforward untouched, asymmetry stated in prose only. 18 passed on test_lab_status.py (180 insertions / 0 deletions), 558+2 skipped lab suite, 3240+411 engine suite; _hard_gate_states 0.807s for 7 methods, inside invariant 4.",
       "package": "engine/commands`, skills, docs",
       "plan": ".workflows/plan/lab-hard-gate/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-09T10:41:17+00:00",
       "satisfies": [
         "R7",
         "R8",
         "R9"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-T6BJ",
       "title": "Make the gate visible before it bites"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-hard-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-hard-gate",
-  "updated": "2026-10-09T10:28:30+00:00",
+  "updated": "2026-10-09T10:45:22+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-hard-gate"
 }

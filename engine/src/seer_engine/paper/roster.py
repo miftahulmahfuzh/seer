@@ -133,7 +133,7 @@ from seer_engine.sim.rules import PRESETS, TradeRules, is_pinned_default
 from seer_engine.strategies.a import STRATEGY_A, STRATEGY_A_PARAMS
 from seer_engine.strategies.allocator import Allocator
 from seer_engine.strategies.base import Strategy
-from seer_engine.strategies.c import STRATEGY_C, STRATEGY_C_PARAMS
+from seer_engine.strategies.c import STRATEGY_C, STRATEGY_C_PARAMS, NewsVeto
 from seer_engine.strategies.f_factor import FACTOR
 from seer_engine.strategies.f_fundamental import FUNDAMENTAL, FundamentalParams
 from seer_engine.strategies.f_index import TIMING
@@ -1347,6 +1347,32 @@ def entry(strategy_id: str) -> RosterEntry:
         if e.id == strategy_id:
             return e
     raise KeyError(f"{strategy_id!r} is not on the paper roster {ROSTER_IDS}")
+
+
+def news_veto(entries: Sequence[RosterEntry] = ROSTER) -> RosterEntry:
+    """The one ACTIVE entry whose object is the LLM news check (``strategies.c.NewsVeto``).
+
+    Both ends of the news check need this id and they must agree: ``commands.veto`` writes its
+    verdicts under it, and ``commands.paper`` reads them back by the entry's own id to build the
+    night's ``NewsVeto`` (``_bracket_strategy``). Naming the id in one of the two is how they come
+    apart -- 017 retired ``C`` for ``C-GT``, ``veto`` went on writing ``news_vetoes.strategy_id =
+    'C'``, the foreign key rejected every verdict, and the control sat in cash for two sessions
+    because "no verdict row is no trade" was working exactly as designed. Derive it from the same
+    roster the night dispatches on and a rename moves both ends at once.
+
+    Pass the DATABASE roster (``from_rows(store.read_roster_rows(conn))``), not the seeded default,
+    anywhere the answer must match what ``paper`` will do tonight.
+
+    RosterError when ``entries`` carries no active news check, or more than one.
+    """
+    found = tuple(e for e in active(entries) if isinstance(e.obj, NewsVeto))
+    if len(found) != 1:
+        ids = ", ".join(e.id for e in found) or "none"
+        raise RosterError(
+            f"the roster needs exactly one active news check (strategies.c.NewsVeto), found "
+            f"{len(found)}: {ids}"
+        )
+    return found[0]
 
 
 # --------------------------------------------------------------------------- the frozen spec (D4)

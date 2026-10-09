@@ -22,7 +22,7 @@ import test_paper_command as tp
 from seer_engine import bars, cli, dates, db, fx, llm, runs
 from seer_engine.commands import paper, paper_check, veto
 from seer_engine.finnhub import FinnhubError
-from seer_engine.paper import store
+from seer_engine.paper import roster, store
 from seer_engine.strategies import c
 from seer_engine.strategies.a import STRATEGY_A, STRATEGY_A_PARAMS
 from seer_engine.strategies.base import history_from_bars
@@ -33,6 +33,11 @@ NOW = datetime(2026, 8, 6, 23, tzinfo=UTC)
 SESSION = date(2026, 8, 7)
 NEWS_FROM, NEWS_TO = date(2026, 8, 3), date(2026, 8, 6)  # ET run date - 3 days .. ET run date
 WINDOW_END = date(2026, 8, 13)  # the 5th session counting 2026-08-07 as 1
+
+#: `tp.IDS` with the news check RENAMED: `C` retired, `C-GT` (017's successor -- the same
+#: STRATEGY_C object paying Gotrade's measured fees) active in its place. Nothing else differs,
+#: so a case that passes under `world` and fails under `gt_world` is about the id alone.
+IDS_GT = tuple(sorted(("C-GT", *(i for i in tp.IDS if i != "C"))))
 
 FH_KEY = "fh-sekret-0123456789"
 LLM_KEY = "llm-sekret-9876543210"
@@ -45,15 +50,12 @@ VETO = '```json\n{"verdict": "veto", "reason": "Earnings are due inside the wind
 # ---- the synthetic world -----------------------------------------------------------------------
 
 
-@pytest.fixture
-def world(pg):
-    """`test_paper_command`'s bars, FX and universe (no dividends: `veto` never reads them)."""
+def _world(pg, ids):
+    """`test_paper_command`'s bars, FX and universe (no dividends: `veto` never reads them),
+    with exactly ``ids`` active."""
     with db.transaction(pg, False):
-        # This file's subject is C's news veto against the night, so C must step. It pins the same
-        # world `test_paper_command` does rather than following production membership: 013 retired
-        # A, F4-FR and F1-FR, and 017 retired C itself in favour of the Gotrade-fee successor C-GT.
         pg.execute("UPDATE strategies SET status = 'retired'")
-        pg.execute("UPDATE strategies SET status = 'active' WHERE id = ANY(%s)", (list(tp.IDS),))
+        pg.execute("UPDATE strategies SET status = 'active' WHERE id = ANY(%s)", (list(ids),))
         bars.upsert_bars(pg, tp.synthetic_bars())
         fx.upsert_fx(pg, [(d, tp.fx_rate(d)) for d in tp._sessions()])
         for s in tp.STOCKS:
@@ -63,6 +65,25 @@ def world(pg):
                 (s, s),
             )
     return pg
+
+
+@pytest.fixture
+def world(pg):
+    """The world this file's cases run in, with `C` as the active news check. It pins the same
+    membership `test_paper_command` does rather than following production: 013 retired A, F4-FR
+    and F1-FR, and 017 retired C itself in favour of the Gotrade-fee successor C-GT."""
+    return _world(pg, tp.IDS)
+
+
+@pytest.fixture
+def gt_world(pg):
+    """PRODUCTION's membership instead: `C` retired by 017 and `C-GT` active in its place.
+
+    One fixture, one bug. Every other case in this file hands `veto` a roster whose active news
+    check happens to be the id the module used to hardcode, so none of them could see the module
+    naming the wrong strategy. This one renames it, which is what 017 did to production.
+    """
+    return _world(pg, IDS_GT)
 
 
 @lru_cache(maxsize=1)
@@ -197,12 +218,12 @@ def bars_run(conn, status: str = "success") -> None:
         )
 
 
-def rows(conn):
+def rows(conn, strategy_id: str = "C"):
     return q(
         conn,
         "SELECT rank, symbol, verdict, reason, model, prompt_version, headlines, earnings_date, decided_at "
-        "FROM news_vetoes WHERE strategy_id = 'C' AND session_date = %s ORDER BY rank",
-        (SESSION,),
+        "FROM news_vetoes WHERE strategy_id = %s AND session_date = %s ORDER BY rank",
+        (strategy_id, SESSION),
     )
 
 
@@ -596,3 +617,88 @@ def test_session_dates_used_by_this_file():
     assert dates.run_dates(NOW) == dates.RunDates(data_date=NIGHT, session_date=SESSION)
     assert c.news_dates(NOW, 3) == (NEWS_FROM, NEWS_TO)
     assert c.earnings_window(SESSION, 5) == (SESSION, WINDOW_END)
+
+
+# ---- the strategy the check is FOR (2026-10-09) -------------------------------------------------
+
+
+def test_the_verdicts_are_written_for_the_active_news_strategy(gt_world, configured):
+    """The 2026-10-07..08 production failure, as the night actually ran it.
+
+    017 retired `C` for `C-GT`; `commands/veto.py` went on naming "C", so every verdict hit
+    `news_vetoes_strategy_id_fkey` ("Key (strategy_id)=(C) is not present in table strategies"),
+    the command exited 1 under continue-on-error, and `paper` found no verdict row -- which is
+    "no trade" by design. The daily control held 100% cash for two sessions and nothing was red.
+    """
+    bars_run(gt_world)
+    h = Harness()
+    assert h.run(gt_world) == 0
+    assert len(h.ask.calls) == len(expected_symbols())
+
+    assert [r[1] for r in rows(gt_world, "C-GT")] == list(expected_symbols())
+    assert rows(gt_world, "C") == []
+    assert q(gt_world, "SELECT DISTINCT strategy_id FROM news_vetoes") == [("C-GT",)]
+
+
+def test_paper_reads_the_verdicts_back_under_the_same_id(gt_world, configured):
+    """The consequence, as the two ends meet it.
+
+    `paper` builds the night's strategy object from the entry's OWN id
+    (`paper._bracket_strategy` -> `store.allowed_between`), so a verdict filed under any other id
+    is invisible to it and every candidate falls through "no verdict row is no trade". Asserted
+    on the object itself rather than on placed orders: this file's synthetic market prices its
+    cheapest stock at $253 against a $156 slot, so `size_picks` rejects everything as
+    `lt_one_share` here whatever the verdicts say (production's 2026-10-07 candidates were
+    $84-$109 and three of them did fit).
+    """
+    bars_run(gt_world)
+    assert Harness(ask=FakeLlm(default=ALLOW)).run(gt_world) == 0
+
+    # Resolved the way PAPER does -- off the roster, not by asking `veto` what it just used.
+    # Asking `veto` would agree with itself no matter which strategy it filed them under.
+    e = roster.news_veto(roster.from_rows(store.read_roster_rows(gt_world)))
+    assert e.id == "C-GT"
+    built = paper._bracket_strategy(gt_world, e, SESSION, SESSION)
+    assert built.allowed == {SESSION: frozenset(expected_symbols())}
+    # and nothing is readable under the id the module used to name.
+    assert store.allowed_between(gt_world, "C", SESSION, SESSION) == {}
+
+
+def test_a_vetoed_candidate_is_kept_out_under_the_renamed_id(gt_world, configured):
+    """The check still has teeth after the rename: a `veto` verdict leaves the symbol out of the
+    allowed set `paper` trades behind."""
+    blocked = expected_symbols()[0]
+    bars_run(gt_world)
+    assert Harness(ask=FakeLlm(replies={blocked: VETO})).run(gt_world) == 0
+
+    e = roster.news_veto(roster.from_rows(store.read_roster_rows(gt_world)))
+    built = paper._bracket_strategy(gt_world, e, SESSION, SESSION)
+    assert built.allowed == {SESSION: frozenset(expected_symbols()) - {blocked}}
+
+
+def test_the_purged_predecessor_row_is_gone_and_the_check_still_writes(gt_world, configured):
+    """Production's exact shape on 2026-10-08, which the migrated schema alone does not have.
+
+    `db/ops/2026-10-08-purge-retired.sql` DELETED every retired strategy and its rows from
+    production -- `C` included -- while the migration replay keeps them, so a wrong id here is a
+    silently misfiled row and there a ForeignKeyViolation. Delete it and both failures are the
+    same failure again.
+    """
+    with db.transaction(gt_world, False):
+        gt_world.execute("DELETE FROM news_vetoes WHERE strategy_id = 'C'")
+        gt_world.execute("DELETE FROM strategies WHERE id = 'C'")
+    bars_run(gt_world)
+    assert Harness().run(gt_world) == 0
+    assert [r[1] for r in rows(gt_world, "C-GT")] == list(expected_symbols())
+
+
+def test_an_unresolvable_news_strategy_exits_1_without_touching_the_network(world, configured, caplog):
+    """`veto` must say which strategy it cannot find, not write verdicts under a guess."""
+    with db.transaction(world, False):
+        world.execute("UPDATE strategies SET status = 'retired' WHERE id = 'C'")
+    bars_run(world)
+    h = Harness()
+    assert h.run(world) == 1
+    assert h.network() == 0
+    assert rows(world) == []
+    assert "exactly one active news check" in caplog.text

@@ -238,10 +238,25 @@ the next session and buys only those whose recent news the LLM lets through. A b
 be contaminated (the LLM has read the past's news, design §4), so C is judged only on paper, month
 by month next to A.
 
+### Which strategy the check is FOR
+
+`commands/veto.py` **resolves** it and never names it: `veto.strategy(conn)` reads the database
+roster and takes the one ACTIVE entry whose object is a `strategies.c.NewsVeto`
+(`roster.news_veto`). Today that is `C-GT`. `paper` reads the verdicts back under the same entry's
+own id (`commands/paper.py::_bracket_strategy`), so the two ends must agree.
+
+They came apart once, and it is why the id is now derived. 017 retired `C` for `C-GT`; the module
+still had `STRATEGY_ID = "C"`, and once `db/ops/2026-10-08-purge-retired.sql` deleted the retired
+row from production, every verdict failed on `news_vetoes_strategy_id_fkey`. `paper` then found no
+verdict row, which is a deliberate no-trade — so `C-GT` held 100% cash through 2026-10-07 and -08
+with a green nightly. The daily line's **news check** fact (`docs/runbooks/monitoring.md`) now
+reports this directly, and `roster.news_veto` raises rather than guessing when the roster carries
+no active news check or more than one.
+
 ### What the Veto step does
 
 For `session_date` S, in `commands/veto.py`, after a successful Nightly and before Paper:
-1. Nothing to do when `news_vetoes` already holds C's rows for S ("already checked": no Finnhub or
+1. Nothing to do when `news_vetoes` already holds the control's rows for S ("already checked": no Finnhub or
    LLM call), or when Paper has already decided S (too late: nothing written).
 2. A's ranked picks for S from Neon's bars through `prev_session(S)` (the same
    `STRATEGY_A` / `STRATEGY_A_PARAMS` call Paper makes), the first 10 only. None: nothing written.
@@ -298,6 +313,7 @@ headline count) and a line "`n` checked · `k` allowed".
 | Catch-up night (Paper steps several sessions at once after missed nights) | rows only for the newest session; earlier sessions have none unless their own night's Veto ran | sits the earlier sessions out | unchanged for past sessions | green | none: the runbook's rule, not a bug |
 | Re-run (01:00 retry, `gh workflow run`) after a written check | unchanged ("already checked") | unchanged | unchanged | green | none |
 | `workflow_dispatch` with `dry_run` | real Finnhub and LLM calls, then rolled back | — | unchanged | green | none |
+| The roster renamed the news strategy and `veto` wrote under the old id | none under the active id (a `ForeignKeyViolation` if the old row is gone, a silently misfiled row if it is not) | buys nothing, every night, for ever | "No news check for {date}…" | green — Veto is `continue-on-error` | the daily line says `news NO`. The id is resolved from the roster now, so this needs a roster with no active `NewsVeto` or two of them; `veto` exits 1 naming what it found. |
 
 `paper` never fails because of C's verdicts, and `paper_check` replays C from exactly the rows Paper
 used.
@@ -516,11 +532,11 @@ with db.connect() as conn:
     # Strategy C's news checks, newest first: checked, allowed, vetoed, failed, decided at.
     for r in conn.execute("SELECT session_date, count(*), count(*) FILTER (WHERE verdict = 'allow'), "
                           "count(*) FILTER (WHERE verdict = 'veto'), count(*) FILTER (WHERE verdict = 'failed'), "
-                          "min(decided_at) FROM news_vetoes WHERE strategy_id = 'C' "
+                          "min(decided_at) FROM news_vetoes WHERE strategy_id = 'C-GT' "
                           "GROUP BY 1 ORDER BY 1 DESC LIMIT 10"):
         print(r)
     for r in conn.execute("SELECT session_date, rank, symbol, left(reason, 120) FROM news_vetoes "
-                          "WHERE strategy_id = 'C' AND verdict = 'failed' "
+                          "WHERE strategy_id = 'C-GT' AND verdict = 'failed' "
                           "ORDER BY session_date DESC, rank LIMIT 10"):
         print(r)
 PY

@@ -1,4 +1,9 @@
-"""veto: Strategy C's nightly news check, run after ``nightly`` and before ``paper`` (handover D6).
+"""veto: the news check the daily control trades behind, run after ``nightly`` and before
+``paper`` (handover D6).
+
+The strategy checked is resolved, never named: :func:`strategy` reads the database roster and
+takes the one ACTIVE ``strategies.c.NewsVeto`` entry, which is what ``paper`` will read the
+verdicts back under. Today that is ``C-GT``.
 
 ``python -m seer_engine [--dry-run] [-v] veto [--now ISO8601]``
 
@@ -11,7 +16,8 @@ Flow (plan contract K6):
   3b. ``paper`` has already decided that session (``runs.paper_status = 'success'``): log "too
      late", exit 0, nothing written, no network call. A verdict written after Paper decided would
      make paper_check replay a trade Paper never placed (reproducible replay, handover §2)
-  4. verdicts already stored for (C, session): log "already checked", exit 0, no network call
+  4. verdicts already stored for (that strategy, session): log "already checked", exit 0, no
+     network call
   5. A's ranked candidates for the session, capped at C's ``max_candidates``: the windowed bars
      cut at rd.data_date (exactly what ``decide_bracket`` hands the strategy), point-in-time
      members on rd.data_date. Read and rolled back before any network call. No candidates:
@@ -50,9 +56,8 @@ from seer_engine.strategies import c
 
 log = logging.getLogger(__name__)
 
-HELP = "Strategy C's news check: ask the LLM about A's candidates for the next session (never fails the night)"
+HELP = "The daily control's news check: ask the LLM about A's candidates for the next session (never fails the night)"
 
-STRATEGY_ID = "C"
 MAX_CONSECUTIVE_FAILURES = 3
 MAX_REASON_LEN = 300
 LLM_TIMEOUT_S = 30.0
@@ -274,6 +279,21 @@ def _all_failed(
 # ---- the command -------------------------------------------------------------------------------
 
 
+def strategy(conn: psycopg.Connection) -> roster.RosterEntry:
+    """The active news-check entry, read from the DATABASE roster -- the one ``paper`` will
+    dispatch on tonight.
+
+    The id is resolved, never written down here. ``paper`` reads these verdicts back under the
+    active entry's own id (``commands.paper._bracket_strategy``), so the two ends must name the
+    same strategy; a literal ``"C"`` in this module outlived 017's rename to ``C-GT``, every
+    verdict was rejected on ``news_vetoes_strategy_id_fkey``, and the daily control held cash
+    through 2026-10-07 and -08 because "no verdict row is no trade" did exactly what it promises.
+
+    Raises ``roster.RosterError`` when the roster has no active news check, or more than one.
+    """
+    return roster.news_veto(roster.from_rows(store.read_roster_rows(conn)))
+
+
 def _paper_decided(conn: psycopg.Connection, session: date) -> bool:
     """True when ``paper`` has already decided ``session`` (its real runs row has
     ``paper_status = 'success'``): a verdict written now would never have been traded, and
@@ -290,7 +310,8 @@ def execute(
     finnhub: NewsFactory = default_finnhub,
     llm: LlmFactory = default_llm,
 ) -> int:
-    """Check C's candidates for the next session against ``conn``. Returns the exit code.
+    """Check the active news strategy's candidates for the next session against ``conn``.
+    Returns the exit code.
 
     ``finnhub`` builds the news source from FINNHUB_API_KEY and ``llm`` the completer from the
     LLM config; neither is called when nothing needs checking or the configuration is incomplete.
@@ -307,12 +328,17 @@ def execute(
     try:
         try:
             bars_run = runs.real_run(conn, session)
-            done = store.has_vetoes(conn, STRATEGY_ID, session)
+            entry = strategy(conn)
+            done = store.has_vetoes(conn, entry.id, session)
         finally:
             conn.rollback()
     except psycopg.Error as exc:
         log.error("veto: database error reading session %s: %s", session, scrub(str(exc), ()))
         return 1
+    except roster.RosterError as exc:
+        log.error("veto: cannot tell which strategy to check for %s: %s", session, exc)
+        return 1
+    strategy_id = entry.id
     if bars_run is None or bars_run.status != "success":
         found = "missing" if bars_run is None else bars_run.status
         log.error("the bars run for session %s is %s; no news check after a failed or missing bars run", session, found)
@@ -321,10 +347,10 @@ def execute(
         log.info("veto: paper already decided %s; too late for a news check, nothing written", session)
         return 0
     if done:
-        log.info("veto: %s already checked for %s; nothing to do", STRATEGY_ID, session)
+        log.info("veto: %s already checked for %s; nothing to do", strategy_id, session)
         return 0
 
-    params: c.CParams = roster.entry(STRATEGY_ID).params
+    params: c.CParams = entry.params
     try:
         try:
             market = store.load_market_window(conn, store.market_window_since(rd.data_date))
@@ -367,7 +393,7 @@ def execute(
     for v in verdicts:
         log.info(
             "veto: %s %s #%d %s: %s (%d headline(s)%s) %s",
-            STRATEGY_ID, session, v.rank, v.symbol, v.verdict, len(v.headlines),
+            strategy_id, session, v.rank, v.symbol, v.verdict, len(v.headlines),
             f", earnings {v.earnings_date}" if v.earnings_date else "", v.reason,
         )
 
@@ -376,17 +402,17 @@ def execute(
             if _paper_decided(conn, session):
                 log.info("veto: paper decided %s while the checks ran; too late, nothing written", session)
                 return 0
-            if store.has_vetoes(conn, STRATEGY_ID, session):
+            if store.has_vetoes(conn, strategy_id, session):
                 log.info("veto: another run checked %s first; nothing written", session)
                 return 0
-            written = store.write_vetoes(conn, STRATEGY_ID, session, verdicts)
+            written = store.write_vetoes(conn, strategy_id, session, verdicts)
     except Exception as exc:  # noqa: BLE001 - a database error is exit 1, logged without secrets
         log.error("veto: could not write the verdicts for %s: %s", session, scrub(f"{type(exc).__name__}: {exc}", secrets))
         return 1
     counts = {name: sum(1 for v in verdicts if v.verdict == name) for name in c.VERDICTS}
     log.info(
         "veto: %s %s: %d checked, %d allowed, %d vetoed, %d failed%s",
-        STRATEGY_ID, session, written, counts["allow"], counts["veto"], counts["failed"],
+        strategy_id, session, written, counts["allow"], counts["veto"], counts["failed"],
         " (dry-run: rolled back; nothing written)" if dry_run else "",
     )
     return 0

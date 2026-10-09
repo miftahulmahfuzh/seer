@@ -35,6 +35,7 @@ from seer_engine.paper.roster import (
     SEED_ROWS,
     BadRosterRow,
     RosterRow,
+    RosterError,
     UnknownObject,
     UnknownRules,
     active,
@@ -43,6 +44,7 @@ from seer_engine.paper.roster import (
     entry,
     from_row,
     from_rows,
+    news_veto,
     resolve,
     resolver_names,
     rules_dict,
@@ -55,6 +57,7 @@ from seer_engine.sim.rules import DESIGN_V0, MONTHLY_HOLD, MONTHLY_HOLD_FRAC
 from seer_engine.strategies.a import STRATEGY_A, STRATEGY_A_PARAMS
 from seer_engine.strategies.c import (
     FROZEN_MODEL,
+    NewsVeto,
     PROMPT_VERSION,
     STRATEGY_C,
     STRATEGY_C_ID,
@@ -512,6 +515,35 @@ def test_active_drops_retired_entries_and_keeps_order():
     assert [e.id for e in active(entries)] == [SPY_GT, C_GT, RMW_GT, MOM_GT, MVW_GT]
     raw = next(e for e in entries if e.id == RAW_GT)
     assert (raw.status, raw.paper_end) == ("retired", date(2026, 10, 2))
+
+
+def test_the_news_check_resolves_to_the_one_active_news_strategy():
+    """`veto` writes its verdicts under this id and `paper` reads them back under it, so it must
+    be an ACTIVE entry or every verdict dies on news_vetoes_strategy_id_fkey. 017 retired `C`
+    for `C-GT` and the hardcoded "C" in commands/veto.py did exactly that for two sessions."""
+    found = news_veto()
+    assert (found.id, found.status) == (C_GT, "active")
+    assert isinstance(found.obj, NewsVeto)
+    assert found.id in ACTIVE_IDS
+    assert news_veto(ROSTER) == found
+
+
+def test_the_news_check_refuses_a_roster_with_no_active_one_or_two():
+    """Both halves of "exactly one". A roster that cannot answer must raise, not guess: guessing
+    is how the id drifted away from the night in the first place."""
+    none = from_rows(
+        dataclasses.replace(r, status="retired") if r.id == C_GT else r for r in SEED_ROWS
+    )
+    with pytest.raises(RosterError, match="found 0: none"):
+        news_veto(none)
+
+    # The old `C` brought back alongside its successor: two active NewsVeto entries, and nothing
+    # in the data says which one the night trades behind.
+    both = from_rows(
+        dataclasses.replace(r, status="active") if r.id == "C" else r for r in SEED_ROWS
+    )
+    with pytest.raises(RosterError, match=r"found 2: C-GT, C"):
+        news_veto(both)
 
 
 def _seed(sid: str) -> RosterRow:

@@ -642,6 +642,83 @@ def test_run_book_credits_a_contribution_on_its_session_and_run_rules_passes_it_
     ) == fed
 
 
+def test_contribution_fx_converts_each_deposit_at_the_rate_of_its_own_session():
+    """The rupiah moves, so the same 5,000,000 buys fewer dollars. That is the honest run.
+
+    The wiring window holds one contribution, 2025-02-25. With a second FX row landing that very
+    day at 20,000 IDR/USD, the deposit is 5,000,000 / 20,000 = $250.00, where the run's single
+    start-date rate of 16,000 would have made it $312.50. The OPENING cash is converted at
+    ``usd_idr`` either way and must not move: only the deposit is affected.
+    """
+    market = replace(wiring_market(), fx=(*W_FX, (D("2025-02-25"), Decimal("20000"))))
+    fixed = run_book(
+        market, Scripted(), None, DAILY_SWITCH, W_START, W_END,
+        initial_idr=FIXTURE_IDR, contributions=OWNER_MONTHLY,
+    )
+    real = run_book(
+        market, Scripted(), None, DAILY_SWITCH, W_START, W_END,
+        initial_idr=FIXTURE_IDR, contributions=OWNER_MONTHLY,
+        contribution_fx=market.usd_idr_on,
+    )
+    assert fixed.cashflows == ((D("2025-02-25"), P("312.5")),)
+    assert real.cashflows == ((D("2025-02-25"), P("250")),)
+    # The opening sum is the same money in both: 20,000,000 IDR at the start-date rate.
+    assert real.initial_cash == fixed.initial_cash == P("1250")
+    assert real.usd_idr == fixed.usd_idr == Decimal("16000")
+    by_date = {s.date: s for s in real.snapshots}
+    assert by_date[D("2025-02-25")] == BookSnapshot(D("2025-02-25"), P("1500"), P("1500"), P("0"))
+
+
+def test_contribution_fx_changes_nothing_while_the_rate_does_not():
+    """The guard on D5: the new argument can only ever matter through a MOVING rate.
+
+    ``wiring_market`` holds one FX row, so ``usd_idr_on`` answers 16,000 on every session of the
+    window -- exactly what the single-rate path uses. Passing it must therefore reproduce the
+    recorded behaviour whole, result object for result object.
+    """
+    market = wiring_market()
+    fed = run_book(
+        market, Scripted(), None, DAILY_SWITCH, W_START, W_END,
+        initial_idr=FIXTURE_IDR, contributions=OWNER_MONTHLY,
+    )
+    assert run_book(
+        market, Scripted(), None, DAILY_SWITCH, W_START, W_END,
+        initial_idr=FIXTURE_IDR, contributions=OWNER_MONTHLY,
+        contribution_fx=market.usd_idr_on,
+    ) == fed
+    # And the default is None, so an unfunded or ordinary funded run is untouched by construction.
+    assert run_book(
+        market, Scripted(), None, DAILY_SWITCH, W_START, W_END,
+        initial_idr=FIXTURE_IDR, contributions=OWNER_MONTHLY, contribution_fx=None,
+    ) == fed
+
+
+def test_contribution_fx_refuses_a_run_with_nothing_to_convert():
+    with pytest.raises(ValueError, match="contribution_fx converts deposits"):
+        run_book(
+            wiring_market(), Scripted(), None, DAILY_SWITCH, W_START, W_END,
+            contribution_fx=wiring_market().usd_idr_on,
+        )
+
+
+def test_contribution_fx_must_be_callable():
+    with pytest.raises(TypeError, match="contribution_fx must be callable"):
+        run_book(
+            wiring_market(), Scripted(), None, DAILY_SWITCH, W_START, W_END,
+            contributions=OWNER_MONTHLY, contribution_fx=Decimal("16000"),
+        )
+
+
+def test_run_rules_refuses_contribution_fx_for_the_bracket_engine():
+    """§5's simulator converts once at ``market.usd_idr_on(start)``; there is nowhere to put it."""
+    with pytest.raises(ValueError, match="bracket engine"):
+        run_rules(
+            seeded_market(39), STRATEGY_A, DESIGN_PARAMS, DESIGN_V0_GOTRADE, SEED_START, SEED_END,
+            prepared=strategy_prepared(39, "A"), initial_idr=FIXTURE_IDR,
+            contributions=OWNER_MONTHLY, contribution_fx=seeded_market(39).usd_idr_on,
+        )
+
+
 def test_run_book_refuses_a_contribution_that_is_not_a_schedule():
     with pytest.raises(TypeError, match="contributions must be a ContributionSchedule"):
         run_book(

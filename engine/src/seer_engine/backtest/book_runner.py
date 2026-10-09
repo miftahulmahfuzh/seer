@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import math
 from collections import Counter
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from decimal import Decimal
@@ -257,6 +257,7 @@ def run_book(
     usd_idr: Decimal | None = None,
     kickoff: date | None = None,
     contributions: Contributions | None = None,
+    contribution_fx: Callable[[date], Decimal] | None = None,
 ) -> BookResult:
     """Run ``allocator`` with ``params`` under the book rules ``rules`` over every session in ``[start, end]``.
 
@@ -281,6 +282,14 @@ def run_book(
     session -- which is the point: the owner's 25th is a mean of 4.2 sessions before a month-start
     rotation. It raises cash AND equity, because ``step_book`` sizes every target from
     ``book.equity``. It is converted at this run's single rate.
+
+    ``contribution_fx``: None, the default and every recorded run -- each deposit converts at this
+    run's single ``usd_idr``, so the result is about the strategy and not about the rupiah. Given a
+    callable (``market.usd_idr_on`` is the real one), each deposit instead converts at the rate on
+    the session it is CREDITED, so a weakening rupiah buys fewer dollars a month as it really
+    would. The opening cash converts at ``usd_idr`` either way -- on the start date those are the
+    same rate -- so the two runs differ in the deposits alone. Pass None to reproduce a record:
+    this argument is the only thing that can make a funded re-run differ from its trial.
     """
     if not isinstance(market, Market):
         raise TypeError(f"market must be a Market, got {type(market).__name__}")
@@ -300,6 +309,12 @@ def run_book(
             "contributions must be a ContributionSchedule, a sequence of (date, Decimal) "
             f"pairs or None, got {type(contributions).__name__}"
         )
+    if contribution_fx is not None and not callable(contribution_fx):
+        raise TypeError(
+            f"contribution_fx must be callable or None, got {type(contribution_fx).__name__}"
+        )
+    if contribution_fx is not None and contributions is None:
+        raise ValueError("contribution_fx converts deposits; it needs contributions, not None")
     _session("start", start)
     _session("end", end)
     if end < start:
@@ -322,7 +337,8 @@ def run_book(
 
     for session in dates.sessions(start, end):
         if contributions is not None:
-            credit = credit_for(contributions, data_date, session, rate)
+            credit_rate = rate if contribution_fx is None else contribution_fx(session)
+            credit = credit_for(contributions, data_date, session, credit_rate)
             if credit > 0:
                 book = replace(book, cash=book.cash + credit, equity=book.equity + credit)
                 cashflows.append((session, credit))
@@ -415,6 +431,7 @@ def run_rules(
     kickoff: date | None = None,
     initial_idr: Decimal = INITIAL_IDR,
     contributions: Contributions | None = None,
+    contribution_fx: Callable[[date], Decimal] | None = None,
 ) -> RunResult | BookResult:
     """Run under ``rules``: the single dispatch every P7a caller uses.
 
@@ -425,6 +442,7 @@ def run_rules(
       at that rate.
     - ``rules.engine == "book"`` with an ``Allocator``: ``run_book`` with every argument.
     - ``kickoff`` is a book argument; with bracket rules it must be None (ValueError).
+    - ``contribution_fx`` is a book argument too; with bracket rules it must be None (ValueError).
     - any other pairing: TypeError.
     """
     if not isinstance(rules, TradeRules):
@@ -442,6 +460,11 @@ def run_rules(
             )
         if kickoff is not None:
             raise ValueError(f"rules {rules.id!r} rank no book; kickoff must be None, got {kickoff}")
+        if contribution_fx is not None:
+            raise ValueError(
+                f"rules {rules.id!r} run the bracket engine, which converts once at "
+                f"market.usd_idr_on(start); contribution_fx must be None"
+            )
         return run_backtest(
             market,
             strategy_or_allocator,
@@ -468,6 +491,7 @@ def run_rules(
         kickoff=kickoff,
         initial_idr=initial_idr,
         contributions=contributions,
+        contribution_fx=contribution_fx,
     )
 
 

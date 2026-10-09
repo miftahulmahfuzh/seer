@@ -489,11 +489,17 @@ def _run(
     window: Window,
     *,
     contributions: ContributionSchedule | None = None,
+    contribution_fx: Callable[[date], Decimal] | None = None,
 ) -> tuple[RunResult | BookResult, DevRow]:
     start, end = candidate_window(market, c, window=window)
     check_dev_session(end, window)
     rate: Decimal = market.usd_idr_on(max(start, FX_START))
     run_market = market
+    if contribution_fx is not None and start < FX_START:
+        raise ValueError(
+            f"contribution_fx needs a USD/IDR rate per session, and this window starts {start}, "
+            f"before the first rate on {FX_START}"
+        )
     if start < FX_START:
         # No USD/IDR before FX_START: the starting cash converts at the FX_START rate. replace()
         # carries history, membership and fundamentals over, so a long window keeps the panel.
@@ -509,6 +515,7 @@ def _run(
         dividends=dividends if c.rules.engine == "book" else {},
         usd_idr=rate,
         contributions=contributions,
+        contribution_fx=contribution_fx,
     )
     # The benchmark pays what the candidate pays and is fed what the candidate is fed: Gotrade's
     # schedule for a cost_model="gotrade" rule set, the flat 0.1% (unchanged) otherwise, and the
@@ -555,6 +562,8 @@ def run_candidate(
     *,
     prepared: Any = None,
     window: Window = DEV_WINDOW,
+    contributions: ContributionSchedule | None = None,
+    contribution_fx: Callable[[date], Decimal] | None = None,
 ) -> tuple[RunResult | BookResult, DevRow]:
     """Run ``c`` once on ``candidate_window(market, c, window=window)``.
 
@@ -568,7 +577,10 @@ def run_candidate(
     spy_divs = _check_dividends(dividends, spy_dividends, window)
     if not isinstance(c, Candidate):
         raise TypeError(f"expected a Candidate, got {type(c).__name__}")
-    return _run(market, market.spy(), dividends, spy_divs, c, prepared, window)
+    return _run(
+        market, market.spy(), dividends, spy_divs, c, prepared, window,
+        contributions=contributions, contribution_fx=contribution_fx,
+    )
 
 
 def run_registry(
@@ -580,6 +592,7 @@ def run_registry(
     on_result: Callable[[int, RunResult | BookResult, DevRow], None] | None = None,
     window: Window = DEV_WINDOW,
     contributions: ContributionSchedule | None = None,
+    contribution_fx: Callable[[date], Decimal] | None = None,
 ) -> tuple[DevRow, ...]:
     """Every candidate, sequentially, in registry order; one row each, in that order.
 
@@ -631,7 +644,8 @@ def run_registry(
         if key not in cache:
             cache[key] = prepare_for(c.allocator, market)
         result, row = _run(
-            market, spy, dividends, spy_divs, c, cache[key], window, contributions=contributions
+            market, spy, dividends, spy_divs, c, cache[key], window,
+            contributions=contributions, contribution_fx=contribution_fx,
         )
         if last_use[key] == i:
             del cache[key]

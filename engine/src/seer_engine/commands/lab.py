@@ -75,6 +75,7 @@ import math
 import os
 import statistics
 import time
+from datetime import date
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -295,6 +296,17 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
              "a test-window store is refused. The store is gitignored, so a fresh worktree has "
              "none -- point this at a checkout that does rather than rebuilding it",
     )
+
+    s = sub.add_parser(
+        "regime",
+        help="split recorded dev results by market breadth (report only; no trial, no look)",
+    )
+    s.add_argument("method", nargs="*", metavar="M0007",
+                   help="methods to report (default: every method with a dev trial)")
+    s.add_argument("--store", type=Path,
+                   default=Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR))
+    s.add_argument("--min-months", type=int, default=12, metavar="N",
+                   help="skip a regime with fewer than N months of evidence (default 12)")
 
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
@@ -1633,6 +1645,87 @@ def _names(conn, args) -> int:
     log.info("lab names: %d runs done (%.1fs)", len(sweep.points), time.perf_counter() - t0)
     return 0
 
+def _regime(conn, args) -> int:
+    """``lab regime``: every recorded dev result, split by whether the market was narrow or broad.
+
+    A report, in the sense ``lab costs`` is a report: it re-runs nothing, inserts no trial, moves
+    no status and spends no look. Recorded curves (``trials.curve_json``) are monthly, so the
+    split is arithmetic on rows the lab already has; the research store is opened only to measure
+    breadth, which needs member bars.
+    """
+    import json
+
+    from seer_engine.backtest import regime
+
+    rows = [
+        r for r in conn.execute(
+            "SELECT method_id, candidate_id, curve_json, mar, cagr FROM trials "
+            "WHERE window = 'dev' AND curve_json IS NOT NULL ORDER BY method_id, n"
+        )
+    ]
+    bench = next((r for r in rows if r["candidate_id"] == regime.BENCH_CANDIDATE), None)
+    if bench is None:
+        raise store.LabError(
+            f"no {regime.BENCH_CANDIDATE} dev trial to compare against; the breadth panel needs "
+            f"the recorded SPY buy-and-hold curve as its benchmark"
+        )
+    wanted = {m.upper() for m in args.method}
+    if wanted:
+        known = {r["method_id"] for r in rows}
+        missing = sorted(wanted - known)
+        if missing:
+            raise store.LabError(f"no dev trial for {', '.join(missing)}")
+
+    t0 = time.perf_counter()
+    try:
+        data = research.load_store(Path(args.store))
+    except (ValueError, FileNotFoundError) as e:
+        raise store.LabError(f"{args.store}: {e}") from e
+    bench_curve = [(date.fromisoformat(d), float(v)) for d, v in json.loads(bench["curve_json"])]
+    spread = regime.breadth(data.market, [d for d, _ in bench_curve])
+    label = regime.labels(spread)
+    counts = {r: sum(1 for x in label.values() if x == r) for r in regime.REGIMES}
+    runs = regime.persistence(spread)
+    log.info("breadth measured over %d months (%.1fs)", len(label), time.perf_counter() - t0)
+
+    print(f"Market breadth on the dev window, {len(label)} months labelled: "
+          f"{counts[regime.NARROW]} narrow, {counts[regime.BROAD]} broad.")
+    print("A month is NARROW when the index beat the equal-weighted average of its own members")
+    print("-- a few big names carried it -- and BROAD otherwise. Returns are annualised within")
+    print("each regime's months alone, so they describe where a result came from, not a return")
+    print("anyone could have earned.\n")
+    head = f"  {'candidate':<26}{'narrow vs SPY':>15}{'broad vs SPY':>15}   {'verdict':<22}"
+    print(head)
+    print("  " + "-" * (len(head) - 2))
+    for r in rows:
+        if r["candidate_id"] == regime.BENCH_CANDIDATE:
+            continue
+        if wanted and r["method_id"] not in wanted:
+            continue
+        curve = [(date.fromisoformat(d), float(v)) for d, v in json.loads(r["curve_json"])]
+        pan = regime.panel(curve, bench_curve, label)
+        cells, gaps = [], {}
+        for name in regime.REGIMES:
+            mine, theirs, gap = pan[name]
+            if gap is None or mine.months < args.min_months:
+                cells.append(f"{'-':>15}")
+            else:
+                cells.append(f"{fmt_signed_pct(gap):>15}")
+                gaps[name] = gap
+        print(f"  {r['candidate_id']:<26}{cells[0]}{cells[1]}   {regime.read(gaps):<22}")
+    if runs:
+        peak_at, peak = max(runs, key=lambda x: x[1])
+        pos = sum(1 for _d, v in runs if v > 0)
+        print(f"\nPersistence ({regime.PERSIST_MONTHS}-month trailing mean spread): "
+              f"{pos} of {len(runs)} windows positive, peak {fmt_signed_pct(peak)} a month "
+              f"ending {peak_at}.")
+        print("A sustained positive reading is a standing headwind for an equal-weighted or")
+        print("beta-stripped book. THIS is the measure that separates eras; the narrow/broad")
+        print("month counts above do not -- on them almost every method reads 'pays in both'.")
+    print(f"\n{len(label)} months, store {data.fingerprint[:12]}. Nothing was recorded.")
+    return 0
+
+
 def _idea(conn, args) -> int:
     store.begin_immediate(conn)  # the next id and its insert, atomic against parallel sessions
     with conn:
@@ -1745,6 +1838,7 @@ def _seed(conn, args) -> int:
 
 _HANDLERS = {
     "status": _status,
+    "regime": _regime,
     "luck": _luck,
     "show": _show,
     "run": _run,

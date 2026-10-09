@@ -692,3 +692,29 @@ def test_command_lab_test_refuses_a_cross_checkout_dev_store(tmp_path, members_d
         assert lab_store.test_looks(conn) == 0  # the one counted look was not spent
     finally:
         conn.close()
+
+
+# ---- the ex-date calendar on the market (M0051's plumbing) ------------------------------------
+
+
+def test_both_windows_hand_the_market_their_own_dividend_calendar(tmp_path, members_dir):
+    """``load_store`` puts the store's dividends on ``Market.dividends`` for either window, and
+    the dev store's calendar holds nothing after DEV_END: the loader clips, the calendar never
+    widens it."""
+    dev, test = tmp_path / "dev", tmp_path / "test"
+    build(dev, members_dir)
+    window = research.test_window(TEST_END)
+    build(test, members_dir, window=window)
+    dev_data = research.load_store(dev, data_dir=members_dir)
+    test_data = research.load_store(test, data_dir=members_dir, window=window)
+    assert dev_data.market.dividends.known_on("SPY", TEST_END) == ((D2, Decimal("0.25")),)
+    assert test_data.market.dividends.known_on("SPY", TEST_END) == (
+        (D2, Decimal("0.25")), (POST, Decimal("0.5")),
+    )
+    # point in time: the day before an ex-date, that ex-date is not visible
+    assert test_data.market.dividends.known_on("SPY", POST - timedelta(days=1)) == ((D2, Decimal("0.25")),)
+    for data in (dev_data, test_data):
+        cal = data.market.dividends
+        assert len(cal) == sum(len(v) for v in data.dividends.values())
+        for symbol, by_date in data.dividends.items():
+            assert cal.known_on(symbol, data.window.end) == tuple(sorted(by_date.items()))

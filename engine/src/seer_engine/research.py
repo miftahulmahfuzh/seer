@@ -54,7 +54,7 @@ from seer_engine.backtest.io import (
     histories_from_frame,
     merge_intervals,
 )
-from seer_engine.backtest.market import EMPTY_FUNDAMENTALS, Market, Membership
+from seer_engine.backtest.market import EMPTY_FUNDAMENTALS, DividendCalendar, Market, Membership
 from seer_engine.backtest.window import WINDOW_NAMES, Window
 from seer_engine.fundamentals import FACT_COLUMNS, Fact, FundamentalPanel as Panel
 from seer_engine.prices import to_decimal
@@ -954,6 +954,7 @@ def load_store(
         membership=research_membership(data_dir, window=window),
         fx=fx_rows,
         fundamentals=fundamentals,
+        dividends=DividendCalendar.from_map(dividends),
     )
     spy_dividends = tuple(
         Dividend(ex_date=d, amount=a) for d, a in sorted(dividends.get("SPY", {}).items())

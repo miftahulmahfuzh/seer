@@ -42,10 +42,74 @@ this phase's code, tests and docstrings use throughout; phase 5 owns the type.
 """
 
 
+class DividendCalendar:
+    """Every symbol's cash dividends by ex-date, read point in time.
+
+    ``rows`` maps a symbol to ``(ex_date, amount)`` pairs, strictly ascending by ex-date, each
+    amount a Decimal > 0 in the bars' (split-adjusted) units. The only read is ``known_on``,
+    which returns the ex-dates dated on or before ``data_date``: an allocator that asks with the
+    ``data_date`` it was handed cannot see a dividend that has not gone ex yet. That is the same
+    contract ``History`` keeps for bars, and ``tests/test_market_dividends.py`` holds it.
+
+    Built from the research store's ``dividends.csv`` by ``research.load_store`` (dev and test
+    windows alike, each clipped to its window by the loader). A market built any other way --
+    the database path, a paper replay, a fixture -- carries ``EMPTY_DIVIDENDS``.
+    """
+
+    __slots__ = ("_rows", "_dates")
+
+    def __init__(self, rows: Mapping[str, Iterable[tuple[date, Decimal]]]) -> None:
+        if not isinstance(rows, Mapping):
+            raise TypeError(f"rows must be a Mapping, got {type(rows).__name__}")
+        out: dict[str, tuple[tuple[date, Decimal], ...]] = {}
+        for symbol in sorted(rows):
+            if not isinstance(symbol, str) or not symbol:
+                raise ValueError(f"symbol must be a non-empty str, got {symbol!r}")
+            items = tuple(rows[symbol])
+            prev: date | None = None
+            for item in items:
+                if not (isinstance(item, tuple) and len(item) == 2):
+                    raise TypeError(f"a {symbol} dividend is (ex_date, Decimal), got {item!r}")
+                d, amount = item
+                _check_date("ex_date", d)
+                if not isinstance(amount, Decimal) or not amount.is_finite() or amount <= 0:
+                    raise ValueError(f"{symbol} dividend on {d} must be a Decimal > 0, got {amount!r}")
+                if prev is not None and d <= prev:
+                    raise ValueError(f"{symbol} dividends must be strictly ascending: {d} after {prev}")
+                prev = d
+            if items:
+                out[symbol] = items
+        self._rows: Mapping[str, tuple[tuple[date, Decimal], ...]] = out
+        self._dates: Mapping[str, tuple[date, ...]] = {s: tuple(d for d, _ in r) for s, r in out.items()}
+
+    @staticmethod
+    def from_map(dividends: Mapping[str, Mapping[date, Decimal]]) -> DividendCalendar:
+        """A calendar from ``symbol -> ex_date -> amount`` (``ResearchData.dividends``' shape)."""
+        return DividendCalendar({s: sorted(by_date.items()) for s, by_date in dividends.items()})
+
+    def __len__(self) -> int:
+        return sum(len(r) for r in self._rows.values())
+
+    def symbols(self) -> tuple[str, ...]:
+        """Every symbol with at least one dividend, sorted."""
+        return tuple(self._rows)
+
+    def known_on(self, symbol: str, data_date: date) -> tuple[tuple[date, Decimal], ...]:
+        """``symbol``'s ``(ex_date, amount)`` rows dated on or before ``data_date``, ascending."""
+        dates_ = self._dates.get(symbol)
+        if dates_ is None:
+            return ()
+        return self._rows[symbol][: bisect_right(dates_, _check_date("data_date", data_date))]
+
+
 def _check_date(name: str, d: object) -> date:
     if isinstance(d, datetime) or not isinstance(d, date):
         raise TypeError(f"{name} must be a date, got {type(d).__name__}")
     return d
+
+
+EMPTY_DIVIDENDS = DividendCalendar({})
+"""The calendar a ``Market`` carries when no dividends were loaded (one shared instance)."""
 
 
 @dataclass(frozen=True)
@@ -109,6 +173,10 @@ class Membership:
 class Market:
     """Everything a backtest reads, in memory.
 
+    ``dividends``: the point-in-time ex-date calendar (``DividendCalendar``), for an allocator
+    that ranks on it; ``EMPTY_DIVIDENDS`` unless the research store loaded one. The book
+    engine's cash ledger does not read it -- it still gets ``ResearchData.dividends``.
+
     ``history``: every symbol with bars (SPY included), keyed by symbol, each ``History``
     ascending. ``fx``: ``(date, usd_idr)`` rows, strictly ascending, ``usd_idr`` a Decimal > 0
     (publishing days only, so not every session has a row). ``fundamentals``: the point-in-time
@@ -124,6 +192,7 @@ class Market:
     membership: Membership
     fx: tuple[tuple[date, Decimal], ...]
     fundamentals: Panel = EMPTY_FUNDAMENTALS
+    dividends: DividendCalendar = EMPTY_DIVIDENDS
     _fx_dates: tuple[date, ...] = field(init=False, repr=False)
     _last: Mapping[str, date] = field(init=False, repr=False)
 
@@ -136,6 +205,8 @@ class Market:
             raise TypeError("fx must be a tuple of (date, Decimal) rows")
         if not isinstance(self.fundamentals, Panel):
             raise TypeError(f"fundamentals must be a Panel, got {type(self.fundamentals).__name__}")
+        if not isinstance(self.dividends, DividendCalendar):
+            raise TypeError(f"dividends must be a DividendCalendar, got {type(self.dividends).__name__}")
         last: dict[str, date] = {}
         for symbol, h in self.history.items():
             if not isinstance(h, History):
@@ -170,6 +241,10 @@ class Market:
         order.
         """
         return replace(self, fundamentals=fundamentals)
+
+    def with_dividends(self, dividends: DividendCalendar) -> Market:
+        """This market with ``dividends`` attached; every other field is carried over."""
+        return replace(self, dividends=dividends)
 
     def bar(self, symbol: str, d: date) -> Bar | None:
         """``symbol``'s bar dated ``d`` as a Decimal ``Bar`` (exact 4 dp), or None."""

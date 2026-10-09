@@ -154,21 +154,30 @@ such commit must also carry `web/data/lab.json` or CI fails.
 ### Documentation (`docs/`)
 
 `ROADMAP.md`; `plans/` (dated design documents, including the method lab design and the P7b
-pre-registration); `design/` (UI prototypes); `backtests/` (dated results with their CSV and SVG);
-`handover/` (dated session handovers); `lab/prereg/` (pre-registrations); `runbooks/`
-(`data-pipeline.md`, `paper-trading.md`, `monitoring.md`).
+pre-registration — plus the `*_PLAN.md` plan sets, see below); `analyzer/` (the `/analyze`
+reports those plan sets are built from); `design/` (UI prototypes); `backtests/` (dated results
+with their CSV and SVG); `handover/` (dated session handovers); `lab/prereg/` (pre-registrations);
+`runbooks/` (`data-pipeline.md`, `paper-trading.md`, `monitoring.md`).
 
-### Root-level plan and analysis files
+### Plan sets and their analyses
 
-`*_PLAN.md` are plan sets (one per feature programme, e.g. `LAB_REALISTIC_GATE_PLAN.md`);
-`YYYYMMDD-HHMMSS-XXXX_code_analyzer.md` are the `/analyze` reports those plan sets are built from.
+`docs/plans/*_PLAN.md` are plan sets, one per feature programme (e.g.
+`LAB_REALISTIC_GATE_PLAN.md`); `docs/analyzer/YYYYMMDD-HHMMSS-XXXX_code_analyzer.md` are the
+`/analyze` reports they are built from. Each plan names its analysis in an `**Analysis:**` line.
+
+Both lived at the repo root until 2026-10-09, when forty-three of them had made the root
+unreadable. `/analyze` now files them under `docs/` in any repo that has a `docs/` tree, so new
+sessions land here without being told. Two naming conventions share `docs/plans/`: dated design
+documents (`2026-10-04-method-lab-design.md`) and these `SCREAMING_SNAKE_PLAN.md` indexes.
 
 ## Internal Architecture
 
 ### Data Flow
 
 ```
-/analyze  ->  <timestamp>_code_analyzer.md  ->  <NAME>_PLAN.md
+/analyze  ->  docs/analyzer/<timestamp>_code_analyzer.md
+                  |
+              docs/plans/<NAME>_PLAN.md
                                                       |
                                         .workflows/plan/<set>/phase-N.md
                                                       |

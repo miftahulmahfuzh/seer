@@ -92,9 +92,17 @@ rather than paper over:
 
 ## Design
 
-**Where it lives.** `engine/src/seer_engine/backtest/walkforward.py`, with `lab walkforward` in
+**Where it lives.** `engine/src/seer_engine/lab/walkforward.py`, with `lab walkforward` in
 `commands/lab.py` beside `regime` and `costs`. Report only, in the sense those are: it writes
 nothing to the database.
+
+**Not `backtest/walkforward.py` — that name is taken, and by something real.** The repo already
+has an anchored yearly walk-forward: P3b's, for Strategy A2 on the bracket engine, which re-runs
+`run_backtest` over a 324-combination tuning grid and selects parameters per fold. That is a
+different engine answering a different question, and it is worth reading before building this one
+(`folds`, `select_fold`, `walk_forward`, `gate_p3b` are all there). This module never runs a
+backtest and tunes nothing: it slices curves the lab already recorded, and the only thing it
+selects is which variant the lab's own rule would have named at each point in time.
 
 **Fold geometry.** Expanding train window, fixed 3-year evaluation slices, minimum 10 years of
 training before the first fold. On `DEV_WINDOW` (1996-01-03..2015-10-16) that is the four folds
@@ -157,8 +165,8 @@ nobody anything.
 
 ## Phases
 
-1. **`walkforward.py`** — folds, per-fold metrics from a monthly curve, the selection rule, and the
-   per-method record. Pure: takes curves and dates, no I/O. It must accept a deposits series per
+1. **`lab/walkforward.py`** — folds, per-fold metrics from a monthly curve, the selection rule, and
+   the per-method record. **Done 2026-10-09**, 23 tests. Pure: takes curves and dates, no I/O. It must accept a deposits series per
    the warning above and subtract it before measuring any fold. Unit tests with synthetic curves,
    including a method built to win on average and lose every fold, and one funded book that earned
    nothing and must read as nothing (`test_backtest_regime.py` has that test to copy).

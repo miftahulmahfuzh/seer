@@ -187,6 +187,28 @@ def bucket(curve: Sequence[tuple[date, float]], credited: Mapping[date, float]) 
     return out
 
 
+def defunded(
+    curve: Sequence[tuple[date, float]], deposits: Mapping[date, float] | None = None
+) -> list[tuple[date, float]]:
+    """``curve`` rebuilt as what the book did with the money it already had.
+
+    Each step grows the previous value by ``(value - deposit) / previous``, so the series keeps the
+    same opening mark and the deposits never appear as growth. A lump-sum curve, or one with no
+    deposits, comes back unchanged. This is the series to measure a drawdown or a CAGR on: those
+    need values, not per-step returns, which is why ``split`` cannot simply be reused for them.
+    """
+    if not deposits or len(curve) < 2:
+        return list(curve)
+    out = [curve[0]]
+    value = curve[0][1]
+    for i in range(1, len(curve)):
+        d, v = curve[i]
+        prev = curve[i - 1][1]
+        value = value * ((v - deposits.get(d, 0.0)) / prev) if prev > 0 else value
+        out.append((d, value))
+    return out
+
+
 def split(
     curve: Sequence[tuple[date, float]],
     label: Mapping[date, str],

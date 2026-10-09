@@ -69,8 +69,20 @@ is a date slice of that curve, so per-fold CAGR, max drawdown and MAR are arithm
 database already holds. No backtest, no research store for the metrics themselves, no trial row, no
 status move, no look.
 
-Two honest limits of that shortcut, which the implementation must state in its output rather than
-paper over:
+**A funded curve must have its deposits taken out first.** This is not optional and it is not a
+detail: from M0032 on every trial is funded with the owner's 5,000,000 IDR a month, and a recorded
+curve counts each deposit as if the book had earned it. Sliced raw against `REF-SPY-HOLD`, which
+received nothing, the batch of 2026-10-09 read as beating the market by seventy to eighty points a
+year in the early era -- 148,000 dollars of the owner's own money counted as profit on one side of
+a comparison and not the other. Use `regime.bucket` and `lab.runner.recorded_contributions`, which
+already do this correctly for `lab regime` and `survivorship_coverage.py`: a recorded curve is
+normalised to the opening cash, so one deposit is `amount_idr / INITIAL_IDR` -- 0.5 for the owner's
+schedule -- and no exchange rate enters, because the run converted both at one rate. **Every trial
+from here on will be funded**, so a walk-forward that skips this is wrong by default rather than in
+an edge case.
+
+Two further honest limits of the curve shortcut, which the implementation must state in its output
+rather than paper over:
 
 - **Profit factor and trade count cannot be sliced** from a monthly curve; they need fills. So the
   per-fold selection rule ranks on MAR among candidates whose *whole-window* record cleared the
@@ -146,8 +158,10 @@ nobody anything.
 ## Phases
 
 1. **`walkforward.py`** — folds, per-fold metrics from a monthly curve, the selection rule, and the
-   per-method record. Pure: takes curves and dates, no I/O. Unit tests with synthetic curves,
-   including a method built to win on average and lose every fold.
+   per-method record. Pure: takes curves and dates, no I/O. It must accept a deposits series per
+   the warning above and subtract it before measuring any fold. Unit tests with synthetic curves,
+   including a method built to win on average and lose every fold, and one funded book that earned
+   nothing and must read as nothing (`test_backtest_regime.py` has that test to copy).
 2. **`lab walkforward`** — reads `trials.curve_json` and `REF-SPY-HOLD`, prints the table. Needs no
    research store. Follow `_regime` for the shape; it is deliberately the same kind of command.
    **It must also print the buy signal**: conditions (a) and (b) it can decide itself; (c) it can

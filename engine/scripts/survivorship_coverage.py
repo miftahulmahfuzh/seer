@@ -70,6 +70,43 @@ def spy_total_return(market, dividends, dates: list[date]) -> list[float]:
     return out
 
 
+def defund(conn, trial_n: int, start: date, end: date,
+           curve: list[tuple[date, float]]) -> list[tuple[date, float]]:
+    """``curve`` with the owner's deposits taken back out, or unchanged for a lump-sum trial.
+
+    A funded curve rises because money arrived as well as because the book earned, and the SPY
+    curve it is compared against here receives nothing. Slicing it raw therefore reads the owner's
+    own deposits as edge: on the batch of 2026-10-09 that was seventy to eighty points a year in
+    the early era, on 148,000 dollars of his money. Every trial from M0032 on is funded, so this is
+    the normal case now, not an edge case.
+
+    A recorded curve is normalised to the opening cash, so one deposit is
+    ``amount_idr / INITIAL_IDR`` and no exchange rate enters: the run converted both at one rate.
+    The rebuilt series is ``value - deposits_in_step``, compounded forward from the same opening.
+    """
+    from seer_engine import dates as nyse
+    from seer_engine.backtest.regime import bucket
+    from seer_engine.backtest.runner import INITIAL_IDR
+    from seer_engine.lab.runner import recorded_contributions
+
+    schedule = recorded_contributions(conn, trial_n)
+    if schedule is None:
+        return curve
+    unit = float(schedule.amount_idr / INITIAL_IDR)
+    credited: dict[date, float] = {}
+    for d in schedule.dates_in(start, end):
+        session = d if nyse.is_session(d) else nyse.next_session(d)
+        if session <= end:
+            credited[session] = credited.get(session, 0.0) + unit
+    per_step = bucket(curve, credited)
+    out, v = [curve[0]], curve[0][1]
+    for i in range(1, len(curve)):
+        d = curve[i][0]
+        v *= (curve[i][1] - per_step.get(d, 0.0)) / curve[i - 1][1]
+        out.append((d, v))
+    return out
+
+
 def cagr_and_fall(values: list[float], years: float) -> tuple[float, float]:
     """Compound annual growth and the worst peak-to-trough fall over ``values``."""
     peak, fall = values[0], 0.0
@@ -104,13 +141,16 @@ def main() -> None:
             shown = False
             for roster_id, candidate in ROSTER:
                 row = conn.execute(
-                    'SELECT curve_json FROM trials WHERE window = "dev" AND candidate_id = ?',
+                    'SELECT n, start, end, curve_json FROM trials '
+                    'WHERE window = "dev" AND candidate_id = ?',
                     (candidate,),
                 ).fetchone()
                 if row is None:
                     print(f"   {roster_id:10} no recorded dev trial for {candidate}")
                     continue
                 curve = [(date.fromisoformat(d), v) for d, v in json.loads(row["curve_json"])]
+                curve = defund(conn, int(row["n"]), date.fromisoformat(row["start"]),
+                               date.fromisoformat(row["end"]), curve)
                 seg = [(d, v) for d, v in curve if start <= d <= end]
                 if len(seg) < 24:
                     print(f"   {roster_id:10} too few months in this era")

@@ -137,3 +137,59 @@ def test_headwind_is_the_latest_trailing_mean():
 def test_persistence_refuses_a_window_too_short_to_mean_anything():
     with pytest.raises(ValueError, match="at least 2"):
         regime.persistence({MONTHS[0]: 0.01}, months=1)
+
+
+# --------------------------------------------------------------------------- funded curves
+
+def test_a_funded_curve_sliced_raw_counts_the_owners_deposits_as_growth():
+    """The defect this guards. A book that earned NOTHING still reads as a winner."""
+    # 100 in, +10 deposited every month, no investment return at all.
+    curve = [(MONTHS[i], 100.0 + 10.0 * i) for i in range(4)]
+    label = {MONTHS[i]: regime.BROAD for i in range(1, 4)}
+    raw = regime.split(curve, label)
+    # 130/100 - 1: thirty points of "return" on a book that never earned a cent.
+    assert raw[regime.BROAD].total_return == pytest.approx(0.30)
+
+
+def test_deposits_make_a_book_that_earned_nothing_read_as_nothing():
+    curve = [(MONTHS[i], 100.0 + 10.0 * i) for i in range(4)]
+    label = {MONTHS[i]: regime.BROAD for i in range(1, 4)}
+    dep = {MONTHS[i]: 10.0 for i in range(1, 4)}
+    got = regime.split(curve, label, dep)
+    assert got[regime.BROAD].total_return == pytest.approx(0.0, abs=1e-12)
+    assert got[regime.BROAD].annualised == pytest.approx(0.0, abs=1e-12)
+
+
+def test_deposits_leave_real_growth_alone():
+    """+10 deposited and +10% earned each month: the deposit goes, the growth stays."""
+    curve, v = [(MONTHS[0], 100.0)], 100.0
+    for i in range(1, 4):
+        v = v * 1.10 + 10.0
+        curve.append((MONTHS[i], v))
+    label = {MONTHS[i]: regime.BROAD for i in range(1, 4)}
+    got = regime.split(curve, label, {MONTHS[i]: 10.0 for i in range(1, 4)})
+    assert got[regime.BROAD].total_return == pytest.approx(1.10 ** 3 - 1)
+
+
+def test_bucket_assigns_a_deposit_to_the_step_it_landed_in():
+    curve = [(MONTHS[0], 1.0), (MONTHS[1], 1.0), (MONTHS[2], 1.0)]
+    credited = {date(2020, 2, 3): 5.0, date(2020, 2, 25): 7.0, date(2020, 3, 10): 11.0}
+    assert regime.bucket(curve, credited) == {MONTHS[1]: 12.0, MONTHS[2]: 11.0}
+
+
+def test_bucket_drops_a_deposit_that_is_already_in_the_opening_balance():
+    """A deposit on or before the first point is part of curve[0], not growth over it."""
+    curve = [(MONTHS[1], 1.0), (MONTHS[2], 1.0)]
+    assert regime.bucket(curve, {MONTHS[0]: 9.0, date(2020, 1, 5): 4.0}) == {}
+
+
+def test_panel_strips_deposits_from_the_book_but_not_from_the_benchmark():
+    """The benchmark curve is a lump sum; it must not have deposits removed from it."""
+    book = [(MONTHS[i], 100.0 + 10.0 * i) for i in range(4)]
+    bench = [(MONTHS[i], 100.0 * 1.05 ** i) for i in range(4)]
+    label = {MONTHS[i]: regime.BROAD for i in range(1, 4)}
+    got = regime.panel(book, bench, label, {MONTHS[i]: 10.0 for i in range(1, 4)})
+    mine, theirs, gap = got[regime.BROAD]
+    assert mine.total_return == pytest.approx(0.0, abs=1e-12)
+    assert theirs.total_return == pytest.approx(1.05 ** 3 - 1)
+    assert gap < 0  # earning nothing loses to a benchmark that earned 5% a month

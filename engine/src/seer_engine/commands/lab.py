@@ -1645,6 +1645,47 @@ def _names(conn, args) -> int:
     log.info("lab names: %d runs done (%.1fs)", len(sweep.points), time.perf_counter() - t0)
     return 0
 
+def _trial_deposits(conn, row, curve) -> dict:
+    """What a funded trial received inside each curve step, in the curve's own units.
+
+    A recorded curve is normalised to the opening cash, so one deposit is
+    ``amount_idr / INITIAL_IDR`` -- 0.5 for the owner's 5,000,000 against a 10,000,000 start --
+    and no exchange rate is involved, because the run converted both at the same rate. (M0032's
+    curve opens at 1.5 for exactly this reason: January's deposit is already in the first point.)
+
+    ``{}`` for a lump-sum trial, which is every trial recorded before the contribution schedule
+    existed. Without this, slicing a funded curve counts the owner's deposits as growth and
+    compares the result against a benchmark that received none -- see ``regime.split``.
+    """
+    from seer_engine import dates as nyse
+    from seer_engine.backtest.regime import bucket
+    from seer_engine.backtest.runner import INITIAL_IDR
+    from seer_engine.lab import runner as labrunner
+
+    schedule = labrunner.recorded_contributions(conn, int(row["n"]))
+    if schedule is None:
+        return {}
+    start, end = date.fromisoformat(row["start"]), date.fromisoformat(row["end"])
+    unit = float(schedule.amount_idr / INITIAL_IDR)
+    due = schedule.dates_in(start, end)
+    credited: dict[date, float] = {}
+    for d in due:
+        session = d if nyse.is_session(d) else nyse.next_session(d)
+        if session > end:
+            continue
+        credited[session] = credited.get(session, 0.0) + unit
+    recorded = store.funding_of(conn, int(row["n"]))
+    expected = int(recorded["deposits_n"])
+    if len(due) != expected:
+        raise store.LabError(
+            f"{row['candidate_id']}: reconstructed {len(due)} deposits from "
+            f"{recorded['schedule']!r} over {start}..{end}, but the trial records {expected}. "
+            f"The schedule in sim.contributions has moved since this trial ran, so its curve "
+            f"cannot be de-funded safely; `lab regime` will not guess"
+        )
+    return bucket(curve, credited)
+
+
 def _regime(conn, args) -> int:
     """``lab regime``: every recorded dev result, split by whether the market was narrow or broad.
 
@@ -1659,7 +1700,7 @@ def _regime(conn, args) -> int:
 
     rows = [
         r for r in conn.execute(
-            "SELECT method_id, candidate_id, curve_json, mar, cagr FROM trials "
+            "SELECT n, method_id, candidate_id, start, end, curve_json FROM trials "
             "WHERE window = 'dev' AND curve_json IS NOT NULL ORDER BY method_id, n"
         )
     ]
@@ -1688,6 +1729,11 @@ def _regime(conn, args) -> int:
     runs = regime.persistence(spread)
     log.info("breadth measured over %d months (%.1fs)", len(label), time.perf_counter() - t0)
 
+    funded = sum(1 for r in rows if store.funding_of(conn, int(r["n"])) is not None)
+    if funded:
+        print(f"{funded} of these trials were funded with the owner's monthly deposits; their "
+              f"curves\nhave the deposits removed before slicing, so a deposit is never read as "
+              f"a gain.\n")
     print(f"Market breadth on the dev window, {len(label)} months labelled: "
           f"{counts[regime.NARROW]} narrow, {counts[regime.BROAD]} broad.")
     print("A month is NARROW when the index beat the equal-weighted average of its own members")
@@ -1703,7 +1749,7 @@ def _regime(conn, args) -> int:
         if wanted and r["method_id"] not in wanted:
             continue
         curve = [(date.fromisoformat(d), float(v)) for d, v in json.loads(r["curve_json"])]
-        pan = regime.panel(curve, bench_curve, label)
+        pan = regime.panel(curve, bench_curve, label, _trial_deposits(conn, r, curve))
         cells, gaps = [], {}
         for name in regime.REGIMES:
             mine, theirs, gap = pan[name]

@@ -171,13 +171,44 @@ def labels(spread: Mapping[date, float]) -> dict[date, str]:
     return {d: (NARROW if v > 0 else BROAD) for d, v in spread.items()}
 
 
-def split(curve: Sequence[tuple[date, float]], label: Mapping[date, str]) -> dict[str, Span]:
+def bucket(curve: Sequence[tuple[date, float]], credited: Mapping[date, float]) -> dict[date, float]:
+    """Deposits credited inside each curve step, keyed by the step's end date.
+
+    A deposit landing in ``(curve[i-1].date, curve[i].date]`` belongs to step ``i``; a deposit on
+    or before the first point belongs to the opening balance and is dropped, because it is already
+    in ``curve[0]`` rather than being growth over it.
+    """
+    out: dict[date, float] = {}
+    for i in range(1, len(curve)):
+        lo, hi = curve[i - 1][0], curve[i][0]
+        got = sum(a for d, a in credited.items() if lo < d <= hi)
+        if got:
+            out[hi] = float(got)
+    return out
+
+
+def split(
+    curve: Sequence[tuple[date, float]],
+    label: Mapping[date, str],
+    deposits: Mapping[date, float] | None = None,
+) -> dict[str, Span]:
     """``curve``'s compounded return inside each regime's months.
 
     The months of one regime are chained as if the other months had not happened, which is the
     only honest way to ask "what does this method do in this weather": it is not a tradable
     result, it is a description of where the return came from.
+
+    ``deposits`` is what a funded run received inside each step (``bucket``), and it is **not
+    optional for a funded trial**. A funded curve rises because money arrived as well as because
+    the book earned, so slicing it raw counts the owner's own deposits as growth -- and then
+    compares that against a benchmark curve which received none. Measured on the lab's own record
+    that is not a rounding error: a funded dev trial records ``cagr`` 0.376 beside an ``mwr`` of
+    0.137, and the batch of 2026-10-09 read as beating the market by seventy to eighty points a
+    year in the early era, which was 148,000 dollars of the owner's money counted as profit on one
+    side of a comparison and not the other. With ``deposits`` each step's return is measured on
+    what the book did with the money it already had: ``(value - deposit) / previous``.
     """
+    dep = deposits or {}
     by: dict[str, list[float]] = {r: [] for r in REGIMES}
     for i in range(1, len(curve)):
         d, v = curve[i]
@@ -185,7 +216,7 @@ def split(curve: Sequence[tuple[date, float]], label: Mapping[date, str]) -> dic
         r = label.get(d)
         if r is None or prev <= 0:
             continue
-        by[r].append(v / prev - 1.0)
+        by[r].append((v - dep.get(d, 0.0)) / prev - 1.0)
     out: dict[str, Span] = {}
     for r, rs in by.items():
         if not rs:
@@ -201,6 +232,7 @@ def panel(
     curve: Sequence[tuple[date, float]],
     bench: Sequence[tuple[date, float]],
     label: Mapping[date, str],
+    deposits: Mapping[date, float] | None = None,
 ) -> dict[str, tuple[Span, Span, float | None]]:
     """Per regime: ``(the method's span, the benchmark's span, the method minus the benchmark)``.
 
@@ -208,7 +240,7 @@ def panel(
     months and loses in narrow ones is not a good method with bad luck; it is a bet on breadth,
     and the only question left is how often each weather comes.
     """
-    mine, theirs = split(curve, label), split(bench, label)
+    mine, theirs = split(curve, label, deposits), split(bench, label)
     out: dict[str, tuple[Span, Span, float | None]] = {}
     for r in REGIMES:
         a, b = mine[r], theirs[r]

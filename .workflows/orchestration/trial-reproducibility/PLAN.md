@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/trial-reproducibility`
 **Branch:** `feature/trial-reproducibility` (base: `origin/main` @ `e5eda52`)
 **Phases:** 4
-**Status:** planned
+**Status:** phase 4/4 complete
 **Coordinator:** —
 
 ---
@@ -81,10 +81,10 @@ changing `INITIAL_IDR`; a path for re-recording the benchmark on a rebuilt store
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Starting capital is a run input | R1 | `backtest` | 2 | — | EASY | `.workflows/plan/trial-reproducibility/phase-1.md` | — | — |
-| 2 | Per-trial provenance, and re-runs at the recorded capital | R1, R4 | `lab`, `research`, `commands` (`_costs` only), `tests/labkit` | 18 | 1 | HARD | `.workflows/plan/trial-reproducibility/phase-2.md` | — | — |
-| 3 | Compare like with like: gate refuses, reports warn, `lab run` pins the store | R1, R2 | `lab` (`hardgate`), `commands` | 5 | 2 | NORMAL | `.workflows/plan/trial-reproducibility/phase-3.md` | — | — |
-| 4 | Verify on copies, record the finding, stage the migrated lab | R1, R2, R3, R4 | docs, skills, `lab/lab.sqlite` | 8 | 2, 3 | NORMAL | `.workflows/plan/trial-reproducibility/phase-4.md` | — | — |
+| 1 | Starting capital is a run input — **done 2026-10-09** | R1 | `backtest` | 2 | — | EASY | `.workflows/plan/trial-reproducibility/phase-1.md` | `P2-ENG-61GM` | — |
+| 2 | Per-trial provenance, and re-runs at the recorded capital — **done 2026-10-09** | R1, R4 | `lab`, `research`, `commands` (`_costs` only), `tests/labkit` | 18 | 1 | HARD | `.workflows/plan/trial-reproducibility/phase-2.md` | `P2-ENG-JC9B` | — |
+| 3 | Compare like with like: gate refuses, reports warn, `lab run` pins the store — **done 2026-10-09** | R1, R2 | `lab` (`hardgate`), `commands` | 5 | 2 | NORMAL | `.workflows/plan/trial-reproducibility/phase-3.md` | `P2-ENG-0HTR` | — |
+| 4 | Verify on copies, record the finding, stage the migrated lab — **done 2026-10-09** | R1, R2, R3, R4 | docs, skills, `lab/lab.sqlite` | 8 | 2, 3 | NORMAL | `.workflows/plan/trial-reproducibility/phase-4.md` | `P2-ROOT-FCG9` | — |
 
 Every dependency points backward. Phases run strictly 1 → 2 → 3 → 4: phase 3 quotes
 `hardgate.py`, `commands/lab.py` and `test_lab_hardgate.py` as phase 2 leaves them.

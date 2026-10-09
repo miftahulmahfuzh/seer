@@ -7,11 +7,13 @@
     "dev:env": "node scripts/with-env.mjs npx next dev -p 3111",
     "signin": "node scripts/with-env.mjs node scripts/signin.mjs",
     "shoot": "node scripts/with-env.mjs node scripts/shoot.mjs",
+    "film": "node scripts/with-env.mjs node scripts/film.mjs",
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
-    "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
-    "db:seed-demo": "node --env-file=.env.local scripts/seed-demo.mjs"
+    "db:migrate": "node scripts/with-env.mjs node scripts/migrate.mjs",
+    "db:seed-demo": "node scripts/with-env.mjs node scripts/seed-demo.mjs",
+    "db:seed-demo-sean": "node scripts/with-env.mjs node scripts/seed-demo-sean.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",

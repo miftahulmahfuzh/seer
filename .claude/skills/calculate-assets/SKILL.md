@@ -82,5 +82,19 @@ which every method here was built on, and a result there is the method marking i
 ## The chart
 
 `--out FILE` writes the series as JSON: `book_real`, `book_fixed`, `spy`, `deposited`, monthly
-points in rupiah. Publish it as an Artifact — four lines over the whole span, with the ending
-balances called out. Load the `artifact-design` skill before writing the page, as always.
+points in rupiah. `build_page.py` turns that JSON into the artifact page:
+
+```bash
+python3 .claude/skills/calculate-assets/build_page.py /tmp/assets.json /tmp/assets.html
+```
+
+Then publish `/tmp/assets.html` with the Artifact tool. Every figure on the page is computed from
+the JSON — no number is ever retyped, so the page cannot drift from the run that produced it.
+
+The chart's palette is validated, not eyeballed: teal `#0d9488` / burnt orange `#c2410c` on light,
+`#19a89a` / `#d4731f` on dark, all four checks passing in both modes under the `dataviz` skill's
+`validate_palette.js`. The two rupiah treatments are one hue split by a dash pattern, because they
+are the same book under different assumptions — not two different things.
+
+If you change the page, note that SVG text lives in viewBox units: tick labels need their own
+larger sizes under the phone media query or they render at about 4px.

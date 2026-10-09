@@ -391,7 +391,7 @@ def main(argv: list[str] | None = None) -> int:
         market.spy(), ran_from, ran_to, real_res.initial_cash, spy_divs,
         cost_model=candidate.rules.cost_model, contributions=real_res.cashflows,
     )
-    spy_curve = [(d, float(v)) for d, v in spy_total]
+    spy_curve = [(s.date, float(s.equity_usd)) for s in spy_total.snapshots]
 
     book_real = pin_open(curve_idr(real_curve, market.usd_idr_on, None))
     book_fixed = pin_open(curve_idr(fixed_curve, None, open_rate))

@@ -188,6 +188,43 @@ Then:
    promote it. If it still passes, register its real-fee twin as a one-variant variation method
    on the `-gotrade` preset, run it on dev, and promote that one if it is still eligible. Paper
    pays real fees, so the look is spent on the configuration paper would trade, or not at all.
+0b. **Durability check, and the one moment buying data is worth it.** A twenty-year average hides
+   a regime, and this lab has the scar: four of four test-window looks have failed on
+   `beats SPY TR`, and all four roster strategies lost to a deposit-matched SPY over 2018-2026
+   (insight 58). Before spending a look, run all three. Every one is report only -- no trial, no
+   look, N unchanged:
+
+   - `lab regime MNNNN` -- narrow versus broad markets. Read it knowing it does **not**
+     discriminate on its own: almost every recorded method reads "pays in both", M0007-N20-RAW
+     included at +6.6% narrow and +7.7% broad, and it went on to lose. Its value is the
+     persistence line at the foot, which is what actually separates eras.
+   - `engine/.venv/bin/python engine/scripts/survivorship_coverage.py` -- the edge by era of rising
+     data coverage. The dev store prices 48% of index members in 1996 and 74% in 2014, and the 522
+     it cannot price are disproportionately the companies that died (AABA, AAMRQ...). **A method
+     whose edge lives in the low-coverage years and vanishes by 2009-2015 may be reading a hole in
+     the data rather than the market.** Three of the four roster strategies were already negative
+     in 2009-2015, on dev, years before the test window said so.
+   - `lab walkforward MNNNN` once it exists (`docs/plans/WALK_FORWARD_EVALUATION_PLAN.md`):
+     require a majority of folds beaten, not a good twenty-year average.
+
+   **THE BUY SIGNAL — say it loudly, do not sit on it.** The moment a method clears all three of:
+
+   > **(a)** dev-eligible at the bars in force, **(b)** a majority of walk-forward folds beaten,
+   > and **(c)** a *positive* edge in the highest-coverage era (2009-2015), so the edge is not an
+   > artefact of the missing half
+
+   ...that is the moment survivorship-free price history becomes worth paying for, and not before.
+   Until then the lab has enough free evidence to reject a method without it; after then, the next
+   two things that happen are a counted look and the owner's real money, and a one-month bulk
+   download (roughly $30-150 -- Norgate, Sharadar via Nasdaq Data Link, or EOD Historical Data;
+   all subscription, so pull the history and cancel, and read the licence first) costs less than
+   being wrong about either.
+
+   When it fires: record a `lab insight --kind risk` titled "Buy signal: MNNNN cleared the
+   durability gate", name which of (a)(b)(c) it cleared with the numbers, and put it at the TOP of
+   the batch report. **Do not block on it and do not ask** -- the iron rule still holds, you never
+   wait for a human -- but the owner must not be able to miss it.
+
 1. `python -m seer_engine lab promote MNNNN`. Read what it printed, then **commit and push
    `docs/lab/prereg/MNNNN.md` before any test number exists** (design §3) — the command prints the
    exact `git add` / `git commit` lines. `lab test` refuses while the file is uncommitted, so this

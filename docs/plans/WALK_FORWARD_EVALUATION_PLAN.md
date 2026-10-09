@@ -105,6 +105,44 @@ zero the finding is about the lab, not about any method, and belongs in a synthe
 **Does the pick stay stable?** Worth reporting: a method whose fold winner changes every fold is
 telling you the choice between its variants is noise.
 
+## The buy signal: the one moment data is worth paying for
+
+The owner asked to be told, automatically, when buying survivorship-free price history stops being
+premature and starts being worth it. This is that rule, and `lab walkforward` is where it gets
+computed, because condition (b) is the piece only this plan can supply.
+
+**A method fires the buy signal when all three hold at once:**
+
+| | Condition | Where it comes from |
+|---|---|---|
+| **(a)** | dev-eligible at the bars in force | `lab show` / the lab's five conditions + DSR |
+| **(b)** | beats SPY in a **majority of walk-forward folds** | `lab walkforward`, phase 2 of this plan |
+| **(c)** | a **positive edge in the highest-coverage era** (2009-2015) | `engine/scripts/survivorship_coverage.py` |
+
+**Why that conjunction and not something simpler.** Condition (c) is the one that makes the
+purchase *about data*. The dev store prices 48% of index members in 1996 and 74% in 2014, and the
+522 it cannot price are disproportionately the companies that died -- AABA (ex-Yahoo!), AAMRQ (AMR
+in bankruptcy), and 520 more. A method whose edge lives in the thin early years and dies by
+2009-2015 is probably reading that hole, and no purchase is needed to reject it: it already failed
+for free. Three of the four roster strategies were negative in 2009-2015 on the dev window, years
+before the test window said the same thing out loud, and nobody looked.
+
+But a method that passes (a), (b) **and** (c) has used up the free evidence. The missing half is
+then the live question, and the next two things that happen are a counted test look -- which is
+spent once and never returned -- and the owner's real money. Roughly $30-150 for a one-month bulk
+download (Norgate, Sharadar via Nasdaq Data Link, or EOD Historical Data; all subscription, so
+pull the history and cancel, and read the licence before relying on continued use) is cheap against
+either.
+
+**Until the signal fires, do not buy.** That is the point of the rule: it stops the purchase being
+made out of enthusiasm, and it stops it being deferred out of thrift when it finally matters.
+
+**Where it is enforced.** `lab walkforward` prints the verdict per method and a one-line summary.
+The explore skill's Promotion **step 0b** requires all three before a look is spent, and Sera's
+synthesis must state the answer every batch, even when it is "no buy signal this batch" -- both
+already updated. Sera reports it and never blocks on it: the iron rule is still that she asks
+nobody anything.
+
 ## Phases
 
 1. **`walkforward.py`** — folds, per-fold metrics from a monthly curve, the selection rule, and the
@@ -112,6 +150,11 @@ telling you the choice between its variants is noise.
    including a method built to win on average and lose every fold.
 2. **`lab walkforward`** — reads `trials.curve_json` and `REF-SPY-HOLD`, prints the table. Needs no
    research store. Follow `_regime` for the shape; it is deliberately the same kind of command.
+   **It must also print the buy signal**: conditions (a) and (b) it can decide itself; (c) it can
+   decide too, since the era split is the same curve-slicing arithmetic `survivorship_coverage.py`
+   already does. Emit one obvious line per method -- `BUY SIGNAL: MNNNN cleared (a)(b)(c)` or
+   `no buy signal (fails b: 1 of 4 folds)` -- so neither a human nor Sera has to assemble the
+   judgement by hand.
 3. **Run it on all 29 methods and write the synthesis** as a `lab insight --kind synthesis`. Expect
    the headline to be uncomfortable.
 4. **Only if phase 3 justifies it:** make a walk-forward majority a *reported* condition on

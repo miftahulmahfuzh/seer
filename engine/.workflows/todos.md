@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 110
+- Completed: 111
 
 ---
 
@@ -915,6 +915,24 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P2-ENG-L1VT** Phase 1: Promoted variant's own folds (D11), ingredients as kin (D12), buy signal follows (D13)
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns `lab/hardgate.py`, `lab/prereg.py`, `commands/lab.py`, `engine/tests/test_lab_hardgate.py`, `engine/tests/test_lab_status.py`. Does not touch `walkforward.py`, `lab/lab.sqlite`, the schema, or method files. Exit criteria: suites green, ruff clean, no-override grep empty; on a scratch copy, `lab status` prints `Promotable now: (none)` with M0044 refused on D11 and M0024/M0028 `kin blocked: M0022`; `lab walkforward` prints "No buy signal."
+  - **Status**: completed
+  - **Plan Set**: `HARDGATE_VARIANT_AND_BLEND_KIN_PLAN.md` (phase 1 of 1)
+  - **Satisfies**: R1, R2 — R1: Insight 82: the exact variant being promoted must also win a strict majority of the folds on its own de-funded curve; measure each rule version's cost. R2: Insight 84: kin looks inside blends — a test-failed ingredient (and its kin) is kin; find or record ingredients machine-readably
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P2-ENG-L1VT.md`
+  - **Completed**: 2026-10-09 21:42
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/hardgate.py, engine/src/seer_engine/lab/prereg.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_hardgate.py, engine/tests/test_lab_status.py
+  - **Verified**: ruff clean on the 5 files; no-override grep on hardgate.py empty; hardgate/status/prereg/walkforward tests 144 passed; `pytest tests -k lab` 709 passed, 7 skipped (PG_TEST_URL unset). Scratch copy of main's lab.sqlite @ 005e5cc (75 methods): `Promotable now: (none)`; M0044 refused on D11 ("M0044-TV14-N21 alone 1 of 4 folds"); M0024/M0028 "kin blocked: M0022 read test-failed"; `lab walkforward` "No buy signal."; 10 of 10 dev-eligible refused. walkforward.py byte-identical to 9560a6b; live lab.sqlite untouched.
+  - **Drift**:
+    - Lab grew from 70 to 75 methods since planning (Sera, main lab.sqlite @ 005e5cc). Re-measured per plan Step 6: dev-eligible counts unchanged (folds 5/6/7 of 10, kin 8 of 10, gate 10 of 10); kin-blocked 29->31 now "of 75"; new ingredient M0054 -> M0036 added to D12's map. Docstring updated to measured values.
+  - **Decided**:
+    - Plan's re-wrapped kin refusal split "There is no " / "override" across two f-strings, failing test_there_is_no_override -> re-wrapped so "There is no override" sits in one string, wording unchanged (rung 1: invariant 1, no override).
+    - Reflowed two D12 docstring lines over 100 chars (plan note: keep lines <= 100).
 - [x] **P2-ENG-0HTR** Phase 3: Compare like with like: gate refuses, reports warn, `lab run` pins the store
   - **Difficulty**: NORMAL
   - **Type**: Feature

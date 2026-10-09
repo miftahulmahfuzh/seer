@@ -151,6 +151,15 @@ def test_the_module_answers_the_four_open_questions():
     assert "no override path" in doc.lower()
 
 
+def test_the_module_records_the_variant_and_ingredient_decisions():
+    """Insights 82 and 84: each rule change is argued, measured, in the docstring (D11-D13)."""
+    doc = hardgate.__doc__ or ""
+    for marker in ("(D11)", "(D12)", "(D13)"):
+        assert marker in doc
+    assert "M0044-TV14-N21" in doc       # D11's live case, named
+    assert "BLEND-RM" in doc             # D12's live case, named
+
+
 # ------------------------------------------------------------------ the geometry
 
 
@@ -287,6 +296,158 @@ def test_a_parent_cycle_does_not_hang_the_kin_walk(conn):
     with conn:
         store.update_method(conn, "M0001", parent_id="M0002")
     assert hardgate.failed_kin(conn, "M0002") == ()
+
+
+# ------------------------------------------------------------------ (D11) the promoted variant
+
+
+def _variant(conn, mid: str, suffix: str, *, annual: float, config_text: str = "t",
+             curves: bool = True) -> None:
+    """A second dev trial of an existing method -- another variant -- stamped on the lab's prices."""
+    with conn:
+        ns = store.insert_trials(conn, [_trial(
+            method_id=mid, candidate_id=f"{mid}-{suffix}", config_digest=f"d-{mid}-{suffix}",
+            config_text=config_text,
+            curve_json=_curve(_months(*DEV_SPAN), annual) if curves else "[]",
+        )])
+        stamp_provenance(conn, ns, price_fingerprint=SAME_PRICES)
+
+
+def test_a_variant_is_scored_on_its_own_curve_not_on_its_siblings_picks(conn):
+    """Insight 82's shape: the picks win every fold, the variant that would be promoted loses all.
+
+    Both curves are monotone, so every training slice ranks both at an infinite MAR and `pick`
+    breaks the tie on the candidate id: `M0001-A` (the 15% curve) is picked in every fold. The
+    2% curve `M0001-Z` is never picked -- and is what `variant_record` must score.
+    """
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _variant(conn, "M0001", "Z", annual=0.02)
+    picks = hardgate.fold_record(conn, "M0001")
+    own = hardgate.variant_record(conn, "M0001", "M0001-Z")
+    assert picks.won == 4 and picks.majority
+    assert own.won == 0 and not own.majority
+    assert len(own.scored) == hardgate.MIN_FOLDS
+    assert {p.picked for p in own.picks} == {"M0001-Z"}
+
+
+def test_a_variant_with_no_curve_cannot_be_scored(conn):
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    with pytest.raises(store.LabError) as e:
+        hardgate.variant_record(conn, "M0001", "M0001-Q")
+    assert "M0001-Q" in str(e.value)
+
+
+def test_a_variant_on_other_prices_is_refused(conn):
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    with conn:
+        ns = store.insert_trials(conn, [_trial(
+            method_id="M0001", candidate_id="M0001-Z", config_digest="d-z",
+            curve_json=_curve(_months(*DEV_SPAN), 0.15),
+        )])
+        stamp_provenance(conn, ns, price_fingerprint=OTHER_PRICES)
+    with pytest.raises(store.LabError) as e:
+        hardgate.variant_record(conn, "M0001", "M0001-Z")
+    assert "D10" in str(e.value)
+
+
+def test_the_gate_is_silent_on_the_variant_when_nothing_would_be_pre_registered(conn, monkeypatch):
+    """`promote_method` refuses a method with no eligible variant one line later (D11)."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    monkeypatch.setattr(store, "best_dev_eligible", lambda _c, _m, **_k: None)
+    assert hardgate.promoted_variant(conn, "M0001") is None
+    hardgate.check(conn, "M0001")  # the picks win 4 of 4, kin clean, no variant: no refusal here
+
+
+def test_the_gate_refuses_when_the_promoted_variant_loses_its_own_folds(conn, monkeypatch):
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _variant(conn, "M0001", "Z", annual=0.02)
+    best = conn.execute("SELECT * FROM trials WHERE candidate_id = 'M0001-Z'").fetchone()
+    monkeypatch.setattr(store, "best_dev_eligible", lambda _c, _m, **_k: best)
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0001")
+    msg = str(e.value)
+    assert "M0001-Z" in msg and "0 of 4" in msg and "D11" in msg
+    assert "4 of 4 folds" in msg            # the picks' record, which alone would have passed
+    line = hardgate.summary(conn, "M0001")
+    assert "M0001-Z alone 0 of 4 folds" in line
+
+
+# ------------------------------------------------------------------ (D12) ingredients are kin
+
+BLEND_OF = (
+    "rules=TradeRules(id='monthly-hold-frac-gotrade')\nallocator=<BLEND>\n"
+    "params=BlendParams(parts=(BlendPart(allocator=<{own}>,share=0.5),"
+    "BlendPart(allocator=<{other}>,share=0.5)))\n"
+)
+
+
+def test_a_blend_with_a_disproven_engine_in_it_is_kin_of_the_failure(conn):
+    """Insight 84's case: M0028-BLEND-RM runs M0007's engine; M0007's family failed via M0022."""
+    _benchmark(conn)
+    _method(conn, "M0022", family="residual", status="test-failed")
+    _method(conn, "M0007", family="residual", annual=0.15)
+    _method(conn, "M0028", family="reversal", annual=0.15)
+    _variant(conn, "M0028", "BLEND-RM", annual=0.15,
+             config_text=BLEND_OF.format(own="M0028", other="M0007"))
+    assert hardgate.ingredients(conn, "M0028") == ("M0007",)
+    assert hardgate.failed_kin(conn, "M0028") == ("M0022",)
+    assert hardgate.family_state(conn, "M0028") == "blocked: M0022 read test-failed"
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0028")
+    assert "M0022" in str(e.value) and "ingredient" in str(e.value)
+
+
+def test_a_disproven_ingredient_is_itself_kin(conn):
+    _benchmark(conn)
+    _method(conn, "M0029", family="blended", status="test-failed")
+    _method(conn, "M0028", family="reversal", annual=0.15)
+    _variant(conn, "M0028", "BLEND", annual=0.15,
+             config_text=BLEND_OF.format(own="M0028", other="M0029"))
+    assert hardgate.failed_kin(conn, "M0028") == ("M0029",)
+
+
+def test_only_lab_methods_are_ingredients(conn):
+    """`<BLEND>`, `<F1>` name seed allocators, not methods; `<M9999>` names no row; and a method's
+    own allocator is not its own ingredient."""
+    _benchmark(conn)
+    _method(conn, "M0028", family="reversal", annual=0.15)
+    _variant(conn, "M0028", "X", annual=0.15,
+             config_text="allocator=<BLEND>\nparams=(<F1>,<M9999>,<M0028>)\n")
+    assert hardgate.ingredients(conn, "M0028") == ()
+    assert hardgate.failed_kin(conn, "M0028") == ()
+
+
+def test_an_ingredients_other_variants_are_not_followed(conn):
+    """One hop (D12): M0028 runs M0030's engine; a *different* variant of M0030 blends M0007,
+    whose family failed. M0028 never runs M0007, so it is not M0007's kin. M0030 itself is."""
+    _benchmark(conn)
+    _method(conn, "M0022", family="residual", status="test-failed")
+    _method(conn, "M0007", family="residual", annual=0.15)
+    _method(conn, "M0030", family="core-satellite", annual=0.15)
+    _variant(conn, "M0030", "C50", annual=0.15,
+             config_text=BLEND_OF.format(own="M0030", other="M0007"))
+    _method(conn, "M0028", family="reversal", annual=0.15)
+    _variant(conn, "M0028", "ON-M0030", annual=0.15, config_text="allocator=<M0030>\n")
+    assert hardgate.failed_kin(conn, "M0030") == ("M0022",)
+    assert hardgate.failed_kin(conn, "M0028") == ()
+
+
+def test_a_nested_blend_names_every_engine_it_runs(conn):
+    """The config text renders nesting in full, so a blend of a blend still names M0007."""
+    _benchmark(conn)
+    _method(conn, "M0022", family="residual", status="test-failed")
+    _method(conn, "M0007", family="residual", annual=0.15)
+    _method(conn, "M0028", family="reversal", annual=0.15)
+    nested = ("allocator=<BLEND>\nparams=BlendParams(parts=(BlendPart(allocator=<M0028>),"
+              "BlendPart(allocator=<BLEND>,params=BlendParams(parts=(BlendPart(allocator=<M0007>),"
+              "))),))\n")
+    _variant(conn, "M0028", "NEST", annual=0.15, config_text=nested)
+    assert hardgate.failed_kin(conn, "M0028") == ("M0022",)
 
 
 # ------------------------------------------------------------------ what other phases call

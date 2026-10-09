@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/hardgate-variant-and-blend-kin`
 **Branch:** `feature/hardgate-variant-and-blend-kin` (base: `HEAD` @ `9560a6b`)
 **Phases:** 1
-**Status:** planned
+**Status:** complete
 **Coordinator:** —
 
 ---
@@ -66,7 +66,7 @@ Whole gate: 9 of 10 refused → **10 of 10**. `lab walkforward`: no buy signal b
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Promoted variant's own folds (D11), ingredients as kin (D12), buy signal follows (D13) | R1, R2 | `engine/src/seer_engine/lab` | 5 | — | NORMAL | `.workflows/plan/hardgate-variant-and-blend-kin/phase-1.md` | — | — |
+| 1 | Promoted variant's own folds (D11), ingredients as kin (D12), buy signal follows (D13) | R1, R2 | `engine/src/seer_engine/lab` | 5 | — | NORMAL | `.workflows/plan/hardgate-variant-and-blend-kin/phase-1.md` | P2-ENG-L1VT | — |
 
 ### Phase 1 — Promoted variant's own folds, ingredients as kin
 **Satisfies:** R1, R2 — one phase on purpose: both rewrite the same functions (`check`, `summary`, the module docstring) in one 700-line file, and splitting would make the second phase quote the first's output verbatim for no review benefit.

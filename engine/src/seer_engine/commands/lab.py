@@ -948,7 +948,8 @@ def _promotable_now(
 
     **Since 2026-10-09 the dev gate is not the last word, and this section says so.**
     ``lab promote`` also refuses a method that lost a majority of its walk-forward folds, or whose
-    kin has already failed the test window (``lab/hardgate.py``). Listing such a method under
+    variant that would be pre-registered lost them on its own curve, or whose kin has already
+    failed the test window (``lab/hardgate.py``). Listing such a method under
     "Promotable now (`lab promote` would take these)" would be a lie about exactly the methods
     this section exists to explain. So each dev-eligible method appears in one of two places and
     never both: **taken**, with its fold record and its kin state on the same line; or **refused**,
@@ -1008,8 +1009,9 @@ def _promotable_now(
     if refused:
         out.append(
             "  Refused by the hard gate (dev-eligible, but `lab promote` exits 2 on these -- it "
-            "wants a majority of walk-forward folds and no kin that has test-failed; there is no "
-            "override):"
+            "wants a majority of walk-forward folds, won by the picks and by the variant it would "
+            "pre-register, and no kin -- family, ancestry or blend ingredient -- that has "
+            "test-failed; there is no override):"
         )
         out += refused
     if held:
@@ -2046,9 +2048,10 @@ def _walkforward(conn, args) -> int:
         row = store.get_method(conn, mid)
         eligible = row is not None and row["status"] == "dev-eligible"
         # The SAME kin rule the promote gate uses (hardgate.failed_kin: family union transitive
-        # ancestors), not a second family-only query beside it. Decision D9 is what happens when
-        # these two disagree: the signal said M0030's family was clean while the gate refused it
-        # on ancestry, which is a worse answer than either one alone.
+        # ancestors union blend ingredients and theirs, hardgate D12), not a second query beside
+        # it. Decision D9 is what happens when these two disagree: the signal said M0030's family
+        # was clean while the gate refused it on ancestry, which is a worse answer than either one
+        # alone. That the signal widens with D12 is recorded as hardgate Decision D13.
         kin = hardgate.failed_kin(conn, mid) if row is not None else ()
         signal, why = wf.buy_signal(eligible, rec, edge, ", ".join(kin) if kin else None)
         if signal:

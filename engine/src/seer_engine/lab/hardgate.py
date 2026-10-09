@@ -4,9 +4,13 @@
 
 - **(F) the folds.** It beat the recorded benchmark in a strict majority of the walk-forward
   folds (``walkforward.Record.majority``), and it was scoreable on *every* fold the geometry
-  yields, and there were at least ``MIN_FOLDS`` of them.
-- **(K) the kin.** No other method in its ``family``, and no transitive ancestor through
-  ``parent_id``, reads ``test-failed``.
+  yields, and there were at least ``MIN_FOLDS`` of them. **And** the variant ``lab promote``
+  would pre-register (``store.best_dev_eligible``) clears the same bar on its own curve alone
+  -- see **(D11)**.
+- **(K) the kin.** No other method in its ``family``, no transitive ancestor through
+  ``parent_id``, no **ingredient** -- a lab method whose engine one of its variants runs, a
+  blend's parts included -- and nothing in an ingredient's own ``family`` or ancestry reads
+  ``test-failed`` -- see **(D12)**.
 
 **Decided 2026-10-09 by the owner, after seeing what it costs.** It blocks every promotion in the
 lab as of today, and that is the intended effect rather than a side effect: five out-of-sample
@@ -192,11 +196,133 @@ starting capital, not the store: ``INITIAL_IDR`` moved from 20M to 10M IDR and w
 rounding made that result-moving. That is recorded beside the price fingerprint
 (``trial_provenance.initial_idr``) and honoured by ``trial_deposits`` and every re-run; it is not
 a comparability question, because a recorded curve is normalised to its own opening cash.
+
+**(D11) Whose folds does (F) score? -- the training slice's pick in each fold, as before, AND
+the exact variant ``lab promote`` would pre-register, on its own curve. Both must win a strict
+majority, scoreable on every fold.**
+
+``walkforward.evaluate`` asks how the lab's *selection process* did out of sample: in each fold
+it scores whichever variant ranked best by MAR on the training slice. ``lab promote`` then spends
+the look, and later the money, on something else: ``store.best_dev_eligible``, the highest-MAR
+variant the verdict calls eligible over the whole dev window. The two need not be the same
+variant, and for M0044 they are not (insight 82). The training slices pick its lighter brakes,
+which fail the dev gate on drawdown and so can never be pre-registered; those picks win 3 of 4.
+``M0044-TV14-N21``, its only eligible variant and therefore the one that would be promoted, wins
+1 of 4 on its own curve -- folds of -5, +24, -42 and -12 points of total return against SPY --
+and trails SPY by about 7 points a year over 2009-2015. Under the rule before this one the gate
+took it, and ``lab status`` listed it as promotable.
+
+``variant_record`` scores the promoted variant through the **same** ``walkforward.evaluate``,
+handed a mapping of one: ``pick`` can then only name that variant, so every fold is that curve,
+de-funded by the same ``trial_deposits``, against the same benchmark, on the same geometry,
+refused on the same price rule (D10). Nothing about the scoring is new; only the candidate set
+is.
+
+Measured on the committed lab (75 methods, 10 dev-eligible), dev-eligible methods each version
+of the fold rule blocks:
+
+====================================  ==========  ============================================
+fold rule                             blocks      which
+====================================  ==========  ============================================
+the pick's record only (before)       5 of 10     M0011, M0024, M0028, M0030, M0053
+the promoted variant's own only       6 of 10     adds M0019 (2 of 4) and M0044 (1 of 4);
+                                                  **drops M0053**, whose own variant wins 3 of 4
+                                                  while its picks win 2 of 4
+**both**                              **7 of 10**  the union
+====================================  ==========  ============================================
+
+Why not the promoted variant alone. ``best_dev_eligible`` chooses on the **whole** dev window,
+which contains every fold's evaluation slice, so the chosen variant's own fold record is not out
+of sample about the *choice*: it is the record of a variant picked with hindsight over exactly
+those slices. The pick's record is the out-of-sample statement about the choosing; the own record
+is the statement that the variant actually bet on is not riding on its siblings' wins. Each
+answers a question the other cannot, which is why the rule is the conjunction -- and why M0053,
+whose choosing loses, stays refused.
+
+Together with (K) the whole gate refused 9 of the 10 dev-eligible methods before this decision
+and refuses 10 of 10 after it; M0044 is the one it moves. ``lab status`` prints
+``Promotable now: (none)``.
+
+Silent when ``best_dev_eligible`` names nothing. There is then nothing to pre-register, and the
+caller one line later is ``prereg.promote_method``, which refuses with the better message it
+already has -- the same reason ``check`` is silent for a status other than ``dev-eligible``. The
+variant is named by the very call ``promote_method`` makes, on the same connection, so the gate
+cannot score one variant while the file pre-registers another.
+
+**(D12) Does (K) look inside a blend? -- Yes. An ingredient is any other lab method whose
+allocator one of the method's dev trials runs, read from the recorded ``trials.config_text``;
+the ingredient itself, and its own ``family`` union ancestors, are kin. One hop, not the
+ingredient's ingredients.**
+
+M0028's ``BLEND-RM`` is half M0028's bounce book and half ``M0007-N20-RAW``'s residual momentum,
+whose family's M0022 read ``test-failed``. It cleared the dev gate, and (K) as written read M0028's
+kin clean, because the blend shares neither a ``family`` string nor a ``parent_id`` with M0007;
+only the fold record (2 of 4) stopped it (insight 84). A blend is a *variant* of a method, not a
+method, so nothing in ``methods`` could ever have carried the link.
+
+**The ingredients are already recorded; nothing new is stored.** ``lab/method.py:config_text`` is
+each trial's identity, digested and append-only, and ``registry._canon`` writes every allocator in
+it -- the top-level one and every one nested anywhere in the params, a blend's parts and a blend of
+blends included -- as ``<ID>``. A lab allocator's id is the id of the method whose file defines it
+(every ``M*`` allocator in ``lab/methods/mNNNN_*.py`` reads ``id = "MNNNN"``; ``method.py``:
+"allocator ids are unique across lab methods"). So ``<M0007>`` in a trial's config text is M0007's
+engine, and ``ingredients`` is a regular expression over text the lab has written on every trial
+since the first. ``BLEND``, ``F1``, ``ROT``, ``VOLTARGET`` and the other seed allocators name no lab
+method and are not ingredients; the ``H-*`` seeds they belong to are all ``rejected``, none
+``test-failed``.
+
+Measured on the committed lab (75 methods). The ingredient map: M0004 -> M0001; M0021 -> M0007,
+M0011; M0024 -> M0011; M0028 -> M0007; M0029 -> M0007; M0030 -> M0007; M0032 -> M0007;
+M0033 -> M0011; M0054 -> M0036.
+
+=============================================  ===========  ==================================
+kin rule                                       of 75        dev-eligible blocked (of 10)
+=============================================  ===========  ==================================
+``family`` union ancestors (D4, before)        29           6
+**+ ingredients and their family union         **31**       **8** -- adds M0024 (via M0011)
+ancestors, every dev variant**                              and M0028 (via M0007), both on M0022
++ ingredients of the promoted variant only     --           8, the same two
++ ingredients followed transitively            31           8, the same two
+=============================================  ===========  ==================================
+
+It refuses nobody new today -- M0024 and M0028 already lose their picks' folds -- and that is the
+point: the next blend with a disproven engine in it will not have a fold record that happens to
+catch it.
+
+Why every dev variant and not only the promoted one. The cost is identical today. Every variant is
+a candidate in every fold's pick, which is (D10)'s reason for refusing on any one variant; and kin
+is a statement about a *method* -- ``family_state``, the buy signal and ``lab test``'s note all ask
+it of a method, which has no single variant. The price is stated rather than hidden: a method that
+carries a readout blend with a disproven engine is refused whole. M0028's own hypothesis already
+said its ``BLEND-RM`` "can never be promoted"; a standalone book that wants a clean kin should not
+carry the readout as one of its variants.
+
+Why one hop. The config text already names every engine a variant runs, at any depth of nesting,
+so nothing a variant actually runs is missed. What one hop declines to follow is an ingredient
+*method's other variants'* ingredients -- engines this method never runs -- which is (D4)'s
+connected-component blob arrived at by another road. Measured, it changes nothing today.
+
+**(D13) Does the buy signal follow (D12)? -- Yes, through its caller, with no edit to
+``walkforward.buy_signal``. What it does not follow is (D11), and that is the owner's to decide.**
+
+``lab walkforward`` passes ``hardgate.failed_kin`` as the signal's ``family_failed``, and (D9)
+aligned the two on purpose: two commands giving opposite answers about one method is worse than
+either answer. So ``failed_kin`` stays the one definition of kin, the signal's kin condition
+widens with it, and this paragraph is the record that it does. Measured on the committed lab the
+report's output is unchanged: no signal fires before or after, and M0024 and M0028 still read
+"fails the folds", the first condition they fail.
+
+Left for the owner, because each is an edit to ``walkforward.py``, which this decision does not
+make: ``BUY_CONDITIONS`` and the ``buy_signal`` docstring still describe kin as "family union
+ancestors", which now under-describes the rule they are handed; and the signal's fold condition
+reads the picks' record only. Whether the buy signal should also require (D11)'s own-variant
+majority is a change to ``buy_signal`` itself.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -228,6 +354,11 @@ COIN_FLIP_NULL: tuple[tuple[int, float], ...] = (
 #: The statuses the gate judges. Exactly the tail of ``store.TRANSITIONS``' only edge into
 #: ``promoted``, so this set is the complete set of promotions the database will accept.
 _GATED_STATUS = "dev-eligible"
+
+#: How a recorded configuration names the lab methods whose engines it runs. ``method.config_text``
+#: writes every allocator -- top level and nested, a blend's parts included -- as ``<ID>``
+#: (``registry._canon``), and a lab allocator's id is its method's id. See (D12).
+_INGREDIENT = re.compile(r"<(M\d{4})>")
 
 
 def trial_deposits(
@@ -542,6 +673,51 @@ def fold_record(
     return wf.Record(method_id, wf.evaluate(curves, list(geo.bench), geo.folds, deposits))
 
 
+def promoted_variant(conn: sqlite3.Connection, method_id: str) -> str | None:
+    """The candidate ``lab promote`` would pre-register, or None when there is none.
+
+    ``store.best_dev_eligible`` -- the very call ``prereg.promote_method`` makes -- so the variant
+    the gate scores under (D11) and the variant the file pre-registers cannot be two different
+    rows.
+    """
+    best = store.best_dev_eligible(conn, method_id)
+    return None if best is None else str(best["candidate_id"])
+
+
+def variant_record(
+    conn: sqlite3.Connection, method_id: str, candidate_id: str, geo: Geometry | None = None
+) -> wf.Record:
+    """``candidate_id``'s own walk-forward record: that one variant's curve, alone. See (D11).
+
+    The same ``wf.evaluate`` ``fold_record`` calls, handed a mapping of one, so ``pick`` can only
+    name this variant and every fold scores exactly the curve that would be pre-registered --
+    de-funded by the same ``trial_deposits``, against the same benchmark, on the same geometry,
+    refused on the same price rule (D10). Raises ``store.LabError`` when the variant has no dev
+    curve or cannot be compared.
+    """
+    geo = geometry(conn) if geo is None else geo
+    rows = [r for r in _dev_curves(conn, method_id) if r["candidate_id"] == candidate_id]
+    if not rows:
+        raise store.LabError(
+            f"{candidate_id} has no dev trial of {method_id} carrying a monthly curve, so the "
+            f"variant that would be pre-registered cannot be scored on the folds. The hard gate "
+            f"fails closed on thin evidence"
+        )
+    problems = mismatches(conn, geo.bench_n, rows)
+    if problems:
+        raise store.LabError(
+            f"{candidate_id} cannot be scored against {regime.BENCH_CANDIDATE}: "
+            f"{describe(problems)}. The hard gate compares two curves only when both were "
+            f"measured on the same prices (D10). There is no override"
+        )
+    row = rows[0]
+    curve = _curve_of(row)
+    deposits = {candidate_id: trial_deposits(conn, row, curve)}
+    return wf.Record(
+        method_id, wf.evaluate({candidate_id: curve}, list(geo.bench), geo.folds, deposits)
+    )
+
+
 def fold_summary(
     conn: sqlite3.Connection, method_id: str, geo: Geometry | None = None
 ) -> str:
@@ -554,20 +730,13 @@ def fold_summary(
     return fold_record(conn, method_id, geo).summary()
 
 
-def failed_kin(conn: sqlite3.Connection, method_id: str) -> tuple[str, ...]:
-    """Every method in ``method_id``'s kin that reads ``test-failed``; ``()`` when clean.
+def _lineage(conn: sqlite3.Connection, row: sqlite3.Row) -> set[str]:
+    """``row``'s ``family`` union its transitive ancestors through ``parent_id`` -- (D4)'s set.
 
-    Kin is the ``family`` string **union** the transitive ancestors reached through
-    ``parent_id``, excluding the method itself. See (D4) in the module docstring for why that
-    union and not the full connected component, with the measurement that decided it.
-
-    The ancestor walk carries a ``seen`` set: ``methods.parent_id`` is a self-referencing foreign
-    key with no cycle constraint, so a cycle would otherwise hang the gate.
+    It contains the method itself, which is in its own family; ``failed_kin`` discards it. The
+    ancestor walk carries a ``seen`` set: ``methods.parent_id`` is a self-referencing foreign key
+    with no cycle constraint, so a cycle would otherwise hang the gate.
     """
-    row = store.get_method(conn, method_id)
-    if row is None:
-        raise store.LabError(f"no method {method_id}")
-
     ancestors: set[str] = set()
     cur = row["parent_id"]
     while cur is not None and cur not in ancestors:
@@ -578,6 +747,55 @@ def failed_kin(conn: sqlite3.Connection, method_id: str) -> tuple[str, ...]:
     kin = set(ancestors)
     for r in conn.execute("SELECT id FROM methods WHERE family = ?", (row["family"],)):
         kin.add(str(r["id"]))
+    return kin
+
+
+def ingredients(conn: sqlite3.Connection, method_id: str) -> tuple[str, ...]:
+    """Every other lab method whose engine one of ``method_id``'s dev trials runs. See (D12).
+
+    Read from ``trials.config_text`` -- the recorded, digested identity of each trial -- where
+    every allocator the configuration runs, at any depth of nesting, is written ``<ID>``. Only ids
+    that name a row in ``methods`` count, so a stray ``<M9999>`` is not an ingredient, and the
+    method's own allocator is not its own ingredient.
+    """
+    found: set[str] = set()
+    for r in conn.execute(
+        "SELECT config_text FROM trials WHERE method_id = ? AND window = 'dev'", (method_id,)
+    ):
+        found.update(_INGREDIENT.findall(str(r["config_text"])))
+    found.discard(method_id)
+    if not found:
+        return ()
+    ids = sorted(found)
+    marks = ", ".join("?" for _ in ids)
+    known = conn.execute(
+        f"SELECT id FROM methods WHERE id IN ({marks}) ORDER BY id", tuple(ids)
+    ).fetchall()
+    return tuple(str(r["id"]) for r in known)
+
+
+def failed_kin(conn: sqlite3.Connection, method_id: str) -> tuple[str, ...]:
+    """Every method in ``method_id``'s kin that reads ``test-failed``; ``()`` when clean.
+
+    Kin is the ``family`` string **union** the transitive ancestors reached through
+    ``parent_id`` (D4), **union** every ingredient -- a lab method whose engine one of its
+    variants runs -- together with that ingredient's own ``family`` and ancestors (D12),
+    excluding the method itself. One hop: an ingredient's *other* variants' ingredients are not
+    followed. See the module docstring for the measurements that decided both.
+
+    This is the one definition of kin. ``prereg.family_text``, ``lab test``'s note and ``lab
+    walkforward``'s buy signal all call it, so they cannot disagree with the gate (D9, D13).
+    """
+    row = store.get_method(conn, method_id)
+    if row is None:
+        raise store.LabError(f"no method {method_id}")
+
+    kin = _lineage(conn, row)
+    for ing in ingredients(conn, method_id):
+        kin.add(ing)
+        ing_row = store.get_method(conn, ing)
+        if ing_row is not None:
+            kin |= _lineage(conn, ing_row)
     kin.discard(method_id)
     if not kin:
         return ()
@@ -605,7 +823,12 @@ def family_state(conn: sqlite3.Connection, method_id: str) -> str:
 
 
 def summary(conn: sqlite3.Connection, method_id: str, geo: Geometry | None = None) -> str:
-    """One display line for ``method_id``: the fold record and the kin state.
+    """One display line for ``method_id``: the fold record, the promoted variant's own, the kin.
+
+    ``"3 of 4 folds; M0044-TV14-N21 alone 1 of 4 folds; kin clean"``. The middle clause is
+    (D11)'s second condition, and it is printed only when the picks' record could be built and
+    there is a variant to pre-register -- when the record itself is not scoreable the reason is
+    already on the line, and repeating it for the variant would only make it longer.
 
     Lenient on purpose -- it catches ``store.LabError`` and returns the reason as text. Its
     caller is ``lab status``, which must keep printing on a lab whose benchmark is missing or
@@ -616,12 +839,19 @@ def summary(conn: sqlite3.Connection, method_id: str, geo: Geometry | None = Non
         folds = fold_record(conn, method_id, geo).summary()
     except store.LabError as e:
         folds = f"not scoreable ({e})"
+    else:
+        try:
+            candidate = promoted_variant(conn, method_id)
+            if candidate is not None:
+                own = variant_record(conn, method_id, candidate, geo)
+                folds = f"{folds}; {candidate} alone {own.summary()}"
+        except store.LabError as e:
+            folds = f"{folds}; the promoted variant is not scoreable ({e})"
     try:
         kin = family_state(conn, method_id)
     except store.LabError as e:
         kin = f"kin unknown ({e})"
     return f"{folds}; kin {kin}"
-
 
 def check(conn: sqlite3.Connection, method_id: str) -> None:
     """Refuse ``method_id``'s promotion, or return. Raises ``store.LabError``.
@@ -637,8 +867,10 @@ def check(conn: sqlite3.Connection, method_id: str) -> None:
 
     The folds are checked before the kin. (F) is a statement about *this* method's own evidence,
     which is what the researcher asked about; (K) is about the company it keeps, and reads better
-    second. Both are cheap -- SQL and arithmetic on recorded curves -- so the order is about the
-    message, not the cost.
+    second. Within (F) the picks' record comes first and the promoted variant's own record second
+    (D11): the first says whether the lab's way of choosing works out of sample, the second
+    whether the variant actually chosen won its folds itself. All of it is cheap -- SQL and
+    arithmetic on recorded curves -- so the order is about the message, not the cost.
     """
     row = store.get_method(conn, method_id)
     if row is None:
@@ -673,13 +905,38 @@ def check(conn: sqlite3.Connection, method_id: str) -> None:
             f"seer_engine/lab/hardgate.py and argue for it in the commit"
         )
 
+    candidate = promoted_variant(conn, method_id)
+    if candidate is not None:
+        own = variant_record(conn, method_id, candidate, geo)
+        own_scored = len(own.scored)
+        if own_scored < total:
+            raise store.LabError(
+                f"{method_id}'s variant {candidate} -- the one `lab promote` would pre-register "
+                f"-- is scoreable on only {own_scored} of the {total} walk-forward folds on its "
+                f"own curve. The hard gate fails closed on thin evidence (D2, D11). Nothing was "
+                f"written and no status moved"
+            )
+        if not own.majority:
+            raise store.LabError(
+                f"{method_id} wins {record.summary()} on the variants the training slices "
+                f"picked, but {candidate} -- the variant `lab promote` would pre-register -- "
+                f"wins only {own.won} of {own_scored} on its own curve, and is not promoted. "
+                f"The picks' record is about the lab's way of choosing; the look and the money "
+                f"are spent on one variant, and that variant has to have won the folds itself "
+                f"(D11). Nothing was written and no status moved. There is no override -- if the "
+                f"rule is wrong, change it in seer_engine/lab/hardgate.py and argue for it in "
+                f"the commit"
+            )
+
     bad = failed_kin(conn, method_id)
     if bad:
         raise store.LabError(
             f"{method_id} is not promoted: {', '.join(bad)} already read test-failed, and "
-            f"{'they are' if len(bad) > 1 else 'it is'} kin -- same family ({row['family']!r}) "
-            f"or an ancestor through parent_id. A new variant of a family that has been disproven "
-            f"out of sample is not a fresh candidate. Nothing was written and no status moved. "
+            f"{'they are' if len(bad) > 1 else 'it is'} kin -- same family ({row['family']!r}), "
+            f"an ancestor through parent_id, or an ingredient one of its variants runs (or that "
+            f"ingredient's family or ancestry, D12). A new variant of a family that has been "
+            f"disproven out of sample is not a fresh candidate, and neither is a blend with a "
+            f"disproven engine in it. Nothing was written and no status moved. "
             f"There is no override -- if this family deserves another look, that is an argued "
             f"change to the rule, in git"
         )

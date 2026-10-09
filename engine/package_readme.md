@@ -2452,15 +2452,18 @@ here is pure, and the purity glob covers it; the one writer is `backtest.io.writ
     first session where every instrument the candidate reads, and SPY, has its lookback. A member
     family also starts no earlier than `MEMBERSHIP_START`, and no candidate opens before
     `window.start` — a floor that can never bind on the dev window, whose start is `date.min`.
-  - `run_candidate(market, dividends, spy_dividends, c, *, prepared=None, window=DEV_WINDOW)` and
+  - `run_candidate(market, dividends, spy_dividends, c, *, prepared=None, window=DEV_WINDOW,
+    initial_idr=INITIAL_IDR, contributions=None, contribution_fx=None)` and
     `run_registry(market, dividends, spy_dividends, registry, *, on_result=None, window=DEV_WINDOW,
-    contributions=None)`
+    initial_idr=INITIAL_IDR, contributions=None, contribution_fx=None)`
     run sequentially, in registry order, with one prepared value per allocator id — built by
     `strategies.allocator.prepare_for(allocator, market)` (edgar-fundamentals), so a `MarketAware`
     allocator gets the whole `Market` (fundamentals included) and every other one gets exactly the
     `allocator.prepare(market.history)` it got before. The candidate's market copy carries
-    `fundamentals` over with `history` and `membership`, so a long window keeps the panel. Starting cash is
-    `initial_cash_usd(20,000,000 IDR, usd_idr_on(max(start, FX_START)))`; a window starting before
+    `fundamentals` over with `history` and `membership`, so a long window keeps the panel. Starting capital is
+    a run input: `initial_idr` (default `runner.INITIAL_IDR`, 10,000,000 IDR) is forwarded through
+    `_run` to `run_rules`, which opens with
+    `initial_cash_usd(initial_idr, usd_idr_on(max(start, FX_START)))`; a window starting before
     `FX_START` runs on a market copy whose `fx` is that single rate (D-C). FX before 1999 affects
     only that conversion, never a decision.
   - `DevRow` holds the stats and both SPY curves on the candidate's own window and cash. SPY's

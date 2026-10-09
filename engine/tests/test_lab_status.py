@@ -12,7 +12,9 @@ hazard Decision D1 created and `_owner_misses` exists to handle.
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
+from datetime import date, timedelta
 
 import pytest
 
@@ -299,6 +301,184 @@ def test_sinks_at_finds_the_first_n_below_the_bar(tmp_path):
                   dsr_at_run=float(v.dsr), n_at_run=int(v.n), var_trials=var)
     assert lab_cmd.recover_dsr(n_trials=n, **common) < store.DSR_MIN
     assert lab_cmd.recover_dsr(n_trials=n - 1, **common) >= store.DSR_MIN
+
+
+# ------------------------------------------------------------------ the hard gate in `lab status`
+#
+# R7 (lab-hard-gate phase 3): a dev-eligible method `lab promote` would refuse must not be listed
+# as promotable, and the reason must be on the screen. Six tests, nothing above this line edited.
+#
+# Two of them need a real fold geometry, so they build a `REF-SPY-HOLD` dev trial with a monthly
+# curve. The span is 1993-02..2015-09 and not the dev window's 1996-01, because `walkforward.folds`
+# cuts the geometry from the *benchmark*: from 1996 the last slice is 9 months, below
+# `MIN_EVAL_MONTHS`, and only three folds survive -- which the gate then refuses on MIN_FOLDS, for
+# a reason that has nothing to do with what the test is about. From 1993-02 there are exactly four
+# 36-month slices, which is the committed lab's own geometry.
+
+
+def _month_ends(first: date, last: date) -> list[date]:
+    """Every month end in ``[first, last]``, the shape a recorded `trials.curve_json` has."""
+    out: list[date] = []
+    y, m = first.year, first.month
+    while True:
+        nxt = date(y + (m // 12), (m % 12) + 1, 1)
+        end = nxt - timedelta(days=1)
+        if end > last:
+            return out
+        if end >= first:
+            out.append(end)
+        y, m = nxt.year, nxt.month
+
+
+def _curve(days: list[date], monthly: float) -> str:
+    """A monotone curve compounding at ``monthly``, as `trials.curve_json` stores it.
+
+    Monotone on purpose: `walkforward.measure` gives a slice that never fell an infinite MAR, so
+    `pick` ranks it rather than dropping it, and `FoldPick.beat` compares total return, so the
+    faster curve wins every fold deterministically. No randomness, no tuning.
+    """
+    value, points = 1.0, []
+    for d in days:
+        points.append([d.isoformat(), round(value, 8)])
+        value *= 1.0 + monthly
+    return json.dumps(points)
+
+
+def _method_at(c, mid: str, *, status: str, family: str = "fam", trials=()) -> None:
+    """Like ``_method``, but reaching the statuses the hard gate cares about.
+
+    ``_method`` above stops at ``dev-eligible``; the gate's (K) condition needs a kin that reads
+    ``test-failed``, which is three transitions further along. A separate helper rather than an
+    edit to ``_method``, because every test above depends on that one exactly as it is.
+    """
+    path = {
+        "registered": ("registered",),
+        "rejected": ("registered", "rejected"),
+        "dev-eligible": ("registered", "dev-eligible"),
+        "promoted": ("registered", "dev-eligible", "promoted"),
+        "test-failed": ("registered", "dev-eligible", "promoted", "test-failed"),
+    }[status]
+    with c:
+        store.add_method(c, id=mid, name=f"name {mid}", family=family,
+                         source_kind="knowledge", hypothesis="h")
+        if trials:
+            store.insert_trials(c, list(trials))
+        for s in path:
+            store.update_method(c, mid, status=s)
+
+
+def _lab_with_a_benchmark(c, *, method_monthly: float, kin_failed: bool = False) -> None:
+    """A lab the walk-forward can actually score: a benchmark, and one dev-eligible method.
+
+    ``method_monthly`` above the benchmark's 0.004 wins every fold; below it loses every fold.
+    ``kin_failed`` adds a sibling in the same family that reads ``test-failed``, which is the
+    gate's (K) condition and nothing else.
+    """
+    days = _month_ends(date(1993, 2, 1), date(2015, 9, 30))
+    n = 3 if kin_failed else 2
+    _method_at(c, "M0001", status="dev-eligible", family="fam", trials=[
+        _trial(method_id="M0001", candidate_id="M0001-A", config_digest="a", mar=0.9,
+               start="1993-02-28", end="2015-09-30", n_trials_at_run=n,
+               curve_json=_curve(days, method_monthly)),
+    ])
+    _method_at(c, "M0009", status="rejected", family="bench", trials=[
+        # `sharpe=0.7` against M0001's 0.9 is not decoration: `store.dsr_at` recovers a DSR
+        # through `dev_sharpe_variance`, which is zero on a lab whose dev trials all carry the
+        # same Sharpe -- the luck test then fails for want of a variance and the method never
+        # reaches the hard gate at all. The same 0.9 / 0.7 spread `_method`'s fixtures use.
+        _trial(method_id="M0009", candidate_id="REF-SPY-HOLD", config_digest="spy",
+               start="1993-02-28", end="2015-09-30", n_trials_at_run=n, eligible=False,
+               failed=OLD_LUCK_LABEL, dsr=0.10, sharpe=0.7, curve_json=_curve(days, 0.004)),
+    ])
+    if kin_failed:
+        _method_at(c, "M0002", status="test-failed", family="fam", trials=[
+            _trial(method_id="M0002", candidate_id="M0002-A", config_digest="b", mar=0.6,
+                   start="1993-02-28", end="2015-09-30", n_trials_at_run=n,
+                   curve_json=_curve(days, 0.006)),
+        ])
+
+
+def test_a_method_that_clears_the_hard_gate_is_listed_with_its_fold_record(tmp_path, status):
+    """R7's positive half: taken, and the line says on what evidence."""
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _lab_with_a_benchmark(c, method_monthly=0.009)
+    c.close()
+    out = status(db)
+    ready = out.split("Promotable now")[1].split("\n  Dev-eligible")[0]
+    assert "M0001" in ready
+    assert "of 4 folds" in ready          # `walkforward.Record.summary()`, printed verbatim
+    assert "kin clean" in ready
+    assert "Refused by the hard gate" not in out
+
+
+def test_a_method_that_loses_its_folds_is_refused_and_the_record_says_so(tmp_path, status):
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _lab_with_a_benchmark(c, method_monthly=0.001)   # below the benchmark's 0.004, every fold
+    c.close()
+    out = status(db)
+    ready = out.split("Promotable now")[1].split("Refused by the hard gate")[0]
+    assert "(none)" in ready and "M0001 " not in ready
+    blocked = out.split("Refused by the hard gate")[1].split("\n  Dev-eligible")[0]
+    assert "M0001" in blocked
+    assert "of 4 folds" in blocked
+
+
+def test_a_method_whose_kin_test_failed_is_refused_and_the_kin_is_named(tmp_path, status):
+    """(K): the folds are won 4 of 4, so the only thing left to refuse on is the sibling."""
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _lab_with_a_benchmark(c, method_monthly=0.009, kin_failed=True)
+    c.close()
+    out = status(db)
+    blocked = out.split("Refused by the hard gate")[1].split("\n  Dev-eligible")[0]
+    assert "M0001" in blocked
+    assert "M0002" in blocked      # the kin, named, so the reader does not go looking
+
+
+def test_lab_status_still_prints_when_the_gate_cannot_score_the_lab(tmp_path, status):
+    """The shape every other fixture in this module has: no benchmark, empty curves.
+
+    The gate refuses it and is right to -- the folds are cut from the benchmark curve. What must
+    not happen is `lab status` exiting non-zero or printing nothing, which is what a `LabError`
+    escaping `_hard_gate_states` would do. The `status` fixture asserts the exit code for us.
+    """
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _method(c, "M0001", status="dev-eligible", trials=[
+        _trial(method_id="M0001", candidate_id="M0001-A", config_digest="a", mar=0.9),
+        _trial(method_id="M0001", candidate_id="M0001-B", config_digest="b", sharpe=0.7, mar=0.5),
+    ])
+    c.close()
+    out = status(db)
+    assert "Promotable now" in out
+    blocked = out.split("Refused by the hard gate")[1].split("\n  Dev-eligible")[0]
+    assert "M0001" in blocked
+    assert "REF-SPY-HOLD" in blocked    # the lab's fixture is wrong, not the method (D7)
+
+
+def test_the_empty_promoted_section_blames_the_gate_not_an_unrun_command(tmp_path, status):
+    """"`lab promote` has not been run on them yet" is false when it would exit 2 on all of them."""
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _lab_with_a_benchmark(c, method_monthly=0.001)
+    c.close()
+    out = status(db)
+    promoted = out.split("Promoted (pre-registered): (none)")[1].split("\n")[0]
+    assert "hard gate refuses" in promoted
+    assert "has not been run on" not in promoted
+    assert "no override" in promoted
+
+
+def test_the_dev_eligible_header_no_longer_promises_a_promotion(tmp_path, status):
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _lab_with_a_benchmark(c, method_monthly=0.001)
+    c.close()
+    out = status(db)
+    assert "`lab promote` pre-registers these" not in out
+    assert "the hard gate decides which of these `lab promote` takes" in out
 
 
 # ------------------------------------------------------------------ the committed database

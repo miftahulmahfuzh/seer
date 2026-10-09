@@ -616,7 +616,7 @@ def _eligible_at(conn, n_trials: int, var_trials: float) -> list[str]:
 # and `_ratchet_warning` says so *before* it happens again (Decision D1b).
 
 _PROMOTION_STATUSES: tuple[tuple[str, str, str], ...] = (
-    ("Dev-eligible", "dev-eligible", "`lab promote` pre-registers these"),
+    ("Dev-eligible", "dev-eligible", "the hard gate decides which of these `lab promote` takes"),
     ("Promoted (pre-registered)", "promoted", "`lab test` spends the one look on these"),
     ("Test-passed", "test-passed", "the owner's call: a paper roster entry with its own clock"),
     ("Test-failed", "test-failed", "final; there is no second look at the configuration"),
@@ -806,13 +806,82 @@ def _no_dev_eligible_reason(conn) -> str:
     return f"no method is dev-eligible: {ran} but no dev trial carries a MAR, so nothing can rank"
 
 
-def _empty_reason(conn, status: str) -> str:
+def _hard_gate_states(conn) -> dict[str, tuple[str, str | None]]:
+    """The hard gate's answer for every ``dev-eligible`` method, run once per ``lab status``.
+
+    ``{method_id: (the gate's one-line summary, why `lab promote` would refuse)}``. The first
+    element is ``hardgate.summary`` verbatim -- the fold record **and** the kin state, in the shape
+    ``"4 of 4 folds; kin clean"`` -- so a caller prints it whole and never re-states the kin. The
+    second is ``None`` when the gate would take the method, and otherwise the refusal's own
+    sentence collapsed to one line, so it drops straight into an indented status line however the
+    gate chose to wrap it.
+
+    The fold geometry is cut **once** here and passed to every ``summary`` (``hardgate.geometry``),
+    which is what phase 1's handoff asks for: the folds come from the benchmark curve, not from the
+    method, so re-cutting them per method is the same arithmetic seven times over. A lab with no
+    benchmark has no geometry, and ``geo`` stays ``None`` -- ``summary`` then says so, per method,
+    in its own words.
+
+    **Only ``dev-eligible`` methods are asked.** A ``promoted`` method is not re-judged here, and
+    that is Decision D3 showing through rather than an oversight: the pre-registration is a
+    promise, ``lab test`` honours it as written, and a status block that re-opened it would be
+    announcing a refusal the lab has already decided not to make. A promoted method whose kin
+    failed *after* the promise is ``lab test``'s note to print, not this one's.
+
+    **It never raises.** ``lab status`` runs on every lab there is, including one with no
+    ``REF-SPY-HOLD`` dev trial and one whose recorded curves are empty -- the shape every fixture
+    in ``test_lab_status.py`` builds, and the shape a lab has on its first day. The gate refuses
+    such a lab and is right to, because the folds are cut from the benchmark curve; but that
+    refusal is information to print, not a reason for ``lab status`` to stop printing. So every
+    ``store.LabError`` is caught and becomes the sentence.
+
+    Cost: at most one ``summary`` and one ``check`` per dev-eligible method -- seven on the
+    committed database. Neither opens a research store, runs a backtest or writes anything.
+    """
+    from seer_engine.lab import hardgate
+
+    def one_line(text: object) -> str:
+        return " ".join(str(text).split())
+
+    try:
+        geo = hardgate.geometry(conn)
+    except store.LabError:
+        geo = None  # `summary` is lenient and says why, per method, in its own words
+
+    states: dict[str, tuple[str, str | None]] = {}
+    for m in conn.execute(
+        "SELECT id FROM methods WHERE status = 'dev-eligible' ORDER BY id"
+    ).fetchall():
+        mid = str(m["id"])
+        record = one_line(hardgate.summary(conn, mid, geo))
+        try:
+            hardgate.check(conn, mid)
+        except store.LabError as e:
+            states[mid] = (record, one_line(e))
+        else:
+            states[mid] = (record, None)
+    return states
+
+
+def _empty_reason(
+    conn, status: str, gates: dict[str, tuple[str, str | None]] | None = None
+) -> str:
     """Why one promotion-path section is empty.
 
     Every step but the first is empty for exactly one reason worth printing -- the step before it
     -- and naming the command that would move it is the whole value of the sentence. The first
     step, ``dev-eligible``, is empty because of the gate, and that is the sentence this block
     exists for.
+
+    **The ``promoted`` section has a second reason since 2026-10-09.** "N methods are
+    dev-eligible; `lab promote` has not been run on them yet" is false in the way that costs
+    somebody an hour when ``lab promote`` would exit 2 on every one of them: it names a command as
+    waiting to be run when running it does nothing. So when the hard gate refuses some or all of
+    the dev-eligible methods, this says that instead and points at the block above that carries
+    each one's fold record and kin.
+
+    ``gates`` is ``_hard_gate_states``'s answer, passed in by ``_promotion_path`` so the gate runs
+    once per ``lab status`` rather than once per section; ``None`` means compute it here.
     """
     if status == "dev-eligible":
         return _no_dev_eligible_reason(conn)
@@ -833,11 +902,29 @@ def _empty_reason(conn, status: str) -> str:
         return f"nothing is {prior}, so `{cmd}` has nothing to take"
     noun = "1 method is" if n == 1 else f"{n} methods are"
     it = "it" if n == 1 else "them"
+    if status == "promoted":
+        if gates is None:
+            gates = _hard_gate_states(conn)
+        refused = sum(1 for _record, why in gates.values() if why is not None)
+        if refused >= n:
+            return (
+                f"{noun} dev-eligible, and the hard gate refuses every one of {it} -- "
+                f"`lab promote` would exit 2, not pre-register. Read \"Refused by the hard gate\" "
+                f"above for each one's fold record and kin; there is no override, and the only "
+                f"way through is a method the folds and its kin have not already judged"
+            )
+        if refused:
+            return (
+                f"{noun} dev-eligible, {refused} of which the hard gate refuses (see \"Refused by "
+                f"the hard gate\" above); `lab promote` has not been run on the rest yet"
+            )
     return f"{noun} {prior}; `{cmd}` has not been run on {it} yet"
 
 
-def _promotable_now(conn) -> list[str]:
-    """What ``lab promote`` would take today, and what the status machine is still holding back.
+def _promotable_now(
+    conn, gates: dict[str, tuple[str, str | None]] | None = None
+) -> list[str]:
+    """What ``lab promote`` would take today, and what is holding the rest back.
 
     ``prereg.promote_method`` wants two things: a method at ``dev-eligible`` (or already
     ``promoted``), and a best dev trial the verdict calls eligible. ``store.best_dev_eligible``
@@ -854,8 +941,21 @@ def _promotable_now(conn) -> list[str]:
 
     Only methods that have a dev trial are asked, so the derivation runs 23 times on the
     committed database rather than 37.
+
+    **Since 2026-10-09 the dev gate is not the last word, and this section says so.**
+    ``lab promote`` also refuses a method that lost a majority of its walk-forward folds, or whose
+    kin has already failed the test window (``lab/hardgate.py``). Listing such a method under
+    "Promotable now (`lab promote` would take these)" would be a lie about exactly the methods
+    this section exists to explain. So each dev-eligible method appears in one of two places and
+    never both: **taken**, with its fold record and its kin state on the same line; or **refused**,
+    with the gate's own sentence on the line beneath it. That is the whole of R7 -- "why can
+    nothing be promoted" becomes answerable from ``lab status`` alone, with no second command and
+    no reading of the source.
     """
+    if gates is None:
+        gates = _hard_gate_states(conn)
     ready: list[str] = []
+    refused: list[str] = []
     held: list[str] = []
     for m in conn.execute(
         "SELECT * FROM methods m WHERE EXISTS "
@@ -866,11 +966,23 @@ def _promotable_now(conn) -> list[str]:
             continue
         if m["status"] in ("dev-eligible", "promoted"):
             v = store.verdict(conn, best)
-            tail = "  (already pre-registered)" if m["status"] == "promoted" else ""
-            ready.append(
+            head = (
                 f"    {m['id']:<6} {best['candidate_id']:<28} MAR {fmt_num(best['mar'])}  "
-                f"DSR {fmt_num(v.dsr, 3)} at N={v.n} ({v.policy}){tail}"
+                f"DSR {fmt_num(v.dsr, 3)} at N={v.n} ({v.policy})"
             )
+            if m["status"] == "promoted":
+                # Already pre-registered: the promise is written and is not re-opened (D3).
+                ready.append(f"{head}  (already pre-registered)")
+                continue
+            record, why = gates.get(m["id"], ("hard gate not evaluated", None))
+            if why is None:
+                # `record` is `hardgate.summary` whole -- "4 of 4 folds; kin clean" -- so the kin
+                # state is already in it. Appending ", kin clean" here would print it twice.
+                ready.append(f"{head}  {record}")
+            else:
+                detail = why if record == why else f"{record}; {why}"
+                refused.append(head)
+                refused.append(f"           {detail}")
         else:
             held.append(
                 f"    {m['id']:<6} {best['candidate_id']:<28} status {m['status']!r}: "
@@ -878,6 +990,13 @@ def _promotable_now(conn) -> list[str]:
             )
     out = ["  Promotable now (`lab promote` would take these):"]
     out += ready or ["    (none)"]
+    if refused:
+        out.append(
+            "  Refused by the hard gate (dev-eligible, but `lab promote` exits 2 on these -- it "
+            "wants a majority of walk-forward folds and no kin that has test-failed; there is no "
+            "override):"
+        )
+        out += refused
     if held:
         out.append("  Eligible on the evidence, held by the status machine:")
         out += held
@@ -885,7 +1004,12 @@ def _promotable_now(conn) -> list[str]:
 
 
 def _promotion_path(conn) -> list[str]:
-    """The whole promotion-path block: always printed, empty sections included."""
+    """The whole promotion-path block: always printed, empty sections included.
+
+    The hard gate runs **once** here, not once per section: ``_promotable_now`` needs it to decide
+    what to list, and ``_empty_reason`` needs it to say why the Promoted section is empty, and
+    both would otherwise re-derive the same seven answers.
+    """
     policy = store.DSR_POLICY
     n = _live_n(conn, policy)
     at = f" at N = {n}" if n is not None else ""
@@ -893,8 +1017,9 @@ def _promotion_path(conn) -> list[str]:
         f"Promotion path (dev-eligible -> promoted -> test-passed -> paper), luck bar "
         f"DSR >= {store.DSR_MIN} under policy {policy}{at}:"
     ]
+    gates = _hard_gate_states(conn)
     out += _ratchet_warning(conn, _dev_var(conn))
-    out += _promotable_now(conn)
+    out += _promotable_now(conn, gates)
     for title, status, why in _PROMOTION_STATUSES:
         rows = conn.execute(
             "SELECT * FROM methods WHERE status = ? ORDER BY id", (status,)
@@ -904,7 +1029,7 @@ def _promotion_path(conn) -> list[str]:
             for m in rows:
                 out.append(f"    {m['id']} {m['name']} ({m['family']}, {m['source_kind']})")
         else:
-            out.append(f"  {title}: (none) -- {_empty_reason(conn, status)}")
+            out.append(f"  {title}: (none) -- {_empty_reason(conn, status, gates)}")
     out.append(
         f"  Test-window looks used: {store.test_looks(conn)}. One look per configuration, "
         f"pre-registered before it is spent, and never given back (design §3)."

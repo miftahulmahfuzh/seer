@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-09 18:02
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-09 17:38
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 106
+- Completed: 107
 
 ---
 
@@ -865,15 +865,29 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - The completed block is left in place under `### [P1] High` marked `[x]`, not moved into `## Completed Tasks` → rung 6, the direct precedent of this same file: every phase of `gotrade-fee-rebuild`, `lab-luck-gate` and this set's own phase 1 did the same, because a cross-file block move is the one edit that reliably loses a peer's concurrent append in this shared worktree. Quick Stats recounted from the file rather than blind-decremented.
     - Phase 3's status flipped to `pending`, not the handler's literal `open` → `open` appears nowhere in this file; `pending` is the value its other unblocked tasks carry (`P2-ENG-N3LB`, `P3-ENG-V2KQ`), and phase 1 set this same field the same way.
     - `readme-updater` not dispatched, and `engine/package_readme.md` deliberately untouched → rung 2. The plan index lists `package_readme.md` under phase 2's **does not touch** and under phase 3's Owns, where its lab package map and new `hardgate` API block are to be ‘checked against the modules as phases 1 and 2 actually built them’. Writing it here would break this phase's exit criteria and put a second author in a file a later phase owns, in a shared worktree.
-- [ ] **P1-ENG-T6BJ** Phase 3: Make the gate visible before it bites
+- [x] **P1-ENG-T6BJ** Phase 3: Make the gate visible before it bites
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `commands/lab.py:_promotable_now`, so each listed method carries its fold record and kin state and "why can nothing be promoted" is answerable from `lab status` alone; `.claude/skills/explore-and-experiment-new-method/SKILL.md` step 0b (the gate **refuses**); `.claude/skills/sera-the-explorer/SKILL.md`'s promotion path and Never table; `engine/package_readme.md`'s lab package map (including `lab/walkforward.py`, missing from it entirely) and the new `hardgate` API block; `docs/plans/WALK_FORWARD_EVALUATION_PLAN.md` with phase 4 marked done and its stale cost paragraph corrected against this plan's measurement; and additions to `engine/tests/test_lab_status.py`. Does not touch the rule itself, `prereg.py`, `lab/runner.py` or `docs/lab/prereg/README.md` (phase 2), `lab/walkforward.py` and `commands/lab.py:_walkforward` (Decision D9 — it states the asymmetry in prose and changes neither), `backtest/walkforward.py`, or any existing test body. Exit criteria: `lab status` prints each dev-eligible method's fold record and, when blocked, the failed kin, and lists no method under "Promotable now" that `lab promote` would refuse; the empty `Promoted` section blames the gate rather than an unrun command; `lab status` exits 0 on a lab with no `REF-SPY-HOLD` dev trial and empty curves; the explore skill and the Sera skill both say the gate refuses, neither tells a child to expect an override, both count the buy signal's conditions at four, and the explore skill states the buy-signal / hard-gate asymmetry (Decision D9); `package_readme.md` describes `hardgate`, `lab/walkforward.py` and the two new pre-registration fields, checked against the modules as phases 1 and 2 actually built them; the walk-forward plan's phase 4 reads done, with the measured seven-method table, not the stale four-method list.
-  - **Status**: pending
+  - **Status**: completed
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/lab-hard-gate/PLAN.md` (phase 3 of 3)
   - **Satisfies**: R7, R8, R9 — `lab status` shows the fold record beside the dev-eligible list; `explore-and-experiment-new-method` Promotion step 0b says the gate **refuses**, not advises; and `sera-the-explorer`'s promotion path and Never table say the same
   - **Depends on**: P1-ENG-K7WZ, P1-ENG-P3MF
   - **Plan**: `.workflows/plan/P1-ENG-T6BJ.md`
+  - **Completed**: 2026-10-09 17:38
+  - **Method**: /do
+  - **Files**: .claude/skills/explore-and-experiment-new-method/SKILL.md, .claude/skills/sera-the-explorer/SKILL.md, docs/plans/WALK_FORWARD_EVALUATION_PLAN.md, engine/package_readme.md, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_status.py, engine/.workflows/todos.md
+  - **Verified**: in this worktree with `PYTHONPATH=$PWD/src` and the main checkout's interpreter (`/home/miftah/seer/engine/.venv/bin/python`) — the worktree has no `.venv`, and without PYTHONPATH pytest silently tests main. `pytest -q tests/test_lab_status.py` → **18 passed** (was 12; six added, exit criterion 4's count). `pytest -q tests/test_lab_*.py` → **558 passed, 2 skipped** (both skips pre-existing live-store opt-ins). Full engine suite → **3240 passed, 411 skipped**. `git diff --numstat engine/tests/test_lab_status.py` → **180 insertions, 0 deletions**, so all 317 pre-existing lines of that file are byte-identical. Manual `lab status` on a scratchpad **copy** of `lab/lab.sqlite` (never the committed file): all seven dev-eligible methods print under “Refused by the hard gate” with the fold records the plan measured (M0007 3/4 kin M0022; M0011 2/4 kin M0022; M0019 3/4 pick changed kin M0002; M0020 3/4 kin M0002; M0024 2/4 kin clean; M0030 2/4 kin M0021+M0029; M0033 3/4 kin M0022), “Promotable now” reads (none), and the empty Promoted section blames the gate. `_hard_gate_states` measured at **0.807s** for seven methods, inside invariant 4's one-second bar. `lab/lab.sqlite` and `web/data/lab.json` unmodified.
+  - **Drift**:
+    - The Sera skill's dev-eligible bullet and synthesis buy-signal bullet differed in wrapping from the lines phase 3's plan quoted at `7708350`; anchored on the bullet text and replaced each whole, as the plan's Step 7 specifies.
+    - `engine/package_readme.md`'s Prereg bullet had NOT been updated by phase 2 (the index assigns that file to phase 3), so the two new fields were added here as planned.
+  - **Decided**:
+    - The plan's `_lab_with_a_benchmark` fixture gave both dev trials the default `sharpe=0.9`, making `store.dev_sharpe_variance` zero; `dsr_at` then cannot recover a DSR, the luck test fails for want of a variance, and `best_dev_eligible` returns `None`, so M0001 reached neither the taken nor the refused list and three of the six new tests failed. Fixed by giving the `REF-SPY-HOLD` row `sharpe=0.7` → rung 6 (the surrounding module's own convention: its existing `_method` fixtures use the same 0.9/0.7 spread), since the plan's fixture is silent on the Sharpe spread while exit criterion 1 requires the lab to produce a promotable method. A comment in the fixture records why.
+    - `package_readme.md`'s hardgate map line was corrected against the real module before committing, as Step 8's reconciliation note requires: it now names `MIN_FOLDS = 4`, `COIN_FLIP_NULL`, `Geometry`/`geometry()`, `fold_record()`, `fold_summary()`, `failed_kin()`/`family_state()`, `check()` and `summary()`, and the Prereg bullet also names `REQUIRED` → rung 3 (the plan's own instruction to check the block against the module as built).
+    - The completed block is left in place under `### [P1] High` marked `[x]`, not moved into `## Completed Tasks` → rung 6, the direct precedent of this same file: every phase of `gotrade-fee-rebuild`, `lab-luck-gate` and this set's own phases 1 and 2 did the same, because a cross-section block move is the one edit that reliably loses a peer's concurrent append in this shared worktree. Quick Stats recounted from the file rather than blind-decremented (recount is idempotent under concurrency; a decrement compounds the race).
+    - No `**Commit**` field → same precedent as phases 1 and 2: `todos.md` is itself in the commit, so a sha recorded here can never be the sha of the commit that carries it. The sha goes to the swarm ledger at `.workflows/orchestration/lab-hard-gate/ledger.json`.
+    - `readme-updater` not dispatched → rung 2 and the coordinator's direct instruction. `engine/package_readme.md` is this phase's own owned deliverable, already written and verified against the modules as phases 1 and 2 built them; a second author there would overwrite measured content.
+    - Landing not attempted and `next_command` empty → `swarm.py find --plan .../lab-hard-gate/PLAN.md` returns `swarm: true`, coordinator `orch-lab-hard-gate`, so per `analyze-orchestrator` Step 5 the merge of `feature/lab-hard-gate` into `main` belongs to that coordinator, even though this is the last phase. Nothing merged or pushed to main; no worktree or branch deleted.
 
 
 ### [P2] Medium

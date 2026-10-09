@@ -142,10 +142,12 @@ engine/
       store.py              lab/lab.sqlite: committed and append-only; methods, trials, ideas, insights; TRANSITIONS, record_promotion(), best_dev_eligible() (build-promotion-path phase 3); PROMOTION_BASES, promotion_basis() and record_promotion's basis= / reason= (lab-luck-gate phase 6); the append-only trial_moments side table with MomentsRow, MOMENTS_COLUMNS, insert_moments(), moments_of(), SCHEMA_VERSION now "3" and the _v1_to_v2 / _v2_to_v3 migration ladder (lab-luck-gate phase 2); the **derived verdict** (lab-luck-gate phase 4) — DSR_MIN and DSR_POLICY as the gate's two constants, LUCK_LABEL_PREFIX / is_luck_label(), recorded_labels(), OWNER_INPUTS_LABEL / owner_failures(), sr_star(), recover_dsr(), dev_sharpe_variance(), dsr_at(), Gate / gate() / pending_gate(), Verdict / verdict(), best_dev_eligible() now judging on it, and the twice-guarded REEVALUATION_MARKER / Reevaluation / reevaluate_method() / reevaluate() behind the one new ('rejected','dev-eligible') transition
       npolicy.py            the luck gate's N policy (lab-luck-gate phase 1): POLICIES all-trials / methods / effective, DEFAULT_POLICY, correlation(), participation_ratio(), effective_n() -> NCount. Pure, reads only; `store.gate` is its one caller since lab-luck-gate phase 4
       runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4). The luck test's N comes from store.pending_gate since lab-luck-gate phase 4; preflight() refuses a flat-cost variant from M0031 on (real_costs.real_cost_problem, Sean phase 7). Since lab-realistic-gate R2 both halves run on sim.contributions.OWNER_MONTHLY and record a trial_funding row: OWNER_SCHEDULE_TEXT, recorded_contributions(), Ran.funding, trial_rows(deposits=, schedule=)
-      prereg.py             the docs/lab/prereg/MNNNN.md pre-registration: Prereg, render()/parse(), require_committed(), check_digest(), check_source(), promote_method() (build-promotion-path phase 3)
+      prereg.py             the docs/lab/prereg/MNNNN.md pre-registration: Prereg, render()/parse(), require_committed(), check_digest(), check_source(), promote_method() (build-promotion-path phase 3); plus `folds` and `family_state`, the hard gate's record of what the method cleared, tolerated-absent on read so the four committed files still parse (lab-hard-gate phase 2)
       remeasure.py          `lab remeasure`: re-runs a recorded method's variants on the dev window, proves the re-run reproduces each trial's recorded Sharpe and DSR, and appends trial_moments rows -- Batch, Plan, Reproduced, Report, resolve_method(), batches_of(), preflight(), measure(), check(), remeasure(), format_report() (lab-luck-gate phase 3); plus the P7a seed path, resumable and chunk-invariant -- SEED_PREFIX, SEED_METRICS, METRIC_TOL, SeedTrial, SeedPlan, SeedReport, SeedVerdict, is_seed_id(), seed_var_trials(), seed_preflight(), observe(), run_chunk(), reproduce(), remeasure_seed(), seed_verdicts(), format_seed_report() (lab-luck-gate phase 9)
       real_costs.py         `lab costs` (Sean phase 7): REAL_COST_SINCE = 31, requires_real_cost(), real_cost_problem() (the M0031 rule runner.preflight raises); resolve_method(), pick_candidate(), twins(), Side, side_of(), Comparison, measure(), format_report(), insight_text(), journal(). Report only: writes one journal observation, never a trial
       name_count.py         `lab names` (GOTRADE_FEE_REBUILD phase 8): NS = (5, 10, 15, 20, 25, 30), ROSTER_NAMES = 20, BASE_VARIANT = "M0007-N20-RAW", MIN_NAMES/MAX_NAMES = 2/60; check_names(), owner_schedule(), check_schedule_support(), variants(), Point, money_weighted(), point_of(), Sweep (of/best/clean/at/agrees), measure(), format_report(), csv_rows(), write_csv(). Sweeps M0007-N20-RAW's `inner.top` at Gotrade's real fees on the owner's contribution schedule, scored money-weighted against a dollar-cost-averaged SPY. Report only, and writes nothing at all: no trial, no moments, no journal entry, no status
+      walkforward.py        the lab's own walk-forward (walk-forward-evaluation phases 1-2): MIN_TRAIN_YEARS = 10, EVAL_YEARS = 3, MIN_EVAL_MONTHS = 12, Fold, Slice, FoldPick, folds(), measure(), pick(), evaluate(), Record (scored / won / majority / stable / summary()), BUY_CONDITIONS and buy_signal(). Pure: it slices curves the lab already recorded, runs no backtest and tunes nothing. **Not `backtest/walkforward.py`**, which is P3b's anchored walk-forward for Strategy A2 on the bracket engine
+      hardgate.py           the hard gate `lab promote` refuses on (lab-hard-gate phase 1): MIN_FOLDS = 4, COIN_FLIP_NULL, trial_deposits(), Geometry/geometry(), fold_record() -> walkforward.Record, fold_summary(), failed_kin()/family_state() walking `family` ∪ transitive `parent_id` ancestors, check() raising store.LabError, summary(). SQL plus arithmetic on recorded curves -- no research store, no backtest, no look
       seed.py               one-time import of the pre-lab record (P7a's 54 candidates)
       methods/              one file per method, mNNNN_<slug>.py exporting METHOD
     sean/                   Sean: the owner's real Gotrade orders, marked to market (Sean phases 1 and 4) and replayed against the fee schedule (phase 7)
@@ -2513,10 +2515,21 @@ committed-file gate. Nothing in it loads a research store, runs a backtest or wr
   `commands/lab.py` already turns it into exit 2 and no caller needs a second `except`.
 - `Prereg`: a frozen dataclass of the file's front-matter block — `method`, `candidate`,
   `config_digest`, `rules_id`, `allocator_id`, `dev_trial`, `dev_window`, `test_window`, `gate`,
-  `mar`, `dsr`, `n_trials_at_run`, `store_fingerprint`, `git_sha`, `date`. **Every field is a `str`**:
-  the file is the record and this value is a reading of it, not a parallel source of truth, so
-  `parse(render(p, name)) == p` exactly with no number formatting in the round trip. `FIELDS` is the
-  tuple of names, taken from the dataclass.
+  `mar`, `dsr`, `n_trials_at_run`, `store_fingerprint`, `git_sha`, `date`, and since
+  lab-hard-gate phase 2 `folds` and `family_state`. **Every field is a `str`**: the file is the
+  record and this value is a reading of it, not a parallel source of truth, so
+  `parse(render(p, name)) == p` exactly with no number formatting in the round trip. `FIELDS` is
+  the tuple of names, taken from the dataclass; `REQUIRED` is the fifteen that carry no default,
+  derived rather than retyped so a new defaulted field can never tighten the parser.
+- `folds` and `family_state` are **the hard gate's record of what this method cleared**, written
+  at promotion and never recomputed afterwards. `folds` is the walk-forward record in
+  `Record.summary()`'s own words (`"3 of 4 folds"`, or `"2 of 4 folds, pick changed"`);
+  `family_state` is the kin's state at that moment. They are the only two fields `parse`
+  tolerates as **absent**, filling them with a stated legacy value, because
+  `docs/lab/prereg/{M0002,M0021,M0022,M0029}.md` were committed before the gate existed and a
+  pre-registration is written once and never rewritten (Decision D5). Every file written from
+  here on carries both, so a reader a year from now sees the bar *this* method cleared rather
+  than today's bar.
 - `render(p, name) -> str` / `parse(text) -> Prereg`: the exact bytes of the file, and the reading of
   them. `parse` is strict on purpose — the block must be the first thing in the file, must be closed
   by its second `---`, must carry every key in `FIELDS` exactly once and must carry nothing else. An
@@ -2573,6 +2586,70 @@ committed-file gate. Nothing in it loads a research store, runs a backtest or wr
   passed, so a NULL here means a row that cannot be compared rather than a row that compares badly.
   `None` when the method has no eligible dev trial at all. `TRANSITIONS` already carried the
   `('dev-eligible', 'promoted')` edge; no schema or trigger changed.
+
+
+### lab: the hard gate (lab-hard-gate phases 1-2)
+
+`lab/hardgate.py` is the rule `lab promote` refuses on, and the only thing in the lab that can stop
+a counted test-window look being spent on a method the evidence has already judged. It opens no
+research store, runs no backtest, writes nothing and spends no look: it is two SQL reads and
+arithmetic on curves already in `trials.curve_json`. Measured 2026-10-09 on the committed lab:
+**0.807s** for all seven dev-eligible methods, inside `lab status`.
+
+- **Why it exists.** Five out-of-sample results, five failures — M0021, M0029, M0022 and M0002 on
+  `beats SPY TR`, and M0032 losing 415 million rupiah to a deposit-matched SPY. The surviving
+  dev-eligible ideas are all cousins of the methods that produced those failures. A lab that keeps
+  promoting cousins of disproven families is not learning, and the dev gate cannot see it: a
+  twenty-year average and a deflated Sharpe both said yes every time.
+- **The rule**, both halves required:
+  - **(F) folds** — the method beat the recorded `REF-SPY-HOLD` benchmark in a **majority** of its
+    scoreable walk-forward folds (`walkforward.Record.majority`), **and** it is scoreable on every
+    fold the geometry yields, at least `MIN_FOLDS = 4`. The second clause is the fail-closed
+    answer to thin evidence: under a coin-flip null a strict majority of an *odd* fold count is a
+    coin flip at every odd count (n=3 → 0.5000, n=4 → 0.3125, n=5 → 0.5000), so a minimum of 3
+    would admit evidence strictly weaker than 4. It is a bound, not a p-value — overlapping folds
+    are not independent observations and nothing here may be fed into a DSR. The table is
+    `COIN_FLIP_NULL`, in the module.
+  - **(K) kin** — no method in the candidate's **`family` ∪ its transitive ancestors through
+    `parent_id`** reads `test-failed`. Measured across the lab's 63 methods: `family` alone blocks
+    26 and misses M0030, whose family is clean but whose parent M0029 and grandparent M0021 both
+    failed; ancestors alone block 10; the union blocks 29; the full connected component blocks 36
+    in one 26-method blob and is rejected as too blunt — "cousin of a disproven family" stretched
+    four hops through unrelated families stops being a statement about the evidence.
+- **Where it is enforced, and where it is not.** `commands/lab.py:_promote` calls it **before**
+  `prereg.promote_method`, so a refusal leaves the repository and the database byte-identical: no
+  file, no status move, no insight, no analysis row. `lab test` does **not** re-check (K): a
+  pre-registration is a promise and is not re-opened, and refusing at `lab test` would strand a
+  method in `promoted`, a state with only two exits and both final. What `lab test` adds instead is
+  one printed note when the kin has failed since the promotion — a sentence, not a gate, the same
+  shape as `_ratchet_warning`.
+- **No override exists, in any form.** No `--force`, no flag, no "promote anyway". If the rule
+  proves too strict the answer is a recorded, argued change to the rule, because an override
+  path is precisely the mechanism that produced the 0-for-5 roster.
+- **A missing benchmark refuses**, naming `REF-SPY-HOLD`, so the reader knows it is the lab's
+  fixture that is wrong rather than their method. With no benchmark curve there is no fold
+  geometry, and "no scoreable folds" is refused rather than waved through.
+- **Every curve is de-funded before it is measured.** `trial_deposits(conn, row, curve)` moved here
+  out of `commands/lab.py` so the gate, `lab regime` and `lab walkforward` share one de-funding
+  path. Every trial from M0032 on is funded with the owner's 5,000,000 IDR a month; measuring a
+  raw funded curve against a benchmark that received none read as seventy to eighty points a year
+  of edge that was the owner's own deposits (insight 72, 75).
+- `check(conn, method_id) -> None` raises `store.LabError`, which `commands/lab.py:run` already
+  turns into exit 2 — no new `except` anywhere. It is silent for every status but `dev-eligible`.
+  `summary(conn, method_id, geo=None) -> str` is the one-line fold record `lab status` prints
+  beside each dev-eligible method, in the shape `"4 of 4 folds; kin clean"`; it is lenient and
+  returns the reason as text rather than raising. `fold_summary` is the strict twin the
+  pre-registration calls, because a pre-registration must never record a number it could not
+  compute. `geometry(conn)` cuts the folds from the benchmark once, for a caller judging many
+  methods.
+- **What it costs today, measured 2026-10-09.** It refuses all seven dev-eligible methods, which is
+  the intended effect and not a side effect. It is not a permanent stop: M0034 and M0035 each win 3
+  of 4 folds with clean kin, and read `rejected` only because the bars moved under them.
+
+In `lab status`, `_hard_gate_states` runs the gate once per command over the dev-eligible methods
+and catches every `LabError`, so a lab with no benchmark — a new one, or any fixture in
+`test_lab_status.py` — prints the refusal as a sentence instead of failing the command. Promoted
+methods are not re-judged there: the promise is not re-opened.
 
 
 ### lab: the N policy for the luck gate (lab-luck-gate phase 1)

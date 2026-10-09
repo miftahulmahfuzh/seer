@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/lab-hard-gate`
 **Branch:** `feature/lab-hard-gate` (base: `origin/main` @ `7708350`)
 **Phases:** 3
-**Status:** phase 1/3 complete
+**Status:** phase 2/3 complete
 **Coordinator:** —
 
 ---
@@ -142,7 +142,7 @@ Every phase must hold all of these, and each phase's exit criteria restate the o
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
 | 1 | The rule, and the refusal at `lab promote` | R1, R2, R3, R4, R5 | `engine/lab`, `engine/commands` | 4 | — | HARD | `.workflows/plan/lab-hard-gate/phase-1.md` | `P1-ENG-K7WZ` (done 2026-10-09) | — |
-| 2 | The pre-registration records what it cleared, and `lab test` says what changed | R3, R3a, R6 | `engine/lab`, `engine/commands`, docs | 6 | 1 | NORMAL | `.workflows/plan/lab-hard-gate/phase-2.md` | `P1-ENG-P3MF` | — |
+| 2 | The pre-registration records what it cleared, and `lab test` says what changed | R3, R3a, R6 | `engine/lab`, `engine/commands`, docs | 6 | 1 | NORMAL | `.workflows/plan/lab-hard-gate/phase-2.md` | `P1-ENG-P3MF` (done 2026-10-09) | — |
 | 3 | Make the gate visible before it bites | R7, R8, R9 | `engine/commands`, skills, docs | 6 | 1, 2 | NORMAL | `.workflows/plan/lab-hard-gate/phase-3.md` | `P1-ENG-T6BJ` | — |
 
 **On the dependency edges, and on quoting the file.** Phases 2 and 3 are logically independent of

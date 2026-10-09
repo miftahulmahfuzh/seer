@@ -27,23 +27,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "7cffbddb108448c62010688b610923bef948cca6",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "prereg gains folds + family_state (defaulted, REQUIRED derived from the defaults so parse cannot drift); runner.kin_note prints D3's line and refuses nothing; README Format table now lists all 17 keys. 552 passed/2 skipped; prereg 31->42, test_window 17->19, 0 deleted lines in either test file. Two ladder calls: (1) Step 2's prose wrapped 'never / a significance test' across a line break while Step 5's own test asserts it unwrapped - rewrapped the prose, did NOT relax the assertion (rung 3, both code blocks); (2) prereg.py module docstring said parse requires every key in FIELDS, made false by the FIELDS->REQUIRED change - corrected in place (rung 3, own file). No code drift: every anchor matched post-phase-1. package_readme.md deliberately untouched - phase 3 owns it.",
       "package": "engine/lab`, `engine/commands`, docs",
       "plan": ".workflows/plan/lab-hard-gate/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-09T10:27:08+00:00",
       "satisfies": [
         "R3",
         "R3",
         "R6"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-P3MF",
       "title": "The pre-registration records what it cleared, and `lab test` says what changed"
     },
     {
@@ -64,7 +64,7 @@
         "R8",
         "R9"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Make the gate visible before it bites"
     }
@@ -72,6 +72,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-hard-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-hard-gate",
-  "updated": "2026-10-09T10:17:54+00:00",
+  "updated": "2026-10-09T10:28:30+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-hard-gate"
 }

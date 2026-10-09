@@ -191,11 +191,102 @@ nobody anything.
    methods win a majority, so it is not a filter that rejects everything. The buy signal gained a
    fourth condition because running it fired on three methods whose families had already failed --
    see below.
-4. **Only if phase 3 justifies it:** make a walk-forward majority a *reported* condition on
-   `lab status` and in the pre-registration gate line. Not a hard gate without the owner's say-so
-   -- that is a policy change about what the lab is allowed to promote, and it belongs to him.
+4. **The hard gate.** Specified in full below. **The owner decided it on 2026-10-09**: a
+   majority of folds AND a clean family, enforced as a refusal, not a report.
 
-Phases 1-3 are a weekend. Phase 4 is a conversation first.
+Phases 1-3 took an afternoon. Phase 4 is the next session's work.
+
+---
+
+# Phase 4 — the hard gate
+
+**Decided 2026-10-09 by the owner**, after seeing what it costs. This section is the brief; it is
+written to be picked up cold.
+
+## The rule
+
+`lab promote` refuses a method unless **both** hold:
+
+- **(F) folds** — the method beat the recorded SPY benchmark in a **majority** of its scoreable
+  walk-forward folds (`lab/walkforward.py`, `Record.majority`);
+- **(K) kin** — **no other method in the same `family` reads `test-failed`**.
+
+Both are already computed and tested. Phase 4 is about where the refusal lives, what gets recorded
+when it passes, and what happens to everything that now cannot move.
+
+## What it costs, stated before anyone is surprised
+
+**It blocks every promotion in the lab as of today.** Every dev-eligible method -- M0007, M0019,
+M0020, M0033 -- is in a family that has already failed the test window, so every one fails (K).
+The lab will promote nothing until a genuinely new family appears.
+
+That is the intended effect, not a side effect. Five out-of-sample results, five failures; and the
+surviving ideas are all cousins of the methods that produced them. A lab that keeps promoting
+cousins of disproven families is not learning. If this proves too strict in practice the answer is
+a recorded, argued change to the rule -- not an override path, which is precisely the mechanism
+that produced the 0-for-5 roster in the first place.
+
+## Why at promote and not at test
+
+`lab promote` is where the lab commits: it writes the pre-registration, moves the method to
+`promoted`, and `promoted` has only two exits, both final. Refusing at `lab test` would leave a
+method stranded in a state it can never leave. Refuse before the commitment, not after it.
+
+The check is cheap and adds no dependency: it reads recorded curves and the methods table, needs
+no research store, and runs in under a second.
+
+## What the pre-registration must record
+
+The lab's idiom is to pin the rule in git *before* any test number exists -- `docs/lab/prereg/
+MNNNN.md` already records the five conditions, the DSR bar and the N in force. The fold record
+belongs there for the same reason: so a reader a year from now can see the bar this method actually
+cleared, not today's bar. Add the folds won and scored, whether the pick was stable across folds,
+and the family's state at promotion.
+
+## Open questions the implementer must answer, not assume
+
+1. **Fail closed on thin evidence.** A method with no scoreable folds, or fewer than some minimum,
+   must be **refused**, never waved through. Decide the minimum and say why in the code.
+2. **Is (K) evaluated at promote time only?** A family can fail *after* a method is promoted but
+   before its look is spent. Decide whether `lab test` re-checks (K) or honours the pre-registration
+   as written. The design's instinct is that a pre-registration is a promise and is not re-opened,
+   but say which you chose.
+3. **Does (K) look at ancestry as well as `family`?** M0032 is M0007's realistic twin by
+   `parent_id`, not by family string. A method whose *parent* failed is as disproven as one whose
+   sibling did. Decide whether to walk `parent_id` too.
+4. **Is there any path back?** `reevaluate` exists for `rejected -> dev-eligible` when the bars
+   move. Nothing equivalent exists for a family unblocked by later evidence. Do not invent one in
+   this phase; note whether it will be needed.
+
+## Also update, or the gate is invisible until it bites
+
+- `explore-and-experiment-new-method` **Promotion step 0b** currently *advises* a fold majority.
+  It must say the gate will refuse, so a child does not waste a cycle discovering it.
+- `sera-the-explorer` promotion path and the Never table, for the same reason.
+- `lab status` should show the fold record beside the dev-eligible list, so "why can nothing be
+  promoted" is answerable without running a second command.
+
+## Tests this phase is not done without
+
+- a method winning a majority with a clean family **promotes** (the existing promote tests must
+  still pass unchanged);
+- one losing the folds **refuses**, naming the record;
+- one in a family with a `test-failed` member **refuses**, naming the member;
+- one with too few scoreable folds **refuses**;
+- the refusal happens **before** the pre-registration file is written and before any status moves
+  -- a refused promote must leave the repository and database byte-identical.
+
+## Context the implementer needs and will not guess
+
+- Five out-of-sample results, five failures: M0021, M0029, M0022, M0002 on `beats SPY TR`, and
+  M0032 losing 415 million rupiah to a deposit-matched SPY over 2018-2026 (insight 58, 76).
+- The fold detector flags three of those four recorded failures and misses M0029. It is not
+  infallible; it is better than what preceded it, which was nothing.
+- **A funded curve must be de-funded before it is measured** (`regime.defunded`). Every trial from
+  M0032 on is funded. Getting this wrong reads the owner's deposits as edge -- it did, by seventy
+  to eighty points a year, until it was fixed (insight 72, 75).
+- `backtest/walkforward.py` is a **different module** -- P3b's anchored walk-forward for Strategy
+  A2 on the bracket engine. The lab one is `lab/walkforward.py`. Do not edit the wrong file.
 
 ## Picking this up on the GPD laptop
 

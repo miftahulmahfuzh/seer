@@ -35,11 +35,12 @@ from decimal import Decimal
 from pathlib import Path
 
 import numpy as np
-from seer_engine import research
+from seer_engine import dates, research
 from seer_engine.backtest import dev
 from seer_engine.backtest.benchmark import spy_curves
 from seer_engine.backtest.dev import Candidate
 from seer_engine.backtest.market import Market
+from seer_engine.backtest.metrics import money_weighted_return
 from seer_engine.lab import runner
 from seer_engine.lab import store as lab_store
 from seer_engine.lab.method import discover
@@ -254,6 +255,35 @@ def run_once(market, dividends, spy_divs, candidate, window, *, real_fx: bool):
 # --------------------------------------------------------------------------- the money
 
 
+def credited_idr(start: date, end: date) -> tuple[tuple[date, float], ...]:
+    """``(session, rupiah)`` per credited deposit -- ``book_runner``'s own crediting loop.
+
+    Mirrors the runner rather than guessing: a contribution dated ``d`` is credited at the first
+    NYSE session on or after ``d``, which the runner gets by asking ``due(previous session, this
+    session)`` once per session. Reproducing that here is what makes the rupiah IRR below measure
+    the same deposits, on the same days, that the book actually received.
+    """
+    per: dict[date, Decimal] = {}
+    data_date = dates.prev_session(start)
+    for session in dates.sessions(start, end):
+        due = OWNER_MONTHLY.due(data_date, session)
+        if due:
+            per[session] = per.get(session, Decimal(0)) + OWNER_MONTHLY.amount_idr * len(due)
+        data_date = session
+    return tuple((d, float(a)) for d, a in sorted(per.items()))
+
+
+def rupiah_return(curve, flows) -> float | None:
+    """The money-weighted return of an IDR curve fed IDR deposits.
+
+    The engine's own ``mwr`` is measured on the USD book, so it cannot see the rupiah: it would
+    read a return in dollars beside a balance in rupiah, and the two would disagree by however
+    far USD/IDR moved. The owner deposits rupiah and ends with rupiah, so the rate that answers
+    his question is the one taken over the rupiah.
+    """
+    return money_weighted_return(curve, flows)
+
+
 def deposits_idr(start: date, end: date) -> tuple[int, Decimal]:
     """``(how many deposits, total rupiah in)`` -- the opening sum plus every 25th in the window."""
     paid = OWNER_MONTHLY.dates_in(start, end)
@@ -275,6 +305,17 @@ def curve_idr(points, rate_on, fixed: Decimal | None):
         (d, float(Decimal(str(usd)) * (fixed if fixed is not None else rate_on(d))))
         for d, usd in points
     ]
+
+
+def pin_open(points):
+    """``points`` with its opening mark set to the rupiah that actually opened the account.
+
+    Snapshot zero is dated the session BEFORE the window, so converting it at that day's rate
+    prices the opening sum at a rate the money never saw -- it was converted at
+    ``usd_idr_on(start)``. Left alone it read 10,049,936 where 10,000,000 went in, and that half
+    a percent lands in the IRR as a return nobody earned.
+    """
+    return [(points[0][0], float(OPENING_IDR)), *points[1:]] if points else points
 
 
 def monthly(points):
@@ -332,7 +373,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Running {candidate.id} from {start} to {end} ...", file=sys.stderr)
         real_res, real_row = run_once(market, dividends, spy_divs, candidate, window, real_fx=True)
         print("  real-rupiah run done; now the fixed-rate one ...", file=sys.stderr)
-        fixed_res, fixed_row = run_once(market, dividends, spy_divs, candidate, window, real_fx=False)
+        fixed_res, _fixed_row = run_once(market, dividends, spy_divs, candidate, window, real_fx=False)
         print("  done.\n", file=sys.stderr)
     except Refused as e:
         print(f"\n{e}\n", file=sys.stderr)
@@ -352,9 +393,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     spy_curve = [(d, float(v)) for d, v in spy_total]
 
-    book_real = curve_idr(real_curve, market.usd_idr_on, None)
-    book_fixed = curve_idr(fixed_curve, None, open_rate)
-    spy_real = curve_idr(spy_curve, market.usd_idr_on, None)
+    book_real = pin_open(curve_idr(real_curve, market.usd_idr_on, None))
+    book_fixed = pin_open(curve_idr(fixed_curve, None, open_rate))
+    spy_real = pin_open(curve_idr(spy_curve, market.usd_idr_on, None))
     paid_in = OWNER_MONTHLY.dates_in(ran_from, ran_to)
     deposited = [
         (d, float(OPENING_IDR + OWNER_MONTHLY.amount_idr * sum(1 for x in paid_in if x <= d)))
@@ -366,15 +407,21 @@ def main(argv: list[str] | None = None) -> int:
     end_spy = spy_real[-1][1]
     years = (ran_to - ran_from).days / 365.25
 
+    # Every rate below is taken over the rupiah, against the rupiah that left the owner's bank.
+    flows = credited_idr(ran_from, ran_to)
+    r_book_real = rupiah_return(book_real, flows)
+    r_book_fixed = rupiah_return(book_fixed, flows)
+    r_spy = rupiah_return(spy_real, flows)
+
     print(f"  {candidate.id}   {ran_from} to {ran_to}   ({years:.1f} years)")
     print(f"  10,000,000 to open, then 5,000,000 on the 25th: {n_deposits} deposits\n")
     print(f"  {'you paid in':<34}{rupiah(total_in):>22}")
     print(f"  {'your book, at real rupiah rates':<34}{rupiah(end_book_real):>22}   "
-          f"{pct(real_row.stats.metrics.mwr)} a year")
+          f"{pct(r_book_real)} a year")
     print(f"  {'the same deposits into SPY':<34}{rupiah(end_spy):>22}   "
-          f"{pct(real_row.spy_tr.mwr)} a year")
-    print(f"  {'your book, at the 2018 rupiah rate':<34}{rupiah(end_book_fixed):>22}   "
-          f"{pct(fixed_row.stats.metrics.mwr)} a year")
+          f"{pct(r_spy)} a year")
+    print(f"  {'your book, at a frozen rupiah':<34}{rupiah(end_book_fixed):>22}   "
+          f"{pct(r_book_fixed)} a year")
     print(f"\n  {'what the rupiah added':<34}{rupiah(end_book_real - end_book_fixed):>22}   "
           f"(USD/IDR {open_rate:,.0f} -> {end_rate:,.0f})")
     print(f"  {'what the strategy added over SPY':<34}{rupiah(end_book_real - end_spy):>22}")
@@ -384,7 +431,8 @@ def main(argv: list[str] | None = None) -> int:
           f"  reads shallower here than the same fall would on money that just sat there.")
     print(f"  {real_row.stats.metrics.trades} trades. Returns are money-weighted: the rate a "
           f"savings account would have\n  had to pay on the same deposits, on the same days, to "
-          f"reach the same balance.")
+          f"reach the same balance -- taken over\n  the rupiah, which is the currency you "
+          f"actually deposit and actually end with.")
 
     if args.out:
         args.out.write_text(json.dumps({
@@ -401,9 +449,11 @@ def main(argv: list[str] | None = None) -> int:
             "end_book_real_idr": end_book_real,
             "end_book_fixed_idr": end_book_fixed,
             "end_spy_idr": end_spy,
-            "mwr_book_real": real_row.stats.metrics.mwr,
-            "mwr_book_fixed": fixed_row.stats.metrics.mwr,
-            "mwr_spy": real_row.spy_tr.mwr,
+            "mwr_book_real": r_book_real,
+            "mwr_book_fixed": r_book_fixed,
+            "mwr_spy": r_spy,
+            "mwr_book_usd": real_row.stats.metrics.mwr,
+            "mwr_spy_usd": real_row.spy_tr.mwr,
             "max_drawdown": real_row.stats.metrics.max_drawdown,
             "trades": real_row.stats.metrics.trades,
             "series": {

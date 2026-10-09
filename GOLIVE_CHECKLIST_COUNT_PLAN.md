@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/golive-checklist-count`
 **Branch:** `feature/golive-checklist-count` (base: `origin/main` @ `d8c0cab`)
 **Phases:** 1
-**Status:** planned
+**Status:** complete (phase 1/1)
 **Coordinator:** —
 
 ---
@@ -99,7 +99,7 @@ depends on it.
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Count the rules once, where the rules are | R1, R2 | `web` | 7 | — | NORMAL | `.workflows/plan/golive-checklist-count/phase-1.md` | — | — |
+| 1 | ✅ Count the rules once, where the rules are | R1, R2 | `web` | 7 | — | NORMAL | `.workflows/plan/golive-checklist-count/phase-1.md` | P1-WEB-H7RK | — |
 
 ### Phase 1 — Count the rules once, where the rules are
 

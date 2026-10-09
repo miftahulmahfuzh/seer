@@ -1,5 +1,13 @@
 // Pure helpers for /sera/how. No data access; page.tsx feeds the snapshot (structurally narrowed).
 import { monthYear, type Era, type PipelineStage } from '../../../components/sera/diagrams/geometry';
+// Design §1's paper bar before real money: MIN_PAPER_MONTHS = 18 months of forward paper, months
+// alone since §13 (2026-10-07) deleted the trades clause — a trade count scales with how many
+// names a book holds, not with how much evidence exists. Imported rather than spelled again: the
+// local `PAPER_MONTHS = 3` / `PAPER_TRADES = 100` that used to sit below this block outlived that
+// revision by two days. It is still absent from `snapshot.gate` — the lab never reaches paper by
+// itself, so there is no carrier to read it from — which is why this one bar comes from
+// `lib/golive.ts` while `gate.maxDrawdown` and every other lab bar still come from the snapshot.
+import { MIN_PAPER_MONTHS } from '../../../lib/golive';
 import { CONDITION_KEYS, type ConditionKey } from '../../../lib/sera/derive';
 import { CONDITION_TERM, type GlossaryKey } from '../../../lib/sera/glossary';
 import type { Gate, LabMethod, LabSnapshot, LabTrial } from '../../../lib/sera/types';
@@ -13,13 +21,6 @@ export type HowInput = {
   methods: readonly Pick<LabMethod, 'status' | 'historical' | 'updated'>[];
   trials: readonly Pick<LabTrial, 'window' | 'eligibleNow'>[];
 };
-
-/**
- * Design §1's paper bar before real money: at least 3 months and 100 trades on paper.
- * Not in snapshot.gate (the lab never reaches paper by itself). See the Phase 6 handoff to Phase 1.
- */
-export const PAPER_MONTHS = 3;
-export const PAPER_TRADES = 100;
 
 /** The two bear markets inside the dev window (S&P 500 peak to trough). */
 export const BEARS: Era[] = [
@@ -113,7 +114,7 @@ export function pipelineStages(snap: HowInput): PipelineStage[] {
     {
       key: 'paper',
       title: ['Paper trading'],
-      detail: [`At least ${PAPER_MONTHS} months`, `and ${PAPER_TRADES} trades,`, 'no real money'],
+      detail: [`At least ${MIN_PAPER_MONTHS} months`, 'of forward paper,', 'no real money'],
       count: `${count(c.paper)} on paper`,
       countTip: 'Lab methods trading with pretend money now',
       fails: true,

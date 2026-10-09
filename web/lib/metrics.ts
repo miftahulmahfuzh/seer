@@ -85,3 +85,22 @@ export function checklist(m: Metrics, spyReturn: number | null, gate: Gate): Che
     gateItem(gate),
   ];
 }
+
+/**
+ * How many rules `checklist` returns. THE definition of that number in `web/`: nothing else may
+ * spell it. `metrics.test.ts` asserts `checklist(...)` has exactly this many rows, and
+ * `app/(app)/leaderboard/view.ts`'s `CHECKS` is this constant rather than a literal.
+ *
+ * It is here, beside the list, because a literal elsewhere is exactly how this went wrong: design
+ * §13 (2026-10-07, commit `ba8a05b`) folded "≥ 3 months forward AND ≥ 100 trades" into "≥ 18
+ * months forward" and shortened this list from six rows to five, while the leaderboard kept its
+ * own `CHECKS = 6`. It then scored five rendered rows out of six and `ready` — which requires
+ * `items.length === CHECKS` — became unreachable, so a strategy that passed everything read 5/6
+ * and never said "Ready for real money".
+ *
+ * The engine's twin, `backtest.metrics.checklist`, returns FOUR and is not wrong: its missing
+ * fifth is the backtest gate, which reads `strategies.params.backtest_gate` — a roster fact no
+ * backtest can evaluate — so the web appends `gateItem` and the engine does not. The engine/web
+ * parity test compares labels, not lengths, and needs no change when this number moves.
+ */
+export const CHECKLIST_RULES = 5;

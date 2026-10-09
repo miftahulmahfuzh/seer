@@ -3,7 +3,7 @@
  *
  * The engine owns these numbers. `MAX_DRAWDOWN` is `backtest.metrics.MAX_DRAWDOWN`, re-exported
  * there as `backtest.tuning.MAX_DRAWDOWN`, and it reaches the web twice over: here, for the
- * leaderboard's six-rule checklist in `lib/metrics.ts`, and in `data/lab.json`'s
+ * leaderboard's five-rule checklist in `lib/metrics.ts`, and in `data/lab.json`'s
  * `gate.maxDrawdown`, written by `lab.store.snapshot`. `golive.test.ts` asserts the two are the
  * same number, so an engine change that is not mirrored here fails the build rather than leaving
  * the leaderboard judging at a bar the engine abandoned.

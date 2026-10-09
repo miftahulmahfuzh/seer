@@ -80,6 +80,19 @@ export type LedgerRow = LedgerOrder & { amountUsd: number };
  * buildLedger / pnlSeries / pnlAt. executedAt is ISO 8601 with the receipt's +07:00 offset, so
  * orderSession() reads the New York trade date from it. Throws when the read fails.
  */
+/**
+ * The ids of orders the owner has claimed as his own (`sean_own_orders`, migration 020).
+ *
+ * Their shares are not the plan's: `planState` drops them before building `held`, so they land in
+ * `outside` and inherit the protection every pre-plan holding already has. Their CASH is left
+ * alone -- the money moved through the account whatever the shares were for -- so the derived
+ * wallet is unchanged and still matches the broker.
+ */
+export async function ownOrderIds(): Promise<Set<number>> {
+  const rows = await sql`SELECT order_id FROM sean_own_orders`;
+  return new Set(rows.map(r => Number(r.order_id)));
+}
+
 export async function ledgerOrders(): Promise<LedgerRow[]> {
   const rows = await sql`
     SELECT id, side, symbol,

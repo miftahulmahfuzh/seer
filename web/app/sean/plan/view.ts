@@ -195,6 +195,18 @@ export function cashLine(planSize: number | null, cashUsd: number | null, budget
 }
 
 /** The note about holdings from before the plan; null when there are none. */
+/**
+ * What the owner has claimed as his own since the plan started (migration 020), or null.
+ *
+ * Kept visible on purpose: a list you can only edit through reminders is a list you cannot see,
+ * and six months on nobody remembers why the method appears to ignore three stocks.
+ */
+export function ownedLine(symbols: readonly string[]): string | null {
+  if (symbols.length === 0) return null;
+  const they = symbols.length === 1 ? 'Those shares are' : 'Those shares are';
+  return `You claimed your ${joinWords(symbols)} as your own, not this plan's. ${they} left out of the plan's value and Sean never asks you to sell them. Buying more because the method picks it would belong to the plan again.`;
+}
+
 export function outsideLine(symbols: readonly string[], since: string): string | null {
   if (symbols.length === 0) return null;
   return `You also hold ${joinWords(symbols)} from before ${shortDate(since)}. They are not part of this plan, so Sean never asks you to sell them.`;

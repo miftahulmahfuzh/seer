@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildReminders, fund, lastPrices, MIN_TRADE_USD, outsideShares, planOrders, resizes, sideOf,
+  buildReminders, fund, lastPrices, MIN_TRADE_USD, outsideShares, planHeldOrders, planOrders,
+  resizes, sharesBySymbol, sideOf,
   type PlanOrderLite, type Reminder, type ReminderInput, type Target,
 } from './reminders';
+import type { LedgerOrder } from './ledger';
 
 const OCT = '2026-10-07';
 const NOV = '2026-11-02';
@@ -344,6 +346,60 @@ describe('fund: spending a leftover wallet, rank order, last one partial', () =>
     const whole = flush.reminders.find(x => x.symbol === 'LRCX' && x.action === 'buy');
     expect(whole?.fundedUsd).toBe(whole?.usd);
     expect(whole?.fundedUsd).toBeLessThan(500);
+  });
+});
+
+describe("planHeldOrders: shares the owner claimed as his own (migration 020)", () => {
+  /** The owner's real 2026-10-08 rotation: PLTR (bought 2025-06-10) sold, NVDA bought minutes later. */
+  const order = (over: Partial<LedgerOrder>): LedgerOrder => ({
+    id: 1, side: 'buy', symbol: 'NVDA', executedAt: '2026-10-08T20:33:00+07:00',
+    price: 234.464, shares: 0.425011942, totalUsd: 99.94,
+    tradingFeeUsd: 0.25, regulatoryFeeUsd: 0.02, ppnUsd: 0.02, ...over,
+  });
+  const pltrSell = order({
+    id: 10, side: 'sell', symbol: 'PLTR', executedAt: '2026-10-08T20:31:00+07:00',
+    price: 200.498, shares: 0.5, totalUsd: 99.94,
+  });
+  const nvda1 = order({ id: 11, executedAt: '2026-10-08T20:30:00+07:00', price: 234.96, shares: 0.286687095, totalUsd: 67.55 });
+  const nvda2 = order({ id: 12 });
+  const inPlan = [nvda1, pltrSell, nvda2];
+
+  it('keeps every order when nothing is claimed', () => {
+    expect(planHeldOrders(inPlan, new Set()).map(o => o.id)).toEqual([11, 10, 12]);
+  });
+
+  it('drops only the claimed orders, and never the sells that funded them', () => {
+    const held = planHeldOrders(inPlan, new Set([11, 12]));
+    expect(held.map(o => o.id)).toEqual([10]);
+  });
+
+  it('the claimed NVDA stops being a plan holding, so no sell reminder can be raised for it', () => {
+    // Before: the plan "holds" NVDA the method never picked, and is told to sell it.
+    const beforeHeld = sharesBySymbol(planHeldOrders(inPlan, new Set()));
+    expect(beforeHeld.get('NVDA')).toBeCloseTo(0.711699, 6);
+    const before = buildReminders(input({ held: beforeHeld, targets: RAW }));
+    expect(before.reminders.some(r => r.symbol === 'NVDA' && r.action === 'sell')).toBe(true);
+
+    // After: the shares were never the plan's, so there is nothing to sell -- and nothing to
+    // re-click next month, because this is not a per-session mark.
+    const afterHeld = sharesBySymbol(planHeldOrders(inPlan, new Set([11, 12])));
+    expect(afterHeld.has('NVDA')).toBe(false);
+    const after = buildReminders(input({ held: afterHeld, targets: RAW }));
+    expect(after.reminders.some(r => r.symbol === 'NVDA')).toBe(false);
+  });
+
+  it('the claimed shares show up as the owner\'s, held outside the plan', () => {
+    const all = new Map<string, number>([['NVDA', 17.796473037]]);  // 17.08 pre-plan + 0.71 claimed
+    const held = sharesBySymbol(planHeldOrders(inPlan, new Set([11, 12])));
+    expect(outsideShares(all, held).get('NVDA')).toBeCloseTo(17.796473, 6);
+  });
+
+  it('claiming a buy does NOT change the plan cash: the money left the account either way', () => {
+    // planOrders is what the wallet is derived from, and it is untouched by a claim.
+    const cashOrders = planOrders(inPlan, '2026-10-07');
+    const net = cashOrders.reduce((t, o) => t + (o.side === 'buy' ? o.totalUsd : -o.totalUsd), 0);
+    expect(net).toBeCloseTo(67.55 + 99.94 - 99.94, 2);  // the rotation nets to the first buy alone
+    expect(planHeldOrders(cashOrders, new Set([11, 12])).length).toBe(1);  // holdings differ
   });
 });
 

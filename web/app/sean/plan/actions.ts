@@ -92,6 +92,53 @@ export async function markDone(formData: FormData): Promise<void> {
   refresh();
 }
 
+/**
+ * Claim the plan's shares of one stock as the owner's own (migration 020).
+ *
+ * Marks every plan-window BUY of `symbol` that is not already claimed. Their shares stop being
+ * plan holdings and fall into `outside` -- never sold by Sean, never counted in plan value --
+ * exactly as a pre-plan holding is. The money is untouched: it moved through the account whoever
+ * the shares were for, so the derived wallet does not change.
+ *
+ * Per order, not per symbol, and that is the point: the method may legitimately pick this stock in
+ * some later month, and those shares WOULD be the plan's. Only the orders claimed here are yours.
+ * It cannot recur as a reminder either, because these shares were never plan shares.
+ */
+export async function claimAsOwn(formData: FormData): Promise<void> {
+  if (!(await isSeanCaller())) return;
+  const symbol = parseSymbol(formData.get('symbol'));
+  if (!symbol) return;
+  try {
+    await sql`INSERT INTO sean_own_orders (order_id, note)
+      SELECT o.id, ${'claimed on the plan page'}
+        FROM sean_orders o, sean_link l
+       WHERE l.id = 1
+         AND o.symbol = ${symbol}
+         AND o.side = 'buy'
+         AND (o.executed_at AT TIME ZONE 'America/New_York')::date >= l.since
+      ON CONFLICT (order_id) DO NOTHING`;
+  } catch (e) {
+    console.error('sean_own_orders insert failed', e);
+    return;
+  }
+  refresh();
+}
+
+/** Give one stock's claimed buys back to the plan. */
+export async function unclaimAsOwn(formData: FormData): Promise<void> {
+  if (!(await isSeanCaller())) return;
+  const symbol = parseSymbol(formData.get('symbol'));
+  if (!symbol) return;
+  try {
+    await sql`DELETE FROM sean_own_orders WHERE order_id IN (
+      SELECT o.id FROM sean_orders o WHERE o.symbol = ${symbol} AND o.side = 'buy')`;
+  } catch (e) {
+    console.error('sean_own_orders delete failed', e);
+    return;
+  }
+  refresh();
+}
+
 /** Take a hand-made done mark back. */
 export async function undoDone(formData: FormData): Promise<void> {
   if (!(await isSeanCaller())) return;

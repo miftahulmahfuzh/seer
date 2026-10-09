@@ -6,10 +6,10 @@
 import { cache } from 'react';
 import { sql } from '@/lib/db';
 import { cashUsd, OWNER_MONTHLY, OWNER_USD_IDR } from '@/lib/sean/cash';
-import { ledgerOrders } from '@/lib/sean/data';
+import { ledgerOrders, ownOrderIds } from '@/lib/sean/data';
 import { orderSession } from '@/lib/sean/ledger';
 import {
-  buildReminders, outsideShares, planOrders, resizes, sharesBySymbol,
+  buildReminders, outsideShares, planHeldOrders, planOrders, resizes, sharesBySymbol,
   type ReminderMark, type ReminderPlan, type Side, type Target,
 } from '@/lib/sean/reminders';
 import { shortLabel } from '@/lib/strategy';
@@ -149,18 +149,25 @@ export type PlanState = {
   plan: ReminderPlan;
   /** Stocks held from outside the plan (before `since`), by ticker: never sold by Sean. */
   outside: string[];
+  /** Stocks whose plan-window buys the owner claimed as his own (020), by ticker. */
+  owned: string[];
 };
 
 /** The followed method, its picks and the reminders against the plan; null when nothing is followed. */
 export async function planState(): Promise<PlanState | null> {
   const l = await link();
   if (!l) return null;
-  const [decision, all] = await Promise.all([
+  const [decision, all, own] = await Promise.all([
     l.retired ? Promise.resolve(null) : latestTargets(l.strategyId),
     ledgerOrders(),
+    ownOrderIds(),
   ]);
   const inPlan = planOrders(all, l.since);
-  const held = sharesBySymbol(inPlan);
+  // The plan's HOLDINGS exclude orders the owner claimed as his own (020); the plan's CASH does
+  // not, because that money moved through the account whoever the shares were for. So a personal
+  // rotation -- sell a pre-plan holding at 20:31, buy another at 20:33 -- nets to zero in the
+  // wallet and leaves the plan holding neither, which is what actually happened.
+  const held = sharesBySymbol(planHeldOrders(inPlan, own));
   const outside = outsideShares(sharesBySymbol(all), held);
   const [marksDone, closes, usdIdr] = await Promise.all([
     decision ? reminderMarks(l.strategyId, decision.sessionDate) : Promise.resolve([] as ReminderMark[]),
@@ -189,7 +196,8 @@ export async function planState(): Promise<PlanState | null> {
     orders: inPlan.map(o => ({ symbol: o.symbol, side: o.side, executedAt: o.executedAt, price: o.price })),
     marks: marksDone,
   });
-  return { link: l, targets: decision, plan, outside: [...outside.keys()].sort() };
+  const owned_ = [...new Set(inPlan.filter(o => own.has(o.id)).map(o => o.symbol))].sort();
+  return { link: l, targets: decision, plan, outside: [...outside.keys()].sort(), owned: owned_ };
 }
 
 /**

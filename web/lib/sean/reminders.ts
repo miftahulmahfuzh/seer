@@ -220,6 +220,21 @@ export function planOrders<T extends { executedAt: string }>(orders: readonly T[
   return orders.filter(o => orderSession(o.executedAt) >= since);
 }
 
+/**
+ * The plan-window orders whose SHARES are the plan's: everything the owner has not claimed as his
+ * own (`sean_own_orders`, migration 020).
+ *
+ * Only holdings are filtered. The plan's CASH still counts every order in the window, because the
+ * money moved through the account whoever the shares were for -- so a personal rotation (sell a
+ * pre-plan holding, buy another minutes later) nets to zero in the wallet and leaves the plan
+ * holding neither, which is what really happened on 2026-10-08.
+ */
+export function planHeldOrders<T extends { id: number }>(
+  inPlan: readonly T[], own: ReadonlySet<number>,
+): T[] {
+  return own.size === 0 ? [...inPlan] : inPlan.filter(o => !own.has(o.id));
+}
+
 /** Open shares per stock after `orders`, by the one ledger (contract B; open positions only). */
 export function sharesBySymbol(orders: readonly LedgerOrder[]): Map<string, number> {
   const out = new Map<string, number>();

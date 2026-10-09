@@ -1,4 +1,4 @@
-import { Check, CircleMinus, CirclePlus, Link2Off, RotateCcw } from 'lucide-react';
+import { Check, CircleMinus, CirclePlus, HandCoins, Link2Off, RotateCcw } from 'lucide-react';
 import type { Metadata } from 'next';
 import { sharesLabel, strategyIcon } from '@/components/roster';
 import { PageHeader } from '@/components/sera/PageHeader';
@@ -9,11 +9,11 @@ import { requireSean } from '@/lib/sean/gate';
 import { orderSession } from '@/lib/sean/ledger';
 import { linkableMethods, planState, type LinkableMethod, type PlanState } from '@/lib/sean/planData';
 import type { Reminder } from '@/lib/sean/reminders';
-import { markDone, undoDone, unlinkMethod } from './actions';
+import { claimAsOwn, markDone, undoDone, unlinkMethod } from './actions';
 import { LinkPicker } from './LinkPicker';
 import { PlanSettings } from './PlanSettings';
 import {
-  cashLine, doneLine, fundedLine, methodTitle, outsideLine, picksLine, planSizeLine, reminderDetail,
+  cashLine, doneLine, fundedLine, methodTitle, outsideLine, ownedLine, picksLine, planSizeLine, reminderDetail,
   reminderTitle, todoLabel,
 } from './view';
 import s from './plan.module.css';
@@ -73,7 +73,7 @@ function Unlinked({ methods, today }: { methods: LinkableMethod[]; today: string
 }
 
 function Linked({ state }: { state: PlanState }) {
-  const { link, targets, plan, outside } = state;
+  const { link, targets, plan, outside, owned } = state;
   const Icon = strategyIcon(link.icon);
   const picks = targets?.targets.length ?? 0;
   const heldPicks = plan.holdings.filter(h => h.picked).length;
@@ -85,6 +85,7 @@ function Linked({ state }: { state: PlanState }) {
       : `${link.short} has not picked any stocks yet. Reminders show up after its first pick.`;
   const unlinkTip = `Stop following ${link.short}`;
   const outsideNote = outsideLine(outside, link.since);
+  const ownedNote = ownedLine(owned);
 
   return (
     <>
@@ -175,6 +176,7 @@ function Linked({ state }: { state: PlanState }) {
             </table>
           )}
           {outsideNote && <p className={s.note}>{outsideNote}</p>}
+          {ownedNote && <p className={s.note}>{ownedNote}</p>}
         </Section>
       </div>
     </>
@@ -193,6 +195,18 @@ function ReminderRow({ r, short, sessionDate }: { r: Reminder; short: string; se
         <span className={s.rowDetail}>{reminderDetail(r, short)}</span>
         {fundedLine(r) === '' ? null : <span className={s.rowDetail}>{fundedLine(r)}</span>}
       </span>
+      {r.action !== 'sell' ? null : (
+        // Not a way to skip a sell: it says these shares were never the plan's. They move to
+        // `outside` for good, so this reminder cannot come back next month (migration 020).
+        <form action={claimAsOwn}>
+          <input type="hidden" name="symbol" value={r.symbol} />
+          <button type="submit" className={`icon-btn sm ${s.doneBtn}`}
+            aria-label={`These ${r.symbol} shares are mine, not the plan's`}
+            data-tip={`These ${r.symbol} shares are mine, not the plan's`}>
+            <HandCoins size={18} strokeWidth={1.75} />
+          </button>
+        </form>
+      )}
       <form action={markDone}>
         <input type="hidden" name="sessionDate" value={sessionDate} />
         <input type="hidden" name="symbol" value={r.symbol} />

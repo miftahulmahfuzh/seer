@@ -171,6 +171,7 @@ class DividendMonthAllocator:
     """
 
     id = "M0051"
+    market_fields = ("dividends",)  # ranks on Market.dividends, never on Market.fundamentals
 
     def lookback(self, params: Any) -> int:
         return factor_lookback(_check(params).inner)

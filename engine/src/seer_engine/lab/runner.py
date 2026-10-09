@@ -187,17 +187,29 @@ def preflight(conn: sqlite3.Connection, method: Method, path: Path, *, require_c
             raise store.LabError(f"{c.id} repeats {hit[0]}, which already ran on the dev window")
 
 
-def market_aware_candidates(method: Method) -> tuple[str, ...]:
-    """The ids of ``method``'s candidates whose allocator reads the whole ``Market``, in order.
+def market_fields(allocator: object) -> tuple[str, ...]:
+    """The ``Market`` fields a ``MarketAware`` allocator ranks on; () for any other allocator.
 
-    ``strategies.allocator.MarketAware`` is ``runtime_checkable``, so this tests for a
-    ``prepare_market`` attribute and nothing more -- which is exactly the dispatch
-    ``allocator.prepare_for`` makes, and therefore exactly the set of candidates whose ranking
-    can see ``Market.fundamentals``. ``f_fundamental.FUNDAMENTAL`` satisfies it structurally; a
-    price-only allocator such as ``f_index.TIMING`` or ``f_rotation.ROTATION`` does not, and a
-    bracket ``Strategy`` does not either.
+    An allocator declares them as a ``market_fields`` class attribute (``("dividends",)`` for
+    M0051's calendar book). One that declares nothing is taken to read ``fundamentals``: that
+    is what every market-aware allocator read before the dividend calendar existed, so the
+    fundamentals coverage gate keeps refusing exactly what it refused before.
     """
-    return tuple(c.id for c in method.candidates if isinstance(c.allocator, MarketAware))
+    if not isinstance(allocator, MarketAware):
+        return ()
+    return tuple(getattr(allocator, "market_fields", ("fundamentals",)))
+
+
+def market_aware_candidates(method: Method, field: str = "fundamentals") -> tuple[str, ...]:
+    """The ids of ``method``'s candidates whose allocator ranks on ``Market.<field>``, in order.
+
+    ``strategies.allocator.MarketAware`` is ``runtime_checkable``, so being market-aware is
+    having a ``prepare_market`` attribute -- exactly the dispatch ``allocator.prepare_for``
+    makes. ``f_fundamental.FUNDAMENTAL`` satisfies it structurally and reads fundamentals; a
+    price-only allocator such as ``f_index.TIMING`` or ``f_rotation.ROTATION`` does not, and a
+    bracket ``Strategy`` does not either. Which field it reads is ``market_fields``.
+    """
+    return tuple(c.id for c in method.candidates if field in market_fields(c.allocator))
 
 
 def preflight_data(
@@ -212,14 +224,21 @@ def preflight_data(
     second checkpoint and it exists for one reason: M0005 was spent on a store whose panel held
     no fact filed before 2013, over a dev window that opens in 1996, and nothing refused it.
 
-    Returns None for a method with no ``MarketAware`` candidate -- a price-only method ranks on
-    bars and must stay runnable against a store with no panel at all. Otherwise it returns the
+    Returns None for a method with no candidate that ranks on fundamentals -- a price-only method
+    ranks on bars, a calendar method on the dividend calendar, and both must stay runnable against a store with no panel at all. Otherwise it returns the
     measurement, so the caller can print it whether or not it cleared the floor, and raises
     ``store.LabError`` when the measured fraction is below ``min_coverage``.
 
     ``min_coverage`` is lowered by ``lab run --allow-coverage F``. That is an acknowledgement,
     not a silencer: the caller prints the table either way.
     """
+    calendar = market_aware_candidates(method, "dividends")
+    if calendar and len(data.market.dividends) == 0:
+        raise store.LabError(
+            f"{method.id}: {', '.join(calendar)} rank on Market.dividends, and this store's market "
+            "carries no dividend calendar; running it would measure the missing calendar, not the "
+            "hypothesis. Nothing has been spent"
+        )
     aware = market_aware_candidates(method)
     if not aware:
         return None
@@ -802,6 +821,12 @@ def run_test(
             f"the look would measure the missing panel, not the hypothesis. Build the test store "
             f"with `research_store --test-window --with-fundamentals` and run it again -- nothing "
             f"has been spent"
+        )
+    if candidate.id in market_aware_candidates(method, "dividends") and len(data.market.dividends) == 0:
+        raise store.LabError(
+            f"{candidate.id} ranks on Market.dividends and this test store's market carries no "
+            f"dividend calendar; the look would measure the missing calendar, not the hypothesis. "
+            f"Nothing has been spent"
         )
     pre = preflight_test(conn, method, path, candidate, require_commit=require_commit)
 

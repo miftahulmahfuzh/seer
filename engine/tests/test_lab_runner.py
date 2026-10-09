@@ -415,3 +415,34 @@ def test_recorded_capital_refuses_a_trial_whose_capital_was_never_recorded(conn,
     n = int(store.trials_of(conn, "M0001")[0]["n"])
     with pytest.raises(store.LabError, match="no recorded starting capital"):
         runner.recorded_capital(conn, n)
+
+
+# ---- a calendar allocator is gated on the calendar, not the panel ------------------------------
+
+
+def _div_method(mid: str = "M0014") -> Method:
+    from seer_engine.lab.methods.m0051_dividend_month_premium import METHOD as M0051
+
+    c = dataclasses.replace(M0051.candidates[0], id=f"{mid}-ALL-T", family=mid)
+    return _method(mid, cands=(c,))
+
+
+def test_a_dividend_calendar_method_skips_the_fundamentals_gate(data):
+    """M0051 is MarketAware but reads Market.dividends: an empty panel must not refuse it."""
+    from seer_engine.backtest.market import DividendCalendar
+
+    m = _div_method()
+    assert runner.market_aware_candidates(m) == ()
+    assert runner.market_aware_candidates(m, "dividends") == ("M0014-ALL-T",)
+    assert runner.market_fields(FUNDAMENTAL) == ("fundamentals",)
+    assert runner.market_fields(TIMING) == ()
+    cal = DividendCalendar({"AAA": [(date(2014, 3, 10), Decimal("0.2"))]})
+    with_cal = dataclasses.replace(data, market=data.market.with_dividends(cal))
+    assert len(with_cal.market.fundamentals) == 0
+    assert runner.preflight_data(with_cal, m) is None
+
+
+def test_a_dividend_calendar_method_is_refused_without_a_calendar(data):
+    assert len(data.market.dividends) == 0
+    with pytest.raises(store.LabError, match="no dividend calendar"):
+        runner.preflight_data(data, _div_method())

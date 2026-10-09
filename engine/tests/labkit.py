@@ -13,6 +13,7 @@ from seer_engine.backtest.benchmark import Dividend
 from seer_engine.backtest.dev import DEV_END
 from seer_engine.backtest.market import Market, Membership
 from seer_engine.backtest.window import Window
+from seer_engine.lab import store
 from seer_engine.research import ResearchData
 from seer_engine.strategies.base import History
 
@@ -56,6 +57,7 @@ def smoke_data(extra: Iterable[str] = ()) -> ResearchData:
         spy_dividends=(Dividend(SPY_EX_DATE, spy_div),),
         fingerprint="smoke",
         manifest={},
+        price_fingerprint="smoke",
     )
 
 
@@ -103,4 +105,43 @@ def smoke_test_data(extra: Iterable[str] = ()) -> ResearchData:
             "window_end": TEST_LAST.isoformat(),
         },
         window=smoke_test_window(),
+        price_fingerprint="smoke-test",
     )
+
+
+# ---- per-trial provenance (trial-reproducibility) --------------------------------------------
+
+#: The price fingerprint every dev trial in the committed lab carries (analysis M1): the P7a
+#: store's, which is also the current dev store's with ``fundamentals.csv`` left out.
+LAB_PRICE_FINGERPRINT = store.P7A_PRICE_FINGERPRINT
+
+
+def stamp_provenance(
+    conn,
+    trial_ns: Iterable[int],
+    *,
+    price_fingerprint: str | None = LAB_PRICE_FINGERPRINT,
+    initial_idr: Decimal = Decimal("10000000"),
+) -> None:
+    """Record provenance for fixture trials, the way ``lab run`` does for real ones.
+
+    Every reader of a trial's provenance -- ``runner.recorded_capital``, the hard gate's
+    de-funding -- refuses a trial with no row, so a fixture that inserts trials with
+    ``store.insert_trials`` and then asks one of them anything stamps them here. ``initial_idr``
+    defaults to today's ``INITIAL_IDR``, 10,000,000, so a funded fixture's de-funding unit stays
+    ``5,000,000 / 10,000,000 = 0.5``; it is a ``Decimal`` because ``insert_provenance`` refuses
+    anything else. The caller holds the transaction, as with every ``store.insert_*``.
+
+    **Idempotent.** ``trial_provenance`` is append-only and refuses a second row for a trial, so
+    a trial that already has one -- from ``run_method``, ``seed``, the v4 -> v5 backfill or an
+    earlier stamp -- is skipped. Two fixture helpers that both stamp the same trial therefore
+    never collide, and the first stamp wins.
+    """
+    store.insert_provenance(conn, [
+        store.ProvenanceRow(
+            trial_n=int(n), initial_idr=initial_idr, price_fingerprint=price_fingerprint,
+            source="recorded", measured="test fixture",
+        )
+        for n in trial_ns
+        if store.provenance_of(conn, int(n)) is None
+    ])

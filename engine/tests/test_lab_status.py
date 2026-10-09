@@ -18,6 +18,7 @@ from datetime import date, timedelta
 
 import pytest
 
+from labkit import stamp_provenance
 from seer_engine.commands import lab as lab_cmd
 from seer_engine.lab import store
 
@@ -353,6 +354,9 @@ def _method_at(c, mid: str, *, status: str, family: str = "fam", trials=()) -> N
     ``_method`` above stops at ``dev-eligible``; the gate's (K) condition needs a kin that reads
     ``test-failed``, which is three transitions further along. A separate helper rather than an
     edit to ``_method``, because every test above depends on that one exactly as it is.
+
+    Every trial is stamped with provenance on the lab's prices, because the gate refuses a trial
+    whose prices are unknown (D10) and these fixtures are about the folds and the kin, not that.
     """
     path = {
         "registered": ("registered",),
@@ -365,7 +369,7 @@ def _method_at(c, mid: str, *, status: str, family: str = "fam", trials=()) -> N
         store.add_method(c, id=mid, name=f"name {mid}", family=family,
                          source_kind="knowledge", hypothesis="h")
         if trials:
-            store.insert_trials(c, list(trials))
+            stamp_provenance(c, store.insert_trials(c, list(trials)))
         for s in path:
             store.update_method(c, mid, status=s)
 

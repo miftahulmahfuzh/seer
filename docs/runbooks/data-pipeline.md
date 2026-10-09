@@ -355,6 +355,56 @@ version it drops is the oldest — possibly the one you would roll back to.
 Tests: `PG_TEST_URL=… engine/.venv/bin/pytest engine/tests -q` (see "Local test database").
 Without `PG_TEST_URL` the DB tests are skipped with a reason.
 
+### Starting capital, price fingerprints and rebuilds
+
+The lab's 152 trials carry three different `trials.store_fingerprint` values, and on 2026-10-09
+that looked like three different stores. **It is not.** `research.fingerprint_of` hashes the whole
+`files` map of `manifest.json`, so adding or refreshing `fundamentals.csv` moves the fingerprint
+without moving a single bar. MEASURED 2026-10-09: the fingerprint of the current store's four
+price files alone (`bars.csv`, `dividends.csv`, `fx.csv`, `unserved.csv`, `fundamentals.csv` left
+out) is `5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a` — exactly the P7a
+store's. `e597367b…` added the 2015-only panel and `399d0d25…` rebuilt the panel from 2009 with
+`--refresh-fundamentals`, which copies the price files byte for byte. **The dev store's prices
+have never changed.**
+
+So the lab keeps two fingerprints and they answer different questions:
+
+| | what it hashes | what it is for |
+|---|---|---|
+| store fingerprint (`trials.store_fingerprint`, `ResearchData.fingerprint`) | every file in the manifest, panel included | re-running a method that reads the fundamentals panel: only the same store fingerprint reproduces it |
+| price fingerprint (`trial_provenance.price_fingerprint`, `ResearchData.price_fingerprint`, `research.price_fingerprint_of`) | the four price files only | comparing recorded curves: two curves are comparable when their price fingerprints are equal |
+
+**Starting capital is recorded per trial.** What actually broke reproduction was not the store but
+`backtest.runner.INITIAL_IDR`, which `d79fc83` moved from 20,000,000 to 10,000,000 IDR on
+2026-10-08. Whole-share lot rounding makes capital a result-moving input, and before schema 5
+nothing recorded it — a curve is normalised to opening cash. `lab/lab.sqlite` schema 5 adds the
+append-only `trial_provenance` table: one row per trial with `initial_idr` and
+`price_fingerprint`. New trials write it in the same transaction as the trial
+(`source = 'recorded'`); the 152 trials that existed at migration were back-filled
+(`source = 'backfill'`) by a rule that is exact on all of them, checked against git ancestry of
+`d79fc83`: a lump-sum trial ran at 20,000,000, a funded trial (one with a `trial_funding` row) at
+10,000,000. The price fingerprint was back-filled as `5451195f…` for all 148 dev trials, as
+itself for the two test trials on `56e83810…`, and as unknown (NULL) for the two on `bbe7abfb…`,
+whose file map is not on this machine. `lab remeasure` and `lab costs` re-run a recorded trial at
+its recorded capital; `INITIAL_IDR` is only the default for a **new** run.
+
+**A rebuild is refused by `lab run`.** `build_store` re-downloads every bar, and yfinance answers
+differently from one day to the next, so a rebuilt store gets a new price fingerprint. `lab run`
+compares the loaded store's price fingerprint with the one recorded for the `REF-SPY-HOLD`
+benchmark trial and refuses, before any backtest, when they differ or when the store names no
+price fingerprint (`hardgate.pin_dev_store`; the rule is decision D10 in `lab/hardgate.py`) — a
+trial recorded on a rebuilt store could not be compared with the benchmark, and the hard gate
+would refuse it anyway. There is no flag to run anyway. To move machines, **copy** the store (`.claude/skills/sync-research-store/`),
+which keeps both fingerprints. A fundamentals-only refresh (`--refresh-fundamentals`) changes the
+store fingerprint and leaves the price fingerprint alone, so `lab run` still accepts it.
+
+**What the gate and the reports do with it.** The hard gate refuses (`lab promote` exits 2) when
+the benchmark's price fingerprint and any of the method's dev trials' price fingerprints differ or
+are unknown; it fails closed and has no override. `lab walkforward` and `lab regime` only report,
+so they print a warning line for such a method instead. MEASURED 2026-10-09: the rule strands 0
+trials and changes 0 verdicts on the committed lab, because every dev trial shares one price
+fingerprint; refusing on `store_fingerprint` instead would have closed every promotion path.
+
 ## Environment and secrets
 
 | Variable | Used by | Where |

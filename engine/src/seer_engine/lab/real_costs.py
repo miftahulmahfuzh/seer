@@ -35,6 +35,7 @@ from typing import Any
 from seer_engine import research
 from seer_engine.backtest import dev
 from seer_engine.backtest.dev import FAILURE_LABELS, Candidate, DevRow
+from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.backtest.metrics import fmt_num, fmt_pct, fmt_pf, fmt_signed_pct
 from seer_engine.lab import store
 from seer_engine.lab.method import METHOD_ID, Method, discover
@@ -251,6 +252,7 @@ def measure(
     data: research.ResearchData,
     *,
     contributions: Any = None,
+    initial_idr: Decimal = INITIAL_IDR,
 ) -> Comparison:
     """Run ``candidate`` at both cost models on the dev window. Writes nothing anywhere.
 
@@ -261,8 +263,16 @@ def measure(
     the store or the engine changed when neither did. None -- the default -- is right for every
     trial recorded before the lab was funded, which is all 128 of them.
 
-    Both sides are fed the same schedule, so the flat/Gotrade comparison is still a comparison of
-    one variant at two fee models and nothing else.
+    ``initial_idr`` is the starting capital the recorded trial ran on, for the same reason --
+    resolve it with ``lab.runner.recorded_capital(conn, trial["n"])``. Measured 2026-10-09: the
+    flat side of ``lab costs M0011`` read +545.3% at the live 10,000,000 IDR where trial #90
+    records +660.2%, because the trial ran at 20,000,000 IDR and whole-share rounding makes the
+    capital result-moving (trial-reproducibility analysis M2). The default is the live constant
+    only so a caller re-measuring something that is not a recorded trial need not invent one;
+    ``commands/lab.py:_costs`` always passes the recorded value.
+
+    Both sides are fed the same schedule and the same capital, so the flat/Gotrade comparison is
+    still a comparison of one variant at two fee models and nothing else.
     """
     if data.window != research.DEV_WINDOW:
         w = data.window
@@ -279,7 +289,7 @@ def measure(
 
     dev.run_registry(
         data.market, data.dividends, data.spy_dividends, (flat, real),
-        on_result=on_result, contributions=contributions,
+        on_result=on_result, contributions=contributions, initial_idr=initial_idr,
     )
     f, g = rows[flat.id], rows[real.id]
     return Comparison(

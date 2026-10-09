@@ -112,3 +112,11 @@ Pull when you want the *same* store. Rebuild when you want a *newer* one — aft
 `fundamentals` or `nightly` run has added data worth picking up. The tell is
 `status`: if both machines agree and you still want new data, the answer is a rebuild on one
 machine followed by a `push`, not a `pull`.
+
+**A rebuild that changes prices is refused by `lab run`** (trial-reproducibility, decision D10 in
+`lab/hardgate.py`). `lab run` compares the store's *price* fingerprint — the four price files,
+`fundamentals.csv` left out — with the one the lab's `REF-SPY-HOLD` benchmark trial recorded, and
+refuses before any backtest when they differ. A fundamentals-only refresh
+(`--refresh-fundamentals`) leaves the price files alone, so it is safe to push; a full rebuild
+re-fetches prices and is not a way to bring newer data into the lab. Moving the lab's prices is a
+change argued in git (a new benchmark trial and an edit to D10), not a store push.

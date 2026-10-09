@@ -162,8 +162,9 @@ only failure, run `lab stage`, commit `lab/lab.sqlite` and `web/data/lab.json`, 
 tests. Always test *after* staging, never before. This is the repair step for an interrupted batch,
 so do it before anything else rather than working on top of an unpublished database.
 
-If `$STORE` is missing, build it (`$PY -m seer_engine research_store`, a few minutes) or pull it with
-`/sync-research-store`. Never point `--store` into a worktree: there is no store there, and a rebuild
+If `$STORE` is missing, pull it with `/sync-research-store`; build it (`$PY -m seer_engine
+research_store`) only when no copy exists, because `lab run` refuses a store whose prices are not
+the lab benchmark's (D10 in `lab/hardgate.py`). Never point `--store` into a worktree: there is no store there, and a rebuild
 is half an hour for nothing.
 
 ## 1. Classify every item, once, before touching anything

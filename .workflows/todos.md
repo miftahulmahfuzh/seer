@@ -2,7 +2,7 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-08 15:35
+**Last Updated**: 2026-10-09 23:30
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 17
+- Completed: 18
 
 ---
 
@@ -25,7 +25,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P1] High
 
 ### [P2] Medium
-
 ### [P3] Low
 
 ### [P4] Backlog
@@ -35,6 +34,26 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P2-ROOT-FCG9** Phase 4: Verify on copies, record the finding, stage the migrated lab
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns the end-to-end verification on scratch copies (M2/M4 reproduced at today's `INITIAL_IDR`; `lab costs M0011` flat column = trial #90; `lab status` identical to `e5eda52`); one `lab insight --kind observation` on the committed database; `lab stage` (migrates the committed DB to v5 with its backfill and regenerates `web/data/lab.json`); `docs/runbooks/data-pipeline.md`, `engine/package_readme.md`, a dated "Resolved" note under `docs/plans/HANDOVER_20261009.md` §5.1; the store-acquisition guidance in `.claude/skills/sync-research-store/SKILL.md`, `explore-and-experiment-new-method/SKILL.md` and `redo-sera-experiments/SKILL.md`. Does not touch any file under `engine/src/` or `engine/tests/`, or any `trial_moments` row on the committed DB. Exit criteria: committed DB at schema 5 with 152 provenance rows (all `backfill`), 38 `trial_moments`, 24 `trial_funding`; `lab status` still `Promotable now: (none)`; `test_lab_snapshot` passes; the full engine suite passes; one commit holding exactly the eight paths of its Step 10.
+  - **Status**: completed
+  - **Plan Set**: `TRIAL_REPRODUCIBILITY_PLAN.md` (phase 4 of 4)
+  - **Satisfies**: R3 — Quantify the drift on a method curve, not just the benchmark; R4 — Does the 58-trial `5451195fd552` cohort need re-running or marking (append-only); R1 — Choose the policy among (a) pin store / (b) re-run benchmark / (c) refuse on fingerprint mismatch / (d) record enough to re-derive — measured by what each strands, and say why (written answer); R2 — Is `trials.store_fingerprint` enough to detect it; should `lab walkforward`, `lab regime`, `hardgate` warn or refuse (written answer)
+  - **Depends on**: P2-ENG-JC9B, P2-ENG-0HTR
+  - **Plan**: `.workflows/plan/P2-ROOT-FCG9.md`
+  - **Completed**: 2026-10-09 23:30
+  - **Method**: /do
+  - **Files**: `lab/lab.sqlite`, `web/data/lab.json`, `docs/runbooks/data-pipeline.md`, `engine/package_readme.md`, `docs/plans/HANDOVER_20261009.md`, `.claude/skills/sync-research-store/SKILL.md`, `.claude/skills/explore-and-experiment-new-method/SKILL.md`, `.claude/skills/redo-sera-experiments/SKILL.md`
+  - **Drift**:
+    - engine/package_readme.md line numbers had shifted (phase 1's readme edit); edits anchored on the quoted text instead of line numbers, exactly as planned.
+  - **Decided**:
+    - Step 3 informational M0001 check exited 0 -> appended the 'reproduce too' sentence to the handover Q4 bullet (plan Step 6c rule).
+    - Step 7 tmux check showed only `orch-trial-reproducibility` -> continued under the plan's stated exception for this set's own coordinator (rung 3: Step 7 text).
+    - Commit made by the main context per Step 10 (pathspec, never git add -A; lab.sqlite only through lab stage) rather than by pusher (rung 3: plan code block outranks the command's default).
+  - **Commit**: `72f832e`
 
 - [x] **P1-ROOT-RDX2** Phase 3: `/redo-sera-experiments` — honest twins of named methods, in a batch
   - **Difficulty**: NORMAL

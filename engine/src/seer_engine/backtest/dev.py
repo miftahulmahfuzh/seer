@@ -27,8 +27,18 @@ this module). It never imports ``seer_engine.research``, the impure research sto
   the report's multiple-testing note.
 
 FX before ``FX_START`` (1999-01-04, Frankfurter's first USD/IDR row): a window that starts
-earlier converts the 20,000,000 IDR starting capital at the ``FX_START`` rate. FX feeds the
-starting cash only, so no decision depends on it.
+earlier converts the IDR starting capital at the ``FX_START`` rate. FX feeds the starting cash
+only, so no decision depends on it.
+
+**Starting capital is an input, not a constant.** ``run_candidate`` and ``run_registry`` take
+``initial_idr``, defaulting to ``runner.INITIAL_IDR``, and hand it to ``run_rules`` unchanged. A
+caller that passes nothing runs at the live constant, byte-for-byte as before the keyword
+existed. A caller re-running a *recorded* trial passes the capital that trial was recorded at:
+whole-share rounding (and, under ``cost_model="gotrade"``, the per-order fee floor) makes capital
+a result-moving input -- a 10,000,000 IDR book and a 20,000,000 IDR book buy different share
+counts of the same names, so their curves differ in shape, not only in scale -- and
+``INITIAL_IDR`` moved from 20,000,000 to 10,000,000 on 2026-10-08 (``d79fc83``) with nothing in
+the lab recording which one a trial ran on.
 """
 
 from __future__ import annotations
@@ -53,7 +63,7 @@ from seer_engine.backtest.metrics import (
     external_cashflows,
     money_weighted_return,
 )
-from seer_engine.backtest.runner import RunResult
+from seer_engine.backtest.runner import INITIAL_IDR, RunResult
 from seer_engine.backtest.window import Window
 from seer_engine.sim.contributions import ContributionSchedule
 from seer_engine.sim.rules import DEFAULT_ETFS, LEVERAGED_ETFS, TradeRules, is_bracket, rule_owner_inputs
@@ -488,6 +498,7 @@ def _run(
     prepared: Any,
     window: Window,
     *,
+    initial_idr: Decimal = INITIAL_IDR,
     contributions: ContributionSchedule | None = None,
     contribution_fx: Callable[[date], Decimal] | None = None,
 ) -> tuple[RunResult | BookResult, DevRow]:
@@ -514,6 +525,12 @@ def _run(
         prepared=prepared,
         dividends=dividends if c.rules.engine == "book" else {},
         usd_idr=rate,
+        # Passed explicitly even at its default: run_rules's own default is the same
+        # runner.INITIAL_IDR object, so a caller that passes nothing gets the run it always got,
+        # and a caller that passes a recorded capital gets that capital on both engines (run_book
+        # and, for DESIGN_V0, run_backtest). The SPY benchmark below starts from
+        # result.initial_cash, so it follows the capital without being told.
+        initial_idr=initial_idr,
         contributions=contributions,
         contribution_fx=contribution_fx,
     )
@@ -562,6 +579,7 @@ def run_candidate(
     *,
     prepared: Any = None,
     window: Window = DEV_WINDOW,
+    initial_idr: Decimal = INITIAL_IDR,
     contributions: ContributionSchedule | None = None,
     contribution_fx: Callable[[date], Decimal] | None = None,
 ) -> tuple[RunResult | BookResult, DevRow]:
@@ -572,6 +590,10 @@ def run_candidate(
     or None. Every input is checked against ``window.end`` first (``DevWindowError``), and
     ``window`` defaults to ``DEV_WINDOW``: pass nothing and this is the D9-guarded dev run it
     has always been.
+
+    ``initial_idr`` is the opening book in IDR, converted to USD once at the window's first
+    rate (the ``FX_START`` rate for a window that opens earlier). It defaults to
+    ``runner.INITIAL_IDR``; see ``run_registry`` for who passes anything else, and why.
     """
     _check_market(market, window)
     spy_divs = _check_dividends(dividends, spy_dividends, window)
@@ -579,7 +601,7 @@ def run_candidate(
         raise TypeError(f"expected a Candidate, got {type(c).__name__}")
     return _run(
         market, market.spy(), dividends, spy_divs, c, prepared, window,
-        contributions=contributions, contribution_fx=contribution_fx,
+        initial_idr=initial_idr, contributions=contributions, contribution_fx=contribution_fx,
     )
 
 
@@ -591,6 +613,7 @@ def run_registry(
     *,
     on_result: Callable[[int, RunResult | BookResult, DevRow], None] | None = None,
     window: Window = DEV_WINDOW,
+    initial_idr: Decimal = INITIAL_IDR,
     contributions: ContributionSchedule | None = None,
     contribution_fx: Callable[[date], Decimal] | None = None,
 ) -> tuple[DevRow, ...]:
@@ -613,6 +636,18 @@ def run_registry(
     re-runs unfunded, byte-for-byte as it did. When a schedule is given, the book is fed the
     deposits AND ``spy_curves`` receives the same dollars on the same sessions, so "beats SPY TR"
     stays a comparison of two books holding the same money.
+
+    ``initial_idr`` is every candidate's opening book in IDR, defaulting to
+    ``runner.INITIAL_IDR`` -- the live capital, which is what a *new* trial runs at, so
+    ``lab.runner.run_method``, ``run_test`` and ``lab.name_count`` pass nothing. It is the second
+    half of the same rule as ``contributions``: a path that re-runs a recorded trial must pass the
+    capital that trial was recorded at, or it reproduces a different measurement. Whole-share
+    rounding makes capital result-moving, and ``INITIAL_IDR`` moved from 20,000,000 to 10,000,000
+    on 2026-10-08 (``d79fc83``): measured on 2026-10-09, ``lab remeasure`` of M0007, M0011 and
+    all 54 P7a seed trials diverges at the live 10,000,000 and reproduces every one exactly at
+    20,000,000. The capital reaches both engines through ``run_rules`` and, via
+    ``result.initial_cash``, the SPY benchmark, so "beats SPY TR" still compares two books that
+    opened with the same money.
     """
     _check_market(market, window)
     spy_divs = _check_dividends(dividends, spy_dividends, window)
@@ -645,7 +680,7 @@ def run_registry(
             cache[key] = prepare_for(c.allocator, market)
         result, row = _run(
             market, spy, dividends, spy_divs, c, cache[key], window,
-            contributions=contributions, contribution_fx=contribution_fx,
+            initial_idr=initial_idr, contributions=contributions, contribution_fx=contribution_fx,
         )
         if last_use[key] == i:
             del cache[key]

@@ -9,13 +9,18 @@ from __future__ import annotations
 import argparse
 import json
 from datetime import date, timedelta
+from decimal import Decimal
 from math import comb
 
 import pytest
 
+from labkit import LAB_PRICE_FINGERPRINT, stamp_provenance
 from seer_engine.backtest import regime
 from seer_engine.lab import hardgate, store
 from seer_engine.lab import walkforward as wf
+
+SAME_PRICES = LAB_PRICE_FINGERPRINT
+OTHER_PRICES = "e" * 64
 
 
 @pytest.fixture(autouse=True)
@@ -76,28 +81,40 @@ def _trial(**kw) -> store.TrialRow:
     return store.TrialRow(**base)
 
 
-def _benchmark(conn) -> None:
+def _benchmark(conn, *, prices: str | None = SAME_PRICES, stamped: bool = True) -> None:
+    """The lab's REF-SPY-HOLD dev trial, recorded -- like the real trial #1 -- under the P7a store
+    fingerprint while every method below carries ``399d0d25``. Same prices, different store: the
+    committed lab's own shape, and the case D10 says must stay comparable."""
     with conn:
         store.add_method(conn, id="H-P7A-REF", name="SPY buy and hold", family="reference",
                          source_kind="seed", hypothesis="h", status="registered")
-        store.insert_trials(conn, [_trial(
+        ns = store.insert_trials(conn, [_trial(
             method_id="H-P7A-REF", candidate_id=regime.BENCH_CANDIDATE,
             config_digest="ref-spy-hold", start="1993-02-01", end="2015-10-16",
-            curve_json=_curve(_months(*BENCH_SPAN), 0.08),
+            store_fingerprint="5451195f", curve_json=_curve(_months(*BENCH_SPAN), 0.08),
         )])
+        if stamped:
+            stamp_provenance(conn, ns, price_fingerprint=prices)
 
 
 def _method(conn, mid="M0001", *, family="trend", parent=None, status="dev-eligible",
-            annual=0.15, span=DEV_SPAN, curves=True) -> None:
-    """One method with one dev trial, walked to ``status`` through the real transitions."""
+            annual=0.15, span=DEV_SPAN, curves=True, prices: str | None = SAME_PRICES,
+            stamped: bool = True) -> None:
+    """One method with one dev trial, walked to ``status`` through the real transitions.
+
+    The trial is stamped with provenance on ``prices`` unless ``stamped`` is False -- the gate
+    refuses an unstamped trial (D10), which is a test of its own below, not a default.
+    """
     with conn:
         store.add_method(conn, id=mid, name=f"n{mid}", family=family, parent_id=parent,
                          source_kind="variation" if parent else "knowledge", hypothesis="h",
                          status="registered")
-        store.insert_trials(conn, [_trial(
+        ns = store.insert_trials(conn, [_trial(
             method_id=mid, candidate_id=f"{mid}-A", config_digest=f"d-{mid}",
             curve_json=_curve(_months(*span), annual) if curves else "[]",
         )])
+        if stamped:
+            stamp_provenance(conn, ns, price_fingerprint=prices)
         for step in {
             "registered": (),
             "dev-eligible": ("dev-eligible",),
@@ -311,7 +328,7 @@ def test_a_lump_sum_trial_has_no_deposits(conn):
 def test_a_funded_trial_is_de_funded_before_it_is_scored(conn):
     """Every trial from M0032 on is funded; reading a deposit as edge is insight 72/75's bug.
 
-    Two claims, both measured. The reconstruction credits ``amount_idr / INITIAL_IDR`` -- 0.5 --
+    Two claims, both measured. The reconstruction credits ``amount_idr / <recorded capital>`` -- 0.5 --
     per deposit, **except** the one landing on or before the curve's first point, which
     ``regime.bucket`` drops because it is already in the opening balance rather than growth over
     it: 237 deposits, 236 credited steps, 118.0 and not 118.5. And the de-funding reaches the
@@ -338,6 +355,8 @@ def test_a_funded_trial_is_de_funded_before_it_is_scored(conn):
             deposits_n=len(due),
             schedule="+5,000,000 IDR on the 25th of each month", measured="test",
         )])
+    with conn:
+        stamp_provenance(conn, [int(row["n"])])  # 10M: the 0.5-per-deposit unit asserted below
 
     curve = [(date.fromisoformat(d), float(v)) for d, v in json.loads(row["curve_json"])]
     deposits = hardgate.trial_deposits(conn, row, curve)
@@ -359,10 +378,52 @@ def test_a_moved_contribution_schedule_refuses_rather_than_guesses(conn):
             trial_n=int(row["n"]), mwr=0.11, spy_tr_mwr=0.08, deposits_usd=1.0, deposits_n=3,
             schedule="+5,000,000 IDR on the 25th of each month", measured="test",
         )])
+    with conn:
+        stamp_provenance(conn, [int(row["n"])])  # 10M: the 0.5-per-deposit unit asserted below
     curve = [(date.fromisoformat(d), float(v)) for d, v in json.loads(row["curve_json"])]
     with pytest.raises(store.LabError) as e:
         hardgate.trial_deposits(conn, row, curve)
     assert "cannot be de-funded safely" in str(e.value)
+
+
+def _funded_trial(conn, mid: str, *, capital: str | None):
+    """A funded dev trial built directly (not through ``_method``), recorded at ``capital``."""
+    from seer_engine.sim.contributions import OWNER_MONTHLY
+
+    due = OWNER_MONTHLY.dates_in(date(1996, 1, 2), date(2015, 10, 16))
+    with conn:
+        store.add_method(conn, id=mid, name=f"n{mid}", family="trend", source_kind="knowledge",
+                         hypothesis="h", status="registered")
+        (n,) = store.insert_trials(conn, [_trial(
+            method_id=mid, candidate_id=f"{mid}-A", config_digest=f"d-{mid}",
+            curve_json=_curve(_months(*DEV_SPAN), 0.15),
+        )])
+        store.insert_funding(conn, [store.FundingRow(
+            trial_n=n, mwr=0.11, spy_tr_mwr=0.08, deposits_usd=1.0, deposits_n=len(due),
+            schedule="+5,000,000 IDR on the 25th of each month", measured="test",
+        )])
+        if capital is not None:
+            stamp_provenance(conn, [n], initial_idr=Decimal(capital))
+    row = conn.execute(
+        'SELECT n, candidate_id, start, "end", curve_json FROM trials WHERE n = ?', (n,)
+    ).fetchone()
+    curve = [(date.fromisoformat(d), float(v)) for d, v in json.loads(row["curve_json"])]
+    return row, curve, due
+
+
+def test_a_deposit_is_measured_against_the_capital_the_trial_ran_on(conn):
+    """Recorded at 20M, each 5M deposit is 0.25 of the opening balance, not the 0.5 the live
+    INITIAL_IDR would say. The day the constant moves again, nothing recorded re-scales."""
+    row, curve, due = _funded_trial(conn, "M0002", capital="20000000")
+    deposits = hardgate.trial_deposits(conn, row, curve)
+    assert len(deposits) == len(due) - 1
+    assert set(deposits.values()) == {0.25}
+
+
+def test_a_funded_trial_with_no_recorded_capital_is_refused_not_guessed(conn):
+    row, curve, _due = _funded_trial(conn, "M0003", capital=None)
+    with pytest.raises(store.LabError, match="no recorded starting capital"):
+        hardgate.trial_deposits(conn, row, curve)
 
 
 # ------------------------------------------------------------------ what the gate judges
@@ -442,3 +503,267 @@ def test_there_is_no_override(tmp_path):
     for word in ("force", "override", "skip_gate", "SEER_SKIP", "getenv", "environ"):
         assert word not in src.replace("no override", "").replace("There is no override", "")
     assert not any(k.startswith("SEER_HARDGATE") for k in os.environ)
+
+
+# ------------------------------------------------------------------ comparability (D10)
+
+
+def test_the_module_records_the_comparability_decision():
+    doc = hardgate.__doc__ or ""
+    assert "(D10)" in doc
+    assert "price fingerprint" in doc
+    assert "store_fingerprint" in doc
+
+
+def test_a_different_store_fingerprint_on_the_same_prices_is_comparable(conn):
+    """M1/M5: the store fingerprint moves with fundamentals.csv; the prices do not. Refusing on
+    the store fingerprint would strand all seven dev-eligible methods in the real lab."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    stores = {r[0] for r in conn.execute("SELECT store_fingerprint FROM trials")}
+    assert len(stores) == 2
+    assert hardgate.comparability(conn, "M0001") == ()
+    hardgate.check(conn, "M0001")  # does not raise
+
+
+def test_a_trial_on_other_prices_is_refused_and_both_fingerprints_are_named(conn):
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15, prices=OTHER_PRICES)
+    problems = hardgate.comparability(conn, "M0001")
+    assert len(problems) == 1
+    assert "M0001-A" in problems[0]
+    assert OTHER_PRICES[:12] in problems[0] and SAME_PRICES[:12] in problems[0]
+    with pytest.raises(store.LabError) as e:
+        hardgate.fold_record(conn, "M0001")
+    assert "M0001-A" in str(e.value) and "D10" in str(e.value)
+    with pytest.raises(store.LabError):
+        hardgate.check(conn, "M0001")
+    with pytest.raises(store.LabError):
+        hardgate.fold_summary(conn, "M0001")
+    assert hardgate.summary(conn, "M0001").startswith("not scoreable (")
+
+
+def test_a_trial_whose_prices_are_unknown_is_refused(conn):
+    """Fail closed: nobody recording the prices is not evidence that they match."""
+    _benchmark(conn)
+    _method(conn, "M0001", family="a", annual=0.15, prices=None)
+    _method(conn, "M0002", family="b", annual=0.15, stamped=False)
+    assert "records no price fingerprint" in hardgate.comparability(conn, "M0001")[0]
+    assert "has no provenance row" in hardgate.comparability(conn, "M0002")[0]
+    for mid in ("M0001", "M0002"):
+        with pytest.raises(store.LabError):
+            hardgate.check(conn, mid)
+
+
+def test_a_benchmark_whose_prices_are_unknown_refuses_every_method(conn):
+    _benchmark(conn, stamped=False)
+    _method(conn, "M0001", annual=0.15)
+    problems = hardgate.comparability(conn, "M0001")
+    assert len(problems) == 1 and regime.BENCH_CANDIDATE in problems[0]
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0001")
+    assert regime.BENCH_CANDIDATE in str(e.value)
+
+
+def test_one_variant_on_other_prices_refuses_the_whole_method(conn):
+    """Every variant is a candidate in every fold's pick, so one on other prices taints them all."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    with conn:
+        ns = store.insert_trials(conn, [_trial(
+            method_id="M0001", candidate_id="M0001-B", config_digest="d-M0001-B",
+            curve_json=_curve(_months(*DEV_SPAN), 0.10),
+        )])
+        stamp_provenance(conn, ns, price_fingerprint=OTHER_PRICES)
+    problems = hardgate.comparability(conn, "M0001")
+    assert [p.split(" ")[0] for p in problems] == ["M0001-B"]
+    with pytest.raises(store.LabError):
+        hardgate.check(conn, "M0001")
+
+
+def test_describe_names_three_and_counts_the_rest():
+    assert hardgate.describe(()) == ""
+    assert hardgate.describe(("a", "b")) == "a; b"
+    assert hardgate.describe(("a", "b", "c", "d", "e")) == "a; b; c; and 2 more"
+
+
+def test_lab_promote_exits_2_and_writes_nothing_on_other_prices(tmp_path):
+    db, prereg_dir = tmp_path / "lab.sqlite", tmp_path / "prereg"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0001", annual=0.15, prices=OTHER_PRICES)  # wins 4 of 4, kin clean
+    before = db.read_bytes()
+    c.close()
+
+    assert _cli(tmp_path, db, prereg_dir) == 2
+    assert not prereg_dir.exists()
+    assert db.read_bytes() == before
+
+
+# ------------------------------------------------------------------ the store pin (D10)
+
+
+def test_the_dev_store_pin_takes_the_benchmarks_prices(conn):
+    _benchmark(conn)
+    hardgate.pin_dev_store(conn, SAME_PRICES)  # does not raise
+
+
+def test_the_dev_store_pin_refuses_other_prices_and_names_both(conn):
+    _benchmark(conn)
+    with pytest.raises(store.LabError) as e:
+        hardgate.pin_dev_store(conn, OTHER_PRICES)
+    msg = str(e.value)
+    assert OTHER_PRICES[:12] in msg and SAME_PRICES[:12] in msg
+    assert "Nothing ran" in msg
+
+
+def test_the_dev_store_pin_refuses_when_the_benchmarks_prices_are_unknown(conn):
+    _benchmark(conn, stamped=False)
+    with pytest.raises(store.LabError) as e:
+        hardgate.pin_dev_store(conn, SAME_PRICES)
+    assert regime.BENCH_CANDIDATE in str(e.value)
+
+
+def test_the_dev_store_pin_refuses_a_store_whose_prices_are_unknown(conn):
+    """Fail closed (D10): ``ResearchData.price_fingerprint`` is None only on a hand-built store,
+    and a trial recorded on it would carry NULL prices the gate refuses forever -- so it is
+    refused with or without a benchmark."""
+    with pytest.raises(store.LabError, match="carries no price fingerprint"):
+        hardgate.pin_dev_store(conn, None)  # no benchmark yet
+    _benchmark(conn)
+    with pytest.raises(store.LabError, match="carries no price fingerprint"):
+        hardgate.pin_dev_store(conn, None)
+
+
+def test_the_dev_store_pin_is_silent_on_a_lab_with_no_benchmark(conn):
+    """A fresh lab must be able to run before it has a yardstick; the gate refuses it anyway."""
+    _method(conn, "M0001")
+    assert hardgate.benchmark_n(conn) is None
+    hardgate.pin_dev_store(conn, OTHER_PRICES)  # does not raise
+
+
+def _run_args(db, tmp_path):
+    return argparse.Namespace(
+        db=db, lab_command="run", method="M0099", store=tmp_path / "store", allow_coverage=0.8,
+    )
+
+
+def _stub_run(monkeypatch, tmp_path, prices: str):
+    """`lab run` up to the store load, with no method file, no store on disk and no backtest."""
+    import types
+
+    from seer_engine import research
+    from seer_engine.lab import method as method_mod
+    from seer_engine.lab import runner
+
+    stub = types.SimpleNamespace(id="M0099")
+    monkeypatch.setattr(method_mod, "discover", lambda: {"M0099": (stub, tmp_path / "m.py")})
+    monkeypatch.setattr(runner, "preflight", lambda *a, **k: None)
+    monkeypatch.setattr(
+        research, "load_store",
+        lambda _path: types.SimpleNamespace(fingerprint="f" * 64, price_fingerprint=prices),
+    )
+
+
+class _Reached(Exception):
+    """Raised by a stubbed step to prove `_run` got that far."""
+
+
+def test_lab_run_refuses_a_store_with_other_prices_before_any_backtest(tmp_path, monkeypatch):
+    from seer_engine.commands import lab as lab_cmd
+    from seer_engine.lab import runner
+
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _benchmark(c)
+    trials_before = c.execute("SELECT COUNT(*) FROM trials").fetchone()[0]
+    c.close()
+
+    _stub_run(monkeypatch, tmp_path, OTHER_PRICES)
+
+    def no_backtest(*_a, **_k):
+        raise AssertionError("the store pin must refuse before any backtest")
+
+    monkeypatch.setattr(runner, "preflight_data", no_backtest)
+    monkeypatch.setattr(runner, "run_method", no_backtest)
+
+    assert lab_cmd.run(_run_args(db, tmp_path)) == 2
+    c = store.connect(db)
+    assert c.execute("SELECT COUNT(*) FROM trials").fetchone()[0] == trials_before
+    c.close()
+
+
+def test_lab_run_takes_a_store_with_the_benchmarks_prices(tmp_path, monkeypatch):
+    from seer_engine.commands import lab as lab_cmd
+    from seer_engine.lab import runner
+
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _benchmark(c)
+    c.close()
+
+    _stub_run(monkeypatch, tmp_path, SAME_PRICES)
+
+    def reached(*_a, **_k):
+        raise _Reached()
+
+    monkeypatch.setattr(runner, "preflight_data", reached)
+    with pytest.raises(_Reached):
+        lab_cmd.run(_run_args(db, tmp_path))
+
+
+# ------------------------------------------------------------------ the reports warn (D10)
+
+
+def test_report_warnings_name_each_incomparable_method_once(conn):
+    from seer_engine.commands import lab as lab_cmd
+
+    _benchmark(conn)
+    _method(conn, "M0001", family="a", annual=0.15)
+    _method(conn, "M0002", family="b", annual=0.15, prices=OTHER_PRICES)
+    _method(conn, "M0003", family="c", annual=0.15, stamped=False)
+    rows = list(conn.execute(
+        "SELECT n, method_id, candidate_id FROM trials WHERE window = 'dev' "
+        "ORDER BY method_id, n"
+    ))
+    bench_n = hardgate.benchmark_n(conn)
+    lines = lab_cmd._comparability_warnings(conn, bench_n, rows, set())
+    assert [line.split()[1] for line in lines] == ["M0002", "M0003"]
+    assert all(line.startswith("WARNING ") for line in lines)
+    assert lab_cmd._comparability_warnings(conn, bench_n, rows, {"M0001"}) == []
+
+
+def test_lab_walkforward_warns_on_other_prices_and_still_reports(tmp_path, capsys):
+    from seer_engine.commands import lab as lab_cmd
+
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0001", family="a", annual=0.15)
+    _method(c, "M0002", family="b", annual=0.15, prices=OTHER_PRICES)
+    c.close()
+
+    rc = lab_cmd.run(argparse.Namespace(
+        db=db, lab_command="walkforward", method=[], min_train_years=None, eval_years=None,
+    ))
+    assert rc == 0  # a report warns; it does not refuse
+    lines = capsys.readouterr().out.splitlines()
+    warned = [line for line in lines if line.startswith("WARNING")]
+    assert len(warned) == 1 and "M0002" in warned[0]
+    assert any(line.strip().startswith("M0002") for line in lines)  # its row is still printed
+    assert any(line.strip().startswith("M0001") for line in lines)
+
+
+def test_lab_walkforward_is_silent_when_everything_is_comparable(tmp_path, capsys):
+    from seer_engine.commands import lab as lab_cmd
+
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0001", annual=0.15)
+    c.close()
+
+    assert lab_cmd.run(argparse.Namespace(
+        db=db, lab_command="walkforward", method=[], min_train_years=None, eval_years=None,
+    )) == 0
+    assert "WARNING" not in capsys.readouterr().out

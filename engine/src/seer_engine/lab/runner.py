@@ -52,6 +52,7 @@ import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -59,6 +60,7 @@ from seer_engine import research
 from seer_engine.backtest import dev
 from seer_engine.backtest.dev import Candidate, DevRow
 from seer_engine.backtest.metrics import external_cashflows
+from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.commands.backtest_dev import daily_moments, month_end_curve, registry_problem
 from seer_engine.fundamentals import coverage
 from seer_engine.lab import store
@@ -119,6 +121,33 @@ def recorded_contributions(conn: sqlite3.Connection, trial_n: int) -> Contributi
     so None is the normal and meaningful answer for all 128 trials recorded before this phase.
     """
     return None if store.funding_of(conn, int(trial_n)) is None else OWNER_MONTHLY
+
+
+def recorded_capital(conn: sqlite3.Connection, trial_n: int) -> Decimal:
+    """The starting capital, in IDR, trial ``trial_n`` was run on -- its ``trial_provenance`` row.
+
+    **Every path that re-runs a recorded trial must go through this**, beside
+    ``recorded_contributions``, and for the same reason: a re-run at the wrong capital is not the
+    same measurement. ``backtest.runner.INITIAL_IDR`` is the capital a *new* run gets; it moved
+    from 20,000,000 to 10,000,000 IDR in ``d79fc83`` (2026-10-08), and whole-share lot rounding
+    makes the capital result-moving. Measured (trial-reproducibility analysis M2/M4): at the live
+    10M, ``lab remeasure M0011`` / ``M0007`` miss their recorded Sharpe by up to 5.2e-2 against a
+    1e-9 tolerance and all 54 P7a seed trials diverge; at their recorded 20M every one reproduces
+    exactly.
+
+    ``store.LabError`` when the trial has no provenance row. After the v4 -> v5 migration every
+    trial has one, so a missing row means the trial was inserted by something that skipped the
+    table; re-running it at the live constant instead would be precisely the guess this exists
+    to stop.
+    """
+    row = store.provenance_of(conn, int(trial_n))
+    if row is None:
+        raise store.LabError(
+            f"trial #{int(trial_n)} has no recorded starting capital (no trial_provenance row), so "
+            f"it cannot be re-run as the measurement it was. A trial recorded by `lab run` or "
+            f"`lab test` carries one; a database opened by this code is backfilled on connect"
+        )
+    return Decimal(str(row["initial_idr"]))
 
 
 def git_head(cwd: Path) -> str:
@@ -365,8 +394,16 @@ def run_method(
     git_sha: str,
     require_commit: bool = True,
 ) -> list[Ran]:
-    """Run ``method`` on the dev window and record it (see the module docstring)."""
+    """Run ``method`` on the dev window and record it (see the module docstring).
+
+    The run is given ``INITIAL_IDR`` -- passed to ``dev.run_registry`` explicitly rather than left
+    to its default -- and that same value is written into each trial's ``trial_provenance`` row,
+    with ``data.price_fingerprint``, in the transaction that inserts the trial. So the record can
+    never name a capital the run was not given, and a later ``lab remeasure`` re-runs it at the
+    capital it actually had, whatever ``INITIAL_IDR`` reads by then.
+    """
     preflight(conn, method, path, require_commit=require_commit)
+    capital = INITIAL_IDR
     results: list[tuple[DevRow, Any]] = []
     deposits: list[Sequence[tuple[date, float]]] = []
 
@@ -385,7 +422,7 @@ def run_method(
 
     dev.run_registry(
         data.market, data.dividends, data.spy_dividends, method.candidates,
-        on_result=on_result, contributions=OWNER_MONTHLY,
+        on_result=on_result, contributions=OWNER_MONTHLY, initial_idr=capital,
     )
     store.begin_immediate(conn)  # lab-wide N and the inserts, atomic against parallel sessions
     with conn:
@@ -434,6 +471,20 @@ def run_method(
             replace(r.funding, trial_n=n)
             for n, r in zip(ns, ran, strict=True)
             if r.funding is not None
+        ])
+        # The two inputs a re-run needs and no `trials` column carries -- the capital this batch
+        # was given and the price fingerprint of the store it read -- one row per trial, in this
+        # same transaction. Unlike funding, every trial gets a row: there is no run without a
+        # starting capital.
+        store.insert_provenance(conn, [
+            store.ProvenanceRow(
+                trial_n=n,
+                initial_idr=capital,
+                price_fingerprint=data.price_fingerprint,
+                source="recorded",
+                measured=r.trial.run_at,
+            )
+            for n, r in zip(ns, ran, strict=True)
         ])
         store.update_method(conn, method.id, source_sha=source_sha(path), status=status)
         for key in method.seen_keys:
@@ -740,6 +791,7 @@ def run_test(
         )
     pre = preflight_test(conn, method, path, candidate, require_commit=require_commit)
 
+    capital = INITIAL_IDR
     captured: list[tuple[DevRow, Any, Sequence[tuple[date, float]]]] = []
 
     def on_result(i: int, result: Any, row: DevRow) -> None:
@@ -753,6 +805,7 @@ def run_test(
         on_result=on_result,
         window=window,
         contributions=OWNER_MONTHLY,
+        initial_idr=capital,
     )
     (row, curve, cash), = captured
     m = row.stats.metrics
@@ -788,5 +841,14 @@ def run_test(
                 schedule=OWNER_SCHEDULE_TEXT,
                 measured=trial.run_at,
             )])
+        # The look's capital and price fingerprint, in the same transaction and for the same
+        # reason: the record of the look and what it was given land together or not at all.
+        store.insert_provenance(conn, [store.ProvenanceRow(
+            trial_n=n,
+            initial_idr=capital,
+            price_fingerprint=data.price_fingerprint,
+            source="recorded",
+            measured=trial.run_at,
+        )])
         store.update_method(conn, method.id, status=status)
     return Tested(trial=trial, row=row, status=status)

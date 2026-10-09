@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import json
 from datetime import date, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from labkit import smoke_data
 from seer_engine.backtest import dev as dev_module
 from seer_engine.backtest.dev import Candidate, deflated_sharpe
 from seer_engine.backtest.market import Market
+from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.fundamentals import Fact, FundamentalPanel, coverage
 from seer_engine.commands.backtest_dev import month_end_curve
 from seer_engine.lab import runner, store
@@ -376,3 +378,40 @@ def test_trial_rows_with_no_deposits_records_no_funding(conn, data):
     assert len(dev_rows) == 2
     ran = runner.trial_rows(conn, _method(), results, fingerprint="smoke", git_sha="x")
     assert [r.funding for r in ran] == [None, None]
+
+
+# ---- trial-reproducibility phase 2: the capital and the price data are recorded -----------------
+
+
+def test_a_run_records_the_capital_it_was_given_and_the_store_s_price_fingerprint(conn, data, monkeypatch):
+    """The provenance row names the capital `run_registry` was actually handed, not a constant
+    read separately, so the two cannot disagree; and every trial gets one."""
+    seen: list = []
+    real = dev_module.run_registry
+
+    def spy(*a, **k):
+        seen.append(k.get("initial_idr"))
+        return real(*a, **k)
+
+    monkeypatch.setattr(runner.dev, "run_registry", spy)
+    runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False)
+    assert seen == [INITIAL_IDR]
+    for r in store.trials_of(conn, "M0001"):
+        p = store.provenance_of(conn, r["n"])
+        assert p is not None and p["source"] == "recorded"
+        assert Decimal(p["initial_idr"]) == INITIAL_IDR
+        assert p["price_fingerprint"] == data.price_fingerprint == "smoke"
+        assert p["measured"] == r["run_at"]  # one measurement, one stamp
+        assert runner.recorded_capital(conn, r["n"]) == INITIAL_IDR
+    # and the seed's 54 still read the 20M they ran on, whatever the live constant is
+    assert {runner.recorded_capital(conn, n) for n in range(1, 55)} == {Decimal("20000000")}
+
+
+def test_recorded_capital_refuses_a_trial_whose_capital_was_never_recorded(conn, data, monkeypatch):
+    """No row is a refusal, never a silent fall-back to the live INITIAL_IDR."""
+    monkeypatch.setattr(store, "insert_provenance", lambda conn, rows: None)
+    runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False)
+    monkeypatch.undo()
+    n = int(store.trials_of(conn, "M0001")[0]["n"])
+    with pytest.raises(store.LabError, match="no recorded starting capital"):
+        runner.recorded_capital(conn, n)

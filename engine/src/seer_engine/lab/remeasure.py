@@ -54,6 +54,7 @@ import sqlite3
 import statistics
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -65,6 +66,7 @@ from seer_engine.backtest.registry import REGISTRY
 from seer_engine.commands.backtest_dev import daily_moments, registry_problem
 from seer_engine.lab import npolicy, store
 from seer_engine.lab.method import METHOD_ID, Method, config_digest, source_sha
+from seer_engine.lab.runner import recorded_capital
 from seer_engine.sim.contributions import OWNER_MONTHLY
 
 log = logging.getLogger(__name__)
@@ -170,6 +172,7 @@ class Plan:
     candidates: tuple[Candidate, ...]  # the variants to re-run, in trial order
     missing: tuple[int, ...]  # trial numbers with no trial_moments row
     present: tuple[int, ...]  # trial numbers that already have one
+    initial_idr: Decimal  # the one starting capital every one of these trials was recorded at
 
     @property
     def nothing_to_do(self) -> bool:
@@ -283,6 +286,37 @@ def batches_of(conn: sqlite3.Connection, trials: Sequence[sqlite3.Row]) -> tuple
     return tuple(out)
 
 
+def plan_capital(conn: sqlite3.Connection, label: str, ns: Sequence[int]) -> Decimal:
+    """The one starting capital trials ``ns`` were recorded at (``runner.recorded_capital``).
+
+    One ``dev.run_registry`` call runs every candidate at one capital, so a set of trials recorded
+    at two different capitals has no single re-run that reproduces them all -- the same shape as
+    ``measure``'s refusal of a plan mixing funded and unfunded trials. ``store.LabError`` when
+    the trials disagree, when any has no recorded capital, or when there are none.
+
+    Why the capital matters at all (trial-reproducibility analysis M2/M4): ``INITIAL_IDR`` moved
+    from 20M to 10M IDR in ``d79fc83``, and at the live 10M ``M0007``, ``M0011`` and all 54 seed
+    trials fail to reproduce on an unchanged store; at their recorded 20M every one does.
+    """
+    by_capital: dict[Decimal, list[int]] = {}
+    for n in ns:
+        by_capital.setdefault(recorded_capital(conn, int(n)), []).append(int(n))
+    if not by_capital:
+        raise store.LabError(f"{label}: no trial to re-run, so there is no capital to re-run it at")
+    if len(by_capital) > 1:
+        parts = []
+        for capital, group in sorted(by_capital.items()):
+            numbers = ", ".join(f"#{n}" for n in group)
+            parts.append(f"{capital:,.0f} IDR for {numbers}")
+        raise store.LabError(
+            f"{label}: these trials were recorded at different starting capitals "
+            f"({'; '.join(parts)}), so one re-run cannot reproduce them all: one run_registry call "
+            f"runs every candidate at one capital. Nothing is backfilled"
+        )
+    (capital,) = by_capital
+    return capital
+
+
 def preflight(
     conn: sqlite3.Connection, method: Method, path: Path, *, require_commit: bool = True
 ) -> Plan:
@@ -357,12 +391,16 @@ def preflight(
             f"measurement"
         )
     have = {int(r["n"]) for r in trials if store.moments_of(conn, int(r["n"])) is not None}
+    # Refused here, before the caller loads a research store: a re-run at a capital the trials
+    # did not have is not the recorded measurement, and neither is one at two capitals.
+    capital = plan_capital(conn, method.id, [int(r["n"]) for r in trials])
     return Plan(
         method_id=method.id,
         batches=batches_of(conn, trials),
         candidates=tuple(by_digest[str(r["config_digest"])] for r in trials),
         missing=tuple(int(r["n"]) for r in trials if int(r["n"]) not in have),
         present=tuple(sorted(have)),
+        initial_idr=capital,
     )
 
 
@@ -389,6 +427,12 @@ def measure(
     Sharpe of 0.26 against a recorded 2.65 and this module correctly refuses to write anything. A
     plan that mixes the two is refused outright, because one ``run_registry`` call runs every
     candidate on one schedule and there is no answer that reproduces both.
+
+    The **starting capital** is not a parameter for the same reason: it is ``plan.initial_idr``,
+    the one capital ``preflight`` read off the trials' ``trial_provenance`` rows, and never the
+    live ``INITIAL_IDR``. Measured 2026-10-09: at the live 10,000,000 IDR, ``M0011`` and ``M0007``
+    miss their recorded Sharpe by 9.5e-4 .. 5.2e-2 against ``SHARPE_TOL``; at their recorded
+    20,000,000 IDR every variant reproduces with delta 0.000e+00.
     """
     if data.window != research.DEV_WINDOW:
         w = data.window
@@ -413,7 +457,7 @@ def measure(
 
     dev.run_registry(
         data.market, data.dividends, data.spy_dividends, plan.candidates,
-        on_result=on_result, contributions=contributions,
+        on_result=on_result, contributions=contributions, initial_idr=plan.initial_idr,
     )
     out: list[Reproduced] = []
     for batch in plan.batches:
@@ -663,10 +707,17 @@ REGISTRY_FILE = Path(dev.__file__).with_name("registry.py")
 # 18.648246` at 1e-6 relative would admit 1.9e-5, which is 37x the rounding bound and wide enough
 # for a real divergence to pass.
 #
-# 1e-6 is 2x the rounding bound. Measured across all 54 on the committed database and today's dev
-# store, the worst delta on any metric is 4.986e-07 -- under the bound, with no exceptions -- so
-# the headroom exists for a libm or platform ulp and for nothing larger. A genuine divergence is
-# orders of magnitude bigger: a changed research store moves these metrics in the third decimal.
+# 1e-6 is 2x the rounding bound. Re-measured 2026-10-09 against the committed database and the dev
+# store `399d0d25...` (trial-reproducibility analysis M4): **at the capital these trials ran on**
+# -- 20,000,000 IDR, their `trial_provenance` row, which `remeasure_seed` hands every chunk -- all
+# 54 reproduce all six metrics within this tolerance, exact on trades. The worst delta recorded
+# when the tolerance was set was 4.986e-07, under the bound, so the headroom exists for a libm or
+# platform ulp and for nothing larger. A genuine divergence is orders of magnitude bigger, and the
+# one actually observed was not the store: at the live `INITIAL_IDR` of 10,000,000 IDR (`d79fc83`,
+# 2026-10-08) all 54 diverge -- `REF-SPY-HOLD` total return 5.945958 recorded against 5.874617
+# re-run, `F9-SPY200M70-MOM30` 8.786433 against 8.031926 with 17 fewer trades -- because
+# whole-share lot rounding makes the starting capital a result-moving input. The three dev
+# fingerprints the lab's trials carry hold byte-identical price files (analysis M1).
 METRIC_TOL = 1e-6  # absolute, per metric
 
 # The six recorded metrics a seed re-run must reproduce, each paired with how to read it off a
@@ -993,9 +1044,16 @@ def seed_preflight(
             f"import writes one batch with one N. The database has been edited"
         )
     have = {p.n for p in pairs if store.moments_of(conn, p.n) is not None}
+    todo = tuple(p for p in pairs if p.n not in have)
+    if todo:
+        # Refused here, before any store is loaded, exactly as `preflight` refuses for the dev
+        # path: a seed trial with no recorded capital cannot be re-run as the measurement it was
+        # (analysis M4), and a to-do set recorded at two capitals has no single re-run (one
+        # `run_registry` call, one capital). `remeasure_seed` resolves the same capital per chunk.
+        plan_capital(conn, wanted, [p.n for p in todo])
     return SeedPlan(
         method_id=wanted,
-        todo=tuple(p for p in pairs if p.n not in have),
+        todo=todo,
         present=tuple(sorted(have)),
         var_trials=seed_var_trials(conn),
         n_at_run=n_at_run.pop(),
@@ -1024,14 +1082,18 @@ def observe(row: DevRow) -> Observed | None:
 
 
 def run_chunk(
-    data: research.ResearchData, candidates: Sequence[Candidate]
+    data: research.ResearchData, candidates: Sequence[Candidate], *, initial_idr: Decimal
 ) -> dict[str, Observed | None]:
-    """Re-run ``candidates`` on the dev window; ``{candidate id: Observed}``.
+    """Re-run ``candidates`` on the dev window at ``initial_idr``; ``{candidate id: Observed}``.
 
     The dev window is not a parameter and not a choice: this function has no ``window``
     parameter, and ``dev.run_registry`` is called with no ``window`` keyword, so the run is
     bounded by ``DEV_WINDOW`` by construction. ``remeasure_seed`` has already refused any ``data``
     that is not the dev window before this is reached.
+
+    ``initial_idr`` is required, with no default, because there is no right default: it is the
+    capital the chunk's trials were recorded at (``plan_capital``), and defaulting to the live
+    ``INITIAL_IDR`` is exactly what made all 54 seed trials diverge on 2026-10-09 (analysis M4).
 
     Splitting the 54 into chunks is free of correctness cost. ``run_registry`` rebuilds its
     per-allocator ``prepare_for`` cache per call, so a chunk pays re-preparation time, but the
@@ -1050,7 +1112,8 @@ def run_chunk(
         out[row.candidate.id] = observe(row)
 
     dev.run_registry(
-        data.market, data.dividends, data.spy_dividends, list(candidates), on_result=on_result
+        data.market, data.dividends, data.spy_dividends, list(candidates), on_result=on_result,
+        initial_idr=initial_idr,
     )
     return out
 
@@ -1131,7 +1194,12 @@ def remeasure_seed(
     written: list[int] = []
     blocked: list[int] = []
     for index, group in enumerate(groups):
-        fresh = run_chunk(data, [s.candidate for s in group])
+        # One capital per chunk, read off the trials' provenance -- never the live constant.
+        # `seed_preflight` already refused a to-do set recorded at two capitals before the store
+        # loaded, so this resolves the one capital it found; it stays a refusal (not an assert)
+        # so a chunk can never be re-run at a capital nobody checked.
+        capital = plan_capital(conn, plan.method_id, [s.n for s in group])
+        fresh = run_chunk(data, [s.candidate for s in group], initial_idr=capital)
         here: list[SeedReproduced] = []
         for seed in group:
             obs = fresh.get(seed.candidate_id)

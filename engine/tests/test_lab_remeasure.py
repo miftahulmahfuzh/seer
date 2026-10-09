@@ -10,10 +10,11 @@ from __future__ import annotations
 import dataclasses
 import inspect
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from labkit import smoke_data, smoke_test_data
+from labkit import smoke_data, smoke_test_data, stamp_provenance
 
 from seer_engine import research
 from seer_engine.backtest import dev
@@ -336,3 +337,58 @@ def test_a_plan_that_mixes_funded_and_unfunded_trials_is_refused(conn, data, tmp
             remeasure.measure(mixed, m, plan, data)
     finally:
         mixed.close()
+
+
+# ---- trial-reproducibility phase 2: the re-run is given the recorded capital ----------------
+
+
+def _without_provenance_run(conn, data, m, monkeypatch):
+    """`lab run` with the provenance write suppressed, so a test can record the capital itself."""
+    monkeypatch.setattr(store, "insert_provenance", lambda conn, rows: None)
+    _run(conn, data, m)
+    monkeypatch.undo()
+    return [int(r["n"]) for r in store.trials_of(conn, m.id)]
+
+
+def test_the_rerun_is_given_the_recorded_capital_not_the_live_constant(conn, data, no_moments):
+    """Analysis M2: M0011 and M0007 ran at 20M and reproduce only there. Whatever the live
+    INITIAL_IDR reads, `measure` hands `run_registry` the capital the trials recorded."""
+    m = _method()
+    ns = _without_provenance_run(conn, data, m, no_moments)
+    with conn:
+        stamp_provenance(conn, ns, price_fingerprint="smoke", initial_idr=Decimal("20000000"))
+    plan = remeasure.preflight(conn, m, HERE, require_commit=False)
+    assert plan.initial_idr == Decimal("20000000")
+
+    class Stop(Exception):
+        pass
+
+    seen: list = []
+
+    def spy(*a, **k):
+        seen.append(k.get("initial_idr"))
+        raise Stop
+
+    no_moments.setattr(remeasure.dev, "run_registry", spy)
+    with pytest.raises(Stop):
+        remeasure.measure(conn, m, plan, data)
+    assert seen == [Decimal("20000000")]
+    assert all(store.moments_of(conn, n) is None for n in ns)
+
+
+def test_trials_recorded_at_two_capitals_are_refused_before_any_store_is_loaded(conn, data, no_moments):
+    m = _method()
+    ns = _without_provenance_run(conn, data, m, no_moments)
+    assert len(ns) == 2  # `_method()` records two variants
+    with conn:
+        stamp_provenance(conn, ns[:1], price_fingerprint="smoke", initial_idr=Decimal("10000000"))
+        stamp_provenance(conn, ns[1:], price_fingerprint="smoke", initial_idr=Decimal("20000000"))
+    with pytest.raises(store.LabError, match="different starting capitals"):
+        remeasure.preflight(conn, m, HERE, require_commit=False)
+
+
+def test_a_trial_with_no_recorded_capital_is_refused_before_any_store_is_loaded(conn, data, no_moments):
+    m = _method()
+    _without_provenance_run(conn, data, m, no_moments)
+    with pytest.raises(store.LabError, match="no recorded starting capital"):
+        remeasure.preflight(conn, m, HERE, require_commit=False)

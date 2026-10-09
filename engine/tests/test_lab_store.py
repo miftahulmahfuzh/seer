@@ -6,11 +6,13 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import replace
 from datetime import date
+from decimal import Decimal
 
 import pytest
 
 from seer_engine.backtest.registry import REGISTRY
 from seer_engine.lab import store
+from seer_engine.lab import seed as seed_mod
 from seer_engine.lab.method import config_digest
 from seer_engine.lab.seed import seed
 
@@ -371,3 +373,65 @@ def test_a_test_passed_method_needs_no_reason_and_says_so(conn):
     analysis = store.get_method(conn, "M0001")["analysis"]
     assert "Basis: `test-passed`" in analysis
     assert "Lab status at admission: `test-passed`" in analysis
+
+
+# ---- trial_provenance (schema v5, trial-reproducibility phase 2) ------------------------------
+
+
+def _provenance(n: int, **kw) -> store.ProvenanceRow:
+    base = dict(trial_n=n, initial_idr=Decimal("10000000"), price_fingerprint="pf",
+                source="recorded", measured="2026-10-09T00:00:00+00:00")
+    base.update(kw)
+    return store.ProvenanceRow(**base)
+
+
+def test_provenance_round_trips_the_capital_exactly_and_is_append_only(conn):
+    _method(conn)
+    with conn:
+        (n,) = store.insert_trials(conn, [_trial()])
+        store.insert_provenance(conn, [_provenance(n, initial_idr=Decimal("2E+7"))])
+    row = store.provenance_of(conn, n)
+    assert row["initial_idr"] == "20000000"  # format(d, "f"): exponent notation never stored
+    assert Decimal(row["initial_idr"]) == Decimal("20000000")
+    assert row["price_fingerprint"] == "pf" and row["source"] == "recorded"
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+        conn.execute("UPDATE trial_provenance SET initial_idr = '1'")
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+        conn.execute("DELETE FROM trial_provenance")
+    with pytest.raises(store.LabError, match="already has recorded provenance"):
+        with conn:
+            store.insert_provenance(conn, [_provenance(n)])
+
+
+def test_provenance_refuses_what_a_rerun_could_not_use(conn):
+    """A capital a run could not have started with, an unknown source, or the sentinel 0."""
+    _method(conn)
+    with conn:
+        (n,) = store.insert_trials(conn, [_trial()])
+    for bad, match in (
+        (_provenance(0), "trial number"),
+        (_provenance(n, initial_idr=Decimal("0")), "positive, finite"),
+        (_provenance(n, initial_idr=Decimal("NaN")), "positive, finite"),
+        (_provenance(n, initial_idr=10_000_000), "must be a Decimal"),
+        (_provenance(n, source="guess"), "source"),
+    ):
+        with pytest.raises(store.LabError, match=match):
+            with conn:
+                store.insert_provenance(conn, [bad])
+    assert store.provenance_of(conn, n) is None
+    with conn:  # an unknown price fingerprint is recordable, and reads back as NULL
+        store.insert_provenance(conn, [_provenance(n, price_fingerprint=None, source="backfill")])
+    assert store.provenance_of(conn, n)["price_fingerprint"] is None
+
+
+def test_seed_records_the_p7a_capital_and_price_fingerprint(conn):
+    """The 58-trial cohort's 54 seed rows are marked, not rewritten (R4): 20M, the P7a prices."""
+    seed(conn)
+    rows = conn.execute("SELECT * FROM trial_provenance ORDER BY trial_n").fetchall()
+    assert [r["trial_n"] for r in rows] == list(range(1, 55))
+    assert {r["initial_idr"] for r in rows} == {"20000000"}
+    assert {r["price_fingerprint"] for r in rows} == {seed_mod.P7A_FINGERPRINT}
+    assert {r["source"] for r in rows} == {"backfill"}
+    assert seed_mod.P7A_INITIAL_IDR == store.BACKFILL_LUMP_SUM_IDR
+    assert seed_mod.P7A_FINGERPRINT == store.P7A_PRICE_FINGERPRINT
+    assert store.BACKFILL_PRICE_FINGERPRINTS[seed_mod.P7A_FINGERPRINT] == store.P7A_PRICE_FINGERPRINT

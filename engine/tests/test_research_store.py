@@ -825,3 +825,45 @@ def test_unserved_reason_names_the_range_it_is_given():
     assert research.unserved_reason(date(2015, 10, 19), date(2026, 8, 18)) == (
         "yfinance returned no bars for 2015-10-19..2026-08-18"
     )
+
+
+# ---- the price fingerprint (trial-reproducibility phase 2) ------------------------------------
+
+#: The live dev store's file map on 2026-10-09 (`engine/.research/manifest.json`, store fingerprint
+#: 399d0d25...). Pinned as data so the measurement it encodes (analysis M1) is arithmetic a test
+#: can check without the 282 MB store.
+DEV_STORE_FILES_20261009 = {
+    "bars.csv": "4148a0fbcf3af8d7432618c8b92101a1447f47dcf11e7fffb984881392e39109",
+    "dividends.csv": "3a46b0a4ff24819afddb79d9d62d328bb6db2a6cabc0bce3da622d7845ed3067",
+    "fundamentals.csv": "79c880ecf7bce03812d5076c02c92bd58c089b5c9ec149a8d6985adff58334e2",
+    "fx.csv": "7bd5aff00a5ec26133771f6a11eff0b6c584b918b2c3fec4bcba7f4786500748",
+    "unserved.csv": "e58d0496b439209a15a2ef8a316d80cfddce4d4ad733c8601d06b26884753e16",
+}
+
+
+def test_today_s_dev_store_has_the_p7a_store_s_prices():
+    """Analysis M1: the store fingerprint moved with the panel; the price fingerprint never did."""
+    assert research.fingerprint_of(DEV_STORE_FILES_20261009) == (
+        "399d0d254c7a90b8cdb49f7ce598269087d38730f795cae90453eeb580b07cf8"
+    )
+    assert research.price_fingerprint_of(DEV_STORE_FILES_20261009) == (
+        "5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a"
+    )
+
+
+def test_the_price_fingerprint_ignores_the_fundamental_panel(tmp_path, members_dir):
+    """A four-file store's two fingerprints are one hash; adding a panel moves only the store's."""
+    store = tmp_path / "store"
+    build(store, members_dir)  # facts=None: four files, no panel
+    four = research.load_store(store, data_dir=members_dir)
+    assert four.price_fingerprint == four.fingerprint
+    research.refresh_fundamentals(store, FACTS_A, data_dir=members_dir)
+    five = research.load_store(store, data_dir=members_dir)
+    assert five.fingerprint != four.fingerprint
+    assert five.price_fingerprint == four.price_fingerprint
+
+
+def test_a_price_fingerprint_needs_all_four_price_files():
+    files = {name: "0" * 64 for name in research.DATA_FILES if name != research.UNSERVED_FILE}
+    with pytest.raises(ValueError, match="unserved.csv"):
+        research.price_fingerprint_of(files)

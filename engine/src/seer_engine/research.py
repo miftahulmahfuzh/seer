@@ -183,7 +183,13 @@ class ResearchStoreError(RuntimeError):
 
 @dataclass(frozen=True)
 class ResearchData:
-    """A loaded, verified research store."""
+    """A loaded, verified research store.
+
+    ``price_fingerprint`` is ``price_fingerprint_of(manifest["files"])`` -- the fingerprint of the
+    four price files, fundamentals excluded -- and ``load_store`` always sets it. It defaults to
+    None only so a hand-built fixture need not invent one; a None reaches ``trial_provenance`` as
+    NULL, which reads as "price data unknown", never as a match.
+    """
 
     market: Market  # history from bars.csv, membership clipped to ``window``, fx from fx.csv
     dividends: dict[str, dict[date, Decimal]]  # symbol -> ex_date -> amount (ascending)
@@ -192,6 +198,7 @@ class ResearchData:
     manifest: Mapping[str, Any]
     unserved: tuple[str, ...] = ()  # requested members with no bars, sorted
     window: Window = DEV_WINDOW  # the window this store declares; its ``end`` is the D9 bound
+    price_fingerprint: str | None = None  # price_fingerprint_of(files): fundamentals excluded
 
 
 @dataclass(frozen=True)
@@ -373,6 +380,35 @@ def fingerprint_of(files: Mapping[str, str]) -> str:
     """sha256 of the sorted ``name:sha256`` lines (LF-terminated) of the store's data files."""
     text = "".join(f"{name}:{files[name]}\n" for name in sorted(files))
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def price_fingerprint_of(files: Mapping[str, str]) -> str:
+    """``fingerprint_of`` over the four price files alone (``DATA_FILES``): the store's identity
+    as far as a backtest is concerned.
+
+    **Why this exists, measured 2026-10-09 (trial-reproducibility analysis M1).** ``fingerprint_of``
+    hashes the store's whole ``files`` map, so adding or refreshing ``fundamentals.csv`` moves it
+    without moving a single bar. That is the correct identity for *the store* -- the
+    ``sync-research-store`` skill keys on it, and a store whose panel changed is a different store
+    -- and the wrong identity for *a price-only comparison*. The lab's 148 dev trials were recorded
+    under three store fingerprints (``5451195f…`` 58 trials, ``e597367b…`` 6, ``399d0d25…`` 84),
+    and this function over today's ``399d0d25…`` manifest returns exactly ``5451195f…``, the P7a
+    store's fingerprint: the three carry byte-identical bars, dividends, FX and unserved rows, and
+    differ only in the panel. Keying a comparability rule on ``store_fingerprint`` would refuse
+    every promotion in the lab for a difference no price-only method can see; keying it on this
+    strands nothing.
+
+    For a four-file store (one built before fundamentals existed) the two fingerprints are the
+    same hash, because the file map *is* ``DATA_FILES``. ``ValueError`` when ``files`` lacks one
+    of the four -- which ``_read_manifest`` already refuses for any store that loads, so in
+    practice only a hand-built map can reach it.
+    """
+    missing = [name for name in DATA_FILES if name not in files]
+    if missing:
+        raise ValueError(
+            f"a price fingerprint covers all of {list(DATA_FILES)}; the file map lacks {missing}"
+        )
+    return fingerprint_of({name: files[name] for name in DATA_FILES})
 
 
 # ---- fundamentals --------------------------------------------------------------------------
@@ -942,6 +978,7 @@ def load_store(
         manifest=manifest,
         unserved=unserved,
         window=window,
+        price_fingerprint=price_fingerprint_of(files),
     )
 
 

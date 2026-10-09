@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from labkit import stamp_provenance
 from seer_engine import dates
 from seer_engine.backtest import dev
 from seer_engine.lab import prereg, store
@@ -166,15 +167,18 @@ def _benchmark(conn) -> None:
     gate earlier. Its span matches the real row's, 1993-02-01..2015-10-16, which is what yields
     the four folds the gate requires.
 
-    Its own family and its own method id, so it is never kin to the method under test.
+    Its own family and its own method id, so it is never kin to the method under test. Stamped
+    with provenance on the lab's prices, because the gate refuses a benchmark whose prices are
+    unknown (D10).
     """
     store.add_method(conn, id="H-P7A-REF", name="SPY buy and hold", family="reference",
                      source_kind="seed", hypothesis="h", status="registered")
-    store.insert_trials(conn, [_trial(
+    ns = store.insert_trials(conn, [_trial(
         method_id="H-P7A-REF", candidate_id="REF-SPY-HOLD", config_digest="ref-spy-hold",
         start="1993-02-01", end="2015-10-16",
         curve_json=_curve(_months(date(1993, 2, 1), date(2015, 10, 16)), 0.08),
     )])
+    stamp_provenance(conn, ns)
 
 
 def _real_method(conn, mid: str = "M0001"):
@@ -187,7 +191,8 @@ def _real_method(conn, mid: str = "M0001"):
     runs the hard gate before `prereg.promote_method`: a method with no curve is scoreable on no
     fold and is refused. The curve compounds at 15% a year against the benchmark's 8%, so the
     method wins all four folds -- which is what the brief means by "a method winning a majority
-    with a clean family promotes".
+    with a clean family promotes". Both trials are stamped with provenance on the benchmark's
+    prices, as `lab run` stamps a real one, because the gate refuses an unstamped trial (D10).
     """
     method, path = discover()[mid]
     c = method.candidates[0]
@@ -196,12 +201,13 @@ def _real_method(conn, mid: str = "M0001"):
         store.add_method(conn, id=mid, name=method.name, family=method.family,
                          source_kind=method.source_kind, source_ref=method.source_ref,
                          hypothesis="h", status="registered")
-        store.insert_trials(conn, [
+        ns = store.insert_trials(conn, [
             _trial(method_id=mid, candidate_id=c.id, config_digest=config_digest(c),
                    rules_id=c.rules.id, allocator_id=str(c.allocator.id),
                    curve_json=_curve(_months(date(1996, 1, 2), date(2015, 10, 16)), 0.15)),
             _ballast(mid),
         ])
+        stamp_provenance(conn, ns)
         store.update_method(conn, mid, source_sha=source_sha(path), status="dev-eligible")
     return c, path
 

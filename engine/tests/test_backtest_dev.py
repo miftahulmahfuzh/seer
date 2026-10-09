@@ -50,6 +50,7 @@ from seer_engine.backtest.runner import INITIAL_IDR, RunResult, run_backtest
 from seer_engine.backtest.window import Window
 from seer_engine.prices import to_decimal
 from seer_engine.sim import Pick, initial_cash_usd, q
+from seer_engine.sim.contributions import OWNER_MONTHLY
 from seer_engine.sim.book import Target
 from seer_engine.sim.rules import DAILY_SWITCH, DAILY_SWITCH_TBILL, DESIGN_V0, MONTHLY_HOLD
 from seer_engine.strategies.base import History
@@ -791,3 +792,99 @@ def test_the_drawdown_label_follows_the_bar_and_keeps_its_prefix() -> None:
     assert FAILURE_LABELS[1].startswith("max DD <= ")
     assert "max DD <= 15%".startswith("max DD <= "), "the historical rows share the prefix"
     assert FAILURE_LABELS[0] == "beats SPY TR" and FAILURE_LABELS[-1] == "owner inputs"
+
+
+# --------------------------------------------------------------------------- starting capital
+
+RECORDED_IDR = Decimal("20000000")  # the capital every lump-sum trial before d79fc83 ran at
+
+
+def test_starting_capital_defaults_to_the_engine_constant():
+    """Passing nothing and passing ``INITIAL_IDR`` are the same run, on both engines."""
+    market = short_market()
+    registry, _, _, _ = short_registry()
+    for c in registry:
+        assert run_candidate(market, DIVS, SPY_DIVS, c) == run_candidate(
+            market, DIVS, SPY_DIVS, c, initial_idr=INITIAL_IDR
+        )
+    assert run_registry(market, DIVS, SPY_DIVS, registry) == run_registry(
+        market, DIVS, SPY_DIVS, registry, initial_idr=INITIAL_IDR
+    )
+
+
+def test_starting_capital_reaches_run_rules(monkeypatch):
+    """``_run`` hands ``run_rules`` the capital it was given -- and the constant when given none."""
+    seen: list[Decimal] = []
+    real_run_rules = dev_module.run_rules
+
+    def spy_run_rules(*args: Any, **kwargs: Any) -> Any:
+        seen.append(kwargs["initial_idr"])
+        return real_run_rules(*args, **kwargs)
+
+    monkeypatch.setattr(dev_module, "run_rules", spy_run_rules)
+    market = short_market()
+    registry, _, _, _ = short_registry()
+    run_candidate(market, DIVS, SPY_DIVS, registry[0])
+    run_candidate(market, DIVS, SPY_DIVS, registry[0], initial_idr=RECORDED_IDR)
+    run_registry(market, DIVS, SPY_DIVS, registry, initial_idr=RECORDED_IDR)
+    assert seen == [INITIAL_IDR, RECORDED_IDR] + [RECORDED_IDR] * len(registry)
+
+
+def test_a_book_run_at_another_capital_opens_with_that_cash_and_so_does_spy():
+    market = short_market()
+    c = cand("F1-FLIP-D", allocator=HoldOne("FLIP", "SPY", flip=True), rules=DAILY_SWITCH)
+    live, live_row = run_candidate(market, DIVS, SPY_DIVS, c)
+    result, row = run_candidate(market, DIVS, SPY_DIVS, c, initial_idr=RECORDED_IDR)
+    assert isinstance(result, BookResult)
+    assert result.initial_cash == initial_cash_usd(RECORDED_IDR, Decimal("12500"))
+    assert result.initial_cash == 2 * live.initial_cash
+    assert (row.start, row.end) == (live_row.start, live_row.end)
+    assert row.stats == run_stats(result)
+    price, total = spy_curves(market.spy(), row.start, row.end, result.initial_cash, SPY_DIVS)
+    assert row.spy_price == curve_metrics(price)
+    assert row.spy_tr == curve_metrics(total)
+    # Whole shares: doubling the cash does not double every position, so the curve's shape moves.
+    # This is the property that makes a recorded trial irreproducible at the wrong capital.
+    assert row.stats.metrics.total_return != live_row.stats.metrics.total_return
+
+
+def test_a_design_v0_run_at_another_capital_matches_run_backtest_at_that_capital():
+    market = short_market()
+    strategy = DipPicks()
+    c = cand("REF-DIP-V0", "REF", allocator=strategy, rules=DESIGN_V0)
+    live, live_row = run_candidate(market, DIVS, SPY_DIVS, c)
+    result, row = run_candidate(market, DIVS, SPY_DIVS, c, initial_idr=RECORDED_IDR)
+    assert isinstance(result, RunResult)
+    assert result == run_backtest(market, strategy, None, row.start, row.end, initial_idr=RECORDED_IDR)
+    assert result.initial_cash == initial_cash_usd(RECORDED_IDR, Decimal("12500"))
+    assert row.stats.metrics.total_return != live_row.stats.metrics.total_return
+
+
+def test_a_window_before_fx_start_converts_another_capital_at_the_fx_start_rate():
+    market = long_market()
+    book, _ = run_candidate(market, {}, (), cand("F1-LONG", allocator=HoldOne("LONG", "SPY", lookback=1)),
+                            initial_idr=RECORDED_IDR)
+    assert isinstance(book, BookResult)
+    assert (book.usd_idr, book.initial_cash) == (Decimal("8002"), initial_cash_usd(RECORDED_IDR, Decimal("8002")))
+
+
+def test_a_registry_at_another_capital_equals_single_runs_at_that_capital():
+    market = short_market()
+    registry, _, _, _ = short_registry()
+    rows = run_registry(market, DIVS, SPY_DIVS, registry, initial_idr=RECORDED_IDR)
+    assert rows == tuple(
+        run_candidate(market, DIVS, SPY_DIVS, c, initial_idr=RECORDED_IDR)[1] for c in registry
+    )
+    assert rows != run_registry(market, DIVS, SPY_DIVS, registry)
+
+
+def test_a_funded_run_at_another_capital_still_feeds_spy_the_same_deposits():
+    market = short_market()
+    c = cand("F1-FLIP-D", allocator=HoldOne("FLIP", "SPY", flip=True), rules=DAILY_SWITCH)
+    result, row = run_candidate(market, DIVS, SPY_DIVS, c, initial_idr=RECORDED_IDR, contributions=OWNER_MONTHLY)
+    assert isinstance(result, BookResult)
+    assert result.initial_cash == initial_cash_usd(RECORDED_IDR, Decimal("12500"))
+    assert result.cashflows  # the deposits landed on top of the larger opening book
+    price, total = spy_curves(market.spy(), row.start, row.end, result.initial_cash, SPY_DIVS,
+                              contributions=result.cashflows)
+    assert row.spy_tr == curve_metrics(total)

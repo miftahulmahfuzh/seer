@@ -16,7 +16,12 @@
                                     store's fundamental panel covers less than 80% of the window
     lab promote M0007               pre-register the best dev-eligible variant by MAR in
                                     docs/lab/prereg/M0007.md and move the method to promoted;
-                                    commit that file before `lab test` will spend the one look
+                                    commit that file before `lab test` will spend the one look.
+                                    REFUSES a method that does not win a majority of its
+                                    walk-forward folds, or that is scoreable on fewer than the
+                                    folds the benchmark yields, or whose family or ancestry
+                                    already reads test-failed (lab/hardgate.py). The refusal
+                                    comes before anything is written, and there is no override
     lab reevaluate [M0022 ...]      re-judge recorded dev trials against the bars in force now
                                     (store.DSR_MIN, store.DSR_POLICY, tuning.MAX_DRAWDOWN) and
                                     move a method they unblock from rejected to dev-eligible.
@@ -1151,12 +1156,24 @@ def _promote(conn, args) -> int:
     Writes one markdown file and one status transition. It loads no research store, runs no
     backtest and inserts no trial, so the test-window look count it prints is the one it found.
 
+    **The hard gate runs first.** `hardgate.check` refuses a method that lost a majority of its
+    walk-forward folds, that is scoreable on fewer folds than the geometry yields, or whose
+    family or ancestry already reads `test-failed`. It raises `store.LabError`, which `run` turns
+    into exit 2, and it raises *before* `prereg.promote_method` writes the file or moves the
+    status -- so a refused promote leaves the repository and the database byte-identical. There
+    is no flag that skips it.
+
+    `prereg.promote_method` has exactly one production caller, and this is it. A second caller
+    must call `hardgate.check` too.
+
     Like every other `lab` subcommand, the global `--dry-run` is ignored: there is no roll-back
     half of this to show, and a dry run that printed a pre-registration without writing it would
     be exactly the artefact design §3 exists to prevent.
     """
-    from seer_engine.lab import prereg
+    from seer_engine.lab import hardgate, prereg
     from seer_engine.lab.runner import git_head
+
+    hardgate.check(conn, args.method)
 
     done = prereg.promote_method(
         conn,
@@ -1653,46 +1670,6 @@ def _names(conn, args) -> int:
     log.info("lab names: %d runs done (%.1fs)", len(sweep.points), time.perf_counter() - t0)
     return 0
 
-def _trial_deposits(conn, row, curve) -> dict:
-    """What a funded trial received inside each curve step, in the curve's own units.
-
-    A recorded curve is normalised to the opening cash, so one deposit is
-    ``amount_idr / INITIAL_IDR`` -- 0.5 for the owner's 5,000,000 against a 10,000,000 start --
-    and no exchange rate is involved, because the run converted both at the same rate. (M0032's
-    curve opens at 1.5 for exactly this reason: January's deposit is already in the first point.)
-
-    ``{}`` for a lump-sum trial, which is every trial recorded before the contribution schedule
-    existed. Without this, slicing a funded curve counts the owner's deposits as growth and
-    compares the result against a benchmark that received none -- see ``regime.split``.
-    """
-    from seer_engine import dates as nyse
-    from seer_engine.backtest.regime import bucket
-    from seer_engine.backtest.runner import INITIAL_IDR
-    from seer_engine.lab import runner as labrunner
-
-    schedule = labrunner.recorded_contributions(conn, int(row["n"]))
-    if schedule is None:
-        return {}
-    start, end = date.fromisoformat(row["start"]), date.fromisoformat(row["end"])
-    unit = float(schedule.amount_idr / INITIAL_IDR)
-    due = schedule.dates_in(start, end)
-    credited: dict[date, float] = {}
-    for d in due:
-        session = d if nyse.is_session(d) else nyse.next_session(d)
-        if session > end:
-            continue
-        credited[session] = credited.get(session, 0.0) + unit
-    recorded = store.funding_of(conn, int(row["n"]))
-    expected = int(recorded["deposits_n"])
-    if len(due) != expected:
-        raise store.LabError(
-            f"{row['candidate_id']}: reconstructed {len(due)} deposits from "
-            f"{recorded['schedule']!r} over {start}..{end}, but the trial records {expected}. "
-            f"The schedule in sim.contributions has moved since this trial ran, so its curve "
-            f"cannot be de-funded safely; `lab regime` will not guess"
-        )
-    return bucket(curve, credited)
-
 
 def _regime(conn, args) -> int:
     """``lab regime``: every recorded dev result, split by whether the market was narrow or broad.
@@ -1705,6 +1682,7 @@ def _regime(conn, args) -> int:
     import json
 
     from seer_engine.backtest import regime
+    from seer_engine.lab import hardgate
 
     rows = [
         r for r in conn.execute(
@@ -1757,7 +1735,7 @@ def _regime(conn, args) -> int:
         if wanted and r["method_id"] not in wanted:
             continue
         curve = [(date.fromisoformat(d), float(v)) for d, v in json.loads(r["curve_json"])]
-        pan = regime.panel(curve, bench_curve, label, _trial_deposits(conn, r, curve))
+        pan = regime.panel(curve, bench_curve, label, hardgate.trial_deposits(conn, r, curve))
         cells, gaps = [], {}
         for name in regime.REGIMES:
             mine, theirs, gap = pan[name]
@@ -1794,6 +1772,7 @@ def _walkforward(conn, args) -> int:
     import json
 
     from seer_engine.backtest import regime
+    from seer_engine.lab import hardgate
     from seer_engine.lab import walkforward as wf
 
     rows = list(conn.execute(
@@ -1844,7 +1823,8 @@ def _walkforward(conn, args) -> int:
     for mid, trials in sorted(by_method.items()):
         curves = {r["candidate_id"]: curve_of(r) for r in trials}
         deps = {
-            r["candidate_id"]: _trial_deposits(conn, r, curves[r["candidate_id"]]) for r in trials
+            r["candidate_id"]: hardgate.trial_deposits(conn, r, curves[r["candidate_id"]])
+            for r in trials
         }
         rec = wf.Record(mid, wf.evaluate(curves, bench, the_folds, deps))
         best = max(

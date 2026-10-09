@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "010f797",
       "depends_on": [],
       "difficulty": "EASY",
       "n": 1,
-      "note": null,
+      "note": "initial_idr keyword on dev._run/run_candidate/run_registry; suite 3242->3249, 0 failed",
       "package": "backtest",
       "plan": ".workflows/plan/trial-reproducibility/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-09T13:20:12+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P2-ENG-61GM",
       "title": "Starting capital is a run input"
     },
     {
@@ -88,6 +88,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/trial-reproducibility/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trial-reproducibility",
-  "updated": "2026-10-09T13:11:25+00:00",
+  "updated": "2026-10-09T13:20:12+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trial-reproducibility"
 }

@@ -14,9 +14,14 @@
   display: flex; justify-content: space-between; gap: 8px;
 }
 .filters > * { --seg-btn: clamp(30px, calc((100cqw - 20px) / var(--n)), 42px); }
-.stats { display: flex; align-items: flex-end; gap: 26px; }
+/* Wraps, because Activity's headline is a basket total and not a P&L. "+$0.00 Net result" fits a
+   phone at 52px; "$2518.09 Bought" is 470px wide and pushed Fees off the right edge entirely
+   (caught by scripts/shoot.mjs, which fails on any horizontal scroll at 390px). */
+.stats { display: flex; align-items: flex-end; gap: 14px 22px; flex-wrap: wrap; }
 .stat { display: flex; flex-direction: column; gap: 2px; }
-.big { font-size: 52px; line-height: 0.95; letter-spacing: -0.04em; }
+/* vw, not cqw: on desktop `.summary` is a flex row, so a container query on `.stats` would size
+   it from an element whose own width depends on this text. */
+.big { font-size: clamp(34px, 11vw, 52px); line-height: 0.95; letter-spacing: -0.04em; }
 .mid { font-size: 26px; }
 .sub { font-size: 15px; }
 .key {
@@ -52,6 +57,9 @@
   display: flex; align-items: center; gap: 4px; font-size: 12px;
 }
 .line2 { font-size: 14px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Activity's detail line is longer than Trades' "112.73 -> 108.54 - Oct 7" and the ellipsis ate
+   the price and the date, which are the two facts the line exists for. It wraps instead. */
+.line2wrap { white-space: normal; overflow: visible; text-overflow: clip; }
 .result { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-size: 13px; }
 .pct { font-size: 19px; }
 

@@ -165,7 +165,7 @@ export default async function History({ searchParams }: { searchParams: Promise<
                     <span className={s.tag} data-tip={st?.name ?? f.strategyId}><SIcon size={12} />{f.strategyShort}</span>
                     {(!st || st.isPaper) && <PaperChip size="sm" />}
                   </span>
-                  <span className={`num ${s.line2}`}>{verb} {sharesLabel(f.shares)} at {money(f.price)} · {monthDay(f.date)}</span>
+                  <span className={`num ${s.line2} ${s.line2wrap}`}>{verb} {sharesLabel(f.shares)} at {money(f.price)} · {monthDay(f.date)}</span>
                 </div>
                 <div className={s.result}>
                   <span className={`num ${s.pct} ${buy ? '' : 'pos'}`}>{buy ? `−${usd(-f.cash)}` : signedUsd(f.cash)}</span>

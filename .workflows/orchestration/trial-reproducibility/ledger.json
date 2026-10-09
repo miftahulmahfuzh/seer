@@ -1,0 +1,93 @@
+{
+  "branch": "feature/trial-reproducibility",
+  "coordinator": "orch-trial-reproducibility",
+  "coordinator_session_id": "ea408a9c-64a0-43b9-bb52-444ea7639b1e",
+  "created": "2026-10-09T13:11:25+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "EASY",
+      "n": 1,
+      "note": null,
+      "package": "backtest",
+      "plan": ".workflows/plan/trial-reproducibility/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Starting capital is a run input"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "lab`, `research`, `commands` (`_costs` only), `tests/labkit",
+      "plan": ".workflows/plan/trial-reproducibility/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Per-trial provenance, and re-runs at the recorded capital"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "lab` (`hardgate`), `commands",
+      "plan": ".workflows/plan/trial-reproducibility/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Compare like with like: gate refuses, reports warn, `lab run` pins the store"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2,
+        3
+      ],
+      "difficulty": "NORMAL",
+      "n": 4,
+      "note": null,
+      "package": "docs, skills, `lab/lab.sqlite",
+      "plan": ".workflows/plan/trial-reproducibility/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Verify on copies, record the finding, stage the migrated lab"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/trial-reproducibility/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "trial-reproducibility",
+  "updated": "2026-10-09T13:11:25+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/trial-reproducibility"
+}

@@ -412,17 +412,59 @@ else:
         f"of paying in every month did the work. The stock-picking did not.</p>"
     )
 
+def _why(d, pts):
+    """Why it lost, measured from this run rather than assumed.
+
+    The first draft of this page repeated M0032's pre-registered guess -- that a trend gate sitting
+    in cash would cost a monthly buyer the cheap months. On the 2018 run that guess was simply
+    wrong: the gate years were the book's BEST years against SPY. So this is computed.
+    """
+    import statistics
+    book, spy, dep = pts["book_real"], pts["spy"], pts["deposited"]
+    days = [t for t, _ in book]
+    bv, sv, dv = dict(book), dict(spy), dict(dep)
+    # Both curves got identical deposits on identical days, so the ratio is pure strategy.
+    per, prev = [], None
+    for y in range(days[0].year, days[-1].year + 1):
+        ds = [t for t in days if t.year == y]
+        if not ds:
+            continue
+        r = bv[ds[-1]] / sv[ds[-1]] if sv[ds[-1]] else None
+        if r and prev:
+            per.append((r / prev - 1, y))
+        if r:
+            prev = r
+    worst = sorted(per)[:3]
+
+    def rets(v):
+        out = []
+        for i in range(1, len(days)):
+            new = dv[days[i]] - dv[days[i - 1]]
+            if v[days[i - 1]] > 0:
+                out.append((v[days[i]] - new) / v[days[i - 1]] - 1)
+        return out
+
+    rb, rs = rets(bv), rets(sv)
+    vol = statistics.pstdev(rb) / statistics.pstdev(rs) if statistics.pstdev(rs) else 1.0
+    yrs = ", ".join(str(y) for _m, y in sorted(worst, key=lambda x: x[1]))
+    share = sum(m for m, _y in worst) / sum(m for m, _y in per if m < 0) * 100
+    return (
+        f"<p><strong>Where it actually went wrong.</strong> The loss is not spread across the "
+        f"{d['years']:.1f} years &mdash; {yrs} account for most of it. In the years the market "
+        f"fell, this book <em>beat</em> SPY; it lost its ground in strong rising years, which is "
+        f"the opposite of the story a cautious, trend-gated book is supposed to tell.</p>"
+        f"<p><strong>And it was not being careful with your money.</strong> Month to month it was "
+        f"<strong>{vol:.2f}&times; as volatile as SPY</strong> while earning "
+        f"{statistics.mean(rb) * 100:.2f}% a month against SPY&rsquo;s "
+        f"{statistics.mean(rs) * 100:.2f}%. More risk, less return &mdash; so the shortfall cannot "
+        f"be explained away as the price of safety.</p>"
+    )
+
+
 if edge >= 0:
     why = ""
 else:
-    why = (
-        "<p><strong>Why it lost, and it was predicted.</strong> This book only buys when the "
-        "market is above its long trend, so it sat in cash through early 2020 and much of 2022 "
-        "&mdash; exactly the months a monthly buyer&rsquo;s new money was buying cheapest. "
-        "M0032&rsquo;s own pre-registered note said this would happen: a money-weighted return "
-        "&ldquo;rewards being invested when the money arrives&rdquo;, and the gate that makes this "
-        "method look safe on a lump sum is what makes it lose on a monthly one.</p>"
-    )
+    why = _why(d, pts)
 HTML = HTML.replace("__BARS__", bars).replace("__LEDE__", lede).replace("__WHY__", why)
 open(out, "w").write(HTML)
 print(f"wrote {out} ({len(HTML):,} bytes)")

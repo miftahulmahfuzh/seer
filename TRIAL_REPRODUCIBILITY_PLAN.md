@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/trial-reproducibility`
 **Branch:** `feature/trial-reproducibility` (base: `origin/main` @ `e5eda52`)
 **Phases:** 4
-**Status:** planned
+**Status:** phase 4/4 complete
 **Coordinator:** —
 
 ---
@@ -81,10 +81,10 @@ changing `INITIAL_IDR`; a path for re-recording the benchmark on a rebuilt store
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Starting capital is a run input | R1 | `backtest` | 2 | — | EASY | `.workflows/plan/trial-reproducibility/phase-1.md` | — | — |
-| 2 | Per-trial provenance, and re-runs at the recorded capital | R1, R4 | `lab`, `research`, `commands` (`_costs` only), `tests/labkit` | 18 | 1 | HARD | `.workflows/plan/trial-reproducibility/phase-2.md` | — | — |
-| 3 | Compare like with like: gate refuses, reports warn, `lab run` pins the store | R1, R2 | `lab` (`hardgate`), `commands` | 5 | 2 | NORMAL | `.workflows/plan/trial-reproducibility/phase-3.md` | — | — |
-| 4 | Verify on copies, record the finding, stage the migrated lab | R1, R2, R3, R4 | docs, skills, `lab/lab.sqlite` | 8 | 2, 3 | NORMAL | `.workflows/plan/trial-reproducibility/phase-4.md` | — | — |
+| 1 | Contract drift | P2 ↔ P3 | P2 defines `ResearchData.price_fingerprint` as a dataclass field `str \| None = None`; P3 assumed a `str` property and typed `pin_dev_store(conn, price_fingerprint: str)` | P3 Requires corrected; `pin_dev_store` takes `str \| None` and refuses None first (fail closed); new test `test_the_dev_store_pin_refuses_a_store_whose_prices_are_unknown`; P3 exit criteria and Step 8 impact updated |
+| 2 | Contract drift (would fail at runtime) | P2 ↔ P3 | P3's `stamp_provenance` passed `initial_idr="10000000"` (str); P2's `insert_provenance` refuses a non-`Decimal` capital with `LabError` — every P3 gate fixture would have raised | The helper takes `initial_idr: Decimal = Decimal("10000000")`; P3 Requires lists `ProvenanceRow.initial_idr: Decimal` |
+| 3 | Duplicate work | P2 `test_lab_hardgate.py` `_capital` / `_funded_trial`, P3 `labkit.stamp_provenance` | Two fixture stamping sites on an append-only one-row-per-trial table | One helper, `labkit.stamp_provenance`, idempotent (skips a trial with a row), **created in P2** (earliest phase needing it). P2's `_capital` deleted; its funded tests and `_funded_trial`, and P2's remeasure / remeasure-seed tests, call the helper. P3 Step 12 replaced by a no-change note |
+| 4 | File collision | `engine/tests/labkit.py` (P2 smoke fingerprints, P3 helper) | Two phases editing one file | P2 owns every `labkit.py` edit; P3 no longer touches it (Files table updated) |
 
 Every dependency points backward. Phases run strictly 1 → 2 → 3 → 4: phase 3 quotes
 `hardgate.py`, `commands/lab.py` and `test_lab_hardgate.py` as phase 2 leaves them.

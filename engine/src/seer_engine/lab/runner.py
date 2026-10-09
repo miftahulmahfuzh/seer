@@ -560,13 +560,27 @@ def kin_note(conn: sqlite3.Connection, method_id: str) -> str | None:
     known then.
 
     Kin is ``hardgate.failed_kin``'s definition -- the ``family`` string union the transitive
-    ancestors through ``parent_id`` -- read from the one place that defines it, so the note and the
-    gate can never disagree about who counts as kin. It names **every** failed relative, not the
-    first: M0030's two are M0021 and M0029.
+    ancestors through ``parent_id`` (D4), the blend ingredients and theirs (hardgate D12), and the
+    test-failed books one of its variants moves with (hardgate D14) -- read from the one place that
+    defines it, so the note and the gate can never disagree about who counts as kin. It names
+    **every** failed relative, not the first: M0030's two are M0021 and M0029.
+
+    When the kin cannot be read today -- D14 compares recorded curves, and ``failed_kin`` raises
+    ``store.LabError`` on a curve measured on other or unknown prices (D10) -- the note says so
+    instead. It is still a note: a kin walk that cannot run is information before the look, and
+    turning it into a refusal here would break the promise exactly as a failed kin would.
     """
     from seer_engine.lab import hardgate
 
-    failed = hardgate.failed_kin(conn, method_id)
+    try:
+        failed = hardgate.failed_kin(conn, method_id)
+    except store.LabError as e:
+        return (
+            f"note: {method_id}'s kin could not be read today ({e}). The pre-registration is a "
+            f"promise and is not re-opened, so this look still runs and its family_state line "
+            f"still records what was true the day it was written. This is information before "
+            f"the look is spent, not a refusal"
+        )
     if not failed:
         return None
     names = ", ".join(failed)

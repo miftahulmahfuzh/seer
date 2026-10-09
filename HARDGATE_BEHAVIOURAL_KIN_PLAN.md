@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/hardgate-behavioural-kin`
 **Branch:** `feature/hardgate-behavioural-kin` (base: `origin/main` @ `461580a`)
 **Phases:** 1
-**Status:** planned
+**Status:** complete (phase 1 code landed; Step 15 — re-file M0060/M0062 on main's lab db — run by the main session after landing)
 **Coordinator:** —
 
 ---
@@ -50,7 +50,7 @@ Verbatim from the owner:
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Behavioural kin (D14), skill text, idea re-file | R1, R2, R3, R4 | `engine/src/seer_engine/lab` | 6 + db | — | HARD | `.workflows/plan/hardgate-behavioural-kin/phase-1.md` | — | — |
+| 1 ✓ | Behavioural kin (D14), skill text, idea re-file | R1, R2, R3, R4 | `engine/src/seer_engine/lab` | 6 + db | — | HARD | `.workflows/plan/hardgate-behavioural-kin/phase-1.md` | P2-ENG-B4KN | — |
 
 ### Phase 1 — Behavioural kin (D14), skill text, idea re-file
 **Satisfies:** R1, R2, R3, R4 (one phase: the decision, its code, its tests, its skill text and the two rows it re-files are one argued change; splitting them would ship a skill describing a rule that does not exist yet)

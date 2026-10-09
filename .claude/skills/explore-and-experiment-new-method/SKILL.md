@@ -87,8 +87,12 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
        quietly favours the smaller ones (insight 91), is betting against the market's shape, not
        only picking stocks. The equal-weight S&P (RSP) as a second yardstick is the open idea
        that separates the two.
-     - **Name the family by what it ranks on**, not by the idea that inspired it (insight 92). A
-       momentum book filed under a new family name escapes the kin check by accident.
+     - **Name the family by what it ranks on**, not by the idea that inspired it (insight 92). The
+       gate no longer depends on the name -- since hardgate D14 it also reads how a book moves, so
+       a momentum book under a new family is kin of the failed momentum books once it has a curve
+       -- but `lab status`, the lab's families and anyone reading the lab before a curve exists
+       still go by it. The runner copies the family from the method file when the idea runs, so
+       the file must carry the family the idea row was given.
      - **`/calculate-assets` is the owner's curiosity, not evidence.** Never block, flag or
        choose an idea because the owner ran it on a method or family, and never cite its result
        in a verdict. It neither spends nor spoils a test look.
@@ -239,10 +243,16 @@ Then:
        at least 4 of them. Fewer than 4 is refused as thin evidence, not waved through: a strict
        majority of an *odd* fold count is a coin flip at every odd count (n=3 is 0.5000, n=4 is
        0.3125), so "3 or more" would admit evidence weaker than 4 and no stronger than 1.
-     - **(K) kin.** **No kin reads `test-failed`** -- kin being the method's `family` *and* its
-       transitive ancestors through `parent_id`. A parent that failed out of sample disproves a
-       method as surely as a sibling that failed; M0032 is M0007's realistic twin by `parent_id`
-       and not by family string.
+     - **(K) kin.** **No kin reads `test-failed`** -- kin being the method's `family`, its
+       transitive ancestors through `parent_id`, every lab method whose engine one of its variants
+       runs (a blend's ingredients, with their own family and ancestry -- D12), **and** every
+       test-failed method whose tested variant moves with one of its dev variants: monthly
+       returns de-funded, less each one's fit on SPY's, correlated at 0.85 or more over at least
+       36 shared months (D14). A parent that failed out of sample disproves a method as surely as
+       a sibling that failed; M0032 is M0007's realistic twin by `parent_id` and not by family
+       string. And a plain momentum book is kin of the failed momentum books whatever its family
+       is called, because it moves with them. A method with no curve yet has nothing measured;
+       its kin is the names alone until it runs.
 
      **There is no override.** No `--force`, no environment variable, no "promote anyway". If the
      rule proves too strict the answer is an argued commit that changes it, because an override
@@ -259,7 +269,7 @@ Then:
 
    **THE BUY SIGNAL — say it loudly, do not sit on it.** The moment a method clears all four of:
 
-   > **(a)** dev-eligible at the bars in force, **(b)** no method in its family has test-failed,
+   > **(a)** dev-eligible at the bars in force, **(b)** no kin has test-failed (the gate's (K) kin),
    > **(c)** a majority of walk-forward folds beaten, and **(d)** a *positive* edge in the
    > highest-coverage era (2009-2015), so the edge is not an artefact of the missing half
 
@@ -275,14 +285,15 @@ Then:
    the batch report. **Do not block on it and do not ask** -- the iron rule still holds, you never
    wait for a human -- but the owner must not be able to miss it.
 
-   **The buy signal's (b) and the hard gate's (K) are not the same test, and that is deliberate.**
-   The buy signal checks the `family` string only (`lab/walkforward.py`'s `BUY_CONDITIONS`, and
-   `lab walkforward`'s own query); the gate also walks `parent_id`. A method can therefore read
-   clean in `lab walkforward` and still be refused by `lab promote` — M0030's family is clean while
-   its parent M0029 and grandparent M0021 both read `test-failed`. The gate is the stricter of the
-   two and it is the one that decides whether a look is spent. The buy signal is a separate,
-   owner-decided rule about when to **buy data**, not about when to promote, so it was left as it
-   is rather than quietly widened.
+   **The buy signal's (b) and the hard gate's (K) read the same kin.** `lab walkforward` hands the
+   signal `hardgate.failed_kin` -- family, ancestry, blend ingredients and behaviour (hardgate D9,
+   D13, D14) -- so a method cannot read clean in `lab walkforward` and be refused on kin by `lab
+   promote`. When the kin cannot be read (a curve on other prices), the report prints "kin
+   unknown" on that row and the signal does not fire. What still differs is the folds: the signal
+   reads the picks' record only, while the gate also wants the promoted variant's own majority
+   (D11). The buy signal is a separate, owner-decided rule about when to **buy data**, not about
+   when to promote; its wording in `lab/walkforward.py` (`BUY_CONDITIONS` still says "family union
+   ancestors") is the owner's to change.
 
 1. `python -m seer_engine lab promote MNNNN`. Read what it printed, then **commit and push
    `docs/lab/prereg/MNNNN.md` before any test number exists** (design §3) — the command prints the

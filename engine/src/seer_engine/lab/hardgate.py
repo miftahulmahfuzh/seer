@@ -10,7 +10,8 @@
 - **(K) the kin.** No other method in its ``family``, no transitive ancestor through
   ``parent_id``, no **ingredient** -- a lab method whose engine one of its variants runs, a
   blend's parts included -- and nothing in an ingredient's own ``family`` or ancestry reads
-  ``test-failed`` -- see **(D12)**.
+  ``test-failed`` -- see **(D12)**; and no ``test-failed`` method's tested variant moves with any
+  of its dev variants, at a residual correlation of ``KIN_CORRELATION`` or more -- see **(D14)**.
 
 **Decided 2026-10-09 by the owner, after seeing what it costs.** It blocks every promotion in the
 lab as of today, and that is the intended effect rather than a side effect: five out-of-sample
@@ -317,6 +318,134 @@ make: ``BUY_CONDITIONS`` and the ``buy_signal`` docstring still describe kin as 
 ancestors", which now under-describes the rule they are handed; and the signal's fold condition
 reads the picks' record only. Whether the buy signal should also require (D11)'s own-variant
 majority is a change to ``buy_signal`` itself.
+
+**(D14) Does (K) read what a method does, as well as what it is called? -- Yes. A test-failed
+method is kin when any dev variant's monthly return, de-funded and less its own fit on SPY's,
+correlates with that method's tested variant at ``KIN_CORRELATION = 0.85`` or more, over at least
+``MIN_KIN_MONTHS = 36`` shared months. Behaviour alone, no declared signal. One hop.**
+
+Insight 92 found the hole the names leave. Two queued ideas are plain momentum books filed under
+new family names with a non-momentum parent: M0060, "quiet twelve-month winners"
+(``stock-low-volume-momentum``, parent M0057, short-term momentum, ``rejected``), and M0062,
+"momentum among the most heavily traded members" (``stock-liquidity-tilt``, parent M0058,
+illiquidity, ``rejected``). Neither shares a ``family``, a ``parent_id`` or an ingredient with M0002
+(``stock-momentum-risk-managed``), M0022 (``stock-residual-momentum``) or M0021 and M0029
+(``stock-multi-factor-blend``), all four ``test-failed``, so (D4) and (D12) would read both clean.
+Nobody meant to dodge the gate; the filing let it happen. Three ways to close it:
+
+- **(a) a declared signal.** Each method states the main thing it ranks on, machine-readably, and
+  kin is "same signal".
+- **(b) behaviour.** Kin is a measured similarity between the method's recorded curves and the
+  failed methods' -- the books themselves, not their labels.
+- **(c) both**, either one linking.
+
+**Why not (a), and so not (c).** The field cannot live in the method files: a file that has run is
+frozen by its ``source_sha`` (``runner.preflight``, ``test_a_method_that_ran_is_frozen``), and
+that is all 30 files on disk, the four ``test-failed`` methods among them -- so the very methods
+kin has to point at could never carry it. It would have to be a second registry kept by hand for
+76 rows, labelled by the same filer whose family label slipped, which moves the hole from one
+string to another. Its one edge, that it works before a method has a curve, buys nothing here:
+``check`` is silent below ``dev-eligible``, and (F) refuses a method with no dev curve before (K)
+is read. (c) carries (a)'s registry and catches nothing at the gate that (b) misses.
+
+**Which correlation.** Measured on the committed lab: 76 methods; ``test-failed`` M0002 (tested
+``M0002-REL-85``), M0021 (``M0021-B70-RAW``), M0022 (``M0022-W-TV14``) and M0029
+(``M0029-B70-RAW-FRAC``); 42 methods carry dev curves, every one on price fingerprint
+``5451195fd552``. Each figure is the best over a method's dev variants against any failed tested
+variant, for the lab's books that are not momentum (``H-P7A-F1``, F3, F5, F7, F10, F11, M0005,
+M0057, M0058) and its momentum books in other families' clothes (``H-P7A-F4``, F9, M0008, M0034,
+M0035, M0036, M0044, M0050, M0053, M0054, M0056):
+
+================================================  ==================  ====================  =========
+correlation of monthly de-funded returns          not momentum,       momentum,             gap
+                                                  highest             lowest
+================================================  ==================  ====================  =========
+raw                                               0.87 (F1)           0.88 (M0054)          none
+active -- minus SPY's return                      0.90 (F3)           0.83 (M0054)          inverted
+**residual -- less each series' fit on SPY's**    **0.8033 (F10)**    **0.8522 (M0008)**    **0.049**
+================================================  ==================  ====================  =========
+
+Every book in the lab is long US stocks, so two raw series correlate through the market alone;
+subtracting SPY one for one leaves each book's own market sensitivity behind, and the active
+column ranks the wrong way round. The residual -- what a line, intercept and slope, fitted on
+SPY's monthly return over the series' own months does not explain -- is the only one with a gap.
+Among the failed books themselves it reads M0021 to M0029 0.99, M0021 and M0029 to M0022 0.91, and
+M0002 to the other three 0.72 to 0.75: M0002 is plain risk-managed momentum, and the other three
+are residual-momentum engines.
+
+**The threshold, and which variants.** Methods linked, of 76. (D4) union (D12) alone links 31 and
+blocks 8 of the 10 ``dev-eligible`` methods (M0007, M0011, M0019, M0020, M0024, M0028, M0030, M0033,
+M0044, M0053) -- all but M0044 and M0053:
+
+======================  ==========  =========  ======  ============  ==========================================
+variants compared       threshold   behaviour  union   dev-eligible  newly linked
+                                                       blocked
+======================  ==========  =========  ======  ============  ==========================================
+promoted only           0.80, 0.85  13         34      10            M0022, M0044, M0053
+promoted only           0.90        10         32      8             M0022
+promoted only           0.95        7          31      8             --
+every dev variant       0.80        29         45      10            the twelve below, and ``H-P7A-F10``
+                                                                     (index ETFs, unrelated) and M0015
+**every dev variant**   **0.85**    **26**     **43**  **10**        ``H-P7A-F4``, ``H-P7A-F9``, M0008, M0022,
+                                                                     M0034, M0035, M0036, M0044, M0050, M0053,
+                                                                     M0054, M0056
+every dev variant       0.90        20         39      9             drops F9, M0008, M0053 and M0054
+every dev variant       0.95        14         35      8             only ``H-P7A-F4``, M0034, M0035, M0050
+======================  ==========  =========  ======  ============  ==========================================
+
+0.85 sits in the gap: 0.047 above the highest unrelated book, and below every momentum book the lab
+has -- M0008 clears it by 0.002, which is said here rather than hidden; the next momentum book can
+land either side of a bar, and the plain one reads 0.97. 0.80 takes in the index-ETF book; 0.90 and
+above let momentum books through.
+
+Every dev variant, for (D12)'s reason: kin is a statement about a method, and every variant is a
+candidate in every fold's pick. The promoted variant alone would also miss the very book this
+decision exists for. A ``rejected`` method has no variant to promote, and a promoted variant is
+often the braked one while the plain book sits beside it as another variant. The failed side is
+each ``test-failed`` method's **tested** variant -- the candidate of its first ``window='test'``
+trial, the book that actually lost its look -- on its dev curve.
+
+**What it catches.** ``H-P7A-F4``'s ``F4-MOM12-N20-TREND`` -- plain twelve-month momentum behind the
+SPY trend gate, 20 names, the exact F4-MOM12 book M0060's hypothesis names as its starting point
+-- moves with M0002's tested ``M0002-REL-85`` at 0.97. That is the M0060 and M0062 shape: a plain
+momentum book under any family name, with any parent, is kin of M0002 the moment it has a curve.
+M0062's pick, twelve-one momentum inside the 60 most heavily traded members, has no recorded curve
+and no proxy in the lab is that book; its own curve decides when it runs, and this rule makes no
+claim about it before then.
+
+**Why this is not (D4)'s blob.** Each link is a measured similarity between this method's books and
+one failed **tested** book -- one hop, never kin of kin: a method that is only kin of a failure is
+not a book anything is compared with. So the unrelated books stay free: index timing (F1, 0.79),
+sector rotation (F3, 0.79), leveraged ETFs (F10, 0.80), low volatility (F5, 0.52), RSI(2) (F7,
+0.32), turn of the month (F11, 0.39), fundamentals (M0005, 0.06), illiquidity (M0058, 0.68) and
+short-term momentum (M0057, 0.76). What the rule links is the momentum the lab has already tested
+and lost on, under whatever name it was filed.
+
+**A method with no curve.** Nothing is measured: ``behavioural_kin`` returns ``()`` and its kin is
+(D4) union (D12) alone. The gate never reaches (K) for such a method anyway -- ``check`` is silent
+below ``dev-eligible``, and (F) refuses a method with no dev curve first. The same holds for any
+pair a correlation cannot be computed on: a flat series (a constant-growth curve, the shape every
+test fixture records), fewer than ``MIN_KIN_MONTHS`` shared months, or a failed method with no
+recorded look. Not measured is never kin, and never a pass on the other rules either.
+
+**Comparability and the cost.** Every row compared must carry the benchmark's price fingerprint;
+a mismatch or an unknown on the method's rows or on a failed tested row raises (D10) -- the gate
+refuses, and ``lab status`` prints "kin unknown" with the reason. It is still SQL and arithmetic
+on recorded curves: no store, no backtest, no look.
+
+**It refuses nobody new today.** The two ``dev-eligible`` methods it newly links, M0044 and M0053,
+already fail (F) under (D11), and M0022 is itself ``test-failed`` and not gated. ``lab status``
+still prints ``Promotable now: (none)``. As with (D12), that is the point: the next momentum book
+under a new name will not have a fold record that happens to catch it.
+
+**(D13) still holds.** ``lab walkforward`` passes ``failed_kin`` to ``walkforward.buy_signal``, so
+the signal's kin condition widens with (D14) through its caller and ``buy_signal`` is not edited.
+The one change at the caller is that ``lab walkforward`` now catches a ``store.LabError`` from
+``failed_kin`` -- (D14) compares curves, so it can refuse on prices (D10) -- and hands
+"kin unknown (...)" to the signal as the failed kin: the signal cannot fire on a kin nobody could
+check, and the report still prints the row. ``BUY_CONDITIONS`` and the ``buy_signal`` docstring
+still say "family union ancestors", which under-describes the rule further; they remain the
+owner's to edit.
 """
 
 from __future__ import annotations
@@ -327,6 +456,8 @@ import sqlite3
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
+
+import numpy as np
 
 from seer_engine.backtest import regime
 from seer_engine.lab import store
@@ -359,6 +490,24 @@ _GATED_STATUS = "dev-eligible"
 #: writes every allocator -- top level and nested, a blend's parts included -- as ``<ID>``
 #: (``registry._canon``), and a lab allocator's id is its method's id. See (D12).
 _INGREDIENT = re.compile(r"<(M\d{4})>")
+
+#: The residual correlation at or above which a book is kin of a test-failed one by behaviour
+#: (D14). Measured on the committed lab: the highest any unrelated book reaches against a failed
+#: tested variant is 0.80 (``H-P7A-F10``, index ETFs), the lowest any momentum book in another
+#: family's clothes reaches is 0.85 (M0008), and the plain twelve-month momentum book
+#: ``H-P7A-F4`` reads 0.97. The bar sits in that gap, and it is not lowered from inside the code.
+KIN_CORRELATION = 0.85
+
+#: The fewest common months a residual correlation is computed on (D14). Three years of monthly
+#: returns; fewer is "not measured", never kin -- a correlation on a handful of months is noise
+#: wearing a number. Every comparable dev curve in the lab today shares 100 months or more with
+#: every failed tested one, so this is a floor against a thin curve, not a quota on a method.
+MIN_KIN_MONTHS = 36
+
+#: Below this standard deviation a monthly series is flat -- a constant-growth curve whose
+#: "returns" differ only by the rounding of its recorded values -- and has no correlation with
+#: anything (D14). A real book's monthly returns move by percent; this is a ten-thousandth of one.
+_FLAT = 1e-6
 
 
 def trial_deposits(
@@ -774,14 +923,204 @@ def ingredients(conn: sqlite3.Connection, method_id: str) -> tuple[str, ...]:
     return tuple(str(r["id"]) for r in known)
 
 
+Month = tuple[int, int]
+
+
+@dataclass(frozen=True, slots=True)
+class Twin:
+    """One behavioural link (D14): a variant of the method that moves with a failed tested book.
+
+    ``failed_id`` read ``test-failed``; ``failed_candidate_id`` is the variant it spent its look
+    on; ``candidate_id`` is the method's own dev variant that tracks it best, and ``correlation``
+    is their residual correlation -- always at or above ``KIN_CORRELATION``, or there is no twin.
+    """
+
+    failed_id: str
+    candidate_id: str
+    failed_candidate_id: str
+    correlation: float
+
+    def sentence(self) -> str:
+        """``"M0002 (M0060-X moves with M0002's tested M0002-REL-85 at 0.97 residual correlation)"``."""
+        return (
+            f"{self.failed_id} ({self.candidate_id} moves with {self.failed_id}'s tested "
+            f"{self.failed_candidate_id} at {self.correlation:.2f} residual correlation)"
+        )
+
+
+def _flat(values: np.ndarray) -> bool:
+    return float(np.std(values)) < _FLAT
+
+
+def monthly_returns(
+    curve: Sequence[tuple[date, float]], deposits: dict[date, float] | None = None
+) -> dict[Month, float]:
+    """``curve``'s month-on-month returns, de-funded, keyed ``(year, month)``. See (D14).
+
+    A recorded lab curve is already one point per month (``regime.month_ends``), so a return is
+    the step between two consecutive points; the key is the month the step ends in. ``deposits``
+    is ``trial_deposits``' answer for the trial, and ``regime.defunded`` takes them out first --
+    the same de-funding path the folds use -- so a funded book's deposits never read as moves.
+    A step from a non-positive value is left out rather than divided by.
+    """
+    by_month: dict[Month, float] = {}
+    for d, v in regime.defunded(curve, deposits):
+        by_month[(d.year, d.month)] = float(v)
+    months = sorted(by_month)
+    out: dict[Month, float] = {}
+    for prev, cur in zip(months, months[1:]):
+        if by_month[prev] > 0:
+            out[cur] = by_month[cur] / by_month[prev] - 1.0
+    return out
+
+
+def residual(series: dict[Month, float], bench: dict[Month, float]) -> dict[Month, float] | None:
+    """What ``series`` did that the market did not: its monthly return minus its own fit on SPY's.
+
+    An ordinary least-squares line, intercept and slope, of ``series`` on the benchmark's monthly
+    return over the months the two share; the residual is what the line does not explain. Every
+    book in the lab is long US stocks, so two raw series correlate through the market alone, and
+    subtracting SPY one-for-one (an "active" return) leaves each book's own market sensitivity
+    behind -- (D14) measures both and neither separates momentum from the rest.
+
+    None -- not measured -- when the two share fewer than ``MIN_KIN_MONTHS`` months, or when the
+    series, the benchmark or the residual is flat (``_FLAT``). Checked before the fit, so a
+    constant-growth curve never reaches ``np.polyfit`` and raises no warning.
+    """
+    months = sorted(set(series) & set(bench))
+    if len(months) < MIN_KIN_MONTHS:
+        return None
+    x = np.array([bench[m] for m in months])
+    y = np.array([series[m] for m in months])
+    if _flat(x) or _flat(y):
+        return None
+    fit = np.polyfit(x, y, 1)
+    left = y - np.polyval(fit, x)
+    if _flat(left):
+        return None
+    return dict(zip(months, (float(v) for v in left)))
+
+
+def correlation(a: dict[Month, float], b: dict[Month, float]) -> float | None:
+    """Pearson correlation of two monthly series over the months they share. See (D14).
+
+    None -- not measured, and therefore never kin -- below ``MIN_KIN_MONTHS`` common months, or
+    when either side is flat over them. Checked before ``np.corrcoef``, which would otherwise
+    divide by a zero variance and warn.
+    """
+    months = sorted(set(a) & set(b))
+    if len(months) < MIN_KIN_MONTHS:
+        return None
+    x = np.array([a[m] for m in months])
+    y = np.array([b[m] for m in months])
+    if _flat(x) or _flat(y):
+        return None
+    return float(np.corrcoef(x, y)[0, 1])
+
+
+def _tested_curves(conn: sqlite3.Connection, method_id: str) -> list[tuple[str, sqlite3.Row]]:
+    """Each test-failed method but ``method_id``, with the dev trial of the variant it tested.
+
+    The tested variant is the candidate of the method's earliest ``window='test'`` trial -- the
+    look it spent and lost. A test-failed method with no recorded test trial, or whose tested
+    variant has no dev curve, has nothing to be compared with and is left out: it is still kin by
+    (D4) and (D12) to whatever its family, ancestry or ingredients link it to. Sorted by id.
+    """
+    out: list[tuple[str, sqlite3.Row]] = []
+    for f in conn.execute(
+        "SELECT id FROM methods WHERE status = 'test-failed' AND id <> ? ORDER BY id",
+        (method_id,),
+    ).fetchall():
+        fid = str(f["id"])
+        tested = conn.execute(
+            "SELECT candidate_id FROM trials WHERE method_id = ? AND window = 'test' "
+            "ORDER BY n LIMIT 1",
+            (fid,),
+        ).fetchone()
+        if tested is None:
+            continue
+        rows = [r for r in _dev_curves(conn, fid) if r["candidate_id"] == tested["candidate_id"]]
+        if rows:
+            out.append((fid, rows[0]))
+    return out
+
+
+def behavioural_kin(
+    conn: sqlite3.Connection, method_id: str, geo: Geometry | None = None
+) -> tuple[Twin, ...]:
+    """The test-failed methods ``method_id`` moves with, one ``Twin`` each; ``()`` when none. (D14)
+
+    For every test-failed method but this one, its tested variant's dev curve is compared with
+    **every** dev variant of ``method_id`` that carries a curve: monthly returns, de-funded
+    (``monthly_returns``), less each series' own fit on the benchmark's (``residual``), correlated
+    over the months they share (``correlation``). The best-correlated pair at or above
+    ``KIN_CORRELATION`` is the twin. One hop: only test-failed tested variants are compared, never
+    a method that is itself only kin of one.
+
+    ``()`` -- nothing measured -- when no test-failed method has a tested curve, or when
+    ``method_id`` has no dev curve yet; its kin is then (D4) and (D12) alone. Otherwise the
+    benchmark is needed (``geometry`` raises ``store.LabError`` without it), and every row
+    compared must carry the benchmark's price fingerprint: a mismatch or an unknown on the
+    method's rows or on a failed tested row raises ``store.LabError`` (D10) -- fail closed, never
+    "no twin".
+    """
+    if store.get_method(conn, method_id) is None:
+        raise store.LabError(f"no method {method_id}")
+    targets = _tested_curves(conn, method_id)
+    if not targets:
+        return ()
+    rows = _dev_curves(conn, method_id)
+    if not rows:
+        return ()
+    geo = geometry(conn) if geo is None else geo
+    problems = mismatches(conn, geo.bench_n, [*rows, *(r for _f, r in targets)])
+    if problems:
+        raise store.LabError(
+            f"{method_id}'s behaviour cannot be compared with the test-failed books: "
+            f"{describe(problems)}. The hard gate compares two curves only when both were "
+            f"measured on the benchmark's prices (D10, D14), and fails closed when either side's "
+            f"prices differ or are unknown. There is no override"
+        )
+    bench = monthly_returns(list(geo.bench))
+
+    def residual_of(row: sqlite3.Row) -> dict[Month, float] | None:
+        curve = _curve_of(row)
+        return residual(monthly_returns(curve, trial_deposits(conn, row, curve)), bench)
+
+    mine = [(str(r["candidate_id"]), residual_of(r)) for r in rows]
+    twins: list[Twin] = []
+    for failed_id, frow in targets:
+        theirs = residual_of(frow)
+        if theirs is None:
+            continue
+        best: Twin | None = None
+        for candidate, series in mine:
+            if series is None:
+                continue
+            rho = correlation(series, theirs)
+            if rho is None or rho < KIN_CORRELATION:
+                continue
+            if best is None or rho > best.correlation:
+                best = Twin(failed_id, candidate, str(frow["candidate_id"]), rho)
+        if best is not None:
+            twins.append(best)
+    return tuple(twins)
+
+
 def failed_kin(conn: sqlite3.Connection, method_id: str) -> tuple[str, ...]:
     """Every method in ``method_id``'s kin that reads ``test-failed``; ``()`` when clean.
 
     Kin is the ``family`` string **union** the transitive ancestors reached through
     ``parent_id`` (D4), **union** every ingredient -- a lab method whose engine one of its
     variants runs -- together with that ingredient's own ``family`` and ancestors (D12),
-    excluding the method itself. One hop: an ingredient's *other* variants' ingredients are not
-    followed. See the module docstring for the measurements that decided both.
+    **union** every test-failed method whose tested variant one of its dev variants moves with,
+    at a residual correlation of at least ``KIN_CORRELATION`` (D14, ``behavioural_kin``),
+    excluding the method itself. One hop each: an ingredient's *other* variants' ingredients are
+    not followed, and behaviour is compared only with the failed books themselves, never with
+    their kin. See the module docstring for the measurements that decided all three.
+
+    Raises ``store.LabError`` when the behavioural comparison cannot be made honestly -- no
+    benchmark, or a curve on other or unknown prices (D10) -- rather than reading "clean".
 
     This is the one definition of kin. ``prereg.family_text``, ``lab test``'s note and ``lab
     walkforward``'s buy signal all call it, so they cannot disagree with the gate (D9, D13).
@@ -797,16 +1136,20 @@ def failed_kin(conn: sqlite3.Connection, method_id: str) -> tuple[str, ...]:
         if ing_row is not None:
             kin |= _lineage(conn, ing_row)
     kin.discard(method_id)
-    if not kin:
-        return ()
 
-    ids = sorted(kin)
-    marks = ", ".join("?" for _ in ids)
-    bad = conn.execute(
-        f"SELECT id FROM methods WHERE id IN ({marks}) AND status = 'test-failed' ORDER BY id",
-        tuple(ids),
-    ).fetchall()
-    return tuple(str(r["id"]) for r in bad)
+    found: set[str] = set()
+    if kin:
+        ids = sorted(kin)
+        marks = ", ".join("?" for _ in ids)
+        found.update(
+            str(r["id"])
+            for r in conn.execute(
+                f"SELECT id FROM methods WHERE id IN ({marks}) AND status = 'test-failed'",
+                tuple(ids),
+            )
+        )
+    found.update(t.failed_id for t in behavioural_kin(conn, method_id))
+    return tuple(sorted(found))
 
 
 def family_state(conn: sqlite3.Connection, method_id: str) -> str:
@@ -930,13 +1273,22 @@ def check(conn: sqlite3.Connection, method_id: str) -> None:
 
     bad = failed_kin(conn, method_id)
     if bad:
+        twins = behavioural_kin(conn, method_id, geo)
+        moves = (
+            ""
+            if not twins
+            else f" By behaviour (D14): {'; '.join(t.sentence() for t in twins)} -- at or above "
+            f"{KIN_CORRELATION:.2f}, what is left of a book's monthly return once the market's "
+            f"share is taken out moves with a book that has already lost its look, and a new "
+            f"name does not make it a new book."
+        )
         raise store.LabError(
             f"{method_id} is not promoted: {', '.join(bad)} already read test-failed, and "
             f"{'they are' if len(bad) > 1 else 'it is'} kin -- same family ({row['family']!r}), "
-            f"an ancestor through parent_id, or an ingredient one of its variants runs (or that "
-            f"ingredient's family or ancestry, D12). A new variant of a family that has been "
-            f"disproven out of sample is not a fresh candidate, and neither is a blend with a "
-            f"disproven engine in it. Nothing was written and no status moved. "
-            f"There is no override -- if this family deserves another look, that is an argued "
-            f"change to the rule, in git"
+            f"an ancestor through parent_id, an ingredient one of its variants runs (or that "
+            f"ingredient's family or ancestry, D12), or a tested book one of its variants moves "
+            f"with (D14).{moves} A new variant of a family that has been disproven out of sample "
+            f"is not a fresh candidate, and neither is a blend with a disproven engine in it. "
+            f"Nothing was written and no status moved. There is no override -- if this family "
+            f"deserves another look, that is an argued change to the rule, in git"
         )

@@ -3,6 +3,12 @@
   "coordinator": "orch-trial-reproducibility",
   "coordinator_session_id": "ea408a9c-64a0-43b9-bb52-444ea7639b1e",
   "created": "2026-10-09T13:11:25+00:00",
+  "landed": {
+    "at": "2026-10-09T13:51:44+00:00",
+    "base": "main",
+    "commit": "5ecc1e21a539ba985145be49ecdbe6d8a10f25be",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -63,31 +69,31 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "1148da2",
       "depends_on": [
         2,
         3
       ],
       "difficulty": "NORMAL",
       "n": 4,
-      "note": null,
+      "note": "v5 lab staged (152 backfill provenance, insight #77); remeasure M0011/M0007/H-P7A/M0001 exit 0 at 10M; status unchanged; Step 7 continued under own-coordinator exception; commit 72f832e made per Step 10 pathspec",
       "package": "docs, skills, `lab/lab.sqlite",
       "plan": ".workflows/plan/trial-reproducibility/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-09T13:51:09+00:00",
       "satisfies": [
         "R1",
         "R2",
         "R3",
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P2-ROOT-FCG9",
       "title": "Verify on copies, record the finding, stage the migrated lab"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/trial-reproducibility/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trial-reproducibility",
-  "updated": "2026-10-09T13:41:45+00:00",
+  "updated": "2026-10-09T13:51:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trial-reproducibility"
 }

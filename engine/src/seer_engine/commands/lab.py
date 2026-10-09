@@ -13,13 +13,17 @@
     lab run M0007 [--store DIR] [--allow-coverage F]
                                     run a committed method on the dev window, record its trials;
                                     a method with a MarketAware allocator is refused when the
-                                    store's fundamental panel covers less than 80% of the window
+                                    store's fundamental panel covers less than 80% of the window,
+                                    and every method is refused, before any backtest, when the
+                                    store's prices are not the ones the lab's benchmark was
+                                    measured on (lab/hardgate.py, D10)
     lab promote M0007               pre-register the best dev-eligible variant by MAR in
                                     docs/lab/prereg/M0007.md and move the method to promoted;
                                     commit that file before `lab test` will spend the one look.
                                     REFUSES a method that does not win a majority of its
                                     walk-forward folds, or that is scoreable on fewer than the
-                                    folds the benchmark yields, or whose family or ancestry
+                                    folds the benchmark yields, or whose curves were measured on
+                                    prices other than the benchmark's, or whose family or ancestry
                                     already reads test-failed (lab/hardgate.py). The refusal
                                     comes before anything is written, and there is no override
     lab reevaluate [M0022 ...]      re-judge recorded dev trials against the bars in force now
@@ -1246,7 +1250,7 @@ def _show(conn, args) -> int:
 
 
 def _run(conn, args) -> int:
-    from seer_engine.lab import runner
+    from seer_engine.lab import hardgate, runner
     from seer_engine.lab.method import discover
 
     methods = discover()
@@ -1265,6 +1269,11 @@ def _run(conn, args) -> int:
             "`python -m seer_engine research_store`"
         ) from e
     log.info("research store %s loaded (%.1fs)", data.fingerprint[:12], time.perf_counter() - t0)
+    # Decision D10 (lab/hardgate.py): the dev store is pinned to the prices the lab's benchmark
+    # was measured on. A store whose price fingerprint differs is refused here, before any
+    # backtest, so a rebuilt store cannot slip into the record unannounced -- every trial it
+    # produced would be one the hard gate refuses as incomparable. No flag skips this.
+    hardgate.pin_dev_store(conn, data.price_fingerprint)
     # The second checkpoint: runner.preflight ran before the store existed and could not see the
     # panel. Nothing here is reached for a price-only method.
     floor = float(getattr(args, "allow_coverage", coverage.MIN_DEV_COVERAGE))
@@ -1814,6 +1823,41 @@ def _names(conn, args) -> int:
     return 0
 
 
+def _comparability_warnings(conn, bench_n: int, rows, wanted: set[str]) -> list[str]:
+    """One line per method whose recorded curves cannot be compared with the benchmark's (D10).
+
+    ``lab regime`` and ``lab walkforward`` are reports: they decide nothing, so on the condition
+    the hard gate refuses they **warn** and keep printing. A report that refused would hide the
+    very record its reader came to look at. The test is the gate's own
+    (``hardgate.mismatches``), against the benchmark row the report itself is using, over the
+    rows the report itself will print -- so a warning and a refusal can never disagree about
+    which method is incomparable.
+
+    ``rows`` need ``n``, ``method_id`` and ``candidate_id``; the benchmark's own row is skipped,
+    and so is every method outside ``wanted`` when ``wanted`` is non-empty.
+    """
+    from seer_engine.backtest import regime
+    from seer_engine.lab import hardgate
+
+    by_method: dict[str, list] = {}
+    for r in rows:
+        if r["candidate_id"] == regime.BENCH_CANDIDATE:
+            continue
+        if wanted and r["method_id"] not in wanted:
+            continue
+        by_method.setdefault(str(r["method_id"]), []).append(r)
+    out: list[str] = []
+    for mid, trials in sorted(by_method.items()):
+        problems = hardgate.mismatches(conn, bench_n, trials)
+        if problems:
+            out.append(
+                f"WARNING {mid} is not comparable with {regime.BENCH_CANDIDATE}: "
+                f"{hardgate.describe(problems)}. Its row below is cross-store arithmetic, and "
+                f"`lab promote` refuses it (lab/hardgate.py, D10)"
+            )
+    return out
+
+
 def _regime(conn, args) -> int:
     """``lab regime``: every recorded dev result, split by whether the market was narrow or broad.
 
@@ -1821,6 +1865,10 @@ def _regime(conn, args) -> int:
     no status and spends no look. Recorded curves (``trials.curve_json``) are monthly, so the
     split is arithmetic on rows the lab already has; the research store is opened only to measure
     breadth, which needs member bars.
+
+    A method whose curves were measured on prices other than the benchmark's -- or on prices
+    nobody recorded -- gets one ``WARNING`` line above the table and its row anyway (D10 in
+    ``lab/hardgate.py``): a report warns, the gate refuses.
     """
     import json
 
@@ -1869,6 +1917,11 @@ def _regime(conn, args) -> int:
     print("-- a few big names carried it -- and BROAD otherwise. Returns are annualised within")
     print("each regime's months alone, so they describe where a result came from, not a return")
     print("anyone could have earned.\n")
+    warnings = _comparability_warnings(conn, int(bench["n"]), rows, wanted)
+    for line in warnings:
+        print(line)
+    if warnings:
+        print()
     head = f"  {'candidate':<26}{'narrow vs SPY':>15}{'broad vs SPY':>15}   {'verdict':<22}"
     print(head)
     print("  " + "-" * (len(head) - 2))
@@ -1911,6 +1964,10 @@ def _walkforward(conn, args) -> int:
     Report only, and unlike ``lab regime`` it needs no research store at all: recorded trials carry
     monthly curves, so every fold is a date slice of rows already in the database. Nothing is
     written, no status moves, no look is spent.
+
+    A method whose curves were measured on prices other than the benchmark's -- or on prices
+    nobody recorded -- gets one ``WARNING`` line above the table and its row anyway (D10 in
+    ``lab/hardgate.py``): a report warns, the gate refuses.
     """
     import json
 
@@ -1957,6 +2014,11 @@ def _walkforward(conn, args) -> int:
           f"{the_folds[-1].eval_end}. Each fold picks the variant the lab's own rule would have")
     print("named knowing nothing past the train end, then scores it on months it has never seen.")
     print("Folds share training data, so they are a sanity check and never a significance test.\n")
+    warnings = _comparability_warnings(conn, int(bench_row["n"]), rows, wanted)
+    for line in warnings:
+        print(line)
+    if warnings:
+        print()
     head = f"  {'method':<8}{'folds won':>11}{'stable':>9}{'2009-15 edge':>15}   verdict"
     print(head)
     print("  " + "-" * (len(head) + 16))

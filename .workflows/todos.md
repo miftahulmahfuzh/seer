@@ -2,7 +2,7 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-09 20:13
+**Last Updated**: 2026-10-09 22:45
 **Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -13,7 +13,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 1
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
+- Blocked: 0
 - Completed: 17
 
 ---
@@ -29,7 +29,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns the end-to-end verification on scratch copies (M2/M4 reproduced at today's `INITIAL_IDR`; `lab costs M0011` flat column = trial #90; `lab status` identical to `e5eda52`); one `lab insight --kind observation` on the committed database; `lab stage` (migrates the committed DB to v5 with its backfill and regenerates `web/data/lab.json`); `docs/runbooks/data-pipeline.md`, `engine/package_readme.md`, a dated "Resolved" note under `docs/plans/HANDOVER_20261009.md` §5.1; the store-acquisition guidance in `.claude/skills/sync-research-store/SKILL.md`, `explore-and-experiment-new-method/SKILL.md` and `redo-sera-experiments/SKILL.md`. Does not touch any file under `engine/src/` or `engine/tests/`, or any `trial_moments` row on the committed DB. Exit criteria: committed DB at schema 5 with 152 provenance rows (all `backfill`), 38 `trial_moments`, 24 `trial_funding`; `lab status` still `Promotable now: (none)`; `test_lab_snapshot` passes; the full engine suite passes; one commit holding exactly the eight paths of its Step 10.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `TRIAL_REPRODUCIBILITY_PLAN.md` (phase 4 of 4)
   - **Satisfies**: R3 — Quantify the drift on a method curve, not just the benchmark; R4 — Does the 58-trial `5451195fd552` cohort need re-running or marking (append-only); R1 — Choose the policy among (a) pin store / (b) re-run benchmark / (c) refuse on fingerprint mismatch / (d) record enough to re-derive — measured by what each strands, and say why (written answer); R2 — Is `trials.store_fingerprint` enough to detect it; should `lab walkforward`, `lab regime`, `hardgate` warn or refuse (written answer)
   - **Depends on**: P2-ENG-JC9B, P2-ENG-0HTR

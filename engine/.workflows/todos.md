@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-09 22:00
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-09 22:45
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
 - P1 High: 0
-- P2 Medium: 2
+- P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 109
+- Completed: 110
 
 ---
 
@@ -891,15 +891,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 
 ### [P2] Medium
-- [ ] **P2-ENG-0HTR** Phase 3: Compare like with like: gate refuses, reports warn, `lab run` pins the store
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `lab/hardgate.py` (module-docstring decision D10; `Geometry.bench_n`; `benchmark_n`, `mismatches`, `describe`, `comparability`, `pin_dev_store(conn, price_fingerprint: str | None)`; `fold_record` — hence `check`, `fold_summary`, `summary` — refuses with `store.LabError` when the benchmark's or any method dev trial's price fingerprint is missing, NULL or different; fail closed, no override); `commands/lab.py` (usage text; `_run` calls `hardgate.pin_dev_store` after the store loads and before any backtest — refuses an unknown store fingerprint always, a different one when the lab has a benchmark; `_comparability_warnings`; `_walkforward` / `_regime` print one `WARNING` line per incomparable method and still report); tests in `test_lab_hardgate.py` (fixtures stamp via `labkit.stamp_provenance`), `test_lab_prereg.py` and `test_lab_status.py` fixtures. Does not touch `walkforward.py`, `trial_deposits`, the provenance schema, `labkit.py`, docs or skills. Exit criteria: on a scratch copy of the committed DB, `lab status` and `lab walkforward` byte-identical to the base commit's (0 stranded, no `WARNING`); `hardgate.comparability` is `()` for all seven dev-eligible methods; a fixture on other prices is refused by `lab promote` and warned by `lab walkforward`; `lab run` on other prices exits 2 before any backtest and `pin_dev_store(conn, None)` refuses; the full engine suite passes.
-  - **Status**: open
-  - **Plan Set**: `TRIAL_REPRODUCIBILITY_PLAN.md` (phase 3 of 4)
-  - **Satisfies**: R2 — Is `trials.store_fingerprint` enough to detect it; should `lab walkforward`, `lab regime`, `hardgate` warn or refuse; R1 — Choose the policy among (a) pin store / (b) re-run benchmark / (c) refuse on fingerprint mismatch / (d) record enough to re-derive — measured by what each strands, and say why (policies (a) and (c′))
-  - **Depends on**: P2-ENG-JC9B
-  - **Plan**: `.workflows/plan/P2-ENG-0HTR.md`
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"
   - **Difficulty**: EASY
   - **Type**: Bug
@@ -924,6 +915,22 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P2-ENG-0HTR** Phase 3: Compare like with like: gate refuses, reports warn, `lab run` pins the store
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `lab/hardgate.py` (module-docstring decision D10; `Geometry.bench_n`; `benchmark_n`, `mismatches`, `describe`, `comparability`, `pin_dev_store(conn, price_fingerprint: str | None)`; `fold_record` — hence `check`, `fold_summary`, `summary` — refuses with `store.LabError` when the benchmark's or any method dev trial's price fingerprint is missing, NULL or different; fail closed, no override); `commands/lab.py` (usage text; `_run` calls `hardgate.pin_dev_store` after the store loads and before any backtest — refuses an unknown store fingerprint always, a different one when the lab has a benchmark; `_comparability_warnings`; `_walkforward` / `_regime` print one `WARNING` line per incomparable method and still report); tests in `test_lab_hardgate.py` (fixtures stamp via `labkit.stamp_provenance`), `test_lab_prereg.py` and `test_lab_status.py` fixtures. Does not touch `walkforward.py`, `trial_deposits`, the provenance schema, `labkit.py`, docs or skills. Exit criteria: on a scratch copy of the committed DB, `lab status` and `lab walkforward` byte-identical to the base commit's (0 stranded, no `WARNING`); `hardgate.comparability` is `()` for all seven dev-eligible methods; a fixture on other prices is refused by `lab promote` and warned by `lab walkforward`; `lab run` on other prices exits 2 before any backtest and `pin_dev_store(conn, None)` refuses; the full engine suite passes.
+  - **Status**: completed
+  - **Plan Set**: `TRIAL_REPRODUCIBILITY_PLAN.md` (phase 3 of 4)
+  - **Satisfies**: R2 — Is `trials.store_fingerprint` enough to detect it; should `lab walkforward`, `lab regime`, `hardgate` warn or refuse; R1 — Choose the policy among (a) pin store / (b) re-run benchmark / (c) refuse on fingerprint mismatch / (d) record enough to re-derive — measured by what each strands, and say why (policies (a) and (c′))
+  - **Depends on**: P2-ENG-JC9B
+  - **Plan**: `.workflows/plan/P2-ENG-0HTR.md`
+  - **Completed**: 2026-10-09 22:45
+  - **Method**: /do
+  - **Files**: `engine/src/seer_engine/lab/hardgate.py`, `engine/src/seer_engine/commands/lab.py`, `engine/tests/test_lab_hardgate.py`, `engine/tests/test_lab_prereg.py`, `engine/tests/test_lab_status.py`
+  - **Drift**:
+    - Line anchors off by ~2 from the plan's post-phase-2 numbers (`Geometry` at :238, not :240); edits anchored on function names as the plan instructs. No content drift: every replaced function differed from the plan's replacement only in the intended lines.
+    - The plan's manual check step 1 archives only `engine/src` at `e5eda52`; `lab regime` at the base also needs `engine/data` (`membership_overrides.csv`). Extracted `engine/data` as well to get the base regime output.
+  - **Verified**: Full engine suite 3286 passed, 411 skipped, 0 failed; targeted hardgate/prereg/status 105 passed. Scratch copy of the committed lab migrated to v5: `lab status`, `lab walkforward`, `lab regime` byte-identical to `e5eda52` output, 0 `WARNING` lines, Promotable now: (none). `hardgate.comparability == ()` for all seven dev-eligible methods (M0007 M0011 M0019 M0020 M0024 M0030 M0033); `bench_n == 1`. `pin_dev_store` passes against the real store (`5451195fd552`) and refuses `'e'*64`. `lab/lab.sqlite` untouched.
 - [x] **P2-ENG-JC9B** Phase 2: Per-trial provenance, and re-runs at the recorded capital
   - **Difficulty**: HARD
   - **Type**: Feature

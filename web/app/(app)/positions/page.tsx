@@ -125,10 +125,10 @@ export default async function Positions({ searchParams }: { searchParams: Promis
           </section>
         ) : (
           <div className={s.grid}>
-            {bracket.map((p, i) => <BracketCard key={p.key} q={p} bg={cardBg(p.slot, i)} paper={paper} />)}
+            {bracket.map((p, i) => <BracketCard key={p.key} q={p} bg={cardBg(p.slot, i)} />)}
             {book.map((p, i) => p.kind === 'benchmark'
               ? <BenchmarkCard key={p.key} q={p} />
-              : <BookCard key={p.key} q={p} bg={cardBg(null, bracket.length + i)} paper={paper} />)}
+              : <BookCard key={p.key} q={p} bg={cardBg(null, bracket.length + i)} />)}
           </div>
         )}
 
@@ -443,7 +443,7 @@ function StopTarget({ q }: { q: Holding }) {
   );
 }
 
-function BracketCard({ q, bg, paper }: { q: Holding; bg: string; paper: boolean }) {
+function BracketCard({ q, bg }: { q: Holding; bg: string }) {
   const max = q.maxDays ?? 5;
   return (
     <article className={`sheet over ${bg} ${s.card}`}>
@@ -455,7 +455,6 @@ function BracketCard({ q, bg, paper }: { q: Holding; bg: string; paper: boolean 
         <Change pnl={q.pnl} ratio={q.pnlPct} />
       </div>
       <div className={s.chips}>
-        {paper && <PaperChip />}
         <span className="chip num">Entry {usd(q.entry)}</span>
         <span className={`chip num ${s.now}`}>Now {usd(q.current)}</span>
       </div>
@@ -470,7 +469,7 @@ function BracketCard({ q, bg, paper }: { q: Holding; bg: string; paper: boolean 
   );
 }
 
-function BookCard({ q, bg, paper }: { q: Holding; bg: string; paper: boolean }) {
+function BookCard({ q, bg }: { q: Holding; bg: string }) {
   return (
     <article className={`sheet over ${bg} ${s.card}`}>
       <div className={s.head}>
@@ -481,7 +480,6 @@ function BookCard({ q, bg, paper }: { q: Holding; bg: string; paper: boolean }) 
         <Change pnl={q.pnl} ratio={q.pnlPct} />
       </div>
       <div className={s.chips}>
-        {paper && <PaperChip />}
         <span className="chip num">Entry {usd(q.entry)}</span>
         <span className={`chip num ${s.now}`}>Now {usd(q.current)}</span>
       </div>

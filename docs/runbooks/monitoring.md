@@ -6,20 +6,20 @@ Spec: [handover 2026-10-08](../handover/2026-10-08-sean-shipped-red-main-and-the
 
 One message a day, on Telegram, at **21:23 WIB (14:23 UTC)**, every day of the week.
 
-Its **first line** carries all four facts, because that is what a phone shows on the lock screen
+Its **first line** carries all five facts, because that is what a phone shows on the lock screen
 without being unlocked. Everything under it is for when you open the message.
 
 ```
-Seer OK | Wed 08 Oct | stepped n/a | picks n/a | CI green | paper PAUSED
+Seer OK | Wed 08 Oct | stepped n/a | picks n/a | news n/a | CI green | paper PAUSED
 ```
 
 - `OK` — nothing needs you today.
-- `CHECK` — one of the four facts needs you. Open the message; the reason is spelled out.
+- `CHECK` — one of the five facts needs you. Open the message; the reason is spelled out.
 
 A deliberate pause is **never** `CHECK`. It is reported, every day, so you cannot forget it is on,
 but it is not an alarm.
 
-## The four facts
+## The five facts
 
 ### 1. Session stepped
 
@@ -51,7 +51,28 @@ rows for it.
 | `NO` | a decision was due and no picks exist for it. This is the failure handover §8 Q8 describes as *"produced picks and nobody was told"*, caught from the other side. |
 | `n/a` | paper is paused, or no nightly was scheduled today |
 
-### 3. CI on main
+### 3. News check
+
+Did the daily control get the verdicts it needs to buy anything?
+
+Read from Neon, by **engine and not by id**: the one active `bracket` strategy (today `C-GT`), its
+`paper_state.pending_session`, and the `news_vetoes` rows stored for that session.
+
+| It says | It means |
+|---|---|
+| `yes` | verdicts exist for the pending session. The detail line gives the count and the orders placed. |
+| `NO` | the control has **no verdict** for its pending session, so it can buy nothing — design §8, "no verdict row is no trade" |
+| `n/a` | paper is paused, no nightly was due, there is no active bracket strategy, or it has not started |
+
+**Why this fact exists.** On 2026-10-07 and -08 the other four facts all read clean while `C-GT`
+placed not one order and sat in 100% cash. `commands/veto.py` still named the retired `C`, every
+verdict died on `news_vetoes_strategy_id_fkey`, and `paper` read no verdict row — which is a
+deliberate no-trade, not an error. Nothing was red: the Veto step is `continue-on-error` on purpose
+(an LLM outage must never fail the night), fact 2 reads `book_targets` and a bracket strategy writes
+none, and fact 1 said `yes` because the control *did* step — into cash. A failure that every other
+green light is built to ignore needs a light of its own.
+
+### 4. CI on main
 
 Read from the GitHub Actions API: the newest **finished** run of `engine-ci.yml` on `main`, and its
 conclusion.
@@ -67,7 +88,7 @@ word "running" never appears in a line.
 | `RED` | the last finished run failed. The link is in the detail line. |
 | `?` | the last finished run was cancelled or skipped, or there is no finished run in the last 20 |
 
-### 4. Paper trading
+### 5. Paper trading
 
 Read from `.github/workflows/nightly.yml`: the value of `PAPER_PAUSED`.
 
@@ -141,6 +162,7 @@ GitHub disables scheduled workflows in a repository with 60 days of no activity.
 | `CI RED` | open the run link in the message; the failing job names itself |
 | `stepped no` | **Actions → Nightly** — did it run? If it ran and went red, the Paper step's log says why. If it did not run, check the schedule is enabled. |
 | `picks NO` | the night stepped but published nothing for a session that wanted a decision. The nightly run's Paper step log is where to start. |
+| `news NO` | the control has no verdict for its pending session. **Actions → Nightly → the Veto step** — it is `continue-on-error`, so the run can be green while that step exited 1. A `ForeignKeyViolation` naming a strategy id means the roster was renamed out from under the check; `roster.news_veto` is what resolves it now, and the id is never written down. A Finnhub or LLM outage instead writes `failed` verdicts and exits 0, which shows as `news yes` with no orders — that one is working as designed. |
 | `paper PAUSED` | expected while the roster is rebuilt. The three resume conditions are written above the switch in `nightly.yml`. |
 
 ## Times

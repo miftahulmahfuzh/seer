@@ -1,7 +1,15 @@
 name: Daily watch
 
-# One line a day, to the owner's phone. Four facts: session stepped, picks published, CI green,
-# paper paused.
+# One line a day, to the owner's phone. Five facts: session stepped, picks published, news check
+# done, CI green, paper paused.
+#
+# WHY THE NEWS CHECK IS A FACT OF ITS OWN (added 2026-10-09). The other four all read clean through
+# 2026-10-07 and -08 while the daily control, C-GT, placed not one order. `commands/veto.py` still
+# named the retired `C`, every verdict died on news_vetoes_strategy_id_fkey, and `paper` read no
+# verdict row -- which is "no trade" by design (§8). Nothing was red: Veto is `continue-on-error`
+# on purpose (an LLM outage must never fail the night), "picks" reads `book_targets` and a bracket
+# strategy has none, and "stepped" was true because the control did step -- into cash. A failure
+# that every green light is built to ignore needs a light of its own.
 #
 # WHY THIS IS NOT A STEP INSIDE nightly.yml. A step inside the nightly cannot report "the nightly
 # did not run" -- if the nightly never starts, its own steps never run either. That is the single
@@ -120,6 +128,12 @@ jobs:
           #                   are due at all (003_paper.sql:25).
           # due_rows        : book_targets rows published for that due session.
           # last_ok_wib     : when the nightly last finished successfully, in WIB.
+          #
+          # And fact 5, the daily control. `ctl` is the one ACTIVE bracket strategy -- today C-GT,
+          # named by its engine and not by its id so 017's next rename does not blind the watcher
+          # the way it blinded `veto`. `ctl_sess` is the session it has a decision pending for,
+          # `ctl_vetoes` the verdicts stored for that session and `ctl_orders` what it placed.
+          # Zero verdicts is the signal: the control cannot buy anything it has no verdict for.
           read_sql="
             SELECT
               coalesce((SELECT max(last_session)::text FROM paper_state), ''),
@@ -132,11 +146,31 @@ jobs:
                                        WHERE pending_decision)),
               coalesce((SELECT to_char(max(finished_at) AT TIME ZONE 'Asia/Jakarta',
                                        'YYYY-MM-DD HH24:MI')
-                          FROM runs WHERE status = 'success' AND NOT is_demo), '')
+                          FROM runs WHERE status = 'success' AND NOT is_demo), ''),
+              coalesce((SELECT string_agg(id, ',' ORDER BY id) FROM strategies
+                         WHERE engine = 'bracket' AND status = 'active'), ''),
+              coalesce((SELECT max(ps.pending_session)::text FROM paper_state ps
+                         JOIN strategies s ON s.id = ps.strategy_id
+                        WHERE s.engine = 'bracket' AND s.status = 'active'), ''),
+              (SELECT count(*) FROM news_vetoes v
+                 JOIN strategies s ON s.id = v.strategy_id
+                WHERE s.engine = 'bracket' AND s.status = 'active'
+                  AND v.session_date = (SELECT max(ps.pending_session) FROM paper_state ps
+                                          JOIN strategies s2 ON s2.id = ps.strategy_id
+                                         WHERE s2.engine = 'bracket' AND s2.status = 'active')),
+              (SELECT count(*) FROM orders o
+                 JOIN strategies s ON s.id = o.strategy_id
+                WHERE s.engine = 'bracket' AND s.status = 'active'
+                  AND o.session_date = (SELECT max(ps.pending_session) FROM paper_state ps
+                                          JOIN strategies s2 ON s2.id = ps.strategy_id
+                                         WHERE s2.engine = 'bracket' AND s2.status = 'active'))
           "
           row="$(psql "$DATABASE_URL_UNPOOLED" -v ON_ERROR_STOP=1 -At -F '|' -c "$read_sql")"
-          IFS='|' read -r stepped_session latest_data due_session due_rows last_ok_wib <<<"$row"
+          IFS='|' read -r stepped_session latest_data due_session due_rows last_ok_wib \
+            ctl ctl_sess ctl_vetoes ctl_orders <<<"$row"
           due_rows="${due_rows:-0}"
+          ctl_vetoes="${ctl_vetoes:-0}"
+          ctl_orders="${ctl_orders:-0}"
 
           # ---------------------------------------------------------------------- fact 3: CI green
           # The status filter in the --jq below is the orphan guard: a run stuck `queued` (handover
@@ -179,11 +213,15 @@ jobs:
             stepped_why="paper is paused on purpose, so no session can be stepped (last stepped: ${stepped_session:-none})"
             picks="n/a"
             picks_why="paper is paused on purpose, so no picks can be published"
+            news="n/a"
+            news_why="paper is paused on purpose, so the news check does not run"
           elif [ "$dow_utc" -lt 2 ] || [ "$dow_utc" -gt 6 ]; then
             stepped="n/a"
             stepped_why="no nightly runs today -- the nightly runs Tue-Sat UTC, 06:17 UTC / 13:17 WIB, reading Mon-Fri's session"
             picks="n/a"
             picks_why="no nightly runs today, so nothing was due"
+            news="n/a"
+            news_why="no nightly runs today, so no news check was due"
           else
             stepped="no"
             stepped_why="paper_state.last_session is ${stepped_session:-none}, behind the night's data at ${latest_data:-none}; the nightly last succeeded ${last_ok_wib:-never} WIB"
@@ -204,6 +242,24 @@ jobs:
               picks="NO"
               picks_why="a decision is due for $due_session and book_targets has no rows for it"
             fi
+
+            # ------------------------------------------------------- fact 5: the daily control
+            # Read off the roster by engine. A control with no verdict for its pending session
+            # cannot buy -- that is design section 8, "no verdict row is no trade", and it is
+            # indistinguishable from "the news check is broken" unless someone says so out loud.
+            if [ -z "$ctl" ]; then
+              news="n/a"
+              news_why="no active bracket strategy on the roster, so no news check is due"
+            elif [ -z "$ctl_sess" ]; then
+              news="n/a"
+              news_why="$ctl has no pending session yet -- it has not started"
+            elif [ "$ctl_vetoes" -gt 0 ]; then
+              news="yes"
+              news_why="$ctl_vetoes verdict(s) stored for $ctl, session $ctl_sess; $ctl_orders order(s) placed"
+            else
+              news="NO"
+              news_why="$ctl has NO verdict for $ctl_sess, so it can buy nothing (design section 8). The Veto step is continue-on-error and will not have turned the night red -- read its log: https://github.com/${GITHUB_REPOSITORY}/actions/workflows/nightly.yml"
+            fi
           fi
 
           if [ "$paused" = yes ]; then
@@ -221,13 +277,15 @@ jobs:
           if [ "$ci" != "green" ]; then status="CHECK"; fi
           if [ "$stepped" = "no" ];  then status="CHECK"; fi
           if [ "$picks" = "NO" ];    then status="CHECK"; fi
+          if [ "$news" = "NO" ];     then status="CHECK"; fi
 
-          headline="Seer $status | $day_wib | stepped $stepped | picks $picks | CI $ci | paper $paper"
+          headline="Seer $status | $day_wib | stepped $stepped | picks $picks | news $news | CI $ci | paper $paper"
 
           {
             printf '%s\n\n' "$headline"
             printf 'Session stepped: %s -- %s\n' "$stepped" "$stepped_why"
             printf 'Picks published: %s -- %s\n'  "$picks"   "$picks_why"
+            printf 'News check: %s -- %s\n'       "$news"    "$news_why"
             printf 'CI on main: %s -- %s\n'       "$ci"      "$ci_why"
             printf 'Paper trading: %s -- %s\n'    "$paper"   "$paper_why"
             printf '\nChecked %s WIB (%s UTC). What to do: docs/runbooks/monitoring.md\n' \

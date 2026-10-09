@@ -72,6 +72,27 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    - **Executable?** Gotrade means long only and the regular session. Limit orders take
      fractional shares; a take-profit/stop-loss bracket needs whole shares. Leverage, shorting
      and non-default ETFs need owner inputs and are never eligible. Test them only as evidence.
+   - **Lessons from the owner's money runs** (2026-10-09; `/calculate-assets` and batches
+     20261009-2105 / -2125). Weigh every idea against these before spending an id:
+     - **Published anomalies fade.** Note the year the idea was published in the hypothesis. The
+       dev window ends in 2015, so it can only show an edge from before the crowd traded it.
+       M0050's overnight momentum won clearly on 1996-2015, then inverted from 2018: the
+       daytime control came first and the overnight versions last. Treat a strong dev result
+       from a widely published anomaly as likely to fade, and say so in `expected_failure`.
+     - **2009-2015 is the first filter.** Every twenty-year edge in batch 20261009-2125 was
+       earned before 2009 (insights 89, 91, 93). Those are the best-covered years and the most
+       like today. An idea that lags SPY there is not worth a variation however good its average.
+     - **SPY's big-company drift is the opponent.** From 2018 every strategy tried lost to SPY
+       on the owner's deposits by a similar margin. A book that equal-weights index members, or
+       quietly favours the smaller ones (insight 91), is betting against the market's shape, not
+       only picking stocks. The equal-weight S&P (RSP) as a second yardstick is the open idea
+       that separates the two.
+     - **Name the family by what it ranks on**, not by the idea that inspired it (insight 92). A
+       momentum book filed under a new family name escapes the kin check by accident.
+     - **`/calculate-assets` is the owner's curiosity, not evidence.** Never block, flag or
+       choose an idea because the owner ran it on a method or family, and never cite its result
+       in a verdict. It neither spends nor spoils a test look.
+
 4. **Write** `engine/src/seer_engine/lab/methods/mNNNN_<slug>.py` from `method_template.py`
    (this folder). Solo: the id comes from `lab next-id`, or from the backlog row.
    - 1–6 fixed variants. `hypothesis` and `expected_failure` are written **now**, before any result.
@@ -117,7 +138,10 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
      dev trial row before). Both are printed by `lab status`; neither is yours to change. Read
      the N off `lab status` rather than counting trials: a method's variants are one look, so the
      trial-row count is no longer the N.
-   - worst year and when the drawdown hit
+   - worst year and when the drawdown hit. Judge the fall on the book without its deposits:
+     monthly top-ups refill a falling account, so a funded fall reads gentler than it was
+   - when a result is quoted in rupiah, say what the rupiah's fall added. From 2018 it added
+     Rp 86-155 million to every M0050 version, enough to make a losing book look acceptable
    - **why**: the mechanism, not just the numbers
    - whether the hypothesis held and whether the expected failure happened
    - comparison with the parent or near misses. A method from M0030 or earlier was measured at

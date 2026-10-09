@@ -249,17 +249,34 @@ class Record:
 
 # --------------------------------------------------------------------------- the buy signal
 
-BUY_CONDITIONS = ("dev-eligible", "majority of folds", "positive 2009-2015 edge")
+BUY_CONDITIONS = (
+    "dev-eligible",
+    "no family member has test-failed",
+    "majority of folds",
+    "positive 2009-2015 edge",
+)
 
 
 def buy_signal(
-    dev_eligible: bool, record: Record, high_coverage_edge: float | None
+    dev_eligible: bool,
+    record: Record,
+    high_coverage_edge: float | None,
+    family_failed: str | None = None,
 ) -> tuple[bool, str]:
     """Is this the moment survivorship-free price history becomes worth paying for?
 
-    All three must hold: the method is dev-eligible at the bars in force; it beat the benchmark in
-    a majority of walk-forward folds; and its edge in the highest-coverage era (2009-2015) is
-    positive, so the edge is not an artefact of the half of the universe the store cannot price.
+    All four must hold: the method is dev-eligible at the bars in force; no method in its family
+    has already failed the test window; it beat the benchmark in a majority of walk-forward folds;
+    and its edge in the highest-coverage era (2009-2015) is positive, so the edge is not an
+    artefact of the half of the universe the store cannot price.
+
+    **The family condition was added after running this.** Without it the signal fired on M0007,
+    M0019 and M0020 -- and every one of the three is in a family that had *already* failed out of
+    sample (``stock-residual-momentum`` and ``stock-momentum-risk-managed``). M0007 in particular
+    reads ``dev-eligible`` only because the lab never spent a formal look on it, while its own
+    realistic twin M0032 lost 415 million rupiah to a deposit-matched SPY over 2018-2026. A status
+    column is not the same thing as the evidence, and a new variant of a family that has been
+    disproven is not a fresh candidate.
 
     The third is what makes the purchase about *data*. The dev store prices 48% of index members
     in 1996 and 74% in 2014, and the 522 it cannot price are disproportionately the companies that
@@ -272,6 +289,8 @@ def buy_signal(
     """
     if not dev_eligible:
         return False, "not dev-eligible"
+    if family_failed:
+        return False, f"family already failed the test window ({family_failed})"
     if not record.majority:
         return False, f"fails the folds: {record.summary()}"
     if high_coverage_edge is None:

@@ -308,6 +308,14 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s.add_argument("--min-months", type=int, default=12, metavar="N",
                    help="skip a regime with fewer than N months of evidence (default 12)")
 
+    s = sub.add_parser(
+        "walkforward",
+        help="score each method's selection out of sample, many folds (report only; no store)",
+    )
+    s.add_argument("method", nargs="*", metavar="M0007")
+    s.add_argument("--min-train-years", type=int, default=None, metavar="N")
+    s.add_argument("--eval-years", type=int, default=None, metavar="N")
+
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
     s.add_argument("--family", required=True)
@@ -1772,6 +1780,113 @@ def _regime(conn, args) -> int:
     return 0
 
 
+#: The era in which the store can price the most of the index -- the buy signal's condition (c).
+HIGH_COVERAGE = (date(2009, 1, 1), date(2015, 10, 16))
+
+
+def _walkforward(conn, args) -> int:
+    """``lab walkforward``: the lab's selection rule, scored out of sample many times.
+
+    Report only, and unlike ``lab regime`` it needs no research store at all: recorded trials carry
+    monthly curves, so every fold is a date slice of rows already in the database. Nothing is
+    written, no status moves, no look is spent.
+    """
+    import json
+
+    from seer_engine.backtest import regime
+    from seer_engine.lab import walkforward as wf
+
+    rows = list(conn.execute(
+        "SELECT n, method_id, candidate_id, start, end, curve_json FROM trials "
+        "WHERE window = 'dev' AND curve_json IS NOT NULL ORDER BY method_id, n"
+    ))
+    bench_row = next((r for r in rows if r["candidate_id"] == regime.BENCH_CANDIDATE), None)
+    if bench_row is None:
+        raise store.LabError(
+            f"no {regime.BENCH_CANDIDATE} dev trial; walk-forward needs the recorded SPY "
+            f"buy-and-hold curve as its benchmark"
+        )
+
+    def curve_of(row):
+        return [(date.fromisoformat(d), float(v)) for d, v in json.loads(row["curve_json"])]
+
+    bench = curve_of(bench_row)
+    kw = {}
+    if args.min_train_years is not None:
+        kw["min_train_years"] = args.min_train_years
+    if args.eval_years is not None:
+        kw["eval_years"] = args.eval_years
+    the_folds = wf.folds([d for d, _v in bench], **kw)
+    if not the_folds:
+        raise store.LabError("the recorded benchmark curve is too short to split into folds")
+
+    wanted = {m.upper() for m in args.method}
+    by_method: dict[str, list] = {}
+    for r in rows:
+        if r["candidate_id"] == regime.BENCH_CANDIDATE:
+            continue
+        if wanted and r["method_id"] not in wanted:
+            continue
+        by_method.setdefault(r["method_id"], []).append(r)
+    if wanted and not by_method:
+        raise store.LabError(f"no dev trial for {', '.join(sorted(wanted))}")
+
+    print(f"Walk-forward over {len(the_folds)} folds, {the_folds[0].eval_start} to "
+          f"{the_folds[-1].eval_end}. Each fold picks the variant the lab's own rule would have")
+    print("named knowing nothing past the train end, then scores it on months it has never seen.")
+    print("Folds share training data, so they are a sanity check and never a significance test.\n")
+    head = f"  {'method':<8}{'folds won':>11}{'stable':>9}{'2009-15 edge':>15}   verdict"
+    print(head)
+    print("  " + "-" * (len(head) + 16))
+
+    fired: list[str] = []
+    majorities = 0
+    for mid, trials in sorted(by_method.items()):
+        curves = {r["candidate_id"]: curve_of(r) for r in trials}
+        deps = {
+            r["candidate_id"]: _trial_deposits(conn, r, curves[r["candidate_id"]]) for r in trials
+        }
+        rec = wf.Record(mid, wf.evaluate(curves, bench, the_folds, deps))
+        best = max(
+            (c for c in curves),
+            key=lambda c: (wf.measure(curves[c], HIGH_COVERAGE[0], HIGH_COVERAGE[1], deps[c])
+                           or wf.Slice(0, None, None, None, None)).mar or -1e9,
+        )
+        mine = wf.measure(curves[best], *HIGH_COVERAGE, deps[best])
+        theirs = wf.measure(bench, *HIGH_COVERAGE)
+        edge = (
+            None if mine is None or theirs is None or mine.cagr is None or theirs.cagr is None
+            else mine.cagr - theirs.cagr
+        )
+        row = store.get_method(conn, mid)
+        eligible = row is not None and row["status"] == "dev-eligible"
+        kin = None if row is None else conn.execute(
+            "SELECT id FROM methods WHERE family = ? AND id != ? AND status = 'test-failed' "
+            "ORDER BY id LIMIT 1", (row["family"], mid),
+        ).fetchone()
+        signal, why = wf.buy_signal(eligible, rec, edge, None if kin is None else kin["id"])
+        if signal:
+            fired.append(f"{mid}: {why}")
+        if rec.majority:
+            majorities += 1
+        print(f"  {mid:<8}{rec.won:>6} of {len(rec.scored):<3}"
+              f"{('yes' if rec.stable else 'no'):>9}"
+              f"{(fmt_signed_pct(edge) if edge is not None else '-'):>15}   {why}")
+
+    print(f"\n{majorities} of {len(by_method)} methods beat the benchmark in a majority of folds.")
+    if fired:
+        print("\n  *** BUY SIGNAL ***")
+        for line in fired:
+            print(f"  {line}")
+        print("  This is the moment survivorship-free price history is worth buying: the free")
+        print("  evidence is used up, and the next two things that happen are a counted look and")
+        print("  real money. See the explore skill's Promotion step 0b.")
+    else:
+        print("No buy signal. Survivorship-free price history is not worth buying yet.")
+    print("\nNothing was recorded. No research store was opened.")
+    return 0
+
+
 def _idea(conn, args) -> int:
     store.begin_immediate(conn)  # the next id and its insert, atomic against parallel sessions
     with conn:
@@ -1885,6 +2000,7 @@ def _seed(conn, args) -> int:
 _HANDLERS = {
     "status": _status,
     "regime": _regime,
+    "walkforward": _walkforward,
     "luck": _luck,
     "show": _show,
     "run": _run,

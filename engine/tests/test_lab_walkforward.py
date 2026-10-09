@@ -227,3 +227,18 @@ def test_a_losing_slice_that_never_fell_cannot_happen_but_is_ranked_last_anyway(
     got = wf.measure(flat, ms[0], ms[-1])
     assert got.max_drawdown == pytest.approx(0.0)
     assert got.mar == float("-inf")
+
+
+def test_buy_signal_refuses_a_family_that_has_already_failed_out_of_sample():
+    """Found by running it: all three firings were in families already disproven.
+
+    A status column is not the evidence. M0007 read dev-eligible only because no formal look had
+    been spent on it, while its own realistic twin had lost to a deposit-matched SPY.
+    """
+    fired, why = wf.buy_signal(True, winner(), 0.03, family_failed="M0022")
+    assert fired is False
+    assert "family already failed" in why and "M0022" in why
+
+
+def test_the_family_check_does_not_block_a_clean_family():
+    assert wf.buy_signal(True, winner(), 0.03, family_failed=None)[0] is True

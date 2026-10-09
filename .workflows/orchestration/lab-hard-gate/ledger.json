@@ -1,0 +1,77 @@
+{
+  "branch": "feature/lab-hard-gate",
+  "coordinator": "orch-lab-hard-gate",
+  "coordinator_session_id": "75d73823-9741-4764-ae3c-172681a065f7",
+  "created": "2026-10-09T09:59:40+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "engine/lab`, `engine/commands",
+      "plan": ".workflows/plan/lab-hard-gate/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The rule, and the refusal at `lab promote"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 2,
+      "note": null,
+      "package": "engine/lab`, `engine/commands`, docs",
+      "plan": ".workflows/plan/lab-hard-gate/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3",
+        "R3",
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The pre-registration records what it cleared, and `lab test` says what changed"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "engine/commands`, skills, docs",
+      "plan": ".workflows/plan/lab-hard-gate/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R7",
+        "R8",
+        "R9"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Make the gate visible before it bites"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/lab-hard-gate/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "lab-hard-gate",
+  "updated": "2026-10-09T09:59:40+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/lab-hard-gate"
+}

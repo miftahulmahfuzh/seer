@@ -1,6 +1,7 @@
 # Handover: the research-store clobber guard is checkout-local
 
-**For:** `/analyze -f RESEARCH_STORE_CLOBBER_GUARD_HANDOVER.md`
+**For:** `/analyze -f docs/handover/2026-10-06-research-store-clobber-guard.md`
+**Was:** `RESEARCH_STORE_CLOBBER_GUARD_HANDOVER.md` at the repo root until 2026-10-09
 **Written:** 2026-10-06, by `orch-build-promotion-path` after that set landed at `9ce5c4e`
 **Status:** unplanned. This file is an input to `/analyze`, not a plan — it states the defect,
 the evidence, and the constraints a fix must hold. It deliberately does **not** choose a design.

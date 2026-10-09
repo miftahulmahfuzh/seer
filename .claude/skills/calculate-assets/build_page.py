@@ -388,9 +388,10 @@ parts = [
     ),
 ]
 total = max(got, spy, paid)
+LOSS_STYLE = ' style="color:var(--loss)"'  # outside the f-string: Python 3.11 can't nest same quotes
 bars = "".join(
     f'<li><div class="lbl"><span>{k}</span>'
-    f'<span class="n"{"" if v >= 0 else ' style="color:var(--loss)"'}>{full(v)}</span></div>'
+    f'<span class="n"{"" if v >= 0 else LOSS_STYLE}>{full(v)}</span></div>'
     f'<div class="bar"><span style="width:{max(0.6, 100 * abs(v) / total):.1f}%;background:{c}"></span></div></li>'
     for k, v, c in parts
 )

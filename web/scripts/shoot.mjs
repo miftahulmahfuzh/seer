@@ -3,12 +3,13 @@
 //
 // Every page under app/(app) and app/sean and app/sera redirects to /signin, so until this script
 // existed a web change could only be proved by vitest and tsc -- and the owner's bug reports are
-// usually about what a page SAYS and how it LOOKS, which neither of those can see. The session is
-// a JWT and AUTH_SECRET is in .env.local, so the cookie can be minted here rather than signed in
-// for.
+// usually about what a page SAYS and how it LOOKS, which neither of those can see.
 //
-//   node --env-file=../.env.local scripts/shoot.mjs /history?s=MOM-FR-GT
-//   node --env-file=../.env.local scripts/shoot.mjs --out /tmp/shots '/history?v=activity' /positions
+//   npm run shoot -- '/history?s=MOM-FR-GT'
+//   npm run shoot -- --out /tmp/shots '/history?v=activity' /positions
+//
+// It uses the session `npm run signin` saved, and mints one itself when there is none, so it
+// never waits for a person.
 //
 // Options:
 //   --out DIR      where the PNGs go (default: .shots/, git-ignored)
@@ -17,15 +18,15 @@
 //   --theme T      light | dark | both (default: both)
 //   --full         full-page shot instead of the viewport
 //
-// Start the server first, with the same env file:
-//   node --env-file=../.env.local node_modules/.bin/next dev -p 3111
+// Start the server first:
+//   npm run dev:env
 //
 // Exits non-zero if any page 404s, 500s, or logs a console error -- a shell that renders while
 // every fetch fails is the failure this is most likely to meet.
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { encode } from 'next-auth/jwt';
+import { STATE, daysLeft, ensureState } from './session.mjs';
 
 const DEFAULTS = { out: '.shots', base: 'http://localhost:3111', theme: 'both', full: false };
 
@@ -47,20 +48,16 @@ function parseArgs(argv) {
   return o;
 }
 
-/** The next-auth session cookie for the allowlisted owner. `salt` must equal the cookie name. */
-async function sessionCookie(base) {
-  const { AUTH_SECRET, ALLOWED_EMAIL } = process.env;
-  if (!AUTH_SECRET) throw new Error('AUTH_SECRET is not set -- run with `node --env-file=../.env.local`');
-  if (!ALLOWED_EMAIL) throw new Error('ALLOWED_EMAIL is not set -- auth() would return null for any email');
-  const email = ALLOWED_EMAIL.split(',')[0].trim();
-  const value = await encode({
-    token: { name: 'Owner', email, sub: 'local-shoot' },
-    secret: AUTH_SECRET,
-    salt: 'authjs.session-token',
-    maxAge: 60 * 60,
-  });
-  const { hostname } = new URL(base);
-  return { name: 'authjs.session-token', value, domain: hostname, path: '/', httpOnly: true, sameSite: 'Lax' };
+/**
+ * The session every context is given. `ensureState` reuses the saved one, renews it when it is
+ * nearly out, and saves the result -- so this never waits for a person and never goes stale.
+ */
+async function session(base) {
+  const { state, renewed, real, replacedReal } = await ensureState(base);
+  const left = `${daysLeft(state).toFixed(1)}d left`;
+  if (!renewed) return { state, how: `${real ? 'your real session' : 'saved session'}, ${left}` };
+  if (replacedReal) return { state, how: `your real session expired; minted a new week (${STATE})` };
+  return { state, how: `minted a new week, saved to ${STATE}` };
 }
 
 /** A filename that survives a query string: /history?s=X&v=activity -> history_s-X_v-activity */
@@ -72,7 +69,8 @@ const themes = o.theme === 'both' ? ['light', 'dark'] : [o.theme];
 await mkdir(o.out, { recursive: true });
 
 const browser = await chromium.launch({ args: ['--no-sandbox'] });
-const cookie = await sessionCookie(o.base);
+const { state, how } = await session(o.base);
+console.log(`  auth: ${how}`);
 const problems = [];
 const made = [];
 
@@ -82,8 +80,8 @@ for (const theme of themes) {
       viewport: { width, height: 900 },
       colorScheme: theme,
       deviceScaleFactor: 2,
+      storageState: state,
     });
-    await ctx.addCookies([cookie]);
     const page = await ctx.newPage();
     const errors = [];
     page.on('console', m => m.type() === 'error' && errors.push(m.text()));

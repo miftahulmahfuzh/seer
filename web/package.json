@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:env": "node scripts/with-env.mjs npx next dev -p 3111",
+    "signin": "node scripts/with-env.mjs node scripts/signin.mjs",
     "shoot": "node scripts/with-env.mjs node scripts/shoot.mjs",
     "build": "next build",
     "start": "next start",

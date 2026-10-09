@@ -299,6 +299,11 @@ def pct(x: float | None) -> str:
     return "n/a" if x is None else f"{x * 100:+.1f}%"
 
 
+def fall(x: float | None) -> str:
+    """A drawdown, unsigned. It is a fall, and ``+32.7%`` reads like a gain."""
+    return "n/a" if x is None else f"{abs(x) * 100:.1f}%"
+
+
 def curve_idr(points, rate_on, fixed: Decimal | None):
     """``[(date, rupiah)]`` from ``[(date, usd)]``, at the day's rate or at one fixed rate."""
     return [
@@ -426,7 +431,7 @@ def main(argv: list[str] | None = None) -> int:
           f"(USD/IDR {open_rate:,.0f} -> {end_rate:,.0f})")
     print(f"  {'what the strategy added over SPY':<34}{rupiah(end_book_real - end_spy):>22}")
     print(f"  {'what you earned over what you paid':<34}{rupiah(end_book_real - float(total_in)):>22}")
-    print(f"\n  deepest fall along the way: {pct(real_row.stats.metrics.max_drawdown)} "
+    print(f"\n  deepest fall along the way: {fall(real_row.stats.metrics.max_drawdown)} "
           f"-- read it gently: monthly deposits keep topping the account up, so a fall\n"
           f"  reads shallower here than the same fall would on money that just sat there.")
     print(f"  {real_row.stats.metrics.trades} trades. Returns are money-weighted: the rate a "

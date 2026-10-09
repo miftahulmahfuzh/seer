@@ -140,18 +140,21 @@ HTML = f"""<title>If I Had Started in 2018</title>
   color-scheme: light;
   --bg: #faf9f6; --panel: #f3f1ec; --ink: #16201f; --ink2: #4a5654; --ink3: #7b8785;
   --rule: #ddd9d0; --s1: #0d9488; --s2: #c2410c; --ref: #9aa3a1; --hair: #e7e3da;
+  --loss: #9f1239;
 }}
 @media (prefers-color-scheme: dark) {{
   :root:not([data-theme="light"]) {{
     color-scheme: dark;
     --bg: #141b1a; --panel: #1b2423; --ink: #eef3f2; --ink2: #a8b4b2; --ink3: #76817f;
     --rule: #2a3534; --s1: #19a89a; --s2: #d4731f; --ref: #6d7876; --hair: #232e2d;
+    --loss: #e05570;
   }}
 }}
 :root[data-theme="dark"] {{
   color-scheme: dark;
   --bg: #141b1a; --panel: #1b2423; --ink: #eef3f2; --ink2: #a8b4b2; --ink3: #76817f;
   --rule: #2a3534; --s1: #19a89a; --s2: #d4731f; --ref: #6d7876; --hair: #232e2d;
+  --loss: #e05570;
 }}
 * {{ box-sizing: border-box; }}
 body {{
@@ -281,8 +284,7 @@ td.n, th.n {{ text-align: right; }}
   <div class="split">
     <div>
       <h2>Where the money came from</h2>
-      <p>Of the {full(got)} at the end, most of it is simply what you put in. That is not a
-      disappointment &mdash; it is the answer to the question you asked.</p>
+      __LEDE__
       <ul class="bars">
         __BARS__
       </ul>
@@ -299,6 +301,7 @@ td.n, th.n {{ text-align: right; }}
       <p><strong>{d['trades']:,} trades</strong> over {d['years']:.1f} years, each one paying
       Gotrade&rsquo;s real schedule &mdash; the trading fee with its $0.10 minimum, the regulatory
       fee, and 11% VAT on both.</p>
+      __WHY__
     </div>
   </div>
 
@@ -374,17 +377,52 @@ rest();
 """
 
 # the decomposition bars, computed here so the page never carries a hand-typed figure
+edge = got - spy
 parts = [
     ("What you paid in", paid, "var(--ref)"),
-    ("What a plain SPY would have added", spy - paid, "var(--s2)"),
-    ("What the method added over SPY", got - spy, "var(--s1)"),
+    ("What being in the market added", spy - paid, "var(--s2)"),
+    (
+        "What the method added over SPY" if edge >= 0 else "What the method cost you against SPY",
+        edge,
+        "var(--s1)" if edge >= 0 else "var(--loss)",
+    ),
 ]
-total = max(got, paid)
+total = max(got, spy, paid)
 bars = "".join(
-    f'<li><div class="lbl"><span>{k}</span><span class="n">{full(v)}</span></div>'
-    f'<div class="bar"><span style="width:{max(0.6, 100 * v / total):.1f}%;background:{c}"></span></div></li>'
+    f'<li><div class="lbl"><span>{k}</span>'
+    f'<span class="n"{"" if v >= 0 else ' style="color:var(--loss)"'}>{full(v)}</span></div>'
+    f'<div class="bar"><span style="width:{max(0.6, 100 * abs(v) / total):.1f}%;background:{c}"></span></div></li>'
     for k, v, c in parts
 )
-HTML = HTML.replace("__BARS__", bars)
+
+if edge >= 0:
+    lede = (
+        f"<p>Of the {full(got)} at the end, {full(paid)} is simply what you put in. The deposits "
+        f"are most of the answer, and the method added {full(edge)} on top of what being in the "
+        f"market gave you anyway.</p>"
+    )
+else:
+    lede = (
+        f"<p>Of the {full(got)} at the end, {full(paid)} is simply what you put in &mdash; the "
+        f"deposits are most of the answer. The rest is not the method&rsquo;s doing. Putting the "
+        f"identical deposits into SPY on the identical days would have ended at {full(spy)}, so "
+        f"over these {d['years']:.1f} years the method <strong>cost</strong> you "
+        f"{full(abs(edge))} against simply buying the market.</p>"
+        f"<p>Your instinct was right, and it is the bigger half of the answer: time and the habit "
+        f"of paying in every month did the work. The stock-picking did not.</p>"
+    )
+
+if edge >= 0:
+    why = ""
+else:
+    why = (
+        "<p><strong>Why it lost, and it was predicted.</strong> This book only buys when the "
+        "market is above its long trend, so it sat in cash through early 2020 and much of 2022 "
+        "&mdash; exactly the months a monthly buyer&rsquo;s new money was buying cheapest. "
+        "M0032&rsquo;s own pre-registered note said this would happen: a money-weighted return "
+        "&ldquo;rewards being invested when the money arrives&rdquo;, and the gate that makes this "
+        "method look safe on a lump sum is what makes it lose on a monthly one.</p>"
+    )
+HTML = HTML.replace("__BARS__", bars).replace("__LEDE__", lede).replace("__WHY__", why)
 open(out, "w").write(HTML)
 print(f"wrote {out} ({len(HTML):,} bytes)")

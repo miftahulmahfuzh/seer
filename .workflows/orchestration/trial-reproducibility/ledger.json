@@ -23,22 +23,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "15bf60c76d4709557c383377f79560146105519a",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "provenance table v5 + re-runs at recorded capital; remeasure M0011/M0007/H-P7A exit 0; decided: v4->v5 test compares tuple(r) (plan's Row-vs-tuple bug)",
       "package": "lab`, `research`, `commands` (`_costs` only), `tests/labkit",
       "plan": ".workflows/plan/trial-reproducibility/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-09T13:33:07+00:00",
       "satisfies": [
         "R1",
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P2-ENG-JC9B",
       "title": "Per-trial provenance, and re-runs at the recorded capital"
     },
     {
@@ -88,6 +88,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/trial-reproducibility/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "trial-reproducibility",
-  "updated": "2026-10-09T13:20:12+00:00",
+  "updated": "2026-10-09T13:33:07+00:00",
   "worktree": "/home/miftah/.worktrees/seer/trial-reproducibility"
 }

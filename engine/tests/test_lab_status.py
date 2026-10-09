@@ -444,6 +444,65 @@ def test_a_method_whose_kin_test_failed_is_refused_and_the_kin_is_named(tmp_path
     assert "M0002" in blocked      # the kin, named, so the reader does not go looking
 
 
+def _lab_where_the_pick_is_not_the_promoted_variant(c) -> None:
+    """Insight 82's shape on a lab the real verdict can judge.
+
+    ``M0001-B`` fails the dev gate on drawdown (0.35), so it can never be pre-registered; its
+    curve compounds at 0.009 a month and wins every fold. ``M0001-Z`` is the only eligible
+    variant -- the one `lab promote` would pre-register -- and compounds at 0.001, below the
+    benchmark's 0.004, so it loses every fold. Both curves are monotone, so every training slice
+    ranks both at an infinite MAR and `pick` breaks the tie on the id: ``B`` is picked every time.
+    Three dev trials, so ``n_trials_at_run=3`` (see the note under ``_trial``).
+    """
+    days = _month_ends(date(1993, 2, 1), date(2015, 9, 30))
+    n = 3
+    _method_at(c, "M0001", status="dev-eligible", family="fam", trials=[
+        _trial(method_id="M0001", candidate_id="M0001-B", config_digest="b", mar=0.5,
+               max_drawdown=0.35, eligible=False, failed="max DD <= 20%", sharpe=0.8,
+               start="1993-02-28", end="2015-09-30", n_trials_at_run=n,
+               curve_json=_curve(days, 0.009)),
+        _trial(method_id="M0001", candidate_id="M0001-Z", config_digest="z", mar=0.9,
+               start="1993-02-28", end="2015-09-30", n_trials_at_run=n,
+               curve_json=_curve(days, 0.001)),
+    ])
+    _method_at(c, "M0009", status="rejected", family="bench", trials=[
+        _trial(method_id="M0009", candidate_id="REF-SPY-HOLD", config_digest="spy",
+               start="1993-02-28", end="2015-09-30", n_trials_at_run=n, eligible=False,
+               failed=OLD_LUCK_LABEL, dsr=0.10, sharpe=0.7, curve_json=_curve(days, 0.004)),
+    ])
+
+
+def test_a_method_whose_promoted_variant_lost_its_own_folds_is_refused(tmp_path, status):
+    """(D11): the picks win 4 of 4, the variant that would be pre-registered wins 0 of 4.
+
+    Before D11 this lab printed M0001 under "Promotable now" on "4 of 4 folds; kin clean" --
+    verified while planning, and the exact shape of M0044 on the committed lab.
+    """
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _lab_where_the_pick_is_not_the_promoted_variant(c)
+    assert store.best_dev_eligible(c, "M0001")["candidate_id"] == "M0001-Z"
+    c.close()
+    out = status(db)
+    ready = out.split("Promotable now")[1].split("Refused by the hard gate")[0]
+    assert "(none)" in ready and "M0001 " not in ready
+    blocked = out.split("Refused by the hard gate")[1].split("\n  Dev-eligible")[0]
+    assert "M0001-Z alone 0 of 4 folds" in blocked
+    assert "D11" in blocked
+
+
+def test_lab_promote_exits_2_and_writes_nothing_when_the_promoted_variant_lost(tmp_path):
+    db, prereg_dir = tmp_path / "lab.sqlite", tmp_path / "prereg"
+    c = store.connect(db)
+    _lab_where_the_pick_is_not_the_promoted_variant(c)
+    c.close()
+    before = db.read_bytes()
+    args = argparse.Namespace(db=db, lab_command="promote", method="M0001", dir=prereg_dir)
+    assert lab_cmd.run(args) == 2
+    assert not prereg_dir.exists()
+    assert db.read_bytes() == before
+
+
 def test_lab_status_still_prints_when_the_gate_cannot_score_the_lab(tmp_path, status):
     """The shape every other fixture in this module has: no benchmark, empty curves.
 

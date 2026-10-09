@@ -495,7 +495,8 @@ def fold_text(conn: sqlite3.Connection, method_id: str) -> str:
     file written next year must not be able to claim a fold record the code never computed, or a
     minimum the owner has since moved. Three facts, which is exactly what the brief asks the
     pre-registration to add: how many folds the pick won, how many could be scored at all, and
-    whether the training slice kept choosing the same variant.
+    whether the training slice kept choosing the same variant -- plus, since hardgate (D11), how
+    many the pre-registered variant won on its own curve, which is the second half of the bar.
 
     ``Record.summary()`` is deliberately not used. It appends ", pick changed" only when the pick
     moved, so a stable record says nothing about stability, and a record is not a record when one
@@ -515,19 +516,29 @@ def fold_text(conn: sqlite3.Connection, method_id: str) -> str:
     except store.LabError as e:
         return one_line(f"not recorded: the fold record could not be built ({e})")
     scored = len(rec.scored)
+    try:
+        candidate = hardgate.promoted_variant(conn, method_id)
+        if candidate is None:
+            own = "the pre-registered variant's own record not recorded: no eligible variant"
+        else:
+            o = hardgate.variant_record(conn, method_id, candidate)
+            own = f"{candidate} alone won {o.won} of {len(o.scored)}"
+    except store.LabError as e:
+        own = f"the pre-registered variant's own record not recorded ({e})"
     return one_line(
         f"{rec.won} of {scored} scoreable walk-forward fold(s) won, "
-        f"pick {'stable' if rec.stable else 'changed'} across folds; the bar this method cleared "
-        f"was a strict majority of at least {hardgate.MIN_FOLDS} scoreable folds"
+        f"pick {'stable' if rec.stable else 'changed'} across folds; {own}; the bar this method "
+        f"cleared was a strict majority of at least {hardgate.MIN_FOLDS} scoreable folds, for "
+        f"the picks and for the pre-registered variant alone (hardgate D11)"
     )
-
 
 def family_text(conn: sqlite3.Connection, method_id: str, family: str) -> str:
     """The state of ``method_id``'s kin at promotion, as the file states it.
 
     ``hardgate.failed_kin`` is the one definition of kin -- the method's ``family`` string together
-    with its transitive ancestors through ``parent_id`` (plan Decision D4) -- and this line quotes
-    its answer rather than re-deriving it, so the file and the rule cannot disagree.
+    with its transitive ancestors through ``parent_id`` (plan Decision D4), and its ingredients
+    with theirs (hardgate D12) -- and this line quotes its answer rather than re-deriving it, so
+    the file and the rule cannot disagree.
 
     ``family`` is passed in because every caller already holds the ``methods`` row and a second
     query inside the write lock would buy nothing. It is named in the line so a reader knows which
@@ -547,12 +558,12 @@ def family_text(conn: sqlite3.Connection, method_id: str, family: str) -> str:
         return one_line(f"not recorded: the kin walk could not be run ({e})")
     if not failed:
         return one_line(
-            f"clean at promotion: no method in {method_id}'s family '{family}' or ancestry read "
-            f"test-failed"
+            f"clean at promotion: no method in {method_id}'s family '{family}', ancestry or "
+            f"ingredients (or theirs) read test-failed"
         )
     return one_line(
-        f"blocked at promotion: {', '.join(failed)} in {method_id}'s family '{family}' or "
-        f"ancestry read test-failed"
+        f"blocked at promotion: {', '.join(failed)} in {method_id}'s family '{family}', ancestry "
+        f"or ingredients (or theirs) read test-failed"
     )
 
 

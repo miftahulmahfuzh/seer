@@ -1,0 +1,116 @@
+{
+  "branch": "feature/eodhd-survivorship-market",
+  "coordinator": "orch-eodhd-survivorship-market",
+  "coordinator_session_id": "8a809521-a956-4700-b52d-282bb0f752a3",
+  "created": "2026-10-10T12:26:40+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": "8c8f79bc05febea42ebee5b4a0ebef6c2a7a6026",
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": "SV store built: price fp bc5ba895, 861/1061, 58.6%->81.3%. Left pre-existing ruff F841 in test_lab_prereg.py:722 (not this set's file).",
+      "package": "seer_engine` (research, survivorship, commands, lab/runner, lab/remeasure)",
+      "plan": ".workflows/plan/eodhd-survivorship-market/phase-1.md",
+      "reported_at": "2026-10-10T12:44:03+00:00",
+      "satisfies": [
+        "R1",
+        "R2",
+        "R3"
+      ],
+      "status": "done",
+      "task_id": "P1-ENG-8X1K",
+      "title": "Survivorship-check store: cleaning, build, marker, reports"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "seer_engine` (eodhd, survivorship_alias, commands/survivorship_store)",
+      "plan": ".workflows/plan/eodhd-survivorship-market/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R7",
+        "R3"
+      ],
+      "status": "spawned",
+      "task_id": null,
+      "title": "Alias fill for the empty members"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "seer_engine` (research, backtest/market, lab/runner, commands)",
+      "plan": ".workflows/plan/eodhd-survivorship-market/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R8",
+        "R9"
+      ],
+      "status": "spawned",
+      "task_id": null,
+      "title": "Market series store file, `Market.series`, `lab unblock"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        3
+      ],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": null,
+      "package": "seer_engine` (lab, commands/lab)",
+      "plan": ".workflows/plan/eodhd-survivorship-market/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "lab survivorship` report command"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2,
+        3,
+        4
+      ],
+      "difficulty": "NORMAL",
+      "n": 5,
+      "note": null,
+      "package": "lab DB, docs, skills",
+      "plan": ".workflows/plan/eodhd-survivorship-market/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R5",
+        "R6",
+        "R7",
+        "R8"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Run, journal, document"
+    }
+  ],
+  "plan": "/home/miftah/.worktrees/seer/eodhd-survivorship-market/.workflows/orchestration/eodhd-survivorship-market/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "eodhd-survivorship-market",
+  "updated": "2026-10-10T12:44:04+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/eodhd-survivorship-market"
+}

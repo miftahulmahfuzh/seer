@@ -96,10 +96,11 @@ DIVIDENDS_FILE = "dividends.csv"
 FX_FILE = "fx.csv"
 UNSERVED_FILE = "unserved.csv"
 FUNDAMENTALS_FILE = "fundamentals.csv"
+ANNOUNCEMENTS_FILE = "dividend_announcements.csv"
 MANIFEST_FILE = "manifest.json"
 DATA_FILES: tuple[str, ...] = (BARS_FILE, DIVIDENDS_FILE, FX_FILE, UNSERVED_FILE)
 
-OPTIONAL_DATA_FILES: tuple[str, ...] = (FUNDAMENTALS_FILE,)
+OPTIONAL_DATA_FILES: tuple[str, ...] = (FUNDAMENTALS_FILE, ANNOUNCEMENTS_FILE)
 """Store files a build MAY write. Deliberately separate from ``DATA_FILES``.
 
 ``fundamentals.csv`` is optional, never a fifth required file: ``_read_manifest`` requires the
@@ -107,6 +108,12 @@ four ``DATA_FILES`` names and ``load_store`` hashes the manifest's own keys, so 
 before fundamentals existed keeps loading with a **bit-identical fingerprint** and every
 recorded lab trial stays valid. Widening ``DATA_FILES`` instead would make every store on disk
 raise ``ValueError`` before any reader ran.
+
+``dividend_announcements.csv`` follows the same rule: the day each dividend was declared, matched
+from a vendor download onto ``dividends.csv`` by ``refresh_announcements``. A store without it
+loads with ex-dates only, exactly as before. A full ``build_store`` does not write it -- a
+rebuild re-downloads every dividend, so the dates must be matched again with
+``dividend_announcements --refresh``.
 """
 
 BARS_HEADER = "symbol,date,open,high,low,close,volume"
@@ -114,6 +121,7 @@ DIVIDENDS_HEADER = "symbol,ex_date,amount"
 FX_HEADER = "date,usd_idr"
 UNSERVED_HEADER = "symbol,reason"
 FUNDAMENTALS_HEADER = ",".join(FACT_COLUMNS)
+ANNOUNCEMENTS_HEADER = "symbol,ex_date,declared"
 
 
 def unserved_reason(start: date = STORE_START, end: date = DEV_END) -> str:
@@ -474,6 +482,57 @@ def _read_fundamentals(path: Path) -> Panel:
     if tuple(frame.columns) != FACT_COLUMNS:
         raise ValueError(f"{path.name}: header is {tuple(frame.columns)}, expected {FACT_COLUMNS}")
     return Panel.from_facts(facts_from_frame(frame))
+
+
+def announcement_lines(
+    rows: Sequence[tuple[str, date, date]],
+    dividends: Mapping[str, Mapping[date, Decimal]],
+) -> list[str]:
+    """``dividend_announcements.csv``'s data lines, sorted by symbol then ex-date.
+
+    ValueError when a row names no dividend in ``dividends``, declares after its ex-date, or
+    repeats a ``(symbol, ex_date)``.
+    """
+    seen: set[tuple[str, date]] = set()
+    for symbol, ex_date, declared in rows:
+        if ex_date not in dividends.get(symbol, {}):
+            raise ValueError(f"{symbol} has no dividend going ex on {ex_date} in the store")
+        if declared > ex_date:
+            raise ValueError(f"{symbol} {ex_date}: declared {declared} after the ex-date")
+        if (symbol, ex_date) in seen:
+            raise ValueError(f"{symbol} {ex_date}: two announcement dates")
+        seen.add((symbol, ex_date))
+    return [
+        f"{s},{e.isoformat()},{d.isoformat()}" for s, e, d in sorted(rows, key=lambda r: (r[0], r[1]))
+    ]
+
+
+def _read_announcements(
+    path: Path, dividends: Mapping[str, Mapping[date, Decimal]]
+) -> dict[str, dict[date, date]]:
+    """``symbol -> ex_date -> declared`` from ``dividend_announcements.csv``.
+
+    Every row must date a dividend the store holds, on or before its ex-date. A dividend with
+    no row is simply undated: the lab then knows it only from its ex-date, as it always has.
+    """
+    out: dict[str, dict[date, date]] = {}
+    for number, line in _data_lines(path, ANNOUNCEMENTS_HEADER):
+        where = f"{path.name}:{number}"
+        fields = line.split(",")
+        if len(fields) != 3:
+            raise ValueError(f"{where}: expected 3 fields, got {len(fields)}")
+        symbol, raw_ex, raw_declared = fields
+        ex_date = _parse_date(raw_ex, where)
+        declared = _parse_date(raw_declared, where)
+        if ex_date not in dividends.get(symbol, {}):
+            raise ValueError(f"{where}: {symbol} has no dividend going ex on {ex_date}")
+        if declared > ex_date:
+            raise ValueError(f"{where}: {symbol} declared {declared}, after its ex-date {ex_date}")
+        per_symbol = out.setdefault(symbol, {})
+        if ex_date in per_symbol:
+            raise ValueError(f"{where}: duplicate {symbol} announcement for {ex_date}")
+        per_symbol[ex_date] = declared
+    return out
 
 
 # ---- build ---------------------------------------------------------------------------------
@@ -844,6 +903,94 @@ def refresh_fundamentals(
             "refresh_fundamentals needs a sequence of fundamentals.Fact; pass () to write an "
             "empty panel"
         )
+    before, manifest = _refresh_optional(
+        store_dir,
+        FUNDAMENTALS_FILE,
+        FUNDAMENTALS_HEADER,
+        fundamentals_lines(facts),
+        data_dir=data_dir,
+        window=window,
+    )
+    log.info(
+        "research: store %s panel refreshed: %d facts written, %d bar rows carried over "
+        "unchanged, fingerprint %s -> %s",
+        store_dir,
+        len(facts),
+        before["bar_rows"],
+        before["fingerprint"],
+        manifest["fingerprint"],
+    )
+    return manifest
+
+
+def refresh_announcements(
+    store_dir: Path,
+    rows: Sequence[tuple[str, date, date]],
+    *,
+    data_dir: Path | None = None,
+    window: Window = DEV_WINDOW,
+) -> dict[str, Any]:
+    """Rewrite an existing store's ``dividend_announcements.csv``; return the new manifest.
+
+    ``rows`` are ``(symbol, ex_date, declared)``: the day the board announced a dividend that
+    ``dividends.csv`` already holds under ``(symbol, ex_date)``. They come from
+    ``dividend_announcements.match`` -- vendor rows matched onto the store's own dividends -- so
+    the file adds a date to an existing payment and never a payment of its own; the amount the
+    lab reads stays the store's split-adjusted one.
+
+    Same discipline as :func:`refresh_fundamentals`: the store is verified first, every other
+    file is carried over byte for byte (so the price fingerprint, the one every recorded trial
+    is compared on, does not move), and the directory is swapped in whole or not at all. The
+    rows are checked here as well as at load, so a bad row is refused before anything is
+    written: each must name a dividend in the store, and ``declared <= ex_date``.
+    """
+    store_dir = Path(store_dir)
+    try:
+        dividends = _read_dividends(store_dir / DIVIDENDS_FILE, window.end)
+    except (OSError, ValueError) as exc:
+        raise ResearchStoreError(
+            f"{store_dir}: refusing to refresh a store that does not verify: {exc}"
+        ) from exc
+    lines = announcement_lines(rows, dividends)
+    before, manifest = _refresh_optional(
+        store_dir,
+        ANNOUNCEMENTS_FILE,
+        ANNOUNCEMENTS_HEADER,
+        lines,
+        data_dir=data_dir,
+        window=window,
+    )
+    log.info(
+        "research: store %s dividend announcements refreshed: %d of %d dividends dated, "
+        "%d bar rows carried over unchanged, fingerprint %s -> %s",
+        store_dir,
+        len(lines),
+        before["dividend_rows"],
+        before["bar_rows"],
+        before["fingerprint"],
+        manifest["fingerprint"],
+    )
+    return manifest
+
+
+def _refresh_optional(
+    store_dir: Path,
+    name: str,
+    header: str,
+    lines: Sequence[str],
+    *,
+    data_dir: Path | None,
+    window: Window,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Write one ``OPTIONAL_DATA_FILES`` member anew; carry every other file over byte for byte.
+
+    Returns ``(manifest before, manifest after)``. The source store is verified with
+    ``load_store`` first and refused with ``ResearchStoreError`` when it does not; the other
+    optional files the store already holds are carried too, so refreshing one optional file
+    never silently drops another.
+    """
+    if name not in OPTIONAL_DATA_FILES:
+        raise ValueError(f"{name} is not one of {list(OPTIONAL_DATA_FILES)}")
     try:
         data = load_store(store_dir, data_dir=data_dir, window=window)
     except ValueError as exc:
@@ -855,36 +1002,29 @@ def refresh_fundamentals(
     before = dict(data.manifest)
     del data
     counts = {key: int(before[key]) for key in _COUNT_KEYS}
+    carried = [n for n in (*DATA_FILES, *OPTIONAL_DATA_FILES) if n in before["files"] and n != name]
+    extra = tuple(n for n in OPTIONAL_DATA_FILES if n == name or n in carried)
 
     tmp = store_dir.with_name(store_dir.name + ".tmp")
     if tmp.exists():
         shutil.rmtree(tmp)
     tmp.mkdir()
     try:
-        for name in DATA_FILES:
-            shutil.copyfile(store_dir / name, tmp / name)
-            copied = file_sha256(tmp / name)
-            if copied != before["files"][name]:
+        for carry in carried:
+            shutil.copyfile(store_dir / carry, tmp / carry)
+            copied = file_sha256(tmp / carry)
+            if copied != before["files"][carry]:
                 raise ResearchStoreError(
-                    f"{name}: the carried-over copy hashes {copied}, the verified store hashes "
-                    f"{before['files'][name]}; the copy is not byte-identical, nothing written"
+                    f"{carry}: the carried-over copy hashes {copied}, the verified store hashes "
+                    f"{before['files'][carry]}; the copy is not byte-identical, nothing written"
                 )
-        _write_text(tmp / FUNDAMENTALS_FILE, FUNDAMENTALS_HEADER, fundamentals_lines(facts))
-        manifest = _seal(tmp, counts, extra_files=(FUNDAMENTALS_FILE,), window=window)
+        _write_text(tmp / name, header, list(lines))
+        manifest = _seal(tmp, counts, extra_files=extra, window=window)
         _swap_in(tmp, store_dir)
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)
         raise
-    log.info(
-        "research: store %s panel refreshed: %d facts written, %d bar rows carried over "
-        "unchanged, fingerprint %s -> %s",
-        store_dir,
-        len(facts),
-        counts["bar_rows"],
-        before["fingerprint"],
-        manifest["fingerprint"],
-    )
-    return manifest
+    return before, manifest
 
 
 # ---- load ----------------------------------------------------------------------------------
@@ -954,7 +1094,14 @@ def load_store(
         membership=research_membership(data_dir, window=window),
         fx=fx_rows,
         fundamentals=fundamentals,
-        dividends=DividendCalendar.from_map(dividends),
+        dividends=DividendCalendar.from_map(
+            dividends,
+            declared=(
+                _read_announcements(store_dir / ANNOUNCEMENTS_FILE, dividends)
+                if ANNOUNCEMENTS_FILE in files
+                else None
+            ),
+        ),
     )
     spy_dividends = tuple(
         Dividend(ex_date=d, amount=a) for d, a in sorted(dividends.get("SPY", {}).items())

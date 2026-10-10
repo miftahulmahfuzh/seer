@@ -635,7 +635,8 @@ def test_data_files_is_not_widened():
     runs.
     """
     assert research.FUNDAMENTALS_FILE not in research.DATA_FILES
-    assert research.OPTIONAL_DATA_FILES == (research.FUNDAMENTALS_FILE,)
+    assert research.ANNOUNCEMENTS_FILE not in research.DATA_FILES
+    assert research.OPTIONAL_DATA_FILES == (research.FUNDAMENTALS_FILE, research.ANNOUNCEMENTS_FILE)
     assert research.FUNDAMENTALS_HEADER == ",".join(FACT_COLUMNS)
 
 

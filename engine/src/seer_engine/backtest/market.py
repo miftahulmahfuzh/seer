@@ -20,6 +20,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from decimal import Decimal
+from typing import NamedTuple
 
 from seer_engine.fundamentals import EMPTY_PANEL, FundamentalPanel as Panel
 from seer_engine.prices import Bar, to_decimal
@@ -42,6 +43,20 @@ this phase's code, tests and docstrings use throughout; phase 5 owns the type.
 """
 
 
+class Announcement(NamedTuple):
+    """One dividend as it was known on a day: ``known`` is when the market learned of it.
+
+    ``known`` is the board's declaration date when the store carries one (``declared`` True),
+    else the ex-date itself -- an undated dividend is never assumed known earlier than the day
+    it went ex.
+    """
+
+    known: date
+    ex_date: date
+    amount: Decimal
+    declared: bool
+
+
 class DividendCalendar:
     """Every symbol's cash dividends by ex-date, read point in time.
 
@@ -54,11 +69,21 @@ class DividendCalendar:
     Built from the research store's ``dividends.csv`` by ``research.load_store`` (dev and test
     windows alike, each clipped to its window by the loader). A market built any other way --
     the database path, a paper replay, a fixture -- carries ``EMPTY_DIVIDENDS``.
+
+    ``declared`` optionally maps ``symbol -> ex_date -> declaration date`` for some of those
+    dividends (the store's ``dividend_announcements.csv``). It feeds the second read,
+    ``announced_on``, which lets an allocator act on a dividend from the day it was announced
+    rather than the day it went ex. ``known_on`` ignores it and is unchanged.
     """
 
-    __slots__ = ("_rows", "_dates")
+    __slots__ = ("_rows", "_dates", "_announced", "_known")
 
-    def __init__(self, rows: Mapping[str, Iterable[tuple[date, Decimal]]]) -> None:
+    def __init__(
+        self,
+        rows: Mapping[str, Iterable[tuple[date, Decimal]]],
+        *,
+        declared: Mapping[str, Mapping[date, date]] | None = None,
+    ) -> None:
         if not isinstance(rows, Mapping):
             raise TypeError(f"rows must be a Mapping, got {type(rows).__name__}")
         out: dict[str, tuple[tuple[date, Decimal], ...]] = {}
@@ -81,11 +106,48 @@ class DividendCalendar:
                 out[symbol] = items
         self._rows: Mapping[str, tuple[tuple[date, Decimal], ...]] = out
         self._dates: Mapping[str, tuple[date, ...]] = {s: tuple(d for d, _ in r) for s, r in out.items()}
+        declared = {} if declared is None else declared
+        if not isinstance(declared, Mapping):
+            raise TypeError(f"declared must be a Mapping, got {type(declared).__name__}")
+        for symbol, by_ex in declared.items():
+            amounts = dict(out.get(symbol, ()))
+            for ex_date, day in by_ex.items():
+                if ex_date not in amounts:
+                    raise ValueError(f"{symbol} has no dividend going ex on {ex_date} to date")
+                _check_date("declared", day)
+                if day > ex_date:
+                    raise ValueError(f"{symbol} {ex_date}: declared {day} after the ex-date")
+        announced: dict[str, tuple[Announcement, ...]] = {}
+        for symbol, items in out.items():
+            by_ex = declared.get(symbol, {})
+            announced[symbol] = tuple(
+                sorted(
+                    (
+                        Announcement(by_ex.get(d, d), d, amount, d in by_ex)
+                        for d, amount in items
+                    ),
+                    key=lambda a: (a.known, a.ex_date),
+                )
+            )
+        self._announced: Mapping[str, tuple[Announcement, ...]] = announced
+        self._known: Mapping[str, tuple[date, ...]] = {
+            s: tuple(a.known for a in r) for s, r in announced.items()
+        }
 
     @staticmethod
-    def from_map(dividends: Mapping[str, Mapping[date, Decimal]]) -> DividendCalendar:
+    def from_map(
+        dividends: Mapping[str, Mapping[date, Decimal]],
+        *,
+        declared: Mapping[str, Mapping[date, date]] | None = None,
+    ) -> DividendCalendar:
         """A calendar from ``symbol -> ex_date -> amount`` (``ResearchData.dividends``' shape)."""
-        return DividendCalendar({s: sorted(by_date.items()) for s, by_date in dividends.items()})
+        return DividendCalendar(
+            {s: sorted(by_date.items()) for s, by_date in dividends.items()}, declared=declared
+        )
+
+    def declared_count(self) -> int:
+        """How many dividends carry a declaration date."""
+        return sum(a.declared for r in self._announced.values() for a in r)
 
     def __len__(self) -> int:
         return sum(len(r) for r in self._rows.values())
@@ -100,6 +162,17 @@ class DividendCalendar:
         if dates_ is None:
             return ()
         return self._rows[symbol][: bisect_right(dates_, _check_date("data_date", data_date))]
+
+    def announced_on(self, symbol: str, data_date: date) -> tuple[Announcement, ...]:
+        """``symbol``'s dividends known on or before ``data_date``, ascending by ``known``.
+
+        A dividend with a declaration date is known from that day, possibly weeks before it goes
+        ex; one without is known from its ex-date, exactly as ``known_on`` reports it.
+        """
+        known = self._known.get(symbol)
+        if known is None:
+            return ()
+        return self._announced[symbol][: bisect_right(known, _check_date("data_date", data_date))]
 
 
 def _check_date(name: str, d: object) -> date:

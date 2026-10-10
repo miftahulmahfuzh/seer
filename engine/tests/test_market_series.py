@@ -194,6 +194,22 @@ def test_refresh_adds_the_file_and_keeps_every_price_byte(tmp_path, members):
     assert len(research.load_store(store_dir, data_dir=members).market.series) == 4
 
 
+def test_refresh_carries_the_side_reports_outside_the_manifest(tmp_path, members):
+    # The survivorship-check store keeps its cleaning, coverage and alias reports beside the data,
+    # outside the manifest. Phase 5's real run proved a refresh used to drop them on the swap.
+    store_dir = tmp_path / "store"
+    build(store_dir, members)
+    reports = {"cleaning_report.csv": b"symbol,action\nAAA,kept\n", "coverage_report.txt": b"year 1996\n"}
+    for name, body in reports.items():
+        (store_dir / name).write_bytes(body)
+
+    after = research.refresh_market_series(store_dir, ROWS, data_dir=members)
+
+    assert {n: (store_dir / n).read_bytes() for n in reports} == reports
+    assert not set(reports) & set(after["files"])
+    research.load_store(store_dir, data_dir=members)
+
+
 def test_a_store_without_the_file_loads_with_the_empty_series(tmp_path, members):
     store_dir = tmp_path / "store"
     build(store_dir, members)

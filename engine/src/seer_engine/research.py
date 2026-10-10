@@ -1186,7 +1186,10 @@ def _refresh_optional(
     optional files the store already holds are carried too, so refreshing one optional file
     never silently drops another. A store's :data:`PURPOSE_KEY` is carried the same way: a
     refreshed survivorship-check store is still marked, and still refused by every
-    trial-writing path.
+    trial-writing path. Side files outside the manifest (the survivorship-check store's cleaning,
+    coverage and alias reports) are carried unchanged too: the swap replaces the whole directory,
+    and phase 5's real run proved a refresh otherwise deletes them. They stay unlisted, so they
+    never enter the fingerprint.
     """
     if name not in OPTIONAL_DATA_FILES:
         raise ValueError(f"{name} is not one of {list(OPTIONAL_DATA_FILES)}")
@@ -1203,6 +1206,8 @@ def _refresh_optional(
     counts = {key: int(before[key]) for key in _COUNT_KEYS}
     carried = [n for n in (*DATA_FILES, *OPTIONAL_DATA_FILES) if n in before["files"] and n != name]
     extra = tuple(n for n in OPTIONAL_DATA_FILES if n == name or n in carried)
+    managed = {MANIFEST_FILE, *DATA_FILES, *OPTIONAL_DATA_FILES}
+    side = sorted(p.name for p in store_dir.iterdir() if p.is_file() and p.name not in managed)
 
     tmp = store_dir.with_name(store_dir.name + ".tmp")
     if tmp.exists():
@@ -1217,6 +1222,8 @@ def _refresh_optional(
                     f"{carry}: the carried-over copy hashes {copied}, the verified store hashes "
                     f"{before['files'][carry]}; the copy is not byte-identical, nothing written"
                 )
+        for report in side:
+            shutil.copyfile(store_dir / report, tmp / report)
         _write_text(tmp / name, header, list(lines))
         manifest = _seal(
             tmp, counts, extra_files=extra, window=window, purpose=before.get(PURPOSE_KEY)

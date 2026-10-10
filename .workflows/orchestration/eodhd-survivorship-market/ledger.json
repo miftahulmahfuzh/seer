@@ -85,7 +85,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "1b31b6c61450a42c0e33fe281ac5e4df7bbc4d4c",
       "depends_on": [
         2,
         3,
@@ -93,25 +93,25 @@
       ],
       "difficulty": "NORMAL",
       "n": 5,
-      "note": null,
+      "note": "22 methods/102 variants: funded CAGR -0.5pt/yr avg; beat SPY 77->72; 11 crossed 20% DD. Synthesis insight 149. Fix 8e51754 (_refresh_optional carries side files). Lab DB staged on main 998225f.",
       "package": "lab DB, docs, skills",
       "plan": ".workflows/plan/eodhd-survivorship-market/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-10T13:55:35+00:00",
       "satisfies": [
         "R5",
         "R6",
         "R7",
         "R8"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-STM7",
       "title": "Run, journal, document"
     }
   ],
   "plan": "/home/miftah/.worktrees/seer/eodhd-survivorship-market/.workflows/orchestration/eodhd-survivorship-market/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "eodhd-survivorship-market",
-  "updated": "2026-10-10T13:14:22+00:00",
+  "updated": "2026-10-10T13:55:35+00:00",
   "verified_at": "2026-10-10T13:08:35+00:00",
   "worktree": "/home/miftah/.worktrees/seer/eodhd-survivorship-market"
 }

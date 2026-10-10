@@ -49,6 +49,7 @@ from seer_engine.sim.rules import (
     MONTHLY_HOLD_FRAC_GOTRADE,
     MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE,
 )
+from seer_engine.strategies.allocator import prepare_for
 from seer_engine.strategies.base import History
 
 OPENING_IDR = Decimal(10000000)  # == backtest.runner.INITIAL_IDR, the run's default
@@ -240,12 +241,19 @@ def truncate(data: research.ResearchData, end: date) -> tuple[Market, dict, tupl
 
 
 def run_once(market, dividends, spy_divs, candidate, window, *, real_fx: bool):
-    """One funded run. ``real_fx`` converts each deposit at the rate of the day it is credited."""
+    """One funded run. ``real_fx`` converts each deposit at the rate of the day it is credited.
+
+    ``prepared`` is what ``dev.run_registry`` hands every candidate -- ``prepare_for``, the
+    ``MarketAware`` path. Without it the book runner falls back to ``targets``, the history-only
+    path, where a dividend-calendar or fundamentals allocator sees no calendar and no panel and
+    targets nothing: the run completes, 0 trades, and the deposits sit in cash, silently.
+    """
     return dev.run_candidate(
         market,
         dividends,
         spy_divs,
         candidate,
+        prepared=prepare_for(candidate.allocator, market),
         window=window,
         contributions=OWNER_MONTHLY,
         contribution_fx=market.usd_idr_on if real_fx else None,

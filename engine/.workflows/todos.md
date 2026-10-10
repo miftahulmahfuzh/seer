@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-10 22:10
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-10 23:59
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 116
+- Completed: 117
 
 ---
 
@@ -106,15 +106,28 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Decided**:
     - Completion: the `[x]` block is left in place under `### [P1] High` and Quick Stats recounted from the file (this file's precedent for swarm-tracked sets). Plan index: phase 4's TaskID cell ticked `(done 2026-10-10)`, `**Status:**` left alone.
     - Unblocked P1-ENG-STM7: its dependencies SLCU, 9L1M and AMKN are all completed. Landing not attempted: swarm coordinator `orch-eodhd-survivorship-market` owns it.
-- [ ] **P1-ENG-STM7** Phase 5: Run, journal, document
+- [x] **P1-ENG-STM7** Phase 5: Run, journal, document
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns Step 0's guarded `git merge origin/main` (D12); the final offline rebuild of the SV store plus `market_series --refresh` on it; running `lab survivorship` on M0069 first, then the roster/near misses and the dividend-date methods picked at run time; the derived grid, README and insight under `docs/lab/survivorship/`; one plain-words `synthesis` insight; the explore skill and sync skill updates; the handover's Done line; staging per D6; the post-landing L0-L3 block repeated in its completion note. Runs no L step. Does not touch engine code (beyond a fix a run proves necessary, with its own test) or the dev store. Exit: every listed method has a journaled observation and grid rows; `guard.py` passes (N, looks, dev manifest unchanged; no trial on the SV store); the synthesis insight is in plain words; skills updated; branch pushed; staging per D6 done or deferred with a reason; the completion note ends with the post-landing block.
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `EODHD_SURVIVORSHIP_MARKET_PLAN.md` (phase 5 of 5)
   - **Satisfies**: R5, R6, R7, R8 — Run it on the roster, the near misses and the Sera dividend-date methods; M0069 first; Plain-words lab insight on how much survivorship flattered results; Decide the gate's use of the store, and whether to spend calls on the 201 empty members; Market series as point-in-time allocator data without moving the price fingerprint
   - **Depends on**: P1-ENG-SLCU, P1-ENG-9L1M, P1-ENG-AMKN
   - **Plan**: `.workflows/plan/P1-ENG-STM7.md`
+  - **Completed**: 2026-10-10 23:59
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/research.py, engine/tests/test_market_series.py, docs/lab/survivorship/grid.csv (new), docs/lab/survivorship/README.md (new), docs/lab/survivorship/insight.md (new), .claude/skills/explore-and-experiment-new-method/SKILL.md, .claude/skills/sync-research-store/SKILL.md, docs/plans/HANDOVER_20261010-eodhd.md
+  - **Commits**: 8f157ba (merge origin/main), 8e51754 (refresh fix + regression test), 53d5b47 (results, docs, skills) on the branch; 998225f on main (lab stage of lab.sqlite + web/data/lab.json, per D6: no sera window, no lab writer alive)
+  - **Results**: 22 methods, 102 variants, all dev re-runs reproduced. Mean funded CAGR -0.5 pt/yr (losers -1.4, momentum -1.1, blends -1.0, earnings -0.6, dividend-date -0.1). Beat SPY 77 -> 72 (6 lost / 1 gained). 11 variants crossed the 20% DD bar, none came back (M0007-N20-RAW 19.6% -> 23.5%). Synthesis insight 149; observations #127-#148. N 276 and looks 4 unchanged; guard.py passes.
+  - **Drift**:
+    - Step 2: market_series --refresh on the SV store dropped cleaning_report.csv, coverage_report.txt, alias_report.csv (research._refresh_optional rebuilds the dir from manifest-listed files only). Fixed: side files outside the manifest are carried unchanged; regression test test_refresh_carries_the_side_reports_outside_the_manifest; SV store rebuilt and refreshed again. Price fingerprint 60adae1b both times (deterministic).
+    - Sync skill: EODHD cache size is now ~330 MB (plan said 215 MB; alias fetches added).
+    - ruff check engine reports one pre-existing F841 in engine/tests/test_lab_prereg.py:722 (from 4807d19, also on main); not this set's, left alone.
+  - **Decided**:
+    - Insight headline branch: mean change -0.5 pt/yr -> 'barely moved' wording, with the momentum drawdown finding stated alongside (rung 3: Step 8 template rules)
+    - Ruff pre-existing failure left untouched (tie-break: narrower blast radius, outside phase Owns)
+    - Completion: the `[x]` block is left in place under `### [P1] High` and Quick Stats recounted from the file (this file's precedent for swarm-tracked sets). Plan index: phase 5's TaskID cell ticked `(done 2026-10-10)`, `**Status:**` left alone. Landing not attempted: swarm coordinator `orch-eodhd-survivorship-market` owns it, including post-landing L0-L3.
 - [x] **P1-ENG-U9XK** Phase 12: The rebuilt roster, and the wiring layer
   - **Difficulty**: HARD
   - **Type**: Feature

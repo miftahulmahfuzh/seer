@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (src layout: `engine/src/seer_engine`)
-**Last Updated**: 2026-10-10 (eodhd-survivorship-market phase 1 (P1-ENG-8X1K): a separate, purpose-marked survivorship-check store, `engine/.research-sv`, built by the new `survivorship_store` command from the dev store plus cleaned EODHD bars for the members the dev store never served (`seer_engine.survivorship`); `lab run`, `lab test` and `lab remeasure` refuse it. Before that, hardgate-variant-and-blend-kin (P2-ENG-L1VT): the hard gate's fold half also scores the variant `lab promote` would pre-register on its own curve (D11, `hardgate.promoted_variant` / `variant_record`), and its kin half counts blend ingredients read from `trials.config_text` plus their family and ancestry (D12, `hardgate.ingredients`), which the walk-forward buy signal follows through `failed_kin` (D13). Before that, trial-reproducibility: every trial records its starting capital and its price fingerprint in the append-only `trial_provenance` table (schema 5, 152 trials back-filled by an exact rule); `lab remeasure` and `lab costs` re-run a recorded trial at its recorded capital and `hardgate.trial_deposits` de-funds by it; the hard gate refuses a comparison across price fingerprints, `lab walkforward` / `lab regime` warn, and `lab run` refuses a rebuilt dev store. Before that, lab-realistic-gate R2 (P1-ENG-FND7): `lab run` and `lab test` run every candidate on the owner's real funding and record a `trial_funding` row per funded trial)
+**Last Updated**: 2026-10-10 (eodhd-survivorship-market phase 3 (P1-ENG-9L1M): an optional store file `market_series.csv` (VIX family, Treasury yields, gold) read point in time through the new `Market.series` (`MarketSeries`, `EMPTY_SERIES` by default) without moving the price fingerprint; the new cache-only `market_series` command writes it; `lab run` refuses a method that reads `series` on a store without them; and `lab unblock MNNNN --note ...` moves a `blocked-data` idea back to `idea`. Before that, eodhd-survivorship-market phase 1 (P1-ENG-8X1K): a separate, purpose-marked survivorship-check store, `engine/.research-sv`, built by the new `survivorship_store` command from the dev store plus cleaned EODHD bars for the members the dev store never served (`seer_engine.survivorship`); `lab run`, `lab test` and `lab remeasure` refuse it. Before that, hardgate-variant-and-blend-kin (P2-ENG-L1VT): the hard gate's fold half also scores the variant `lab promote` would pre-register on its own curve (D11, `hardgate.promoted_variant` / `variant_record`), and its kin half counts blend ingredients read from `trials.config_text` plus their family and ancestry (D12, `hardgate.ingredients`), which the walk-forward buy signal follows through `failed_kin` (D13). Before that, trial-reproducibility: every trial records its starting capital and its price fingerprint in the append-only `trial_provenance` table (schema 5, 152 trials back-filled by an exact rule); `lab remeasure` and `lab costs` re-run a recorded trial at its recorded capital and `hardgate.trial_deposits` de-funds by it; the hard gate refuses a comparison across price fingerprints, `lab walkforward` / `lab regime` warn, and `lab run` refuses a rebuilt dev store. Before that, lab-realistic-gate R2 (P1-ENG-FND7): `lab run` and `lab test` run every candidate on the owner's real funding and record a `trial_funding` row per funded trial)
 
 ## Overview
 
@@ -49,6 +49,7 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - The search is run on the owner's real money, and a deposit stops counting as a return (lab-realistic-gate, R2): `lab run` and `lab test` now fund every candidate with `sim.contributions.OWNER_MONTHLY` — 10,000,000 IDR to start and +5,000,000 IDR on the 25th of every month — and record one `trial_funding` row per funded trial inside the **same** `BEGIN IMMEDIATE` that records the trial, so the gate's money-weighted branch judges a newly run method on `mwr` against a dollar-cost-averaged SPY instead of on a total return that counts the owner's own deposits as growth. New in `lab/runner.py`: `OWNER_SCHEDULE_TEXT` (built from `OWNER_MONTHLY` rather than typed out, so a recorded row can never state a schedule the run was not fed), `recorded_contributions(conn, trial_n)` and `Ran.funding`; `trial_rows` gains keyword-only `deposits=` / `schedule=` whose defaults reproduce its old output byte for byte. **Every re-run path resolves its funding through `recorded_contributions`** — `lab remeasure` and `lab costs` reproduce a recorded trial on the funding it actually ran on, and `remeasure.measure` refuses outright a plan that mixes funded and unfunded trials, because one `dev.run_registry` call runs every candidate on one schedule and no schedule reproduces both. The second half of the phase is the correction funding made necessary: a deposit is not a return, and two gate conditions were being computed off raw equity. `book_runner._daily_returns` and `_year_returns` are now cashflow-adjusted (`cur / (prev + flow_t) - 1`, through the new `metrics.flow_map`) and `metrics.strategy_metrics` measures a funded run's `max_drawdown` on the time-weighted wealth index. Measured on the smoke fixture, uncorrected: an annualized Sharpe of 2.6524 for a book whose honest Sharpe is 0.2620 — a 10.1x inflation feeding `trials.dsr` and the luck test — and a max drawdown of 0.0796 against an honest 0.1055; corrected, 0.2904 and 0.1034. `total_return` and `cagr` are left contaminated deliberately, because they are the recorded shape of the curve that readers of the 128 historical trials depend on and `mwr` stands beside them with the honest number. Nothing recorded moves: the 128 pre-existing trials have no `trial_funding` row, `store.funding_of` still answers None for every one of them, and an unfunded run takes the original expressions verbatim and is byte-identical
 - Recorded trials reproduce, and the gate compares like with like (trial-reproducibility): the lab could not re-run its own record — `lab costs M0011` read +545.3% where trial #90 records +660.2%, and the 152 trials carried three store fingerprints. Measured, the store never moved its prices (the three fingerprints differ only in `fundamentals.csv`); what moved was `INITIAL_IDR`, 20,000,000 -> 10,000,000 in `d79fc83`, which no trial recorded and which whole-share rounding makes result-moving. `lab/store.py` schema 5 adds the append-only `trial_provenance` table (`initial_idr`, `price_fingerprint`, `source` `'recorded'`/`'backfill'`), written by `lab run` / `lab test` in the trial's own transaction and back-filled for every older trial (lump-sum -> 20M, funded -> 10M, exact on all 152); `research.price_fingerprint_of` hashes the four price files only. Every re-run of a recorded trial runs at `runner.recorded_capital`, which is how `lab remeasure M0007`, `M0011` and all 54 `H-P7A` seed trials reproduce exactly on today's store with `INITIAL_IDR` unchanged. Comparability is keyed on the price fingerprint, not the store fingerprint: `hardgate.fold_record` refuses a mismatch or an unknown, `lab walkforward` / `lab regime` warn, and `lab run` refuses a dev store whose price fingerprint is not the benchmark's. It strands 0 trials and changes 0 verdicts today. Recovered `trial_moments` were deliberately not written to the committed lab (they would move `H-P7A-F9` and two DSRs; that judgement belongs to the explore loop)
 - A second dev-window store that measures the survivorship gap and can never record a trial (eodhd-survivorship-market, phase 1): `engine/.research` serves 539 of the 1061 symbols it requested, and most of the other 522 are companies that died. The paid EODHD month cached their raw history; `seer_engine.survivorship` (pure) cleans it into the dev store's own bar conventions, and `commands/survivorship_store.py` writes `engine/.research-sv` (gitignored) — the dev store's lines byte for byte plus the cleaned symbols, offline from the cache, with **its own price fingerprint**. The dev store stays byte-identical. The new manifest is marked `"purpose": "survivorship-check"` (`research.PURPOSE_KEY`, optional, unhashed, never written by `build_store`), surfaced as `ResearchData.purpose` / `research.declared_purpose()`, and `lab run`, `lab test` and `lab remeasure` refuse a marked store (exit 2) before any trial, moment or look is written: the store is report-only, never a trial source. Real build: member-day coverage 58.6% -> 81.3%; of 522 cached symbols 187 kept, 73 repaired, 62 trimmed, 200 dropped; 239 members still missing
+- Market-wide series an allocator can read, point in time (eodhd-survivorship-market, phase 3): `research.MARKET_SERIES_FILE` (`market_series.csv`, `series,date,value`) joins `OPTIONAL_DATA_FILES` as its third entry, never `DATA_FILES`, so writing it moves a store's full fingerprint and never the price fingerprint every recorded trial is compared on. `load_store` reads it into `Market.series`, a `backtest.market.MarketSeries` (`value_on`, `upto`, `names`, `first_date`; every read sees only rows dated on or before `data_date`); a market built any other way carries `EMPTY_SERIES`. `commands/market_series.py` reports and (`--refresh`) writes the ten series from the EODHD cache only: the VIX family in points, `IRX` as a yield in percent, `TNX` / `FVX` / `TYX` divided by 10 into percent, VIX3M spliced from `VXV` where `VIX3M` has no close, gold in USD/oz, NYSE sessions only, clipped to the store's window. An allocator declaring `market_fields = ("series",)` is refused by `runner.preflight_data` on a store with no series. `lab unblock MNNNN --note ...` is the command for the existing `blocked-data -> idea` transition
 
 ## Layout; since trial-reproducibility trial_deposits() de-funds by the recorded capital, and the price-fingerprint comparability rule (D10): mismatches(), comparability(), fold_record() refusing an incomparable trial, pin_dev_store() for `lab run`
 
@@ -71,7 +72,7 @@ engine/
     fx.py                   Frankfurter USD/IDR fetch, upsert_fx()
     yahoo.py                yfinance download + frame parsing, BRK.B <-> BRK-B (phase 3)
     runs.py                 start_run / finish_run / fail_run
-    research.py             local research store: build_store() / load_store() / refresh_fundamentals(), each with a keyword window=; test_window(), latest_session(), declared_window(); the D9 end-of-window guard (impure; P7a, windowed in build-promotion-path phase 2); since trial-reproducibility price_fingerprint_of() over the four price files and ResearchData.price_fingerprint; since eodhd-survivorship-market the optional manifest `purpose` key (PURPOSE_KEY, SURVIVORSHIP_PURPOSE, SV_STORE_DIR, declared_purpose(), ResearchData.purpose)
+    research.py             local research store: build_store() / load_store() / refresh_fundamentals(), each with a keyword window=; test_window(), latest_session(), declared_window(); the D9 end-of-window guard (impure; P7a, windowed in build-promotion-path phase 2); since trial-reproducibility price_fingerprint_of() over the four price files and ResearchData.price_fingerprint; since eodhd-survivorship-market the optional manifest `purpose` key (PURPOSE_KEY, SURVIVORSHIP_PURPOSE, SV_STORE_DIR, declared_purpose(), ResearchData.purpose); since phase 3 the optional market_series.csv (MARKET_SERIES_FILE, MARKET_SERIES_HEADER, MARKET_SERIES_NAMES, market_series_lines(), refresh_market_series(), read into Market.series by load_store)
     survivorship.py         pure (bar a cache reader): cleans cached EODHD series for the members the dev store never served -- SourceSeries, read_series(), clean_symbol(), best_of(), coverage_by_year() (eodhd-survivorship-market phase 1)
     delisting.py            delisting stress: measure_hazard() / survivors() / draw_deaths() / kill() / stressed();
                             pure given its Random, reads no clock and no I/O, imports no lab module
@@ -115,7 +116,7 @@ engine/
       evidence.py           per-pick evidence (why-this-pick-pipeline phase 1): EVIDENCE keyed by paper.roster.RESOLVER name -> (market, params, data_date, symbols) -> {symbol: plain facts}; evidence_for(), has_evidence(). Pure; never read by any decision
     backtest/               10-year backtest (P3) and walk-forward (P3b, P6a); every module but io.py is pure
       __init__.py           docstring only
-      market.py             Membership, Market: bars, universe, FX and the point-in-time SEC fact panel in memory; EMPTY_FUNDAMENTALS, Market.with_fundamentals() (edgar-fundamentals)
+      market.py             Membership, Market: bars, universe, FX and the point-in-time SEC fact panel in memory; EMPTY_FUNDAMENTALS, Market.with_fundamentals() (edgar-fundamentals); MarketSeries, EMPTY_SERIES, Market.series, Market.with_series() (eodhd-survivorship-market phase 3)
       runner.py             run_backtest(), RunResult, survivorship(), ParamsSchedule (P3b)
       benchmark.py          SPY buy-and-hold, price-only and total-return
       metrics.py            Metrics, strategy_metrics(), checklist() (web/lib/metrics.ts parity), metrics_through() (P3b); money_weighted_return(), external_cashflows(), flow_map() for a run that received deposits (lab-realistic-gate R2)
@@ -144,7 +145,7 @@ engine/
       method.py             a lab method file: METHOD, Candidate, METHOD_ID, discover(), config_digest(), source_sha()
       store.py              lab/lab.sqlite: committed and append-only; methods, trials, ideas, insights; TRANSITIONS, record_promotion(), best_dev_eligible() (build-promotion-path phase 3); PROMOTION_BASES, promotion_basis() and record_promotion's basis= / reason= (lab-luck-gate phase 6); the append-only trial_moments side table with MomentsRow, MOMENTS_COLUMNS, insert_moments(), moments_of(), SCHEMA_VERSION now "3" and the _v1_to_v2 / _v2_to_v3 migration ladder (lab-luck-gate phase 2); the **derived verdict** (lab-luck-gate phase 4) — DSR_MIN and DSR_POLICY as the gate's two constants, LUCK_LABEL_PREFIX / is_luck_label(), recorded_labels(), OWNER_INPUTS_LABEL / owner_failures(), sr_star(), recover_dsr(), dev_sharpe_variance(), dsr_at(), Gate / gate() / pending_gate(), Verdict / verdict(), best_dev_eligible() now judging on it, and the twice-guarded REEVALUATION_MARKER / Reevaluation / reevaluate_method() / reevaluate() behind the one new ('rejected','dev-eligible') transition
       npolicy.py            the luck gate's N policy (lab-luck-gate phase 1): POLICIES all-trials / methods / effective, DEFAULT_POLICY, correlation(), participation_ratio(), effective_n() -> NCount. Pure, reads only; `store.gate` is its one caller since lab-luck-gate phase 4
-      runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4). The luck test's N comes from store.pending_gate since lab-luck-gate phase 4; preflight() refuses a flat-cost variant from M0031 on (real_costs.real_cost_problem, Sean phase 7). Since lab-realistic-gate R2 both halves run on sim.contributions.OWNER_MONTHLY and record a trial_funding row: OWNER_SCHEDULE_TEXT, recorded_contributions(), Ran.funding, trial_rows(deposits=, schedule=)
+      runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4). The luck test's N comes from store.pending_gate since lab-luck-gate phase 4; preflight() refuses a flat-cost variant from M0031 on (real_costs.real_cost_problem, Sean phase 7). Since lab-realistic-gate R2 both halves run on sim.contributions.OWNER_MONTHLY and record a trial_funding row: OWNER_SCHEDULE_TEXT, recorded_contributions(), Ran.funding, trial_rows(deposits=, schedule=). Since eodhd-survivorship-market phase 3 preflight_data() refuses a candidate declaring market_fields = ("series",) on a store with no market series
       prereg.py             the docs/lab/prereg/MNNNN.md pre-registration: Prereg, render()/parse(), require_committed(), check_digest(), check_source(), promote_method() (build-promotion-path phase 3); plus `folds` and `family_state`, the hard gate's record of what the method cleared, tolerated-absent on read so the four committed files still parse (lab-hard-gate phase 2)
       remeasure.py          `lab remeasure`: re-runs a recorded method's variants on the dev window, proves the re-run reproduces each trial's recorded Sharpe and DSR, and appends trial_moments rows -- Batch, Plan, Reproduced, Report, resolve_method(), batches_of(), preflight(), measure(), check(), remeasure(), format_report() (lab-luck-gate phase 3); plus the P7a seed path, resumable and chunk-invariant -- SEED_PREFIX, SEED_METRICS, METRIC_TOL, SeedTrial, SeedPlan, SeedReport, SeedVerdict, is_seed_id(), seed_var_trials(), seed_preflight(), observe(), run_chunk(), reproduce(), remeasure_seed(), seed_verdicts(), format_seed_report() (lab-luck-gate phase 9)
       real_costs.py         `lab costs` (Sean phase 7): REAL_COST_SINCE = 31, requires_real_cost(), real_cost_problem() (the M0031 rule runner.preflight raises); resolve_method(), pick_candidate(), twins(), Side, side_of(), Comparison, measure(), format_report(), insight_text(), journal(). Report only: writes one journal observation, never a trial; since trial-reproducibility the re-run starts at runner.recorded_capital
@@ -168,8 +169,9 @@ engine/
       backtest_b.py         `backtest_b` command (P6a)
       research_store.py     `research_store` command (P7a)
       survivorship_store.py `survivorship_store` command: builds the survivorship-check store engine/.research-sv from the dev store plus the EODHD cache, offline (eodhd-survivorship-market phase 1)
+      market_series.py      `market_series` command: reports, and with --refresh writes, market_series.csv from the EODHD market cache; no network (eodhd-survivorship-market phase 3)
       backtest_dev.py       `backtest_dev` command (P7a)
-      lab.py                `lab` command: the method lab (status / luck / show / run / promote / reevaluate / test / remeasure / costs / idea / note / insight / stage / export ...)
+      lab.py                `lab` command: the method lab (status / luck / show / run / promote / reevaluate / test / remeasure / costs / idea / note / block / unblock / insight / stage / export ...)
       nightly.py            `nightly` command (P1; P4 adds dividends and held paper symbols)
       paper.py              `paper` command (P4)
       paper_check.py        `paper_check` command (P4)
@@ -521,6 +523,39 @@ store and the local EODHD cache only.
 - **Exit codes:** 0 ok; 2 refused (paths, a source that does not verify or is itself a
   survivorship-check store, or, for `--report`, a store at `--out` that is not one).
 - Tests: `tests/test_survivorship_store.py` (37).
+
+### `market_series` (eodhd-survivorship-market phase 3, P1-ENG-9L1M)
+
+```
+python -m seer_engine [--dry-run] market_series [--refresh] [--store DIR] [--cache DIR]
+```
+
+Reports the market-wide daily series cached from EODHD and, with `--refresh`, writes them into a
+research store as `market_series.csv`. **Cache only**: it reads `engine/.cache/eodhd/market/<TICKER>.json`
+(gitignored; the licence is personal, so raw rows never enter git or `web/`), needs no token and
+never fetches a missing file.
+
+- **Sources** (`SOURCES`, in `research.MARKET_SERIES_NAMES` order, pinned equal by a test):
+  `VIX`, `VIX9D`, `VXN`, `VVIX` the close in index points; `VIX3M` from `VIX3M.INDX` wherever it
+  has a close, else `VXV.INDX` (its name until 2007-11-13); `T13W` the `IRX.INDX` close, already
+  a yield in percent; `T5Y` / `T10Y` / `T30Y` the `FVX` / `TNX` / `TYX` close **divided by 10**
+  (TNX 65.48 on 2000-01-03 is a 6.548% ten-year yield); `GOLD` the `XAUUSD.FOREX` close in USD/oz.
+- **Rows dropped and counted**: dated before `research.STORE_START` or after the store's window
+  end, on a day that was not an NYSE session (bond and FX markets publish on some stock-market
+  holidays), or with no close.
+- **The report** prints one coverage row per series (unit, rows, first/last date, member-day
+  share, off-session / outside / no-close counts, rows per source ticker) and, for a spliced
+  series, how often the two tickers agree on the sessions both have.
+- **`--store`** defaults to `research.STORE_DIR`; the window is the one the store declares
+  (`research.declared_window`). **`--refresh`** writes through `research.refresh_market_series`:
+  every other store file is carried over byte for byte and the directory is swapped in whole, so
+  the **price fingerprint does not move** — the command prints both fingerprints and exits 2 if
+  the price fingerprint changed. The global `--dry-run` prints what it would write and writes
+  nothing.
+- **Exit codes:** 0 ok; 2 the store's manifest is missing or unreadable, a cache file is missing
+  or unreadable, a series has no row in the window (on `--refresh`), or the refresh was refused.
+- A full `build_store` does not write the file; re-run `market_series --refresh` after a rebuild.
+- Tests: `tests/test_market_series.py` (49 collected).
 
 ### `backtest_dev` (P7a)
 
@@ -1178,6 +1213,19 @@ answer.
   run at Gotrade's real fees — and that method pays its trials like any other.
 - Tests: `tests/test_lab_name_count.py` (19).
 
+### `lab unblock` (eodhd-survivorship-market phase 3)
+
+```
+python -m seer_engine lab unblock MNNNN --note "what arrived and how much of the dev window it covers"
+```
+
+The command for the `blocked-data -> idea` edge `store.TRANSITIONS` already allowed ("the missing
+data arrived"), the counterpart of `lab block`. It refuses (`store.LabError`, exit 2) an empty
+note, an unknown method and a method that is not `blocked-data`. Otherwise, in one transaction, it
+appends `Unblocked: the missing data arrived. <note>` plus what the method was blocked on to the
+analysis (`store.append_analysis`), then sets the status to `idea` and clears `blocked_on`, so the
+analysis is the only place that history survives. Tests: `tests/test_lab_unblock.py` (3).
+
 ### `sean marks` (Sean phase 4)
 
 ```
@@ -1610,6 +1658,18 @@ the database.
   field order. The panel is deliberately **independent of `history`**: a symbol may have facts and
   no bars (a delisted ever-member) or bars and no facts (every ETF), and nothing cross-checks the
   two. `__post_init__` type-checks it like the other fields.
+  **`series`** (eodhd-survivorship-market phase 3) is a `MarketSeries`: market-wide daily series by
+  name (`VIX`, `VIX3M`, `VIX9D`, `VVIX`, `VXN`, `T13W`, `T5Y`, `T10Y`, `T30Y`, `GOLD`), each
+  `(date, float)` strictly ascending and finite, in the unit an allocator reasons in (the VIX family
+  in points, yields in percent, gold in USD/oz). Every read takes the allocator's `data_date` and
+  sees only rows dated on or before it: `value_on(name, data_date)` is the **latest** value on or
+  before it (a Treasury index has no close on Columbus Day; the last published yield is what a
+  trader knew), `upto(name, data_date, *, last=None)` the rows up to it (the final `last` only),
+  `names()` the non-empty series, `first_date(name)`. It defaults to `EMPTY_SERIES` (one shared
+  instance); only `research.load_store` fills it, from `market_series.csv`, and
+  `with_series(series) -> Market` attaches one. An allocator that reads it declares
+  `market_fields = ("series",)`, and `lab.runner.preflight_data` refuses such a method on a store
+  whose `len(market.series) == 0` before anything is spent.
 - **`backtest.runner`**: `INITIAL_IDR = Decimal("10000000")` — the owner's real Gotrade capital, the
   same number `paper.capital.PAPER_INITIAL_IDR` holds. It was 20,000,000 while every simulated fee
   was a flat percentage, where only ratios matter; Gotrade's measured schedule has a $0.10
@@ -2269,7 +2329,8 @@ parameter builds, loads and refreshes exactly what it did before.
     sector SPDRs);
   - `SECTOR_ETFS`, equal to `backtest.registry.SECTOR_ETFS` (tested).
   - `DATA_FILES` (the four required files) and, since edgar-fundamentals,
-    `OPTIONAL_DATA_FILES = (FUNDAMENTALS_FILE,)`. `fundamentals.csv` is in the **optional** tuple,
+    `OPTIONAL_DATA_FILES` (now `(FUNDAMENTALS_FILE, ANNOUNCEMENTS_FILE, MARKET_SERIES_FILE)`; the
+    third added by eodhd-survivorship-market phase 3, see "Market series" below). `fundamentals.csv` is in the **optional** tuple,
     never a fifth required file: `_read_manifest` requires `DATA_FILES` and *permits* the optional
     ones, and the fingerprint is the sha256 of the sorted `name:sha` lines of the files that were
     actually written. So a store built before this phase keeps loading with a **bit-identical
@@ -2438,6 +2499,21 @@ a hand-built fixture without the field is an ordinary store). It is the first st
 `runner.run_method`, `runner.run_test`, `remeasure.measure`, `remeasure.remeasure` and
 `remeasure.remeasure_seed`, and `commands/lab.py`'s `_run` asks `declared_purpose` before it even
 discovers the method — so a marked store exits 2 with nothing ran and nothing written.
+
+**Market series** (eodhd-survivorship-market phase 3). `MARKET_SERIES_FILE = "market_series.csv"`,
+`MARKET_SERIES_HEADER = "series,date,value"`, and `MARKET_SERIES_NAMES` (the ten names, sorted; the
+only ones the file may hold). The file is the third `OPTIONAL_DATA_FILES` entry and never in
+`DATA_FILES`, so `price_fingerprint_of` (which hashes `DATA_FILES` alone) does not move when a store
+gains it, and a store without it loads exactly as before. `market_series_lines(rows, *, end=DEV_END)`
+turns `(series, date, Decimal)` rows into deterministic, sorted lines (normalized decimals) and
+raises on an unknown series, a date after `end` (D9) or before `STORE_START`, a non-finite value or
+a repeated `(series, date)`. `refresh_market_series(store_dir, rows, *, data_dir=None,
+window=DEV_WINDOW)` rewrites the file through `_refresh_optional`, the same discipline as
+`refresh_announcements`: rows checked first, every other file carried over byte for byte, the
+store verified and swapped in whole. The private reader is as strict as the others and also refuses
+any CR byte itself (read_text's universal newlines would hide a CRLF from the shared `_data_lines`);
+values may be zero or negative, never NaN or infinite. `load_store` builds `Market.series` from it
+when the manifest lists it, else `EMPTY_SERIES`. `build_store` never writes it.
 
 ### survivorship (eodhd-survivorship-market phase 1)
 
@@ -3380,7 +3456,7 @@ re-reads the orders and replaces `sean_equity` whole. In `nightly.yml` it is the
 - `paper.book` and `paper.replay` (phase 6) also import `MarketAware` and `prepare_for` from `strategies.allocator`; `paper.roster` imports `strategies.f_fundamental` (`FUNDAMENTAL`, `FundamentalParams`) and still never imports `lab.methods.*` — the lab must not become an input to a paper spec digest.
 - `sean.ledger` (Sean phase 1) imports only the standard library (`bisect`, `decimal`, `zoneinfo`). `sean.marks` imports `yahoo` and psycopg. `sean.equity` imports `dates`, `sean.ledger` and psycopg. `commands.sean` (phase 4) imports `dates`, `db`, `sean.equity`, `sean.marks` and (phase 7) `sean.calibrate`. `sean.calibrate` imports `sim.costs` only, which is the one `sim` edge from `sean`. Nothing else in the engine imports `sean`, and `sean` imports no `paper`, `lab` or `strategies` module.
 - `lab.real_costs` (Sean phase 7) imports `research`, `backtest.dev`, `backtest.metrics` (formatters), `lab.store`, `lab.method` and `sim.rules`. `lab.runner` imports `lab.real_costs.real_cost_problem` at module scope. `commands.lab`'s `costs` handler uses `real_costs`, `research`, `backtest.dev` and `lab.store`.
-- `survivorship` (eodhd-survivorship-market phase 1) imports numpy, `research` (window constants and the store's line formats), `bars` (`to_volume`), `prices` (`to_decimal`) and `yahoo` (`DIVIDEND_QUANTUM`); never `lab`, `db` or `http`, and it makes no network call. `commands.survivorship_store` imports numpy, `config`, `dates`, `research`, `survivorship`, `dividend_announcements` and `commands.dividend_announcements` (`read_cache`). `lab.remeasure` imports `refuse_survivorship_store` from `lab.runner`.
+- `survivorship` (eodhd-survivorship-market phase 1) imports numpy, `research` (window constants and the store's line formats), `bars` (`to_volume`), `prices` (`to_decimal`) and `yahoo` (`DIVIDEND_QUANTUM`); never `lab`, `db` or `http`, and it makes no network call. `commands.survivorship_store` imports numpy, `config`, `dates`, `research`, `survivorship`, `dividend_announcements` and `commands.dividend_announcements` (`read_cache`). `lab.remeasure` imports `refuse_survivorship_store` from `lab.runner`. Phase 3: `commands.market_series` imports `config`, `dates`, `research` and `backtest.window` (`Window`) only; no `http`, `db` or `lab`, and no network call. `research` imports `MarketSeries` and `EMPTY_SERIES` from `backtest.market`.
 ### Standard library
 `argparse`, `importlib`/`pkgutil` (command discovery), `logging`, `contextlib`, `dataclasses`, `decimal`, `functools.lru_cache`, `re`, `time`.
 

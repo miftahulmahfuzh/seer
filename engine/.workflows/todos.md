@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-10 20:40
-**Total Active Tasks**: 6
+**Last Updated**: 2026-10-10 21:30
+**Total Active Tasks**: 5
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 4
+- P1 High: 3
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 2
-- Completed: 113
+- Blocked: 1
+- Completed: 114
 
 ---
 
@@ -52,20 +52,33 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R7, R3 — Decide the gate's use of the store, and whether to spend calls on the 201 empty members; Coverage report: member-days per year before/after, still-missing list
   - **Depends on**: P1-ENG-8X1K
   - **Plan**: `.workflows/plan/P1-ENG-SLCU.md`
-- [ ] **P1-ENG-9L1M** Phase 3: Market series store file, `Market.series`, `lab unblock`
+- [x] **P1-ENG-9L1M** Phase 3: Market series store file, `Market.series`, `lab unblock`
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `research.MARKET_SERIES_FILE = "market_series.csv"` (header `series,date,value`) joined to `OPTIONAL_DATA_FILES` (pinned test updated deliberately), its reader and `refresh_market_series` via `_refresh_optional`; `backtest/market.py` `MarketSeries` (point-in-time `value_on`, `upto`, `names`, `first_date`) and `Market.series` defaulting to `EMPTY_SERIES`; `runner.preflight_data` refusing a `"series"` method on a store without series; new command `commands/market_series.py` (report + `--refresh`, cache-only, TNX/FVX/TYX ÷ 10, VXV spliced before VIX3M, NYSE sessions only, clipped to the window); `lab unblock MNNNN --note …`; the refresh proven on scratch copies of both stores. Does not touch survivorship cleaning, `lab survivorship`, the real dev or SV store, the lab DB (the real dev-store file and the M0039/M0038 moves are post-landing L1-L2). Exit: on copies, `market_series --refresh` adds the file with neither price fingerprint moving and the SV mark kept (43,317 rows, 10 series); `value_on` never returns a value dated after `d` (tested); a series method is refused on a store without series (tested); `lab unblock` tested; tests pass.
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `EODHD_SURVIVORSHIP_MARKET_PLAN.md` (phase 3 of 5)
   - **Satisfies**: R8, R9 — Market series as point-in-time allocator data without moving the price fingerprint; M0039 and M0038 back from `blocked-data` to `idea` with a coverage note
   - **Depends on**: P1-ENG-8X1K
   - **Plan**: `.workflows/plan/P1-ENG-9L1M.md`
+  - **Completed**: 2026-10-10 21:30
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/market.py, engine/src/seer_engine/research.py, engine/src/seer_engine/lab/runner.py, engine/src/seer_engine/commands/market_series.py (new), engine/src/seer_engine/commands/lab.py, engine/tests/test_market_fundamentals.py, engine/tests/test_market_series.py (new), engine/tests/test_lab_unblock.py (new)
+  - **Verified**: ruff clean on every touched file (the pre-existing F841 at tests/test_lab_prereg.py:722 is untouched). Full suite with PG_TEST_URL: 4146 passed, 2 skipped. Step 13a on a scratch dev-store copy: 43,317 rows in 10 series; VIX3M 2,331 (VIX3M.INDX 1,996, VXV.INDX 335), differ on 9 by at most 1.05 (2014-10-15); T10Y member days 4,966 (99.6%), VIX3M 2,331 (46.8%) — all equal to the plan's measured facts. Price fingerprint 5451195f…7d90a unchanged; full fingerprint fd2bc190… -> 8817191c23ef29aba5cd8d7e6bc6cd503be7e28645092c6a5768af97eae83730 (post-landing L1 compares the real store against this). Step 13c on an SV copy: price fingerprint bc5ba895… unchanged, purpose survivorship-check kept, 43,317 rows, market_series.csv byte-identical to the dev copy. Real dev store manifest still fd2bc190…; no real store and no lab DB written.
+  - **Drift**:
+    - Line numbers in market.py / research.py shifted after phase 1 (e.g. EMPTY_DIVIDENDS at :184 not :168); every edit applied by quoted anchor text, no content drift.
+  - **Decided**:
+    - CRLF case in test_the_reader_is_strict failed because read_text's universal newlines hide CRLF from the shared _data_lines -> _read_market_series refuses a CR byte itself; the shared reader and the plan's test are unchanged (rung 3: the plan's test code block; tie-break: narrower blast radius).
+    - Completion: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats recounted from the file rather than blind-decremented (rung 6: this file's precedent for every swarm-tracked set, incl. phase 1 of this set; a peer phase session shares this worktree).
+    - Unblocked P1-ENG-AMKN (depends on phases 1 and 3, both done). P1-ENG-STM7 stays blocked on phases 2 and 4. Landing not attempted: `swarm.py find` returns `swarm: true`, coordinator `orch-eodhd-survivorship-market` owns it.
+  - **Handoffs**:
+    - Phase 5: run `market_series --refresh` on the real SV store after its final rebuild.
+    - VVIX's first weeks (2006-03 and 2006-11-13) are implausibly low; written as-is (D5).
 - [ ] **P1-ENG-AMKN** Phase 4: `lab survivorship` report command
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns new `engine/src/seer_engine/lab/survivorship_check.py` (`SV_PURPOSE = research.SURVIVORSHIP_PURPOSE`, `peek_purpose` over `research.declared_purpose`, `CSV_HEADER`) and the `survivorship` subcommand in `commands/lab.py` (docstring entry, subparser, handler, `_HANDLERS`): each named method's variants with a recorded dev trial re-run at recorded capital and funding on the dev store, then on the SV store (never both in memory); the dev re-run must reproduce the recorded total return (else the report says so); per variant and store: yearly return vs SPY's, max DD, PF, trades, daily Sharpe / T / skew / kurt and DSR at the recorded N and var_trials, 2009-2015 era edge; per method and store: walk-forward record; one plain-words `observation` per method (unless `--no-journal`); optional `--csv`; N and test looks printed before and after. Does not touch any trial-writing path, `hardgate.py` rules, stores, `research.py`. Exit: runs on fixtures end to end, lowers the fixture method on the collapse store, refuses a wrong store pair / same store twice / test-window store / unknown or unrun method, never writes trial rows; a `--no-journal` smoke run of M0069 on the real stores completes against a scratch DB copy.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `EODHD_SURVIVORSHIP_MARKET_PLAN.md` (phase 4 of 5)
   - **Satisfies**: R4 — Report-only measurement command, dev vs survivorship store side by side, journaled, N unchanged
   - **Depends on**: P1-ENG-8X1K, P1-ENG-9L1M

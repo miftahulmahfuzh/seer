@@ -39,28 +39,28 @@
         "R7",
         "R3"
       ],
-      "status": "spawned",
+      "status": "pending",
       "task_id": null,
       "title": "Alias fill for the empty members"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "bb718c95dea73804cc12b76f041ae7bac99b4241",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "Dev copy fp after refresh 8817191c23ef29aba5cd8d7e6bc6cd503be7e28645092c6a5768af97eae83730 (L1 compares). CRLF: _read_market_series refuses CR itself (rung 3).",
       "package": "seer_engine` (research, backtest/market, lab/runner, commands)",
       "plan": ".workflows/plan/eodhd-survivorship-market/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-10T13:05:39+00:00",
       "satisfies": [
         "R8",
         "R9"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-9L1M",
       "title": "Market series store file, `Market.series`, `lab unblock"
     },
     {
@@ -79,7 +79,7 @@
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "lab survivorship` report command"
     },
@@ -111,6 +111,7 @@
   "plan": "/home/miftah/.worktrees/seer/eodhd-survivorship-market/.workflows/orchestration/eodhd-survivorship-market/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "eodhd-survivorship-market",
-  "updated": "2026-10-10T12:44:04+00:00",
+  "updated": "2026-10-10T13:05:44+00:00",
+  "verified_at": "2026-10-10T13:05:40+00:00",
   "worktree": "/home/miftah/.worktrees/seer/eodhd-survivorship-market"
 }

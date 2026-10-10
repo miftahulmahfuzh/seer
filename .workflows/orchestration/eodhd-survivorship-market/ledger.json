@@ -3,6 +3,12 @@
   "coordinator": "orch-eodhd-survivorship-market",
   "coordinator_session_id": "8a809521-a956-4700-b52d-282bb0f752a3",
   "created": "2026-10-10T12:26:40+00:00",
+  "landed": {
+    "at": "2026-10-10T13:56:02+00:00",
+    "base": "main",
+    "commit": "bd0e450699205853cc1764d7fed0fe2e28896f25",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -111,7 +117,7 @@
   "plan": "/home/miftah/.worktrees/seer/eodhd-survivorship-market/.workflows/orchestration/eodhd-survivorship-market/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "eodhd-survivorship-market",
-  "updated": "2026-10-10T13:55:35+00:00",
+  "updated": "2026-10-10T13:56:02+00:00",
   "verified_at": "2026-10-10T13:08:35+00:00",
   "worktree": "/home/miftah/.worktrees/seer/eodhd-survivorship-market"
 }

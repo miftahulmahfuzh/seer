@@ -257,6 +257,30 @@ def preflight_data(
     )
 
 
+def survivorship_refusal(what: str, purpose: str) -> store.LabError:
+    """The one refusal every trial-writing path gives a purpose-marked store (``research.PURPOSE_KEY``)."""
+    return store.LabError(
+        f"{what}: this research store is marked {purpose!r} in its manifest. It is the dev store "
+        "plus EODHD bars for the members the dev store never served, built to measure how much "
+        "the missing delisted companies flatter recorded results, and nothing measured on it is "
+        "ever recorded as a trial, a moment or a look -- its prices are not the ones every "
+        "recorded trial was compared on. Use `lab survivorship` to set a method's dev result "
+        "beside its result on this store; point --store at the dev store for anything that "
+        "records. Nothing ran and nothing was written"
+    )
+
+
+def refuse_survivorship_store(data: object, what: str) -> None:
+    """Raise :func:`survivorship_refusal` when ``data`` (a ``ResearchData``) carries a purpose.
+
+    ``getattr`` rather than the attribute: a hand-built fixture without the field is an
+    ordinary store, exactly as ``ResearchData.purpose``'s default None says.
+    """
+    purpose = getattr(data, "purpose", None)
+    if purpose is not None:
+        raise survivorship_refusal(what, str(purpose))
+
+
 def _dsr(row: DevRow, n_trials: int, var_trials: float | None) -> float | None:
     m = daily_moments(row.stats.daily_returns)
     if m is None or var_trials is None:
@@ -420,7 +444,11 @@ def run_method(
     with ``data.price_fingerprint``, in the transaction that inserts the trial. So the record can
     never name a capital the run was not given, and a later ``lab remeasure`` re-runs it at the
     capital it actually had, whatever ``INITIAL_IDR`` reads by then.
+
+    A survivorship-check store (``data.purpose`` set) is refused first, before the preflight and
+    before any backtest, so it can never produce a trial.
     """
+    refuse_survivorship_store(data, f"lab run {method.id}")
     preflight(conn, method, path, require_commit=require_commit)
     capital = INITIAL_IDR
     results: list[tuple[DevRow, Any]] = []
@@ -806,7 +834,10 @@ def run_test(
     still the first write inside the one ``BEGIN IMMEDIATE``, every refusal is the same refusal in
     the same order, and the funding row is written inside that transaction -- so the look and its
     record land together or not at all, exactly as the trial and the status move already did.
+
+    A survivorship-check store (``data.purpose`` set) is refused before everything else.
     """
+    refuse_survivorship_store(data, f"lab test {candidate.id}")
     window = data.window
     if window.name != "test":
         raise store.LabError(

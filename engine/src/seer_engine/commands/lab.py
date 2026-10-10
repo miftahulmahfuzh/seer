@@ -1256,6 +1256,14 @@ def _run(conn, args) -> int:
     from seer_engine.lab import hardgate, runner
     from seer_engine.lab.method import discover
 
+    # A survivorship-check store says so in its manifest; refuse it before discovering the method
+    # or paying for a full load. runner.run_method refuses it again on the loaded data.
+    try:
+        purpose = research.declared_purpose(Path(args.store))
+    except ValueError:
+        purpose = None  # missing or unreadable: research.load_store below names the problem
+    if purpose is not None:
+        raise runner.survivorship_refusal(f"lab run {args.method}", purpose)
     methods = discover()
     if args.method not in methods:
         raise store.LabError(f"no method file for {args.method} in seer_engine/lab/methods/")

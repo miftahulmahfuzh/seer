@@ -66,7 +66,7 @@ from seer_engine.backtest.registry import REGISTRY
 from seer_engine.commands.backtest_dev import daily_moments, registry_problem
 from seer_engine.lab import npolicy, store
 from seer_engine.lab.method import METHOD_ID, Method, config_digest, source_sha
-from seer_engine.lab.runner import recorded_capital
+from seer_engine.lab.runner import recorded_capital, refuse_survivorship_store
 from seer_engine.sim.contributions import OWNER_MONTHLY
 
 log = logging.getLogger(__name__)
@@ -434,6 +434,7 @@ def measure(
     miss their recorded Sharpe by 9.5e-4 .. 5.2e-2 against ``SHARPE_TOL``; at their recorded
     20,000,000 IDR every variant reproduces with delta 0.000e+00.
     """
+    refuse_survivorship_store(data, f"lab remeasure {method.id}")
     if data.window != research.DEV_WINDOW:
         w = data.window
         raise store.LabError(
@@ -595,7 +596,10 @@ def remeasure(
     inside one ``BEGIN IMMEDIATE``, after both checks have passed for every trial. ``preflight``
     runs again inside the lock because a parallel explorer session may have backfilled the same
     method in between -- the same race ``runner.run_method`` guards.
+
+    A survivorship-check store (``data.purpose`` set) is refused before anything is read.
     """
+    refuse_survivorship_store(data, f"lab remeasure {method.id}")
     plan = preflight(conn, method, path, require_commit=require_commit)
     if plan.nothing_to_do:
         return Report(method_id=method.id, measured=(), written=(), skipped=plan.present)
@@ -1177,7 +1181,9 @@ def remeasure_seed(
 
     ``on_chunk(index, total, written, blocked)``, when given, is called after each chunk commits;
     ``commands/lab.py`` uses it to print progress on a job that has no other output until the end.
+    A survivorship-check store (``data.purpose`` set) is refused before anything else.
     """
+    refuse_survivorship_store(data, "lab remeasure (seed trials)")
     if data.window != research.DEV_WINDOW:
         w = data.window
         raise store.LabError(

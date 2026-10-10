@@ -67,6 +67,13 @@ MEMBERSHIP_START = date(1996, 1, 2)  # first sp500_history.csv row (== backtest.
 FX_START = date(1999, 1, 4)  # first Frankfurter USD/IDR row (== backtest.dev.FX_START)
 STORE_DIR = config.REPO_ROOT / "engine" / ".research"  # gitignored; the dev window
 TEST_STORE_DIR = config.REPO_ROOT / "engine" / ".research-test"  # gitignored; the P7b test window
+SV_STORE_DIR = config.REPO_ROOT / "engine" / ".research-sv"  # gitignored; the survivorship check
+"""The survivorship-check store: the dev store plus EODHD bars for the members it never served.
+
+Dev window, its own price fingerprint, and ``purpose: "survivorship-check"`` in its manifest
+(:data:`PURPOSE_KEY`), which every trial-writing path refuses. Written only by
+``python -m seer_engine survivorship_store --build``; never by ``build_store``.
+"""
 TEST_WINDOW_START = date(2015, 10, 19)  # the first NYSE session after DEV_END (design S3)
 """The first session the test window TRADES. Not where the test store's data starts.
 
@@ -170,6 +177,21 @@ either way: :func:`fingerprint_of` hashes the ``files`` map alone, never the man
 keys.
 """
 
+PURPOSE_KEY = "purpose"
+SURVIVORSHIP_PURPOSE = "survivorship-check"
+PURPOSES: frozenset[str] = frozenset({SURVIVORSHIP_PURPOSE})
+"""What a store that is NOT for recording trials says it is for. Absent means an ordinary store.
+
+``purpose`` is optional and sits outside both key sets above on purpose: the dev store's and
+the test store's manifests never carry it, so they stay byte-identical, and :func:`_read_manifest`
+accepts it beside either shape. Its only value today is ``"survivorship-check"``: the store
+``commands/survivorship_store.py`` builds from the dev store plus EODHD bars for the members the
+dev store never served. It loads like a dev store -- same window, same readers -- and that is
+exactly why it needs a mark: ``lab run``, ``lab test`` and ``lab remeasure`` refuse any store
+whose :attr:`ResearchData.purpose` is set, so a survivorship check can never become a trial.
+Like the window keys it is not hashed: ``fingerprint_of`` covers the ``files`` map alone.
+"""
+
 DEFAULT_BATCH_SIZE = 40
 BATCH_PAUSE_S = 3.0
 RATE_LIMIT_BACKOFF_S: tuple[float, ...] = (60.0, 120.0, 240.0)
@@ -207,6 +229,7 @@ class ResearchData:
     unserved: tuple[str, ...] = ()  # requested members with no bars, sorted
     window: Window = DEV_WINDOW  # the window this store declares; its ``end`` is the D9 bound
     price_fingerprint: str | None = None  # price_fingerprint_of(files): fundamentals excluded
+    purpose: str | None = None  # manifest["purpose"]; None for the dev and test stores
 
 
 @dataclass(frozen=True)
@@ -796,6 +819,7 @@ def _seal(
     *,
     extra_files: Sequence[str] = (),
     window: Window = DEV_WINDOW,
+    purpose: str | None = None,
 ) -> dict[str, Any]:
     """The manifest for the store under ``tmp``, written and returned.
 
@@ -813,7 +837,13 @@ def _seal(
     ``store_start`` is ``STORE_START`` for both windows: it is where the DATA starts, and the
     test store holds the same deep history the dev store does. Only ``window_start`` says where
     scoring begins.
+
+    ``purpose`` is written as :data:`PURPOSE_KEY` only when it is not None, and must then be one
+    of :data:`PURPOSES` (ValueError otherwise, before anything is written). Every caller that
+    predates it passes nothing, so the dev store's and the test store's manifests are unchanged.
     """
+    if purpose is not None and purpose not in PURPOSES:
+        raise ValueError(f"purpose must be one of {sorted(PURPOSES)} or None, got {purpose!r}")
     files = {name: file_sha256(tmp / name) for name in (*DATA_FILES, *extra_files)}
     manifest: dict[str, Any] = {
         "dev_end": DEV_END.isoformat(),
@@ -826,6 +856,8 @@ def _seal(
         manifest[WINDOW_NAME_KEY] = window.name
         manifest[WINDOW_START_KEY] = window.start.isoformat()
         manifest[WINDOW_END_KEY] = window.end.isoformat()
+    if purpose is not None:
+        manifest[PURPOSE_KEY] = purpose
     with (tmp / MANIFEST_FILE).open("w", encoding="utf-8", newline="\n") as fh:
         fh.write(json.dumps(manifest, sort_keys=True, indent=2) + "\n")
     return manifest
@@ -987,7 +1019,9 @@ def _refresh_optional(
     Returns ``(manifest before, manifest after)``. The source store is verified with
     ``load_store`` first and refused with ``ResearchStoreError`` when it does not; the other
     optional files the store already holds are carried too, so refreshing one optional file
-    never silently drops another.
+    never silently drops another. A store's :data:`PURPOSE_KEY` is carried the same way: a
+    refreshed survivorship-check store is still marked, and still refused by every
+    trial-writing path.
     """
     if name not in OPTIONAL_DATA_FILES:
         raise ValueError(f"{name} is not one of {list(OPTIONAL_DATA_FILES)}")
@@ -1019,7 +1053,9 @@ def _refresh_optional(
                     f"{before['files'][carry]}; the copy is not byte-identical, nothing written"
                 )
         _write_text(tmp / name, header, list(lines))
-        manifest = _seal(tmp, counts, extra_files=extra, window=window)
+        manifest = _seal(
+            tmp, counts, extra_files=extra, window=window, purpose=before.get(PURPOSE_KEY)
+        )
         _swap_in(tmp, store_dir)
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -1127,6 +1163,7 @@ def load_store(
         unserved=unserved,
         window=window,
         price_fingerprint=price_fingerprint_of(files),
+        purpose=manifest.get(PURPOSE_KEY),
     )
 
 
@@ -1205,14 +1242,40 @@ def declared_window(store_dir: Path) -> Window:
     return _declared_window(path, manifest)
 
 
+def _declared_purpose(path: Path, manifest: Mapping[str, Any]) -> str | None:
+    """The manifest's :data:`PURPOSE_KEY`, or None when absent; ValueError on an unknown value."""
+    if PURPOSE_KEY not in manifest:
+        return None
+    purpose = manifest[PURPOSE_KEY]
+    if not isinstance(purpose, str) or purpose not in PURPOSES:
+        raise ValueError(
+            f"{path}: {PURPOSE_KEY!r} must be one of {sorted(PURPOSES)} when present, got {purpose!r}"
+        )
+    return purpose
+
+
+def declared_purpose(store_dir: Path) -> str | None:
+    """What the store at ``store_dir`` says it is for: None for an ordinary store.
+
+    Reads the manifest alone and verifies nothing else, like :func:`declared_window`. A caller
+    that must refuse a survivorship-check store before paying for a full ``load_store`` asks
+    here; ``load_store`` itself surfaces the same value as ``ResearchData.purpose``. ValueError
+    when the manifest is missing, unparseable, or names an unknown purpose.
+    """
+    path, manifest = _manifest_json(Path(store_dir))
+    return _declared_purpose(path, manifest)
+
+
 def _read_manifest(store_dir: Path, window: Window = DEV_WINDOW) -> dict[str, Any]:
     path, manifest = _manifest_json(store_dir)
-    keys = set(manifest)
+    keys = set(manifest) - {PURPOSE_KEY}
     if keys != MANIFEST_KEYS and keys != MANIFEST_KEYS | OPTIONAL_MANIFEST_KEYS:
         raise ValueError(
             f"{path}: expected keys {sorted(MANIFEST_KEYS)}, optionally also "
-            f"{sorted(OPTIONAL_MANIFEST_KEYS)} (all three or none), got {sorted(keys)}"
+            f"{sorted(OPTIONAL_MANIFEST_KEYS)} (all three or none) and {PURPOSE_KEY!r}, "
+            f"got {sorted(set(manifest))}"
         )
+    _declared_purpose(path, manifest)
     if manifest["dev_end"] != DEV_END.isoformat():
         raise ValueError(
             f"{path}: the store was built for dev_end {manifest['dev_end']!r}; this code expects "

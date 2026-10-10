@@ -18,6 +18,9 @@ Files (UTF-8, LF, sorted, deterministic; no timestamps anywhere):
 - ``dividends.csv`` ``symbol,ex_date,amount``  (ORDER BY symbol, ex_date; at most 6 dp)
 - ``fx.csv``        ``date,usd_idr``  (ascending; 4 dp)
 - ``unserved.csv``  ``symbol,reason``  (requested members yfinance returned no bars for)
+- ``market_series.csv`` ``series,date,value``  (optional; ORDER BY series, date; NYSE sessions
+  only; the VIX family in points, Treasury yields in percent, gold in USD/oz; written by
+  ``python -m seer_engine market_series --refresh``, never by a build)
 - ``manifest.json`` counts, per-file sha256 and the fingerprint (sha256 of the sorted
   ``name:sha256`` lines of the four data files); ``json.dumps(sort_keys=True, indent=2)``.
 
@@ -32,6 +35,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import os
 import shutil
 import time
@@ -54,7 +58,14 @@ from seer_engine.backtest.io import (
     histories_from_frame,
     merge_intervals,
 )
-from seer_engine.backtest.market import EMPTY_FUNDAMENTALS, DividendCalendar, Market, Membership
+from seer_engine.backtest.market import (
+    EMPTY_FUNDAMENTALS,
+    EMPTY_SERIES,
+    DividendCalendar,
+    Market,
+    MarketSeries,
+    Membership,
+)
 from seer_engine.backtest.window import WINDOW_NAMES, Window
 from seer_engine.fundamentals import FACT_COLUMNS, Fact, FundamentalPanel as Panel
 from seer_engine.prices import to_decimal
@@ -104,10 +115,11 @@ FX_FILE = "fx.csv"
 UNSERVED_FILE = "unserved.csv"
 FUNDAMENTALS_FILE = "fundamentals.csv"
 ANNOUNCEMENTS_FILE = "dividend_announcements.csv"
+MARKET_SERIES_FILE = "market_series.csv"
 MANIFEST_FILE = "manifest.json"
 DATA_FILES: tuple[str, ...] = (BARS_FILE, DIVIDENDS_FILE, FX_FILE, UNSERVED_FILE)
 
-OPTIONAL_DATA_FILES: tuple[str, ...] = (FUNDAMENTALS_FILE, ANNOUNCEMENTS_FILE)
+OPTIONAL_DATA_FILES: tuple[str, ...] = (FUNDAMENTALS_FILE, ANNOUNCEMENTS_FILE, MARKET_SERIES_FILE)
 """Store files a build MAY write. Deliberately separate from ``DATA_FILES``.
 
 ``fundamentals.csv`` is optional, never a fifth required file: ``_read_manifest`` requires the
@@ -121,6 +133,12 @@ from a vendor download onto ``dividends.csv`` by ``refresh_announcements``. A st
 loads with ex-dates only, exactly as before. A full ``build_store`` does not write it -- a
 rebuild re-downloads every dividend, so the dates must be matched again with
 ``dividend_announcements --refresh``.
+
+``market_series.csv`` (EODHD month, R8) is the third: market-wide daily series -- the VIX family,
+Treasury yields, gold -- read point in time through ``Market.series``. It is optional for the
+same reason: ``price_fingerprint_of`` hashes ``DATA_FILES`` alone, so writing it moves the store's
+full fingerprint and never the price fingerprint every recorded trial is compared on. A full
+``build_store`` does not write it; re-run ``market_series --refresh`` after a rebuild.
 """
 
 BARS_HEADER = "symbol,date,open,high,low,close,volume"
@@ -129,6 +147,10 @@ FX_HEADER = "date,usd_idr"
 UNSERVED_HEADER = "symbol,reason"
 FUNDAMENTALS_HEADER = ",".join(FACT_COLUMNS)
 ANNOUNCEMENTS_HEADER = "symbol,ex_date,declared"
+MARKET_SERIES_HEADER = "series,date,value"
+MARKET_SERIES_NAMES: tuple[str, ...] = (
+    "GOLD", "T10Y", "T13W", "T30Y", "T5Y", "VIX", "VIX3M", "VIX9D", "VVIX", "VXN",
+)  # sorted; the only names market_series.csv may hold (commands/market_series.SOURCES writes them)
 
 
 def unserved_reason(start: date = STORE_START, end: date = DEV_END) -> str:
@@ -555,6 +577,109 @@ def _read_announcements(
         if ex_date in per_symbol:
             raise ValueError(f"{where}: duplicate {symbol} announcement for {ex_date}")
         per_symbol[ex_date] = declared
+    return out
+
+
+# ---- market series -------------------------------------------------------------------------
+
+
+def _series_value_text(value: Decimal) -> str:
+    """A finite Decimal as plain fixed-point text with no trailing zeros: 6.5480 -> ``6.548``."""
+    text = format(value.normalize(), "f")
+    return "0" if text == "-0" else text
+
+
+def market_series_lines(
+    rows: Sequence[tuple[str, date, Decimal]], *, end: date = DEV_END
+) -> list[str]:
+    """``market_series.csv``'s data lines, sorted by series then date.
+
+    ``rows`` are ``(series, date, value)`` with ``series`` one of :data:`MARKET_SERIES_NAMES` and
+    ``value`` a finite Decimal already in the series' unit. The text is deterministic (sorted,
+    normalized decimals), so the same rows always hash to the same file.
+
+    ValueError when a row names an unknown series, is dated after ``end`` (D9) or before
+    ``STORE_START``, holds a value that is not a finite Decimal, or repeats a ``(series, date)``.
+    """
+    seen: set[tuple[str, date]] = set()
+    for item in rows:
+        if not (isinstance(item, tuple) and len(item) == 3):
+            raise TypeError(f"a market series row is (series, date, Decimal), got {item!r}")
+        name, d, value = item
+        if name not in MARKET_SERIES_NAMES:
+            raise ValueError(
+                f"unknown market series {name!r}; expected one of {list(MARKET_SERIES_NAMES)}"
+            )
+        if isinstance(d, datetime) or not isinstance(d, date):
+            raise TypeError(f"{name}: date must be a date, got {type(d).__name__}")
+        if d > end:
+            raise _after_window_end(MARKET_SERIES_FILE, f"a {name} value", d, end)
+        if d < STORE_START:
+            raise ValueError(
+                f"{MARKET_SERIES_FILE}: a {name} value dated {d} is before STORE_START {STORE_START}"
+            )
+        if not isinstance(value, Decimal) or not value.is_finite():
+            raise ValueError(f"{name} {d}: value must be a finite Decimal, got {value!r}")
+        if (name, d) in seen:
+            raise ValueError(f"{name} {d}: two values")
+        seen.add((name, d))
+    return [
+        f"{name},{d.isoformat()},{_series_value_text(value)}"
+        for name, d, value in sorted(rows, key=lambda r: (r[0], r[1]))
+    ]
+
+
+def _parse_finite(raw: str, where: str) -> float:
+    if not raw or raw != raw.strip():
+        raise ValueError(f"{where}: bad number {raw!r}")
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise ValueError(f"{where}: bad number {raw!r}") from exc
+    if not math.isfinite(value):
+        raise ValueError(f"{where}: {raw!r} must be a finite number")
+    return value
+
+
+def _read_market_series(path: Path, end: date = DEV_END) -> dict[str, list[tuple[date, float]]]:
+    """``series -> [(date, value)]`` from ``market_series.csv``, each list ascending.
+
+    Strict, like every other store reader: LF text under the exact header, three fields, a known
+    series name, an ISO date no later than ``end`` (D9) and no earlier than ``STORE_START``, a
+    finite number, and rows sorted by series then date with no date repeated within a series.
+    Values may be zero or negative (a yield can be); they may not be NaN or infinite.
+    """
+    # read_text's universal newlines would turn CRLF into LF before _data_lines could see it, so
+    # the CR is refused on the bytes (the plan's reader test pins CRLF as a header error).
+    if b"\r" in path.read_bytes():
+        raise ValueError(
+            f"{path.name}: expected header {MARKET_SERIES_HEADER!r} and LF-terminated lines"
+        )
+    out: dict[str, list[tuple[date, float]]] = {}
+    prev: tuple[str, date] | None = None
+    for number, line in _data_lines(path, MARKET_SERIES_HEADER):
+        where = f"{path.name}:{number}"
+        fields = line.split(",")
+        if len(fields) != 3:
+            raise ValueError(f"{where}: expected 3 fields, got {len(fields)}")
+        name, raw_date, raw_value = fields
+        if name not in MARKET_SERIES_NAMES:
+            raise ValueError(
+                f"{where}: unknown series {name!r}; expected one of {list(MARKET_SERIES_NAMES)}"
+            )
+        d = _parse_date(raw_date, where)
+        if d > end:
+            raise _after_window_end(where, f"a {name} value", d, end)
+        if d < STORE_START:
+            raise ValueError(f"{where}: a {name} value dated {d} is before STORE_START {STORE_START}")
+        value = _parse_finite(raw_value, where)
+        if prev is not None and (name, d) <= prev:
+            raise ValueError(
+                f"{where}: rows must be sorted by series then date, each date once per series; "
+                f"{name} {d} follows {prev[0]} {prev[1]}"
+            )
+        prev = (name, d)
+        out.setdefault(name, []).append((d, value))
     return out
 
 
@@ -1004,6 +1129,46 @@ def refresh_announcements(
     )
     return manifest
 
+def refresh_market_series(
+    store_dir: Path,
+    rows: Sequence[tuple[str, date, Decimal]],
+    *,
+    data_dir: Path | None = None,
+    window: Window = DEV_WINDOW,
+) -> dict[str, Any]:
+    """Rewrite an existing store's ``market_series.csv``; return the new manifest.
+
+    ``rows`` are ``(series, date, value)`` already normalized by ``commands/market_series``
+    (yields in percent, the VIX family in points, NYSE sessions only, clipped to the window).
+    Same discipline as :func:`refresh_announcements`: the rows are checked before anything is
+    written (:func:`market_series_lines` refuses a row after ``window.end``); the store is verified
+    with ``load_store``; every other file -- the four price files and any other optional file -- is
+    carried over byte for byte, so the price fingerprint does not move; the directory is swapped in
+    whole or not at all. ``window`` must be the window the store declares
+    (``declared_window(store_dir)``).
+    """
+    store_dir = Path(store_dir)
+    lines = market_series_lines(rows, end=window.end)
+    before, manifest = _refresh_optional(
+        store_dir,
+        MARKET_SERIES_FILE,
+        MARKET_SERIES_HEADER,
+        lines,
+        data_dir=data_dir,
+        window=window,
+    )
+    log.info(
+        "research: store %s market series refreshed: %d rows in %d series, %d bar rows carried "
+        "over unchanged, fingerprint %s -> %s",
+        store_dir,
+        len(lines),
+        len({line.split(",", 1)[0] for line in lines}),
+        before["bar_rows"],
+        before["fingerprint"],
+        manifest["fingerprint"],
+    )
+    return manifest
+
 
 def _refresh_optional(
     store_dir: Path,
@@ -1137,6 +1302,11 @@ def load_store(
                 if ANNOUNCEMENTS_FILE in files
                 else None
             ),
+        ),
+        series=(
+            MarketSeries(_read_market_series(store_dir / MARKET_SERIES_FILE, window.end))
+            if MARKET_SERIES_FILE in files
+            else EMPTY_SERIES
         ),
     )
     spy_dividends = tuple(

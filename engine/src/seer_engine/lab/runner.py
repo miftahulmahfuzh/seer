@@ -191,9 +191,10 @@ def market_fields(allocator: object) -> tuple[str, ...]:
     """The ``Market`` fields a ``MarketAware`` allocator ranks on; () for any other allocator.
 
     An allocator declares them as a ``market_fields`` class attribute (``("dividends",)`` for
-    M0051's calendar book). One that declares nothing is taken to read ``fundamentals``: that
-    is what every market-aware allocator read before the dividend calendar existed, so the
-    fundamentals coverage gate keeps refusing exactly what it refused before.
+    M0051's calendar book, ``("series",)`` for one that reads ``Market.series``). One that declares
+    nothing is taken to read ``fundamentals``: that is what every market-aware allocator read
+    before the dividend calendar existed, so the fundamentals coverage gate keeps refusing exactly
+    what it refused before.
     """
     if not isinstance(allocator, MarketAware):
         return ()
@@ -225,7 +226,10 @@ def preflight_data(
     no fact filed before 2013, over a dev window that opens in 1996, and nothing refused it.
 
     Returns None for a method with no candidate that ranks on fundamentals -- a price-only method
-    ranks on bars, a calendar method on the dividend calendar, and both must stay runnable against a store with no panel at all. Otherwise it returns the
+    ranks on bars, a calendar method on the dividend calendar, a series method on
+    ``Market.series``, and all three must stay runnable against a store with no panel at all. A
+    calendar method on a store with no dividend calendar, and a series method on a store with no
+    market series, are refused outright. Otherwise it returns the
     measurement, so the caller can print it whether or not it cleared the floor, and raises
     ``store.LabError`` when the measured fraction is below ``min_coverage``.
 
@@ -238,6 +242,14 @@ def preflight_data(
             f"{method.id}: {', '.join(calendar)} rank on Market.dividends, and this store's market "
             "carries no dividend calendar; running it would measure the missing calendar, not the "
             "hypothesis. Nothing has been spent"
+        )
+    reads_series = market_aware_candidates(method, "series")
+    if reads_series and len(data.market.series) == 0:
+        raise store.LabError(
+            f"{method.id}: {', '.join(reads_series)} read Market.series, and this store carries no "
+            f"market series ({research.MARKET_SERIES_FILE}); running it would measure the missing "
+            "series, not the hypothesis. Nothing has been spent. Write them with "
+            "`python -m seer_engine market_series --refresh --store <store>`"
         )
     aware = market_aware_candidates(method)
     if not aware:

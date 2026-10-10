@@ -61,6 +61,9 @@
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
+    lab unblock M0007 --note "..."         the missing data arrived: blocked-data -> idea, the
+                                           note (what arrived, how much of the window it covers)
+                                           appended to the analysis
     lab drop M0007 --why "..."             an idea dropped before running
     lab seen KEY [--method M] [--note N] | lab seen --find TEXT
     lab insight --kind K --title T (--body B | --file F) [--method M]   the lab journal
@@ -342,6 +345,10 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s = sub.add_parser("block", help="mark an idea blocked on missing data")
     s.add_argument("method")
     s.add_argument("--on", required=True)
+    s = sub.add_parser("unblock", help="the missing data arrived: move a blocked idea back to idea")
+    s.add_argument("method")
+    s.add_argument("--note", required=True,
+                   help="what arrived and how much of the dev window it covers (appended to the analysis)")
 
     s = sub.add_parser("drop", help="drop an idea before it runs")
     s.add_argument("method")
@@ -2127,6 +2134,34 @@ def _block(conn, args) -> int:
     return 0
 
 
+def _unblock(conn, args) -> int:
+    """``blocked-data -> idea`` (``store.TRANSITIONS``: "the missing data arrived").
+
+    The note is appended to the method's analysis with ``store.append_analysis``, the way
+    ``lab note`` records one, together with what the method was blocked on. ``blocked_on`` is
+    then cleared, so the analysis is the only place that history survives.
+    """
+    note = args.note.strip()
+    if not note:
+        raise store.LabError("give --note: what data arrived and how much of the dev window it covers")
+    row = store.get_method(conn, args.method)
+    if row is None:
+        raise store.LabError(f"no method {args.method}")
+    if row["status"] != "blocked-data":
+        raise store.LabError(
+            f"{args.method} is {row['status']}, not blocked-data; only an idea blocked on data "
+            "can be unblocked"
+        )
+    text = f"Unblocked: the missing data arrived. {note}"
+    if row["blocked_on"]:
+        text += f"\n\nIt was blocked on: {row['blocked_on']}"
+    with conn:
+        store.append_analysis(conn, args.method, text)
+        store.update_method(conn, args.method, status="idea", blocked_on="")
+    print(f"{args.method}: blocked-data -> idea")
+    return 0
+
+
 def _drop(conn, args) -> int:
     with conn:
         store.update_method(conn, args.method, status="rejected", verdict=f"dropped before running: {args.why.strip()}")
@@ -2224,6 +2259,7 @@ _HANDLERS = {
     "idea": _idea,
     "note": _note,
     "block": _block,
+    "unblock": _unblock,
     "drop": _drop,
     "seen": _seen,
     "insight": _insight,

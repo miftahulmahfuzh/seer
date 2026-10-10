@@ -45,7 +45,7 @@ from typing import Any
 
 import numpy as np
 
-from seer_engine import config, dates, research
+from seer_engine import config, dates, eodhd, membership, research, survivorship_alias
 from seer_engine import dividend_announcements as da
 from seer_engine import survivorship as sv
 from seer_engine.commands.dividend_announcements import read_cache
@@ -95,6 +95,7 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--out", type=Path, default=research.SV_STORE_DIR, help=f"store to write (default {research.SV_STORE_DIR})")
     p.add_argument("--source", type=Path, default=research.STORE_DIR, help=f"dev store to start from, read only (default {research.STORE_DIR})")
     p.add_argument("--cache", type=Path, default=CACHE_DIR, help=f"EODHD cache (default {CACHE_DIR})")
+    add_alias_arguments(p)
 
 
 # ---- planning ------------------------------------------------------------------------------
@@ -385,15 +386,26 @@ def _print_store_reports(out: Path) -> int:
 
 
 def run(args: argparse.Namespace) -> int:
+    if getattr(args, "resolve_aliases", False) or getattr(args, "fetch_aliases", False):
+        return run_aliases(args)
     out = Path(args.out)
     if args.report:
         return _print_store_reports(out)
     try:
-        plan = plan_build(Path(args.source), Path(args.cache))
+        fill = alias_fill(args)  # None with --no-aliases, or a cache without the symbol lists
+        plan = plan_build(
+            Path(args.source), Path(args.cache), extra_sources=fill.sources if fill else None
+        )
+    except (OSError, ValueError) as exc:  # SurvivorshipStoreError is a RuntimeError: below
+        print(f"survivorship_store: alias inputs: {exc}")
+        return 2
     except SurvivorshipStoreError as exc:
         print(f"survivorship_store: {exc}")
         return 2
     print(coverage_report(plan), end="")
+    if fill is not None:
+        used = sum(1 for c in plan.cleaned.values() if c.source == survivorship_alias.ALIAS_SOURCE)
+        print(f"\nalias fill: {len(fill.sources)} fetched alias series offered, {used} used")
     if not args.build:
         print(f"\nnothing written; pass --build to write {out}")
         return 0
@@ -401,7 +413,10 @@ def run(args: argparse.Namespace) -> int:
         print(f"\ndry run: would write {len(plan.added)} added symbols into {out}")
         return 0
     try:
-        manifest = write_store(plan, out, Path(args.cache))
+        manifest = write_store(
+            plan, out, Path(args.cache),
+            extra_reports={survivorship_alias.REPORT_FILE: fill.report(plan)} if fill else None,
+        )
     except SurvivorshipStoreError as exc:
         print(f"survivorship_store: {exc}")
         return 2
@@ -411,3 +426,145 @@ def run(args: argparse.Namespace) -> int:
         f"purpose {manifest[research.PURPOSE_KEY]!r}"
     )
     return 0
+
+
+# ---- alias fill (phase 2) ------------------------------------------------------------------
+#
+#     python -m seer_engine survivorship_store --resolve-aliases              # offline report
+#     python -m seer_engine survivorship_store --fetch-aliases [--symbols A,B] [--refetch]
+#     python -m seer_engine survivorship_store --build ...                    # reads <cache>/alias/ (default)
+#     python -m seer_engine survivorship_store --build --no-aliases ...       # phase 1's build alone
+#
+# --fetch-aliases is the only network path in this command (EODHD_API_TOKEN, from $SEER_ENV_FILE
+# in a worktree). It writes under <cache>/alias/ only. The global --dry-run fetches nothing and
+# writes nothing. Exit codes: 0 ok; 1 some members failed to fetch (the rest are cached);
+# 2 no token, a missing input, or --symbols names a member that already has a usable series.
+
+
+def add_alias_arguments(p: argparse.ArgumentParser) -> None:
+    p.add_argument(
+        "--resolve-aliases",
+        action="store_true",
+        help="offline: list other EODHD codes for every member with no usable series, and which fit",
+    )
+    p.add_argument(
+        "--fetch-aliases",
+        action="store_true",
+        help="network: fetch eod/splits/dividends for candidate codes into <cache>/alias/ (resumable)",
+    )
+    p.add_argument("--refetch", action="store_true", help="with --fetch-aliases: fetch cached codes again")
+    p.add_argument(
+        "--symbols", default=None, help="comma-separated members to resolve or fetch instead of all of them"
+    )
+    p.add_argument("--no-aliases", action="store_true", help="with --build: ignore <cache>/alias/")
+
+
+def _alias_inputs(args: argparse.Namespace):
+    cache_root = Path(args.cache)
+    data_dir = Path(getattr(args, "data_dir", None) or membership.DATA_DIR)
+    source = Path(args.source) if getattr(args, "source", None) else research.STORE_DIR
+    by_symbol = survivorship_alias.intervals_by_symbol(research.research_membership(data_dir))
+    unserved = research._read_unserved(source / research.UNSERVED_FILE)
+    sources = survivorship_alias.load_sources(cache_root, data_dir)
+    return cache_root, by_symbol, unserved, sources
+
+
+def run_aliases(args: argparse.Namespace) -> int:
+    sa = survivorship_alias
+    dry_run = bool(getattr(args, "dry_run", False))
+    try:
+        cache_root, by_symbol, unserved, sources = _alias_inputs(args)
+    except (OSError, ValueError) as exc:
+        print(f"survivorship_store: {exc}")
+        return 2
+    alias_dir = cache_root / sa.ALIAS_DIR
+    members = sa.targets(cache_root, unserved, by_symbol, clean=sa.phase1_clean)
+    if args.symbols:
+        wanted = [s.strip() for s in args.symbols.split(",") if s.strip()]
+        unknown = sorted(set(wanted) - set(members))
+        if unknown:
+            print(f"survivorship_store: not an unserved member without a usable series: {', '.join(unknown)}")
+            return 2
+        members = [s for s in members if s in set(wanted)]
+    status = 0
+    if args.fetch_aliases:
+        token = config.get(eodhd.TOKEN_ENV)
+        if not token:
+            print(
+                f"survivorship_store: {eodhd.TOKEN_ENV} is not set (checked the environment and "
+                f"{config.env_file()}); in a worktree set SEER_ENV_FILE=/home/miftah/seer/.env.local"
+            )
+            return 2
+        if dry_run:
+            codes = {
+                c.code
+                for s in members
+                for c in sa.candidates(s, sources)
+                if args.refetch or sa.read_probe(alias_dir, c.code) is None
+            }
+            print(
+                f"dry run: would probe {len(codes)} codes for {len(members)} members into {alias_dir} "
+                f"(plus one splits call per code with member-day rows, one dividends call per accepted member)"
+            )
+        else:
+            stats = sa.fetch(
+                eodhd.Client(token),
+                alias_dir,
+                members,
+                sources=sources,
+                by_symbol=by_symbol,
+                clean=sa.phase1_clean,
+                refetch=args.refetch,
+            )
+            print(
+                f"alias fetch: {stats.calls} calls, {stats.accepted} members accepted, "
+                f"{stats.skipped} already cached, {len(stats.failed)} failed"
+                + (f": {', '.join(stats.failed)}" if stats.failed else "")
+            )
+            if stats.failed:
+                status = 1
+    resolutions = sa.resolve(members, sources=sources, alias_dir=alias_dir, by_symbol=by_symbol, clean=sa.phase1_clean)
+    for line in sa.summary(resolutions, by_symbol):
+        print(line)
+    for r in resolutions:
+        print(f"  {r.symbol:8} {r.code or '-':10} {r.matched_by or '-':12} {'yes' if r.accepted else 'no '} {r.reason}")
+    return status
+
+
+@dataclass(frozen=True)
+class AliasFill:
+    """The alias fill for one build: phase 1's ``extra_sources`` and what to report afterwards."""
+
+    sources: Mapping[str, tuple[sv.SourceSeries, ...]]
+    resolutions: tuple[survivorship_alias.Resolution, ...]
+    alias_dir: Path
+    by_symbol: Mapping[str, tuple[tuple[date, date | None], ...]]
+
+    def report(self, plan: BuildPlan) -> str:
+        """``alias_report.csv`` after ``plan_build`` chose between each original and its alias."""
+        rows = survivorship_alias.report_rows(
+            self.resolutions, plan.cleaned, alias_dir=self.alias_dir,
+            by_symbol=self.by_symbol, clean=survivorship_alias.phase1_clean,
+        )
+        return survivorship_alias.report_text(rows)
+
+
+def alias_fill(args: argparse.Namespace) -> AliasFill | None:
+    """The fetched aliases ``--build`` offers ``plan_build``; None with ``--no-aliases``, or when
+    the cache has no EODHD symbol lists (a test fixture: the real cache always has them).
+
+    Offline. Re-resolves every target from the cached probes, so only an alias file whose code is
+    still the resolver's choice is offered."""
+    if getattr(args, "no_aliases", False):
+        return None
+    sa = survivorship_alias
+    if not (Path(args.cache) / sa.DELISTED_FILE).is_file():
+        log.warning("survivorship_store: %s has no %s; alias fill skipped", args.cache, sa.DELISTED_FILE)
+        return None
+    cache_root, by_symbol, unserved, sources = _alias_inputs(args)
+    alias_dir = cache_root / sa.ALIAS_DIR
+    members = sa.targets(cache_root, unserved, by_symbol, clean=sa.phase1_clean)
+    resolutions = tuple(
+        sa.resolve(members, sources=sources, alias_dir=alias_dir, by_symbol=by_symbol, clean=sa.phase1_clean)
+    )
+    return AliasFill(sa.alias_sources(alias_dir, resolutions), resolutions, alias_dir, by_symbol)

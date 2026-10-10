@@ -277,3 +277,13 @@ what `EARLY_WINDOW_DAYS` and the `EARLY` screen are for, and what the `EARLY_EXE
 records exceptions to. `EARLY` still cannot see a handover between two filers that both reported
 throughout — `GOLD` (Randgold in 2011–2013, Barrick's ticker today) and `S` (Sprint Nextel, now
 SentinelOne) are that case and live in `MANUAL`.
+
+## eodhd_alias_hints.csv
+
+`symbol,code,note`. Hand-checked EODHD codes for index members whose store symbol is not the code
+EODHD keeps their history under (a bankruptcy `Q` ticker, a rename, a re-listing). Read only by
+`seer_engine.survivorship_alias`, which treats each row as one more *candidate*: it is accepted only
+when the fetched series has rows on the member's own index days and passes the survivorship-check
+cleaning, exactly like a code found by name or suffix. Each `code` was checked against the `Name`
+in EODHD's `exchange-symbol-list/US` (live and delisted) on 2026-10-10; the note says which company
+it is. Owner of this file: the engine. No vendor data in it, codes and names only.

@@ -1,9 +1,12 @@
-"""EODHD REST client: one symbol's full cash-dividend history, with declaration dates.
+"""EODHD REST client: dividends (with declaration dates), daily prices and splits per code.
 
 Bought for one month to fill the research store's ``dividend_announcements.csv`` (insight 109:
 the lab only sees the ex-date, weeks after a dividend is announced). The token travels only as
 the ``api_token`` query parameter EODHD requires; every URL that reaches a log line or an
 exception goes through ``scrub`` (``http.redact`` plus the token itself).
+The by-code endpoints (``eod``, ``splits``, ``dividends_by_code``) take a vendor code from the
+symbol lists verbatim (``exchange_code``); the alias fill in ``survivorship_alias`` is their only
+caller.
 
 The transport is injectable (anything with ``get(url, *, params, timeout)`` returning a
 requests-like response), and so are ``clock`` and ``sleep``, so tests never touch the network.
@@ -36,6 +39,7 @@ DEFAULT_TIMEOUT_S = 30.0
 RETRIES = 3
 BACKOFF_S = 5.0
 MAX_ERROR_BODY = 200
+EOD_FROM = date(1993, 1, 1)  # the original eod/ pull's start (handover §2)
 
 
 class EodhdError(RuntimeError):
@@ -60,6 +64,19 @@ def ticker(symbol: str) -> str:
     if not symbol or not symbol.strip():
         raise ValueError("symbol is empty")
     return symbol.strip().upper().replace(".", "-") + ".US"
+
+
+def exchange_code(code: str) -> str:
+    """An EODHD symbol-list ``Code`` with the US suffix, verbatim: ``DELL_old`` -> ``DELL_old.US``.
+
+    The store's symbols go through ``ticker`` (``BRK.B`` -> ``BRK-B.US``); a vendor code from
+    ``symbols-US-*.json`` is already in EODHD's spelling and must keep its case (``_old``)."""
+    if not code or not code.strip():
+        raise ValueError("code is empty")
+    code = code.strip()
+    if "." in code:
+        raise ValueError(f"{code!r} is not an EODHD code (has a '.'); store symbols go through ticker()")
+    return code + ".US"
 
 
 def scrub(text: str, token: str | None) -> str:
@@ -137,8 +154,41 @@ class Client:
 
     def dividends(self, symbol: str, *, start: date = HISTORY_FROM) -> list[Any] | None:
         """The raw ``/div`` list for ``symbol`` since ``start``; None when EODHD has no such ticker."""
-        url = f"{self.base_url}/div/{ticker(symbol)}"
-        params = {"fmt": "json", "from": start.isoformat(), "api_token": self._token}
+        return self._get_list("div", ticker(symbol), start, what="dividend list")
+
+    def dividends_by_code(self, code: str, *, start: date = HISTORY_FROM) -> list[Any] | None:
+        """``/div`` for an EODHD code from its symbol lists (``DELL_old``); None on 404."""
+        return self._get_list("div", exchange_code(code), start, what="dividend list")
+
+    def eod(self, code: str, *, start: date = EOD_FROM) -> list[Any] | None:
+        """The raw daily ``/eod`` list for an EODHD code since ``start``; None on 404.
+
+        Rows are ``{date, open, high, low, close, adjusted_close, volume}`` with RAW (not
+        split-adjusted) OHLC, exactly like ``engine/.cache/eodhd/eod/``."""
+        return self._get_list("eod", exchange_code(code), start, what="price list", extra={"period": "d"})
+
+    def splits(self, code: str, *, start: date = HISTORY_FROM) -> list[Any] | None:
+        """The raw ``/splits`` list (``[{date, split: "2.000000/1.000000"}]``) for a code; None on 404."""
+        return self._get_list("splits", exchange_code(code), start, what="split list")
+
+    def _get_list(
+        self,
+        endpoint: str,
+        target: str,
+        start: date,
+        *,
+        what: str,
+        extra: dict[str, str] | None = None,
+    ) -> list[Any] | None:
+        """GET ``<base>/<endpoint>/<target>`` expecting a JSON list; None on 404.
+
+        Paced by ``min_interval``; 429, 5xx and connection errors retry with exponential
+        backoff up to ``retries`` times. Every message that can reach a log line or an
+        exception goes through ``scrub`` so the token never leaves this object."""
+        url = f"{self.base_url}/{endpoint}/{target}"
+        params: dict[str, Any] = {"fmt": "json", "from": start.isoformat()}
+        params.update(extra or {})
+        params["api_token"] = self._token
         attempt = 0
         while True:
             attempt += 1
@@ -160,10 +210,10 @@ class Client:
                     try:
                         data = resp.json()
                     except ValueError as exc:
-                        raise EodhdError(f"non-JSON answer for {ticker(symbol)}") from exc
+                        raise EodhdError(f"non-JSON answer for {target}") from exc
                     if not isinstance(data, list):
                         raise EodhdError(
-                            f"expected a dividend list for {ticker(symbol)}, got "
+                            f"expected a {what} for {target}, got "
                             f"{scrub(str(data)[:MAX_ERROR_BODY], self._token)}"
                         )
                     return data
@@ -171,7 +221,7 @@ class Client:
                     self._last_call = self._clock()
                     return None
                 body = scrub(str(getattr(resp, "text", ""))[:MAX_ERROR_BODY], self._token)
-                message = f"HTTP {status} for {ticker(symbol)}: {body}"
+                message = f"HTTP {status} for {target}: {body}"
                 retryable = status == 429 or status >= 500
             self._last_call = self._clock()
             if not retryable or attempt > self.retries:

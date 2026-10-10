@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-10 21:30
-**Total Active Tasks**: 4
+**Last Updated**: 2026-10-10 22:10
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 115
+- Blocked: 0
+- Completed: 116
 
 ---
 
@@ -87,20 +87,30 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Handoffs**:
     - Phase 5: run `market_series --refresh` on the real SV store after its final rebuild.
     - VVIX's first weeks (2006-03 and 2006-11-13) are implausibly low; written as-is (D5).
-- [ ] **P1-ENG-AMKN** Phase 4: `lab survivorship` report command
+- [x] **P1-ENG-AMKN** Phase 4: `lab survivorship` report command
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns new `engine/src/seer_engine/lab/survivorship_check.py` (`SV_PURPOSE = research.SURVIVORSHIP_PURPOSE`, `peek_purpose` over `research.declared_purpose`, `CSV_HEADER`) and the `survivorship` subcommand in `commands/lab.py` (docstring entry, subparser, handler, `_HANDLERS`): each named method's variants with a recorded dev trial re-run at recorded capital and funding on the dev store, then on the SV store (never both in memory); the dev re-run must reproduce the recorded total return (else the report says so); per variant and store: yearly return vs SPY's, max DD, PF, trades, daily Sharpe / T / skew / kurt and DSR at the recorded N and var_trials, 2009-2015 era edge; per method and store: walk-forward record; one plain-words `observation` per method (unless `--no-journal`); optional `--csv`; N and test looks printed before and after. Does not touch any trial-writing path, `hardgate.py` rules, stores, `research.py`. Exit: runs on fixtures end to end, lowers the fixture method on the collapse store, refuses a wrong store pair / same store twice / test-window store / unknown or unrun method, never writes trial rows; a `--no-journal` smoke run of M0069 on the real stores completes against a scratch DB copy.
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `EODHD_SURVIVORSHIP_MARKET_PLAN.md` (phase 4 of 5)
   - **Satisfies**: R4 — Report-only measurement command, dev vs survivorship store side by side, journaled, N unchanged
   - **Depends on**: P1-ENG-8X1K, P1-ENG-9L1M
   - **Plan**: `.workflows/plan/P1-ENG-AMKN.md`
+  - **Completed**: 2026-10-10 22:10
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/survivorship_check.py (new), engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_survivorship.py (new)
+  - **Verified**: pytest engine/tests/test_lab_survivorship.py -n0: 17 passed, 1 skipped (live opt-in). Full suite with PG_TEST_URL: 4163 passed, 3 skipped. ruff: only the pre-existing F841 at tests/test_lab_prereg.py:722. Smoke `lab survivorship M0069 --no-journal` on the real stores against a scratch DB copy: exit 0; all 5 variants reproduce their recorded trials (#219-#223); dev store released before the SV store loaded; peak RSS 1.2 GB; wall 2:19; N 276 -> 276, looks 4 -> 4; CSV 11 lines; both manifests and the main lab.sqlite sha256 unchanged.
+  - **Smoke headline**: M0069-L60-N20-T yearly +9.8% -> +8.5% (SPY +7.2% both), max DD 33.8% -> 39.1%, 2009-2015 lead -2.3% -> -4.3%, folds 2/4 -> 1/4; 4 of 5 variants earn less a year on the survivorship-check store. SV store at smoke time: 989 symbols, fingerprint d9c70702… (phase 2's rebuild, price fingerprint 60adae1b…).
+  - **Drift**:
+    - none: every anchor quoted by the plan was present; code blocks applied verbatim
+  - **Decided**:
+    - Completion: the `[x]` block is left in place under `### [P1] High` and Quick Stats recounted from the file (this file's precedent for swarm-tracked sets). Plan index: phase 4's TaskID cell ticked `(done 2026-10-10)`, `**Status:**` left alone.
+    - Unblocked P1-ENG-STM7: its dependencies SLCU, 9L1M and AMKN are all completed. Landing not attempted: swarm coordinator `orch-eodhd-survivorship-market` owns it.
 - [ ] **P1-ENG-STM7** Phase 5: Run, journal, document
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns Step 0's guarded `git merge origin/main` (D12); the final offline rebuild of the SV store plus `market_series --refresh` on it; running `lab survivorship` on M0069 first, then the roster/near misses and the dividend-date methods picked at run time; the derived grid, README and insight under `docs/lab/survivorship/`; one plain-words `synthesis` insight; the explore skill and sync skill updates; the handover's Done line; staging per D6; the post-landing L0-L3 block repeated in its completion note. Runs no L step. Does not touch engine code (beyond a fix a run proves necessary, with its own test) or the dev store. Exit: every listed method has a journaled observation and grid rows; `guard.py` passes (N, looks, dev manifest unchanged; no trial on the SV store); the synthesis insight is in plain words; skills updated; branch pushed; staging per D6 done or deferred with a reason; the completion note ends with the post-landing block.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `EODHD_SURVIVORSHIP_MARKET_PLAN.md` (phase 5 of 5)
   - **Satisfies**: R5, R6, R7, R8 — Run it on the roster, the near misses and the Sera dividend-date methods; M0069 first; Plain-words lab insight on how much survivorship flattered results; Decide the gate's use of the store, and whether to spend calls on the 201 empty members; Market series as point-in-time allocator data without moving the price fingerprint
   - **Depends on**: P1-ENG-SLCU, P1-ENG-9L1M, P1-ENG-AMKN

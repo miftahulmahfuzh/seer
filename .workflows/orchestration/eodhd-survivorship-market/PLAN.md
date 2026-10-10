@@ -120,7 +120,7 @@ the web app.
 | 1 | Survivorship-check store: cleaning, build, marker, reports | R1, R2, R3 | `seer_engine` (research, survivorship, commands, lab/runner, lab/remeasure) | 8 | — | HARD | `.workflows/plan/eodhd-survivorship-market/phase-1.md` | P1-ENG-8X1K (done 2026-10-10) | — |
 | 2 | Alias fill for the empty members | R7, R3 | `seer_engine` (eodhd, survivorship_alias, commands/survivorship_store) | 6 | 1 | HARD | `.workflows/plan/eodhd-survivorship-market/phase-2.md` | P1-ENG-SLCU (done 2026-10-10) | — |
 | 3 | Market series store file, `Market.series`, `lab unblock` | R8, R9 | `seer_engine` (research, backtest/market, lab/runner, commands) | 8 | 1 | NORMAL | `.workflows/plan/eodhd-survivorship-market/phase-3.md` | P1-ENG-9L1M (done 2026-10-10) | — |
-| 4 | `lab survivorship` report command | R4 | `seer_engine` (lab, commands/lab) | 3 | 1, 3 | HARD | `.workflows/plan/eodhd-survivorship-market/phase-4.md` | P1-ENG-AMKN | — |
+| 4 | `lab survivorship` report command | R4 | `seer_engine` (lab, commands/lab) | 3 | 1, 3 | HARD | `.workflows/plan/eodhd-survivorship-market/phase-4.md` | P1-ENG-AMKN (done 2026-10-10) | — |
 | 5 | Run, journal, document | R5, R6, R7, R8 | lab DB, docs, skills | 6 | 2, 3, 4 | NORMAL | `.workflows/plan/eodhd-survivorship-market/phase-5.md` | P1-ENG-STM7 | — |
 
 ### Phase 1 — Survivorship-check store

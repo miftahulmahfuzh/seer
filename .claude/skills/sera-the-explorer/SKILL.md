@@ -149,6 +149,7 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
 | "Promote the whole-share winner, it passed dev" | Never. A 20M IDR book can't buy 2016+ stocks in whole shares, so the look measures cash. Run the fractional twin first (M0021's lesson). |
 | "Promote that old flat-fee winner, it passed dev" | Never as is. Run `lab costs` first, then its real-fee twin as a one-variant variation method; promote the twin. |
 | "Promote in parallel" | Promotions are serial and done by Sera. Each spends one counted test-window look. |
+| "`git pull --rebase --autostash` before each lab commit" | Only at preflight, before any child runs. Mid-batch, autostash rewrites `lab/lab.sqlite` on disk under a child's open connection (SQLite then reports "readonly database", and a write in that window is lost). Sync with `git fetch` + `git merge --ff-only origin/main` (it leaves untouched dirty files alone), then `lab stage`, commit, push; if the push is rejected, `git reset --soft HEAD~1 && git reset` and repeat. |
 | "It passed dev, that's the gate" | Not since 2026-10-09. Four of four test looks failed on `beats SPY TR`. Run Promotion step 0b before every look. |
 | "The buy signal fired, I'll ask the owner first" | Never ask, never block. Record the insight, put it first in the report, carry on. |
 | "`lab promote` refused it, I'll find a way round" | There is no way round. No `--force`, no environment variable, no editing the method to dodge the kin walk. Record the refusal, report it, take the next idea. |

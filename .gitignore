@@ -28,6 +28,12 @@ engine/.research-test/
 engine/.research-test.tmp/
 engine/.research-test.old/
 
+# survivorship-check store (`python -m seer_engine survivorship_store --build`): the dev store plus
+# cleaned EODHD bars for the members it never served. Vendor rows: never commit (personal licence)
+engine/.research-sv/
+engine/.research-sv.tmp/
+engine/.research-sv.old/
+
 # misc
 .DS_Store
 *.log

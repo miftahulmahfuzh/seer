@@ -7,6 +7,11 @@ as data that strategies can read. Do §5.1 first; §5.2 is smaller and independe
 **State at handover:** `main` @ `18dad84` or later. 3,513 engine tests passing. A Sera batch
 (`sera-20261010-1742`, tmux window `@6`) is running and writing to `lab/lab.sqlite`; see §6.
 
+**Done (2026-10-10):** §5.1 and §5.2 are built on `feature/eodhd-survivorship-market`. The
+survivorship check's results, coverage table and the journaled answer are in
+`docs/lab/survivorship/` (README, grid, insight; lab synthesis insight 149). The check store stays
+a cross-check, not a gate (plan D1).
+
 ---
 
 ## 1. Why this exists

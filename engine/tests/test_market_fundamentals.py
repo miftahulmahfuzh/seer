@@ -633,10 +633,22 @@ def test_data_files_is_not_widened():
     ones beyond them, and load_store hashes the manifest's own keys. If fundamentals.csv ever
     joins DATA_FILES, every store on disk stops loading -- with a ValueError, before any reader
     runs.
+
+    OPTIONAL_DATA_FILES was widened on purpose by the EODHD plan set (phase 3, R8):
+    market_series.csv is a third *optional* file. That is the shape this test protects, not a
+    breach of it -- DATA_FILES stays the four price files, so price_fingerprint_of (which hashes
+    DATA_FILES alone) does not move when a store gains the series, and a store without the file
+    loads exactly as before.
     """
     assert research.FUNDAMENTALS_FILE not in research.DATA_FILES
     assert research.ANNOUNCEMENTS_FILE not in research.DATA_FILES
-    assert research.OPTIONAL_DATA_FILES == (research.FUNDAMENTALS_FILE, research.ANNOUNCEMENTS_FILE)
+    assert research.MARKET_SERIES_FILE not in research.DATA_FILES
+    assert research.DATA_FILES == (
+        research.BARS_FILE, research.DIVIDENDS_FILE, research.FX_FILE, research.UNSERVED_FILE
+    )
+    assert research.OPTIONAL_DATA_FILES == (
+        research.FUNDAMENTALS_FILE, research.ANNOUNCEMENTS_FILE, research.MARKET_SERIES_FILE
+    )
     assert research.FUNDAMENTALS_HEADER == ",".join(FACT_COLUMNS)
 
 

@@ -105,6 +105,19 @@ to check before wondering where the quota went.
   *fresher* store rather than the same one, rebuild it from the database on one laptop
   (`python -m seer_engine research_store --with-fundamentals`) and `push` that.
 - **Recorded lab trials.** Those live in the repo and move by git, as they should.
+- **The survivorship-check store, `engine/.research-sv/`.** `sync_store.py` moves
+  `engine/.research/` and nothing else (`store_dir`), and its Blob key and `LATEST.json` pointer
+  belong to the dev store alone. So the check store can never overwrite the dev store's pointer,
+  and it never travels by Blob. It is derived, so rebuild it on the other machine instead:
+  1. copy the EODHD cache folder `engine/.cache/eodhd/` across by hand (USB or `scp`, about
+     330 MB). It is raw vendor data under a personal licence, so **never commit it, never put it
+     in Blob and never put it under `web/`**;
+  2. `pull` the dev store with this skill;
+  3. from the main checkout, build offline with absolute paths (never through a symlink):
+     `engine/.venv/bin/python -m seer_engine survivorship_store --build --out "$PWD/engine/.research-sv" --source "$PWD/engine/.research"`.
+
+  The same cache and the same dev store give the same check store. Compare the price fingerprint
+  that `survivorship_store --report` prints on both machines.
 
 ## When a rebuild is the right answer instead
 

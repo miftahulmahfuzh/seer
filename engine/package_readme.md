@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (src layout: `engine/src/seer_engine`)
-**Last Updated**: 2026-10-09 (hardgate-variant-and-blend-kin (P2-ENG-L1VT): the hard gate's fold half also scores the variant `lab promote` would pre-register on its own curve (D11, `hardgate.promoted_variant` / `variant_record`), and its kin half counts blend ingredients read from `trials.config_text` plus their family and ancestry (D12, `hardgate.ingredients`), which the walk-forward buy signal follows through `failed_kin` (D13). Before that, trial-reproducibility: every trial records its starting capital and its price fingerprint in the append-only `trial_provenance` table (schema 5, 152 trials back-filled by an exact rule); `lab remeasure` and `lab costs` re-run a recorded trial at its recorded capital and `hardgate.trial_deposits` de-funds by it; the hard gate refuses a comparison across price fingerprints, `lab walkforward` / `lab regime` warn, and `lab run` refuses a rebuilt dev store. Before that, lab-realistic-gate R2 (P1-ENG-FND7): `lab run` and `lab test` run every candidate on the owner's real funding and record a `trial_funding` row per funded trial)
+**Last Updated**: 2026-10-10 (eodhd-survivorship-market phase 5 (P1-ENG-STM7): `lab survivorship` run over 22 methods / 102 variants, every dev re-run reproduced, results in `docs/lab/survivorship/`; and `research._refresh_optional` now carries the side reports outside the manifest (`cleaning_report.csv`, `coverage_report.txt`, `alias_report.csv`) instead of dropping them. Before that, eodhd-survivorship-market phase 4 (P1-ENG-AMKN): the report-only `lab survivorship MNNNN...` (`seer_engine.lab.survivorship_check`) re-runs each named method's recorded variants on the dev store, then on the survivorship-check store (never both in memory), proves the dev re-run reproduces the recorded trial, and prints the two side by side; one journal observation per method, no trial row, N and test looks unmoved. Before that, eodhd-survivorship-market phase 2 (P1-ENG-SLCU): an alias fill for the 200 survivorship-check members with no usable EODHD series under their store symbol — `seer_engine.survivorship_alias` resolves, offline, the other EODHD code each traded under (hint, company name, alias, class share, bankruptcy stem, vendor suffix), `survivorship_store --fetch-aliases` caches them under `engine/.cache/eodhd/alias/` only, and `--build` offers the accepted series by default (`--no-aliases` to opt out) and writes `alias_report.csv`; 128 of 200 filled, member-days 81.3% -> 89.0%. Before that, eodhd-survivorship-market phase 3 (P1-ENG-9L1M): an optional store file `market_series.csv` (VIX family, Treasury yields, gold) read point in time through the new `Market.series` (`MarketSeries`, `EMPTY_SERIES` by default) without moving the price fingerprint; the new cache-only `market_series` command writes it; `lab run` refuses a method that reads `series` on a store without them; and `lab unblock MNNNN --note ...` moves a `blocked-data` idea back to `idea`. Before that, eodhd-survivorship-market phase 1 (P1-ENG-8X1K): a separate, purpose-marked survivorship-check store, `engine/.research-sv`, built by the new `survivorship_store` command from the dev store plus cleaned EODHD bars for the members the dev store never served (`seer_engine.survivorship`); `lab run`, `lab test` and `lab remeasure` refuse it. Before that, hardgate-variant-and-blend-kin (P2-ENG-L1VT): the hard gate's fold half also scores the variant `lab promote` would pre-register on its own curve (D11, `hardgate.promoted_variant` / `variant_record`), and its kin half counts blend ingredients read from `trials.config_text` plus their family and ancestry (D12, `hardgate.ingredients`), which the walk-forward buy signal follows through `failed_kin` (D13). Before that, trial-reproducibility: every trial records its starting capital and its price fingerprint in the append-only `trial_provenance` table (schema 5, 152 trials back-filled by an exact rule); `lab remeasure` and `lab costs` re-run a recorded trial at its recorded capital and `hardgate.trial_deposits` de-funds by it; the hard gate refuses a comparison across price fingerprints, `lab walkforward` / `lab regime` warn, and `lab run` refuses a rebuilt dev store. Before that, lab-realistic-gate R2 (P1-ENG-FND7): `lab run` and `lab test` run every candidate on the owner's real funding and record a `trial_funding` row per funded trial)
 
 ## Overview
 
@@ -48,6 +48,10 @@ and removal of the web app's seeded demo data. Later phases add commands on top 
 - The gate counts the looks the data supports (lab-realistic-gate, R1): `store.DSR_POLICY` and `npolicy.DEFAULT_POLICY` move `"all-trials"` -> `"methods"`, so the luck test deflates by the number of **distinct methods** the lab has looked at — **N = 28** on the committed `lab/lab.sqlite`, not the 126 dev trial rows — floored at the measured participation ratio (`max(distinct_methods, ceil(participation_ratio))`; `ceil(2.338) = 3`, so the floor does not bind). The reason is not that 126 is a big number: a lab of 126 rows holds 28 ideas, and mean pairwise correlation 0.612 across them says the row count asserts an independence the curves contradict. The consequence that matters operationally is **locality** — a variation twin of an existing method adds 0 to N and a brand-new method adds 1, so re-running one method no longer perturbs every other method's verdict, which is what made the all-trials gate unusable as exploration continued. Nothing recorded is rewritten (`trials` still 128 rows, `test_looks` still 2, every row keeps the label of the bar it was judged under): the verdict is *derived*, so only the published verdicts move — six methods go `rejected` -> `dev-eligible` (M0002, M0007, M0011, M0019, M0024, M0030), `dev-eligible` 2 -> 8 and `rejected` 27 -> 21. Two consequences elsewhere in the package: `remeasure.batches_of`'s second guard had to widen from an equality to a bounded range, because the equality *was* the all-trials projection and would have refused every batch recorded under any other policy; and the lab test modules whose fixtures stamp `n_trials_at_run` with their own dev row count (`test_lab_prereg.py`, `test_lab_status.py`) now pin `DSR_POLICY = "all-trials"` in an autouse fixture, naming the assumption they already encoded rather than inheriting whatever the shipped constant happens to be. Shipped in the same phase: `lab --help`, dead on `main` since a bare `%` entered an argparse `help=` string, is fixed — see the Command contract; since trial-reproducibility both paths re-run at runner.recorded_capital, and plan_capital() refuses a set recorded at two capitals
 - The search is run on the owner's real money, and a deposit stops counting as a return (lab-realistic-gate, R2): `lab run` and `lab test` now fund every candidate with `sim.contributions.OWNER_MONTHLY` — 10,000,000 IDR to start and +5,000,000 IDR on the 25th of every month — and record one `trial_funding` row per funded trial inside the **same** `BEGIN IMMEDIATE` that records the trial, so the gate's money-weighted branch judges a newly run method on `mwr` against a dollar-cost-averaged SPY instead of on a total return that counts the owner's own deposits as growth. New in `lab/runner.py`: `OWNER_SCHEDULE_TEXT` (built from `OWNER_MONTHLY` rather than typed out, so a recorded row can never state a schedule the run was not fed), `recorded_contributions(conn, trial_n)` and `Ran.funding`; `trial_rows` gains keyword-only `deposits=` / `schedule=` whose defaults reproduce its old output byte for byte. **Every re-run path resolves its funding through `recorded_contributions`** — `lab remeasure` and `lab costs` reproduce a recorded trial on the funding it actually ran on, and `remeasure.measure` refuses outright a plan that mixes funded and unfunded trials, because one `dev.run_registry` call runs every candidate on one schedule and no schedule reproduces both. The second half of the phase is the correction funding made necessary: a deposit is not a return, and two gate conditions were being computed off raw equity. `book_runner._daily_returns` and `_year_returns` are now cashflow-adjusted (`cur / (prev + flow_t) - 1`, through the new `metrics.flow_map`) and `metrics.strategy_metrics` measures a funded run's `max_drawdown` on the time-weighted wealth index. Measured on the smoke fixture, uncorrected: an annualized Sharpe of 2.6524 for a book whose honest Sharpe is 0.2620 — a 10.1x inflation feeding `trials.dsr` and the luck test — and a max drawdown of 0.0796 against an honest 0.1055; corrected, 0.2904 and 0.1034. `total_return` and `cagr` are left contaminated deliberately, because they are the recorded shape of the curve that readers of the 128 historical trials depend on and `mwr` stands beside them with the honest number. Nothing recorded moves: the 128 pre-existing trials have no `trial_funding` row, `store.funding_of` still answers None for every one of them, and an unfunded run takes the original expressions verbatim and is byte-identical
 - Recorded trials reproduce, and the gate compares like with like (trial-reproducibility): the lab could not re-run its own record — `lab costs M0011` read +545.3% where trial #90 records +660.2%, and the 152 trials carried three store fingerprints. Measured, the store never moved its prices (the three fingerprints differ only in `fundamentals.csv`); what moved was `INITIAL_IDR`, 20,000,000 -> 10,000,000 in `d79fc83`, which no trial recorded and which whole-share rounding makes result-moving. `lab/store.py` schema 5 adds the append-only `trial_provenance` table (`initial_idr`, `price_fingerprint`, `source` `'recorded'`/`'backfill'`), written by `lab run` / `lab test` in the trial's own transaction and back-filled for every older trial (lump-sum -> 20M, funded -> 10M, exact on all 152); `research.price_fingerprint_of` hashes the four price files only. Every re-run of a recorded trial runs at `runner.recorded_capital`, which is how `lab remeasure M0007`, `M0011` and all 54 `H-P7A` seed trials reproduce exactly on today's store with `INITIAL_IDR` unchanged. Comparability is keyed on the price fingerprint, not the store fingerprint: `hardgate.fold_record` refuses a mismatch or an unknown, `lab walkforward` / `lab regime` warn, and `lab run` refuses a dev store whose price fingerprint is not the benchmark's. It strands 0 trials and changes 0 verdicts today. Recovered `trial_moments` were deliberately not written to the committed lab (they would move `H-P7A-F9` and two DSRs; that judgement belongs to the explore loop)
+- A second dev-window store that measures the survivorship gap and can never record a trial (eodhd-survivorship-market, phase 1): `engine/.research` serves 539 of the 1061 symbols it requested, and most of the other 522 are companies that died. The paid EODHD month cached their raw history; `seer_engine.survivorship` (pure) cleans it into the dev store's own bar conventions, and `commands/survivorship_store.py` writes `engine/.research-sv` (gitignored) — the dev store's lines byte for byte plus the cleaned symbols, offline from the cache, with **its own price fingerprint**. The dev store stays byte-identical. The new manifest is marked `"purpose": "survivorship-check"` (`research.PURPOSE_KEY`, optional, unhashed, never written by `build_store`), surfaced as `ResearchData.purpose` / `research.declared_purpose()`, and `lab run`, `lab test` and `lab remeasure` refuse a marked store (exit 2) before any trial, moment or look is written: the store is report-only, never a trial source. Real build: member-day coverage 58.6% -> 81.3%; of 522 cached symbols 187 kept, 73 repaired, 62 trimmed, 200 dropped; 239 members still missing
+- The members phase 1 could not fill, filled under the code they really traded under (eodhd-survivorship-market, phase 2): 200 cached symbols came back with nothing on their member days because the ticker now belongs to someone else (`DOW` is Dow Inc since 2019) or the company traded under another code (WorldCom is `MCWEQ`). `seer_engine.survivorship_alias` lists candidate codes per member from EODHD's cached symbol lists — a hand-checked hint (`data/eodhd_alias_hints.csv`), the normalized company name, `ticker_aliases.csv`, the class-share spelling, the bankruptcy stem, the vendor's `_old` / `_oldN` / `N` suffixes — and accepts one only when its series has at least `MIN_MEMBER_ROWS` rows on the member's own index days and passes the same cleaning; two fitting candidates that are different price series resolve to none. `survivorship_store --fetch-aliases` is the only network path and writes under `engine/.cache/eodhd/alias/` only; `--build` offers the accepted series to `plan_build` as `extra_sources` (cleaned like any other, `best_of` keeps the better) and writes `alias_report.csv`. Real build: 128 of 200 filled (`source` `eodhd-alias` in `cleaning_report.csv`), member-day coverage 81.3% -> 89.0%, members still missing 239 -> 111; the SV store's price fingerprint moved to `60adae1b…` (was `bc5ba895…`). The dev store is untouched
+- Market-wide series an allocator can read, point in time (eodhd-survivorship-market, phase 3): `research.MARKET_SERIES_FILE` (`market_series.csv`, `series,date,value`) joins `OPTIONAL_DATA_FILES` as its third entry, never `DATA_FILES`, so writing it moves a store's full fingerprint and never the price fingerprint every recorded trial is compared on. `load_store` reads it into `Market.series`, a `backtest.market.MarketSeries` (`value_on`, `upto`, `names`, `first_date`; every read sees only rows dated on or before `data_date`); a market built any other way carries `EMPTY_SERIES`. `commands/market_series.py` reports and (`--refresh`) writes the ten series from the EODHD cache only: the VIX family in points, `IRX` as a yield in percent, `TNX` / `FVX` / `TYX` divided by 10 into percent, VIX3M spliced from `VXV` where `VIX3M` has no close, gold in USD/oz, NYSE sessions only, clipped to the store's window. An allocator declaring `market_fields = ("series",)` is refused by `runner.preflight_data` on a store with no series. `lab unblock MNNNN --note ...` is the command for the existing `blocked-data -> idea` transition
+- How much the missing companies flattered a recorded result (eodhd-survivorship-market, phase 4): `lab survivorship MNNNN [MNNNN ...]` (`lab/survivorship_check.py`) re-runs every recorded variant still in each method file at its recorded capital and funding, once on `engine/.research` and then once on `engine/.research-sv` (each store loaded, run and freed before the next), checks the dev re-run reproduces the recorded trial, and prints side by side the yearly return vs SPY, max DD, PF, trades, Sharpe / T / skew / kurtosis and DSR at the recorded N, the 2009-2015 edge (where the SV store's coverage is high) and the walk-forward folds. A report, never a trial: it writes no `trials`, `trial_moments`, `trial_funding` or `trial_provenance` row, so N and test looks cannot move; only one plain-words `observation` per method unless `--no-journal`. Smoke run on M0069: 4 of 5 variants earn less a year on the survivorship-check store (M0069-L60-N20-T +9.8% -> +8.5%, max DD 33.8% -> 39.1%). Full run (phase 5): 22 methods, 102 variants, all dev re-runs reproduced; mean funded CAGR -0.5 pt/yr, beat SPY 77 -> 72, 11 variants crossed the 20% drawdown bar; written up in `docs/lab/survivorship/`
 
 ## Layout; since trial-reproducibility trial_deposits() de-funds by the recorded capital, and the price-fingerprint comparability rule (D10): mismatches(), comparability(), fold_record() refusing an incomparable trial, pin_dev_store() for `lab run`
 
@@ -70,7 +74,9 @@ engine/
     fx.py                   Frankfurter USD/IDR fetch, upsert_fx()
     yahoo.py                yfinance download + frame parsing, BRK.B <-> BRK-B (phase 3)
     runs.py                 start_run / finish_run / fail_run
-    research.py             local research store: build_store() / load_store() / refresh_fundamentals(), each with a keyword window=; test_window(), latest_session(), declared_window(); the D9 end-of-window guard (impure; P7a, windowed in build-promotion-path phase 2); since trial-reproducibility price_fingerprint_of() over the four price files and ResearchData.price_fingerprint
+    research.py             local research store: build_store() / load_store() / refresh_fundamentals(), each with a keyword window=; test_window(), latest_session(), declared_window(); the D9 end-of-window guard (impure; P7a, windowed in build-promotion-path phase 2); since trial-reproducibility price_fingerprint_of() over the four price files and ResearchData.price_fingerprint; since eodhd-survivorship-market the optional manifest `purpose` key (PURPOSE_KEY, SURVIVORSHIP_PURPOSE, SV_STORE_DIR, declared_purpose(), ResearchData.purpose); since phase 3 the optional market_series.csv (MARKET_SERIES_FILE, MARKET_SERIES_HEADER, MARKET_SERIES_NAMES, market_series_lines(), refresh_market_series(), read into Market.series by load_store)
+    survivorship.py         pure (bar a cache reader): cleans cached EODHD series for the members the dev store never served -- SourceSeries, read_series(), clean_symbol(), best_of(), coverage_by_year() (eodhd-survivorship-market phase 1)
+    survivorship_alias.py   offline alias resolution for the members with no usable EODHD series under their store symbol: load_sources(), candidates(), choose(), resolve(), Resolution; fetch() (the one network path, injected eodhd.Client, writes <cache>/alias/ only); alias_sources() -> SourceSeries for plan_build; report_rows()/report_text() for alias_report.csv (eodhd-survivorship-market phase 2)
     delisting.py            delisting stress: measure_hazard() / survivors() / draw_deaths() / kill() / stressed();
                             pure given its Random, reads no clock and no I/O, imports no lab module
                             (delisting-stress-roster-rules phase 1)
@@ -113,7 +119,7 @@ engine/
       evidence.py           per-pick evidence (why-this-pick-pipeline phase 1): EVIDENCE keyed by paper.roster.RESOLVER name -> (market, params, data_date, symbols) -> {symbol: plain facts}; evidence_for(), has_evidence(). Pure; never read by any decision
     backtest/               10-year backtest (P3) and walk-forward (P3b, P6a); every module but io.py is pure
       __init__.py           docstring only
-      market.py             Membership, Market: bars, universe, FX and the point-in-time SEC fact panel in memory; EMPTY_FUNDAMENTALS, Market.with_fundamentals() (edgar-fundamentals)
+      market.py             Membership, Market: bars, universe, FX and the point-in-time SEC fact panel in memory; EMPTY_FUNDAMENTALS, Market.with_fundamentals() (edgar-fundamentals); MarketSeries, EMPTY_SERIES, Market.series, Market.with_series() (eodhd-survivorship-market phase 3)
       runner.py             run_backtest(), RunResult, survivorship(), ParamsSchedule (P3b)
       benchmark.py          SPY buy-and-hold, price-only and total-return
       metrics.py            Metrics, strategy_metrics(), checklist() (web/lib/metrics.ts parity), metrics_through() (P3b); money_weighted_return(), external_cashflows(), flow_map() for a run that received deposits (lab-realistic-gate R2)
@@ -142,11 +148,12 @@ engine/
       method.py             a lab method file: METHOD, Candidate, METHOD_ID, discover(), config_digest(), source_sha()
       store.py              lab/lab.sqlite: committed and append-only; methods, trials, ideas, insights; TRANSITIONS, record_promotion(), best_dev_eligible() (build-promotion-path phase 3); PROMOTION_BASES, promotion_basis() and record_promotion's basis= / reason= (lab-luck-gate phase 6); the append-only trial_moments side table with MomentsRow, MOMENTS_COLUMNS, insert_moments(), moments_of(), SCHEMA_VERSION now "3" and the _v1_to_v2 / _v2_to_v3 migration ladder (lab-luck-gate phase 2); the **derived verdict** (lab-luck-gate phase 4) — DSR_MIN and DSR_POLICY as the gate's two constants, LUCK_LABEL_PREFIX / is_luck_label(), recorded_labels(), OWNER_INPUTS_LABEL / owner_failures(), sr_star(), recover_dsr(), dev_sharpe_variance(), dsr_at(), Gate / gate() / pending_gate(), Verdict / verdict(), best_dev_eligible() now judging on it, and the twice-guarded REEVALUATION_MARKER / Reevaluation / reevaluate_method() / reevaluate() behind the one new ('rejected','dev-eligible') transition
       npolicy.py            the luck gate's N policy (lab-luck-gate phase 1): POLICIES all-trials / methods / effective, DEFAULT_POLICY, correlation(), participation_ratio(), effective_n() -> NCount. Pure, reads only; `store.gate` is its one caller since lab-luck-gate phase 4
-      runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4). The luck test's N comes from store.pending_gate since lab-luck-gate phase 4; preflight() refuses a flat-cost variant from M0031 on (real_costs.real_cost_problem, Sean phase 7). Since lab-realistic-gate R2 both halves run on sim.contributions.OWNER_MONTHLY and record a trial_funding row: OWNER_SCHEDULE_TEXT, recorded_contributions(), Ran.funding, trial_rows(deposits=, schedule=)
+      runner.py             `lab run`: one committed method's variants on the dev window, into the database; git_head(); and the appended test-window half — Tested, resolve_candidate(), preflight_test(), test_trial_row(), run_test() (build-promotion-path phase 4). The luck test's N comes from store.pending_gate since lab-luck-gate phase 4; preflight() refuses a flat-cost variant from M0031 on (real_costs.real_cost_problem, Sean phase 7). Since lab-realistic-gate R2 both halves run on sim.contributions.OWNER_MONTHLY and record a trial_funding row: OWNER_SCHEDULE_TEXT, recorded_contributions(), Ran.funding, trial_rows(deposits=, schedule=). Since eodhd-survivorship-market phase 3 preflight_data() refuses a candidate declaring market_fields = ("series",) on a store with no market series
       prereg.py             the docs/lab/prereg/MNNNN.md pre-registration: Prereg, render()/parse(), require_committed(), check_digest(), check_source(), promote_method() (build-promotion-path phase 3); plus `folds` and `family_state`, the hard gate's record of what the method cleared, tolerated-absent on read so the four committed files still parse (lab-hard-gate phase 2)
       remeasure.py          `lab remeasure`: re-runs a recorded method's variants on the dev window, proves the re-run reproduces each trial's recorded Sharpe and DSR, and appends trial_moments rows -- Batch, Plan, Reproduced, Report, resolve_method(), batches_of(), preflight(), measure(), check(), remeasure(), format_report() (lab-luck-gate phase 3); plus the P7a seed path, resumable and chunk-invariant -- SEED_PREFIX, SEED_METRICS, METRIC_TOL, SeedTrial, SeedPlan, SeedReport, SeedVerdict, is_seed_id(), seed_var_trials(), seed_preflight(), observe(), run_chunk(), reproduce(), remeasure_seed(), seed_verdicts(), format_seed_report() (lab-luck-gate phase 9)
       real_costs.py         `lab costs` (Sean phase 7): REAL_COST_SINCE = 31, requires_real_cost(), real_cost_problem() (the M0031 rule runner.preflight raises); resolve_method(), pick_candidate(), twins(), Side, side_of(), Comparison, measure(), format_report(), insight_text(), journal(). Report only: writes one journal observation, never a trial; since trial-reproducibility the re-run starts at runner.recorded_capital
       name_count.py         `lab names` (GOTRADE_FEE_REBUILD phase 8): NS = (5, 10, 15, 20, 25, 30), ROSTER_NAMES = 20, BASE_VARIANT = "M0007-N20-RAW", MIN_NAMES/MAX_NAMES = 2/60; check_names(), owner_schedule(), check_schedule_support(), variants(), Point, money_weighted(), point_of(), Sweep (of/best/clean/at/agrees), measure(), format_report(), csv_rows(), write_csv(). Sweeps M0007-N20-RAW's `inner.top` at Gotrade's real fees on the owner's contribution schedule, scored money-weighted against a dollar-cost-averaged SPY. Report only, and writes nothing at all: no trial, no moments, no journal entry, no status
+      survivorship_check.py `lab survivorship` (eodhd-survivorship-market phase 4): resolve_method(), plan_method()/plan_methods() -> MethodPlan of Variant, peek_purpose(), check_stores(), load_checked(), Side/side_of(), run_store(), measure_store() -> StoreRun (one store alive at a time), compare() -> MethodReport of VariantRow, format_report(), summary_line(), insight_text(), journal(), csv_rows()/write_csv(); HIGH_COVERAGE = 2009-01-01..2015-10-16. Report only: one journal observation per method, never a trial
       walkforward.py        the lab's own walk-forward (walk-forward-evaluation phases 1-2): MIN_TRAIN_YEARS = 10, EVAL_YEARS = 3, MIN_EVAL_MONTHS = 12, Fold, Slice, FoldPick, folds(), measure(), pick(), evaluate(), Record (scored / won / majority / stable / summary()), BUY_CONDITIONS and buy_signal(). Pure: it slices curves the lab already recorded, runs no backtest and tunes nothing. **Not `backtest/walkforward.py`**, which is P3b's anchored walk-forward for Strategy A2 on the bracket engine
       hardgate.py           the hard gate `lab promote` refuses on (lab-hard-gate phase 1): MIN_FOLDS = 4, COIN_FLIP_NULL, trial_deposits(), Geometry/geometry(), fold_record() -> walkforward.Record, promoted_variant()/variant_record() scoring the variant `lab promote` would pre-register on its own curve (D11), fold_summary(), ingredients() reading `<MNNNN>` allocators out of `trials.config_text` (D12), failed_kin()/family_state() walking `family` ∪ transitive `parent_id` ancestors ∪ ingredients and their family ∪ ancestors, check() raising store.LabError, summary(). SQL plus arithmetic on recorded curves -- no research store, no backtest, no look
       seed.py               one-time import of the pre-lab record (P7a's 54 candidates); since trial-reproducibility writes a source='backfill' trial_provenance row per seed trial
@@ -165,8 +172,10 @@ engine/
       backtest_wf.py        `backtest_wf` command (P3b)
       backtest_b.py         `backtest_b` command (P6a)
       research_store.py     `research_store` command (P7a)
+      survivorship_store.py `survivorship_store` command: builds the survivorship-check store engine/.research-sv from the dev store plus the EODHD cache, offline (eodhd-survivorship-market phase 1); since phase 2 --resolve-aliases (offline), --fetch-aliases [--symbols] [--refetch] (network, <cache>/alias/ only), and --build offering accepted alias series by default (--no-aliases)
+      market_series.py      `market_series` command: reports, and with --refresh writes, market_series.csv from the EODHD market cache; no network (eodhd-survivorship-market phase 3)
       backtest_dev.py       `backtest_dev` command (P7a)
-      lab.py                `lab` command: the method lab (status / luck / show / run / promote / reevaluate / test / remeasure / costs / idea / note / insight / stage / export ...)
+      lab.py                `lab` command: the method lab (status / luck / show / run / promote / reevaluate / test / remeasure / costs / survivorship / idea / note / block / unblock / insight / stage / export ...)
       nightly.py            `nightly` command (P1; P4 adds dividends and held paper symbols)
       paper.py              `paper` command (P4)
       paper_check.py        `paper_check` command (P4)
@@ -177,9 +186,12 @@ engine/
       sean.py               `sean` command (Sean phase 4): `sean marks` fetches closes for the owner's symbols and rewrites sean_equity; `sean calibrate` (phase 7) checks the fee schedule against every stored order, read-only
   tests/                    pytest; DB tests need PG_TEST_URL
   data/spy_dividends.csv    SPY dividends (ex_date, amount_usd), vendored from yfinance (see data/SOURCES.md)
+  data/eodhd_alias_hints.csv hand-checked EODHD codes (symbol,code,note) for members whose history lives under another code; candidates only, read by survivorship_alias (see data/SOURCES.md; eodhd-survivorship-market phase 2)
   .cache/                   gitignored; bars-<max date>-<rows>.pkl and fundamentals-<max filed>-<rows>.pkl written by the backtest loader
   .research/                gitignored; the P7a research store, dev window: bars.csv, dividends.csv, fx.csv, unserved.csv, manifest.json (research_store), plus the optional fundamentals.csv (--with-fundamentals)
   .research-test/           gitignored; the P7b test-window store, the same files (research_store --test-window), its manifest declaring window_name/window_start/window_end; built on the first promotion and never before (build-promotion-path phase 2)
+  .research-sv/             gitignored; the survivorship-check store (survivorship_store --build): the dev store's files plus cleaned EODHD members, manifest marked purpose: survivorship-check, plus cleaning_report.csv, coverage_report.txt and (phase 2) alias_report.csv outside the manifest (carried unchanged by an optional-file refresh since phase 5). Vendor rows under a personal licence: never commit
+  .cache/eodhd/             gitignored; the EODHD cache (eod/, splits/, dividends/) survivorship_store reads; since phase 2 also alias/ (probe/<CODE>.json per candidate, <SYM>.json per accepted member), the only directory --fetch-aliases writes
 docs/backtests/             committed reports: <end>-strategy-a{.md,-equity.csv,-equity.svg} (P3); <end>-strategy-a2-walkforward{.md,-equity.csv,-equity.svg,-variants.svg,-grid.csv} (P3b); <end>-strategy-b-walkforward{.md,-equity.csv,-equity.svg} (P6a); <run date>-p7a-dev-exploration{.md,-rows.csv,-curves.csv,-frontier.svg} (P7a)
 docs/plans/                 <run date>-p7b-preregistration.md: the P7b finalists (or "none eligible"), written by backtest_dev (P7a)
 docs/lab/prereg/            committed pre-registrations, one MNNNN.md per promoted method, written by `lab promote`; README.md documents the format (build-promotion-path phase 3)
@@ -479,6 +491,98 @@ the first build of all still proceeds.
   manifest declares the other window (the content guard, which holds wherever that store lives),
   `--window-end` without `--test-window` or on a read-only mode, or `--coverage` with
   `--test-window`.
+
+### `survivorship_store` (eodhd-survivorship-market phase 1, P1-ENG-8X1K)
+
+```
+python -m seer_engine survivorship_store [--build | --report] [--out DIR] [--source DIR] [--cache DIR] [--no-aliases]
+python -m seer_engine survivorship_store --resolve-aliases [--symbols A,B]
+python -m seer_engine survivorship_store --fetch-aliases [--symbols A,B] [--refetch]
+```
+
+Builds the **survivorship-check store**: a dev-window store that answers how much the dev store's
+missing delisted companies flatter a recorded result. **No network, no Neon**: it reads the dev
+store and the local EODHD cache only.
+
+- **No flag** cleans every cached series and prints the coverage report; it writes nothing.
+  **`--build`** writes the store at `--out`; **`--report`** prints the two reports of the store
+  already there.
+- **`--out`** defaults to `research.SV_STORE_DIR` (`engine/.research-sv`, gitignored). It must not
+  be the source, a symlink, or the dev or test store's directory. **`--source`** defaults to the dev
+  store (`engine/.research`), read only and verified with `research.load_store` first; a source that
+  is itself a survivorship-check store is refused. **`--cache`** defaults to `engine/.cache/eodhd`
+  (`eod/`, `splits/`, `dividends/`).
+- **What it writes**, built in `<out>.tmp` and swapped in whole: `bars.csv` / `dividends.csv` with
+  the source's lines byte for byte and the added symbols' lines at their sorted place; `fx.csv` and
+  every optional file copied and sha-checked; `unserved.csv` (members still without a bar, with the
+  cleaning's reason); `dividend_announcements.csv` re-matched over the merged dividends; and a
+  manifest sealed for the dev window with `"purpose": "survivorship-check"`, so its **price
+  fingerprint is its own**. The built store is loaded once more before the swap. The dev store is
+  never written and stays byte-identical.
+- **Reports, inside the store but outside the manifest** (the loader ignores unlisted files, so they
+  never touch the fingerprint): `cleaning_report.csv`, one row per cached symbol the dev store
+  could not serve, with its action (`kept` / `repaired` / `trimmed` / `dropped`), reason and counts;
+  and `coverage_report.txt`, member-days per year before and after, plus the members still missing.
+- **Measured on the real cache** (2026-10-10): member-day coverage 58.6% -> 81.3%; 187 kept,
+  73 repaired, 62 trimmed, 200 dropped; 239 members still missing.
+- **Alias fill** (phase 2, P1-ENG-SLCU; see `survivorship_alias` under Exported API). For the
+  members whose cached series is unusable under their store symbol:
+  - **`--resolve-aliases`** is offline: per member, the candidate codes, which one fits, and why.
+  - **`--fetch-aliases`** is the command's **only network path** (`EODHD_API_TOKEN`; in a worktree
+    via `SEER_ENV_FILE`). Resumable: codes already probed are skipped unless **`--refetch`**. It
+    writes under `<cache>/alias/` only (`probe/<CODE>.json`, `<SYM>.json`); `eod/`, `splits/` and
+    `dividends/` are only read. The global `--dry-run` fetches and writes nothing.
+  - **`--symbols A,B`** limits either mode to those members; one that already has a usable series
+    is refused.
+  - **`--build`** (and the no-flag report) offers the accepted alias series to `plan_build` as
+    `extra_sources` by default, re-resolved from the cached probes so only a code that is still the
+    resolver's choice is used; each is cleaned like any other series and `best_of` keeps whichever
+    covers more member days. It writes **`alias_report.csv`** beside the other reports (outside the
+    manifest), and an alias-filled symbol carries source `eodhd-alias` in `cleaning_report.csv`.
+    **`--no-aliases`** gives phase 1's build alone; a cache without EODHD's symbol lists skips the
+    fill with a warning.
+  - **Measured** (2026-10-10): 128 of 200 filled; member-day coverage 81.3% -> 89.0%; members still
+    missing 239 -> 111; SV price fingerprint `60adae1b…` (was `bc5ba895…`).
+- **The store is report-only.** `lab run`, `lab test` and `lab remeasure` refuse it (exit 2) before
+  any trial row is written; see `research.PURPOSE_KEY` under Exported API.
+- **Exit codes:** 0 ok; 2 refused (paths, a source that does not verify or is itself a
+  survivorship-check store, or, for `--report`, a store at `--out` that is not one; for the alias
+  modes, no token, a missing input, or a `--symbols` member that already has a usable series);
+  1 when `--fetch-aliases` failed for some members (the rest are cached).
+- Tests: `tests/test_survivorship_store.py` (37), `tests/test_survivorship_alias.py` (22).
+
+### `market_series` (eodhd-survivorship-market phase 3, P1-ENG-9L1M)
+
+```
+python -m seer_engine [--dry-run] market_series [--refresh] [--store DIR] [--cache DIR]
+```
+
+Reports the market-wide daily series cached from EODHD and, with `--refresh`, writes them into a
+research store as `market_series.csv`. **Cache only**: it reads `engine/.cache/eodhd/market/<TICKER>.json`
+(gitignored; the licence is personal, so raw rows never enter git or `web/`), needs no token and
+never fetches a missing file.
+
+- **Sources** (`SOURCES`, in `research.MARKET_SERIES_NAMES` order, pinned equal by a test):
+  `VIX`, `VIX9D`, `VXN`, `VVIX` the close in index points; `VIX3M` from `VIX3M.INDX` wherever it
+  has a close, else `VXV.INDX` (its name until 2007-11-13); `T13W` the `IRX.INDX` close, already
+  a yield in percent; `T5Y` / `T10Y` / `T30Y` the `FVX` / `TNX` / `TYX` close **divided by 10**
+  (TNX 65.48 on 2000-01-03 is a 6.548% ten-year yield); `GOLD` the `XAUUSD.FOREX` close in USD/oz.
+- **Rows dropped and counted**: dated before `research.STORE_START` or after the store's window
+  end, on a day that was not an NYSE session (bond and FX markets publish on some stock-market
+  holidays), or with no close.
+- **The report** prints one coverage row per series (unit, rows, first/last date, member-day
+  share, off-session / outside / no-close counts, rows per source ticker) and, for a spliced
+  series, how often the two tickers agree on the sessions both have.
+- **`--store`** defaults to `research.STORE_DIR`; the window is the one the store declares
+  (`research.declared_window`). **`--refresh`** writes through `research.refresh_market_series`:
+  every other store file is carried over byte for byte and the directory is swapped in whole, so
+  the **price fingerprint does not move** — the command prints both fingerprints and exits 2 if
+  the price fingerprint changed. The global `--dry-run` prints what it would write and writes
+  nothing.
+- **Exit codes:** 0 ok; 2 the store's manifest is missing or unreadable, a cache file is missing
+  or unreadable, a series has no row in the window (on `--refresh`), or the refresh was refused.
+- A full `build_store` does not write the file; re-run `market_series --refresh` after a rebuild.
+- Tests: `tests/test_market_series.py` (49 collected).
 
 ### `backtest_dev` (P7a)
 
@@ -1136,6 +1240,54 @@ answer.
   run at Gotrade's real fees — and that method pays its trials like any other.
 - Tests: `tests/test_lab_name_count.py` (19).
 
+### `lab unblock` (eodhd-survivorship-market phase 3)
+
+```
+python -m seer_engine lab unblock MNNNN --note "what arrived and how much of the dev window it covers"
+```
+
+The command for the `blocked-data -> idea` edge `store.TRANSITIONS` already allowed ("the missing
+data arrived"), the counterpart of `lab block`. It refuses (`store.LabError`, exit 2) an empty
+note, an unknown method and a method that is not `blocked-data`. Otherwise, in one transaction, it
+appends `Unblocked: the missing data arrived. <note>` plus what the method was blocked on to the
+analysis (`store.append_analysis`), then sets the status to `idea` and clears `blocked_on`, so the
+analysis is the only place that history survives. Tests: `tests/test_lab_unblock.py` (3).
+
+### `lab survivorship` (eodhd-survivorship-market phase 4, P1-ENG-AMKN)
+
+```
+python -m seer_engine lab survivorship M0069 [M0007 ...] [--store DIR] [--sv-store DIR] [--csv PATH] [--no-journal]
+```
+
+Answers, per method, how much the companies the dev store never priced flattered the recorded
+result. For each named method, every variant with a recorded dev trial still in the method file is
+re-run through `dev.run_registry` at `runner.recorded_capital` and `runner.recorded_contributions`,
+first on the dev store (`--store`, default `engine/.research`), then on the survivorship-check
+store (`--sv-store`, default `engine/.research-sv`). `measure_store` loads one store, keeps only
+small `Side` records and frees it before the next loads: the two are never in memory together. The
+dev re-run must reproduce the recorded trial. Per variant it prints, dev beside survivorship-check:
+yearly return vs SPY, max DD, PF, trades, Sharpe / T / skew / kurtosis and DSR at the recorded N,
+the 2009-2015 era edge (`HIGH_COVERAGE`) and the walk-forward folds, then a one-line summary per
+method (best recorded variant by MAR). `--csv` writes the rows.
+
+- **Report only.** No `trials`, `trial_moments`, `trial_funding` or `trial_provenance` row, no status,
+  no pre-registration, so `store.dev_trial_count` (N) and `store.test_looks` cannot move and a
+  survivorship-check result can never become a dev trial of the original method (the hard gate
+  refuses mixed price fingerprints anyway). Unless `--no-journal`, one plain-words `observation` per
+  method (`insight_text`, `journal`).
+- **Refusals** (`store.LabError`, exit 2), all before any store loads where they can be: an unknown
+  or unrun method, a `--store` whose manifest declares a purpose, a `--sv-store` not marked
+  `survivorship-check`, the same store twice; `load_checked` re-checks the loaded
+  `ResearchData.purpose` and `research.load_store` refuses a test-window store.
+- Smoke run on M0069: 4 of 5 variants earn less a year on the survivorship-check store (e.g.
+  M0069-L60-N20-T +9.8% -> +8.5% a year, max DD 33.8% -> 39.1%).
+- **Full run** (phase 5, P1-ENG-STM7, 2026-10-10): 22 methods, 102 variants; every dev re-run
+  reproduced its recorded trial; mean funded CAGR -0.5 pt/yr on the survivorship-check store; variants
+  beating SPY 77 -> 72; 11 variants crossed the 20% drawdown bar; N (276) and test looks (4)
+  unchanged. Results, method and coverage table in `docs/lab/survivorship/` (`README.md`,
+  `insight.md`, `grid.csv` from `--csv`).
+- Tests: `tests/test_lab_survivorship.py` (16).
+
 ### `sean marks` (Sean phase 4)
 
 ```
@@ -1568,6 +1720,18 @@ the database.
   field order. The panel is deliberately **independent of `history`**: a symbol may have facts and
   no bars (a delisted ever-member) or bars and no facts (every ETF), and nothing cross-checks the
   two. `__post_init__` type-checks it like the other fields.
+  **`series`** (eodhd-survivorship-market phase 3) is a `MarketSeries`: market-wide daily series by
+  name (`VIX`, `VIX3M`, `VIX9D`, `VVIX`, `VXN`, `T13W`, `T5Y`, `T10Y`, `T30Y`, `GOLD`), each
+  `(date, float)` strictly ascending and finite, in the unit an allocator reasons in (the VIX family
+  in points, yields in percent, gold in USD/oz). Every read takes the allocator's `data_date` and
+  sees only rows dated on or before it: `value_on(name, data_date)` is the **latest** value on or
+  before it (a Treasury index has no close on Columbus Day; the last published yield is what a
+  trader knew), `upto(name, data_date, *, last=None)` the rows up to it (the final `last` only),
+  `names()` the non-empty series, `first_date(name)`. It defaults to `EMPTY_SERIES` (one shared
+  instance); only `research.load_store` fills it, from `market_series.csv`, and
+  `with_series(series) -> Market` attaches one. An allocator that reads it declares
+  `market_fields = ("series",)`, and `lab.runner.preflight_data` refuses such a method on a store
+  whose `len(market.series) == 0` before anything is spent.
 - **`backtest.runner`**: `INITIAL_IDR = Decimal("10000000")` — the owner's real Gotrade capital, the
   same number `paper.capital.PAPER_INITIAL_IDR` holds. It was 20,000,000 while every simulated fee
   was a flat percentage, where only ratios matter; Gotrade's measured schedule has a $0.10
@@ -2227,7 +2391,8 @@ parameter builds, loads and refreshes exactly what it did before.
     sector SPDRs);
   - `SECTOR_ETFS`, equal to `backtest.registry.SECTOR_ETFS` (tested).
   - `DATA_FILES` (the four required files) and, since edgar-fundamentals,
-    `OPTIONAL_DATA_FILES = (FUNDAMENTALS_FILE,)`. `fundamentals.csv` is in the **optional** tuple,
+    `OPTIONAL_DATA_FILES` (now `(FUNDAMENTALS_FILE, ANNOUNCEMENTS_FILE, MARKET_SERIES_FILE)`; the
+    third added by eodhd-survivorship-market phase 3, see "Market series" below). `fundamentals.csv` is in the **optional** tuple,
     never a fifth required file: `_read_manifest` requires `DATA_FILES` and *permits* the optional
     ones, and the fingerprint is the sha256 of the sorted `name:sha` lines of the files that were
     actually written. So a store built before this phase keeps loading with a **bit-identical
@@ -2379,6 +2544,100 @@ go to zero** — +0.73 (RMW-FR), +3.69 (RAW-FR), +2.30 (MOM-FR) and +0.11 (MVW-F
 not carry: at the pessimistic 5.091%/yr rate MVW-FR's break-even lands on the scale at **-85.8%**
 and RMW-FR sits at +0.01 pts/yr, so for those two the conclusion rests on the measured rate; and
 the injected death is abrupt, which makes the whole result an **upper bound** on the damage.
+
+**The purpose marker** (eodhd-survivorship-market phase 1). `PURPOSE_KEY = "purpose"`,
+`SURVIVORSHIP_PURPOSE = "survivorship-check"` and `PURPOSES` (that one value) name what a store that
+is **not** for recording trials is for; `SV_STORE_DIR` is `engine/.research-sv`. The key is optional,
+sits outside both `MANIFEST_KEYS` and `OPTIONAL_MANIFEST_KEYS`, and is not hashed, so the dev and
+test manifests are unchanged and their fingerprints cannot move. `_seal(..., purpose=)` writes it
+only when given (ValueError on an unknown value); `build_store` never passes it. `_read_manifest`
+accepts it beside either manifest shape and rejects an unknown value; `_refresh_optional` carries
+it, so a refreshed survivorship-check store stays marked. Since phase 5 (P1-ENG-STM7)
+`_refresh_optional` also carries every regular file in the store that is not `manifest.json`, a
+`DATA_FILES` entry or an `OPTIONAL_DATA_FILES` entry — the survivorship-check store's
+`cleaning_report.csv`, `coverage_report.txt` and `alias_report.csv` — copied unchanged and still
+unlisted, so they never touch either fingerprint; before, the rebuild kept manifest-listed files
+only, and phase 5's real run showed a refresh of `engine/.research-sv` deleted them (regression test
+`test_refresh_carries_the_side_reports_outside_the_manifest` in `tests/test_market_series.py`).
+`load_store` surfaces it as
+`ResearchData.purpose` (None for an ordinary store), and `declared_purpose(store_dir)` reads it from
+the manifest alone, without a full load. The refusal lives in `lab/runner.py`:
+`survivorship_refusal(what, purpose)` builds the one `store.LabError` every trial-writing path gives,
+and `refuse_survivorship_store(data, what)` raises it when `data.purpose` is set (via `getattr`, so
+a hand-built fixture without the field is an ordinary store). It is the first statement of
+`runner.run_method`, `runner.run_test`, `remeasure.measure`, `remeasure.remeasure` and
+`remeasure.remeasure_seed`, and `commands/lab.py`'s `_run` asks `declared_purpose` before it even
+discovers the method — so a marked store exits 2 with nothing ran and nothing written.
+
+**Market series** (eodhd-survivorship-market phase 3). `MARKET_SERIES_FILE = "market_series.csv"`,
+`MARKET_SERIES_HEADER = "series,date,value"`, and `MARKET_SERIES_NAMES` (the ten names, sorted; the
+only ones the file may hold). The file is the third `OPTIONAL_DATA_FILES` entry and never in
+`DATA_FILES`, so `price_fingerprint_of` (which hashes `DATA_FILES` alone) does not move when a store
+gains it, and a store without it loads exactly as before. `market_series_lines(rows, *, end=DEV_END)`
+turns `(series, date, Decimal)` rows into deterministic, sorted lines (normalized decimals) and
+raises on an unknown series, a date after `end` (D9) or before `STORE_START`, a non-finite value or
+a repeated `(series, date)`. `refresh_market_series(store_dir, rows, *, data_dir=None,
+window=DEV_WINDOW)` rewrites the file through `_refresh_optional`, the same discipline as
+`refresh_announcements`: rows checked first, every other file carried over byte for byte, the
+store verified and swapped in whole. The private reader is as strict as the others and also refuses
+any CR byte itself (read_text's universal newlines would hide a CRLF from the shared `_data_lines`);
+values may be zero or negative, never NaN or infinite. `load_store` builds `Market.series` from it
+when the manifest lists it, else `EMPTY_SERIES`. `build_store` never writes it.
+
+### survivorship (eodhd-survivorship-market phase 1)
+
+`seer_engine.survivorship` is pure apart from `read_series(cache, symbol)`, which reads one
+symbol's cached EODHD answers and nothing else. `commands/survivorship_store.py` is its impure edge.
+It turns raw EODHD history into bars in the dev store's conventions (split-adjusted, not
+dividend-adjusted, 4 dp, integer volume).
+
+- **Types:** `RawBar`, `Split`, `RawDividend`, `SourceSeries` (source-agnostic, the seam for a
+  second source), `CleanBar`, `Cleaned` (the bars, dividends, `action` and reason), `YearCoverage`.
+  Actions: `KEPT`, `REPAIRED`, `TRIMMED`, `DROPPED`.
+- **`clean_symbol(series, member_days, sessions)`** runs the rules in order, each a named,
+  calibrated constant: drop invalid and zero-volume filler rows; apply a listed split only when the
+  raw close actually fell by its ratio (EODHD's "raw" sometimes already carries it); clip to the dev
+  window's NYSE sessions; cut the series at holes over `HOLE_SESSIONS` and **trim** segments wholly
+  outside the membership span (a reused ticker spliced on, e.g. CTX, BSC), **dropping** a symbol with
+  no segment inside it; end `TAIL_GRACE_SESSIONS` after the last member session; split-adjust;
+  rescale unlisted scale breaks (open, close and inverse volume all agree); remove short spikes;
+  rescale wrong-scale islands; then judge each remaining move beyond `JUMP`. A move with a volume
+  surge, or a fall near the end of membership or of the series, is **genuine and kept** (ENRNQ,
+  WAMUQ, CVH: removing a collapse would bring the bias back); any other is a vendor error,
+  **repaired** by rescaling the rows before it or cut when outside the span. More than
+  `ABSURD_MAX_MOVES` suspect or genuine moves inside the span **drops** the symbol. Finally bars the
+  loader would refuse are fixed or removed, and dividends (USD, clipped to the kept bars, refused
+  above `MAX_DIVIDEND_YIELD`) are attached.
+- **`best_of(candidates)`** picks, among several cleaned candidates for one symbol, the one
+  covering the most member days. `member_sessions()` and `coverage_by_year()` do the coverage
+  arithmetic (member-days served per year, before and after); `bar_line`, `amount_text` and
+  `merge_sorted_lines` write the store's lines in the dev store's format.
+
+### survivorship_alias (eodhd-survivorship-market phase 2)
+
+`seer_engine.survivorship_alias` finds the EODHD code an index member with no usable series traded
+under. Offline apart from `fetch`, which goes through an injected `eodhd.Client`-like object.
+
+- **Candidates:** `load_listings` / `load_sources(cache_root, data_dir)` read
+  `symbols-US-delisted.json` / `symbols-US-live.json` from the cache, `ticker_cik.csv`,
+  `ticker_aliases.csv` and `data/eodhd_alias_hints.csv`. `candidates(symbol, sources)` returns up
+  to `MAX_CANDIDATES` codes in `MATCH_ORDER` (`hint`, `name`, `alias`, `class`, `bankruptcy`,
+  `code-variant`), skipping `SKIP_TYPES` listings and never the store symbol's own code.
+- **Acceptance:** `choose` / `resolve(members, sources=, alias_dir=, by_symbol=, clean=)` give one
+  `Resolution` (`symbol`, `code`, `name`, `matched_by`, `accepted`, `reason`) per member. A
+  candidate fits when its series has at least `MIN_MEMBER_ROWS` rows on the member's index days and
+  `phase1_clean` (phase 1's `clean_symbol`) does not drop it. Two fits that are different series
+  (`same_series`: closes within `SAME_CLOSE_TOL` on `SAME_SERIES_SHARE` of shared days) are
+  "ambiguous" and resolve to none, unless exactly one came by hint or name (`NAMED`).
+- **Cache:** `fetch(client, alias_dir, members, ...) -> FetchStats` writes `probe/<CODE>.json` per
+  candidate and `<SYM>.json` per accepted member under `<cache>/alias/` (`ALIAS_DIR`, `PROBE_DIR`)
+  and nothing else. `targets` lists the members still without a usable series.
+- **Into the build:** `alias_sources(alias_dir, resolutions)` turns accepted alias files into
+  `survivorship.SourceSeries` with source `ALIAS_SOURCE = "eodhd-alias"`; `report_rows` /
+  `report_text` produce `alias_report.csv` (`REPORT_HEADER`).
+- **`eodhd` additions:** `exchange_code(code)` (a symbol-list code verbatim plus `.US`, case kept:
+  `DELL_old` -> `DELL_old.US`), and `Client.eod`, `Client.splits`, `Client.dividends_by_code`,
+  which take such a code and return None on 404.
 
 ### backtest book runner (P7a)
 
@@ -3292,6 +3551,7 @@ re-reads the orders and replaces `sean_equity` whole. In `nightly.yml` it is the
 - `paper.book` and `paper.replay` (phase 6) also import `MarketAware` and `prepare_for` from `strategies.allocator`; `paper.roster` imports `strategies.f_fundamental` (`FUNDAMENTAL`, `FundamentalParams`) and still never imports `lab.methods.*` — the lab must not become an input to a paper spec digest.
 - `sean.ledger` (Sean phase 1) imports only the standard library (`bisect`, `decimal`, `zoneinfo`). `sean.marks` imports `yahoo` and psycopg. `sean.equity` imports `dates`, `sean.ledger` and psycopg. `commands.sean` (phase 4) imports `dates`, `db`, `sean.equity`, `sean.marks` and (phase 7) `sean.calibrate`. `sean.calibrate` imports `sim.costs` only, which is the one `sim` edge from `sean`. Nothing else in the engine imports `sean`, and `sean` imports no `paper`, `lab` or `strategies` module.
 - `lab.real_costs` (Sean phase 7) imports `research`, `backtest.dev`, `backtest.metrics` (formatters), `lab.store`, `lab.method` and `sim.rules`. `lab.runner` imports `lab.real_costs.real_cost_problem` at module scope. `commands.lab`'s `costs` handler uses `real_costs`, `research`, `backtest.dev` and `lab.store`.
+- `survivorship` (eodhd-survivorship-market phase 1) imports numpy, `research` (window constants and the store's line formats), `bars` (`to_volume`), `prices` (`to_decimal`) and `yahoo` (`DIVIDEND_QUANTUM`); never `lab`, `db` or `http`, and it makes no network call. `commands.survivorship_store` imports numpy, `config`, `dates`, `research`, `survivorship`, `dividend_announcements` and `commands.dividend_announcements` (`read_cache`); since phase 2 also `survivorship_alias`, `eodhd` and `membership`. `survivorship_alias` imports `dates`, `eodhd`, `research`, `survivorship` and `backtest.market` (`Membership`); never `lab` or `db`, and its one network call is through the client it is handed. `lab.remeasure` imports `refuse_survivorship_store` from `lab.runner`. Phase 3: `commands.market_series` imports `config`, `dates`, `research` and `backtest.window` (`Window`) only; no `http`, `db` or `lab`, and no network call. `research` imports `MarketSeries` and `EMPTY_SERIES` from `backtest.market`.
 ### Standard library
 `argparse`, `importlib`/`pkgutil` (command discovery), `logging`, `contextlib`, `dataclasses`, `decimal`, `functools.lru_cache`, `re`, `time`.
 
@@ -3652,6 +3912,7 @@ engine/.venv/bin/python -m seer_engine lab costs M0022
 - **Rebuild a `Market` with `dataclasses.replace`, never `Market(history=..., membership=..., fx=...)`.** Every windowing site that re-listed the fields by hand (`paper.replay.expected_bracket`, `commands.paper.night_view`, `backtest.dev`'s FX-window copy) now uses `replace`, so a new field such as `fundamentals` is carried over instead of being silently dropped back to the empty panel. Use `market.with_fundamentals(panel)` to attach one.
 - **`prepare_market` must not be added to the `Allocator` protocol.** `Allocator` is `runtime_checkable` and several production sites test `isinstance(x, Allocator)`; adding a member — even one with a default body — makes every structural implementer fail the check. Implement `strategies.allocator.MarketAware` alongside it and let `prepare_for(obj, market)` dispatch.
 - **Fundamentals are optional everywhere they are read.** A database with no `fundamental_facts` / `ticker_cik` (or no rows) loads to `EMPTY_FUNDAMENTALS`, and a research store built before the panel existed loads with a bit-identical fingerprint. Never make either an error: the backtest must stay runnable on a database that has not applied `005_fundamentals.sql`.
+- **The survivorship-check store is never a trial source.** `engine/.research-sv` loads exactly like a dev store (same window, same readers); only its manifest's `purpose` key tells them apart, and `lab run` / `lab test` / `lab remeasure` refuse it on that key. Never strip the key, never point a recording command at it, and never commit it (EODHD rows are licensed to the owner personally).
 
 ## Notes
 

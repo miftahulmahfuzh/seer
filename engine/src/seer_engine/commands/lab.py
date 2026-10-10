@@ -58,9 +58,18 @@
                                     fees (sim/costs.py, measured from the owner's receipts), print
                                     both and journal the difference as an observation. No trial
                                     row, no moments, no status change: N and the looks do not move
+    lab survivorship M0069 [M0007 ...] [--store DIR] [--sv-store DIR] [--csv PATH] [--no-journal]
+                                    report only: re-run every recorded dev variant of each method
+                                    at its recorded capital and funding on the dev store and on
+                                    the survivorship-check store (engine/.research-sv), side by
+                                    side; journal one observation per method. No trial row, no
+                                    moments, no status change: N and the looks do not move
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
+    lab unblock M0007 --note "..."         the missing data arrived: blocked-data -> idea, the
+                                           note (what arrived, how much of the window it covers)
+                                           appended to the analysis
     lab drop M0007 --why "..."             an idea dropped before running
     lab seen KEY [--method M] [--note N] | lab seen --find TEXT
     lab insight --kind K --title T (--body B | --file F) [--method M]   the lab journal
@@ -326,6 +335,40 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s.add_argument("--min-train-years", type=int, default=None, metavar="N")
     s.add_argument("--eval-years", type=int, default=None, metavar="N")
 
+    s = sub.add_parser(
+        "survivorship",
+        help="report only: recorded methods re-run on the survivorship-check store beside the dev store",
+        description=(
+            "Re-run every recorded dev variant of each named method at its recorded capital and "
+            "funding, first on the dev store and then on the survivorship-check store (the dev "
+            "store plus the bars of members it could not price), never holding both in memory. "
+            "Prints them side by side: yearly return against SPY in the same measure, max "
+            "drawdown, profit factor, trades, the DSR inputs at the recorded N and var_trials, "
+            "the 2009-2015 lead over SPY and the walk-forward record. Records no trial, no "
+            "moments, no funding and no status, so the lab's N and the test-window looks do not "
+            "move; one plain-words observation per method is journaled unless --no-journal."
+        ),
+    )
+    s.add_argument("method", nargs="+", metavar="M0069", help="the methods to re-run")
+    s.add_argument(
+        "--store",
+        type=Path,
+        default=Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR),
+        help=f"the dev store the trials were recorded on (default: {research.STORE_DIR}, or "
+             "$SEER_RESEARCH_STORE); a store with a purpose marker or a test window is refused",
+    )
+    s.add_argument(
+        "--sv-store",
+        type=Path,
+        default=research.SV_STORE_DIR,
+        help=f"the survivorship-check store (default: {research.SV_STORE_DIR}); refused unless "
+             "its manifest says purpose survivorship-check",
+    )
+    s.add_argument("--no-journal", action="store_true",
+                   help="print the report and write nothing at all, not even the observation")
+    s.add_argument("--csv", type=Path, default=None, metavar="PATH",
+                   help="also write the full grid (variant x store) to PATH as CSV, full precision")
+
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
     s.add_argument("--family", required=True)
@@ -342,6 +385,10 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s = sub.add_parser("block", help="mark an idea blocked on missing data")
     s.add_argument("method")
     s.add_argument("--on", required=True)
+    s = sub.add_parser("unblock", help="the missing data arrived: move a blocked idea back to idea")
+    s.add_argument("method")
+    s.add_argument("--note", required=True,
+                   help="what arrived and how much of the dev window it covers (appended to the analysis)")
 
     s = sub.add_parser("drop", help="drop an idea before it runs")
     s.add_argument("method")
@@ -1256,6 +1303,14 @@ def _run(conn, args) -> int:
     from seer_engine.lab import hardgate, runner
     from seer_engine.lab.method import discover
 
+    # A survivorship-check store says so in its manifest; refuse it before discovering the method
+    # or paying for a full load. runner.run_method refuses it again on the loaded data.
+    try:
+        purpose = research.declared_purpose(Path(args.store))
+    except ValueError:
+        purpose = None  # missing or unreadable: research.load_store below names the problem
+    if purpose is not None:
+        raise runner.survivorship_refusal(f"lab run {args.method}", purpose)
     methods = discover()
     if args.method not in methods:
         raise store.LabError(f"no method file for {args.method} in seer_engine/lab/methods/")
@@ -2090,6 +2145,57 @@ def _walkforward(conn, args) -> int:
     return 0
 
 
+def _survivorship(conn, args) -> int:
+    """``lab survivorship M0069 [M0007 ...]``: recorded methods on the survivorship-check store.
+
+    Report only. Every refusal that needs no bars -- method ids, files, recorded trials, capital,
+    funding, the benchmark geometry, the two stores' manifest purpose -- is made before either
+    store loads. The dev store is loaded, run and freed before the survivorship-check store is
+    loaded. Nothing is written except one observation per method (none with --no-journal); N and
+    the test-window looks are printed before and after so the invariant is visible.
+    """
+    from seer_engine.lab import hardgate
+    from seer_engine.lab import survivorship_check as svc
+
+    if research.DEV_END != dev.DEV_END:
+        raise store.LabError("research.DEV_END differs from dev.DEV_END; refusing to run")
+    dev_dir, sv_dir = Path(args.store), Path(args.sv_store)
+    plans = svc.plan_methods(conn, args.method)
+    geo = hardgate.geometry(conn)
+    svc.check_stores(dev_dir, sv_dir)
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+    t0 = time.perf_counter()
+    dev_run = svc.measure_store(conn, plans, dev_dir, survivorship=False, bench=geo.bench)
+    sv_run = svc.measure_store(conn, plans, sv_dir, survivorship=True, bench=geo.bench)
+    reports = svc.compare(plans, dev_run, sv_run, geo)
+    for rep in reports:
+        print(svc.format_report(rep, dev_run, sv_run, len(geo.folds)))
+        print()
+    print("summary (best recorded variant by MAR; dev -> survivorship-check):")
+    for rep in reports:
+        print(f"  {svc.summary_line(rep)}")
+    if args.csv is not None:
+        written = svc.write_csv(reports, dev_run, sv_run, Path(args.csv))
+        print(f"\ngrid written to {written}")
+    if args.no_journal:
+        tail = "No journal entry (--no-journal), so `lab stage` is not needed."
+    else:
+        with conn:
+            entries = [svc.journal(conn, rep) for rep in reports]
+        tail = (
+            f"journal entries {', '.join(f'#{e}' for e in entries)} written (one observation per "
+            f"method). Solo: `python -m seer_engine lab stage` so seertrade.site/sera shows them."
+        )
+    print(
+        f"\nNo trial was recorded. Lab N (dev trials): {n_before} before, "
+        f"{store.dev_trial_count(conn)} after; test-window looks used: {looks_before} before, "
+        f"{store.test_looks(conn)} after. {tail}"
+    )
+    log.info("lab survivorship: %d method(s) done (%.1fs)", len(reports), time.perf_counter() - t0)
+    return 0
+
+
 def _idea(conn, args) -> int:
     store.begin_immediate(conn)  # the next id and its insert, atomic against parallel sessions
     with conn:
@@ -2116,6 +2222,34 @@ def _note(conn, args) -> int:
 def _block(conn, args) -> int:
     with conn:
         store.update_method(conn, args.method, status="blocked-data", blocked_on=args.on.strip())
+    return 0
+
+
+def _unblock(conn, args) -> int:
+    """``blocked-data -> idea`` (``store.TRANSITIONS``: "the missing data arrived").
+
+    The note is appended to the method's analysis with ``store.append_analysis``, the way
+    ``lab note`` records one, together with what the method was blocked on. ``blocked_on`` is
+    then cleared, so the analysis is the only place that history survives.
+    """
+    note = args.note.strip()
+    if not note:
+        raise store.LabError("give --note: what data arrived and how much of the dev window it covers")
+    row = store.get_method(conn, args.method)
+    if row is None:
+        raise store.LabError(f"no method {args.method}")
+    if row["status"] != "blocked-data":
+        raise store.LabError(
+            f"{args.method} is {row['status']}, not blocked-data; only an idea blocked on data "
+            "can be unblocked"
+        )
+    text = f"Unblocked: the missing data arrived. {note}"
+    if row["blocked_on"]:
+        text += f"\n\nIt was blocked on: {row['blocked_on']}"
+    with conn:
+        store.append_analysis(conn, args.method, text)
+        store.update_method(conn, args.method, status="idea", blocked_on="")
+    print(f"{args.method}: blocked-data -> idea")
     return 0
 
 
@@ -2213,9 +2347,11 @@ _HANDLERS = {
     "remeasure": _remeasure,
     "costs": _costs,
     "names": _names,
+    "survivorship": _survivorship,
     "idea": _idea,
     "note": _note,
     "block": _block,
+    "unblock": _unblock,
     "drop": _drop,
     "seen": _seen,
     "insight": _insight,

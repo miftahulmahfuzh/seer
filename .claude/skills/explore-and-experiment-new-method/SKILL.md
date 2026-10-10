@@ -66,7 +66,12 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    - `lab seen --find <words>`. If it was already explored, pick another idea or make a real variation.
    - **Testable?** The store has daily OHLCV for 1993 → 2015-10-16 (~539 stocks plus ETFs,
      no delisted names), cash dividends, and point-in-time S&P 500 / Nasdaq-100 membership. No
-     fundamentals, intraday, options, short interest or sentiment. If it isn't testable:
+     fundamentals, intraday, options, short interest or sentiment. Market-wide daily series are
+     there too, read point in time through `Market.series` (`value_on(name, data_date)`,
+     `upto(name, data_date, last=K)`): VIX, VIX3M (VXV before 2007-11-13), VIX9D, VXN, VVIX in
+     index points; T13W, T5Y, T10Y, T30Y Treasury yields in percent; GOLD in USD/oz. An allocator
+     that reads them declares `market_fields = ("series",)`, so `lab run` refuses it on a store
+     without them. If it isn't testable:
      `lab block <id> --on "<data>"` plus a `data-wish` insight. Solo: choose another idea.
      Child: report `blocked`.
    - **Executable?** Gotrade means long only and the regular session. Limit orders take
@@ -222,7 +227,7 @@ Then:
 0b. **Durability check, and the one moment buying data is worth it.** A twenty-year average hides
    a regime, and this lab has the scar: four of four test-window looks have failed on
    `beats SPY TR`, and all four roster strategies lost to a deposit-matched SPY over 2018-2026
-   (insight 58). Before spending a look, run all three. Every one is report only -- no trial, no
+   (insight 58). Before spending a look, run all four. Every one is report only -- no trial, no
    look, N unchanged:
 
    - `lab regime MNNNN` -- narrow versus broad markets. Read it knowing it does **not**
@@ -235,6 +240,29 @@ Then:
      whose edge lives in the low-coverage years and vanishes by 2009-2015 may be reading a hole in
      the data rather than the market.** Three of the four roster strategies were already negative
      in 2009-2015, on dev, years before the test window said so.
+   - `lab survivorship MNNNN` -- the same method re-run on the **survivorship-check store**
+     (`engine/.research-sv`): the dev store plus EODHD prices for most of the members the dev
+     store cannot price, dead companies included (real collapses kept, data errors cleaned). It
+     re-runs every variant with a recorded dev trial, at its recorded capital and funding, on both
+     stores and prints them side by side: funded CAGR vs SPY, max DD, PF, the DSR inputs, the
+     2009-2015 era and the walk-forward folds. Report only: no trial, no look, N unchanged; it
+     journals one plain-words observation per method (`--no-journal` to skip, `--csv PATH` for the
+     grid). It answers the coverage script's question directly, where that script can only point
+     at it: **an edge that shrinks or flips on the check store was partly the missing dead
+     companies.** Read the dev column's "reproduced" first. A dev re-run that does not match the
+     recorded trial makes the side-by-side meaningless for that variant. The check store is a
+     cross-check, not a gate (`EODHD_SURVIVORSHIP_MARKET_PLAN.md` D1): `lab run`, `lab test` and
+     `lab remeasure` refuse it, and `lab promote` never reads it. Making it gate anything is an
+     argued commit in `lab/hardgate.py`, like any other rule change. If `engine/.research-sv` is
+     missing, build it offline from the EODHD cache, from the main checkout with absolute paths
+     and never through a symlink: `engine/.venv/bin/python -m seer_engine survivorship_store
+     --build --out "$PWD/engine/.research-sv" --source "$PWD/engine/.research"`.
+     `survivorship_store --report` prints its year-by-year coverage. Measured 2026-10-10 on the
+     roster, the near misses and the dividend-date methods (102 variants): funded CAGR fell 0.5
+     pt/yr on average, about 1-1.4 for the stock-picking books (momentum, blends, long-term
+     losers, earnings jumps) and 0.1 for the dividend-date methods; max DD deepened 2.6 pts on the
+     momentum books and 11 variants crossed the 20% bar (M0007-N20-RAW 19.6% -> 23.5%). The grid
+     is in `docs/lab/survivorship/` (insight 149).
    - `lab walkforward MNNNN` -- the fold record, and **the one item on this list that is not
      advice**. Since 2026-10-09 `lab promote` *refuses* (`engine/src/seer_engine/lab/hardgate.py`):
      it exits 2, writes no pre-registration and moves no status, unless **both** hold --
@@ -340,10 +368,12 @@ Then:
 lab status | lab show M0007 | lab next-id | lab seen --find momentum
 lab run M0007                     # needs a committed method file
 lab costs M0007                   # report only: best variant at the flat 0.1% vs Gotrade's real fees; journals it, N unchanged
+lab survivorship M0069            # report only: every recorded variant on the dev store vs the survivorship-check store; journals it, N unchanged
 lab note M0007 --file /tmp/a.md --verdict "..."
 lab insight --kind data-wish --title "Quarterly fundamentals" --body "..." --method M0007
 lab idea --name "..." --family ... --source-kind variation --parent M0007 --hypothesis "..."
 lab block M0012 --on "quarterly fundamentals"   lab drop M0013 --why "duplicate of M0004"
+lab unblock M0012 --note "what arrived, how much of the window it covers"   # blocked-data -> idea
 lab stage                         # solo only: writes web/data/lab.json, git-adds it and lab/lab.sqlite
 lab export                        # lab/lab.xlsx (gitignored)
 lab export-json                   # web/data/lab.json without staging (lab stage already does this)

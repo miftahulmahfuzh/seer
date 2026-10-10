@@ -15,6 +15,7 @@ file, the network or a clock.
 
 from __future__ import annotations
 
+import math
 from bisect import bisect_right
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
@@ -185,6 +186,102 @@ EMPTY_DIVIDENDS = DividendCalendar({})
 """The calendar a ``Market`` carries when no dividends were loaded (one shared instance)."""
 
 
+class MarketSeries:
+    """Market-wide daily series by name (VIX, Treasury yields, gold), read point in time.
+
+    ``rows`` maps a series name to ``(date, value)`` pairs, strictly ascending by date, each value a
+    finite float in the unit an allocator reasons in: the VIX family in index points, Treasury
+    yields in percent (``T10Y`` 6.548 means 6.548%), gold in USD per ounce. Names with no rows are
+    dropped, as ``DividendCalendar`` drops a symbol with no dividends.
+
+    Every read takes the allocator's ``data_date`` and sees only rows dated on or before it. That
+    is the same contract ``History`` keeps for bars and ``DividendCalendar.known_on`` keeps for
+    dividends, and ``tests/test_market_series.py`` holds it.
+
+    ``value_on`` is the **latest** value on or before ``data_date``, not only one dated exactly
+    then: a Treasury index has no close on Columbus Day while the stock market trades, and the
+    last published yield is what a trader knew that morning. An allocator that must know how old
+    the value is reads ``upto(name, data_date, last=1)`` and compares the date.
+
+    Built from the research store's optional ``market_series.csv`` by ``research.load_store``.
+    A market built any other way -- the database path, a paper replay, a fixture -- carries
+    ``EMPTY_SERIES``.
+    """
+
+    __slots__ = ("_rows", "_dates")
+
+    def __init__(self, rows: Mapping[str, Iterable[tuple[date, float]]]) -> None:
+        if not isinstance(rows, Mapping):
+            raise TypeError(f"rows must be a Mapping, got {type(rows).__name__}")
+        out: dict[str, tuple[tuple[date, float], ...]] = {}
+        for name in sorted(rows):
+            if not isinstance(name, str) or not name:
+                raise ValueError(f"series name must be a non-empty str, got {name!r}")
+            items: list[tuple[date, float]] = []
+            prev: date | None = None
+            for item in rows[name]:
+                if not (isinstance(item, tuple) and len(item) == 2):
+                    raise TypeError(f"a {name} row is (date, float), got {item!r}")
+                d, value = item
+                _check_date(f"{name} date", d)
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    raise TypeError(f"{name} on {d}: value must be a float, got {type(value).__name__}")
+                value = float(value)
+                if not math.isfinite(value):
+                    raise ValueError(f"{name} on {d}: value must be finite, got {value!r}")
+                if prev is not None and d <= prev:
+                    raise ValueError(f"{name} rows must be strictly ascending: {d} after {prev}")
+                prev = d
+                items.append((d, value))
+            if items:
+                out[name] = tuple(items)
+        self._rows: Mapping[str, tuple[tuple[date, float], ...]] = out
+        self._dates: Mapping[str, tuple[date, ...]] = {n: tuple(d for d, _ in r) for n, r in out.items()}
+
+    def __len__(self) -> int:
+        return sum(len(r) for r in self._rows.values())
+
+    def names(self) -> tuple[str, ...]:
+        """Every series with at least one row, sorted."""
+        return tuple(self._rows)
+
+    def first_date(self, name: str) -> date | None:
+        """The date of ``name``'s first row, or None when the series is absent."""
+        dates_ = self._dates.get(name)
+        return dates_[0] if dates_ else None
+
+    def value_on(self, name: str, data_date: date) -> float | None:
+        """``name``'s latest value dated on or before ``data_date``; None when there is none yet."""
+        d = _check_date("data_date", data_date)
+        dates_ = self._dates.get(name)
+        if dates_ is None:
+            return None
+        i = bisect_right(dates_, d)
+        return self._rows[name][i - 1][1] if i else None
+
+    def upto(
+        self, name: str, data_date: date, *, last: int | None = None
+    ) -> tuple[tuple[date, float], ...]:
+        """``name``'s ``(date, value)`` rows dated on or before ``data_date``, ascending.
+
+        ``last`` keeps only the final ``last`` of them (a lookback window without copying the
+        whole history on every rank day).
+        """
+        if last is not None and (isinstance(last, bool) or not isinstance(last, int) or last < 1):
+            raise ValueError(f"last must be a positive int or None, got {last!r}")
+        d = _check_date("data_date", data_date)
+        dates_ = self._dates.get(name)
+        if dates_ is None:
+            return ()
+        i = bisect_right(dates_, d)
+        lo = 0 if last is None else max(0, i - last)
+        return self._rows[name][lo:i]
+
+
+EMPTY_SERIES = MarketSeries({})
+"""The series a ``Market`` carries when no market series were loaded (one shared instance)."""
+
+
 @dataclass(frozen=True)
 class Membership:
     """Point-in-time index membership, both indices unioned.
@@ -250,6 +347,11 @@ class Market:
     that ranks on it; ``EMPTY_DIVIDENDS`` unless the research store loaded one. The book
     engine's cash ledger does not read it -- it still gets ``ResearchData.dividends``.
 
+    ``series``: the point-in-time market-wide series (``MarketSeries``: VIX, VIX3M, Treasury
+    yields, gold), ``EMPTY_SERIES`` unless the research store carries ``market_series.csv``. An
+    allocator that reads it declares ``market_fields = ("series",)`` so ``lab run`` refuses it on
+    a store without series.
+
     ``history``: every symbol with bars (SPY included), keyed by symbol, each ``History``
     ascending. ``fx``: ``(date, usd_idr)`` rows, strictly ascending, ``usd_idr`` a Decimal > 0
     (publishing days only, so not every session has a row). ``fundamentals``: the point-in-time
@@ -266,6 +368,7 @@ class Market:
     fx: tuple[tuple[date, Decimal], ...]
     fundamentals: Panel = EMPTY_FUNDAMENTALS
     dividends: DividendCalendar = EMPTY_DIVIDENDS
+    series: MarketSeries = EMPTY_SERIES
     _fx_dates: tuple[date, ...] = field(init=False, repr=False)
     _last: Mapping[str, date] = field(init=False, repr=False)
 
@@ -280,6 +383,8 @@ class Market:
             raise TypeError(f"fundamentals must be a Panel, got {type(self.fundamentals).__name__}")
         if not isinstance(self.dividends, DividendCalendar):
             raise TypeError(f"dividends must be a DividendCalendar, got {type(self.dividends).__name__}")
+        if not isinstance(self.series, MarketSeries):
+            raise TypeError(f"series must be a MarketSeries, got {type(self.series).__name__}")
         last: dict[str, date] = {}
         for symbol, h in self.history.items():
             if not isinstance(h, History):
@@ -318,6 +423,10 @@ class Market:
     def with_dividends(self, dividends: DividendCalendar) -> Market:
         """This market with ``dividends`` attached; every other field is carried over."""
         return replace(self, dividends=dividends)
+
+    def with_series(self, series: MarketSeries) -> Market:
+        """This market with ``series`` attached; every other field is carried over."""
+        return replace(self, series=series)
 
     def bar(self, symbol: str, d: date) -> Bar | None:
         """``symbol``'s bar dated ``d`` as a Decimal ``Bar`` (exact 4 dp), or None."""

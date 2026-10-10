@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-10 21:30
-**Total Active Tasks**: 5
+**Total Active Tasks**: 4
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 2
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 1
-- Completed: 114
+- Completed: 115
 
 ---
 
@@ -43,15 +43,28 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - pre-existing F841 in test_lab_prereg.py -> left untouched (tie-break: never widen scope; not in phase 1 Owns)
     - Completion: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: the recorded precedent of this same file for every swarm-tracked set; peer phase sessions append here concurrently). Plan index: phase 1's TaskID cell ticked `(done 2026-10-10)`, `**Status:**` left alone (swarm sets finish out of order; the coordinator's ledger is the status of record).
     - Unblocked P1-ENG-SLCU and P1-ENG-9L1M (both depend only on phase 1); P1-ENG-AMKN and P1-ENG-STM7 stay blocked.
-- [ ] **P1-ENG-SLCU** Phase 2: Alias fill for the empty members
+- [x] **P1-ENG-SLCU** Phase 2: Alias fill for the empty members
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns offline alias resolution for phase 1's 200 dropped symbols (EODHD code candidates from the delisted/live symbol lists, `ticker_cik.csv` name, `ticker_aliases.csv`, class spelling, bankruptcy stem and code variants; accepted only when the series has member-day rows and cleans to a usable action through `clean_symbol`); `eodhd.Client.eod/splits/dividends_by_code` and `exchange_code`; `survivorship_store --resolve-aliases / --fetch-aliases [--symbols] [--refetch]` writing only `engine/.cache/eodhd/alias/`; the build offering accepted alias series via `plan_build(extra_sources=)` by default (`--no-aliases` off) and writing `alias_report.csv`; `engine/data/eodhd_alias_hints.csv`; the rebuilt SV store. Does not touch `research.py`, `survivorship.py`, `commands/lab.py`, `backtest/`, the original cache folders. Exit: every one of the 200 targets has an `alias_report.csv` line; fetches within ≤ 4 `/eod` probes + 1 `/splits` per overlapping probe + 1 `/div` per accepted member (≈500 calls); filled symbols read `source = eodhd-alias` in `cleaning_report.csv`; SV store rebuilt offline with the coverage gain shown; original cache hashes unchanged; tests pass without network.
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `EODHD_SURVIVORSHIP_MARKET_PLAN.md` (phase 2 of 5)
   - **Satisfies**: R7, R3 — Decide the gate's use of the store, and whether to spend calls on the 201 empty members; Coverage report: member-days per year before/after, still-missing list
   - **Depends on**: P1-ENG-8X1K
   - **Plan**: `.workflows/plan/P1-ENG-SLCU.md`
+  - **Completed**: 2026-10-10 20:05
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/eodhd.py, engine/src/seer_engine/survivorship_alias.py (new), engine/src/seer_engine/commands/survivorship_store.py, engine/data/eodhd_alias_hints.csv (new), engine/data/SOURCES.md, engine/tests/test_survivorship_alias.py (new)
+  - **Commits**: 0b9a426 (code), aef4003 (alias fetch + SV store rebuild)
+  - **Verified**: pytest engine/tests with PG_TEST_URL: 4146 passed, 2 skipped (live-only opt-ins). ruff: only the pre-existing F841 at tests/test_lab_prereg.py:722. Offline `--resolve-aliases`: 200 targets, 157 with another code, 43 none. Fetch: 490 calls + 15 smoke, 0 failed; accepted 128, ambiguous 10, no fit 19. SV store rebuilt offline: 989 of 1061 served, price fingerprint 60adae1b… (was bc5ba895…), purpose survivorship-check; `alias_report.csv` 200 rows; `cleaning_report.csv` 128 rows with source eodhd-alias; coverage 81.3% -> 89.0%, every year higher, still missing 239 -> 111. Dev store fingerprint fd2bc190… unchanged; original eod/splits/dividends/market cache hashes unchanged; no token in alias files.
+  - **Drift**:
+    - none in code: all Step 1-5 code blocks applied verbatim
+    - SV store price fingerprint changed bc5ba895… -> 60adae1b… (expected: the alias fill adds 128 symbols). Later phases must not hardcode bc5ba895.
+  - **Decided**:
+    - pre-existing F841 in test_lab_prereg.py -> left untouched (tie-break: never widen scope)
+    - started the stopped seer-pg container so DB tests ran instead of skipping (CLAUDE.md: CI fails if they skip)
+    - Completion: the `[x]` block is left in place under `### [P1] High` and Quick Stats recounted from the file (this file's precedent for swarm-tracked sets). Plan index: phase 2's TaskID cell ticked `(done 2026-10-10)`, `**Status:**` left alone.
+    - P1-ENG-STM7 stays blocked: it depends on SLCU, 9L1M and AMKN, and AMKN (phase 4) is still open.
 - [x] **P1-ENG-9L1M** Phase 3: Market series store file, `Market.series`, `lab unblock`
   - **Difficulty**: NORMAL
   - **Type**: Feature

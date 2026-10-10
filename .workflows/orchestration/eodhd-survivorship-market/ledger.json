@@ -25,22 +25,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "5ec41d14ced39abe98efc8f0ffe6f0fb912d1e2d",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "128/200 filled, 490 calls. SV store rebuilt: 989/1061, 81.3%->89.0%, still missing 111. SV price fp now 60adae1b (was bc5ba895) \u2014 phases 4/5 must not hardcode bc5ba895.",
       "package": "seer_engine` (eodhd, survivorship_alias, commands/survivorship_store)",
       "plan": ".workflows/plan/eodhd-survivorship-market/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-10T13:08:34+00:00",
       "satisfies": [
         "R7",
         "R3"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-SLCU",
       "title": "Alias fill for the empty members"
     },
     {
@@ -79,7 +79,7 @@
       "satisfies": [
         "R4"
       ],
-      "status": "spawned",
+      "status": "pending",
       "task_id": null,
       "title": "lab survivorship` report command"
     },
@@ -111,7 +111,7 @@
   "plan": "/home/miftah/.worktrees/seer/eodhd-survivorship-market/.workflows/orchestration/eodhd-survivorship-market/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "eodhd-survivorship-market",
-  "updated": "2026-10-10T13:05:44+00:00",
-  "verified_at": "2026-10-10T13:05:40+00:00",
+  "updated": "2026-10-10T13:08:35+00:00",
+  "verified_at": "2026-10-10T13:08:35+00:00",
   "worktree": "/home/miftah/.worktrees/seer/eodhd-survivorship-market"
 }

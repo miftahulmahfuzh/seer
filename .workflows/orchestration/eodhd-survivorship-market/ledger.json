@@ -65,22 +65,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "5a62d5571a509b33a0076638afc786e13794ec65",
       "depends_on": [
         1,
         3
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "lab survivorship added; M0069 smoke: best +9.8%->+8.5% (SPY 7.2%), DD 33.8->39.1%, folds 2/4->1/4; N 276, looks 4 unchanged.",
       "package": "seer_engine` (lab, commands/lab)",
       "plan": ".workflows/plan/eodhd-survivorship-market/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-10T13:14:21+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-AMKN",
       "title": "lab survivorship` report command"
     },
     {
@@ -103,7 +103,7 @@
         "R7",
         "R8"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Run, journal, document"
     }
@@ -111,7 +111,7 @@
   "plan": "/home/miftah/.worktrees/seer/eodhd-survivorship-market/.workflows/orchestration/eodhd-survivorship-market/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "eodhd-survivorship-market",
-  "updated": "2026-10-10T13:08:35+00:00",
+  "updated": "2026-10-10T13:14:22+00:00",
   "verified_at": "2026-10-10T13:08:35+00:00",
   "worktree": "/home/miftah/.worktrees/seer/eodhd-survivorship-market"
 }

@@ -409,8 +409,8 @@ else:
         f"identical deposits into SPY on the identical days would have ended at {full(spy)}, so "
         f"over these {d['years']:.1f} years the method <strong>cost</strong> you "
         f"{full(abs(edge))} against simply buying the market.</p>"
-        f"<p>Your instinct was right, and it is the bigger half of the answer: time and the habit "
-        f"of paying in every month did the work. The stock-picking did not.</p>"
+        f"<p>Time and the habit of paying in every month did the work. The stock-picking "
+        f"did not.</p>"
     )
 
 def _why(d, pts):
@@ -442,23 +442,49 @@ def _why(d, pts):
         for i in range(1, len(days)):
             new = dv[days[i]] - dv[days[i - 1]]
             if v[days[i - 1]] > 0:
-                out.append((v[days[i]] - new) / v[days[i - 1]] - 1)
+                out.append((days[i].year, (v[days[i]] - new) / v[days[i - 1]] - 1))
         return out
 
-    rb, rs = rets(bv), rets(sv)
+    rbs, rss = rets(bv), rets(sv)
+    rb, rs = [r for _y, r in rbs], [r for _y, r in rss]
     vol = statistics.pstdev(rb) / statistics.pstdev(rs) if statistics.pstdev(rs) else 1.0
     yrs = ", ".join(str(y) for _m, y in sorted(worst, key=lambda x: x[1]))
-    share = sum(m for m, _y in worst) / sum(m for m, _y in per if m < 0) * 100
+
+    def yearly(rr):
+        g = {}
+        for y, r in rr:
+            g[y] = g.get(y, 1.0) * (1 + r)
+        return g
+
+    yb, ys = yearly(rbs), yearly(rss)
+    down = [y for y in sorted(ys) if ys[y] < 1]
+    beat = [y for y in down if yb.get(y, 1.0) > ys[y]]
+    if not down:
+        falls = "The market had no losing calendar year in this window, so there was no fall for a cautious book to earn its keep in."
+    elif len(beat) == len(down):
+        falls = ("In the years the market fell, this book <em>beat</em> SPY; it lost its ground in "
+                 "rising years, which is the opposite of the story a cautious, trend-gated book is "
+                 "supposed to tell.")
+    elif not beat:
+        falls = ("It did not make it up in the bad years either: in every year the market fell, "
+                 "this book did worse than SPY too.")
+    else:
+        falls = (f"Of the years the market fell, it beat SPY in {', '.join(map(str, beat))} and "
+                 f"trailed it in {', '.join(str(y) for y in down if y not in beat)}.")
+    mb, ms = statistics.mean(rb) * 100, statistics.mean(rs) * 100
+    if vol >= 1:
+        risk = (f"<p><strong>And it was not being careful with your money.</strong> Month to month "
+                f"it was <strong>{vol:.2f}&times; as volatile as SPY</strong> while earning "
+                f"{mb:.2f}% a month against SPY&rsquo;s {ms:.2f}%. More risk, less return &mdash; so "
+                f"the shortfall cannot be explained away as the price of safety.</p>")
+    else:
+        risk = (f"<p><strong>It was a little calmer, but not enough to be worth it.</strong> Month "
+                f"to month it swung <strong>{vol:.2f}&times; as much as SPY</strong>, but earned "
+                f"{mb:.2f}% a month against SPY&rsquo;s {ms:.2f}%. It gave up far more return than "
+                f"it saved in risk.</p>")
     return (
         f"<p><strong>Where it actually went wrong.</strong> The loss is not spread across the "
-        f"{d['years']:.1f} years &mdash; {yrs} account for most of it. In the years the market "
-        f"fell, this book <em>beat</em> SPY; it lost its ground in strong rising years, which is "
-        f"the opposite of the story a cautious, trend-gated book is supposed to tell.</p>"
-        f"<p><strong>And it was not being careful with your money.</strong> Month to month it was "
-        f"<strong>{vol:.2f}&times; as volatile as SPY</strong> while earning "
-        f"{statistics.mean(rb) * 100:.2f}% a month against SPY&rsquo;s "
-        f"{statistics.mean(rs) * 100:.2f}%. More risk, less return &mdash; so the shortfall cannot "
-        f"be explained away as the price of safety.</p>"
+        f"{d['years']:.1f} years &mdash; {yrs} account for most of it. {falls}</p>" + risk
     )
 
 

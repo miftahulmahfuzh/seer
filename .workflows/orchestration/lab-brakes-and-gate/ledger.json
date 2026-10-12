@@ -24,21 +24,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "cf904ff",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "Verified by the coordinator from git: cf904ff is an ancestor of origin/feature/lab-brakes-and-gate; 5 files (gate_probe.py new 1420, test_lab_gate_probe.py new 629, commands/lab.py +160/-0, package_readme.md +5/-4, engine todos). Invariant 9 checked directly, not quoted: commands/lab.py is a PURE ADDITION with zero deletions and no -/+ pair on 'Lab N (dev trials)'; grep -c at that commit = 10; _gate prints the clear form at :2478 ('Luck hurdle N: ... (policy ...)'). D11 intact. lab/lab.sqlite still md5 4a34ddb8... and clean. Coordinator re-ran the whole tree after this commit: 4449 passed / 3 skipped, ruff check engine clean. Phase decisions: (1) the plan's OWN _gate code block carried an eleventh literal 'Lab N (dev trials)' inside its explanatory comment, which made grep -c return 11 on a verbatim paste; reworded the comment to spell the label in two pieces, rung 1 (invariant 9) over rung 3 (the plan's code block) -- this is the one that protects phase 6's assertion; (2) added the missing phrase to format_plan rather than deleting the test assertion, 'a failing verification is never settled by relaxing the check'; (3) control_problems() now reads committed files via method_module.discover() instead of the monkeypatched module global, rung 2; (4) renamed a test fixture that tripped its own plain-words ban, rung 6; (5) dropped an F541 f-prefix from the plan's code block, CI lint is E9+F. Measured against the real lab: 225 variants carry the gate and transform, 69 carry none, 6 refuse -- matching plan time; end-to-end on M0024-SAME-N20 reproduces recorded trial #117 (+634.3%) exactly and the handover's \u00a72 control (+2.7%/yr gated vs +1.0% ungated; 2008 +34.8% to -2.1%; 2009-2015 -5.4% to +1.5%). Drift, no action: the plan expected --all --dry-run to list 54 variants as orphaned; it correctly lists none -- all 54 are P7a seed-import rows under 11 non-MNNNN ids with no method file, so recorded_method_ids never plans them. The plan conflated two counts.",
       "package": "engine/src/seer_engine/lab",
       "plan": ".workflows/plan/lab-brakes-and-gate/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T07:29:55+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-J8RM",
       "title": "lab gate`: price the shared SPY 200-day gate across the lab, report only"
     },
     {
@@ -101,7 +101,7 @@
         "R3",
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Pre-register, run, record, stage and write up"
     },
@@ -128,7 +128,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-brakes-and-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-brakes-and-gate",
-  "updated": "2026-10-12T07:07:28+00:00",
+  "updated": "2026-10-12T07:30:19+00:00",
   "verified_at": "2026-10-12T06:47:00+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-brakes-and-gate"
 }

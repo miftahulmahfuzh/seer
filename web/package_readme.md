@@ -474,6 +474,41 @@ eyebrow names the section instead, and `SeraBackLink` puts the way back to Seer 
 `app/sera/sera.module.css` reserves the bar's space once, for all seven pages (`.main` padding
 `var(--safe-top) 16px var(--nav-clear)`); no page adds its own spacer. Desktop is byte-identical.
 
+Inside that shell each page is laid out for the width rather than merely allowed to stack. The two
+tables become cards below 1024 px and stay byte-for-byte tables at 1024 px and up: `/sera/methods`
+renders a card per method and `/sera/methods/[id]` a card per variant, both through the same class
+names and the same 28 px `var(--stone)` card geometry, with the best variant carrying a named
+`Best` chip as well as its tint -- a tint alone cannot label a card whose neighbours are off-screen.
+Each presentation is marked `.desk-only` / `.mobile-only`, so exactly one of the two is in the
+accessibility tree at any width. The cards spell their measures out in the glossary's plain words
+(`Max drawdown`, `Profit factor`, `Luck check`) rather than the table's abbreviations: the table
+abbreviates because of a column budget a card does not have, and a `<Term>`'s focusable span under
+a card-wide link overlay would be both unreachable and a focus trap. `<T>` stays in the desk
+tables' `<th>`s.
+
+`/sera/ideas` stopped scrolling sideways when its grid tracks became `minmax(0, 1fr)` -- a default
+`1fr` track floors at the widest item's min-content, which the long `stock-momentum-...` slugs
+blew past -- and its `.tag` pills were allowed to wrap, with 30 px as a min-height floor instead of
+a fixed height (`.chip`'s `white-space: nowrap` is global and correct, so `.tag` overrides it
+locally). `/sera`'s stat tiles go one per row at a size reached from `overview.module.css` as
+`.stats :global(.num)`: **`components/sera/Stat.module.css` is deliberately never edited**, because
+`Stat` is also rendered by `/sean` and `.value` / `.md` tie on specificity, so a media block
+appended there would silently enlarge Sean's tiles on source order. That makes one standing
+assumption worth keeping: `Stat.tsx` must keep the global `num` class on its value span, or Sera's
+phone tiles quietly return to 52 px. `/sera/how`'s diagrams keep their horizontal scroll but now
+say so, with a `mask-image` fade and a thin rail -- declarations on the scroller itself, adding no
+new element.
+
+**The containing-block trap, worth knowing before adding any scroller here.** `Term`'s
+visually-hidden `.sr` definition is `position: absolute`, and an absolutely positioned box is
+clipped only by an ancestor in its *containing-block* chain -- an `overflow` value alone does
+nothing. Sera's table and prose scrollers are all `position: static`, so every `.sr` resolved its
+containing block out to `.sheet` and widened the whole document: `/sera/methods` measured a 959 px
+`scrollWidth` at a 390 px viewport. The fix is one declaration, `position: relative` on `.term` in
+`Term.module.css`, which covers every scroller that will ever hold a `<Term>`. The standing rule it
+leaves: any scroller that gains an absolutely positioned child needs `position: relative` (or
+`contain: paint`) in the same rule as its `overflow`.
+
 ### Routes
 
 | Route | What it shows |

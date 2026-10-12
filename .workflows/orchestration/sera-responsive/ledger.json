@@ -6,37 +6,37 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "57b9b23",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "Narrow nav landed: desk-only rail + mobile-only 348px bottom pill bar, SeraBackLink route-guarded so /sean is untouched; .main reserves --nav-clear once. /sera, /sera/journal, /sera/gotrade, /sera/how now exact at 390 and 414 both themes; /sera/ideas still 476 (phase 5). All 16 desktop PNGs byte-identical to a pre-edit baseline. tsc clean, 676 tests pass. Decisions: per-phase dev ports are impossible \u2014 Next 16.3.8 refuses a second dev server per project dir, so all phases must share one; Step 3 created only phase 1's task row, not all five, to avoid racing the shared todos.md; my todos.md row was swept into phase 2's commit 3e65f21 (bookkeeping only, not re-done).",
       "package": "web/components/sera`, `web/app/sera",
       "plan": ".workflows/plan/sera-responsive/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T11:02:42+00:00",
       "satisfies": [
         "R1",
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-R5PT",
       "title": "The narrow nav and the shell"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "3e65f21",
       "depends_on": [],
       "difficulty": "EASY",
       "n": 2,
-      "note": null,
+      "note": "Coordinator-verified: 3e65f21 is an ancestor of origin/feature/sera-responsive. Commit is 3 files \u2014 Term.module.css (its only owned file), its own task plan, and the shared web/.workflows/todos.md. No peer source file; Term.tsx untouched; all frozen files (view.ts, view.test.ts, Stat.module.css, globals.css, Nav.*, tooltip.ts) untouched across the whole branch. Phase decided two ties itself: minted only its own todos row (not all five), and committed the shared todos.md though it carries phase 1's row \u2014 both reversible, both accepted. Follow-up it raised for whoever lands last: web/package_readme.md:466 still calls Sera desktop-first.",
       "package": "web/components/sera",
       "plan": ".workflows/plan/sera-responsive/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T11:01:20+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-R2FX",
       "title": "Term's hidden span stops escaping its scroller"
     },
     {
@@ -105,6 +105,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/sera-responsive/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-responsive",
-  "updated": "2026-10-12T10:46:29+00:00",
+  "updated": "2026-10-12T11:02:42+00:00",
+  "verified_at": "2026-10-12T11:00:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-responsive"
 }

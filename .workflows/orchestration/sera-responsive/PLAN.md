@@ -144,8 +144,8 @@ viewport width. See the analysis for the bisection and the live before→after n
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Port | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|------|--------|------|
-| 1 | The narrow nav and the shell | R1, R2 | `web/components/sera`, `web/app/sera` | 5 | — | HARD | 3121 | `.workflows/plan/sera-responsive/phase-1.md` | — | — |
-| 2 | Term's hidden span stops escaping its scroller | R2 | `web/components/sera` | 1 | — | EASY | 3122 | `.workflows/plan/sera-responsive/phase-2.md` | — | — |
+| 1 | The narrow nav and the shell | R1, R2 | `web/components/sera`, `web/app/sera` | 5 | — | HARD | 3121 | `.workflows/plan/sera-responsive/phase-1.md` | P1-WEB-R5PT | — |
+| 2 | Term's hidden span stops escaping its scroller | R2 | `web/components/sera` | 1 | — | EASY | 3122 | `.workflows/plan/sera-responsive/phase-2.md` | P1-WEB-R2FX | — |
 | 3 | `/sera/methods`: cards on a phone, table on a desk | R1 (holds R2) | `web/app/sera/methods` | 2 | 1, 2 | HARD | 3123 | `.workflows/plan/sera-responsive/phase-3.md` | — | — |
 | 4 | `/sera/methods/[id]`: the variants table, same treatment | R1 (holds R2) | `web/app/sera/methods/[id]` | 2 | 1, 2 | HARD | 3124 | `.workflows/plan/sera-responsive/phase-4.md` | — | — |
 | 5 | The rest of the narrow layout | R1, R2 | `web/app/sera` | **3** | 1 | NORMAL | 3125 | `.workflows/plan/sera-responsive/phase-5.md` | — | — |

@@ -54,13 +54,23 @@ RECORD = "docs/plans/2026-10-03-seer-design.md §13"
 #: Unpacked in ``FAILURE_LABELS`` order, exactly as ``store.owner_failures`` unpacks it.
 _SPY, _DRAWDOWN, _PF, TRADES_LABEL, _OWNER = dev.FAILURE_LABELS
 
-#: Measured 2026-10-07 against the committed lab database, read-only, with no trial recorded and the
-#: lab's N unmoved at 110: the only recorded dev trials whose **sole** miss against today's five
-#: owner conditions is the trades bar. 26 of 110 clear all five with the bar; 28 without it. Both are
-#: P7a seed trials carrying ``dsr IS NULL`` -- which is what the third test is really about.
+#: Re-measured 2026-10-12 against the committed lab database, read-only, with no trial recorded:
+#: the only recorded dev trials whose **sole** miss against today's five owner conditions is the
+#: trades bar. First measured 2026-10-07 at two trials out of 110; M0084 then priced the SPY-200
+#: safety switch on its own, and three of its variants trade 10 to 13 times in twenty-two years,
+#: taking the set to five out of 354.
+#:
+#: The two P7a seeds carry ``dsr IS NULL``; the three M0084 rows carry a real luck score, all of it
+#: under ``DSR_MIN``. That is the case §13 predicted when it said the bar "binds future trials that
+#: do carry a DSR", and it is why the third test below asks whether a held-out trial *clears the
+#: luck bar* rather than whether it has one at all. Every trial the bar has ever held out is a
+#: market-timing book: nothing else trades seldom enough to be caught by it.
 HELD_OUT_BY_THE_TRADES_BAR: tuple[tuple[str, int], ...] = (
     ("F1-SPY-10MSMA-M", 13),
     ("F1-SPY-SMA200-M", 11),
+    ("M0084-BAND3-W", 10),
+    ("M0084-FABER-M", 13),
+    ("M0084-MONTHLY", 11),
 )
 
 
@@ -173,15 +183,20 @@ def test_the_trades_bar_holds_out_two_trials_and_neither_of_them_has_a_luck_scor
         f"legitimately changes it. If that is what happened, re-take the measurement and update\n"
         f"both this list and the one in {RECORD}, whose argument is built on it."
     )
-    scored = [(name, count, dsr) for name, count, dsr in held_out if dsr is not None]
-    assert not scored, (
-        f"a trial held out by the dev trades bar now carries a luck score: {scored}.\n"
+    lucky = [
+        (name, count, dsr)
+        for name, count, dsr in held_out
+        if dsr is not None and float(dsr) >= store.DSR_MIN
+    ]
+    assert not lucky, (
+        f"a trial held out by the dev trades bar now clears the luck bar as well: {lucky}.\n"
         f"\n"
         f"{RECORD} argues that dropping the dev trades bar would change zero eligibility verdicts\n"
-        f"today, and the whole of that argument is that both held-out trials are P7a seed imports\n"
-        f"with `dsr IS NULL` -- under method-lab design §7.1 a luck test that cannot be evaluated is\n"
-        f"one that was not passed, so the trades bar is not what is keeping them out. `lab\n"
-        f"remeasure`'s seed path (method-lab design §7.6) can give a seed trial a DSR, and if it has\n"
-        f"given one to a trial in this set, re-check whether that trial now clears the luck bar and\n"
-        f"rewrite §13's 'zero verdicts actually change' finding before anyone leans on it again."
+        f"today. That argument has exactly one load-bearing fact: no trial whose only miss is the\n"
+        f"trades bar also passes `DSR >= {store.DSR_MIN}`. The two P7a seeds carry `dsr IS NULL`, and\n"
+        f"under method-lab design §7.1 a luck test that cannot be evaluated is one that was not\n"
+        f"passed; the M0084 rows carry real scores below the bar. A trial in this list that clears\n"
+        f"the luck bar would become eligible the moment the trades bar went, so the bar would be\n"
+        f"load-bearing and §13's 'zero verdicts actually change' finding is wrong as written.\n"
+        f"Re-take the measurement and rewrite §13 before anyone leans on it again."
     )

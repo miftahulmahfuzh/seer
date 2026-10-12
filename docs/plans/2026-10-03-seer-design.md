@@ -274,6 +274,24 @@ survivors are not yet known.
   dropping it would change **zero** eligibility verdicts today. The bar is not load-bearing for
   them; it binds future trials that do carry a DSR, which is exactly where the sample-size
   argument has force.
+- **Re-measured 2026-10-12 (the predicted case arrived).** The paragraph above ends by saying the
+  dev trades bar "binds future trials that do carry a DSR, which is exactly where the sample-size
+  argument has force." That is now the situation, and the held-out set has grown from two trials to
+  five. M0084 priced the SPY-200 safety switch on its own — a book holding nothing but SPY, varying
+  only how the switch is read — and three of its variants trade 10, 11 and 13 times in twenty-two
+  years: `M0084-BAND3-W` (10 trades, DSR 0.815), `M0084-MONTHLY` (11, 0.884) and `M0084-FABER-M`
+  (13, 0.837). Each one's **only** miss against the five owner conditions is the trades bar.
+  **The finding of 2026-10-07 survives, but not its reasoning.** Dropping the dev trades bar would
+  still change **zero** eligibility verdicts, because all three carry a luck score below
+  `DSR_MIN` (0.90) and would fail on that instead — not, as in 2026-10-07, because the held-out
+  trials had no luck score at all. The argument is now "none of the five clears the luck bar",
+  which is the form `tests/test_dev_trades_bar.py` asserts from today.
+  Worth recording separately: **every trial the bar has ever held out is a market-timing book** —
+  the two P7a SPY moving-average seeds and these three. Nothing else in 354 dev trials trades few
+  enough to be caught by it. The bar is, in practice, a filter on index-timing strategies rather
+  than a general sample-size rule, and §1's item 1 was revised in 2026-10-07 precisely to stop
+  that filter applying to the forward record. The asymmetry is still intentional: a profit factor
+  off 11 trades is still not a measurement.
 - **Where it is implemented.** `backtest.metrics.MIN_PAPER_MONTHS`, re-exported as
   `backtest.tuning.MIN_PAPER_MONTHS`, is the one Python definition; `web/lib/golive.ts` is the one
   TypeScript definition. The go-live checklist drops from six items to five.

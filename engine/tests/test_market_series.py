@@ -414,5 +414,96 @@ def test_a_missing_cache_file_exits_2_and_writes_nothing(tmp_path, store_dir, ca
     cache = _cache(tmp_path)
     (cache / "VXV.INDX.json").unlink()
     assert cmd.run(_args(store_dir, cache, refresh=True)) == 2
-    assert "VXV.INDX.json" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "VXV.INDX.json" in out
+    assert "paid EODHD month" in out and "--fetch" not in out  # no fetch to offer on this path
     assert not (store_dir / research.MARKET_SERIES_FILE).exists()
+
+
+# ---- the free (yfinance) source ---------------------------------------------------------------
+
+
+def test_the_free_source_writes_the_same_store_names_with_percent_yields():
+    """Yahoo quotes the Treasury indices in percent already, so no divisor may be 10 here."""
+    assert tuple(s.series for s in cmd.YF_SOURCES) == research.MARKET_SERIES_NAMES
+    by = {s.series: s for s in cmd.YF_SOURCES}
+    assert all(s.divisor == Decimal(1) for s in cmd.YF_SOURCES)
+    assert by["T10Y"].tickers == ("^TNX",) and by["T13W"].tickers == ("^IRX",)
+    assert by["GOLD"].tickers == ("GC=F",)  # the front-month future; Yahoo has no XAUUSD spot
+    assert by["VIX3M"].tickers == ("^VIX3M",)  # ^VXV is gone, so this path has no splice
+    assert cmd.SOURCES_BY_NAME == {"eodhd": cmd.SOURCES, "yfinance": cmd.YF_SOURCES}
+
+
+def _yf_cache(tmp_path):
+    """The same two sessions per ticker as the paid fixture, at Yahoo's percent scale."""
+    cache = tmp_path / "yf"
+    cache.mkdir()
+    for t in sorted({t for s in cmd.YF_SOURCES for t in s.tickers}):
+        rows = [_eod("1999-01-04", 20.0), _eod("1999-01-05", 21.5)]
+        if t == "^TNX":  # 4.653% reads straight off Yahoo, where EODHD wanted 46.53 / 10
+            rows = [_eod("1999-01-04", 4.653), _eod("2015-10-16", 2.023)]
+        (cache / f"{t}.json").write_text(json.dumps(rows), encoding="utf-8")
+    return cache
+
+
+def test_the_free_source_needs_no_divisor_to_reach_the_paid_numbers(tmp_path, store_dir, capsys):
+    assert cmd.run(_args(store_dir, _yf_cache(tmp_path), refresh=True, source="yfinance")) == 0
+    written = (store_dir / research.MARKET_SERIES_FILE).read_text(encoding="utf-8")
+    assert "T10Y,1999-01-04,4.653" in written  # identical to EXPECTED's paid-path row
+    assert "T10Y,2015-10-16,2.023" in written
+    assert "T13W,1999-01-04,20" in written
+    after = json.loads((store_dir / research.MANIFEST_FILE).read_text())
+    before = research.price_fingerprint_of(json.loads((store_dir / research.MANIFEST_FILE).read_text())["files"])
+    assert research.price_fingerprint_of(after["files"]) == before
+    assert "(unchanged)" in capsys.readouterr().out
+
+
+def test_the_free_source_defaults_to_its_own_cache_not_the_paid_one(
+    tmp_path, store_dir, capsys, monkeypatch
+):
+    """``--cache`` unset must resolve per source, never silently read the other one's directory."""
+    empty = tmp_path / "nowhere"  # pointed somewhere empty: the real cache exists on a dev machine
+    monkeypatch.setitem(cmd.CACHE_BY_NAME, "yfinance", empty)
+    args = argparse.Namespace(
+        store=store_dir, cache=None, refresh=False, dry_run=False, source="yfinance", fetch=False
+    )
+    assert cmd.run(args) == 2  # nothing is cached there, so it reports the miss and writes nothing
+    out = capsys.readouterr().out
+    assert str(empty) in out and "GC=F" in out  # the first yfinance ticker, not an EODHD one
+    assert "^IRX" in out and "IRX.INDX" not in out  # it lists this source's tickers, not the other's
+    assert "--fetch" in out  # and says how to fix it on the path where fetching is possible
+    assert not (store_dir / research.MARKET_SERIES_FILE).exists()
+
+
+def test_fetch_is_refused_on_the_paid_path(tmp_path, store_dir, capsys):
+    args = _args(store_dir, _cache(tmp_path), refresh=True, source="eodhd", fetch=True)
+    assert cmd.run(args) == 2
+    assert "--fetch needs --source yfinance" in capsys.readouterr().out
+    assert not (store_dir / research.MARKET_SERIES_FILE).exists()
+
+
+def test_fetch_writes_read_ticker_shape_and_is_resumable(tmp_path, store_dir, monkeypatch):
+    """The fetcher's output must be exactly what read_ticker parses, nulls included."""
+    import sys
+    import types
+
+    import pandas as pd
+
+    calls: list[str] = []
+
+    class _Fake:
+        def __init__(self, ticker):
+            calls.append(ticker)
+
+        def history(self, **kw):
+            idx = pd.to_datetime(["1999-01-04", "1999-01-05"])
+            return pd.DataFrame({"Close": [20.0, float("nan")]}, index=idx)
+
+    monkeypatch.setitem(sys.modules, "yfinance", types.SimpleNamespace(Ticker=_Fake))
+    cache = tmp_path / "fetched"
+    window = research.declared_window(store_dir)
+    written = cmd.fetch_yfinance(cache, ("^VIX",), window)
+    assert written == ["^VIX (2 rows)"]
+    assert cmd.read_ticker(cache, "^VIX") == {date(1999, 1, 4): Decimal("20"), date(1999, 1, 5): None}
+    assert cmd.fetch_yfinance(cache, ("^VIX",), window) == []  # already cached: skipped
+    assert calls == ["^VIX"]

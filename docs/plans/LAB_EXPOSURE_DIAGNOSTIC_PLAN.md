@@ -112,6 +112,14 @@ Every phase must hold all of these. They are the §3/§6 constraints restated as
    M0030-C50T re-runs to `9.583603` against a recorded `9.583723`, and its SPY TR to `3.466805`
    against a recorded `3.514206`. The reproduction check is printed as information, the way
    `lab costs` prints it; no conclusion may rest on a recorded number beside a re-run one.
+
+   > **Correction, re-measured 2026-10-12 after the set landed.** This figure was taken on an
+   > earlier store build and did not hold when the phases ran. On dev store `77c37d553508…` all
+   > **23** recorded dev variants of the five reproduce digit for digit — M0030-C50T re-runs to
+   > `9.58372256394318` against a recorded `9.58372256394318`. The invariant itself stands (arms
+   > are still compared only with each other); only its measurement was stale. It reached
+   > `engine/package_readme.md` as a present-tense claim before anyone re-ran it, which is the
+   > reason these corrections are dated rather than silently overwritten.
 9. **Any commit that contains `lab/lab.sqlite` was produced by `lab stage` and also contains
    `web/data/lab.json`.** CI fails a database commit without it.
 10. **No mid-run `git pull --rebase`.** `git fetch` + `git merge --ff-only` only, and never while

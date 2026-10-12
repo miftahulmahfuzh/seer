@@ -67,6 +67,14 @@ pre-registration file format and its enforcement; tests for all of it.
 
 ## Invariants
 
+> **Correction, 2026-10-12.** Every reference below to the dev store's fingerprint `399d0d25…` —
+> including "cannot move" and "unchanged" — is stale. `engine/.research` is `77c37d5535…` today:
+> `fundamentals.csv` and `market_series.csv` joined the file map, and an optional file moves the
+> full fingerprint by design. No data moved — 2,490,793 bar rows, 539 symbols, price fingerprint
+> still `5451195f…`. What these invariants were really protecting (that *this set* adds no
+> manifest key and writes no window key on a dev build) held and still holds. See
+> `RESEARCH_STORE_CLOBBER_GUARD_PLAN.md` invariant 1.
+
 Every phase must hold all of these, and each phase's exit criteria restate the ones it can break:
 
 1. **The tree builds and `pytest -q` passes in `engine/` at the end of every phase.**

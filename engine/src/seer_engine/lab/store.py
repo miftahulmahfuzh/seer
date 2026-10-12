@@ -344,13 +344,22 @@ P7A_PRICE_FINGERPRINT = "5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4
 #: - ``5451195f…`` (P7a, 2026-10-04, four files): itself.
 #: - ``e597367b…`` (2026-10-05, adds a 2015-only ``fundamentals.csv``): ``5451195f…`` -- the
 #:   ``399d0d25…`` refresh copied its four price files byte for byte (data-pipeline runbook).
-#: - ``399d0d25…`` (2026-10-05, the panel rebuilt from 2009; today's dev store):
-#:   ``5451195f…`` -- proven by ``research.price_fingerprint_of`` over its manifest.
+#: - ``399d0d25…`` (2026-10-05, the panel rebuilt from 2009; the dev store when this map was
+#:   written): ``5451195f…`` -- proven by ``research.price_fingerprint_of`` over its manifest.
 #: - ``56e83810…`` (a four-file test store, window end 2026-10-06): itself.
 #:
 #: Anything else -- ``bbe7abfb…``, the test store on the other laptop, whose file map is not here
 #: -- backfills NULL ("unknown"). No comparison reads a test trial against the dev benchmark, so
 #: that NULL affects nothing today, and a NULL is the honest answer rather than a guess.
+#:
+#: **This map is a closed historical record, not a registry to keep current (checked 2026-10-12).**
+#: The dev store's fingerprint has moved on since -- ``engine/.research`` is ``77c37d55…`` now,
+#: and the lab's trials carry seven distinct store fingerprints against this map's four -- because
+#: every optional file added to the map moves it. That is not a gap: a trial recorded since
+#: trial-reproducibility writes its own ``price_fingerprint`` (``source='recorded'``) and never
+#: consults this map, which exists only for the one-time backfill of the trials that predate it.
+#: Measured 2026-10-12: all 354 dev trials carry ``5451195f…``, and the only two NULLs are the
+#: ``bbe7abfb…`` rows named above. Do not add today's fingerprint here -- add nothing here.
 BACKFILL_PRICE_FINGERPRINTS: Mapping[str, str] = {
     P7A_PRICE_FINGERPRINT: P7A_PRICE_FINGERPRINT,
     "e597367bb6806d7edc2f9af4033b26c366aae92517207b4e71daad96346fcca3": P7A_PRICE_FINGERPRINT,

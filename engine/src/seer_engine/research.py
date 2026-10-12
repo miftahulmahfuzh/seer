@@ -189,8 +189,10 @@ They describe what the store is **scored** on, never what it holds: ``store_star
 
 **Absent means the dev window.** That is not a convenience, it is the only shape that keeps the
 dev store on disk loadable: ``engine/.research`` was sealed with exactly ``MANIFEST_KEYS`` and
-its fingerprint ``399d0d25...`` is the identity the ``sync-research-store`` skill keys on and
-every recorded lab trial was measured against. Requiring a window key would reject it before
+its fingerprint (``399d0d25...`` when this was written; ``77c37d55...`` today, after
+``fundamentals.csv`` and ``market_series.csv`` joined the file map) is the identity the
+``sync-research-store`` skill keys on, and the price files under it are what every recorded lab
+trial was measured against. Requiring a window key would reject it before
 any reader ran -- exactly the precedent ``OPTIONAL_DATA_FILES`` already sets for a four-file
 manifest from before fundamentals existed.
 
@@ -445,9 +447,13 @@ def price_fingerprint_of(files: Mapping[str, str]) -> str:
     ``sync-research-store`` skill keys on it, and a store whose panel changed is a different store
     -- and the wrong identity for *a price-only comparison*. The lab's 148 dev trials were recorded
     under three store fingerprints (``5451195f…`` 58 trials, ``e597367b…`` 6, ``399d0d25…`` 84),
-    and this function over today's ``399d0d25…`` manifest returns exactly ``5451195f…``, the P7a
+    and this function over that ``399d0d25…`` manifest returned exactly ``5451195f…``, the P7a
     store's fingerprint: the three carry byte-identical bars, dividends, FX and unserved rows, and
-    differ only in the panel. Keying a comparability rule on ``store_fingerprint`` would refuse
+    differ only in the panel. **Re-measured 2026-10-12 and still exactly so.** The dev store's own
+    fingerprint has since moved on twice more -- the lab's trials now carry seven of them, and
+    ``engine/.research`` is ``77c37d55…`` as this is written -- because each optional file added to
+    the map moves it. This function over that manifest still returns ``5451195f…``, which is the
+    whole point: the store keeps changing identity and the price-only comparison does not. Keying a comparability rule on ``store_fingerprint`` would refuse
     every promotion in the lab for a difference no price-only method can see; keying it on this
     strands nothing.
 

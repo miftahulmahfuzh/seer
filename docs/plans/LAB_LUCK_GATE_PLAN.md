@@ -96,6 +96,9 @@ Every phase must hold all of these, and each phase's exit criteria restate the o
    (`399d0d25…`) are byte-for-byte unchanged. **This does not cover `tuning.MAX_DRAWDOWN` or
    `tuning.MIN_PROFIT_FACTOR`**, which are the owner's dials: D6 moves the first of them, in
    phase 8, and the formula that reads it is untouched.
+   *(Correction, 2026-10-12: the store fingerprint named here has since moved to `77c37d5535…`
+   — optional files joined the file map, not a data change; the price fingerprint is still
+   `5451195f…`. See the correction in `RESEARCH_STORE_CLOBBER_GUARD_PLAN.md` invariant 1.)*
 5. No started paper roster id changes its `spec_digest`; no entry is retired or re-admitted.
 6. The committed `lab/lab.sqlite` is modified by at most one phase (phase 4's migration), and that
    migration is additive and idempotent. `web/data/lab.json` is a *projection* of it and is

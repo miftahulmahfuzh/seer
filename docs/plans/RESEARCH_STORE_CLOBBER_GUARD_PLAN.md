@@ -86,8 +86,20 @@ Every one of these is a measured baseline from the analysis, re-checkable by com
 1. **`MANIFEST_KEYS` stays at 9 and a dev build writes no window key.** `engine/.research` must
    keep loading at fingerprint `399d0d254c7a90b8cdb49f7ce598269087d38730f795cae90453eeb580b07cf8`
    with 2,490,793 bar rows and 539 symbols served.
+
    `engine/tests/test_research_store.py:236` and `:622` assert `set(manifest) == research.MANIFEST_KEYS`
    and **must pass unedited**.
+
+   > **Correction, re-measured 2026-10-12.** The fingerprint in this invariant is stale and the
+   > guard it describes is **not** tripped. `engine/.research` is `77c37d553508…` today, because
+   > `fundamentals.csv` and `market_series.csv` joined the file map (six files now, four at P7a)
+   > and every optional file moves the full fingerprint by design. The two numbers that actually
+   > detect a clobber are **unchanged to the row: 2,490,793 bar rows and 539 symbols**, and
+   > `research.price_fingerprint_of` over today's manifest still returns `5451195f…`, the value
+   > all 354 dev trials are recorded against. **Do not rebuild the store on a fingerprint
+   > mismatch alone** — a rebuild costs ~30 minutes and drops the optional files, which would move
+   > the fingerprint again and destroy the market series. Compare the bar rows, the symbol count
+   > and the price fingerprint instead.
 2. **`DEV_END` keeps the value `2015-10-16`** in `backtest/dev.py:57` and `research.py:64`, and
    `coverage.WINDOW_END == dev.DEV_END == research.DEV_END`
    (`engine/tests/test_fundamentals_coverage.py:107`) holds. **That test must not be edited.**

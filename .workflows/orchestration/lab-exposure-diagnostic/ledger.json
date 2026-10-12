@@ -3,6 +3,12 @@
   "coordinator": "orch-lab-exposure-diagnostic",
   "coordinator_session_id": "2a515a0a-b757-4752-b3e4-5a2a69d972d7",
   "created": "2026-10-12T03:35:20+00:00",
+  "landed": {
+    "at": "2026-10-12T04:14:42+00:00",
+    "base": "main",
+    "commit": "989383e466bbf96eedd1fdbf3e21a21695872d37",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -24,21 +30,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "bd65a8e",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "Live space NOT empty and not the dividend shape: 3 of 5 park nothing; the one that parks (market-core) is diluted by it, picks-at-full-size +7.5%/yr vs +4.7% recorded. Report-only held: insights 184->190 the only change, N 354 and looks 4 unmoved, all 23 variants reproduced exactly (index invariant-8 mismatch note is STALE). Key finding: empty_share bit-identical 67/237 across 4 methods incl NOBRAKE is GENUINE not a bug -- one shared SPY 200-day gate, worth +34.8 in 2008 for every book, so the five are far less independent than 5 ids suggest. Decided: reused existing task P1-ROOT-K2VB instead of minting P2-ROOT-<ID> as phase plan Step 10 said (rung 4: index TaskID column).",
       "package": "lab/`, `docs/`, `web/data",
       "plan": ".workflows/plan/lab-exposure-diagnostic/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T04:12:51+00:00",
       "satisfies": [
         "R2",
         "R3"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ROOT-K2VB",
       "title": "Run it over the five, and journal the answer"
     }
@@ -46,6 +52,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-exposure-diagnostic/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-exposure-diagnostic",
-  "updated": "2026-10-12T03:55:28+00:00",
+  "updated": "2026-10-12T04:14:42+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-exposure-diagnostic"
 }

@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/lab-exposure-diagnostic`
 **Branch:** `feature/lab-exposure-diagnostic` (base: `origin/main` @ `85f65bd`)
 **Phases:** 2
-**Status:** reconciled
+**Status:** complete
 **Coordinator:** —
 
 ---
@@ -132,8 +132,8 @@ Every phase must hold all of these. They are the §3/§6 constraints restated as
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | `lab exposure`: the diagnostic | R1, R3 | `engine/src/seer_engine/lab`, `engine/src/seer_engine/commands` | 3 | — | HARD | `.workflows/plan/lab-exposure-diagnostic/phase-1.md` | — | — |
-| 2 | Run it over the five, and journal the answer | R2, R3 | `lab/`, `docs/`, `web/data` | 5 | 1 | NORMAL | `.workflows/plan/lab-exposure-diagnostic/phase-2.md` | — | — |
+| 1 | `lab exposure`: the diagnostic | R1, R3 | `engine/src/seer_engine/lab`, `engine/src/seer_engine/commands` | 3 | — | HARD | `.workflows/plan/lab-exposure-diagnostic/phase-1.md` | P1-ENG-XP7Q (done 2026-10-12) | — |
+| 2 | Run it over the five, and journal the answer | R2, R3 | `lab/`, `docs/`, `web/data` | 5 | 1 | NORMAL | `.workflows/plan/lab-exposure-diagnostic/phase-2.md` | P1-ROOT-K2VB (done 2026-10-12) | — |
 
 ### Phase 1 — `lab exposure`: the diagnostic
 

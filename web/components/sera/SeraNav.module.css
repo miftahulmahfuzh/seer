@@ -1,4 +1,7 @@
-/* Same rail as Seer's Nav (Nav.module.css), always shown: Sera is desktop-first, not desktop-only. */
+/* Sera's rail: the same one Seer's Nav ships (Nav.module.css), shown on a desk.
+   Below 1024 px globals.css's `.desk-only` takes it out entirely and `.bar` below takes over.
+   `display: flex` lives in the base rule, so -- unlike Nav's rail, which has none and needs a
+   `display: flex !important` at >=1024 to get one back -- no override is needed here. */
 .rail {
   position: sticky;
   top: 0;
@@ -15,6 +18,7 @@
 .wordmark { font-size: 24px; font-weight: 500; letter-spacing: -0.05em; }
 .dot { color: var(--coral); }
 
+/* The rail's vertical tab pill. The bar's horizontal one is .barTabs. */
 .tabs {
   display: flex;
   flex-direction: column;
@@ -24,6 +28,34 @@
   background: var(--bar);
 }
 
+/* Sera's phone navigation: Seer's own floating pill (Nav.module.css .bar), at Seer's own metrics.
+   The only number that differs is the width, because Sera has six sections where Seer has four:
+   6 x 52 tab + 5 x 4 gap + 2 x 8 padding = 348 px, which fits the 390 px floor with 21 px of
+   gutter each side and 414 with 33 px. There is no wordmark and no back button in here on purpose
+   -- that is what pays for the sixth tab at full size (SeraNav.tsx). */
+.bar {
+  position: fixed;
+  left: 50%;
+  bottom: max(11px, calc((var(--safe-bottom) - 4px) * 0.7));
+  transform: translateX(-50%);
+  width: 348px;
+  height: 68px;
+  border-radius: 999px;
+  background: var(--bar);
+  padding: 8px;
+  z-index: 50;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+
+.barTabs {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  height: 100%;
+}
+
+/* One tab, whichever pill holds it. In .barTabs the 1fr track resolves to exactly 52 px, so the
+   bar and the rail show the same button at the same size. */
 .tab, .active {
   position: relative;
   display: flex;
@@ -45,8 +77,14 @@
 
 /* Unseen journal entries. A sibling of the Journal page's own badge
    (app/sera/journal/journal.module.css .badge): same coral pill, same tabular numerals,
-   sized for the rail's 52 px tab and ringed so it reads off the tab strip. There is no
-   `.zero` variant on purpose — a zero count renders no badge at all (SeraNav.tsx). */
+   sized for the 52 px tab and ringed so it reads off the tab strip. There is no
+   `.zero` variant on purpose -- a zero count renders no badge at all (SeraNav.tsx).
+
+   One size at every width, deliberately. The tab is 52 px in the rail and 52 px in the bar, and
+   in the bar this pill sits 6 px below the bar's own top edge (8 px padding less the 2 px offset),
+   4 px once its ring is counted -- inside the pill, not cut by it, which is what the shipped
+   top-bar placeholder got wrong. The ring is var(--bar), which is the bar's background as well as
+   the rail pill's, so it separates cleanly in both themes. */
 .badge {
   position: absolute;
   top: -2px;
@@ -69,30 +107,4 @@
   background: var(--on-coral);
   color: var(--coral);
   box-shadow: 0 0 0 2px var(--coral);
-}
-
-/* Below 1024 px: a top bar, not designed further (plan: desktop only for now). */
-@media (max-width: 1023.98px) {
-  .rail {
-    z-index: 40;
-    width: 100%;
-    height: auto;
-    flex-direction: row;
-    padding: calc(10px + var(--safe-top)) 16px 10px;
-    gap: 16px;
-    background: var(--bg);
-  }
-  .tabs { flex-direction: row; padding: 5px; }
-  .tab, .active { height: 44px; min-width: 44px; }
-  .back { margin-top: 0; margin-left: auto; }
-  /* 44 px tab: a smaller pill, nudged out to sit on the rim rather than over the icon. */
-  .badge {
-    top: -3px;
-    right: -3px;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
-    font-size: 11px;
-    line-height: 18px;
-  }
 }

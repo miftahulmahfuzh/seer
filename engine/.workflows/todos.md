@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-12 22:10
-**Total Active Tasks**: 9
+**Last Updated**: 2026-10-12 22:00
+**Total Active Tasks**: 6
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 7
+- P1 High: 4
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 5
-- Completed: 123
+- Blocked: 3
+- Completed: 125
 
 ---
 
@@ -58,15 +58,25 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R1, R2 — Resize band measured against the holding's own target, past results unchanged, explicit paper/web decision; Interest on idle cash from the cached T-bill yield, as a versioned explicit simulator input
   - **Depends on**: P1-ENG-0L6E, P1-ENG-0JM2
   - **Plan**: `.workflows/plan/P1-ENG-03JM.md`
-- [ ] **P1-ENG-ESU5** Phase 4: Survivorship check runnable here; EODHD top-up
+- [x] **P1-ENG-ESU5** Phase 4: Survivorship check runnable here; EODHD top-up
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `$SEER_SV_STORE` default for `commands/lab.py --sv-store` and env honouring in `commands/survivorship_store.py` (`--out`/`--source`/`--cache`), `lab/survivorship_check.py` refusal text, `tests/test_sv_store_env.py`, explore and sera skills exporting `SEER_SV_STORE`, a runbook note, and data operations on the main checkout (`survivorship_store --fetch-aliases` from EODHD before 2026-11-10, then `--build`, plus a smoke `lab survivorship`); leaves cleaning rules, `lab/hardgate.py` and the dev store untouched. Exit: from a worktree with `SEER_SV_STORE` set, `lab survivorship <existing method> --no-journal` runs to a report; the rebuilt sv store names the current dev store and its `market_series.csv` (with `T13W`) is byte-identical; coverage before/after recorded in the runbook; suite green.
-  - **Status**: blocked
+  - **Status**: completed
   - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 4 of 7)
   - **Satisfies**: R3 — Survivorship check runnable on this machine; EODHD top-up before 2026-11-10
   - **Depends on**: —
   - **Plan**: `.workflows/plan/P1-ENG-ESU5.md`
+  - **Completed**: 2026-10-12 22:00
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/commands/lab.py, engine/src/seer_engine/commands/survivorship_store.py, engine/src/seer_engine/lab/survivorship_check.py, engine/tests/test_lab_survivorship.py, engine/tests/test_sv_store_env.py (new), .claude/skills/explore-and-experiment-new-method/SKILL.md, .claude/skills/sera-the-explorer/SKILL.md, docs/runbooks/survivorship-store.md (new)
+  - **Verified**: `ruff check engine` clean. Full suite with Postgres up: 4550 passed, 3 skipped (opt-in live tests only). Smoke: with `SEER_SV_STORE` set, `lab survivorship M0117 --no-journal` exits 0 and all 5 variants reproduce; unset, it exits 2 with a message naming `SEER_SV_STORE`; main lab DB unwritten.
+  - **Drift**:
+    - None in code. Data: the alias dry run found 0 codes to probe; the real fetch made 0 calls, 0 failed (128 already cached). The rebuild reproduced the 2026-10-10 sv store exactly (manifest fingerprint 9de54476…, 989/1061 served, 58.6% -> 89.0%, source price fingerprint 5451195f…); `market_series.csv` byte-identical to the dev store's (5722 T13W rows). Backup at /home/miftah/seer-backups/research-sv.bak-20261012 (outside the repo).
+    - Task creation skipped: another session of this swarm had already created all seven tasks. This file briefly held two phase-6 entries (P1-ENG-H3RM and P1-ENG-DEBZ); left to the phase 6 session, which owns that dedup.
+  - **Decided**:
+    - Completion: the `[x]` block is left in place under `### [P1] High` and Quick Stats adjusted for this task only (this file's precedent for swarm-tracked sets; phases 1 and 6 share this worktree). Plan index: phase 4's TaskID cell ticked `(done 2026-10-12)`, `**Status:**` left alone (the coordinator's ledger is the status of record). P1-ENG-FON5 left `blocked`: it also depends on phase 3 (P1-ENG-03JM), still blocked.
+    - Landing not attempted: swarm coordinator `orch-measure-then-learn` owns the merge of `feature/measure-then-learn` into `main`.
 - [ ] **P1-ENG-FON5** Phase 5: Near-miss twins under the fixed tape (lab method + run)
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -76,15 +86,24 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R4 — Near misses re-priced under the fixed tape as new pre-registered twins; "picking or shape?" answered
   - **Depends on**: P1-ENG-03JM, P1-ENG-ESU5
   - **Plan**: `.workflows/plan/P1-ENG-FON5.md`
-- [ ] **P1-ENG-H3RM** Phase 6: Tree-ranker allocator (features, walk-forward model, tests)
+- [x] **P1-ENG-H3RM** Phase 6: Tree-ranker allocator (features, walk-forward model, tests)
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns new pure allocator module `engine/src/seer_engine/lab/tree_rank.py` (point-in-time features, forward-21-session return rank labels, walk-forward annual refits of a fixed-seed `HistGradientBoostingRegressor`, top-N equal-weight targets; exports `TREE_RANK`, `TreeRankParams`, `TreeRankPrepared.model_on`, etc.) and `engine/tests/test_tree_rank.py`; leaves lab methods, lab data and closed strategies untouched. Exit: allocator contract tests (prepared == unprepared, reads only <= d), determinism test (two fits bit-identical), no-lookahead test (labels never extend past d); purity test green.
-  - **Status**: blocked
+  - **Status**: done
   - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 6 of 7)
   - **Satisfies**: R5 — One pre-registered gradient-boosted-tree ranker method, run on the dev window
   - **Depends on**: —
   - **Plan**: `.workflows/plan/P1-ENG-H3RM.md`
+  - **Completed**: 2026-10-12 22:00
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/tree_rank.py, engine/tests/test_tree_rank.py, engine/.workflows/todos.md
+  - **Drift**:
+    - None in code. A bookkeeping duplicate (P1-ENG-DEBZ) for phase 6 was created by a parallel task-creation race and committed inside phase 1's commit b8daa97; it is removed from this file in this commit. P1-ENG-H3RM is the real phase 6 task.
+  - **Decided**:
+    - Step 3 task creation with three phase sessions sharing one worktree -> create only this phase's task (tie-break: narrower blast radius); another session had already created all seven, so the duplicate was removed.
+    - Completion: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own precedent for every swarm-tracked set; phases 1 and 4 share this worktree and append here concurrently). Plan index: phase 6's TaskID cell ticked `(done 2026-10-12)`, `**Status:**` left alone. P1-ENG-SHJJ stays blocked: it also waits on P1-ENG-03JM and P1-ENG-FON5, neither complete.
+    - Landing not attempted: swarm coordinator `orch-measure-then-learn` owns the merge of `feature/measure-then-learn` into `main`.
 - [ ] **P1-ENG-SHJJ** Phase 7: Tree-ranker method: pre-register and run on the dev window
   - **Difficulty**: NORMAL
   - **Type**: Feature
@@ -94,16 +113,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R5 — One pre-registered gradient-boosted-tree ranker method, run on the dev window
   - **Depends on**: P1-ENG-03JM, P1-ENG-FON5, P1-ENG-H3RM
   - **Plan**: `.workflows/plan/P1-ENG-SHJJ.md`
-- [ ] **P1-ENG-DEBZ** Phase 6: Tree-ranker allocator (features, walk-forward model, tests)
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns the new pure allocator module `engine/src/seer_engine/lab/tree_rank.py` (point-in-time features from existing feature code, forward-21-session return rank labels, walk-forward annual refits of a fixed-seed `HistGradientBoostingRegressor`, top-N equal-weight targets; exports `TREE_RANK`, `TREE_RANK_FUND`, `TreeRankParams`, `TreeRankPrepared.model_on`, `anchor_for`, `month_ends`, `label_end`, `SCREEN`, `FEATURE_LOOKBACK`) and `engine/tests/test_tree_rank.py`. Exit: allocator contract tests (prepared == unprepared, reads only ≤ d), determinism test (two fits bit-identical), no-lookahead test (labels never extend past d); purity test green.
-  - **Status**: in_progress
-  - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 6 of 7)
-  - **Satisfies**: R5 — One pre-registered gradient-boosted-tree ranker method, run on the dev window
-  - **Depends on**: —
-  - **Plan**: `.workflows/plan/P1-ENG-DEBZ.md`
-
 - [x] **P1-ENG-8X1K** Phase 1: Survivorship-check store: cleaning, build, marker, reports
   - **Difficulty**: HARD
   - **Type**: Feature

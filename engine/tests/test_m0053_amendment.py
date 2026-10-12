@@ -90,7 +90,14 @@ def test_the_five_recorded_candidates_still_digest_to_what_the_lab_holds():
 
 
 def test_the_recorded_digests_match_the_committed_database():
-    """The constants above are a copy of the record; this proves the copy is still true."""
+    """The constants above are a copy of the record; this proves the copy is still true.
+
+    This asserted equality with ``RECORDED`` alone until phase 5 ran the amendment, at which
+    point the database held eight M0053 rows rather than five and the equality could never hold
+    again. Both halves are checked separately now, which is stronger than the single equality
+    was: the five pre-amendment rows must be untouched *and* the three new ones must each sit on
+    the digest their pre-registration pinned, with nothing else recorded under this method.
+    """
     if not store.COMMITTED_DB.exists():
         pytest.skip("no lab database")
     conn = sqlite3.connect(f"file:{store.COMMITTED_DB}?mode=ro", uri=True)
@@ -100,7 +107,17 @@ def test_the_recorded_digests_match_the_committed_database():
         ).fetchall()
     finally:
         conn.close()
-    assert {cid: d for cid, d in rows} == RECORDED
+    recorded = {cid: d for cid, d in rows}
+    for cid, digest in RECORDED.items():
+        assert recorded.get(cid) == digest, (
+            f"{cid}'s recorded configuration moved; the lab holds a trial on the old digest"
+        )
+    for cid, digest in AMENDED_DIGESTS.items():
+        assert recorded.get(cid) == digest, (
+            f"{cid} did not land on its pre-registered digest; the amendment ran a different "
+            "configuration from the one it committed to"
+        )
+    assert set(recorded) == set(RECORDED) | set(AMENDED_DIGESTS)
 
 
 def test_the_amendment_carries_the_three_pre_registered_configurations():

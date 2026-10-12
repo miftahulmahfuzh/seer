@@ -3,9 +3,12 @@
 The amendment adds candidates to a method that has already run (trials #126-#128). Two things
 have to be true at once for that to be honest, and this module checks both:
 
-- the three configurations the amendment pre-registers are **free** -- no recorded trial, in any
-  window, already claims their ``config_digest`` -- so running them is a new measurement and not
-  a silent re-run;
+- no recorded trial claims any of the amendment's three digests under any *other*
+  candidate -- so running them was a new measurement and not a silent re-run under a new name.
+  This was written before the run, when the right check was "no trial holds this digest at all";
+  phase 5's six trials are what made that form unsatisfiable, so it now states the property that
+  survives the run and is strictly stronger than absence: a digest is claimed by its own
+  candidate or by nothing;
 - the three configurations the lab already recorded still digest to exactly the values it holds
   on file. ``registry._canon`` enumerates every ``compare=True`` field of a params dataclass, so
   one added field would rewrite the digest of every recorded candidate that uses it and break
@@ -72,6 +75,28 @@ def _recorded_digests() -> set[str] | None:
         conn.close()
 
 
+def _recorded_claims() -> dict[str, set[tuple[str, str]]] | None:
+    """Which ``(method_id, candidate_id)`` pairs the committed database records against each
+    digest, or None when the database is not in this tree.
+
+    ``_recorded_digests`` cannot answer the question that matters once an amendment has run,
+    because by then the amendment's own digests are present and a bare membership test says
+    only that *somebody* claims them.
+    """
+    if not store.COMMITTED_DB.exists():
+        return None
+    conn = sqlite3.connect(f"file:{store.COMMITTED_DB}?mode=ro", uri=True)
+    try:
+        claims: dict[str, set[tuple[str, str]]] = {}
+        for method_id, candidate_id, digest in conn.execute(
+            "SELECT method_id, candidate_id, config_digest FROM trials"
+        ):
+            claims.setdefault(str(digest), set()).add((str(method_id), str(candidate_id)))
+        return claims
+    finally:
+        conn.close()
+
+
 @pytest.fixture(scope="module")
 def market():
     return smoke_market({"SPY"})
@@ -116,14 +141,22 @@ def test_the_amendment_digests_are_the_preregistered_ones():
     assert {c.id: config_digest(c) for c in NEW} == AMENDMENT
 
 
-def test_the_amendment_digests_are_free_in_the_committed_lab():
-    digests = _recorded_digests()
-    if digests is None:
+def test_no_amendment_digest_is_claimed_by_another_candidate():
+    """An amendment's configuration must be its own measurement, never a re-run under a new name.
+
+    Before phase 5 ran, that read "no trial holds this digest". After it, each digest is held by
+    exactly one trial -- the amendment's own -- so the pre-run form could never pass again. The
+    property below is what was actually meant and holds on both sides of the run: a digest is
+    claimed by its own candidate, or by nothing at all. It is stricter than absence, because it
+    also catches a second method quietly recording the same configuration under its own id.
+    """
+    claims = _recorded_claims()
+    if claims is None:
         pytest.skip("no lab database")
     for cid, digest in AMENDMENT.items():
-        assert digest not in digests, (
-            f"{cid} repeats a configuration the lab has already run; an amendment must be a new "
-            "measurement, not a re-run under a new name"
+        assert claims.get(digest, set()) <= {("M0030", cid)}, (
+            f"{cid}'s configuration is recorded under {sorted(claims[digest])}; an amendment must "
+            "be a new measurement, not a re-run of something the lab already holds"
         )
 
 

@@ -1,0 +1,145 @@
+{
+  "branch": "feature/measure-then-learn",
+  "coordinator": "orch-measure-then-learn",
+  "coordinator_session_id": "556e6d4c-4240-4633-ba27-54b95a25ad81",
+  "created": "2026-10-12T14:42:54+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 1,
+      "note": null,
+      "package": "engine/sim",
+      "plan": ".workflows/plan/measure-then-learn/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Resize band relative to the holding's target (`resize_basis` lever)"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "engine/sim`, `engine/backtest`, `engine/paper`, `engine/commands`, `engine/lab`, `engine/tests",
+      "plan": ".workflows/plan/measure-then-learn/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Interest on idle cash (`cash_yield` lever)"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "engine/sim`, `web/lib",
+      "plan": ".workflows/plan/measure-then-learn/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Fixed-tape presets and the web mirror"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 4,
+      "note": null,
+      "package": "engine/commands`, `engine/lab`, skills, runbook, data",
+      "plan": ".workflows/plan/measure-then-learn/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Survivorship check runnable here; EODHD top-up"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        3,
+        4
+      ],
+      "difficulty": "HARD",
+      "n": 5,
+      "note": null,
+      "package": "engine/lab/methods`, `lab/",
+      "plan": ".workflows/plan/measure-then-learn/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Near-miss twins under the fixed tape (lab method + run)"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 6,
+      "note": null,
+      "package": "engine/lab` (`lab/tree_rank.py`)",
+      "plan": ".workflows/plan/measure-then-learn/phase-6.md",
+      "reported_at": null,
+      "satisfies": [
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Tree-ranker allocator (features, walk-forward model, tests)"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        3,
+        5,
+        6
+      ],
+      "difficulty": "NORMAL",
+      "n": 7,
+      "note": null,
+      "package": "engine/lab/methods`, `lab/",
+      "plan": ".workflows/plan/measure-then-learn/phase-7.md",
+      "reported_at": null,
+      "satisfies": [
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Tree-ranker method: pre-register and run on the dev window"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/measure-then-learn/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "measure-then-learn",
+  "updated": "2026-10-12T14:42:54+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/measure-then-learn"
+}

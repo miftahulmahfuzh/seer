@@ -2,7 +2,7 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-10 23:59
+**Last Updated**: 2026-10-12 10:48
 **Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 117
+- Completed: 118
 
 ---
 
@@ -993,6 +993,27 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - No `**Commit**` field → same precedent as phases 1 and 2: `todos.md` is itself in the commit, so a sha recorded here can never be the sha of the commit that carries it. The sha goes to the swarm ledger at `.workflows/orchestration/lab-hard-gate/ledger.json`.
     - `readme-updater` not dispatched → rung 2 and the coordinator's direct instruction. `engine/package_readme.md` is this phase's own owned deliverable, already written and verified against the modules as phases 1 and 2 built them; a second author there would overwrite measured content.
     - Landing not attempted and `next_command` empty → `swarm.py find --plan .../lab-hard-gate/PLAN.md` returns `swarm: true`, coordinator `orch-lab-hard-gate`, so per `analyze-orchestrator` Step 5 the merge of `feature/lab-hard-gate` into `main` belongs to that coordinator, even though this is the last phase. Nothing merged or pushed to main; no worktree or branch deleted.
+
+
+- [x] **P1-ENG-XP7Q** Phase 1: `lab exposure`: the diagnostic
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/lab/exposure.py` (new) — the park-set rule, the `ExposureAllocator` wrapper and its params, the four arm builders, `plan_methods`, `measure`, the era table, `format_report`, `summary_line`, `insight_text`, `journal`; `engine/src/seer_engine/commands/lab.py` (additive edit only — one module-docstring line, one `sub.add_parser("exposure", ...)` block, one `_exposure(conn, args)` handler, one `_HANDLERS` entry); `engine/tests/test_lab_exposure.py` (new). Does not touch `sim/`, `backtest/`, `strategies/`, `paper/`, `sean/`, `fundamentals/`, `lab/methods/`, `lab/hardgate.py`, `lab/runner.py`, `lab/store.py`, `web/`, `db/`, the lab database itself, or any existing subcommand's behaviour or help text. Exit: `lab exposure --help` renders (the `%%` escaping rule holds) and `lab exposure M0030` runs on the real dev store, printing four arms per variant and the per-era grid; `ruff check engine` clean and `pytest engine/tests` green with Postgres up and no DB test skipping, the new test file covering the wrapper's `Allocator` contract (via `allocatorkit`), the re-weighting arithmetic, every refusal that must land before a store loads, the test-window refusal, and the report-only invariant (N, looks and every trial-side table unchanged across a full CLI run on the smoke fixture); `git show --stat HEAD` lists exactly those three files and `git diff --name-only origin/main -- engine/ lab/ web/ db/ docs/backtests/ .workflows/todos.md` shows the same three and nothing else (the planning artifacts are expected differences, Reconciliation Log C6). Report-only throughout: no trial row, no moments, N unmoved, no test-window look, no new method id, no hard-gate override.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/lab-exposure-diagnostic/PLAN.md` (phase 1 of 2)
+  - **Satisfies**: R1 — Build the §4.1 exposure diagnostic: report what share of a method's money was in its own picks (whole window and per era) versus parked in the market or in cash, and what the picks alone did against SPY TR per era with the parked holding removed and the brakes off; R3 — Hold the §3/§6 constraints: report-only — no trial row, no moments, N unmoved, no test-window look, nothing in `lab.sqlite` but a journal entry; `lab stage` for any database commit; no hard-gate override
+  - **Plan**: `.workflows/plan/P1-ENG-XP7Q.md`
+  - **Completed**: 2026-10-12 10:48
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/exposure.py (new), engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_exposure.py (new)
+  - **Verified**: `ruff check engine` clean ("All checks passed!"). Full suite with Postgres up (`PG_TEST_URL`, `PYTHONPATH=<worktree>/engine/src`): 4,364 passed, 3 skipped in 81s — the 3 skips are the opt-in live-store tests (`SEER_LAB_COSTS_LIVE`, `SEER_LAB_NAMES_LIVE`, `SEER_LAB_SURVIVORSHIP_LIVE`), not DB tests, so the DB tests ran. New test file alone: 23 passed. `lab exposure --help` renders (the `%%` escaping rule holds). `lab exposure M0030 --store /home/miftah/seer/engine/.research --no-journal` ran end to end in 23.7s, printing four columns per variant, the `parks money in: SPY` line, the full per-era grid and the closing line "Lab N (dev trials): 354 before, 354 after; test-window looks used: 4 before, 4 after". Report-only held on the real database: `lab/lab.sqlite` byte-identical before and after (md5 5de3260bc3d075834535ce2936978f0f, clean in `git status`), counts unchanged — trials 358, trial_moments 244, trial_funding 230, trial_provenance 358, insights 184.
+  - **Drift**:
+    - The handover's reproduction gap did not appear: all three recorded M0030 variants reproduced their recorded total return exactly on dev store 77c37d553508 (trials #126 +758.8%, #127 +958.4%, #128 +826.7%). The plan's invariant 8 note (M0030-C50T re-running to 9.583603 vs a recorded 9.583723) was measured on an older store fingerprint. The reproduction check is still printed as information and no conclusion rests on a recorded number beside a re-run one, so the module is unchanged; this is a note, not a fix.
+    - Phase 1's exit criterion `git diff --name-only origin/main -- engine/ lab/ web/ db/ docs/backtests/ .workflows/todos.md shows exactly those three engine paths` cannot be literally met: `/implement` Step 3's mandatory task bookkeeping also writes `.workflows/todos.md`, `engine/.workflows/todos.md` and two adopted plan copies. These are workflow artifacts of the same class Reconciliation Log C6 already named as expected differences, not scope creep. The code half of the criterion holds exactly: `engine/src/seer_engine/commands/lab.py` is the only tracked engine source that differs, 97 insertions and 0 deletions.
+  - **Decided**:
+    - Where to put the Step 3 task-bookkeeping files, given the phase plan says it leaves `.workflows/todos.md` to phase 2 -> they go in their OWN commit, made BEFORE the code commit, so `git show --stat HEAD` lists exactly the phase's three files as its exit criterion requires and nothing is left uncommitted for phase 2 (Rung 2, the phase exit criteria, plus Rung 3, the Verification block's explicit three-path `git add`).
+    - Completion: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own recorded precedent for every swarm-tracked set, since peer phase sessions append here concurrently). Plan index: phase 1's row ticked in the main checkout and left uncommitted for the coordinator, per the orchestration convention.
+    - Landing not attempted and `next_command` handed on rather than merged: `swarm.py find --plan .../lab-exposure-diagnostic/PLAN.md` reports a live swarm, coordinator `orch-lab-exposure-diagnostic`, so the merge of `feature/lab-exposure-diagnostic` into `main` belongs to that coordinator. Nothing merged or pushed to main; no worktree or branch deleted.
 
 
 ### [P2] Medium

@@ -64,6 +64,13 @@
                                     the survivorship-check store (engine/.research-sv), side by
                                     side; journal one observation per method. No trial row, no
                                     moments, no status change: N and the looks do not move
+    lab exposure M0030 [M0024 ...] [--only IDS] [--store DIR] [--csv PATH] [--no-journal]
+                                    report only: what share of a method's money was ever in its
+                                    own picks rather than parked in the market, and what those
+                                    picks did alone against SPY per era, with the parked holding
+                                    removed and the brakes off. Four columns per recorded variant,
+                                    no method file changed and no new method id. No trial row, no
+                                    moments, no status change: N and the looks do not move
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
@@ -368,6 +375,46 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
                    help="print the report and write nothing at all, not even the observation")
     s.add_argument("--csv", type=Path, default=None, metavar="PATH",
                    help="also write the full grid (variant x store) to PATH as CSV, full precision")
+
+    s = sub.add_parser(
+        "exposure",
+        # No literal `%` in any `help=` string below, and none may be added: argparse runs every
+        # `help=` through %-interpolation (HelpFormatter._expand_help), so a bare `%` is read as a
+        # format spec and `lab --help` dies. A doubled `%%` renders as one `%`. `description=` is
+        # NOT interpolated and must stay single. See the `costs` parser above.
+        help="report only: how much of a method's money was in its own picks, and what they did alone",
+        description=(
+            "Re-run every recorded dev variant of each named method at its recorded capital and "
+            "funding, four times on the dev window: the candidate as the lab recorded it; its own "
+            "picks with the parked instruments dropped at the weights it gave the rest; those "
+            "picks rescaled to fill the whole book with every brake off; and the parked money "
+            "alone. Prints the share of the book that was ever in its own picks, the share of "
+            "decision days it had no pick to make, and the lead over SPY whole-window and per era "
+            "(1996-2002, 2003-2008, 2008 alone, 2009-2015). Parked is read generically from the "
+            "allocator's own holds(), so no method file changes and no method id is minted. "
+            "Records no trial, no moments, no funding and no status, so the lab's N and the "
+            "test-window looks do not move and the test window is never read; one plain-words "
+            "observation per method is journaled unless --no-journal."
+        ),
+    )
+    s.add_argument("method", nargs="+", metavar="M0030", help="the methods to measure")
+    s.add_argument(
+        "--only", "--candidate", default=None, metavar="IDS",
+        help="measure only these recorded variants (comma-separated candidate ids, e.g. "
+             "M0030-C50T) instead of every recorded dev variant of each method",
+    )
+    s.add_argument(
+        "--store",
+        type=Path,
+        default=Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR),
+        help=f"the dev store the trials were recorded on (default: {research.STORE_DIR}, or "
+             "$SEER_RESEARCH_STORE); a test-window store is refused. The store is gitignored, so "
+             "a fresh worktree has none -- point this at a checkout that does",
+    )
+    s.add_argument("--no-journal", action="store_true",
+                   help="print the report and write nothing at all, not even the observation")
+    s.add_argument("--csv", type=Path, default=None, metavar="PATH",
+                   help="also write the full grid (variant x column) to PATH as CSV, full precision")
 
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
@@ -2196,6 +2243,55 @@ def _survivorship(conn, args) -> int:
     return 0
 
 
+def _exposure(conn, args) -> int:
+    """``lab exposure M0030 [M0024 ...]``: a method's own picks, apart from what it parks.
+
+    Report only. Every refusal that needs no bars -- the method ids, their files, their recorded
+    trials, a bracket-engine variant with no targets to re-weight, the recorded capital and
+    funding, an unknown --only id, the benchmark geometry -- is made before the research store is
+    loaded. Then four arms per recorded variant run on the dev window and the grid is printed.
+    Nothing is written except one observation per method (none with --no-journal); N and the
+    test-window looks are printed before and after so the invariant is visible, not just tested.
+    """
+    from seer_engine.lab import exposure as exp
+    from seer_engine.lab import hardgate
+
+    if research.DEV_END != dev.DEV_END:
+        raise store.LabError("research.DEV_END differs from dev.DEV_END; refusing to run")
+    plans = exp.plan_methods(conn, args.method, args.only)
+    geo = hardgate.geometry(conn)  # the recorded SPY hold: the per-era benchmark, before any load
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+    t0 = time.perf_counter()
+    run, arms = exp.measure_store(conn, plans, Path(args.store), geo.bench)
+    reports = exp.compare(plans, arms)
+    for rep in reports:
+        print(exp.format_report(rep, run))
+        print()
+    print("summary (best recorded eligible variant by MAR, else the best by MAR):")
+    for rep in reports:
+        print(f"  {exp.summary_line(rep)}")
+    if args.csv is not None:
+        written = exp.write_csv(reports, run, Path(args.csv))
+        print(f"\ngrid written to {written}")
+    if args.no_journal:
+        tail = "No journal entry (--no-journal), so `lab stage` is not needed."
+    else:
+        with conn:
+            entries = [exp.journal(conn, rep) for rep in reports]
+        tail = (
+            f"journal entries {', '.join(f'#{e}' for e in entries)} written (one observation per "
+            f"method). Solo: `python -m seer_engine lab stage` so seertrade.site/sera shows them."
+        )
+    print(
+        f"\nNo trial was recorded and no method id was minted. Lab N (dev trials): {n_before} "
+        f"before, {store.dev_trial_count(conn)} after; test-window looks used: {looks_before} "
+        f"before, {store.test_looks(conn)} after. {tail}"
+    )
+    log.info("lab exposure: %d method(s) done (%.1fs)", len(reports), time.perf_counter() - t0)
+    return 0
+
+
 def _idea(conn, args) -> int:
     store.begin_immediate(conn)  # the next id and its insert, atomic against parallel sessions
     with conn:
@@ -2348,6 +2444,7 @@ _HANDLERS = {
     "costs": _costs,
     "names": _names,
     "survivorship": _survivorship,
+    "exposure": _exposure,
     "idea": _idea,
     "note": _note,
     "block": _block,

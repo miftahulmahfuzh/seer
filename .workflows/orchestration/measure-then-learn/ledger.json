@@ -100,19 +100,19 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "0028022",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 6,
-      "note": null,
+      "note": "lab/tree_rank.py + 20 tests; real-store fits 11.6s, 202 book months; duplicate phase-6 task P1-ENG-DEBZ (raced in b8daa97) removed, H3RM is canonical",
       "package": "engine/lab` (`lab/tree_rank.py`)",
       "plan": ".workflows/plan/measure-then-learn/phase-6.md",
-      "reported_at": "2026-10-12T14:54:17+00:00",
+      "reported_at": "2026-10-12T15:04:20+00:00",
       "satisfies": [
         "R5"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-H3RM",
       "title": "Tree-ranker allocator (features, walk-forward model, tests)"
     },
     {
@@ -140,7 +140,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/measure-then-learn/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "measure-then-learn",
-  "updated": "2026-10-12T14:54:17+00:00",
+  "updated": "2026-10-12T15:04:20+00:00",
   "verified_at": "2026-10-12T14:54:11+00:00",
   "worktree": "/home/miftah/.worktrees/seer/measure-then-learn"
 }

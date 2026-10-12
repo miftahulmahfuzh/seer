@@ -303,7 +303,7 @@ def test_the_real_fee_presets_are_promotable_fractional_books():
         assert roster.rules_for(preset.id) is preset
         assert rule_owner_inputs(preset) == ()
         assert preset.fractional and preset.engine == "book"
-    assert PRESETS[-2:] == (MONTHLY_HOLD_FRAC_GOTRADE, MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE)
+    assert PRESETS[14:16] == (MONTHLY_HOLD_FRAC_GOTRADE, MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE)
     # the whole-share flat preset's fractional twin is still the flat one
     assert promote.fractional_twin(MONTHLY_HOLD) is MONTHLY_HOLD_FRAC
 

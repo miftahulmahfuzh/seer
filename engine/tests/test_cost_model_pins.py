@@ -87,6 +87,9 @@ def test_flat_is_absent_from_every_canonical_form():
         "design-v0-gotrade",
         "monthly-hold-frac-gotrade",
         "monthly-rank-weekly-resize-frac-gotrade",
+        "monthly-hold-frac-gotrade-tband",
+        "monthly-hold-frac-gotrade-tband-cash",
+        "weekly-hold-frac-gotrade-tband-cash",
     ]
 
 

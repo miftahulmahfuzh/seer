@@ -270,6 +270,41 @@ MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE = replace(
 # 1.036% the round trip, against the flat model's 0.2%.
 DESIGN_V0_GOTRADE = replace(DESIGN_V0, id="design-v0-gotrade", engine="bracket", cost_model="gotrade")
 
+# The fixed measuring tape (handover 2026-10-12, "measure then learn", Step 0). Under RESIZE_BAND a
+# held name is traded back only when its gap reaches 1% of the WHOLE account, so in a 20-50 name
+# book it must drift 50-100% of its own target before anything trades, and "resize" was close to a
+# no-op. This preset measures the band against the holding's own target instead
+# (resize_basis="target", TARGET_RESIZE_BAND = 20% of weight x equity). Every other lever is
+# monthly-hold-frac-gotrade's, so a twin built on it isolates the tape. A new id, never an edit:
+# every recorded trial and pinned paper spec stays on the old presets byte for byte. No roster
+# entry uses it (live paper is unchanged), but it carries no owner input and is promotable, so the
+# web mirrors know it (cadence.ts TARGET_BAND_RULES, reminders.ts RESIZING_RULES).
+MONTHLY_HOLD_FRAC_GOTRADE_TBAND = replace(
+    MONTHLY_HOLD_FRAC_GOTRADE, id="monthly-hold-frac-gotrade-tband", resize_basis="target"
+)
+# The same tape with idle cash earning the 13-week T-bill yield (cash_yield="T13W", read
+# point-in-time from the store's market series). Cash that waits for the month-start rotation, and
+# the money a rule steps aside with, used to earn nothing. It raises the owner input "cash-yield"
+# (that Gotrade pays interest on idle dollars is not verified) and paper refuses it, so it is a
+# lab measurement: what a method looks like when its waiting money is credited as a real account
+# could credit it.
+MONTHLY_HOLD_FRAC_GOTRADE_TBAND_CASH = replace(
+    MONTHLY_HOLD_FRAC_GOTRADE_TBAND, id="monthly-hold-frac-gotrade-tband-cash", cash_yield="T13W"
+)
+# The weekly arm on the fixed tape: weekly-hold in fractional shares at Gotrade's real fees, target
+# band, T-bill cash. Real-fee weekly books so far were one-off rule sets inside method files
+# (weekly-hold-frac-gotrade in M0063, M0064, M0076, M0085), not presets. Under the old band
+# weekly-against-monthly measured little, because a weekly resize almost never cleared 1% of
+# equity; the near-miss twins (M0020-W-NOSTOP ran weekly) need a weekly arm on the same tape.
+WEEKLY_HOLD_FRAC_GOTRADE_TBAND_CASH = replace(
+    WEEKLY_HOLD,
+    id="weekly-hold-frac-gotrade-tband-cash",
+    fractional=True,
+    cost_model="gotrade",
+    resize_basis="target",
+    cash_yield="T13W",
+)
+
 PRESETS: tuple[TradeRules, ...] = (
     DESIGN_V0,
     MONTHLY_HOLD,
@@ -287,6 +322,9 @@ PRESETS: tuple[TradeRules, ...] = (
     DESIGN_V0_GOTRADE,
     MONTHLY_HOLD_FRAC_GOTRADE,
     MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE,
+    MONTHLY_HOLD_FRAC_GOTRADE_TBAND,
+    MONTHLY_HOLD_FRAC_GOTRADE_TBAND_CASH,
+    WEEKLY_HOLD_FRAC_GOTRADE_TBAND_CASH,
 )
 
 

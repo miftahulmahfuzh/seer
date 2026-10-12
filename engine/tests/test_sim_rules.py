@@ -110,6 +110,9 @@ def test_preset_ids_are_unique_and_in_order():
         "design-v0-gotrade",
         "monthly-hold-frac-gotrade",
         "monthly-rank-weekly-resize-frac-gotrade",
+        "monthly-hold-frac-gotrade-tband",
+        "monthly-hold-frac-gotrade-tband-cash",
+        "weekly-hold-frac-gotrade-tband-cash",
     ]
     assert len(set(ids)) == len(ids)
 
@@ -250,8 +253,12 @@ def test_decision_session_rejects_non_sessions_and_bad_types():
 
 def test_owner_inputs_of_the_presets():
     for r in PRESETS:
-        expected = ("etf:BIL",) if r.idle_symbol == "BIL" else ()
-        assert rule_owner_inputs(r) == expected, r.id
+        expected: set[str] = set()
+        if r.idle_symbol == "BIL":
+            expected.add("etf:BIL")
+        if r.cash_yield is not None:
+            expected.add("cash-yield")
+        assert rule_owner_inputs(r) == tuple(sorted(expected)), r.id
     assert rule_owner_inputs(V0_BOOK) == ()
 
 

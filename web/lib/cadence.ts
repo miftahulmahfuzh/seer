@@ -40,10 +40,13 @@ const CADENCE: Record<string, Cadence> = {
   'swing-t20': 'daily',
   'swing-t20-open': 'daily',
   'weekly-hold': 'weekly',
+  'weekly-hold-frac-gotrade-tband-cash': 'weekly',
   'monthly-hold': 'monthly',
   'monthly-hold-tbill': 'monthly',
   'monthly-hold-frac': 'monthly',
   'monthly-hold-frac-gotrade': 'monthly',
+  'monthly-hold-frac-gotrade-tband': 'monthly',
+  'monthly-hold-frac-gotrade-tband-cash': 'monthly',
   'monthly-rank-weekly-resize': 'monthly-weekly',
   'monthly-rank-weekly-resize-tbill': 'monthly-weekly',
   'monthly-rank-weekly-resize-frac': 'monthly-weekly',
@@ -67,16 +70,45 @@ export function sellsWhen(c: Cadence): string | null {
 
 /**
  * Mirror of the engine's `RESIZE_BAND = Decimal("0.01")` (engine/src/seer_engine/sim/rules.py):
- * a held position is only traded back to its target when it is off by at least this share of
- * paper equity (sim/book.py skips the trade when the gap is strictly smaller).
+ * on the equity basis (every rule set not in TARGET_BAND_RULES) a held position is only traded
+ * back to its target when it is off by at least this share of paper equity (sim/book.py skips the
+ * trade when the gap is strictly smaller).
  */
 export const RESIZE_BAND = 0.01;
 
 /**
+ * Mirror of the engine's `TARGET_RESIZE_BAND = Decimal("0.20")` (sim/rules.py): for a rule set in
+ * TARGET_BAND_RULES a held position is only traded back when it is off by at least this share of
+ * its OWN target value (weight × equity), not of the whole account. In a 20-name book 1% of
+ * equity is a fifth of one holding; in a 50-name book it is half of one, which is why the engine
+ * grew the second basis.
+ */
+export const TARGET_RESIZE_BAND = 0.2;
+
+/**
+ * Engine rule sets with `resize_basis="target"` (sim/rules.py PRESETS). Their band is
+ * TARGET_RESIZE_BAND of each holding target instead of RESIZE_BAND of equity. A hand mirror,
+ * guarded by engine/tests/test_sean_mirrors.py; append when such a preset is added.
+ */
+export const TARGET_BAND_RULES: readonly string[] = [
+  'monthly-hold-frac-gotrade-tband',
+  'monthly-hold-frac-gotrade-tband-cash',
+  'weekly-hold-frac-gotrade-tband-cash',
+];
+
+/** What a resize gap is measured against: the whole account, or the holding's own target. */
+export type ResizeBasis = 'equity' | 'target';
+
+/** The engine `resize_basis` of a rule set: 'target' for TARGET_BAND_RULES, else 'equity'. */
+export function resizeBasisOf(rulesId: string | null | undefined): ResizeBasis {
+  return typeof rulesId === 'string' && TARGET_BAND_RULES.includes(rulesId) ? 'target' : 'equity';
+}
+
+/**
  * What one book order means against what is held now, in dollars at tonight's marks and equity.
  * `buy`: not held, the whole target is bought. `add` / `trim`: held, the gap to the target.
- * `none`: held and off by less than RESIZE_BAND of equity, so the engine leaves it alone.
- * `usd` is always >= 0 (0 for `none`).
+ * `none`: held and inside the band (RESIZE_BAND of equity, or TARGET_RESIZE_BAND of the target on
+ * the target basis), so the engine leaves it alone. `usd` is always >= 0 (0 for `none`).
  */
 export type SizeChange = { action: 'buy' | 'add' | 'trim' | 'none'; usd: number };
 
@@ -84,12 +116,16 @@ export type SizeChange = { action: 'buy' | 'add' | 'trim' | 'none'; usd: number 
  * The order's dollar change: target `weight × equity` against `heldUsd`, the dollar value held now
  * (shares × current mark), or null when the symbol is not held. Approximate on purpose: the engine
  * sizes at the open's equity and the target's last close, the page at tonight's equity and marks.
+ * `basis` is the rule set's (resizeBasisOf); the band it picks matches sim/book.py's.
  */
-export function sizeChange(weight: number, equity: number, heldUsd: number | null): SizeChange {
+export function sizeChange(
+  weight: number, equity: number, heldUsd: number | null, basis: ResizeBasis = 'equity',
+): SizeChange {
   const target = weight * equity;
   if (heldUsd === null) return { action: 'buy', usd: Math.max(0, target) };
   const gap = target - heldUsd;
-  if (Math.abs(gap) < RESIZE_BAND * equity) return { action: 'none', usd: 0 };
+  const band = basis === 'target' ? TARGET_RESIZE_BAND * target : RESIZE_BAND * equity;
+  if (Math.abs(gap) < band) return { action: 'none', usd: 0 };
   return gap > 0 ? { action: 'add', usd: gap } : { action: 'trim', usd: -gap };
 }
 
@@ -103,9 +139,10 @@ export function heldUsd(holdings: readonly { symbol: string; value: number }[]):
 /** `sizeChange` for one order row; null when the weight or the paper equity is not known. */
 export function orderSizeChange(
   weight: number | null, equity: number | null, symbol: string, held: ReadonlyMap<string, number>,
+  basis: ResizeBasis = 'equity',
 ): SizeChange | null {
   if (weight === null || equity === null) return null;
-  return sizeChange(weight, equity, held.get(symbol) ?? null);
+  return sizeChange(weight, equity, held.get(symbol) ?? null, basis);
 }
 
 /** The words in the cell: 'Buy about $40.00', 'Add about $6.12', 'Trim about $9.80', 'No change'. */
@@ -117,9 +154,12 @@ export function sizeLabel(c: SizeChange): string {
 }
 
 /** The cell's tooltip, in plain words. */
-export function sizeTip(c: SizeChange): string {
+export function sizeTip(c: SizeChange, basis: ResizeBasis = 'equity'): string {
   if (c.action === 'buy') return 'Not held yet: the whole amount is bought at the open';
   if (c.action === 'add') return 'Held, but below its target: about this much more is bought at the open';
   if (c.action === 'trim') return 'Held, but above its target: about this much is sold at the open';
+  if (basis === 'target') {
+    return `Off its target by less than ${Math.round(TARGET_RESIZE_BAND * 100)}% of that target, too little to trade`;
+  }
   return 'Off its target by less than 1% of paper equity, too little to trade';
 }

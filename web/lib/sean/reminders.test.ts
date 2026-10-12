@@ -30,8 +30,8 @@ const PRE_PLAN = new Map<string, number>([
 
 function input(over: Partial<ReminderInput> = {}): ReminderInput {
   return {
-    sessionDate: OCT, targets: RAW, resizes: true, held: new Map(), outside: new Map(), closes: new Map(),
-    budgetUsd: null, cashUsd: null, orders: [], marks: [], ...over,
+    sessionDate: OCT, targets: RAW, resizes: true, resizeBasis: 'equity', held: new Map(), outside: new Map(),
+    closes: new Map(), budgetUsd: null, cashUsd: null, orders: [], marks: [], ...over,
   };
 }
 
@@ -215,6 +215,39 @@ describe('buildReminders: resizing', () => {
     const r = buildReminders(input({ held, budgetUsd: 5000 }));
     expect(r.open.map(x => `${x.action}:${x.symbol}`)).toEqual(['add:DELL']);
     expect(r.open[0].usd).toBeCloseTo(60, 6);
+  });
+});
+
+describe('buildReminders: the target-basis band', () => {
+  // Two picks of half the plan each: a $2,000 plan puts $1,000 in each. The equity band is
+  // max($25, 1% of $2,000) = $25; the target band is max($25, 20% of $1,000) = $200.
+  const HALVES: Target[] = [
+    { symbol: 'AAA', weight: 0.5, last: 100 },
+    { symbol: 'BBB', weight: 0.5, last: 50 },
+  ];
+  const holding = (aaaUsd: number, bbbUsd: number): Map<string, number> =>
+    new Map([['AAA', aaaUsd / 100], ['BBB', bbbUsd / 50]]);
+
+  it('on the equity basis a $100 gap is an add', () => {
+    const r = buildReminders(input({ targets: HALVES, held: holding(900, 1000), budgetUsd: 2000 }));
+    expect(r.open.map(x => `${x.action}:${x.symbol}`)).toEqual(['add:AAA']);
+    expect(r.open[0].usd).toBeCloseTo(100, 6);
+  });
+
+  it('on the target basis the same gap is left alone, and a gap past a fifth of the target is not', () => {
+    const r = buildReminders(input({
+      targets: HALVES, held: holding(900, 1250), budgetUsd: 2000, resizeBasis: 'target',
+    }));
+    expect(r.open.map(x => `${x.action}:${x.symbol}`)).toEqual(['trim:BBB']);
+    expect(r.open[0].usd).toBeCloseTo(250, 6);
+  });
+
+  it('the $25 floor still binds when a fifth of the target is smaller', () => {
+    // 20 picks on an $838.16 plan: a fifth of a $41.91 share is $8.38, so $25 decides
+    const held = followed();
+    held.set('MU', 28 / 1045.56); // $13.91 below its share
+    const r = buildReminders(input({ held, budgetUsd: 838.16, resizeBasis: 'target' }));
+    expect(r.reminders).toHaveLength(0);
   });
 });
 
@@ -451,6 +484,9 @@ describe('helpers', () => {
     expect(resizes('monthly-rank-weekly-resize-frac')).toBe(true);
     expect(resizes('monthly-hold-frac-gotrade')).toBe(true);
     expect(resizes('monthly-rank-weekly-resize-frac-gotrade')).toBe(true);
+    expect(resizes('monthly-hold-frac-gotrade-tband')).toBe(true);
+    expect(resizes('monthly-hold-frac-gotrade-tband-cash')).toBe(true);
+    expect(resizes('weekly-hold-frac-gotrade-tband-cash')).toBe(true);
     expect(resizes('daily-switch')).toBe(false);
     expect(resizes('swing-t20')).toBe(false);
     expect(resizes(null)).toBe(false);

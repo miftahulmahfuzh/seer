@@ -12,7 +12,9 @@
  *  - buy:  a pick the plan does not hold, sized weight × plan size (no amount without a plan size).
  *  - add / trim: only when the method's rules resize (engine `resize=True`), measured at the
  *    pick's decision price like the engine, and only when the gap is at least MIN_TRADE_USD and at
- *    least RESIZE_BAND of the plan (Gotrade's minimum fee makes smaller trades waste money).
+ *    least the engine's band: RESIZE_BAND of the plan, or, for a rule set on the target basis
+ *    (cadence.ts TARGET_BAND_RULES), TARGET_RESIZE_BAND of that pick's own share of the plan
+ *    (Gotrade's minimum fee makes smaller trades waste money).
  *  - done: an uploaded order of the same side and stock whose New York trade date is on or after
  *    the decision session, or a row the owner marked done for that decision.
  *  - no picks at all: no reminders (an empty decision is not an order to sell everything).
@@ -30,7 +32,7 @@
  *
  * Pure: no database, relative imports only (vitest has no `@/` alias).
  */
-import { RESIZE_BAND } from '../cadence';
+import { RESIZE_BAND, TARGET_RESIZE_BAND, type ResizeBasis } from '../cadence';
 import { buildLedger, orderSession, type LedgerOrder } from './ledger';
 import { cents } from './money';
 
@@ -73,6 +75,11 @@ export const RESIZING_RULES: readonly string[] = [
   // Gotrade real-fee twins of the two fractional presets (Sean phase 7); they resize the same way.
   'monthly-hold-frac-gotrade',
   'monthly-rank-weekly-resize-frac-gotrade',
+  // The fixed-tape presets (measure-then-learn): they resize against each holding target,
+  // so their band is cadence.ts TARGET_RESIZE_BAND (see TARGET_BAND_RULES).
+  'monthly-hold-frac-gotrade-tband',
+  'monthly-hold-frac-gotrade-tband-cash',
+  'weekly-hold-frac-gotrade-tband-cash',
 ];
 
 /** Does this rule set trade a held pick back to its weight? */
@@ -134,6 +141,8 @@ export type ReminderInput = {
   targets: readonly Target[];
   /** resizes(rulesId) of the followed method. */
   resizes: boolean;
+  /** resizeBasisOf(rulesId) of the followed method: which band an add or a trim must clear. */
+  resizeBasis: ResizeBasis;
   /** Plan shares per stock (sharesBySymbol over planOrders). */
   held: ReadonlyMap<string, number>;
   /** Shares held from outside the plan per stock (outsideShares). */
@@ -323,7 +332,10 @@ export function buildReminders(input: ReminderInput): ReminderPlan {
       }
       if (!input.resizes || planSize === null) continue;
       const gap = t.weight * planSize - shares * t.last;
-      if (Math.abs(gap) < Math.max(MIN_TRADE_USD, RESIZE_BAND * planSize)) continue;
+      const band = input.resizeBasis === 'target'
+        ? TARGET_RESIZE_BAND * (t.weight * planSize)
+        : RESIZE_BAND * planSize;
+      if (Math.abs(gap) < Math.max(MIN_TRADE_USD, band)) continue;
       const action: ReminderAction = gap > 0 ? 'add' : 'trim';
       drafts.push({
         action, side: sideOf(action), symbol: t.symbol, usd: Math.abs(gap),

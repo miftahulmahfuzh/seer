@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-12 22:04
-**Total Active Tasks**: 5
+**Last Updated**: 2026-10-12 22:30
+**Total Active Tasks**: 4
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 2
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 2
-- Completed: 126
+- Blocked: 1
+- Completed: 127
 
 ---
 
@@ -59,15 +59,25 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Decided**:
     - Completion: the `[x]` block is left in place under `### [P1] High` and Quick Stats recounted from the file (rung 6: this file's precedent for swarm-tracked sets; phases 4 and 6 share this worktree). Plan index: phase 2's TaskID cell ticked `(done 2026-10-12)`, `**Status:**` left alone (the coordinator's ledger is the status of record). P1-ENG-03JM unblocked: both its dependencies (P1-ENG-0L6E, P1-ENG-0JM2) are now complete.
     - Landing not attempted: swarm coordinator `orch-measure-then-learn` owns the merge of `feature/measure-then-learn` into `main`.
-- [ ] **P1-ENG-03JM** Phase 3: Fixed-tape presets and the web mirror
+- [x] **P1-ENG-03JM** Phase 3: Fixed-tape presets and the web mirror
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns new `PRESETS` `monthly-hold-frac-gotrade-tband`, `monthly-hold-frac-gotrade-tband-cash`, `weekly-hold-frac-gotrade-tband-cash`; web mirror in `web/lib/cadence.ts` (`TARGET_RESIZE_BAND = 0.2`, `TARGET_BAND_RULES`, `sizeChange` basis), `web/lib/sean/reminders.ts` `RESIZING_RULES`, `web/lib/sean/planData.ts`, vitest tests; `engine/tests/test_sean_mirrors.py`; the PRESETS-enumerating tests; new `test_sim_rules_fixed_tape.py` (also proves promote refuses the cash presets); leaves `SEED_ROWS`, existing presets, simulator logic untouched. Exit: engine suite and web `tsc` + vitest green; mirror test covers the new constant and set; no pinned digest moves.
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 3 of 7)
   - **Satisfies**: R1, R2 — Resize band measured against the holding's own target, past results unchanged, explicit paper/web decision; Interest on idle cash from the cached T-bill yield, as a versioned explicit simulator input
   - **Depends on**: P1-ENG-0L6E, P1-ENG-0JM2
   - **Plan**: `.workflows/plan/P1-ENG-03JM.md`
+  - **Completed**: 2026-10-12 22:30
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/sim/rules.py, engine/tests/test_sim_rules.py, engine/tests/test_lab_costs.py, engine/tests/test_cost_model_pins.py, engine/tests/test_sean_mirrors.py, engine/tests/test_sim_rules_fixed_tape.py (new), web/lib/cadence.ts, web/lib/cadence.test.ts, web/lib/sean/reminders.ts, web/lib/sean/reminders.test.ts, web/lib/sean/planData.ts
+  - **Verified**: `ruff check engine` clean. Full suite with `PG_TEST_URL`: 4613 passed, 3 skipped (opt-in live tests only). Web `npx tsc --noEmit` + `npm test`: 685 passed. No existing preset, pinned digest or roster row changed.
+  - **Drift**:
+    - Line numbers shifted by phases 1-2; every textual anchor matched, no code drift.
+  - **Decided**:
+    - Completion: the `[x]` block is left in place under `### [P1] High` and Quick Stats recounted from the file (this file's precedent for swarm-tracked sets; phase 4 shares this worktree). Plan index: phase 3's TaskID cell ticked `(done 2026-10-12)`, `**Status:**` left alone (the coordinator's ledger is the status of record). P1-ENG-FON5 unblocked: both its dependencies (P1-ENG-03JM, P1-ENG-ESU5) are complete. P1-ENG-SHJJ stays blocked on P1-ENG-FON5.
+    - Commit uses an explicit pathspec so phase 4's staged files stay staged and out of this commit.
+    - Landing not attempted: swarm coordinator `orch-measure-then-learn` owns the merge of `feature/measure-then-learn` into `main`.
 - [x] **P1-ENG-ESU5** Phase 4: Survivorship check runnable here; EODHD top-up
   - **Difficulty**: NORMAL
   - **Type**: Feature
@@ -91,7 +101,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns one new lab method file (id from `lab next-id`, variation of M0030), its pre-registration commit, `lab run`, `lab survivorship`, `lab note`, `lab insight` answering "picking or shape?", `lab stage`, commits, and landing the set on `main` before `lab run`; leaves existing methods, lab rows, the test window and fixtures untouched. Exit: the method has dev trials for all its variants, an sv-check observation, a plain-words note and insight; `lab stage` committed; CI's lab.json/lab.sqlite agreement holds.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 5 of 7)
   - **Satisfies**: R4 — Near misses re-priced under the fixed tape as new pre-registered twins; "picking or shape?" answered
   - **Depends on**: P1-ENG-03JM, P1-ENG-ESU5

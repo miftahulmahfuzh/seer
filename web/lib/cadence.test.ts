@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  cadenceOf, heldUsd, orderSizeChange, picksMonthlySizesWeekly, RESIZE_BAND, sellsWhen, sizeChange,
-  sizeLabel, sizeTip, SPLIT_CADENCE_RULES,
+  cadenceOf, heldUsd, orderSizeChange, picksMonthlySizesWeekly, RESIZE_BAND, resizeBasisOf, sellsWhen,
+  sizeChange, sizeLabel, sizeTip, SPLIT_CADENCE_RULES, TARGET_BAND_RULES, TARGET_RESIZE_BAND,
 } from './cadence';
 
 describe('picksMonthlySizesWeekly', () => {
@@ -118,5 +118,49 @@ describe('sellsWhen', () => {
   });
   it('says nothing at all for a cadence it does not know', () => {
     expect(sellsWhen('unknown')).toBeNull();
+  });
+});
+
+describe('the target-basis band', () => {
+  it('mirrors the engine: a fifth of the holding target, for the fixed-tape rule sets only', () => {
+    expect(TARGET_RESIZE_BAND).toBe(0.2);
+    expect([...TARGET_BAND_RULES]).toEqual([
+      'monthly-hold-frac-gotrade-tband',
+      'monthly-hold-frac-gotrade-tband-cash',
+      'weekly-hold-frac-gotrade-tband-cash',
+    ]);
+    for (const id of TARGET_BAND_RULES) expect(resizeBasisOf(id)).toBe('target');
+    for (const id of ['monthly-hold-frac-gotrade', 'weekly-hold', 'design-v0', '']) {
+      expect(resizeBasisOf(id)).toBe('equity');
+    }
+    expect(resizeBasisOf(null)).toBe('equity');
+    expect(resizeBasisOf(undefined)).toBe('equity');
+  });
+  it('measures the gap against the target, trading at exactly the band and not under it', () => {
+    // target 0.1 × 1000 = 100, so the band is 20 (the equity band would be 10)
+    expect(sizeChange(0.1, 1000, 80, 'target')).toEqual({ action: 'add', usd: 20 });
+    expect(sizeChange(0.1, 1000, 81, 'target')).toEqual({ action: 'none', usd: 0 });
+    expect(sizeChange(0.1, 1000, 119, 'target')).toEqual({ action: 'none', usd: 0 });
+    expect(sizeChange(0.1, 1000, 120, 'target')).toEqual({ action: 'trim', usd: 20 });
+  });
+  it('leaves alone a gap the equity band would trade', () => {
+    expect(sizeChange(0.1, 1000, 85)).toEqual({ action: 'add', usd: 15 });
+    expect(sizeChange(0.1, 1000, 85, 'target')).toEqual({ action: 'none', usd: 0 });
+  });
+  it('still buys a symbol that is not held, whatever the basis', () => {
+    expect(sizeChange(0.005, 500, null, 'target')).toEqual({ action: 'buy', usd: 2.5 });
+    expect(orderSizeChange(0.1, 1000, 'AAPL', heldUsd([{ symbol: 'AAPL', value: 85 }]), 'target'))
+      .toEqual({ action: 'none', usd: 0 });
+  });
+  it('says which band in the tooltip', () => {
+    expect(sizeTip({ action: 'none', usd: 0 }, 'target')).toContain('20%');
+    expect(sizeTip({ action: 'none', usd: 0 }, 'target')).not.toContain('equity');
+    expect(sizeTip({ action: 'none', usd: 0 }, 'equity')).toContain('1%');
+  });
+  it('knows the cadence of the fixed-tape rule sets', () => {
+    expect(cadenceOf('monthly-hold-frac-gotrade-tband')).toBe('monthly');
+    expect(cadenceOf('monthly-hold-frac-gotrade-tband-cash')).toBe('monthly');
+    expect(cadenceOf('weekly-hold-frac-gotrade-tband-cash')).toBe('weekly');
+    for (const id of TARGET_BAND_RULES) expect(picksMonthlySizesWeekly(id)).toBe(false);
   });
 });

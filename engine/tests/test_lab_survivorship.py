@@ -390,7 +390,11 @@ def test_cli_exits_2_when_the_dev_store_is_a_test_window_store(lab, recorded, sv
 )
 def test_lab_survivorship_m0069_on_the_real_stores(tmp_path, capsys):
     dev_dir = Path(os.environ.get("SEER_RESEARCH_STORE") or "/home/miftah/seer/engine/.research")
-    sv_dir = Path(os.environ.get("SEER_RESEARCH_SV_STORE") or "/home/miftah/seer/engine/.research-sv")
+    sv_dir = Path(
+        os.environ.get("SEER_SV_STORE")
+        or os.environ.get("SEER_RESEARCH_SV_STORE")  # the name this test used before SEER_SV_STORE
+        or "/home/miftah/seer/engine/.research-sv"
+    )
     live_db = Path(os.environ.get("SEER_LAB_DB") or store.COMMITTED_DB)
     db = tmp_path / "lab.sqlite"
     src = sqlite3.connect(f"file:{live_db}?mode=ro", uri=True)

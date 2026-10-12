@@ -28,7 +28,7 @@ Design: `docs/plans/2026-10-04-method-lab-design.md`. CLI: `python -m seer_engin
 | started by | the user or `/loop` | `/sera-the-explorer`, in its own worktree and tmux window |
 | idea | you choose it | already reserved as an `idea` row `MNNNN`; refine it, keep its id |
 | python | `engine/.venv/bin/python` | `PYTHONPATH=$PWD/engine/src /home/miftah/seer/engine/.venv/bin/python` (a worktree has no venv) |
-| database | `lab/lab.sqlite` in this checkout | the shared one: `export SEER_LAB_DB=/home/miftah/seer/lab/lab.sqlite SEER_RESEARCH_STORE=/home/miftah/seer/engine/.research` |
+| database | `lab/lab.sqlite` in this checkout | the shared one: `export SEER_LAB_DB=/home/miftah/seer/lab/lab.sqlite SEER_RESEARCH_STORE=/home/miftah/seer/engine/.research SEER_SV_STORE=/home/miftah/seer/engine/.research-sv` (the last one is what lets `lab survivorship` run from the worktree) |
 | commits | method file, then `lab stage` (`lab/lab.sqlite` + `web/data/lab.json`), to `main` | method file only; **never commit `lab/lab.sqlite` or `web/data/lab.json`** (the coordinator does) |
 | promotion | do it yourself (below) | `lab` marks it `dev-eligible`; report it, and the coordinator promotes |
 | end | short report to the user | report to the coordinator (below), then stop |
@@ -253,10 +253,14 @@ Then:
      recorded trial makes the side-by-side meaningless for that variant. The check store is a
      cross-check, not a gate (`EODHD_SURVIVORSHIP_MARKET_PLAN.md` D1): `lab run`, `lab test` and
      `lab remeasure` refuse it, and `lab promote` never reads it. Making it gate anything is an
-     argued commit in `lab/hardgate.py`, like any other rule change. If `engine/.research-sv` is
-     missing, build it offline from the EODHD cache, from the main checkout with absolute paths
-     and never through a symlink: `engine/.venv/bin/python -m seer_engine survivorship_store
-     --build --out "$PWD/engine/.research-sv" --source "$PWD/engine/.research"`.
+     argued commit in `lab/hardgate.py`, like any other rule change. In a worktree (a Sera
+     child), `lab survivorship` finds the check store only through `SEER_SV_STORE` (exported in
+     the table at the top). Without it, the command refuses with exit 2 and names the variable.
+     That is no reason to skip a check you promised: export it and run again. If
+     `/home/miftah/seer/engine/.research-sv` itself is missing, build it offline from the EODHD
+     cache with absolute paths and never through a symlink:
+     `engine/.venv/bin/python -m seer_engine survivorship_store --build --out /home/miftah/seer/engine/.research-sv --source /home/miftah/seer/engine/.research --cache /home/miftah/seer/engine/.cache/eodhd`
+     (`docs/runbooks/survivorship-store.md` has the refresh steps and the EODHD deadline).
      `survivorship_store --report` prints its year-by-year coverage. Measured 2026-10-10 on the
      roster, the near misses and the dividend-date methods (102 variants): funded CAGR fell 0.5
      pt/yr on average, about 1-1.4 for the stock-picking books (momentum, blends, long-term

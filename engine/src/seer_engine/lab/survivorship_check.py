@@ -191,15 +191,21 @@ def plan_methods(conn: sqlite3.Connection, ids: Sequence[str]) -> tuple[MethodPl
 
 def peek_purpose(store_dir: Path) -> str | None:
     """The manifest's ``purpose`` without loading a bar: ``research.declared_purpose``, with its
-    refusals (no manifest, not JSON, an unknown purpose) as ``store.LabError``."""
+    refusals (no manifest, not JSON, an unknown purpose) as ``store.LabError``.
+
+    The usual refusal is a missing manifest in a worktree: both stores are gitignored and live
+    only in the main checkout, and the defaults are derived from the running module's own repo
+    root. So the message names the two variables that point a worktree at the main checkout
+    (lab insight 208: M0117's promised check was skipped because nothing said how to reach it)."""
     try:
         return research.declared_purpose(Path(store_dir))
     except OSError as e:
         raise store.LabError(f"{store_dir}: cannot read the manifest ({e})") from e
     except ValueError as e:
         raise store.LabError(
-            f"{e}. Point the flag at a built store (the dev store and engine/.research-sv live in "
-            f"the main checkout)"
+            f"{e}. Point the flag at a built store. Both stores live in the main checkout "
+            f"(engine/.research and engine/.research-sv); from a worktree, export "
+            f"SEER_RESEARCH_STORE and SEER_SV_STORE to them"
         ) from e
 
 

@@ -28,6 +28,7 @@ PY=$REPO/engine/.venv/bin/python               # lab CLI: $PY -m seer_engine lab
 SWARM=~/.claude/skills/swarm/swarm.py          # `launch` opens a named session in a tmux window
 WT=$HOME/.worktrees/seer/explore-MNNNN         # one worktree per child, branch explore/MNNNN
 LOGS=$REPO/.workflows/sera/<run-id>/           # gitignored scrollback of finished children
+SV=$REPO/engine/.research-sv                   # the survivorship-check store; children reach it via SEER_SV_STORE=$SV
 ```
 
 Only Sera commits `lab/lab.sqlite`, and always through `lab stage`, which takes the write lock
@@ -46,7 +47,11 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
    `test_lab_snapshot.py` fails whenever `lab/lab.sqlite` changed without `lab stage` (for example
    after an interrupted batch). If that is the only failure, run `lab stage`, commit both files,
    push, and run the tests again. Always test after staging, never before. `engine/.research/`
-   present (build it if not). Then check `$TMUX`. If there is **no tmux**, don't stop: run the
+   present (build it if not), and `engine/.research-sv/` present
+   (`$PY -m seer_engine survivorship_store --report` prints its coverage; rebuild per
+   `docs/runbooks/survivorship-store.md` if it is missing). Each child exports
+   `SEER_SV_STORE=$SV` from the explore skill's table, so it can keep a survivorship-check promise
+   the same day. Then check `$TMUX`. If there is **no tmux**, don't stop: run the
    explore skill **solo, sequentially**, num-methods times in this session, then do step 7.
 3. **Choose the first slate** (and when you reserve a book idea, write in its hypothesis that it
    runs in fractional shares at Gotrade's real fees, a `-frac-gotrade` preset, so the child builds

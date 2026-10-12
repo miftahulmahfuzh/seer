@@ -9,6 +9,12 @@ EODHD series for every member the dev store could not serve, read from ``--cache
 ``engine/.cache/eodhd``: ``eod/``, ``splits/``, ``dividends/``). ``seer_engine.survivorship`` holds
 the cleaning rules; this module only reads, merges and writes.
 
+The three defaults derive from the running module's repo root, and all three directories are
+gitignored, so in a worktree they name directories that do not exist. ``$SEER_SV_STORE`` sets
+``--out``, ``$SEER_RESEARCH_STORE`` sets ``--source`` (the variable ``lab`` already reads for
+``--store``) and ``$SEER_EODHD_CACHE`` sets ``--cache``. A worktree exports them to the main
+checkout's directories; ``docs/runbooks/survivorship-store.md`` has the commands.
+
 What lands in ``--out``, built in ``<out>.tmp`` and swapped in whole or not at all:
 
 - ``bars.csv`` / ``dividends.csv``: the source's lines, byte for byte, with the added symbols'
@@ -36,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import shutil
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -90,11 +97,23 @@ class BuildPlan:
 
 
 def add_arguments(p: argparse.ArgumentParser) -> None:
+    out = Path(os.environ.get("SEER_SV_STORE") or research.SV_STORE_DIR)
+    source = Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR)
+    cache = Path(os.environ.get("SEER_EODHD_CACHE") or CACHE_DIR)
     p.add_argument("--build", action="store_true", help="write the store at --out")
     p.add_argument("--report", action="store_true", help="print the reports of the store at --out")
-    p.add_argument("--out", type=Path, default=research.SV_STORE_DIR, help=f"store to write (default {research.SV_STORE_DIR})")
-    p.add_argument("--source", type=Path, default=research.STORE_DIR, help=f"dev store to start from, read only (default {research.STORE_DIR})")
-    p.add_argument("--cache", type=Path, default=CACHE_DIR, help=f"EODHD cache (default {CACHE_DIR})")
+    p.add_argument(
+        "--out", type=Path, default=out,
+        help=f"store to write (default {research.SV_STORE_DIR}, or $SEER_SV_STORE)",
+    )
+    p.add_argument(
+        "--source", type=Path, default=source,
+        help=f"dev store to start from, read only (default {research.STORE_DIR}, or $SEER_RESEARCH_STORE)",
+    )
+    p.add_argument(
+        "--cache", type=Path, default=cache,
+        help=f"EODHD cache (default {CACHE_DIR}, or $SEER_EODHD_CACHE)",
+    )
     add_alias_arguments(p)
 
 

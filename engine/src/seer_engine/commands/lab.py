@@ -98,8 +98,10 @@
     lab export-json [--out F]       the web snapshot (default: web/data/lab.json beside the database's repo)
     lab seed                        one-time import of the pre-lab record
 
-Parallel sessions (sera-the-explorer) share one database: SEER_LAB_DB sets --db and
-SEER_RESEARCH_STORE sets --store.
+Parallel sessions (sera-the-explorer) share one database: SEER_LAB_DB sets --db,
+SEER_RESEARCH_STORE sets --store, and SEER_SV_STORE sets lab survivorship's --sv-store. A
+worktree has none of the three stores of its own, so a child exports all three to the main
+checkout's.
 
 Exit 0 on success; 2 when the lab's rules refuse the request; 1 on any other error.
 """
@@ -392,9 +394,10 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s.add_argument(
         "--sv-store",
         type=Path,
-        default=research.SV_STORE_DIR,
-        help=f"the survivorship-check store (default: {research.SV_STORE_DIR}); refused unless "
-             "its manifest says purpose survivorship-check",
+        default=Path(os.environ.get("SEER_SV_STORE") or research.SV_STORE_DIR),
+        help=f"the survivorship-check store (default: {research.SV_STORE_DIR}, or "
+             "$SEER_SV_STORE); refused unless its manifest says purpose survivorship-check. From a "
+             "worktree, export SEER_SV_STORE to the main checkout's engine/.research-sv",
     )
     s.add_argument("--no-journal", action="store_true",
                    help="print the report and write nothing at all, not even the observation")

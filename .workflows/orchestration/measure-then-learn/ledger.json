@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "b8daa97",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": null,
+      "note": "tasks tracked in engine/.workflows/todos.md (rung 6)",
       "package": "engine/sim",
       "plan": ".workflows/plan/measure-then-learn/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T14:54:09+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-0L6E",
       "title": "Resize band relative to the holding's target (`resize_basis` lever)"
     },
     {
@@ -36,7 +36,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Interest on idle cash (`cash_yield` lever)"
     },
@@ -70,11 +70,11 @@
       "note": null,
       "package": "engine/commands`, `engine/lab`, skills, runbook, data",
       "plan": ".workflows/plan/measure-then-learn/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T14:54:17+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "running",
       "task_id": null,
       "title": "Survivorship check runnable here; EODHD top-up"
     },
@@ -107,11 +107,11 @@
       "note": null,
       "package": "engine/lab` (`lab/tree_rank.py`)",
       "plan": ".workflows/plan/measure-then-learn/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T14:54:17+00:00",
       "satisfies": [
         "R5"
       ],
-      "status": "pending",
+      "status": "running",
       "task_id": null,
       "title": "Tree-ranker allocator (features, walk-forward model, tests)"
     },
@@ -140,6 +140,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/measure-then-learn/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "measure-then-learn",
-  "updated": "2026-10-12T14:42:54+00:00",
+  "updated": "2026-10-12T14:54:17+00:00",
+  "verified_at": "2026-10-12T14:54:11+00:00",
   "worktree": "/home/miftah/.worktrees/seer/measure-then-learn"
 }

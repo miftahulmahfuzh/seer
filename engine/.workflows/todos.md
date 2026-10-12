@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-12 23:00
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-12 23:59
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 128
+- Completed: 129
 
 ---
 
@@ -137,16 +137,27 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Step 3 task creation with three phase sessions sharing one worktree -> create only this phase's task (tie-break: narrower blast radius); another session had already created all seven, so the duplicate was removed.
     - Completion: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own precedent for every swarm-tracked set; phases 1 and 4 share this worktree and append here concurrently). Plan index: phase 6's TaskID cell ticked `(done 2026-10-12)`, `**Status:**` left alone. P1-ENG-SHJJ stays blocked: it also waits on P1-ENG-03JM and P1-ENG-FON5, neither complete.
     - Landing not attempted: swarm coordinator `orch-measure-then-learn` owns the merge of `feature/measure-then-learn` into `main`.
-- [ ] **P1-ENG-SHJJ** Phase 7: Tree-ranker method: pre-register and run on the dev window
+- [x] **P1-ENG-SHJJ** Phase 7: Tree-ranker method: pre-register and run on the dev window
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns one new lab method file (family `stock-ml-ranker`, rules `monthly-hold-frac-gotrade-tband`, own calendar `model_ready` rule checked against phase 6's `model_on`), pre-registration commit, landing on `main`, `lab run --allow-coverage 0.31`, `lab survivorship`, `lab note`, `lab insight`, `lab stage`, commits; leaves the test window and existing lab rows untouched. Exit: dev trials recorded for every variant; a survivorship observation; note and insight in plain words; staged and committed.
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 7 of 7)
   - **Satisfies**: R5 — One pre-registered gradient-boosted-tree ranker method, run on the dev window
   - **Depends on**: P1-ENG-03JM, P1-ENG-FON5, P1-ENG-H3RM
   - **Plan**: `.workflows/plan/P1-ENG-SHJJ.md`
   - **Note**: the method id must come from `lab next-id` / `lab idea` at run time. M0129 is already taken by phase 5's queued idea (fifty-stock residual momentum), so the plan's id is not to be assumed.
+  - **Completed**: 2026-10-12 23:59
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/methods/m0130_tree_ranker.py (new; pre-registered in 30a1ea9, on main), engine/src/seer_engine/lab/tree_rank.py and engine/tests/test_tree_rank.py (all-blank column fix + regression test, 450a5ea, on main), lab/lab.sqlite and web/data/lab.json (lab stage, d796d7d, pushed to main)
+  - **Result**: M0130 (family stock-ml-ranker, 6 variants) rejected; six dev trials #393-#398, N 79 -> 80, test looks unchanged at 4. P20 +2.2%/yr vs SPY DCA +7.2% (DD 75%); P50 3.7%; P50-REG 5.8%; P20-GATE 7.0% (DD 24.7%); PF20 2.4%; DV20 control 5.6%. Pre-registered bar (P20 beats the control by >= 2 pts over 1999-2015 and is ahead over 2009-15) failed at -1.7 and -5.5. Survivorship observation #216, plain-words note, insights #217 (observation) and #218 (data-wish), next idea M0131 queued (a slower 12-month target for the same trees). Main suite green after staging (4640 passed).
+  - **Drift**:
+    - Method id is M0130 (from `lab idea` at run time); next idea queued as M0131 (a slower 12-month target for the same trees, variation of M0130).
+    - First `lab run` crashed at the PF20 variant before any trial was written: sklearn 1.9.1 HistGradientBoosting raises "window shape cannot be larger than input array shape" on a training column with zero finite values (the four fundamentals before 2009). Fixed in phase 6's `tree_rank.fit_model` (outside phase 7's Owns) by filling an all-blank column with constant 0.0 (unsplittable); every previously-succeeding fit is bit-identical, and the re-run reproduced the first four variants to the last digit. Committed separately from the frozen method file.
+  - **Decided**:
+    - Crash in phase 6's fit on an all-NaN column -> fixed `tree_rank.fit_model` in a separate commit and re-ran, rather than stop (rung 2: exit criteria require dev trials for every variant; plan Step 7 "Exit 1 with no trial written: fix the cause (tooling, never the method file) and run again"; the fix realises the pre-registered assumption that the empty fundamentals columns cannot be split on).
+    - Completion: the `[x]` block is left in place under `### [P1] High` and Quick Stats recounted from the file (this file's precedent for swarm-tracked sets). Plan index: phase 7's TaskID cell ticked `(done 2026-10-12)`, `**Status:**` left alone (the coordinator's ledger is the status of record). Phase 7 is the last phase; no task to unblock.
+    - Landing not attempted: swarm coordinator `orch-measure-then-learn` owns the merge of `feature/measure-then-learn` into `main`.
 - [x] **P1-ENG-8X1K** Phase 1: Survivorship-check store: cleaning, build, marker, reports
   - **Difficulty**: HARD
   - **Type**: Feature

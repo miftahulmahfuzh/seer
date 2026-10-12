@@ -96,7 +96,7 @@ touched by this set).
 | 4 | Survivorship check runnable here; EODHD top-up | R3 | `engine/commands`, `engine/lab`, skills, runbook, data | 9 | — | NORMAL | `.workflows/plan/measure-then-learn/phase-4.md` | P1-ENG-ESU5 (done 2026-10-12) | — |
 | 5 | Near-miss twins under the fixed tape (lab method + run) | R4 | `engine/lab/methods`, `lab/` | 3 | 3, 4 | HARD | `.workflows/plan/measure-then-learn/phase-5.md` | P1-ENG-FON5 (done 2026-10-12) | — |
 | 6 | Tree-ranker allocator (features, walk-forward model, tests) | R5 | `engine/lab` (`lab/tree_rank.py`) | 2 | — | HARD | `.workflows/plan/measure-then-learn/phase-6.md` | P1-ENG-H3RM (done 2026-10-12) | — |
-| 7 | Tree-ranker method: pre-register and run on the dev window | R5 | `engine/lab/methods`, `lab/` | 3 | 3, 5, 6 | NORMAL | `.workflows/plan/measure-then-learn/phase-7.md` | P1-ENG-SHJJ | — |
+| 7 | Tree-ranker method: pre-register and run on the dev window | R5 | `engine/lab/methods`, `lab/` | 3 | 3, 5, 6 | NORMAL | `.workflows/plan/measure-then-learn/phase-7.md` | P1-ENG-SHJJ (done 2026-10-12) | — |
 
 Plan: 7 phases — 49 files across engine sim/backtest/paper/commands/lab, web/lib, skills, a runbook and lab data; levers before presets before runs. R1 -> 1,3 · R2 -> 2,3 · R3 -> 4 · R4 -> 5 · R5 -> 6,7.
 

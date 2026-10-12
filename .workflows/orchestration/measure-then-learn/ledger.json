@@ -3,6 +3,12 @@
   "coordinator": "orch-measure-then-learn",
   "coordinator_session_id": "556e6d4c-4240-4633-ba27-54b95a25ad81",
   "created": "2026-10-12T14:42:54+00:00",
+  "landed": {
+    "at": "2026-10-12T15:51:19+00:00",
+    "base": "main",
+    "commit": "29f9cd7d87cb0c82587e86914c4e52d0b4f94cfc",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -117,7 +123,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "29f9cd7",
       "depends_on": [
         3,
         5,
@@ -125,22 +131,22 @@
       ],
       "difficulty": "NORMAL",
       "n": 7,
-      "note": null,
+      "note": "M0130 rejected; first run crashed (sklearn all-NaN column), tree_rank.fit_model fixed in 450a5ea (rung 2: plan Step 7)",
       "package": "engine/lab/methods`, `lab/",
       "plan": ".workflows/plan/measure-then-learn/phase-7.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T15:50:59+00:00",
       "satisfies": [
         "R5"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-SHJJ",
       "title": "Tree-ranker method: pre-register and run on the dev window"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/measure-then-learn/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "measure-then-learn",
-  "updated": "2026-10-12T15:32:32+00:00",
+  "updated": "2026-10-12T15:51:19+00:00",
   "verified_at": "2026-10-12T14:54:11+00:00",
   "worktree": "/home/miftah/.worktrees/seer/measure-then-learn"
 }

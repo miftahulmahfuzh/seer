@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-12 22:30
-**Total Active Tasks**: 4
+**Last Updated**: 2026-10-12 23:00
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 127
+- Blocked: 0
+- Completed: 128
 
 ---
 
@@ -97,15 +97,28 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Decided**:
     - Completion: the `[x]` block is left in place under `### [P1] High` and Quick Stats adjusted for this task only (this file's precedent for swarm-tracked sets; phases 1 and 6 share this worktree). Plan index: phase 4's TaskID cell ticked `(done 2026-10-12)`, `**Status:**` left alone (the coordinator's ledger is the status of record). P1-ENG-FON5 left `blocked`: it also depends on phase 3 (P1-ENG-03JM), still blocked.
     - Landing not attempted: swarm coordinator `orch-measure-then-learn` owns the merge of `feature/measure-then-learn` into `main`.
-- [ ] **P1-ENG-FON5** Phase 5: Near-miss twins under the fixed tape (lab method + run)
+- [x] **P1-ENG-FON5** Phase 5: Near-miss twins under the fixed tape (lab method + run)
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns one new lab method file (id from `lab next-id`, variation of M0030), its pre-registration commit, `lab run`, `lab survivorship`, `lab note`, `lab insight` answering "picking or shape?", `lab stage`, commits, and landing the set on `main` before `lab run`; leaves existing methods, lab rows, the test window and fixtures untouched. Exit: the method has dev trials for all its variants, an sv-check observation, a plain-words note and insight; `lab stage` committed; CI's lab.json/lab.sqlite agreement holds.
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 5 of 7)
   - **Satisfies**: R4 — Near misses re-priced under the fixed tape as new pre-registered twins; "picking or shape?" answered
   - **Depends on**: P1-ENG-03JM, P1-ENG-ESU5
   - **Plan**: `.workflows/plan/P1-ENG-FON5.md`
+  - **Completed**: 2026-10-12 23:00
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/methods/m0128_near_miss_fixed_tape.py (new, pre-registered in ff3eaa1, on main), lab/lab.sqlite and web/data/lab.json (lab stage, committed c75a137 on main from the main checkout)
+  - **Verified**: `ruff check engine` clean; `pytest engine/tests` with PG_TEST_URL 4626 passed, 3 skipped (opt-in live tests) in the worktree before and after rebasing onto origin/main, and again in the main checkout after `lab stage`. `lab show M0128`: 6 funded dev trials (#387-#392), no test-window trial.
+  - **Result**: M0128 (variation of M0030, family near-miss-fixed-tape, 6 variants) rejected; N 78 -> 79; test looks unchanged at 4. Picking +4.6 pts/yr (RAW20-CASH over the gated EW20 control), switch +3.9, shape -1.5; on the survivorship store +3.5 / +4.9 / -3.0 (journal #212, all six dev re-runs reproduce). Cash +0.54; the band is a no-op at 20 names (RAW20 reproduces M0032-N20-RAW-FRAC-GT exactly). 2009-2015 momentum lead vs SPY +1.1 -> 0.0 on the sv store. Lab costs on M0021-B70-RAW (#213) and M0020-W-NOSTOP (#214); plain-words insight #215; next idea M0129 queued (fifty-stock residual momentum on the fixed tape).
+  - **Drift**:
+    - None in code. The method file was written verbatim from the plan; ADDED = 2026-10-12 (the run date).
+    - `lab costs` grew the shared DB's journal by two observations (#213, #214), as the plan's Step 8 intends.
+  - **Decided**:
+    - Landing the set on main mid-set before `lab run` (rebase onto origin/main, full suite, push HEAD:main) -> done as the plan index Decisions row allows (rung 1/plan Decisions), although Step 5a says the coordinator lands the set; the coordinator still owns the final merge of the branch.
+    - Next idea: picking was credited -> queued the fifty-stock residual-momentum book (M0129), checked distinct from M0127 (prices the band itself) and from M0125 (volume-weighted fifty). Rung 3: phase plan Step 11.
+    - Completion: the `[x]` block is left in place under `### [P1] High` and Quick Stats recounted from the file (this file's precedent for swarm-tracked sets). Plan index: phase 5's TaskID cell ticked `(done 2026-10-12)`, `**Status:**` left alone (the coordinator's ledger is the status of record). P1-ENG-SHJJ unblocked: all its dependencies (P1-ENG-03JM, P1-ENG-FON5, P1-ENG-H3RM) are complete.
+    - Landing not attempted: swarm coordinator `orch-measure-then-learn` owns the merge of `feature/measure-then-learn` into `main`.
 - [x] **P1-ENG-H3RM** Phase 6: Tree-ranker allocator (features, walk-forward model, tests)
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -128,11 +141,12 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns one new lab method file (family `stock-ml-ranker`, rules `monthly-hold-frac-gotrade-tband`, own calendar `model_ready` rule checked against phase 6's `model_on`), pre-registration commit, landing on `main`, `lab run --allow-coverage 0.31`, `lab survivorship`, `lab note`, `lab insight`, `lab stage`, commits; leaves the test window and existing lab rows untouched. Exit: dev trials recorded for every variant; a survivorship observation; note and insight in plain words; staged and committed.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 7 of 7)
   - **Satisfies**: R5 — One pre-registered gradient-boosted-tree ranker method, run on the dev window
   - **Depends on**: P1-ENG-03JM, P1-ENG-FON5, P1-ENG-H3RM
   - **Plan**: `.workflows/plan/P1-ENG-SHJJ.md`
+  - **Note**: the method id must come from `lab next-id` / `lab idea` at run time. M0129 is already taken by phase 5's queued idea (fifty-stock residual momentum), so the plan's id is not to be assumed.
 - [x] **P1-ENG-8X1K** Phase 1: Survivorship-check store: cleaning, build, marker, reports
   - **Difficulty**: HARD
   - **Type**: Feature

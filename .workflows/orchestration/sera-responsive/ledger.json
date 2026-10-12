@@ -10,10 +10,10 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": "Narrow nav landed: desk-only rail + mobile-only 348px bottom pill bar, SeraBackLink route-guarded so /sean is untouched; .main reserves --nav-clear once. /sera, /sera/journal, /sera/gotrade, /sera/how now exact at 390 and 414 both themes; /sera/ideas still 476 (phase 5). All 16 desktop PNGs byte-identical to a pre-edit baseline. tsc clean, 676 tests pass. Decisions: per-phase dev ports are impossible \u2014 Next 16.3.8 refuses a second dev server per project dir, so all phases must share one; Step 3 created only phase 1's task row, not all five, to avoid racing the shared todos.md; my todos.md row was swept into phase 2's commit 3e65f21 (bookkeeping only, not re-done).",
+      "note": "Coordinator-verified: 57b9b23 is an ancestor of origin/feature/sera-responsive. Seven files \u2014 its five owned sources, its own task plan, and web/package_readme.md (owned by no phase; the readme-updater's natural target). No peer source file. All frozen files intact across the branch, Term.tsx included. CONTRACT CHANGE carried to wave 2: Next 16.3.8 locks 'next dev' per PROJECT DIRECTORY (verified in next/dist/build/lockfile.js \u2014 acquireWithRetriesOrExit on the .next/dev lockfile), so the plan's 'phase N takes port 312N' is unachievable in a shared worktree; only one dev server can exist at a time. Wave 2 told to reuse the running server via --base and keep --out .shots/pN. Mis-attribution recorded not repaired: phase 1's todos.md completion row went out inside phase 2's 3e65f21.",
       "package": "web/components/sera`, `web/app/sera",
       "plan": ".workflows/plan/sera-responsive/phase-1.md",
-      "reported_at": "2026-10-12T11:02:42+00:00",
+      "reported_at": "2026-10-12T11:04:00+00:00",
       "satisfies": [
         "R1",
         "R2"
@@ -56,56 +56,56 @@
         "R1",
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "/sera/methods`: cards on a phone, table on a desk"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "509025b",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "Coordinator-verified: 509025b on origin/feature/sera-responsive. Four files \u2014 its two owned sources under app/sera/methods/[id]/, its task plan, the shared todos.md. No peer source; methods.module.css and page.tsx (phase 3's) untouched; view.ts and view.test.ts frozen and intact. Applied both coordinator corrections (reused the dev server on 3123, left package_readme.md alone). Adopted D7's card vocabulary from phase 3. Plan-prose drift it caught, no action needed: M0102 is a FUNDED method so its cards lead on 'What your money earned'; the plan called M0084 the funded sample and M0102 only the baseline route. Both shapes verified anyway (M0007 unfunded, M0084 funded).",
       "package": "web/app/sera/methods/[id]",
       "plan": ".workflows/plan/sera-responsive/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T11:16:25+00:00",
       "satisfies": [
         "R1",
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-V4CD",
       "title": "/sera/methods/[id]`: the variants table, same treatment"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "97b576a",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 5,
-      "note": null,
+      "note": "Coordinator-verified: 97b576a on origin/feature/sera-responsive. Five files \u2014 its three owned stylesheets, its task plan, the shared todos.md. Stat.module.css absent from the diff, so D5 held. /sera/ideas 476 -> exact at 390 and 414; last R2 number in the set. INCIDENT it surfaced: phase 3 ran a merge (db3e0ee) in the shared worktree while phase 4 had uncommitted work. SEPARATELY, and worse, MY OWN ledger pusher subagent ran a rebase (start/abort) and two mixed resets in that same shared worktree \u2014 reflog HEAD@{4}..HEAD@{12} \u2014 and committed the ledger to the FEATURE BRANCH as 2e5c70e instead of only to main. Both resets were mixed, not --hard, so no working-tree file was lost and phase 4's work survived and is now committed at 509025b. Consequence to handle at landing: the feature branch carries its own .workflows/orchestration/sera-responsive/{PLAN.md,ledger.json} which will conflict with main's live copy \u2014 resolution pre-decided, main's copy wins, the branch copy is a stale snapshot.",
       "package": "web/app/sera",
       "plan": ".workflows/plan/sera-responsive/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T11:16:01+00:00",
       "satisfies": [
         "R1",
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-N4JW",
       "title": "The rest of the narrow layout"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/sera-responsive/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-responsive",
-  "updated": "2026-10-12T11:02:42+00:00",
+  "updated": "2026-10-12T11:16:25+00:00",
   "verified_at": "2026-10-12T11:00:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-responsive"
 }

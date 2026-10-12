@@ -6,20 +6,20 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "625098f",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "lab exposure built: report-only, 4 arms per recorded variant, parked read from allocator.holds(). Decided: Step 3 task bookkeeping went in its own commit BEFORE the code commit (64654db), so git show --stat HEAD lists exactly phase 1's three files per its exit criterion. Smoke run: M0030's picks alone LEAD SPY by 7.5pts/yr vs 4.7 recorded, and turn 2009-2015 from -1.7 to +2.7 -- the parked SPY is the drag, the opposite shape to the dividend family. Reproduction gap closed: all 3 M0030 variants reproduce exactly on store 77c37d553508, so invariant 8's 9.583603/9.583723 note is stale.",
       "package": "engine/src/seer_engine/lab`, `engine/src/seer_engine/commands",
       "plan": ".workflows/plan/lab-exposure-diagnostic/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T03:54:32+00:00",
       "satisfies": [
         "R1",
         "R3"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-XP7Q",
       "title": "lab exposure`: the diagnostic"
     },
     {
@@ -38,14 +38,14 @@
         "R2",
         "R3"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "spawned",
+      "task_id": "P1-ROOT-K2VB",
       "title": "Run it over the five, and journal the answer"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-exposure-diagnostic/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-exposure-diagnostic",
-  "updated": "2026-10-12T03:35:20+00:00",
+  "updated": "2026-10-12T03:55:28+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-exposure-diagnostic"
 }

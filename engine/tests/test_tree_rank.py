@@ -426,6 +426,20 @@ def test_two_prepares_fit_bit_identical_models():
     assert a.model(replace(SMALL, learning_rate=0.2), anchor).digest != a.model(SMALL, anchor).digest
 
 
+def test_an_all_missing_column_fits_as_unsplittable_and_leaves_other_fits_untouched():
+    # The fundamentals before 2009: four columns with no finite value. sklearn 1.9 raised on them
+    # ("window shape cannot be larger than input array shape"); the guard fits them as a constant.
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(600, 3))
+    y = X[:, 0] + 0.1 * rng.normal(size=600)
+    blank = np.column_stack([X, np.full(600, np.nan)])
+    est = tree_rank.fit_model(blank, y, SMALL)
+    filled = np.column_stack([X, rng.normal(size=600)])
+    assert np.array_equal(est.predict(blank), est.predict(filled))  # the blank column is never split on
+    assert np.array_equal(est.predict(blank), tree_rank.fit_model(X, y, SMALL).predict(X))
+    assert np.isnan(blank[:, 3]).all()  # the caller's matrix is not written to
+
+
 # ---- the feature-set switch ---------------------------------------------------------------------
 
 

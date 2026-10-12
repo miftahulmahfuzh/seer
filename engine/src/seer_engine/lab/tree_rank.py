@@ -553,7 +553,18 @@ class TreeModel:
 
 
 def fit_model(X: np.ndarray, y: np.ndarray, params: TreeRankParams) -> HistGradientBoostingRegressor:
-    """``params``' regressor fitted on (X, y) under a one-thread limit (module docstring, DETERMINISM)."""
+    """``params``' regressor fitted on (X, y) under a one-thread limit (module docstring, DETERMINISM).
+
+    A column with no finite value at all (the four fundamentals before the EDGAR panel starts in
+    2009) is fitted as a constant 0.0. sklearn 1.9 bins a one-valued column into a single bin and
+    never splits on it, which is what an all-missing column means, but it raises on a column with
+    zero distinct values. Any column with one finite value is passed through untouched, so every
+    fit that succeeded before this guard is bit-identical.
+    """
+    blank = ~np.isfinite(X).any(axis=0) if X.size else np.zeros(X.shape[1], dtype=bool)
+    if blank.any():
+        X = X.copy()
+        X[:, blank] = 0.0
     estimator = HistGradientBoostingRegressor(
         loss="squared_error",
         learning_rate=params.learning_rate,

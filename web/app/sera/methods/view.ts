@@ -129,6 +129,21 @@ export const fixed = (v: number | null, digits = 2): string =>
 /** Profit factor; '∞' when the variant never lost. */
 export const pfText = (t: LabTrial): string => (t.pfInfinite ? '∞' : fixed(t.profitFactor, 2));
 export const count = (v: number): string => INT.format(v);
+
+/** The N the method's MOST RECENT run was scored against, or null when it has never run.
+ *
+ * Deliberately the newest trial's N and not `Math.max` over them. Those agreed while N only ever
+ * grew, and they stopped agreeing on 2026-10-08, when the luck policy moved from counting trial
+ * rows to counting methods and N fell from 126 to 74. A book whose trials straddle that change --
+ * which an amendment is the first thing able to produce, since it adds trials to a method that has
+ * already run -- would otherwise advertise the largest N any of its trials ever faced rather than
+ * the one it was last judged against. Measured 2026-10-12: M0030 carries trials at N = 126 (Oct 7)
+ * and N = 74 (Oct 12), and `Math.max` showed 126 beside a lab whose hurdle is 74.
+ */
+export function nAtLastRun(trials: LabTrial[]): number | null {
+  if (trials.length === 0) return null;
+  return trials.reduce((newest, t) => (t.n > newest.n ? t : newest)).nTrialsAtRun;
+}
 /** Any ISO date or timestamp -> 'Oct 4, 2026' (the date as written, no timezone shift). */
 export const longDate = (iso: string): string => {
   const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);

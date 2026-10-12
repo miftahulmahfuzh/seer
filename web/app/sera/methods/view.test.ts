@@ -8,6 +8,7 @@ import {
   markLabel, marks, methodRows, parseShow, pct1, pfText, showCounts, showHref, signed1, sortMethods, sourceHref,
   SPY_COLOR, SPY_DASH, techRows, untestedNote, windowText, workedSummary, yearPairs,
   redoneOf,
+  nAtLastRun,
 } from './view';
 
 const method = (over: Partial<LabMethod> = {}): LabMethod => ({
@@ -342,5 +343,31 @@ describe('redoneOf', () => {
     const of = (id: string) => [trial({ methodId: id, ...fed })];
     expect(redoneOf([method({ id: 'M0047' }), method({ id: 'M0046' })], of).map(r => r.method.id))
       .toEqual(['M0046', 'M0047']);
+  });
+});
+
+describe('nAtLastRun', () => {
+  it('takes the newest trial\'s N, not the largest', () => {
+    // M0030's real shape on 2026-10-12: three trials scored when the luck policy counted trial
+    // rows (N = 126), then an amendment's three scored after it moved to counting methods
+    // (N = 74). Math.max would advertise 126 beside a lab whose hurdle is 74.
+    const trials = [
+      trial({ n: 126, nTrialsAtRun: 126 }),
+      trial({ n: 127, nTrialsAtRun: 126 }),
+      trial({ n: 128, nTrialsAtRun: 126 }),
+      trial({ n: 359, nTrialsAtRun: 74 }),
+      trial({ n: 360, nTrialsAtRun: 74 }),
+      trial({ n: 361, nTrialsAtRun: 74 }),
+    ];
+    expect(nAtLastRun(trials)).toBe(74);
+    expect(nAtLastRun([...trials].reverse())).toBe(74);
+  });
+
+  it('is unchanged for a method whose N only ever grew', () => {
+    expect(nAtLastRun([trial({ n: 10, nTrialsAtRun: 37 }), trial({ n: 362, nTrialsAtRun: 74 })])).toBe(74);
+  });
+
+  it('is null when the method has never run', () => {
+    expect(nAtLastRun([])).toBeNull();
   });
 });

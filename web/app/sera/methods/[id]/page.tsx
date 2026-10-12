@@ -18,7 +18,7 @@ import { childrenOf, insightsOf, lab, methodById, trialsOf } from '@/lib/sera/la
 import { collapseRepeatedHeadings, renderMarkdown } from '@/lib/sera/markdown';
 import type { LabMethod, LabTrial } from '@/lib/sera/types';
 import {
-  anyMoneyWeighted, BEST_COLOR, conditionTip, count, DEPOSITS_TIP, dsrNote, earned, earnedVs, fixed, growthFmt,
+  anyMoneyWeighted, BEST_COLOR, conditionTip, count, DEPOSITS_TIP, dsrNote, earned, earnedVs, fixed, growthFmt, nAtLastRun,
   redoneOf, type Redone,
   growthLines, hurdlePoints, longDate, markLabel, marks, pct1, pfText, signed1, SOURCE_ICON, sourceHref, SPY_COLOR,
   SPY_DASH, techRows, untestedNote, windowText, workedSummary, yearPairs, type Mark,
@@ -55,7 +55,7 @@ export default async function MethodPage({ params }: { params: Promise<Params> }
   const children = childrenOf(m.id);
   const redone = redoneOf(children, trialsOf);
   const insights = insightsOf(m.id);
-  const nAtRun = trials.length ? Math.max(...trials.map(t => t.nTrialsAtRun)) : null;
+  const nAtRun = nAtLastRun(trials);
   const srcHref = sourceHref(m.sourceRef);
   const SrcIcon = SOURCE_ICON[m.sourceKind];
   const srcLabel = SOURCE_KIND_LABEL[m.sourceKind];

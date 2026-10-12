@@ -23,21 +23,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "69f2c9fb",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "cash_yield lever (T13W, ACT/365 at open, point-in-time); paper/promote/lab refuse appropriately; labkit.SMOKE_T13W added; all preset pins unchanged; no ladder decisions",
       "package": "engine/sim`, `engine/backtest`, `engine/paper`, `engine/commands`, `engine/lab`, `engine/tests",
       "plan": ".workflows/plan/measure-then-learn/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T15:06:39+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-0JM2",
       "title": "Interest on idle cash (`cash_yield` lever)"
     },
     {
@@ -57,7 +57,7 @@
         "R1",
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Fixed-tape presets and the web mirror"
     },
@@ -140,7 +140,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/measure-then-learn/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "measure-then-learn",
-  "updated": "2026-10-12T15:04:20+00:00",
+  "updated": "2026-10-12T15:06:39+00:00",
   "verified_at": "2026-10-12T14:54:11+00:00",
   "worktree": "/home/miftah/.worktrees/seer/measure-then-learn"
 }

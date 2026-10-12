@@ -23,7 +23,7 @@ from seer_engine import cli, research
 from seer_engine.backtest.dev import Candidate
 from seer_engine.lab import gate_probe as gp
 from seer_engine.lab import hardgate, runner, store
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0007_residual_momentum import N20, N20_NOTREND
 from seer_engine.lab.seed import seed
 from seer_engine.sim.rules import MONTHLY_HOLD_FRAC
@@ -540,6 +540,36 @@ def test_a_variant_gone_from_the_file_is_listed_not_run(lab, dev_data, recorded,
     (rep,), run = _measure(conn, dev_data, tmp_path, monkeypatch)
     assert rep.missing == ("M0001-B",)
     assert "no longer in the method file): M0001-B" in gp.format_report(rep, run)
+
+
+def test_a_variant_an_amendment_added_is_planned_not_called_missing(
+    lab, dev_data, recorded, tmp_path, monkeypatch
+):
+    """A variant that lives in an amendment is still a variant of this method.
+
+    ``plan_method`` resolved its recorded trials against ``method.candidates``, which is the
+    original batch and nothing else, so every variant an amendment added came back as "recorded,
+    but no longer in a method file" and was never priced. Measured on the committed lab
+    2026-10-12, before this was fixed: ``lab gate M0030 M0053 --dry-run`` reported 8 recorded dev
+    variants and listed all six of the 2026-10-12 amendments' as gone from their files; it reports
+    14 now. The method file had not changed -- only the reader was looking at half of it.
+    """
+    conn, _ = lab
+    amended = Method(
+        id="M0001", name="Fast movers, bought only in a rising market", family="factor",
+        source_kind="knowledge", source_ref="", hypothesis="h", expected_failure="f",
+        candidates=(_cand("M0001-A", GATED_PARAMS),),
+        amendments=(
+            Amendment(
+                added=date(2026, 10, 12), why="w", hypothesis="h", expected_failure="f",
+                candidates=(_cand("M0001-B", OPEN_PARAMS),),
+            ),
+        ),
+    )
+    monkeypatch.setattr(gp, "discover", lambda: {"M0001": (amended, HERE)})
+    (rep,), run = _measure(conn, dev_data, tmp_path, monkeypatch)
+    assert rep.missing == ()
+    assert [r.variant.candidate.id for r in rep.rows] == ["M0001-A", "M0001-B"]
 
 
 def test_a_test_window_store_is_refused(lab, recorded, tmp_path, monkeypatch):

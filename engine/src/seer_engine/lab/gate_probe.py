@@ -295,7 +295,7 @@ def _candidate_in(methods: Mapping[str, Any], cid: str) -> Candidate | None:
     method = methods.get(cid.split("-")[0])
     if method is None:
         return None
-    return next((c for c in method[0].candidates if c.id == cid), None)
+    return next((c for c in method[0].all_candidates() if c.id == cid), None)
 
 
 def control_problems() -> tuple[tuple[str, ...], int]:
@@ -643,7 +643,7 @@ def plan_method(conn: sqlite3.Connection, method_id: str) -> MethodPlan:
             f"{method.id} has no dev trial; `lab gate` re-runs what the lab recorded. Run it with "
             f"`lab run {method.id}` first"
         )
-    by_id = {c.id: c for c in method.candidates}
+    by_id = {c.id: c for c in method.all_candidates()}
     taken: set[str] = set(by_id) | {str(t["candidate_id"]) for t in trials}
     seen: set[str] = set()
     variants: list[Variant] = []

@@ -510,3 +510,93 @@ Before proposing any roster change, a session must be able to answer all five:
 The default answer is **no change**. That is not inertia: on 2026-10-07 the roster's entire
 forward record was zero sessions old, and every month it is left alone is the only kind of
 evidence this project cannot manufacture.
+
+## 9. Revision 2026-10-12 (built under the owner's instruction of 2026-10-12; one question still open): a method may be amended
+
+**This section is not an owner decision.** §6, §7 and §8 record things the owner decided. This one
+records a change made by a plan set acting under his instruction of 2026-10-12 — "these must be
+VARIANTS of the existing method files (free in N) and not new method ids" — and it flags the part
+that is still his to settle and has not been put to him before now. Read it as "this is what the
+lab does as of today, and here is the piece nobody has decided".
+
+The sections it qualifies are left exactly as written. Corrections here are dated rather than
+overwritten, so the original still records what was believed when it was written.
+
+### 9.1 What changed
+
+A method that has already run may now carry one or more **amendments**: additional fixed variants,
+pre-registered in their own right and recorded under the method's own id.
+
+Before this, `lab run` refused outright — "a method runs once. A change is a new variation method"
+— and the only path to a new variant was a new method id.
+
+### 9.2 §2's "1–6 fixed variants per run" — an amendment is a run
+
+**Clarified, not changed.** The 2026-10-04 owner decisions line at the top of this document reads
+"scope = one idea with 1–6 fixed variants **per run**", and §2 says a method file exports
+`METHOD = Method(...)` with 1–6 fixed `Candidate`s.
+
+The cap is now read the way that sentence is written: **per run**. The method's original candidate
+tuple keeps its own 1–6, and each amendment carries its own 1–6. There is no cap on a method's
+lifetime total — see §9.5, which is the open question.
+
+This reading was forced by the data, not chosen for convenience: one method in the lab already
+holds five recorded candidates, so a per-lifetime cap of six would have left room for one variant
+and silenced the question this plan set was asked to answer on that book.
+
+### 9.3 §4's guardrail — qualified, not lifted
+
+**Qualified, §4 guardrails, the last clause only.** The original wording, 2026-10-04, stands as
+written:
+
+> never tune after seeing a result within a method (tuning is a new variation method with new
+> trials)
+
+**The prohibition is unchanged. The remedy has a second form.** Tuning after seeing a result is
+still forbidden, and nothing in this revision permits it. What changes is that "a new variation
+method with new trials" is no longer the *only* way to try a different setting of the same idea: a
+**pre-registered amendment** — committed, with its own date, its own hypothesis and its own stated
+expected failure, all written before any result is seen — is now a second legitimate path, and it
+does not mint a method id.
+
+The distinction that matters is unchanged and is the whole point: *pre-registered* versus
+*post-hoc*. An amendment written before the run is pre-registration. A variant chosen after
+reading a result is tuning, and it is still refused.
+
+### 9.4 Why, and what still guards it
+
+**Why.** Under the `methods` N policy in force since 2026-10-08, a new method id costs **+1 N**,
+retroactively, for every method already on file; a variant of an existing method costs **nothing**.
+Measured 2026-10-12 on a copy of the committed `lab/lab.sqlite` (md5 `4a34ddb8…`):
+`store.pending_gate` on an existing method returns `Gate(n=74)` for any batch size, and on a new
+id `Gate(n=75)` against 130 recorded method rows. The 2026-10-04 freeze was written when N was the
+dev trial **row** count, where a method with six variants cost six, not one. The rule was
+calibrated against a price that no longer exists.
+
+**What still guards it.**
+
+- `methods.source_sha` is never rewritten; the trigger `methods_source_sha_once` stays in place
+  and keeps meaning exactly what it says.
+- Each amendment appends a row to an append-only `method_amendments` table with its own source
+  hash, date and git sha. The commit is still the pre-registration, and an uncommitted or dirty
+  file is still refused.
+- The freeze test becomes two checks, stronger together than the one they replace: the file hashes
+  to the **latest** recorded sha, **and** every candidate already recorded still digests to the
+  `config_digest` the lab holds.
+- `trials`, `trial_moments`, `trial_funding` and `trial_provenance` stay append-only. No recorded
+  row is edited or deleted.
+
+### 9.5 The open question — not decided here
+
+The `methods` policy's only guard against one idea being amended without limit is its floor,
+`N = max(distinct_methods, ceil(participation_ratio))`. Measured 2026-10-12 on the committed
+database, that floor is `ceil(2.19) = 3` against 74 methods. **It does not bind**, and nothing else
+charges for an amendment: a method could in principle be amended indefinitely with N never moving
+off 74.
+
+No cap was invented here. Choosing a number changes what every future result means, and that is
+the owner's call.
+
+The question is put to him in `docs/plans/2026-10-12-lab-n-and-amendments-owner-decision.md`
+(Decision B), together with the separate question of what `lab` should print as N (Decision A).
+**Until he answers, this section describes a door that is open and uncounted.**

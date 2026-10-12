@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-12 13:43
-**Total Active Tasks**: 5
+**Last Updated**: 2026-10-12 14:01
+**Total Active Tasks**: 4
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 2
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 119
+- Completed: 120
 
 ---
 
@@ -1056,15 +1056,29 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R1, R2 — Build §4.1: the brakes-off variants on M0030 and M0053 — the exposure diagnostic's `-FULL` arms, turned into real pre-registered, recorded lab variants; Build §4.2: interrogate the shared SPY 200-day gate that is nearly all one year of value and a drag since 2009
   - **Depends on**: P1-ENG-V4QT
   - **Plan**: `.workflows/plan/P1-ENG-T3ZK.md`
-- [ ] **P1-ENG-Q6WD** Phase 4: M0053's amendment: the weekly brake off, and the gate off
+- [x] **P1-ENG-Q6WD** Phase 4: M0053's amendment: the weekly brake off, and the gate off
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `engine/src/seer_engine/lab/methods/m0053_overnight_winners_weekly_brake.py` — a new params dataclass `NoBrakeOnParams`, a new allocator `FULLON` with `id = "M0053-NOBRAKE"` for the no-brake arm, `NOGATE20`, and the amendment block — and `engine/tests/test_m0053_amendment.py` (new, 6 tests). Does not touch `WeeklyOnParams`, `WeeklyOnPrepared`, `WeeklyOvernightAllocator`, `WEEKLYON`, `TOTON20`, `TOTON30`, `PoolBy`, the recorded five candidates, `m0050_*.py`, `m0007_*.py`, `m0030_*.py`, the `lab/` engine modules, or `engine/tests/test_lab_methods.py`. Exit: `M0053`'s `METHOD` carries one `Amendment` dated 2026-10-12, built with phase 1's exact five-field signature including `why=`, with the three candidates named under **Decisions** and `amendments=` as the call's last keyword; the new allocator's id is unique across the lab; the three new digests are `d8e94b62…`, `150eb251…` and `76de74aa…`, all free; the five recorded candidates still digest to their recorded digests; `allocatorkit`'s contract checks pass for the new allocator; no existing params dataclass gains, loses or renames a `compare=True` field and no existing allocator id changes (invariant 3); the suite is green. **No `lab run` here.**
-  - **Status**: pending
+  - **Status**: completed
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/lab-brakes-and-gate/PLAN.md` (phase 4 of 6)
   - **Satisfies**: R1, R2 — Build §4.1: the brakes-off variants on M0030 and M0053 — the exposure diagnostic's `-FULL` arms, turned into real pre-registered, recorded lab variants; Build §4.2: interrogate the shared SPY 200-day gate that is nearly all one year of value and a drag since 2009
   - **Depends on**: P1-ENG-V4QT
   - **Plan**: `.workflows/plan/P1-ENG-Q6WD.md`
+  - **Completed**: 2026-10-12 14:01
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/methods/m0053_overnight_winners_weekly_brake.py, engine/tests/test_m0053_amendment.py (new), engine/.workflows/todos.md
+  - **Verified**: M0053's method file gains one `Amendment(added=date(2026,10,12), why=, hypothesis=, expected_failure=, candidates=)`, passed to `Method(...)` as its last keyword after `seen_keys`, carrying three candidates: `M0053-TOTON20-NOBRAKE` and `M0053-RESON20-NOBRAKE` on a NEW allocator `FULLON` (`id = "M0053-NOBRAKE"`) with a NEW frozen params dataclass `NoBrakeOnParams(inner, pool_by)` — `WEEKLYON` with `_braked`'s `_scaled(...)` call removed and nothing else, so the brake goes and the weekly cadence stays; and `M0053-RESON20-TV16-NOGATE` on the UNCHANGED `WEEKLYON` with the new module constant `NOGATE20 = OnParams(N20_NOTREND, rank="total-overnight", pool=40)`. Run from the worktree with `PYTHONPATH=<worktree>/engine/src`, the main checkout's venv, Postgres up: `discover()['M0053']` -> `5 8 ['M0053-TOTON20-NOBRAKE', 'M0053-RESON20-NOBRAKE', 'M0053-RESON20-TV16-NOGATE']`, exactly the plan's expected string. The three new `config_digest`s are byte-for-byte the three the plan pinned and all three are FREE in the committed database: `d8e94b62...`, `150eb251...`, `76de74aa...`. All five recorded candidates still digest to exactly what `trials` holds for them (invariant 3), checked against the pinned constants and against the committed DB directly. `FULLON.id` is unique lab-wide: one object owns it, no `trials.allocator_id` claims it, not in `backtest.registry.REGISTRY`. `allocatorkit`'s `assert_p4_identity` and `assert_no_lookahead` pass for `FULLON` on both params values with a non-zero non-empty count. `WEEKLYON.targets(...) == _scaled(FULLON.targets(...), basket_scale(...))` on every probed session in both pool modes — the brake is the only difference. `pytest engine/tests/test_m0053_amendment.py` -> 7 passed; `test_lab_methods.py test_registry.py` -> 752 passed; full `pytest engine/tests` -> **4449 passed, 3 skipped** (the 3 skips are the opt-in live-store tests, same as baseline; above the coordinator's 4381 baseline because peer phases have since added tests to this shared worktree). `ruff check` clean on both of this phase's files. **No lab command was run**: `md5sum lab/lab.sqlite` still `4a34ddb823ec88a5e86afeb5d7e1b7c9` (unchanged), `git status --porcelain web/data/lab.json` empty, no row written anywhere — phase 5 owns the run. Deliberately not done, per the plan: no intermediate brake target (TV20/TV22) added (Decision D5); `seen_keys` not extended; `METHOD.hypothesis`, `METHOD.expected_failure` and the five recorded candidates untouched; no funding caveat added — M0053's five recorded trials are already funded at 10,000,000 on the same schedule at the same real fees, so its 22.4-22.8% figures are like-for-like, unlike M0030's (reconciler C7).
+  - **Drift**:
+    - The plan says the new test module has 6 tests; its own complete code block contains 7 (recorded-digest lock, committed-database lock, the three amendment digests, the brake-is-the-only-difference equivalence, the allocatorkit contract, the smoke window, the params-type guards). All 7 were written and all 7 pass. Same shape as phase 1's 15-not-14 drift.
+    - The plan's Verification runs `ruff check engine` tree-wide; that is RED, but not on this phase's files. The single error is F541 (f-string without placeholders) at `engine/src/seer_engine/lab/gate_probe.py:1291` — phase 2's in-flight new file. `ruff check` on this phase's two files is clean. **Worth flagging to phase 2:** CLAUDE.md says CI lint is E9 and F minus F401, so F541 WOULD fail CI if it lands.
+    - The plan's quoted line anchors were all accurate at this tree (TOTON30 at 222, `_v` at 225, `METHOD` at 231, docstring closing `"""` at 25). No source drift.
+  - **Decided**:
+    - Tree-wide `ruff check engine` is red on a peer's in-flight file (`gate_probe.py:1291`, phase 2) -> left untouched and reported rather than fixed. Tie-break rule "take the narrower blast radius", plus the phase plan's own "Leaves alone (owned by others)" list, which names `lab/gate_probe.py` as phase 2's.
+    - Completion: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own recorded precedent for every swarm-tracked set — P1-ENG-V4QT, XP7Q, D7XQ, T4KD, 7V3C all did exactly this; three peer phase sessions share this worktree and append here concurrently).
+    - `engine/package_readme.md` NOT touched and readme-updater NOT dispatched: reconciler C5 gives phase 2 (`P1-ENG-J8RM`) exclusive ownership of all of this plan set's `package_readme.md` changes, including phase 1's clauses, and that file is dirty in this shared worktree right now.
+    - Nothing unblocked: `P1-ROOT-H5NX` (phase 5) depends on phases 2, 3 and 4, and phases 2 and 3 are still pending, so it correctly stays `blocked`. Root `.workflows/todos.md` is also dirty under a peer's edit and was left alone.
+    - Landing not attempted: `swarm.py find --plan` reports a live swarm, coordinator `orch-lab-brakes-and-gate`, so the merge of `feature/lab-brakes-and-gate` into `main` belongs to that coordinator (analyze-orchestrator Step 5). Nothing merged or pushed to `main`; no worktree or branch deleted. Plan index: phase 4's row ticked in the main checkout and left uncommitted, per the orchestration convention phase 1 followed.
 
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"

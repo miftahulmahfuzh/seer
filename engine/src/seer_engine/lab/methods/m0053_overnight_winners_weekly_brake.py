@@ -22,6 +22,18 @@ momentum (the real-fee residual book's ranking) and runs the same overnight sort
 Assumptions written before the run: the 30-name version keeps M0050's pool-to-book ratio (pool 60
 for 30 names). The ex-dividend gap stays inside the overnight leg, as in M0050 (allocators see no
 dividends). Every piece reads only bars dated <= ``data_date``.
+
+Amendment, 2026-10-12 — the brake off, and the gate off. The exposure diagnostic
+(``docs/backtests/2026-10-12-exposure-diagnostic.md``, measured on the dev store 77c37d553508 with
+prices 5451195fd552) re-weighted every recorded version of this book to its own picks at full size
+and found the brake is the most expensive one in the lab. ``NoBrakeOnParams`` and ``FULLON`` below
+make that arm a real pre-registered candidate instead of a column in a diagnostic: ``FULLON`` is
+``WEEKLYON`` with ``_braked``'s scalar removed and nothing else — the basket is still chosen once a
+month on the anchor date and still refreshed to today's closes every week. The brake is removed,
+not the weekly cadence. They are a new params type and a new allocator rather than a field on
+``WeeklyOnParams`` or a sentinel ``target_vol``, because ``registry._canon`` enumerates every
+``compare=True`` field of a dataclass, so one added field would silently rewrite the
+``config_digest`` of all five candidates above, which the lab has recorded.
 """
 
 from __future__ import annotations
@@ -34,10 +46,11 @@ from decimal import Decimal
 from typing import Any, Literal
 
 from seer_engine.backtest.dev import Candidate
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0001_momentum_own_vol_scaling import _scaled, basket_scale
 from seer_engine.lab.methods.m0007_residual_momentum import (
     N20,
+    N20_NOTREND,
     N30,
     ReturnGrid,
     build_grid,
@@ -222,10 +235,226 @@ TOTON20 = OnParams(N20, rank="total-overnight", pool=40)  # M0050-TOT-ON's param
 TOTON30 = OnParams(N30, rank="total-overnight", pool=60)
 
 
+# --------------------------------------------------------------------------- the amendment, 2026-10-12
+#
+# Everything above this line is frozen: the five candidates have run and the lab holds their
+# config digests. `registry._canon` renders a dataclass by enumerating every `compare=True`
+# field, so adding a field to `WeeklyOnParams` would rewrite all five of them. The no-brake arm
+# therefore gets its own params type and its own allocator, side by side with the originals.
+
+AMENDED = date(2026, 10, 12)
+
+
+@dataclass(frozen=True, slots=True)
+class NoBrakeOnParams:
+    """``WeeklyOnParams`` with the brake taken out — not turned down, and not widened away.
+
+    There is no ``target_vol`` and no ``n`` here, because with no scalar there is nothing to read a
+    volatility for; a sentinel like ``Decimal("99")`` would say the same thing and be unreadable a
+    year from now. ``inner`` and ``pool_by`` mean exactly what they mean on ``WeeklyOnParams``, so
+    the selection helpers above — ``choose``, ``_resid`` and ``_basket`` — read this type unchanged.
+    They touch ``.inner`` and ``.pool_by`` and nothing else, which is why they are shared rather
+    than copied: the two params types must pick the identical basket or the comparison this
+    amendment makes is not a comparison.
+    """
+
+    inner: OnParams
+    pool_by: PoolBy = "total"
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.inner, OnParams):
+            raise TypeError(f"inner must be OnParams, got {type(self.inner).__name__}")
+        if self.inner.rank != "total-overnight":
+            raise ValueError(f"inner.rank must be 'total-overnight', got {self.inner.rank!r}")
+        if self.pool_by not in ("total", "residual"):
+            raise ValueError(f"pool_by must be 'total' or 'residual', got {self.pool_by!r}")
+
+    def as_dict(self) -> dict[str, str]:
+        out = {"pool_by": self.pool_by}
+        for k, v in self.inner.as_dict().items():
+            out[f"inner.{k}"] = v
+        return out
+
+
+def _check_full(params: object) -> NoBrakeOnParams:
+    if not isinstance(params, NoBrakeOnParams):
+        raise TypeError(f"params must be NoBrakeOnParams, got {type(params).__name__}")
+    return params
+
+
+class FullOvernightAllocator:
+    """The month's overnight-picked winners at full size: ``WEEKLYON`` without the brake's scalar.
+
+    Exactly ``WeeklyOvernightAllocator`` minus ``_braked``'s ``_scaled(...)`` call. The basket is
+    still chosen once a month on the anchor date, through the same ``trend_on`` gate, the same
+    ``factor_rows`` screen and the same ``_basket``; it is still re-issued on every weekly decision
+    through ``_refreshed`` — the month's weights at today's closes. **This is the brake removed,
+    not the weekly cadence removed.** The exposure diagnostic's ``-FULL`` arm rescales the braked
+    basket back to a full book, so it undoes the scalar and never the weekly refresh; an allocator
+    that also dropped the refresh would not be the arm that diagnostic priced.
+
+    Its ``id`` is its own, ``"M0053-NOBRAKE"``: a config digest names its allocator by id, and one
+    object owns each id across the whole lab (``tests/test_lab_methods.py``).
+    """
+
+    id = "M0053-NOBRAKE"
+
+    def lookback(self, params: Any) -> int:
+        p = _check_full(params)
+        need = on_lookback(p.inner)
+        if p.pool_by == "residual":
+            need = max(need, resid_lookback(_resid(p)))
+        return need + 25  # the anchor can be a month behind data_date; no brake window to cover
+
+    def symbols(self, params: Any) -> tuple[str, ...]:
+        p = _check_full(params)
+        fixed = {p.inner.market}
+        if p.inner.inner.trend is not None:
+            fixed.add(p.inner.inner.trend[0])
+        return tuple(sorted(fixed))
+
+    def holds(self, params: Any) -> tuple[str, ...]:
+        _check_full(params)
+        return ()
+
+    def uses_members(self, params: Any) -> bool:
+        _check_full(params)
+        return True
+
+    def targets(self, history: Mapping[str, History], members: AbstractSet[str], data_date: date,
+                held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        p = _check_full(params)
+        anchor = anchor_date(data_date)
+        cut = {s: h.upto(anchor) for s, h in history.items()}
+        if not trend_on(cut, anchor, p.inner.inner):
+            return ()
+        rows = factor_rows(cut, members, anchor, p.inner.inner)
+        grid = build_grid(cut, p.inner.market) if p.pool_by == "residual" else None
+        basket = _basket(rows, build_legs(cut, p.inner.market), grid, anchor, p)
+        return _refreshed(basket, history, data_date, None)
+
+    def prepare(self, history: Mapping[str, History]) -> WeeklyOnPrepared:
+        return WeeklyOnPrepared(history, prepare_factor(history))
+
+    def targets_prepared(self, prepared: Any, members: AbstractSet[str], data_date: date,
+                         held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        if not isinstance(prepared, WeeklyOnPrepared):
+            raise TypeError(f"prepared must be WeeklyOnPrepared, got {type(prepared).__name__}")
+        p = _check_full(params)
+        anchor = anchor_date(data_date)
+        if not trend_on(prepared.history, anchor, p.inner.inner):
+            return ()
+        rows = prepared.factor.rows_on(members, anchor, p.inner.inner)
+        grid = prepared.return_grid(p.inner.market) if p.pool_by == "residual" else None
+        basket = _basket(rows, prepared.leg_grid(p.inner.market), grid, anchor, p)
+        return _refreshed(basket, prepared.history, data_date, None)
+
+
+FULLON = FullOvernightAllocator()
+NOGATE20 = OnParams(N20_NOTREND, rank="total-overnight", pool=40)  # TOTON20 with the SPY-200 gate off
+
+
+def _a(suffix: str, allocator: Any, params: Any, rationale: str) -> Candidate:
+    """The amendment's twin of ``_v``: same rules, same family, the amendment's date."""
+    return Candidate(id=f"M0053-{suffix}", family="M0053", rules=MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE,
+                     allocator=allocator, params=params, rationale=rationale, added=AMENDED,
+                     owner_inputs=())
+
+
 def _v(suffix: str, params: WeeklyOnParams, rationale: str) -> Candidate:
     return Candidate(id=f"M0053-{suffix}", family="M0053", rules=MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE,
                      allocator=WEEKLYON, params=params, rationale=rationale, added=ADDED,
                      owner_inputs=())
+
+
+NOBRAKE_AMENDMENT = Amendment(
+    added=AMENDED,
+    why="The brake sells the jumpiness that pays, and the gate is a 2008 trade this book keeps paying for",
+    hypothesis=(
+        "The brake sells the jumpiness that pays, and the gate is a 2008 trade this book keeps "
+        "paying for. M0053's own recorded analysis already priced the first half: the weekly brake "
+        "took 4.0 points off the worst fall (22.8% to 18.8% at a 16% target) and cost 4.6 points of "
+        "yearly return (15.1% to 10.5%), against the roughly one point per point every other brake "
+        "in this lab has cost, because the overnight book picks stocks that jump on news and a "
+        "volatility brake reads that as risk in ordinary months too. That analysis closed by asking "
+        "for exactly this measurement: 'the lab should check how the unbraked overnight book did in "
+        "2009-2015. If it also lost to SPY there, drop the family.' The exposure diagnostic of "
+        "2026-10-12 answered it by re-weighting, not by running: with the brake off, every one of "
+        "TOTON20's three targets lands on one number, 14.9% a year funded against deposit-matched "
+        "SPY's 7.2% (+7.7 points), at a 22.8% worst fall, and +0.8 points a year over 2009-2015; "
+        "RESON20-TV16 goes to 14.4% a year (+7.2) at a 22.4% fall and +0.5 after 2009. Those are "
+        "the only two arms in the whole grid besides M0030's that are above the market after 2009. "
+        "A re-weighted column is not a trial, so this amendment runs them: TOTON20-NOBRAKE and "
+        "RESON20-NOBRAKE keep every pick, the monthly anchor and the weekly refresh of the five "
+        "versions above, and remove only the scalar. The third candidate asks the other question. "
+        "Four of the lab's five live books go to cash on the same 28.3% of decision days behind the "
+        "same SPY 200-day read -- 67 of 237 monthly decisions, the identical dates -- so the +34.8 "
+        "point lead all of them show in 2008 is one trade shared five ways, not five discoveries. "
+        "The lab's recorded control prices that gate at +2.7 points a year gated against +1.0 "
+        "ungated over the whole window, but after 2009 the gated version trails by 5.4 while the "
+        "ungated one leads by 1.5. RESON20-TV16-NOGATE is the recorded headline version with "
+        "N20_NOTREND in place of N20 and everything else -- pool, rank, target, window, pool_by, "
+        "rules, funding -- held fixed. "
+        "What I expect: both NOBRAKE arms land near 14-15% a year funded at a 22.4-22.8% worst "
+        "fall, clearing beats-SPY, clearing the 1.3 profit-factor bar comfortably (the diagnostic's "
+        "re-weighted arms read 2.37 and 2.02) and clearing 100 trades by an order of magnitude, and "
+        "then failing the owner's 20% drawdown rule by 2.4 to 2.8 points. They are predicted "
+        "INELIGIBLE, and that is the point of running them: it records, rather than infers from a "
+        "diagnostic column, that the only post-2009 edge this book has exists only above the "
+        "owner's risk limit. I expect the real runs to differ a little from the diagnostic's "
+        "columns in fees and trade count, because with constant weights the weekly resize band "
+        "fires less often than it does under a moving brake; the direction of that difference is "
+        "fewer trades and slightly more return, not less. For RESON20-TV16-NOGATE I expect the "
+        "ordering flip the seasonality control showed: most of the whole-window lead gone with "
+        "2008's +34.8 removed, a worst fall far past 20% (the brake clamps but 2008 fell for a "
+        "year, and the ungated seasonality control fell 61%), and 2009-2015 improved by roughly "
+        "five points from -4.9 toward flat. Also predicted ineligible, on the same rule. "
+        "Success for this amendment is not a passing version. It is three recorded answers: how "
+        "much return the brake really costs when it is removed rather than re-weighted, whether "
+        "the unbraked book's post-2009 edge survives a real run, and how much of this family's "
+        "whole-window record is the shared gate's one year."
+    ),
+    expected_failure=(
+        "The most likely outcome is that all three fail, and two of them fail in the way written "
+        "above: 22.4-22.8% against a 20% bar is not close, and no version here is built to pass. "
+        "**No intermediate brake target is added, and none will be.** TV20 or TV22 might squeak a "
+        "version under 20%, and looking for one after seeing these numbers is precisely what design "
+        "section 4 forbids -- never tune after seeing a result within a method. The grid this "
+        "amendment is built on is already a result; the honest move is to record what it implies "
+        "and let the drawdown rule refuse it, not to search the gap between 18 and 22 for a number "
+        "that passes. If the owner ever wants a braked version that clears 20%, it is a new method "
+        "with a new pre-registration and a new line in the luck budget. "
+        "The other ways this goes wrong. The two NOBRAKE arms may not reproduce the diagnostic's "
+        "numbers at all: the diagnostic re-weighted a recorded run's snapshots, while these are "
+        "fresh simulations whose weekly resize places real orders at Gotrade's real fees on a book "
+        "funded 5M IDR a month, so the 0.10 USD floor lands on slices worth tens of dollars and "
+        "could cost a point or more that the re-weighting never charged. If so, 14.9% becomes 13-14% "
+        "and the arm is ineligible on two conditions instead of one. TOTON20-NOBRAKE is also very "
+        "close to M0050-TOT-ON, the parent, which recorded 15.1% a year at a 22.8% fall on "
+        "monthly-hold-frac-gotrade; it differs only in running on "
+        "monthly-rank-weekly-resize-frac-gotrade, which adds weekly resize trades to hold the "
+        "weights equal. If the two land on the same number, the honest reading is that this "
+        "amendment has re-measured the parent at a different cadence and learned nothing new about "
+        "the picks -- a real risk worth naming before the run. The NOGATE arm may fail to teach "
+        "anything either: with the gate off the book is invested through 2008, the brake is the "
+        "only thing standing between it and a 2008 that the ungated seasonality control took as a "
+        "61% fall, and a worst fall in the thirties would swamp every other difference and leave "
+        "the 2009-2015 reading as the only usable column. And the 2009-2015 improvement may simply "
+        "not appear: the diagnostic's +0.5 and +0.8 are small, measured on a window whose last five "
+        "years are also the lab's most complete data, and M0053's walk-forward record is already 2 "
+        "of 4 folds. If the unbraked book also loses to SPY after 2009 in a real run, the recorded "
+        "analysis's own instruction applies and the family should be dropped."
+    ),
+    candidates=(
+        _a("TOTON20-NOBRAKE", FULLON, NoBrakeOnParams(TOTON20),
+           "M0050-TOT-ON's selection, chosen monthly and refreshed weekly, with the brake removed"),
+        _a("RESON20-NOBRAKE", FULLON, NoBrakeOnParams(TOTON20, pool_by="residual"),
+           "RESON20-TV16's selection with the brake removed: the headline version's full-size arm"),
+        _a("RESON20-TV16-NOGATE", WEEKLYON,
+           WeeklyOnParams(NOGATE20, Decimal("0.16"), 21, pool_by="residual"),
+           "RESON20-TV16 with the shared SPY 200-day gate off and everything else held fixed"),
+    ),
+)
 
 
 METHOD = Method(
@@ -282,4 +511,5 @@ METHOD = Method(
            "The overnight sort inside the 40 best residual-momentum names, braked weekly to 16%"),
     ),
     seen_keys=("concept:overnight-momentum-weekly-brake", "concept:residual-overnight-momentum"),
+    amendments=(NOBRAKE_AMENDMENT,),
 )

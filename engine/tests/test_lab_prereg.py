@@ -719,8 +719,8 @@ def test_one_line_collapses_anything_a_refusal_message_can_carry():
 def test_the_prose_says_the_family_state_is_not_rechecked_at_lab_test(conn, prereg_dir):
     """Decision D3, stated to the file's reader and not only in a plan."""
     _eligible(conn)
-    done = prereg.promote_method(conn, "M0001", git_sha="x", directory=prereg_dir,
-                                 check_method_file=False)
+    prereg.promote_method(conn, "M0001", git_sha="x", directory=prereg_dir,
+                          check_method_file=False)
     text = (prereg_dir / "M0001.md").read_text(encoding="utf-8")
     assert "state **at promotion**" in text
     assert "`lab test` does not re-check it" in text

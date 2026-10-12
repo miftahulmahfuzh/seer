@@ -63,22 +63,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "5840048",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "Verified by the coordinator from git: 5840048 is an ancestor of origin/feature/lab-brakes-and-gate; 3 files, only m0053_*.py + its new test + engine todos. Invariant 3 checked directly rather than quoted \u2014 the m0053 diff is 231 insertions and exactly ONE deletion, the import line widened for Amendment; no recorded params dataclass, allocator or candidate line is altered. lab/lab.sqlite still md5 4a34ddb823ec88a5e86afeb5d7e1b7c9 and untouched in git, web/data/lab.json untouched: no lab command was run, as required. New allocator FULLON id M0053-NOBRAKE, new frozen dataclass NoBrakeOnParams; WEEKLYON/TOTON20/TOTON30/PoolBy/WeeklyOnParams byte-for-byte unchanged. Phase evidence: three pinned digests reproduced byte-for-byte and free; allocatorkit assert_p4_identity + assert_no_lookahead pass; WEEKLYON.targets == _scaled(FULLON.targets, basket_scale) on every probed session, so the brake is the only difference. Plan drift, benign: the plan said 6 tests, its own code block held 7; all 7 written and passing. Phase decision: left F541 at phase 2's gate_probe.py:1291 alone and messaged p2 instead of fixing it \u2014 narrower blast radius, and that file is phase 2's by the ownership list.",
       "package": "engine/src/seer_engine/lab/methods",
       "plan": ".workflows/plan/lab-brakes-and-gate/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T07:05:29+00:00",
       "satisfies": [
         "R1",
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-Q6WD",
       "title": "M0053's amendment: the weekly brake off, and the gate off"
     },
     {
@@ -107,28 +107,28 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "fdda7ac",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 6,
-      "note": null,
+      "note": "Verified by the coordinator from git: fdda7ac is an ancestor of origin/feature/lab-brakes-and-gate; its 3 files are docs/plans x2 + .workflows/todos.md with ZERO engine/src paths, which is exit criteria 2-3 proved by the commit rather than by a tree-wide diff the shared worktree cannot give. grep -c 'Lab N (dev trials)' at branch HEAD = 10 (p6's transient reading of 11 was p2's uncommitted working copy; re-checked at HEAD and after). Phase decisions: (1) rewrote the stale 'twenty-three documents' figure to the measured 32-on-branch / 21-at-d3c1ec4 / 4 durable, rung 1 invariant 10; (2) scoped the empty-engine-diff check to its own paths, rung = the ownership rule; (3) proceeded over 3 failures in test_lab_gate_probe.py, phase 2's in-flight file, rung 2. Index race: p6's stage briefly caught three of p4's files and unstaged them by explicit name with 'git restore --staged', never a reset; fdda7ac landed first, p4 re-staged and 5840048 carries all three intact.",
       "package": "docs/plans",
       "plan": ".workflows/plan/lab-brakes-and-gate/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T07:04:59+00:00",
       "satisfies": [
         "R5"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-B2YP",
       "title": "The owner's two decisions: \u00a75.1's N strings, and the amendment rule"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-brakes-and-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-brakes-and-gate",
-  "updated": "2026-10-12T06:50:05+00:00",
+  "updated": "2026-10-12T07:05:29+00:00",
   "verified_at": "2026-10-12T06:47:00+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-brakes-and-gate"
 }

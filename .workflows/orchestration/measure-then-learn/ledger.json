@@ -63,19 +63,19 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "1330b35",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 4,
-      "note": null,
+      "note": "EODHD alias top-up 0 calls (nothing left); sv store rebuilt 89.0% coverage",
       "package": "engine/commands`, `engine/lab`, skills, runbook, data",
       "plan": ".workflows/plan/measure-then-learn/phase-4.md",
-      "reported_at": "2026-10-12T14:54:17+00:00",
+      "reported_at": "2026-10-12T15:13:06+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-ESU5",
       "title": "Survivorship check runnable here; EODHD top-up"
     },
     {
@@ -140,7 +140,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/measure-then-learn/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "measure-then-learn",
-  "updated": "2026-10-12T15:06:39+00:00",
+  "updated": "2026-10-12T15:13:06+00:00",
   "verified_at": "2026-10-12T14:54:11+00:00",
   "worktree": "/home/miftah/.worktrees/seer/measure-then-learn"
 }

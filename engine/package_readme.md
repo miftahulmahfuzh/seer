@@ -1362,11 +1362,30 @@ brake switched off".
   named in the report: this command compares four arms measured on **one** store with each other,
   so a marked store is internally consistent in a way `lab survivorship`'s two-store comparison is
   not. Exit 0 ok, 2 the lab's rules refused the request, 1 an error.
-- The arms are compared with each other, never with the recorded trial. The reproduction check is
-  printed as information, the way `lab costs` prints it: measured 2026-10-12, `M0030-C50T` re-runs
-  to 9.583603 against a recorded 9.583723 and its SPY TR to 3.466805 against a recorded 3.514206,
-  because the store's fingerprint moved. No conclusion here rests on a recorded number beside a
-  re-run one.
+- The arms are compared with each other, never with the recorded trial, and the reproduction check
+  is printed as information the way `lab costs` prints it. **On the dev store in use
+  (`77c37d553508`) that check passes:** re-measured 2026-10-12, all 23 recorded dev variants of the
+  five reproduce their recorded total return digit for digit — `M0030-C50T` re-runs to
+  9.58372256394318 against a recorded 9.58372256394318. An earlier reading of the same variant
+  (9.583603 against 9.583723, "because the store's fingerprint moved") was taken on a previous
+  store build and no longer holds: the drift tracks store rebuilds rather than being a standing
+  property of old rows, so re-measure it rather than carrying either figure forward. The rule is
+  unchanged and costs nothing when the numbers do agree — no conclusion here rests on a recorded
+  number beside a re-run one.
+- **The measured answer (2026-10-12, dev store `77c37d553508`; write-up
+  `docs/backtests/2026-10-12-exposure-diagnostic.md`, full-precision grid
+  `docs/backtests/2026-10-12-exposure-diagnostic-grid.csv`): the lab's live space is not empty, and
+  four of the five park nothing at all.** M0024, M0028, M0044 and M0053 hold only their own picks,
+  so the blind spot that cost `stock-dividend-change-drift` three batches is simply absent there;
+  their picks on the whole book lead SPY by +4.4, +3.6, +4.8 and +7.2 points a year. M0030 is the
+  inverse of that family: only 35.6% of its book was ever in its own names, and its picks alone
+  lead by +7.5 against +4.7 for the whole book, so the parked SPY dilutes its edge rather than
+  carrying it. Two cautions carry equal weight. The five books are **far less independent than five
+  method ids suggest** — `empty_share` comes back bit-identical at 67/237 (28.3%) across four of
+  them because they share one SPY 200-day gate read on the same monthly dates, and that one gate
+  produced the +34.8 2008 lead for every book: one trade shared five ways, not five discoveries.
+  And from 2009 to the end of the dev window the best version of all five trails the market; only
+  two recover with the brakes off, by under three points a year.
 - Modelled on the report-only subcommands the lab already has (`lab costs`, `lab names`,
   `lab survivorship`). The store (about 2.5M bar rows) is loaded once, every arm measured on it,
   and it is freed before anything is formatted, so a long run over many methods never holds two

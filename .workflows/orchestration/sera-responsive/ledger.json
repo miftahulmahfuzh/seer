@@ -1,0 +1,110 @@
+{
+  "branch": "feature/sera-responsive",
+  "coordinator": "orch-sera-responsive",
+  "coordinator_session_id": "1c90e6f6-1545-42aa-98de-526caf3bfe9d",
+  "created": "2026-10-12T10:45:43+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "web/components/sera`, `web/app/sera",
+      "plan": ".workflows/plan/sera-responsive/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The narrow nav and the shell"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "EASY",
+      "n": 2,
+      "note": null,
+      "package": "web/components/sera",
+      "plan": ".workflows/plan/sera-responsive/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Term's hidden span stops escaping its scroller"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2
+      ],
+      "difficulty": "HARD",
+      "n": 3,
+      "note": null,
+      "package": "web/app/sera/methods",
+      "plan": ".workflows/plan/sera-responsive/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "/sera/methods`: cards on a phone, table on a desk"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2
+      ],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": null,
+      "package": "web/app/sera/methods/[id]",
+      "plan": ".workflows/plan/sera-responsive/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "/sera/methods/[id]`: the variants table, same treatment"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 5,
+      "note": null,
+      "package": "web/app/sera",
+      "plan": ".workflows/plan/sera-responsive/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The rest of the narrow layout"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/sera-responsive/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "sera-responsive",
+  "updated": "2026-10-12T10:46:29+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/sera-responsive"
+}

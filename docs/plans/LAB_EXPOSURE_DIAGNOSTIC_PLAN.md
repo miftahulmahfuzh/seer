@@ -96,6 +96,16 @@ Every phase must hold all of these. They are the §3/§6 constraints restated as
 3. **N does not move.** `store.dev_trial_count(conn)` is identical before and after any run of
    `lab exposure`, and no new method file is created. No recorded method's DSR hurdle may change
    as a side effect of this work.
+
+   > **Correction, measured 2026-10-12.** This invariant calls `store.dev_trial_count` "N", and
+   > so does Reconciliation Log C8 ("the lab's N (354 dev trials)"). **They are different
+   > numbers.** The luck gate runs the `methods` policy: `store.gate(conn)` returns **N = 74**,
+   > the count of distinct methods carrying a dev trial, while `dev_trial_count` is 354 trial
+   > *rows*. The check itself was right and did its job — both numbers were unmoved — but the
+   > label misprices what new work costs, which is the thing a reader takes away. Measured:
+   > `pending_gate` for a batch of four variants on an existing method returns 74 (free); for a
+   > brand-new method it returns 75 (+1 for every method in the lab, retroactively). Variants are
+   > free; **method ids are what the hurdle counts.**
 4. **The look budget does not move.** `store.test_looks(conn)` is identical before and after.
    `measure` refuses any store whose `window` is not `research.DEV_WINDOW`, and `dev.run_registry`
    is called with **no `window=` keyword**, so the D9 default binds.

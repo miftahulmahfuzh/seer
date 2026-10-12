@@ -52,7 +52,9 @@ nothing, and the report prints that share per arm rather than faking a gate-free
 
 **A report, not a trial.** Nothing is written but, unless ``--no-journal``, one ``observation``
 per method: no ``trials``, ``trial_moments``, ``trial_funding`` or ``trial_provenance`` row, no
-status, no pre-registration. ``store.dev_trial_count`` (the lab's N) and ``store.test_looks``
+status, no pre-registration. ``store.dev_trial_count`` (the dev trial ROW count -- not the luck gate's N, which is
+``store.gate(conn).n`` = the distinct-method count under the ``methods`` policy) and
+``store.test_looks``
 therefore cannot move, and the command prints both before and after so the invariant is visible
 rather than merely asserted. Every refusal that needs no bars is made before the store is opened,
 and ``dev.run_registry`` is called with **no** ``window=`` keyword, so the D9 dev default binds

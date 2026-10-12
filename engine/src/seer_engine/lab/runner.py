@@ -72,6 +72,7 @@ from seer_engine import research
 from seer_engine.backtest import dev
 from seer_engine.backtest.dev import Candidate, DevRow
 from seer_engine.backtest.metrics import external_cashflows
+from seer_engine.backtest.market import Market
 from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.commands.backtest_dev import daily_moments, month_end_curve, registry_problem
 from seer_engine.fundamentals import coverage
@@ -333,6 +334,18 @@ def market_aware_candidates(method: Method, field: str = "fundamentals") -> tupl
     return tuple(c.id for c in method.all_candidates() if field in market_fields(c.allocator))
 
 
+def missing_cash_yield(candidates: Sequence[Candidate], market: Market) -> tuple[str, ...]:
+    """The ids of ``candidates`` whose ``rules.cash_yield`` names a series ``market`` lacks, in order.
+
+    Such a candidate credits idle cash from ``Market.series`` (``book_runner.run_book``), so on a
+    store without that series it cannot run at all; the lab refuses it before spending anything.
+    """
+    have = set(market.series.names())
+    return tuple(
+        c.id for c in candidates if c.rules.cash_yield is not None and c.rules.cash_yield not in have
+    )
+
+
 def preflight_data(
     data: research.ResearchData,
     method: Method,
@@ -349,7 +362,9 @@ def preflight_data(
     ranks on bars, a calendar method on the dividend calendar, a series method on
     ``Market.series``, and all three must stay runnable against a store with no panel at all. A
     calendar method on a store with no dividend calendar, and a series method on a store with no
-    market series, are refused outright. Otherwise it returns the
+    market series, are refused outright. A candidate whose rules credit idle cash at a T-bill
+    yield (``rules.cash_yield``) on a store without that series is refused outright too.
+    Otherwise it returns the
     measurement, so the caller can print it whether or not it cleared the floor, and raises
     ``store.LabError`` when the measured fraction is below ``min_coverage``.
 
@@ -369,6 +384,14 @@ def preflight_data(
             f"{method.id}: {', '.join(reads_series)} read Market.series, and this store carries no "
             f"market series ({research.MARKET_SERIES_FILE}); running it would measure the missing "
             "series, not the hypothesis. Nothing has been spent. Write them with "
+            "`python -m seer_engine market_series --refresh --store <store>`"
+        )
+    no_rate = missing_cash_yield(method.all_candidates(), data.market)
+    if no_rate:
+        raise store.LabError(
+            f"{method.id}: {', '.join(no_rate)} credit idle cash at a Treasury bill yield, and this "
+            f"store carries no such series ({research.MARKET_SERIES_FILE}); running it would crash "
+            "partway, measuring nothing. Nothing has been spent. Write the series with "
             "`python -m seer_engine market_series --refresh --store <store>`"
         )
     aware = market_aware_candidates(method)
@@ -1033,6 +1056,12 @@ def run_test(
             f"{candidate.id} ranks on Market.dividends and this test store's market carries no "
             f"dividend calendar; the look would measure the missing calendar, not the hypothesis. "
             f"Nothing has been spent"
+        )
+    if missing_cash_yield((candidate,), data.market):
+        raise store.LabError(
+            f"{candidate.id} credits idle cash at the {candidate.rules.cash_yield} yield and this "
+            f"test store carries no such series ({research.MARKET_SERIES_FILE}); the look would "
+            f"crash, not measure. Nothing has been spent"
         )
     pre = preflight_test(conn, method, path, candidate, require_commit=require_commit)
 

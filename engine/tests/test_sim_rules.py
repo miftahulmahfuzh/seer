@@ -415,7 +415,12 @@ def test_a_lever_added_after_the_pins_is_left_out_of_canonical_text_at_its_defau
     assert is_pinned_default("cost_model", "gotrade") is False
     assert is_pinned_default("resize_basis", "equity") is True
     assert is_pinned_default("resize_basis", "target") is False
-    assert LEVERS_SINCE_PINS == {"resize_cadence": None, "cost_model": "flat", "resize_basis": "equity"}
+    assert LEVERS_SINCE_PINS == {
+        "resize_cadence": None,
+        "cost_model": "flat",
+        "resize_basis": "equity",
+        "cash_yield": None,
+    }
 
 
 # ============================================================== the Gotrade cost model

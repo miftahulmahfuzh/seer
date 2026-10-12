@@ -11,7 +11,7 @@ import numpy as np
 from seer_engine import dates
 from seer_engine.backtest.benchmark import Dividend
 from seer_engine.backtest.dev import DEV_END
-from seer_engine.backtest.market import Market, Membership
+from seer_engine.backtest.market import Market, MarketSeries, Membership
 from seer_engine.backtest.window import Window
 from seer_engine.lab import store
 from seer_engine.research import ResearchData
@@ -22,6 +22,11 @@ MEMBER_STOCKS: tuple[str, ...] = ("AAA", "BBB", "CCC", "DDD", "EEE", "FFF", "GGG
 BASE_ETFS: tuple[str, ...] = ("BIL", "EFA", "IEF", "QQQ", "SPY", "TLT", "GLD",
                               "XLB", "XLE", "XLF", "XLI", "XLK", "XLP", "XLU", "XLV", "XLY")
 SPY_EX_DATE = date(2015, 6, 19)
+SMOKE_T13W = MarketSeries({"T13W": [(date(1993, 1, 29), 4.0)]})
+"""A flat 4% 13-week T-bill, dated before both smoke windows, so ``value_on`` answers 4.0 on any
+dev or test session. Opt-in: a candidate whose rules credit idle cash (``rules.cash_yield``) runs
+on ``smoke_market(...).with_series(SMOKE_T13W)``; the smoke markets themselves keep
+``EMPTY_SERIES``."""
 
 
 def smoke_history(symbol: str, k: int, days: list[date]) -> History:

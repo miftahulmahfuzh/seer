@@ -18,8 +18,11 @@ same shape as ``runner.run_backtest``:
    not called), so the run never parks itself in the idle instrument before it has ranked once;
 2. with ``rules.idle_symbol`` set and a bar for it dated ``data_date``, the residual weight
    ``1 - sum(weights)`` is appended as the last target, in that instrument;
-3. ``step_book`` gets S's bars for every held or targeted symbol, and (``rules.dividends`` only)
-   the cash dividends whose ex-date is S for the symbols held at night;
+3. ``step_book`` gets S's bars for every held or targeted symbol, (``rules.dividends`` only)
+   the cash dividends whose ex-date is S for the symbols held at night, and (``rules.cash_yield``
+   only) ``cash_rate_on(market, rules.cash_yield, data_date)`` -- the yield as published by the
+   previous session, never S's -- plus the deposit credited at S's open, which earns nothing for
+   the gap;
 4. every position whose symbol has no bar on S or later in the loaded data is force-closed at
    its mark (``close_book_unpriced``) and S's snapshot is replaced, exactly as ``run_backtest``
    does with ``sim.close_unpriced``.
@@ -109,6 +112,10 @@ class BookResult:
     ``contributions`` is the schedule the run was funded on, or None (the default, and every
     closed record). ``cashflows`` is ``(session, usd)`` per credited contribution in session
     order -- the dated series a money-weighted return is computed from.
+
+    ``interest_usd`` is the idle-cash interest credited over the run (``rules.cash_yield`` only;
+    0 for every other rule set, so every closed record compares equal). It is not an external
+    cashflow: it is return the book earned, and it is in the snapshots' cash and equity.
     """
 
     allocator_id: str
@@ -127,6 +134,7 @@ class BookResult:
     rejections: tuple[tuple[str, int], ...]
     contributions: Contributions | None = None
     cashflows: tuple[tuple[date, Decimal], ...] = ()
+    interest_usd: Decimal = _ZERO
 
 
 def _session(name: str, d: object) -> date:
@@ -243,6 +251,26 @@ def _invested(book: Book, rules: TradeRules) -> Decimal:
     return q(total)
 
 
+def cash_rate_on(market: Market, name: str, data_date: date) -> Decimal:
+    """The annual percent idle cash earns over the night after ``data_date``.
+
+    ``name``'s latest value on or before ``data_date`` (``MarketSeries.value_on``: point in time,
+    so a Treasury holiday reuses the last published yield, as a trader would), as the exact
+    Decimal of its shortest float repr (``4.057`` -> ``Decimal("4.057")``). A negative print is
+    floored at 0: an idle balance is never charged for being held. ValueError when the series has
+    no value yet on ``data_date``.
+    """
+    value = market.series.value_on(name, data_date)
+    if value is None:
+        raise ValueError(
+            f"the {name} series has no value on or before {data_date} (it starts "
+            f"{market.series.first_date(name)}); idle cash cannot be credited a rate nobody had "
+            "published yet"
+        )
+    rate = Decimal(repr(value))
+    return rate if rate > 0 else Decimal(0)
+
+
 def run_book(
     market: Market,
     allocator: Allocator,
@@ -290,6 +318,14 @@ def run_book(
     would. The opening cash converts at ``usd_idr`` either way -- on the start date those are the
     same rate -- so the two runs differ in the deposits alone. Pass None to reproduce a record:
     this argument is the only thing that can make a funded re-run differ from its trial.
+
+    ``rules.cash_yield`` (2026-10-12): None, every rule set before it, passes ``step_book`` no
+    rate at all, so the call is exactly the one it always was. Set, the market must carry that
+    series (``market.series``, the research store's ``market_series.csv``; a ValueError up front
+    otherwise), and each session's ``step_book`` gets ``cash_rate_on(market, rules.cash_yield,
+    data_date)`` -- the yield published by the PREVIOUS session -- and the deposit credited at
+    this open as ``deposited``, which was not in the account overnight and earns nothing for it.
+    The interest credited is summed into ``BookResult.interest_usd``.
     """
     if not isinstance(market, Market):
         raise TypeError(f"market must be a Market, got {type(market).__name__}")
@@ -315,6 +351,12 @@ def run_book(
         )
     if contribution_fx is not None and contributions is None:
         raise ValueError("contribution_fx converts deposits; it needs contributions, not None")
+    if rules.cash_yield is not None and rules.cash_yield not in market.series.names():
+        raise ValueError(
+            f"rules {rules.id!r} credit idle cash at the {rules.cash_yield} yield, and this market "
+            f"carries no {rules.cash_yield} series (the research store's market_series.csv); write "
+            "it with `python -m seer_engine market_series --refresh --store <store>`"
+        )
     _session("start", start)
     _session("end", end)
     if end < start:
@@ -333,15 +375,18 @@ def run_book(
     rejections: Counter[str] = Counter()
     dividends_usd = _ZERO
     costs_usd = _ZERO
+    interest_usd = _ZERO
     cashflows: list[tuple[date, Decimal]] = []
 
     for session in dates.sessions(start, end):
+        deposited = _ZERO
         if contributions is not None:
             credit_rate = rate if contribution_fx is None else contribution_fx(session)
             credit = credit_for(contributions, data_date, session, credit_rate)
             if credit > 0:
                 book = replace(book, cash=book.cash + credit, equity=book.equity + credit)
                 cashflows.append((session, credit))
+                deposited = credit
         held = book.held()
         targets: tuple[Target, ...] | None = None
         idle_added = False
@@ -370,7 +415,21 @@ def run_book(
         bars = market.bars_on(session, sorted(symbols))
         divs = _dividends_on(dividends, held, session) if rules.dividends else {}
 
-        stepped = step_book(book, session, bars, targets, rules, divs, idle_symbol_ok=idle_added)
+        if rules.cash_yield is None:
+            stepped = step_book(book, session, bars, targets, rules, divs, idle_symbol_ok=idle_added)
+        else:
+            stepped = step_book(
+                book,
+                session,
+                bars,
+                targets,
+                rules,
+                divs,
+                idle_symbol_ok=idle_added,
+                cash_rate=cash_rate_on(market, rules.cash_yield, data_date),
+                deposited=deposited,
+            )
+            interest_usd += stepped.interest
         book = stepped.book
         fills.extend(stepped.fills)
         trades.extend(stepped.trades)
@@ -414,6 +473,7 @@ def run_book(
         rejections=tuple(sorted(rejections.items())),
         contributions=contributions,
         cashflows=tuple(cashflows),
+        interest_usd=interest_usd,
     )
 
 

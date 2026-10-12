@@ -266,7 +266,10 @@ def candidate_window(market: Market, c: Candidate, *, window: Window = DEV_WINDO
     ``prev_session(S)``; for candidates that read index members, also
     ``prev_session(S) >= MEMBERSHIP_START``; and never before ``window.start``. ``DESIGN_V0``
     strategies read SPY and members with ``strategy.lookback``. The idle instrument is not part
-    of the rule (idle cash earns nothing until it has a bar).
+    of the rule (idle cash earns nothing until it has a bar). Neither is ``rules.cash_yield``:
+    under that lever idle cash is credited the named T-bill yield from ``Market.series`` by
+    ``book_runner.run_book``, which refuses a market without the series, and ``lab run`` refuses
+    such a store before anything is spent (``lab.runner.preflight_data``).
 
     ``window`` defaults to ``DEV_WINDOW``, whose ``start`` is ``date.min``: on the dev window
     the floor can never bind and the result is exactly what it has always been. On the test

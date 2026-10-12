@@ -10,6 +10,12 @@ One session, in this exact order (all money ``Decimal``; ``q`` at every product;
 ``rules.cost_model == "gotrade"`` instead buy cash ``q(p × n) + fee``, sell proceeds
 ``q(p × n) − fee``, the fee from Gotrade's current schedule, ``sim.costs.gotrade_cash``):
 
+0. interest (``rules.cash_yield`` only): the cash held at the previous close, less any
+   ``deposited`` the caller credited at this open, earns ``accrued_interest(cash, cash_rate,
+   (S − last_session).days)`` -- simple ACT/365 at the annual percent the caller read for the
+   previous session -- credited to cash. A book never stepped (``last_session`` None) earns
+   nothing. Like dividends, interest is not in the night-before buy budget (``book.cash`` plus
+   planned sells); it reaches sizing through the next snapshot's equity;
 1. dividends (``rules.dividends``): each position held before S with an ex-date on S is
    credited ``q(shares × amount)``;
 2. open exits, in symbol order, positions with a bar on S: time stop, then gap below the
@@ -71,6 +77,7 @@ RejectReason = Literal["no_slot", "too_small", "unfilled", "no_bar", "cash"]
 _ONE = Decimal(1)
 _ZERO = Decimal(0)
 _NO_DIVIDENDS: Mapping[str, Decimal] = MappingProxyType({})
+_PERCENT_YEAR = Decimal(36500)  # 100 (a percent) x 365 (ACT/365 calendar days)
 
 
 # --------------------------------------------------------------------------- validation
@@ -110,6 +117,51 @@ def _int(name: str, x: object) -> int:
     if isinstance(x, bool) or not isinstance(x, int):
         raise TypeError(f"{name} must be an int, got {type(x).__name__}")
     return x
+
+
+def accrued_interest(cash: Decimal, annual_pct: Decimal, days: int) -> Decimal:
+    """Simple ACT/365 interest on ``cash`` for ``days`` calendar days at ``annual_pct`` percent a year.
+
+    ``q(cash × annual_pct × days / 36500)``, so ``Decimal("4.057")`` is 4.057% a year, the unit
+    the market series carries. 0 when ``cash``, ``days`` or the rate is not positive: an empty
+    or overdrawn balance is neither paid nor charged. A negative rate is a ValueError (the
+    runner floors the series at 0 before it gets here); a float anywhere is a TypeError.
+    """
+    _decimal("cash", cash)
+    rate = _decimal("annual_pct", annual_pct)
+    if rate < 0:
+        raise ValueError(f"annual_pct must be >= 0, got {rate}")
+    _int("days", days)
+    if cash <= 0 or days <= 0 or rate == 0:
+        return _ZERO
+    return q(cash * rate * days / _PERCENT_YEAR)
+
+
+def _check_cash_rate(
+    book: Book, rules: TradeRules, cash_rate: object, deposited: object
+) -> tuple[Decimal | None, Decimal]:
+    """``(cash_rate, deposited)`` checked against ``rules.cash_yield`` (see ``step_book``)."""
+    if rules.cash_yield is None:
+        if cash_rate is not None:
+            raise ValueError(
+                f"rules {rules.id!r} credit idle cash nothing (cash_yield is None); cash_rate must be None"
+            )
+    elif cash_rate is None:
+        raise ValueError(
+            f"rules {rules.id!r} credit idle cash at the {rules.cash_yield} yield; pass that yield's "
+            "annual percent for the previous session as cash_rate"
+        )
+    rate: Decimal | None = None
+    if cash_rate is not None:
+        rate = _decimal("cash_rate", cash_rate)
+        if rate < 0:
+            raise ValueError(f"cash_rate must be >= 0, got {rate}")
+    fresh = _decimal("deposited", deposited)
+    if fresh < 0 or fresh > book.cash:
+        raise ValueError(f"deposited must be in [0, book.cash = {book.cash}], got {fresh}")
+    if fresh != 0 and rate is None:
+        raise ValueError("deposited only shapes the interest base; it needs a cash_rate")
+    return rate, fresh
 
 
 # --------------------------------------------------------------------------- weights
@@ -300,12 +352,16 @@ class BookSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class BookStep:
+    """One stepped session. ``interest``: the cash interest credited at the open (``rules.cash_yield``
+    only; 0 otherwise), already in ``book.cash`` and the snapshot."""
+
     book: Book
     fills: tuple[Fill, ...]
     trades: tuple[Trade, ...]
     dividends: tuple[tuple[str, Decimal], ...]
     rejected: tuple[tuple[str, RejectReason], ...]
     snapshot: BookSnapshot
+    interest: Decimal = _ZERO
 
 
 @dataclass(frozen=True, slots=True)
@@ -514,6 +570,9 @@ def step_book(
     rules: TradeRules,
     dividends: Mapping[str, Decimal] = _NO_DIVIDENDS,
     idle_symbol_ok: bool = False,
+    *,
+    cash_rate: Decimal | None = None,
+    deposited: Decimal = _ZERO,
 ) -> BookStep:
     """Advance ``book`` through the NYSE session ``session`` (see the module docstring).
 
@@ -522,11 +581,17 @@ def step_book(
     ``dividends``: {symbol: cash amount per share} for ex-dates ON ``session``.
     ``idle_symbol_ok``: True when the caller appended the ``rules.idle_symbol`` target itself
     (the runner); otherwise a target for the idle instrument is a ValueError.
+    ``cash_rate``: with ``rules.cash_yield`` set, required: the yield's annual percent as known
+    at the previous session's close (``Decimal("4.057")`` = 4.057%), >= 0; with it None, must be
+    None. ``deposited``: cash the caller added to ``book.cash`` at this open (the owner's
+    deposit), which was not there overnight and so earns no interest for the gap; in
+    ``[0, book.cash]``, and non-zero only with a ``cash_rate``.
 
     TypeError on a wrong type (a float anywhere included). ValueError when ``rules.engine`` is
     not "book", ``session`` is not an NYSE session after ``book.last_session``, the targets
-    repeat a symbol, or they weigh more than 1 while ``rules.max_positions`` is None. A new
-    entry under entry "limit" with no limit price is bought like "open_limit" (never an error).
+    repeat a symbol, they weigh more than 1 while ``rules.max_positions`` is None, or
+    ``cash_rate``/``deposited`` disagree with ``rules.cash_yield``. A new entry under entry
+    "limit" with no limit price is bought like "open_limit" (never an error).
     """
     if not isinstance(book, Book):
         raise TypeError(f"book must be a Book, got {type(book).__name__}")
@@ -545,6 +610,7 @@ def step_book(
         raise TypeError(f"dividends must be a Mapping, got {type(dividends).__name__}")
     if not isinstance(idle_symbol_ok, bool):
         raise TypeError("idle_symbol_ok must be a bool")
+    rate, fresh = _check_cash_rate(book, rules, cash_rate, deposited)
     held_at_night = book.held()
     checked = _check_targets(targets, rules, idle_symbol_ok)
     wanted: dict[str, Target] | None = None if checked is None else {t.symbol: t for t in checked}
@@ -584,6 +650,12 @@ def step_book(
             if _beyond_band(excess, t.last, t.weight, equity, rules):
                 planned += _sell_cash(t.last, excess, rules)
     slots_used = sum(1 for p in book.positions if p.symbol != idle and p.symbol not in night_exits)
+
+    # (0) interest on the cash held at the previous close (rules.cash_yield), before anything moves.
+    interest = _ZERO
+    if rate is not None and book.last_session is not None:
+        interest = accrued_interest(book.cash - fresh, rate, (session - book.last_session).days)
+        cash += interest
 
     # (1) dividends on the ex-date, to positions held at the previous close.
     if rules.dividends:
@@ -776,6 +848,7 @@ def step_book(
         dividends=tuple(credited),
         rejected=tuple(rejected),
         snapshot=BookSnapshot(date=session, cash_usd=cash, equity_usd=equity_now, invested_usd=invested),
+        interest=interest,
     )
 
 

@@ -22,7 +22,7 @@ from decimal import Decimal
 
 import pytest
 from allocatorkit import assert_no_lookahead, assert_p4_identity, everyone
-from labkit import MEMBER_STOCKS, SPY_EX_DATE, smoke_market
+from labkit import MEMBER_STOCKS, SMOKE_T13W, SPY_EX_DATE, smoke_market
 
 from seer_engine import dates
 from seer_engine.backtest.benchmark import Dividend
@@ -78,7 +78,9 @@ def test_method_source_is_pure(mid):
 @pytest.mark.parametrize("mid,c", CANDIDATES, ids=[c.id for _, c in CANDIDATES])
 def test_candidate_runs_a_smoke_window(market, mid, c):
     amount = Decimal("1.0300")
-    result, row = run_candidate(market, {"SPY": {SPY_EX_DATE: amount}}, (Dividend(SPY_EX_DATE, amount),), c)
+    # A rule set that credits idle cash reads the T-bill series; run_book refuses a market without it.
+    m = market.with_series(SMOKE_T13W) if c.rules.cash_yield is not None else market
+    result, row = run_candidate(m, {"SPY": {SPY_EX_DATE: amount}}, (Dividend(SPY_EX_DATE, amount),), c)
     assert row.end == DEV_END
     assert len(result.snapshots) >= 2
 

@@ -28,6 +28,13 @@ account, which in a 20-50 name book means a holding must drift 50-100% of its ow
 of its own target value. The default is a pinned no-op (``LEVERS_SINCE_PINS``), so no recorded
 result, digest or live paper strategy moves.
 
+``cash_yield`` names a market series (``CASH_YIELD_SERIES``: only ``"T13W"``, the 13-week Treasury
+bill yield the research store caches from EODHD) whose annual percent idle cash is credited at,
+by ``sim.book.step_book`` at each open, read point in time by ``backtest.book_runner.run_book``.
+``None`` (every rule set before 2026-10-12) credits nothing, and is a ``LEVERS_SINCE_PINS`` no-op.
+It is a book-engine lever, it excludes ``idle_symbol`` (two answers to one question), and it raises
+the owner input ``cash-yield``: nobody has verified that Gotrade pays interest on idle dollars.
+
 Pure: no clock, no I/O, no randomness.
 """
 
@@ -53,6 +60,10 @@ RESIZE_BAND = Decimal("0.01")
 # this fraction of its OWN target value (2026-10-12, measure-then-learn). RESIZE_BAND stays the
 # band of every rule set that predates the lever, so no recorded result moves.
 TARGET_RESIZE_BAND = Decimal("0.20")
+#: The market series ``TradeRules.cash_yield`` may name: an annual yield in percent that idle cash
+#: is credited at. Only the 13-week US Treasury bill (EODHD ``IRX.INDX``), which the research store
+#: already holds (``research.MARKET_SERIES_NAMES``); a test keeps the two in step.
+CASH_YIELD_SERIES: tuple[str, ...] = ("T13W",)
 SHARE_QUANTUM = Decimal("0.0001")
 DEFAULT_ETFS: frozenset[str] = frozenset({"SPY", "QQQ"})
 LEVERAGED_ETFS: frozenset[str] = frozenset({"SSO", "QLD", "UPRO", "TQQQ"})
@@ -105,6 +116,7 @@ class TradeRules:
     cost_rate: Decimal = _DEFAULT_COST
     cost_model: CostModel = "flat"
     resize_basis: ResizeBasis = "equity"
+    cash_yield: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, str):
@@ -163,6 +175,20 @@ class TradeRules:
                 )
             if not self.resize:
                 raise ValueError("resize_basis 'target' needs resize=True: a band with nothing to resize is a no-op")
+        if self.cash_yield is not None:
+            if not isinstance(self.cash_yield, str):
+                raise TypeError(f"cash_yield must be a str or None, got {type(self.cash_yield).__name__}")
+            if self.cash_yield not in CASH_YIELD_SERIES:
+                raise ValueError(f"unknown cash_yield {self.cash_yield!r}; expected one of {CASH_YIELD_SERIES}")
+            if self.engine != "book":
+                raise ValueError(
+                    f"cash_yield is a book-engine lever; the {self.engine} simulator credits idle cash nothing"
+                )
+            if self.idle_symbol is not None:
+                raise ValueError(
+                    f"cash_yield {self.cash_yield!r} and idle_symbol {self.idle_symbol!r} are two answers to "
+                    "one question (what idle money earns); use one"
+                )
         is_v0 = _lever_values(self) == _V0_LEVERS
         if self.engine == "bracket_v0" and not is_v0:
             raise ValueError("engine 'bracket_v0' is reserved for DESIGN_V0 (the unchanged §5 simulator)")
@@ -190,6 +216,7 @@ _V0_LEVERS: tuple[object, ...] = (
     _DEFAULT_COST,
     "flat",
     "equity",
+    None,
 )
 
 DESIGN_V0 = TradeRules(
@@ -274,6 +301,7 @@ LEVERS_SINCE_PINS: dict[str, object] = {
     "resize_cadence": None,  # the rank/resize cadence split, 2026-10-05
     "cost_model": "flat",  # Gotrade's measured fee schedule (sim.costs), 2026-10-07
     "resize_basis": "equity",  # the band measured against the holding's own target, 2026-10-12
+    "cash_yield": None,  # interest on idle cash at a T-bill yield, 2026-10-12
 }
 
 
@@ -363,12 +391,14 @@ def rule_owner_inputs(rules: TradeRules) -> tuple[str, ...]:
     """The Gotrade features ``rules`` needs that the owner has not verified, sorted and unique.
 
     ``market-on-open`` (entry "open"), ``etf:<symbol>`` (an idle instrument outside
-    ``DEFAULT_ETFS``) and ``fee`` (a flat cost rate other than 0.1% per side). Empty means
-    executable under the conservative owner-input defaults. Fractional shares are not on the
-    list: the owner verified that Gotrade takes fractional limit buys and sells (2026-10-07), and
-    the paper roster already trades its lab winners that way. Neither is ``cost_model="gotrade"``:
-    its schedule is fitted to the owner's own Gotrade receipts (``sim.costs``), and it requires
-    the default ``cost_rate``, so it never raises ``fee`` either.
+    ``DEFAULT_ETFS``), ``fee`` (a flat cost rate other than 0.1% per side) and ``cash-yield``
+    (idle cash credited a T-bill yield: nobody has verified that Gotrade pays interest on idle
+    dollars, or that the owner sweeps them into a T-bill fund). Empty means executable under the
+    conservative owner-input defaults. Fractional shares are not on the list: the owner verified
+    that Gotrade takes fractional limit buys and sells (2026-10-07), and the paper roster already
+    trades its lab winners that way. Neither is ``cost_model="gotrade"``: its schedule is fitted
+    to the owner's own Gotrade receipts (``sim.costs``), and it requires the default
+    ``cost_rate``, so it never raises ``fee`` either.
     """
     _rules(rules)
     out: set[str] = set()
@@ -378,12 +408,18 @@ def rule_owner_inputs(rules: TradeRules) -> tuple[str, ...]:
         out.add(f"etf:{rules.idle_symbol}")
     if rules.cost_model == "flat" and rules.cost_rate != _DEFAULT_COST:
         out.add("fee")
+    if rules.cash_yield is not None:
+        out.add("cash-yield")
     return tuple(sorted(out))
 
 
 def _pct(x: Decimal) -> str:
     """``x`` as a plain percentage string: Decimal('0.001') -> '0.1%'."""
     return f"{format((x * 100).normalize(), 'f')}%"
+
+
+# The plain-English name of each CASH_YIELD_SERIES entry, for describe_rules.
+_CASH_YIELD_NAMES: dict[str, str] = {"T13W": "the 13-week US Treasury bill yield"}
 
 
 def describe_rules(rules: TradeRules) -> tuple[str, ...]:
@@ -468,10 +504,16 @@ def describe_rules(rules: TradeRules) -> tuple[str, ...]:
         lines.append("Dividends: cash dividends are credited on the ex-date.")
     else:
         lines.append("Dividends: not credited.")
-    if rules.idle_symbol is None:
+    if rules.idle_symbol is not None:
+        lines.append(f"Idle cash: the unallocated weight is held in {rules.idle_symbol} on decision sessions.")
+    elif rules.cash_yield is None:
         lines.append("Idle cash: held as cash, earning nothing.")
     else:
-        lines.append(f"Idle cash: the unallocated weight is held in {rules.idle_symbol} on decision sessions.")
+        lines.append(
+            f"Idle cash: held as cash and credited {_CASH_YIELD_NAMES[rules.cash_yield]}, read at the "
+            "previous session's close, for the calendar days since the last session, at each open "
+            "(needs owner verification: cash-yield)."
+        )
     if rules.cost_model == "gotrade":
         lines.append(_gotrade_costs_line())
     else:

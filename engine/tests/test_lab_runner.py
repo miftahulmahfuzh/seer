@@ -451,3 +451,25 @@ def test_a_dividend_calendar_method_is_refused_without_a_calendar(data):
     assert len(data.market.dividends) == 0
     with pytest.raises(store.LabError, match="no dividend calendar"):
         runner.preflight_data(data, _div_method())
+
+
+# ---- a cash-yield candidate needs the yield series ---------------------------------------------
+
+
+def test_a_cash_yield_method_is_refused_on_a_store_without_the_series(data):
+    from seer_engine.backtest.market import MarketSeries
+
+    cash = dataclasses.replace(MONTHLY_HOLD, id="monthly-hold-cash-test", cash_yield="T13W")
+    m = _method("M0015", cands=(_cand("M0015-A", "M0015", rules=cash), _cand("M0015-B", "M0015")))
+    assert "T13W" not in data.market.series.names()
+    assert runner.missing_cash_yield(m.all_candidates(), data.market) == ("M0015-A",)
+    with pytest.raises(store.LabError, match="M0015-A credit idle cash"):
+        runner.preflight_data(data, m)
+    series = MarketSeries({"T13W": [(date(1993, 1, 29), 2.9)]})
+    with_series = dataclasses.replace(data, market=data.market.with_series(series))
+    assert runner.missing_cash_yield(m.all_candidates(), with_series.market) == ()
+    assert runner.preflight_data(with_series, m) is None
+
+
+def test_a_method_without_the_lever_never_needs_the_series(data):
+    assert runner.missing_cash_yield(_method().all_candidates(), data.market) == ()

@@ -91,9 +91,9 @@ touched by this set).
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
 | 1 | Resize band relative to the holding's target (`resize_basis` lever) | R1 | `engine/sim` | 7 | — | NORMAL | `.workflows/plan/measure-then-learn/phase-1.md` | P1-ENG-0L6E (done 2026-10-12) | — |
-| 2 | Interest on idle cash (`cash_yield` lever) | R2 | `engine/sim`, `engine/backtest`, `engine/paper`, `engine/commands`, `engine/lab`, `engine/tests` | 14 | 1 | HARD | `.workflows/plan/measure-then-learn/phase-2.md` | P1-ENG-0JM2 | — |
+| 2 | Interest on idle cash (`cash_yield` lever) | R2 | `engine/sim`, `engine/backtest`, `engine/paper`, `engine/commands`, `engine/lab`, `engine/tests` | 14 | 1 | HARD | `.workflows/plan/measure-then-learn/phase-2.md` | P1-ENG-0JM2 (done 2026-10-12) | — |
 | 3 | Fixed-tape presets and the web mirror | R1, R2 | `engine/sim`, `web/lib` | 11 | 1, 2 | NORMAL | `.workflows/plan/measure-then-learn/phase-3.md` | P1-ENG-03JM | — |
-| 4 | Survivorship check runnable here; EODHD top-up | R3 | `engine/commands`, `engine/lab`, skills, runbook, data | 9 | — | NORMAL | `.workflows/plan/measure-then-learn/phase-4.md` | P1-ENG-ESU5 | — |
+| 4 | Survivorship check runnable here; EODHD top-up | R3 | `engine/commands`, `engine/lab`, skills, runbook, data | 9 | — | NORMAL | `.workflows/plan/measure-then-learn/phase-4.md` | P1-ENG-ESU5 (done 2026-10-12) | — |
 | 5 | Near-miss twins under the fixed tape (lab method + run) | R4 | `engine/lab/methods`, `lab/` | 3 | 3, 4 | HARD | `.workflows/plan/measure-then-learn/phase-5.md` | P1-ENG-FON5 | — |
 | 6 | Tree-ranker allocator (features, walk-forward model, tests) | R5 | `engine/lab` (`lab/tree_rank.py`) | 2 | — | HARD | `.workflows/plan/measure-then-learn/phase-6.md` | P1-ENG-H3RM | — |
 | 7 | Tree-ranker method: pre-register and run on the dev window | R5 | `engine/lab/methods`, `lab/` | 3 | 3, 5, 6 | NORMAL | `.workflows/plan/measure-then-learn/phase-7.md` | P1-ENG-SHJJ | — |

@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-12 22:00
-**Total Active Tasks**: 6
+**Last Updated**: 2026-10-12 22:04
+**Total Active Tasks**: 5
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 4
+- P1 High: 3
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 3
-- Completed: 125
+- Blocked: 2
+- Completed: 126
 
 ---
 
@@ -40,20 +40,30 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Package column names sub-paths with no todos.md (engine/sim, engine/lab, ...) -> all seven phase tasks tracked in engine/.workflows/todos.md (ENG) (rung 6: existing convention - every prior engine plan set lives there).
     - Completion: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own precedent for every swarm-tracked set; phases 4 and 6 share this worktree and append here concurrently). Plan index: phase 1's TaskID cell ticked `(done 2026-10-12)`, `**Status:**` left alone (the coordinator's ledger is the status of record). Only P1-ENG-0JM2 unblocked; P1-ENG-03JM still waits on phase 2.
     - Landing not attempted: swarm coordinator `orch-measure-then-learn` owns the merge of `feature/measure-then-learn` into `main`.
-- [ ] **P1-ENG-0JM2** Phase 2: Interest on idle cash (`cash_yield` lever)
+- [x] **P1-ENG-0JM2** Phase 2: Interest on idle cash (`cash_yield` lever)
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `sim/rules.py` (`CASH_YIELD_SERIES`, `cash_yield` field, validation, `_V0_LEVERS`, `LEVERS_SINCE_PINS`, `rule_owner_inputs` adds `cash-yield`, `describe_rules` idle-cash line), `sim/book.py` (`accrued_interest`, accrual step, `BookStep.interest`), `backtest/book_runner.py` (point-in-time rate, `BookResult.interest_usd`), paper refusal in `paper/book.py` and `commands/promote.py`, `lab/runner.py` refusal, `labkit.SMOKE_T13W` fixture, `tests/test_cash_yield.py`; leaves `PRESETS`, web and phase 1's resize logic untouched. Exit: default rules credit nothing (digests and results unchanged); with `cash_yield="T13W"` positive cash earns simple ACT/365 interest at the open, rate read point-in-time; paper and promote refuse such rules plainly; a cash-yield candidate runs the lab smoke window; suite green.
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 2 of 7)
   - **Satisfies**: R2 — Interest on idle cash from the cached T-bill yield, as a versioned explicit simulator input
   - **Depends on**: P1-ENG-0L6E
   - **Plan**: `.workflows/plan/P1-ENG-0JM2.md`
+  - **Completed**: 2026-10-12 22:04
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/sim/rules.py, engine/src/seer_engine/sim/__init__.py, engine/src/seer_engine/sim/book.py, engine/src/seer_engine/backtest/book_runner.py, engine/src/seer_engine/backtest/dev.py, engine/src/seer_engine/paper/book.py, engine/src/seer_engine/commands/promote.py, engine/src/seer_engine/lab/runner.py, engine/tests/test_cash_yield.py (new), engine/tests/test_lab_runner.py, engine/tests/test_sim_rules.py, engine/tests/test_backtest_dev_report.py, engine/tests/labkit.py, engine/tests/test_lab_methods.py
+  - **Verified**: Step 0 preset pins matched `PRESET_RUN_PINS` before any edit. `ruff check engine` clean. Targeted pytest (10 modules, -n0): 1168 passed. Full suite with `PG_TEST_URL`: 4603 passed, 3 skipped (only the opt-in *_LIVE tests; no DB skips). Manual: M0057-HIGH-N20 (monthly-hold-frac-gotrade, owner funding) on the dev store reproduces its recorded dev total_return 236.968665608909 exactly; a `cash_yield="T13W"` twin credits $8,736.84 interest and ends at $316,082 vs $297,386.
+  - **Drift**:
+    - `lab/runner.py` `preflight_data` docstring: the "refused outright" sentence continues on the same line, so the new cash-yield sentence was inserted mid-paragraph rather than appended — same intent.
+    - No other drift: `book_runner.run_book`, `step_book` head, `BookStep`, `BookResult` matched the plan's quotes exactly.
+  - **Decided**:
+    - Completion: the `[x]` block is left in place under `### [P1] High` and Quick Stats recounted from the file (rung 6: this file's precedent for swarm-tracked sets; phases 4 and 6 share this worktree). Plan index: phase 2's TaskID cell ticked `(done 2026-10-12)`, `**Status:**` left alone (the coordinator's ledger is the status of record). P1-ENG-03JM unblocked: both its dependencies (P1-ENG-0L6E, P1-ENG-0JM2) are now complete.
+    - Landing not attempted: swarm coordinator `orch-measure-then-learn` owns the merge of `feature/measure-then-learn` into `main`.
 - [ ] **P1-ENG-03JM** Phase 3: Fixed-tape presets and the web mirror
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns new `PRESETS` `monthly-hold-frac-gotrade-tband`, `monthly-hold-frac-gotrade-tband-cash`, `weekly-hold-frac-gotrade-tband-cash`; web mirror in `web/lib/cadence.ts` (`TARGET_RESIZE_BAND = 0.2`, `TARGET_BAND_RULES`, `sizeChange` basis), `web/lib/sean/reminders.ts` `RESIZING_RULES`, `web/lib/sean/planData.ts`, vitest tests; `engine/tests/test_sean_mirrors.py`; the PRESETS-enumerating tests; new `test_sim_rules_fixed_tape.py` (also proves promote refuses the cash presets); leaves `SEED_ROWS`, existing presets, simulator logic untouched. Exit: engine suite and web `tsc` + vitest green; mirror test covers the new constant and set; no pinned digest moves.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 3 of 7)
   - **Satisfies**: R1, R2 — Resize band measured against the holding's own target, past results unchanged, explicit paper/web decision; Interest on idle cash from the cached T-bill yield, as a versioned explicit simulator input
   - **Depends on**: P1-ENG-0L6E, P1-ENG-0JM2

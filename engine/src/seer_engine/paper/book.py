@@ -118,6 +118,21 @@ def _book_rules(rules: object) -> TradeRules:
     return rules
 
 
+def _lab_only(rules: TradeRules) -> None:
+    """Refuse a rule set paper trading cannot run yet: one that credits idle cash interest.
+
+    ``rules.cash_yield`` needs the T-bill yield every night, and the paper night has no feed of
+    it. Nobody has verified that Gotrade pays interest on idle dollars either (``cash-yield`` is
+    an owner input), so such a rule set is a lab measurement, not something to paper-trade.
+    """
+    if rules.cash_yield is not None:
+        raise ValueError(
+            f"rules {rules.id!r} pay interest on idle cash; paper trading cannot run them yet "
+            "(there is no nightly feed of that rate, and nobody has checked that Gotrade pays it), "
+            "so they are for the lab only"
+        )
+
+
 def _held(held: object) -> frozenset[str]:
     if isinstance(held, str) or not isinstance(held, AbstractSet):
         raise TypeError(f"held must be a set of symbols, got {type(held).__name__}")
@@ -248,6 +263,7 @@ def decide_book(
     if not isinstance(allocator, Allocator):
         raise TypeError(f"allocator must be an Allocator, got {type(allocator).__name__}")
     _book_rules(rules)
+    _lab_only(rules)
     _session("data_date", data_date)
     held_now = _held(held)
     basket_then = _last_rank(last_rank)
@@ -392,6 +408,7 @@ def settle_book(
         raise TypeError(f"book must be a Book, got {type(book).__name__}")
     _session("session", session)
     _book_rules(rules)
+    _lab_only(rules)
     if not isinstance(idle_added, bool):
         raise TypeError("idle_added must be a bool")
     if idle_added and targets is None:

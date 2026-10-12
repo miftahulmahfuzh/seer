@@ -54,6 +54,7 @@ from seer_engine.sim.model import (
 )
 from seer_engine.sim.rules import (
     BRACKET_ENGINES,
+    CASH_YIELD_SERIES,
     DAILY_SWITCH,
     DAILY_SWITCH_TBILL,
     DEFAULT_ETFS,
@@ -89,6 +90,7 @@ from seer_engine.sim.split_adjust import apply_split
 
 __all__ = [
     "BRACKET_ENGINES",
+    "CASH_YIELD_SERIES",
     "COST_RATE",
     "DAILY_SWITCH",
     "DAILY_SWITCH_TBILL",

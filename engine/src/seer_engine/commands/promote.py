@@ -152,13 +152,22 @@ def fractional_twin(rules: TradeRules) -> TradeRules:
 
 
 def _check_rules(rules: TradeRules) -> None:
-    """NotPromotable when ``rules`` is not the ``sim.rules`` preset of its own id.
+    """NotPromotable when ``rules`` cannot be a roster entry's rules.
 
-    ``roster.from_row`` rebuilds a roster entry's rules with ``roster.rules_for(row.rules_id)``,
-    which answers out of ``PRESETS``. A candidate carrying a one-off ``TradeRules`` would be
-    frozen under its own rules and read back under the preset's, and the difference would surface
-    as a ``store.SpecMismatch`` on the strategy's first paper night rather than here.
+    Two reasons. ``rules.cash_yield`` credits idle cash a T-bill yield, which the paper night has
+    no feed of (``paper.book`` refuses such rules), so the strategy could never trade a night.
+    Otherwise ``rules`` must be the ``sim.rules`` preset of its own id: ``roster.from_row``
+    rebuilds a roster entry's rules with ``roster.rules_for(row.rules_id)``, which answers out of
+    ``PRESETS``. A candidate carrying a one-off ``TradeRules`` would be frozen under its own rules
+    and read back under the preset's, and the difference would surface as a
+    ``store.SpecMismatch`` on the strategy's first paper night rather than here.
     """
+    if rules.cash_yield is not None:
+        raise NotPromotable(
+            f"this variant's rules ({rules.id!r}) pay interest on idle cash, which paper trading "
+            f"cannot do yet: there is no nightly feed of the {rules.cash_yield} rate and nobody has "
+            f"checked that Gotrade pays it. Promote its twin without the interest instead"
+        )
     preset = roster.rules_for(rules.id)  # raises roster.UnknownRules for an unknown id
     if preset != rules:
         raise NotPromotable(

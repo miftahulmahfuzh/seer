@@ -6,14 +6,14 @@
   "phases": [
     {
       "card": null,
-      "commit": "a0e15c764784627560c2f764b0bd397771cfe1c3",
+      "commit": "a0e15c7",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": "amendments mechanism + schema v6; suite 4381/3 (base 4364/3); N held at 74 and pending_gate(M0030|M0053,3)=Gate(74); lab.sqlite untouched (md5 4a34dd..); freeze test tolerates a committed-but-unrun Amendment, so phases 3/4 can land; grep 'Lab N (dev trials)' still 10. Decisions: insert_amendment's two guards kept and the test's missing method row added (rung 3); _run reads getattr(args,'amend',False) because hardgate tests pass a hand-built Namespace (rung 1, invariant 1). NOTE for phase 2: phase 1 inserted ~97 lines into commands/lab.py, so its quoted line numbers have shifted.",
+      "note": "Verified by the coordinator from git, not from the report: a0e15c7 is an ancestor of origin/feature/lab-brakes-and-gate; its 29 files match phase 1's Owns list (no lab/methods/*.py, no lab.sqlite, no lab.json); grep -c 'Lab N (dev trials)' = 10 (invariant 9); suite re-run by the coordinator = 4381 passed / 3 skipped, the 3 skips the opt-in live-store ones. Phase decisions: insert_amendment test given its missing method row (rung 3, Interface Contract); _run reads getattr(args,'amend',False) for hand-built Namespaces (rung 1, invariant 1).",
       "package": "engine/src/seer_engine/lab",
       "plan": ".workflows/plan/lab-brakes-and-gate/phase-1.md",
-      "reported_at": "2026-10-12T06:47:39+00:00",
+      "reported_at": "2026-10-12T06:50:01+00:00",
       "satisfies": [
         "R3",
         "R4"
@@ -37,7 +37,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "lab gate`: price the shared SPY 200-day gate across the lab, report only"
     },
@@ -57,7 +57,7 @@
         "R1",
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "M0030's amendment: the satellite at full size, with and without the gate"
     },
@@ -77,7 +77,7 @@
         "R1",
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "M0053's amendment: the weekly brake off, and the gate off"
     },
@@ -120,7 +120,7 @@
       "satisfies": [
         "R5"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The owner's two decisions: \u00a75.1's N strings, and the amendment rule"
     }
@@ -128,7 +128,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-brakes-and-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-brakes-and-gate",
-  "updated": "2026-10-12T06:47:39+00:00",
+  "updated": "2026-10-12T06:50:05+00:00",
   "verified_at": "2026-10-12T06:47:00+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-brakes-and-gate"
 }

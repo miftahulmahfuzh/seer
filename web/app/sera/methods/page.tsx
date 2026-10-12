@@ -82,28 +82,42 @@ export default async function Methods({ searchParams }: { searchParams: Promise<
         {shown.length === 0 ? (
           <p className={s.empty}>{EMPTY[show]}</p>
         ) : (
-          <div className={s.tableWrap}>
-            <table className={s.table}>
-              <thead>
-                <tr>
-                  <th className={s.cStatus} scope="col">Status</th>
-                  <th className={s.cMethod} scope="col">Method</th>
-                  <th className={s.cSource} scope="col">Source</th>
-                  <th className={`${s.cCagr} ${s.r}`} scope="col"><T k="cagr">Growth a year</T> vs SPY</th>
-                  <th className={`${s.cMaxDd} ${s.r}`} scope="col"><T k="maxDrawdown">Max DD</T></th>
-                  <th className={`${s.cPf} ${s.r}`} scope="col"><T k="profitFactor">PF</T></th>
-                  <th className={`${s.cTrades} ${s.r}`} scope="col"><T k="trades">Trades</T></th>
-                  <th className={`${s.cDsr} ${s.r}`} scope="col"><T k="dsr">DSR</T></th>
-                  <th className={s.cDots} scope="col">Hurdles</th>
-                  <th className={s.cVerdict} scope="col">Verdict</th>
-                  <th className={s.cGo} aria-hidden="true" />
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map(r => <Row key={r.method.id} r={r} />)}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Two presentations of one `shown` array, switched by the global 1024px helpers
+               (globals.css:245-250). Those rules are `display: none !important`, which takes the
+               hidden subtree out of the accessibility tree as well as out of layout, so exactly
+               one of the two is ever exposed and neither needs aria-hidden (plan invariant 10).
+               The idiom is components/Nav.tsx:26-50, which renders the same TABS as a desktop
+               rail and a phone bar; the shared inner piece here is <Dots>, called by both.
+               An eleven-column, 1200px table does not become readable by being put inside a 330px
+               scroller -- at 390 the reader sees STATUS, a cut-off METHOD, and no hint that nine
+               more columns exist -- so below 1024px the table is not shown at all. */}
+            <div className={`${s.tableWrap} desk-only`}>
+              <table className={s.table}>
+                <thead>
+                  <tr>
+                    <th className={s.cStatus} scope="col">Status</th>
+                    <th className={s.cMethod} scope="col">Method</th>
+                    <th className={s.cSource} scope="col">Source</th>
+                    <th className={`${s.cCagr} ${s.r}`} scope="col"><T k="cagr">Growth a year</T> vs SPY</th>
+                    <th className={`${s.cMaxDd} ${s.r}`} scope="col"><T k="maxDrawdown">Max DD</T></th>
+                    <th className={`${s.cPf} ${s.r}`} scope="col"><T k="profitFactor">PF</T></th>
+                    <th className={`${s.cTrades} ${s.r}`} scope="col"><T k="trades">Trades</T></th>
+                    <th className={`${s.cDsr} ${s.r}`} scope="col"><T k="dsr">DSR</T></th>
+                    <th className={s.cDots} scope="col">Hurdles</th>
+                    <th className={s.cVerdict} scope="col">Verdict</th>
+                    <th className={s.cGo} aria-hidden="true" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map(r => <Row key={r.method.id} r={r} />)}
+                </tbody>
+              </table>
+            </div>
+            <ul className={`${s.cards} mobile-only`}>
+              {shown.map(r => <Card key={r.method.id} r={r} />)}
+            </ul>
+          </>
         )}
       </Section>
     </>
@@ -166,6 +180,78 @@ function Row({ r }: { r: MethodRow }) {
       <td><span className={s.verdict}>{m.verdict || '—'}</span></td>
       <td className={s.go} aria-hidden="true"><ChevronRight size={18} /></td>
     </tr>
+  );
+}
+
+/**
+ * One method as a card: the narrow-width presentation of `Row`.
+ *
+ * A 390px screen cannot carry the table's eleven columns legibly, so the card keeps only what
+ * decides whether the reader opens the method -- what it is, how it ended, how close it came, and
+ * whether it beat SPY without an unbearable fall -- and leaves the rest to the method's own page,
+ * which the whole card links to.
+ *
+ * Dropped on purpose, each reachable one tap away:
+ *   - Trades: a sample-size check, not a result; its hurdle is still one of the six dots.
+ *   - Source: provenance, not performance, and a second tap target inside a card that is itself
+ *     one big link is a mis-tap waiting to happen on a phone.
+ *   - The verdict: the longest in the lab runs to 434 characters, and two lines of it at this
+ *     width is a fragment of dates and file paths cut mid-clause -- exactly the text the owner
+ *     should never be handed. The status chip already gives the plain one-word answer.
+ *
+ * The labels are spelled out rather than abbreviated: the table says "Max DD" / "PF" / "DSR"
+ * because of its measured column budget and buys the meaning back with a <Term> tooltip, which a
+ * card cannot use (a Term is a tabIndex={0} span, and it would sit under the card-wide link
+ * overlay). The words here are the glossary's own: GLOSSARY.maxDrawdown.term,
+ * GLOSSARY.profitFactor.term, and derive.CONDITION_LABEL.dsr ("Luck check").
+ */
+function Card({ r }: { r: MethodRow }) {
+  const m = r.method;
+  const b = r.best;
+  const st = STATUS_LABEL[m.status];
+  const excess = b ? excessCagr(b) : null;
+  return (
+    <li className={s.card}>
+      <div className={s.cardHead}>
+        <span className={s.id}>{m.id}</span>
+        <span className={`chip ${s.status}`} data-tone={st.tone} data-tip={st.meaning}>{st.label}</span>
+      </div>
+      <div className={s.cardTitles}>
+        {/* The ::after on .cardLink covers the whole card, as .nameLink::after covers the whole
+            row on desktop. The link's accessible name stays the method's name. */}
+        <Link href={`/sera/methods/${m.id}`} className={s.cardLink}>
+          <span className={s.name}>{m.name}</span>
+        </Link>
+        <span className={s.family}>{m.family}</span>
+      </div>
+      <div className={s.cardScore}>
+        {b
+          ? <Dots best={b} passed={r.passed ?? 0} />
+          : <span className={s.untested}>Not tested yet</span>}
+        <ChevronRight size={18} className={s.cardGo} aria-hidden="true" />
+      </div>
+      {b ? (
+        <dl className={s.stats}>
+          <CardStat label="Growth a year">
+            <span className={`num ${excess === null ? '' : excess >= 0 ? 'pos' : 'neg'}`}>{pct1(b.cagr)}</span>
+            <span className={s.vs}> vs {pct1(b.spyTrCagr)}</span>
+          </CardStat>
+          <CardStat label="Max drawdown"><span className="num">{pct1(b.maxDrawdown)}</span></CardStat>
+          <CardStat label="Profit factor"><span className="num">{pfText(b)}</span></CardStat>
+          <CardStat label="Luck check"><span className="num">{fixed(b.dsrNow, 2)}</span></CardStat>
+        </dl>
+      ) : null}
+    </li>
+  );
+}
+
+/** One label/value pair in a card's 2x2 stat grid. A <div> around dt/dd is valid inside a <dl>. */
+function CardStat({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className={s.stat}>
+      <dt className={s.statLabel}>{label}</dt>
+      <dd className={s.statValue}>{children}</dd>
+    </div>
   );
 }
 

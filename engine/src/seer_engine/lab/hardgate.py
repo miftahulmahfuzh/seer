@@ -340,9 +340,12 @@ Nobody meant to dodge the gate; the filing let it happen. Three ways to close it
 - **(c) both**, either one linking.
 
 **Why not (a), and so not (c).** The field cannot live in the method files: a file that has run is
-frozen by its ``source_sha`` (``runner.preflight``, ``test_a_method_that_ran_is_frozen``), and
-that is all 30 files on disk, the four ``test-failed`` methods among them -- so the very methods
-kin has to point at could never carry it. It would have to be a second registry kept by hand for
+frozen against the sha the lab last recorded for it (``runner.preflight``, ``store.latest_source_sha``,
+``test_a_method_that_ran_is_frozen_to_its_latest_recorded_sha``), and that is all 30 files on disk,
+the four ``test-failed`` methods among them -- so the very methods kin has to point at could never
+carry it. (Since 2026-10-12 a file may grow ``Amendment`` blocks, but only for a method that has
+not reached the test window: ``runner.AMEND_CLOSED`` refuses the four ``test-failed`` books
+outright, so this paragraph's argument is unchanged.) It would have to be a second registry kept by hand for
 76 rows, labelled by the same filer whose family label slipped, which moves the hole from one
 string to another. Its one edge, that it works before a method has a curve, buys nothing here:
 ``check`` is silent below ``dev-eligible``, and (F) refuses a method with no dev curve before (K)

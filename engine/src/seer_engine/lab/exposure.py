@@ -489,6 +489,10 @@ def plan_method(conn: sqlite3.Connection, method_id: str) -> MethodPlan:
     store is opened. A funded trial's schedule is checked against its recorded deposit count here
     too (``hardgate.trial_deposits`` with an empty curve buckets nothing but still raises on a
     moved schedule).
+
+    Every variant the method ever pre-registered, amendments included: a recorded trial may come
+    from a later batch (``method.Amendment``), and a diagnostic that skipped those would report an
+    incomplete book with no sign that it had.
     """
     method = resolve_method(method_id)
     trials = [t for t in store.trials_of(conn, method.id) if t["window"] == "dev"]
@@ -497,7 +501,7 @@ def plan_method(conn: sqlite3.Connection, method_id: str) -> MethodPlan:
             f"{method.id} has no dev trial; `lab exposure` re-weights what the lab recorded. "
             f"Run it with `lab run {method.id}` first"
         )
-    by_id = {c.id: c for c in method.candidates}
+    by_id = {c.id: c for c in method.all_candidates()}
     seen: set[str] = set()
     variants: list[Variant] = []
     missing: list[str] = []

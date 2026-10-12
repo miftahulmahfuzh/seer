@@ -202,12 +202,26 @@ def test_analysis_grows_and_hypothesis_freezes(conn):
         store.update_method(conn, "M0001", hypothesis="h3")
 
 
-def test_source_sha_is_set_once(conn):
+def test_source_sha_is_set_once_and_later_shas_go_to_method_amendments(conn):
+    """The column is written once; an amended file's newer shas live in the side table.
+
+    This is plan Decision D2 in one test: the trigger stays and keeps meaning what it says, and
+    ``latest_source_sha`` -- not the column -- is what a freeze check reads.
+    """
     _method(conn)
     with conn:
-        store.update_method(conn, "M0001", source_sha="aaa")
+        store.update_method(conn, "M0001", source_sha="a" * 64)
     with pytest.raises(store.LabError, match="set once"):
-        store.update_method(conn, "M0001", source_sha="bbb")
+        store.update_method(conn, "M0001", source_sha="b" * 64)
+    assert store.latest_source_sha(conn, "M0001") == "a" * 64
+    with conn:
+        store.insert_amendment(conn, store.AmendmentRow(
+            method_id="M0001", seq=1, source_sha="c" * 64, added="2026-10-12",
+            why="the brakes are the drag", hypothesis="h", expected_failure="e",
+            run_at="2026-10-12T00:00:00+00:00", git_sha="deadbeef",
+        ))
+    assert store.get_method(conn, "M0001")["source_sha"] == "a" * 64
+    assert store.latest_source_sha(conn, "M0001") == "c" * 64
 
 
 def test_next_id_and_seen(conn):

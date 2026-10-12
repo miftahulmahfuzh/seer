@@ -131,9 +131,14 @@ def test_recording_the_inputs_did_not_move_the_verdict(conn, data):
 
 
 def test_a_method_runs_once_and_configs_never_repeat(conn, data):
+    """Without ``--amend`` the old refusal stands, and it now names the way through.
+
+    The amendment path is tested in ``test_lab_amendments.py``; this keeps the default closed.
+    """
     runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False)
-    with pytest.raises(store.LabError, match="runs once"):
+    with pytest.raises(store.LabError, match="runs once") as e:
         runner.preflight(conn, _method(), Path(__file__), require_commit=False)
+    assert "--amend" in str(e.value)
     clone = _method("M0002", cands=(_cand("M0002-A", "M0002"),))  # same config as M0001-A
     with pytest.raises(store.LabError, match="repeats M0001-A"):
         runner.preflight(conn, clone, Path(__file__), require_commit=False)

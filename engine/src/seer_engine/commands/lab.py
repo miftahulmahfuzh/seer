@@ -193,6 +193,19 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
             "allocator are gated at all"
         ),
     )
+    s.add_argument(
+        "--amend",
+        action="store_true",
+        help=(
+            "run the next pre-registered Amendment this method file declares, instead of its "
+            "original candidates. The trials land under the same method id, so the luck gate's N "
+            "does not move and no method id is spent; `methods.source_sha` is left alone and the "
+            "file's current sha is appended to `method_amendments`. The method must have run, "
+            "must not have reached the test window, and the amendment must be committed -- the "
+            "commit is its pre-registration. The method's status is not moved: use `lab "
+            "reevaluate` if an amendment's trial clears every condition"
+        ),
+    )
 
     s = sub.add_parser(
         "promote", help="pre-register a dev-eligible method's best variant for the test window"
@@ -1362,7 +1375,10 @@ def _run(conn, args) -> int:
     if args.method not in methods:
         raise store.LabError(f"no method file for {args.method} in seer_engine/lab/methods/")
     method, path = methods[args.method]
-    runner.preflight(conn, method, path)
+    # getattr, not args.amend: `_run` is also called with a hand-built Namespace (the hard-gate
+    # tests do), exactly as `allow_coverage` is read below. The flag defaults to False either way.
+    amend = bool(getattr(args, "amend", False))
+    amendment = runner.preflight(conn, method, path, amend=amend)
     if research.DEV_END != dev.DEV_END:
         raise store.LabError("research.DEV_END differs from dev.DEV_END; refusing to run")
     t0 = time.perf_counter()
@@ -1392,11 +1408,28 @@ def _run(conn, args) -> int:
                 f"{coverage.MIN_DEV_COVERAGE:.0%} floor. These trials measure the panel, not the "
                 "hypothesis, and the method id is spent either way."
             )
-    ran = runner.run_method(conn, method, path, data, git_sha=runner.git_head(config.REPO_ROOT))
+    ran = runner.run_method(
+        conn, method, path, data, git_sha=runner.git_head(config.REPO_ROOT), amend=amend
+    )
     status = store.get_method(conn, method.id)["status"]
     log.info("%s: %d trial(s) recorded, status %s (%.1fs)", method.id, len(ran), status, time.perf_counter() - t0)
     _show(conn, argparse.Namespace(method=method.id))
     print(f"\nLab N (dev trials) is now {store.dev_trial_count(conn)}; test-window looks used: {store.test_looks(conn)}")
+    if amendment is not None:
+        g = store.gate(conn)
+        seq = len(store.amendments_of(conn, method.id))
+        print(
+            f"\n{method.id} amendment {seq} recorded: {len(ran)} trial(s) under {method.id}'s own "
+            f"id, so no method id was spent."
+        )
+        print(f"  added           {amendment.added.isoformat()}")
+        print(f"  why             {amendment.why.strip()}")
+        print(f"  file sha        {store.latest_source_sha(conn, method.id)}")
+        print(f"  luck gate       N = {g.n} (policy {g.policy})")
+        print(
+            f"  status          {status} (unchanged -- an amendment appends trials, it never moves "
+            f"a verdict; `lab reevaluate {method.id}` is the one door on rejected -> dev-eligible)"
+        )
     return 0
 
 

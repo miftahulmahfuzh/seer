@@ -3,18 +3,18 @@
 **Package Path**: `web`
 **Package Code**: WEB
 **Last Updated**: 2026-10-12
-**Total Active Tasks**: 0
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 22
+- Completed: 24
 
 ---
 
@@ -23,6 +23,16 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+
+- [ ] **P1-WEB-V4CD** Phase 4: /sera/methods/[id]: the variants table, same treatment
+  - **Difficulty**: HARD
+  - **Type**: Update
+  - **Context**: Owns `app/sera/methods/[id]/method.module.css` and `app/sera/methods/[id]/page.tsx`. Below 1024px the variants table becomes cards using phase 3's class names and card geometry; at >=1024px the table is byte-for-byte unchanged. Exit: /sera/methods/M0102 measures exactly 390/414 in both themes (a hold, not a gain), and so do M0007, M0084 and M0040; 1280 pixel-identical to a pre-edit baseline; the best-variant row stays visually distinguished and is additionally named by a `Best` chip.
+  - **Status**: in_progress
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-responsive/PLAN.md` (phase 4 of 5)
+  - **Satisfies**: R1 — a designed narrow layout at 390 and 414, so Sera is good to use on a phone, not merely non-overflowing (and holds R2 on /sera/methods/[id])
+  - **Depends on**: P1-WEB-R5PT, P1-WEB-R2FX
+  - **Plan**: `.workflows/plan/P1-WEB-V4CD.md`
 
 ### [P2] Medium
 
@@ -35,6 +45,49 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-HS7C** Phase 3: /sera/methods: cards on a phone, table on a desk
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `web/app/sera/methods/methods.module.css`, `web/app/sera/methods/page.tsx`. Below 1024px the eleven-column 1200px methods table becomes one card per method in Sera's own 28px-radius var(--stone) panel vocabulary; at >= 1024px the table is byte-for-byte what it is today. Exit: /sera/methods measures exactly 390/414 in both themes (a hold, not a gain — phases 1 and 2 moved that number); 1280 PNGs pixel-identical to a pre-edit baseline; exactly one of the two presentations is in the accessibility tree. `view.ts` / `view.test.ts` are frozen (D6).
+  - **Status**: done
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-responsive/PLAN.md` (phase 3 of 5)
+  - **Satisfies**: R1 — a designed narrow layout at 390 and 414, so Sera is good to use on a phone; and holds R2 on /sera/methods
+  - **Depends on**: P1-WEB-R5PT (phase 1), P1-WEB-R2FX (phase 2) — both done
+  - **Plan**: `.workflows/plan/P1-WEB-HS7C.md`
+  - **Completed**: 2026-10-12 18:11
+  - **Method**: /do
+  - **Files**: web/app/sera/methods/page.tsx, web/app/sera/methods/methods.module.css, web/.workflows/todos.md, web/.workflows/plan/P1-WEB-HS7C.md
+  - **Drift**:
+    - No code drift: both owned files matched the plan's quoted content byte for byte. `page.tsx`'s lines 82-107 and `methods.module.css`'s 85 lines were exactly as the plan quoted them.
+    - The shoot reported `/sera/methods/M0102` HTTP 500 `ReferenceError: VariantCard is not defined` on the two light-theme narrow shots, and `/sera/ideas` reported NO overflow when the Residual-overflow ledger says it should still be 476. Both are peers mid-flight in the shared worktree (phase 4's `[id]/page.tsx` and phase 5's `ideas.module.css` are dirty on disk), exactly as the plan index anticipates. Neither is phase 3's and neither was chased. M0102 recovered by the dark pass, i.e. phase 4 finished its edit mid-run.
+  - **Decided**:
+    - Skipped readme-updater and `web/package_readme.md` entirely → the coordinator's direct instruction, which owns that file for the whole set (rung 5: the task text / coordinator note, over the command's default chain). Phase 1 already rewrote its Sera section.
+    - Measured the element-count cost rather than quoting the plan's estimate → the plan's Verification section says "Record the cost (do not estimate it)". `/sera/methods` at 390 went 4,381 → 7,792 elements and 842,497 → 1,565,322 HTML bytes: 1.78x and 1.86x, slightly under the plan's "roughly doubles" (rung 3: the plan's own code block).
+    - Committed the shared `web/.workflows/todos.md` although it carries peers' rows → omitting it would strand this phase's own task row; a bookkeeping row is trivially reversible (tie-break: take the reversible option; matches phases 1 and 2).
+    - The plan index's set-level `**Status:**` line was NOT advanced and `ledger.json` was not touched: this set has coordinator `orch-sera-responsive`, so set progress is its ledger and five concurrent phases writing it would race (matches phases 1 and 2).
+  - **Verified**: `npx tsc --noEmit` exit 0, clean; `npm test` 49 files / 676 tests passed — same count as before the change (no test imports `page.tsx` or `methods.module.css`). Acceptance shoot, port 3123, 7 routes x 3 widths x 2 themes into `.shots/p3`: `/sera/methods` measures exactly 390 at 390, 414 at 414 and 1280 at 1280 in both themes — the hold phases 1 and 2 bought, not a number phase 3 moved (D10). Both 1280 `/sera/methods` PNGs byte-identical (`cmp`) to the pre-edit baseline in `.shots/p3-before` (invariant 2 — desktop did not drift); the stylesheet change is a pure append at line 86, lines 1-85 untouched, and every new rule sits inside the one `@media (max-width: 1023.98px)` query. Exactly one presentation at each width, measured: @390/@414 `cardsVisible=true tableVisible=false` with 130 cards; @1280 `cardsVisible=false tableVisible=true` — `display: none !important` takes the hidden subtree out of the accessibility tree too, so neither needs `aria-hidden`. PNGs read (R1 — the half the shoot cannot see), all seven checks discharged: a card per method, not a table in a scroller; the status chip visible in both themes including `Rejected` — the `--chip-solid` override measured as `#ffffff` on the light card and `rgba(255,255,255,0.14)` over `#2c2823` in dark, i.e. lighter than the card, with its `data-tip` meaning intact; the longest name (160 chars, M0113/M0114) wraps to 5 lines at 390 and 4 at 414 and 0 of 130 names are clipped; the six dots, `n/6` and the chevron share one right-aligned line; 0 of 296 stat labels ellipsise at 390; untested cards show "Not tested yet" with no stat grid (0 of 56 carry one); the filter pill sits on its own row above the count chips with all four icons distinguishable; exactly 1 link per card — no competing tap target. `view.ts` and `view.test.ts` untouched (D6, frozen for the set).
+
+- [x] **P1-WEB-N4JW** Phase 5: The rest of the narrow layout
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns `app/sera/ideas/ideas.module.css`, `app/sera/overview.module.css`, `app/sera/how/how.module.css` (three files). Exit: `/sera/ideas` measures exactly 390/414 in both themes (the last R2 number in the set — this phase turns the shoot fully green); `/sera` stat tiles no longer collide at 390; `/sera/how` diagrams carry a visible sideways-scroll affordance in both themes adding no absolutely positioned child; 1280 unchanged on all three; `components/sera/Stat.module.css` does not appear in the diff.
+  - **Status**: done
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-responsive/PLAN.md` (phase 5 of 5)
+  - **Satisfies**: R1 — a designed narrow layout at 390 and 414; R2 — zero horizontal scroll at 390, 414 and 1280 in both themes on all seven Sera routes
+  - **Depends on**: P1-WEB-R5PT
+  - **Plan**: `.workflows/plan/P1-WEB-N4JW.md`
+  - **Completed**: 2026-10-12 18:12
+  - **Method**: /do
+  - **Files**: web/app/sera/ideas/ideas.module.css, web/app/sera/overview.module.css, web/app/sera/how/how.module.css, web/.workflows/todos.md, web/.workflows/plan/P1-WEB-N4JW.md
+  - **Drift**:
+    - None. All three stylesheets matched the plan's quoted base byte-for-byte, including the overview.module.css :93/:95 insertion boundary.
+  - **Decided**:
+    - Per-phase dev port 3125 -> reused the already-running server on 3123 (rung 6, surrounding code: Next 16 locks `next dev` per project directory, not per port, so one server exists for the shared worktree; coordinator verified this in next/dist/build/lockfile.js and ruled it). `--out .shots/p5` still kept the PNGs apart.
+    - readme-updater NOT run and `web/package_readme.md` NOT touched (rung 6, the set's one-file-one-owner discipline; the coordinator owns that file, phase 1 already rewrote its Sera section, and three concurrent sessions editing it is the collision the ownership table prevents).
+    - The `.needs` chip overflows its 30px pill by 3px at 1280 -> left alone (rung 1, invariant 2: no phase may change how >=1024px renders). Measured and confirmed pre-existing; it is already a documented Handoff in the phase plan, not an R1/R2 item.
+    - The plan index's set-level `**Status:**` line was NOT advanced and `ledger.json` was not touched: `swarm.py find` reports coordinator `orch-sera-responsive` owns this set, so set progress is its ledger and five concurrent phases writing it would race. Phase 5's own TaskID cell was already filled in the main checkout; the Phases table has no done column to tick (rung: narrower blast radius; matches phases 1 and 2).
+  - **Verified**: `npx tsc --noEmit` exit 0; `npm test` 49 files / 676 tests passed. Acceptance shoot, all seven Sera routes at 390/414/1280 in both themes (`--out .shots/p5`): zero horizontal scroll on every route at every width. `/sera/ideas` went from 86px over at 390 and 62px over at 414 (absolute 476) to exactly the viewport width — the last R2 number in the set, so the shoot is now fully green. R1 read from the PNGs: `/sera` stat tiles one per row at 38px, each with its label and a full-width plain sentence (before: two 52px numbers sharing a 314px sheet); `/sera/how` diagrams carry a right-edge fade plus a thin scroll rail in BOTH themes, left edge unfaded, no wrong mask colour in dark; `/sera/ideas` measured in-browser — 205 `.tag` chips `white-space: normal` at 390 with 8 wrapping to two lines and `scrollHeight == clientHeight` on every one, still `nowrap` at 30px at 1280. Invariant 2 proven not asserted: all six 1280 PNGs byte-identical before and after. `web/components/sera/Stat.module.css` does not appear in the diff (D5). One route returned HTTP 500 in one of six shots (`/sera/methods/M0102` light 414, `ReferenceError: VariantCard is not defined`) — phase 4 mid-edit in the shared worktree, its own file, 200 in the other five shots; not phase 5's and not chased.
 
 - [x] **P1-WEB-R5PT** Phase 1: The narrow nav and the shell
   - **Difficulty**: HARD

@@ -48,5 +48,36 @@
 .empty { font-size: 16px; color: var(--ink-2); }
 
 @media (max-width: 1023.98px) {
-  .cards, .groups { grid-template-columns: 1fr; }
+  /*
+   * One column, but written `minmax(0, 1fr)` rather than `1fr` on purpose. `1fr` is shorthand for
+   * `minmax(auto, 1fr)`, and an `auto` track minimum is a *content* minimum: the track refuses to
+   * shrink below its contents' min-content width. Inside `.group` that content is a `.chip`, and
+   * `globals.css:195` gives every chip `white-space: nowrap`, so the chip has no min-content
+   * narrower than its whole label -- which held the track, and the page, at 476px on a 390px
+   * viewport. `minmax(0, 1fr)` lets the track shrink to the column; the chips then have to be
+   * allowed to wrap too, which is the rule below. Measured: 476 -> 458 here, 458 -> 456 there.
+   * `.cards` carries the identical construction and is fixed the same way.
+   */
+  .cards, .groups { grid-template-columns: minmax(0, 1fr); }
+
+  /*
+   * The other half of the same fix. A chip that may wrap can no longer be a fixed-height pill, or
+   * its second line spills out of the stadium -- so 30px becomes a floor and the padding grows
+   * vertically. `.needs` already wrapped at every width while keeping `height: 30px`, so it had
+   * the same defect and gets the same treatment. `.chip`'s global `white-space: nowrap` stays
+   * global and correct; it is only overridden here, on these two, below 1024px.
+   */
+  .tag, .needs {
+    white-space: normal;
+    height: auto;
+    min-height: 30px;
+    padding: 5px 14px;
+    line-height: 1.3;
+  }
+
+  /* Phone spacing: the sheet is 314px wide at 390 and 338px at 414, so the cards and rows hand
+     more of it to the text and less to their own chrome. */
+  .card { padding: 20px 20px 18px; }
+  .wish { gap: 12px; padding: 16px 18px; }
+  .link { gap: 10px; }
 }

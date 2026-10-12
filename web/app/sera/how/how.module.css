@@ -37,7 +37,44 @@
   .grid3, .rules, .cols { grid-template-columns: 1fr; }
   .glossary { grid-template-columns: 1fr; }
   .glossary dt { border-bottom: 0; padding-bottom: 0; }
-  /* The diagrams are drawn for desktop; below 1024px they scroll sideways instead of shrinking text. */
-  .diagram { overflow-x: auto; }
+
+  /* Phone spacing: the sheet is 314px wide at 390. A rule row was spending 102px of that on its
+     own chrome (44px icon + 14px gap + 44px padding), a third of the line length. */
+  .card, .col { padding: 20px; }
+  .rule { gap: 12px; padding: 18px; }
+  .ruleIcon { width: 40px; height: 40px; }
+
+  /*
+   * The diagrams are drawn for desktop; below 1024px they scroll sideways instead of shrinking
+   * their text -- a 1240-unit drawing squeezed into 314px would be unreadable. This scroller is
+   * NOT an overflow bug: it already contains the svg (the page measures the nav width and nothing
+   * more), because an <svg>'s children are not absolutely positioned CSS boxes and so none of
+   * them escapes the clip. What was missing is any sign that it scrolls, which is what the three
+   * additions below supply.
+   *
+   * The fade is a mask rather than a gradient overlay on purpose: an overlay must be painted in
+   * whatever colour it sits on, so it would need one value for the light theme, one for dark, and
+   * another for any sheet tint. A mask removes paint instead of adding it, so it is correct in
+   * both themes and on any background with a single declaration. It is applied to the scroll
+   * container, so it sits at the right edge of the scrollport and stays there while the drawing
+   * moves under it. Right edge only -- a fade on the left would dim the start of the drawing where
+   * nothing is hidden, and read as a defect.
+   *
+   * `scrollbar-width: thin` draws a permanent rail in Chromium and Firefox (this is what shows in
+   * the screenshots); iOS Safari ignores it and keeps its overlay bar, where the fade does the
+   * work alone. `overscroll-behavior-x: contain` keeps a swipe that reaches the end of the
+   * drawing from becoming a page scroll or a browser back gesture. Nothing inside `.diagram` is
+   * absolutely positioned, so the scroller stays `position: static` and needs no containing-block
+   * guard.
+   */
+  .diagram {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 8px;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent 100%);
+    mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent 100%);
+    scrollbar-width: thin;
+    scrollbar-color: var(--outline) transparent;
+  }
   .diagram > svg { min-width: 960px; }
 }

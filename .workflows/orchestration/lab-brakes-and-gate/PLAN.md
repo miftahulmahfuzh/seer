@@ -129,12 +129,12 @@ Every phase holds all of these. A phase that cannot is a phase that stops and sa
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Method amendments: pre-registered variants of a method that has already run | R3, R4 | `engine/src/seer_engine/lab` | 18 | — | HARD | `.workflows/plan/lab-brakes-and-gate/phase-1.md` | P1-ENG-V4QT (done 2026-10-12) | — |
-| 2 | `lab gate`: price the shared SPY 200-day gate across the lab, report only | R2 | `engine/src/seer_engine/lab` | 4 | 1 | HARD | `.workflows/plan/lab-brakes-and-gate/phase-2.md` | P1-ENG-J8RM (done 2026-10-12) | — |
-| 3 | M0030's amendment: the satellite at full size, with and without the gate | R1, R2 | `engine/src/seer_engine/lab/methods` | 2 | 1 | NORMAL | `.workflows/plan/lab-brakes-and-gate/phase-3.md` | P1-ENG-T3ZK (done 2026-10-12) | — |
-| 4 | M0053's amendment: the weekly brake off, and the gate off | R1, R2 | `engine/src/seer_engine/lab/methods` | 2 | 1 | HARD | `.workflows/plan/lab-brakes-and-gate/phase-4.md` | P1-ENG-Q6WD (done 2026-10-12) | — |
-| 5 | Pre-register, run, record, stage and write up | R1, R2, R3, R4 | `lab/`, `docs/backtests` | 7 | 2, 3, 4 | NORMAL | `.workflows/plan/lab-brakes-and-gate/phase-5.md` | P1-ROOT-H5NX | — |
-| 6 | The owner's two decisions: §5.1's N strings, and the amendment rule | R5 | `docs/plans` | 2 | 1 | NORMAL | `.workflows/plan/lab-brakes-and-gate/phase-6.md` | P1-ROOT-B2YP (done 2026-10-12) | — |
+| 1 | Method amendments: pre-registered variants of a method that has already run | R3, R4 | `engine/src/seer_engine/lab` | 18 | — | HARD | `.workflows/plan/lab-brakes-and-gate/phase-1.md` | — | — |
+| 2 | `lab gate`: price the shared SPY 200-day gate across the lab, report only | R2 | `engine/src/seer_engine/lab` | 4 | 1 | HARD | `.workflows/plan/lab-brakes-and-gate/phase-2.md` | — | — |
+| 3 | M0030's amendment: the satellite at full size, with and without the gate | R1, R2 | `engine/src/seer_engine/lab/methods` | 2 | 1 | NORMAL | `.workflows/plan/lab-brakes-and-gate/phase-3.md` | — | — |
+| 4 | M0053's amendment: the weekly brake off, and the gate off | R1, R2 | `engine/src/seer_engine/lab/methods` | 2 | 1 | HARD | `.workflows/plan/lab-brakes-and-gate/phase-4.md` | — | — |
+| 5 | Pre-register, run, record, stage and write up | R1, R2, R3, R4 | `lab/`, `docs/backtests` | 7 | 2, 3, 4 | NORMAL | `.workflows/plan/lab-brakes-and-gate/phase-5.md` | — | — |
+| 6 | The owner's two decisions: §5.1's N strings, and the amendment rule | R5 | `docs/plans` | 2 | 1 | NORMAL | `.workflows/plan/lab-brakes-and-gate/phase-6.md` | — | — |
 
 Waves, by `Depends on`: **{1}** → **{2, 3, 4, 6}** → **{5}**.
 

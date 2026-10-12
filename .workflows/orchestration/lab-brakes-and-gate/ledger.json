@@ -3,6 +3,12 @@
   "coordinator": "orch-lab-brakes-and-gate",
   "coordinator_session_id": "14bf58eb-9e3a-4670-af81-76a3d40dbb42",
   "created": "2026-10-12T06:25:02+00:00",
+  "landed": {
+    "at": "2026-10-12T07:52:34+00:00",
+    "base": "main",
+    "commit": "8f5f4bdbceb28efb4c21c4557b2958ff65349651",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -83,7 +89,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "9746f43",
       "depends_on": [
         2,
         3,
@@ -91,18 +97,18 @@
       ],
       "difficulty": "NORMAL",
       "n": 5,
-      "note": null,
+      "note": "Verified by the coordinator from git and from a read-only copy of the committed DB, not from the report. Two commits: 03008af (lab stage: lab.sqlite + lab.json) and 9746f43 (write-up + both CSVs). R3 end to end: gate Gate(n=74, policy='methods') both sides, dev_method_count 74->74, pending_gate(M0030,3)=pending_gate(M0053,3)=Gate(74) both sides; dev_trial_count 354->360 is the only line that moved; test_looks 4->4. Coordinator's own probe on a copy: trials n=359..364, three under M0030 and three under M0053 -- no new method id; n contiguous 1-364 over 364 rows; method_amendments carries exactly two rows, M0030 and M0053, both dated 2026-10-12; each amendment digest claimed by exactly its own candidate under its own method; M0053 holds exactly 8 rows. RESULT: all six candidates ineligible on max DD <= 20%. Brakes-off landed 20.64 / 22.79 / 22.41 against predictions of 20.4 / 22.8 / 22.4 -- the pre-registration held, and M0030's was the weak claim precisely because 20.4 was unfunded. Gate-off arms were worse on return AND drawdown at once (66.7 / 61.4 / 37.1), and lab gate over 22 recorded variants has the switch helping 22 of 22 whole-window and 0 of 22 after 2009: removing it is not available as an improvement, it is one 2008 trade four books share. That INVERTS the \u00a74.2 premise the set was built on and the write-up says so. Phase decisions: (1) skipped re-committing the two pre-registration commits because phases 3 and 4 already made them and both predate every run -- rung 1, invariant 5, and an empty re-commit would record a false pre-registration date; (2) declined to patch two red tests belonging to phases 3 and 4 -- correct, that is drift. COORDINATOR RESOLVED THE BLOCKER at c61cc98: both tests pinned the PRE-RUN database and went red exactly because the phase succeeded (the C1 class the reconciler caught for the freeze test and missed here). Inverted both to post-run forms strictly stronger than what they replaced. Suite green afterwards: 4449 passed / 3 skipped, ruff clean, grep count still 10. OPEN DEFECT, not fixed, reported to the owner: lab/gate_probe.py:298 and :646 read method.candidates instead of all_candidates(), so lab gate lists the six new amendment trials as orphaned and did not price them through its transform. Changes no number in the write-up. C6/D10 class; left alone because phase 2 owns that file and the committed gate-grid CSV is a dated record.",
       "package": "lab/`, `docs/backtests",
       "plan": ".workflows/plan/lab-brakes-and-gate/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T07:51:38+00:00",
       "satisfies": [
         "R1",
         "R2",
         "R3",
         "R4"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-H5NX",
       "title": "Pre-register, run, record, stage and write up"
     },
     {
@@ -128,7 +134,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-brakes-and-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-brakes-and-gate",
-  "updated": "2026-10-12T07:30:19+00:00",
+  "updated": "2026-10-12T07:52:34+00:00",
   "verified_at": "2026-10-12T06:47:00+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-brakes-and-gate"
 }

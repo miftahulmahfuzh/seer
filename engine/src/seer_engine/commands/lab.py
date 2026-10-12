@@ -564,6 +564,12 @@ def _status(conn, args) -> int:
     out: list[str] = []
     for label, value in store.summary_rows(conn):
         out.append(f"{label}: {value}")
+    # The N the luck gate actually judges at, printed beside the trial count rather than left to
+    # the promotion heading far below: the two differ by several times under the ``methods``
+    # policy, and a reader who meets only the larger number up here misreads every DSR on screen.
+    live_n = _live_n(conn, store.DSR_POLICY)
+    if live_n is not None:
+        out.append(f"N the luck gate judges at (policy {store.DSR_POLICY}): {live_n}")
     out.append("")
     out.append("Families (best dev MAR):")
     for r in conn.execute(

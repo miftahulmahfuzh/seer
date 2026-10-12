@@ -2362,7 +2362,12 @@ def export_xlsx(conn: sqlite3.Connection, path: Path = XLSX_PATH) -> Path:
 def summary_rows(conn: sqlite3.Connection) -> list[tuple[str, Any]]:
     by_status = conn.execute("SELECT status, count(*) FROM methods GROUP BY status ORDER BY status").fetchall()
     out: list[tuple[str, Any]] = [
-        ("dev trials (N for the DSR)", dev_trial_count(conn)),
+        # The label used to read "N for the DSR", which was true only under the ``all-trials``
+        # policy. ``DSR_POLICY`` has been ``methods`` since 2026-10-08, so the gate judges at
+        # ``npolicy.effective_n``, a number several times smaller -- and this row, the first the
+        # reader sees, was overstating the lab's single most important gate input fivefold.
+        # The count is still worth printing (it is the lab's size), but it is not N.
+        ("dev trials (one row per recorded backtest)", dev_trial_count(conn)),
         ("test-window looks used", test_looks(conn)),
         ("methods", int(conn.execute("SELECT count(*) FROM methods").fetchone()[0])),
         ("insights", int(conn.execute("SELECT count(*) FROM insights").fetchone()[0])),

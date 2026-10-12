@@ -9,6 +9,7 @@ listed, never run as though the gate were off.
 from __future__ import annotations
 
 import csv
+import sqlite3
 from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
@@ -540,6 +541,36 @@ def test_a_variant_gone_from_the_file_is_listed_not_run(lab, dev_data, recorded,
     (rep,), run = _measure(conn, dev_data, tmp_path, monkeypatch)
     assert rep.missing == ("M0001-B",)
     assert "no longer in the method file): M0001-B" in gp.format_report(rep, run)
+
+
+def test_other_brakes_resolves_by_family_and_leaves_an_unknown_method_alone():
+    assert gp.other_brake("M0084-WEEKLY") == gp.OTHER_BRAKES["M0084"]
+    assert gp.other_brake("M0107-STOCK200-SPREAD") == gp.OTHER_BRAKES["M0107"]
+    assert gp.other_brake("M0030-C70T") is None
+
+
+def test_every_control_other_brakes_names_is_a_recorded_trial():
+    """``OTHER_BRAKES`` claims a switched-off arm already exists; this is that claim, checked.
+
+    The whole point of the mapping is that refusing to transform these families costs the lab
+    nothing, because the comparison is already on file. If one of the named controls is ever
+    renamed or dropped the claim becomes a comfortable lie, and the probe would be declining to
+    measure something nobody else measures either.
+    """
+    if not store.COMMITTED_DB.exists():
+        pytest.skip("no lab database")
+    conn = sqlite3.connect(f"file:{store.COMMITTED_DB}?mode=ro", uri=True)
+    try:
+        recorded = {str(r[0]) for r in conn.execute("SELECT candidate_id FROM trials")}
+    finally:
+        conn.close()
+    for cid in ("M0007-N20-RAW", "M0084-ALWAYS", "M0107-NONE"):
+        assert cid in recorded, (
+            f"OTHER_BRAKES points a reader at {cid} as the already-recorded switched-off arm, "
+            "and the lab no longer holds it"
+        )
+    for prefix, (what, where) in gp.OTHER_BRAKES.items():
+        assert what.strip() and where.strip(), f"{prefix} must say what its brake is and where"
 
 
 def test_a_variant_an_amendment_added_is_planned_not_called_missing(

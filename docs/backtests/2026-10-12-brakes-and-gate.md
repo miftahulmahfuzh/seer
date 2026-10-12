@@ -186,6 +186,24 @@ reproduced all six.
 | **2008 alone** | **+31.0%** | **22 of 22** |
 | **2009–2015** | **−3.2% a year** | **0 of 22** |
 
+**The same question asked of the whole lab, later the same day** — all 228 versions that carry the
+switch, not just the five live books' 22. The companion file
+`2026-10-12-brakes-and-gate-gate-grid.csv` now holds that wider run rather than the 22-version one
+the table above was built from:
+
+| era | what the switch was worth, on average | how many of the 228 it helped |
+|---|---:|---|
+| whole window | **+1.3% a year** | **174 of 228** |
+| 1996–2002 | +0.9% a year | 144 of 228 |
+| 2003–2008 | +5.1% a year | 212 of 228 |
+| **2008 alone** | **+32.9%** | **226 of 228** |
+| **2009–2015** | **−4.4% a year** | **10 of 228** |
+
+The shape survives the wider sample and sharpens in one place: across the five live books the switch
+helped *every* version over the whole window, while across the whole lab it helps **three in four**.
+The 2009–2015 collapse holds — 10 of 228 — and 2008 is still one shared trade, now visible in 226 of
+228 books at once.
+
 Per book, taking each one's steadiest recorded version:
 
 | book | lead over SPY, switch on | switch off | 2009–2015 | 2008 | worst fall |
@@ -222,12 +240,12 @@ control, not a bad method — the other five recorded pairs the probe reproduces
 
 ### What the gate probe could not price
 
-Measured across the whole lab on 2026-10-12: of **360** recorded development trial rows, **300** are
-still described by a method file. Of those 300:
+Measured across the whole lab on 2026-10-12, **re-measured later the same day** once the defect
+below was fixed: of **360** recorded development trial rows, **306** are still described by a method
+file. Of those 306:
 
-- **225** carry the switch and can have it cleanly removed — these are what the roster table above
-  is built from;
-- **69** carry no switch this probe can see;
+- **228** carry the switch and can have it cleanly removed;
+- **72** carry no switch this probe can see;
 - **6** carry it and *refuse* to run without it — `M0054-PARK-SPY`, `M0054-HALF-PARK`, `M0101-CTRL`,
   `M0101-BAND-3`, `M0101-BAND-5` and `M0101-FABER`. Each is a book built around the switch being on:
   there is no "same book without it" to measure, so none was guessed at.
@@ -236,8 +254,30 @@ That last point matters more than it looks. A number that resembles a switched-o
 one is worse than no number, so the probe lists its refusals by name and reason instead of filling
 the gap.
 
-The remaining 60 recorded versions have no method file to read. **Six of those 60 are today's own
-new trials**, and that is a defect rather than a fact — see below.
+The remaining **54** recorded versions have no method file to read. All 54 are the pre-lab seed
+import, whose ids are not book names at all. *(The first measurement, taken before the fix, read 300
+live versions at 225/69/6 and put 60 in that last bucket, six of them this document's own new
+trials. That was the defect, not a fact about the lab.)*
+
+### Nineteen versions declare no switch and still sit in cash — and that is not a gap
+
+The probe flags any version that declares no switch yet still holds nothing on a real share of its
+decision days, on the principle that such a row must not be read as "ungated". Nineteen are flagged.
+**None of them is a switch the probe missed.** Each book carries a different risk machine on purpose,
+and in every case the switched-off comparison is either meaningless or already sitting in the lab
+under its own name:
+
+| book | what its brake really is | the switched-off comparison |
+|---|---|---|
+| `M0005` (6) | no market switch at all — its empty days are the fundamentals panel, which starts in 2009 | there is no switch to remove |
+| `M0012` (3) | its own crash gate, read weekly rather than monthly; its params *assert* the inner book carries no switch, because this allocator **is** the gate | removing it leaves the raw-residual book bare, already recorded as `M0007-N20-RAW` |
+| `M0084` (5) | the switch **is** the method — it holds SPY when the switch reads on and cash when it reads off, four readings priced against each other | `M0084-ALWAYS`, a recorded trial and the method's own control |
+| `M0107` (2) | a per-stock 200-day exit, deliberately not the market-wide switch: holdings drop one at a time | `M0107-NONE`, a recorded trial and the method's own control |
+| `M0109` (3) | a book drawdown brake — exposure falls as the book falls from its own high; no switch and no stop, by design | there is no switch to remove |
+
+So refusing to transform these is the correct answer rather than a hole in the measurement. The
+probe now records that reasoning next to each flag instead of reporting only that the brake is
+somewhere it cannot reach.
 
 ## Does it survive out of sample
 
@@ -298,5 +338,9 @@ versions, not at its amendments. So it reported today's six new trials as "recor
 a method file", which is wrong — they are in the file, inside the amendment. The effect is cosmetic
 here and does not touch a single number in this document: the six are each recorded trials in their
 own right, and the three switch-off arms among them are reported above from those trials directly.
-It does mean the six were not *also* priced by the probe's own switch-off transform. It is logged for
-the owning change rather than patched from here.
+It does mean the six were not *also* priced by the probe's own switch-off transform. It was logged
+for the owning change rather than patched from the run.
+
+**Fixed later the same day.** Both of the probe's version readers now read a book's amendments as
+well as its original list, the grid was re-measured across the whole lab, and a regression test
+fails against the old reader. The six are priced like any other version now.

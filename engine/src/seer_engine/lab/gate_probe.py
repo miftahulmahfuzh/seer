@@ -291,6 +291,48 @@ IMPURE_CONTROLS: Mapping[tuple[str, str], str] = {
 }
 
 
+#: Method-id prefix -> (what its brake actually is, where its gate-off measurement already lives).
+#: A variant here declares no shared SPY-200 gate *and* still holds nothing on a real share of its
+#: decision days, which looks like the probe missing a gate and is not. Each of these carries a
+#: different risk machine on purpose, and in every case the comparison this probe would build by
+#: switching a gate off is either meaningless or already a recorded trial under its own name -- so
+#: refusing to transform them is the correct answer, not a gap. Checked against the committed lab
+#: 2026-10-12; the named control trials were all present.
+OTHER_BRAKES: Mapping[str, tuple[str, str]] = {
+    "M0005": (
+        "no market switch at all -- its empty days are the fundamentals panel, which starts in "
+        "2009, so the book is all-cash for the dev window's earlier years",
+        "there is no gate to switch off",
+    ),
+    "M0012": (
+        "its own crash gate, read weekly rather than monthly, over a tuple of averages -- its "
+        "params assert the inner book carries no trend gate, because this allocator is the gate",
+        "switching it off leaves the raw-residual book bare, which the lab already holds as "
+        "M0007-N20-RAW",
+    ),
+    "M0084": (
+        "the switch IS the method -- this book holds SPY when the switch reads on and cash when "
+        "it reads off, four readings of it priced against each other",
+        "its switched-off arm is M0084-ALWAYS, a recorded trial and the method's own control",
+    ),
+    "M0107": (
+        "a per-stock 200-day exit, deliberately not the market-wide switch: a holding is dropped "
+        "when it trades below its own average, so exposure falls one name at a time",
+        "its switched-off arm is M0107-NONE, a recorded trial and the method's own control",
+    ),
+    "M0109": (
+        "a book drawdown brake -- exposure falls as the book falls from its own high; the method "
+        "carries no trend gate and no stop, by design",
+        "there is no gate to switch off",
+    ),
+}
+
+
+def other_brake(cid: str) -> tuple[str, str] | None:
+    """What a suspect variant's brake really is, when the lab already knows -- else None."""
+    return OTHER_BRAKES.get(cid.split("-")[0])
+
+
 def _candidate_in(methods: Mapping[str, Any], cid: str) -> Candidate | None:
     method = methods.get(cid.split("-")[0])
     if method is None:
@@ -1063,8 +1105,9 @@ def format_plan(plans: Sequence[MethodPlan], *, gated_only: bool = False) -> str
         out.append(f"  {v.candidate.id}")
     out.append(
         "  these run the recorded arm only; the report flags any that still hold nothing on a "
-        "real share of their decision days, because their brake is somewhere this probe does not "
-        "reach"
+        "real share of their decision days. For the families in OTHER_BRAKES that is known and "
+        "expected -- they carry a different risk machine and their switched-off arm is already a "
+        "recorded trial, or there is no gate to switch off; anything else is unexplained"
     )
     out.append("")
     out.append(
@@ -1100,11 +1143,18 @@ def _variant_block(row: VariantRow) -> list[str]:
             f"probe to switch off, and the recorded column is the only one"
         )
     if row.suspect:
+        known = other_brake(row.variant.candidate.id)
         out.append(
             f"    *** it holds nothing on {fmt_pct(row.gated.empty_share)} of its decision days "
-            f"while declaring no {GATE_SYMBOL} {GATE_N}-day gate: its brake is somewhere this "
-            f"probe does not reach. Do not read this row as ungated ***"
+            f"while declaring no {GATE_SYMBOL} {GATE_N}-day gate. Do not read this row as "
+            f"ungated ***"
         )
+        if known is None:
+            out.append("    its brake is somewhere this probe does not reach, and unexplained")
+        else:
+            what, where = known
+            out.append(f"    its brake is {what}")
+            out.append(f"    the comparison this probe would build: {where}")
     grid: list[tuple[str, tuple[str, ...]]] = [
         ("decision days with no pick", tuple(fmt_pct(row.arms[m].empty_share) for m in modes)),
         ("names it asked for (mean)", tuple(fmt_num(row.arms[m].mean_names, 1) for m in modes)),

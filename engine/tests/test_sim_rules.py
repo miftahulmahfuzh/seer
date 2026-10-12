@@ -413,7 +413,9 @@ def test_a_lever_added_after_the_pins_is_left_out_of_canonical_text_at_its_defau
     assert is_pinned_default("cadence", "monthly") is False  # only post-pin levers are skippable
     assert is_pinned_default("cost_model", "flat") is True
     assert is_pinned_default("cost_model", "gotrade") is False
-    assert LEVERS_SINCE_PINS == {"resize_cadence": None, "cost_model": "flat"}
+    assert is_pinned_default("resize_basis", "equity") is True
+    assert is_pinned_default("resize_basis", "target") is False
+    assert LEVERS_SINCE_PINS == {"resize_cadence": None, "cost_model": "flat", "resize_basis": "equity"}
 
 
 # ============================================================== the Gotrade cost model
@@ -513,3 +515,50 @@ def test_a_bracket_rule_set_is_described_as_the_bracket_simulator():
     assert lines[11].startswith("Costs: Gotrade's fee schedule measured from the owner's receipts")
     assert "$0.10" in lines[11]
     assert describe_rules(DESIGN_V0)[11] == "Costs: 0.1% per side."
+
+
+# ============================================================== the resize basis
+
+
+def test_resize_basis_defaults_to_equity_everywhere():
+    assert rules.TARGET_RESIZE_BAND == Decimal("0.20")
+    assert rules.RESIZE_BAND == Decimal("0.01")  # frozen: every recorded result used it
+    assert sim.TARGET_RESIZE_BAND is rules.TARGET_RESIZE_BAND
+    assert TradeRules(id="x", engine="book").resize_basis == "equity"
+    assert DESIGN_V0.resize_basis == "equity" and V0_BOOK.resize_basis == "equity"
+    # Every preset that predates the lever (the first 16). Phase 3 appends target-basis presets
+    # after them; asserting over all of PRESETS would turn red the moment it does.
+    assert len(PRESETS) >= 16
+    assert all(r.resize_basis == "equity" for r in PRESETS[:16])
+
+
+def test_resize_basis_validation():
+    target = replace(MONTHLY_HOLD, id="x", resize_basis="target")
+    assert target.resize_basis == "target"
+    with pytest.raises(ValueError, match="unknown resize_basis"):
+        replace(MONTHLY_HOLD, id="x", resize_basis="position")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="resize_basis"):
+        replace(MONTHLY_HOLD, id="x", resize_basis=None)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="needs resize=True"):
+        replace(DAILY_SWITCH, id="x", resize_basis="target")
+    with pytest.raises(ValueError, match="book-engine lever"):
+        replace(DESIGN_V0_GOTRADE, id="x", resize=True, resize_basis="target")
+    with pytest.raises(ValueError, match="book-engine lever"):
+        replace(DESIGN_V0, resize_basis="target")
+
+
+def test_describe_target_basis_changes_only_the_rebalance_line():
+    target = replace(MONTHLY_HOLD_TBILL, id="monthly-hold-tbill", resize_basis="target")
+    lines = describe_rules(target)
+    assert len(lines) == 12
+    assert lines[7] == (
+        "Rebalance: on decision sessions, a held position is traded back to its target weight at "
+        "the open when it is off by at least 20% of its own target value."
+    )
+    before = describe_rules(MONTHLY_HOLD_TBILL)
+    assert lines[:7] == before[:7] and lines[8:] == before[8:]
+    assert before[7].endswith("off by at least 1% of equity.")
+
+
+def test_resize_basis_is_not_an_owner_input():
+    assert rule_owner_inputs(replace(MONTHLY_HOLD, id="x", resize_basis="target")) == ()

@@ -2193,6 +2193,7 @@ from `seer_engine.sim`.
 - Constants:
   - `OPEN_LIMIT_BAND = Decimal("0.02")`;
   - `RESIZE_BAND = Decimal("0.01")`;
+  - `TARGET_RESIZE_BAND = Decimal("0.20")`, the band under `resize_basis="target"` (measure-then-learn, P1-ENG-0L6E); `RESIZE_BAND` is unchanged;
   - `SHARE_QUANTUM = Decimal("0.0001")`;
   - `DEFAULT_ETFS = {"SPY", "QQQ"}`, the owner-input default;
   - `LEVERAGED_ETFS = {"SSO", "QLD", "UPRO", "TQQQ"}`.
@@ -2216,6 +2217,7 @@ from `seer_engine.sim`.
 | `idle_symbol` | `None` | the residual weight (1 − Σ targets) held in this instrument on decision sessions; 0% while it has no bar (BIL before 2007) |
 | `cost_rate` | `0.001` | per side; any other value is an owner input |
 | `cost_model` | `"flat"` | `"flat"`: `cost_rate` per side. `"gotrade"`: every fill pays Gotrade's current measured schedule (`sim.costs`, Sean phase 6); not an owner input. Set by the two `*_GOTRADE` presets (Sean phase 7) |
+| `resize_basis` | `"equity"` | what the resize band is measured against (P1-ENG-0L6E). `"equity"`: a held target trades when off by ≥ `RESIZE_BAND` × equity (every rule set before the lever). `"target"`: when \|gap shares\| × last ≥ `TARGET_RESIZE_BAND` × target weight × equity, so a 2% holding in a 50-name book resizes as readily as a 50% one. `"target"` needs `engine="book"` and `resize=True` (`ValueError`); a non-`str` is a `TypeError`. No preset sets it |
 
 - Presets (`PRESETS` holds every row below except `V0_BOOK`; ids are unique):
 
@@ -2245,10 +2247,12 @@ from `seer_engine.sim`.
   correct. All three raise `ValueError` for a non-session.
 - `LEVERS_SINCE_PINS` / `is_pinned_default(name, value)`: a lever added AFTER the P7a registry, the lab
   trials and the paper roster were pinned, mapped to the value meaning "as before this lever existed"
-  (`{"resize_cadence": None, "cost_model": "flat"}`). Every canonical form pinned before the lever leaves such a field out
+  (`{"resize_cadence": None, "cost_model": "flat", "resize_basis": "equity"}`). Every canonical form pinned before the lever leaves such a field out
   while it holds that value — `backtest.registry._canon` (so no pinned candidate digest moves and no
   closed lab trial re-digests through `lab.method.config_digest`) and `paper.roster.rules_dict` (so no
   live paper spec digest moves). A rule set that uses the lever canonicalizes differently.
+  `tests/test_resize_basis_pins.py` asserts `resize_basis="equity"` is absent from every registry,
+  lab-trial and paper-roster canonical form, and that `"target"` digests differently.
 - `rule_owner_inputs(rules) -> tuple[str, ...]`. The result is sorted and drawn from
   `market-on-open`, `fractional`, `etf:<idle symbol>` (outside `DEFAULT_ETFS`) and `fee`. `fee`
   means a flat `cost_rate` other than 0.1%; `cost_model="gotrade"` never adds it, because the
@@ -2256,7 +2260,9 @@ from `seer_engine.sim`.
 - `describe_rules(rules) -> tuple[str, ...]`: one fixed plain-English line per lever. The reports
   and the pre-registration's §5 text use it. Under `cost_model="gotrade"` the costs line is
   read off `GOTRADE.current` (rates, minimum, cap, sell extra, PPN and the regime's start date),
-  so it cannot drift from what the simulator charges.
+  so it cannot drift from what the simulator charges. Under `resize_basis="target"` the Rebalance
+  line reads "off by at least 20% of its own target value" (from `TARGET_RESIZE_BAND`) instead of
+  "1% of equity".
 
 **`sim.book`** (`WEIGHT_QUANTUM = Decimal("0.000001")`):
 - `Target(symbol, weight, last, limit=None, stop=None, take=None)`: one instrument wanted after the
@@ -2288,7 +2294,10 @@ from `seer_engine.sim`.
     2. Open exits, in symbol order: time stop, then a gap through the stop or the take, then a
        signal exit (a dropped target or `exit_pending`). A position sold this way does not re-enter
        on S.
-    3. Trims (`resize`, or the idle symbol) beyond `RESIZE_BAND`.
+    3. Trims (`resize`, or the idle symbol) beyond the band. Trims, the planned night sells and
+       adds all ask one helper, `_beyond_band(gap, last, weight, equity, rules)`, so they cannot
+       disagree: `RESIZE_BAND` × equity under `resize_basis="equity"` (byte-for-byte the old
+       comparison), `TARGET_RESIZE_BAND` × weight × equity under `"target"`.
     4. Buys in rank order, idle last.
        - `max_positions` → `no_slot`.
        - Sizing price: the target's limit, or last × 1.02 (`open_limit`, `open`, and a

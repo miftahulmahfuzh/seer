@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-12 14:03
-**Total Active Tasks**: 2
+**Last Updated**: 2026-10-12 22:10
+**Total Active Tasks**: 9
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 7
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 0
-- Completed: 122
+- Blocked: 5
+- Completed: 123
 
 ---
 
@@ -23,6 +23,87 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [x] **P1-ENG-0L6E** Phase 1: Resize band relative to the holding's target (`resize_basis` lever)
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `sim/rules.py` (new field `resize_basis` equity|target default equity, `TARGET_RESIZE_BAND = 0.20`, `LEVERS_SINCE_PINS` entry, validation, Rebalance line of `describe_rules`), `sim/book.py` (one helper deciding whether a gap is big enough, used at all three sites), `sim/__init__.py` exports, tests; leaves `PRESETS`, web, cash untouched. Exit: with `equity` every existing test and digest is unchanged; with `target` a holding is traded when `|gap shares| x last >= TARGET_RESIZE_BAND x target weight x equity`; unit tests prove both; full engine suite green.
+  - **Status**: completed
+  - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 1 of 7)
+  - **Satisfies**: R1 — Resize band measured against the holding's own target, past results unchanged, explicit paper/web decision
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-0L6E.md`
+  - **Completed**: 2026-10-12 22:10
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/sim/rules.py, engine/src/seer_engine/sim/book.py, engine/src/seer_engine/sim/__init__.py, engine/tests/test_sim_rules.py, engine/tests/test_sim_book.py, engine/tests/test_backtest_dev_report.py, engine/tests/test_resize_basis_pins.py (new)
+  - **Verified**: `ruff check engine` clean. Full suite with Postgres up: 4550 passed, 3 skipped (only the opt-in *_LIVE tests), 0 failed. One pre-existing parallel-only flake in the baseline (`test_lab_luck::test_owner_misses_is_a_one_line_delegation_and_reads_the_row_not_the_string`) passes serially and passed in the post-change run; unrelated.
+  - **Decided**:
+    - Package column names sub-paths with no todos.md (engine/sim, engine/lab, ...) -> all seven phase tasks tracked in engine/.workflows/todos.md (ENG) (rung 6: existing convention - every prior engine plan set lives there).
+    - Completion: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own precedent for every swarm-tracked set; phases 4 and 6 share this worktree and append here concurrently). Plan index: phase 1's TaskID cell ticked `(done 2026-10-12)`, `**Status:**` left alone (the coordinator's ledger is the status of record). Only P1-ENG-0JM2 unblocked; P1-ENG-03JM still waits on phase 2.
+    - Landing not attempted: swarm coordinator `orch-measure-then-learn` owns the merge of `feature/measure-then-learn` into `main`.
+- [ ] **P1-ENG-0JM2** Phase 2: Interest on idle cash (`cash_yield` lever)
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `sim/rules.py` (`CASH_YIELD_SERIES`, `cash_yield` field, validation, `_V0_LEVERS`, `LEVERS_SINCE_PINS`, `rule_owner_inputs` adds `cash-yield`, `describe_rules` idle-cash line), `sim/book.py` (`accrued_interest`, accrual step, `BookStep.interest`), `backtest/book_runner.py` (point-in-time rate, `BookResult.interest_usd`), paper refusal in `paper/book.py` and `commands/promote.py`, `lab/runner.py` refusal, `labkit.SMOKE_T13W` fixture, `tests/test_cash_yield.py`; leaves `PRESETS`, web and phase 1's resize logic untouched. Exit: default rules credit nothing (digests and results unchanged); with `cash_yield="T13W"` positive cash earns simple ACT/365 interest at the open, rate read point-in-time; paper and promote refuse such rules plainly; a cash-yield candidate runs the lab smoke window; suite green.
+  - **Status**: open
+  - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 2 of 7)
+  - **Satisfies**: R2 — Interest on idle cash from the cached T-bill yield, as a versioned explicit simulator input
+  - **Depends on**: P1-ENG-0L6E
+  - **Plan**: `.workflows/plan/P1-ENG-0JM2.md`
+- [ ] **P1-ENG-03JM** Phase 3: Fixed-tape presets and the web mirror
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `PRESETS` `monthly-hold-frac-gotrade-tband`, `monthly-hold-frac-gotrade-tband-cash`, `weekly-hold-frac-gotrade-tband-cash`; web mirror in `web/lib/cadence.ts` (`TARGET_RESIZE_BAND = 0.2`, `TARGET_BAND_RULES`, `sizeChange` basis), `web/lib/sean/reminders.ts` `RESIZING_RULES`, `web/lib/sean/planData.ts`, vitest tests; `engine/tests/test_sean_mirrors.py`; the PRESETS-enumerating tests; new `test_sim_rules_fixed_tape.py` (also proves promote refuses the cash presets); leaves `SEED_ROWS`, existing presets, simulator logic untouched. Exit: engine suite and web `tsc` + vitest green; mirror test covers the new constant and set; no pinned digest moves.
+  - **Status**: blocked
+  - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 3 of 7)
+  - **Satisfies**: R1, R2 — Resize band measured against the holding's own target, past results unchanged, explicit paper/web decision; Interest on idle cash from the cached T-bill yield, as a versioned explicit simulator input
+  - **Depends on**: P1-ENG-0L6E, P1-ENG-0JM2
+  - **Plan**: `.workflows/plan/P1-ENG-03JM.md`
+- [ ] **P1-ENG-ESU5** Phase 4: Survivorship check runnable here; EODHD top-up
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `$SEER_SV_STORE` default for `commands/lab.py --sv-store` and env honouring in `commands/survivorship_store.py` (`--out`/`--source`/`--cache`), `lab/survivorship_check.py` refusal text, `tests/test_sv_store_env.py`, explore and sera skills exporting `SEER_SV_STORE`, a runbook note, and data operations on the main checkout (`survivorship_store --fetch-aliases` from EODHD before 2026-11-10, then `--build`, plus a smoke `lab survivorship`); leaves cleaning rules, `lab/hardgate.py` and the dev store untouched. Exit: from a worktree with `SEER_SV_STORE` set, `lab survivorship <existing method> --no-journal` runs to a report; the rebuilt sv store names the current dev store and its `market_series.csv` (with `T13W`) is byte-identical; coverage before/after recorded in the runbook; suite green.
+  - **Status**: blocked
+  - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 4 of 7)
+  - **Satisfies**: R3 — Survivorship check runnable on this machine; EODHD top-up before 2026-11-10
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-ESU5.md`
+- [ ] **P1-ENG-FON5** Phase 5: Near-miss twins under the fixed tape (lab method + run)
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns one new lab method file (id from `lab next-id`, variation of M0030), its pre-registration commit, `lab run`, `lab survivorship`, `lab note`, `lab insight` answering "picking or shape?", `lab stage`, commits, and landing the set on `main` before `lab run`; leaves existing methods, lab rows, the test window and fixtures untouched. Exit: the method has dev trials for all its variants, an sv-check observation, a plain-words note and insight; `lab stage` committed; CI's lab.json/lab.sqlite agreement holds.
+  - **Status**: blocked
+  - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 5 of 7)
+  - **Satisfies**: R4 — Near misses re-priced under the fixed tape as new pre-registered twins; "picking or shape?" answered
+  - **Depends on**: P1-ENG-03JM, P1-ENG-ESU5
+  - **Plan**: `.workflows/plan/P1-ENG-FON5.md`
+- [ ] **P1-ENG-H3RM** Phase 6: Tree-ranker allocator (features, walk-forward model, tests)
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new pure allocator module `engine/src/seer_engine/lab/tree_rank.py` (point-in-time features, forward-21-session return rank labels, walk-forward annual refits of a fixed-seed `HistGradientBoostingRegressor`, top-N equal-weight targets; exports `TREE_RANK`, `TreeRankParams`, `TreeRankPrepared.model_on`, etc.) and `engine/tests/test_tree_rank.py`; leaves lab methods, lab data and closed strategies untouched. Exit: allocator contract tests (prepared == unprepared, reads only <= d), determinism test (two fits bit-identical), no-lookahead test (labels never extend past d); purity test green.
+  - **Status**: blocked
+  - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 6 of 7)
+  - **Satisfies**: R5 — One pre-registered gradient-boosted-tree ranker method, run on the dev window
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-H3RM.md`
+- [ ] **P1-ENG-SHJJ** Phase 7: Tree-ranker method: pre-register and run on the dev window
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns one new lab method file (family `stock-ml-ranker`, rules `monthly-hold-frac-gotrade-tband`, own calendar `model_ready` rule checked against phase 6's `model_on`), pre-registration commit, landing on `main`, `lab run --allow-coverage 0.31`, `lab survivorship`, `lab note`, `lab insight`, `lab stage`, commits; leaves the test window and existing lab rows untouched. Exit: dev trials recorded for every variant; a survivorship observation; note and insight in plain words; staged and committed.
+  - **Status**: blocked
+  - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 7 of 7)
+  - **Satisfies**: R5 — One pre-registered gradient-boosted-tree ranker method, run on the dev window
+  - **Depends on**: P1-ENG-03JM, P1-ENG-FON5, P1-ENG-H3RM
+  - **Plan**: `.workflows/plan/P1-ENG-SHJJ.md`
+- [ ] **P1-ENG-DEBZ** Phase 6: Tree-ranker allocator (features, walk-forward model, tests)
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns the new pure allocator module `engine/src/seer_engine/lab/tree_rank.py` (point-in-time features from existing feature code, forward-21-session return rank labels, walk-forward annual refits of a fixed-seed `HistGradientBoostingRegressor`, top-N equal-weight targets; exports `TREE_RANK`, `TREE_RANK_FUND`, `TreeRankParams`, `TreeRankPrepared.model_on`, `anchor_for`, `month_ends`, `label_end`, `SCREEN`, `FEATURE_LOOKBACK`) and `engine/tests/test_tree_rank.py`. Exit: allocator contract tests (prepared == unprepared, reads only ≤ d), determinism test (two fits bit-identical), no-lookahead test (labels never extend past d); purity test green.
+  - **Status**: in_progress
+  - **Plan Set**: `MEASURE_THEN_LEARN_PLAN.md` (phase 6 of 7)
+  - **Satisfies**: R5 — One pre-registered gradient-boosted-tree ranker method, run on the dev window
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-DEBZ.md`
+
 - [x] **P1-ENG-8X1K** Phase 1: Survivorship-check store: cleaning, build, marker, reports
   - **Difficulty**: HARD
   - **Type**: Feature

@@ -21,6 +21,13 @@ they are functions of history and live in the allocators (``strategies.allocator
 monthly while re-scaling its exposure weekly (lab journal, 2026-10-04). See ``is_rank_session``
 and ``is_resize_session``.
 
+``resize_basis`` chooses what the rebalance band is measured against. "equity" (every rule set
+before 2026-10-12) trades a held target only once it is off by ``RESIZE_BAND`` (1%) of the whole
+account, which in a 20-50 name book means a holding must drift 50-100% of its own size first, so
+"resize" rules barely resized. "target" trades it once it is off by ``TARGET_RESIZE_BAND`` (20%)
+of its own target value. The default is a pinned no-op (``LEVERS_SINCE_PINS``), so no recorded
+result, digest or live paper strategy moves.
+
 Pure: no clock, no I/O, no randomness.
 """
 
@@ -38,9 +45,14 @@ from seer_engine.sim.costs import COST_MODELS, GOTRADE, CostModel
 Engine = Literal["bracket_v0", "bracket", "book"]
 Cadence = Literal["daily", "weekly", "monthly"]
 Entry = Literal["limit", "open_limit", "open"]
+ResizeBasis = Literal["equity", "target"]
 
 OPEN_LIMIT_BAND = Decimal("0.02")
 RESIZE_BAND = Decimal("0.01")
+# The band under resize_basis="target": a held position is traded back once it is off by at least
+# this fraction of its OWN target value (2026-10-12, measure-then-learn). RESIZE_BAND stays the
+# band of every rule set that predates the lever, so no recorded result moves.
+TARGET_RESIZE_BAND = Decimal("0.20")
 SHARE_QUANTUM = Decimal("0.0001")
 DEFAULT_ETFS: frozenset[str] = frozenset({"SPY", "QQQ"})
 LEVERAGED_ETFS: frozenset[str] = frozenset({"SSO", "QLD", "UPRO", "TQQQ"})
@@ -52,6 +64,7 @@ _CADENCES: tuple[str, ...] = ("daily", "weekly", "monthly")
 # Slower cadences sort higher: a resize cadence must be strictly below its rank cadence.
 _CADENCE_ORDER: dict[str, int] = {"daily": 0, "weekly": 1, "monthly": 2}
 _ENTRIES: tuple[str, ...] = ("limit", "open_limit", "open")
+_RESIZE_BASES: tuple[str, ...] = ("equity", "target")
 _ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 _DEFAULT_COST = Decimal("0.001")
 _MAX_COST = Decimal("0.05")
@@ -91,6 +104,7 @@ class TradeRules:
     idle_symbol: str | None = None
     cost_rate: Decimal = _DEFAULT_COST
     cost_model: CostModel = "flat"
+    resize_basis: ResizeBasis = "equity"
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, str):
@@ -138,6 +152,17 @@ class TradeRules:
                 f"cost_model 'gotrade' prices every order from Gotrade's measured fee schedule "
                 f"(sim.costs); cost_rate must stay at its default {_DEFAULT_COST}, got {self.cost_rate}"
             )
+        if not isinstance(self.resize_basis, str):
+            raise TypeError(f"resize_basis must be a str, got {type(self.resize_basis).__name__}")
+        if self.resize_basis not in _RESIZE_BASES:
+            raise ValueError(f"unknown resize_basis {self.resize_basis!r}; expected one of {_RESIZE_BASES}")
+        if self.resize_basis == "target":
+            if self.engine != "book":
+                raise ValueError(
+                    "resize_basis 'target' is a book-engine lever; the bracket simulator never resizes"
+                )
+            if not self.resize:
+                raise ValueError("resize_basis 'target' needs resize=True: a band with nothing to resize is a no-op")
         is_v0 = _lever_values(self) == _V0_LEVERS
         if self.engine == "bracket_v0" and not is_v0:
             raise ValueError("engine 'bracket_v0' is reserved for DESIGN_V0 (the unchanged §5 simulator)")
@@ -164,6 +189,7 @@ _V0_LEVERS: tuple[object, ...] = (
     None,
     _DEFAULT_COST,
     "flat",
+    "equity",
 )
 
 DESIGN_V0 = TradeRules(
@@ -247,6 +273,7 @@ PRESETS: tuple[TradeRules, ...] = (
 LEVERS_SINCE_PINS: dict[str, object] = {
     "resize_cadence": None,  # the rank/resize cadence split, 2026-10-05
     "cost_model": "flat",  # Gotrade's measured fee schedule (sim.costs), 2026-10-07
+    "resize_basis": "equity",  # the band measured against the holding's own target, 2026-10-12
 }
 
 
@@ -421,7 +448,12 @@ def describe_rules(rules: TradeRules) -> tuple[str, ...]:
         lines.append("Time stop: none.")
     else:
         lines.append(f"Time stop: sell at the next open once a position has been held {rules.time_stop} sessions.")
-    if rules.resize:
+    if rules.resize and rules.resize_basis == "target":
+        lines.append(
+            f"Rebalance: on decision sessions, a held position is traded back to its target weight "
+            f"at the open when it is off by at least {_pct(TARGET_RESIZE_BAND)} of its own target value."
+        )
+    elif rules.resize:
         lines.append(
             f"Rebalance: on decision sessions, a held position is traded back to its target weight "
             f"at the open when it is off by at least {_pct(RESIZE_BAND)} of equity."

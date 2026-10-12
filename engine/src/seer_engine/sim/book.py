@@ -17,7 +17,9 @@ One session, in this exact order (all money ``Decimal``; ``q`` at every product;
    whose targets omit the symbol). A position the targets drop that has no bar on S is
    marked ``exit_pending`` and sold at its next bar's open. Nothing sold here is re-bought on S;
 3. trims (decision sessions; ``rules.resize`` or the idle instrument): a held target worth
-   at least ``RESIZE_BAND × equity`` more than its target weight is sold down at the open;
+   more than its target weight by at least the band (``_beyond_band``: ``RESIZE_BAND × equity``
+   under ``rules.resize_basis == "equity"``, ``TARGET_RESIZE_BAND × weight × equity`` under
+   "target") is sold down at the open;
 4. buys, targets in rank order with the idle instrument last: new entries (``max_positions``
    counted as the night before, exactly as ``sim.size_picks``) and adds (same band as trims,
    upward), sized the night before from the last snapshot's equity and the cash the night's
@@ -57,7 +59,7 @@ from seer_engine import dates
 from seer_engine.prices import Bar
 from seer_engine.sim.costs import gotrade_cash, gotrade_shares_for
 from seer_engine.sim.model import q
-from seer_engine.sim.rules import OPEN_LIMIT_BAND, RESIZE_BAND, SHARE_QUANTUM, TradeRules
+from seer_engine.sim.rules import OPEN_LIMIT_BAND, RESIZE_BAND, SHARE_QUANTUM, TARGET_RESIZE_BAND, TradeRules
 from seer_engine.sim.split_adjust import _q_exact, _rescale_price, _split_ratio
 
 WEIGHT_QUANTUM = Decimal("0.000001")
@@ -384,6 +386,27 @@ def _desired_shares(equity: Decimal, weight: Decimal, last: Decimal, rules: Trad
     return _shares_for(q(equity * weight), last, rules)
 
 
+def _beyond_band(gap: Decimal, last: Decimal, weight: Decimal, equity: Decimal, rules: TradeRules) -> bool:
+    """True when a held target is far enough off its weight to trade: ``gap`` shares (a trim's
+    excess or an add's shortfall; <= 0 is never beyond) worth at ``last`` at least the band.
+
+    The one place trims, adds and the night's planned trims decide "big enough", so the three
+    can never disagree. ``rules.resize_basis``:
+
+    - "equity" (every rule set before the lever): ``gap × last >= RESIZE_BAND × equity``, 1% of
+      the whole account -- byte-for-byte the comparison the engine always made;
+    - "target": ``gap × last >= TARGET_RESIZE_BAND × weight × equity``, 20% of the holding's own
+      target value, so a 2% holding in a 50-name book is resized as readily as a 50% one.
+
+    ``equity`` is the last snapshot's (``book.equity``), the same equity the sizing uses.
+    """
+    if gap <= 0:
+        return False
+    if rules.resize_basis == "target":
+        return gap * last >= TARGET_RESIZE_BAND * weight * equity
+    return gap * last >= RESIZE_BAND * equity
+
+
 def _sizing_price(t: Target, rules: TradeRules) -> Decimal:
     """The buy limit (and sizing price): ``t.limit`` under entry "limit" when the target has
     one; otherwise ``q(t.last × (1 + OPEN_LIMIT_BAND))`` ("open_limit", the sizing price of
@@ -558,7 +581,7 @@ def step_book(
                 continue
             desired = _desired_shares(equity, t.weight, t.last, rules)
             excess = p.shares - desired
-            if excess > 0 and excess * t.last >= RESIZE_BAND * equity:
+            if _beyond_band(excess, t.last, t.weight, equity, rules):
                 planned += _sell_cash(t.last, excess, rules)
     slots_used = sum(1 for p in book.positions if p.symbol != idle and p.symbol not in night_exits)
 
@@ -614,7 +637,7 @@ def step_book(
                 continue
             desired = _desired_shares(equity, t.weight, t.last, rules)
             excess = p.shares - desired
-            if excess <= 0 or excess * t.last < RESIZE_BAND * equity:
+            if not _beyond_band(excess, t.last, t.weight, equity, rules):
                 continue
             if desired <= 0:
                 proceeds, fill, trade = _close_out(p, session, b.open, "signal", p.days_held, rules, "trim")
@@ -651,7 +674,7 @@ def step_book(
                     continue
                 desired = _desired_shares(equity, t.weight, t.last, rules)
                 gap = desired - p.shares
-                if gap <= 0 or gap * t.last < RESIZE_BAND * equity:
+                if not _beyond_band(gap, t.last, t.weight, equity, rules):
                     continue
                 price = _sizing_price(t, rules)
                 shares = min(gap, _shares_for(available - committed, price, rules))

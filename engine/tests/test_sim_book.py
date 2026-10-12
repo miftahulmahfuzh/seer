@@ -868,3 +868,72 @@ def test_flat_rules_are_unchanged_by_the_cost_model_lever():
     out = go(new_book(W(1000)), TUE, bars, (T("XYZ", "1", "300"),), replace(FRACTIONAL, cost_model="flat"))
     (f,) = out.fills
     assert (f.shares, f.cash_usd, f.cost_usd) == (W("3.2647"), P("-983.6574"), P("0.9827"))
+
+
+# ============================================================== the resize basis
+
+
+RESIZE_TARGET = replace(RESIZE, id="resize-target", resize_basis="target")
+
+
+def test_target_basis_trims_a_small_holding_the_equity_band_ignores():
+    # equity 0 + 25 × 10 + 975 × 10 = 10,000.
+    b = book("0", pos("AAA", 25, "10"), pos("BBB", 975, "10"))
+    bars = day(bar("AAA", TUE, "10", "10", "10", "10"), bar("BBB", TUE, "10", "10", "10", "10"))
+    targets = (T("AAA", "0.02", "10"), T("BBB", "0.975", "10"))
+    # AAA desired floor(200 / 10.01) = 19, excess 6 × 10 = 60: < 1% × 10,000 = 100 (equity basis
+    # holds), >= 20% × 0.02 × 10,000 = 40 (target basis trims). BBB desired floor(9750 / 10.01)
+    # = 974, excess 1 × 10 = 10: below both bands.
+    assert go(b, TUE, bars, targets, RESIZE).fills == ()
+    out = go(b, TUE, bars, targets, RESIZE_TARGET)
+    # trim 6 at the open 10: q(60 × 0.999) = 59.94
+    assert [(f.symbol, f.side, f.shares, f.price, f.cash_usd, f.reason) for f in out.fills] == [
+        ("AAA", "sell", W(6), P("10"), P("59.94"), "trim"),
+    ]
+    assert out.book.position("AAA").shares == W(19)
+    assert out.book.position("BBB").shares == W(975)
+
+
+def test_target_basis_adds_to_a_small_holding_the_equity_band_ignores():
+    # equity 100 + 10 × 10 + 980 × 10 = 10,000.
+    b = book("100", pos("AAA", 10, "10"), pos("BBB", 980, "10"))
+    bars = day(bar("AAA", TUE, "10", "10", "9.9", "10"), bar("BBB", TUE, "10", "10", "10", "10"))
+    targets = (T("AAA", "0.02", "10"), T("BBB", "0.98", "10"))
+    # AAA desired 19, gap 9 × 10 = 90: < 100 (equity basis holds), >= 40 (target basis adds).
+    # BBB desired floor(9800 / 10.01) = 979, excess 1 × 10 = 10: below both bands.
+    assert go(b, TUE, bars, targets, RESIZE).fills == ()
+    out = go(b, TUE, bars, targets, RESIZE_TARGET)
+    # limit q(10 × 1.02) = 10.2; min(9, floor(100 / 10.2102) = 9) = 9; low 9.9 < 10.2 fills at
+    # min(open 10, 10.2) = 10: q(10 × 9 × 1.001) = 90.09.
+    assert [(f.symbol, f.side, f.shares, f.price, f.cash_usd, f.reason) for f in out.fills] == [
+        ("AAA", "buy", W(9), P("10"), P("-90.09"), "add"),
+    ]
+    assert out.snapshot.cash_usd == P("9.91")
+
+
+def test_target_basis_leaves_a_large_holding_the_equity_band_would_trade():
+    # equity 0 + 52 × 100 + 48 × 100 = 10,000.
+    b = book("0", pos("AAA", 52, "100"), pos("BBB", 48, "100"))
+    bars = day(bar("AAA", TUE, "100", "100", "99", "100"), bar("BBB", TUE, "100", "100", "99", "100"))
+    targets = (T("AAA", "0.5", "100"), T("BBB", "0.5", "100"))
+    # desired floor(5000 / 100.1) = 49 both. AAA excess 3 × 100 = 300, BBB gap 1 × 100 = 100:
+    # both >= 1% × 10,000 = 100 (equity basis trades both), both < 20% × 0.5 × 10,000 = 1,000.
+    assert [(f.symbol, f.reason) for f in go(b, TUE, bars, targets, RESIZE).fills] == [
+        ("AAA", "trim"),
+        ("BBB", "add"),
+    ]
+    out = go(b, TUE, bars, targets, RESIZE_TARGET)
+    assert out.fills == () and out.rejected == ()
+
+
+def test_beyond_band_is_the_old_comparison_under_the_equity_basis():
+    from seer_engine.sim.book import _beyond_band
+
+    e = W("10000")
+    for gap in (W(-1), W(0), W(1), W(2)):
+        for last in (W("49.99"), W("50"), W("100")):
+            old = gap > 0 and gap * last >= W("0.01") * e
+            assert _beyond_band(gap, last, W("0.5"), e, RESIZE) is old
+    assert _beyond_band(W(0), W(100), W("0.02"), e, RESIZE_TARGET) is False
+    assert _beyond_band(W(4), W(10), W("0.02"), e, RESIZE_TARGET) is True  # 40 >= 0.2 × 200
+    assert _beyond_band(W("3.9999"), W(10), W("0.02"), e, RESIZE_TARGET) is False

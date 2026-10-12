@@ -24,15 +24,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ### [P1] High
 
-- [ ] **P1-WEB-V4CD** Phase 4: /sera/methods/[id]: the variants table, same treatment
-  - **Difficulty**: HARD
-  - **Type**: Update
-  - **Context**: Owns `app/sera/methods/[id]/method.module.css` and `app/sera/methods/[id]/page.tsx`. Below 1024px the variants table becomes cards using phase 3's class names and card geometry; at >=1024px the table is byte-for-byte unchanged. Exit: /sera/methods/M0102 measures exactly 390/414 in both themes (a hold, not a gain), and so do M0007, M0084 and M0040; 1280 pixel-identical to a pre-edit baseline; the best-variant row stays visually distinguished and is additionally named by a `Best` chip.
-  - **Status**: in_progress
-  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-responsive/PLAN.md` (phase 4 of 5)
-  - **Satisfies**: R1 — a designed narrow layout at 390 and 414, so Sera is good to use on a phone, not merely non-overflowing (and holds R2 on /sera/methods/[id])
-  - **Depends on**: P1-WEB-R5PT, P1-WEB-R2FX
-  - **Plan**: `.workflows/plan/P1-WEB-V4CD.md`
 
 ### [P2] Medium
 
@@ -45,6 +36,30 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-V4CD** Phase 4: /sera/methods/[id]: the variants table, same treatment
+  - **Difficulty**: HARD
+  - **Type**: Update
+  - **Context**: Owns `app/sera/methods/[id]/method.module.css` and `app/sera/methods/[id]/page.tsx`. Below 1024px the variants table becomes cards using phase 3's class names and card geometry; at >=1024px the table is byte-for-byte unchanged. Exit: /sera/methods/M0102 measures exactly 390/414 in both themes (a hold, not a gain), and so do M0007, M0084 and M0040; 1280 pixel-identical to a pre-edit baseline; the best-variant row stays visually distinguished and is additionally named by a `Best` chip.
+  - **Status**: done
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-responsive/PLAN.md` (phase 4 of 5)
+  - **Satisfies**: R1 — a designed narrow layout at 390 and 414, so Sera is good to use on a phone, not merely non-overflowing (and holds R2 on /sera/methods/[id])
+  - **Depends on**: P1-WEB-R5PT, P1-WEB-R2FX
+  - **Plan**: `.workflows/plan/P1-WEB-V4CD.md`
+  - **Completed**: 2026-10-12 18:13
+  - **Method**: /do
+  - **Files**: web/app/sera/methods/[id]/method.module.css, web/app/sera/methods/[id]/page.tsx, web/.workflows/plan/P1-WEB-V4CD.md, web/.workflows/todos.md
+  - **Drift**:
+    - None. Every line the plan quotes matched the tree exactly: `method.module.css` was 176 lines with the `@media (max-width: 34rem)` block at :173-176 and `white-space: nowrap` on `.prose th, .prose td` at :85; `page.tsx` had the lucide import at :1, the types import at :19, `MarkIcon` at :179-187, the Variants `<Section>` at :373-455 and `function Tech(` following at :460.
+    - Observation, not drift: M0102 turns out to be a FUNDED method, so its cards lead on "What your money earned" rather than "Growth a year". The plan named M0084 as its funded sample and M0102 only as the baseline route; both funded and unfunded shapes were verified anyway (M0007 and M0084 cover the other side).
+  - **Decided**:
+    - Step 3 of /implement says create tasks for every phase, but phases 1 and 2 already minted their own and peers p3/p5 are live on the same shared todos.md -> minted ONLY phase 4's task (P1-WEB-V4CD). Rung: tie-break "narrower blast radius", matching the precedent phases 1 and 2 both recorded in todos.md.
+    - The plan's per-phase dev port 3124 was not used; the acceptance shoot reused the peer dev server already listening on 3123 via `--base`. Rung: the surrounding code -- Next 16 locks `next dev` per PROJECT DIRECTORY (`next/dist/build/lockfile.js`), so a second dev server in this shared worktree exits 1. Directed by coordinator `orch-sera-responsive`. `--out .shots/p4` still separates the PNGs, which is what actually mattered.
+    - Phase 4 Step 3 rewrites the whole 83-line Variants `<Section>`, but its own text says the table is "byte for byte what it is today". Applied the two surgical changes that amount to (the wrapper gains `desk-only` plus the explanatory comment; the `<ul>` of cards appended before `</Section>`) rather than retyping the table. Rung 3, the plan's code blocks, confirmed by rung 2's exit criterion 4: all eight 1280 PNGs came back byte-identical to the pre-edit baseline.
+    - Committed the shared `web/.workflows/todos.md` even though it may carry peers' concurrently-added rows -> tie-break "take the reversible option", and the established precedent of phases 1 and 2, which each recorded the same choice. Peers' plan-copy files and source files are excluded by pathspec.
+    - Skipped readme-updater and left `web/package_readme.md` untouched, on the coordinator's explicit instruction (phase 1 already rewrote its Sera section; the file has no phase owner and the coordinator finishes it when landing the set). Rung: surrounding convention -- the set's one-file-one-owner discipline.
+    - The Quick Stats counters at the top of this file were NOT adjusted and the plan index's set-level `**Status:**` line was NOT advanced: `swarm.py find` reports coordinator `orch-sera-responsive` owns this set, and four concurrent phases writing shared counters would race (rung: narrower blast radius; matches phases 1, 2, 3 and 5).
+  - **Verified**: `npx tsc --noEmit` clean; `npm test` clean -- 49 files, 676 tests passed, including the frozen `app/sera/methods/view.test.ts`. Acceptance shoot, 10 routes x 3 widths (390/414/1280) x both themes = 60 shots: no HTTP error, console error or horizontal scroll. Desktop drift proven not asserted: all 8 method-page 1280 PNGs (M0102/M0007/M0084/M0040 x light/dark) byte-identical (`cmp`) to the pre-edit baseline in `.shots/p4-before`. Measured in-browser at 390 and 414 in both themes: `document.scrollWidth` === viewport exactly; `tableWrap` computed `display: none` and cards `display: flex` (exactly one presentation in the a11y tree, invariant 10); exactly one `Best` chip per page; prose scrollers fell to 352-633px from up to 965px. PNGs read, not just exit codes: the cards render Sera's 28px stone card with the funded/unfunded lead switch, the 2x2 hurdle grid with spelled-out labels (MAX DRAWDOWN / PROFIT FACTOR / TRADES / LUCK CHECK), the demoted `.vMore` line, six labelled condition marks, and the best variant carrying BOTH the butter wash and a named "Best" chip -- correct in light and dark. M0040 (the never-tested control) is unchanged.
 
 - [x] **P1-WEB-HS7C** Phase 3: /sera/methods: cards on a phone, table on a desk
   - **Difficulty**: HARD

@@ -1,0 +1,51 @@
+{
+  "branch": "feature/lab-exposure-diagnostic",
+  "coordinator": "orch-lab-exposure-diagnostic",
+  "coordinator_session_id": "2a515a0a-b757-4752-b3e4-5a2a69d972d7",
+  "created": "2026-10-12T03:35:20+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "engine/src/seer_engine/lab`, `engine/src/seer_engine/commands",
+      "plan": ".workflows/plan/lab-exposure-diagnostic/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "lab exposure`: the diagnostic"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 2,
+      "note": null,
+      "package": "lab/`, `docs/`, `web/data",
+      "plan": ".workflows/plan/lab-exposure-diagnostic/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Run it over the five, and journal the answer"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/lab-exposure-diagnostic/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "lab-exposure-diagnostic",
+  "updated": "2026-10-12T03:35:20+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/lab-exposure-diagnostic"
+}

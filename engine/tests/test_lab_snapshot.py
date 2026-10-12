@@ -22,6 +22,23 @@ from seer_engine.lab import seed as seed_mod
 from seer_engine.lab import store
 from seer_engine.lab.seed import seed
 
+def _without_amendments(schema: str) -> str:
+    """``schema`` as it read at v5: the ``method_amendments`` table and its triggers removed.
+
+    Derived from ``store._SCHEMA`` exactly as ``_without_moments`` and ``_without_provenance`` are,
+    for the same reason: a fixture that is supposed to be an older database must not quietly carry
+    a newer table.
+    """
+    for ddl in (store._AMENDMENTS_TABLE, *store._AMENDMENTS_TRIGGERS):
+        assert f"{ddl};\n\n" in schema
+        schema = schema.replace(f"{ddl};\n\n", "")
+    assert "method_amendments" not in schema
+    return schema
+
+
+V5_SCHEMA = _without_amendments(store._SCHEMA)
+
+
 def _without_moments(schema: str) -> str:
     """``schema`` as it read at v2: the ``trial_moments`` table and its triggers removed.
 
@@ -36,7 +53,7 @@ def _without_moments(schema: str) -> str:
     return schema
 
 
-V2_SCHEMA = _without_moments(store._SCHEMA)
+V2_SCHEMA = _without_moments(V5_SCHEMA)
 V1_SCHEMA = V2_SCHEMA.replace(", 'synthesis'", "")
 V1_INSIGHTS = [
     (1, "observation", "Vol scaling buys drawdown", "It costs CAGR.", "M0001", "2026-10-02T00:00:00+00:00"),
@@ -113,7 +130,7 @@ def test_connect_migrates_a_v1_database_keeping_rows_and_triggers(tmp_path):
 def test_a_new_database_starts_at_the_current_schema_version(tmp_path):
     conn = store.connect(tmp_path / "lab.sqlite")
     try:
-        assert store.schema_version(conn) == store.SCHEMA_VERSION == "5"
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "6"
         assert "synthesis" in store.INSIGHT_KINDS
         with conn:
             assert store.add_insight(conn, kind="synthesis", title="t", body="b") == 1
@@ -122,6 +139,9 @@ def test_a_new_database_starts_at_the_current_schema_version(tmp_path):
         ).fetchone()[0] == 1
         assert conn.execute(
             "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'trial_provenance'"
+        ).fetchone()[0] == 1
+        assert conn.execute(
+            "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'method_amendments'"
         ).fetchone()[0] == 1
     finally:
         conn.close()
@@ -283,7 +303,7 @@ def _without_provenance(schema: str) -> str:
     return schema
 
 
-V4_SCHEMA = _without_provenance(store._SCHEMA)
+V4_SCHEMA = _without_provenance(V5_SCHEMA)
 P7A = "5451195fd552e208eaadfc6bc89241b9b8e3e6ccb0f4c447a84bbc4f32e7d90a"
 E597 = "e597367bb6806d7edc2f9af4033b26c366aae92517207b4e71daad96346fcca3"
 D399 = "399d0d254c7a90b8cdb49f7ce598269087d38730f795cae90453eeb580b07cf8"
@@ -354,7 +374,7 @@ def test_connect_migrates_a_v4_database_backfilling_provenance_and_touching_no_t
     conn = store.connect(db)
     fresh = store.connect(tmp_path / "fresh.sqlite")
     try:
-        assert store.schema_version(conn) == store.SCHEMA_VERSION == "5"
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "6"
         assert _trials_bytes(db) == before
         assert [tuple(r) for r in conn.execute("SELECT * FROM trial_funding ORDER BY trial_n")] == funding_before
         assert _provenance_schema(conn) == _provenance_schema(fresh)
@@ -377,6 +397,91 @@ def test_connect_migrates_a_v4_database_backfilling_provenance_and_touching_no_t
     try:
         assert store.schema_version(again) == store.SCHEMA_VERSION
         assert again.execute("SELECT count(*) FROM trial_provenance").fetchone()[0] == len(V4_TRIALS)
+        assert _trials_bytes(db) == before
+    finally:
+        again.close()
+
+
+def _amendments_schema(conn) -> list[tuple[str, str, str]]:
+    return [tuple(r) for r in conn.execute(
+        "SELECT type, name, sql FROM sqlite_master WHERE tbl_name = 'method_amendments' "
+        "ORDER BY type, name"
+    )]
+
+
+def _v5_db(path):
+    """A schema-v5 database: one method that has run, one dev trial, no amendments table."""
+    c = sqlite3.connect(path)
+    c.executescript(V5_SCHEMA)
+    c.executemany("INSERT INTO transitions (src, dst) VALUES (?, ?)", store.TRANSITIONS)
+    c.execute("INSERT INTO meta (key, value) VALUES ('schema_version', '5')")
+    c.execute(
+        "INSERT INTO methods (id, name, family, source_kind, hypothesis, status, source_sha, "
+        "created, updated) VALUES ('M0001', 'n', 'f', 'knowledge', 'h', 'dev-eligible', ?, "
+        "'2026-10-01T00:00:00+00:00', '2026-10-01T00:00:00+00:00')",
+        ("a" * 64,),
+    )
+    c.execute(
+        'INSERT INTO trials (method_id, candidate_id, config_digest, config_text, rules_id, '
+        'allocator_id, window, start, "end", store_fingerprint, git_sha, run_at, trades, '
+        "sharpe, mar, failed, eligible, dsr, n_trials_at_run, curve_json) VALUES "
+        "('M0001', 'M0001-A', 'd1', 't', 'r', 'a', 'dev', '2000-01-03', '2015-10-16', 'fp', "
+        "'abc', '2026-10-05T00:00:00+00:00', 200, 0.945, 0.82, '', 0, 0.9, 110, '[]')"
+    )
+    c.execute(
+        "INSERT INTO trial_provenance (trial_n, initial_idr, price_fingerprint, source, measured) "
+        "VALUES (1, '20000000', NULL, 'backfill', '2026-10-09T00:00:00+00:00')"
+    )
+    c.commit()
+    c.close()
+
+
+def test_connect_migrates_a_v5_database_adding_method_amendments_and_touching_no_row(tmp_path):
+    """v5 -> v6 is purely additive: a table, two triggers, a version string, and nothing else.
+
+    No method row and no trial row moves -- in particular ``methods.source_sha`` is not read,
+    rewritten or backfilled, because the amendment mechanism never rewrites it. The table that
+    arrives by migration is as append-only as one a fresh database creates.
+    """
+    db = tmp_path / "lab.sqlite"
+    _v5_db(db)
+    before = _trials_bytes(db)
+    methods_before = sqlite3.connect(db).execute("SELECT * FROM methods ORDER BY id").fetchall()
+
+    conn = store.connect(db)
+    fresh = store.connect(tmp_path / "fresh.sqlite")
+    try:
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "6"
+        assert _trials_bytes(db) == before
+        assert [tuple(r) for r in conn.execute("SELECT * FROM methods ORDER BY id")] == [
+            tuple(r) for r in methods_before
+        ]
+        assert _amendments_schema(conn) == _amendments_schema(fresh)
+        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+        assert conn.execute("SELECT count(*) FROM method_amendments").fetchone()[0] == 0
+        assert store.amendments_of(conn, "M0001") == []
+        assert store.latest_source_sha(conn, "M0001") == "a" * 64
+        with conn:
+            store.insert_amendment(conn, store.AmendmentRow(
+                method_id="M0001", seq=1, source_sha="b" * 64, added="2026-10-12",
+                why="w", hypothesis="h", expected_failure="e",
+                run_at="2026-10-12T00:00:00+00:00", git_sha="deadbeef",
+            ))
+        assert store.latest_source_sha(conn, "M0001") == "b" * 64
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            conn.execute("UPDATE method_amendments SET why = 'x'")
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            conn.execute("DELETE FROM method_amendments")
+        assert _trials_bytes(db) == before
+        assert conn.execute("SELECT source_sha FROM methods WHERE id = 'M0001'").fetchone()[0] == "a" * 64
+    finally:
+        conn.close()
+        fresh.close()
+
+    again = store.connect(db)  # idempotent: a second connect adds nothing
+    try:
+        assert store.schema_version(again) == store.SCHEMA_VERSION
+        assert again.execute("SELECT count(*) FROM method_amendments").fetchone()[0] == 1
         assert _trials_bytes(db) == before
     finally:
         again.close()

@@ -368,7 +368,7 @@ def preflight(
                 f"{method.id}: {problem}. `lab remeasure` re-runs the committed method file -- the "
                 f"same file the trials ran under -- and nothing else"
             )
-    recorded_sha = row["source_sha"]
+    recorded_sha = store.latest_source_sha(conn, method.id)
     if recorded_sha is None:
         raise store.LabError(
             f"{method.id} has no recorded source_sha, so nothing proves the method file on disk is "
@@ -377,11 +377,14 @@ def preflight(
     actual = source_sha(path)
     if actual != recorded_sha:
         raise store.LabError(
-            f"{method.id}: the method file hashes {actual[:12]} but its trials ran under "
+            f"{method.id}: the method file hashes {actual[:12]} but the lab last ran it under "
             f"{str(recorded_sha)[:12]}; the file changed after it ran. Re-running it would measure "
             f"a different configuration, not recover the recorded one"
         )
-    by_digest = {config_digest(c): c for c in method.candidates}
+    # Every variant the method ever pre-registered, amendments included: `lab remeasure` re-runs
+    # the trials the lab holds, and a method with an amendment holds trials from more than one
+    # batch.
+    by_digest = {config_digest(c): c for c in method.all_candidates()}
     drifted = [r for r in trials if str(r["config_digest"]) not in by_digest]
     if drifted:
         names = ", ".join(str(r["candidate_id"]) for r in drifted)

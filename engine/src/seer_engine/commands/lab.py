@@ -71,6 +71,18 @@
                                     removed and the brakes off. Four columns per recorded variant,
                                     no method file changed and no new method id. No trial row, no
                                     moments, no status change: N and the looks do not move
+    lab gate [M0030 ...] [--all] [--only IDS] [--store DIR] [--csv PATH] [--gated-only]
+             [--no-journal] [--dry-run]
+                                    report only: what the shared SPY 200-day trend gate is worth,
+                                    book by book. Re-runs every recorded dev variant twice -- as
+                                    recorded, and with that one gate switched off and nothing else
+                                    moved -- and prints the lead over SPY whole-window and per era
+                                    beside what the gate was worth in each. The gate is found by a
+                                    generic walk over the params, checked first against the
+                                    recorded controls the lab already holds; a variant whose gate
+                                    cannot be identified is listed, never run as if it were off.
+                                    No method file changes and no new method id. No trial row, no
+                                    moments, no status change: N and the looks do not move
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
@@ -191,6 +203,19 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
             "(0..1) for this run. An acknowledgement, not a silencer: the measured fraction and "
             "the per-year table are printed either way. Only methods with a MarketAware "
             "allocator are gated at all"
+        ),
+    )
+    s.add_argument(
+        "--amend",
+        action="store_true",
+        help=(
+            "run the next pre-registered Amendment this method file declares, instead of its "
+            "original candidates. The trials land under the same method id, so the luck gate's N "
+            "does not move and no method id is spent; `methods.source_sha` is left alone and the "
+            "file's current sha is appended to `method_amendments`. The method must have run, "
+            "must not have reached the test window, and the amendment must be committed -- the "
+            "commit is its pre-registration. The method's status is not moved: use `lab "
+            "reevaluate` if an amendment's trial clears every condition"
         ),
     )
 
@@ -411,6 +436,63 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
              "$SEER_RESEARCH_STORE); a test-window store is refused. The store is gitignored, so "
              "a fresh worktree has none -- point this at a checkout that does",
     )
+    s.add_argument("--no-journal", action="store_true",
+                   help="print the report and write nothing at all, not even the observation")
+    s.add_argument("--csv", type=Path, default=None, metavar="PATH",
+                   help="also write the full grid (variant x column) to PATH as CSV, full precision")
+
+    s = sub.add_parser(
+        "gate",
+        # No literal `%` in any `help=` string below, and none may be added: argparse runs every
+        # `help=` through %-interpolation (HelpFormatter._expand_help), so a bare `%` is read as a
+        # format spec and `lab --help` dies. A doubled `%%` renders as one `%`. `description=` is
+        # NOT interpolated and must stay single. See the `exposure` parser above.
+        help="report only: what the shared SPY 200-day trend gate was worth, book by book",
+        description=(
+            "Re-run every recorded dev variant of each named method at its recorded capital and "
+            "funding, twice on the dev window: the candidate as the lab recorded it, and the same "
+            "candidate with SPY's 200-day trend gate switched off and nothing else moved. Prints "
+            "the lead over SPY whole-window and per era (1996-2002, 2003-2008, 2008 alone, "
+            "2009-2015), what the gate was worth in each era, the share of decision days each arm "
+            "held nothing, and a roll-up over everything measured. The gate is found by a generic "
+            "walk over the candidate's params -- the trend pair f_factor.trend_on reads, and the "
+            "blend-core spelling of the same rule -- so no method file changes and no method id is "
+            "minted; the walk is checked against the gate-off controls the lab already holds "
+            "before anything runs, and a variant whose gate it cannot identify is listed as not "
+            "transformable and never run as though the gate were off. Records no trial, no "
+            "moments, no funding and no status, so the lab's N and the test-window looks do not "
+            "move and the test window is never read; one plain-words observation per method is "
+            "journaled unless --no-journal."
+        ),
+    )
+    s.add_argument("method", nargs="*", metavar="M0030",
+                   help="the methods to measure; omit and pass --all for every method with a "
+                        "recorded dev trial")
+    s.add_argument("--all", action="store_true",
+                   help="measure every method that has a recorded dev trial and still has a "
+                        "method file, instead of naming them. Hundreds of backtests: use --dry-run "
+                        "first to see the scope")
+    s.add_argument(
+        "--only", "--candidate", default=None, metavar="IDS",
+        help="measure only these recorded variants (comma-separated candidate ids, e.g. "
+             "M0030-C50T) instead of every recorded dev variant of each method",
+    )
+    s.add_argument(
+        "--store",
+        type=Path,
+        default=Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR),
+        help=f"the dev store the trials were recorded on (default: {research.STORE_DIR}, or "
+             "$SEER_RESEARCH_STORE); a test-window store is refused. The store is gitignored, so "
+             "a fresh worktree has none -- point this at a checkout that does",
+    )
+    s.add_argument("--gated-only", action="store_true",
+                   help="skip the recorded variants the walk finds no gate in. Faster, and it "
+                        "gives up the empty-decision cross-check that keeps a no-gate verdict "
+                        "honest")
+    s.add_argument("--dry-run", action="store_true",
+                   help="classify every recorded variant and print what would run -- which carry "
+                        "the gate, which do not, and which refuse it off -- then stop. Opens no "
+                        "store, reads no bar, writes nothing")
     s.add_argument("--no-journal", action="store_true",
                    help="print the report and write nothing at all, not even the observation")
     s.add_argument("--csv", type=Path, default=None, metavar="PATH",
@@ -1362,7 +1444,10 @@ def _run(conn, args) -> int:
     if args.method not in methods:
         raise store.LabError(f"no method file for {args.method} in seer_engine/lab/methods/")
     method, path = methods[args.method]
-    runner.preflight(conn, method, path)
+    # getattr, not args.amend: `_run` is also called with a hand-built Namespace (the hard-gate
+    # tests do), exactly as `allow_coverage` is read below. The flag defaults to False either way.
+    amend = bool(getattr(args, "amend", False))
+    amendment = runner.preflight(conn, method, path, amend=amend)
     if research.DEV_END != dev.DEV_END:
         raise store.LabError("research.DEV_END differs from dev.DEV_END; refusing to run")
     t0 = time.perf_counter()
@@ -1392,11 +1477,28 @@ def _run(conn, args) -> int:
                 f"{coverage.MIN_DEV_COVERAGE:.0%} floor. These trials measure the panel, not the "
                 "hypothesis, and the method id is spent either way."
             )
-    ran = runner.run_method(conn, method, path, data, git_sha=runner.git_head(config.REPO_ROOT))
+    ran = runner.run_method(
+        conn, method, path, data, git_sha=runner.git_head(config.REPO_ROOT), amend=amend
+    )
     status = store.get_method(conn, method.id)["status"]
     log.info("%s: %d trial(s) recorded, status %s (%.1fs)", method.id, len(ran), status, time.perf_counter() - t0)
     _show(conn, argparse.Namespace(method=method.id))
     print(f"\nLab N (dev trials) is now {store.dev_trial_count(conn)}; test-window looks used: {store.test_looks(conn)}")
+    if amendment is not None:
+        g = store.gate(conn)
+        seq = len(store.amendments_of(conn, method.id))
+        print(
+            f"\n{method.id} amendment {seq} recorded: {len(ran)} trial(s) under {method.id}'s own "
+            f"id, so no method id was spent."
+        )
+        print(f"  added           {amendment.added.isoformat()}")
+        print(f"  why             {amendment.why.strip()}")
+        print(f"  file sha        {store.latest_source_sha(conn, method.id)}")
+        print(f"  luck gate       N = {g.n} (policy {g.policy})")
+        print(
+            f"  status          {status} (unchanged -- an amendment appends trials, it never moves "
+            f"a verdict; `lab reevaluate {method.id}` is the one door on rejected -> dev-eligible)"
+        )
     return 0
 
 
@@ -2292,6 +2394,96 @@ def _exposure(conn, args) -> int:
     return 0
 
 
+def _gate(conn, args) -> int:
+    """``lab gate M0030 [M0053 ...]``: what the shared SPY 200-day gate was worth.
+
+    Report only. Every refusal that needs no bars -- the method ids, their files, their recorded
+    trials, a bracket-engine variant with no params to walk, the recorded capital and funding, an
+    unknown --only id, the benchmark geometry, and the transform's own disagreement with the lab's
+    recorded gate-off controls -- is made before the research store is loaded. --dry-run stops
+    there. Then one or two arms per recorded variant run on the dev window and the grid is
+    printed. Nothing is written except one observation per method (none with --no-journal); N and
+    the test-window looks are printed before and after so the invariant is visible, not just
+    tested.
+    """
+    from seer_engine.lab import gate_probe as gp
+    from seer_engine.lab import hardgate
+
+    if research.DEV_END != dev.DEV_END:
+        raise store.LabError("research.DEV_END differs from dev.DEV_END; refusing to run")
+    if bool(args.method) == bool(args.all):
+        raise store.LabError(
+            "name at least one method (e.g. `lab gate M0030`) or pass --all, not both and not "
+            "neither"
+        )
+    problems, checked = gp.control_problems()
+    if problems:
+        raise store.LabError(
+            "the gate transform disagrees with the lab's own recorded gate-off controls, so it "
+            "cannot be trusted to switch the gate off anywhere else:\n  "
+            + "\n  ".join(problems)
+        )
+    ids = gp.recorded_method_ids(conn) if args.all else args.method
+    plans = gp.plan_methods(conn, ids, args.only, gated_only=args.gated_only)
+    print(
+        f"the gate transform reproduced all {checked} of the lab's recorded gate-off controls "
+        f"({', '.join(a for a, _b in gp.CONTROLS)}, and M0030-C50T's core leg against M0030-C50A)"
+    )
+    print()
+    print(gp.format_plan(plans, gated_only=args.gated_only))
+    if args.dry_run:
+        print("\n--dry-run: no store was opened, no backtest ran and nothing was written.")
+        return 0
+    geo = hardgate.geometry(conn)  # the recorded SPY hold: the per-era benchmark, before any load
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+    t0 = time.perf_counter()
+    run, arms = gp.measure_store(conn, plans, Path(args.store), geo.bench)
+    reports = gp.compare(plans, arms)
+    for rep in reports:
+        print()
+        print(gp.format_report(rep, run))
+    print()
+    print("summary (best recorded gated variant by MAR, else the best by MAR):")
+    for rep in reports:
+        print(f"  {gp.summary_line(rep)}")
+    print()
+    for line in gp.lab_summary(reports):
+        print(line)
+    if args.csv is not None:
+        written = gp.write_csv(reports, run, Path(args.csv))
+        print(f"\ngrid written to {written}")
+    if args.no_journal:
+        tail = "No journal entry (--no-journal), so `lab stage` is not needed."
+    else:
+        with conn:
+            entries = [gp.journal(conn, rep) for rep in reports]
+        tail = (
+            f"journal entries {', '.join(f'#{e}' for e in entries)} written (one observation per "
+            f"method). Solo: `python -m seer_engine lab stage` so seertrade.site/sera shows them."
+        )
+    # Two numbers, two labels, and neither of them called "Lab N". The ten strings §5.1 puts to
+    # the owner print the lab's N as `Lab N` qualified by `(dev trials)`, set to
+    # `<dev_trial_count>`. (That label is spelt in two pieces here on purpose: the set's invariant
+    # 9 is checked by a `grep -c` for the exact phrase, and this comment must not be an eleventh
+    # hit.) The wording names the trial ROW
+    # count as the lab's N when the gate actually applies `store.gate(conn).n` -- 354 against 74,
+    # measured 2026-10-12. This command is new today, so it is under no obligation to repeat that;
+    # it prints the hurdle as the hurdle and the row count as rows. The ten are untouched (plan
+    # invariant 9) and this adds no eleventh, so a grep for the misleading wording still returns
+    # exactly ten and phase 6's count stays right.
+    g_after = store.gate(conn)
+    print(
+        f"\nNo trial was recorded and no method id was minted. "
+        f"Luck hurdle N: {g_after.n} (policy {g_after.policy}) -- unchanged, because this command "
+        f"records no trial and mints no method id. "
+        f"Dev trial rows: {n_before} before, {store.dev_trial_count(conn)} after. "
+        f"Test-window looks used: {looks_before} before, {store.test_looks(conn)} after. {tail}"
+    )
+    log.info("lab gate: %d method(s) done (%.1fs)", len(reports), time.perf_counter() - t0)
+    return 0
+
+
 def _idea(conn, args) -> int:
     store.begin_immediate(conn)  # the next id and its insert, atomic against parallel sessions
     with conn:
@@ -2445,6 +2637,7 @@ _HANDLERS = {
     "names": _names,
     "survivorship": _survivorship,
     "exposure": _exposure,
+    "gate": _gate,
     "idea": _idea,
     "note": _note,
     "block": _block,

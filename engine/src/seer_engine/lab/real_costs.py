@@ -64,12 +64,16 @@ def real_cost_problem(method: Method) -> str | None:
     From M0031 on, every variant must be a book rule set at ``cost_model="gotrade"``: the lab
     measures what the owner would really pay. Methods up to M0030 ran at the flat cost and keep
     it -- their digests are pinned -- and are compared through ``lab costs`` instead.
+
+    An amendment's candidates are held to exactly the same rule, because ``all_candidates`` covers
+    them: a method numbered M0031 or later cannot slip a flat-cost variant in through a later
+    pre-registration.
     """
     if not requires_real_cost(method.id):
         return None
     flat = [
         c.id
-        for c in method.candidates
+        for c in method.all_candidates()
         if c.rules.engine != "book" or getattr(c.rules, "cost_model", FLAT) != REAL
     ]
     if not flat:
@@ -130,7 +134,7 @@ def pick_candidate(
                 f"{method.id} has no dev trial for {candidate_id!r}; its dev trials are {known}"
             )
         trial = found[0]
-    by_id = {c.id: c for c in method.candidates}
+    by_id = {c.id: c for c in method.all_candidates()}
     candidate = by_id.get(str(trial["candidate_id"]))
     if candidate is None:
         raise store.LabError(

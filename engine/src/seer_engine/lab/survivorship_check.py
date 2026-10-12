@@ -130,7 +130,7 @@ def plan_method(conn: sqlite3.Connection, method_id: str) -> MethodPlan:
             f"{method.id} has no dev trial; `lab survivorship` re-runs what the lab recorded. "
             f"Run it with `lab run {method.id}` first"
         )
-    by_id = {c.id: c for c in method.candidates}
+    by_id = {c.id: c for c in method.all_candidates()}
     seen: set[str] = set()
     variants: list[Variant] = []
     missing: list[str] = []

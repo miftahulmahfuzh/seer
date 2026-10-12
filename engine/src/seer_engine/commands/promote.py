@@ -202,15 +202,15 @@ def find_candidate(method_id: str, candidate_id: str | None) -> tuple[Any, Path,
             f"Known: {', '.join(methods) or '(none)'}"
         )
     method, path = methods[method_id]
-    ids = tuple(c.id for c in method.candidates)
+    ids = tuple(c.id for c in method.all_candidates())
     if candidate_id is None:
         if len(ids) != 1:
             raise NotPromotable(
                 f"{method_id} has {len(ids)} variants ({', '.join(ids)}); they are different "
                 f"algorithms, so name the one to promote with --candidate"
             )
-        return method, path, method.candidates[0]
-    found = [c for c in method.candidates if c.id == candidate_id]
+        return method, path, method.all_candidates()[0]
+    found = [c for c in method.all_candidates() if c.id == candidate_id]
     if len(found) != 1:
         raise NotPromotable(
             f"{method_id} has no variant {candidate_id!r}; its variants are {', '.join(ids)}"

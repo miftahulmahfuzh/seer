@@ -292,9 +292,11 @@ def test_the_digest_is_checked_against_the_live_method_file(conn, prereg_dir):
 def test_promote_refuses_a_method_file_that_changed_since_it_ran(conn, prereg_dir):
     """`source_sha` is written wrong from the start, never re-written.
 
-    `methods_source_sha_once` (store.py:208) fires on any change once the column is non-NULL --
-    NULL included -- so a test cannot set it and then correct it. It sets the sha of a file that
-    is not this one, which is exactly the state a post-run edit would leave behind.
+    `methods_source_sha_once` fires on any change once the column is non-NULL -- NULL included --
+    so a test cannot set it and then correct it. It sets the sha of a file that is not this one,
+    which is exactly the state a post-run edit would leave behind. M0001 has no amendment here, so
+    `store.latest_source_sha` resolves to that column and `check_source` reads the same wrong sha
+    it always did.
     """
     method, path = discover()["M0001"]
     c = method.candidates[0]

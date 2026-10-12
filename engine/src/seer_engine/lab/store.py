@@ -32,10 +32,18 @@ Tables:
   (``source='recorded'``), or added after the fact by a stated rule (``source='backfill'``: the
   v4 -> v5 migration and the seed import). Triggers refuse every UPDATE and DELETE.
 
+- ``method_amendments``: one row per *amendment* of a method -- a batch of further
+  pre-registered variants of an idea the lab has already run, recorded under that method's own
+  id so the luck gate's N does not move (``method.Amendment``). It carries the method file's
+  sha256 at the moment that batch ran, so the file is frozen against its **latest** recorded sha
+  rather than only its first; ``methods.source_sha`` is still written once and never rewritten.
+  Triggers refuse every UPDATE and DELETE.
+
 Schema versions (``meta.schema_version``): 1 is the first lab; 2 adds the ``synthesis`` insight
 kind; 3 adds the ``trial_moments`` side table; 4 adds the ``trial_funding`` side table (the
 money-weighted return of a trial that received deposits, and of the SPY fed the same ones); 5 adds
-the ``trial_provenance`` side table and backfills it for every trial already recorded.
+the ``trial_provenance`` side table and backfills it for every trial already recorded; 6 adds the
+``method_amendments`` side table (empty: nothing is backfilled, because no amendment predates it).
 ``connect`` migrates an older database in place; ``connect_readonly`` never does.
 
 The **verdict** a trial reads is derived, not frozen: ``DSR_MIN`` is the threshold (0.90 since
@@ -75,7 +83,7 @@ COMMITTED_DB = config.REPO_ROOT / "lab" / "lab.sqlite"
 # database through SEER_LAB_DB; only the coordinator commits it.
 DB_PATH = Path(os.environ.get("SEER_LAB_DB") or COMMITTED_DB)
 XLSX_PATH = config.REPO_ROOT / "lab" / "lab.xlsx"  # gitignored
-SCHEMA_VERSION = "5"  # 2: synthesis kind; 3: trial_moments; 4: trial_funding; 5: trial_provenance (see _migrate)
+SCHEMA_VERSION = "6"  # 2: synthesis kind; 3: trial_moments; 4: trial_funding; 5: trial_provenance; 6: method_amendments (see _migrate)
 
 SOURCE_KINDS: tuple[str, ...] = ("paper", "blog", "github", "knowledge", "variation", "seed")
 STATUSES: tuple[str, ...] = (
@@ -323,6 +331,50 @@ BEGIN SELECT RAISE(ABORT, 'trial_provenance is append-only: a provenance row is 
 BEGIN SELECT RAISE(ABORT, 'trial_provenance is append-only: a provenance row is never deleted'); END""",
 )
 
+# The method_amendments table and its two triggers -- one definition of the v6 table, shared by
+# ``_SCHEMA`` and ``_v5_to_v6`` for the same reason ``_PROVENANCE_TABLE`` is shared.
+#
+# **What it records and why (2026-10-12).** A method file was frozen outright once it ran:
+# ``methods.source_sha`` was written once, ``methods_source_sha_once`` refused to let it move, and
+# every reader hashed the file against it. That rule was built when the luck gate counted trial
+# rows, so another variant of an idea the lab had already counted cost a whole new method id and
+# the id cost nothing. Under ``DSR_POLICY = 'methods'`` (2026-10-08) it costs the lab one more
+# independent look: measured 2026-10-12 on the committed database, ``pending_gate`` prices a
+# brand-new method at N = 75 against 74 for a variant of one that has run, retroactively for all
+# 130 methods.
+#
+# So the file may now grow ``method.Amendment`` blocks, and each one that runs appends a row here
+# carrying the sha the file had when it ran. ``methods.source_sha`` is still never rewritten and
+# the trigger stays: this table is strictly additional, and ``latest_source_sha`` is the one place
+# that resolves "the sha this file is supposed to hash to today".
+#
+# A side table, not a column on ``methods``, for exactly the reason ``trial_funding`` and
+# ``trial_provenance`` are: ``ALTER TABLE methods ADD COLUMN`` would move every recorded method
+# row's bytes, and one column could not hold a list that grows.
+#
+# ``seq`` starts at 1 and is contiguous per method, so the recorded amendments are always a prefix
+# of the file's ``Method.amendments`` tuple and ``runner.pending_amendment`` can compare them
+# position for position. ``run_at`` and ``git_sha`` are the run's, not the file's: they are what
+# joins this row to the ``trials`` rows it produced, which share the same ``run_at``.
+_AMENDMENTS_TABLE = """CREATE TABLE IF NOT EXISTS method_amendments (
+    method_id        TEXT NOT NULL REFERENCES methods(id),
+    seq              INTEGER NOT NULL CHECK (seq >= 1),
+    source_sha       TEXT NOT NULL CHECK (length(source_sha) = 64),
+    added            TEXT NOT NULL CHECK (length(trim(added)) > 0),
+    why              TEXT NOT NULL CHECK (length(trim(why)) > 0),
+    hypothesis       TEXT NOT NULL CHECK (length(trim(hypothesis)) > 0),
+    expected_failure TEXT NOT NULL CHECK (length(trim(expected_failure)) > 0),
+    run_at           TEXT NOT NULL CHECK (length(trim(run_at)) > 0),
+    git_sha          TEXT NOT NULL CHECK (length(trim(git_sha)) > 0),
+    PRIMARY KEY (method_id, seq)
+)"""
+_AMENDMENTS_TRIGGERS: tuple[str, ...] = (
+    """CREATE TRIGGER IF NOT EXISTS method_amendments_no_update BEFORE UPDATE ON method_amendments
+BEGIN SELECT RAISE(ABORT, 'method_amendments are append-only: an amendment row is never updated'); END""",
+    """CREATE TRIGGER IF NOT EXISTS method_amendments_no_delete BEFORE DELETE ON method_amendments
+BEGIN SELECT RAISE(ABORT, 'method_amendments are append-only: an amendment row is never deleted'); END""",
+)
+
 #: The backfill's capital rule, exact on every trial recorded before schema v5 (analysis M3).
 #: Cross-checked with ``git merge-base --is-ancestor d79fc83 <trials.git_sha>`` over all 26
 #: distinct ``git_sha`` values: the 20 shas behind trials #1..#128 predate ``d79fc83`` and none of
@@ -464,6 +516,12 @@ CREATE TABLE IF NOT EXISTS ideas_seen (
 {_PROVENANCE_TRIGGERS[0]};
 
 {_PROVENANCE_TRIGGERS[1]};
+
+{_AMENDMENTS_TABLE};
+
+{_AMENDMENTS_TRIGGERS[0]};
+
+{_AMENDMENTS_TRIGGERS[1]};
 
 CREATE TRIGGER IF NOT EXISTS trials_no_update BEFORE UPDATE ON trials
 BEGIN SELECT RAISE(ABORT, 'trials are append-only: a trial row is never updated'); END;
@@ -652,15 +710,36 @@ def _v4_to_v5(conn: sqlite3.Connection) -> None:
     ])
 
 
+def _v5_to_v6(conn: sqlite3.Connection) -> None:
+    """Add the ``method_amendments`` side table and its two append-only triggers.
+
+    Purely additive, exactly as ``_v2_to_v3`` and ``_v3_to_v4`` were and for the same reason: no
+    ``methods``, ``trials``, ``trial_moments``, ``trial_funding`` or ``trial_provenance`` row is
+    read, written, rebuilt or re-keyed, no column is altered, no verdict moves and no backfill
+    runs -- a lab that has recorded no amendment has none to record. A v5 database that migrates
+    and is then never written again differs from its v5 self only by an empty table, two triggers
+    and the ``schema_version`` string, which
+    ``test_connect_migrates_a_v5_database_adding_method_amendments_and_touching_no_row`` pins.
+
+    In particular ``methods.source_sha`` is not read and not written here. It is still set once,
+    ``methods_source_sha_once`` still refuses to let it move, and this table is what the file's
+    *later* shas go into instead.
+    """
+    conn.execute(_AMENDMENTS_TABLE)
+    for trigger in _AMENDMENTS_TRIGGERS:
+        conn.execute(trigger)
+
+
 def _migrate(conn: sqlite3.Connection) -> None:
     """Bring an older database up to ``SCHEMA_VERSION`` in one transaction under the write lock.
 
-    A ladder: each step moves the database up exactly one version, so a v1 database reaches v5 in
-    one open by running all four steps in order. v1 -> v2 adds the ``synthesis`` insight kind
+    A ladder: each step moves the database up exactly one version, so a v1 database reaches v6 in
+    one open by running all five steps in order. v1 -> v2 adds the ``synthesis`` insight kind
     (``_v1_to_v2``); v2 -> v3 adds the ``trial_moments`` side table (``_v2_to_v3``); v3 -> v4 adds
     the ``trial_funding`` side table (``_v3_to_v4``); v4 -> v5 adds the ``trial_provenance`` side
     table and backfills it (``_v4_to_v5``) -- after v3 -> v4, because the backfill reads
-    ``trial_funding``. A version this code does not know is refused rather than guessed at.
+    ``trial_funding``; v5 -> v6 adds the ``method_amendments`` side table (``_v5_to_v6``). A
+    version this code does not know is refused rather than guessed at.
 
     Parallel sessions may connect at once, so the version is read again after
     ``BEGIN IMMEDIATE``: only the first one migrates, the others find the current version and do
@@ -685,6 +764,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
         if version == "4":
             _v4_to_v5(conn)
             version = "5"
+        if version == "5":
+            _v5_to_v6(conn)
+            version = "6"
         if version != SCHEMA_VERSION:
             raise LabError(
                 f"lab database schema version {found!r} is unknown to this code "
@@ -2053,6 +2135,135 @@ def insert_provenance(conn: sqlite3.Connection, rows: Sequence[ProvenanceRow]) -
             f"INSERT INTO trial_provenance ({cols}) VALUES ({marks})",
             [int(r.trial_n), format(capital, "f"), r.price_fingerprint, r.source, r.measured],
         )
+
+
+# --------------------------------------------------------------------------- method amendments
+
+
+@dataclass(frozen=True)
+class AmendmentRow:
+    """One pre-registered amendment of a method that had already run (schema v6).
+
+    The database half of ``method.Amendment``. One row per amendment that has actually been run;
+    an amendment declared in a method file and not yet run has no row, and that absence is exactly
+    how ``runner.pending_amendment`` knows which one is next.
+
+    - ``method_id``        the method this amends. It must already exist and have run.
+    - ``seq``              1 for the first amendment, 2 for the second, contiguous. The recorded
+                           rows are therefore always a prefix of the file's ``Method.amendments``.
+    - ``source_sha``       the method file's sha256 **at the moment this amendment ran**. This is
+                           the sha the file is expected to hash to from now on
+                           (``latest_source_sha``); ``methods.source_sha`` keeps the first one and
+                           is never rewritten.
+    - ``added``            the ``Amendment.added`` date, ISO, as the file declared it.
+    - ``why``              the one line the file gives for asking this further question.
+    - ``hypothesis`` /     the amendment's own, written before any result was seen and frozen with
+      ``expected_failure`` the commit that pre-registered it. Kept here, and not folded into
+                           ``methods.hypothesis``, because that column is frozen once the method
+                           leaves ``idea`` and must stay the record of what the *original* run
+                           claimed.
+    - ``run_at``           the run's timestamp -- the same ``run_at`` every trial of this batch
+                           carries, which is what joins the two.
+    - ``git_sha``          the repository HEAD the run was made at.
+    """
+
+    method_id: str
+    seq: int
+    source_sha: str
+    added: str
+    why: str
+    hypothesis: str
+    expected_failure: str
+    run_at: str
+    git_sha: str
+
+
+AMENDMENT_COLUMNS: tuple[str, ...] = tuple(f.name for f in fields(AmendmentRow))
+
+
+def amendments_of(conn: sqlite3.Connection, method_id: str) -> list[sqlite3.Row]:
+    """Every recorded amendment of ``method_id``, oldest first; ``[]`` when it has none.
+
+    A database on schema v1-v5 has no ``method_amendments`` table at all and answers ``[]`` the
+    same way -- ``connect`` migrates, so that can only be a ``connect_readonly`` caller or a raw
+    read-only connection such as the one ``test_a_method_that_ran_is_frozen_to_its_latest_recorded_sha``
+    opens on the committed file. ``provenance_of``, ``moments_of`` and ``funding_of`` carry the
+    same branch for the same reason.
+    """
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'method_amendments'"
+    ).fetchone() is None:
+        return []
+    return list(conn.execute(
+        "SELECT * FROM method_amendments WHERE method_id = ? ORDER BY seq", (str(method_id),)
+    ))
+
+
+def latest_source_sha(conn: sqlite3.Connection, method_id: str) -> str | None:
+    """The sha256 ``method_id``'s file is supposed to hash to today, or None when it has not run.
+
+    **This is the replacement for "a method file is frozen once it has run".** It is the newest
+    ``method_amendments`` row's ``source_sha``, falling back to ``methods.source_sha`` when the
+    method has no amendment -- which is every method the lab recorded before 2026-10-12, so this
+    returns exactly what ``row['source_sha']`` returned for all of them.
+
+    ``methods.source_sha`` is never rewritten and ``methods_source_sha_once`` still enforces that:
+    the first sha stays the record of what the original batch of trials measured, and the
+    amendment rows record what each later batch measured. A reader that wants "has this file
+    changed since the lab last ran it" asks this; a reader that wants "what did the original run
+    measure" asks the column.
+    """
+    rows = amendments_of(conn, method_id)
+    if rows:
+        return str(rows[-1]["source_sha"])
+    row = get_method(conn, method_id)
+    if row is None or row["source_sha"] is None:
+        return None
+    return str(row["source_sha"])
+
+
+def insert_amendment(conn: sqlite3.Connection, row: AmendmentRow) -> None:
+    """Record one amendment (the caller holds the transaction).
+
+    Append-only, contiguous and prefix-shaped: ``seq`` must be exactly one past the highest seq
+    this method already has, so the recorded amendments can never be a set with a hole in it and
+    ``runner.pending_amendment`` can compare them to the file position for position. The method
+    must exist and must already have run (``methods.source_sha`` is not NULL) -- an amendment
+    amends something, and a method whose first batch has not run has nothing to amend.
+
+    The two triggers refuse UPDATE and DELETE exactly as ``trials`` does, so an amendment, like a
+    trial, is written once and stands.
+    """
+    method = get_method(conn, row.method_id)
+    if method is None:
+        raise LabError(f"no method {row.method_id}: an amendment amends a method the lab has run")
+    if method["source_sha"] is None:
+        raise LabError(
+            f"{row.method_id} has no recorded source_sha, so it has not run: there is nothing to "
+            f"amend. `lab run {row.method_id}` records the first batch"
+        )
+    if not isinstance(row.source_sha, str) or len(row.source_sha) != 64:
+        raise LabError(
+            f"{row.method_id}: an amendment's source_sha is the method file's sha256 "
+            f"(64 hex characters), got {row.source_sha!r}"
+        )
+    have = amendments_of(conn, row.method_id)
+    expected = len(have) + 1
+    if row.seq != expected:
+        raise LabError(
+            f"{row.method_id}: amendment seq must be {expected} (it has {len(have)} recorded), "
+            f"got {row.seq}. method_amendments is append-only and contiguous, so the recorded "
+            f"amendments stay a prefix of the method file's"
+        )
+    cols = ", ".join(f'"{c}"' for c in AMENDMENT_COLUMNS)
+    marks = ", ".join("?" for _ in AMENDMENT_COLUMNS)
+    conn.execute(
+        f"INSERT INTO method_amendments ({cols}) VALUES ({marks})",
+        [
+            str(row.method_id), int(row.seq), row.source_sha, row.added, row.why,
+            row.hypothesis, row.expected_failure, row.run_at, row.git_sha,
+        ],
+    )
 
 
 # --------------------------------------------------------------------------- ideas_seen

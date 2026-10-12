@@ -3,7 +3,8 @@
 ``lab run`` (design §2, §3) -- the search:
 
 1. Refuse when the method file is not committed (its commit is the pre-registration), when the
-   method has already run, or when any variant's configuration already has a dev trial.
+   method has already run **and ``--amend`` was not given**, or when any variant this run is about
+   to execute already has a dev trial.
 2. Run the variants through ``dev.run_registry`` on the research store (every D9 guard), funded on
    ``sim.contributions.OWNER_MONTHLY`` -- 10,000,000 IDR to start and +5,000,000 IDR on the 25th of
    every month, the owner's real plan. The dollar-cost-averaged SPY TR curve receives the identical
@@ -20,6 +21,17 @@
    status (``dev-eligible`` when any trial is eligible, else ``rejected``), all in one
    transaction. ``store.verdict`` re-reads a recorded trial against the same threshold and N, so
    a verdict is comparable across time rather than frozen at its run date.
+
+**``lab run --amend MNNNN``** runs the next ``method.Amendment`` the file declares and the lab has
+not recorded: further pre-registered variants of an idea the lab has already counted, landing
+under that method's own id. Everything about the recording is identical except two things --
+``methods.source_sha`` is not rewritten (the file's current sha is appended to
+``method_amendments`` instead, and ``store.latest_source_sha`` resolves which sha a reader should
+expect) and ``methods.status`` is not moved (``store.reevaluate_method`` is the one door on
+``rejected`` -> ``dev-eligible``). The reason the mechanism exists is the gate: under
+``DSR_POLICY = 'methods'`` a new method id costs the whole lab one more look -- measured
+2026-10-12 on the committed database, N = 75 against 74, retroactively for all 130 methods --
+while another variant of a counted idea costs nothing.
 
 ``lab test`` (design §3) -- the one counted look:
 
@@ -64,7 +76,7 @@ from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.commands.backtest_dev import daily_moments, month_end_curve, registry_problem
 from seer_engine.fundamentals import coverage
 from seer_engine.lab import store
-from seer_engine.lab.method import METHOD_ID, Method, config_digest, config_text, source_sha
+from seer_engine.lab.method import METHOD_ID, Amendment, Method, config_digest, config_text, source_sha
 from seer_engine.lab.real_costs import real_cost_problem
 from seer_engine.sim.contributions import OWNER_MONTHLY, ContributionSchedule
 from seer_engine.strategies.allocator import MarketAware
@@ -155,11 +167,84 @@ def git_head(cwd: Path) -> str:
     return out.stdout.strip()
 
 
-def preflight(conn: sqlite3.Connection, method: Method, path: Path, *, require_commit: bool = True) -> None:
+#: Statuses from which a method may not be amended. All four mean the one look at the test window
+#: has been committed to or spent, and design §3 gives exactly one look per configuration: a
+#: mechanism that let a tested book keep growing variants under its own id would be the fishing
+#: the pre-registration exists to stop. A ``rejected`` or ``dev-eligible`` method is amendable --
+#: those are search states, and an amendment is more search.
+AMEND_CLOSED: tuple[str, ...] = ("promoted", "test-passed", "test-failed", "paper")
+
+
+def pending_amendment(conn: sqlite3.Connection, method: Method) -> Amendment:
+    """The next ``Amendment`` of ``method`` the lab has not recorded (``store.LabError`` if none).
+
+    **The record must be a prefix of the file.** ``method_amendments`` is append-only and
+    contiguous, so the amendment that runs next is always ``method.amendments[k]`` where ``k`` is
+    the number of rows already recorded. Before returning it, every recorded row is compared field
+    for field against the block it was written from. That comparison is the amendment-level half
+    of what the old whole-file freeze gave: an amendment that was reordered, reworded or deleted
+    after it ran is a refusal, so a recorded batch of trials can never end up filed under a
+    hypothesis nobody committed to before seeing it.
+
+    The *candidate* half of the freeze is checked elsewhere and against the recorded trials
+    themselves -- ``prereg.check_source``, ``remeasure.preflight`` and
+    ``test_every_recorded_configuration_still_digests_to_its_recorded_digest`` -- because a
+    configuration can drift through an imported params dataclass without this file's bytes moving.
+    """
+    recorded = store.amendments_of(conn, method.id)
+    if len(recorded) > len(method.amendments):
+        raise store.LabError(
+            f"{method.id}: the lab has recorded {len(recorded)} amendment(s) but the method file "
+            f"declares {len(method.amendments)}. An amendment that has run is part of the record "
+            f"and is never taken back out: restore the file from git"
+        )
+    for row, a in zip(recorded, method.amendments, strict=False):
+        mine = (a.added.isoformat(), a.why.strip(), a.hypothesis.strip(), a.expected_failure.strip())
+        theirs = (str(row["added"]), str(row["why"]), str(row["hypothesis"]), str(row["expected_failure"]))
+        if mine != theirs:
+            raise store.LabError(
+                f"{method.id}: amendment {row['seq']} in the method file no longer matches the one "
+                f"the lab recorded on {row['run_at']}. It was pre-registered by the commit that "
+                f"added it and is frozen the same way the original batch is; restore the file from "
+                f"git, or add a new amendment instead of editing a spent one"
+            )
+    if len(recorded) == len(method.amendments):
+        if not method.amendments:
+            raise store.LabError(
+                f"{method.id}: `--amend` runs the next pre-registered Amendment and this method "
+                f"file declares none. Add an `Amendment(...)` to its `amendments=` tuple, commit "
+                f"it -- the commit is the pre-registration -- and run it then"
+            )
+        raise store.LabError(
+            f"{method.id}: all {len(recorded)} of its amendments have already run. An amendment, "
+            f"like a method, runs once; add another one to the method file and commit it first"
+        )
+    return method.amendments[len(recorded)]
+
+
+def preflight(
+    conn: sqlite3.Connection,
+    method: Method,
+    path: Path,
+    *,
+    require_commit: bool = True,
+    amend: bool = False,
+) -> Amendment | None:
     """Every refusal ``lab run`` makes before loading data (``store.LabError``).
 
     From M0031 on that includes a variant not priced at Gotrade's real fees
-    (``real_costs.real_cost_problem``); methods up to M0030 are unaffected.
+    (``real_costs.real_cost_problem``, which reads ``all_candidates()`` so an amendment is held to
+    the same rule); methods up to M0030 are unaffected.
+
+    ``amend`` switches the one refusal that used to be unconditional. Without it a method that has
+    run is refused outright -- a method runs once. With it, the method **must** have run, must not
+    have reached the test window, and the amendment that runs is the next one its file declares
+    that the lab has not recorded (``pending_amendment``). Returns that ``Amendment``, so the
+    caller runs its candidates and records its metadata, and None on the ordinary path.
+
+    Either way the "this configuration already ran" check is made only against the candidates this
+    run is about to execute: on an amendment the originals have dev trials by definition, and
+    checking them would refuse every amendment that ever existed.
     """
     if require_commit:
         problem = registry_problem(path)
@@ -171,20 +256,50 @@ def preflight(conn: sqlite3.Connection, method: Method, path: Path, *, require_c
     if cost_problem is not None:
         raise store.LabError(f"{method.id}: {cost_problem}")
     row = store.get_method(conn, method.id)
-    if row is not None and row["status"] not in ("idea", "registered"):
-        raise store.LabError(
-            f"{method.id} is already {row['status']}: a method runs once. A change is a new "
-            "variation method (source_kind='variation', parent_id=...)"
-        )
+    amendment: Amendment | None = None
+    if amend:
+        if row is None or row["source_sha"] is None:
+            raise store.LabError(
+                f"{method.id} has not run, so there is nothing to amend. `lab run {method.id}` "
+                f"records its first batch; `--amend` adds a later, separately pre-registered one"
+            )
+        status = str(row["status"])
+        if status in AMEND_CLOSED:
+            raise store.LabError(
+                f"{method.id} is {status!r}: a method that has reached the test window is not "
+                f"amended. The look is spent once and never given back, and growing more variants "
+                f"under the same id afterwards is exactly the fishing the pre-registration exists "
+                f"to stop. A new question about this book is a new variation method "
+                f"(source_kind='variation', parent_id={method.id})"
+            )
+        if conn.execute(
+            "SELECT 1 FROM trials WHERE method_id = ? AND window = 'test' LIMIT 1", (method.id,)
+        ).fetchone() is not None:
+            raise store.LabError(
+                f"{method.id} has a test trial: its one look is spent, so it is not amended"
+            )
+        amendment = pending_amendment(conn, method)
+        running = amendment.candidates
+    else:
+        if row is not None and row["status"] not in ("idea", "registered"):
+            raise store.LabError(
+                f"{method.id} is already {row['status']}: a method runs once. More variants of "
+                "this same idea are an Amendment in its method file, pre-registered by the commit "
+                "that adds it and run with `lab run --amend` -- they record under this method id, "
+                "so the luck gate's N does not move. A different idea is a new variation method "
+                "(source_kind='variation', parent_id=...)"
+            )
+        running = method.candidates
     if method.parent_id is not None and store.get_method(conn, method.parent_id) is None:
         raise store.LabError(f"{method.id}: parent {method.parent_id} is not in the lab")
-    for c in method.candidates:
+    for c in running:
         if store.has_trial(conn, config_digest(c), "dev"):
             hit = conn.execute(
                 "SELECT candidate_id FROM trials WHERE config_digest = ? AND window = 'dev'",
                 (config_digest(c),),
             ).fetchone()
             raise store.LabError(f"{c.id} repeats {hit[0]}, which already ran on the dev window")
+    return amendment
 
 
 def market_fields(allocator: object) -> tuple[str, ...]:
@@ -209,8 +324,13 @@ def market_aware_candidates(method: Method, field: str = "fundamentals") -> tupl
     makes. ``f_fundamental.FUNDAMENTAL`` satisfies it structurally and reads fundamentals; a
     price-only allocator such as ``f_index.TIMING`` or ``f_rotation.ROTATION`` does not, and a
     bracket ``Strategy`` does not either. Which field it reads is ``market_fields``.
+
+    Every variant the method has ever pre-registered, amendments included (``all_candidates``),
+    because the coverage gate this feeds is about what a store can rank and that question does not
+    change batch by batch. For a method with no amendment -- every file committed before
+    2026-10-12 -- this is identical to ``method.candidates``.
     """
-    return tuple(c.id for c in method.candidates if field in market_fields(c.allocator))
+    return tuple(c.id for c in method.all_candidates() if field in market_fields(c.allocator))
 
 
 def preflight_data(
@@ -448,6 +568,7 @@ def run_method(
     *,
     git_sha: str,
     require_commit: bool = True,
+    amend: bool = False,
 ) -> list[Ran]:
     """Run ``method`` on the dev window and record it (see the module docstring).
 
@@ -459,9 +580,27 @@ def run_method(
 
     A survivorship-check store (``data.purpose`` set) is refused first, before the preflight and
     before any backtest, so it can never produce a trial.
+
+    ``amend=True`` runs the next pre-registered ``Amendment`` instead of the original candidates
+    (``preflight``). Everything about the recording is the same -- the trials, their moments, their
+    funding and their provenance all land under the method's own ``method_id``, which is the whole
+    point: ``store.pending_gate`` prices a further batch for a method that already has dev trials
+    at the N the lab already has, so the luck gate does not move and no method id is spent. Two
+    things differ, and both are deliberate:
+
+    - **``methods.source_sha`` is not written.** It is set once, when the method first ran, and
+      ``methods_source_sha_once`` refuses to let it move. The sha the file has *now* is appended
+      to ``method_amendments`` instead, and ``store.latest_source_sha`` is what every freeze check
+      reads.
+    - **``methods.status`` is not moved.** An amendment appends trials; it does not re-decide a
+      verdict. A ``rejected`` method whose amendment comes back eligible is re-judged by
+      ``store.reevaluate_method``, which is the one door on that edge and which appends its own
+      dated reasoning to the analysis. Letting this function take that decision would put a second,
+      silent door beside it (plan Decision P2).
     """
     refuse_survivorship_store(data, f"lab run {method.id}")
-    preflight(conn, method, path, require_commit=require_commit)
+    amendment = preflight(conn, method, path, require_commit=require_commit, amend=amend)
+    candidates = method.candidates if amendment is None else amendment.candidates
     capital = INITIAL_IDR
     results: list[tuple[DevRow, Any]] = []
     deposits: list[Sequence[tuple[date, float]]] = []
@@ -474,18 +613,26 @@ def run_method(
         log.info(
             "[%d/%d] %s %s..%s: money-weighted %s vs DCA SPY TR %s (%d deposits, %.2f USD), "
             "max DD %s, PF %s, trades %d",
-            i + 1, len(method.candidates), row.candidate.id, row.start, row.end,
+            i + 1, len(candidates), row.candidate.id, row.start, row.end,
             m.mwr, row.spy_tr.mwr, len(cash), float(sum(a for _, a in cash)),
             m.max_drawdown, m.profit_factor, m.trades,
         )
 
     dev.run_registry(
-        data.market, data.dividends, data.spy_dividends, method.candidates,
+        data.market, data.dividends, data.spy_dividends, candidates,
         on_result=on_result, contributions=OWNER_MONTHLY, initial_idr=capital,
     )
     store.begin_immediate(conn)  # lab-wide N and the inserts, atomic against parallel sessions
     with conn:
-        preflight(conn, method, path, require_commit=False)  # a parallel session may have won a race
+        # A parallel session may have won a race. On the amendment path the re-check must resolve
+        # the *same* amendment, or the trials just produced would be filed under another block's
+        # hypothesis.
+        again = preflight(conn, method, path, require_commit=False, amend=amend)
+        if again is not amendment:
+            raise store.LabError(
+                f"{method.id}: another session recorded an amendment while this run was in "
+                f"flight. Nothing has been written; re-run `lab run --amend {method.id}`"
+            )
         ran = trial_rows(
             conn, method, results, fingerprint=data.fingerprint, git_sha=git_sha, deposits=deposits
         )
@@ -545,7 +692,23 @@ def run_method(
             )
             for n, r in zip(ns, ran, strict=True)
         ])
-        store.update_method(conn, method.id, source_sha=source_sha(path), status=status)
+        if amendment is None:
+            store.update_method(conn, method.id, source_sha=source_sha(path), status=status)
+        else:
+            # The file's sha goes to `method_amendments`, never to `methods.source_sha`, and the
+            # status is left where it is (see this function's docstring). Same transaction as the
+            # trials: an amendment and the batch it pre-registered are one record or neither.
+            store.insert_amendment(conn, store.AmendmentRow(
+                method_id=method.id,
+                seq=len(store.amendments_of(conn, method.id)) + 1,
+                source_sha=source_sha(path),
+                added=amendment.added.isoformat(),
+                why=amendment.why.strip(),
+                hypothesis=amendment.hypothesis.strip(),
+                expected_failure=amendment.expected_failure.strip(),
+                run_at=ran[0].trial.run_at if ran else store.now_iso(),
+                git_sha=git_sha,
+            ))
         for key in method.seen_keys:
             store.mark_seen(conn, key, method.id)
     return ran
@@ -592,11 +755,11 @@ def resolve_candidate(candidate_id: str) -> tuple[Method, Path, Candidate]:
             f"committed method file, not a database row. Known: {', '.join(methods) or '(none)'}"
         )
     method, path = methods[method_id]
-    found = [c for c in method.candidates if c.id == candidate_id]
+    found = [c for c in method.all_candidates() if c.id == candidate_id]
     if len(found) != 1:
         raise store.LabError(
             f"{method_id} has no variant {candidate_id!r}; its variants are "
-            f"{', '.join(c.id for c in method.candidates)}"
+            f"{', '.join(c.id for c in method.all_candidates())}"
         )
     return method, path, found[0]
 
@@ -714,11 +877,11 @@ def preflight_test(
                 f"{method.id}: {problem}. The test window is spent once; it runs only against the "
                 f"committed method file"
             )
-        recorded = row["source_sha"]
+        recorded = store.latest_source_sha(conn, method.id)
         actual = source_sha(path)
         if recorded is not None and recorded != actual:
             raise store.LabError(
-                f"{method.id}: the method file hashes {actual[:12]} but its dev trials ran under "
+                f"{method.id}: the method file hashes {actual[:12]} but the lab last ran it under "
                 f"{recorded[:12]}; the file changed after it ran. A changed method is a new "
                 f"variation method (source_kind='variation', parent_id={method.id}), not a second look"
             )

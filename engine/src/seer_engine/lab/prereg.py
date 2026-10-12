@@ -15,8 +15,10 @@ sufficient alone:
 
 1. the file's ``config_digest`` is **copied out of the recorded dev ``trials`` row**, never
    recomputed from the live method file (``promote_method``);
-2. the live method file still hashes to the ``source_sha`` frozen when the method ran, and the
-   named candidate still digests to the recorded digest (``check_source``);
+2. the live method file still hashes to the sha the lab last ran it under
+   (``store.latest_source_sha``: the newest ``method_amendments`` row, else the
+   ``methods.source_sha`` frozen when the method first ran), and the named candidate still digests
+   to the recorded digest (``check_source``);
 3. the file is in git, unmodified, before the look (``require_committed``, which ``lab test``
    calls and which refuses otherwise).
 
@@ -432,22 +434,30 @@ def check_digest(p: Prereg, digest: str, *, directory: Path | None = None) -> No
         )
 
 
-def check_source(method_id: str, row: sqlite3.Row, trial: sqlite3.Row) -> Path:
+def check_source(conn: sqlite3.Connection, method_id: str, trial: sqlite3.Row) -> Path:
     """The method file still is what the trial measured; returns its path.
 
     Two equalities, both ``PreregError`` when broken:
 
-    - the file's sha256 is the ``source_sha`` frozen when the method ran, so nothing has edited
-      it since (``lab run`` set it once; ``methods_source_sha_once`` keeps it);
+    - the file's sha256 is the sha the lab last ran it under -- ``store.latest_source_sha``: the
+      newest ``method_amendments`` row, falling back to the ``methods.source_sha`` frozen when the
+      method first ran, which ``lab run`` set once and ``methods_source_sha_once`` keeps. For a
+      method with no amendment, and that is every method recorded before 2026-10-12, the two are
+      the same value;
     - the candidate the trial names still digests to the trial's ``config_digest``, so the thing
       about to be pre-registered is the thing that was measured.
 
     The second is implied by the first for most edits, and is checked anyway: ``config_digest``
     canonicalizes ``TradeRules`` and allocator params defined in *other* files, so the method
-    file's own bytes do not pin it.
+    file's own bytes do not pin it. It is also the half that an amendment cannot loosen -- a file
+    may grow new blocks, but no recorded trial's configuration may move.
 
     No git call. ``lab run`` already refused an uncommitted method file before recording these
-    trials, and ``source_sha`` answers "has it changed since" exactly, without a subprocess.
+    trials, and the sha answers "has it changed since" exactly, without a subprocess.
+
+    It takes ``conn`` rather than the method ``row`` it used to, because the sha a reader should
+    expect is no longer one column: ``latest_source_sha`` has to look at ``method_amendments``
+    first.
     """
     from seer_engine.lab.method import discover
 
@@ -455,16 +465,16 @@ def check_source(method_id: str, row: sqlite3.Row, trial: sqlite3.Row) -> Path:
     if method_id not in methods:
         raise PreregError(f"no method file for {method_id} in seer_engine/lab/methods/")
     method, path = methods[method_id]
-    recorded = row["source_sha"]
+    recorded = store.latest_source_sha(conn, method_id)
     actual = source_sha(path)
     if recorded and actual != recorded:
         raise PreregError(
-            f"{repo_path(path)} has changed since {method_id} ran (sha256 {actual[:12]}, "
+            f"{repo_path(path)} has changed since {method_id} last ran (sha256 {actual[:12]}, "
             f"recorded {str(recorded)[:12]}). Pre-registering it would name a file that is no "
             f"longer what produced these trials: restore the file from git, or make the change a "
             f"new variation method with its own dev trials"
         )
-    candidates = {c.id: c for c in method.candidates}
+    candidates = {c.id: c for c in method.all_candidates()}
     cid = str(trial["candidate_id"])
     if cid not in candidates:
         raise PreregError(
@@ -664,7 +674,7 @@ def promote_method(
                 f"there is nothing to pre-register"
             )
         if check_method_file:
-            check_source(method_id, row, trial)
+            check_source(conn, method_id, trial)
 
         p = Prereg(
             method=method_id,

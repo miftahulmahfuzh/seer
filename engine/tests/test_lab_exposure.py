@@ -162,6 +162,7 @@ def _untouched(conn):
         conn.execute("SELECT count(*) FROM trial_moments").fetchone()[0],
         conn.execute("SELECT count(*) FROM trial_funding").fetchone()[0],
         conn.execute("SELECT count(*) FROM trial_provenance").fetchone()[0],
+        conn.execute("SELECT count(*) FROM method_amendments").fetchone()[0],
         tuple(tuple(r) for r in conn.execute(
             "SELECT id, status, verdict, source_sha FROM methods ORDER BY id")),
     )

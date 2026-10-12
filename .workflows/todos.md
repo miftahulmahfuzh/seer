@@ -2,19 +2,19 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-12 11:09
-**Total Active Tasks**: 0
+**Last Updated**: 2026-10-12 14:03
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 19
+- Completed: 20
 
 ---
 
@@ -23,6 +23,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [ ] **P1-ROOT-H5NX** Phase 5: Pre-register, run, record, stage and write up
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns the two pre-registration commits, the two `lab run --amend` executions, `lab gate`'s run, `lab walkforward`'s read, the journal entries, the two verdicts, `lab stage`, `lab/lab.sqlite`, `web/data/lab.json`, `docs/backtests/2026-10-12-brakes-and-gate.md`, `docs/backtests/2026-10-12-brakes-and-gate-grid.csv` and `docs/backtests/2026-10-12-brakes-and-gate-gate-grid.csv` (unconditional — phase 2 ships `--csv`). Does not touch any engine source or test (phases 1–4 own it — hard stop rule: a bug the runs expose is reported, never patched from here); the test window (no `lab test`, no `lab promote`, `engine/.research-test` never named); the hard gate; `docs/plans/` (phase 6's); `.workflows/todos.md`. Exit: M0030 and M0053 each carry their amendment's three trials under their own `method_id` (`n` 359–364), with their `trial_provenance`, `trial_moments`, `trial_funding` and one `method_amendments` row each; R3's end-to-end proof — `store.gate(conn)` reads `Gate(n=74, policy='methods')` and `npolicy.dev_method_count` reads 74 on **both** sides of the six new trials, recorded in the write-up; `store.test_looks(conn) == 4` unchanged and `git status --short docs/lab/` empty; the coverage gate was measured over `all_candidates()` before the runs rather than assumed; the write-up states the result against the pre-registered hypothesis and expected failure both ways round, carries the M0030 funding caveat before any table that could be misread, and carries the finding that `M0001-TV10-NOTREND` was never a clean gate control; `lab stage` has run and CI's `lab.sqlite`/`lab.json` row-for-row check passes; trial `n` is contiguous; the suite is green.
+  - **Status**: pending
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/lab-brakes-and-gate/PLAN.md` (phase 5 of 6)
+  - **Satisfies**: R1, R2, R3, R4 — Build §4.1: the brakes-off variants on M0030 and M0053 — the exposure diagnostic's `-FULL` arms, turned into real pre-registered, recorded lab variants; Build §4.2: interrogate the shared SPY 200-day gate that is nearly all one year of value and a drag since 2009; Hold the hard constraint: VARIANTS of the existing method files, free in N, never new method ids — verified with `store.pending_gate` before committing to a shape; Hold the usual lab rules: pre-register by committing the method file before `lab run`; `lab stage` for any database commit; Postgres for DB tests; no hard-gate override; never touch the test window
+  - **Depends on**: P1-ENG-J8RM, P1-ENG-T3ZK, P1-ENG-Q6WD
+  - **Plan**: `.workflows/plan/P1-ROOT-H5NX.md`
 
 ### [P2] Medium
 ### [P3] Low
@@ -34,6 +43,28 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-B2YP** Phase 6: The owner's two decisions: §5.1's N strings, and the amendment rule
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `docs/plans/2026-10-12-lab-n-and-amendments-owner-decision.md` (new) and the dated `## 9.` revision appended to `docs/plans/2026-10-04-method-lab-design.md`. Does not touch `engine/src/seer_engine/commands/lab.py` — not one of the ten strings — no engine source at all, and not `docs/backtests/2026-10-12-brakes-and-gate.md` (phase 5's; this memo is a policy document and must state no result from those runs, so the two can land in either order). Exit: the memo states §5.1 exactly as the handover does — ten line numbers, labelled as being at base commit `d3c1ec4`, 354 vs 74, the three options the previous session named — and recommends nothing the owner has not asked for; it notes that the set's one new command (`lab gate`) deliberately prints the clear form, as evidence the owner can weigh, not as a recommendation, and without touching the ten; it states the amendment mechanism's own integrity trade-off and the one open policy question it raises — whether amendments should be capped — as a question put to him, not answered; the design doc carries a dated revision recording the new rule beside the 2026-10-04 one it qualifies, with no existing line edited; `grep -c 'Lab N (dev trials)' engine/src/seer_engine/commands/lab.py` returns 10 on the branch, not only at `d3c1ec4`; `git diff HEAD -- engine/` is empty. No source file changes.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/lab-brakes-and-gate/PLAN.md` (phase 6 of 6)
+  - **Satisfies**: R5 — Surface §5.1 (the ten `Lab N (dev trials)` strings) to the owner as a decision. Do not fix it
+  - **Depends on**: P1-ENG-V4QT
+  - **Plan**: `.workflows/plan/P1-ROOT-B2YP.md`
+  - **Completed**: 2026-10-12 13:58
+  - **Method**: /do
+  - **Files**: `docs/plans/2026-10-12-lab-n-and-amendments-owner-decision.md`, `docs/plans/2026-10-04-method-lab-design.md`, `.workflows/todos.md`
+  - **Drift**:
+    - No code drift. The design doc was 512 lines ending at section 8 exactly as the plan said; the append begins at line 514 and the diff is 90 insertions, 0 deletions.
+    - One measured figure in the plan had gone stale: the memo's 'twenty-three documents quote the printed phrase' now measures 32 on this branch, inflated by this plan set's own planning notes. Rewrote that paragraph to carry the honest measurement (32 on branch, 21 at base d3c1ec4, 4 durable documents) per index invariant 10. The sub-claims it rests on — 0 under docs/runbooks/, 3 under docs/, 2 hits in engine/package_readme.md — all re-verified 2026-10-12.
+    - Suite: 4439 passed, 3 skipped, 3 failed. All three failures are in engine/tests/test_lab_gate_probe.py, phase 2's in-progress file. This phase touches no Python and adds no test. The three skips are the known opt-in live-store tests.
+    - grep -c 'Lab N (dev trials)' on engine/src/seer_engine/commands/lab.py transiently read 11 while phase 2 was mid-write, then settled at 10 across three consecutive samples and at HEAD. Exit criterion 5 holds.
+  - **Decided**:
+    - The memo's stale 'twenty-three documents' count -> rewrote as measured today with what it was measured on (32 on branch / 21 at d3c1ec4 / 4 durable). Rung 1: index invariant 10, measured numbers are written as measurements.
+    - Exit checks 2 and 3 ('git diff HEAD -- engine/' is empty) cannot pass tree-wide while three peers hold engine files -> verified scoped to this phase's own paths. Rung: the plan's own ownership rule; the criterion's intent is that THIS phase changed no source file, and this phase's diff contains no engine path.
+    - Suite not wholly green -> proceeded rather than stopping. Rung 2: the phase's exit criterion is 'green at whatever count this phase inherited'; every failure is in a peer's half-written file and this phase cannot have caused one.
 
 - [x] **P1-ROOT-K2VB** Phase 2: Run it over the five, and journal the answer
   - **Difficulty**: NORMAL

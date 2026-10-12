@@ -6,8 +6,11 @@
   and no look-ahead, on a synthetic market;
 - each candidate runs a smoke window through ``dev.run_candidate``;
 - allocator ids are unique across methods (a config digest names the allocator by id);
-- a method that has run is frozen: its file's sha256 equals the ``source_sha`` the committed
-  lab database recorded when it ran.
+- a method that has run is frozen against the sha the lab last ran it under: its file's sha256
+  equals ``store.latest_source_sha`` (the newest ``method_amendments`` row, else the
+  ``methods.source_sha`` recorded when it first ran), **and** every configuration the committed
+  lab has a trial for still digests to the ``config_digest`` that trial recorded. The two together
+  replaced the old whole-file freeze when amendments arrived (``method.Amendment``).
 """
 
 from __future__ import annotations
@@ -25,12 +28,12 @@ from seer_engine import dates
 from seer_engine.backtest.benchmark import Dividend
 from seer_engine.backtest.dev import DEV_END, run_candidate
 from seer_engine.backtest.registry import REGISTRY
-from seer_engine.lab import store
-from seer_engine.lab.method import discover, source_sha
+from seer_engine.lab import runner, store
+from seer_engine.lab.method import config_digest, discover, source_sha
 from seer_engine.strategies.allocator import Allocator, MarketAware
 
 METHODS = discover()
-CANDIDATES = [(mid, c) for mid, (m, _) in METHODS.items() for c in m.candidates]
+CANDIDATES = [(mid, c) for mid, (m, _) in METHODS.items() for c in m.all_candidates()]
 
 FORBIDDEN_IMPORT_ROOTS = {"psycopg", "requests", "yfinance", "time", "random", "logging", "urllib",
                           "socket", "subprocess", "sqlite3", "os"}
@@ -110,21 +113,106 @@ def test_allocator_ids_are_unique_across_methods():
         assert seen is c.allocator, f"{c.id}: allocator id {key!r} is already used by another object"
 
 
-def test_a_method_that_ran_is_frozen():
-    # The committed database, not SEER_LAB_DB: in a sera worktree the shared database already
-    # holds sibling methods whose files this tree does not have yet.
+def _committed_lab():
+    """A read-only connection to the committed lab, or None when this tree has no database.
+
+    The committed database, not ``SEER_LAB_DB``: in a sera worktree the shared database already
+    holds sibling methods whose files this tree does not have yet. Raw ``sqlite3`` rather than
+    ``store.connect``, because connecting migrates -- and a test must never rewrite the committed
+    file (``store.connect_readonly`` would do, but this predates it and the explicit URI says what
+    it does).
+    """
     if not store.COMMITTED_DB.exists():
-        pytest.skip("no lab database")
+        return None
     conn = sqlite3.connect(f"file:{store.COMMITTED_DB}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
+    return conn
+
+
+def test_a_method_that_ran_is_frozen_to_its_latest_recorded_sha():
+    """Half one of the freeze: the file on disk is the file the lab last ran, or the one it is
+    about to run next.
+
+    Not ``methods.source_sha`` directly but ``store.latest_source_sha``, which is that column
+    until the method gains an amendment and the newest ``method_amendments`` row afterwards. The
+    column is still written once and never rewritten, so for a method with no amendment -- which
+    is every method recorded before 2026-10-12 -- this asserts exactly what it asserted before.
+
+    **The pre-registration window, and why it is tolerated.** An amendment is pre-registered by
+    the commit that writes it and recorded only by the ``lab run --amend`` that executes it, so
+    between those two moments the file legitimately hashes to something no row holds. That window
+    is the mechanism, not a hole in it: the commit has to land first, because the commit *is* the
+    pre-registration. So a sha mismatch is accepted on exactly one condition --
+    ``runner.pending_amendment`` resolves, which means the file declares an ``Amendment`` the lab
+    has not recorded **and** every amendment it *has* recorded still matches the block it was
+    written from, field for field. Any other mismatch is the old failure, unchanged.
+
+    What is never tolerated is the thing the freeze exists to protect, and it is checked
+    separately and unconditionally by
+    ``test_every_recorded_configuration_still_digests_to_its_recorded_digest``: a recorded trial's
+    configuration may not move, amendment or no amendment. That test has no window.
+    """
+    conn = _committed_lab()
+    if conn is None:
+        pytest.skip("no lab database")
     try:
-        ran = conn.execute("SELECT id, source_sha FROM methods WHERE id GLOB 'M*' AND source_sha IS NOT NULL").fetchall()
+        ran = conn.execute(
+            "SELECT id FROM methods WHERE id GLOB 'M*' AND source_sha IS NOT NULL"
+        ).fetchall()
+        for row in ran:
+            mid = str(row["id"])
+            assert mid in METHODS, f"{mid} ran but its method file is gone"
+            method, path = METHODS[mid]
+            expected = store.latest_source_sha(conn, mid)
+            actual = source_sha(path)
+            if actual == expected:
+                continue
+            try:
+                runner.pending_amendment(conn, method)
+            except store.LabError as e:
+                raise AssertionError(
+                    f"{mid} changed after the lab last ran it (file {actual[:12]}, recorded "
+                    f"{str(expected)[:12]}) and it has no committed, unrecorded Amendment to "
+                    f"explain the difference: {e}. A method file is frozen against its latest "
+                    "recorded sha: a further question about the same idea is an Amendment "
+                    "(committed first, run with `lab run --amend`), a different idea is a new "
+                    "variation method"
+                ) from e
     finally:
         conn.close()
-    for row in ran:
-        assert row["id"] in METHODS, f"{row['id']} ran but its method file is gone"
-        _, path = METHODS[row["id"]]
-        assert source_sha(path) == row["source_sha"], (
-            f"{row['id']} changed after it ran; a method file is frozen once it has trials "
-            "(a change is a new variation method)"
+
+
+def test_every_recorded_configuration_still_digests_to_its_recorded_digest():
+    """Half two of the freeze, and the one an amendment cannot loosen.
+
+    ``config_digest`` canonicalizes ``TradeRules`` and allocator params defined in *other* files,
+    so a method file's own sha does not pin what its candidates do. This is the check that does,
+    and it is also the proof of plan invariant 3: ``Method`` gained an ``amendments`` field, and
+    ``registry._canon`` renders a dataclass by enumerating every ``compare=True`` field -- but
+    ``config_text`` never passes a ``Method`` to ``_canon``, only ``c.rules``, ``c.allocator.id``
+    and ``c.params``. Measured on the committed lab 2026-10-12, before the field existed: 63
+    method files, 0 digests drifted. This test keeps that at 0.
+    """
+    conn = _committed_lab()
+    if conn is None:
+        pytest.skip("no lab database")
+    try:
+        drifted: list[str] = []
+        for row in conn.execute(
+            "SELECT id FROM methods WHERE id GLOB 'M*' AND source_sha IS NOT NULL"
+        ).fetchall():
+            mid = str(row["id"])
+            method, _ = METHODS[mid]
+            have = {config_digest(c) for c in method.all_candidates()}
+            for t in conn.execute(
+                "SELECT candidate_id, config_digest FROM trials WHERE method_id = ?", (mid,)
+            ):
+                if str(t["config_digest"]) not in have:
+                    drifted.append(f"{mid}/{t['candidate_id']}")
+        assert drifted == [], (
+            f"{', '.join(drifted)}: a recorded trial's configuration is no longer one the method "
+            "file produces. Its rules, allocator or params changed after it ran, which rewrites "
+            "history the lab has already published"
         )
+    finally:
+        conn.close()

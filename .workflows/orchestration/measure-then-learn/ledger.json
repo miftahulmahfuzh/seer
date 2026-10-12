@@ -6,14 +6,14 @@
   "phases": [
     {
       "card": null,
-      "commit": "b8daa97",
+      "commit": "fceeeb4",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
       "note": "tasks tracked in engine/.workflows/todos.md (rung 6)",
       "package": "engine/sim",
       "plan": ".workflows/plan/measure-then-learn/phase-1.md",
-      "reported_at": "2026-10-12T14:54:09+00:00",
+      "reported_at": "2026-10-12T15:32:31+00:00",
       "satisfies": [
         "R1"
       ],
@@ -23,7 +23,7 @@
     },
     {
       "card": null,
-      "commit": "69f2c9fb",
+      "commit": "2a1271b",
       "depends_on": [
         1
       ],
@@ -32,7 +32,7 @@
       "note": "cash_yield lever (T13W, ACT/365 at open, point-in-time); paper/promote/lab refuse appropriately; labkit.SMOKE_T13W added; all preset pins unchanged; no ladder decisions",
       "package": "engine/sim`, `engine/backtest`, `engine/paper`, `engine/commands`, `engine/lab`, `engine/tests",
       "plan": ".workflows/plan/measure-then-learn/phase-2.md",
-      "reported_at": "2026-10-12T15:06:39+00:00",
+      "reported_at": "2026-10-12T15:32:32+00:00",
       "satisfies": [
         "R2"
       ],
@@ -42,7 +42,7 @@
     },
     {
       "card": null,
-      "commit": "14f9711",
+      "commit": "aada051",
       "depends_on": [
         1,
         2
@@ -52,7 +52,7 @@
       "note": "three fixed-tape presets appended to PRESETS; web mirrors TARGET_RESIZE_BAND/TARGET_BAND_RULES; no pinned digest moved",
       "package": "engine/sim`, `web/lib",
       "plan": ".workflows/plan/measure-then-learn/phase-3.md",
-      "reported_at": "2026-10-12T15:16:11+00:00",
+      "reported_at": "2026-10-12T15:32:32+00:00",
       "satisfies": [
         "R1",
         "R2"
@@ -63,14 +63,14 @@
     },
     {
       "card": null,
-      "commit": "1330b35",
+      "commit": "da71af6",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 4,
       "note": "EODHD alias top-up 0 calls (nothing left); sv store rebuilt 89.0% coverage",
       "package": "engine/commands`, `engine/lab`, skills, runbook, data",
       "plan": ".workflows/plan/measure-then-learn/phase-4.md",
-      "reported_at": "2026-10-12T15:13:06+00:00",
+      "reported_at": "2026-10-12T15:32:32+00:00",
       "satisfies": [
         "R3"
       ],
@@ -80,34 +80,34 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "c75a137",
       "depends_on": [
         3,
         4
       ],
       "difficulty": "HARD",
       "n": 5,
-      "note": null,
+      "note": "M0128 rejected; picking credited +4.6pts/yr over EW20; band no-op at 20 names; set rebased onto main before lab run (Decisions)",
       "package": "engine/lab/methods`, `lab/",
       "plan": ".workflows/plan/measure-then-learn/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T15:32:32+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-FON5",
       "title": "Near-miss twins under the fixed tape (lab method + run)"
     },
     {
       "card": null,
-      "commit": "0028022",
+      "commit": "3e12cf6",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 6,
       "note": "lab/tree_rank.py + 20 tests; real-store fits 11.6s, 202 book months; duplicate phase-6 task P1-ENG-DEBZ (raced in b8daa97) removed, H3RM is canonical",
       "package": "engine/lab` (`lab/tree_rank.py`)",
       "plan": ".workflows/plan/measure-then-learn/phase-6.md",
-      "reported_at": "2026-10-12T15:04:20+00:00",
+      "reported_at": "2026-10-12T15:32:32+00:00",
       "satisfies": [
         "R5"
       ],
@@ -132,7 +132,7 @@
       "satisfies": [
         "R5"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Tree-ranker method: pre-register and run on the dev window"
     }
@@ -140,7 +140,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/measure-then-learn/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "measure-then-learn",
-  "updated": "2026-10-12T15:16:11+00:00",
+  "updated": "2026-10-12T15:32:32+00:00",
   "verified_at": "2026-10-12T14:54:11+00:00",
   "worktree": "/home/miftah/.worktrees/seer/measure-then-learn"
 }

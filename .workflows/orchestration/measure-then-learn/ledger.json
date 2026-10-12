@@ -42,23 +42,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "14f9711",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "three fixed-tape presets appended to PRESETS; web mirrors TARGET_RESIZE_BAND/TARGET_BAND_RULES; no pinned digest moved",
       "package": "engine/sim`, `web/lib",
       "plan": ".workflows/plan/measure-then-learn/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T15:16:11+00:00",
       "satisfies": [
         "R1",
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-03JM",
       "title": "Fixed-tape presets and the web mirror"
     },
     {
@@ -94,7 +94,7 @@
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Near-miss twins under the fixed tape (lab method + run)"
     },
@@ -140,7 +140,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/measure-then-learn/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "measure-then-learn",
-  "updated": "2026-10-12T15:13:06+00:00",
+  "updated": "2026-10-12T15:16:11+00:00",
   "verified_at": "2026-10-12T14:54:11+00:00",
   "worktree": "/home/miftah/.worktrees/seer/measure-then-learn"
 }

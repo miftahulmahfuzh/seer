@@ -43,22 +43,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "f4f5b61",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "Verified by the coordinator from git: f4f5b61 is an ancestor of origin/feature/lab-brakes-and-gate; exactly 2 files (m0030_*.py +161/-2, test_lab_m0030_amendment.py +197). Invariant 3 checked directly: the only two deletions are the two import lines widened for Amendment and RESIDMOM \u2014 no recorded candidate, TIMED_SPY, ALWAYS_SPY, _blend or _v line altered. lab/lab.sqlite still md5 4a34ddb823ec88a5e86afeb5d7e1b7c9 and clean. D5-as-corrected-by-C7 held: the 20.4% worst fall is stated as the UNFUNDED re-weighting (trials 126/127/128, lump-sum 20,000,000, no trial_funding row) with the funded caveat IN FRONT of the prediction, the drawdown claim named the pre-registration's weakest, and a 19.6% reading declared not a refutation. Phase decisions: (1) the Amendment date field is 'added' not 'date' \u2014 the plan's two prose mentions were the stale half, rung 3 the plan's code blocks + phase 1's shipped dataclass; (2) reported rather than fixed phase 2's F541 and 3 test failures, rung = narrower blast radius. CORRECTION TO THE PHASE'S OWN REPORT: it stated phase 5 is unblocked because 'phases 2, 4 and 3 are all complete'. Phase 2 had NOT landed \u2014 gate_probe.py and test_lab_gate_probe.py were still untracked and commands/lab.py and package_readme.md dirty when this was checked. Phase 5 stays blocked on phase 2.",
       "package": "engine/src/seer_engine/lab/methods",
       "plan": ".workflows/plan/lab-brakes-and-gate/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T07:07:28+00:00",
       "satisfies": [
         "R1",
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-T3ZK",
       "title": "M0030's amendment: the satellite at full size, with and without the gate"
     },
     {
@@ -128,7 +128,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-brakes-and-gate/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-brakes-and-gate",
-  "updated": "2026-10-12T07:05:29+00:00",
+  "updated": "2026-10-12T07:07:28+00:00",
   "verified_at": "2026-10-12T06:47:00+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-brakes-and-gate"
 }

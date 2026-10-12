@@ -1,4 +1,4 @@
-import { CalendarClock, CalendarPlus, Check, ChevronRight, CircleDashed, ExternalLink, GitFork, Hash, X } from 'lucide-react';
+import { CalendarClock, CalendarPlus, Check, ChevronRight, CircleDashed, ExternalLink, GitFork, Hash, Star, X } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -16,7 +16,7 @@ import { requireSera } from '@/lib/sera/gate';
 import { GLOSSARY, type GlossaryKey, INSIGHT_KIND_LABEL, SOURCE_KIND_LABEL, STATUS_LABEL } from '@/lib/sera/glossary';
 import { childrenOf, insightsOf, lab, methodById, trialsOf } from '@/lib/sera/lab';
 import { collapseRepeatedHeadings, renderMarkdown } from '@/lib/sera/markdown';
-import type { LabMethod, LabTrial } from '@/lib/sera/types';
+import type { Gate, LabMethod, LabTrial } from '@/lib/sera/types';
 import {
   anyMoneyWeighted, BEST_COLOR, conditionTip, count, DEPOSITS_TIP, dsrNote, earned, earnedVs, fixed, growthFmt, nAtLastRun,
   redoneOf, type Redone,
@@ -176,12 +176,23 @@ export default async function MethodPage({ params }: { params: Promise<Params> }
   );
 }
 
-function MarkIcon({ mark, size }: { mark: Mark; size: number }) {
+/**
+ * A condition mark: tick, cross, or a dashed circle for a hurdle that does not apply.
+ *
+ * `decorative` is for the places that print the mark's label as visible text right beside it —
+ * the narrow-width variant cards. There the icon is a picture of a sentence the reader can
+ * already read, so it is hidden from assistive tech rather than announced twice.
+ */
+function MarkIcon({ mark, size, decorative = false }: { mark: Mark; size: number; decorative?: boolean }) {
   const label = markLabel(mark);
   const cls = mark.ok === true ? s.ok : mark.ok === null ? s.na : s.no;
+  const glyph = mark.ok === true ? <Check size={size} /> : mark.ok === null ? <CircleDashed size={size} /> : <X size={size} />;
+  if (decorative) {
+    return <span className={cls} aria-hidden="true" data-tip={label}>{glyph}</span>;
+  }
   return (
     <span className={cls} role="img" aria-label={label} data-tip={label}>
-      {mark.ok === true ? <Check size={size} /> : mark.ok === null ? <CircleDashed size={size} /> : <X size={size} />}
+      {glyph}
     </span>
   );
 }
@@ -374,7 +385,15 @@ function Tested({ m, trials, best }: { m: LabMethod; trials: LabTrial[]; best: L
         caption={`One row per test run. A tick means the hurdle was cleared. The best variant is highlighted.${
           funded ? ' Some runs here had money added every month, so their return and growth-a-year cells are left blank: with deposits arriving, neither is a return. What that money actually earned has a column of its own.' : ''}`}
         className={s.chartSheet}>
-        <div className={s.tableWrap}>
+        {/* One list, two presentations, switched at 1024px by globals' .desk-only / .mobile-only
+            pair -- the idiom components/Nav.tsx already uses for its two navs. Those classes set
+            `display: none !important`, so exactly one of the two is in the accessibility tree at
+            any width (plan invariant 10): the table keeps its scope attributes for a desk reader,
+            and the cards carry their own labels for a phone one. A 1240px table of 17 columns
+            whose every cell takes its meaning from the header row is not readable on a 390px
+            screen even inside a working scroller, which is why the phone gets cards instead of a
+            narrower table. */}
+        <div className={`${s.tableWrap} desk-only`}>
           <table className={s.table}>
             <thead>
               <tr>
@@ -452,8 +471,122 @@ function Tested({ m, trials, best }: { m: LabMethod; trials: LabTrial[]; best: L
             </tbody>
           </table>
         </div>
+
+        <ul className={`${s.cards} mobile-only`}>
+          {trials.map(t => (
+            <VariantCard key={t.n} t={t} gate={gate} isBest={t.n === best.n} />
+          ))}
+        </ul>
       </Section>
     </>
+  );
+}
+
+/**
+ * One variant, as a card: the phone presentation of a row of the variants table.
+ *
+ * The desk table is 17 columns at 1240px and every cell takes its whole meaning from the header
+ * row above it, so a 390px screen shows two of them and understands neither. The card re-ranks
+ * rather than abbreviates: nothing the row prints is dropped. It leads on the measure the SPY
+ * hurdle is decided by, gives the four hurdles that have a number a two-up grid, demotes the
+ * three measures no hurdle reads (return, Sharpe, MAR) to one compact line, and prints a label
+ * beside every condition mark — on a desk those marks borrow their meaning from a column header
+ * a card does not have.
+ *
+ * The labels are the glossary's plain words rather than the table's abbreviations, and carry no
+ * <Term>: the table says "Max DD" / "PF" / "DSR" because of a column budget a card does not have,
+ * and /sera/methods' cards already spell them out. <T> stays in the desk table's headers.
+ *
+ * The lead switches on funding for the reason view.conditionSentence('spy') switches: a run that
+ * was fed deposits is judged on what its money earned, and its `cagr` is not a yearly return once
+ * deposits keep arriving. Leading a funded card with `cagr` would headline a number the engine
+ * did not decide the tick by. The two cells the deposits inflate stay blanked, with the same
+ * tooltip the table hangs on them, because the blanking is the honest part.
+ */
+function VariantCard({ t, gate, isBest }: { t: LabTrial; gate: Gate; isBest: boolean }) {
+  const money = moneyWeighted(t);
+  const note = dsrNote(t, gate);
+  return (
+    <li className={s.card} data-best={isBest ? 'true' : undefined}>
+      <div className={s.cardHead}>
+        <span className={s.vName}>{t.candidateId}</span>
+        {isBest && (
+          <span className={`chip ${s.vBest}`}
+            data-tip="Of this method's development runs, the one that missed the fewest hurdles. It is the run the verdict above is written about.">
+            <Star size={14} aria-hidden="true" />Best
+          </span>
+        )}
+      </div>
+
+      <div className={s.vWhen}>
+        <span className={s.window} data-window={t.window}>{t.window === 'dev' ? 'Dev' : 'Test'}</span>
+        <span>{windowText(t)}</span>
+      </div>
+
+      <div className={s.vLead}>
+        <span className={s.vLeadLabel}>
+          {money ? 'What your money earned' : 'Growth a year'}
+        </span>
+        <span className={`num ${s.vLeadValue}`}>{money ? earned(t) : pct1(t.cagr)}</span>
+        <span className={s.vLeadVs}>
+          {money
+            ? `${earnedVs(t)} from the same deposits in SPY`
+            : `vs ${pct1(t.spyTrCagr)} from SPY with dividends`}
+        </span>
+      </div>
+
+      <dl className={s.stats}>
+        <div className={s.stat}>
+          <dt className={s.statLabel}>Max drawdown</dt>
+          <dd className={`num ${s.statValue}`}>{pct1(t.maxDrawdown)}</dd>
+        </div>
+        <div className={s.stat}>
+          <dt className={s.statLabel}>Profit factor</dt>
+          <dd className={`num ${s.statValue}`}>{pfText(t)}</dd>
+        </div>
+        <div className={s.stat}>
+          <dt className={s.statLabel}>Trades</dt>
+          <dd className={`num ${s.statValue}`}>{count(t.trades)}</dd>
+        </div>
+        <div className={s.stat}>
+          <dt className={s.statLabel}>Luck check</dt>
+          <dd className={`num ${s.statValue}`}>
+            {fixed(t.dsrNow, 2)}
+            {note !== null && <span className={s.vNote}>{note}</span>}
+          </dd>
+        </div>
+      </dl>
+
+      <p className={s.vMore}>
+        {money !== null && (
+          <span className={s.vMoreItem}>
+            Growth a year
+            <span className="num" data-tip={DEPOSITS_TIP}>—</span>
+          </span>
+        )}
+        <span className={s.vMoreItem}>
+          Return
+          {money !== null
+            ? <span className="num" data-tip={DEPOSITS_TIP}>—</span>
+            : <span className="num">{signed1(t.totalReturn)}</span>}
+        </span>
+        <span className={s.vMoreItem}>
+          Sharpe<span className="num">{fixed(t.sharpe, 2)}</span>
+        </span>
+        <span className={s.vMoreItem}>
+          MAR<span className="num">{fixed(t.mar, 2)}</span>
+        </span>
+      </p>
+
+      <ul className={s.vMarks}>
+        {marks(t).map(x => (
+          <li key={x.key} className={s.vMark}>
+            <MarkIcon mark={x} size={14} decorative />
+            <span>{markLabel(x)}</span>
+          </li>
+        ))}
+      </ul>
+    </li>
   );
 }
 

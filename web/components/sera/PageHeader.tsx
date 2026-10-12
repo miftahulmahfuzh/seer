@@ -1,6 +1,7 @@
 import { CalendarClock, LogOut } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { signOut } from '@/auth';
+import { SeraBackLink } from './SeraNav';
 import s from './PageHeader.module.css';
 
 export type PageHeaderProps = {
@@ -22,7 +23,14 @@ function asOfLabel(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : DAY.format(d);
 }
 
-/** Top of every Sera page: eyebrow, big title, plain lede; as-of date and sign-out on the right. */
+/**
+ * Top of every Sera page: eyebrow, big title, plain lede; as-of date and sign-out on the right.
+ *
+ * Below 1024 px the header is also the top of the page -- Sera's rail is gone and its tab bar
+ * floats at the bottom -- so the eyebrow is what names the section there, and the way back to Seer
+ * joins sign-out in the aside because the six-tab bar has no room for it (SeraBackLink renders
+ * nothing on a desk, and nothing outside /sera: this header is Sean's too).
+ */
 export function PageHeader({ eyebrow, title, lede, asOf, aside }: PageHeaderProps) {
   return (
     <header className={s.header}>
@@ -39,6 +47,7 @@ export function PageHeader({ eyebrow, title, lede, asOf, aside }: PageHeaderProp
             As of {asOfLabel(asOf)}
           </span>
         ) : null}
+        <SeraBackLink />
         <form action={async () => { 'use server'; await signOut({ redirectTo: '/signin?next=%2Fsera' }); }}>
           <button type="submit" className="icon-btn" data-tip="Sign out" aria-label="Sign out">
             <LogOut size={21} strokeWidth={1.5} />

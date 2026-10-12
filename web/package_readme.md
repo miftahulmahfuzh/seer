@@ -28,7 +28,7 @@ See [Sean](#sean-sean-libsean).
 - One data layer (`lib/data.ts`) that turns rows of all three engines (`bracket`, `book`, `benchmark`) into typed view models
 - Pure, DB-free logic that tests run without a connection: metrics and the go-live checklist (`lib/metrics.ts`), month-by-month paper performance (`lib/monthly.ts`), strategy row helpers (`lib/strategy.ts`), split-cadence wording and per-order size change (`lib/cadence.ts`), slot letters and card colours (`lib/slots.ts`), session freshness and WIB clock (`lib/session.ts`), why there is nothing to act on and when the next decision is due (`lib/decision.ts`), number/date formatting (`lib/format.ts`)
 - Four pages: Today, Positions, History, Leaderboard
-- Sera (`/sera`), the method lab section: gated to one account (`lib/sera/`), its own desktop shell and rail (`app/sera/layout.tsx`, `components/sera/`), a dependency-free SVG chart kit (`components/sera/charts/`), hand-built SVG diagrams for How it works (`components/sera/diagrams/`), and a pure data layer over the bundled lab snapshot `data/lab.json` (`lib/sera/types.ts`, `lab.ts`, `derive.ts`, `glossary.ts`, `markdown.ts`). Pages: Overview, Methods list + detail, Journal, Ideas, How it works; each page keeps its logic in a pure, tested `view.ts` (`overview.ts` for the Overview, and the Journal a second one, `seen-client.ts`, beside it). The Journal is the one Sera page that also touches Neon, for reader state only: `lib/sera/seen.ts` over `journal_seen` decides which entries are unseen, which orders them and fills the badges; it is also the only Sera page to mount a `'use client'` island of its own (`JournalSeen.tsx`), so `SeraNav.tsx` is no longer the section's sole client component. See [Sera](#sera-sera)
+- Sera (`/sera`), the method lab section: gated to one account (`lib/sera/`), its own shell, desktop rail and phone tab bar (`app/sera/layout.tsx`, `components/sera/`), a dependency-free SVG chart kit (`components/sera/charts/`), hand-built SVG diagrams for How it works (`components/sera/diagrams/`), and a pure data layer over the bundled lab snapshot `data/lab.json` (`lib/sera/types.ts`, `lab.ts`, `derive.ts`, `glossary.ts`, `markdown.ts`). Pages: Overview, Methods list + detail, Journal, Ideas, How it works; each page keeps its logic in a pure, tested `view.ts` (`overview.ts` for the Overview, and the Journal a second one, `seen-client.ts`, beside it). The Journal is the one Sera page that also touches Neon, for reader state only: `lib/sera/seen.ts` over `journal_seen` decides which entries are unseen, which orders them and fills the badges; it is also the only Sera page to mount a `'use client'` island of its own (`JournalSeen.tsx`), so `SeraNav.tsx` is no longer the section's sole client component. See [Sera](#sera-sera)
 - Sean foundation (`lib/sean/`, phase 1, pure): Gotrade receipt text -> numbers (`money.ts`), the arithmetic check that turns the model's JSON into one `SeanOrder` (`order.ts`), the glm-4.6v vision client with its token floor (`vision.ts`, `prompt.ts`, `extractJson.ts`), the read-and-one-repair flow (`readOrder.ts`), the average-cost ledger shared with the engine (`ledger.ts`), and a browser zip reader (`unzip.ts`)
 - Shared roster UI (`components/StrategySwitch.tsx`, `components/PaperChip.tsx`, `components/roster.ts`): icon-only strategy switching by `?s=` and the paper marker on research strategies' holdings, orders and trades
 - Migrations runner shared with the engine (`scripts/migrate.mjs`) and two demo seeders (`scripts/seed-demo.mjs` for the paper roster, `scripts/seed-demo-sean.mjs` for Sean)
@@ -62,7 +62,7 @@ web/
       leaderboard/view.ts   looks, researchOf, compare, windowLine, spyOverSpan, pickResearch, retiredLabel, scoreOf, monthLines, sinceStartLine  (pure)
       leaderboard/view.test.ts  vitest suite for view.ts
     sera/
-      layout.tsx            requireSera(), the Journal's unseen total, then SeraNav rail + centred column (max 1360px); stacks below 1024px
+      layout.tsx            requireSera(), the Journal's unseen total, then SeraNav + centred column (max 1360px); below 1024px the rail is gone and .main reserves --safe-top / --nav-clear for the floating bar
       not-found.tsx         in-shell 404 (Section + back-to-overview icon link)
       sera.module.css
       page.tsx              /sera Overview: latest synthesis, KPI tiles, trial scatter vs the gate, hurdle funnel, progress, luck bar, families, latest methods
@@ -82,8 +82,8 @@ web/
     roster.ts               strategyIcon, selectStrategy, sharesLabel                (pure)
     roster.test.ts          vitest suite for roster.ts
     sera/
-      SeraNav.tsx           (client) icon-only rail: Overview, Methods, Journal, Ideas, How it works (/sera/*), Back to Seer; the Journal tab carries an unseen-count badge (prop from app/sera/layout.tsx; no badge at zero)
-      PageHeader.tsx        eyebrow, title, lede, asOf, aside
+      SeraNav.tsx           (client) SeraNav: icon-only desk rail (wordmark, six tabs, Back to Seer) + a fixed 348px bottom pill bar below 1024px, both fed by one module-private Tabs; also exports SeraBackLink, the phone's way back to Seer (null off /sera/**)
+      PageHeader.tsx        eyebrow, title, lede, asOf, aside; as-of pill, SeraBackLink and sign-out in the aside (wraps below 1024px)
       Section.tsx           Section (eyebrow/title/caption, bg sheet|lav|butter|sky|stone|coral, aside), SectionGrid
       Stat.tsx              big figure + label, tone, tip, sub, size
       Term.tsx              glossary term with a wrapping definition tooltip
@@ -463,8 +463,51 @@ Page consumers:
 
 The method lab, shown: every method and trial the lab has run (the 14 historical `H-*` methods
 seeded from P7a and every lab `M*` method), with charts and plain-language explanations, the
-analysis and opinion on each method, and the insights journal. It is desktop-first. Below
-1024 px the pages stack in one column, readable but not designed.
+analysis and opinion on each method, and the insights journal.
+
+Below 1024 px it ships the same two shapes Seer's own `Nav` does: the rail disappears
+(globals.css `.desk-only` / `.mobile-only` is the switch, not a media query of Sera's own) and a
+fixed pill bar floats at the bottom with the six section tabs at the rail's full 52 px
+(6 x 52 + 5 x 4 gap + 2 x 8 padding = 348 px, clearing the 390 px floor). The bar carries no
+wordmark and no back button -- that is what pays for the sixth tab at full size; `PageHeader`'s
+eyebrow names the section instead, and `SeraBackLink` puts the way back to Seer beside sign-out.
+`app/sera/sera.module.css` reserves the bar's space once, for all seven pages (`.main` padding
+`var(--safe-top) 16px var(--nav-clear)`); no page adds its own spacer. Desktop is byte-identical.
+
+Inside that shell each page is laid out for the width rather than merely allowed to stack. The two
+tables become cards below 1024 px and stay byte-for-byte tables at 1024 px and up: `/sera/methods`
+renders a card per method and `/sera/methods/[id]` a card per variant, both through the same class
+names and the same 28 px `var(--stone)` card geometry, with the best variant carrying a named
+`Best` chip as well as its tint -- a tint alone cannot label a card whose neighbours are off-screen.
+Each presentation is marked `.desk-only` / `.mobile-only`, so exactly one of the two is in the
+accessibility tree at any width. The cards spell their measures out in the glossary's plain words
+(`Max drawdown`, `Profit factor`, `Luck check`) rather than the table's abbreviations: the table
+abbreviates because of a column budget a card does not have, and a `<Term>`'s focusable span under
+a card-wide link overlay would be both unreachable and a focus trap. `<T>` stays in the desk
+tables' `<th>`s.
+
+`/sera/ideas` stopped scrolling sideways when its grid tracks became `minmax(0, 1fr)` -- a default
+`1fr` track floors at the widest item's min-content, which the long `stock-momentum-...` slugs
+blew past -- and its `.tag` pills were allowed to wrap, with 30 px as a min-height floor instead of
+a fixed height (`.chip`'s `white-space: nowrap` is global and correct, so `.tag` overrides it
+locally). `/sera`'s stat tiles go one per row at a size reached from `overview.module.css` as
+`.stats :global(.num)`: **`components/sera/Stat.module.css` is deliberately never edited**, because
+`Stat` is also rendered by `/sean` and `.value` / `.md` tie on specificity, so a media block
+appended there would silently enlarge Sean's tiles on source order. That makes one standing
+assumption worth keeping: `Stat.tsx` must keep the global `num` class on its value span, or Sera's
+phone tiles quietly return to 52 px. `/sera/how`'s diagrams keep their horizontal scroll but now
+say so, with a `mask-image` fade and a thin rail -- declarations on the scroller itself, adding no
+new element.
+
+**The containing-block trap, worth knowing before adding any scroller here.** `Term`'s
+visually-hidden `.sr` definition is `position: absolute`, and an absolutely positioned box is
+clipped only by an ancestor in its *containing-block* chain -- an `overflow` value alone does
+nothing. Sera's table and prose scrollers are all `position: static`, so every `.sr` resolved its
+containing block out to `.sheet` and widened the whole document: `/sera/methods` measured a 959 px
+`scrollWidth` at a 390 px viewport. The fix is one declaration, `position: relative` on `.term` in
+`Term.module.css`, which covers every scroller that will ever hold a `<Term>`. The standing rule it
+leaves: any scroller that gains an absolutely positioned child needs `position: relative` (or
+`contain: paint`) in the same rule as its `overflow`.
 
 ### Routes
 

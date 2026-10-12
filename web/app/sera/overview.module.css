@@ -92,6 +92,30 @@
 .status[data-status='dev-eligible'], .status[data-status='promoted'] { background: var(--butter); }
 .status[data-status='test-passed'], .status[data-status='paper'] { background: var(--coral); color: var(--on-coral); }
 
+/*
+ * Phone. The sheet's inner width is 314px at a 390px viewport (390 - 32 main padding - 44 Section
+ * padding) and 338px at 414. Two tiles in that space give each number ~145px, and Stat's value is
+ * 52px with `white-space: nowrap`, so the two numbers overlap -- they do *not* widen the document,
+ * because `minmax(0, 1fr)` already caps the tracks. That is why `npm run shoot` passes on this
+ * page while the tiles are broken, and why this block is judged from the screenshot rather than
+ * from the run. One tile per row at 38px is the designed answer: the longest value the page can
+ * print is 'none yet' (eight characters, the no-result fallback), which fits 314px with room, and
+ * each tile's plain sentence gets a full-width line instead of a four-line ribbon.
+ */
+@media (max-width: 1023.98px) {
+  .stats { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+
+  /*
+   * The size is set from here, not from Stat.module.css, because that component is also rendered
+   * by /sean and /sean/plan, which this plan set does not touch -- and because `.value` and `.md`
+   * tie on specificity there, so a media block appended to that file would silently outrank the
+   * 34px `md` size those pages use. Stat.tsx puts the global `num` class on the value span, so
+   * `.stats .num` (0,2,0) reaches it from here and beats `.value` (0,1,0) whatever the stylesheet
+   * order is, scoped to these five tiles and nothing else. Keep `num` on that span.
+   */
+  .stats :global(.num) { font-size: 38px; }
+}
+
 @media (min-width: 1024px) {
   .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
 

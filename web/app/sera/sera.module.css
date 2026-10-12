@@ -14,7 +14,15 @@
 
 .notFound { padding-top: 40px; }
 
+/* Below 1024 px neither half of the nav is in flow: the rail is `desk-only` (display: none) and
+   the tab bar is a fixed floating pill. So the shell holds `main` alone and needs no column flip
+   -- the main app's shell (app/(app)/shell.module.css) is the same two rules and has never had one.
+   What `main` does need is the space the fixed bar sits over, and the notch the old top bar used
+   to clear. Both come from the tokens that already exist: --nav-clear, the way
+   app/(app)/today.module.css and history/history.module.css reserve it, and --safe-top, the way
+   app/(app)/shell.module.css does. Reserved once, here, rather than as a spacer in each of the
+   seven Sera pages; no page should add its own. The >=1024 padding above is untouched -- it is
+   measured correct beside the 104 px rail. */
 @media (max-width: 1023.98px) {
-  .shell { flex-direction: column; }
-  .main { padding: 0 16px 40px; }
+  .main { padding: var(--safe-top) 16px var(--nav-clear); }
 }

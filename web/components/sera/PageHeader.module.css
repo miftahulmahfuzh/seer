@@ -14,7 +14,16 @@
 .asOf { height: 52px; color: var(--ink); cursor: help; }
 
 @media (max-width: 1023.98px) {
+  /* The top of the page: the rail is gone and the tab bar floats at the bottom, so this header
+     is what names the section. 24 px above the eyebrow is the house measure for a page top; the
+     notch is cleared by .main (app/sera/sera.module.css), not here, because /sean uses this same
+     header behind its own shell. */
   .header { flex-direction: column; align-items: flex-start; gap: 18px; padding: 24px 4px 12px; }
   .title { font-size: 36px; }
   .lede { font-size: 17px; }
+  /* Three controls now, once the phone's way back to Seer joins the as-of pill and sign-out
+     (SeraBackLink). They measure ~300 px in a 366 px row at 390 px, so they do not wrap today --
+     this is what makes a longer date or a page's own `aside` fall to a second line instead of
+     scrolling the page sideways. */
+  .aside { flex-wrap: wrap; }
 }

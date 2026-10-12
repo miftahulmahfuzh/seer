@@ -41,23 +41,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "89e04d7",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "HARD",
       "n": 3,
-      "note": null,
+      "note": "Coordinator-verified: 89e04d7 on origin/feature/sera-responsive. Three files \u2014 its two owned sources, its task plan. No peer source. Audited independently: D8 held (all five <T> usages are still in the desk table's <th>s; they show as added lines only because the table was re-indented into its new .desk-only wrapper, and no <Term> is in the cards); invariant 6 held (the switch is phase 1's shared .desk-only/.mobile-only primitives, not a second media query); one @media (max-width: 1023.98px) block, pure append at line 86. Measured rather than estimated the cost: 4,381 -> 7,792 elements, 1.78x, under the plan's 'roughly doubles'. Its completed todos.md row landed inside phase 5's 97b576a \u2014 mis-attribution recorded, not repaired. Left a dev server on 3123.",
       "package": "web/app/sera/methods",
       "plan": ".workflows/plan/sera-responsive/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-12T11:20:55+00:00",
       "satisfies": [
         "R1",
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-HS7C",
       "title": "/sera/methods`: cards on a phone, table on a desk"
     },
     {
@@ -105,7 +105,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/sera-responsive/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-responsive",
-  "updated": "2026-10-12T11:16:25+00:00",
+  "updated": "2026-10-12T11:20:55+00:00",
   "verified_at": "2026-10-12T11:00:44+00:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-responsive"
 }

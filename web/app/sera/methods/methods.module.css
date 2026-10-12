@@ -83,3 +83,66 @@
 @media (min-width: 1024px) {
   .sheet { padding: 28px 30px 30px; border-radius: 40px; }
 }
+
+/* ---- Below 1024px: a card per method ---------------------------------------------------------
+   The table above is 1200px of eleven columns and does not become readable by being put in a
+   330px scroller: measured at 390, the reader gets STATUS, a truncated METHOD, and no affordance
+   that nine more columns exist. So below this width the table is hidden outright (.desk-only in
+   page.tsx) and the same rows are rendered again as cards -- the vocabulary every other Sera page
+   already uses here: ideas.module.css .card/.wish/.group and journal.module.css .card are all
+   28px-radius panels on var(--stone) inside their sheet.
+
+   Everything new in this file is inside this one query, so desktop cannot drift: nothing below
+   this comment applies at >= 1024px. The column budget above (:24-38) and the >= 1024px block
+   (:83-85) are measured records and are left exactly as they are. */
+@media (max-width: 1023.98px) {
+  /* The filter pill (166px) and the five count chips stop sharing one row and fighting for it.
+     journal.module.css does the same to .bar at the same breakpoint. */
+  .toolbar { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .counts :global(.chip) { height: 30px; font-size: 14px; }
+
+  .cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+
+  .card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px 18px 14px;
+    border-radius: 28px;
+    background: var(--stone);
+  }
+  /* Offset outward, not inward: an inset outline would cut the 28px corners. */
+  .card:focus-within { outline: 2px solid var(--coral); outline-offset: 2px; }
+
+  .cardHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .cardTitles { min-width: 0; }
+
+  /* The whole card is the link, exactly as .nameLink::after covers the whole row on desktop.
+     The card deliberately carries no second tap target, so nothing competes with it. */
+  .cardLink { display: block; color: var(--ink); outline: none; }
+  .cardLink::after { content: ''; position: absolute; inset: 0; border-radius: 28px; }
+
+  .cardScore { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .cardGo { flex: none; color: var(--ink-3); }
+
+  /* One tone, not a new palette. .status and .status[data-tone='bad'] are both var(--stone), which
+     is this card's own background, so a Rejected chip would vanish. --chip-solid is the token for
+     a chip that must sit proud of a tinted surface (globals.css:169) and, unlike var(--sheet), it
+     stays LIGHTER than --stone in the dark theme. ideas.module.css makes the same move with
+     `.chips :global(.chip)`. The other three tones are correct on stone and are left alone -- in
+     particular 'wait' keeps its transparent, dashed-outline look, which is the point of it. */
+  .card .status[data-tone='bad'] { background: var(--chip-solid); }
+
+  /* Four numbers, 2x2. At 390 each column is ~131px: "GROWTH A YEAR" is the widest label at
+     ~103px and "12.3% vs 9.1%" the widest value at ~88px, so neither needs to truncate. */
+  .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; margin: 2px 0 0; }
+  .stat { min-width: 0; }
+  /* ideas.module.css .label, copied exactly. */
+  .statLabel {
+    display: block; margin: 0; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* margin: 0 first -- a <dd> carries a 40px inline-start margin by default. */
+  .statValue { margin: 2px 0 0; font-size: 16px; line-height: 1.2; }
+}

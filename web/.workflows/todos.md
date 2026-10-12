@@ -2,7 +2,7 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-10-09
+**Last Updated**: 2026-10-12
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 20
+- Completed: 22
 
 ---
 
@@ -35,6 +35,50 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-R5PT** Phase 1: The narrow nav and the shell
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns components/sera/SeraNav.tsx, components/sera/SeraNav.module.css, app/sera/sera.module.css, components/sera/PageHeader.tsx, components/sera/PageHeader.module.css. Exit: /sera, /sera/journal, /sera/gotrade, /sera/how measure exactly 390 at 390 and 414 at 414 in both themes; 1280 renders identically to 09515d1; the six section tabs and a way back to Seer are reachable on a phone, each icon-only with aria-label + tooltip; the journal badge is not clipped. /sera/methods and /sera/ideas still overflow (476 / 959 / 848) — that is phases 2-5's work.
+  - **Status**: done
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-responsive/PLAN.md` (phase 1 of 5)
+  - **Satisfies**: R1 — a designed narrow layout at 390 and 414; R2 — zero horizontal scroll at 390, 414 and 1280 in both themes on all seven Sera routes
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-WEB-R5PT.md`
+  - **Completed**: 2026-10-12 17:58
+  - **Method**: /do
+  - **Files**: web/components/sera/SeraNav.tsx, web/components/sera/SeraNav.module.css, web/app/sera/sera.module.css, web/components/sera/PageHeader.tsx, web/components/sera/PageHeader.module.css, web/.workflows/todos.md, web/.workflows/plan/P1-WEB-R5PT.md
+  - **Drift**:
+    - No code drift: all five owned files matched the plan's quoted content byte for byte at `09515d1`.
+    - `/sera/methods` and `/sera/methods/M0102` measured EXACT rather than the ledger's 959/848, because phase 2's `Term.module.css` fix was live (uncommitted) in the shared worktree during the shoot. The plan index anticipates exactly this ("a wave-2 session that sees an unexpected number is probably looking at a peer's in-flight edit"). Phase 1 did not touch either route's files.
+    - A peer minted P1-WEB-R2FX and left an adopted plan file; at the time phase 1 looked, no matching row was visible in this shared `todos.md`. It is present now, under Completed Tasks — the two sessions' concurrent writes raced, and the row survived. No repair needed.
+  - **Decided**:
+    - Step 3 creates only phase 1's task row, not all five phases' — five concurrent sessions each running Step 3 against one shared `web/.workflows/todos.md` would interleave writes and lose rows (tie-break: narrower blast radius).
+    - Shoot ran against the single dev server the worktree permits instead of the plan's dedicated port 3121 — Next 16.3.8 refuses a second dev server per project directory, so "phase N takes port 312N" is unachievable in a shared worktree (rung 6, surrounding reality). Re-verified on 3121 once the peer's server exited; identical result.
+    - `web/.workflows/todos.md` is committed although it is a file every phase writes — leaving it out would leave the phase's own task row uncommitted and the bookkeeping broken (tie-break: reversible option).
+    - The plan index's set-level `**Status:**` line was NOT advanced and `ledger.json` was not touched: `swarm.py find` reports coordinator `orch-sera-responsive` owns this set, so set progress is its ledger and five concurrent phases writing it would race. Phase 1's own TaskID cell was already filled in the main checkout; nothing further to tick (rung: narrower blast radius; matches phase 2's precedent).
+  - **Verified**: `npx tsc --noEmit` clean; `npm test` 49 files / 676 tests passed. `npm run shoot` at 390, 414 and 1280 in both themes over all seven Sera routes plus `/sean`: `/sera`, `/sera/journal`, `/sera/gotrade` and `/sera/how` measure exactly the viewport width (from 66px @390 / 42px @414 of horizontal scroll). `/sera/ideas` remains 476px absolute — phase 5's grid-track minimum, correctly not fixed here. 1280 clean on every route, and all 16 desktop PNGs byte-identical to a pre-edit baseline, `/sean`'s included. PNGs read: six tabs inside one centred floating pill with gutter either side; the journal badge sits inside the pill with its ring clean in both themes; a back-to-Seer eye button beside sign-out on every Sera page and on none of `/sean`'s; no wordmark or top bar at narrow widths; a full-page shot confirms the last content clears the floating bar.
+
+- [x] **P1-WEB-R2FX** Phase 2: Term's hidden span stops escaping its scroller
+  - **Difficulty**: EASY
+  - **Type**: Bug
+  - **Context**: Owns `web/components/sera/Term.module.css`. The `.sr` visually-hidden span's containing block is a `position: static` scroller's ancestor (`section.sheet`), so it escapes the scroller and widens the document. Fix is a containing-block declaration in Term.module.css only. Exit: with phase 1 not yet merged, `/sera/methods` measures 456 at 390 (from 959) and `/sera/methods/M0102` measures 456 (from 848); 1280 visually unchanged; glossary tooltip and screen-reader text still work.
+  - **Status**: done
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-responsive/PLAN.md` (phase 2 of 5)
+  - **Satisfies**: R2 — Zero horizontal scroll at 390, 414 and 1280 in both themes on all seven Sera routes
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-WEB-R2FX.md`
+  - **Completed**: 2026-10-12 17:56
+  - **Method**: /do
+  - **Files**: web/components/sera/Term.module.css, web/.workflows/plan/P1-WEB-R2FX.md, web/.workflows/todos.md
+  - **Drift**:
+    - No code drift: Term.module.css matched the plan's quoted 19-line source byte for byte before editing.
+    - web/.workflows/todos.md is a shared ledger and also carries phase 1's P1-WEB-R5PT row, added concurrently by the phase 1 session. Committing it is deliberate (see decisions) — it is bookkeeping, not phase 1's source work, none of which is in this commit.
+  - **Decided**:
+    - Step 3 task creation: created only phase 2's task row, not all five phases' — tie-break rule "narrower blast radius", since five concurrent sessions each writing all five rows into the one shared web/.workflows/todos.md would corrupt it.
+    - Commit scope includes the shared web/.workflows/todos.md even though it carries phase 1's row → tie-break "take the reversible option": a bookkeeping row is trivially reversible, whereas omitting the file would strand this phase's own task record. Phase 1's adopted plan file P1-WEB-R5PT.md is excluded.
+    - The plan index's set-level `**Status:**` line was NOT advanced: `swarm.py find` reports this set has coordinator `orch-sera-responsive`, so set progress is the coordinator's ledger and five concurrent phases writing it would race. Only phase 2's own TaskID cell was filled, in the main checkout, left uncommitted for the coordinator (rung: narrower blast radius; matches phase 1, which filled its own cell the same way).
+  - **Verified**: `npx tsc --noEmit` exit 0 clean; `npm test` 49 files, 676 tests, all passed. Acceptance shoot (7 routes x 3 widths x 2 themes, port 3122): `/sera/methods` 569px -> 66px horizontal scroll at 390 (scrollWidth 959 -> 456), `/sera/methods/M0102` 458px -> 66px (848 -> 456); at 414, 545 -> 42 and 434 -> 42; nothing at 1280 on all seven routes. The residual 66/42 is phase 1's nav and the extra 20px on `/sera/ideas` is phase 5's grid track — both expected by the plan's Residual-overflow ledger. All eight 1280px PNGs (4 routes x 2 themes) byte-identical before vs after (plan invariant 2). DOM check on 4 routes: `.term` computed `position: relative`, `.sr` still `absolute`, 1x1 box, no `aria-hidden`, text intact, dotted underline unchanged (invariant 10). Tooltip shows, hides on inner-scroller scroll (the capture-phase path the plan flagged), re-shows, auto-hides after 2.5s — identical to a non-Term `[data-tip]` control.
 
 - [x] **P1-WEB-H7RK** Phase 1: Count the rules once, where the rules are
   - **Difficulty**: NORMAL

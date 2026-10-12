@@ -1,4 +1,17 @@
+/* A glossary word: a dotted underline, plus a visually-hidden copy of its definition for screen
+   readers. `.sr` is `position: absolute`, and an absolutely positioned box is only clipped by an
+   ancestor scroller that is in its *containing-block* chain -- an `overflow` value alone does
+   nothing. Sera's scrollers (`methods.module.css .tableWrap`, `[id]/method.module.css .tableWrap`,
+   the `[data-md-table]` wrappers in the prose) are all `position: static`, so without the rule
+   below each `.sr` resolves its containing block all the way out to `.sheet`
+   (`globals.css`, `position: relative`), escapes the scroller, and widens the whole document:
+   `/sera/methods` measured a 959px scrollWidth at a 390px viewport, the last `.sr`'s right edge
+   to the pixel. `position: relative` here -- no offsets, so nothing moves -- makes `.term` itself
+   the containing block, which puts `.sr` back inside the scroller where it is clipped normally.
+   Remove it and both method pages scroll sideways on a phone again. Fixing it here rather than in
+   each scroller is deliberate: it covers every scroller that will ever hold a <Term>. */
 .term {
+  position: relative;
   text-decoration: underline dotted;
   text-decoration-color: var(--ink-3);
   text-decoration-thickness: 1.5px;

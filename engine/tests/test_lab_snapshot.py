@@ -22,6 +22,20 @@ from seer_engine.lab import seed as seed_mod
 from seer_engine.lab import store
 from seer_engine.lab.seed import seed
 
+def _without_folds(schema: str) -> str:
+    """``schema`` as it read at v6: the ``method_folds`` table and its triggers removed.
+
+    Derived from ``store._SCHEMA`` exactly as the three strippers below are, and chained ahead of
+    them, so a "v5" fixture does not quietly carry a v7 table. The assertions fail loudly if the
+    statements stop being laid out one per paragraph, which is what makes the strip exact.
+    """
+    for ddl in (store._FOLDS_TABLE, *store._FOLDS_TRIGGERS):
+        assert f"{ddl};\n\n" in schema
+        schema = schema.replace(f"{ddl};\n\n", "")
+    assert "method_folds" not in schema
+    return schema
+
+
 def _without_amendments(schema: str) -> str:
     """``schema`` as it read at v5: the ``method_amendments`` table and its triggers removed.
 
@@ -36,7 +50,8 @@ def _without_amendments(schema: str) -> str:
     return schema
 
 
-V5_SCHEMA = _without_amendments(store._SCHEMA)
+V6_SCHEMA = _without_folds(store._SCHEMA)
+V5_SCHEMA = _without_amendments(V6_SCHEMA)
 
 
 def _without_moments(schema: str) -> str:
@@ -130,7 +145,7 @@ def test_connect_migrates_a_v1_database_keeping_rows_and_triggers(tmp_path):
 def test_a_new_database_starts_at_the_current_schema_version(tmp_path):
     conn = store.connect(tmp_path / "lab.sqlite")
     try:
-        assert store.schema_version(conn) == store.SCHEMA_VERSION == "6"
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "7"
         assert "synthesis" in store.INSIGHT_KINDS
         with conn:
             assert store.add_insight(conn, kind="synthesis", title="t", body="b") == 1
@@ -374,7 +389,7 @@ def test_connect_migrates_a_v4_database_backfilling_provenance_and_touching_no_t
     conn = store.connect(db)
     fresh = store.connect(tmp_path / "fresh.sqlite")
     try:
-        assert store.schema_version(conn) == store.SCHEMA_VERSION == "6"
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "7"
         assert _trials_bytes(db) == before
         assert [tuple(r) for r in conn.execute("SELECT * FROM trial_funding ORDER BY trial_n")] == funding_before
         assert _provenance_schema(conn) == _provenance_schema(fresh)
@@ -451,7 +466,7 @@ def test_connect_migrates_a_v5_database_adding_method_amendments_and_touching_no
     conn = store.connect(db)
     fresh = store.connect(tmp_path / "fresh.sqlite")
     try:
-        assert store.schema_version(conn) == store.SCHEMA_VERSION == "6"
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "7"
         assert _trials_bytes(db) == before
         assert [tuple(r) for r in conn.execute("SELECT * FROM methods ORDER BY id")] == [
             tuple(r) for r in methods_before
@@ -485,6 +500,120 @@ def test_connect_migrates_a_v5_database_adding_method_amendments_and_touching_no
         assert _trials_bytes(db) == before
     finally:
         again.close()
+
+
+def _folds_schema(conn) -> list[tuple[str, str, str]]:
+    return [tuple(r) for r in conn.execute(
+        "SELECT type, name, sql FROM sqlite_master WHERE tbl_name = 'method_folds' "
+        "ORDER BY type, name"
+    )]
+
+
+def _v6_db(path):
+    """A schema-v6 database: one method that has run, one dev trial, no method_folds table."""
+    c = sqlite3.connect(path)
+    c.executescript(V6_SCHEMA)
+    c.executemany("INSERT INTO transitions (src, dst) VALUES (?, ?)", store.TRANSITIONS)
+    c.execute("INSERT INTO meta (key, value) VALUES ('schema_version', '6')")
+    c.execute(
+        "INSERT INTO methods (id, name, family, source_kind, hypothesis, status, source_sha, "
+        "created, updated) VALUES ('M0001', 'n', 'f', 'knowledge', 'h', 'dev-eligible', ?, "
+        "'2026-10-01T00:00:00+00:00', '2026-10-01T00:00:00+00:00')",
+        ("a" * 64,),
+    )
+    c.execute(
+        'INSERT INTO trials (method_id, candidate_id, config_digest, config_text, rules_id, '
+        'allocator_id, window, start, "end", store_fingerprint, git_sha, run_at, trades, '
+        "sharpe, mar, failed, eligible, dsr, n_trials_at_run, curve_json) VALUES "
+        "('M0001', 'M0001-A', 'd1', 't', 'r', 'a', 'dev', '2000-01-03', '2015-10-16', 'fp', "
+        "'abc', '2026-10-05T00:00:00+00:00', 200, 0.945, 0.82, '', 0, 0.9, 110, '[]')"
+    )
+    c.execute(
+        "INSERT INTO trial_provenance (trial_n, initial_idr, price_fingerprint, source, measured) "
+        "VALUES (1, '20000000', NULL, 'backfill', '2026-10-09T00:00:00+00:00')"
+    )
+    c.commit()
+    c.close()
+
+
+def test_connect_migrates_a_v6_database_adding_method_folds_and_touching_no_row(tmp_path):
+    """v6 -> v7 is purely additive: a table, two triggers, a version string, and nothing else.
+
+    No method row and no trial row moves, and in particular ``trials.eligible`` is not touched:
+    the fold verdict annotates, it has never decided eligibility, and this migration does not make
+    it start. Nothing is backfilled either -- a past run's fold record cannot be recomputed as it
+    read, so ``latest_folds`` answering None for every method that predates the table is the
+    honest answer, not a gap.
+    """
+    db = tmp_path / "lab.sqlite"
+    _v6_db(db)
+    before = _trials_bytes(db)
+    methods_before = sqlite3.connect(db).execute("SELECT * FROM methods ORDER BY id").fetchall()
+
+    conn = store.connect(db)
+    fresh = store.connect(tmp_path / "fresh.sqlite")
+    try:
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "7"
+        assert _trials_bytes(db) == before
+        assert [tuple(r) for r in conn.execute("SELECT * FROM methods ORDER BY id")] == [
+            tuple(r) for r in methods_before
+        ]
+        assert _folds_schema(conn) == _folds_schema(fresh)
+        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+        assert conn.execute("SELECT count(*) FROM method_folds").fetchone()[0] == 0
+        assert store.folds_of(conn, "M0001") == []
+        assert store.latest_folds(conn, "M0001") is None
+        with conn:
+            store.insert_folds(conn, store.FoldRow(
+                method_id="M0001", seq=1, run_at="2026-10-13T00:00:00+00:00", git_sha="deadbeef",
+                bench_n=None, folds_total=None, folds_scored=None, folds_won=None, majority=None,
+                stable=None, picks_json="[]", summary="not scoreable (no benchmark)",
+                reason="no benchmark", recorded="2026-10-13T00:00:01+00:00",
+            ))
+        assert store.latest_folds(conn, "M0001")["git_sha"] == "deadbeef"
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            conn.execute("UPDATE method_folds SET summary = 'x'")
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            conn.execute("DELETE FROM method_folds")
+        assert _trials_bytes(db) == before
+    finally:
+        conn.close()
+        fresh.close()
+
+    again = store.connect(db)  # idempotent: a second connect adds nothing
+    try:
+        assert store.schema_version(again) == store.SCHEMA_VERSION
+        assert again.execute("SELECT count(*) FROM method_folds").fetchone()[0] == 1
+        assert _trials_bytes(db) == before
+    finally:
+        again.close()
+
+
+@pytest.mark.skipif(not store.COMMITTED_DB.is_file(), reason="no committed lab database here")
+def test_the_v6_to_v7_migration_moves_not_one_byte_of_the_web_snapshot(tmp_path):
+    """Decision D3, as a test rather than a claim.
+
+    ``store.snapshot`` reads ``methods``, ``trials``, ``insights`` and ``ideas_seen`` only, so a
+    new side table cannot change its bytes -- but "cannot" is an argument and this is the
+    measurement, taken on a copy of the committed lab (the original is never opened for writing).
+    ``SNAPSHOT_VERSION`` therefore does not move, ``web/data/lab.json`` is unchanged by this
+    phase, and nothing under ``web/`` is touched.
+    """
+    db = tmp_path / "lab.sqlite"
+    shutil.copyfile(store.COMMITTED_DB, db)
+    ro = store.connect_readonly(db)
+    try:
+        before = store.snapshot_json(ro)
+    finally:
+        ro.close()
+    store.connect(db).close()  # migrates in place, whatever version the committed file is at
+    ro = store.connect_readonly(db)
+    try:
+        assert store.schema_version(ro) == store.SCHEMA_VERSION == "7"
+        assert store.snapshot_json(ro) == before
+    finally:
+        ro.close()
+    assert store.SNAPSHOT_VERSION == 5
 
 
 @pytest.mark.skipif(not store.COMMITTED_DB.is_file(), reason="no committed lab database here")

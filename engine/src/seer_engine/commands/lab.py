@@ -1430,6 +1430,19 @@ def _show(conn, args) -> int:
                 f"({f['deposits_n']} deposits, {f['schedule']}); the return and CAGR above count "
                 f"those deposits as gains"
             )
+    # The walk-forward record this method's last `lab run` recorded (store.method_folds, schema
+    # v7). None -- so no line -- for a method that has not run, and for every method that ran
+    # before the table existed: the migration backfills nothing, because a past run's record
+    # cannot be recomputed as it read (store._v6_to_v7).
+    #
+    # Printed through `hardgate.FoldVerdict.from_row`, which is the exact inverse of what the run
+    # wrote, so this line and the one `lab run` printed are the same sentence from the same code.
+    folds_row = store.latest_folds(conn, m["id"])
+    if folds_row is not None:
+        from seer_engine.lab import hardgate
+
+        v = hardgate.FoldVerdict.from_row(folds_row)
+        print(f"\nWalk-forward, recorded at the run of {folds_row['run_at']}: {v.line()}")
     if m["verdict"]:
         print(f"\nVerdict: {m['verdict']}")
     if m["analysis"]:
@@ -1438,6 +1451,8 @@ def _show(conn, args) -> int:
 
 
 def _run(conn, args) -> int:
+    import json
+
     from seer_engine.lab import hardgate, runner
     from seer_engine.lab.method import discover
 
@@ -1486,13 +1501,38 @@ def _run(conn, args) -> int:
                 f"{coverage.MIN_DEV_COVERAGE:.0%} floor. These trials measure the panel, not the "
                 "hypothesis, and the method id is spent either way."
             )
-    ran = runner.run_method(
+    done = runner.run_method(
         conn, method, path, data, git_sha=runner.git_head(config.REPO_ROOT), amend=amend
     )
+    ran = done.ran
     status = store.get_method(conn, method.id)["status"]
     log.info("%s: %d trial(s) recorded, status %s (%.1fs)", method.id, len(ran), status, time.perf_counter() - t0)
     _show(conn, argparse.Namespace(method=method.id))
     print(f"\nLab N (dev trials) is now {store.dev_trial_count(conn)}; test-window looks used: {store.test_looks(conn)}")
+    # The run's walk-forward verdict, printed from the value that was just recorded (R1). This is
+    # the part a researcher never used to see until `lab promote`, by which time the method id was
+    # spent and the dev write-up was already written.
+    #
+    # It ANNOTATES; it does not gate (hardgate D15, store._FOLDS_TABLE). `done.verdict.note()` is
+    # the single source of that sentence, and `lab show` prints the same one back off the row, so
+    # the two can never drift. Nothing below refuses anything: a lost majority is a warning here
+    # and a refusal at `lab promote`.
+    v = done.verdict
+    print(f"\nWalk-forward on the lab's shared folds: {v.line()}")
+    print(f"  {v.note()}")
+    for p in json.loads(v.picks_json):
+        got = fmt_signed_pct(p["got"]) if p["got"] is not None else "-"
+        bench = fmt_signed_pct(p["bench"]) if p["bench"] is not None else "-"
+        mark = "-" if p["beat"] is None else ("won" if p["beat"] else "lost")
+        print(
+            f"  fold {p['fold']}  train to {p['train_end']}, score {p['eval_start']}.."
+            f"{p['eval_end']}: {p['picked'] or '(no variant had enough history)'} "
+            f"{got} vs SPY TR {bench}  {mark}"
+        )
+    print(
+        "  Folds share training data, so they are a sanity check, never a significance test, and "
+        "nothing here enters a DSR."
+    )
     if amendment is not None:
         g = store.gate(conn)
         seq = len(store.amendments_of(conn, method.id))

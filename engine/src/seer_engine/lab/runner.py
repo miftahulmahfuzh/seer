@@ -21,6 +21,14 @@
    status (``dev-eligible`` when any trial is eligible, else ``rejected``), all in one
    transaction. ``store.verdict`` re-reads a recorded trial against the same threshold and N, so
    a verdict is comparable across time rather than frozen at its run date.
+5. Score the method's whole walk-forward record against the lab's shared geometry and record it
+   (``hardgate.fold_verdict`` -> ``store.method_folds``), **in that same transaction**, so the
+   curves this batch just produced are inside the record it keeps and a rolled-back run leaves
+   neither. **This annotates; it does not gate** (hardgate D15): no trial becomes ineligible, no
+   status moves differently, and the run completes and records the *reason* when the record cannot
+   be computed at all -- a fresh lab with no ``REF-SPY-HOLD`` benchmark has to be able to run. The
+   fold majority stays a refusal at ``lab promote`` (``hardgate.check``), which is where it has
+   always been and where ``lab test`` already depends on it.
 
 **``lab run --amend MNNNN``** runs the next ``method.Amendment`` the file declares and the lab has
 not recorded: further pre-registered variants of an idea the lab has already counted, landing
@@ -83,7 +91,7 @@ from seer_engine.sim.contributions import OWNER_MONTHLY, ContributionSchedule
 from seer_engine.strategies.allocator import MarketAware
 
 if TYPE_CHECKING:  # typing only: prereg is imported inside the functions that use it, so
-    from seer_engine.lab import prereg  # importing `runner` never pulls in git or the docs tree
+    from seer_engine.lab import hardgate, prereg  # importing `runner` never pulls in git or the docs tree
 
 log = logging.getLogger(__name__)
 
@@ -109,6 +117,33 @@ class Ran:
     row: DevRow
     moments: store.MomentsRow | None = None
     funding: store.FundingRow | None = None
+
+
+@dataclass(frozen=True)
+class Run:
+    """What one ``lab run`` produced: the variants it recorded, and the fold verdict it recorded.
+
+    ``run_method`` returned a bare ``list[Ran]`` until the fold verdict existed. It returns this
+    instead, rather than writing the row and making the caller go and read it back, so the command
+    prints the object it wrote: ``lab run`` and ``lab show`` cannot end up disagreeing about what
+    the folds said, because one is the value and the other is ``FoldVerdict.from_row`` of the very
+    row that value produced.
+
+    ``ran`` is a tuple, not a list: nothing downstream mutates it and a run's batch is a record.
+    ``folds`` is the row as it was written -- ``seq`` included -- and ``verdict`` is the structured
+    value it was written from, carrying the display sentences (``line``, ``note``).
+
+    ``hardgate`` is deliberately NOT a module-level import here. ``hardgate.trial_deposits``
+    imports ``seer_engine.lab.runner`` inside its function body precisely to keep the two modules'
+    import-time graph acyclic; importing ``hardgate`` at this module's scope would work today and
+    make the next edit to either module a 50/50 bet. ``from __future__ import annotations`` is in
+    force above, so the quoted annotation below is never evaluated, and ``run_method`` pays one
+    dictionary lookup per run for a local import instead.
+    """
+
+    ran: tuple[Ran, ...]
+    folds: store.FoldRow
+    verdict: "hardgate.FoldVerdict"
 
 
 def _ordinal(n: int) -> str:
@@ -592,7 +627,7 @@ def run_method(
     git_sha: str,
     require_commit: bool = True,
     amend: bool = False,
-) -> list[Ran]:
+) -> Run:
     """Run ``method`` on the dev window and record it (see the module docstring).
 
     The run is given ``INITIAL_IDR`` -- passed to ``dev.run_registry`` explicitly rather than left
@@ -620,6 +655,15 @@ def run_method(
       ``store.reevaluate_method``, which is the one door on that edge and which appends its own
       dated reasoning to the analysis. Letting this function take that decision would put a second,
       silent door beside it (plan Decision P2).
+
+    Both paths end by recording the method's walk-forward record for this batch -- one
+    ``store.method_folds`` row, inside the same transaction, computed after the provenance so the
+    curves just recorded are in it and their prices are known (``hardgate.fold_verdict``). The
+    row and the value it was built from come back on the returned ``Run``, so the command that
+    prints the verdict prints the object that was written. **It annotates; it does not gate**
+    (hardgate D15): no trial's ``eligible`` moves, no status moves differently, and a lab with no
+    benchmark records the reason and completes. The fold majority is still a refusal at
+    ``lab promote`` and nowhere else.
     """
     refuse_survivorship_store(data, f"lab run {method.id}")
     amendment = preflight(conn, method, path, require_commit=require_commit, amend=amend)
@@ -715,6 +759,48 @@ def run_method(
             )
             for n, r in zip(ns, ran, strict=True)
         ])
+        # The fold verdict of this batch, computed HERE: after the trials, their moments, their
+        # funding and their provenance are all in, and inside this same transaction. Three things
+        # make that the only correct place.
+        #
+        # - **This connection sees its own uncommitted rows.** `hardgate.fold_record` reads
+        #   `trials.curve_json` for every dev trial of the method, so the curves this run has just
+        #   recorded are in the record. Computing it before the inserts would score the method as
+        #   it was yesterday.
+        # - **After `insert_provenance`, not before.** The record's price rule (hardgate D10) reads
+        #   `trial_provenance.price_fingerprint` for every curve it scores and fails closed on a
+        #   trial that has none. Run one line earlier and every trial of this very batch would be
+        #   reported as "has no provenance row", which is true for a few microseconds and
+        #   misleading forever.
+        # - **Inside the transaction.** A trial batch and the verdict on it are one record or
+        #   neither, exactly as the moments, the funding and the provenance are.
+        #
+        # It ANNOTATES; it does not gate (hardgate D15). `fold_verdict` is lenient by
+        # construction: no `REF-SPY-HOLD` benchmark, a geometry thinner than `hardgate.MIN_FOLDS`,
+        # a method with no curve, or prices that are not the benchmark's all record the REASON and
+        # the run still completes. A fresh lab has to be able to run before it has a benchmark
+        # (`hardgate.pin_dev_store`). Nothing here reads or writes `trials.eligible` or
+        # `methods.status`, and `hardgate.check` -- the real gate, at `lab promote` -- is untouched.
+        from seer_engine.lab import hardgate  # local: see the `Run` docstring on the import graph
+
+        verdict = hardgate.fold_verdict(conn, method.id)
+        folds = store.FoldRow(
+            method_id=method.id,
+            seq=len(store.folds_of(conn, method.id)) + 1,
+            run_at=ran[0].trial.run_at if ran else store.now_iso(),
+            git_sha=git_sha,
+            bench_n=verdict.bench_n,
+            folds_total=verdict.total,
+            folds_scored=verdict.scored,
+            folds_won=verdict.won,
+            majority=verdict.majority,
+            stable=verdict.stable,
+            picks_json=verdict.picks_json,
+            summary=verdict.summary,
+            reason=verdict.reason,
+            recorded=store.now_iso(),
+        )
+        store.insert_folds(conn, folds)
         if amendment is None:
             store.update_method(conn, method.id, source_sha=source_sha(path), status=status)
         else:
@@ -734,7 +820,7 @@ def run_method(
             ))
         for key in method.seen_keys:
             store.mark_seen(conn, key, method.id)
-    return ran
+    return Run(ran=tuple(ran), folds=folds, verdict=verdict)
 
 
 def _hypothesis(method: Method) -> str:

@@ -59,21 +59,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "9390de8",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 4,
-      "note": null,
+      "note": "R3 ANSWERED, no model written: the cheapest daily book (one name of twenty swapped per session) must earn 7.03%% a year to break even; re-picking the whole book every session needs 290.45%%; weekly 32.49%%; the lab's own monthly cadence on the same book costs 1.63%%. The short-horizon chart model is dead on cost. Commits 871dd85 (turnover.py + commands/lab.py + tests) and 9390de8 (write-up + grid CSV), bookkeeping 3e24071. Coordinator re-verified independently: phase 4's OWN diff on commands/lab.py is additions-only (the single branch deletion is phase 1's D17 change in 01ea113, confirmed by git log -S); sim/costs.py byte-identical across the whole branch; no lab commit between a24ad5b and the tip, so the database was never written; working tree clean; its 26-test module re-run green by the coordinator. Correction phase 4 makes to the analysis: the /usr/bin/zsh.10 per-order floor is NOT 'the whole of R3's answer' -- it binds through month 1 at twenty names, month 3 at thirty, never at ten, and over ten years only 1.7%% of a twenty-name book's orders pay it; the killer is the plain rate, 0.503%% a round trip times 252. Corrected in the write-up prose only; the analysis document is left as the record of what was believed when written. Phase decisions: (rung 2) the coordinator's ruling applied -- proved 'writes nothing' by reading counts around its own run on a scratch COPY (dev trials 394->394, test looks 4->4, trials 398, moments 284, funding 270, provenance 398, insights 219, methods 145, method_folds 0 all unchanged) instead of the invalid git-status form; (rung 3) the plan's Step 2 anchored the docstring insert on 'the lab names entry', which does not exist in that docstring -- the entry at the quoted position is 'lab costs', the position was unambiguous, so the block went exactly there. NOTED, not fixed: bookkeeping commit 3e24071 necessarily carries peers' concurrent todos.md edits (98 insertions against its own ~25) because todos.md is one shared file; cosmetic attribution only, never rewritten.",
       "package": "engine/lab`, `engine/commands`, `docs",
       "plan": ".workflows/plan/fold-verdict-and-fall-label/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-13T02:43:02+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-H8TC",
       "title": "Price the chart model's turnover"
     },
     {
@@ -93,7 +93,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Pre-register, run and record the fall-labelled method"
     }
@@ -101,7 +101,7 @@
   "plan": "/home/miftah/.worktrees/seer/fold-verdict-and-fall-label/.workflows/orchestration/fold-verdict-and-fall-label/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "fold-verdict-and-fall-label",
-  "updated": "2026-10-13T02:38:28+00:00",
+  "updated": "2026-10-13T02:43:06+00:00",
   "verified_at": "2026-10-13T02:24:22+00:00",
   "worktree": "/home/miftah/.worktrees/seer/fold-verdict-and-fall-label"
 }

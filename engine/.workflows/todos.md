@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-13 09:36
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-13 11:05
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 133
+- Completed: 134
 
 ---
 
@@ -1315,16 +1315,28 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Completion bookkeeping: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own precedent for every swarm-tracked set, including this set's own phases 1 and 2). Peer phase sessions share this worktree and append here concurrently; a cross-section block move is the one edit that silently loses a peer's append.
     - `P1-ENG-5VBX` (phase 5) left exactly as found — a peer had already recorded it `pending` with an `Unblocked` line of 2026-10-13 02:35. Phase 4 is not one of its dependencies, so this completion neither unblocks nor re-blocks it.
     - Landing not attempted: this is a swarm-tracked set and the coordinator `orch-fold-verdict-and-fall-label` owns the merge (analyze-orchestrator Step 5). Nothing merged or pushed to `main`; no worktree or branch deleted.
-- [ ] **P1-ENG-5VBX** Phase 5: Pre-register, run and record the fall-labelled method
+- [x] **P1-ENG-5VBX** Phase 5: Pre-register, run and record the fall-labelled method
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `lab/methods/m<NNNN>_<slug>.py` (new), where `<NNNN>` is whatever `lab next-id` prints at the time (**M0132** as of 2026-10-13; `M0131` is taken). Built on phase 2's `FALL_SIZE` allocator and `FallSizeParams` (the book-size field is `slots`, not `top_n`) and modelled on `m0130_tree_ranker.py`: a `hypothesis` and an `expected_failure` written **before** any result is seen, **five** variants that are the only hyperparameter settings this idea will ever try (three model arms and two controls on the same twenty dollar-volume names), and `seen_keys`. The hypothesis must describe the method as phase 2 actually builds it — a raw **level** label, three un-normalised market-level columns, and a head reading the date's cross-sectional mean against the model's own training distribution — and pre-registers **no exposure ladder of its own** (D13). Then the pre-registration commit (the method file alone, `lab: M<NNNN> pre-registered — …`) **before** any run; the run `lab run M<NNNN> --store /home/miftah/seer/engine/.research`, then `lab stage`, then the two lab files committed with no pathspec; one plain-language journal entry; and `docs/backtests/2026-10-13-learn-the-fall.md`. Does not touch any engine source outside `lab/methods/` — a bug this run exposes is reported, never patched from here — nor the test window, `hardgate.check`, `docs/plans/` or another phase's files. Exit: the id came from `lab next-id` at run time and the module number matches `METHOD.id`; the file was committed before `lab run`, in its own commit; phase 2's exposure gate passed and this phase's own pre-commit re-check agrees, both quoted in the write-up — **if either is flat, or 2008 is not below 2005, the id is not spent** (D13.5); the variants rank on price and dividend features only, no fundamentals variant and no fundamentals allocator to name (D14); the appended insight strictly newer than phase 3's, with neither phase asserting an absolute `insights` id or count; one trial per variant recorded with its provenance, moments and funding rows plus phase 1's `method_folds` row, the printed fold verdict quoted in the write-up; N moved by exactly one method (`store.gate` and `npolicy.dev_method_count` read on both sides); `test_looks` unchanged at 4 and `git status --short docs/lab/` empty; trial `n` contiguous, `lab stage` run, CI's row-for-row check passing; write-up and journal entry in plain language stating the verdict honestly whichever way it fell, with the commit saying `lab: M<NNNN> rejected (plain reason)` if rejected; suite green with the skip count quoted.
-  - **Status**: pending
+  - **Status**: completed
   - **Unblocked**: 2026-10-13 02:35 — phase 3 (`P1-ENG-RN2P`) landed at `a24ad5b`; phases 1 and 2 already landed
   - **Plan Set**: `docs/plans/FOLD_VERDICT_AND_FALL_LABEL_PLAN.md` (phase 5 of 5)
   - **Satisfies**: R2 — Learn the fall, not the pick: label the tree model on forward downside **as a level** instead of forward return rank, give it market-level inputs to read, let the output size the book by **exposure** rather than selection, and pre-register it as a new method id
   - **Depends on**: P1-ENG-W7QD, P1-ENG-4KJE, P1-ENG-RN2P
   - **Plan**: `.workflows/plan/P1-ENG-5VBX.md`
+  - **Completed**: 2026-10-13 11:05
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/methods/m0132_fall_sized_book.py (new), lab/lab.sqlite, web/data/lab.json, docs/backtests/2026-10-13-learn-the-fall.md (new)
+  - **Commit**: d5d99fe (`lab: M0132 pre-registered`, the method file alone), 14f5b5d (`lab: M0132 rejected`, lab.sqlite + lab.json), d7adaf3 (the write-up)
+  - **Delivered**: the lab's 132nd method, pre-registered and run on the dev window, asking the handover's question "learn the fall, not the pick". A model forecasts the worst peak-to-trough drop of a twenty-name dollar-volume book over the coming quarter — as a raw **level**, not a per-date rank — and holds only the share of the book its training distribution says the date is calm enough for. Five variants, fixed before any result: three model arms and two controls on the same twenty names. **Verdict: rejected.** The model's sizing is much better than no brake at all and clearly worse than the one brake the lab has. Owning the twenty names flat out fell 74% for 4.9%/yr of the owner's money; the model's sizing cut that to 29% for the same 4.9%/yr; the plain SPY 200-day switch on the same names cut it to 21% **and** earned 8.2%/yr (SPY TR gave the same deposits 7.2%). So on the question asked — can a learned downside forecast improve on the switch? — no, and not narrowly: 7.5 points deeper drawdown and 3.3 points a year behind, simultaneously. The most defensive arm (model behind the switch) had the shallowest fall of all, 18.1%, and the thinnest return, 4.7%. The pre-registered success bar was met on 1 of its 3 clauses. The regularised tree beat the base tree on every axis at once, which the frozen pre-registration had named in advance as evidence the base tree was overfitting the label. One journal insight appended in plain language, and a full write-up at `docs/backtests/2026-10-13-learn-the-fall.md`.
+  - **Verified**: `ruff check engine` → All checks passed. Full suite, `PYTHONPATH` + `PG_TEST_URL` both set: **4725 passed, 3 skipped** (the 3 skips are only the opt-in `*_LIVE` tests: `test_lab_name_count`, `test_lab_costs`, `test_lab_survivorship`); run twice — before the pre-registration commit and after the run — green both times. Lab counters on both sides: N 80 → 81 methods, dev trials 394 → 399, **`test_looks` 4, UNCHANGED**, trial `n` contiguous through 403, one `method_folds` row for M0132, 5 each of trial_moments / trial_funding / trial_provenance, `git status --short docs/lab/` empty. Insights: baseline 219 → 220, exactly one higher than this phase's own baseline (no absolute id asserted). `lab stage` ran and the database commit carried **no pathspec**, so `lab.sqlite` and `lab.json` agree. `git diff HEAD~3 HEAD -- engine/src/seer_engine/lab/tree_rank.py store.py commands/lab.py` is empty: no engine source outside `lab/methods/` was touched. The exposure gate (D13.5) was re-measured on the real store **before** the pre-registration commit: ten distinct exposures 0.250–1.000 across the January decision dates 2000-2015, 2008 at 0.400 against 2005's 0.850, size-off control flat at 1.000 on all sixteen lines — reproducing phase 2's M5b line for line. The behavioural-kin re-check `failed_kin(conn, "M0130")` returned `()`.
+  - **Decided**:
+    - `Co-Authored-By` trailer: the plan's template said "Claude Opus 5"; the session's attribution instruction and all three landed peer phases say "Claude Opus 5 (1M context)" → chose the latter. Rung 6 (the surrounding convention) plus the session's own standing instruction.
+    - The write-up **records, rather than corrects**, one inaccuracy in the now-frozen pre-registration: the hypothesis says all five arms hold SPY before the first model, but the gate is evaluated **before** the calendar rule, so the two gated arms hold SPY-or-cash through 1996-1999. The method file is frozen against its recorded source sha the moment `lab run` exits 0, and the measured gap (7.5 points of drawdown, 3.3 points a year) is far larger than four pre-model years of a 200-day switch could explain. Rung 1: the lab's append-only / frozen-source invariant. Recorded in its own section of the write-up, and named as a thing a follow-up **method** (not a revision) would fix.
+    - No engine bug was patched from this phase. Nothing this run exposed required one.
+    - Completion bookkeeping: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own precedent for every swarm-tracked set, including this set's phases 1-4). Peer phase sessions share this worktree and append here concurrently; a cross-section block move is the one edit that silently loses a peer's append.
+    - Landing not attempted: this is a swarm-tracked set and the coordinator `orch-fold-verdict-and-fall-label` owns the merge (analyze-orchestrator Step 5). Nothing merged or pushed to `main`; no worktree or branch deleted.
 
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"

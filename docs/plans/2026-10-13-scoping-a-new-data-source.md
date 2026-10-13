@@ -320,3 +320,73 @@ wastes the month as surely as losing the data.
 **Check the other machines before paying anything.** This check covered `pc` only. If the Lenovo or
 the GPD still holds `engine/.cache/eodhd` or `engine/.research-sv`, that is the cheapest recovery
 available, and `sync-research-store` is the tool for moving it here.
+
+---
+
+## MEASURED 2026-10-13: the universe fits, and no selection filter is needed
+
+The sweep ran: **214 month-end cross-sections, 1998-01-31 to 2015-10-31, 1,045,043 ranked rows**,
+from 214 bulk calls inside the subscription already paid for. This replaces every estimate above.
+
+### The market the lab has been ignoring
+
+| | names trading |
+|---|---|
+| Jan 1998 | 10,305 |
+| Jun 2005 | 20,067 |
+| Nov 2010 | 30,666 |
+| Oct 2015 | **44,201** |
+
+The tradable US market **quadrupled** across the dev window. A fixed rank band therefore means
+something different at each end, which is why the universe had to be counted rather than guessed.
+
+### Two estimates above were wrong, in opposite directions
+
+1. **Turnover is far higher than assumed.** A 500-wide band touches ~11× its width in distinct
+   names over 18 years: rank 500-1000 is **5,505** symbols, not the 1,200-1,800 estimated.
+2. **But small caps are much shorter-lived, so they cost far less RAM.** Measured from first to
+   last sighting: a rank 500-2000 name is listed and liquid for a **median of 101 months**, giving
+   **~2,301 bar rows and 0.85 MB** against a large cap's 4,620 rows and 1.79 MB. The earlier
+   1.61 MB/symbol was ~2× too pessimistic.
+
+The two errors nearly cancel, and the second is larger.
+
+### The answer, with no look-ahead
+
+Every symbol **ever** in the band on any sampled month-end — no persistence filter, so the universe
+is chosen with no information from the future:
+
+| band | symbols | mean rows | MB/sym | total | fits 12 GB? |
+|---|---|---|---|---|---|
+| 1-500 | 3,542 | 2,860 | 1.06 | 3.7 GB | yes |
+| 500-1000 | 5,505 | 2,651 | 0.98 | 5.3 GB | yes |
+| 500-1500 | 7,741 | 2,438 | 0.90 | 6.8 GB | yes |
+| **500-2000** | **9,758** | 2,301 | 0.85 | **8.1 GB** | **yes** |
+| **1-2000** | **9,977** | 2,298 | 0.85 | **8.3 GB** | **yes** |
+| 500-3000 | 13,172 | 2,074 | 0.77 | 9.9 GB | tight |
+
+**Recommended: rank 1-2000, 9,977 symbols, ~8.3 GB.** It is the complete liquid US universe for
+1998-2015 including everything that died, it keeps the large caps so old and new methods can be
+compared on one store, and it needs **no selection filter at all**.
+
+**Why no persistence filter, even though it would halve the store.** Requiring a name to hold the
+band for ≥12 months cuts rank 500-2000 from 9,758 to 4,631 (4.9 GB) — but that is a judgement made
+with the whole window in view. A name briefly liquid in 2001 would be absent from the 2001
+cross-section because of what happened to it later, which is look-ahead of exactly the kind this
+store exists to remove. The unbiased set fits, so the biased one is not worth having.
+
+### Cost to pull
+
+| | |
+|---|---|
+| API calls | 9,977 × 3 = **29,931** of 100,000/day — fits in one day |
+| Money | **$0** — inside the month already paid for |
+| Disk | ~22.9M bar rows, ~2.5 GB (768 GB free) |
+| Wall clock | ~5.5 hours at the measured ~2 s/symbol, resumable |
+
+### What is still unknown, and is not answerable from here
+
+Coverage **inside** the band before 1998 is not measured — the delisted large-cap histories begin
+end-1997 (above) and small caps will not be better, which is why the window starts in 1998. And
+whether a liquidity-ranked small-cap book has an edge is the question the store exists to ask; the
+store only makes it askable.

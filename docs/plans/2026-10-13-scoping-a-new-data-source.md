@@ -285,3 +285,38 @@ paywall. If the real count lands above ~5,000 for the 1998 window, the slice mus
 500–1000 rather than 500–2000) or the window shorten. **That is a first-day question inside the
 paid month, not a reason to delay it:** one $19.99 month covers the symbol list, the feasibility
 count and the full pull, since 3,000 symbols × 3 calls is 9,000 of 100,000 daily calls.
+
+**And that month is probably already running** — see the correction above. This is therefore urgent
+rather than expensive: the cheapest version of this whole plan is to pull inside the subscription
+that is already paid for.
+
+## Do not let the next pull evaporate: sync the derived store to Blob
+
+The October month's work is gone from the machine that made it. Verified 2026-10-13 on `pc` — the
+very machine `docs/lab/survivorship/README.md` says the check store "lives only on":
+
+| | |
+|---|---|
+| `engine/.research-sv` | absent |
+| `engine/.cache/eodhd` (1,192,432 raw rows) | absent — only a `yfinance` cache remains |
+| Vercel Blob, `seer/research-store/` and every other prefix | **empty: 0 blobs** |
+| `.env.local`, its `2026-10-08` backup, `.env.local-train`, `.env.example` | no `EODHD_API_TOKEN` in any of them |
+| git | never committed, by design — raw vendor data is under personal licence |
+
+**What that cost, concretely.** The (D16) promote gate added today can only judge the **102
+variants** recorded in `grid.csv`. With the cache intact, `lab survivorship` could measure any
+method on demand and the gate would bite across the whole lab; the "unmeasured → silent" hole in
+(D16) exists *because* this store is gone. Re-pulling restores a capability, not just a file.
+
+**The rule, from here: before a paid month ends, push the derived store to Blob.** The raw vendor
+data cannot be committed — that is the licence — but `engine/.research-sv` is the repo's own
+cleaned artifact, Blob is private, and `engine/.research` already syncs there through
+`.claude/skills/sync-research-store` at key `seer/research-store/<fingerprint>.tar.gz`. Nothing in
+the licence or the tooling stands in the way; it simply was not done. **A store that exists on
+exactly one machine and in no backup is one `rm` away from being a repeat purchase.** The same goes
+for the token: keep it in `.env.local` for the life of the subscription, since losing it mid-month
+wastes the month as surely as losing the data.
+
+**Check the other machines before paying anything.** This check covered `pc` only. If the Lenovo or
+the GPD still holds `engine/.cache/eodhd` or `engine/.research-sv`, that is the cheapest recovery
+available, and `sync-research-store` is the tool for moving it here.

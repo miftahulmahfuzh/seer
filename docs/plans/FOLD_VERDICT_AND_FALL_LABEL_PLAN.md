@@ -6,8 +6,8 @@
 **Worktree:** `/home/miftah/.worktrees/seer/fold-verdict-and-fall-label`
 **Branch:** `feature/fold-verdict-and-fall-label` (base: `origin/main` @ `a737aff`)
 **Phases:** 5
-**Status:** planned
-**Coordinator:** —
+**Status:** phases 1, 2 and 3 of 5 complete
+**Coordinator:** `orch-fold-verdict-and-fall-label` (swarm; landing is the coordinator's)
 
 ---
 
@@ -169,11 +169,11 @@ Every phase must hold all of these. They are checkable, not aspirational.
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | The fold verdict on every `lab run` | R1 | `engine/lab`, `engine/commands` | 9 | — | HARD | `.workflows/plan/fold-verdict-and-fall-label/phase-1.md` | — | — |
-| 2 | The forward-fall **level** label and the market-level sizing head | R2 | `engine/lab` | 2 | — | HARD | `.workflows/plan/fold-verdict-and-fall-label/phase-2.md` | — | — |
-| 3 | The correcting journal entry | R4 | `lab/` | 2 | 1 | EASY | `.workflows/plan/fold-verdict-and-fall-label/phase-3.md` | — | — |
-| 4 | Price the chart model's turnover | R3 | `engine/lab`, `engine/commands`, `docs` | 5 | 1 | NORMAL | `.workflows/plan/fold-verdict-and-fall-label/phase-4.md` | — | — |
-| 5 | Pre-register, run and record the fall-labelled method | R2 | `engine/lab/methods`, `lab/`, `docs` | 4 | 1, 2, 3 | HARD | `.workflows/plan/fold-verdict-and-fall-label/phase-5.md` | — | — |
+| 1 | ✅ The fold verdict on every `lab run` | R1 | `engine/lab`, `engine/commands` | 9 | — | HARD | `.workflows/plan/fold-verdict-and-fall-label/phase-1.md` | P1-ENG-W7QD | — |
+| 2 | ✅ The forward-fall **level** label and the market-level sizing head | R2 | `engine/lab` | 2 | — | HARD | `.workflows/plan/fold-verdict-and-fall-label/phase-2.md` | P1-ENG-4KJE | — |
+| 3 | ✅ The correcting journal entry | R4 | `lab/` | 2 | 1 | EASY | `.workflows/plan/fold-verdict-and-fall-label/phase-3.md` | P1-ENG-RN2P | — |
+| 4 | ✅ Price the chart model's turnover | R3 | `engine/lab`, `engine/commands`, `docs` | 5 | 1 | NORMAL | `.workflows/plan/fold-verdict-and-fall-label/phase-4.md` | P1-ENG-H8TC | — |
+| 5 | Pre-register, run and record the fall-labelled method | R2 | `engine/lab/methods`, `lab/`, `docs` | 4 | 1, 2, 3 | HARD | `.workflows/plan/fold-verdict-and-fall-label/phase-5.md` | P1-ENG-5VBX | — |
 
 Waves the `Depends on` column yields: **{1, 2}**, then **{3, 4}**, then **{5}**.
 

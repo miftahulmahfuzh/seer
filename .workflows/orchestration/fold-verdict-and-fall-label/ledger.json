@@ -17,25 +17,25 @@
       "satisfies": [
         "R1"
       ],
-      "status": "spawned",
+      "status": "pending",
       "task_id": null,
       "title": "The fold verdict on every `lab run"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "1f2d317",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "M5b PASSED on the real store (77c37d553508): ten distinct exposure values across Jan 2000-2015 at slots=20, 2008 at 0.400 vs 2005 at 0.850, size=False control flat at 1.000 on all sixteen lines. Phase 5 is clear to spend the method id. Coordinator re-verified independently: frozen-digest tripwire green, test_two_dates_labels_live_on_a_shared_scale present, rank01 absent from the fall path (only docstrings forbidding it), no module-level FALL_SIZE_FUND and FALLF free, FALL_FEATURE_LOOKBACK = max(401,252,61) = 401 <= 473. Commit carries exactly its two owned files with zero deletions. Phase decisions: (1) ONE commit not the plan's two, rung 3 -- both plan commit commands pass the identical two-file pathspec so the second would be empty, and a real split cannot satisfy 'both green alone' since step 5 calls step 6; both messages preserved in the body. (2) MOMENTUM_FEATURE was a plan placeholder; real spelling is PRICE_FEATURES[0] == 'momentum', so MOMENTUM_COL = PRICE_FEATURES.index('momentum') == 0, keeping the .index() mechanism so a reorder raises at import. M5a re-measured: slots=3 -> {1:7, 2:16, 3:12}, slots=5 -> {1:2, 2:8, 3:10, 4:6, 5:9}; the superseded M5 numbers are void.",
       "package": "engine/lab",
       "plan": ".workflows/plan/fold-verdict-and-fall-label/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-13T02:25:10+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-4KJE",
       "title": "The forward-fall **level** label and the market-level sizing head"
     },
     {
@@ -101,6 +101,7 @@
   "plan": "/home/miftah/.worktrees/seer/fold-verdict-and-fall-label/.workflows/orchestration/fold-verdict-and-fall-label/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "fold-verdict-and-fall-label",
-  "updated": "2026-10-13T02:12:00+00:00",
+  "updated": "2026-10-13T02:25:10+00:00",
+  "verified_at": "2026-10-13T02:24:22+00:00",
   "worktree": "/home/miftah/.worktrees/seer/fold-verdict-and-fall-label"
 }

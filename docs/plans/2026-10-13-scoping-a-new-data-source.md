@@ -390,3 +390,61 @@ Coverage **inside** the band before 1998 is not measured — the delisted large-
 end-1997 (above) and small caps will not be better, which is why the window starts in 1998. And
 whether a liquidity-ranked small-cap book has an edge is the question the store exists to ask; the
 store only makes it askable.
+
+---
+
+## PULLED 2026-10-13: the data is secured; building the store is the remaining work
+
+**The pull ran clean.**
+
+| | |
+|---|---|
+| codes requested | **7,697** — rank 1-2000 ever, filtered to Common Stock on a major exchange |
+| served / empty / failed | **7,697 / 0 / 0** |
+| raw cache | 3.5 GB at `engine/.cache/eodhd-universe/` |
+| API calls | ~23,100; quota ended at **55,873 of 100,000** |
+| money | **$0** — inside the month already paid for |
+
+Filtering the 9,977 ranked codes down to real common stocks dropped **2,280** ETFs, mutual funds,
+preferreds and OTC names the bulk endpoint returns alongside equities, and improved every number:
+8.3 GB → 6.5 GB projected, 29,931 → 23,091 calls.
+
+**Verified from the cache, 600 sampled symbols:** zero empty series, **every** symbol has bars
+inside 1998-2015, median 2,390 in-window bars. Projected **19,281,152 in-window bar rows = 7.0 GB**
+in memory — against the dev store's 2,490,793 rows and 0.94 GB. It fits the 12 GB budget.
+
+Note the raw series run wider than the window (first bars back to 1993-01-04, last to 2026-10-12),
+so the cache is larger than the store will be; a store clips to the dev window.
+
+### What is NOT done, stated plainly
+
+**No command in this repo can build this store.** `research_store` builds the S&P 500 / Nasdaq-100
+dev store from yfinance plus the Neon universe table; `survivorship_store` builds the dev store
+plus its 522 unserved members from the EODHD cache. Neither turns an EODHD cache into a store for a
+**new universe**. That is new engineering, roughly:
+
+1. read the 7,697 cached series and clean them with `survivorship.py`'s existing, tested rules
+   (split-adjust, drop zero-volume filler rows, repair or trim absurd prices, keep real collapses);
+2. derive **point-in-time** universe membership from the 214 month-end rank cross-sections already
+   in `engine/.cache/eodhd-bulk/monthend_dollar_volume.csv`, in the `[start, end)` interval shape
+   `membership.py` uses — this replaces the vendored index CSVs, which do not cover these names;
+3. emit `bars.csv`, `dividends.csv`, `fx.csv`, `market_series.csv` and a `manifest.json` with its
+   own fingerprint and a `purpose` mark, so it can never be mistaken for the dev store;
+4. a coverage report, as the survivorship store has.
+
+**The sequencing was deliberate and is the right way round.** The perishable, paid thing — API
+access — is spent and the data is on disk. Everything above is local work that needs no
+subscription and can be done at any time.
+
+### The one thing that should not wait
+
+The 3.5 GB cache is now the single most valuable unbacked artifact on this machine, and the exact
+asset whose deletion cost a month last time. It is raw vendor data under a personal licence, so it
+is correctly **never committed to git** — but that leaves it on one disk, in one directory, in the
+state this whole note exists to warn about.
+
+### Known limit of this universe
+
+**There are no fundamentals for these names.** The EDGAR panel is keyed to the large-cap universe
+and starts in 2009 regardless, so a method built on this store is a price-and-volume method. That
+is a constraint on what may be asked of it, not a defect of the pull.

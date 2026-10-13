@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "e1348c5",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "Two commits: 01ea113 (source+tests) then e1348c5 (migrated lab/lab.sqlite). The one-way schema door is open: committed lab.sqlite reads schema_version 7. D1 DECIDED: a lost fold majority ANNOTATES, never gates -- hardgate.check stays the only refusal and lab test already refuses anything not promoted. Coordinator re-verified independently: committed db reads 7 via sqlite3 mode=ro; web/data/lab.json untouched across the whole branch (so its committed bytes already matched, consistent with the byte-identical snapshot proof); hardgate.py diff is a docstring, one import line and a pure +221 append -- 'check' appears in no hunk, so D1 holds by construction. Both commits inside phase 1 ownership. Phase drift, rung 6: the plan's D17 said every caller of test_lab_remeasure.py's shared _run helper discards run_method's return, but two index it (:187, :216); fixed once in the helper rather than at each call site, one file beyond the plan's seven. Flagged for the todos, not this set: publishing the fold verdict to /sera (would move SNAPSHOT_VERSION to 6, out of scope per D3), and a 'fold record as of today for every method' REPORT (a backfill as a record is deliberately impossible; the report would be cheap).",
       "package": "engine/lab`, `engine/commands",
       "plan": ".workflows/plan/fold-verdict-and-fall-label/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-13T02:29:14+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-W7QD",
       "title": "The fold verdict on every `lab run"
     },
     {
@@ -53,7 +53,7 @@
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The correcting journal entry"
     },
@@ -72,7 +72,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Price the chart model's turnover"
     },
@@ -101,7 +101,7 @@
   "plan": "/home/miftah/.worktrees/seer/fold-verdict-and-fall-label/.workflows/orchestration/fold-verdict-and-fall-label/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "fold-verdict-and-fall-label",
-  "updated": "2026-10-13T02:25:10+00:00",
+  "updated": "2026-10-13T02:29:14+00:00",
   "verified_at": "2026-10-13T02:24:22+00:00",
   "worktree": "/home/miftah/.worktrees/seer/fold-verdict-and-fall-label"
 }

@@ -17,7 +17,7 @@ import pytest
 
 from labkit import LAB_PRICE_FINGERPRINT, stamp_provenance
 from seer_engine.backtest import regime
-from seer_engine.lab import hardgate, store
+from seer_engine.lab import hardgate, survivorship_record, store
 from seer_engine.lab import walkforward as wf
 
 SAME_PRICES = LAB_PRICE_FINGERPRINT
@@ -1180,3 +1180,107 @@ def test_lab_tests_note_says_when_the_kin_cannot_be_read(conn):
     note = runner.kin_note(conn, "M0060")
     assert note is not None
     assert "could not be read" in note and "not a refusal" in note
+
+
+# --- (D16): a dev-store drawdown under the bar is not evidence the book clears it -------------
+
+
+def _grid(tmp_path, rows):
+    """A committed-grid lookalike: the real columns this reader uses, in the real order."""
+    p = tmp_path / "grid.csv"
+    head = "method_id,candidate_id,store,max_drawdown\n"
+    p.write_text(head + "".join(f"{m},{c},{s},{d}\n" for m, c, s, d in rows), encoding="utf-8")
+    return p
+
+
+def test_the_survivorship_grid_reader_reads_only_the_fuller_history(tmp_path):
+    """Both stores are in one file; only the survivorship rows are the second opinion."""
+    g = _grid(tmp_path, [
+        ("M0001", "M0001-A", "dev", "0.19"),
+        ("M0001", "M0001-A", "survivorship", "0.2346"),
+    ])
+    assert survivorship_record.sv_drawdown("M0001", "M0001-A", g) == 0.2346
+    assert survivorship_record.over_bar("M0001", "M0001-A", 0.20, g) == 0.2346
+    assert survivorship_record.over_bar("M0001", "M0001-A", 0.25, g) is None
+
+
+def test_an_unmeasured_variant_reads_none_and_never_refuses(tmp_path):
+    """Absence is not evidence. `engine/.research-sv` is not on every machine, so refusing every
+    unmeasured variant would stop the lab on a store the owner may not hold (D16)."""
+    g = _grid(tmp_path, [("M0001", "M0001-A", "survivorship", "0.30")])
+    assert survivorship_record.sv_drawdown("M0001", "M0001-NEVER-RUN", g) is None
+    assert survivorship_record.over_bar("M0001", "M0001-NEVER-RUN", 0.20, g) is None
+    assert survivorship_record.sv_drawdown("M9999", "M9999-A", g) is None
+
+
+def test_a_missing_or_malformed_grid_is_an_empty_mapping_not_a_crash(tmp_path):
+    """A checkout that never ran `lab survivorship` is a normal checkout."""
+    assert survivorship_record.sv_drawdown("M0001", "M0001-A", tmp_path / "absent.csv") is None
+    g = _grid(tmp_path, [
+        ("M0001", "M0001-A", "survivorship", ""),
+        ("M0001", "M0001-B", "survivorship", "not-a-number"),
+    ])
+    assert survivorship_record.sv_drawdown("M0001", "M0001-A", g) is None
+    assert survivorship_record.sv_drawdown("M0001", "M0001-B", g) is None
+
+
+def test_the_gate_refuses_a_promoted_variant_that_falls_past_the_bar_on_honest_data(
+    conn, monkeypatch, tmp_path
+):
+    """THE RULE. The variant wins its own folds, its kin is clean and its dev-store fall clears
+    the bar -- and it is still refused, because the history that fall was measured on is missing
+    four in ten of the index's days (D16)."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    best = conn.execute("SELECT * FROM trials WHERE candidate_id = 'M0001-A'").fetchone()
+    assert best is not None
+    monkeypatch.setattr(store, "best_dev_eligible", lambda _c, _m, **_k: best)
+    assert hardgate.promoted_variant(conn, "M0001") == "M0001-A"
+    assert hardgate.failed_kin(conn, "M0001") == ()          # kin is NOT why it is refused
+    hardgate.check(conn, "M0001")                            # clean before the grid says otherwise
+
+    g = _grid(tmp_path, [("M0001", "M0001-A", "survivorship", "0.2346")])
+    monkeypatch.setattr(survivorship_record, "GRID_PATH", g)
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0001")
+    msg = str(e.value)
+    assert "M0001-A" in msg and "23.46%" in msg and "20%" in msg and "D16" in msg
+    assert "grid.csv" in msg
+
+
+def test_the_gate_still_promotes_a_variant_the_fuller_history_clears(conn, monkeypatch, tmp_path):
+    """The rule refuses what was measured OVER the bar, not everything that was measured."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    best = conn.execute("SELECT * FROM trials WHERE candidate_id = 'M0001-A'").fetchone()
+    monkeypatch.setattr(store, "best_dev_eligible", lambda _c, _m, **_k: best)
+    g = _grid(tmp_path, [("M0001", "M0001-A", "survivorship", "0.1600")])
+    monkeypatch.setattr(survivorship_record, "GRID_PATH", g)
+    hardgate.check(conn, "M0001")  # does not raise
+
+
+def test_the_committed_grid_still_holds_the_eleven_that_cross(tmp_path):
+    """Pins the live evidence (D16). If `lab survivorship` is ever re-run and the grid rewritten,
+    this goes red and the numbers in the docstring and design doc §17 must be re-read."""
+    grid = survivorship_record.GRID_PATH
+    if not grid.is_file():                     # a checkout without docs/ is not a failure
+        pytest.skip("docs/lab/survivorship/grid.csv not in this checkout")
+    for mid, cid, expected in (
+        ("M0007", "M0007-N20-RAW", 0.2346),
+        ("M0020", "M0020-W-NOSTOP", 0.2342),
+        ("M0019", "M0019-RAW20-S15", 0.2448),
+    ):
+        dd = survivorship_record.sv_drawdown(mid, cid)
+        assert dd is not None and round(dd, 4) == expected
+        assert survivorship_record.over_bar(mid, cid, 0.20) is not None
+    # and one that clears it, so the test cannot pass by refusing everything
+    assert survivorship_record.over_bar("M0007", "M0007-N20", 0.20) is None
+
+
+def test_the_module_records_the_survivorship_drawdown_decision():
+    """(D16) is argued in the docstring, with the measurement, not merely asserted."""
+    doc = hardgate.__doc__ or ""
+    assert "(D16)" in doc
+    assert "M0007-N20-RAW" in doc and "23.46" in doc
+    assert "-9.03" in doc and "+14.44" in doc      # the spread that forbids a blanket haircut
+    assert "absence is not evidence" in doc.lower()

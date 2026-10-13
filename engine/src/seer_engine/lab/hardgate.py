@@ -477,6 +477,48 @@ below is explicit that "a fresh lab has to be able to run before it has a benchm
 ``REF-SPY-HOLD`` trial, a benchmark curve too short for ``MIN_FOLDS``, a method with no curve, or a
 price fingerprint that is not the benchmark's (D10) each record the reason and the run completes.
 ``check`` is not touched by any of this and keeps its present behaviour exactly.
+
+**(D16) Is a dev-store drawdown under the bar enough evidence that a book clears the bar?
+-- No, and from 2026-10-13 ``check`` refuses a variant MEASURED over it on the fuller history.**
+
+Every recorded result is measured on ``engine/.research``, which prices about 59% of the
+index-member days of 1996-2015 -- overwhelmingly survivors, since the companies that went
+bankrupt, were bought or renamed are the ones the free feed could not serve. The October 2026
+EODHD month filled 522 of them into a second store and ``lab survivorship`` re-ran 102 variants on
+both histories (``docs/lab/survivorship/``). Its summary was an average -- momentum drawdowns about
+2.6 points deeper -- and that average was never applied to ``tuning.MAX_DRAWDOWN``, the one bar it
+threatens.
+
+Measured per variant rather than averaged (design doc §17, from the committed grid):
+
+- of the **28** variants whose dev-store drawdown clears the bar, **11 cross it** on the fuller
+  history -- 39%;
+- the per-variant deltas run **-9.03 to +14.44 points**, mean +1.42. **No single haircut can stand
+  in for the measurement**, which is why this rule reads recorded numbers and does not scale a
+  constant;
+- the books that break are the ones that looked best: ``M0007-N20-RAW`` 19.59% -> **23.46%** (the
+  entry §12 singled out as the only one ahead of SPY in all three eras), ``M0020-W-NOSTOP``
+  19.27% -> **23.42%**, ``M0019-RAW20-S15`` 18.56% -> **24.48%**.
+
+**Why it refuses only on a measured figure, and reads silence as silence.** ``engine/.research-sv``
+is not on every machine and cannot be rebuilt offline, so most variants have no row in the grid.
+Refusing every unmeasured variant would block the whole lab on a store the owner may not currently
+hold -- a rule nobody could satisfy is not a stricter rule, it is a stopped lab. So the mechanical
+half of §17's rule is the half that can be checked anywhere: a variant **measured and found at or
+above the bar** is refused, and an unmeasured one is left to the other clauses, which are the
+researcher's judgement rather than the gate's. ``survivorship_record`` says this in its own
+docstring: absence is not evidence.
+
+**Why the grid and not the database.** A survivorship re-run is a report, never a trial -- mixing
+price fingerprints inside one method's trial set is precisely what this module refuses elsewhere --
+so these numbers have no home in ``trials``. ``docs/lab/survivorship/grid.csv`` is the committed
+record, and reading it needs no store, no network and no research data.
+
+**What it does not do.** It does not move ``MAX_DRAWDOWN`` (design doc §11 stands), does not touch
+any recorded row, and does not re-open a closed verdict: the grid was always a second opinion, and
+a second opinion is still what refuses here -- it just now refuses *before* a test look is spent
+rather than after. 1996 and 1997 remain under half covered in **both** histories and 111 index
+members are missing from both, so the fuller history is better evidence, not true evidence.
 """
 
 from __future__ import annotations
@@ -491,8 +533,8 @@ from datetime import date
 
 import numpy as np
 
-from seer_engine.backtest import regime
-from seer_engine.lab import store
+from seer_engine.backtest import regime, tuning
+from seer_engine.lab import store, survivorship_record
 from seer_engine.lab import walkforward as wf
 
 #: The fewest scoreable folds that count as evidence. See (D2) in the module docstring: the rule
@@ -1522,6 +1564,20 @@ def check(conn: sqlite3.Connection, method_id: str) -> None:
                 f"(D11). Nothing was written and no status moved. There is no override -- if the "
                 f"rule is wrong, change it in seer_engine/lab/hardgate.py and argue for it in "
                 f"the commit"
+            )
+
+        sv_dd = survivorship_record.over_bar(method_id, candidate, tuning.MAX_DRAWDOWN)
+        if sv_dd is not None:
+            raise store.LabError(
+                f"{method_id} is not promoted: {candidate} -- the variant `lab promote` would "
+                f"pre-register -- falls {sv_dd:.2%} on the fuller price history, against the "
+                f"{tuning.MAX_DRAWDOWN:.0%} bar (D16). Its dev-store fall clears the bar only "
+                f"because that history is missing about four in ten of the days a company sat in "
+                f"the index, overwhelmingly the ones that went bankrupt or were bought. The "
+                f"figure is recorded in docs/lab/survivorship/grid.csv and was measured by "
+                f"re-running this very variant, not by applying an average. Nothing was written "
+                f"and no status moved. There is no override -- if the rule is wrong, change it in "
+                f"seer_engine/lab/hardgate.py and argue for it in the commit"
             )
 
     bad = failed_kin(conn, method_id)

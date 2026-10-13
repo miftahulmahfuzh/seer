@@ -3,6 +3,12 @@
   "coordinator": "orch-fold-verdict-and-fall-label",
   "coordinator_session_id": "1b52281e-1442-4cbb-9cc7-097ff818b96e",
   "created": "2026-10-13T02:10:51+00:00",
+  "landed": {
+    "at": "2026-10-13T03:04:59+00:00",
+    "base": "main",
+    "commit": "366a87557a2895756e410191610d3358dc9aba65",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -78,7 +84,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "3aa600d",
       "depends_on": [
         1,
         2,
@@ -86,22 +92,22 @@
       ],
       "difficulty": "HARD",
       "n": 5,
-      "note": null,
+      "note": "M0132 ran, exit 0, recorded REJECTED. VERDICT: the learned fall forecast is much better than no brake and clearly worse than the one brake the lab has. ON20 (flat) fell 74.4%% for 4.9%%/yr; FALL20 (model sizing) cut that to 28.9%% at the same 4.9%%/yr -- 45 points of fall bought for free; but GATE20, the plain SPY 200-day switch on the same twenty names, cut it to 21.4%% AND earned 8.2%%/yr, the only arm to beat SPY TR's 7.2%% on the same deposits. So on the handover's question the answer is no and not narrowly: 7.5 points deeper drawdown and 3.3 points a year behind at once. FALL20-GATE gave the shallowest fall (18.1%%) and the thinnest return (4.7%%). Best DSR 0.769; nothing clears the section 1 bar. The pre-registered 'ladder too coarse' failure mode is RULED OUT -- the book held between 5 and 20 slots, so the question was asked loudly and the answer was simply no. Coordinator re-verified independently from the committed sqlite blobs: test looks 4 -> 4 UNCHANGED (the test window was never read), dev trials 394 -> 399, insights 219 -> 220, methods 145 -> 146, method_folds 0 -> 1, trial n contiguous through 403 with zero gaps. Invariant 5 proved by git: the method file's first appearance is d5d99fe (1 file, the method alone) and d5d99fe is an ancestor of the run commit 14f5b5d, and the method_folds row's own git_sha is d5d99fe. THE SET DEMONSTRATED ITSELF: phase 1's new method_folds table recorded its first real verdict on phase 5's own run -- '1 of 4 folds, pick changed'. The single fold it won is fold 2, 2006-2008, the crash; folds 3 and 4 both picked GATE20, the plain switch, over every model arm. That is exactly the flag R1 was built to raise before a test look is spent. Phase decisions: (rung 1) the frozen hypothesis says the pre-model era cancels out across variants -- true for the three ungated arms, NOT for the two gated ones, since the gate is evaluated before the calendar rule and GATE20/FALL20-GATE hold SPY-or-cash through 1996-1999; RECORDED in its own write-up section rather than corrected, because the method file is frozen to its recorded source sha the moment lab run exits 0 and the gap being explained away (7.5 points, 3.3 points a year) dwarfs four pre-model years of a 200-day switch -- flagged as something a follow-up METHOD would fix. Also noted: the regularised tree beat the base tree on every axis at once (fall 24.8 vs 28.9, money 5.7 vs 4.9, PF 1.72 vs 1.58, DSR 0.769 vs 0.682), which the frozen pre-registration named in advance as evidence the base tree was overfitting the label and that the right reading is that neither setting found anything.",
       "package": "engine/lab/methods`, `lab/`, `docs",
       "plan": ".workflows/plan/fold-verdict-and-fall-label/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-13T03:02:08+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-5VBX",
       "title": "Pre-register, run and record the fall-labelled method"
     }
   ],
   "plan": "/home/miftah/.worktrees/seer/fold-verdict-and-fall-label/.workflows/orchestration/fold-verdict-and-fall-label/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "fold-verdict-and-fall-label",
-  "updated": "2026-10-13T02:43:06+00:00",
+  "updated": "2026-10-13T03:04:59+00:00",
   "verified_at": "2026-10-13T02:24:22+00:00",
   "worktree": "/home/miftah/.worktrees/seer/fold-verdict-and-fall-label"
 }

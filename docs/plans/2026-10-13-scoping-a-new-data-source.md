@@ -153,3 +153,70 @@ It spends no test look, promotes nothing, records no trial, and buys nothing. It
 the §1 bar, and it does not claim the survivorship check settles whether the lab's edges are real —
 that check was explicitly a second opinion, and 1996–97 remain under half covered in both
 histories.
+
+---
+
+## Gap B priced, 2026-10-13: it fits only if the universe is kept small
+
+Measured on this machine, not estimated.
+
+**What a small-cap store would cost to buy.** Nothing that matters.
+
+| | |
+|---|---|
+| EODHD tier with 30+ years of US end-of-day | **Historian, $19.99/month** (Sandbox is free but 1 year of history and 20 calls/day) |
+| API budget | 100,000 calls/day, 1,000/minute on every paid tier |
+| Calls needed | 3 per symbol (`eod`, `splits`, `dividends`) — **~4,500 calls for a 1,500-symbol universe**, under 5% of one day's budget |
+| Symbol discovery | `exchange-symbol-list/US` for active names, the same endpoint with `delisted=1` for dead ones. The two sets do not overlap, so both are needed. ~51,600 active US tickers across all venues |
+
+The purchase is one month, under $20, and the ingestion path already exists and is tested
+(`eodhd.py`, the `engine/.cache/eodhd` layout, `survivorship.py`'s cleaning rules). **Money and API
+limits are not the constraint.**
+
+**What is the constraint: memory.** The research store is loaded whole into RAM. Measured on the
+committed dev store:
+
+| | |
+|---|---|
+| `engine/.research` | 2,490,793 bar rows, 539 symbols served, 271 MB on disk |
+| Peak RSS to load it | **965 MB**, in 13.6 s |
+| Derived | **388 bytes per bar row**, ~4,620 rows per symbol, **~1.79 MB of RAM per symbol** |
+| This machine | 16 GB total, **~12 GB available**, 768 GB disk free |
+
+Disk is irrelevant. RAM decides it:
+
+| universe size (distinct symbols over 1996–2015) | bar rows | RAM to load | verdict |
+|---|---|---|---|
+| 1,500 | ~7M | **~2.7 GB** | comfortable |
+| 3,000 | ~14M | ~5.4 GB | workable, less headroom for the simulation itself |
+| 5,000 | ~23M | ~8.9 GB | tight — little left for the run |
+| 8,000 | ~37M | **~14.3 GB** | **does not fit** |
+
+A dollar-volume rank 500–2000 universe is 1,500 names *live at any moment*; over twenty years of
+turnover and delisting the distinct-symbol count is several times that — the large-cap universe
+needed 1,061 requested symbols to cover ~500 live members, and small caps turn over far faster. So
+the natural reading of "small caps" lands in the 5,000–8,000 band, which is exactly where this
+machine stops.
+
+*(The estimate is deliberately pessimistic: small-cap names have shorter histories than S&P 500
+members, so rows-per-symbol will come in under 4,620. It errs toward not fitting.)*
+
+**What that means for the shape of the work.** Do not attempt the whole small-cap tail. Two ways to
+stay inside the budget, both of which still deliver a genuinely new universe:
+
+1. **A narrow slice.** Dollar-volume rank 500–1000 — 500 live names, perhaps 1,200–1,800 distinct
+   over the window, **~2.2–3.2 GB**. Still completely disjoint from the twenty names every current
+   method ranks, which is the entire point.
+2. **A shorter window.** The EDGAR panel starts in 2009 regardless, so a 2009–2015 small-cap store
+   is roughly a third of the rows for the same symbol count.
+
+**The one thing to confirm before paying.** Whether EODHD's *delisted* US coverage actually reaches
+back to 1996 for small caps. It reached back far enough for the 522 dead large caps bought in
+October 2026, but those histories mostly began at the end of 1997 — which is why 1996–97 is still
+under half covered in both stores. Small caps are likelier to be worse, not better. The free
+Sandbox tier answers this for a handful of known-dead small-cap tickers before any money is spent,
+and that check is the honest next step rather than a subscription.
+
+**Still true, and still the governing constraint:** whatever is built goes in a **new store** with
+its own fingerprint. Rebuilding `engine/.research` would move every recorded `config_digest` and
+reset 399 trials and their DSRs, and the survivorship store already proves a second store avoids it.

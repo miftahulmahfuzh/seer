@@ -34,6 +34,26 @@ BLOB_API = "https://blob.vercel-storage.com"
 BLOB_API_VERSION = "7"
 PREFIX = "seer/research-store"
 POINTER = f"{PREFIX}/LATEST.json"
+
+
+def prefix_for(which: str) -> str:
+    """Blob prefix for ``which``. ``dev`` keeps the flat legacy layout; others get a subfolder.
+
+    Every store shared one prefix and ONE ``LATEST.json`` until 2026-10-13, so pushing a second
+    kind of store silently repointed the first and `_prune` deleted across both by upload time.
+    That is the exact failure this tool exists to prevent -- the survivorship store costs a paid
+    EODHD month to rebuild, and a routine dev push could evict it. ``dev`` keeps the old paths so
+    machines holding the legacy layout keep working.
+    """
+    return PREFIX if which == "dev" else f"{PREFIX}/{which}"
+
+
+def pointer_for(which: str) -> str:
+    return f"{prefix_for(which)}/LATEST.json"
+
+
+def _store_arg(args) -> str:
+    return getattr(args, "store", "dev") or "dev"
 MANIFEST = "manifest.json"
 KEEP_VERSIONS = 3
 TIMEOUT = 600
@@ -63,8 +83,26 @@ def repo_root(start: Path | None = None) -> Path | None:
         return None
 
 
-def store_dir(root: Path) -> Path:
-    return root / "engine" / ".research"
+#: Stores this tool will sync, by the name passed to ``--store``. The dev store is the default
+#: because it is the one `lab run` reads; the survivorship-check store is here because it is built
+#: from a PAID EODHD month and has already been lost once to a single `rm` on the only machine
+#: holding it, which cost the (D16) promote gate its coverage of every method but 102.
+STORES: dict[str, str] = {
+    "dev": ".research",
+    "sv": ".research-sv",
+    "test": ".research-test",
+}
+
+
+def store_dir(root: Path, which: str = "dev") -> Path:
+    """The directory for ``which`` (a key of :data:`STORES`), or a literal path if given one.
+
+    Identity stays the manifest fingerprint, so two different stores never collide in Blob even
+    though they share a key prefix -- a store is addressed by what is in it, not by its name.
+    """
+    if which in STORES:
+        return root / "engine" / STORES[which]
+    return Path(which).expanduser().resolve()
 
 
 def read_manifest(store: Path) -> dict | None:
@@ -192,9 +230,9 @@ def blob_delete(tok: str, urls: list[str]) -> None:
                  headers={"content-type": "application/json"})
 
 
-def pointer(tok: str) -> dict | None:
-    for b in blob_list(tok, POINTER):
-        if b.get("pathname") == POINTER:
+def pointer(tok: str, key: str = POINTER) -> dict | None:
+    for b in blob_list(tok, key):
+        if b.get("pathname") == key:
             try:
                 return json.loads(blob_get(b["url"]))
             except Exception:  # noqa: BLE001 - a corrupt pointer is "no pointer"
@@ -209,7 +247,7 @@ def cmd_status(args) -> int:
     root = repo_root()
     if not root:
         return fail("not inside a git repository")
-    store = store_dir(root)
+    store = store_dir(root, getattr(args, "store", "dev"))
     local = fingerprint(store) if store.is_dir() else None
     local_ok, local_detail = verify_store(store) if store.is_dir() else (False, "no store on this machine")
 
@@ -219,7 +257,7 @@ def cmd_status(args) -> int:
         remote_err = "BLOB_READ_WRITE_TOKEN not set (see the skill's Setup section)"
     else:
         try:
-            ptr = pointer(tok)
+            ptr = pointer(tok, pointer_for(_store_arg(args)))
             remote = ptr
         except RuntimeError as exc:
             remote_err = str(exc)
@@ -247,7 +285,7 @@ def cmd_push(args) -> int:
     root = repo_root()
     if not root:
         return fail("not inside a git repository")
-    store = store_dir(root)
+    store = store_dir(root, getattr(args, "store", "dev"))
     if not store.is_dir():
         return fail("no store to push", store=str(store),
                     hint="build one: python -m seer_engine research_store --with-fundamentals")
@@ -260,7 +298,7 @@ def cmd_push(args) -> int:
         return fail("BLOB_READ_WRITE_TOKEN not set", hint="see the skill's Setup section")
 
     try:
-        ptr = pointer(tok)
+        ptr = pointer(tok, pointer_for(_store_arg(args)))
     except RuntimeError as exc:
         return fail(f"could not read the remote pointer: {exc}")
     if ptr and ptr.get("fingerprint") == fp and not args.force:
@@ -275,7 +313,7 @@ def cmd_push(args) -> int:
                     tar.add(path, arcname=path.name)
         payload = archive.read_bytes()
 
-    key = f"{PREFIX}/{fp}.tar.gz"
+    key = f"{prefix_for(_store_arg(args))}/{fp}.tar.gz"
     try:
         put = blob_put(tok, key, payload, "application/gzip")
         meta = {
@@ -287,11 +325,11 @@ def cmd_push(args) -> int:
             "pushed_from": os.uname().nodename,
             "manifest": read_manifest(store),
         }
-        blob_put(tok, POINTER, json.dumps(meta, indent=2).encode(), "application/json")
+        blob_put(tok, pointer_for(_store_arg(args)), json.dumps(meta, indent=2).encode(), "application/json")
     except RuntimeError as exc:
         return fail(f"upload failed: {exc}")
 
-    pruned = _prune(tok, keep=args.keep) if args.keep else []
+    pruned = _prune(tok, keep=args.keep, which=_store_arg(args)) if args.keep else []
     return out({"ok": True, "pushed": True, "fingerprint": fp, "pathname": key,
                 "bytes": len(payload), "mb": round(len(payload) / 1024 ** 2, 1),
                 "verified": detail, "pruned": pruned})
@@ -301,13 +339,13 @@ def cmd_pull(args) -> int:
     root = repo_root()
     if not root:
         return fail("not inside a git repository")
-    store = store_dir(root)
+    store = store_dir(root, getattr(args, "store", "dev"))
     tok = token()
     if not tok:
         return fail("BLOB_READ_WRITE_TOKEN not set", hint="see the skill's Setup section")
 
     try:
-        ptr = pointer(tok)
+        ptr = pointer(tok, pointer_for(_store_arg(args)))
     except RuntimeError as exc:
         return fail(f"could not read the remote pointer: {exc}")
     if not ptr:
@@ -332,8 +370,10 @@ def cmd_pull(args) -> int:
 
     # Extract to a sibling temp dir, verify there, and only then swap. A half-written store
     # is worse than no store: `lab run` would read it.
-    staging = store.parent / f".research.incoming-{os.getpid()}"
-    backup = store.parent / f".research.replaced-{os.getpid()}"
+    # Named after the store being pulled, not after ".research": two concurrent pulls of
+    # different stores would otherwise stage into the same directory.
+    staging = store.parent / f"{store.name}.incoming-{os.getpid()}"
+    backup = store.parent / f"{store.name}.replaced-{os.getpid()}"
     if staging.exists():
         shutil.rmtree(staging)
     staging.mkdir(parents=True)
@@ -376,8 +416,16 @@ def cmd_pull(args) -> int:
                 "mb": round(len(payload) / 1024 ** 2, 1)})
 
 
-def _prune(tok: str, keep: int) -> list[str]:
-    blobs = [b for b in blob_list(tok, f"{PREFIX}/") if b.get("pathname", "").endswith(".tar.gz")]
+def _prune(tok: str, keep: int, which: str = "dev") -> list[str]:
+    """Delete all but the newest ``keep`` versions OF ``which`` -- never another store's.
+
+    ``dev`` lives flat under PREFIX, so its candidates must exclude anything in a subfolder;
+    otherwise a dev push would prune the survivorship store it cannot rebuild.
+    """
+    pre = prefix_for(which) + "/"
+    blobs = [b for b in blob_list(tok, pre)
+             if b.get("pathname", "").endswith(".tar.gz")
+             and (which != "dev" or "/" not in b.get("pathname", "")[len(pre):])]
     blobs.sort(key=lambda b: b.get("uploadedAt", ""), reverse=True)
     doomed = blobs[keep:]
     if doomed:
@@ -390,8 +438,11 @@ def cmd_list(args) -> int:
     if not tok:
         return fail("BLOB_READ_WRITE_TOKEN not set", hint="see the skill's Setup section")
     try:
-        blobs = blob_list(tok, f"{PREFIX}/")
-        ptr = pointer(tok)
+        _which = _store_arg(args)
+        _pre = prefix_for(_which) + "/"
+        blobs = [b for b in blob_list(tok, _pre)
+                 if _which != "dev" or "/" not in b.get("pathname", "")[len(_pre):]]
+        ptr = pointer(tok, pointer_for(_which))
     except RuntimeError as exc:
         return fail(str(exc))
     rows = [
@@ -409,7 +460,7 @@ def cmd_prune(args) -> int:
     if not tok:
         return fail("BLOB_READ_WRITE_TOKEN not set")
     try:
-        return out({"ok": True, "pruned": _prune(tok, keep=args.keep), "kept": args.keep})
+        return out({"ok": True, "pruned": _prune(tok, keep=args.keep, which=_store_arg(args)), "kept": args.keep})
     except RuntimeError as exc:
         return fail(str(exc))
 
@@ -417,15 +468,22 @@ def cmd_prune(args) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("status", help="compare this machine's store with the remote")
+    _store_help = ("which store: " + ", ".join(f"{k} (engine/{v})" for k, v in STORES.items())
+                   + ", or a path. Default dev.")
+    p = sub.add_parser("status", help="compare this machine's store with the remote")
+    p.add_argument("--store", default="dev", help=_store_help)
     p = sub.add_parser("push", help="publish this machine's store")
     p.add_argument("--force", action="store_true", help="re-upload even if the remote matches")
     p.add_argument("--keep", type=int, default=KEEP_VERSIONS, help="versions to retain (0 = never prune)")
+    p.add_argument("--store", default="dev", help=_store_help)
     p = sub.add_parser("pull", help="install the remote store on this machine")
     p.add_argument("--force", action="store_true", help="discard a differing local store")
-    sub.add_parser("list", help="versions held remotely")
+    p.add_argument("--store", default="dev", help=_store_help)
+    p = sub.add_parser("list", help="versions held remotely")
+    p.add_argument("--store", default="dev", help=_store_help)
     p = sub.add_parser("prune", help="delete all but the newest N versions")
     p.add_argument("--keep", type=int, default=KEEP_VERSIONS)
+    p.add_argument("--store", default="dev", help=_store_help)
     args = ap.parse_args()
     try:
         return {"status": cmd_status, "push": cmd_push, "pull": cmd_pull,

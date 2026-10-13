@@ -40,21 +40,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "a24ad5b",
       "depends_on": [
         1
       ],
       "difficulty": "EASY",
       "n": 3,
-      "note": null,
+      "note": "Insight 219 appended, kind observation, attached to M0130: 'Correcting ourselves: we tested one learning model, not whether learning can help'. Narrows 217's first clause to what that run actually tested, keeps the supported second clause explicitly, and poses phase 5's direction as an open question. Coordinator re-verified independently from the committed sqlite BLOBS (not the working tree): insights 218 -> 219 across e1348c5..a24ad5b; insight 217's body sha256 identical on both sides (c5de39c7...5ece, 731 chars); test_looks 4 and dev trials 394 unchanged on both sides; schema 7. Read the stored body and confirmed invariant 10 by grep -- no method id, digest, DSR, walk-forward, gradient/boost, Sharpe or hyperparameter anywhere in title or body. D19 honoured: the id was read back from stdout, never hardcoded. Commit is exactly lab/lab.sqlite + web/data/lab.json via lab stage and a bare commit; none of phase 4's files rode along. Phase decision, rung 5: the Co-Authored-By trailer reads 'Claude Opus 5 (1M context)' per this session's attribution reminder, not the plan template's shorter spelling; both already appear on the branch.",
       "package": "lab/",
       "plan": ".workflows/plan/fold-verdict-and-fall-label/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-13T02:38:28+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-RN2P",
       "title": "The correcting journal entry"
     },
     {
@@ -101,7 +101,7 @@
   "plan": "/home/miftah/.worktrees/seer/fold-verdict-and-fall-label/.workflows/orchestration/fold-verdict-and-fall-label/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "fold-verdict-and-fall-label",
-  "updated": "2026-10-13T02:29:14+00:00",
+  "updated": "2026-10-13T02:38:28+00:00",
   "verified_at": "2026-10-13T02:24:22+00:00",
   "worktree": "/home/miftah/.worktrees/seer/fold-verdict-and-fall-label"
 }

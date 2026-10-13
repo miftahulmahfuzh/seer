@@ -220,3 +220,68 @@ and that check is the honest next step rather than a subscription.
 **Still true, and still the governing constraint:** whatever is built goes in a **new store** with
 its own fingerprint. Rebuilding `engine/.research` would move every recorded `config_digest` and
 reset 399 trials and their DSRs, and the survivorship store already proves a second store avoids it.
+
+---
+
+## The coverage check, done 2026-10-13 — and the free route does not exist
+
+**Correction to the step proposed above.** The previous section said the free Sandbox tier could
+answer "does delisted coverage reach 1996?" before paying. **It cannot**, tested directly:
+
+| request (public `demo` token) | result |
+|---|---|
+| `eod/AAPL.US` from 1996-01-01 | **served** — `1996-01-02` open 32.2448. 30-year depth is real |
+| `eod/ENRNQ.US` (a dead ticker) | **`Forbidden`** |
+| `exchange-symbol-list/US?delisted=1` | **`Forbidden`** |
+
+The `demo` token answers only a whitelist of large living tickers, and the free Sandbox tier holds
+**1 year** of history — so neither can speak about a dead small cap in 1996. There is no free path
+to that question. No EODHD token is present in this checkout either; the October subscription
+lapsed and its token was removed.
+
+**But the question is already answered, by the month that was bought.** The check store's
+coverage-by-year table (`docs/lab/survivorship/README.md`) is a direct measurement of how far
+EODHD's *delisted* US history reaches, over 522 dead names:
+
+| window | check-store coverage of index-member days |
+|---|---|
+| 1996 | 47.0% |
+| 1997 | 49.1% |
+| **1998** | **84.4%** ← the cliff |
+| 2002 | 88.6% |
+| 2008 | 95.7% |
+| 2009 | 96.8% |
+| 2015 | 98.8% |
+
+**Delisted histories effectively begin at the end of 1997.** That is a property of the vendor's
+data start, not of company size, so a small-cap pull will not do better before 1998 and may do
+worse. **The 1996-start question is settled: no, and no purchase was needed to settle it.**
+
+### What that does to the window — and it resolves the memory problem
+
+The memory ceiling and the coverage cliff pull the same way, and together they pick the window:
+
+| window | years | rows/symbol | RAM/symbol | 3,000 symbols | 5,000 | 8,000 |
+|---|---|---|---|---|---|---|
+| 1996–2015 (as now) | 20 | 4,620 | 1.79 MB | 5.4 GB | 8.9 GB | **14.3 GB ✗** |
+| **1998–2015** | 18 | ~4,160 | ~1.61 MB | **4.8 GB ✓** | 8.1 GB (tight) | 12.9 GB ✗ |
+| 2009–2015 | 7 | ~1,617 | ~0.63 MB | 1.9 GB | 3.1 GB | **5.0 GB ✓** |
+
+**Recommended: 1998–2015, about 3,000 distinct symbols, ~4.8 GB.** It keeps both crashes — the
+dot-com bust and 2008 — sits above the coverage cliff at 84%+ rising to 98.8%, and fits this
+machine with headroom for the simulation itself.
+
+**Why not 2009–2015, even though it fits far more symbols.** That window contains **no crash**, and
+the lab's whole measured edge is crash insurance: §12 found these books make 7–9% a year in
+2002–2008 while SPY loses 1.4%, and *trail* SPY by about two points in 2009–2015. The SPY 200-day
+gate likewise helped 0 of 22 variants after 2009. A drawdown bar of 20% tested on a window with no
+crash is not a test. The extra symbols are not worth losing the only two falls in the record.
+
+### The remaining unknown, stated honestly
+
+How many *distinct* small-cap symbols a dollar-volume rank 500–1000 or 500–2000 screen actually
+yields over 1998–2015 is still an estimate — it needs the delisted symbol list, which is behind the
+paywall. If the real count lands above ~5,000 for the 1998 window, the slice must narrow (rank
+500–1000 rather than 500–2000) or the window shorten. **That is a first-day question inside the
+paid month, not a reason to delay it:** one $19.99 month covers the symbol list, the feasibility
+count and the full pull, since 3,000 symbols × 3 calls is 9,000 of 100,000 daily calls.

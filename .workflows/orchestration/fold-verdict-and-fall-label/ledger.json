@@ -1,0 +1,106 @@
+{
+  "branch": "feature/fold-verdict-and-fall-label",
+  "coordinator": "orch-fold-verdict-and-fall-label",
+  "coordinator_session_id": "1b52281e-1442-4cbb-9cc7-097ff818b96e",
+  "created": "2026-10-13T02:10:51+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "engine/lab`, `engine/commands",
+      "plan": ".workflows/plan/fold-verdict-and-fall-label/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The fold verdict on every `lab run"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/fold-verdict-and-fall-label/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The forward-fall **level** label and the market-level sizing head"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "EASY",
+      "n": 3,
+      "note": null,
+      "package": "lab/",
+      "plan": ".workflows/plan/fold-verdict-and-fall-label/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The correcting journal entry"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 4,
+      "note": null,
+      "package": "engine/lab`, `engine/commands`, `docs",
+      "plan": ".workflows/plan/fold-verdict-and-fall-label/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Price the chart model's turnover"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2,
+        3
+      ],
+      "difficulty": "HARD",
+      "n": 5,
+      "note": null,
+      "package": "engine/lab/methods`, `lab/`, `docs",
+      "plan": ".workflows/plan/fold-verdict-and-fall-label/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Pre-register, run and record the fall-labelled method"
+    }
+  ],
+  "plan": "/home/miftah/.worktrees/seer/fold-verdict-and-fall-label/.workflows/orchestration/fold-verdict-and-fall-label/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "fold-verdict-and-fall-label",
+  "updated": "2026-10-13T02:10:51+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/fold-verdict-and-fall-label"
+}

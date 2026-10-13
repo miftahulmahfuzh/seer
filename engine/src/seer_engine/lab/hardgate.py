@@ -449,14 +449,43 @@ The one change at the caller is that ``lab walkforward`` now catches a ``store.L
 check, and the report still prints the row. ``BUY_CONDITIONS`` and the ``buy_signal`` docstring
 still say "family union ancestors", which under-describes the rule further; they remain the
 owner's to edit.
+
+**(D15) Does `lab run` see the folds, and does a lost majority refuse it? -- it SEES them and
+RECORDS them; it does not refuse.** Until now a researcher met the fold record only at
+``lab promote``, after the method id was spent and often after the dev verdict had already been
+written up. ``fold_verdict`` is a third sibling beside ``fold_record`` (strict, for the gate) and
+``summary`` (display-only, for ``lab status``): **lenient and structured**. It catches
+``store.LabError`` the way ``summary`` does, and returns either the record's numbers or the reason
+there are none, as a value ``runner.run_method`` writes into ``store.method_folds`` inside the
+same transaction as the trials.
+
+It is **evidence, not a gate**, and the distinction is the whole of the decision:
+
+- The handover that asked for this (HANDOVER_20261013-measure-the-constraint.md 2.1) asked for "a
+  new column/report path, never an edit of recorded rows".
+- ``check`` below already refuses a lost fold majority at ``lab promote``; ``store.TRANSITIONS``
+  admits exactly one edge into ``promoted``; and ``runner.preflight_test`` refuses any method that
+  is not ``promoted``. The test window is therefore already behind this rule, and a second gate at
+  run time would only spend method ids to say what the first one already says.
+- The record is **method-level and time-varying** -- scored over every recorded dev curve of the
+  method against the benchmark -- so an amendment recorded tomorrow changes it. ``store.verdict``
+  promises a verdict is "comparable across time"; a per-trial ``eligible`` that moved when a
+  sibling row was appended would break that promise outright.
+
+And it must never refuse the run, because the lab has to be able to bootstrap: ``pin_dev_store``
+below is explicit that "a fresh lab has to be able to run before it has a benchmark". A lab with no
+``REF-SPY-HOLD`` trial, a benchmark curve too short for ``MIN_FOLDS``, a method with no curve, or a
+price fingerprint that is not the benchmark's (D10) each record the reason and the run completes.
+``check`` is not touched by any of this and keeps its present behaviour exactly.
 """
 
 from __future__ import annotations
 
 import json
+import math
 import re
 import sqlite3
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 
@@ -1198,6 +1227,227 @@ def summary(conn: sqlite3.Connection, method_id: str, geo: Geometry | None = Non
     except store.LabError as e:
         kin = f"kin unknown ({e})"
     return f"{folds}; kin {kin}"
+
+
+def _finite(x: float | None) -> float | None:
+    """``x`` when it is a real, finite number; None otherwise.
+
+    ``picks_json`` goes through ``json.dumps``, which writes a non-finite float as the bare token
+    ``Infinity`` -- not JSON, and not something ``json.loads`` in another language will read. MAR
+    is a ratio with a drawdown underneath it, so infinity is reachable on a curve that never fell.
+    None is the honest answer and the one every other recorded column already uses for "there is
+    no number here".
+    """
+    if x is None:
+        return None
+    v = float(x)
+    return v if math.isfinite(v) else None
+
+
+def _picks_json(picks: Sequence[wf.FoldPick]) -> str:
+    """The per-fold detail of a record, as the JSON ``store.method_folds.picks_json`` keeps.
+
+    Written out rather than left to be recomputed, because the record is **time-varying**: it is
+    scored over every dev curve the method has, so the same question asked after the next
+    amendment lands gives a different answer. These numbers are what the folds said on the day the
+    batch ran, and they stay that.
+
+    Compact separators and no key sorting: the key order is the one a reader wants (when, what was
+    picked, what it did, what the benchmark did, who won), and the bytes are a record, so they are
+    written the same way every time.
+    """
+    out = [
+        {
+            "fold": p.fold.index,
+            "train_end": p.fold.train_end.isoformat(),
+            "eval_start": p.fold.eval_start.isoformat(),
+            "eval_end": p.fold.eval_end.isoformat(),
+            "picked": p.picked,
+            "train_mar": _finite(p.train_mar),
+            "got": None if p.got is None else _finite(p.got.total_return),
+            "bench": None if p.bench is None else _finite(p.bench.total_return),
+            "beat": p.beat,
+        }
+        for p in picks
+    ]
+    return json.dumps(out, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+
+
+@dataclass(frozen=True, slots=True)
+class FoldVerdict:
+    """A method's walk-forward record as a value a run can record: the numbers, **or** the reason.
+
+    The third sibling, beside the strict ``fold_record`` (the gate's) and the display-only
+    ``summary`` (``lab status``'s). ``fold_record`` raises when the record cannot be built, which
+    is right for a gate and wrong for a run: ``lab run`` must complete on a lab that has no
+    benchmark yet. So this one carries the refusal as data.
+
+    ``reason`` is None exactly when the numbers are present. Everything downstream -- the table's
+    last CHECK, ``store.insert_folds``'s own check, ``scoreable`` -- restates that one invariant,
+    deliberately, because a half-filled record is the failure mode worth three guards.
+
+    ``picks_json`` is a string rather than a tuple of ``wf.FoldPick`` so this value round-trips
+    through the database unchanged: ``from_row`` rebuilds exactly what ``fold_verdict`` produced,
+    and ``lab show`` and ``lab run`` therefore print the same sentences from the same source.
+
+    **It annotates; it does not gate.** See (D15) in this module's docstring.
+    """
+
+    method: str
+    bench_n: int | None
+    total: int | None
+    scored: int | None
+    won: int | None
+    majority: bool | None
+    stable: bool | None
+    picks_json: str
+    summary: str
+    reason: str | None
+
+    @property
+    def scoreable(self) -> bool:
+        return self.reason is None
+
+    def line(self) -> str:
+        """One line for a report: ``"3 of 4 folds"``, or the reason there is no number.
+
+        When the method was scoreable on fewer folds than the geometry yields, the geometry's
+        count is named too -- that gap is (D2)'s refusal at ``lab promote``, and a researcher who
+        sees it at run time can fix it before the id is spent.
+        """
+        if self.reason is not None:
+            return f"not scoreable ({self.reason})"
+        if self.total is not None and self.scored is not None and self.scored < self.total:
+            return f"{self.summary} (the benchmark's geometry yields {self.total})"
+        return self.summary
+
+    def note(self) -> str:
+        """One plain sentence: what this record means for promotion, and that it gated nothing.
+
+        The single source of that sentence. ``lab run`` prints it from the value it just recorded
+        and ``lab show`` prints it from the row it read back, so the two can never drift and the
+        reader is never left guessing whether the run was quietly weakened.
+        """
+        if self.reason is not None:
+            return (
+                "The folds could not be scored, so the reason was recorded instead of a record. "
+                "Nothing was refused: `lab run` annotates, and `lab promote` is where a lost fold "
+                "majority actually refuses."
+            )
+        if not self.scored:
+            # Measured, not hypothetical: a method whose curve starts inside the last fold's
+            # training slice -- the smoke fixture's 2014-2015 curve against the lab's 1993-2015
+            # benchmark -- yields four folds and nothing to score on any of them. `Record.majority`
+            # is False there, and printing the lost-majority warning for it would be a lie: the
+            # method did not lose the folds, it was never in them.
+            return (
+                "The lab's folds could be cut, but none of them could be scored for this method "
+                "-- its curve does not reach back far enough for any training slice to choose "
+                "on. Nothing was refused here; thin evidence is a refusal at `lab promote`, "
+                "which requires a method to be scoreable on every fold the geometry yields."
+            )
+        if self.majority:
+            return (
+                "A majority of the scoreable folds went this method's way, so the fold condition "
+                "of the promote gate would pass today. It is re-checked at `lab promote`, which "
+                "is where it is a gate; here it is evidence."
+            )
+        return (
+            "This method lost a majority of its walk-forward folds. That does NOT make these "
+            "trials ineligible and nothing was refused -- `lab promote` is where the fold "
+            "majority is a gate, and `lab test` refuses anything that is not promoted, so the "
+            "test window is already behind it. Read the line as the warning it is: a method that "
+            "wins its twenty-year dev average and loses the folds is a selection, not an edge."
+        )
+
+    @classmethod
+    def from_row(cls, row: Mapping[str, object] | sqlite3.Row) -> FoldVerdict:
+        """Rebuild the verdict a run recorded, from its ``store.method_folds`` row.
+
+        The inverse of what ``runner.run_method`` writes, field for field, so ``lab show`` prints
+        exactly the sentences ``lab run`` printed. ``majority`` and ``stable`` come back out of
+        SQLite as 0/1 integers and are turned back into booleans here, in the one place that knows
+        the table stores them that way.
+        """
+        def opt_int(key: str) -> int | None:
+            v = row[key]
+            return None if v is None else int(v)  # type: ignore[arg-type]
+
+        def opt_bool(key: str) -> bool | None:
+            v = row[key]
+            return None if v is None else bool(v)
+
+        reason = row["reason"]
+        return cls(
+            method=str(row["method_id"]),
+            bench_n=opt_int("bench_n"),
+            total=opt_int("folds_total"),
+            scored=opt_int("folds_scored"),
+            won=opt_int("folds_won"),
+            majority=opt_bool("majority"),
+            stable=opt_bool("stable"),
+            picks_json=str(row["picks_json"]),
+            summary=str(row["summary"]),
+            reason=None if reason is None else str(reason),
+        )
+
+
+def fold_verdict(
+    conn: sqlite3.Connection, method_id: str, geo: Geometry | None = None
+) -> FoldVerdict:
+    """``method_id``'s walk-forward record as a value, never a refusal. See (D15).
+
+    The lenient, structured sibling of ``fold_record``. It calls exactly the gate's own functions
+    -- ``geometry`` for the shared folds, ``fold_record`` for the de-funded scoring against them --
+    so the number a run records and the number ``lab promote`` later checks are the same
+    arithmetic, not two implementations of it. What differs is only what happens when that
+    arithmetic cannot be done: the gate raises and this returns the sentence.
+
+    ``store.LabError`` is caught from both calls, exactly as ``summary`` catches it, and for the
+    same reason one layer down: ``runner.run_method`` must finish and record a trial batch on a
+    lab that has no ``REF-SPY-HOLD`` benchmark yet, a benchmark curve too short for ``MIN_FOLDS``,
+    a method whose curves are empty, or a price fingerprint that is not the benchmark's (D10).
+    Every one of those is a real state of a working lab, not a bug, and none of them is a reason
+    to throw away a completed backtest.
+
+    When a ``geo`` is passed and the refusal came from ``fold_record``, the geometry's fold count
+    still goes into the record: "the lab yields four folds and this method could be scored on none
+    of them" is a more useful row than one with two blanks.
+
+    Nothing here is a gate. ``check`` is untouched and still refuses the same promotions it did.
+    """
+    known = geo
+    try:
+        if known is None:
+            known = geometry(conn)
+        record = fold_record(conn, method_id, known)
+    except store.LabError as e:
+        reason = str(e)
+        return FoldVerdict(
+            method=method_id,
+            bench_n=None if known is None else known.bench_n,
+            total=None if known is None else len(known.folds),
+            scored=None,
+            won=None,
+            majority=None,
+            stable=None,
+            picks_json="[]",
+            summary=f"not scoreable ({reason})",
+            reason=reason,
+        )
+    return FoldVerdict(
+        method=method_id,
+        bench_n=known.bench_n,
+        total=len(known.folds),
+        scored=len(record.scored),
+        won=record.won,
+        majority=record.majority,
+        stable=record.stable,
+        picks_json=_picks_json(record.picks),
+        summary=record.summary(),
+        reason=None,
+    )
+
 
 def check(conn: sqlite3.Connection, method_id: str) -> None:
     """Refuse ``method_id``'s promotion, or return. Raises ``store.LabError``.

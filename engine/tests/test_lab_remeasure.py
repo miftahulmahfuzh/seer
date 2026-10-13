@@ -70,7 +70,11 @@ def no_moments(monkeypatch):
 
 
 def _run(conn, data, method):
-    return runner.run_method(conn, method, HERE, data, git_sha="deadbeef", require_commit=False)
+    # `.ran` -- `run_method` returns a `runner.Run` (the batch plus the fold verdict it recorded).
+    # Every caller here wants the batch, so the helper unwraps it in one place.
+    return runner.run_method(
+        conn, method, HERE, data, git_sha="deadbeef", require_commit=False
+    ).ran
 
 
 def _trials_snapshot(conn):

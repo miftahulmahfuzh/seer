@@ -58,6 +58,16 @@
                                     fees (sim/costs.py, measured from the owner's receipts), print
                                     both and journal the difference as an observation. No trial
                                     row, no moments, no status change: N and the looks do not move
+    lab turnover [--cadence daily,weekly,monthly] [--names 10,20,30] [--churn 0.25,0.5,1.0]
+                 [--years 10] [--usd-idr 17841] [--growth 0] [--csv PATH]
+                                    report only: what Gotrade's measured schedule charges a book
+                                    for re-picking itself at each cadence, on the owner's real
+                                    funding plan. Arithmetic over sim/costs.py's fee_parts: no
+                                    backtest, no research store, no model. Prints the annual
+                                    return a strategy must add just to be level with doing
+                                    nothing, and the month the $0.10 per-order floor stops
+                                    binding. No trial row, no moments, no status change: N and
+                                    the looks do not move
     lab survivorship M0069 [M0007 ...] [--store DIR] [--sv-store DIR] [--csv PATH] [--no-journal]
                                     report only: re-run every recorded dev variant of each method
                                     at its recorded capital and funding on the dev store and on
@@ -348,6 +358,66 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
         help=f"dev-window research store (default: {research.STORE_DIR}, or $SEER_RESEARCH_STORE); "
              "a test-window store is refused. The store is gitignored, so a fresh worktree has "
              "none -- point this at a checkout that does rather than rebuilding it",
+    )
+
+    s = sub.add_parser(
+        "turnover",
+        # `$0.10` is safe but every `%` below is doubled: argparse runs each `help=` through
+        # %-interpolation (HelpFormatter._expand_help), so a bare `%` is read as a format spec
+        # and `lab --help` dies. `description=` is NOT interpolated and must stay single. Same
+        # rule as the `costs` and `exposure` parsers above.
+        help="report only: what Gotrade charges a book for re-picking itself, by cadence",
+        description=(
+            "Price a book shape -- how many names, how often it is re-picked, what share of it "
+            "turns over each time -- against sim/costs.py's measured Gotrade schedule, over the "
+            "owner's real funding plan (10,000,000 IDR at the start, +5,000,000 IDR on the 25th "
+            "of every month). Arithmetic, not a backtest: it builds no model, opens no research "
+            "store and runs no simulator, and every order goes through sim.costs.fee_parts with "
+            "a re-pick counted as one sell plus one buy. Prints, per cell, the fees paid, the "
+            "share of orders that paid the $0.10 trading-fee floor rather than the 0.2% rate, "
+            "the round-trip cost as a share of a slot, and the annual return the strategy must "
+            "add just to be level with doing nothing. Also prints the floor month by month as "
+            "the owner's deposits arrive, because the floor's bite shrinks as the book grows and "
+            "a single average would hide that. Records no trial, so the lab's N and the "
+            "test-window looks do not move; the test window is never read. This prices a "
+            "CADENCE, not a name count: the owner's standing instruction is that a name count is "
+            "tested on the merits and never on fee grounds."
+        ),
+    )
+    s.add_argument(
+        "--cadence", default=None, metavar="daily,weekly,monthly",
+        help="the re-pick cadences to price (default: all three). sim.rules offers these and no "
+             "others, so these are the only horizons there are",
+    )
+    s.add_argument(
+        "--names", default=None, metavar="10,20,30",
+        help="the book sizes to price (default: 10,20,30). This axis is here because the "
+             "per-order floor depends on slot size, NOT because a name count is being chosen",
+    )
+    s.add_argument(
+        "--churn", default=None, metavar="0.25,0.5,1.0",
+        help="the share of the book replaced at each re-pick, in (0, 1] (default: 0.25,0.5,1.0). "
+             "1.0 means the whole book is swapped every time",
+    )
+    s.add_argument(
+        "--years", type=int, default=None, metavar="N",
+        help="how many years of the funding plan to price (default: 10, the design's own bar)",
+    )
+    s.add_argument(
+        "--usd-idr", default=None, metavar="17841",
+        help="rupiah per dollar for the owner's deposits (default: 17841, the rate the frozen "
+             "production book started at and the rate `lab names` was measured at)",
+    )
+    s.add_argument(
+        "--growth", default=None, metavar="0.10",
+        help="compound the deposit path at this annual rate (default: 0). Zero is the "
+             "conservative reading -- a book that earns nothing keeps the smallest slots and so "
+             "pays the floor the longest. The knob is for checking the answer does not hinge on "
+             "it; measured, it does not",
+    )
+    s.add_argument(
+        "--csv", type=Path, default=None, metavar="PATH",
+        help="also write the grid and the floor ramp to PATH as CSV, at full precision",
     )
 
     s = sub.add_parser(
@@ -1430,6 +1500,19 @@ def _show(conn, args) -> int:
                 f"({f['deposits_n']} deposits, {f['schedule']}); the return and CAGR above count "
                 f"those deposits as gains"
             )
+    # The walk-forward record this method's last `lab run` recorded (store.method_folds, schema
+    # v7). None -- so no line -- for a method that has not run, and for every method that ran
+    # before the table existed: the migration backfills nothing, because a past run's record
+    # cannot be recomputed as it read (store._v6_to_v7).
+    #
+    # Printed through `hardgate.FoldVerdict.from_row`, which is the exact inverse of what the run
+    # wrote, so this line and the one `lab run` printed are the same sentence from the same code.
+    folds_row = store.latest_folds(conn, m["id"])
+    if folds_row is not None:
+        from seer_engine.lab import hardgate
+
+        v = hardgate.FoldVerdict.from_row(folds_row)
+        print(f"\nWalk-forward, recorded at the run of {folds_row['run_at']}: {v.line()}")
     if m["verdict"]:
         print(f"\nVerdict: {m['verdict']}")
     if m["analysis"]:
@@ -1438,6 +1521,8 @@ def _show(conn, args) -> int:
 
 
 def _run(conn, args) -> int:
+    import json
+
     from seer_engine.lab import hardgate, runner
     from seer_engine.lab.method import discover
 
@@ -1486,13 +1571,38 @@ def _run(conn, args) -> int:
                 f"{coverage.MIN_DEV_COVERAGE:.0%} floor. These trials measure the panel, not the "
                 "hypothesis, and the method id is spent either way."
             )
-    ran = runner.run_method(
+    done = runner.run_method(
         conn, method, path, data, git_sha=runner.git_head(config.REPO_ROOT), amend=amend
     )
+    ran = done.ran
     status = store.get_method(conn, method.id)["status"]
     log.info("%s: %d trial(s) recorded, status %s (%.1fs)", method.id, len(ran), status, time.perf_counter() - t0)
     _show(conn, argparse.Namespace(method=method.id))
     print(f"\nLab N (dev trials) is now {store.dev_trial_count(conn)}; test-window looks used: {store.test_looks(conn)}")
+    # The run's walk-forward verdict, printed from the value that was just recorded (R1). This is
+    # the part a researcher never used to see until `lab promote`, by which time the method id was
+    # spent and the dev write-up was already written.
+    #
+    # It ANNOTATES; it does not gate (hardgate D15, store._FOLDS_TABLE). `done.verdict.note()` is
+    # the single source of that sentence, and `lab show` prints the same one back off the row, so
+    # the two can never drift. Nothing below refuses anything: a lost majority is a warning here
+    # and a refusal at `lab promote`.
+    v = done.verdict
+    print(f"\nWalk-forward on the lab's shared folds: {v.line()}")
+    print(f"  {v.note()}")
+    for p in json.loads(v.picks_json):
+        got = fmt_signed_pct(p["got"]) if p["got"] is not None else "-"
+        bench = fmt_signed_pct(p["bench"]) if p["bench"] is not None else "-"
+        mark = "-" if p["beat"] is None else ("won" if p["beat"] else "lost")
+        print(
+            f"  fold {p['fold']}  train to {p['train_end']}, score {p['eval_start']}.."
+            f"{p['eval_end']}: {p['picked'] or '(no variant had enough history)'} "
+            f"{got} vs SPY TR {bench}  {mark}"
+        )
+    print(
+        "  Folds share training data, so they are a sanity check, never a significance test, and "
+        "nothing here enters a DSR."
+    )
     if amendment is not None:
         g = store.gate(conn)
         seq = len(store.amendments_of(conn, method.id))
@@ -2037,6 +2147,47 @@ def _names(conn, args) -> int:
         f"and `lab stage` is not needed."
     )
     log.info("lab names: %d runs done (%.1fs)", len(sweep.points), time.perf_counter() - t0)
+    return 0
+
+
+def _turnover(conn, args) -> int:
+    """``lab turnover``: what Gotrade charges a book for trading often. Report only.
+
+    Every refusal that needs no arithmetic -- a bad cadence, a turnover outside (0, 1], a
+    nonsensical horizon or rate -- is made first, so a typo costs nothing. Then
+    ``turnover.measure`` prices the grid, which is pure arithmetic over ``sim.costs.fee_parts``:
+    no research store is opened and no simulator runs, which is the whole point of the item this
+    answers -- the number arrives before the model is built, not after.
+
+    Nothing is written to the lab database. N and the test-window looks are printed before and
+    after so the invariant is visible on the terminal, not merely asserted in a test.
+    """
+    from seer_engine.lab import turnover
+
+    cadences = turnover.check_cadences(args.cadence)
+    names = turnover.check_names(args.names)
+    churns = turnover.check_churns(args.churn)
+    years = turnover.check_years(args.years)
+    usd_idr = turnover.check_usd_idr(args.usd_idr)
+    growth = turnover.check_growth(args.growth)
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+    t0 = time.perf_counter()
+    sweep = turnover.measure(
+        cadences=cadences, names=names, churns=churns,
+        years=years, usd_idr=usd_idr, growth=growth,
+    )
+    print(turnover.format_report(sweep))
+    if args.csv is not None:
+        written = turnover.write_csv(sweep, Path(args.csv))
+        print(f"\ngrid written to {written}")
+    print(
+        f"\nnothing was recorded. Lab N (dev trials): {n_before} before, "
+        f"{store.dev_trial_count(conn)} after; test-window looks used: {looks_before} before, "
+        f"{store.test_looks(conn)} after. No journal entry, so seertrade.site/sera is unchanged "
+        f"and `lab stage` is not needed."
+    )
+    log.info("lab turnover: %d cells priced (%.1fs)", len(sweep.points), time.perf_counter() - t0)
     return 0
 
 
@@ -2644,6 +2795,7 @@ _HANDLERS = {
     "remeasure": _remeasure,
     "costs": _costs,
     "names": _names,
+    "turnover": _turnover,
     "survivorship": _survivorship,
     "exposure": _exposure,
     "gate": _gate,

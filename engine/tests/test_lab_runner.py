@@ -70,7 +70,7 @@ def test_run_records_trials_with_lab_wide_n(conn, data, tmp_path):
     """
     m = _method()
     projected = store.pending_gate(conn, m.id, len(m.candidates))
-    ran = runner.run_method(conn, m, Path(__file__), data, git_sha="deadbeef", require_commit=False)
+    ran = runner.run_method(conn, m, Path(__file__), data, git_sha="deadbeef", require_commit=False).ran
     assert [r.trial.candidate_id for r in ran] == ["M0001-A", "M0001-B"]
     rows = store.trials_of(conn, "M0001")
     assert [r["n"] for r in rows] == [55, 56]
@@ -280,7 +280,7 @@ def test_the_gate_measures_content_not_presence(data):
 
 def test_run_method_itself_does_not_gate(conn, data):
     """The gate lives in ``commands/lab._run``; ``run_method`` stays callable from a test."""
-    ran = runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False)
+    ran = runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False).ran
     assert len(ran) == 2
 
 
@@ -294,7 +294,7 @@ def test_a_run_records_one_funding_row_per_trial(conn, data):
     on `trials`. The numbers are the ones `trial_funding`'s CHECKs insist on -- deposits_usd > 0
     and deposits_n >= 1 -- plus the money-weighted pair the gate reads.
     """
-    ran = runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False)
+    ran = runner.run_method(conn, _method(), Path(__file__), data, git_sha="x", require_commit=False).ran
     rows = store.trials_of(conn, "M0001")
     assert len(rows) == len(ran) == 2
     assert conn.execute("SELECT count(*) FROM trial_funding").fetchone()[0] == 2

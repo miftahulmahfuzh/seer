@@ -39,11 +39,24 @@ Tables:
   rather than only its first; ``methods.source_sha`` is still written once and never rewritten.
   Triggers refuse every UPDATE and DELETE.
 
+- ``method_folds``: one row per *batch* of trials -- one per ``lab run``, one per ``--amend`` run
+  -- carrying that method's whole walk-forward record as it read the moment the batch was
+  recorded: how many folds the lab's geometry yields, how many could be scored, how many the
+  method won, whether the training slices kept choosing the same variant, and the per-fold detail
+  as JSON. When the record could not be computed at all -- no ``REF-SPY-HOLD`` benchmark, a
+  geometry thinner than ``hardgate.MIN_FOLDS``, no curve, or prices that are not the benchmark's
+  (hardgate D10) -- the row carries the **reason** instead and the run still completes. **It
+  annotates; it does not gate**: the fold majority is a refusal at ``lab promote``
+  (``hardgate.check``) and nowhere else, and no ``trials`` column changed meaning when this table
+  arrived. Triggers refuse every UPDATE and DELETE.
+
 Schema versions (``meta.schema_version``): 1 is the first lab; 2 adds the ``synthesis`` insight
 kind; 3 adds the ``trial_moments`` side table; 4 adds the ``trial_funding`` side table (the
 money-weighted return of a trial that received deposits, and of the SPY fed the same ones); 5 adds
 the ``trial_provenance`` side table and backfills it for every trial already recorded; 6 adds the
-``method_amendments`` side table (empty: nothing is backfilled, because no amendment predates it).
+``method_amendments`` side table (empty: nothing is backfilled, because no amendment predates it);
+7 adds the ``method_folds`` side table (empty for the same reason: the verdict of a run that has
+already happened cannot be recomputed as it was, because the lab has recorded curves since).
 ``connect`` migrates an older database in place; ``connect_readonly`` never does.
 
 The **verdict** a trial reads is derived, not frozen: ``DSR_MIN`` is the threshold (0.90 since
@@ -83,7 +96,7 @@ COMMITTED_DB = config.REPO_ROOT / "lab" / "lab.sqlite"
 # database through SEER_LAB_DB; only the coordinator commits it.
 DB_PATH = Path(os.environ.get("SEER_LAB_DB") or COMMITTED_DB)
 XLSX_PATH = config.REPO_ROOT / "lab" / "lab.xlsx"  # gitignored
-SCHEMA_VERSION = "6"  # 2: synthesis kind; 3: trial_moments; 4: trial_funding; 5: trial_provenance; 6: method_amendments (see _migrate)
+SCHEMA_VERSION = "7"  # 2: synthesis kind; 3: trial_moments; 4: trial_funding; 5: trial_provenance; 6: method_amendments; 7: method_folds (see _migrate)
 
 SOURCE_KINDS: tuple[str, ...] = ("paper", "blog", "github", "knowledge", "variation", "seed")
 STATUSES: tuple[str, ...] = (
@@ -375,6 +388,65 @@ BEGIN SELECT RAISE(ABORT, 'method_amendments are append-only: an amendment row i
 BEGIN SELECT RAISE(ABORT, 'method_amendments are append-only: an amendment row is never deleted'); END""",
 )
 
+# The walk-forward record of one batch of trials, as it read the moment that batch was recorded
+# (schema v7). Written by ``runner.run_method`` inside the very transaction that inserts the
+# trials, so the curves the run just produced are in the record it keeps.
+#
+# **It annotates; it does not gate.** A method that loses a majority of its folds here still
+# records its trials, still keeps whatever ``trials.eligible`` ``runner.trial_rows`` computed, and
+# still moves its status by the existing rule. The fold majority remains a refusal at
+# ``lab promote`` only (``hardgate.check``), and ``runner.preflight_test`` refuses any method that
+# is not ``promoted``, so the one counted look is already behind that gate. Three reasons this is
+# the right side of the line, all checkable:
+#
+# - the handover (HANDOVER_20261013-measure-the-constraint.md 2.1) asked for "a new column/report
+#   path, never an edit of recorded rows";
+# - a second gate at run time protects nothing the promote gate does not already protect, and
+#   would spend method ids to say so;
+# - the record is a **method-level, time-varying** property -- it is scored over *every* recorded
+#   dev curve of the method against the benchmark, so an amendment recorded tomorrow changes it.
+#   ``store.verdict`` promises that a verdict is "comparable across time"; a per-trial column that
+#   moved when a sibling row was appended would break exactly that promise.
+#
+# A side table, not a column on ``methods`` or ``trials``, for the reason ``trial_funding``,
+# ``trial_provenance`` and ``method_amendments`` are: ``ALTER TABLE ... ADD COLUMN`` would move
+# every recorded row's bytes, and one column could not hold a list of folds.
+#
+# ``seq`` starts at 1 and is contiguous per method, exactly as ``method_amendments.seq`` is, so
+# the recorded verdicts are a prefix of the method's run history and ``latest_folds`` has a
+# definite answer. ``run_at`` is the run's, not the moment of the computation: it is the same
+# ``run_at`` every trial of that batch carries, which is what joins this row to them.
+#
+# Either the numbers or the reason, never both and never neither -- the final CHECK. A lab with no
+# ``REF-SPY-HOLD`` benchmark, a geometry too thin for ``hardgate.MIN_FOLDS``, a method with no
+# curve, or a price fingerprint that is not the benchmark's (D10) all land in the second case, and
+# the run completes anyway: a fresh lab has to be able to run before it has a benchmark
+# (``hardgate.pin_dev_store``).
+_FOLDS_TABLE = """CREATE TABLE IF NOT EXISTS method_folds (
+    method_id    TEXT NOT NULL REFERENCES methods(id),
+    seq          INTEGER NOT NULL CHECK (seq >= 1),
+    run_at       TEXT NOT NULL CHECK (length(trim(run_at)) > 0),
+    git_sha      TEXT NOT NULL CHECK (length(trim(git_sha)) > 0),
+    bench_n      INTEGER REFERENCES trials(n),
+    folds_total  INTEGER CHECK (folds_total IS NULL OR folds_total >= 0),
+    folds_scored INTEGER CHECK (folds_scored IS NULL OR folds_scored >= 0),
+    folds_won    INTEGER CHECK (folds_won IS NULL OR folds_won >= 0),
+    majority     INTEGER CHECK (majority IS NULL OR majority IN (0, 1)),
+    stable       INTEGER CHECK (stable IS NULL OR stable IN (0, 1)),
+    picks_json   TEXT NOT NULL,
+    summary      TEXT NOT NULL CHECK (length(trim(summary)) > 0),
+    reason       TEXT,
+    recorded     TEXT NOT NULL CHECK (length(trim(recorded)) > 0),
+    PRIMARY KEY (method_id, seq),
+    CHECK ((reason IS NULL) <> (folds_scored IS NULL))
+)"""
+_FOLDS_TRIGGERS: tuple[str, ...] = (
+    """CREATE TRIGGER IF NOT EXISTS method_folds_no_update BEFORE UPDATE ON method_folds
+BEGIN SELECT RAISE(ABORT, 'method_folds are append-only: a recorded fold verdict is never updated'); END""",
+    """CREATE TRIGGER IF NOT EXISTS method_folds_no_delete BEFORE DELETE ON method_folds
+BEGIN SELECT RAISE(ABORT, 'method_folds are append-only: a recorded fold verdict is never deleted'); END""",
+)
+
 #: The backfill's capital rule, exact on every trial recorded before schema v5 (analysis M3).
 #: Cross-checked with ``git merge-base --is-ancestor d79fc83 <trials.git_sha>`` over all 26
 #: distinct ``git_sha`` values: the 20 shas behind trials #1..#128 predate ``d79fc83`` and none of
@@ -522,6 +594,12 @@ CREATE TABLE IF NOT EXISTS ideas_seen (
 {_AMENDMENTS_TRIGGERS[0]};
 
 {_AMENDMENTS_TRIGGERS[1]};
+
+{_FOLDS_TABLE};
+
+{_FOLDS_TRIGGERS[0]};
+
+{_FOLDS_TRIGGERS[1]};
 
 CREATE TRIGGER IF NOT EXISTS trials_no_update BEFORE UPDATE ON trials
 BEGIN SELECT RAISE(ABORT, 'trials are append-only: a trial row is never updated'); END;
@@ -730,16 +808,47 @@ def _v5_to_v6(conn: sqlite3.Connection) -> None:
         conn.execute(trigger)
 
 
+def _v6_to_v7(conn: sqlite3.Connection) -> None:
+    """Add the ``method_folds`` side table and its two append-only triggers.
+
+    Purely additive, exactly as ``_v2_to_v3``, ``_v3_to_v4`` and ``_v5_to_v6`` were and for the
+    same reason: no ``methods``, ``trials``, ``trial_moments``, ``trial_funding``,
+    ``trial_provenance`` or ``method_amendments`` row is read, written, rebuilt or re-keyed, no
+    column is altered, no verdict moves. A v6 database that migrates and is then never written
+    again differs from its v6 self only by an empty table, two triggers and the
+    ``schema_version`` string, which
+    ``test_connect_migrates_a_v6_database_adding_method_folds_and_touching_no_row`` pins.
+
+    **Nothing is backfilled, and nothing can be.** A fold record is scored over every dev curve
+    the method has *today*; re-scoring a run that happened in 2026-10 would give the record the
+    lab would compute now, not the one that run would have recorded, and writing that into a row
+    stamped with that run's ``run_at`` would be a fabricated measurement. The table therefore
+    starts empty and fills from the next ``lab run`` onwards, and ``latest_folds`` answering None
+    is the honest "this method ran before the lab kept this" -- the same shape ``funding_of``
+    answers for the 128 trials that predate ``trial_funding``.
+
+    In particular ``trials.eligible`` is not read and not written here. The fold record annotates;
+    it has never decided a trial's eligibility and this migration does not make it start.
+    """
+    conn.execute(_FOLDS_TABLE)
+    for trigger in _FOLDS_TRIGGERS:
+        conn.execute(trigger)
+
+
 def _migrate(conn: sqlite3.Connection) -> None:
     """Bring an older database up to ``SCHEMA_VERSION`` in one transaction under the write lock.
 
-    A ladder: each step moves the database up exactly one version, so a v1 database reaches v6 in
-    one open by running all five steps in order. v1 -> v2 adds the ``synthesis`` insight kind
+    A ladder: each step moves the database up exactly one version, so a v1 database reaches v7 in
+    one open by running all six steps in order. v1 -> v2 adds the ``synthesis`` insight kind
     (``_v1_to_v2``); v2 -> v3 adds the ``trial_moments`` side table (``_v2_to_v3``); v3 -> v4 adds
     the ``trial_funding`` side table (``_v3_to_v4``); v4 -> v5 adds the ``trial_provenance`` side
     table and backfills it (``_v4_to_v5``) -- after v3 -> v4, because the backfill reads
-    ``trial_funding``; v5 -> v6 adds the ``method_amendments`` side table (``_v5_to_v6``). A
-    version this code does not know is refused rather than guessed at.
+    ``trial_funding``; v5 -> v6 adds the ``method_amendments`` side table (``_v5_to_v6``); v6 -> v7
+    adds the ``method_folds`` side table (``_v6_to_v7``), empty, because a past run's fold record
+    cannot be recomputed as it read. A version this code does not know is refused rather than
+    guessed at -- **which makes this a one-way door for every other checkout**: a v7 database
+    opened by v6 code raises ``LabError`` on connect, so the code and the migrated committed
+    database must land together.
 
     Parallel sessions may connect at once, so the version is read again after
     ``BEGIN IMMEDIATE``: only the first one migrates, the others find the current version and do
@@ -767,6 +876,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
         if version == "5":
             _v5_to_v6(conn)
             version = "6"
+        if version == "6":
+            _v6_to_v7(conn)
+            version = "7"
         if version != SCHEMA_VERSION:
             raise LabError(
                 f"lab database schema version {found!r} is unknown to this code "
@@ -2262,6 +2374,160 @@ def insert_amendment(conn: sqlite3.Connection, row: AmendmentRow) -> None:
         [
             str(row.method_id), int(row.seq), row.source_sha, row.added, row.why,
             row.hypothesis, row.expected_failure, row.run_at, row.git_sha,
+        ],
+    )
+
+
+# --------------------------------------------------------------------------- method folds
+
+
+@dataclass(frozen=True)
+class FoldRow:
+    """One batch's walk-forward record, as it read when that batch was recorded (schema v7).
+
+    The database half of ``hardgate.FoldVerdict``. One row per ``lab run`` -- the ordinary path
+    and the ``--amend`` path alike -- written by ``runner.run_method`` in the very transaction
+    that inserts the trials, so the curves that run produced are inside the record it keeps. A
+    rolled-back run leaves neither the trials nor this row.
+
+    **It annotates; it does not gate.** Nothing in this row feeds ``trials.eligible``,
+    ``store.verdict`` or ``methods.status``. The fold majority is a refusal at ``lab promote``
+    (``hardgate.check``) and nowhere else; ``runner.preflight_test`` refuses any method that is not
+    ``promoted``, so the one counted look is already behind that gate. See ``_FOLDS_TABLE`` above
+    for the three reasons the line is drawn here.
+
+    - ``method_id``    the method this batch belongs to. It exists by the time the row is written:
+                       ``run_method`` adds the method before it inserts the trials.
+    - ``seq``          1 for the first recorded run, 2 for the first amendment, contiguous --
+                       exactly ``method_amendments.seq``'s shape, so ``latest_folds`` is the
+                       highest ``seq`` and the history has no holes.
+    - ``run_at``       the run's timestamp: the same ``run_at`` every trial of this batch carries,
+                       which is what joins this row to them. Not the moment of the computation --
+                       that is ``recorded``.
+    - ``git_sha``      the repository HEAD the run was made at.
+    - ``bench_n``      the ``trials.n`` of the ``REF-SPY-HOLD`` row the folds were cut from
+                       (``hardgate.Geometry.bench_n``), so a reader can find the yardstick rather
+                       than look it up again and risk naming a different one. None when the lab had
+                       no benchmark.
+    - ``folds_total``  how many folds the lab's shared geometry yields. None when there was no
+                       geometry at all.
+    - ``folds_scored`` how many of them could be scored for this method; ``folds_won`` how many it
+                       beat the de-funded benchmark on. **None exactly when ``reason`` is set** --
+                       the table's last CHECK.
+    - ``majority``     ``walkforward.Record.majority``: did it win a strict majority of the folds
+                       it was scoreable on. ``stable``: did the training slices keep choosing the
+                       same variant.
+    - ``picks_json``   the per-fold detail as compact JSON -- one object per fold with the fold's
+                       dates, the variant the training slice picked, its training MAR, the pick's
+                       and the benchmark's evaluation-slice total returns, and whether it beat.
+                       ``"[]"`` when nothing could be scored. Kept rather than recomputed because
+                       the record is **time-varying**: it is scored over every dev curve the method
+                       has, so the same question asked after the next amendment gives a different
+                       answer, and this row is the answer *that run* got.
+    - ``summary``      the one display line (``walkforward.Record.summary()``: ``"3 of 4 folds"``,
+                       or ``"3 of 4 folds, pick changed"``), or ``"not scoreable (...)"``.
+    - ``reason``       why the record could not be computed, or None when it could. Set exactly
+                       when ``folds_scored`` is None.
+    - ``recorded``     an ISO timestamp: when this row was written.
+    """
+
+    method_id: str
+    seq: int
+    run_at: str
+    git_sha: str
+    bench_n: int | None
+    folds_total: int | None
+    folds_scored: int | None
+    folds_won: int | None
+    majority: bool | None
+    stable: bool | None
+    picks_json: str
+    summary: str
+    reason: str | None
+    recorded: str
+
+
+FOLD_COLUMNS: tuple[str, ...] = tuple(f.name for f in fields(FoldRow))
+
+
+def folds_of(conn: sqlite3.Connection, method_id: str) -> list[sqlite3.Row]:
+    """Every recorded fold verdict of ``method_id``, oldest first; ``[]`` when it has none.
+
+    A database on schema v1-v6 has no ``method_folds`` table at all and answers ``[]`` the same
+    way -- ``connect`` migrates, so that can only be a ``connect_readonly`` caller or a raw
+    read-only connection. ``amendments_of``, ``provenance_of``, ``moments_of`` and ``funding_of``
+    all carry the same branch for the same reason.
+
+    ``[]`` is also the honest answer for every method the lab ran before this table existed: the
+    v6 -> v7 migration backfills nothing, because a past run's record cannot be recomputed as it
+    read (see ``_v6_to_v7``).
+    """
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'method_folds'"
+    ).fetchone() is None:
+        return []
+    return list(conn.execute(
+        "SELECT * FROM method_folds WHERE method_id = ? ORDER BY seq", (str(method_id),)
+    ))
+
+
+def latest_folds(conn: sqlite3.Connection, method_id: str) -> sqlite3.Row | None:
+    """The newest recorded fold verdict of ``method_id``, or None when it has none.
+
+    "Newest" is the highest ``seq``, not the latest ``recorded``: ``seq`` is contiguous and
+    assigned under the run's own write lock, so it orders the batches even when two sessions
+    stamp the same second. ``lab show`` prints this one; it is what the method's last run saw.
+    """
+    rows = folds_of(conn, method_id)
+    return rows[-1] if rows else None
+
+
+def insert_folds(conn: sqlite3.Connection, row: FoldRow) -> None:
+    """Record one batch's fold verdict (the caller holds the transaction).
+
+    Append-only, contiguous and prefix-shaped, exactly as ``insert_amendment`` is: ``seq`` must be
+    one past the highest this method already has, so the recorded verdicts can never be a set with
+    a hole in it. The method must already exist -- ``run_method`` adds it before it inserts the
+    trials, and a verdict about a method the database has never heard of is not a record of
+    anything.
+
+    The "numbers or a reason, never both" rule is enforced here as well as by the table's CHECK,
+    because a Python caller deserves a sentence rather than a constraint name. ``majority`` and
+    ``stable`` are booleans in the dataclass and 0/1 in the table; the conversion is here, in one
+    place, so no caller has to remember it.
+    """
+    if get_method(conn, row.method_id) is None:
+        raise LabError(
+            f"no method {row.method_id}: a fold verdict is recorded for a method the lab knows"
+        )
+    scoreable = row.reason is None
+    if scoreable != (row.folds_scored is not None):
+        raise LabError(
+            f"{row.method_id}: a fold verdict carries either the numbers or the reason it has "
+            f"none, never both and never neither (reason={row.reason!r}, "
+            f"folds_scored={row.folds_scored!r})"
+        )
+    have = folds_of(conn, row.method_id)
+    expected = len(have) + 1
+    if row.seq != expected:
+        raise LabError(
+            f"{row.method_id}: fold verdict seq must be {expected} (it has {len(have)} "
+            f"recorded), got {row.seq}. method_folds is append-only and contiguous, so the "
+            f"recorded verdicts stay a prefix of the method's run history"
+        )
+    cols = ", ".join(f'"{c}"' for c in FOLD_COLUMNS)
+    marks = ", ".join("?" for _ in FOLD_COLUMNS)
+    conn.execute(
+        f"INSERT INTO method_folds ({cols}) VALUES ({marks})",
+        [
+            str(row.method_id), int(row.seq), row.run_at, row.git_sha,
+            None if row.bench_n is None else int(row.bench_n),
+            None if row.folds_total is None else int(row.folds_total),
+            None if row.folds_scored is None else int(row.folds_scored),
+            None if row.folds_won is None else int(row.folds_won),
+            None if row.majority is None else int(bool(row.majority)),
+            None if row.stable is None else int(bool(row.stable)),
+            row.picks_json, row.summary, row.reason, row.recorded,
         ],
     )
 

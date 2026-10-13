@@ -47,6 +47,46 @@ close to the close of the symbol's last bar on or before ``label_end(t, horizon)
 session after t. A symbol with no bar after t has no label. The label of (s, t) is known on
 ``label_end(t)``, and not one day before.
 
+THE FALL LABEL, the second thing this module can be asked to predict, and the one place this
+module does NOT rank-normalise. The constraint that binds this lab is not the pick but the fall: of
+394 recorded dev trials 65% beat SPY total return and only 23% keep the worst drawdown at or under
+20% (handover 2026-10-13, "measure the constraint"). So beside the forward return rank there is a
+forward *downside* LEVEL. ``forward_drawdown`` is the worst peak-to-trough fall of a symbol's
+closes from ``section.day`` to its last close on or before the label end, as a fraction;
+``forward_downside_vol`` is the root mean square of its down days over the same window. Both read
+only bars dated on or before that end, and both are NaN where the window cannot be measured and a
+measured 0.0 where it was calm -- NaN means "not known", never "no fall".
+
+**``fall_labels`` returns that measure RAW. ``rank01`` is not applied to it, ever.** The return
+label is a per-date rank because the ranker's question is "which of these names"; the fall model's
+question is "how much of this book", and a per-date rank cannot answer it. Every FEATURE column is
+already rank-normalised per date (``rank_columns`` in ``build_section``); a per-date rank LABEL on
+top of that would make the prediction distribution near-stationary across dates by construction, so
+a cut would select a count that moved only with cross-sectional composition noise, and in October
+2008 -- when every name is about to fall -- the per-date ranks would still be uniform and the label
+could not encode "all of them" even in principle. That is a selection test wearing a sizing head.
+The level can say "every name on this date is about to fall thirty per cent"; the rank cannot.
+
+The horizon is a quarter (``QUARTER``, 63 sessions) rather than the ranker's month, because a fall
+is a path and a month of a path is mostly noise. A longer horizon costs label-end calendar, not
+lookback: a sample enters training only once ``label_end(t, horizon) <= anchor``, so the first fall
+refit with 35 labelled month-ends is 1999-12-31 against the ranker's 1998-12-31, the first book year
+is 2000 against 1999, and the last labelled dev month-end is 2015-06-30 against 2015-08-31.
+``FEATURE_LOOKBACK`` does not move.
+
+THE MARKET-LEVEL COLUMNS, because a level label needs level inputs. If every feature were a per-date
+rank the model could not tell 2008 from 2005 and the best it could do with a level label is predict
+the unconditional mean. ``build_fall_section`` therefore COMPOSES ``build_section`` -- which is not
+edited, nor is ``Section``, ``rank_columns`` or ``PRICE_FEATURES`` -- and appends three columns that
+are deliberately NOT normalised: SPY's distance below its trailing ``MARKET_HIGH_N`` (252) session
+high, SPY's realised volatility over the last ``MARKET_VOL_N`` (60) sessions, and the cross-sectional
+dispersion of the date's own 12-1 momentum, read off the raw matrix before ranking. All three are
+per-date scalars broadcast down the rows: within a date they carry no cross-sectional information
+and so cannot change which names the model prefers, only how far the whole date's predictions shift
+-- which is exactly the level the head reads. Each reads only bars dated on or before the decision
+date. ``FALL_FEATURE_LOOKBACK`` is ``max(FEATURE_LOOKBACK, MARKET_HIGH_N, MARKET_VOL_N + 1)`` = 401,
+unchanged, and under the lab smoke fixture's 473-bar cap.
+
 WALK-FORWARD. One model per calendar year. The model deciding on d is the one refit at
 ``anchor_for(d)``, the last NYSE session of the latest year ended on or before d, on every sample
 with ``train_start <= t`` and ``label_end(t) <= anchor`` (an expanding window). A sample therefore
@@ -58,6 +98,40 @@ target and the book is cash. With the defaults the first model is the 1998-12-31
 THE BOOK. The ``top_n`` highest predictions (ties by symbol) at ``equal_weight(top_n)``, priced at
 d's close; fewer eligible names leave the rest in cash. Held names get no special treatment
 (as F4): a name that falls out of the top set is signal-exited by the book engine.
+
+THE SIZING HEAD reads a MARKET-LEVEL quantity, not a per-name one. The names are still read in one
+pass -- the calmest predicted falls first, ties by symbol -- but how many of the ``slots`` are
+filled is decided by where the WHOLE CROSS-SECTION sits, and the slots that are not filled are cash.
+At each refit the model predicts on its own training rows, takes the mean predicted fall per
+training date, and keeps those date-level means sorted (``FallModel.levels``); ``FallModel.cut`` is
+their median, the level at which the book sits at half exposure. At a decision date the head takes
+the date's cross-sectional MEAN predicted fall and asks where it falls in that training
+distribution: ``danger`` is the share of training dates that looked no more dangerous, and the book
+holds ``slots - floor(danger * slots)`` whole slots. Calmer than every training date and the book is
+full; more dangerous than every one of them and the book is entirely cash; at the median, half.
+It is monotone, it reaches both ends, and NOT ONE NUMBER IN IT WAS CHOSEN -- the ladder is the
+empirical distribution of the model's own in-sample predictions, so nothing here was read off the
+dev window, which is what pre-registration requires. ``size=False`` is the control: the same
+ordering, the ladder ignored, the book always full, which separates what the sizing adds from what
+ranking by predicted calm adds.
+
+WHY WHOLE SLOTS. The weight of a held name is ``equal_weight(slots)`` and never changes with how
+many are held: the book is never renormalised onto the names that survived. The measuring tape
+(``sim.rules.MONTHLY_HOLD_FRAC_GOTRADE_TBAND``) resizes a holding only once it is off by
+``TARGET_RESIZE_BAND``, 20% of its OWN target value, so at 20 slots a weight nudge smaller than 1%
+of equity is never traded at all and a head that expressed exposure by nudging weights would be
+swallowed whole by the band. An entry or an exit is a gap of a full slot, 5% of equity at 20 slots:
+five times the band, every time, at every book size. So exposure moves in whole slots, which is the
+only step this tape can hear.
+
+ONE OBJECT, DELIBERATELY. ``FALL_SIZE`` is the fall model's only exported allocator, beside the
+ranker's pair ``TREE_RANK`` and ``TREE_RANK_FUND``. There is no ``FALL_SIZE_FUND``: the EDGAR panel
+starts in 2009, so a method pre-registered on fundamentals would be learning from four empty columns
+for thirteen of the dev window's twenty years and would burn its method id measuring the panel
+rather than the hypothesis. An exported allocator that no method may ever use would only claim an
+allocator id forever, so the id ``FALLF`` is left free. ``FallSizeAllocator`` still accepts
+``"price+fund"`` -- the branch is reachable and tested by constructing one locally -- but the fall
+model is built to run on price and dividend features alone, and that is what it is pre-registered on.
 
 THE TWO PATHS. Membership history, the dividend calendar and the fundamental panel are not in
 ``Mapping[str, History]``, so the live path is ``prepare_market(market) -> targets_prepared``. The
@@ -599,6 +673,9 @@ class TreeRankPrepared:
     _ends: dict[tuple[date, int], date] = field(default_factory=dict, repr=False)
     _returns: dict[tuple[date, date], np.ndarray] = field(default_factory=dict, repr=False)
     _models: dict[tuple[Any, ...], TreeModel | None] = field(default_factory=dict, repr=False)
+    _falls: dict[tuple[date, date, str], np.ndarray] = field(default_factory=dict, repr=False)
+    _fall_sections: dict[tuple[date, Any], Section] = field(default_factory=dict, repr=False)
+    _fall_models: dict[tuple[Any, ...], FallModel | None] = field(default_factory=dict, repr=False)
 
     @staticmethod
     def build(inputs: TreeInputs, feature_set: str) -> TreeRankPrepared:
@@ -718,6 +795,163 @@ class TreeRankPrepared:
                 out.append(target)
         return tuple(out)
 
+    def forward_fall(self, t: date, horizon: int, measure: str) -> np.ndarray:
+        """``measure``'s forward fall of the members' cross-section on ``t`` over ``horizon`` sessions.
+
+        Cached in ``_falls``, keyed by (t, label end, measure). That is a different dict from
+        ``_returns``, so a fall vector can never be served where a forward return was asked for,
+        or the other way round, whatever the horizon -- the two caches cannot reach each other.
+        """
+        inputs, _ = self._live()
+        end = self.end(t, horizon)
+        key = (t, end, measure)
+        hit = self._falls.get(key)
+        if hit is None:
+            hit = forward_fall(inputs.history, self.section(t), end, measure)
+            self._falls[key] = hit
+        return hit
+
+    def fall_labels(self, t: date, horizon: int, measure: str) -> np.ndarray:
+        """The fall labels on ``t``: the RAW forward fall. A LEVEL, never a rank (D13).
+
+        ``rank01``/``rank_columns`` is deliberately NOT applied here and must never be added. Every
+        FEATURE column is already rank-normalised per date; a per-date rank LABEL on top of that
+        makes the prediction distribution near-stationary across dates by construction, so the head
+        could only ever select a count that moved with cross-sectional composition noise, and in
+        October 2008 the per-date ranks are still uniform -- the label could not encode "all of
+        them" even in principle. The level can; that is the whole point of this path.
+
+        NaN is passed through unchanged and still means "not known": ``fall_training_set`` drops
+        those rows and ``forward_fall`` never returns 0.0 for an unmeasurable window.
+        """
+        return self.forward_fall(t, horizon, measure)
+
+    def fall_section(self, t: date, members: AbstractSet[str] | None = None) -> Section:
+        """The fall model's section on ``t``: the ranker's, plus the three market-level columns.
+
+        ``self.section(...)`` is the ranker's own cached builder and is called, never copied, so
+        the seven rank-normalised columns are byte-identical between the two heads and the feature
+        work is paid for once. ``build_fall_section`` appends the un-normalised level columns (D13).
+        Cached in ``_fall_sections``, its own dict, so a 10-column fall section can never be served
+        where a 7-column ranker section was asked for.
+        """
+        inputs, _ = self._live()
+        key = (t, None if members is None else frozenset(members))
+        hit = self._fall_sections.get(key)
+        if hit is None:
+            base = self.section(t) if members is None else self.section(t, members)
+            hit = build_fall_section(base, inputs.history, MOMENTUM_COL)
+            self._fall_sections[key] = hit
+        return hit
+
+    def fall_training_set(
+        self, params: FallSizeParams, anchor: date
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+        """(X, y, groups, labelled month-ends) for a fall refit on ``anchor``.
+
+        Rows are stacked by (t, symbol) exactly as the ranker's ``training_set`` stacks them, and
+        ``groups`` carries each row's training-date index, 0 .. months-1. The head's ladder is a
+        distribution over DATES, not over rows, so the fit needs to know which rows belong to which
+        date; without ``groups`` a date with 500 names would outvote one with 20 (D2c).
+
+        ``training_dates`` is the ranker's own, called and never copied: it reads
+        ``params.train_start`` and ``params.horizon``, which this params class carries under the
+        same names, so both heads share one calendar by construction rather than by a restated rule.
+        """
+        k = len(fall_feature_names(self.feature_set))
+        xs: list[np.ndarray] = []
+        ys: list[np.ndarray] = []
+        gs: list[np.ndarray] = []
+        months = 0
+        for t in self.training_dates(params, anchor):
+            y = self.fall_labels(t, params.horizon, params.measure)
+            ok = np.isfinite(y)
+            if not ok.any():
+                continue
+            xs.append(self.fall_section(t).X[ok])
+            ys.append(y[ok])
+            gs.append(np.full(int(ok.sum()), months, dtype=np.int64))
+            months += 1
+        if not xs:
+            return (
+                np.empty((0, k), dtype=np.float64),
+                np.empty(0, dtype=np.float64),
+                np.empty(0, dtype=np.int64),
+                0,
+            )
+        return np.concatenate(xs, axis=0), np.concatenate(ys), np.concatenate(gs), months
+
+    def fall_model(self, params: FallSizeParams, anchor: date) -> FallModel | None:
+        """The fall model refit on ``anchor``, or None with fewer than ``min_train_months`` to learn from."""
+        if params.feature_set != self.feature_set:
+            raise ValueError(f"params.feature_set {params.feature_set!r} != prepared {self.feature_set!r}")
+        key = (anchor, params.model_key())
+        if key in self._fall_models:
+            return self._fall_models[key]
+        X, y, groups, months = self.fall_training_set(params, anchor)
+        model: FallModel | None = None
+        if months >= params.min_train_months and X.shape[0] >= 2:
+            model = fit_fall_model(X, y, groups, months, anchor, params)
+        self._fall_models[key] = model
+        return model
+
+    def fall_model_on(self, data_date: date, params: FallSizeParams) -> FallModel | None:
+        """The fall model that decides on ``data_date``: the one refit at ``anchor_for(data_date)``."""
+        return self.fall_model(params, anchor_for(data_date))
+
+    def fall_targets_on(
+        self, members: AbstractSet[str], data_date: date, params: FallSizeParams
+    ) -> tuple[Target, ...]:
+        """The book the predicted fall sizes on ``data_date``: the calmest names, cash for the rest.
+
+        TWO DECISIONS, DELIBERATELY SEPARATE (D13, D2c):
+
+        - HOW MANY slots are filled is a MARKET-LEVEL question. The date's cross-sectional MEAN
+          predicted fall is located in the model's own training distribution of date-level means
+          (``model.levels``, sorted at fit time); ``danger`` is the share of training dates that
+          looked no more dangerous, and the book holds ``slots - floor(danger * slots)`` whole
+          slots. Calmer than every training date -> a full book; more dangerous than all of them ->
+          entirely cash; at the median -> half. Monotone, both ends reachable, and not one number
+          in it was chosen: the ladder IS the empirical distribution of the model's own in-sample
+          predictions, so nothing was read off the dev window.
+        - WHICH names fill them is the ordinary cross-sectional question: predicted fall ascending,
+          ties by symbol.
+
+        Every held name is at ``equal_weight(params.slots)`` whatever the count -- the book is NEVER
+        renormalised onto the survivors, and the unfilled slots are cash. With ``size`` off the
+        ladder is ignored entirely and ``k`` is ``slots``: the always-full control.
+
+        A non-finite prediction is dropped before both the mean and the sort, so no NaN reaches
+        either; when nothing is finite the date is all cash.
+        """
+        if params.feature_set != self.feature_set:
+            raise ValueError(f"params.feature_set {params.feature_set!r} != prepared {self.feature_set!r}")
+        model = self.fall_model_on(data_date, params)
+        if model is None:
+            return ()
+        sec = self.fall_section(data_date, members)
+        if not sec.symbols:
+            return ()
+        pred = model.predict(sec.X)
+        live = [k for k in range(len(sec.symbols)) if math.isfinite(float(pred[k]))]
+        if not live:
+            return ()
+        k_slots = params.slots if not params.size else model.exposure(
+            float(np.mean([float(pred[k]) for k in live])), params.slots
+        )
+        if k_slots <= 0:
+            return ()
+        order = sorted(live, key=lambda k: (float(pred[k]), sec.symbols[k]))
+        weight = equal_weight(params.slots)
+        out: list[Target] = []
+        for k in order:
+            if len(out) == k_slots:
+                break
+            target = target_from_close(sec.symbols[k], float(sec.close[k]), weight)
+            if target is not None:
+                out.append(target)
+        return tuple(out)
+
 
 # --------------------------------------------------------------------------- the allocator
 
@@ -830,3 +1064,536 @@ def targets_with_inputs(
     _check_call(members, data_date, held)
     prepared = TreeRankPrepared.build(inputs.upto(data_date), params.feature_set)
     return prepared.targets_on(members, data_date, params)
+
+
+# --------------------------------------------------------------- the fall label (R2, 2026-10-13)
+
+
+QUARTER = 63
+"""NYSE sessions in a calendar quarter: the fall label's horizon, the handover's "next quarter"."""
+
+FallMeasure = Literal["drawdown", "downside_vol"]
+FALL_MEASURES: tuple[str, ...] = ("drawdown", "downside_vol")
+
+
+def _window(h: History, day: np.datetime64, stop: np.datetime64) -> np.ndarray | None:
+    """``h``'s closes from its bar dated ``day`` through its last bar dated on or before ``stop``.
+
+    None -- "not measurable" -- when ``h`` has no bar dated exactly ``day``, no bar after it by
+    ``stop``, or any close in the window is not a finite positive price. The two ``searchsorted``
+    calls are ``forward_returns``' discipline verbatim: ``j`` is found with ``side="right"`` on
+    ``stop``, so a bar dated after the label end can never enter the window, however far the
+    history runs past it.
+    """
+    i = int(np.searchsorted(h.dates, day, side="left"))
+    j = int(np.searchsorted(h.dates, stop, side="right")) - 1
+    if i >= len(h) or h.dates[i] != day or j <= i:
+        return None
+    path = np.asarray(h.close[i : j + 1], dtype=np.float64)
+    if not bool(np.isfinite(path).all()) or not bool((path > 0.0).all()):
+        return None
+    return path
+
+
+def forward_drawdown(history: Mapping[str, History], section: Section, end: date) -> np.ndarray:
+    """Each section symbol's worst peak-to-trough fall from ``section.day`` to ``end``, as a fraction.
+
+    0.0 for a path that never closes below a previous close in the window -- a measured zero, which
+    is why "unmeasurable" is NaN and never 0.0. NaN when the window is unmeasurable (``_window``).
+    Reads only bars dated on or before ``end``.
+    """
+    out = np.full(len(section.symbols), NAN, dtype=np.float64)
+    day = as_day(section.day)
+    stop = as_day(end)
+    for k, symbol in enumerate(section.symbols):
+        path = _window(history[symbol], day, stop)
+        if path is None:
+            continue
+        fall = float(np.max(1.0 - path / np.maximum.accumulate(path)))
+        out[k] = fall if fall > 0.0 else 0.0
+    out.setflags(write=False)
+    return out
+
+
+def forward_downside_vol(history: Mapping[str, History], section: Section, end: date) -> np.ndarray:
+    """Each section symbol's realised downside volatility from ``section.day`` to ``end``.
+
+    The root mean square of ``min(r, 0)`` over the window's one-day simple returns: up days count
+    as zero, so a path that only rises scores 0.0. NaN when the window is unmeasurable
+    (``_window``). Reads only bars dated on or before ``end``.
+    """
+    out = np.full(len(section.symbols), NAN, dtype=np.float64)
+    day = as_day(section.day)
+    stop = as_day(end)
+    for k, symbol in enumerate(section.symbols):
+        path = _window(history[symbol], day, stop)
+        if path is None:
+            continue
+        down = np.minimum(path[1:] / path[:-1] - 1.0, 0.0)
+        out[k] = float(np.sqrt(float(np.mean(down * down))))
+    out.setflags(write=False)
+    return out
+
+
+def forward_fall(
+    history: Mapping[str, History], section: Section, end: date, measure: str
+) -> np.ndarray:
+    """``measure``'s forward fall of ``section`` over (``section.day``, ``end``]."""
+    if measure == "drawdown":
+        return forward_drawdown(history, section, end)
+    if measure == "downside_vol":
+        return forward_downside_vol(history, section, end)
+    raise ValueError(f"measure must be one of {FALL_MEASURES}, got {measure!r}")
+
+
+# ------------------------------------------------- the market-level columns (D13, un-normalised)
+
+
+MARKET_HIGH_N = 252
+"""Sessions in the trailing high SPY's drawdown column is measured against (one year)."""
+
+MARKET_VOL_N = 60
+"""One-day SPY returns in the realised-volatility column; it needs MARKET_VOL_N + 1 bars."""
+
+MARKET_FEATURES: tuple[str, ...] = (
+    "spy_drawdown_from_high",
+    "spy_vol_60",
+    "momentum_dispersion",
+)
+
+MOMENTUM_COL = PRICE_FEATURES.index("momentum")
+"""Where the 12-1 momentum column sits in ``build_section``'s raw matrix.
+
+Looked up from the frozen tuple rather than written as a literal ``0``: if ``PRICE_FEATURES`` is
+ever reordered, this raises at import instead of silently computing the dispersion of the wrong
+column.
+"""
+
+FALL_FEATURE_LOOKBACK = max(FEATURE_LOOKBACK, MARKET_HIGH_N, MARKET_VOL_N + 1)
+"""How far back the FALL model reads: max(401, 252, 61) = 401, so the ranker's own window.
+
+``FEATURE_LOOKBACK`` is frozen (M0130's recorded digests do not name it, but ``TreeRankAllocator``
+does and this module does not edit that path). This constant is the fall allocator's own, written
+as a ``max`` so that the claim "the market columns add no reach" is arithmetic a reader can check
+rather than a sentence they must trust. The lab's smoke fixture is 473 bars, so 401 clears it.
+"""
+
+
+def fall_feature_names(feature_set: str) -> tuple[str, ...]:
+    """The fall model's columns: the ranker's own, then the three un-normalised market columns.
+
+    ``feature_names`` is the ranker's and is not edited. The market columns come last so the
+    ranker's column order inside the matrix is the one ``build_section`` produced, byte for byte.
+    """
+    return tuple(feature_names(feature_set)) + MARKET_FEATURES
+
+
+def market_columns(
+    history: Mapping[str, History], day: date, momentum: np.ndarray
+) -> tuple[float, float, float]:
+    """The date's three market-level scalars. Reads only bars dated on or before ``day``.
+
+    Per-date SCALARS, not per-name values: broadcast down every row of the section, they carry no
+    cross-sectional information and so cannot change which names the model prefers. They can only
+    shift the whole date's predictions, which is exactly the level a sizing head has to read (D13).
+
+    - ``spy_drawdown_from_high``: ``1 - close(day) / max(close over the trailing MARKET_HIGH_N
+      sessions ending at day)``. 0.0 at a new high, larger the further the market has already
+      fallen. NaN when SPY has no bar dated ``day`` or fewer than two bars behind it.
+    - ``spy_vol_60``: the sample standard deviation of SPY's last ``MARKET_VOL_N`` one-day simple
+      returns ending at ``day``. NaN with fewer than ``MARKET_VOL_N + 1`` bars.
+    - ``momentum_dispersion``: the standard deviation of the date's own 12-1 momentum column, taken
+      from ``build_section``'s RAW matrix before ``rank_columns`` touched it, over the finite
+      entries. NaN when fewer than two are finite.
+
+    The slice is ``searchsorted(dates, day, side="right")`` -- ``forward_returns``' and
+    ``_window``'s own discipline -- so a bar dated after ``day`` can never enter, however far the
+    history runs past it. NaN is left as NaN: ``fit_model`` bins a missing value into its own bin,
+    which is the honest encoding of "this column is not known on this date".
+    """
+    h = history.get(RESID.market)
+    dd = NAN
+    vol = NAN
+    if h is not None:
+        j = int(np.searchsorted(h.dates, as_day(day), side="right"))
+        if j > 0 and h.dates[j - 1] == as_day(day):
+            hi = np.asarray(h.close[max(0, j - MARKET_HIGH_N) : j], dtype=np.float64)
+            if len(hi) >= 2 and bool(np.isfinite(hi).all()) and bool((hi > 0.0).all()):
+                peak = float(np.max(hi))
+                if peak > 0.0:
+                    dd = float(1.0 - float(hi[-1]) / peak)
+            win = np.asarray(h.close[max(0, j - MARKET_VOL_N - 1) : j], dtype=np.float64)
+            if len(win) >= MARKET_VOL_N + 1 and bool(np.isfinite(win).all()) and bool((win > 0.0).all()):
+                vol = float(np.std(win[1:] / win[:-1] - 1.0, ddof=1))
+    ok = np.isfinite(momentum)
+    disp = float(np.std(momentum[ok], ddof=1)) if int(ok.sum()) >= 2 else NAN
+    return dd, vol, disp
+
+
+def build_fall_section(
+    base: Section, history: Mapping[str, History], momentum_index: int
+) -> Section:
+    """``base`` with the three market-level columns appended, un-normalised.
+
+    COMPOSES ``build_section``'s output; it does not reimplement or edit it. ``base.X`` already
+    carries the ranker's seven rank-normalised columns and is copied through untouched, so the
+    fall model sees exactly what the ranker sees plus three columns that were never ranked -- which
+    is the whole of D13's second requirement. ``Section`` itself is unedited: this constructs one.
+
+    ``momentum_index`` is the position of the 12-1 momentum column in ``base.raw``; the dispersion
+    is read from the RAW matrix, because the standard deviation of a rank column is a constant of
+    the cross-section's size and would carry no information at all.
+    """
+    extra = np.array(
+        market_columns(history, base.day, np.asarray(base.raw[:, momentum_index], dtype=np.float64)),
+        dtype=np.float64,
+    )
+    block = np.repeat(extra.reshape(1, -1), len(base.symbols), axis=0)
+    raw = np.hstack([np.asarray(base.raw, dtype=np.float64), block])
+    X = np.hstack([np.asarray(base.X, dtype=np.float64), block])
+    raw.setflags(write=False)
+    X.setflags(write=False)
+    return Section(base.day, base.symbols, base.close, raw, X)
+
+
+# ------------------------------------------------------------- the fall model and its sizing head
+
+
+@dataclass(frozen=True, slots=True)
+class FallSizeParams:
+    """The fall model's pre-registered knobs. Every field enters the config digest.
+
+    A new class rather than a field on ``TreeRankParams``: ``lab.method.config_text`` writes
+    ``params={registry._canon(c.params)}`` over every ``compare`` field of the params dataclass,
+    so one more field there would move five of M0130's six recorded ``config_digest``s (measured
+    2026-10-13: M0130-P20 381a0d7c -> e7d9e0c2, and four more) and silently rewrite closed records.
+    The two classes share ``fit_model``, the calendar, the features and the section cache by reuse.
+
+    At most ``slots`` names are held, each at ``equal_weight(slots)``, and the unfilled slots are
+    cash. ``size`` is the sizing switch: on, the model's own exposure ladder decides how many of
+    the slots are filled; off, the book is always full and the method is the control that isolates
+    what the sizing adds. ``measure`` picks the forward-fall measure (``FALL_MEASURES``) -- both
+    are LEVELS, in their own units, never ranks (D13). ``feature_set`` must name the allocator
+    object's own set (``FALL_SIZE``: "price"). The five model fields are
+    ``HistGradientBoostingRegressor``'s and default to Strategy B's pre-registered ``TREE_PARAMS``,
+    as the ranker's do. ``horizon`` is the label's length in sessions and defaults to ``QUARTER``.
+    The refit cadence is fixed (annual), not a knob.
+    """
+
+    slots: int = 20
+    size: bool = True
+    feature_set: FeatureSet = "price"
+    measure: FallMeasure = "drawdown"
+    learning_rate: float = 0.05
+    max_iter: int = 300
+    max_leaf_nodes: int = 15
+    min_samples_leaf: int = 200
+    l2: float = 1.0
+    train_start: date = date(1996, 1, 31)
+    min_train_months: int = 35
+    horizon: int = QUARTER
+    seed: int = 0
+
+    def __post_init__(self) -> None:
+        _check_int("slots", self.slots, 1, MAX_TOP)
+        if not isinstance(self.size, bool):
+            raise TypeError(f"size must be a bool, got {type(self.size).__name__}")
+        if not isinstance(self.feature_set, str):
+            raise TypeError(f"feature_set must be a str, got {type(self.feature_set).__name__}")
+        feature_names(self.feature_set)
+        if not isinstance(self.measure, str):
+            raise TypeError(f"measure must be a str, got {type(self.measure).__name__}")
+        if self.measure not in FALL_MEASURES:
+            raise ValueError(f"measure must be one of {FALL_MEASURES}, got {self.measure!r}")
+        object.__setattr__(
+            self, "learning_rate", _check_float("learning_rate", self.learning_rate, positive=True, at_most=1.0)
+        )
+        _check_int("max_iter", self.max_iter, 1, 10_000)
+        _check_int("max_leaf_nodes", self.max_leaf_nodes, 2, 4096)
+        _check_int("min_samples_leaf", self.min_samples_leaf, 1)
+        object.__setattr__(self, "l2", _check_float("l2", self.l2, positive=False))
+        _check_date("train_start", self.train_start)
+        _check_int("min_train_months", self.min_train_months, 1)
+        _check_int("horizon", self.horizon, 1, 252)
+        _check_int("seed", self.seed, 0, 2**32 - 1)
+
+    def model_key(self) -> tuple[Any, ...]:
+        """Every field a fitted fall model depends on.
+
+        NEITHER ``slots`` NOR ``size`` is in it, exactly as ``TreeRankParams.model_key()`` leaves
+        ``top_n`` out, because neither touches the fit. ``levels`` and ``cut`` are the distribution
+        of the model's own per-date in-sample predictions; ``slots`` is applied to that
+        distribution at DECISION time by the exposure ladder, and ``size`` only decides whether the
+        ladder is consulted at all. So two variants differing only in book size share one annual
+        refit ladder -- which is both cheaper and the honest statement that they are the same model.
+        """
+        return (
+            self.feature_set,
+            self.measure,
+            self.learning_rate,
+            self.max_iter,
+            self.max_leaf_nodes,
+            self.min_samples_leaf,
+            self.l2,
+            self.train_start,
+            self.min_train_months,
+            self.horizon,
+            self.seed,
+        )
+
+    def as_dict(self) -> dict[str, str]:
+        """Every parameter as a plain string, in a fixed key order (report and pre-registration)."""
+        return {
+            "slots": str(self.slots),
+            "size": "on" if self.size else "off",
+            "feature_set": self.feature_set,
+            "measure": self.measure,
+            "learning_rate": _plain(self.learning_rate),
+            "max_iter": str(self.max_iter),
+            "max_leaf_nodes": str(self.max_leaf_nodes),
+            "min_samples_leaf": str(self.min_samples_leaf),
+            "l2": _plain(self.l2),
+            "train_start": self.train_start.isoformat(),
+            "min_train_months": str(self.min_train_months),
+            "horizon": str(self.horizon),
+            "seed": str(self.seed),
+        }
+
+
+@dataclass(frozen=True, eq=False)
+class FallModel:
+    """One fall refit, plus the training distribution of DATE-LEVEL predicted falls its head reads.
+
+    Identity is (anchor, months, rows, n_features, digest, levels); the estimator is the payload,
+    as in ``TreeModel``. ``levels`` is in the identity because it is what the head actually
+    consults, and ``cut`` is derived from it, so two models with the same estimator and the same
+    levels are the same model to every caller.
+
+    ``levels`` is a sorted ``tuple[float, ...]``, not an ndarray: the dataclass is hashable and a
+    recorded model must compare by value. One float per labelled training month-end, so a few
+    hundred at most.
+    """
+
+    anchor: date
+    months: int  # labelled month-ends it learned from
+    rows: int
+    n_features: int
+    digest: str  # b_model._tree_digest of the fitted estimator
+    levels: tuple[float, ...]  # sorted mean in-sample predicted fall, one per training date
+    estimator: HistGradientBoostingRegressor
+
+    @property
+    def cut(self) -> float:
+        """The median training date-level predicted fall: the half-exposure point.
+
+        Reported and tested as the model's single scalar summary of "what an ordinary date looks
+        like to me". The head does not read it directly -- it reads the whole of ``levels`` -- but
+        ``exposure(cut, slots)`` is about half of ``slots`` by construction, which is what makes
+        this the honest one-number description of the ladder.
+        """
+        return self.levels[len(self.levels) // 2]
+
+    def exposure(self, level: float, slots: int) -> int:
+        """How many whole slots a cross-section at ``level`` is worth: 0 .. ``slots``.
+
+        ``danger`` is the share of this model's training dates that looked NO MORE dangerous than
+        ``level``; the book keeps the complement. Calmer than every training date -> ``slots``;
+        more dangerous than all of them -> 0; at the median -> half. Monotone non-increasing in
+        ``level``, so a more dangerous-looking market can never buy the book more exposure.
+
+        Nothing here is a chosen number: the ladder is the empirical CDF of the model's own
+        in-sample date-level predictions. An absolute threshold would have had to be read off the
+        dev window, which pre-registration forbids.
+        """
+        danger = float(np.searchsorted(np.asarray(self.levels), level, side="right")) / float(
+            len(self.levels)
+        )
+        return int(slots - math.floor(danger * slots))
+
+    def _key(self) -> tuple[Any, ...]:
+        return (self.anchor, self.months, self.rows, self.n_features, self.digest, self.levels)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, FallModel):
+            return NotImplemented
+        return self._key() == other._key()
+
+    def __hash__(self) -> int:
+        return hash(self._key())
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """Predicted fall per row -- a LEVEL in the label's own units -- float64, one thread."""
+        return _predict(self.estimator, X)
+
+
+def _predict(estimator: HistGradientBoostingRegressor, X: np.ndarray) -> np.ndarray:
+    """``estimator``'s predictions, float64, under a one-thread limit (module docstring, DETERMINISM)."""
+    with threadpool_limits(limits=1):
+        return np.asarray(estimator.predict(X), dtype=np.float64)
+
+
+def fit_fall_model(
+    X: np.ndarray,
+    y: np.ndarray,
+    groups: np.ndarray,
+    months: int,
+    anchor: date,
+    params: FallSizeParams,
+) -> FallModel:
+    """``params``' regressor fitted on (X, y), plus the training distribution its head reads.
+
+    The fit is ``fit_model``, shared with the ranker and not modified, so the two heads differ in
+    their label and in nothing else -- including the all-blank-column guard, which matters for the
+    market columns on a history that does not reach back far enough and is otherwise inert.
+
+    THE LEVELS are the model's own in-sample predictions averaged WITHIN each training date, then
+    sorted. A distribution over DATES, not over rows, which is why ``groups`` is a parameter: the
+    head asks "how dangerous does this whole cross-section look, against the cross-sections I was
+    trained on", and a date with 500 names must not outvote one with 20. ``FallModel.cut`` is their
+    median and ``FallModel.exposure`` is the ladder (D13, D2c).
+
+    Nothing in this is a chosen number and nothing was read off the dev window: the ladder is the
+    empirical CDF of the model's own training predictions. ``params.slots`` is NOT used here at all
+    -- it is applied to this distribution at decision time -- which is why it is out of
+    ``model_key()`` and why two variants differing only in book size share one fit.
+
+    Predicting on the caller's ``X`` rather than on ``fit_model``'s internally zeroed copy is
+    deliberate and makes no difference: an all-blank column is binned into one bin and never split
+    on, which ``tests/test_tree_rank.py::test_an_all_missing_column_fits_as_unsplittable_and_leaves_other_fits_untouched``
+    already pins.
+    """
+    estimator = fit_model(X, y, params)
+    rows = int(X.shape[0])
+    inside = _predict(estimator, X)
+    levels = tuple(
+        sorted(float(np.mean(inside[groups == g])) for g in range(months) if bool((groups == g).any()))
+    )
+    return FallModel(
+        anchor,
+        months,
+        rows,
+        int(X.shape[1]),
+        _tree_digest(estimator),
+        levels,
+        estimator,
+    )
+
+
+class FallSizeAllocator:
+    """The fall model behind the ``Allocator`` and ``MarketAware`` protocols (module docstring).
+
+    One object per feature set, as ``TreeRankAllocator`` is: ``id`` and ``market_fields`` are what
+    ``lab run`` reads, and they depend on whether fundamentals are ranked on. ``FALL`` was free
+    across all 75 allocator ids in the registry and every discovered lab method on 2026-10-13, and
+    ``tests/test_tree_fall.py`` keeps it free.
+
+    ONLY THE "price" OBJECT IS EXPORTED (D14). The ``"price+fund"`` branch stays reachable and is
+    exercised by constructing one locally in the tests, but no module-level ``FALL_SIZE_FUND``
+    exists: the EDGAR panel starts in 2009, so no method may pre-register on fundamentals (D8), and
+    an exported allocator no method can use would claim the id ``FALLF`` forever for nothing.
+    """
+
+    def __init__(self, feature_set: str) -> None:
+        feature_names(feature_set)
+        self.feature_set = feature_set
+        self.id = "FALL" if feature_set == "price" else "FALLF"
+        self.market_fields: tuple[str, ...] = (
+            ("dividends",) if feature_set == "price" else ("dividends", "fundamentals")
+        )
+
+    def _check(self, params: object) -> FallSizeParams:
+        if not isinstance(params, FallSizeParams):
+            raise TypeError(f"params must be FallSizeParams, got {type(params).__name__}")
+        if params.feature_set != self.feature_set:
+            raise ValueError(
+                f"{self.id} ranks feature_set {self.feature_set!r}; params name {params.feature_set!r}"
+            )
+        return params
+
+    def lookback(self, params: Any) -> int:
+        """``FALL_FEATURE_LOOKBACK`` -- the fall model's own constant, not the ranker's.
+
+        It evaluates to the same 401 today (the market columns reach 252 and 61 sessions, both
+        inside the ranker's window), but it is written as its own ``max`` so that the claim is
+        arithmetic rather than a coincidence a later edit could quietly break.
+        """
+        self._check(params)
+        return FALL_FEATURE_LOOKBACK
+
+    def symbols(self, params: Any) -> tuple[str, ...]:
+        self._check(params)
+        return (RESID.market,)
+
+    def holds(self, params: Any) -> tuple[str, ...]:
+        self._check(params)
+        return ()
+
+    def uses_members(self, params: Any) -> bool:
+        self._check(params)
+        return True
+
+    def targets(
+        self,
+        history: Mapping[str, History],
+        members: AbstractSet[str],
+        data_date: date,
+        held: frozenset[str],
+        params: Any,
+    ) -> tuple[Target, ...]:
+        """The history-only path: no membership history, no calendar, so no model and no target."""
+        self._check(params)
+        _check_call(members, data_date, held)
+        return ()
+
+    def prepare(self, history: Mapping[str, History]) -> TreeRankPrepared:
+        return TreeRankPrepared(self.feature_set)
+
+    def prepare_market(self, market: Any) -> TreeRankPrepared:
+        return TreeRankPrepared.build(TreeInputs.from_market(market), self.feature_set)
+
+    def targets_prepared(
+        self,
+        prepared: Any,
+        members: AbstractSet[str],
+        data_date: date,
+        held: frozenset[str],
+        params: Any,
+    ) -> tuple[Target, ...]:
+        p = self._check(params)
+        _check_call(members, data_date, held)
+        if not isinstance(prepared, TreeRankPrepared):
+            raise TypeError(f"prepared must be TreeRankPrepared, got {type(prepared).__name__}")
+        if prepared.feature_set != self.feature_set:
+            raise ValueError(f"{self.id} was handed a prepared value for feature_set {prepared.feature_set!r}")
+        if prepared.inputs is None:
+            return ()
+        return prepared.fall_targets_on(members, data_date, p)
+
+
+FALL_SIZE = FallSizeAllocator("price")
+#: No FALL_SIZE_FUND (D14/D8): the EDGAR panel starts in 2009, no method may pre-register on it,
+#: and an exported allocator nothing uses would claim the id "FALLF" for ever. The "price+fund"
+#: branch above stays reachable; construct one locally if you need it.
+
+
+def fall_targets_with_inputs(
+    inputs: TreeInputs,
+    members: AbstractSet[str],
+    data_date: date,
+    held: frozenset[str],
+    params: FallSizeParams,
+) -> tuple[Target, ...]:
+    """The fall model's from-scratch path: every feature, label, model and cut rebuilt from
+    ``inputs`` cut at ``data_date``.
+
+    Slow by design, and the sibling of ``targets_with_inputs``. The prepared path must equal it bit
+    for bit (tests/test_tree_fall.py), which is what proves that the shared section cache, the
+    shared calendar and the two private caches never let anything dated after ``data_date`` in.
+    """
+    if not isinstance(inputs, TreeInputs):
+        raise TypeError(f"inputs must be TreeInputs, got {type(inputs).__name__}")
+    if not isinstance(params, FallSizeParams):
+        raise TypeError(f"params must be FallSizeParams, got {type(params).__name__}")
+    _check_call(members, data_date, held)
+    prepared = TreeRankPrepared.build(inputs.upto(data_date), params.feature_set)
+    return prepared.fall_targets_on(members, data_date, params)

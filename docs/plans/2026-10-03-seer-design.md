@@ -478,3 +478,72 @@ assumption because of the $0.10 minimum and the near-flat regulatory fee.
 strategy on the roster keeps the flat 0.1% it was measured and frozen under, so no recorded number
 and no pinned digest moves. The §5 bracket simulator keeps 0.1% too. Slippage is not modelled
 separately: fills still happen at the open or the limit, as before.
+
+## 16. Verified 2026-10-13: Gotrade does not support short selling
+
+§2 lists the constraints verified from the app on 2026-10-03 and is silent on short selling, which
+left the short side looking like an open research direction. It is not one.
+
+- **The answer, from Gotrade's own help centre** (`help.heygotrade.com/en/articles/5985254-can-i-short-sell-a-stock`,
+  "Can I short sell a stock?", written 2022-03-31): *"No, short selling is not available on the
+  Gotrade platform at this time."* Found by the owner, 2026-10-13. This is the vendor's
+  documentation, not an inference from the UI.
+- **What it rules out, permanently until the vendor changes.** §1 requires a strategy to be
+  deployable with the owner's real money at his actual broker. A method that sells short cannot be
+  held, so pre-registering one would spend a method id — and, if it reached `lab test`, a
+  test-window look — on a book that can never be traded. That is the same trap as a method gated on
+  the EDGAR panel, which is all-cash for 13 of the dev window's 20 years.
+- **Why it is recorded here rather than left in a scoping note.** Several of the published results
+  the lab's ideas come from find most of their edge on the short side. Without this line, that
+  reading recurs every time someone asks why a long-only book underperforms the paper it came from.
+  The honest statement is: *that edge exists and we cannot reach it.*
+- **What it does not change.** Nothing in §1, no fee, no bar, no recorded row. Long-only was always
+  what the simulator and every recorded trial assumed; this makes the assumption a verified
+  constraint instead of an unexamined default.
+
+## 17. Measured 2026-10-13: 11 of 28 drawdown passes do not survive honest data
+
+The October 2026 survivorship check (§12, `docs/lab/survivorship/`) bought one month of EODHD
+history, filled the 522 index members the free feed never served, and re-ran 102 variants on both
+histories. Its summary reported an average: momentum drawdowns about 2.6 points deeper. **The
+average was never applied to the one bar it threatens**, and applying it is what this section does.
+
+**The bar.** §11 set the go-live maximum drawdown at 20%, for the lab screen and for real money
+both.
+
+**Measured per variant, not averaged** (from the committed `grid.csv`, both stores, no re-run):
+
+- Of the **28** variants whose dev-store drawdown is under 20%, **11 cross 20% on the fuller
+  history** — 39%.
+- The per-variant deltas run **−9.03 to +14.44 points**, mean **+1.42**. The "2.6 points" figure is
+  the momentum-book average and must not be applied lab-wide as a haircut: the spread is far too
+  wide for one number to stand in for the measurement.
+- The books that break are the ones that looked best. `M0007-N20-RAW` 19.59% → **23.46%** — the
+  entry §12 singled out as the only one ahead of SPY in all three eras. `M0020-W-NOSTOP`
+  19.27% → **23.42%**. `M0019-RAW20-S15` 18.56% → **24.48%**. `M0033` loses four variants at once.
+
+**Across the whole lab, for scale:** of 399 recorded dev trials, 306 already fail the 20% bar. Of
+the 93 that pass, **54 sit between 17.4% and 20%** — the band where a delta of the measured size
+decides the verdict. Most of the lab's drawdown passes are therefore unverified rather than safe.
+
+**The rule, from here.** A dev-store drawdown under 20% is **no longer sufficient evidence** that a
+method clears the drawdown bar. Before a method spends a test-window look, the variant it would
+pre-register must either
+
+1. have a recorded fuller-history drawdown under 20% in `docs/lab/survivorship/grid.csv`, or
+2. have that measurement made, or
+3. have a dev-store drawdown low enough that no plausible delta reaches 20%.
+
+A variant whose fuller-history drawdown is at or above 20% is **not promotable**, whatever the dev
+store says. Eleven variants are in that state today.
+
+**What this does not do.** It does not re-open any closed record: the recorded trials keep their
+recorded numbers, and `grid.csv` was always a second opinion rather than a correction. It does not
+move the 20% bar itself (§11 stands). It does not promote or refuse anything automatically — the
+gate is not yet changed in code, because the fuller-history store (`engine/.research-sv`) is not on
+this machine and cannot be rebuilt offline; the committed grid is the only evidence available
+without re-buying the month. Enforcing clause 1 mechanically against that committed grid is the
+obvious next step and is not yet done.
+
+**The uncertainty, stated.** 1996 and 1997 remain under half covered in *both* histories, and 111
+index members are missing from both, so the fuller history is better evidence, not a true one.

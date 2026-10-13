@@ -65,6 +65,16 @@ over all 399 recorded dev trials:
 the band the already-bought data says would push them over.** More than half of the lab's drawdown
 passes may be survivorship artifacts, and this is knowable today without buying anything.
 
+**Superseded, and sharpened — measured per variant rather than averaged (2026-10-13).** The table
+above reasons with the 2.6-point momentum average; the committed `grid.csv` holds the real
+per-variant numbers, and they are better evidence. Of the **28** variants that pass the 20% bar on
+the dev store, **11 cross it on the fuller history — 39%**. The deltas run **−9.03 to +14.44
+points**, mean **+1.42**, so no single haircut can stand in for the measurement. The books that
+break are the lab's best: `M0007-N20-RAW` 19.59% → **23.46%**, `M0020-W-NOSTOP` 19.27% → **23.42%**,
+`M0019-RAW20-S15` 18.56% → **24.48%**. This is recorded as §17 of the design doc, with the rule it
+implies. The 2.6-point reasoning below is kept only to show what the average suggested before the
+per-variant numbers were read.
+
 It lands on the methods that matter. Among the ten dev-eligible, kin-blocked methods, the
 at-risk band holds `M0030-C50T` (18.56%), `M0030-C70T` (18.77%), `M0020-W-S20` (18.88%),
 `M0019-RAW20-S15` (18.56%), `M0053-TOTON20-TV16` (18.78%). And the variants with the *safest*
@@ -95,11 +105,12 @@ motivated several of these ideas finds most of its edge.
   goes, and how many symbols and API calls a rank-500–2000 universe needs. That is a feasibility
   check against the demo token and the symbol lists, not a purchase.
 
-### Gap C — the short side
-**Blocked on a question nobody has asked: can Gotrade sell short at all?** The design doc's §2
-"Constraints from Gotrade (verified from the app)" lists bracket orders, whole shares, session
-hours and fees — and says nothing about shorting. Gotrade is a fractional-share retail app; the
-likely answer is no.
+### Gap C — the short side — CLOSED, 2026-10-13
+**Answered: Gotrade does not support short selling.** Not an inference — the vendor's own help
+centre says so outright (`help.heygotrade.com/en/articles/5985254-can-i-short-sell-a-stock`:
+*"No, short selling is not available on the Gotrade platform at this time."*). Recorded as design
+doc §16. The short side leaves the roadmap until the vendor changes, and the published edges that
+live there are out of reach by construction.
 
 This matters because §1 requires the strategy to be deployable with real money. A short-side method
 that cannot be traded burns a method id for a book the owner can never hold — the same mistake as
@@ -123,9 +134,8 @@ So "buy data" and "reset the lab" are not the same decision, and the second one 
 
 ## Recommendation, in order
 
-1. **Ask whether Gotrade supports short selling.** Free, one message, and it decides whether Gap C
-   exists. If the answer is no, the short side leaves the roadmap permanently and that is worth
-   knowing.
+1. ~~**Ask whether Gotrade supports short selling.**~~ **DONE 2026-10-13 — the answer is no**, from
+   Gotrade's help centre. Gap C is closed and recorded as design doc §16.
 2. **Act on the drawdown finding before buying anything.** 54 trials across 31 methods pass the
    20% bar on data known to be optimistic by ~2.6 points for momentum books. Deciding how the lab
    should treat that band — a haircut, a flag, or a required re-check against the fuller history

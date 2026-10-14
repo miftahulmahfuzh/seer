@@ -3,18 +3,18 @@
 **Package Path**: `.`
 **Package Code**: ROOT
 **Last Updated**: 2026-10-14
-**Total Active Tasks**: 2
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 20
+- Completed: 21
 
 ---
 
@@ -23,17 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ROOT-M2XZ** Phase 2: The dated owner revision, and the before/after
-  - **Difficulty**: NORMAL
-  - **Type**: Update
-  - **Context**: Owns `docs/plans/2026-10-03-seer-design.md` — a new `## 18. Revision 2026-10-14 (owner)` appended after `## 17.`, plus exactly one line above it: §1 condition 4's inline revision marker at `:20`. Touches nothing else above `## 18.`; §13 is edited by nobody. Exit: §18 exists in the house shape of `## 11.`/`## 13.`, states condition 4 now reads 25% with the dev screen a separate number and why, carries the measurement (257 of 399 trials beat SPY TR and the old 20% bar rejected 188 of them; SPY itself fell 56.5% at 7.86%/yr) plus phase 1's measured before/after (the eligibility pair 26→67 trials over 16→32 methods as the headline, the browsable pair 93→319 beside it, labelled), states the residual risk honestly (N is unaffected, since it counts methods tried rather than methods that passed), records the trades-bar held-out set growing five→twelve and attributes it to the screen rather than the money bar, names the `/sera` drawdown-target rough edge in plain language, carries no stale "do not run `lab reevaluate`" caveat, and passes Step 0's hard-stop precondition check against the landed phase 1 constants.
-  - **Status**: pending
-  - **Unblocked**: 2026-10-14 10:46 — phase 1 (`P1-ENG-QK7F`) landed at `315a863` + `127507d` + `ab4fe01`
-  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/split-screen-from-bar/PLAN.md` (phase 2 of 2)
-  - **Satisfies**: R1 — Raise the real-money drawdown bar from 20% to 25% (§1 condition 4, the promote gate, the leaderboard); R2 — Split the lab's dev-eligibility screen off from that bar, so a method can be studied without being fundable; R3 — Record it as a dated owner revision, the way §11 and §13 record their predecessors
-  - **Depends on**: P1-ENG-QK7F
-  - **Plan**: `.workflows/plan/P1-ROOT-M2XZ.md`
-
 - [ ] **P1-ROOT-H5NX** Phase 5: Pre-register, run, record, stage and write up
   - **Difficulty**: NORMAL
   - **Type**: Feature
@@ -54,6 +43,24 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-M2XZ** Phase 2: The dated owner revision, and the before/after
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns `docs/plans/2026-10-03-seer-design.md` — a new `## 18. Revision 2026-10-14 (owner)` appended after `## 17.`, plus exactly one line above it: §1 condition 4's inline revision marker at `:20`. Touches nothing else above `## 18.`; §13 is edited by nobody. Exit: §18 exists in the house shape of `## 11.`/`## 13.`, states condition 4 now reads 25% with the dev screen a separate number and why, carries the measurement (257 of 399 trials beat SPY TR and the old 20% bar rejected 188 of them; SPY itself fell 56.5% at 7.86%/yr) plus phase 1's measured before/after (the eligibility pair 26→67 trials over 16→32 methods as the headline, the browsable pair 93→319 beside it, labelled), states the residual risk honestly (N is unaffected, since it counts methods tried rather than methods that passed), records the trades-bar held-out set growing five→twelve and attributes it to the screen rather than the money bar, names the `/sera` drawdown-target rough edge in plain language, carries no stale "do not run `lab reevaluate`" caveat, and passes Step 0's hard-stop precondition check against the landed phase 1 constants.
+  - **Status**: completed
+  - **Unblocked**: 2026-10-14 10:46 — phase 1 (`P1-ENG-QK7F`) landed at `315a863` + `127507d` + `ab4fe01`
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/split-screen-from-bar/PLAN.md` (phase 2 of 2)
+  - **Satisfies**: R1 — Raise the real-money drawdown bar from 20% to 25% (§1 condition 4, the promote gate, the leaderboard); R2 — Split the lab's dev-eligibility screen off from that bar, so a method can be studied without being fundable; R3 — Record it as a dated owner revision, the way §11 and §13 record their predecessors
+  - **Depends on**: P1-ENG-QK7F
+  - **Plan**: `.workflows/plan/P1-ROOT-M2XZ.md`
+  - **Completed**: 2026-10-14 10:59
+  - **Method**: /do
+  - **Files**: docs/plans/2026-10-03-seer-design.md
+  - **Drift**: The phase plan's lint command reads `cd <worktree>/engine && ruff check engine`, which double-counts the engine path segment and fails with E902. Ran CLAUDE.md's documented form, `ruff check engine` from the worktree root — clean. Content unaffected.
+  - **Decided**: Plan's lint command `cd engine && ruff check engine` fails (doubled path) → ran `ruff check engine` from the worktree root (rung 6: CLAUDE.md's documented command; the doubled path is a typo, not a decision).
+  - **Decided**: Commit from the main context per phase plan Step 4, or via pusher per /implement Step 4 → via completion-handler/pusher, carrying the plan's exact commit message (rung 6: /implement owns the process, the plan owns the content).
+  - **Decided**: Dispatch readme-updater to write, or hold it read-only → read-only. Phase 2's Owns is exactly one file and its commit is pathspec-locked to it; phase 1 (`5826328`) already updated the engine and web readmes for this same drawdown split, and a write here would land outside the allowlist in a worktree shared with other sessions.
 
 - [x] **P1-ROOT-B2YP** Phase 6: The owner's two decisions: §5.1's N strings, and the amendment rule
   - **Difficulty**: NORMAL

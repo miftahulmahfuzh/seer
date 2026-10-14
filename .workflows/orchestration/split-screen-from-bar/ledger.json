@@ -1,0 +1,53 @@
+{
+  "branch": "feature/split-screen-from-bar",
+  "coordinator": "orch-split-screen-from-bar",
+  "coordinator_session_id": "21e86e36-e403-4744-8178-ea264ffcb2e8",
+  "created": "2026-10-14T03:24:22+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "engine/backtest`, `engine/lab`, `web`, `lab/",
+      "plan": ".workflows/plan/split-screen-from-bar/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Two constants, and everything that reads them"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 2,
+      "note": null,
+      "package": "docs",
+      "plan": ".workflows/plan/split-screen-from-bar/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2",
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The dated owner revision, and the before/after"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/split-screen-from-bar/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "split-screen-from-bar",
+  "updated": "2026-10-14T03:24:22+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/split-screen-from-bar"
+}

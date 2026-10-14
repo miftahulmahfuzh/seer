@@ -254,7 +254,7 @@ could not have agreed on by themselves.
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | M0156 — the roster's other book on the honest tape | R3, R6 | `engine/lab` | 6 | — | NORMAL | `.workflows/plan/roster-35-four-methods/phase-1.md` | `P1-ENG-W35A` | — |
+| 1 | M0156 — the roster's other book on the honest tape | R3, R6 | `engine/lab` | 6 | — | NORMAL | `.workflows/plan/roster-35-four-methods/phase-1.md` | `P1-ENG-W35A` (done 2026-10-14) | — |
 | 2 | Hold thirty-five: a new roster entry, and `RAW-FR-GT` retired | R1, R6 | `engine/paper`, `db`, `engine/tests`, `web` | 13 | — | HARD | `.workflows/plan/roster-35-four-methods/phase-2.md` | `P1-ENG-W35B` | — |
 | 3 | M0155 — trim a holding falling apart while the market is fine | R2, R6 | `engine/lab` | 6 | — | HARD | `.workflows/plan/roster-35-four-methods/phase-3.md` | `P2-ENG-N60A` | — |
 | 4 | M0149 — braked by its own falling account, not the market's trend | R4, R6 | `engine/lab` | 4 | — | HARD | `.workflows/plan/roster-35-four-methods/phase-4.md` | `P1-ENG-W35D` (done 2026-10-14) | — |

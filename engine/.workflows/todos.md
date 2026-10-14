@@ -1337,15 +1337,17 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - No engine bug was patched from this phase. Nothing this run exposed required one.
     - Completion bookkeeping: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own precedent for every swarm-tracked set, including this set's phases 1-4). Peer phase sessions share this worktree and append here concurrently; a cross-section block move is the one edit that silently loses a peer's append.
     - Landing not attempted: this is a swarm-tracked set and the coordinator `orch-fold-verdict-and-fall-label` owns the merge (analyze-orchestrator Step 5). Nothing merged or pushed to `main`; no worktree or branch deleted.
-- [ ] **P1-ENG-W35A** Phase 1: M0156 — the roster's other book on the honest tape
+- [x] **P1-ENG-W35A** Phase 1: M0156 — the roster's other book on the honest tape
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `lab survivorship M0002` and its report; the two dated CSVs and the dated `.md` under `docs/lab/survivorship/`; the method file `m0156_regime_book_width.py`, its pre-registration commit, its `lab run`, its five dev trials and its verdict. Does not touch `docs/lab/survivorship/grid.csv`, the roster (including `MOM-FR-GT`), or any other method's files; `m0002`, `m0007`, `m0128`, `m0152` are imported, never edited. Exit: paired dev/check numbers for every recorded `M0002` variant reported and committed, with any 25%-bar breach stated plainly up top; step two either run with a paired width curve or recorded as not warranted and the row moved off `idea` with `lab drop`; `grid.csv` byte-identical to `661870d`; `lab status` reads 4 test looks; lock released with the lab pair identical to `HEAD`; last-lab-phase check run and acted on.
-  - **Status**: in_progress
+  - **Status**: completed
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/roster-35-four-methods/PLAN.md` (phase 1 of 5)
   - **Satisfies**: R3, R6 — M0156 — survivorship-check M0002-REL-85, the roster book never checked at all; Do not spend a test-window look: the count is 4 and must stay 4
   - **Depends on**: —
   - **Plan**: `.workflows/plan/P1-ENG-W35A.md`
+  - **Completed**: 2026-10-14
+  - **Delivered**: M0156 ran at five widths on both price histories; the answer is TWENTY names by the pre-registered decision rule (twenty clears the 23.0% threshold at 20.08% on the survivorship-check store and is also best on return and MAR); the roster was not changed; test-window looks stayed at 4.
 - [ ] **P1-ENG-W35B** Phase 2: Hold thirty-five: a new roster entry, and `RAW-FR-GT` retired
   - **Difficulty**: HARD
   - **Type**: Update

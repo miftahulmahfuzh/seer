@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-14
-**Total Active Tasks**: 6
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 0
 - P2 Medium: 2
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 136
+- Completed: 139
 
 ---
 
@@ -1348,15 +1348,34 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Plan**: `.workflows/plan/P1-ENG-W35A.md`
   - **Completed**: 2026-10-14
   - **Delivered**: M0156 ran at five widths on both price histories; the answer is TWENTY names by the pre-registered decision rule (twenty clears the 23.0% threshold at 20.08% on the survivorship-check store and is also best on return and MAR); the roster was not changed; test-window looks stayed at 4.
-- [ ] **P1-ENG-W35B** Phase 2: Hold thirty-five: a new roster entry, and `RAW-FR-GT` retired
+- [x] **P1-ENG-W35B** Phase 2: Hold thirty-five: a new roster entry, and `RAW-FR-GT` retired
   - **Difficulty**: HARD
   - **Type**: Update
   - **Context**: Owns `paper/roster.py` (new params constant, `RESOLVER["RESIDMOM35"]`, `LAB_PROVENANCE` entry, `SEED_ROWS` row, `RAW-FR-GT` retired), `strategies/evidence.py` (one key), new `db/migrations/021_roster_width_35.sql`, the `PINS` entry and roster id lists in `engine/tests/` (`test_promote_command.py`, `test_evidence.py`), `web/lib/sera/paper.test.ts`, `.claude/skills/calculate-assets/build_audit.py`, the runbook's roster table, and the `web/data/lab.json` regeneration its own roster edit forces. Does not touch `backtest/registry.py`, any lab row (`lab/lab.sqlite` untouched — `promote` is unusable for this change), any lab method file, `MOM-FR-GT`/`RMW-FR-GT`/`MVW-FR-GT`, or `docs/lab/survivorship/` (read only). Exit: `test_digests_are_pinned` green with exactly one new pin and no moved pin; migration-equality pair green against a migrated scratch Postgres; whole engine + web suite green with no DB test skipped; `web/data/lab.json`'s `paper` block holds `RAW35-FR-GT` and not `RAW-FR-GT`; `lab status` reads 4 test looks and `lab/lab.sqlite` byte-identical to `HEAD`; runbook records the retirement.
-  - **Status**: in_progress
+  - **Status**: completed
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/roster-35-four-methods/PLAN.md` (phase 2 of 5)
   - **Satisfies**: R1, R6 — Change the Seer roster to hold 35 stocks instead of 20; Do not spend a test-window look: the count is 4 and must stay 4
   - **Depends on**: —
   - **Plan**: `.workflows/plan/P1-ENG-W35B.md`
+  - **Completed**: 2026-10-14 16:44
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/paper/roster.py, engine/src/seer_engine/strategies/evidence.py, db/migrations/021_roster_width_35.sql (new), engine/tests/test_paper_roster.py, engine/tests/test_promote_command.py, engine/tests/test_paper_store.py, engine/tests/test_paper_check.py, engine/tests/test_migrate.py, engine/tests/test_evidence.py, engine/tests/test_paper_fnd.py, docs/runbooks/paper-trading.md, .claude/skills/calculate-assets/build_audit.py, web/lib/sera/paper.test.ts, engine/.workflows/plan/P1-ENG-W35B.md (new)
+  - **Commit**: 6d08ee4 (roster, evidence, migration 021 and the nine engine test files), 5a867e8 (the runbook, `build_audit.py` and `web/lib/sera/paper.test.ts`) — both already on `origin/main`; this close-out commits the bookkeeping only
+  - **Delivered**: The roster holds thirty-five names. A new paper entry `RAW35-FR-GT` takes `RAW-FR-GT`'s slot on the same rule preset with the width as the only thing that moves, `RAW-FR-GT` is retired to the end of the tuple, and `db/migrations/021_roster_width_35.sql` performs the two status flips plus the additive insert. Its provenance is `M0139` / `M0139-N35-EBAND` at `dev-eligible`. The evidence behind it is a **drawdown** case and not a return case, and the migration's prose and the admission note say so: on the survivorship-check store the worst fall goes 25.05% → 20.11% while `era_2009_2015_edge` reads −0.0022 at twenty names and −0.0168 at thirty-five, so over the years most like today the wider book loses to SPY by more. The headline 20.11% / 12.11% is the tband twin's reading, 0.012 points of drawdown and 0.19 points of CAGR from the eband variant actually admitted; that caveat travels in the note rather than being rounded away.
+  - **Verified**: `ruff check engine` → All checks passed. Full suite with `PG_TEST_URL` exported: **4992 passed, 3 skipped** — the three skips are only the opt-in live-research-store tests (`SEER_LAB_COSTS_LIVE`, `SEER_LAB_NAMES_LIVE`, `SEER_LAB_SURVIVORSHIP_LIVE`); no DB test skipped. `cd web && npx tsc --noEmit` clean; `npm test` 49 files / 685 tests all passed. `test_digests_are_pinned` green: exactly one pin line added (`f9def72ae37bd7534807e5957a1e48917fe54322b65a5bbb0cd2898db41c443f`), zero removed, and `RAW-FR-GT`'s `21947eef…` unmoved (invariant 4). The migration-equality trio green against a migrated scratch Postgres — the replacement for `promote --dry-run`, which is unavailable and was not attempted. `lab status` reads 4 test-window looks before and after (R6 held); `lab/lab.sqlite` byte-identical to `HEAD`; `docs/lab/survivorship/grid.csv` byte-identical to `661870d`.
+  - **Drift**:
+    - `engine/tests/test_paper_fnd.py::test_fnd_is_the_sixth_roster_entry` was not in the plan's Files table: its `len(ROSTER_IDS) == 19` census had to become 20. FND's index 11 is unchanged, because 021 put `RAW35-FR-GT` in `RAW-FR-GT`'s slot and sent `RAW-FR-GT` to the tuple's end.
+    - `engine/tests/test_paper_roster.py::test_active_drops_retired_entries_and_keeps_order` was not in the plan's Files table either: it retired `RAW-FR-GT` to exercise "retiring a LIVE entry", which its own comment says is the case that matters. `RAW-FR-GT` is no longer live, so it now retires `RAW35-FR-GT`. The expected active list is unchanged.
+    - The plan's step 8j pair list makes `RAW-FR-GT` both a successor and a predecessor (`RAW` → `RAW-FR-GT` → `RAW35-FR-GT`), so the loop's per-pair `assert entry(new).status == "active"` cannot hold for the (`RAW`, `RAW_GT`) pair. Every pair keeps its digest teeth; the active-set claim moved to one assertion over `ACTIVE_IDS`.
+    - Step 11 found `web/data/lab.json` already up to date: a lab phase regenerated the snapshot over the merged roster change, so phase 2 committed nothing there. Invariant 12's recovery clause calls this normal and correct by construction — whoever lands last is right. The committed snapshot's `paper` block does hold `RAW35-FR-GT` → M0139 / `M0139-N35-EBAND` / `dev-eligible` and no longer holds `RAW-FR-GT`, and `test_the_committed_snapshot_is_the_export_of_the_committed_database` is green.
+  - **Decided**:
+    - Where does the M0139 import go, given the plan said both "after the m0011 pair, before m0022" and "keeping the existing alphabetical-by-module order"? → after the m0022 pair, which is alphabetical (rung 6, surrounding convention).
+    - Can step 8j's pair loop assert the successor is active, when `RAW-FR-GT` is now both successor and predecessor? → no; keep every pair's digest assertions and state the active set once over `ACTIVE_IDS` (rung 2, the exit criteria require a green suite; rung 3, the code block's stated intent is the predecessor's unmoved pin).
+    - Two census tests the plan never listed (`test_paper_fnd`'s roster count, `test_active_drops_retired_entries`) → updated, following the same "the test instructs its own update" convention the plan invoked for `test_paper_roster.py:685` (rung 6).
+    - `promote --dry-run` as a verification? → never attempted; the plan's Decisions settled it (`object_name_of`'s identity scan refuses an object two `RESOLVER` keys name). The migration-equality pair against a scratch Postgres replaced it and is green.
+    - Completion bookkeeping: the `[x]` block stays in place under `### [P1] High` rather than moving into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own precedent, set by `P1-ENG-W35D`). Five peer phase sessions append to this file concurrently, and a cross-section block move is the one edit that silently loses a peer's append.
+    - No phase unblocked: every phase in this set has `Depends on: —`, so this completion neither unblocks nor re-blocks a sibling.
+    - Landing not attempted: `swarm.py find` returns `swarm: true` with coordinator `orch-roster-35-four-methods`, which owns the merge (analyze-orchestrator Step 5). Nothing merged, nothing deleted; `main` is the branch and there is no feature branch.
 - [x] **P1-ENG-W35D** Phase 4: M0149 — braked by its own falling account, not the market's trend
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -1385,15 +1404,31 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Completion bookkeeping: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own precedent for every swarm-tracked set). Four peer phase sessions share this checkout and append here concurrently; a cross-section block move is the one edit that silently loses a peer's append.
     - No phase unblocked: every phase in this set has `Depends on: —`, so this completion neither unblocks nor re-blocks a sibling.
     - Landing not attempted: this is a swarm-tracked set and the coordinator owns the merge (analyze-orchestrator Step 5). Nothing merged; no worktree or branch deleted.
-- [ ] **P1-ENG-W35E** Phase 5: M0148 — a time-lock on the switch
+- [x] **P1-ENG-W35E** Phase 5: M0148 — a time-lock on the switch
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `engine/src/seer_engine/lab/methods/m0148_switch_time_lock.py` (allocator id `"M0148"`), `engine/tests/test_m0148_switch_time_lock.py`, its pre-registration commit, its `lab run`, its three `seen` keys, its verdict. Does not touch any other method file, `m0143`'s or `m0113`'s frozen files, the roster, or `grid.csv`. Exit: the K=0 arm reproduces `M0143-CALM-UP63` to the digit, or the time-lock machinery is declared wrong and every other number in the batch unreadable; verdict says how often the lock actually bound (a lock binding on almost no sessions is a null result and should be reported as one); `lab status` reads 4 test looks; lock released with the pair clean; last-lab-phase check run and acted on.
-  - **Status**: in_progress
+  - **Status**: completed
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/roster-35-four-methods/PLAN.md` (phase 5 of 5)
   - **Satisfies**: R5, R6 — M0148 — a time-lock on the safety switch; Do not spend a test-window look: the count is 4 and must stay 4
   - **Depends on**: —
   - **Plan**: `.workflows/plan/P1-ENG-W35E.md`
+  - **Completed**: 2026-10-14 16:43
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/methods/m0148_switch_time_lock.py (new), engine/tests/test_m0148_switch_time_lock.py (new), lab/lab.sqlite, web/data/lab.json
+  - **Commit**: 903217e (`lab: M0148 pre-registered — a cooling-off period on the safety switch` — the method file and its test; the commit **is** the pre-registration), 82fc0de (`lab: M0148 — a waiting period on the safety switch loses return and safety at once` — `lab/lab.sqlite` + `web/data/lab.json`, staged by `lab stage` inside the lab write lock), 71bbf22 (`lab: re-judged every rejected method at the new luck bar` — the post-set `lab reevaluate` sweep, same pair, same hold)
+  - **Delivered**: M0148, five arms, verdict **rejected** — a rejected *direction*, not a null result. Making the safety switch wait K monthly checks before it may move again lost return **and** safety at once: yearly return 11.3% (no lock) → 10.2% / 9.8% / 9.0% at one, two and three checks, while the worst fall went the wrong way, 20.4% → 25.3% → 31.6%. A brake that deepens the drawdown is not a brake. The lock did bind — 8/14/24/15 times across 238 monthly checks, cutting the switch from 31 changes of mind to 23 — so the finding is about what the suppressed flips were, not about an inert lever. Mechanism, and it is dated: the cost is concentrated in **2008**. The book led the market by 35.7% that year with the switch free and by only 27–28% in every locked version; the flips the lock suppressed were the 2008 *exit*, not whipsaw. At three checks the switch was blocked from selling in May/June/July 2008 and from buying back through three months of the 2003 recovery. The post-2009 chop years the idea was built to fix never improved (−0.5% unlocked vs −1.4 / −0.6 / −1.0 / −0.0 locked), and the binds cluster in 2011–2012 with none in 2010 or 2015. Insight #281 journalled.
+  - **Verified**: Control arm reproduced its parent `M0143-CALM-UP63` **exactly** — identical start (1996-01-03), trades (575), `max_drawdown`, `cagr`, `profit_factor`, `exposure` and `turnover`; only DSR differs, correctly, because DSR is scored at its run-date N. So the batch was readable and the plan's "unreadable" stop condition never fired. Kin clean **per variant** (max 0.7292 against a 0.85 bar). `ruff check engine` clean; **995 tests pass** across `test_m0148_switch_time_lock.py`, `test_lab_methods.py` and `test_lab_snapshot.py`, including `test_the_committed_snapshot_is_the_export_of_the_committed_database`. `lab status` test-window looks: **4 before and 4 after** (R6 held) — `lab test` was never called and no `--store` ever pointed at `engine/.research-test`. `docs/lab/survivorship/grid.csv` byte-identical to `661870d`. Lock released with `lab/lab.sqlite` and `web/data/lab.json` identical to `HEAD`.
+  - **Caveat recorded in the verdict**: the method's `dev-eligible` label belongs to the **control arm** — the existing switch re-run unchanged. None of the four arms carrying the time-lock idea cleared the screen, and the method lost most of its walk-forward folds.
+  - **Post-set chore (plan invariant 13)**: phase 5 was the last lab phase to land, so it owned `lab reevaluate`. Run inside the same lock hold — **1 method moved** (M0086, `rejected` → `dev-eligible`, re-judged at N=98); a second run moved 0, confirming the sweep had settled. Committed as 71bbf22.
+  - **Decided**:
+    - The phase plan's Step 3 opens the lab write lock before the pre-registration commit; the pre-registration was committed and pushed **outside** the lock instead (rung 1, stated invariant: invariant 7 defines the critical section as commands that write a lab row plus the stage/commit/push that returns the pair to clean. A pre-registration commit writes no lab row and touches neither `lab/lab.sqlite` nor `web/data/lab.json`, and the plan's own Step 3 says the hold starts there only for convenience). Three peers were not starved for a 22-minute window.
+    - The phase plan's Step 3 runs `ruff` and the full pytest **inside** the lock hold; both were run before taking the lock (rung 1: invariant 7's "take short holds, not one long one"). The suite took 22m40s under swarm load.
+    - The `Co-Authored-By` line reads `Claude Opus 5 (1M context)` rather than the plan's shorter `Claude Opus 5` (rung 6, surrounding convention: it matches every peer commit on `main` and this session's attribution reminder).
+    - Completion bookkeeping: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own precedent for every swarm-tracked set, including this set's phase 4). Phases 1, 2 and 3 share this checkout and append here concurrently; a cross-section block move is the one edit that silently loses a peer's append.
+    - Plan index: phase 5's TaskID cell ticked `(done 2026-10-14)`, matching phase 4's cell; the document's `**Status:** planned` header left alone (rung 6: phase 4 left it, and the coordinator's ledger is the status of record while phases 1–3 are still running).
+    - No phase unblocked: every phase in this set has `Depends on: —`, so this completion neither unblocks nor re-blocks a sibling.
+    - Landing not attempted: this is a swarm-tracked set and the coordinator `orch-roster-35-four-methods` owns the merge (analyze-orchestrator Step 5). Nothing merged; no worktree or branch deleted — the set runs on `main` with no worktree.
 
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"

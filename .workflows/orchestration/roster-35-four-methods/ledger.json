@@ -1,0 +1,103 @@
+{
+  "branch": "main",
+  "coordinator": "orch-roster-35-four-methods",
+  "coordinator_session_id": "0378187c-4d17-4433-8d93-b3348ab7126b",
+  "created": "2026-10-14T08:48:51+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 1,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/roster-35-four-methods/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3",
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "M0156 \u2014 the roster's other book on the honest tape"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "engine/paper`, `db`, `engine/tests`, `web",
+      "plan": ".workflows/plan/roster-35-four-methods/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Hold thirty-five: a new roster entry, and `RAW-FR-GT` retired"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 3,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/roster-35-four-methods/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "M0155 \u2014 trim a holding falling apart while the market is fine"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/roster-35-four-methods/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4",
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "M0149 \u2014 braked by its own falling account, not the market's trend"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 5,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/roster-35-four-methods/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R5",
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "M0148 \u2014 a time-lock on the switch"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/roster-35-four-methods/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "roster-35-four-methods",
+  "updated": "2026-10-14T08:48:51+00:00",
+  "worktree": "none"
+}

@@ -91,6 +91,7 @@ STORES: dict[str, str] = {
     "dev": ".research",
     "sv": ".research-sv",
     "test": ".research-test",
+    "dv": ".research-dv",
 }
 
 

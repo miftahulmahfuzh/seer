@@ -448,3 +448,55 @@ state this whole note exists to warn about.
 **There are no fundamentals for these names.** The EDGAR panel is keyed to the large-cap universe
 and starts in 2009 regardless, so a method built on this store is a price-and-volume method. That
 is a constraint on what may be asked of it, not a defect of the pull.
+
+---
+
+## BUILT 2026-10-14: the store exists, and it is far smaller than projected
+
+| | |
+|---|---|
+| store | `engine/.research-dv`, purpose `dollar-volume-universe` |
+| symbols | **7,693 of 7,718 served**, 25 unserved |
+| bar rows | **15,693,461** |
+| dividends | 104,041 |
+| on disk | 808 MB |
+| **peak RSS to load** | **1.94 GB in 13 s** — against a 7.0 GB projection |
+| fingerprint | `ed59dbf6ea895cba…` |
+
+**Why the projection was 3.6× too high.** The 388 bytes/row figure came from the dev store, where
+fixed overhead is spread across only 2.49M rows. At 15.7M rows it amortises to ~124 bytes/row.
+Every memory estimate in this note that used 388 B/row was therefore pessimistic, and the rank
+1-2000 universe is not tight at all — it is comfortable, with room for a wider band later.
+
+**What was built, and what was reused.** Only membership is new: `universe_rank.py` derives
+point-in-time intervals from the 214 month-end rank cross-sections, because there is no index to
+read for a liquidity band. Everything else is the existing machinery — `survivorship.clean_symbol`
+unchanged for the cleaning, `research._seal` for the manifest.
+
+**The purpose mark is the safety rail.** `UNIVERSE_PURPOSE = "dollar-volume-universe"` makes
+`lab run`, `lab test` and `lab remeasure` refuse the store outright, so a trial measured on this
+universe can never join a method whose other trials were measured on the index store. Mixing price
+fingerprints inside one method's trial set is exactly what `lab/hardgate.py` exists to refuse, and
+a universe this different is the easiest way to do it by accident.
+
+**Everything is backed up, each under its own prefix:**
+
+| | Blob | size |
+|---|---|---|
+| dev store | `seer/research-store/` (3 versions) | 45 MB |
+| survivorship store | `seer/research-store/sv/` | 61.5 MB |
+| **universe store** | `seer/research-store/dv/` | **210.6 MB** |
+| **raw EODHD cache** | `seer/eodhd-cache/` | **565.5 MB**, sha256 round-trip verified |
+
+Pushing `dv` pruned nothing from `dev` or `sv` — the per-store prefix fix is proven in practice,
+not only in intent.
+
+## What this whole exercise bought, in one line each
+
+- The kin gate is **not** over-reaching: the lab's books genuinely correlate 0.93-0.96 with books
+  that already failed. The problem was never the rules.
+- Gotrade **cannot short**, so that dimension is closed by the broker, not by choice.
+- **11 of 28** drawdown passes do not survive honest data, and the promote gate now refuses the
+  ones it can prove — M0007-N20-RAW at 23.46%, M0020-W-NOSTOP at 23.42%, M0033-TV22-N21 at 22.40%.
+- A genuinely different universe now exists, with the dead companies in it, for **$0** beyond a
+  subscription that was already running.

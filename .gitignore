@@ -34,6 +34,15 @@ engine/.research-sv/
 engine/.research-sv.tmp/
 engine/.research-sv.old/
 
+# Dollar-volume universe store (`python -m seer_engine universe_store --build`) and the EODHD
+# cache it is built from. Both are large and the raw vendor data is under a personal licence;
+# backups live in Vercel Blob (`sync_store.py push --store dv`), never in git.
+engine/.research-dv/
+engine/.research-dv.tmp/
+engine/.research-dv.old/
+engine/.research-dv-smoke/
+engine/.cache/
+
 # misc
 .DS_Store
 *.log

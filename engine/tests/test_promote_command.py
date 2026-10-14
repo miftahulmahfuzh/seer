@@ -152,12 +152,47 @@ def test_object_name_of_refuses_an_object_the_resolver_does_not_name():
         promote.object_name_of(Unnamed())
 
 
-def test_object_name_of_is_the_resolvers_inverse():
-    # RESOLVER maps a name to a roster.Binding; the live object is binding.obj, None for the
-    # benchmark (which has no object to name).
+def test_object_name_of_is_the_resolvers_inverse_where_the_inverse_exists():
+    """RESOLVER maps a name to a roster.Binding; the live object is binding.obj, None for the
+    benchmark (which has no object to name).
+
+    The inverse is a function only for an object ONE key names. Since 021 that is not every
+    object: a width change binds the SAME allocator under a second key, because a Binding carries
+    the params and the params are in the frozen spec. For such an object `object_name_of` must
+    REFUSE rather than pick one of the two -- the key is part of the digest, so an object with two
+    names has two digests, and guessing would silently freeze a strategy under the wrong one.
+    """
+    by_obj: dict[int, list[str]] = {}
     for name, binding in roster.RESOLVER.items():
         if binding.obj is not None:
-            assert promote.object_name_of(binding.obj) == name
+            by_obj.setdefault(id(binding.obj), []).append(name)
+    assert by_obj, "the resolver names no objects at all"
+    for names in by_obj.values():
+        if len(names) == 1:
+            obj = roster.RESOLVER[names[0]].obj
+            assert promote.object_name_of(obj) == names[0]
+        else:
+            obj = roster.RESOLVER[names[0]].obj
+            with pytest.raises(promote.NotPromotable, match="names"):
+                promote.object_name_of(obj)
+
+
+def test_a_second_width_of_one_allocator_takes_promote_off_the_table():
+    """021's cost, asserted so it is never rediscovered as a surprise at 23:00.
+
+    RESIDMOM is on the roster twice -- RAW-FR-GT at 20 names (retired) and RAW35-FR-GT at 35 --
+    under two resolver keys with two params. `promote` can therefore place NEITHER, and a roster
+    row for this allocator is written by a migration instead (db/migrations/021_roster_width_35.sql
+    says so in its own prose). The refusal names both keys, which is what tells an operator what
+    actually happened.
+    """
+    residmom = roster.RESOLVER["RESIDMOM"].obj
+    assert roster.RESOLVER["RESIDMOM35"].obj is residmom
+    assert roster.RESOLVER["RESIDMOM35"].params is not roster.RESOLVER["RESIDMOM"].params
+    with pytest.raises(promote.NotPromotable) as exc:
+        promote.object_name_of(residmom)
+    assert "RESIDMOM" in str(exc.value) and "RESIDMOM35" in str(exc.value)
+    assert "exactly one" in str(exc.value)
 
 
 def test_the_resolver_must_name_the_allocator_first(monkeypatch):

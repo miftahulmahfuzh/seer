@@ -59,10 +59,12 @@ def bar(symbol: str, d: date, o: str, h: str, low: str, c: str) -> Bar:
 def test_read_strategies_returns_the_roster_rows_in_sort_order(pg):
     rows = store.read_strategies(pg)
     # 017 put the six Gotrade-fee successors at the head and moved the thirteen below them.
+    # 021 swapped one of the six: RAW35-FR-GT (35 names) takes RAW-FR-GT's slot, and RAW-FR-GT
+    # goes to the end of the retired block.
     assert [r.id for r in rows] == [
-        "SPY-GT", "C-GT", "RMW-FR-GT", "RAW-FR-GT", "MOM-FR-GT", "MVW-FR-GT",
+        "SPY-GT", "C-GT", "RMW-FR-GT", "RAW35-FR-GT", "MOM-FR-GT", "MVW-FR-GT",
         "SPY", "A", BOOK_ID, TIMING_ID, "C", "FND", f"{BOOK_ID}-FR", f"{TIMING_ID}-FR", "RM-FR",
-        "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR",
+        "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR", "RAW-FR-GT",
     ]
     spy = next(r for r in rows if r.id == "SPY-GT")
     assert (spy.engine, spy.rules_id, spy.is_champion, spy.is_benchmark) == ("benchmark", None, True, True)

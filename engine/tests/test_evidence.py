@@ -448,6 +448,7 @@ def lab_market() -> Market:
 
 LAB_BOOKS = (
     ("RESIDMOM", roster.RESIDMOM_PARAMS),
+    ("RESIDMOM35", roster.RESIDMOM35_PARAMS),
     ("REGIME", roster.REGIME_PARAMS),
     ("MINVAR", roster.MINVAR_PARAMS),
 )

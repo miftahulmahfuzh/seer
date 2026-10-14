@@ -687,6 +687,7 @@ EVIDENCE: dict[str, EvidenceFn] = {
     "RESIDVOL": residvol_evidence,
     "WEEKLYBRAKE": weeklybrake_evidence,
     "RESIDMOM": residmom_evidence,
+    "RESIDMOM35": residmom_evidence,  # 021: the same book at 35 names; the function is width-agnostic
     "REGIME": regime_evidence,
     "MINVAR": minvar_evidence,
 }

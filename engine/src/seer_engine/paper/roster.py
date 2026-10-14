@@ -126,6 +126,7 @@ from seer_engine.lab.methods.m0011_raw_residual_own_vol import METHOD as M0011
 from seer_engine.lab.methods.m0011_raw_residual_own_vol import RESIDVOL
 from seer_engine.lab.methods.m0022_weekly_brake_residual import METHOD as M0022
 from seer_engine.lab.methods.m0022_weekly_brake_residual import WEEKLYBRAKE
+from seer_engine.lab.methods.m0139_names_on_an_invested_tape import METHOD as M0139
 from seer_engine.paper.capital import PAPER_INITIAL_IDR
 from seer_engine.sim import COST_RATE
 from seer_engine.sim.costs import CostModel
@@ -172,6 +173,14 @@ RMW_GT_ID = "RMW-FR-GT"
 RAW_GT_ID = "RAW-FR-GT"
 MOM_GT_ID = "MOM-FR-GT"
 MVW_GT_ID = "MVW-FR-GT"
+
+# 021, the width change (owner, 2026-10-14): "let's change our seer roster to hold 35 stocks
+# instead of 20". RAW35-FR-GT is RAW-FR-GT's book with only the name count moved -- the same
+# screen, the same ranking, the same SPY 200-day filter, the same rule set, the same fees. It is a
+# NEW ID and not an edit because `top` is in the frozen spec: moving it on a started entry would
+# fail its next night with a SpecMismatch (store.check_digest). RAW-FR-GT is retired in the same
+# migration, so the board never shows two widths of one book.
+RAW35_GT_ID = "RAW35-FR-GT"
 
 #: The bracket rule set the daily control trades under: design section 5's shape, charging Gotrade's
 #: measured schedule instead of a flat 0.1% a side. Added by the bracket-path work; this module only
@@ -370,6 +379,15 @@ WEEKLYBRAKE_PARAMS = next(c.params for c in M0022.candidates if c.id == "M0022-W
 #: above, so the roster can never drift from the trial it records.
 RESIDMOM_PARAMS = next(c.params for c in M0007.candidates if c.id == "M0007-N20-RAW")
 
+#: RAW35's params: lab M0139's N35-EBAND variant -- RAW's residual-momentum book with ONE field
+#: moved, ``inner.top`` 20 -> 35, on the SAME rules preset (``monthly-hold-frac-gotrade``).
+#: ``M0139-N35-EBAND`` and not ``M0139-N35-TBAND``: the tband twin also moves ``resize_basis`` to
+#: "target", and changing two things at once would break the one comparison RAW exists on this
+#: roster to provide -- the same picks WITH the brake (RMW-FR-GT) against the same picks without
+#: it. The owner asked for a width change; this is a width change and nothing else. Read from the
+#: frozen method file like the five above, so the roster can never drift from the trial it records.
+RESIDMOM35_PARAMS = next(c.params for c in M0139.candidates if c.id == "M0139-N35-EBAND")
+
 #: MOM's params: lab M0002's REL-85 variant -- total-return momentum, own-vol scaling applied only
 #: when the book is jumpy relative to its own history (the 85th-percentile regime trigger).
 REGIME_PARAMS = next(c.params for c in M0002.candidates if c.id == "M0002-REL-85")
@@ -482,6 +500,17 @@ RESOLVER: dict[str, Binding] = {
     # Lab M0008's minimum-variance weighting, its N30-C07 variant (promoted 2026-10-07,
     # replaces F1).
     "MINVAR": Binding(obj=MINVAR, params=MINVAR_PARAMS),
+    # 021: the SAME allocator object at a different width (lab M0139-N35-EBAND, 35 names). A
+    # binding carries the PARAMS as well as the object, and `params` is in the frozen spec, so a
+    # new width is a new key -- it cannot ride on "RESIDMOM" without re-digesting a live entry.
+    #
+    # THE ONE CONSEQUENCE, STATED HERE SO IT IS NOT DISCOVERED LATER. `commands.promote`'s
+    # `object_name_of` inverts this table by object identity and refuses an object two keys name,
+    # because the name is part of the digest. RESIDMOM now has two names, so `promote` can no
+    # longer place ANY variant of this allocator: migration 021 writes the row instead, and a
+    # future width of this book takes the same path. That is a cost of widths, not a defect --
+    # the alternative is a resolver that cannot tell two widths apart.
+    "RESIDMOM35": Binding(obj=RESIDMOM, params=RESIDMOM35_PARAMS),
 }
 
 
@@ -675,6 +704,37 @@ LAB_PROVENANCE: dict[str, LabProvenance] = {
             "It is the board's one portfolio-construction bet rather than another ranking rule, "
             "and the least correlated with RMW-FR-GT of any variant that passes the five. Its max "
             "DD is 20.0%, exactly the bar, with no margin: that is the risk of this admission"
+        ),
+    ),
+    # 021: the width change. The entry it replaces, RAW-FR-GT, keeps its line above -- a retired
+    # entry's provenance is lineage and is never edited.
+    RAW35_GT_ID: LabProvenance(
+        method_id="M0139",
+        candidate_id="M0139-N35-EBAND",
+        lab_status="dev-eligible",
+        basis="owner-override",
+        reason=(
+            "the owner moved the roster's width from twenty names to thirty-five (2026-10-14). "
+            "It is RAW-FR-GT's own book with one field changed -- the number of names -- on the "
+            "same screen, the same ranking, the same market filter, the same rule set and the "
+            "same fees, so the forward comparison against RMW-FR-GT (the same picks WITH the "
+            "volatility brake) still reads. The variant passes every dev check with nothing "
+            "failed -- max DD 19.6%, PF 2.09, 2,548 trades, recorded DSR 0.934 at its recorded "
+            "N=88 -- which is new for this roster. It has still never had a test-window look and "
+            "it never will: the hard gate blocks M0139 on kin, because M0021, M0022 and M0029 "
+            "read test-failed in the same family and this book moves with M0021's tested one at "
+            "0.95. So the basis is the owner's rule and not the lab's, and 'not yet tested' would "
+            "be the wrong way to read it. The width evidence is "
+            "M0152's curve on the survivorship-check store, the price history that keeps the "
+            "companies that went bankrupt or were bought: there the twenty-name book falls 25.05%, "
+            "outside the owner's own 25% bar, and the thirty-five-name book 20.11% while earning "
+            "slightly more. That check-store reading was taken on this variant's target-band twin "
+            "M0139-N35-TBAND, which differs from it on the dev store by 0.012 points of drawdown "
+            "and 0.19 points of yearly return, so the width conclusion transfers but the "
+            "check-store number is the twin's. M0139's own recorded verdict reads 'Twenty names "
+            "still wins': it was written on the dev store alone, before M0147 and M0152 showed "
+            "that store cannot see the holdings that collapsed and left, and it stays frozen as "
+            "the closed record it is"
         ),
     ),
 }
@@ -920,10 +980,12 @@ SEED_ROWS: tuple[RosterRow, ...] = (
     # spec from their first night -- 10,000,000 IDR to start and 5,000,000 IDR more on the 25th of
     # each month. Adding that later would have moved their digests and forced a second rebuild.
     #
-    # WHAT DOES NOT CHANGE. The books still hold 20 names. The fee case for holding fewer is a
-    # two-month transient under the funding plan: measured, by month 3 a 20-name book pays 0.614%
-    # and an 11-name book 0.612%. How many names to hold is a question about returns, not fees, and
-    # if it is ever answered differently the answer lands as a FURTHER entry under this same rule.
+    # WHAT DOES NOT CHANGE HERE. The books still hold 20 names at 017. The fee case for holding
+    # fewer is a two-month transient under the funding plan: measured, by month 3 a 20-name book
+    # pays 0.614% and an 11-name book 0.612%. How many names to hold is a question about returns
+    # and about what one collapsing holding can do, not about fees -- and 021 is the FURTHER entry
+    # this paragraph said such an answer would have to be: RAW35-FR-GT at thirty-five names, with
+    # RAW-FR-GT retired beside it. Not one digest above moved to do it.
     RosterRow(
         id=BENCHMARK_GT_ID,
         name="SPY",
@@ -992,26 +1054,34 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         ),
     ),
     RosterRow(
-        id=RAW_GT_ID,
-        name="RAW · Unbraked momentum",
-        sub="Top 20 by rise beyond the market, no brake, monthly, fractional shares, real Gotrade fees",
+        id=RAW35_GT_ID,
+        name="RAW35 · Unbraked momentum",
+        sub="Top 35 by rise beyond the market, no brake, monthly, fractional shares, real Gotrade fees",
         icon="zap",
         is_champion=False,
         is_benchmark=False,
         sort=4,
         engine="book",
         rules_id="monthly-hold-frac-gotrade",
-        object_name="RESIDMOM",
+        object_name="RESIDMOM35",
         registry_id=None,
         gate_note=(
-            "Lab M0007 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
-            "0.1% a side: beats SPY TR (+1,502.2% vs +351.4%), max DD 19.6%, PF 2.16 and 1,596 "
-            "trades all pass, on a recorded DSR of 0.914 at its recorded N=85; its method was "
-            "rejected under the older 15% drawdown bar. Never had a test-window "
-            "look. Re-measured at Gotrade's real fees (449fa34, report only) it returns +1,126% "
-            "against SPY's +350% at the same fees. Successor of RAW-FR, which paid the assumed "
-            "rate. On paper as the controlled comparison against RMW-FR-GT: the same book without "
-            "the brake"
+            "Lab M0139 dev window only (1996-01-03..2015-10-16), already in fractional shares at "
+            "Gotrade's measured fees -- the same rule set this entry runs, so nothing is "
+            "re-measured here: funded on the owner's own plan it returns +499.9% against a "
+            "deposit-matched SPY TR's +257.2% (12.8% a year against 7.2%), max DD 19.6%, PF 2.09 "
+            "and 2,548 trades all pass, on a recorded DSR of 0.934 at its recorded N=88. Nothing "
+            "failed: it is the first roster entry whose variant clears every dev check. It has "
+            "never had a test-window look. It is RAW-FR-GT's book with only the name count moved, "
+            "20 to 35, and it replaces it. The width answer is M0152's, measured on the "
+            "survivorship-check store, where the twenty-name book falls 25.05% -- outside the "
+            "owner's 25% bar -- against 20.11% at thirty-five names for slightly more money; that "
+            "check-store reading was taken on the target-band twin M0139-N35-TBAND, which differs "
+            "from this variant on dev by 0.012 points of drawdown. Over 2009-2015 on that same "
+            "store both widths lose to SPY, and thirty-five loses by more (-1.7 points a year "
+            "against -0.2): the width case is a drawdown case, not a return case, and that is the "
+            "risk of this admission. On paper as the controlled comparison against RMW-FR-GT: the "
+            "same picks without the brake"
         ),
     ),
     RosterRow(
@@ -1323,6 +1393,33 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "Its drawdown sits exactly on the 20% bar, with no margin. On paper to test it forward"
         ),
         status="retired",  # 017: superseded by MVW-FR-GT, which pays Gotrade's measured fees
+    ),
+    # 021: retired. The owner moved the roster to thirty-five names (2026-10-14) and RAW35-FR-GT
+    # is the same book at that width. `status`, `sort` and `paper_end` are outside the frozen
+    # spec, so this entry's digest is unchanged and it keeps every row it ever wrote.
+    RosterRow(
+        id=RAW_GT_ID,
+        name="RAW · Unbraked momentum",
+        sub="Top 20 by rise beyond the market, no brake, monthly, fractional shares, real Gotrade fees",
+        icon="zap",
+        is_champion=False,
+        is_benchmark=False,
+        sort=20,
+        engine="book",
+        rules_id="monthly-hold-frac-gotrade",
+        object_name="RESIDMOM",
+        registry_id=None,
+        gate_note=(
+            "Lab M0007 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
+            "0.1% a side: beats SPY TR (+1,502.2% vs +351.4%), max DD 19.6%, PF 2.16 and 1,596 "
+            "trades all pass, on a recorded DSR of 0.914 at its recorded N=85; its method was "
+            "rejected under the older 15% drawdown bar. Never had a test-window "
+            "look. Re-measured at Gotrade's real fees (449fa34, report only) it returns +1,126% "
+            "against SPY's +350% at the same fees. Successor of RAW-FR, which paid the assumed "
+            "rate. On paper as the controlled comparison against RMW-FR-GT: the same book without "
+            "the brake"
+        ),
+        status="retired",  # 021: superseded by RAW35-FR-GT, which holds thirty-five names
     ),
 )
 

@@ -93,10 +93,15 @@ RMW_GT = "RMW-FR-GT"
 RAW_GT = "RAW-FR-GT"
 MOM_GT = "MOM-FR-GT"
 MVW_GT = "MVW-FR-GT"
-#: every entry that ever traded under the assumed flat rate, plus the three 013 retired; none of
-#: them ever stepped a paper session, and every one of them keeps every row it wrote.
-RETIRED = (F4, F1, FND, RM, "A", F4_FR, F1_FR, "SPY", "C", RMW, RAW, MOM, MVW)
-ACTIVE_IDS = (SPY_GT, C_GT, RMW_GT, RAW_GT, MOM_GT, MVW_GT)
+# 021, the width change (owner, 2026-10-14): the same residual-momentum book at 35 names instead
+# of 20, on the same rule set, as a NEW id -- `inner.top` is in the frozen spec, so moving it on
+# RAW-FR-GT would have failed its next night. RAW-FR-GT is retired beside it.
+RAW35_GT = "RAW35-FR-GT"
+#: every entry that ever traded under the assumed flat rate, plus the three 013 retired and the one
+#: 021 retires; none of them ever stepped a paper session, and every one of them keeps every row it
+#: wrote.
+RETIRED = (F4, F1, FND, RM, "A", F4_FR, F1_FR, "SPY", "C", RMW, RAW, MOM, MVW, RAW_GT)
+ACTIVE_IDS = (SPY_GT, C_GT, RMW_GT, RAW35_GT, MOM_GT, MVW_GT)
 
 # 2026-10-07: every digest moved once, on purpose, when the paper books' starting cash went from
 # 20,000,000 to 10,000,000 IDR (spec "initial_idr"; the owner's own Gotrade money). Production's
@@ -133,6 +138,11 @@ PINS = {
     RAW_GT: "21947eef1b8f1c9060fc3bd0af8be34d764b18041fd8f6c79bd720788575f822",
     MOM_GT: "0551e953ea8b62fe7bb1b12852f8f549ad9353b99d15f5090d9a8e2ca591f503",
     MVW_GT: "f463f4af9aeb3157029979df64e4923a55ea675991d4fddbfe992a3a685f4df2",
+    # 021: the width change. ONE new pin and NOT ONE MOVED PIN -- that is the whole point of this
+    # block. RAW-FR-GT's digest above is byte-identical to what 017 wrote, because `status`, `sort`
+    # and `paper_end` are deliberately outside the frozen spec; retiring it moved nothing. The new
+    # entry digests differently from it for exactly one reason: `params["inner.top"]` reads "35".
+    RAW35_GT: "f9def72ae37bd7534807e5957a1e48917fe54322b65a5bbb0cd2898db41c443f",
 }
 
 FACTOR_PARAMS_AS_DICT = {
@@ -154,10 +164,10 @@ DISPLAY = ("id", "name", "sub", "icon", "is_champion", "is_benchmark", "sort", "
 
 def test_the_roster_is_the_handover_entries_in_sort_order():
     assert ROSTER_IDS == (
-        SPY_GT, C_GT, RMW_GT, RAW_GT, MOM_GT, MVW_GT,
-        "SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW,
+        SPY_GT, C_GT, RMW_GT, RAW35_GT, MOM_GT, MVW_GT,
+        "SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW, RAW_GT,
     )
-    assert [e.sort for e in ROSTER] == list(range(1, 20))
+    assert [e.sort for e in ROSTER] == list(range(1, 21))
     assert "B" not in ROSTER_IDS
 
 
@@ -319,13 +329,15 @@ def test_strategy_params_round_trip_through_jsonb(pg):
 
 def test_lookbacks():
     assert {e.id: e.lookback for e in ROSTER} == {
-        SPY_GT: 1, C_GT: 200, RMW_GT: 426, RAW_GT: 401, MOM_GT: 379, MVW_GT: 253,
+        SPY_GT: 1, C_GT: 200, RMW_GT: 426, RAW35_GT: 401, MOM_GT: 379, MVW_GT: 253,
+        RAW_GT: 401,
         "SPY": 1, "A": 200, F4: 253, F1: 200, "C": 200, FND: 20, F4_FR: 253, F1_FR: 200,
         RM: 401, RMW: 426, RAW: 401, MOM: 379, MVW: 253,
     }
     # FND's lookback is the 20-bar dollar-volume window: a filing's availability is its `filed`
     # date, not a bar count. RMW's 426 is the roster's longest, which is why the night loads 640
-    # calendar days, not 550 -- unchanged by 017, which adds no new object.
+    # calendar days, not 550 -- unchanged by 017 (which adds no new object) and unchanged by 021
+    # (whose new object is RESIDMOM at a different width: `resid_lookback` does not read `top`).
     assert MAX_LOOKBACK_BARS == 426
 
 
@@ -503,17 +515,18 @@ def test_the_seed_roster_retires_the_whole_share_three_with_no_paper_end():
 
 
 def test_active_drops_retired_entries_and_keeps_order():
-    # RAW_GT, not A or RMW: both are retired in SEED_ROWS already, so retiring them again would
+    # RAW35_GT, not A or RMW: both are retired in SEED_ROWS already, so retiring them again would
     # assert nothing. Retiring a LIVE entry is the case that matters -- it is what
-    # `promote --retire` does on every future swap.
+    # `promote --retire` does on every future swap. It was RAW_GT until 021 retired that entry for
+    # real; the test follows the width change to the entry that is now live at that slot.
     rows = tuple(
-        dataclasses.replace(r, status="retired", paper_end=date(2026, 10, 2)) if r.id == RAW_GT else r
+        dataclasses.replace(r, status="retired", paper_end=date(2026, 10, 2)) if r.id == RAW35_GT else r
         for r in SEED_ROWS
     )
     entries = from_rows(rows)
     assert [e.id for e in entries] == list(ROSTER_IDS)  # retired rows are never dropped from the roster
     assert [e.id for e in active(entries)] == [SPY_GT, C_GT, RMW_GT, MOM_GT, MVW_GT]
-    raw = next(e for e in entries if e.id == RAW_GT)
+    raw = next(e for e in entries if e.id == RAW35_GT)
     assert (raw.status, raw.paper_end) == ("retired", date(2026, 10, 2))
 
 
@@ -595,7 +608,7 @@ def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
     # 013 rows are the rest -- every lab-derived row added after `promote` existed names its
     # method here, and only F4, F1 and their fractional twins predate it.
     assert {r.id for r in rows.values() if r.promoted_from is not None} == {
-        FND, RM, RMW, RAW, MOM, MVW, RMW_GT, RAW_GT, MOM_GT, MVW_GT,
+        FND, RM, RMW, RAW, MOM, MVW, RMW_GT, RAW_GT, MOM_GT, MVW_GT, RAW35_GT,
     }
     assert (rows[FND].promoted_from, rows[RM].promoted_from) == ("M0005", "M0011")
     assert (rows[RAW].promoted_from, rows[MOM].promoted_from, rows[MVW].promoted_from) == (
@@ -644,7 +657,8 @@ from seer_engine.paper.roster import (  # noqa: E402
 #: Every roster entry admitted from a recorded lab candidate. A promotion adds a SEED_ROWS row
 #: AND a LAB_PROVENANCE entry in the same commit; this tuple is the third place that has to name
 #: it, and that is the point -- forgetting is a failing test, not a silent gap.
-LAB_DERIVED = (F4, F1, FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW, RMW_GT, RAW_GT, MOM_GT, MVW_GT)
+LAB_DERIVED = (F4, F1, FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW,
+               RMW_GT, RAW_GT, MOM_GT, MVW_GT, RAW35_GT)
 #: And the five that are not: the two benchmark entries, C and its Gotrade successor (the LLM
 #: strategy the quant gate does not apply to), and A, which predates the lab.
 NOT_LAB_DERIVED = ("SPY", SPY_GT, "A", "C", C_GT)
@@ -680,6 +694,12 @@ def test_the_entries_name_the_variants_the_roster_advertises():
     # the fractional twins trade the same lab candidate as the whole-share entries they replaced
     assert entry(F4_FR).lab_provenance.candidate_id == entry(F4).lab_provenance.candidate_id == F4
     assert entry(F1_FR).lab_provenance.candidate_id == entry(F1).lab_provenance.candidate_id == F1
+    # 021: the width change names M0139's variant, not M0007's -- the 35-name rung is M0139's
+    # recorded trial, and the roster must say so rather than claiming M0007 measured a width it
+    # never ran.
+    assert (entry(RAW35_GT).lab_provenance.method_id,
+            entry(RAW35_GT).lab_provenance.candidate_id) == ("M0139", "M0139-N35-EBAND")
+    assert entry(RAW_GT).lab_provenance.candidate_id == "M0007-N20-RAW"
 
 
 def test_every_override_states_its_basis_and_a_reason():
@@ -688,10 +708,17 @@ def test_every_override_states_its_basis_and_a_reason():
         assert p.lab_status in lab_store.STATUSES, sid
         if p.basis == "owner-override":
             assert p.reason.strip(), f"{sid}: an override must say why"
-    # today every roster entry is an override admitted at 'rejected': not one of them has had a
-    # test-window look. When that stops being true, this assertion is the place to say so.
+    # Every roster entry is still an override: not one of them has had a test-window look, and the
+    # lab's own route to paper (design section 3) runs through one. What CHANGED on 2026-10-14 is
+    # what they were overridden FROM. The fourteen entries up to 017 were admitted at 'rejected' --
+    # they failed the dev gate too. RAW35-FR-GT (021) is the first admitted at 'dev-eligible': its
+    # variant M0139-N35-EBAND fails nothing on the dev window, and the only thing the owner is
+    # overriding is the missing test-window look. Both statuses are named here rather than
+    # collapsed, because the difference is the admission's whole character.
     assert {p.basis for p in LAB_PROVENANCE.values()} == {"owner-override"}
-    assert {p.lab_status for p in LAB_PROVENANCE.values()} == {"rejected"}
+    assert {p.lab_status for p in LAB_PROVENANCE.values()} == {"rejected", "dev-eligible"}
+    assert LAB_PROVENANCE[RAW35_GT].lab_status == "dev-eligible"
+    assert {sid for sid, p in LAB_PROVENANCE.items() if p.lab_status != "rejected"} == {RAW35_GT}
     assert set(BASES) == set(lab_store.PROMOTION_BASES)
 
 
@@ -752,16 +779,28 @@ def test_every_provenance_matches_the_committed_lab_database():
                 f"{sid}: admitted at lab status {p.lab_status!r}, but {p.method_id} now reads "
                 f"{method['status']!r}, which is not that status or forward of it"
             )
+            # What an override OVERRIDES is the lab's own route to this roster, and that route is
+            # the TEST window (design section 3), not the dev gate. So the check is the exact
+            # mirror of the test-passed branch below: an owner-override must have NO passed
+            # test-window trial. (It used to assert the dev trial FAILED, which was true of the
+            # fourteen entries admitted up to 017 and is not a property of an override: 021's
+            # M0139-N35-EBAND fails nothing on dev and has still never been looked at on test.)
+            # `AND method_id = ?` is new: the inherited query filtered on candidate_id alone.
+            # Harmless while only the test-passed branch ran it (candidate ids are method-
+            # prefixed and the lab refuses a second look), but this restatement runs it for all
+            # fifteen entries, so it gets the filter while the line is open.
+            passed = conn.execute(
+                "SELECT eligible FROM trials WHERE method_id = ? AND candidate_id = ? "
+                "AND window = 'test'",
+                (p.method_id, p.candidate_id),
+            ).fetchone()
             if p.basis == "owner-override":
-                assert dev["eligible"] == 0, (
-                    f"{sid}: the basis says owner-override, but {p.candidate_id} passed the dev "
-                    f"gate (failed={dev['failed']!r}). Nothing was overridden -- fix the basis"
+                assert passed is None or passed["eligible"] == 0, (
+                    f"{sid}: the basis says owner-override, but {p.candidate_id} has a PASSED "
+                    f"test-window trial -- the lab's own route admitted it, and nothing was "
+                    f"overridden. Fix the basis to 'test-passed'"
                 )
             else:
-                passed = conn.execute(
-                    "SELECT eligible FROM trials WHERE candidate_id = ? AND window = 'test'",
-                    (p.candidate_id,),
-                ).fetchone()
                 assert passed is not None and passed["eligible"] == 1, (
                     f"{sid}: the basis says test-passed, but no passed test-window trial for "
                     f"{p.candidate_id} is recorded"
@@ -780,7 +819,7 @@ def test_lab_provenance_agrees_with_the_promoted_from_column(pg):
     # their fractional twins were seeded by migration before `promote` existed. 017's four book
     # successors carry the method of the entry each replaces.
     assert {i for i, r in rows.items() if r.promoted_from is not None} == {
-        FND, RM, RMW, RAW, MOM, MVW, RMW_GT, RAW_GT, MOM_GT, MVW_GT,
+        FND, RM, RMW, RAW, MOM, MVW, RMW_GT, RAW_GT, MOM_GT, MVW_GT, RAW35_GT,
     }
 
 
@@ -802,13 +841,18 @@ def test_every_active_entry_pays_gotrade_and_nothing_retired_changed():
         else:
             assert e.rules is not None and e.rules.cost_model == "gotrade", e.id
             assert spec(e)["rules"]["cost_model"] == "gotrade", e.id
-    # and the six predecessors are retired, not deleted: every one keeps its row and its digest.
+    # and the predecessors are retired, not deleted: every one keeps its row and its digest.
+    # 021 put a THIRD link on the unbraked book's chain -- RAW -> RAW-FR-GT -> RAW35-FR-GT -- so
+    # RAW-FR-GT is now a successor AND a predecessor, and "the successor trades" is true only of
+    # the last link of each chain. The active set is therefore asserted once, below, instead of
+    # once per pair; what every pair still states is the thing that matters -- the predecessor is
+    # retired, its digest is STILL the one that was pinned for it, and the successor's is not.
     for old, new in (("SPY", SPY_GT), ("C", C_GT), (RMW, RMW_GT), (RAW, RAW_GT),
-                     (MOM, MOM_GT), (MVW, MVW_GT)):
+                     (MOM, MOM_GT), (MVW, MVW_GT), (RAW_GT, RAW35_GT)):
         assert entry(old).status == "retired", old
         assert spec_digest(spec(entry(old))) == PINS[old], old
-        assert entry(new).status == "active", new
         assert spec_digest(spec(entry(new))) != PINS[old], new
+    assert {e.id for e in active(ROSTER)} == set(ACTIVE_IDS)
 
 
 def test_the_daily_control_stays_and_is_funded_like_the_books():

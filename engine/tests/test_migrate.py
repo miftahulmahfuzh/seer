@@ -288,12 +288,13 @@ def test_004_on_a_fresh_schema_adds_c_last_and_the_news_vetoes_table(pg_empty):
         "FROM strategies ORDER BY sort"
     ).fetchall()
     # 017 renumbered `sort`: the six Gotrade-fee successors that trade come first, then the
-    # thirteen it and its predecessors retired, in the order they were added.
+    # thirteen it and its predecessors retired, in the order they were added. 021 put RAW35-FR-GT
+    # in RAW-FR-GT's slot and sent RAW-FR-GT to the end of the retired block.
     assert [r[0] for r in rows] == [
-        "SPY-GT", "C-GT", "RMW-FR-GT", "RAW-FR-GT", "MOM-FR-GT", "MVW-FR-GT",
+        "SPY-GT", "C-GT", "RMW-FR-GT", "RAW35-FR-GT", "MOM-FR-GT", "MVW-FR-GT",
         "SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND",
         "F4-MOM12-N20-TREND-FR", "F1-SPY-SMA200-M-FR", "RM-FR", "RMW-FR",
-        "RAW-FR", "MOM-FR", "MVW-FR",
+        "RAW-FR", "MOM-FR", "MVW-FR", "RAW-FR-GT",
     ]
     by_id = {r[0]: r for r in rows}
     # C is 004's last row and FND 007's, both now behind 017's six; their columns are untouched

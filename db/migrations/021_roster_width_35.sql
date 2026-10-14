@@ -1,0 +1,116 @@
+-- Seer schema v21: the roster holds thirty-five names, not twenty (owner, 2026-10-14).
+--
+-- The owner's instruction, verbatim: "let's change our seer roster to hold 35 stocks instead of
+-- 20". He mirrors this roster with his own money, so this migration moves what he actually buys.
+--
+-- THE EVIDENCE. M0152 measured the roster's own picking rule at seven widths on both price
+-- histories. On the survivorship-check store -- the history that keeps the companies that went
+-- bankrupt, were bought or were renamed -- the roster's twenty-name book falls 25.05%, OUTSIDE the
+-- owner's own 25% bar, while a thirty-five-name book falls 20.11% and earns slightly MORE:
+-- 12.11% a year against 11.98%. MAR peaks at thirty-five on both stores. The full curve, with
+-- trough dates and era columns, is docs/lab/survivorship/roster-width-curve-2026-10-14.csv.
+--
+-- THE MECHANISM, DATED RATHER THAN INFERRED. Every width's worst fall on both stores is
+-- 1998-06 -> 1998-08 with exactly one exception: the twenty-name book on the check store, which
+-- troughs 2006-03 -> 2006-07. SPY went 3.71 -> 3.62 in that window -- a 2% dip that made a new
+-- high by September -- while the twenty-name book lost 21.8%. By era and by width (20 -> 70):
+--     1998     21.6 19.2 19.9 19.7 19.4 18.7 18.0    3.6 pts -- width barely helps
+--     dot-com   9.4  6.7  4.3  5.0  6.5  6.6  5.1
+--     2006     21.8 18.9 18.8 16.2 15.1 14.8 12.9    8.9 pts -- the ONLY width-sensitive episode
+--     2008-09   9.1  9.3  9.5 10.1 10.0  9.7  8.2    the gate's best work is the famous crashes
+--     2010-15   9.9 10.2 10.1 10.4 11.1 10.7 10.6
+-- The SPY 200-day gate handles MARKET falls and handles them well. Width handles the single
+-- holding that collapses while the market is fine, and in twenty years that happened once. What
+-- makes it more than a coin flip is that the one episode is the ORDINARY kind of accident -- a
+-- company failing in a rising market -- not a crisis that may not repeat.
+--
+-- WHICH VARIANT, AND WHY NOT THE OTHER ONE. The new entry's params are lab trial M0139-N35-EBAND:
+-- M0007-N20-RAW's screen, ranking and SPY 200-day filter verbatim, with ONE field moved,
+-- inner.top 20 -> 35, on rules preset monthly-hold-frac-gotrade -- the SAME preset RAW-FR-GT runs
+-- today. M0139 also recorded M0139-N35-TBAND, which is the same book on monthly-hold-frac-gotrade-
+-- tband (resize_basis = "target"). Taking the tband twin would change the width AND the rebalance
+-- basis at once, and would break the one comparison RAW exists on this roster to provide: the same
+-- picks WITH the volatility brake (RMW-FR-GT, still on the equity basis) against the same picks
+-- without it. The owner asked for a width change. This is a width change and nothing else.
+--
+-- THE CAVEAT THAT TRAVELS WITH THE HEADLINE NUMBERS. The 20.11% / 12.11% check-store reading above
+-- was measured on M0139-N35-TBAND, not on the M0139-N35-EBAND being admitted here. On the dev
+-- store the two differ by 0.012 points of drawdown (0.19590 vs 0.19602) and 0.19 points of yearly
+-- return (0.36913 vs 0.37106). The width conclusion transfers; the check-store number is the
+-- twin's, and this migration says so rather than implying a measurement nobody took.
+--
+-- THE SECOND CAVEAT, AND THE RISK OF THIS ADMISSION. On the check store over 2009-2015 -- the
+-- years most like today -- BOTH widths lose to a deposit-matched SPY, and the wider book loses by
+-- more: -0.2 points a year at twenty names, -1.7 at thirty-five. The case for width is a drawdown
+-- case, not a return case. The headline 12.11% is a twenty-year average that was earned before
+-- 2009, as every edge in this lab was.
+--
+-- WHAT THE LAB SAYS ABOUT THE VARIANT. M0139-N35-EBAND is DEV-ELIGIBLE: funded on the owner's own
+-- plan it returns +499.9% against a deposit-matched SPY TR's +257.2% (12.8% a year against 7.2%),
+-- max DD 19.6%, PF 2.09, 2,548 trades, recorded DSR 0.934 at its recorded N=88 -- nothing failed.
+-- It is the first roster entry whose variant clears every dev check. It has still never had a
+-- test-window look AND IT NEVER WILL: the hard gate blocks M0139 on kin, because M0021, M0022 and
+-- M0029 already read test-failed in the same family and this book moves with M0021's tested one at
+-- 0.95 residual correlation. "Not tested yet" is the wrong reading; the lab will not spend a look
+-- on this line at all. That is exactly the case paper/roster.py's module docstring describes as
+-- the deliberate divergence from the lab's design: a lab test pass is a SUFFICIENT basis for a
+-- paper entry, never a necessary one, because paper trading is how a near-miss earns the right to
+-- be taken seriously. So the admission basis is the owner's (owner-override) and not the lab's,
+-- and no test-window look is spent by this migration or anywhere near it.
+-- M0139's own recorded verdict reads "Twenty names still wins"; that was written on the dev
+-- store alone, before M0147 and M0152 showed the dev store cannot see the holdings that collapsed
+-- and left. The verdict is a closed record and is NOT edited; the correction lives here and in
+-- paper/roster.py's LAB_PROVENANCE.
+--
+-- WHY A NEW ID AND NOT AN EDIT. `inner.top` is in the frozen spec (roster.spec -> params), so
+-- moving it on a STARTED entry changes its digest and paper/store.py's check_digest refuses the
+-- next night with a SpecMismatch -- the whole paper night rolled back, runs.paper_status = failed.
+-- docs/runbooks/paper-trading.md states the rule and 010, 011, 013 and 017 are the precedents. The
+-- predecessor is RETIRED here, not deleted: a retired entry keeps every row it ever wrote and
+-- stays on the leaderboard.
+--
+-- WHY THE MIGRATION AND NOT `promote`. Every roster row since 007 has been what
+-- `promote --method ... --candidate ... --id ... --retire ...` writes on the live database, with
+-- the migration writing it everywhere else byte for byte. That is not available here, and the
+-- reason is mechanical: a new width needs a new paper.roster.RESOLVER key bound to the SAME
+-- allocator object (a Binding carries the params, and the params are in the spec), and
+-- commands/promote.py's object_name_of refuses an object that two resolver keys name, because the
+-- key is part of the frozen digest. So RESIDMOM now has two names and `promote` can place neither;
+-- this migration is the only writer of the row, on the live database and everywhere else alike. It
+-- also means no lab.store.record_promotion note is written: lab/lab.sqlite is untouched by this
+-- change, and the roster states the provenance on its own side as it always has.
+--
+-- MOM-FR-GT IS NOT WIDENED HERE. It is the roster's other twenty-name book, and it has never been
+-- measured at any width on any store. Widening it on M0152's number would apply a measurement of
+-- the residual-momentum picking rule to a different picking rule. Its number is being measured
+-- separately; if it warrants a width change that is its own argued commit, not a retrofit into
+-- this one. RMW-FR-GT (14.3% recorded fall, well inside the bar, no 35-name variant ever run) and
+-- MVW-FR-GT (already thirty names) are untouched for the same reason.
+--
+-- NOT TOUCHED. The section 1 real-money bar (18 months of paper, beat SPY, PF >= 1.3, max DD <=
+-- 20%, a 10-year backtest), which changes only through a dated owner revision. backtest/registry.py,
+-- which is the P7a dev-run candidate set with candidate_digest pinned. Any lab row.
+--
+-- The row below is byte for byte paper/roster.py's SEED_ROWS (the migration-equality test,
+-- tests/test_paper_roster.py::test_the_migration_rows_equal_the_seed_rows). paper_start, the
+-- frozen spec and the paper clock are written by the entry's first night, as for every new entry.
+INSERT INTO strategies (id, name, sub, icon, is_champion, is_benchmark, sort, engine, rules_id,
+                        object_name, registry_id, gate_note, gate_applicable, promoted_from) VALUES
+  ('RAW35-FR-GT', 'RAW35 · Unbraked momentum', 'Top 35 by rise beyond the market, no brake, monthly, fractional shares, real Gotrade fees', 'zap', false, false, 4, 'book', 'monthly-hold-frac-gotrade', 'RESIDMOM35', NULL, 'Lab M0139 dev window only (1996-01-03..2015-10-16), already in fractional shares at Gotrade''s measured fees -- the same rule set this entry runs, so nothing is re-measured here: funded on the owner''s own plan it returns +499.9% against a deposit-matched SPY TR''s +257.2% (12.8% a year against 7.2%), max DD 19.6%, PF 2.09 and 2,548 trades all pass, on a recorded DSR of 0.934 at its recorded N=88. Nothing failed: it is the first roster entry whose variant clears every dev check. It has never had a test-window look. It is RAW-FR-GT''s book with only the name count moved, 20 to 35, and it replaces it. The width answer is M0152''s, measured on the survivorship-check store, where the twenty-name book falls 25.05% -- outside the owner''s 25% bar -- against 20.11% at thirty-five names for slightly more money; that check-store reading was taken on the target-band twin M0139-N35-TBAND, which differs from this variant on dev by 0.012 points of drawdown. Over 2009-2015 on that same store both widths lose to SPY, and thirty-five loses by more (-1.7 points a year against -0.2): the width case is a drawdown case, not a return case, and that is the risk of this admission. On paper as the controlled comparison against RMW-FR-GT: the same picks without the brake', true, 'M0139')
+ON CONFLICT (id) DO NOTHING;
+
+-- Retiring stamps paper_end with the last session the entry actually traded, which is
+-- paper_state.last_session -- exactly what paper/store.py's `retire` writes, and NULL for an entry
+-- that never started. Nothing else is read or written: no equity_snapshots, orders,
+-- book_positions, book_targets, book_fills, book_trades or paper_state row is touched, and
+-- RAW-FR-GT keeps its whole track record and stays on the leaderboard.
+UPDATE strategies AS s SET
+    status = 'retired',
+    paper_end = (SELECT ps.last_session FROM paper_state ps WHERE ps.strategy_id = s.id)
+WHERE s.id = 'RAW-FR-GT' AND s.status = 'active';
+
+-- Sort is display order: the six that trade come first, then the fourteen that are retired, in the
+-- order they were added. RAW35-FR-GT takes the slot RAW-FR-GT held, so the new book sits beside
+-- RMW-FR-GT, the braked twin it is the control for. `sort` is not in the frozen spec, so no digest
+-- moves -- the same reason 017 could renumber all thirteen.
+UPDATE strategies SET sort = 20 WHERE id = 'RAW-FR-GT';

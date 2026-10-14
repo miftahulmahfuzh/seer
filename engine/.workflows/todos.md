@@ -1437,11 +1437,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Context**: `engine/src/seer_engine/lab/name_count.py:27` (module docstring) equates the two quantities outright — ``store.dev_trial_count`` **(the lab's N)**. That was true under `DSR_POLICY = "all-trials"`, where N was one look per dev trial row. Since 2026-10-08 the shipped policy is `methods` (lab-realistic-gate R1, `P1-ENG-L4ND`) and N is the distinct-method count floored at the measured participation ratio — 28, against 126 dev trial rows. The parenthetical now names the wrong quantity, and it sits in the docstring a reader consults to learn what the module guarantees. The fix is the wording: `dev_trial_count` is still the right number for that sentence's purpose (it is what stays unchanged), it is simply no longer "the lab's N" — that is `store.gate(conn).n`. Found during phase 1 and deliberately left: `name_count.py` is outside that phase's Owns, so it is carded rather than edited. **Checked and NOT a defect — do not "fix" it:** `:477`, the `format_report` footer, says "the lab's N and the test-window looks do not move". That is a claim about `lab names` writing nothing, and it stays true under every policy. `:27` is the only site that mislabels the quantity.
   - **Status**: pending
   - **Found by**: `P1-ENG-L4ND` (lab-realistic-gate phase 1)
-- [ ] **P2-ENG-N60A** Phase 3: M0155 — trim a holding falling apart while the market is fine
+- [x] **P2-ENG-N60A** Phase 3: M0155 — trim a holding falling apart while the market is fine
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `engine/src/seer_engine/lab/methods/m0155_single_name_shortfall_brake.py` (allocator id `M0155`), `engine/tests/test_lab_m0155_brake.py`, two dated files under `docs/lab/survivorship/`, its pre-registration commit, its `lab run`, its measurement on both stores, its verdict and its journalled insight. Does not touch any other method file, the roster, or `grid.csv`. Exit: the method is pre-registered and run; the 2006 episode is measured at twenty names on the check store against M0152's recorded curve; the verdict says plainly whether the brake closes the hole, costs more than a point a year, or is width in disguise; `grid.csv` unchanged; `lab status` reads 4 test looks; the lock is released with the lab pair clean; the last-lab-phase check has been run and acted on.
-  - **Status**: in_progress
+  - **Status**: completed
   - **Plan Set**: `.workflows/orchestration/roster-35-four-methods/PLAN.md` (phase 3 of 5)
   - **Satisfies**: R2 — M0155, a single-name brake: trim a holding falling apart while the market is fine; R6 — the test-window look count is 4 and must stay 4
   - **Plan**: `.workflows/plan/P2-ENG-N60A.md`

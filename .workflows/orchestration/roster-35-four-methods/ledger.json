@@ -3,6 +3,16 @@
   "coordinator": "orch-roster-35-four-methods",
   "coordinator_session_id": "0378187c-4d17-4433-8d93-b3348ab7126b",
   "created": "2026-10-14T08:48:51+00:00",
+  "final_verification": {
+    "at": "2026-10-14T17:12+07:00",
+    "by": "coordinator, on a clean tree with every phase session closed",
+    "engine_pytest": "4992 passed, 3 skipped in 116.56s; the three skips are opt-in live-store sweeps (SEER_LAB_NAMES_LIVE, SEER_LAB_SURVIVORSHIP_LIVE, SEER_LAB_COSTS_LIVE) so NO DB test skipped and the CI requirement holds",
+    "note": "The first unconfounded read of the suite -- every earlier run was taken while up to five sessions wrote to this one checkout, so peers mid-write made files red that were never broken.",
+    "postgres": "PG_TEST_URL exported against the seer-pg container",
+    "ruff": "All checks passed",
+    "web_tests": "49 files, 685 tests, all passed",
+    "web_tsc": "clean (exit 0)"
+  },
   "invariant_13": {
     "at": "2026-10-14T16:39+07:00",
     "commit": "71bbf22",
@@ -31,6 +41,14 @@
       "5": "71bbf22"
     }
   },
+  "loose_ends_closed": [
+    "engine/.workflows/plan/P1-ENG-W35A.md and P2-ENG-N60A.md committed -- phases 1 and 3 completion-handlers never landed their adopted plan copies while the other three phases did",
+    "engine/.workflows/todos.md: P2-ENG-N60A ticked and Status moved in_progress -> completed, matching its four siblings",
+    "PLAN.md (both copies): Status planned -> complete (2026-10-14), Coordinator set to orch-roster-35-four-methods",
+    "PLAN.md (orchestration copy): phase 3 TaskID marked (done 2026-10-14) like the other four rows",
+    "CLAUDE.md real-money bar corrected 20%% -> 25%% per the dated owner revision (design section 18); code already read 0.25 on both sides",
+    "Plan Rollback section: the stale PAPER_PAUSED-reads-true premise corrected with a dated note in both copies, superseded sentence preserved"
+  ],
   "phases": [
     {
       "card": null,

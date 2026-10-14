@@ -435,6 +435,23 @@ has had a first night it has a `paper_start`, and the runbook forbids resetting 
 rows. So the cost of being wrong here is one restarted 18-month paper record, not a corrupted one —
 and it is zero for as long as `nightly.yml`'s `PAPER_PAUSED` reads `true`.
 
+> **Correction, 2026-10-14 (coordinator, at set close).** That last clause was already false when
+> it was written, and the sentence is kept rather than tidied away because the rest of the
+> paragraph is right. `nightly.yml` sets `PAPER_PAUSED: 'false'` — the owner resumed paper trading
+> on 2026-10-08, and the workflow's own comment records the consequence: *"From here the clock
+> runs. A full revert is no longer exact once a session has stepped — that property belonged to
+> the pause and is now spent, by intent."*
+>
+> So the free-rollback window this paragraph assumed **does not exist for this change**. On the
+> first nightly after migration 021 applies, `RAW35-FR-GT` takes a `paper_start` and begins its
+> 18-month record, and `RAW-FR-GT`'s record stops where it stops. The cost of being wrong is
+> therefore one restarted 18-month paper record, full stop — not "zero". Nothing else in the
+> Rollback section changes: the migration is data-only, no spec digest moves, and `PINS`, the
+> `RESOLVER` key and the `LAB_PROVENANCE` entry are all untouched either way.
+>
+> This is a correction to the plan's risk analysis, not to the decision. Widening the roster to
+> thirty-five is the owner's own call and the clock starting is that call taking effect.
+
 **The lab write lock** leaves nothing to roll back: `/home/miftah/seer/.git/seer-lab.lock` is an
 empty advisory file inside `.git/`, untracked and unreachable by `git add`, and the kernel releases
 the lock when the holding shell exits even on a crash. A stale *file* is harmless; a stale *hold*

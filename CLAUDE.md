@@ -77,8 +77,10 @@ Use the `run-the-web-app` skill to visually check any change to web/.
 - argparse help strings must still format, so escape `%` as `%%`.
 - Gotrade bracket orders (with TP and SL) take whole shares only. Plain limit orders can be
   fractional.
-- The §1 real-money bar (18 months of paper, beat SPY, PF ≥ 1.3, max DD ≤ 20%, a 10-year backtest)
-  changes only through a dated owner revision.
+- The §1 real-money bar (18 months of paper, beat SPY, PF ≥ 1.3, max DD ≤ 25%, a 10-year backtest)
+  changes only through a dated owner revision. The fall was 15% to 2026-10-07 and 20% to
+  2026-10-14; design §18 is the revision that set 25%. The lab's *screen* is a separate, looser
+  number (`metrics.DEV_MAX_DRAWDOWN`) and collapsing the two back together undoes that split.
 
 ## Conventions
 

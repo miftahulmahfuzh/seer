@@ -2167,12 +2167,13 @@ the rest of `backtest/`, every module here except `io.py` is pure, and the purit
 The traded segments form **one** portfolio: 20,000,000 IDR at `prev_session(2018-01-02)`'s FX, with
 params switching at each year's first session. Picks for that session use `data_date` = the last
 session of Y−1 = `tune_end(Y)`. Each fold selects among all 324 (variant × grid) combinations with
-P3's rule (highest tuning-window total return among max DD ≤ 20% and PF ≥ 1.3; ties → lower DD →
+P3's rule (highest tuning-window total return among max DD ≤ 25% and PF ≥ 1.3; ties → lower DD →
 combination order), else V0 with the design values. Each variant also gets its own walk-forward,
 with the variant fixed and the grid tuned per fold.
 
 **Gate (P3b).** A2 passes only if the combined walk-forward curve (2018-01-02 → data end) beats
-total-return SPY over the same span with PF ≥ 1.3 and max DD ≤ 20%, measured with P3's `metrics`
+total-return SPY over the same span with PF ≥ 1.3 and max DD ≤ `tuning.MAX_DRAWDOWN` (25% since
+2026-10-14, design §18; 20% before that), measured with P3's `metrics`
 (web parity). The 2022-01-03 → data end window has been seen before. The report shows it only as a
 labelled slice of the continuous curves, and it never feeds the gate.
 
@@ -2281,7 +2282,8 @@ is pure, and the purity glob covers it.
   a night with no positive prediction trades nothing.
 
 **Gate (P6a).** The gated curve passes only if its walk-forward (2018-01-02 → data end) beats
-total-return SPY over the same span with PF ≥ 1.3 and max DD ≤ 20%, measured with P3's `metrics`
+total-return SPY over the same span with PF ≥ 1.3 and max DD ≤ `tuning.MAX_DRAWDOWN` (25% since
+2026-10-14, design §18; 20% before that), measured with P3's `metrics`
 (web parity). The gated curve is B, unless the last fold's determinism probe fails. Then the
 pre-registered switch gates B-linear, and the verdict sentence says so. B-linear is otherwise
 information only and never promotable on this data. A2's walk-forward is on the chart and in the

@@ -67,7 +67,11 @@ describe('gateChecks', () => {
       target: 'more than +7.9% a year',
       ok: false,
     });
-    expect(checks[1]).toMatchObject({ value: '12.0% at worst', target: '20% or less', ok: true });
+    // "25% or less": the target is built from `gate.maxDrawdown`, the owner's REAL-MONEY bar,
+    // which he raised 20% -> 25% on 2026-10-14 (design §18). The lab's own dev screen moved to
+    // 50% the same day and is not published in the gate, so this target is the funding bar and
+    // not the one that decided `failedNow`. Design §18 records that rough edge.
+    expect(checks[1]).toMatchObject({ value: '12.0% at worst', target: '25% or less', ok: true });
     expect(checks[2]).toMatchObject({ value: '1.50', target: '1.3 or more', ok: true });
     expect(checks[3]).toMatchObject({ value: '240', target: '100 or more', ok: true });
     expect(checks[4]).toMatchObject({ value: 'none needed', target: 'none needed', ok: true });

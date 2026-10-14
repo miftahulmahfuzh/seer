@@ -64,7 +64,7 @@ describe('pipelineStages', () => {
     expect(st[2].title).toEqual(['Tested on', '1993–2015']);
     expect(st[4].title).toEqual(['One look at', '2015–today']);
     expect(st[3].detail.join(' | ')).toBe(
-      'Beat SPY + dividends | Worst fall ≤ 20% | PF ≥ 1.3 · 100+ trades | No owner inputs | Luck check ≥ 0.9',
+      'Beat SPY + dividends | Worst fall ≤ 25% | PF ≥ 1.3 · 100+ trades | No owner inputs | Luck check ≥ 0.9',
     );
     // 0.3 / 0.8, not 0.2 / 0.9: once the defaults ARE 0.2 and 0.9 an override to those values is
     // a no-op and the case passes while proving nothing. The override has to differ from the
@@ -113,7 +113,7 @@ describe('hurdles', () => {
     const h = hurdles(GATE, 58);
     expect(h.map(x => x.key)).toEqual(['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr']);
     expect(h.map(x => x.target)).toEqual([
-      'More than SPY total return', 'Max drawdown ≤ 20%', 'Profit factor ≥ 1.3', 'At least 100 trades',
+      'More than SPY total return', 'Max drawdown ≤ 25%', 'Profit factor ≥ 1.3', 'At least 100 trades',
       'Nothing left for the owner to decide', 'Luck check ≥ 0.9',
     ]);
     expect(h.map(x => x.term)).toEqual(['spyTr', 'maxDrawdown', 'profitFactor', 'trades', 'ownerInputs', 'dsr']);

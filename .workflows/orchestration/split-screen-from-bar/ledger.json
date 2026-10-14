@@ -3,6 +3,12 @@
   "coordinator": "orch-split-screen-from-bar",
   "coordinator_session_id": "21e86e36-e403-4744-8178-ea264ffcb2e8",
   "created": "2026-10-14T03:24:22+00:00",
+  "landed": {
+    "at": "2026-10-14T04:08:11+00:00",
+    "base": "main",
+    "commit": "e93fa85549ca4f7f19b2a9cde9b9ef2da61224ce",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -25,29 +31,29 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "8dae6e2",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "design \u00a718 appended + \u00a71 condition 4 marker; all figures re-measured on the landed tree and matching the reconciliation cell for cell (dev-eligible 26/16 -> 67/32, browsable 93 -> 319, 30 of 32 at a 0.25 screen, trades-bar held-out 5 -> 12 with luck bar = 0 so \u00a713 survives). lab.sqlite byte-identical. ruff clean, pytest 4757 passed / 4 skipped. Decisions: plan's lint command doubles the engine path segment (E902) -> used CLAUDE.md's 'ruff check engine' from the worktree root, rung 6; committed via completion-handler/pusher rather than the main context, rung 6. Two commits: 8dae6e2 design doc, d1cc871 todos.md bookkeeping (uncommitted todos would be destroyed by swarm.py land). NOT landed - coordinator owns the merge.",
       "package": "docs",
       "plan": ".workflows/plan/split-screen-from-bar/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-14T04:02:55+00:00",
       "satisfies": [
         "R1",
         "R2",
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-M2XZ",
       "title": "The dated owner revision, and the before/after"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/split-screen-from-bar/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "split-screen-from-bar",
-  "updated": "2026-10-14T03:54:19+00:00",
+  "updated": "2026-10-14T04:08:11+00:00",
   "worktree": "/home/miftah/.worktrees/seer/split-screen-from-bar"
 }

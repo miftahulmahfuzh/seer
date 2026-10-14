@@ -3,11 +3,11 @@
 **Slug:** split-screen-from-bar
 **Date:** 2026-10-14 09:52:18 +07
 **Analysis:** `docs/analyzer/20261014-095218-B7QD_code_analyzer.md`
-**Worktree:** `/home/miftah/.worktrees/seer/split-screen-from-bar`
-**Branch:** `feature/split-screen-from-bar` (base: `origin/main` @ `49287bb`)
+**Worktree:** `/home/miftah/.worktrees/seer/split-screen-from-bar` (removed on landing)
+**Branch:** `feature/split-screen-from-bar` (base: `origin/main` @ `49287bb`) — merged and deleted
 **Phases:** 2
-**Status:** planned
-**Coordinator:** —
+**Status:** complete
+**Coordinator:** `orch-split-screen-from-bar` (landed 2026-10-14 at `e93fa85`)
 **Reconciled:** 2026-10-14 (round 1)
 
 ---
@@ -136,8 +136,8 @@ in-scope fix, and all of that landed inside the phase that already owned the fil
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Two constants, and everything that reads them | R1, R2, R4 | `engine/backtest`, `engine/lab`, `web`, `lab/` | ~45 | — | HARD | `.workflows/plan/split-screen-from-bar/phase-1.md` | — | — |
-| 2 | The dated owner revision, and the before/after | R1, R2, R3 | `docs` | 1 | 1 | NORMAL | `.workflows/plan/split-screen-from-bar/phase-2.md` | — | — |
+| 1 | Two constants, and everything that reads them | R1, R2, R4 | `engine/backtest`, `engine/lab`, `web`, `lab/` | ~45 | — | HARD | `.workflows/plan/split-screen-from-bar/phase-1.md` | P1-ENG-QK7F (done 2026-10-14) | — |
+| 2 | The dated owner revision, and the before/after | R1, R2, R3 | `docs` | 1 | 1 | NORMAL | `.workflows/plan/split-screen-from-bar/phase-2.md` | P1-ROOT-M2XZ (done 2026-10-14) | — |
 
 **Why the web is in phase 1 and not its own.** `web/lib/golive.test.ts` pins the TS constant to
 `web/data/lab.json`'s gate, which `store.snapshot` writes from `tuning.MAX_DRAWDOWN`. An

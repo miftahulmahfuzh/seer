@@ -203,7 +203,16 @@ keys.
 
 PURPOSE_KEY = "purpose"
 SURVIVORSHIP_PURPOSE = "survivorship-check"
-PURPOSES: frozenset[str] = frozenset({SURVIVORSHIP_PURPOSE})
+
+UNIVERSE_PURPOSE = "dollar-volume-universe"
+"""A store whose membership is a dollar-volume rank band, not an index (``universe_rank``).
+
+Marked as a purpose for the same reason ``SURVIVORSHIP_PURPOSE`` is: ``lab run``, ``lab test`` and
+``lab remeasure`` refuse any store carrying one, so a trial measured on this universe can never be
+recorded against a method whose other trials were measured on the index store. Mixing price
+fingerprints inside one method's trial set is exactly what ``lab/hardgate.py`` exists to refuse,
+and a universe this different would be the easiest way to do it by accident."""
+PURPOSES: frozenset[str] = frozenset({SURVIVORSHIP_PURPOSE, UNIVERSE_PURPOSE})
 """What a store that is NOT for recording trials says it is for. Absent means an ordinary store.
 
 ``purpose`` is optional and sits outside both key sets above on purpose: the dev store's and

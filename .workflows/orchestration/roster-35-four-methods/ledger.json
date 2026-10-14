@@ -64,7 +64,7 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 4,
-      "note": "LANDED 0a18127 \"lab: M0149 -- braking on your own account escapes the behaviour rule, but costs the whole edge\". COORDINATOR-VERIFIED from git: commit is an ancestor of origin/main and carries EXACTLY the lab pair (lab/lab.sqlite 6115328->6193152, web/data/lab.json) and nothing else -- invariant 6 held, no peer file swept in. Ran first, held the lock 16:16-16:22, exit 0. Session still busy after the push (verdict/insight/last-phase check); full report pending.",
+      "note": "LANDED 0a18127 \"lab: M0149 -- braking on your own account escapes the behaviour rule, but costs the whole edge\". COORDINATOR-VERIFIED from git: commit is an ancestor of origin/main and carries EXACTLY the lab pair (lab/lab.sqlite 6115328->6193152, web/data/lab.json) and nothing else -- invariant 6 held, no peer file swept in. Ran first, held the lock 16:16-16:22, exit 0. Session still busy after the push (verdict/insight/last-phase check); full report pending. | STATUS HELD AT running DELIBERATELY: its commit 0a18127 is landed and coordinator-verified on origin/main, but the session is still busy (verdict/insight/last-phase check) and has not reported. reap closes a done phase whose commit is on the branch, so marking it done early would kill a live session mid-write. Flip to done only on its own report.",
       "package": "engine/lab",
       "plan": ".workflows/plan/roster-35-four-methods/phase-4.md",
       "reported_at": "2026-10-14T09:19:29+00:00",
@@ -72,7 +72,7 @@
         "R4",
         "R6"
       ],
-      "status": "done",
+      "status": "running",
       "task_id": null,
       "title": "M0149 \u2014 braked by its own falling account, not the market's trend"
     },

@@ -35,10 +35,10 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 2,
-      "note": "RAW35-FR-GT admitted at 35 names, RAW-FR-GT retired; migration 021 is the only writer since promote refuses a second resolver key. Code in 6d08ee4 + 5a867e8. Snapshot needed no commit: a lab phase regenerated it over the merged roster change (invariant 12, last-lands-wins) and its paper block holds RAW35-FR-GT. Decisions: M0139 import kept alphabetical after m0022 (plan's prose contradicted itself, rung 6); step 8j's pair loop cannot assert the successor is active now that RAW-FR-GT is both successor and predecessor, so digest teeth stay per-pair and the active set is asserted once over ACTIVE_IDS (rung 2+3); two census tests the Files table missed (test_paper_fnd roster count 19 to 20, test_active_drops_retired now retires RAW35-FR-GT per its own comment) updated on rung 6. promote --dry-run never attempted. 4992 engine tests and 685 web tests green, ruff and tsc clean, 4 test-window looks before and after, lab.sqlite and grid.csv untouched.",
+      "note": "THE ROSTER HOLDS THIRTY-FIVE: RAW35-FR-GT admitted, RAW-FR-GT retired, by migration 021 alone. Code in 6d08ee4 beneath 5a867e8. EXIT CRITERIA, each output read not assumed: test_digests_are_pinned green, new pin f9def72a..., exactly one pin line added zero removed, RAW-FR-GT's 21947eef unmoved -- invariant 4 holds. Migration-equality trio green against a migrated scratch Postgres, which replaced promote --dry-run (not attempted). ruff clean; engine suite 4992 passed 3 skipped, the three being opt-in live-research-store tests so NO DB test skipped. tsc clean; web suite 49 files / 685 tests green. Committed snapshot's paper block holds RAW35-FR-GT -> M0139 / M0139-N35-EBAND / dev-eligible and no longer holds RAW-FR-GT; test_the_committed_snapshot_is_the_export_of_the_committed_database green. 4 test looks before and after; lab.sqlite byte-identical to HEAD; grid.csv byte-identical to 661870d. *** STEP 11, THE PART WORTH NOTING: when the job got the lock at 16:39 and ran lab export-json, THE SNAPSHOT WAS ALREADY UP TO DATE -- a lab phase had regenerated it over phase 2's merged roster change. Per invariant 12's recovery clause that is normal and correct BY CONSTRUCTION (whoever lands last is right), so phase 2 committed nothing there, did not hand-edit the file and did not git checkout -- it back. Lock released with the pair identical to HEAD 71bbf22. Net: phase 2 has TWO commits not three, and the third was correctly unnecessary rather than skipped. *** DECISIONS: (1) rung 6 M0139 import placed after m0022 -- the plan's own sentence self-contradicted and alphabetical-by-module is the file's convention. (2) rung 2+3 Step 8j pair loop: adding (RAW_GT, RAW35_GT) makes RAW-FR-GT both successor and predecessor so the per-pair active assert cannot hold for the older pair; every pair keeps its real teeth (predecessor retired, pin unmoved, successor digest different) and the active-set claim moved to one assertion active(ROSTER)==ACTIVE_IDS, which is STRONGER than the per-pair form since it names the whole active set rather than six independent memberships. (3) rung 6 two census tests the plan's Files table never listed: test_paper_fnd len(ROSTER_IDS) 19->20 with FND index 11 unchanged; test_active_drops_retired_entries now retires RAW35-FR-GT because its own comment requires a LIVE entry, expected active list unchanged. 8h INTACT and not weakened alongside the :724 restatement -- {sid for sid,p in LAB_PROVENANCE.items() if p.lab_status != 'rejected'} == {RAW35_GT} is in the suite and green, naming the single permitted dev-eligible admission.",
       "package": "engine/paper`, `db`, `engine/tests`, `web",
       "plan": ".workflows/plan/roster-35-four-methods/phase-2.md",
-      "reported_at": "2026-10-14T09:43:22+00:00",
+      "reported_at": "2026-10-14T09:44:13+00:00",
       "satisfies": [
         "R1",
         "R6"
@@ -113,7 +113,7 @@
   ],
   "repo": "/home/miftah/seer",
   "slug": "roster-35-four-methods",
-  "updated": "2026-10-14T09:43:45+00:00",
+  "updated": "2026-10-14T09:44:13+00:00",
   "verified_at": "2026-10-14T09:19:19+00:00",
   "worktree": "/home/miftah/seer"
 }

@@ -10,7 +10,7 @@
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": "live session impl-roster-35-four-methods-p1 confirmed busy via ListAgents 16:20; verify --apply had downgraded it to pending on absent commit/TaskID -- do NOT re-spawn",
+      "note": "live session impl-roster-35-four-methods-p1 confirmed busy via ListAgents 16:20; verify --apply had downgraded it to pending on absent commit/TaskID -- do NOT re-spawn | 25pct BAR NOT BREACHED -- the state-it-at-the-top branch does not fire. M0002-REL-85 (what MOM-FR-GT holds) on the check store, all six recorded variants reproducing their dev trials exactly: worst fall 18.4 dev -> 19.6 check (+1.2 pts, well inside 25); yearly 12.6 -> 13.1 (earns MORE on the honest tape); 2009-2015 lead -2.2 -> -1.0 (narrows), folds 2of4 -> 3of4 (gains a majority). So the two roster books do NOT carry the same single-name risk: residual-momentum falls 25.05 at 20 names and troughs in 2006, relative-strength falls 19.6. Report as a primary finding, not an absence. HANDED TO PHASE 3: the only variant in that family that DROPS the market-trend switch falls 34.2 instead of 19.6 -- the switch is what holds survivorship damage down, independent corroboration of gate-is-not-a-drag. DECISION rung 1: hold B split into B1 (run + paired check read, ending with stage/commit/push of the trials) and B2 (verdict note, own stage/commit/push), curve-up prose written UNLOCKED in between -- invariant 7 takes short holds and outranks the plan prose describing hold B as one window; phases 3 and 5 get the lock while phase 1 writes. Took the lock 16:22:36, lab run M0156 underway at five widths.",
       "package": "engine/lab",
       "plan": ".workflows/plan/roster-35-four-methods/phase-1.md",
       "reported_at": "2026-10-14T09:19:29+00:00",
@@ -60,11 +60,11 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "0a18127",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 4,
-      "note": "live session impl-roster-35-four-methods-p4 confirmed busy via ListAgents 16:20; verify --apply had downgraded it to pending on absent commit/TaskID -- do NOT re-spawn",
+      "note": "LANDED 0a18127 \"lab: M0149 -- braking on your own account escapes the behaviour rule, but costs the whole edge\". COORDINATOR-VERIFIED from git: commit is an ancestor of origin/main and carries EXACTLY the lab pair (lab/lab.sqlite 6115328->6193152, web/data/lab.json) and nothing else -- invariant 6 held, no peer file swept in. Ran first, held the lock 16:16-16:22, exit 0. Session still busy after the push (verdict/insight/last-phase check); full report pending.",
       "package": "engine/lab",
       "plan": ".workflows/plan/roster-35-four-methods/phase-4.md",
       "reported_at": "2026-10-14T09:19:29+00:00",
@@ -72,7 +72,7 @@
         "R4",
         "R6"
       ],
-      "status": "running",
+      "status": "done",
       "task_id": null,
       "title": "M0149 \u2014 braked by its own falling account, not the market's trend"
     },

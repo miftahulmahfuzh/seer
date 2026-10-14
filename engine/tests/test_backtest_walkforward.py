@@ -159,7 +159,7 @@ def test_select_fold_falls_back_when_nothing_qualifies():
         params=A2_DESIGN_PARAMS,
         qualified=False,
         reason=(
-            "No in-sample grid run had max drawdown ≤ 20% and profit factor ≥ 1.3 (0 of 324), "
+            "No in-sample grid run had max drawdown ≤ 25% and profit factor ≥ 1.3 (0 of 324), "
             "so the design values are kept."
         ),
     )
@@ -635,7 +635,7 @@ def test_gate_p3b_fail_sentence_names_every_failed_check_and_blocks_p4():
     assert v.sentence == (
         "Strategy A2 fails the P3b gate: walk-forward from 2018-01-02 to 2026-10-02 it returned "
         "−10.0% against +75.0% for total-return SPY, with profit factor 0.90 and max drawdown 30.0%, "
-        "so it fails on beating total-return SPY, profit factor ≥ 1.3 and max drawdown ≤ 20%; "
+        "so it fails on beating total-return SPY, profit factor ≥ 1.3 and max drawdown ≤ 25%; "
         "Strategy A's one rework has failed, and P4 stays blocked."
     )
 
@@ -645,7 +645,7 @@ def test_gate_p3b_fail_sentence_names_every_failed_check_and_blocks_p4():
     [
         (M(0.70, pf=1.5, dd=0.12), "beating total-return SPY"),
         (M(0.80, pf=1.29, dd=0.12), "profit factor ≥ 1.3"),
-        (M(0.80, pf=1.5, dd=math.nextafter(MAX_DRAWDOWN, 1)), "max drawdown ≤ 20%"),
+        (M(0.80, pf=1.5, dd=math.nextafter(MAX_DRAWDOWN, 1)), "max drawdown ≤ 25%"),
     ],
 )
 def test_gate_p3b_fails_on_each_condition_alone(wf_m, name):

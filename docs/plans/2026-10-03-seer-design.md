@@ -17,7 +17,7 @@ paper before real money (20,000,000 IDR) is risked.
   1. ≥ 18 months of forward paper trading  *(revised 2026-10-07; was "≥ 3 months … and ≥ 100 closed trades" — see §13)*
   2. Total return beats SPY buy-and-hold over the same forward period
   3. Profit factor ≥ 1.3
-  4. Max drawdown ≤ 20%  *(revised 2026-10-07; was 15% — see §11)*
+  4. Max drawdown ≤ 25%  *(revised 2026-10-14; was 20% — see §18, and §11 for the 15% before that)*
   5. Passed a 10-year backtest under identical rules (quant strategies only)
 
 ## 2. Constraints from Gotrade (verified from the app)
@@ -547,3 +547,117 @@ obvious next step and is not yet done.
 
 **The uncertainty, stated.** 1996 and 1997 remain under half covered in *both* histories, and 111
 index members are missing from both, so the fuller history is better evidence, not a true one.
+
+## 18. Revision 2026-10-14 (owner): the go-live drawdown bar is 25%, and the lab's screen is a separate number
+
+Two changes arrived in one sentence from the owner, and they are not the same change. One is about
+his money. The other is about what the lab is allowed to look at. They had been the same number by
+accident, and that accident was the single most expensive constraint in the research programme.
+
+- **Go-live condition #4 is now "Max drawdown ≤ 25%."** The sentence it replaces, preserved:
+  *"4. Max drawdown ≤ 20%"*, written 2026-10-07 under §11 — which had itself replaced *"4. Max
+  drawdown ≤ 15%"* from 2026-10-03. The bar has now moved twice. Both times the owner moved it,
+  both times on the record, and both times the sentence it replaced was kept rather than tidied
+  away.
+
+- **The lab's screen is no longer that number.** Until today a single figure answered two
+  unrelated questions: how far the owner is prepared to watch his own money fall, and how deep a
+  fall the lab will even bother to study. The first is a statement about risk appetite. The second
+  is a statement about where research time goes. The second had been quietly inheriting the first.
+  They are now two separate figures, and the screen is set at a fall of one half.
+
+- **Who and why.** The owner, 2026-10-14: *"i agree with you. this is what i am afraid of. beating
+  SPY is so hard already, yet we still impose these strict constraints . you know what, let's do
+  your suggestion, and in fact, raise my risk appetite more to 25%"*
+
+  The suggestion he is agreeing to is the split: keep the figure as the real-money bar, applied at
+  the moment a strategy would be funded, and loosen it on the screen, whose job is to surface
+  candidates worth understanding. A strategy that falls too far for the owner to hold can still be
+  found, measured, argued about and learned from — it simply cannot be given money. Those were
+  always two different refusals, and only one of them had to be this strict. He then went further
+  than the suggestion and raised the real-money bar itself, from 20% to 25%.
+
+- **The measurement that prompted it.** Of the 399 dev-window trials on record, 257 beat
+  total-return SPY — a result the lab exists to find. The 20% drawdown bar then rejected 188 of
+  those 257, which is 73% of everything that had already cleared the hardest test in the building.
+  Nothing else in the lab rejects at anything like that rate. The bar was not one constraint among
+  five; it was *the* constraint, and almost everything the lab had ever found was dying behind it.
+
+- **What the benchmark itself does, for scale.** SPY fell 56.5% peak to trough over the dev window,
+  bottoming on 2009-03-09, while returning 7.86% a year. The lab had been requiring its strategies
+  to fall less than a third as far as the thing they are measured against. A strategy that fell by
+  half would still have fallen less than simply owning the index — which is the reasoning behind
+  where the new screen sits, and it is a reason rather than a preference.
+
+- **Measured effect on the lab's own records.** Against the committed dev trials, the number of
+  trials that clear every one of the five owner conditions and the luck test moves from
+  26 to 67, across 16 distinct methods before and 32 after. Those are candidates that already beat
+  the benchmark, already passed the luck test, and were being set aside for one reason only. A
+  looser but separate count, which is the one the screen exists to move: the number of trials a
+  person can sit down and browse — those that clear the drawdown condition, whatever else they
+  miss — goes from 93 to 319. The two counts answer different questions and are not
+  interchangeable.
+
+- **The part of this that argues against the number chosen, stated rather than buried.** Most of
+  the gain in the first count arrives by the time the screen reaches 25%: at that setting it
+  already reaches 30 of the 32 methods, and moving on from 40% to one half adds no further method
+  at all. So the case for setting the screen at one half is not that it finds more methods than a
+  tighter setting would. It is that the screen must not be *the same number* as the money bar, or
+  the separation is cosmetic and quietly closes again the next time the bar moves — and that
+  browsing is cheap, which is the second count above.
+
+- **What it does not change.**
+  - Conditions 1, 2, 3 and 5 are untouched. Eighteen months of forward paper, beating SPY, a
+    profit factor of at least 1.3, and a ten-year backtest all stand exactly as written.
+  - **Nothing is promoted and nothing is tested.** This makes more methods worth looking at. It
+    does not look at them. Spending a test-window look is a separate act, taken later and by the
+    owner; four have been spent and that count is unchanged by this revision.
+  - **No recorded trial is edited.** Verdicts are re-derived from the numbers each trial recorded,
+    against the bars in force today — which is exactly how the 2026-10-07 move worked, and why
+    rows judged under older bars keep the wording of their own day.
+  - **The bar still governs money.** The promotion check and the go-live checklist read the
+    real-money figure, not the screen. A method that falls 30% can now be studied, written about
+    and understood. It can never be funded.
+  - **One known rough edge on the site, named rather than discovered.** The lab page prints a
+    target beside each condition, and for the fall it prints the money bar — "25% or less" — on
+    every trial, including one the lab is now studying at a much deeper fall and correctly marks
+    as clearing the screen. The tick is right and the number beside it is the wrong one of the two.
+    Nothing is mis-judged and nothing is mis-recorded; the page simply has one figure where there
+    are now two. It is left as it is in this revision, and it is written down here so that reading
+    it is not mistaken for a verdict that disagrees with itself.
+  - §17's rule stands and simply follows the bar. A dev-window drawdown under the bar is still not
+    sufficient evidence that a strategy clears it, because the fuller history moves drawdowns by
+    as much as fourteen points in either direction. Re-read against the committed survivorship
+    grid at the new bar: 49 variants pass on the dev store, and 7 of them cross on the fuller
+    history — 14%, where the same count at 20% was 11 of 28, or 39%. The rule bites less often at
+    25%, which is a consequence of the bar moving and not a weakening of the rule.
+
+- **The residual risk, stated plainly.** A looser screen means more candidates to look at, and
+  every additional look is another chance to be fooled by something that only worked by luck. That
+  is not a new danger and it is not unpriced: the luck test and the policy that decides how hard
+  it has to be exist for precisely this, and the specific reason this change cannot quietly
+  degrade them is that the count feeding that policy counts methods **tried**, not methods that
+  passed. Loosening the screen admits more results; it cannot inflate the count, and it cannot
+  move any luck score. The honest counterweight is on the other side: 25% is a real increase in
+  the fall the owner has said he could sit through, and on the 20,000,000 IDR at stake that is
+  5,000,000 IDR of paper loss before a strategy is judged to have broken its promise. That is the
+  part of this revision that is a preference rather than a measurement, and it is his to make.
+
+- **A measurement elsewhere that moves with it, noted so it is not mistaken for drift.** §13's
+  record of which trials are held out by the dev-window trades bar alone is re-computed against
+  the live figures on every test run. It is the **screen** that moves it, not the money bar: a
+  trial that used to miss both the fall limit and the trade count now misses only the trade count,
+  so it joins that set. Loosening the screen therefore grows it from five trials to twelve. §13's
+  load-bearing finding survives: every trial in the larger set still sits below the luck bar or
+  carries no luck score at all, so dropping the trades bar would still change zero verdicts. §13
+  is a dated record and is left as it was written; this is where the re-measurement lives.
+
+- **Where it is implemented.** `backtest.metrics.MAX_DRAWDOWN`, re-exported as
+  `backtest.tuning.MAX_DRAWDOWN`, remains the one Python definition of the real-money bar, and
+  `web/lib/golive.ts` the one TypeScript definition, pinned to it by `web/lib/golive.test.ts`
+  through `data/lab.json`'s gate. The screen is a second constant,
+  `backtest.metrics.DEV_MAX_DRAWDOWN`, re-exported the same way. It is one decision — the lab's
+  dev-eligibility check — written at four call sites that must always agree: the label the check
+  records, the check applied to a fresh run, the check applied to a recorded row, and the second,
+  deliberate repetition of it that guards the write. The two constants are not permitted to
+  collapse back into one — that would undo this revision entirely.

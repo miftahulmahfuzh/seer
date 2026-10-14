@@ -69,12 +69,33 @@ describe('lab snapshot (web/data/lab.json)', () => {
         expect([t.candidateId, missedLuck]).toEqual([t.candidateId, true]);
       }
 
+      // The drawdown condition can no longer be re-derived from the published gate, and that is
+      // a deliberate change rather than a gap. On 2026-10-14 the owner split the lab's dev SCREEN
+      // (50%: is this worth another hour of study) off his real-money BAR (25%: would he fund it)
+      // -- design §18. `failedNow` is judged against the screen; `gate.maxDrawdown` publishes the
+      // bar. So `maxDrawdown > gate.maxDrawdown` stopped implying a recorded drawdown miss, and
+      // the old equality here would now fail on every trial that falls between the two numbers.
+      //
+      // What still holds is the one-way implication, and it is the half worth pinning: the screen
+      // is looser than the bar, so a trial inside the BAR is necessarily inside the screen and can
+      // never record a drawdown miss. A trial outside the bar may go either way -- that is exactly
+      // the band the split created.
       const missedDd = t.failedNow.some((f) => f.startsWith(DRAWDOWN_FAILURE_PREFIX));
-      if (t.maxDrawdown !== null) {
-        expect([t.candidateId, missedDd]).toEqual([t.candidateId, t.maxDrawdown > lab.gate.maxDrawdown]);
+      if (t.maxDrawdown !== null && t.maxDrawdown <= lab.gate.maxDrawdown) {
+        expect([t.candidateId, missedDd]).toEqual([t.candidateId, false]);
       }
       expect(t.eligibleNow).toBe(t.failedNow.length === 0);
     }
+
+    // ...and the band is not empty, or the assertion above would be vacuous and the split would
+    // be invisible here: at least one published trial falls further than the owner would fund and
+    // is still, correctly, carrying no drawdown miss because the lab thinks it worth studying.
+    const studiedButUnfundable = lab.trials.filter(
+      (t) => t.maxDrawdown !== null
+        && t.maxDrawdown > lab.gate.maxDrawdown
+        && !t.failedNow.some((f) => f.startsWith(DRAWDOWN_FAILURE_PREFIX)),
+    );
+    expect(studiedButUnfundable.length).toBeGreaterThan(0);
   });
 
   it('says per trial whether the luck gate applies, and the ungated branch is not empty', () => {

@@ -76,7 +76,7 @@ def test_best_dev_eligible_is_the_highest_mar_and_breaks_ties_on_the_trial_numbe
     #   * the Sharpes differ, so the lab has a trial-Sharpe variance for `dsr_at` to deflate by
     #     -- with one repeated Sharpe there is no dispersion and no DSR is evaluable at all;
     #   * `n_trials_at_run` is the 4 dev rows below, so each DSR is read back at its own N, and
-    #     C is kept out by a 24.5% drawdown rather than by its recorded `failed` string.
+    #     C is kept out by a 55% drawdown rather than by its recorded `failed` string.
     _method(conn)
     assert store.best_dev_eligible(conn, "M0001") is None
     with conn:
@@ -85,7 +85,7 @@ def test_best_dev_eligible_is_the_highest_mar_and_breaks_ties_on_the_trial_numbe
                    dsr=0.95, sharpe=0.80, n_trials_at_run=4),
             _trial(candidate_id="M0001-B", config_digest="db", mar=0.9, eligible=True, failed="",
                    dsr=0.95, sharpe=0.94, n_trials_at_run=4),
-            _trial(candidate_id="M0001-C", config_digest="dc", mar=1.4, max_drawdown=0.245,
+            _trial(candidate_id="M0001-C", config_digest="dc", mar=1.4, max_drawdown=0.55,
                    dsr=0.95, sharpe=1.10, n_trials_at_run=4),  # not eligible: drawdown
             _trial(candidate_id="M0001-D", config_digest="dd", mar=None, eligible=True, failed="",
                    dsr=0.95, sharpe=1.46, n_trials_at_run=4),

@@ -54,20 +54,35 @@ RECORD = "docs/plans/2026-10-03-seer-design.md §13"
 #: Unpacked in ``FAILURE_LABELS`` order, exactly as ``store.owner_failures`` unpacks it.
 _SPY, _DRAWDOWN, _PF, TRADES_LABEL, _OWNER = dev.FAILURE_LABELS
 
-#: Re-measured 2026-10-12 against the committed lab database, read-only, with no trial recorded:
-#: the only recorded dev trials whose **sole** miss against today's five owner conditions is the
-#: trades bar. First measured 2026-10-07 at two trials out of 110; M0084 then priced the SPY-200
-#: safety switch on its own, and three of its variants trade 10 to 13 times in twenty-two years,
-#: taking the set to five out of 354.
+#: Re-measured 2026-10-14 against the committed lab database, read-only, with no trial recorded,
+#: after the owner split the dev screen off the real-money bar (design §18): the screen moved
+#: 0.20 -> 0.50, so trials that previously missed BOTH drawdown and trades now miss trades alone.
+#: These are the recorded dev trials whose **sole** miss against the five owner conditions is the
+#: trades bar.
 #:
-#: The two P7a seeds carry ``dsr IS NULL``; the three M0084 rows carry a real luck score, all of it
-#: under ``DSR_MIN``. That is the case §13 predicted when it said the bar "binds future trials that
-#: do carry a DSR", and it is why the third test below asks whether a held-out trial *clears the
-#: luck bar* rather than whether it has one at all. Every trial the bar has ever held out is a
-#: market-timing book: nothing else trades seldom enough to be caught by it.
+#: The set has grown twice for reasons that are not the bar's. First measured 2026-10-07 at two
+#: trials out of 110; M0084 then priced the SPY-200 safety switch on its own and three of its
+#: variants trade 10 to 13 times in twenty-two years, taking it to five out of 354; and on
+#: 2026-10-14 the screen moved, taking it to twelve. Nothing about the trades bar itself changed
+#: on any of those days.
+#:
+#: **Every one of the twelve still fails the luck test** -- measured at the 0.50 screen, the count
+#: clearing ``DSR_MIN`` is zero, the P7a seeds carrying ``dsr IS NULL`` and the rest a real score
+#: under the bar. That is the case §13 predicted when it said the bar "binds future trials that do
+#: carry a DSR", and it is why the third test below asks whether a held-out trial *clears the luck
+#: bar* rather than whether it has one at all. §13's finding -- that dropping the trades bar would
+#: change zero eligibility verdicts -- therefore survives the wider set. Every trial the bar has
+#: ever held out is a market-timing book: nothing else trades seldom enough to be caught by it.
 HELD_OUT_BY_THE_TRADES_BAR: tuple[tuple[str, int], ...] = (
+    ("F1-QQQ-SMA200-M", 17),
+    ("F1-QQQ-VT15-W", 28),
     ("F1-SPY-10MSMA-M", 13),
+    ("F1-SPY-ABS12-M", 9),
     ("F1-SPY-SMA200-M", 11),
+    ("F2-SPYQQQ-12M", 14),
+    ("F2-SPYQQQ-3M", 36),
+    ("F2-SPYQQQ-6M", 28),
+    ("M0084-BAND3-M", 9),
     ("M0084-BAND3-W", 10),
     ("M0084-FABER-M", 13),
     ("M0084-MONTHLY", 11),
@@ -155,10 +170,13 @@ def test_the_trades_bar_holds_out_two_trials_and_neither_of_them_has_a_luck_scor
     not bind these two, and §13 says so.
 
     The set is recomputed from the recorded columns against the live constants, never parsed out of
-    ``trials.failed``. It can therefore move for a legitimate reason -- the owner lowering
-    ``tuning.MAX_DRAWDOWN`` would drop both of these out of it, since they sit at 18.7% and 18.9%
-    against today's 20% bar. That is not a bug in this test: it means §13's measurement has gone
-    stale, and §13 is what to update.
+    ``trials.failed``. It can therefore move for a legitimate reason, and on 2026-10-14 it did:
+    the owner split the lab's dev screen off his real-money bar and set it to 50% (design §18), so
+    trials that had missed both drawdown and trades now miss trades alone and the set grew from
+    five to twelve. Tightening ``tuning.DEV_MAX_DRAWDOWN`` again would shrink it the same way.
+    That is not a bug in this test: it means the measurement has gone stale and has to be retaken.
+    §13 itself is a dated record of what was true on 2026-10-07 and is **not** amended -- the
+    re-measurement is recorded in design §18, which is where this change belongs.
 
     Read-only: ``mode=ro``, no trial recorded, the lab's N unmoved at 110, no test-window look spent.
     """

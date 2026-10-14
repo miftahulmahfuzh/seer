@@ -22,7 +22,7 @@ from stratkit import hist, sawtooth
 import seer_engine.backtest.dev as dev_module
 from seer_engine import dates
 from seer_engine.backtest import tuning
-from seer_engine.backtest.tuning import MAX_DRAWDOWN
+from seer_engine.backtest.tuning import DEV_MAX_DRAWDOWN, MAX_DRAWDOWN
 from seer_engine.backtest.benchmark import Dividend, spy_curves
 from seer_engine.backtest.book_runner import BookResult, RunStats, run_stats
 from seer_engine.backtest.dev import (
@@ -206,7 +206,8 @@ def test_constants():
     first_row = csv.read_text(encoding="utf-8").splitlines()[1]
     assert MEMBERSHIP_START == date.fromisoformat(first_row.split(",", 1)[0])
     assert FAILURE_LABELS == (
-        "beats SPY TR", f"max DD <= {tuning.MAX_DRAWDOWN:.0%}", "PF >= 1.3", ">= 100 trades", "owner inputs",
+        "beats SPY TR", f"max DD <= {tuning.DEV_MAX_DRAWDOWN:.0%}", "PF >= 1.3", ">= 100 trades",
+        "owner inputs",
     )
 
 
@@ -476,14 +477,16 @@ def row(id: str, family: str = "F1", *, allocator: Any = None, **kw: Any) -> Dev
 
 
 # The drawdown-miss label, taken from the engine rather than spelled: entry [1] follows
-# tuning.MAX_DRAWDOWN (D13), so a literal here would pin the test to one value of the bar.
+# tuning.DEV_MAX_DRAWDOWN (D13), so a literal here would pin the test to one value of the screen.
+# It is the SCREEN and not the owner's real-money bar: the two were separated on 2026-10-14
+# (design §18), and ``make_row`` compares against the screen.
 _DD_MISS = FAILURE_LABELS[1]
 
 
 @pytest.mark.parametrize("kw, failed", [
     (dict(), ()),
-    (dict(dd=MAX_DRAWDOWN), ()),
-    (dict(dd=math.nextafter(MAX_DRAWDOWN, 1)), (_DD_MISS,)),
+    (dict(dd=DEV_MAX_DRAWDOWN), ()),
+    (dict(dd=math.nextafter(DEV_MAX_DRAWDOWN, 1)), (_DD_MISS,)),
     (dict(dd=None), (_DD_MISS,)),
     (dict(pf=1.3), ()),
     (dict(pf=1.2999), ("PF >= 1.3",)),
@@ -494,7 +497,9 @@ _DD_MISS = FAILURE_LABELS[1]
     (dict(total_return=0.4), ("beats SPY TR",)),  # equal is not beating
     (dict(total_return=0.4000001), ()),
     (dict(total_return=None), ("beats SPY TR",)),
-    (dict(dd=0.25, trades=10), (_DD_MISS, ">= 100 trades")),
+    # 0.55, not the 0.25 this case used until 2026-10-14: the dev screen is 0.50 now, and a 25%
+    # fall clears it, so the pair would have collapsed to a trades-only miss.
+    (dict(dd=0.55, trades=10), (_DD_MISS, ">= 100 trades")),
 ])
 def test_eligibility_boundaries(kw, failed):
     r = row("B-1", **kw)
@@ -504,7 +509,7 @@ def test_eligibility_boundaries(kw, failed):
 
 
 def test_every_failure_in_order():
-    r = row("B-ALL", allocator=HoldOne("SSOH", "SSO"), total_return=0.3, dd=0.3, pf=1.0, trades=5)
+    r = row("B-ALL", allocator=HoldOne("SSOH", "SSO"), total_return=0.3, dd=0.6, pf=1.0, trades=5)
     assert r.failed == FAILURE_LABELS
     assert r.eligible is False and r.beats_spy is False
     only_owner = row("B-OWN", allocator=HoldOne("IEFH", "IEF"))
@@ -516,11 +521,14 @@ def test_every_failure_in_order():
 
 
 def test_thresholds_come_from_tuning(monkeypatch):
-    real_max_dd = tuning.MAX_DRAWDOWN
+    # The drawdown threshold ``make_row`` reads is the dev SCREEN, split off the owner's
+    # real-money ``tuning.MAX_DRAWDOWN`` on 2026-10-14 (design §18). Patching the bar here would
+    # leave the comparison untouched and the test would pass without exercising anything.
+    real_dev_max_dd = tuning.DEV_MAX_DRAWDOWN
     assert row("T-1").eligible
-    monkeypatch.setattr(tuning, "MAX_DRAWDOWN", 0.05)
+    monkeypatch.setattr(tuning, "DEV_MAX_DRAWDOWN", 0.05)
     assert row("T-1").failed == (_DD_MISS,)
-    monkeypatch.setattr(tuning, "MAX_DRAWDOWN", real_max_dd)
+    monkeypatch.setattr(tuning, "DEV_MAX_DRAWDOWN", real_dev_max_dd)
     monkeypatch.setattr(tuning, "MIN_PROFIT_FACTOR", 2.0)
     assert row("T-1").failed == ("PF >= 1.3",)
 
@@ -556,7 +564,7 @@ def test_finalists_d8():
     rows = [
         row("F5-X", "F5", cagr=0.05, dd=0.10),  # MAR 0.5: fourth family, cut by the cap of 3
         row("F1-B", "F1", cagr=0.12, dd=0.10),  # MAR 1.2, tied with F1-A, loses on id
-        row("F4-X", "F4", cagr=0.30, dd=0.25),  # MAR 1.2 but DD over the bar: not eligible
+        row("F4-X", "F4", cagr=0.66, dd=0.55),  # MAR 1.2 but DD over the screen: not eligible
         row("F3-X", "F3", cagr=0.09, dd=0.10),  # MAR 0.9
         row("F1-A", "F1", cagr=0.12, dd=0.10),  # MAR 1.2
         row("F2-X", "F2", cagr=0.10, dd=0.10),  # MAR 1.0
@@ -783,14 +791,22 @@ def test_rows_carry_their_window():
 def test_the_drawdown_label_follows_the_bar_and_keeps_its_prefix() -> None:
     """D13: the label names the bar it enforces, and the prefix is the part that is stable.
 
-    `trials.failed` is append-only, so the 30 committed rows judged at 15% keep that text for
-    ever while rows judged from now on carry 20%. Both must read as a drawdown miss, which is why
-    every reader matches the prefix and never the whole string.
+    The bar it enforces is now the dev SCREEN (`tuning.DEV_MAX_DRAWDOWN`), split off from the
+    owner's real-money `tuning.MAX_DRAWDOWN` on 2026-10-14 (design §18). `trials.failed` is
+    append-only, so the 30 committed rows judged at 15% keep that text for ever, the rows judged
+    between 2026-10-07 and 2026-10-14 keep 20%, and rows judged from now on carry 50%. All three
+    must read as a drawdown miss, which is why every reader matches the prefix and never the
+    whole string.
     """
     assert len(FAILURE_LABELS) == 5
-    assert FAILURE_LABELS[1] == f"max DD <= {tuning.MAX_DRAWDOWN:.0%}" == "max DD <= 20%"
+    assert FAILURE_LABELS[1] == f"max DD <= {tuning.DEV_MAX_DRAWDOWN:.0%}" == "max DD <= 50%"
+    assert FAILURE_LABELS[1] != f"max DD <= {tuning.MAX_DRAWDOWN:.0%}", (
+        "the screen and the real-money bar are two numbers and the label names the screen; "
+        "a label that follows MAX_DRAWDOWN would name a bar make_row does not compare against"
+    )
     assert FAILURE_LABELS[1].startswith("max DD <= ")
-    assert "max DD <= 15%".startswith("max DD <= "), "the historical rows share the prefix"
+    for historical in ("max DD <= 15%", "max DD <= 20%"):
+        assert historical.startswith("max DD <= "), "the historical rows share the prefix"
     assert FAILURE_LABELS[0] == "beats SPY TR" and FAILURE_LABELS[-1] == "owner inputs"
 
 

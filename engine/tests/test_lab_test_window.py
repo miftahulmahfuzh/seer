@@ -336,7 +336,9 @@ def test_the_verdict_is_the_five_go_live_conditions(promoted):
     assert _test_row(c).eligible is True
     assert _test_row(c, trades=99).failed == (">= 100 trades",)
     assert _test_row(c, total=0.6).failed == ("beats SPY TR",)  # equal is not beating
-    assert _test_row(c, dd=0.25).failed == (dev.FAILURE_LABELS[1],)  # "max DD <= 20%" (D13)
+    # dd 0.55: `make_row` compares against the dev SCREEN, which the owner split off his
+    # real-money bar and set to 50% on 2026-10-14 (design §18), so a 25% fall now clears it.
+    assert _test_row(c, dd=0.55).failed == (dev.FAILURE_LABELS[1],)  # "max DD <= 50%" (D13)
     assert _test_row(c, pf=1.2).failed == ("PF >= 1.3",)
 
 

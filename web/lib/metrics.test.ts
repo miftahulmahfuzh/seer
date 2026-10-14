@@ -54,7 +54,9 @@ describe('checklist', () => {
     expect(items.slice(0, 4).map(i => i.ok)).toEqual([false, true, true, true]);
     expect(items[0].label).toBe('≥ 18 months forward');
     expect(items[0].val).toBe('3.0 mo');
-    expect(checklist({ ...base, maxDrawdown: 0.21, months: 18 }, 0.046, PASSED)[3].ok).toBe(false);
+    // 0.26 and not 0.21: the owner raised the real-money bar 20% -> 25% on 2026-10-14
+    // (design §18), so a 21% fall now PASSES go-live condition 4.
+    expect(checklist({ ...base, maxDrawdown: 0.26, months: 18 }, 0.046, PASSED)[3].ok).toBe(false);
   });
 
   it('counts no trades at all, whatever the trade count is', () => {

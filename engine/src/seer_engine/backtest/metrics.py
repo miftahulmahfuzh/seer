@@ -52,18 +52,58 @@ strategies beat SPY in 54-72% of rolling 18-month windows and only 65-78% of 36-
 Design §13 carries the table.
 """
 
-MAX_DRAWDOWN = 0.20
-"""Go-live condition #4 (design §1): the deepest peak-to-trough fall a strategy may show.
+MAX_DRAWDOWN = 0.25
+"""Go-live condition #4 (design §1): the deepest peak-to-trough fall a strategy may show
+**before the owner will put real money behind it**.
 
 The single definition in Python. ``tuning.MAX_DRAWDOWN`` re-exports this name, so every caller
-that reads the threshold -- ``checklist`` below, ``tuning.qualifies``, ``tuning.gate``,
-``walkforward.gate_p3b``, ``b_walkforward.gate_p6a``, ``dev.make_row`` and ``lab.store.snapshot``
--- resolves to this one float. It lives here, not in ``tuning``, only because ``tuning`` imports
-``metrics`` and the dependency cannot run the other way.
+that reads the real-money threshold -- ``checklist`` below, ``tuning.qualifies``, ``tuning.gate``,
+``walkforward.gate_p3b``, ``b_walkforward.gate_p6a``, ``lab.hardgate``'s D16 survivorship rule
+and ``lab.store.snapshot`` -- resolves to this one float. It lives here, not in ``tuning``, only
+because ``tuning`` imports ``metrics`` and the dependency cannot run the other way.
 
-0.15 until 2026-10-07, when the owner raised it to 0.20 on stated risk appetite; design §11
-records the revision. ``web/lib/golive.ts`` carries the same number for the leaderboard and is
-pinned to it through ``data/lab.json``'s gate by ``web/lib/golive.test.ts``.
+0.15 until 2026-10-07, when the owner raised it to 0.20 on stated risk appetite (design §11);
+0.20 until 2026-10-14, when he raised it again to 0.25 (design §18). ``web/lib/golive.ts``
+carries the same number for the leaderboard and is pinned to it through ``data/lab.json``'s gate
+by ``web/lib/golive.test.ts``.
+
+**This is no longer the lab's dev screen.** Until 2026-10-14 this one float also decided what the
+lab would even look at. ``DEV_MAX_DRAWDOWN`` below is that job now; see its docstring for why the
+two were separated.
+"""
+
+DEV_MAX_DRAWDOWN = 0.50
+"""The lab's **dev screen**: the deepest fall a recorded dev trial may show and still be worth
+another hour of study. Not a statement about money.
+
+``tuning.DEV_MAX_DRAWDOWN`` re-exports it, and exactly four call sites read it -- all of them one
+decision written in four places: ``dev.FAILURE_LABELS[1]`` (the label, interpolated from this bar
+so the two can never disagree), ``dev.make_row`` (the screen applied to a fresh run),
+``lab.store.owner_failures`` (the screen applied to a recorded row) and ``lab.store._blocking``
+(the same screen written a second time, on purpose, to guard the ``rejected -> dev-eligible``
+write edge).
+
+**Why there are now two numbers.** They answer different questions. The bar asks *could the owner
+hold this through its worst month*; the screen asks *is this worth another hour of study*. One
+float answered both until 2026-10-14, and the second job was the binding constraint on the whole
+research programme. Measured on the 399 recorded dev trials: **257 beat total-return SPY, and the
+20% bar rejected 188 of them -- 73%.** Nothing else in the lab rejects at that rate. Meanwhile
+**SPY itself fell 56.5%** over the dev window (trough 2009-03-09) while compounding at 7.86%/yr,
+so the lab was requiring its strategies to fall less than a third as far as the benchmark they
+had to beat.
+
+**Why 0.50 and not SPY's own 0.5665.** A book that falls by half offers no risk control that
+buy-and-hold does not already give away free, so the screen is drawn just inside what doing
+nothing costs. Measured against the committed lab, the screen admits 319 of 399 trials for a
+human to browse where 0.20 admitted 93. Under the *full* dev verdict -- every owner condition
+plus the deflated-Sharpe luck test at the live N -- it admits 67 trials over 32 methods against
+26 over 16. (Most of that is already reached at 0.25; the screen is loose because browsing is
+cheap, not because the extra methods are free. Design §18 carries the table.)
+
+**What a looser screen does not do.** It cannot move N or any DSR: ``lab.npolicy.dev_method_count``
+counts distinct methods with *any* dev trial, eligible or not. And it cannot reach the test
+window: ``lab.runner.preflight_test`` refuses any method that is not ``promoted``, and promotion
+is judged at ``MAX_DRAWDOWN``. The screen widens what is studied; it widens nothing that is spent.
 """
 EXIT_REASONS: tuple[str, ...] = ("tp", "sl", "time", "gap")
 MINUS = "−"  # the web's minus sign in signed percentages

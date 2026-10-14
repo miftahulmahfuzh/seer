@@ -95,12 +95,12 @@ def _ballast(mid: str = "M0001", **kw) -> store.TrialRow:
 
     So a fixture that wants a *promotable* method has to look like a lab that could have one:
     at least two dev trials, with different Sharpes. This row is that second trial. It is
-    deliberately ineligible on a 24.5% drawdown -- outside even the owner's new 20% bar -- and
+    deliberately ineligible on a 55% drawdown -- outside the lab's 50% dev screen -- and
     carries the lowest MAR, so it never wins ``best_dev_eligible`` and never changes an answer.
     """
     base = dict(
         method_id=mid, candidate_id=f"{mid}-BALLAST", config_digest=f"ballast-{mid}",
-        sharpe=1.4, max_drawdown=0.245, mar=0.05, eligible=False,
+        sharpe=1.4, max_drawdown=0.55, mar=0.05, eligible=False,
         failed="max DD <= 15%; DSR >= 0.95",
     )
     base.update(kw)
@@ -237,9 +237,9 @@ def test_promote_pre_registers_the_best_eligible_variant_by_mar(conn, prereg_dir
         _trial(candidate_id="M0001-A", config_digest="da", mar=0.60),
         _trial(candidate_id="M0001-B", config_digest="db", mar=0.90),
         # Ineligible on its NUMBERS, not on its recorded string: since phase 4 the four
-        # threshold conditions are re-derived from the columns, so a 24.5% drawdown is what
+        # threshold conditions are re-derived from the columns, so a 55% drawdown is what
         # keeps the top-MAR variant out. (At the fixture's old 0.11 it would now qualify.)
-        _trial(candidate_id="M0001-C", config_digest="dc", mar=1.50, max_drawdown=0.245,
+        _trial(candidate_id="M0001-C", config_digest="dc", mar=1.50, max_drawdown=0.55,
                eligible=False, failed="max DD <= 15%"),
     ])
     done = prereg.promote_method(conn, "M0001", git_sha="deadbeef", today=date(2026, 10, 6),

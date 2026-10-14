@@ -229,7 +229,7 @@ describe('marks / workedSummary', () => {
     const w = workedSummary(trial(), GATE);
     expect(w.headline).toBe('Not yet. Its best variant, M0001-TV12, cleared 4 of 6 hurdles on 1996–2015 data.');
     expect(w.sentence).toBe(
-      'Beats SPY: no (7.6% vs 7.9% a year). Max drawdown: yes (12.9% ≤ 20%). ' +
+      'Beats SPY: no (7.6% vs 7.9% a year). Max drawdown: yes (12.9% ≤ 25%). ' +
       'Profit factor: yes (2.27 ≥ 1.3). Trade count: yes (1,130 ≥ 100). ' +
       'Owner inputs: yes (none needed). ' +
       'Luck check: no (0.899 < 0.90, scored at N = 110).',
@@ -240,10 +240,11 @@ describe('marks / workedSummary', () => {
     expect(workedSummary(t, GATE).headline).toBe('Yes. Its best variant, M0001-TV12, cleared all six hurdles on 1996–2015 data.');
   });
   it('flips the comparison sign on a miss', () => {
-    // 0.23 rather than 0.18: the sentence says "> 20%", so the value must actually exceed 20%
+    // 0.28 rather than 0.18: the sentence says "> 25%", so the value must actually exceed 25%
+    // (the owner raised the real-money bar 20% -> 25% on 2026-10-14, design §18)
     // or the rendered sentence contradicts itself.
-    const t = trial({ maxDrawdown: 0.23, failedNow: ['beats SPY TR', 'max DD <= 20%', 'DSR >= 0.90'] });
-    expect(conditionSentence('drawdown', false, t, GATE)).toBe('Max drawdown: no (23.0% > 20%).');
+    const t = trial({ maxDrawdown: 0.28, failedNow: ['beats SPY TR', 'max DD <= 20%', 'DSR >= 0.90'] });
+    expect(conditionSentence('drawdown', false, t, GATE)).toBe('Max drawdown: no (28.0% > 25%).');
   });
 });
 

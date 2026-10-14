@@ -2,7 +2,7 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-13 11:05
+**Last Updated**: 2026-10-14
 **Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 134
+- Completed: 135
 
 ---
 
@@ -1362,6 +1362,31 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-QK7F** Phase 1: Two constants, and everything that reads them
+  - **Difficulty**: HARD
+  - **Type**: Update
+  - **Context**: Owns `backtest/metrics.py`, `backtest/tuning.py`, `backtest/dev.py` (`FAILURE_LABELS`, `make_row`), `lab/store.py` (`owner_failures`, `_blocking`, and `reevaluate_method`'s analysis prose at `:1904`), the ~40 engine tests the change moves (including `test_dev_trades_bar.py`'s `HELD_OUT_BY_THE_TRADES_BAR` list), `web/lib/golive.ts` + `golive.test.ts`, `web/lib/sera/fixture.ts`, and the regenerated `web/data/lab.json` + `lab/lab.sqlite`. Exit: `tuning.MAX_DRAWDOWN == 0.25` and `tuning.DEV_MAX_DRAWDOWN == 0.50` read at exactly the four decision sites (`dev.FAILURE_LABELS`, `dev.make_row`, `store.owner_failures`, `store._blocking`); the real-money bar still refuses a 30%-drawdown trial via `metrics.checklist`'s go-live item 4 even though it is now dev-eligible; `golive.ts`/`golive.test.ts`/`lab.json` all agree at 0.25; every re-expressed test keeps its original historical claim, none deleted; `store.test_looks(conn)` reads 4 before and after, the digest tripwire is green, and `git status --short` is clean after the bare lab commit; ruff is clean, pytest is green with the skip count quoted, and `npx tsc --noEmit && npm test` is green; the measured before/after dev-eligible and browsable trial/method counts are reported; and `store.py:1904`'s re-evaluation prose names the screen rather than the bar.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/split-screen-from-bar/PLAN.md` (phase 1 of 2)
+  - **Satisfies**: R1 — Raise the real-money drawdown bar from 20% to 25% (§1 condition 4, the promote gate, the leaderboard); R2 — Split the lab's dev-eligibility screen off from that bar, so a method can be studied without being fundable; R4 — Keep engine and web agreeing — the bar reaches the web as a TS constant and through `lab.json`
+  - **Plan**: `.workflows/plan/P1-ENG-QK7F.md`
+  - **Completed**: 2026-10-14 10:46
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/backtest/metrics.py, engine/src/seer_engine/backtest/tuning.py, engine/src/seer_engine/backtest/dev.py, engine/src/seer_engine/lab/store.py, engine/tests/test_lab_gate_policy.py, engine/tests/test_lab_gate_wording.py, engine/tests/test_lab_hardgate.py, engine/tests/test_lab_luck.py, engine/tests/test_lab_status.py, engine/tests/test_lab_prereg.py, engine/tests/test_lab_store.py, engine/tests/test_lab_test_window.py, engine/tests/test_dev_trades_bar.py, engine/tests/test_backtest_dev.py, engine/tests/test_backtest_metrics.py, engine/tests/test_backtest_tuning.py, engine/tests/test_backtest_walkforward.py, engine/tests/test_backtest_b_walkforward.py, engine/tests/test_backtest_report.py, engine/tests/test_backtest_dev_report.py, engine/tests/test_backtest_wf_report.py, web/lib/golive.ts, web/lib/golive.test.ts, web/lib/sera/fixture.ts, web/lib/metrics.test.ts, web/lib/sera/derive.test.ts, web/lib/sera/lab.test.ts, web/app/sera/how/view.test.ts, web/app/sera/methods/view.test.ts, web/data/lab.json, lab/lab.sqlite
+  - **Commits**: 315a863 lab: the drawdown bar was doing two jobs — 25% for money, 50% for study; 127507d lab: restage the snapshot at the 25% bar and the 50% dev screen; ab4fe01 web: the five sera tests the drawdown split moves
+  - **Verified**: engine suite 4757 passed / 4 skipped (plan's exact target; baseline 4756/4); `ruff check engine` clean; web `npx tsc --noEmit` exit 0 and `npm test` 685 passed across 49 files. `tuning.MAX_DRAWDOWN` 0.25 and `tuning.DEV_MAX_DRAWDOWN` 0.50 read at exactly the four decision sites (dev.py:101, dev.py:445, store.py:1471, store.py:1818); store.py:1904's prose names the screen (`a max drawdown bar of` → 0 hits); lab/lab.sqlite byte-identical (sha256 2c8c9669ad766427…), `store.test_looks` 4 before and after, no recorded row edited; digest tripwire green; no test file loses a `def test_`, exactly one gains one.
+  - **Measured (for phase 2, exit criterion 7)**: 399 recorded dev trials, `Gate(n=81, policy='methods')`, re-derived read-only on the landed tree — screen 0.20: browsable 93 trials / 37 methods, dev-eligible 26 / 16 · screen 0.25: 196 / 61, dev-eligible 60 / 30 · screen 0.40: 303 / 75, dev-eligible 67 / 32 · screen 0.50: 319 / 76, dev-eligible 67 / 32. `HELD_OUT_BY_THE_TRADES_BAR` 5 → 12 trials, 0 of the 12 clear the luck bar, so design §13's finding survives.
+  - **Drift**:
+    - The plan's web Owns listed only golive.ts, golive.test.ts and sera/fixture.ts. Five more web test files moved: four are the mechanical 20%->25% label follow-through from MAX_DRAWDOWN_LABEL, and lib/sera/lab.test.ts needed a real re-expression (third commit, ab4fe01).
+    - `lab stage` must be run as `PYTHONPATH=engine/src <main venv python> -m seer_engine lab stage`. Run bare, the main venv's editable install resolves seer_engine and COMMITTED_DB to the MAIN checkout and stages there instead. Verified afterwards that the main checkout was left clean.
+    - web/node_modules was absent in the worktree; hardlinked (cp -al) from the main checkout, never symlinked.
+    - store.py:1655's docstring claimed verdict re-derives against tuning.MAX_DRAWDOWN; it delegates to owner_failures, which now reads the screen. Fixed in the same commit.
+  - **Decided**:
+    - test_lab_gate_wording SUPERSEDED_BARS -> {0.20}, not the plan's {0.15, 0.20} (rung 1, invariant 9: excusing 0.15 would delete the sibling guard's coverage, whose premise this change does not retire)
+    - test_owner_failures_rederives keeps its drawdown label bound to dev.FAILURE_LABELS[1] rather than the plan's rebind (rung 2, exit criterion 5: the tuple is interpolated at import and the fixture monkeypatch cannot reach it)
+    - _ballast default fall 0.245 -> 0.55 (rung 2: its docstring promised a row ineligible on an owner condition; at 0.245 it went silently eligible under the 50% screen)
+    - lib/sera/lab.test.ts drawdown equality re-expressed as a one-way implication plus a non-vacuity assertion (rung 1, invariant 9; adding gate.devMaxDrawdown is forbidden by Decision D12)
+    - Baseline pass-count arithmetic replaced by a structural per-file `def test_` count (rung 2, exit criterion 5). Confirmed independently anyway: mid-change 44 failed + 4712 passed = 4756 passed / 4 skipped.
 - [x] **P1-ENG-RN2P** Phase 3: The correcting journal entry
   - **Difficulty**: EASY
   - **Type**: Update

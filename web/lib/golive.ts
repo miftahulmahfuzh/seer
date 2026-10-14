@@ -14,11 +14,16 @@
  * must read `gate.maxDrawdown` from it instead of importing this -- `app/sera/how/view.ts` is
  * the model.
  *
- * Raised 0.15 -> 0.2 by the owner on 2026-10-07; design §11 records the revision.
+ * Raised 0.15 -> 0.2 by the owner on 2026-10-07 (design §11) and 0.2 -> 0.25 on 2026-10-14
+ * (design §18). This is the REAL-MONEY bar only. On 2026-10-14 the engine split the lab's
+ * dev-eligibility screen off it into `backtest.metrics.DEV_MAX_DRAWDOWN` (0.50), which decides
+ * what the lab studies rather than what the owner funds. The screen has no mirror here and needs
+ * none: the web reads a trial's verdict out of `data/lab.json`'s `failedNow` strings, matching
+ * the stable `max DD <= ` prefix in `lib/sera/derive.ts`, never the number.
  */
 import { pct } from './format';
 
-export const MAX_DRAWDOWN = 0.2;
+export const MAX_DRAWDOWN = 0.25;
 
 /**
  * Go-live condition #1 (design §1, §13): months of forward paper before a real-money decision.

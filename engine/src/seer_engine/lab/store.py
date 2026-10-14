@@ -1420,7 +1420,15 @@ def owner_failures(
 
     - ``beats SPY TR``  ``dev.beats_spy_tr`` -- money-weighted when ``funding`` carries both
                         sides' rates, and ``total_return > spy_tr_return`` otherwise
-    - ``max DD``        ``max_drawdown <= tuning.MAX_DRAWDOWN`` (0.20 since 2026-10-07, phase 8)
+    - ``max DD``        ``max_drawdown <= tuning.DEV_MAX_DRAWDOWN`` -- **the dev SCREEN, not the
+                        real-money bar.** 0.15 until 2026-10-07, 0.20 until 2026-10-14, 0.50
+                        since (design §18). This function answers "is this trial worth another
+                        hour of study", which is why it reads the loose number. The owner's
+                        real-money bar is ``tuning.MAX_DRAWDOWN`` (0.25) and nothing in this
+                        module reads it as a gate: ``metrics.checklist`` is §1 condition 4,
+                        ``lab.hardgate``'s D16 rule is the survivorship refusal, and
+                        ``snapshot`` publishes it. ``_blocking`` below repeats *this* comparison,
+                        against this same screen, because it guards the same edge.
     - ``PF``            ``profit_factor >= tuning.MIN_PROFIT_FACTOR``
     - ``trades``        ``trades >= dev._MIN_TRADES``
 
@@ -1460,7 +1468,7 @@ def owner_failures(
         _opt_float(total), _opt_float(bench), _opt_float(mwr), _opt_float(spy_mwr)
     ):
         out.append(spy)
-    if dd is None or float(dd) > tuning.MAX_DRAWDOWN:
+    if dd is None or float(dd) > tuning.DEV_MAX_DRAWDOWN:
         out.append(drawdown)
     if factor is None or float(factor) < tuning.MIN_PROFIT_FACTOR:
         out.append(pf)
@@ -1644,9 +1652,11 @@ def verdict(
     **Nothing is ever returned verbatim.** Every one of the six conditions is decided here:
 
     - the four **threshold** owner conditions are re-derived from this row's recorded columns by
-      ``owner_failures``, against the live ``tuning.MAX_DRAWDOWN`` / ``tuning.MIN_PROFIT_FACTOR``
-      / ``dev._MIN_TRADES``, so a trial recorded under the old 15% drawdown bar reads against
-      today's 20% one;
+      ``owner_failures``, against the live ``tuning.DEV_MAX_DRAWDOWN`` /
+      ``tuning.MIN_PROFIT_FACTOR`` / ``dev._MIN_TRADES``, so a trial recorded under the old 15%
+      drawdown bar reads against today's 50% dev screen. The drawdown number here is the
+      **screen** and not the owner's real-money ``tuning.MAX_DRAWDOWN``: the two were separated on
+      2026-10-14 (design §18), and this function answers what is worth studying;
     - ``owner inputs`` is carried from the recorded string, because it is not a threshold and no
       constant re-decides it;
     - the **luck** test is decided on ``dsr_at(conn, trial, g.n)`` -- this trial's DSR **at the
@@ -1781,6 +1791,15 @@ def _blocking(
 
     Phrased as sentences with the numbers in them, because this text goes into the refusal a
     human reads.
+
+    **It reads the dev SCREEN**, ``tuning.DEV_MAX_DRAWDOWN``, because the edge it guards is
+    ``rejected -> dev-eligible`` -- a research decision, not a funding one. It must read the same
+    number ``owner_failures`` reads or this guard fires on its own module's verdict: measured on
+    2026-10-14, holding this at ``MAX_DRAWDOWN`` while the screen moved would have raised
+    ``LabError`` for seven recorded trials across M0050, M0058, M0082 and M0085, all of them
+    ``rejected``, and ``lab reevaluate`` with no argument sweeps exactly those. The point of the
+    repetition is that the comparison is written twice in two places, not that it is written
+    against two different bars.
     """
     from seer_engine.backtest import dev, tuning
 
@@ -1798,8 +1817,8 @@ def _blocking(
         if total is None or bench is None or float(total) <= float(bench):
             out.append(f"total return {total!r} does not beat SPY TR {bench!r}")
     dd = trial["max_drawdown"]
-    if dd is None or float(dd) > tuning.MAX_DRAWDOWN:
-        out.append(f"max drawdown {dd!r} is outside the {tuning.MAX_DRAWDOWN:.0%} bar")
+    if dd is None or float(dd) > tuning.DEV_MAX_DRAWDOWN:
+        out.append(f"max drawdown {dd!r} is outside the {tuning.DEV_MAX_DRAWDOWN:.0%} screen")
     factor = trial["profit_factor"]
     if factor is None or float(factor) < tuning.MIN_PROFIT_FACTOR:
         out.append(f"profit factor {factor!r} is under {tuning.MIN_PROFIT_FACTOR}")
@@ -1901,8 +1920,9 @@ def reevaluate_method(conn: sqlite3.Connection, method_id: str) -> Reevaluation:
         "# Re-evaluation",
         "",
         f"{REEVALUATION_MARKER}`{g.policy}` N policy at N = {g.n}, against `{DSR_LABEL}` and "
-        f"a max drawdown bar of {tuning.MAX_DRAWDOWN:.0%} (both the owner's risk appetite, set "
-        f"2026-10-07; LAB_LUCK_GATE_PLAN.md Decisions D1 and D6).",
+        f"a max drawdown screen of {tuning.DEV_MAX_DRAWDOWN:.0%} (the luck bar is the owner's "
+        f"risk appetite, set 2026-10-07, LAB_LUCK_GATE_PLAN.md Decisions D1 and D6; the drawdown "
+        f"screen was split off the owner's real-money bar on 2026-10-14, design §18).",
         "",
         "Every condition was re-read against the bars in force today: the four threshold "
         "conditions from this method's own recorded columns, and the luck test from the same "

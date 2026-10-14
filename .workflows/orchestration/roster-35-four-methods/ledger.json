@@ -10,6 +10,27 @@
     "note": "Invariant 13 chore discharged by the last lab phase to land, exactly as the ownership rule specifies. A SIDE EFFECT WORTH THE OWNER SEEING: asking four questions this week promoted a fifth, unrelated method (M0086) off rejected -- the luck bar is a function of how many questions the lab has asked, so a batch of refusals can still change an old verdict.",
     "result": "One method moved: M0086 goes from rejected to clearing the development screen, re-judged at a count of 98 methods. Four questions were asked this week so the bar multiple-testing count moved by four and every recorded verdict is read against it. Nothing re-run, no new measurement -- the lab re-reading what it already holds. Idempotency check passed: running it a second time moves nothing, which is how the sweep is known to be settled. The test window was NOT read and the look count stays at four."
   },
+  "landed": {
+    "base": "main",
+    "final_guardrails": {
+      "backtest_registry_py": "untouched",
+      "frozen_method_files": "only 4 NEW files added under lab/methods/, none modified",
+      "grid_csv": "byte-identical to 661870d",
+      "lab_counters": "dev trials 469->491, insights 275->282, idea methods 69->65, N 94->98 -- consistent with exactly four methods run",
+      "lab_pair_vs_HEAD": "clean with nobody holding the lock -- invariant 7 postcondition holds",
+      "spec_digest_pins": "one added (RAW35_GT), none moved",
+      "test_window_looks": 4
+    },
+    "migration": "db/migrations/021_roster_width_35.sql is DATA-ONLY (one INSERT, two UPDATEs on strategies; no DDL verified by grep), so there is no code-ahead-of-schema risk. It reaches production through the repo own nightly.yml Migrate step, which runs BEFORE every paper step in the same workflow -- the ordering Step 4 requires. NOT applied by hand from here: doing so is outside every phase boundary, gains no safety, and would start the paper clock earlier than the owner own pipeline.",
+    "note": "No feature branch: the plan set cut none and every phase pushed straight to main, so Step 5 merge and cleanup are no-ops by construction -- there is no branch or worktree to delete. 48 commits between 661870d and the tip.",
+    "phase_commits": {
+      "1": "158ff96",
+      "2": "5a867e8",
+      "3": "280923e",
+      "4": "0a18127",
+      "5": "71bbf22"
+    }
+  },
   "phases": [
     {
       "card": null,
@@ -113,6 +134,7 @@
   ],
   "repo": "/home/miftah/seer",
   "slug": "roster-35-four-methods",
+  "status": "complete",
   "updated": "2026-10-14T09:44:48+00:00",
   "verified_at": "2026-10-14T09:19:19+00:00",
   "worktree": "/home/miftah/seer"

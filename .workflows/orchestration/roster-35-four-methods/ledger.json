@@ -10,15 +10,15 @@
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": null,
+      "note": "live session impl-roster-35-four-methods-p1 confirmed busy via ListAgents 16:20; verify --apply had downgraded it to pending on absent commit/TaskID -- do NOT re-spawn",
       "package": "engine/lab",
       "plan": ".workflows/plan/roster-35-four-methods/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-14T09:19:29+00:00",
       "satisfies": [
         "R3",
         "R6"
       ],
-      "status": "spawned",
+      "status": "running",
       "task_id": null,
       "title": "M0156 \u2014 the roster's other book on the honest tape"
     },
@@ -28,15 +28,15 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "live session impl-roster-35-four-methods-p2 confirmed busy via ListAgents 16:20; verify --apply had downgraded it to pending on absent commit/TaskID -- do NOT re-spawn",
       "package": "engine/paper`, `db`, `engine/tests`, `web",
       "plan": ".workflows/plan/roster-35-four-methods/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-14T09:19:29+00:00",
       "satisfies": [
         "R1",
         "R6"
       ],
-      "status": "spawned",
+      "status": "running",
       "task_id": null,
       "title": "Hold thirty-five: a new roster entry, and `RAW-FR-GT` retired"
     },
@@ -46,15 +46,15 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 3,
-      "note": null,
+      "note": "live session impl-roster-35-four-methods-p3 confirmed busy via ListAgents 16:20; verify --apply had downgraded it to pending on absent commit/TaskID -- do NOT re-spawn",
       "package": "engine/lab",
       "plan": ".workflows/plan/roster-35-four-methods/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-14T09:19:29+00:00",
       "satisfies": [
         "R2",
         "R6"
       ],
-      "status": "spawned",
+      "status": "running",
       "task_id": null,
       "title": "M0155 \u2014 trim a holding falling apart while the market is fine"
     },
@@ -64,15 +64,15 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "live session impl-roster-35-four-methods-p4 confirmed busy via ListAgents 16:20; verify --apply had downgraded it to pending on absent commit/TaskID -- do NOT re-spawn",
       "package": "engine/lab",
       "plan": ".workflows/plan/roster-35-four-methods/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-14T09:19:29+00:00",
       "satisfies": [
         "R4",
         "R6"
       ],
-      "status": "spawned",
+      "status": "running",
       "task_id": null,
       "title": "M0149 \u2014 braked by its own falling account, not the market's trend"
     },
@@ -82,15 +82,15 @@
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 5,
-      "note": null,
+      "note": "live session impl-roster-35-four-methods-p5 confirmed busy via ListAgents 16:20; verify --apply had downgraded it to pending on absent commit/TaskID -- do NOT re-spawn",
       "package": "engine/lab",
       "plan": ".workflows/plan/roster-35-four-methods/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-14T09:19:29+00:00",
       "satisfies": [
         "R5",
         "R6"
       ],
-      "status": "spawned",
+      "status": "running",
       "task_id": null,
       "title": "M0148 \u2014 a time-lock on the switch"
     }
@@ -98,6 +98,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/roster-35-four-methods/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "roster-35-four-methods",
-  "updated": "2026-10-14T08:49:54+00:00",
+  "updated": "2026-10-14T09:19:29+00:00",
+  "verified_at": "2026-10-14T09:19:19+00:00",
   "worktree": "/home/miftah/seer"
 }

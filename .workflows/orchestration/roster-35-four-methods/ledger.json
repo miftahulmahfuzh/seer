@@ -18,7 +18,7 @@
         "R3",
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "M0156 \u2014 the roster's other book on the honest tape"
     },
@@ -36,7 +36,7 @@
         "R1",
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Hold thirty-five: a new roster entry, and `RAW-FR-GT` retired"
     },
@@ -54,7 +54,7 @@
         "R2",
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "M0155 \u2014 trim a holding falling apart while the market is fine"
     },
@@ -72,7 +72,7 @@
         "R4",
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "M0149 \u2014 braked by its own falling account, not the market's trend"
     },
@@ -90,7 +90,7 @@
         "R5",
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "M0148 \u2014 a time-lock on the switch"
     }
@@ -98,6 +98,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/roster-35-four-methods/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "roster-35-four-methods",
-  "updated": "2026-10-14T08:48:51+00:00",
+  "updated": "2026-10-14T08:49:54+00:00",
   "worktree": "/home/miftah/seer"
 }

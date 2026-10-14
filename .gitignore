@@ -41,6 +41,8 @@ engine/.research-dv/
 engine/.research-dv.tmp/
 engine/.research-dv.old/
 engine/.research-dv-smoke/
+engine/.research-dv500/
+engine/.research-dv500.tmp/
 engine/.cache/
 
 # misc

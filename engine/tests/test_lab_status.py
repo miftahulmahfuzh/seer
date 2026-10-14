@@ -151,7 +151,9 @@ def test_a_candidate_that_misses_an_owner_condition_is_named_as_unrescuable(tmp_
     c = store.connect(db)
     _method(c, "M0001", status="rejected", trials=[
         _trial(method_id="M0001", candidate_id="M0001-A", config_digest="a",
-               max_drawdown=0.31, failed=f"max DD <= 15%; {OLD_LUCK_LABEL}",
+               # 0.55: a 31% fall cleared the lab's dev screen once it moved to 50% on
+               # 2026-10-14 (design §18), and this candidate has to MISS an owner condition.
+               max_drawdown=0.55, failed=f"max DD <= 15%; {OLD_LUCK_LABEL}",
                eligible=False, dsr=0.99),
     ])
     c.close()

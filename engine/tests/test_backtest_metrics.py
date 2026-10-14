@@ -117,7 +117,9 @@ def test_parity_checklist_passes_only_when_every_rule_holds():
     assert [i.ok for i in items] == [False, True, True, True]
     assert items[0].val == "3.0 mo"
     assert all(i.ok for i in checklist(Metrics(**{**BASE.__dict__, "months": 18.0}), 0.046))
-    assert checklist(Metrics(**{**BASE.__dict__, "max_drawdown": 0.21, "months": 18.0}), 0.046)[3].ok is False
+    # 0.26, not the 0.21 this line used until 2026-10-14: the owner raised the real-money bar
+    # 20% -> 25% that day (design §18) and a 21% fall now PASSES go-live condition 4.
+    assert checklist(Metrics(**{**BASE.__dict__, "max_drawdown": 0.26, "months": 18.0}), 0.046)[3].ok is False
 
 
 def test_parity_checklist_labels_and_values_match_the_web_strings():
@@ -126,7 +128,7 @@ def test_parity_checklist_labels_and_values_match_the_web_strings():
         ("≥ 18 months forward", "3.0 mo"),
         ("Beats SPY", "+6.8 vs +4.6"),
         ("Profit factor ≥ 1.3", "1.42"),
-        ("Max drawdown ≤ 20%", "7.9%"),
+        ("Max drawdown ≤ 25%", "7.9%"),
     ]
 
 

@@ -11,7 +11,7 @@ describe('go-live thresholds', () => {
   });
 
   it('labels the threshold it actually compares against', () => {
-    expect(MAX_DRAWDOWN_LABEL).toBe('Max drawdown ≤ 20%');
+    expect(MAX_DRAWDOWN_LABEL).toBe('Max drawdown ≤ 25%');
   });
 
   // MIN_PAPER_MONTHS has no carrier in the lab snapshot (it is a forward-paper bar, not a lab

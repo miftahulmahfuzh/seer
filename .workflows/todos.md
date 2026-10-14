@@ -2,14 +2,14 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-12 14:03
-**Total Active Tasks**: 1
+**Last Updated**: 2026-10-14
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
@@ -23,6 +23,16 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [ ] **P1-ROOT-M2XZ** Phase 2: The dated owner revision, and the before/after
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns `docs/plans/2026-10-03-seer-design.md` — a new `## 18. Revision 2026-10-14 (owner)` appended after `## 17.`, plus exactly one line above it: §1 condition 4's inline revision marker at `:20`. Touches nothing else above `## 18.`; §13 is edited by nobody. Exit: §18 exists in the house shape of `## 11.`/`## 13.`, states condition 4 now reads 25% with the dev screen a separate number and why, carries the measurement (257 of 399 trials beat SPY TR and the old 20% bar rejected 188 of them; SPY itself fell 56.5% at 7.86%/yr) plus phase 1's measured before/after (the eligibility pair 26→67 trials over 16→32 methods as the headline, the browsable pair 93→319 beside it, labelled), states the residual risk honestly (N is unaffected, since it counts methods tried rather than methods that passed), records the trades-bar held-out set growing five→twelve and attributes it to the screen rather than the money bar, names the `/sera` drawdown-target rough edge in plain language, carries no stale "do not run `lab reevaluate`" caveat, and passes Step 0's hard-stop precondition check against the landed phase 1 constants.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/split-screen-from-bar/PLAN.md` (phase 2 of 2)
+  - **Satisfies**: R1 — Raise the real-money drawdown bar from 20% to 25% (§1 condition 4, the promote gate, the leaderboard); R2 — Split the lab's dev-eligibility screen off from that bar, so a method can be studied without being fundable; R3 — Record it as a dated owner revision, the way §11 and §13 record their predecessors
+  - **Depends on**: P1-ENG-QK7F
+  - **Plan**: `.workflows/plan/P1-ROOT-M2XZ.md`
+
 - [ ] **P1-ROOT-H5NX** Phase 5: Pre-register, run, record, stage and write up
   - **Difficulty**: NORMAL
   - **Type**: Feature

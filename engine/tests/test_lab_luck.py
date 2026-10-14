@@ -224,7 +224,10 @@ def test_owner_misses_is_a_one_line_delegation_and_reads_the_row_not_the_string(
         "profit_factor": 1.6, "trades": 250, "failed": "max DD <= 15%; DSR >= 0.95",
     }
     assert lab_cmd._owner_misses(row) == []          # both recorded bars have moved
-    assert lab_cmd._owner_misses({**row, "max_drawdown": 0.247}) == [dev.FAILURE_LABELS[1]]
+    # 0.55 and not the 0.247 this line used until 2026-10-14: the owner split the lab's dev
+    # screen off his real-money bar that day and set it to 50% (design §18), and _owner_misses
+    # delegates to store.owner_failures, which compares against the screen.
+    assert lab_cmd._owner_misses({**row, "max_drawdown": 0.55}) == [dev.FAILURE_LABELS[1]]
     assert lab_cmd._owner_misses({**row, "failed": store.OWNER_INPUTS_LABEL}) == [
         store.OWNER_INPUTS_LABEL
     ]  # the one condition carried from the record rather than re-derived

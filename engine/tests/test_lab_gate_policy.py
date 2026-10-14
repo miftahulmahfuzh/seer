@@ -66,6 +66,16 @@ from seer_engine.lab import npolicy, store
 
 _EULER_GAMMA = 0.5772156649015329
 
+#: The drawdown bar the owner set on 2026-10-07, and the bar every historical claim in this
+#: module is about. Pinned as a literal and NOT read from ``tuning``: on 2026-10-14 the owner
+#: raised the real-money bar to 0.25 and split the lab's dev screen off at
+#: ``tuning.DEV_MAX_DRAWDOWN`` = 0.50 (design §18). The facts below -- that 15% -> 20% unblocked
+#: exactly M0022-W-TV14, M0022-W-TV16 and M0020-W-NOSTOP, and that M0007-N20-RAW,
+#: M0019-RAW20-S25 and M0001-TV10 stayed out, each for its own reason -- are facts about that
+#: day. A test about history that reads a live constant stops being about history the moment the
+#: constant moves, and the coverage quietly evaporates instead of going red.
+BAR_2026_10_07 = 0.20
+
 
 # --------------------------------------------------------------------------- fixtures
 
@@ -98,6 +108,20 @@ def at_all_trials(monkeypatch):
 
 
 @pytest.fixture()
+def screen_at_2026_10_07(monkeypatch):
+    """Judge as the lab judged on 2026-10-07: the dev screen back at that day's 20%.
+
+    ``store.owner_failures`` and ``store._blocking`` read ``tuning.DEV_MAX_DRAWDOWN``. Setting it
+    to ``BAR_2026_10_07`` re-enacts the day without touching a recorded row and without asserting
+    anything about today's screen -- which the tests under "the split" assert instead.
+    """
+    from seer_engine.backtest import tuning
+
+    monkeypatch.setattr(tuning, "DEV_MAX_DRAWDOWN", BAR_2026_10_07)
+    return BAR_2026_10_07
+
+
+@pytest.fixture()
 def conn(tmp_path):
     c = store.connect(tmp_path / "lab.sqlite")
     yield c
@@ -127,14 +151,21 @@ def _trial(**kw) -> store.TrialRow:
 def _ballast(method_id="M0001", **kw) -> store.TrialRow:
     """A second dev trial, so the fixture lab has a real trial-Sharpe variance to deflate by.
 
-    It is deliberately **ineligible on an owner condition no bar in this plan set moves** -- a
-    24.5% drawdown, outside even the owner's new 20% bar -- so it supplies the spread
-    ``dev_sharpe_variance`` needs without ever appearing in an eligible set or an ``unblocked``
-    tuple. Its Sharpe differs from ``_trial``'s default, which is the whole of its job.
+    It is deliberately **ineligible on an owner condition**, a 55% drawdown outside the lab's
+    dev screen, so it supplies the spread ``dev_sharpe_variance`` needs without ever appearing in
+    an eligible set or an ``unblocked`` tuple. Its Sharpe differs from ``_trial``'s default, which
+    is the whole of its job.
+
+    It fell 24.5% until 2026-10-14. That was outside the owner's 20% bar, and the docstring here
+    used to say the bar it sat outside of was one "no bar in this plan set moves". The bar did
+    move: on 2026-10-14 the owner split the lab's dev screen off the real-money bar and set it to
+    50% (design §18), and at 24.5% this row would have become *eligible* -- silently turning every
+    fixture that leans on it into one that asserts its claim for the wrong reason. The number is
+    chosen to stay clear of the screen; what the ballast is for has not changed.
     """
     base = dict(
         method_id=method_id, candidate_id=f"{method_id}-BALLAST",
-        config_digest=f"ballast-{method_id}", sharpe=1.46, max_drawdown=0.245, mar=0.1,
+        config_digest=f"ballast-{method_id}", sharpe=1.46, max_drawdown=0.55, mar=0.1,
         dsr=0.50, n_trials_at_run=2, failed="max DD <= 15%; DSR >= 0.95",
     )
     base.update(kw)
@@ -197,12 +228,20 @@ def test_the_owner_inputs_label_is_the_one_dev_still_writes():
         assert any(ch.isdigit() for ch in other), other
 
 
-def test_owner_failures_rederives_the_four_thresholds_and_carries_owner_inputs(conn):
+def test_owner_failures_rederives_the_four_thresholds_and_carries_owner_inputs(
+    conn, screen_at_2026_10_07
+):
     """**Four re-derived, one carried** -- the heart of the reconciled design.
 
     The recorded ``failed`` string names the bars of the run date. Both of them have moved: the
     luck bar to 0.90 (D1) and the drawdown bar to 20% (D6, phase 8). Only ``owner inputs`` comes
     out of the string.
+
+    Judged at the 2026-10-07 screen (``screen_at_2026_10_07``), because 19.3% vs 20.7% is a
+    distinction only that day's bar draws. On 2026-10-14 the owner split the dev screen off the
+    real-money bar and set it to 50% (design §18), under which both rows clear and the claim this
+    test makes -- that the recorded string is re-derived rather than parsed -- would be made by a
+    fixture that no longer exercises it.
     """
     from seer_engine.backtest import dev, tuning
 
@@ -224,13 +263,21 @@ def test_owner_failures_rederives_the_four_thresholds_and_carries_owner_inputs(c
         ])
     rows = {r["candidate_id"]: r for r in conn.execute("SELECT * FROM trials")}
 
-    assert tuning.MAX_DRAWDOWN == 0.20, "phase 8 sets the drawdown bar this phase reads"
+    assert tuning.DEV_MAX_DRAWDOWN == BAR_2026_10_07 == 0.20, (
+        "the dev screen as it stood on 2026-10-07, which is what this test is about"
+    )
     # A: the recorded string says it missed drawdown; the columns say it clears today's bar.
     assert rows["A"]["failed"] == "max DD <= 15%; DSR >= 0.95"       # untouched on disk
     assert store.owner_failures(rows["A"]) == ()                      # ...and clear today
     # B: still outside the bar, so still a miss -- and named with TODAY's label, not the old one.
     assert store.owner_failures(rows["B"]) == (drawdown,)
-    assert drawdown == "max DD <= 20%" != rows["B"]["failed"].split("; ")[0]
+    # Two different numbers are in play and that is the point. The COMPARISON is made against
+    # whatever ``tuning.DEV_MAX_DRAWDOWN`` says right now -- 20% here, because this test re-enacts
+    # 2026-10-07 -- while the LABEL comes from ``dev.FAILURE_LABELS``, interpolated once at import
+    # from the live screen. Neither is the recorded string, which is what this test exists to say:
+    # the condition is re-derived from the column, never parsed back out of ``failed``.
+    assert drawdown.startswith("max DD <= ") != rows["B"]["failed"].startswith(drawdown)
+    assert drawdown != rows["B"]["failed"].split("; ")[0] == "max DD <= 15%"
     # C: three thresholds re-derived from columns, plus `owner inputs` carried from the string.
     assert store.owner_failures(rows["C"]) == (spy, pf, trades, owner)
     assert store.owner_failures(rows["C"])[-1] == store.OWNER_INPUTS_LABEL
@@ -286,8 +333,11 @@ def test_a_recorded_095_label_is_read_as_zero_owner_misses(conn):
 def test_verdict_failed_is_a_tuple_of_labels_in_the_recorded_order(conn):
     """Shape, pinned: `failed` is a tuple of label strings, never a "; "-joined string.
 
-    The labels are the **live** ones: a 24.5% drawdown is outside today's 20% bar and is named
-    `max DD <= 20%`, not the `max DD <= 15%` the row happens to have recorded.
+    The labels are the **live** ones: a 55% drawdown is outside today's 50% dev screen and is
+    named `max DD <= 50%`, not the `max DD <= 15%` the row happens to have recorded. (The fixture
+    fell 24.5% until 2026-10-14, when the owner split the screen off the real-money bar and set it
+    to 50%, design §18 -- a 24.5% fall now clears the screen and would have stopped exercising the
+    claim. The claim itself is unchanged: labels are re-derived, never parsed.)
     """
     from seer_engine.backtest import dev
 
@@ -295,9 +345,9 @@ def test_verdict_failed_is_a_tuple_of_labels_in_the_recorded_order(conn):
     _method(conn)
     with conn:
         store.insert_trials(conn, [
-            _trial(dsr=0.5, max_drawdown=0.245, failed="max DD <= 15%; DSR >= 0.95",
+            _trial(dsr=0.5, max_drawdown=0.55, failed="max DD <= 15%; DSR >= 0.95",
                    n_trials_at_run=2),
-            _ballast(candidate_id="M0001-SPREAD", config_digest="spread", max_drawdown=0.30),
+            _ballast(candidate_id="M0001-SPREAD", config_digest="spread", max_drawdown=0.60),
         ])
     row = conn.execute("SELECT * FROM trials WHERE candidate_id = 'M0001-A'").fetchone()
     v = store.verdict(conn, row, at=store.Gate(n=2, policy="all-trials"))
@@ -319,7 +369,7 @@ def test_verdict_rederives_the_luck_label_and_the_four_thresholds(conn):
         lucky, owner = store.insert_trials(conn, [
             _trial(candidate_id="M0001-A", config_digest="da", failed="DSR >= 0.95",
                    sharpe=0.94, n_trials_at_run=2),
-            _trial(candidate_id="M0001-B", config_digest="db", max_drawdown=0.245,
+            _trial(candidate_id="M0001-B", config_digest="db", max_drawdown=0.55,
                    failed="max DD <= 15%; DSR >= 0.95", sharpe=1.46, n_trials_at_run=2),
         ])
         for n in (lucky, owner):
@@ -332,8 +382,9 @@ def test_verdict_rederives_the_luck_label_and_the_four_thresholds(conn):
     assert a.dsr == pytest.approx(b.dsr)        # identical moments, identical DSR
     assert a.dsr > store.DSR_MIN
     assert a.failed == () and a.eligible is True
-    # ...and B's drawdown of 24.5% is still outside today's bar, re-derived from the column and
-    # named with today's label rather than the one the row recorded.
+    # ...and B's drawdown of 55% is still outside today's dev screen, re-derived from the column
+    # and named with today's label rather than the one the row recorded. (It fell 24.5% until
+    # 2026-10-14, when the owner split the screen off the real-money bar at 50%, design §18.)
     from seer_engine.backtest import dev
 
     assert b.failed == (dev.FAILURE_LABELS[1],)
@@ -415,8 +466,10 @@ def test_a_trial_with_no_evaluable_dsr_fails_the_luck_test(conn):
 def test_an_owner_condition_is_never_re_decided_by_the_n_policy(conn):
     """The N policy moves the luck test and nothing else.
 
-    An owner condition is re-derived against its own constant, which no policy touches: a 24.5%
-    drawdown is outside the 20% bar at every N, and `owner inputs` is outside every bar there is.
+    An owner condition is re-derived against its own constant, which no policy touches: a 55%
+    drawdown is outside the 50% dev screen at every N, and `owner inputs` is outside every bar
+    there is. (24.5% against a 20% bar until 2026-10-14, when the owner split the screen off the
+    real-money bar and set it to 50%, design §18. The claim is the same one.)
     """
     from seer_engine.backtest import dev
 
@@ -427,8 +480,8 @@ def test_an_owner_condition_is_never_re_decided_by_the_n_policy(conn):
     _method(conn, "M0002")
     with conn:
         n, _ = store.insert_trials(conn, [
-            _trial(max_drawdown=0.245, failed="max DD <= 15%; DSR >= 0.95", n_trials_at_run=2),
-            _ballast("M0002", max_drawdown=0.30),
+            _trial(max_drawdown=0.55, failed="max DD <= 15%; DSR >= 0.95", n_trials_at_run=2),
+            _ballast("M0002", max_drawdown=0.60),
         ])
         _moments(conn, n, sr_daily=0.0595, t=3900, var_trials=2.395e-04, n_at_run=2)
     row = conn.execute("SELECT * FROM trials WHERE candidate_id = 'M0001-A'").fetchone()
@@ -450,7 +503,7 @@ def test_best_dev_eligible_keeps_its_contract_on_the_derived_verdict(conn, at_al
                    n_trials_at_run=5),
             _trial(candidate_id="M0001-B", config_digest="db", mar=0.9, sharpe=1.46,
                    n_trials_at_run=5),
-            _trial(candidate_id="M0001-C", config_digest="dc", mar=1.4, max_drawdown=0.245,
+            _trial(candidate_id="M0001-C", config_digest="dc", mar=1.4, max_drawdown=0.55,
                    failed="max DD <= 15%; DSR >= 0.95", sharpe=1.10,
                    n_trials_at_run=5),  # top MAR, owner fail
             _trial(candidate_id="M0001-D", config_digest="dd", mar=None, sharpe=0.80,
@@ -575,14 +628,17 @@ def test_reevaluate_refuses_outright_if_a_verdict_contradicts_the_record(conn, m
     ``_blocking`` is written separately so that a future change to ``owner_failures`` or to
     ``verdict`` cannot quietly promote a method whose recorded numbers do not clear the bars.
 
-    24.5% is outside today's 20% bar, so this is a genuine drawdown failure and not a stale label.
+    55% is outside today's 50% dev screen, so this is a genuine drawdown failure and not a stale
+    label. (24.5% against the 20% bar until 2026-10-14, when the owner split the screen off the
+    real-money bar, design §18. ``_blocking`` reads the screen, not the bar -- the edge it guards
+    is ``rejected -> dev-eligible``, which is a research decision.)
     """
     _method(conn, "M0003")
     with conn:
         store.update_method(conn, "M0003", status="registered")
         store.update_method(conn, "M0003", status="rejected")
         store.insert_trials(conn, [
-            _trial(method_id="M0003", candidate_id="M0003-A", max_drawdown=0.245,
+            _trial(method_id="M0003", candidate_id="M0003-A", max_drawdown=0.55,
                    failed="max DD <= 15%; DSR >= 0.95", n_trials_at_run=1),
         ])
     monkeypatch.setattr(
@@ -787,7 +843,7 @@ def test_the_committed_lab_keeps_every_recorded_verdict_and_spends_no_look(commi
     ).fetchone() is not None
 
 
-def test_the_two_moved_bars_unblock_exactly_m0022_and_m0020(committed):
+def test_the_two_moved_bars_unblock_exactly_m0022_and_m0020(committed, screen_at_2026_10_07):
     """R1 + R5, measured. At (N=110, DSR >= 0.90, max DD <= 20%) **three** candidates clear.
 
     Two of them are M0022's, admitted by the luck threshold the owner moved (D1). The third is
@@ -796,7 +852,7 @@ def test_the_two_moved_bars_unblock_exactly_m0022_and_m0020(committed):
     """
     from seer_engine.backtest import tuning
 
-    assert store.DSR_MIN == 0.90 and tuning.MAX_DRAWDOWN == 0.20
+    assert store.DSR_MIN == 0.90 and tuning.DEV_MAX_DRAWDOWN == BAR_2026_10_07
     # This phase migrates the committed database (Decision D5, Step 10), so by the time this
     # test runs on a landed branch M0020 and M0022 already read `dev-eligible` and there is no
     # edge left to take. Which methods the two moved bars UNBLOCK is the claim either way: it is
@@ -834,7 +890,7 @@ def test_the_two_moved_bars_unblock_exactly_m0022_and_m0020(committed):
     assert store.test_looks(committed) == 0
 
 
-def test_the_three_near_misses_that_still_do_not_qualify(committed):
+def test_the_three_near_misses_that_still_do_not_qualify(committed, screen_at_2026_10_07):
     """Each of the three fails for a different, named reason -- and none of them is a stale label.
 
     This is the test that says the two moved bars did not become a general amnesty.
@@ -853,7 +909,7 @@ def test_the_three_near_misses_that_still_do_not_qualify(committed):
     #    column would admit it. RE-EVALUATED at today's N = 110 it is 0.8985, which is not.
     #    The gate uses the re-evaluated number (Decision D8), so it stays out.
     m7 = rows["M0007-N20-RAW"]
-    assert float(m7["max_drawdown"]) <= tuning.MAX_DRAWDOWN
+    assert float(m7["max_drawdown"]) <= BAR_2026_10_07
     assert store.owner_failures(m7) == ()                      # every owner condition clears
     assert int(m7["n_trials_at_run"]) == 85
     assert float(m7["dsr"]) == pytest.approx(0.9138, abs=1e-3)  # recorded, at N = 85: ABOVE 0.90
@@ -863,7 +919,7 @@ def test_the_three_near_misses_that_still_do_not_qualify(committed):
 
     # 2. M0019-RAW20-S25 is outside even the new bar, at 20.7%.
     m19 = rows["M0019-RAW20-S25"]
-    assert float(m19["max_drawdown"]) > tuning.MAX_DRAWDOWN
+    assert float(m19["max_drawdown"]) > BAR_2026_10_07
     assert store.owner_failures(m19) == (dev.FAILURE_LABELS[1],)
     assert store.verdict(committed, m19, at=g).eligible is False
 
@@ -970,9 +1026,18 @@ def test_m0011_stays_rejected_so_rm_and_rmw_diverge_on_purpose(committed):
     assert v.eligible is False
 
 
-def test_no_candidate_that_fails_a_condition_at_todays_bars_becomes_eligible(committed):
+def test_no_candidate_that_fails_a_condition_at_todays_bars_becomes_eligible(
+    committed, screen_at_2026_10_07
+):
     """The owner conditions bind under every N policy. Note the argument: ``owner_failures`` takes
-    the **row**, so this asks what each trial is today, not what its recorded string says."""
+    the **row**, so this asks what each trial is today, not what its recorded string says.
+
+    Judged at the 2026-10-07 screen, because the named pair below is a fact about that day:
+    M0019-RAW20-S25 fell 20.7%, outside the bar of its own time. On 2026-10-14 the owner split the
+    dev screen off the real-money bar at 50% (design §18) and that fall clears it -- so under the
+    live screen M0019 is no longer held out on drawdown and the historical claim would quietly
+    stop being tested. The general rule in the loop above holds at any screen; the two named rows
+    are the record of that day."""
     g = store.gate(committed)
     for row in committed.execute("SELECT * FROM trials WHERE window = 'dev'"):
         if store.owner_failures(row):
@@ -1141,3 +1206,74 @@ def test_the_old_bars_reproduce_todays_verdicts(committed, monkeypatch):
         if v.derived:
             assert v.eligible == bool(row["eligible"]), row["candidate_id"]
     assert _recorded_digest(committed) == RECORDED_VERDICT_DIGEST
+
+
+# --------------------------------------------------------------------- the split (design §18)
+
+
+def test_a_thirty_percent_fall_is_worth_studying_and_is_not_worth_money(conn):
+    """**THE SPLIT.** One trial, two answers, and they disagree on purpose.
+
+    This is the whole of R2. Before 2026-10-14 one float decided both "is this worth another hour
+    of study" and "may the owner put money behind it", and the second answer was silently
+    deciding the first. The owner separated them (design §18): ``tuning.DEV_MAX_DRAWDOWN`` is the
+    screen, ``tuning.MAX_DRAWDOWN`` is the bar, and a trial that falls 30% now sits between them.
+
+    It is a real shape, not a hypothetical. ``M0050-ON`` is recorded at a 30.48% fall with a
+    +823.2% total return against SPY TR's +257.2%, a profit factor of 2.83, 794 closed trades and
+    a DSR of 0.973. The fixture below is that trial's shape, built from the module's own helpers
+    so this test owns no committed state and spends no test-window look.
+
+    If this test ever goes green by the two constants being equal again, the split is gone and so
+    is R2. The first assertion is there to say so out loud.
+    """
+    from seer_engine.backtest import dev, metrics, tuning
+
+    assert tuning.DEV_MAX_DRAWDOWN > 0.30 > tuning.MAX_DRAWDOWN, (
+        "the dev screen and the owner's real-money bar must straddle 30%: the screen admits a "
+        "trial for study that the bar refuses funding. If these two numbers have collapsed back "
+        "into one, R2 is undone and this is the test that was supposed to notice"
+    )
+
+    _method(conn)
+    with conn:
+        n, _ = store.insert_trials(conn, [
+            _trial(candidate_id="M0001-A", config_digest="da",
+                   total_return=8.232, spy_tr_return=2.572, cagr=0.102,
+                   max_drawdown=0.3048, profit_factor=2.83, trades=794, mar=0.33,
+                   failed="max DD <= 20%", eligible=False, n_trials_at_run=2),
+            _ballast(candidate_id="M0001-SPREAD", config_digest="spread"),
+        ])
+        _moments(conn, n, sr_daily=0.0595, t=3900, var_trials=2.395e-04, n_at_run=2)
+    row = conn.execute("SELECT * FROM trials WHERE candidate_id = 'M0001-A'").fetchone()
+
+    # 1. THE SCREEN SAYS YES. It is worth another hour of study: no owner condition misses, and
+    #    the drawdown label is not among them even though the row recorded one.
+    assert store.owner_failures(row) == (), (
+        "a 30.5% fall clears the 50% dev screen, so nothing holds this trial out of the lab's "
+        "attention"
+    )
+    v = store.verdict(conn, row, at=store.Gate(n=2, policy="all-trials"))
+    assert v.eligible is True and v.failed == ()
+    assert dev.FAILURE_LABELS[1] == "max DD <= 50%"      # the label names the screen it used
+
+    # 2. ...and the recorded string still says what it said on its own day. Nothing was rewritten.
+    assert row["failed"] == "max DD <= 20%" and bool(row["eligible"]) is False
+
+    # 3. THE REAL-MONEY BAR SAYS NO. §1 condition 4, the one the owner's money answers to, still
+    #    refuses it -- at 25%, which is itself looser than the 20% that judged it.
+    m = metrics.Metrics(
+        total_return=8.232, win_rate=0.58, profit_factor=2.83, max_drawdown=0.3048,
+        trades=794, months=240.0,
+    )
+    dd_item = {c.label: c for c in metrics.checklist(m, 2.572)}[metrics.MAX_DRAWDOWN_LABEL]
+    assert dd_item.label == "Max drawdown ≤ 25%"
+    assert dd_item.ok is False, (
+        "the go-live checklist must still refuse a 30.5% fall. If this passes, the owner's "
+        "real-money bar followed the dev screen and §1 condition 4 means nothing"
+    )
+    assert float(row["max_drawdown"]) > tuning.MAX_DRAWDOWN   # the D16 survivorship bar too
+
+    # 4. And the second, independent no on the write edge agrees with the SCREEN, not the bar --
+    #    because the edge it guards is `rejected -> dev-eligible`, which is research, not money.
+    assert store._blocking(row, store.funding_of(conn, row["n"])) == ()

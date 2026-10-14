@@ -1239,12 +1239,16 @@ def test_the_gate_refuses_a_promoted_variant_that_falls_past_the_bar_on_honest_d
     assert hardgate.failed_kin(conn, "M0001") == ()          # kin is NOT why it is refused
     hardgate.check(conn, "M0001")                            # clean before the grid says otherwise
 
-    g = _grid(tmp_path, [("M0001", "M0001-A", "survivorship", "0.2346")])
+    # The fall is 28.46% and not the 23.46% this fixture used until 2026-10-14: the owner raised
+    # the real-money bar 20% -> 25% that day (design §18) and 23.46% now sits INSIDE it. D16 is a
+    # real-money rule and keeps reading ``tuning.MAX_DRAWDOWN``, so the fixture moves with the bar
+    # rather than the rule moving to the lab's looser dev screen.
+    g = _grid(tmp_path, [("M0001", "M0001-A", "survivorship", "0.2846")])
     monkeypatch.setattr(survivorship_record, "GRID_PATH", g)
     with pytest.raises(store.LabError) as e:
         hardgate.check(conn, "M0001")
     msg = str(e.value)
-    assert "M0001-A" in msg and "23.46%" in msg and "20%" in msg and "D16" in msg
+    assert "M0001-A" in msg and "28.46%" in msg and "25%" in msg and "D16" in msg
     assert "grid.csv" in msg
 
 

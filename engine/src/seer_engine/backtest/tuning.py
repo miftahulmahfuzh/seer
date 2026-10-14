@@ -34,11 +34,19 @@ GRID_LIMIT: tuple[Decimal, ...] = (Decimal("0.25"), Decimal("0.5"), Decimal("0.7
 GRID_TP: tuple[Decimal, ...] = (Decimal("0.75"), Decimal("1.0"), Decimal("1.5"))
 GRID_SL: tuple[Decimal, ...] = (Decimal("1.0"), Decimal("1.5"), Decimal("2.0"))
 
-# go-live #4, re-exported from ``metrics`` so ``checklist`` and this module cannot drift apart.
-# Every reader of the threshold (dev.make_row, lab.store.snapshot, dev_report, qualifies, gate)
-# goes through this name; the value lives in ``metrics.MAX_DRAWDOWN``. Raised 0.15 -> 0.20 by the
-# owner on 2026-10-07; design §11.
+# go-live #4 -- the REAL-MONEY bar, re-exported from ``metrics`` so ``checklist`` and this module
+# cannot drift apart. Every reader of the real-money threshold (lab.store.snapshot, dev_report,
+# qualifies, gate, walkforward.gate_p3b, b_walkforward.gate_p6a, lab.hardgate's D16 rule) goes
+# through this name; the value lives in ``metrics.MAX_DRAWDOWN``. Raised 0.15 -> 0.20 by the owner
+# on 2026-10-07 (design §11) and 0.20 -> 0.25 on 2026-10-14 (design §18).
 MAX_DRAWDOWN = _metrics.MAX_DRAWDOWN
+# The lab's DEV SCREEN, re-exported for the same reason. NOT the bar above: this one decides what
+# the lab studies, not what the owner funds, and it is deliberately far looser. Split off from
+# MAX_DRAWDOWN by the owner on 2026-10-14 (design §18); ``metrics.DEV_MAX_DRAWDOWN`` carries the
+# measurement. Exactly four call sites read it -- dev.FAILURE_LABELS, dev.make_row,
+# lab.store.owner_failures and lab.store._blocking -- and they are one decision written four
+# times. Anything that collapses this back into MAX_DRAWDOWN undoes the split.
+DEV_MAX_DRAWDOWN = _metrics.DEV_MAX_DRAWDOWN
 # go-live #1, re-exported for the same reason. Replaced ">= 100 closed trades" by the owner
 # on 2026-10-07; design §13. NOTE this is the FORWARD-paper bar: the dev-window gate keeps its
 # own trades condition (``dev._MIN_TRADES``), and the asymmetry is intentional.

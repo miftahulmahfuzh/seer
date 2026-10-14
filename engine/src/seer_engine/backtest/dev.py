@@ -19,10 +19,11 @@ this module). It never imports ``seer_engine.research``, the impure research sto
   ``DESIGN_V0`` bracket strategies reach the unchanged ``run_backtest``, every other rule set
   the book engine. SPY curves come from ``benchmark.spy_curves`` on the same window and the
   same starting cash, with the store's SPY dividends.
-- **D8.** ``make_row`` applies the §1 thresholds (beating total-return SPY,
-  ``tuning.MAX_DRAWDOWN``, ``tuning.MIN_PROFIT_FACTOR``, 100 closed trades) and the
+- **D8.** ``make_row`` applies the dev screen (beating total-return SPY,
+  ``tuning.DEV_MAX_DRAWDOWN``, ``tuning.MIN_PROFIT_FACTOR``, 100 closed trades) and the
   owner-input rule; ``finalists`` ranks the eligible rows by MAR and keeps one per family, at
-  most three.
+  most three. The drawdown condition is the **screen**, not §1's real-money bar: the two were
+  separated on 2026-10-14 (design §18) and ``tuning.MAX_DRAWDOWN`` is the other one.
 - **D7.** ``deflated_sharpe`` is Bailey & López de Prado's (2014) deflated Sharpe ratio for
   the report's multiple-testing note.
 
@@ -85,15 +86,19 @@ value built from ``research.DEV_END``; ``tests/test_backtest_window.py`` pins th
 
 FAILURE_LABELS: tuple[str, ...] = (
     "beats SPY TR",
-    # go-live #4's label, interpolated from the bar it names so the two can never disagree.
-    # Raised 0.15 -> 0.20 by the owner on 2026-10-07 (design §1 item 4, §11); at 0.15 this
-    # formats to "max DD <= 15%" byte-for-byte, which is what makes the change revertible and
-    # what keeps the 110 recorded rows comparable. The PREFIX is the stable part: `trials.failed`
-    # is append-only, so rows judged before that day keep "max DD <= 15%" for ever and rows
-    # judged after carry "max DD <= 20%". Both are misses, and every reader -- store.owner_failures
-    # in Python, DRAWDOWN_FAILURE_PREFIX in web/lib/sera/derive.ts -- matches on "max DD <= ",
-    # never on the whole string. See tests/test_lab_gate_wording.py (phase 7).
-    f"max DD <= {tuning.MAX_DRAWDOWN:.0%}",
+    # The DEV SCREEN's label, interpolated from the bar it names so the two can never disagree.
+    # This is ``tuning.DEV_MAX_DRAWDOWN``, not ``tuning.MAX_DRAWDOWN``: these five labels are the
+    # lab's D8 dev-eligibility conditions -- what is worth studying -- and on 2026-10-14 the owner
+    # split that screen off from the real-money bar (design §18). ``metrics.DEV_MAX_DRAWDOWN``
+    # carries the argument.
+    #
+    # The number has moved three times and the PREFIX is the stable part. ``trials.failed`` is
+    # append-only, so rows judged before 2026-10-07 keep "max DD <= 15%" for ever, rows judged
+    # between then and 2026-10-14 keep "max DD <= 20%", and rows judged from now on carry
+    # "max DD <= 50%". All three are misses, and every reader -- store.owner_failures and
+    # store._blocking in Python, DRAWDOWN_FAILURE_PREFIX in web/lib/sera/derive.ts -- matches on
+    # "max DD <= ", never on the whole string. See tests/test_lab_gate_wording.py.
+    f"max DD <= {tuning.DEV_MAX_DRAWDOWN:.0%}",
     "PF >= 1.3",
     ">= 100 trades",
     "owner inputs",
@@ -437,7 +442,7 @@ def make_row(
         mar = float(rate / m.max_drawdown)
     passed = (
         beats,
-        m.max_drawdown is not None and m.max_drawdown <= tuning.MAX_DRAWDOWN,
+        m.max_drawdown is not None and m.max_drawdown <= tuning.DEV_MAX_DRAWDOWN,
         m.profit_factor is not None and m.profit_factor >= tuning.MIN_PROFIT_FACTOR,
         m.trades >= _MIN_TRADES,
         not candidate_owner_inputs(candidate),

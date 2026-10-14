@@ -2,14 +2,14 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-13 11:05
-**Total Active Tasks**: 2
+**Last Updated**: 2026-10-14
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 1
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
@@ -23,6 +23,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [ ] **P1-ENG-QK7F** Phase 1: Two constants, and everything that reads them
+  - **Difficulty**: HARD
+  - **Type**: Update
+  - **Context**: Owns `backtest/metrics.py`, `backtest/tuning.py`, `backtest/dev.py` (`FAILURE_LABELS`, `make_row`), `lab/store.py` (`owner_failures`, `_blocking`, and `reevaluate_method`'s analysis prose at `:1904`), the ~40 engine tests the change moves (including `test_dev_trades_bar.py`'s `HELD_OUT_BY_THE_TRADES_BAR` list), `web/lib/golive.ts` + `golive.test.ts`, `web/lib/sera/fixture.ts`, and the regenerated `web/data/lab.json` + `lab/lab.sqlite`. Exit: `tuning.MAX_DRAWDOWN == 0.25` and `tuning.DEV_MAX_DRAWDOWN == 0.50` read at exactly the four decision sites (`dev.FAILURE_LABELS`, `dev.make_row`, `store.owner_failures`, `store._blocking`); the real-money bar still refuses a 30%-drawdown trial via `metrics.checklist`'s go-live item 4 even though it is now dev-eligible; `golive.ts`/`golive.test.ts`/`lab.json` all agree at 0.25; every re-expressed test keeps its original historical claim, none deleted; `store.test_looks(conn)` reads 4 before and after, the digest tripwire is green, and `git status --short` is clean after the bare lab commit; ruff is clean, pytest is green with the skip count quoted, and `npx tsc --noEmit && npm test` is green; the measured before/after dev-eligible and browsable trial/method counts are reported; and `store.py:1904`'s re-evaluation prose names the screen rather than the bar.
+  - **Status**: in_progress
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/split-screen-from-bar/PLAN.md` (phase 1 of 2)
+  - **Satisfies**: R1 — Raise the real-money drawdown bar from 20% to 25% (§1 condition 4, the promote gate, the leaderboard); R2 — Split the lab's dev-eligibility screen off from that bar, so a method can be studied without being fundable; R4 — Keep engine and web agreeing — the bar reaches the web as a TS constant and through `lab.json`
+  - **Plan**: `.workflows/plan/P1-ENG-QK7F.md`
+
 - [x] **P1-ENG-0L6E** Phase 1: Resize band relative to the holding's target (`resize_basis` lever)
   - **Difficulty**: NORMAL
   - **Type**: Feature

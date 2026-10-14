@@ -539,7 +539,10 @@ def test_frontier_svg():
     texts = [t.text for t in root.iter(f"{ns}text")]
     assert "F1-A" in texts and "F4-A" in texts and "F1-B" not in texts
     assert "SPY total-return" in texts
-    assert any(t and t.startswith("max drawdown 20%") for t in texts)
+    # The frontier's threshold line is the REAL-MONEY bar and says "(design §1)" in its own
+    # label, so it follows `MAX_DRAWDOWN` to 25% (2026-10-14, design §18) rather than the lab's
+    # dev screen. The dots are dev rows; the line is what the owner would fund.
+    assert any(t and t.startswith("max drawdown 25%") for t in texts)
     assert "Not plotted (no CAGR or drawdown): 1." in svg
     assert root.find(f"{ns}line[@class='lim']") is not None
 
@@ -577,7 +580,7 @@ def test_preregistration_names_each_finalist_exactly():
     assert "- Owner inputs: none" in text
     assert f"- Main: {TEST_START.isoformat()} → data end" in text
     assert f"{TEST_SLICE_START.isoformat()} → data end" in text
-    assert "- Max drawdown ≤ 20%." in text and "- Profit factor ≥ 1.3." in text and "- ≥ 100 closed trades." in text
+    assert "- Max drawdown ≤ 25%." in text and "- Profit factor ≥ 1.3." in text and "- ≥ 100 closed trades." in text
     assert "Beats total-return SPY" in text
     revision = text.split("## Proposed design-§5 revision (D10)")[1]
     for line in describe_rules(DESIGN_V0):

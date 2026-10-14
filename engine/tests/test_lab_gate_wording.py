@@ -259,13 +259,36 @@ def test_the_web_mirrors_the_engines_luck_label_prefix() -> None:
 
 # ------------------------------------------------------------------- the lab journal's newest note
 
+#: The drawdown bar a journal note may state without being stale, because the note that states it
+#: is the dated note that SET it. 0.20 was the bar from 2026-10-07 (design §11) until 2026-10-14,
+#: when the owner raised the real-money bar to 0.25 and split the lab's dev screen off it at
+#: ``tuning.DEV_MAX_DRAWDOWN`` = 0.50 (design §18).
+#:
+#: The journal is append-only -- ``insights_no_update`` aborts an UPDATE -- so insight #27, the
+#: synthesis that announced the 2026-10-07 move and names 20% as what it moved TO, is correct
+#: prose that can never be rewritten. Without this the matcher reads it as a live claim of 20%
+#: against a 50% screen, and the only available fix would be in the journal, which is forbidden.
+#:
+#: **0.15 is deliberately NOT here**, even though it is just as superseded. The note that states
+#: 15% states it as a live limit ("past our 15% limit"), not as the outcome of a dated revision,
+#: and sweeping exactly that sentence is what
+#: ``test_the_prose_matcher_still_catches_the_insight_that_caused_this_guard`` exists to prove.
+#: Excusing it here would delete that coverage rather than re-express it. The rule this set
+#: encodes is narrow on purpose: a bar is excused where the sentence naming it IS the record of
+#: the revision, never merely because the number is old.
+SUPERSEDED_BARS: frozenset[float] = frozenset({0.20})
+
+
 def _stated_bars(text: str) -> list[tuple[int, str, float, float]]:
     """Every bar ``text`` states as the rule in force: (line, as written, what it means, the bar).
 
-    The number's **form** routes it, not the noun it sits beside: a percentage is the drawdown bar
-    and a bare decimal is the luck bar. That is how the whole journal reads -- the luck bar is
-    always ``0.90``, the drawdown bar always ``20%`` -- and it is what lets an unqualified sentence
-    ("our limit is 15%") be swept at all.
+    The number's **form** routes it, not the noun it sits beside: a percentage is the drawdown
+    screen and a bare decimal is the luck bar. That is how the whole journal reads -- the luck bar
+    is always ``0.90``, the drawdown screen always ``50%`` since 2026-10-14 -- and it is what lets
+    an unqualified sentence ("our limit is 15%") be swept at all.
+
+    A percentage naming a bar the lab has since retired (``SUPERSEDED_BARS``) is not returned: it
+    is history, not a stale claim, and the journal row stating it cannot be edited.
 
     A hit inside a code span is skipped by the same rule as the docs sweep above, for the same
     reason: backticks quote a recorded literal rather than state the rule.
@@ -281,7 +304,10 @@ def _stated_bars(text: str) -> list[tuple[int, str, float, float]]:
                 seen.add(m.start(1))
                 written = m.group(1)
                 if written.endswith("%"):
-                    out.append((i, written, float(written[:-1]) / 100, tuning.MAX_DRAWDOWN))
+                    value = float(written[:-1]) / 100
+                    if any(abs(value - b) < 1e-9 for b in SUPERSEDED_BARS):
+                        continue
+                    out.append((i, written, value, tuning.DEV_MAX_DRAWDOWN))
                 else:
                     out.append((i, written, float(written), store.DSR_MIN))
     return out

@@ -17,10 +17,10 @@
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": "M0156: answer is TWENTY, by the pre-registered rule (narrowest rung <=23.0% check fall; 20 names clears at 20.08% and is also best on return 12.46% and MAR 0.621). Width costs this book 1.7 pts/yr and buys 1.5 pts of fall. Mechanism is dated: 4 of 5 widths trough Aug-1998 (market-wide) vs the other book's 2006 (single-name) -- width fixes single-name accidents, not market-wide months, so the two roster books want different widths. 25% bar NOT breached (20.08% max), reassuring result reported as primary. Predictions (2) and (3) recorded as WRONG. Roster untouched; MOM-FR-GT not widened. DECISIONS: (a) split hold B into B1 run+read and B2 verdict, writing prose unlocked between -- rung 1, invariant 7 short-holds; (b) did NOT run lab reevaluate -- already run at 71bbf22 after all four left idea, invariant 13 says once not four times, and lab note changes no trial/status/N; (c) kept both CSVs, raw grid and era grid, neither a superset -- rung 3, Step 6 offers it; (d) era caveat narrowed to measured scope per phase 3: 2006 column reproduces to 0.0003, only whole-window 1998 month-end is convention-sensitive to 0.0035. Suite 4992 passed 3 skipped (opt-in live only, no DB skip); looks 4; grid.csv byte-identical to 661870d; snapshot test green.",
+      "note": "M0156 pre-registered, run at five widths, read on both histories, written verdict. Two dated CSVs + a plain-language record under docs/lab/survivorship/. No engine module edited, no roster entry touched, no migration written. THE ANSWER IS TWENTY by the pre-registered rule, not judgement: narrowest rung at or under 23.0% on the honest history -- twenty clears at 20.08% and is also best on return (12.46%/yr) and MAR (0.621). Widening costs 1.7 pts/yr and buys 1.5 pts of fall. THE MECHANISM IS DATED: four of five widths trough in August 1998, a market-wide month; the OTHER roster book's worst at twenty was spring 2006, a single-name accident in a rising market. Width fixes the second kind and not the first, so the two books want different widths for a reason you can point at on a calendar. Confirming detail: 2006 is the one stretch where width visibly works here (14.3% at twenty -> 9.9% at forty-five) but 2006 was never THIS book's worst episode -- which is also why twenty-FIVE reads worse than twenty: widening shaved 2006 just enough to leave 1998 standing alone. 25% BAR NOT BREACHED (20.08%) so the state-it-at-the-top branch never fired; the reassuring finding is primary throughout. TWO OWN PREDICTIONS RECORDED AS WRONG rather than dropped. DECISIONS: (a) rung 1 split hold B into B1/B2, prose written unlocked between. (b) did NOT run lab reevaluate -- it had already run at 71bbf22 after all four ids left idea; invariant 13 says ONCE not four times, and lab note changes no trial/status/N so its input was unchanged. The literal self-check would have returned true, but it exists to find the one session that CLOSES the batch and phase 5 was that session. Good judgement over literal reading. (c) kept both CSVs -- raw grid carries PF/Sharpe/DSR inputs/reproduction flags, era grid carries trough dates, neither a superset. (d) narrowed the era caveat to the measured scope. VERIFICATION: ruff clean; 4992 passed 3 skipped (opt-in live-store only, no DB skip, PG_TEST_URL exported); 4 test looks before and after; grid.csv byte-identical to 661870d; snapshot byte-compare green with the pair clean at HEAD; nothing of a peer's swept in. HANDOVER ITEM, NOT ACTED ON: CLAUDE.md line 80 still states the real-money bar as 'max DD <= 20%', but design doc line 20 and section 18 record the owner revising condition 4 to <= 25% on 2026-10-14 with his words quoted. CLAUDE.md is one dated revision behind; anyone reading it alone would mis-grade both roster books including phase 2's 35-name entry. Phase 1 used 25% correctly because the dated owner revision governs. FOLLOW-UP correctly scoped out: lab exposure M0156 reads most of it free and would settle whether the book's own safety rule already absorbs the single-name damage width would otherwise absorb.",
       "package": "engine/lab",
       "plan": ".workflows/plan/roster-35-four-methods/phase-1.md",
-      "reported_at": "2026-10-14T09:42:18+00:00",
+      "reported_at": "2026-10-14T09:43:45+00:00",
       "satisfies": [
         "R3",
         "R6"
@@ -31,38 +31,38 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "5a867e8",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 2,
-      "note": "CODE LANDED 6d08ee4 (roster.py, evidence.py, migration 021, 9 engine test files) + 5a867e8 (runbook, build_audit.py, paper.test.ts). Only Step 11 snapshot commit remains, queued on the lock. COORDINATOR-VERIFIED from git, not quoted: both commits file-lists fall entirely inside phase 2 Owns, no peer file; grid.csv byte-identical to 661870d; exactly ONE pin added (RAW35_GT f9def72ae37bd7534807e5957a1e48917fe54322b65a5bbb0cd2898db41c443f) and zero removed or moved so invariant 4 holds; backtest/registry.py untouched; neither commit touches lab.sqlite or lab.json. DECISIONS: (1) rung 6 import placed after m0022 -- plan prose self-contradicted, alphabetical-by-module is the file convention. (2) rung 2+3 test_every_active_entry_pays_gotrade: plan 8j pair list makes RAW-FR-GT both successor and predecessor so the per-pair active assert cannot hold; kept every digest tooth (predecessor retired, pin unmoved, successor digest differs) and moved the active-set claim to one explicit assertion active(ROSTER)==ACTIVE_IDS. No tooth lost. (3) rung 6 two census tests the plan Files table never listed: test_active_drops_retired_entries now retires RAW35-FR-GT because its own comment requires a LIVE entry; test_paper_fnd len(ROSTER_IDS) 19->20, FND index 11 unchanged. | MONTH-END DEFECT DOES NOT TOUCH PHASE 2, checked not assumed: it recomputes nothing, every figure comes from the plan Verified Facts table or straight out of docs/lab/survivorship/roster-width-curve-2026-10-14.csv, and migration 021 era table reproduces that file at widths 20/25/30/35/45/50/70 to the digit. Both figures phase 3 found non-reproducing land on the COMMITTED side here: 0.215678 used for check era_1998 (not 0.212132) and 0.090762 for check era_2008_09 (not 0.090511). Headlines are the daily column: max_drawdown_daily 0.250494 at 20 and 0.201096 at 35, funded_yearly 0.119781 and 0.121106, MAR 0.6022 the peak of that column. 2006 trough claim is the CSV own mdd_peak_month/mdd_trough_month 2006-03->2006-07. COORDINATOR-VERIFIED in the files, not quoted: migration 021 carries THE CAVEAT THAT TRAVELS WITH THE HEADLINE NUMBERS naming TBAND vs the EBAND admitted with the 0.012/0.19 dev gap (4 TBAND mentions), and THE SECOND CAVEAT AND THE RISK OF THIS ADMISSION ending \"drawdown case, not a return case, and that is the risk of this admission\"; roster.py LAB_PROVENANCE reason carries the twin sentence; the runbook dated record ends \"worst fall, not about returns\"; and the committed CSV contains 0.215678/0.090762/0.250494/0.201096/0.119781/0.121106. Nothing lets the 12.11%% headline stand alone.",
+      "note": "RAW35-FR-GT admitted at 35 names, RAW-FR-GT retired; migration 021 is the only writer since promote refuses a second resolver key. Code in 6d08ee4 + 5a867e8. Snapshot needed no commit: a lab phase regenerated it over the merged roster change (invariant 12, last-lands-wins) and its paper block holds RAW35-FR-GT. Decisions: M0139 import kept alphabetical after m0022 (plan's prose contradicted itself, rung 6); step 8j's pair loop cannot assert the successor is active now that RAW-FR-GT is both successor and predecessor, so digest teeth stay per-pair and the active set is asserted once over ACTIVE_IDS (rung 2+3); two census tests the Files table missed (test_paper_fnd roster count 19 to 20, test_active_drops_retired now retires RAW35-FR-GT per its own comment) updated on rung 6. promote --dry-run never attempted. 4992 engine tests and 685 web tests green, ruff and tsc clean, 4 test-window looks before and after, lab.sqlite and grid.csv untouched.",
       "package": "engine/paper`, `db`, `engine/tests`, `web",
       "plan": ".workflows/plan/roster-35-four-methods/phase-2.md",
-      "reported_at": "2026-10-14T09:19:29+00:00",
+      "reported_at": "2026-10-14T09:43:22+00:00",
       "satisfies": [
         "R1",
         "R6"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-W35B",
       "title": "Hold thirty-five: a new roster entry, and `RAW-FR-GT` retired"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "280923e",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 3,
-      "note": "pre-registered fa67e5a (method file + 9-test module, own paths only). DECISION rung 3: inline exec 9>lock;flock does not survive -- every tool call is its own shell -- so the hold is carried by a dedicated background holder on the same lock file, same flock semantics, same kernel-release-on-crash. Sentinel-on-acquisition wait, TIMEOUT branch reports rather than forcing. Six config digests pre-checked read-only against recorded trials so the run cannot be refused on a dedupe key after the backtest is paid for. | RUN LANDED fb3f848 \"M0155 run and read on both price histories -- the brake does not move the fall\". COORDINATOR-VERIFIED: carries exactly the lab pair (lab.sqlite 6242304->6311936, web/data/lab.json), nothing of a peer; grid.csv still byte-identical to 661870d. Headline is a NEGATIVE result answering R2: the single-name brake does not move the fall. Full verdict/insight report pending. | VERDICT LANDED 01efde8 \"M0155 -- the brake fires on names the book does not own\" (two dated docs files; grid.csv re-verified byte-identical to 661870d). THE RESULT: every arm spring-2006 fall is 21.83%% -- identical to the unbraked book to four decimals -- and five of six arms are identical on every era column on BOTH histories. Control reproduces its recorded trial (daily fall, funded return, trade count) to six digits, and the seven recorded widths were re-measured here under ONE convention so the two are directly comparable, which also resolves the month-end convention problem phase 3 found earlier. THE MECHANISM, the part worth keeping: the brake fires on 77%% of monthly decisions and named 820 names in twenty years, OF WHICH THE BOOK HELD ELEVEN. In spring 2006 it named thirty-six and held NONE. The book ranks on a year of momentum and buys the top twenty; a name two standard deviations behind the index over a quarter is already out of that twenty. The two screens select nearly disjoint sets, so the brake spends its life reading names the book does not own. This is why it does nothing -- a far more useful answer than it failed, and it closes R2 with a mechanism rather than a null.",
+      "note": "M0155 is a null and the mechanism is the finding: the brake fires on 77% of monthly decisions, named 820 names in 20 years, and the book held 11 of them (0 in spring 2006). A momentum host never owns the names a relative-shortfall brake catches, so this shape is near-inert by construction. All six arms leave the 2006 fall at 21.83% on the check store, identical to the control to 4dp; no cost, not width in disguise. Decisions: (1) lock hold carried by a background holder process, not inline exec 9> (each tool call is its own shell) [rung 3]; (2) tree-green read against a pristine worktree, peers hold uncommitted edits [rung 1]; (3) era grid moved OUT of the lock hold \u2014 reads no lab DB [rung 1, invariant 7 short holds]; (4) era grid re-measures all 7 widths under one convention and gates on the RECORDED quantities (daily fall/return/trades, exact) instead of M0152's unreproducible month-end columns [rung 2, exit criterion is 'priced against the width answer']. Re-measured 2006 column matches M0152's published row to 0.0003. Lock held 6 min total across two holds. Invariant 13: I was LAST \u2014 ran lab reevaluate, 0 methods moved, committed nothing. Looks 4 before and after; grid.csv byte-identical to 661870d.",
       "package": "engine/lab",
       "plan": ".workflows/plan/roster-35-four-methods/phase-3.md",
-      "reported_at": "2026-10-14T09:19:29+00:00",
+      "reported_at": "2026-10-14T09:43:43+00:00",
       "satisfies": [
         "R2",
         "R6"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P2-ENG-N60A",
       "title": "M0155 \u2014 trim a holding falling apart while the market is fine"
     },
     {
@@ -113,7 +113,7 @@
   ],
   "repo": "/home/miftah/seer",
   "slug": "roster-35-four-methods",
-  "updated": "2026-10-14T09:42:48+00:00",
+  "updated": "2026-10-14T09:43:45+00:00",
   "verified_at": "2026-10-14T09:19:19+00:00",
   "worktree": "/home/miftah/seer"
 }

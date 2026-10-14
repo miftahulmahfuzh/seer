@@ -8,11 +8,18 @@ S = "/tmp/claude-1000/-home-miftah-seer/a9bbceac-2a9d-48c8-a03d-1c5630d980bb/scr
 out = sys.argv[1]
 
 # roster id -> (what it is, the json, the lab's formal verdict on this METHOD)
+#
+# 2026-10-14: migration 021 moved the roster's unbraked momentum book from twenty names to
+# thirty-five (RAW35-FR-GT, lab M0139-N35-EBAND) and retired RAW-FR-GT. The row below is LEFT
+# NAMING THE VARIANT IT WAS MEASURED ON -- M0007-N20-RAW, from `assets.json` -- because relabelling
+# a 20-name measurement as the 35-name variant would be a lie about where the number came from.
+# Rebuilding this page for the current roster means re-running calculate-assets on
+# M0139-N35-EBAND first and pointing the row at that JSON.
 ROWS = [
     ("MVW-FR-GT", "MVW · Steady weights", "M0008-N30-C07", f"{S}/M0008-N30-C07.json",
      "M0008", "rejected — never testable", "Re-evaluated today and still rejected at the current bars, so the lab will not give it a look."),
-    ("RAW-FR-GT", "RAW · Unbraked momentum", "M0007-N20-RAW", f"{S}/assets.json",
-     "M0007", "dev-eligible — no formal look", "The variant you hold. Measured as a report today; its method has never spent a counted look."),
+    ("RAW-FR-GT", "RAW · Unbraked momentum (20 names, retired 2026-10-14)", "M0007-N20-RAW", f"{S}/assets.json",
+     "M0007", "dev-eligible — no formal look", "The variant you held until the roster went to thirty-five names. Measured as a report; its method has never spent a counted look."),
     ("MOM-FR-GT", "MOM · Regime momentum", "M0002-REL-85", f"{S}/M0002-REL-85.json",
      "M0002", "test-failed", "Formally tested today on the exact variant you hold. Failed beats SPY TR, max DD and PF."),
     ("RMW-FR-GT", "RMW · Braked momentum", "M0022-W-TV16", f"{S}/M0022-W-TV16.json",

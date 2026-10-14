@@ -32,12 +32,12 @@ side every earlier entry assumed:
 | `SPY-GT` | Buy and hold SPY, dividends reinvested at the ex-date close | benchmark | — | champion and yardstick; not a strategy |
 | `C-GT` | Strategy C: A's first 10 ranked candidates for the session, minus every symbol whose nightly news check did not say `allow`; 5-day brackets, 4 slots, **daily** | bracket | `design-v0-gotrade` | not applicable: an LLM strategy (design §1 item 5) |
 | `RMW-FR-GT` | Top 20 by rise beyond the market, picked monthly; holds less when jumpy, checked weekly | book | `monthly-rank-weekly-resize-frac-gotrade` | not passed: lab M0022 dev window only |
-| `RAW-FR-GT` | The same book as RMW with the volatility brake removed | book | `monthly-hold-frac-gotrade` | not passed: lab M0007 dev window only |
+| `RAW35-FR-GT` | The same book as RMW with the volatility brake removed, holding **35** names | book | `monthly-hold-frac-gotrade` | not passed (never looked at): lab M0139-N35-EBAND clears every dev check |
 | `MOM-FR-GT` | Top 20 by last year's rise, holding less when jumpy for itself | book | `monthly-hold-frac-gotrade` | not passed: lab M0002 dev window only |
 | `MVW-FR-GT` | Top 30 by last year's rise, weighted to swing least together | book | `monthly-hold-frac-gotrade` | not passed: lab M0008 dev window only |
 
-Thirteen earlier entries are **retired**. A retired entry keeps every row it ever wrote and stays on
-the leaderboard; it only stops trading. None of the thirteen ever stepped a paper session.
+Fourteen earlier entries are **retired**. A retired entry keeps every row it ever wrote and stays on
+the leaderboard; it only stops trading. None of the fourteen ever stepped a paper session.
 
 **`C-GT` is permanent.** It is the daily-trading control: the owner's original plan was to trade
 daily on Gotrade, and `C-GT` is how he finds out how that would have gone. It is expensive — daily
@@ -45,6 +45,34 @@ trading costs roughly 26% a year on a book this size at $28 slots — and that i
 reason to remove it. It is never retired on cost grounds, and it only answers the question while it
 runs on the same starting capital, the same monthly deposits and the same fees as the books beside
 it.
+
+### 2026-10-14 — the roster went from twenty names to thirty-five
+
+The owner's instruction: *"let's change our seer roster to hold 35 stocks instead of 20"*. He
+mirrors this roster with his own money, so the change moves what he buys.
+
+`RAW-FR-GT` is **retired** and `RAW35-FR-GT` replaces it (migration `021_roster_width_35.sql`).
+It is the same book — the same screen, the same ranking, the same SPY 200-day filter, the same rule
+set, the same fees — with one field moved: 20 names to 35. It is a new id because the name count is
+in the frozen spec, so editing the running entry would have failed its next night with a
+`SpecMismatch`. `RAW-FR-GT`'s own spec digest did not move and it keeps everything it wrote.
+
+The evidence is M0152's width curve on the survivorship-check store, the price history that keeps
+the companies that went bankrupt or were bought: there the 20-name book's worst fall is **25.05%**,
+outside the owner's 25% bar, against **20.11%** at 35 names, for slightly more money a year. The
+whole effect rests on one dated episode — spring 2006, when a single holding collapsed while the
+market dipped 2% and made a new high by September — which is the ordinary kind of accident rather
+than a crisis that may not repeat. Over 2009–2015 both widths lose to SPY on that store, and 35
+loses by more: the case for width is a case about the worst fall, not about returns.
+
+**Migration, not `promote`.** A new width needs a new `RESOLVER` key bound to the same allocator
+object, and `promote`'s `object_name_of` refuses an object that two keys name (the key is part of
+the frozen digest). So `promote` can no longer place any variant of this allocator, and 021 writes
+the row on the live database itself. No `record_promotion` note was written, so `lab/lab.sqlite` is
+untouched by this change. The next width of this book takes the same path.
+
+`MOM-FR-GT` is **not** widened: it is the roster's other 20-name book and has never been measured at
+any width on any store. `RMW-FR-GT` and `MVW-FR-GT` are unchanged.
 
 Monthly entries decide only on the first session of a month. A paper start in early October means
 the four books hold cash until the open of the next month's first session, and their October shows
@@ -77,9 +105,15 @@ entry with a new id**. Its paper clock starts on its own first night. Never edit
 a `paper_start`, and never reset a clock by deleting rows. Concretely:
 1. Add the entry to `paper/roster.py` with a new id, and pin its digest in
    `tests/test_paper_roster.py`.
-2. Add a migration `00N_*.sql` that inserts its display row (`id, name, sub, icon, sort, engine,
-   rules_id`, `is_champion = false`), in the style of `003_paper.sql`.
+2. Add a migration `0NN_*.sql` that inserts its row — every column `roster.from_row` reads, not
+   just the display ones — and retires its predecessor in the same file, in the style of
+   `017_roster_real_fees.sql` and `021_roster_width_35.sql`. The migration explains the decision
+   with numbers; the DDL is the smaller half of it.
 3. Commit, push, merge. The next nightly writes its spec and `paper_start`.
+4. Check whether `promote` can write the live row at all before planning on it. It refuses an
+   allocator that two `RESOLVER` keys name — which is every allocator the roster carries at two
+   different parameter sets, as `RESIDMOM` has since 021. When it refuses, the migration is the
+   only writer, no `record_promotion` note is written, and `lab/lab.sqlite` is untouched.
 
 New research ideas belong in a new handover (registry append under P7a's D6). Paper results are
 never a reason to change a running entry.

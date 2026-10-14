@@ -1,0 +1,11 @@
+Correction: two words in this message were eaten by shell backtick substitution when it was
+written. The sentence under "THE GRIDS ARE LEFT UNMERGED" should read:
+
+  `survivorship_record.GRID_PATH` points D16 at docs/lab/survivorship/grid.csv specifically, so
+  appending these rows would change which promotions the hard gate refuses as a side effect of a
+  research run.
+
+The ruling itself is unchanged and was deliberate: the width grids from this run are left as their
+own dated files rather than merged into the grid D16 reads. The commit was not rewritten because
+main is shared and a child session was still pushing at the time; a cosmetic message defect is not
+worth a force-push.

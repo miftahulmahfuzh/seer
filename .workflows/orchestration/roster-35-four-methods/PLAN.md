@@ -254,11 +254,11 @@ could not have agreed on by themselves.
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | M0156 — the roster's other book on the honest tape | R3, R6 | `engine/lab` | 6 | — | NORMAL | `.workflows/plan/roster-35-four-methods/phase-1.md` | — | — |
-| 2 | Hold thirty-five: a new roster entry, and `RAW-FR-GT` retired | R1, R6 | `engine/paper`, `db`, `engine/tests`, `web` | 13 | — | HARD | `.workflows/plan/roster-35-four-methods/phase-2.md` | — | — |
-| 3 | M0155 — trim a holding falling apart while the market is fine | R2, R6 | `engine/lab` | 6 | — | HARD | `.workflows/plan/roster-35-four-methods/phase-3.md` | — | — |
-| 4 | M0149 — braked by its own falling account, not the market's trend | R4, R6 | `engine/lab` | 4 | — | HARD | `.workflows/plan/roster-35-four-methods/phase-4.md` | — | — |
-| 5 | M0148 — a time-lock on the switch | R5, R6 | `engine/lab` | 4 | — | NORMAL | `.workflows/plan/roster-35-four-methods/phase-5.md` | — | — |
+| 1 | M0156 — the roster's other book on the honest tape | R3, R6 | `engine/lab` | 6 | — | NORMAL | `.workflows/plan/roster-35-four-methods/phase-1.md` | `P1-ENG-W35A` | — |
+| 2 | Hold thirty-five: a new roster entry, and `RAW-FR-GT` retired | R1, R6 | `engine/paper`, `db`, `engine/tests`, `web` | 13 | — | HARD | `.workflows/plan/roster-35-four-methods/phase-2.md` | `P1-ENG-W35B` | — |
+| 3 | M0155 — trim a holding falling apart while the market is fine | R2, R6 | `engine/lab` | 6 | — | HARD | `.workflows/plan/roster-35-four-methods/phase-3.md` | `P2-ENG-N60A` | — |
+| 4 | M0149 — braked by its own falling account, not the market's trend | R4, R6 | `engine/lab` | 4 | — | HARD | `.workflows/plan/roster-35-four-methods/phase-4.md` | `P1-ENG-W35D` (done 2026-10-14) | — |
+| 5 | M0148 — a time-lock on the switch | R5, R6 | `engine/lab` | 4 | — | NORMAL | `.workflows/plan/roster-35-four-methods/phase-5.md` | `P1-ENG-W35E` | — |
 
 **No phase reads another's output, and no `Depends on` edge exists or was created.** What the five
 share is mutable state, not interfaces: `lab/lab.sqlite` (phases 1, 3, 4, 5) and

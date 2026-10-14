@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-14
-**Total Active Tasks**: 2
+**Total Active Tasks**: 6
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
-- P2 Medium: 1
+- P1 High: 3
+- P2 Medium: 2
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 135
+- Completed: 136
 
 ---
 
@@ -1337,6 +1337,61 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - No engine bug was patched from this phase. Nothing this run exposed required one.
     - Completion bookkeeping: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own precedent for every swarm-tracked set, including this set's phases 1-4). Peer phase sessions share this worktree and append here concurrently; a cross-section block move is the one edit that silently loses a peer's append.
     - Landing not attempted: this is a swarm-tracked set and the coordinator `orch-fold-verdict-and-fall-label` owns the merge (analyze-orchestrator Step 5). Nothing merged or pushed to `main`; no worktree or branch deleted.
+- [ ] **P1-ENG-W35A** Phase 1: M0156 — the roster's other book on the honest tape
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `lab survivorship M0002` and its report; the two dated CSVs and the dated `.md` under `docs/lab/survivorship/`; the method file `m0156_regime_book_width.py`, its pre-registration commit, its `lab run`, its five dev trials and its verdict. Does not touch `docs/lab/survivorship/grid.csv`, the roster (including `MOM-FR-GT`), or any other method's files; `m0002`, `m0007`, `m0128`, `m0152` are imported, never edited. Exit: paired dev/check numbers for every recorded `M0002` variant reported and committed, with any 25%-bar breach stated plainly up top; step two either run with a paired width curve or recorded as not warranted and the row moved off `idea` with `lab drop`; `grid.csv` byte-identical to `661870d`; `lab status` reads 4 test looks; lock released with the lab pair identical to `HEAD`; last-lab-phase check run and acted on.
+  - **Status**: in_progress
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/roster-35-four-methods/PLAN.md` (phase 1 of 5)
+  - **Satisfies**: R3, R6 — M0156 — survivorship-check M0002-REL-85, the roster book never checked at all; Do not spend a test-window look: the count is 4 and must stay 4
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-W35A.md`
+- [ ] **P1-ENG-W35B** Phase 2: Hold thirty-five: a new roster entry, and `RAW-FR-GT` retired
+  - **Difficulty**: HARD
+  - **Type**: Update
+  - **Context**: Owns `paper/roster.py` (new params constant, `RESOLVER["RESIDMOM35"]`, `LAB_PROVENANCE` entry, `SEED_ROWS` row, `RAW-FR-GT` retired), `strategies/evidence.py` (one key), new `db/migrations/021_roster_width_35.sql`, the `PINS` entry and roster id lists in `engine/tests/` (`test_promote_command.py`, `test_evidence.py`), `web/lib/sera/paper.test.ts`, `.claude/skills/calculate-assets/build_audit.py`, the runbook's roster table, and the `web/data/lab.json` regeneration its own roster edit forces. Does not touch `backtest/registry.py`, any lab row (`lab/lab.sqlite` untouched — `promote` is unusable for this change), any lab method file, `MOM-FR-GT`/`RMW-FR-GT`/`MVW-FR-GT`, or `docs/lab/survivorship/` (read only). Exit: `test_digests_are_pinned` green with exactly one new pin and no moved pin; migration-equality pair green against a migrated scratch Postgres; whole engine + web suite green with no DB test skipped; `web/data/lab.json`'s `paper` block holds `RAW35-FR-GT` and not `RAW-FR-GT`; `lab status` reads 4 test looks and `lab/lab.sqlite` byte-identical to `HEAD`; runbook records the retirement.
+  - **Status**: in_progress
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/roster-35-four-methods/PLAN.md` (phase 2 of 5)
+  - **Satisfies**: R1, R6 — Change the Seer roster to hold 35 stocks instead of 20; Do not spend a test-window look: the count is 4 and must stay 4
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-W35B.md`
+- [x] **P1-ENG-W35D** Phase 4: M0149 — braked by its own falling account, not the market's trend
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/lab/methods/m0149_own_account_brake.py` (allocator id `"M0149"`), `engine/tests/test_m0149_own_account_brake.py`, its pre-registration commit, its `lab run`, the kin reading that must come first, its three `seen` keys, its verdict. Does not touch any other method file, the roster, `grid.csv`, or M0133's frozen file — `AsymParams` gains no field. Exit: kin reading taken before any analysis is written, per variant and not only on the best twin; method pre-registered and run; verdict states the fall, the funded return against SPY TR, and the residual kin against all four test-failed books; `lab status` reads 4 test looks; lock released with the pair clean; last-lab-phase check run and acted on.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/roster-35-four-methods/PLAN.md` (phase 4 of 5)
+  - **Satisfies**: R4, R6 — M0149 — the asymmetry book braked by its own falling account, not the market's trend; Do not spend a test-window look: the count is 4 and must stay 4
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-W35D.md`
+  - **Completed**: 2026-10-14 16:26
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/lab/methods/m0149_own_account_brake.py (new), engine/tests/test_m0149_own_account_brake.py (new), engine/.workflows/plan/P1-ENG-W35D.md (new)
+  - **Commit**: 79db0fd (`lab: M0149 pre-registered — brake the asymmetry book on its own fall, not the market's` — the method file and its test, the commit **is** the pre-registration), 0a18127 (`lab: M0149 — braking on your own account escapes the behaviour rule, but costs the whole edge` — `lab/lab.sqlite` + `web/data/lab.json`, staged by `lab stage` inside the lab write lock)
+  - **Delivered**: M0149, six arms, verdict **rejected**. The question was whether a brake that reads the owner's **own falling account** rather than the market's trend can cut the asymmetry book's fall without being the same animal as the SPY 200-day switch. Half the answer is yes: all 24 kin pairs are clean (control 0.5689, braked arms 0.55–0.76, bar 0.85), so an account-reading brake genuinely escapes the behaviour rule that a market-reading brake cannot. The other half kills it. Every brake is paid for out of the return: the worst fall drops 68.7% → 19.3–33.2%, but the funded return falls 9.9% → 5.9–9.2% against SPY TR's 7.2% on the same deposits. No arm is simultaneously inside the owner's 25% bar and still worth owning. All six failed DSR ≥ 0.90, and the book lost 0 of 4 walk-forward folds.
+  - **Verified**: `ruff check engine` → All checks passed. Full suite with `PG_TEST_URL` set: **4992 passed, 3 skipped** — the 3 skips are only the opt-in `*_LIVE` tests, no DB test skipped. The phase's own module `engine/tests/test_m0149_own_account_brake.py`: 7 passed (397s). `engine/tests/test_lab_methods.py`: 964 passed. D4 ingredient probe: every candidate's `config_text` names `M0149` and nothing else. `lab status` test-window looks: **4 before and 4 after** (R6 held). `docs/lab/survivorship/grid.csv` byte-identical to `661870d`.
+  - **Drift**:
+    - The plan's pre-registration prose quoted kin figures (0.57 / 0.59 / 0.58, against `M0021` and `F4-MOM12-N20-TREND`) that today's matrix contradicts, and `F4-MOM12-N20-TREND` is not one of the four test-failed books at all. Corrected before the pre-registration commit to the measured 0.5717 / 0.3524 / 0.3625 / 0.3341. No code changed; both code blocks were otherwise extracted verbatim from the plan.
+    - The plan's Step 5 (`lab seen`) sat outside the lock hold that Step 6 opens, but invariant 7 lists `lab seen` among the commands that must be inside a hold. The hold was opened before Step 5 instead.
+  - **Decided**:
+    - Step 3 created only phase 4's task, not all five (rung 1: plan invariant 5 — five live sessions share one checkout and one index, so five subagents each writing five rows would collide). A peer's bookkeeping session had already created all five as `P1-ENG-W35A`..`E`, so `P1-ENG-W35D` was adopted rather than duplicated.
+    - The pre-registration's quoted kin numbers were replaced with the matrix measured at Step 1 (rung 1: Step 1 makes the kin reading a gate taken **before** the file is written; a frozen pre-registration may not contain a figure the lab's own `kin` command contradicts).
+    - The lab write lock was carried by a background holder process gated on a sentinel file rather than the plan's single `exec 9>` shell (rung 6: each tool call is its own shell, so one shell cannot span run-then-judge-then-write). Same flock, same path, same identity line, plus a 6h self-release deadline. Held 6 minutes; released with the lab pair clean.
+    - The lock hold opened before Step 5's `lab seen` rather than at Step 6 (rung 1: invariant 7 names `lab seen` as a lab-row write).
+    - `lab reevaluate` **not** run: the invariant-13 check returned "not last" — M0148, M0155 and M0156 are all still `idea`. Named here so the next phase to finish can see it is becoming the last.
+    - The misplaced root copy `.workflows/plan/P1-ENG-W35D.md` was deleted and the peer's `engine/.workflows/plan/P1-ENG-W35D.md` kept (rung 6: every committed `P1-ENG-*` plan lives under `engine/.workflows/plan/`; the two were byte-identical).
+    - Completion bookkeeping: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own precedent for every swarm-tracked set). Four peer phase sessions share this checkout and append here concurrently; a cross-section block move is the one edit that silently loses a peer's append.
+    - No phase unblocked: every phase in this set has `Depends on: —`, so this completion neither unblocks nor re-blocks a sibling.
+    - Landing not attempted: this is a swarm-tracked set and the coordinator owns the merge (analyze-orchestrator Step 5). Nothing merged; no worktree or branch deleted.
+- [ ] **P1-ENG-W35E** Phase 5: M0148 — a time-lock on the switch
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/lab/methods/m0148_switch_time_lock.py` (allocator id `"M0148"`), `engine/tests/test_m0148_switch_time_lock.py`, its pre-registration commit, its `lab run`, its three `seen` keys, its verdict. Does not touch any other method file, `m0143`'s or `m0113`'s frozen files, the roster, or `grid.csv`. Exit: the K=0 arm reproduces `M0143-CALM-UP63` to the digit, or the time-lock machinery is declared wrong and every other number in the batch unreadable; verdict says how often the lock actually bound (a lock binding on almost no sessions is a null result and should be reported as one); `lab status` reads 4 test looks; lock released with the pair clean; last-lab-phase check run and acted on.
+  - **Status**: in_progress
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/roster-35-four-methods/PLAN.md` (phase 5 of 5)
+  - **Satisfies**: R5, R6 — M0148 — a time-lock on the safety switch; Do not spend a test-window look: the count is 4 and must stay 4
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-W35E.md`
 
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"
@@ -1345,6 +1400,14 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Context**: `engine/src/seer_engine/lab/name_count.py:27` (module docstring) equates the two quantities outright — ``store.dev_trial_count`` **(the lab's N)**. That was true under `DSR_POLICY = "all-trials"`, where N was one look per dev trial row. Since 2026-10-08 the shipped policy is `methods` (lab-realistic-gate R1, `P1-ENG-L4ND`) and N is the distinct-method count floored at the measured participation ratio — 28, against 126 dev trial rows. The parenthetical now names the wrong quantity, and it sits in the docstring a reader consults to learn what the module guarantees. The fix is the wording: `dev_trial_count` is still the right number for that sentence's purpose (it is what stays unchanged), it is simply no longer "the lab's N" — that is `store.gate(conn).n`. Found during phase 1 and deliberately left: `name_count.py` is outside that phase's Owns, so it is carded rather than edited. **Checked and NOT a defect — do not "fix" it:** `:477`, the `format_report` footer, says "the lab's N and the test-window looks do not move". That is a claim about `lab names` writing nothing, and it stays true under every policy. `:27` is the only site that mislabels the quantity.
   - **Status**: pending
   - **Found by**: `P1-ENG-L4ND` (lab-realistic-gate phase 1)
+- [ ] **P2-ENG-N60A** Phase 3: M0155 — trim a holding falling apart while the market is fine
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/lab/methods/m0155_single_name_shortfall_brake.py` (allocator id `M0155`), `engine/tests/test_lab_m0155_brake.py`, two dated files under `docs/lab/survivorship/`, its pre-registration commit, its `lab run`, its measurement on both stores, its verdict and its journalled insight. Does not touch any other method file, the roster, or `grid.csv`. Exit: the method is pre-registered and run; the 2006 episode is measured at twenty names on the check store against M0152's recorded curve; the verdict says plainly whether the brake closes the hole, costs more than a point a year, or is width in disguise; `grid.csv` unchanged; `lab status` reads 4 test looks; the lock is released with the lab pair clean; the last-lab-phase check has been run and acted on.
+  - **Status**: in_progress
+  - **Plan Set**: `.workflows/orchestration/roster-35-four-methods/PLAN.md` (phase 3 of 5)
+  - **Satisfies**: R2 — M0155, a single-name brake: trim a holding falling apart while the market is fine; R6 — the test-window look count is 4 and must stay 4
+  - **Plan**: `.workflows/plan/P2-ENG-N60A.md`
 ### [P3] Low
 - [ ] **P3-ENG-V2KQ** Append a dated §7.3 revision recording the N policy move to the lab design doc
   - **Difficulty**: EASY

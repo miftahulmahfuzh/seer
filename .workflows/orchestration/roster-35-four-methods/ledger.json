@@ -64,16 +64,16 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 4,
-      "note": "LANDED 0a18127 \"lab: M0149 -- braking on your own account escapes the behaviour rule, but costs the whole edge\". COORDINATOR-VERIFIED from git: commit is an ancestor of origin/main and carries EXACTLY the lab pair (lab/lab.sqlite 6115328->6193152, web/data/lab.json) and nothing else -- invariant 6 held, no peer file swept in. Ran first, held the lock 16:16-16:22, exit 0. Session still busy after the push (verdict/insight/last-phase check); full report pending. | STATUS HELD AT running DELIBERATELY: its commit 0a18127 is landed and coordinator-verified on origin/main, but the session is still busy (verdict/insight/last-phase check) and has not reported. reap closes a done phase whose commit is on the branch, so marking it done early would kill a live session mid-write. Flip to done only on its own report.",
+      "note": "M0149 rejected, but the method's own question came back YES. FINDING: all 24 kin pairs clean -- unbraked control 0.5689 vs nearest failed book, braked arms 0.55-0.76, every one under the 0.85 bar. An account-reading brake escapes the behaviour rule a market-reading brake cannot; measured, not argued. Texture: against two of the four failed books the control reads 0.359/0.343 and the drawdown-braked arms 0.625/0.631 -- account-reading brakes cost about half the distance to the line, market-reading brakes cost all of it. COST: every brake works and every one is paid out of the return. Worst fall 68.7%->19.3-33.2%; funded return 9.9%->5.9-9.2% vs SPY TR 7.2%. The only arm keeping half the +2.7pt lead (loose vol dial, 9.2%) still falls 33.2%; both arms inside the 25% bar lose to the index outright. A recovery cost not a crash cost -- the drawdown brake turned a 23%/yr 2009-2015 stretch into 12.9%/yr. All six failed DSR>=0.90 (0.51-0.67 at N=95), 0 of 4 folds. Residue worth keeping: the volatility dial beat the drawdown dial on every axis at once. R6 HELD: 4 looks before and after, no lab test, no .research-test. grid.csv byte-identical to 661870d (coordinator re-verified). ruff clean, 4992 passed 3 skipped (opt-in LIVE only, no DB skips). Lock held 6 min, released with the pair clean. NOT LAST: M0148/M0155/M0156 all still idea at its push, so it correctly did NOT run lab reevaluate. DECISIONS: (1) rung 1 corrected the pre-registration's quoted kin figures to the measured 0.5717/0.3524/0.3625/0.3341 -- the plan draft's prose had three of four wrong and named F4-MOM12-N20-TREND, which is not one of the four test-failed books; a frozen pre-registration may not contain a figure the lab's own kin command contradicts. No code changed. (2) rung 1 opened the hold before Step 5's lab seen, not Step 6 -- invariant 7 names lab seen among the lab-row writes. (3) sentinel-gated background holder instead of the plan's single exec 9> shell, same flock/path/identity plus a 6h self-release. (4) adopted the pre-existing task W35D rather than duplicating, and deleted a misplaced root copy of the adopted plan.",
       "package": "engine/lab",
       "plan": ".workflows/plan/roster-35-four-methods/phase-4.md",
-      "reported_at": "2026-10-14T09:19:29+00:00",
+      "reported_at": "2026-10-14T09:27:12+00:00",
       "satisfies": [
         "R4",
         "R6"
       ],
-      "status": "running",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-W35D",
       "title": "M0149 \u2014 braked by its own falling account, not the market's trend"
     },
     {
@@ -98,7 +98,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/roster-35-four-methods/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "roster-35-four-methods",
-  "updated": "2026-10-14T09:19:29+00:00",
+  "updated": "2026-10-14T09:27:12+00:00",
   "verified_at": "2026-10-14T09:19:19+00:00",
   "worktree": "/home/miftah/seer"
 }

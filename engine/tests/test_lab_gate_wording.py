@@ -279,13 +279,34 @@ def test_the_web_mirrors_the_engines_luck_label_prefix() -> None:
 SUPERSEDED_BARS: frozenset[float] = frozenset({0.20})
 
 
+def DECIMAL_BARS() -> tuple[float, ...]:
+    """Every bar the lab states as a bare decimal, read live from the engine, never hard-coded.
+
+    Two of them: the luck bar and the resemblance limit. Read at call time so that moving either
+    constant moves this guard with it, which is the property the whole module is built on.
+    """
+    from seer_engine.lab import hardgate
+
+    return (store.DSR_MIN, hardgate.KIN_CORRELATION)
+
+
 def _stated_bars(text: str) -> list[tuple[int, str, float, float]]:
     """Every bar ``text`` states as the rule in force: (line, as written, what it means, the bar).
 
     The number's **form** routes it, not the noun it sits beside: a percentage is the drawdown
-    screen and a bare decimal is the luck bar. That is how the whole journal reads -- the luck bar
-    is always ``0.90``, the drawdown screen always ``50%`` since 2026-10-14 -- and it is what lets
-    an unqualified sentence ("our limit is 15%") be swept at all.
+    screen and a bare decimal is one of the lab's decimal bars. That is how the whole journal
+    reads -- the drawdown screen is always ``50%`` since 2026-10-14 -- and it is what lets an
+    unqualified sentence ("our limit is 15%") be swept at all.
+
+    A bare decimal is matched against EVERY decimal bar the lab applies, not only the luck bar,
+    and is reported against whichever it is nearest. The lab has two: ``store.DSR_MIN`` (0.90) and
+    ``hardgate.KIN_CORRELATION`` (0.85), the resemblance limit above which a book counts as kin of
+    one that already failed its look. CORRECTED 2026-10-14: this routed every bare decimal to the
+    luck bar, so insight #271 -- which says a book "reads 0.90 where our limit is 0.85", both
+    numbers correct and both live -- was flagged as stating a bar the lab does not apply. The
+    guard was wrong and the prose was right. Nearest-match keeps the coverage that matters: 0.95
+    is nearer 0.90 than 0.85 and is still caught, which is the insight #21 case this guard exists
+    for.
 
     A percentage naming a bar the lab has since retired (``SUPERSEDED_BARS``) is not returned: it
     is history, not a stale claim, and the journal row stating it cannot be edited.
@@ -309,7 +330,9 @@ def _stated_bars(text: str) -> list[tuple[int, str, float, float]]:
                         continue
                     out.append((i, written, value, tuning.DEV_MAX_DRAWDOWN))
                 else:
-                    out.append((i, written, float(written), store.DSR_MIN))
+                    value = float(written)
+                    nearest = min(DECIMAL_BARS(), key=lambda b: abs(value - b))
+                    out.append((i, written, value, nearest))
     return out
 
 

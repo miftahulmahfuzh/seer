@@ -86,6 +86,17 @@ HELD_OUT_BY_THE_TRADES_BAR: tuple[tuple[str, int], ...] = (
     ("M0084-BAND3-W", 10),
     ("M0084-FABER-M", 13),
     ("M0084-MONTHLY", 11),
+    # 2026-10-14, second re-take of the same day, and a DIFFERENT cause from the 5 -> 12 above.
+    # That growth was the dev screen moving to 50% (design §18). This one is simply new methods of
+    # a shape that can never clear 100 trades: M0113 and M0143 recorded SPY-only switch books,
+    # which hold one instrument and trade 11-43 times in 22 years. §18's statement about what the
+    # screen change did stays true as written and is not amended.
+    ("M0113-SMA20", 30),
+    ("M0113-SMA200", 11),
+    ("M0113-SMA50", 24),
+    ("M0113-SMA50-W", 43),
+    ("M0113-UP63", 18),
+    ("M0143-SPY-UP63", 18),
 )
 
 
@@ -174,6 +185,11 @@ def test_the_trades_bar_holds_out_two_trials_and_neither_of_them_has_a_luck_scor
     the owner split the lab's dev screen off his real-money bar and set it to 50% (design §18), so
     trials that had missed both drawdown and trades now miss trades alone and the set grew from
     five to twelve. Tightening ``tuning.DEV_MAX_DRAWDOWN`` again would shrink it the same way.
+    Later the same day it grew again, twelve to eighteen, for an unrelated reason: M0113 and M0143
+    recorded SPY-only switch books, which hold one instrument and trade 11-43 times in 22 years and
+    so miss the trades bar alone by construction rather than because any bar moved. The finding
+    still holds -- every one of the eighteen either carries no luck score or sits below the bar,
+    the closest being 0.884 -- so dropping the trades bar would still change zero verdicts.
     That is not a bug in this test: it means the measurement has gone stale and has to be retaken.
     §13 itself is a dated record of what was true on 2026-10-07 and is **not** amended -- the
     re-measurement is recorded in design §18, which is where this change belongs.

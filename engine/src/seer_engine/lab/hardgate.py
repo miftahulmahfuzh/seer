@@ -1181,6 +1181,78 @@ def behavioural_kin(
     return tuple(twins)
 
 
+@dataclass(frozen=True, slots=True)
+class KinPair:
+    """One measured (dev variant, test-failed tested variant) correlation -- kin or not.
+
+    ``correlation`` is ``None`` when the pair could not be measured at all: fewer than
+    ``MIN_KIN_MONTHS`` months in common, or a flat series on either side. ``crosses`` is the only
+    thing the hard gate would act on.
+    """
+
+    failed_id: str
+    failed_candidate_id: str
+    candidate_id: str
+    correlation: float | None
+
+    @property
+    def crosses(self) -> bool:
+        """True when this pair alone would make the method kin of ``failed_id`` (D14)."""
+        return self.correlation is not None and self.correlation >= KIN_CORRELATION
+
+
+def kin_matrix(
+    conn: sqlite3.Connection, method_id: str, geo: Geometry | None = None
+) -> tuple[KinPair, ...]:
+    """EVERY dev-variant x test-failed-variant correlation, not only the best one. (D14)
+
+    ``behavioural_kin`` keeps one ``Twin`` per failed method -- the best-correlated variant -- and
+    that is right for the gate, which only needs to know *whether* a method has any twin. It is
+    wrong for analysis, and the difference has cost a method id: a variant that is not the best
+    correlator never appears in the gate's output at all, so its own number is unreadable from
+    outside and the only way to obtain it was to register the configuration alone and re-run it.
+
+    MEASURED 2026-10-14: M0133's 40-name arm inherited its 20-name sibling's refusal. Its own
+    correlation (0.8964) had never been computed, and it was the one arm whose worst fall stayed
+    under the owner's bar on the survivorship store -- the single configuration that could have
+    been funded, barred on a number measured from a different book.
+
+    Same path as ``behavioural_kin``, pair for pair: monthly returns, de-funded, less each
+    series' own fit on the benchmark's, correlated over the months they share. Fails closed on a
+    price-fingerprint mismatch exactly as the gate does (D10), so a number this returns is the
+    number the gate would read. Report only -- it writes nothing and reads no research store.
+    """
+    if store.get_method(conn, method_id) is None:
+        raise store.LabError(f"no method {method_id}")
+    targets = _tested_curves(conn, method_id)
+    rows = _dev_curves(conn, method_id)
+    if not targets or not rows:
+        return ()
+    geo = geometry(conn) if geo is None else geo
+    problems = mismatches(conn, geo.bench_n, [*rows, *(r for _f, r in targets)])
+    if problems:
+        raise store.LabError(
+            f"{method_id}'s behaviour cannot be compared with the test-failed books: "
+            f"{describe(problems)}. The hard gate compares two curves only when both were "
+            f"measured on the benchmark's prices (D10, D14), and fails closed when either side's "
+            f"prices differ or are unknown. There is no override"
+        )
+    bench = monthly_returns(list(geo.bench))
+
+    def residual_of(row: sqlite3.Row) -> dict[Month, float] | None:
+        curve = _curve_of(row)
+        return residual(monthly_returns(curve, trial_deposits(conn, row, curve)), bench)
+
+    mine = [(str(r["candidate_id"]), residual_of(r)) for r in rows]
+    out: list[KinPair] = []
+    for failed_id, frow in targets:
+        theirs = residual_of(frow)
+        for candidate, series in mine:
+            rho = None if (theirs is None or series is None) else correlation(series, theirs)
+            out.append(KinPair(failed_id, str(frow["candidate_id"]), candidate, rho))
+    return tuple(out)
+
+
 def failed_kin(conn: sqlite3.Connection, method_id: str) -> tuple[str, ...]:
     """Every method in ``method_id``'s kin that reads ``test-failed``; ``()`` when clean.
 

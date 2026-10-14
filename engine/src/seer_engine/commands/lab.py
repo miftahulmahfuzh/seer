@@ -475,6 +475,29 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
                    help="also write the full grid (variant x store) to PATH as CSV, full precision")
 
     s = sub.add_parser(
+        "kin",
+        # No literal `%` in any `help=` string below: argparse %-interpolates every `help=`.
+        help="report only: how alike a method is to every book that has already failed its look",
+        description=(
+            "Print EVERY correlation between this method's recorded dev variants and the tested "
+            "variant of every method that reads test-failed, instead of only the single best one "
+            "the hard gate reports. The gate keeps one twin per failed method because that is all "
+            "it needs in order to refuse; the consequence is that any variant which is not the "
+            "best correlator never has its own number computed, so the only way to read it was to "
+            "register that configuration alone and spend a method id re-deriving a number the "
+            "recorded curves already contain. This command reads it instead. Same path as the "
+            "gate, pair for pair -- monthly returns, de-funded, less each series' own fit on the "
+            "benchmark's, correlated over the months they share -- and it fails closed on a price "
+            "fingerprint mismatch exactly as the gate does, so a number printed here is the number "
+            "the gate would read. Writes nothing, opens no research store, mints no method id: "
+            "the lab's N and the test-window looks cannot move."
+        ),
+    )
+    s.add_argument("method", nargs="+", metavar="M0133", help="the methods to measure")
+    s.add_argument("--all", action="store_true",
+                   help="print every pair, not only each variant's strongest match")
+
+    s = sub.add_parser(
         "exposure",
         # No literal `%` in any `help=` string below, and none may be added: argparse runs every
         # `help=` through %-interpolation (HelpFormatter._expand_help), so a bare `%` is read as a
@@ -2505,6 +2528,65 @@ def _survivorship(conn, args) -> int:
     return 0
 
 
+def _kin(conn, args) -> int:
+    """``lab kin M0133 [M0007 ...]``: every variant's own resemblance to the failed books.
+
+    Report only, and the reason it exists is in ``hardgate.kin_matrix``'s docstring: the gate
+    reports one twin per failed method, so a variant that is not the strongest correlator has no
+    readable number and a method id was once spent to obtain one. Nothing is written, no store is
+    opened, and N and the test-window looks are printed either side so the invariant is visible
+    rather than merely asserted.
+    """
+    from seer_engine.lab import hardgate
+
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+    bar = hardgate.KIN_CORRELATION
+    geo = hardgate.geometry(conn)
+    for mid in args.method:
+        pairs = hardgate.kin_matrix(conn, mid, geo)
+        print()
+        if not pairs:
+            print(f"{mid}: nothing to compare -- no dev curve, or no test-failed book has one.")
+            continue
+        failed = sorted({p.failed_id for p in pairs})
+        variants = list(dict.fromkeys(p.candidate_id for p in pairs))
+        width = max(len(v) for v in variants)
+        print(f"{mid}: residual correlation against every test-failed book (the bar is {bar:.2f})")
+        print("  " + "variant".ljust(width) + "".join(f"{f:>10}" for f in failed))
+        for v in variants:
+            cells = ""
+            for f in failed:
+                rho = next((p.correlation for p in pairs
+                            if p.candidate_id == v and p.failed_id == f), None)
+                cells += f"{'--' if rho is None else format(rho, '.4f'):>10}"
+            print("  " + v.ljust(width) + cells)
+        crossing = [p for p in pairs if p.crosses]
+        if crossing:
+            worst = max(crossing, key=lambda p: p.correlation or 0.0)
+            print(f"  KIN: {len(crossing)} pair(s) at or above {bar:.2f}; strongest is "
+                  f"{worst.candidate_id} with {worst.failed_id}'s {worst.failed_candidate_id} "
+                  f"at {worst.correlation:.4f}.")
+            clean = [v for v in variants
+                     if not any(p.crosses for p in pairs if p.candidate_id == v)]
+            if clean:
+                print(f"  Clean variants, measured on their own curve: {', '.join(clean)}.")
+        else:
+            print(f"  CLEAN: no pair reaches {bar:.2f}.")
+        if args.all:
+            print("  every pair:")
+            for p in sorted(pairs, key=lambda q: -(q.correlation or -1.0)):
+                rho = "--" if p.correlation is None else f"{p.correlation:.4f}"
+                mark = "  <- kin" if p.crosses else ""
+                print(f"    {p.candidate_id} vs {p.failed_id}'s {p.failed_candidate_id}: "
+                      f"{rho}{mark}")
+    print()
+    print(f"recorded dev trials {n_before} -> {store.dev_trial_count(conn)}; "
+          f"test-window looks {looks_before} -> {store.test_looks(conn)}. "
+          f"Nothing was written and no method id was minted.")
+    return 0
+
+
 def _exposure(conn, args) -> int:
     """``lab exposure M0030 [M0024 ...]``: a method's own picks, apart from what it parks.
 
@@ -2798,6 +2880,7 @@ _HANDLERS = {
     "turnover": _turnover,
     "survivorship": _survivorship,
     "exposure": _exposure,
+    "kin": _kin,
     "gate": _gate,
     "idea": _idea,
     "note": _note,

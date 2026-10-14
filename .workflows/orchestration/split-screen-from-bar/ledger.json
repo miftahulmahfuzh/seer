@@ -6,21 +6,21 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "5826328",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "Two constants: MAX_DRAWDOWN 0.25 (real money), DEV_MAX_DRAWDOWN 0.50 (dev screen), read at the four decision sites dev.FAILURE_LABELS/dev.make_row/store.owner_failures/store._blocking. Engine 4757 passed 4 skipped; ruff clean; web tsc clean + 685 passed/49 files. lab.sqlite byte-identical, test_looks 4, no row edited. MEASURED before/after on the landed tree, matching reconciliation exactly: dev-eligible 26 trials/16 methods -> 67/32; browsable 93/37 -> 319/76; at a 0.25 screen 60/30; 0.40 and 0.50 identical at 67/32. HELD_OUT_BY_THE_TRADES_BAR 5 -> 12, and 0 of the 12 clear the luck bar, so design 13's finding survives. DECISIONS: SUPERSEDED_BARS={0.20} not the plan's {0.15,0.20} (rung 1, invariant 9 - excusing 0.15 deletes the sibling guard's live coverage); drawdown label stays bound to dev.FAILURE_LABELS[1] since that tuple is import-time and the monkeypatch cannot reach it (rung 2); _ballast default fall 0.245->0.55 (it went silently eligible under the looser screen); lib/sera/lab.test.ts drawdown equality re-expressed as a one-way implication plus a non-vacuity check, since D12 forbids adding gate.devMaxDrawdown (rung 1, invariant 9). DRIFT: five web test files beyond the plan's three-file web scope (commit ab4fe01); and 'lab stage' run bare stages the MAIN checkout because the venv's editable install resolves there - needs PYTHONPATH=engine/src. Main checkout verified clean.",
       "package": "engine/backtest`, `engine/lab`, `web`, `lab/",
       "plan": ".workflows/plan/split-screen-from-bar/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-14T03:52:22+00:00",
       "satisfies": [
         "R1",
         "R2",
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-QK7F",
       "title": "Two constants, and everything that reads them"
     },
     {
@@ -40,7 +40,7 @@
         "R2",
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The dated owner revision, and the before/after"
     }
@@ -48,6 +48,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/split-screen-from-bar/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "split-screen-from-bar",
-  "updated": "2026-10-14T03:24:22+00:00",
+  "updated": "2026-10-14T03:54:19+00:00",
   "worktree": "/home/miftah/.worktrees/seer/split-screen-from-bar"
 }

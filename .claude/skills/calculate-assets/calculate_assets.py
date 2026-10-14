@@ -39,6 +39,7 @@ from seer_engine import dates, research
 from seer_engine.backtest import dev
 from seer_engine.backtest.benchmark import spy_curves
 from seer_engine.backtest.dev import Candidate
+from seer_engine.backtest.registry import REGISTRY
 from seer_engine.backtest.market import Market
 from seer_engine.backtest.metrics import money_weighted_return
 from seer_engine.lab import runner
@@ -47,6 +48,7 @@ from seer_engine.lab.method import discover
 from seer_engine.sim.contributions import OWNER_MONTHLY
 from seer_engine.sim.rules import (
     MONTHLY_HOLD_FRAC_GOTRADE,
+    MONTHLY_HOLD_FRAC_GOTRADE_TBAND,
     MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE,
 )
 from seer_engine.strategies.allocator import prepare_for
@@ -64,7 +66,21 @@ REALISTIC: dict[str, object] = {
     "monthly-rank-weekly-resize": MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE,
     "monthly-rank-weekly-resize-frac": MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE,
     "monthly-rank-weekly-resize-frac-gotrade": MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE,
+    # The fixed measuring tape (rules.py, 2026-10-12) is already fractional at Gotrade's real
+    # fees, so it maps to itself: there is nothing to swap in. It measures the resize band
+    # against a holding's own target rather than the whole account, which is the band the owner
+    # actually trades, so a method built on it is left exactly as it was recorded.
+    "monthly-hold-frac-gotrade-tband": MONTHLY_HOLD_FRAC_GOTRADE_TBAND,
 }
+
+# Tapes that credit idle cash with the 13-week T-bill yield. They stay out of REALISTIC on
+# purpose: that Gotrade pays interest on idle dollars is an unverified owner input, and this
+# report answers what the account would really say. Running one here would pay the owner
+# interest he may never have received.
+CASH_TAPES = frozenset({
+    "monthly-hold-frac-gotrade-tband-cash",
+    "weekly-hold-frac-gotrade-tband-cash",
+})
 
 
 class Refused(Exception):
@@ -106,12 +122,23 @@ def parse_target(text: str) -> str:
 
 
 def resolve(target: str) -> tuple[str, Candidate]:
-    """``(method id, the Candidate to run)``, from the committed method files only."""
+    """``(owning id, the Candidate to run)``, from committed files only -- never the database.
+
+    Two places hold a book the owner might name. The lab's method files hold every method
+    variant, and ``backtest/registry.py`` holds the frozen P7a candidates -- among them the
+    three books the nightly paper roster steps, which is why ``F4-MOM12-N20-TREND`` is a name
+    the owner reads on the site but no lab method file carries. Both are the same
+    ``backtest.dev.Candidate``, so once one is found the rest of this script cannot tell them
+    apart; only the owning id in the report says which shelf it came off.
+    """
     methods = discover()
     if "-" in target:
         try:
             method, _path, candidate = runner.resolve_candidate(target)
         except lab_store.LabError as e:
+            for c in REGISTRY:
+                if c.id.upper() == target:
+                    return f"registry/{c.family}", c
             raise Refused(str(e))
         return method.id, candidate
     if target not in methods:
@@ -157,6 +184,13 @@ def realistic(candidate: Candidate) -> tuple[Candidate, str]:
         raise Refused(
             f"{candidate.id} runs on the {rules.engine} engine, which has no real-fee model. "
             f"This asks what the owner would really have paid, so there is no honest answer for it"
+        )
+    if rules.id in CASH_TAPES:
+        raise Refused(
+            f"{candidate.id} runs on {rules.id!r}, which credits idle cash with the 13-week "
+            f"T-bill yield. That Gotrade pays interest on idle dollars is not verified, so this "
+            f"report would hand the owner money he may never have been paid. Name the same "
+            f"method's arm without the cash yield"
         )
     want = REALISTIC.get(rules.id)
     if want is None:

@@ -308,6 +308,12 @@ def _stated_bars(text: str) -> list[tuple[int, str, float, float]]:
     is nearer 0.90 than 0.85 and is still caught, which is the insight #21 case this guard exists
     for.
 
+    A percentage is matched the same way against the lab's two drawdown bars: the money bar
+    ``tuning.MAX_DRAWDOWN`` (25%, design §1) and the study screen ``tuning.DEV_MAX_DRAWDOWN`` (50%).
+    CORRECTED 2026-10-16: this routed every percentage to the screen, so insight #288 -- which says
+    a book "fell more than the owner's 25% limit", correct and live -- was flagged. 15% is still
+    nearer 25% than 50% and is still caught.
+
     A percentage naming a bar the lab has since retired (``SUPERSEDED_BARS``) is not returned: it
     is history, not a stale claim, and the journal row stating it cannot be edited.
 
@@ -328,7 +334,10 @@ def _stated_bars(text: str) -> list[tuple[int, str, float, float]]:
                     value = float(written[:-1]) / 100
                     if any(abs(value - b) < 1e-9 for b in SUPERSEDED_BARS):
                         continue
-                    out.append((i, written, value, tuning.DEV_MAX_DRAWDOWN))
+                    nearest = min(
+                        (tuning.MAX_DRAWDOWN, tuning.DEV_MAX_DRAWDOWN), key=lambda b: abs(value - b)
+                    )
+                    out.append((i, written, value, nearest))
                 else:
                     value = float(written)
                     nearest = min(DECIMAL_BARS(), key=lambda b: abs(value - b))

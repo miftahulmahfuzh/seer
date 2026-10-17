@@ -45,6 +45,7 @@ from seer_engine.backtest.metrics import money_weighted_return
 from seer_engine.lab import runner
 from seer_engine.lab import store as lab_store
 from seer_engine.lab.method import discover
+from seer_engine.lab.methods.m0039_vix_term_structure_gate import DAILY_HOLD_FRAC_GOTRADE
 from seer_engine.sim.contributions import OWNER_MONTHLY
 from seer_engine.sim.rules import (
     MONTHLY_HOLD_FRAC_GOTRADE,
@@ -71,6 +72,10 @@ REALISTIC: dict[str, object] = {
     # against a holding's own target rather than the whole account, which is the band the owner
     # actually trades, so a method built on it is left exactly as it was recorded.
     "monthly-hold-frac-gotrade-tband": MONTHLY_HOLD_FRAC_GOTRADE_TBAND,
+    # M0039's daily tape is MONTHLY_HOLD_FRAC_GOTRADE checked every session instead of every
+    # month: the same fractional shares and Gotrade fees, so it too maps to itself. The SPY hosts
+    # of the gate methods (M0039, M0167) run on it.
+    "daily-hold-frac-gotrade": DAILY_HOLD_FRAC_GOTRADE,
 }
 
 # Tapes that credit idle cash with the 13-week T-bill yield. They stay out of REALISTIC on
@@ -422,6 +427,18 @@ def main(argv: list[str] | None = None) -> int:
         print("  real-rupiah run done; now the fixed-rate one ...", file=sys.stderr)
         fixed_res, _fixed_row = run_once(market, dividends, spy_divs, candidate, window, real_fx=False)
         print("  done.\n", file=sys.stderr)
+        if real_row.stats.metrics.trades == 0:
+            # A book that never trades is almost always a book that could not see its data: a
+            # gate allocator reads Market.series and targets nothing when market_series.csv is
+            # absent, which a test store built without `market_series --refresh` is. The run
+            # completes and reports the deposits sitting in cash as if that were the method.
+            have = "present" if len(getattr(market, "series", ())) else "ABSENT"
+            raise Refused(
+                f"{candidate.id} made no trade in {start}..{end}, so the deposits only sat in cash. "
+                f"That is a missing input, not a result. The store's market series "
+                f"(market_series.csv: VIX, Treasury yields) is {have}; add it with "
+                f"`python -m seer_engine market_series --refresh --store {args.store}`"
+            )
     except Refused as e:
         print(f"\n{e}\n", file=sys.stderr)
         return 2

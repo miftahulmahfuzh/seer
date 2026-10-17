@@ -46,6 +46,7 @@ from seer_engine.lab import runner
 from seer_engine.lab import store as lab_store
 from seer_engine.lab.method import discover
 from seer_engine.lab.methods.m0039_vix_term_structure_gate import DAILY_HOLD_FRAC_GOTRADE
+from seer_engine.lab.methods.m0063_earnings_day_jump import WEEKLY_HOLD_FRAC_GOTRADE
 from seer_engine.sim.contributions import OWNER_MONTHLY
 from seer_engine.sim.rules import (
     MONTHLY_HOLD_FRAC_GOTRADE,
@@ -76,6 +77,9 @@ REALISTIC: dict[str, object] = {
     # month: the same fractional shares and Gotrade fees, so it too maps to itself. The SPY hosts
     # of the gate methods (M0039, M0167) run on it.
     "daily-hold-frac-gotrade": DAILY_HOLD_FRAC_GOTRADE,
+    # M0063's weekly tape is weekly-hold in fractional shares at Gotrade's real fees, with no cash
+    # yield, so it maps to itself as well. M0064, M0076 and M0204 run on it.
+    "weekly-hold-frac-gotrade": WEEKLY_HOLD_FRAC_GOTRADE,
 }
 
 # Tapes that credit idle cash with the 13-week T-bill yield. They stay out of REALISTIC on

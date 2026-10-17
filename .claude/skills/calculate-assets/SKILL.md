@@ -51,6 +51,27 @@ even a read dirties the file. Methods come from `lab.method.discover()`, reading
 files on disk. Nothing is recorded: no trial, no observation, no status move. It is a report, in
 the sense `lab costs` is a report.
 
+## Running it without wasting the owner's time
+
+One run takes about a minute. A bare family id with several variants is refused and lists
+them; when the owner gave no variant, run the method's main variant and its switch variant
+(the docstring names them) side by side instead of asking.
+
+Run several variants as plain background jobs and `wait` for them, all in one command:
+
+```bash
+for v in S20 S40-SW; do
+  PYTHONPATH=engine/src engine/.venv/bin/python "$S" M0185-$v 1-4-2018 \
+    --out "$D/assets-$v.json" > "$D/out-$v.txt" 2>&1 &
+done
+wait
+```
+
+**Never wait with `while pgrep -f calculate_assets.py`.** The loop's own shell command line
+contains that string, so `pgrep -f` matches the shell itself and the loop never ends. It sat
+there for 20 minutes after the runs had already finished. If you have to poll, check that the
+`--out` JSON files exist.
+
 ## The store
 
 Needs `engine/.research-test`, which `lab test` needs too. If it is missing the skill says so and

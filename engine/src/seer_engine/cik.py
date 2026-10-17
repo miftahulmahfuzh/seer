@@ -22,6 +22,10 @@ The reverse is not true: one CIK legitimately backs several symbols at once. Amo
 ever-members GOOG/GOOGL, FOX/FOXA, NWS/NWSA, UA/UAA, CMCSA/CMCSK and BATRA/BATRK are share
 classes of a single filer, so no uniqueness check is applied to ``cik``.
 
+``ticker_cik_pre2009.csv`` (:data:`HISTORY_FILE`) is the 1996-2008 companion in the same
+format, for consumers with no XBRL floor (sector labels); :func:`load_index_with_history` joins
+the two. Fundamentals keep reading ``ticker_cik.csv`` alone through :func:`load_index`.
+
 Nothing in this module reads the network, the clock or the database. ``membership`` is imported
 for ``normalize_ticker`` and ``Interval``; ``membership`` must never import this module.
 """
@@ -39,6 +43,9 @@ from seer_engine.membership import Interval, MembershipError
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 TICKER_CIK_FILE = "ticker_cik.csv"
+#: The 1996-2008 companion: same columns, same loader, every row ending on or before
+#: :data:`SINCE`. See :func:`load_index_with_history` for why it is a separate file.
+HISTORY_FILE = "ticker_cik_pre2009.csv"
 
 #: First day the map is guaranteed from, and the floor every membership start is clipped to.
 #: 2009-01-01, because SEC XBRL company facts do not exist before it at any price: large
@@ -65,8 +72,11 @@ HEADER: tuple[str, ...] = (
 
 #: How a row was produced. ``current`` = SEC company_tickers.json, ``edgar`` = EDGAR's
 #: browse-edgar ticker lookup, ``exact``/``fuzzy`` = company-name match against
-#: cik-lookup-data.txt, ``manual`` = hand-audited in build_ticker_cik.py.
-SOURCES: tuple[str, ...] = ("current", "edgar", "exact", "fuzzy", "manual")
+#: cik-lookup-data.txt, ``manual`` = hand-audited in build_ticker_cik.py (or, in
+#: :data:`HISTORY_FILE`, build_ticker_cik_pre2009.py). ``carry`` appears only in
+#: :data:`HISTORY_FILE`: the symbol's 2009 row carried back across the floor because its
+#: membership runs continuously across it, then screened against the filer's own reports.
+SOURCES: tuple[str, ...] = ("current", "edgar", "exact", "fuzzy", "manual", "carry")
 
 #: Sources whose rows a human must justify in ``note``.
 NOTE_REQUIRED = frozenset({"fuzzy", "manual"})
@@ -157,7 +167,7 @@ def _parse_symbol(raw: str, where: str) -> str:
         raise CikError(f"{where}: {exc}") from exc
 
 
-def load_ticker_cik(path: Path) -> list[CikRow]:
+def load_ticker_cik(path: Path, *, none_alone: bool = True) -> list[CikRow]:
     """Read ``ticker_cik.csv`` into rows, rejecting anything inconsistent.
 
     Rejected: a header that is not exactly :data:`HEADER`; a symbol that is not a ticker; a
@@ -165,7 +175,11 @@ def load_ticker_cik(path: Path) -> list[CikRow]:
     ``source``; a missing ``note`` where one is required; a missing ``company_name`` on a row
     that has a CIK; a file not sorted by ``(symbol, start_date)``; a duplicate
     ``(symbol, start_date)``; two overlapping intervals for one symbol; an open interval that is
-    not the symbol's last row; and a ``NONE`` row that is not the symbol's only row.
+    not the symbol's last row; and a ``NONE`` row that is not the symbol's only row, unless
+    ``none_alone`` is False. :data:`HISTORY_FILE` passes False: before 2009 a ticker can belong to
+    an unidentified company in one stint and a known filer in another (``COV`` in 1996 and
+    Covidien from 2007), and ``NONE`` there means "no filer for this tenure", not "for this
+    symbol".
     """
     rows: list[CikRow] = []
     with open(path, newline="", encoding="utf-8") as fh:
@@ -211,7 +225,7 @@ def load_ticker_cik(path: Path) -> list[CikRow]:
     if not rows:
         raise CikError(f"{path}: no rows")
     _check_order(rows, path)
-    _check_intervals(rows, path)
+    _check_intervals(rows, path, none_alone=none_alone)
     return rows
 
 
@@ -225,12 +239,12 @@ def _check_order(rows: Sequence[CikRow], path: Path) -> None:
             )
 
 
-def _check_intervals(rows: Sequence[CikRow], path: Path) -> None:
+def _check_intervals(rows: Sequence[CikRow], path: Path, *, none_alone: bool = True) -> None:
     grouped: dict[str, list[CikRow]] = {}
     for row in rows:
         grouped.setdefault(row.symbol, []).append(row)
     for symbol, group in grouped.items():
-        if any(r.cik is None for r in group) and len(group) > 1:
+        if none_alone and any(r.cik is None for r in group) and len(group) > 1:
             raise CikError(
                 f"{path.name}: {symbol} has a {NO_FILER} row alongside {len(group) - 1} other "
                 f"row(s); {NO_FILER} must be the symbol's only row"
@@ -266,6 +280,46 @@ def build_index(rows: Iterable[CikRow]) -> dict[str, tuple[CikRow, ...]]:
 def load_index(data_dir: Path = DATA_DIR) -> dict[str, tuple[CikRow, ...]]:
     """The vendored map, loaded and validated, ready for :func:`resolve`."""
     return build_index(load_ticker_cik(data_dir / TICKER_CIK_FILE))
+
+
+def load_history(data_dir: Path = DATA_DIR) -> list[CikRow]:
+    """The 1996-2008 companion rows, validated, each ending on or before :data:`SINCE`."""
+    path = data_dir / HISTORY_FILE
+    rows = load_ticker_cik(path, none_alone=False)
+    late = [(r.symbol, r.start_date) for r in rows if r.end_date is None or r.end_date > SINCE]
+    if late:
+        raise CikError(f"{path.name}: rows must end on or before {SINCE}: {late[:5]}")
+    return rows
+
+
+def load_index_with_history(data_dir: Path = DATA_DIR) -> dict[str, tuple[CikRow, ...]]:
+    """``ticker_cik.csv`` plus its 1996-2008 companion, as one index.
+
+    Two files and not one because they answer for different consumers. ``ticker_cik.csv`` is
+    the fundamentals join: its floor is the first year XBRL exists, its generator clips every
+    tenure to that floor, and ``test_cik`` pins both. Sector labels have no such floor -- a
+    sector cap applied to a 1996 backtest day needs that day's filer -- so the earlier tenures
+    live beside it, written by ``engine/scripts/build_ticker_cik_pre2009.py``, rather than
+    inside it where a re-run of the fundamentals generator would silently drop them.
+
+    The seam is exact: every history row ends on or before :data:`SINCE` and every main row
+    starts on or after it, so concatenating keeps one non-overlapping tenure list per symbol.
+    The merged list is re-checked anyway. A symbol may be ``NONE`` on one side of the seam and
+    have a filer on the other; the "``NONE`` is a symbol's only row" rule holds per file.
+    """
+    main = load_ticker_cik(data_dir / TICKER_CIK_FILE)
+    early = [r for r in main if r.start_date < SINCE]
+    if early:
+        raise CikError(f"{TICKER_CIK_FILE}: rows start before {SINCE}: {early[:3]}")
+    index = build_index([*load_history(data_dir), *main])
+    for symbol, group in index.items():
+        for prev, cur in zip(group, group[1:]):
+            if prev.end_date is None or prev.end_date > cur.start_date:
+                raise CikError(
+                    f"{symbol}: {HISTORY_FILE} row [{prev.start_date}, {prev.end_date}) overlaps "
+                    f"the row starting {cur.start_date}"
+                )
+    return index
 
 
 def resolve_row(symbol: str, on: date, index: Index) -> CikRow:

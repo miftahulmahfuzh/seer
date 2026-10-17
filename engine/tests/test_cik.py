@@ -487,3 +487,47 @@ def test_vendored_none_row_is_ndoi_and_it_is_alone(vendored_index):
     )
     assert none_rows == ["NDOI"]
     assert len(vendored_index["NDOI"]) == 1
+
+
+# --- the 1996-2008 companion (ticker_cik_pre2009.csv) ----------------------------------------
+
+
+def _write_pair(tmp_path: Path, main_rows: list[str], history_rows: list[str]) -> Path:
+    write(tmp_path / c.TICKER_CIK_FILE, *main_rows)
+    write(tmp_path / c.HISTORY_FILE, *history_rows)
+    return tmp_path
+
+
+def test_history_allows_none_beside_a_filer_but_main_does_not(tmp_path):
+    rows = (
+        "COV,NONE,1996-01-02,1996-08-16,,manual,unidentified",
+        "COV,0001385187,2007-07-02,2009-01-01,Covidien plc,carry,carried",
+    )
+    with pytest.raises(CikError, match="only row"):
+        c.load_ticker_cik(write(tmp_path / "a.csv", *rows))
+    assert len(c.load_ticker_cik(write(tmp_path / "b.csv", *rows), none_alone=False)) == 2
+
+
+def test_load_index_with_history_joins_at_the_seam(tmp_path):
+    data = _write_pair(
+        tmp_path,
+        ["X,0001163302,2009-01-01,2014-07-02,UNITED STATES STEEL CORP,edgar,"],
+        [
+            "X,0000101778,1996-01-02,2002-01-02,USX CORP,manual,tracking stock",
+            "X,0001163302,2002-01-02,2009-01-01,UNITED STATES STEEL CORP,manual,spun",
+        ],
+    )
+    ix = c.load_index_with_history(data)
+    assert c.resolve("X", D("2000-06-01"), ix) == "0000101778"
+    assert c.resolve("X", D("2008-12-31"), ix) == "0001163302"
+    assert c.resolve("X", D("2010-06-01"), ix) == "0001163302"
+
+
+def test_history_rows_may_not_cross_the_seam(tmp_path):
+    data = _write_pair(
+        tmp_path,
+        ["AAPL,0000320193,2009-01-01,,Apple Inc.,current,"],
+        ["AAPL,0000320193,1996-01-02,2009-06-01,Apple Inc.,carry,x"],
+    )
+    with pytest.raises(CikError, match="end on or before"):
+        c.load_index_with_history(data)

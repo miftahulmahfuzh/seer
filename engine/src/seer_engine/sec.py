@@ -58,6 +58,9 @@ from seer_engine import __version__, config, http
 log = logging.getLogger(__name__)
 
 BASE_URL = "https://data.sec.gov/api/xbrl"
+#: The filer-metadata API (name, SIC, former names, filing index). Same host, same fair-access
+#: rules, so the same client serves it; only the path root differs.
+SUBMISSIONS_URL = "https://data.sec.gov/submissions"
 CONTACT_SETTING = "SEC_CONTACT_EMAIL"
 # SEC's published ceiling is 10 requests/second. 0.11 s is ~9.1 req/s: the headroom keeps a
 # multi-hundred-call sweep under the ceiling even when the clock rounds a wait down.
@@ -445,14 +448,14 @@ class Client:
             log.debug("sec: waiting %.3fs for the 10 req/s ceiling", wait)
             self._sleep(wait)
 
-    def _get(self, path: str) -> Any:
-        """GET ``path`` under base_url and return the decoded JSON body.
+    def _get(self, path: str, *, root: str | None = None) -> Any:
+        """GET ``path`` under ``root`` (default base_url) and return the decoded JSON body.
 
         Connection errors, timeouts, 429 and 5xx are retried up to ``retries`` times with
         exponential backoff (a longer numeric Retry-After wins, capped at MAX_RETRY_AFTER_S).
         404 raises SecNotFound at once; any other non-200 raises SecError at once.
         """
-        url = f"{self.base_url}{path}"
+        url = f"{(root or self.base_url).rstrip('/')}{path}"
         headers = {
             "User-Agent": user_agent(self.contact),
             "Accept": "application/json",
@@ -479,7 +482,8 @@ class Client:
                     except ValueError:
                         raise SecError(f"non-JSON response from sec {path}", status) from None
                 if status == 404:
-                    raise SecNotFound(f"sec {path}: EDGAR has no XBRL facts for this CIK")
+                    what = "filer" if root else "XBRL facts"
+                    raise SecNotFound(f"sec {path}: EDGAR has no {what} for this CIK")
                 message = f"HTTP {status} from sec {path}: {str(resp.text)[:MAX_ERROR_BODY]}"
                 if status == 403:
                     message += f" (SEC refuses an undeclared client; check {CONTACT_SETTING})"
@@ -534,3 +538,46 @@ class Client:
         out = parse_company_concept(payload, key, tax, name)
         log.info("sec companyconcept CIK%s %s:%s: %d facts", key, tax, name, len(out.facts))
         return out
+
+    def submissions(self, cik: str | int) -> Filer:
+        """The filer header of ``data.sec.gov/submissions/CIK##########.json``: name and SIC.
+
+        Dead filers answer too (Merrill Lynch 0000065100, Wachovia 0000036995), because EDGAR is
+        an archive. Raises SecNotFound for a CIK EDGAR has never heard of.
+        """
+        key = cik10(cik)
+        payload = self._get(f"/CIK{key}.json", root=SUBMISSIONS_URL)
+        if not isinstance(payload, dict):
+            raise SecError(f"sec submissions CIK{key}: unexpected {type(payload).__name__}", 200)
+        return parse_filer(payload, key)
+
+
+@dataclass(frozen=True, slots=True)
+class Filer:
+    """What the sector labels need from a submissions document.
+
+    ``sic`` is the four-digit Standard Industrial Classification SEC assigned **most recently**
+    -- EDGAR keeps no history of it -- or None when the filer has none (some funds, trusts and
+    foreign filers carry an empty field).
+    """
+
+    cik: str
+    name: str
+    sic: int | None
+    sic_description: str
+
+
+def parse_filer(payload: Mapping[str, Any], cik: str | int) -> Filer:
+    """A submissions body as a Filer. ``sic`` that is empty, non-numeric or 0000 is None."""
+    key = cik10(cik)
+    _check_cik(payload, key, "submissions")
+    raw = payload.get("sic")
+    text = str(raw).strip() if raw is not None else ""
+    sic = int(text) if text.isdigit() and int(text) > 0 else None
+    desc = payload.get("sicDescription")
+    return Filer(
+        cik=key,
+        name=_entity_name({"entityName": payload.get("name")}),
+        sic=sic,
+        sic_description=(desc.strip() if isinstance(desc, str) and sic is not None else ""),
+    )

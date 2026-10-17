@@ -1,0 +1,980 @@
+symbol,cik,start_date,end_date,company_name,source,note
+A,0001090872,2000-06-05,2009-01-01,"AGILENT TECHNOLOGIES, INC.",carry,carried back from the 2009 row (current); 35 periodic filings inside the span (2000-06-12 .. 2008-12-19)
+AABA,0001011006,1999-12-08,2009-01-01,ALTABA INC.,carry,carried back from the 2009 row (manual); 36 periodic filings inside the span (2000-03-30 .. 2008-11-07)
+AAL,0000003449,1996-01-02,1997-01-15,ALEXANDER & ALEXANDER SERVICES INC,exact,name 'Alexander & Alexander Services' -> EDGAR 'ALEXANDER & ALEXANDER SERVICES INC'; 4 periodic filings inside the span (1996-03-29 .. 1996-11-12)
+AAMRQ,0000006201,1996-01-02,2003-03-14,American Airlines Group Inc.,exact,name 'AMR Corp' -> EDGAR 'American Airlines Group Inc.'; 28 periodic filings inside the span (1996-03-21 .. 2002-10-18)
+AAPL,0000320193,1996-01-02,2009-01-01,Apple Inc.,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-12 .. 2008-11-05)
+ABI,0000077551,1996-01-02,2008-11-24,APPLIED BIOSYSTEMS INC.,exact,name 'Applera' -> EDGAR 'APPLIED BIOSYSTEMS INC.'; 52 periodic filings inside the span (1996-02-12 .. 2008-11-06)
+ABKFQ,0000874501,2000-12-11,2008-06-11,OCTAVE SPECIALTY GROUP INC,exact,name 'Ambac Financial Group' -> EDGAR 'OCTAVE SPECIALTY GROUP INC'; 30 periodic filings inside the span (2001-03-28 .. 2008-05-12)
+ABS,0000003333,1996-01-02,2006-06-02,ALBERTSONS INC /DE/,exact,name 'Albertsons' -> EDGAR 'ALBERTSONS INC /DE/'; 42 periodic filings inside the span (1996-04-08 .. 2006-05-31); best of 3 same-name entities
+ABT,0000001800,1996-01-02,2009-01-01,ABBOTT LABORATORIES,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-11 .. 2008-11-03)
+ABX,0000756894,1996-01-02,2002-07-22,BARRICK MINING CORP,exact,name 'Barrick Gold' -> EDGAR 'BARRICK MINING CORP'; 1 periodic filings inside the span (2002-04-29 .. 2002-04-29); best of 2 same-name entities
+ACAS,0000817473,2007-07-09,2009-01-01,"AMERICAN CAPITAL, LTD",carry,carried back from the 2009 row (manual); 6 periodic filings inside the span (2007-08-09 .. 2008-11-10)
+ACKH,0000007431,1996-01-02,2000-11-17,ARMSTRONG WORLD INDUSTRIES INC,exact,name 'Armstrong World Industries' -> EDGAR 'ARMSTRONG WORLD INDUSTRIES INC'; 20 periodic filings inside the span (1996-03-28 .. 2000-11-14); best of 4 same-name entities
+ACS,0000002135,2004-04-02,2009-01-01,AFFILIATED COMPUTER SERVICES INC,carry,carried back from the 2009 row (manual); 19 periodic filings inside the span (2004-05-17 .. 2008-11-07)
+ACV,0000003327,1996-01-02,2006-11-17,New Alberto-Culver LLC,exact,name 'Alberto-Culver' -> EDGAR 'New Alberto-Culver LLC'; 43 periodic filings inside the span (1996-02-13 .. 2006-08-07); best of 2 same-name entities
+ADBE,0000796343,1997-05-06,2009-01-01,ADOBE INC.,carry,carried back from the 2009 row (current); 46 periodic filings inside the span (1997-07-14 .. 2008-10-02)
+ADCT,0000061478,1999-08-02,2007-07-02,ADC TELECOMMUNICATIONS INC,exact,name 'ADC Telecommunications' -> EDGAR 'ADC TELECOMMUNICATIONS INC'; 32 periodic filings inside the span (1999-09-14 .. 2007-06-07)
+ADI,0000006281,1999-10-12,2009-01-01,ANALOG DEVICES INC,carry,carried back from the 2009 row (current); 37 periodic filings inside the span (2000-01-28 .. 2008-11-25)
+ADM,0000007084,1996-01-02,2009-01-01,Archer-Daniels-Midland Co,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-13 .. 2008-11-10)
+ADP,0000008670,1996-01-02,2009-01-01,AUTOMATIC DATA PROCESSING INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-13 .. 2008-11-07)
+ADSK,0000769397,1996-01-02,2009-01-01,"Autodesk, Inc.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-04-30 .. 2008-12-04)
+AEE,0000100826,1996-01-02,1998-01-02,UNION ELECTRIC CO,manual,Union Electric until the 1997-12-31 CIPSCO merger formed Ameren; fja05680 back-fills AEE over the Union Electric slot
+AEE,0001002910,1998-01-02,2009-01-01,AMEREN CORP,manual,Ameren from its 1998 first trading day
+AEOS,0000919012,2007-02-01,2007-03-08,AMERICAN EAGLE OUTFITTERS INC,exact,name 'American Eagle Outfitters' -> EDGAR 'AMERICAN EAGLE OUTFITTERS INC'; 0 periodic filings inside the span
+AEP,0000004904,1996-01-02,2009-01-01,AMERICAN ELECTRIC POWER CO INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-28 .. 2008-10-31)
+AES,0000874761,1998-10-02,2009-01-01,AES CORP,carry,carried back from the 2009 row (current); 41 periodic filings inside the span (1998-11-16 .. 2008-11-06)
+AET,0000002648,1996-01-02,1996-07-19,AETNA LIFE & CASUALTY CO,manual,EDGAR former name AETNA LIFE & CASUALTY CO (1994..1996-07-16); the U.S. Healthcare merger closed 1996-07-19 under a new holding company
+AET,0001013761,1996-07-19,2000-12-14,AETNA INC /CT/,manual,Aetna Inc 1996-2000; sold its financial services arm to ING and spun the health business 2000-12-13
+AET,0001122304,2000-12-14,2009-01-01,AETNA INC /PA/,manual,the spun health company (EDGAR former name AETNA U S HEALTHCARE INC)
+AFL,0000004977,1999-05-28,2009-01-01,AFLAC INC,carry,carried back from the 2009 row (current); 38 periodic filings inside the span (1999-08-11 .. 2008-11-07)
+AFS.A,0000007974,1998-04-08,2000-12-01,ASSOCIATES FIRST CAPITAL CORP,exact,name 'Associates First Capital' -> EDGAR 'ASSOCIATES FIRST CAPITAL CORP'; 11 periodic filings inside the span (1998-05-13 .. 2000-11-14)
+AGC,0000005103,1996-01-02,2001-08-29,AMERICAN GENERAL CORP /TX/,exact,name 'American General Corp' -> EDGAR 'AMERICAN GENERAL CORP /TX/'; 23 periodic filings inside the span (1996-03-20 .. 2001-08-14); best of 2 same-name entities
+AGN,0000850693,1996-01-02,2009-01-01,Allergan plc,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-03-28 .. 2008-11-07)
+AHM,0000771667,1996-01-02,1998-10-01,AHMANSON H F & CO /DE/,exact,name 'H.F. Ahmanson' -> EDGAR 'AHMANSON H F & CO /DE/'; 11 periodic filings inside the span (1996-03-27 .. 1998-08-14)
+AIG,0000005272,1996-01-02,2009-01-01,"AMERICAN INTERNATIONAL GROUP, INC.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-11-10)
+AIT,0000732715,1996-01-02,1999-10-11,AMERITECH CORP /DE/,exact,name 'Ameritech' -> EDGAR 'AMERITECH CORP /DE/'; 15 periodic filings inside the span (1996-03-13 .. 1999-08-03)
+AIV,0000922864,2003-03-14,2009-01-01,APARTMENT INVESTMENT & MANAGEMENT CO,carry,carried back from the 2009 row (current); 23 periodic filings inside the span (2003-05-08 .. 2008-10-31)
+AIZ,0001267238,2007-04-10,2009-01-01,"ASSURANT, INC.",carry,carried back from the 2009 row (current); 7 periodic filings inside the span (2007-05-09 .. 2008-11-04)
+AKAM,0001086222,2007-02-01,2009-01-01,AKAMAI TECHNOLOGIES INC,carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-03-01 .. 2008-11-10)
+AKS,0000918160,2008-07-01,2009-01-01,Cleveland-Cliffs Steel Holding Corp,carry,carried back from the 2009 row (manual); 2 periodic filings inside the span (2008-08-05 .. 2008-11-04)
+AL,0000004285,1996-01-02,2002-07-22,ALCAN INC,exact,name 'Alcan Aluminium' -> EDGAR 'ALCAN INC'; 22 periodic filings inside the span (1997-03-28 .. 2002-05-15)
+ALL,0000899051,1996-01-02,2009-01-01,ALLSTATE CORP,carry,carried back from the 2009 row (current); 51 periodic filings inside the span (1996-05-14 .. 2008-11-06)
+ALTR,0000768251,2000-04-18,2009-01-01,ALTERA CORP,carry,carried back from the 2009 row (manual); 35 periodic filings inside the span (2000-05-12 .. 2008-11-03)
+AM,0000005133,1996-01-02,2004-05-03,AMERICAN GREETINGS CORP,exact,name 'American Greetings' -> EDGAR 'AMERICAN GREETINGS CORP'; 33 periodic filings inside the span (1996-01-12 .. 2004-01-14)
+AMAT,0000006951,1996-01-02,2009-01-01,APPLIED MATERIALS INC /DE,carry,carried back from the 2009 row (current); 53 periodic filings inside the span (1996-01-12 .. 2008-12-12)
+AMCC,0000711065,2001-01-02,2006-05-18,APPLIED MICRO CIRCUITS CORP,exact,name 'Applied Micro Circuits' -> EDGAR 'APPLIED MICRO CIRCUITS CORP'; 21 periodic filings inside the span (2001-02-14 .. 2006-02-09)
+AMD,0000002488,1996-01-02,2009-01-01,ADVANCED MICRO DEVICES INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-21 .. 2008-11-06)
+AMGN,0000318154,1996-01-02,2009-01-01,AMGEN INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-11-07)
+AMH,0000004427,1996-01-02,1997-09-15,AMDAHL CORP,exact,name 'Amdahl' -> EDGAR 'AMDAHL CORP'; 7 periodic filings inside the span (1996-03-25 .. 1997-08-11)
+AMLN,0000881464,2007-02-01,2008-12-22,AMYLIN PHARMACEUTICALS INC,exact,name 'Amylin Pharmaceuticals' -> EDGAR 'AMYLIN PHARMACEUTICALS INC'; 8 periodic filings inside the span (2007-02-26 .. 2008-11-04)
+AMP,0000006164,1996-01-02,1999-04-05,AMP INC,manual,"AMP Inc (connectors), acquired by Tyco 1999; the ticker went to Ameriprise in 2005"
+AMP,0000820027,2005-10-03,2009-01-01,AMERIPRISE FINANCIAL INC,carry,carried back from the 2009 row (current); 13 periodic filings inside the span (2005-11-14 .. 2008-11-05)
+AMT,0001053507,2007-11-19,2009-01-01,AMERICAN TOWER CORP /MA/,carry,carried back from the 2009 row (current); 4 periodic filings inside the span (2008-03-14 .. 2008-11-06)
+AMZN,0001018724,2005-11-21,2009-01-01,AMAZON COM INC,carry,carried back from the 2009 row (current); 12 periodic filings inside the span (2006-02-17 .. 2008-10-22)
+AN,0000093397,1996-01-02,1999-01-04,AMOCO CORP,manual,"Amoco (EDGAR now BP CORP NORTH AMERICA), merged with BP 1998-12-31; the ticker went to AutoNation"
+AN,0000350698,2003-02-24,2009-01-01,"AUTONATION, INC.",carry,carried back from the 2009 row (current); 24 periodic filings inside the span (2003-02-28 .. 2008-11-07)
+ANDV,0000050104,2007-09-27,2009-01-01,Andeavor,carry,carried back from the 2009 row (exact); 5 periodic filings inside the span (2007-11-01 .. 2008-11-04)
+ANDW,0000317093,1996-01-02,2006-10-02,ANDREW CORP,exact,name 'Andrew Corp' -> EDGAR 'ANDREW CORP'; 43 periodic filings inside the span (1996-02-12 .. 2006-08-09)
+ANF,0001018840,2007-03-29,2009-01-01,ABERCROMBIE & FITCH CO /DE/,carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-03-30 .. 2008-12-05)
+ANV,0000059198,1996-01-02,1999-04-12,AEROQUIP-VICKERS INC,manual,"Aeroquip-Vickers (former TRINOVA), NYSE ANV, acquired by Eaton 1999-04-09; identified from the ticker and the removal date"
+AON,0000315293,1996-04-23,2009-01-01,Aon plc,carry,carried back from the 2009 row (current); 51 periodic filings inside the span (1996-05-15 .. 2008-11-07)
+APA,0000006769,1997-07-28,2009-01-01,APACHE CORP,carry,carried back from the 2009 row (manual); 46 periodic filings inside the span (1997-08-14 .. 2008-11-10)
+APC,0000773910,1997-07-28,2009-01-01,ANADARKO PETROLEUM CORP,carry,carried back from the 2009 row (manual); 46 periodic filings inside the span (1997-08-13 .. 2008-11-04)
+APCC,0000835910,2000-06-01,2007-02-15,AMERICAN POWER CONVERSION CORP,exact,name 'American Power Conversion' -> EDGAR 'AMERICAN POWER CONVERSION CORP'; 26 periodic filings inside the span (2000-08-16 .. 2006-11-03)
+APD,0000002969,1996-01-02,2009-01-01,"Air Products & Chemicals, Inc.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-14 .. 2008-11-26)
+APH,0000820313,2008-09-30,2009-01-01,AMPHENOL CORP /DE/,carry,carried back from the 2009 row (current); 1 periodic filings inside the span (2008-11-06 .. 2008-11-06)
+APOL,0000929887,2002-05-15,2009-01-01,Apollo Education Group Inc Class A,carry,carried back from the 2009 row (exact); 26 periodic filings inside the span (2002-07-12 .. 2008-10-28)
+AR,0000007649,1996-01-02,1999-10-27,ASARCO INC,exact,name 'ASARCO' -> EDGAR 'ASARCO INC'; 15 periodic filings inside the span (1996-03-20 .. 1999-08-16)
+ARC,0000775483,1996-01-02,2000-04-18,ATLANTIC RICHFIELD CO /DE,exact,name 'Atlantic Richfield' -> EDGAR 'ATLANTIC RICHFIELD CO /DE'; 17 periodic filings inside the span (1996-02-28 .. 2000-03-01)
+AS,0000007383,1996-01-02,1998-11-24,ARMCO INC,exact,name 'Armco' -> EDGAR 'ARMCO INC'; 12 periodic filings inside the span (1996-03-27 .. 1998-11-05)
+ASC,0000090811,1996-01-02,1999-06-24,AMERICAN STORES CO /NEW/,exact,name 'American Stores' -> EDGAR 'AMERICAN STORES CO /NEW/'; 14 periodic filings inside the span (1996-04-19 .. 1999-06-03); best of 2 same-name entities
+ASH,0000007694,1996-01-02,2005-06-30,ASHLAND INC,manual,the original Ashland until the 2005-06-30 MAP transaction put a new Ashland Inc on the ticker
+ASH,0001305014,2005-06-30,2008-11-14,ASHLAND INC.,manual,former name New EXM Inc.
+ASN,0001156826,2004-12-20,2007-10-08,ARCHSTONE SMITH TRUST,exact,name 'Archstone-Smith Trust' -> EDGAR 'ARCHSTONE SMITH TRUST'; 11 periodic filings inside the span (2005-02-28 .. 2007-08-09)
+ASND,0000921146,1998-06-12,1999-06-25,ASCEND COMMUNICATIONS INC,exact,name 'Ascend Communications' -> EDGAR 'ASCEND COMMUNICATIONS INC'; 4 periodic filings inside the span (1998-08-11 .. 1999-05-17)
+ASO,0000003133,1999-03-10,2006-11-06,AMSOUTH BANCORPORATION,exact,name 'AmSouth Bancorporation' -> EDGAR 'AMSOUTH BANCORPORATION'; 31 periodic filings inside the span (1999-03-31 .. 2006-08-07)
+AT,0000065873,1996-01-02,2007-11-19,ALLTEL CORP,exact,name 'Alltel' -> EDGAR 'ALLTEL CORP'; 48 periodic filings inside the span (1996-02-20 .. 2007-10-19); best of 2 same-name entities
+ATI,0001018963,1996-01-02,2009-01-01,ATI INC,carry,carried back from the 2009 row (current); 49 periodic filings inside the span (1996-11-14 .. 2008-10-31)
+ATVI,0000718877,2007-02-01,2009-01-01,"Activision Blizzard, Inc.",carry,carried back from the 2009 row (edgar); 9 periodic filings inside the span (2007-06-07 .. 2008-11-10)
+AV,0001116521,2000-10-02,2007-10-26,AVAYA INC,exact,name 'Avaya' -> EDGAR 'AVAYA INC'; 28 periodic filings inside the span (2000-12-28 .. 2007-08-06); best of 3 same-name entities
+AVB,0000915912,2007-01-10,2009-01-01,AVALONBAY COMMUNITIES INC,carry,carried back from the 2009 row (edgar); 8 periodic filings inside the span (2007-03-01 .. 2008-11-10)
+AVP,0000008868,1996-01-02,2009-01-01,"Avon Products, Inc.",carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-03-29 .. 2008-10-30)
+AVY,0000008818,1996-01-02,2009-01-01,Avery Dennison Corp,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-11-06)
+AW,0000848865,1999-08-02,2008-12-05,"Allied Waste Industries, LLC",exact,"name 'Allied Waste Industries' -> EDGAR 'Allied Waste Industries, LLC'; 38 periodic filings inside the span (1999-08-16 .. 2008-10-30)"
+AWE,0001138234,2001-07-09,2004-10-27,"NEW CINGULAR WIRELESS SERVICES, INC.",exact,"name 'AT&T Wireless Services' -> EDGAR 'NEW CINGULAR WIRELESS SERVICES, INC.'; 13 periodic filings inside the span (2001-08-14 .. 2004-08-06)"
+AXP,0000004962,1996-01-02,2009-01-01,AMERICAN EXPRESS CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-10-31)
+AYE,0000003673,2000-12-11,2009-01-01,ALLEGHENY ENERGY INC,carry,carried back from the 2009 row (exact); 32 periodic filings inside the span (2001-03-30 .. 2008-11-06)
+AZA.A,0000004310,1996-01-02,2001-06-25,ALZA CORP,exact,name 'Alza Corp' -> EDGAR 'ALZA CORP'; 22 periodic filings inside the span (1996-04-01 .. 2001-05-14)
+AZO,0000866787,1997-01-02,2009-01-01,AUTOZONE INC,carry,carried back from the 2009 row (current); 49 periodic filings inside the span (1997-01-06 .. 2008-12-19)
+BA,0000012927,1996-01-02,2009-01-01,BOEING CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-13 .. 2008-10-22)
+BAC,0000070858,1996-01-02,2009-01-01,BANK OF AMERICA CORP /DE/,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-11-06)
+BALL,0000009389,1996-01-02,2009-01-01,BALL Corp,carry,carried back from the 2009 row (current); 54 periodic filings inside the span (1996-04-01 .. 2008-11-05)
+BAX,0000010456,1996-01-02,2009-01-01,BAXTER INTERNATIONAL INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-22 .. 2008-10-31)
+BAY,0000876516,1996-02-12,1998-08-31,BAY NETWORKS INC,exact,name 'Bay Networks' -> EDGAR 'BAY NETWORKS INC'; 8 periodic filings inside the span (1996-09-05 .. 1998-05-08); best of 2 same-name entities
+BBBY,0000886158,1999-10-01,2009-01-01,"20230930-DK-Butterfly-1, Inc.",carry,carried back from the 2009 row (edgar); 37 periodic filings inside the span (1999-10-12 .. 2008-10-09)
+BBI,0000010012,1996-01-02,1998-01-12,BARNETT BANKS INC,exact,name 'Barnett Banks' -> EDGAR 'BARNETT BANKS INC'; 8 periodic filings inside the span (1996-02-07 .. 1997-11-14)
+BBWI,0000701985,1996-01-02,2009-01-01,"Bath & Body Works, Inc.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-05-02 .. 2008-12-05)
+BBY,0000764478,1999-06-30,2009-01-01,BEST BUY CO INC,carry,carried back from the 2009 row (current); 38 periodic filings inside the span (1999-07-12 .. 2008-10-09)
+BC,0000014930,1996-01-02,2008-06-23,BRUNSWICK CORP,exact,name 'Brunswick Corp' -> EDGAR 'BRUNSWICK CORP'; 50 periodic filings inside the span (1996-03-28 .. 2008-05-01); best of 2 same-name entities
+BCO,NONE,1996-01-02,1996-01-22,,manual,"unidentified: a 20-day 1996 member under BCO in fja05680 (not Brink's, which took BCO in 2003); no name source checked knows it"
+BCR,0000009892,1996-01-02,2009-01-01,BARD C R INC /NJ/,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-26 .. 2008-10-27)
+BDK,0000012355,1996-01-02,2009-01-01,BLACK & DECKER CORP,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-02-29 .. 2008-11-06)
+BDX,0000010795,1996-01-02,2009-01-01,BECTON DICKINSON & CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-12 .. 2008-11-26)
+BEAM,0000789073,1996-01-02,2009-01-01,Beam Suntory Inc.,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-04-01 .. 2008-11-10)
+BEAS,0001031798,2007-02-01,2008-04-30,BEA SYSTEMS INC,exact,name 'BEA Systems' -> EDGAR 'BEA SYSTEMS INC'; 7 periodic filings inside the span (2007-11-15 .. 2008-03-28)
+BEN,0000038777,1998-04-29,2009-01-01,FRANKLIN TEMPLETON INC,carry,carried back from the 2009 row (current); 43 periodic filings inside the span (1998-05-15 .. 2008-11-25)
+BEV,0000812305,1996-01-02,1997-12-04,BEVERLY ENTERPRISES INC /DE/,exact,name 'Beverly Enterprises' -> EDGAR 'BEVERLY ENTERPRISES INC /DE/'; 8 periodic filings inside the span (1996-03-26 .. 1997-11-14); best of 2 same-name entities
+BF.B,0000014693,1996-01-02,2009-01-01,BROWN FORMAN CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-13 .. 2008-12-08)
+BFI,0000014827,1996-01-02,1999-08-02,BROWNING FERRIS INDUSTRIES INC,exact,name 'Browning-Ferris Industries' -> EDGAR 'BROWNING FERRIS INDUSTRIES INC'; 14 periodic filings inside the span (1996-02-09 .. 1999-05-14); best of 3 same-name entities
+BFO,0000025350,1996-01-02,2000-10-03,BESTFOODS,exact,name 'Bestfoods' -> EDGAR 'BESTFOODS'; 19 periodic filings inside the span (1996-03-28 .. 2000-08-03)
+BGEN,0000714655,2000-01-31,2003-11-13,BIOGEN INC,manual,"the original Biogen (EDGAR now BIOGEN IDEC MA INC); 0000875045, today's Biogen Inc, was IDEC Pharmaceuticals until the 2003-11-12 merger"
+BGG,0000014195,1996-01-02,2001-04-03,BRIGGS & STRATTON CORP,exact,name 'Briggs & Stratton' -> EDGAR 'BRIGGS & STRATTON CORP'; 21 periodic filings inside the span (1996-02-13 .. 2001-02-13)
+BHMSQ,0000011860,1996-01-02,2000-12-11,BETHLEHEM STEEL CORP /DE/,exact,name 'Bethlehem Steel' -> EDGAR 'BETHLEHEM STEEL CORP /DE/'; 20 periodic filings inside the span (1996-03-27 .. 2000-10-25)
+BIDU,0001329099,2007-12-04,2009-01-01,"Baidu, Inc.",carry,carried back from the 2009 row (current); 1 periodic filings inside the span (2008-06-05 .. 2008-06-05)
+BIG,0000768835,1998-01-20,2009-01-01,FORMER BL STORES INC,carry,carried back from the 2009 row (edgar); 44 periodic filings inside the span (1998-04-22 .. 2008-12-09)
+BIIB,0000875045,2003-11-13,2009-01-01,BIOGEN INC.,carry,carried back from the 2009 row (current); 20 periodic filings inside the span (2004-03-10 .. 2008-10-21)
+BJS,0000864328,2002-05-15,2009-01-01,BJ SERVICES CO,carry,carried back from the 2009 row (exact); 26 periodic filings inside the span (2002-08-14 .. 2008-11-26)
+BKB,0000036672,1996-01-02,1999-10-01,BANKBOSTON CORP,exact,name 'BankBoston' -> EDGAR 'BANKBOSTON CORP'; 15 periodic filings inside the span (1996-03-18 .. 1999-08-12)
+BKR,0000808362,1996-01-02,2009-01-01,Baker Hughes Holdings LLC,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-02-12 .. 2008-10-29)
+BLS,0000732713,1996-01-02,2007-01-03,BELLSOUTH CORP,exact,name 'BellSouth' -> EDGAR 'BELLSOUTH CORP'; 44 periodic filings inside the span (1996-02-29 .. 2006-11-01)
+BLY,0000009435,1996-01-02,1996-12-19,BALLY ENTERTAINMENT CORP,exact,name 'Bally Entertainment' -> EDGAR 'BALLY ENTERTAINMENT CORP'; 3 periodic filings inside the span (1996-04-01 .. 1996-11-14)
+BMC,0000835729,1998-10-01,2009-01-01,"BMC SOFTWARE, INC",carry,carried back from the 2009 row (exact); 41 periodic filings inside the span (1998-11-16 .. 2008-10-31)
+BMET,0000351346,1996-01-02,2007-07-12,BIOMET INC,exact,name 'Biomet' -> EDGAR 'BIOMET INC'; 46 periodic filings inside the span (1996-01-16 .. 2007-06-04); best of 2 same-name entities
+BMGCA,0000771498,1996-07-22,1999-08-09,BATTLE MOUNTAIN GOLD CO,exact,name 'Battle Mountain Gold' -> EDGAR 'BATTLE MOUNTAIN GOLD CO'; 12 periodic filings inside the span (1996-08-14 .. 1999-05-17); best of 2 same-name entities
+BMS,0000011199,1996-01-02,2009-01-01,Bemis,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-03-19 .. 2008-11-10)
+BMY,0000014272,1996-01-02,2009-01-01,BRISTOL MYERS SQUIBB CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-28 .. 2008-10-23)
+BNI,0000934612,1996-01-02,2009-01-01,"BURLINGTON NORTHERN SANTA FE, LLC",carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-04-01 .. 2008-10-24)
+BNL,0000008960,1996-01-02,1998-07-01,BENEFICIAL CORP,exact,name 'Beneficial Corp' -> EDGAR 'BENEFICIAL CORP'; 10 periodic filings inside the span (1996-03-26 .. 1998-05-13); best of 2 same-name entities
+BNY,0000009626,1996-01-02,2007-07-02,BANK OF NEW YORK CO INC,manual,Bank of New York Co until the 2007-07-01 Mellon merger formed BNY Mellon
+BNY,0001390777,2007-07-02,2009-01-01,Bank of New York Mellon Corp,manual,BNY Mellon
+BOAT,0000040454,1996-01-02,1997-01-07,BOATMENS BANCSHARES INC /MO,exact,"name ""Boatmen's Bancshares"" -> EDGAR 'BOATMENS BANCSHARES INC /MO'; 4 periodic filings inside the span (1996-03-15 .. 1996-11-13)"
+BOL,0000010427,1996-01-02,2007-10-29,BAUSCH & LOMB INC,exact,name 'Bausch & Lomb' -> EDGAR 'BAUSCH & LOMB INC'; 47 periodic filings inside the span (1996-03-29 .. 2007-08-08); best of 3 same-name entities
+BR,0000833320,1996-01-02,2006-04-03,BURLINGTON RESOURCES INC,exact,name 'Burlington Resources' -> EDGAR 'BURLINGTON RESOURCES INC'; 41 periodic filings inside the span (1996-02-08 .. 2006-02-28)
+BRCM,0001054374,2000-07-03,2009-01-01,BROADCOM CORP,carry,carried back from the 2009 row (manual); 34 periodic filings inside the span (2000-08-14 .. 2008-10-22)
+BRL,0000010081,2006-02-27,2008-12-23,BARR PHARMACEUTICALS INC,exact,name 'Barr Pharmaceuticals' -> EDGAR 'BARR PHARMACEUTICALS INC'; 10 periodic filings inside the span (2006-05-08 .. 2008-11-06)
+BSC,0000777001,1998-07-01,2008-06-02,BEAR STEARNS COMPANIES INC,exact,name 'Bear Stearns Companies' -> EDGAR 'BEAR STEARNS COMPANIES INC'; 41 periodic filings inside the span (1998-09-28 .. 2008-04-14); best of 2 same-name entities
+BSX,0000885725,1996-01-02,2009-01-01,BOSTON SCIENTIFIC CORP,carry,carried back from the 2009 row (current); 51 periodic filings inside the span (1996-05-15 .. 2008-11-07)
+BT,0000009749,1996-01-02,1999-06-04,BANKERS TRUST CORP,exact,name 'Bankers Trust New York' -> EDGAR 'BANKERS TRUST CORP'; 14 periodic filings inside the span (1996-03-07 .. 1999-05-17); best of 8 same-name entities
+BTUUQ,0001064728,2006-11-20,2009-01-01,PEABODY ENERGY CORP,carry,carried back from the 2009 row (manual); 8 periodic filings inside the span (2007-02-28 .. 2008-11-07)
+BUD,0000310569,1996-01-02,2008-11-18,"ANHEUSER-BUSCH COMPANIES, LLC",exact,"name 'Anheuser-Busch Companies' -> EDGAR 'ANHEUSER-BUSCH COMPANIES, LLC'; 52 periodic filings inside the span (1996-03-28 .. 2008-11-06)"
+BVSN,0000920448,2000-11-06,2001-09-04,BROADVISION INC,exact,name 'BroadVision' -> EDGAR 'BROADVISION INC'; 4 periodic filings inside the span (2000-11-14 .. 2001-08-14)
+BXP,0001037540,2006-04-03,2009-01-01,"BXP, Inc.",carry,carried back from the 2009 row (current); 11 periodic filings inside the span (2006-05-10 .. 2008-11-10)
+C,0000831001,1996-01-02,2009-01-01,CITIGROUP INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-27 .. 2008-10-31)
+CA,0000356028,1996-01-02,2009-01-01,"CA, INC.",carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-02-02 .. 2008-10-30)
+CAG,0000023217,1996-01-02,2009-01-01,CONAGRA BRANDS INC.,carry,carried back from the 2009 row (current); 53 periodic filings inside the span (1996-01-10 .. 2008-12-31)
+CAH,0000721371,1997-05-27,2009-01-01,CARDINAL HEALTH INC,carry,carried back from the 2009 row (current); 46 periodic filings inside the span (1997-09-29 .. 2008-11-07)
+CAL,NONE,1996-01-02,1996-07-22,,manual,"unidentified: a 1996 member under CAL in fja05680; Continental Airlines, the obvious holder, was not an S&P 500 member then"
+CAM,0000941548,2008-01-29,2009-01-01,CAMERON INTERNATIONAL CORP,carry,carried back from the 2009 row (manual); 4 periodic filings inside the span (2008-02-29 .. 2008-11-04)
+CAR,0000723612,1996-01-02,2006-08-01,"AVIS BUDGET GROUP, INC.",exact,"name 'CUC International' -> EDGAR 'AVIS BUDGET GROUP, INC.'; 42 periodic filings inside the span (1996-04-25 .. 2006-05-03)"
+CAT,0000018230,1996-01-02,2009-01-01,CATERPILLAR INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-05 .. 2008-10-31)
+CB,0000896159,1996-01-02,2009-01-01,Chubb Ltd,carry,carried back from the 2009 row (current); 51 periodic filings inside the span (1996-05-15 .. 2008-11-07)
+CBB,0000701708,1996-01-02,1998-01-28,CALIBER SYSTEM INC,exact,name 'Caliber System' -> EDGAR 'CALIBER SYSTEM INC'; 8 periodic filings inside the span (1996-03-14 .. 1997-10-27)
+CBE,0000024454,1996-01-02,2002-05-22,COOPER INDUSTRIES INC,manual,Ohio Cooper Industries until the 2002-05-22 Bermuda reincorporation
+CBE,0001141982,2002-05-22,2009-01-01,Cooper Industries plc,manual,"Cooper Industries Ltd (Bermuda), later plc"
+CBH,0000715096,2006-06-06,2008-03-31,COMMERCE BANCORP INC /NJ/,exact,name 'Commerce Bancorp' -> EDGAR 'COMMERCE BANCORP INC /NJ/'; 7 periodic filings inside the span (2006-08-04 .. 2008-03-14); best of 6 same-name entities
+CBRE,0001138118,2006-11-10,2009-01-01,"CBRE GROUP, INC.",carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-03-01 .. 2008-11-10)
+CBSS,0000018568,2004-12-20,2007-09-07,COMPASS BANCSHARES INC,exact,name 'Compass Bancshares' -> EDGAR 'COMPASS BANCSHARES INC'; 11 periodic filings inside the span (2005-02-28 .. 2007-08-07)
+CCB,0000017109,1996-01-02,1996-02-12,CAPITAL CITIES ABC INC /NY/,exact,name 'Capital Cities/ABC' -> EDGAR 'CAPITAL CITIES ABC INC /NY/'; 0 periodic filings inside the span
+CCE,0000804055,1998-10-08,2009-01-01,"COCA-COLA REFRESHMENTS USA, INC.",carry,carried back from the 2009 row (manual); 41 periodic filings inside the span (1998-11-06 .. 2008-10-24)
+CCI,0000020405,1996-01-02,1998-10-08,CITICORP,exact,name 'Citicorp' -> EDGAR 'CITICORP'; 11 periodic filings inside the span (1996-02-28 .. 1998-08-13); best of 2 same-name entities
+CCK,0000025890,1996-01-02,2000-12-11,CROWN CORK & SEAL CO INC,exact,name 'Crown Cork & Seal' -> EDGAR 'CROWN CORK & SEAL CO INC'; 20 periodic filings inside the span (1996-04-01 .. 2000-11-13); best of 3 same-name entities
+CCL,0000815097,1998-12-22,2009-01-01,Carnival Corp Ltd.,carry,carried back from the 2009 row (current); 40 periodic filings inside the span (1999-02-25 .. 2008-09-26)
+CCTYQ,0000104599,1996-01-02,2008-03-31,CIRCUIT CITY STORES INC,exact,name 'Circuit City Stores' -> EDGAR 'CIRCUIT CITY STORES INC'; 49 periodic filings inside the span (1996-01-12 .. 2008-01-09)
+CCU,0000739708,1997-09-02,2008-07-31,"iHeartCommunications, Inc.",exact,"name 'Clear Channel Communications' -> EDGAR 'iHeartCommunications, Inc.'; 43 periodic filings inside the span (1997-11-06 .. 2008-05-09)"
+CDNS,0000813672,2007-02-01,2008-12-22,CADENCE DESIGN SYSTEMS INC,exact,name 'Cadence Design Systems' -> EDGAR 'CADENCE DESIGN SYSTEMS INC'; 8 periodic filings inside the span (2007-02-23 .. 2008-12-11)
+CDWC,0000899171,2007-02-01,2007-10-08,CDW CORP,manual,"CDW Corp (former CDW Computer Centers), taken private 2007-10"
+CE,0000740112,2001-04-02,2004-02-27,CONCORD EFS INC,exact,name 'Concord EFS' -> EDGAR 'CONCORD EFS INC'; 12 periodic filings inside the span (2001-04-02 .. 2003-11-07)
+CEG,0000009466,1996-01-02,1999-05-03,BALTIMORE GAS & ELECTRIC CO,manual,BGE until Constellation Energy Group became its holding company 1999-04-30
+CEG,0001004440,1999-05-03,2009-01-01,CONSTELLATION ENERGY GROUP INC,manual,Constellation
+CELG,0000816284,2006-11-06,2009-01-01,CELGENE CORP /DE/,carry,carried back from the 2009 row (manual); 9 periodic filings inside the span (2006-11-08 .. 2008-10-29)
+CEN,0000109758,1996-01-02,2001-04-02,ARBITRON INC,exact,name 'Ceridian' -> EDGAR 'ARBITRON INC'; 20 periodic filings inside the span (1996-03-26 .. 2000-11-14); best of 2 same-name entities
+CEPH,0000873364,2007-06-01,2009-01-01,CEPHALON INC,carry,carried back from the 2009 row (exact); 6 periodic filings inside the span (2007-08-07 .. 2008-11-05)
+CF,0000819692,2000-06-19,2004-09-01,CHARTER ONE FINANCIAL INC,manual,"Charter One Financial, acquired by Citizens 2004-08-31; the ticker went to CF Industries"
+CF,0001324404,2008-08-27,2009-01-01,"CF Industries Holdings, Inc.",carry,carried back from the 2009 row (current); 1 periodic filings inside the span (2008-11-04 .. 2008-11-04)
+CFC,0000025191,1997-06-18,2008-07-01,COUNTRYWIDE FINANCIAL CORP,exact,name 'Countrywide Financial' -> EDGAR 'COUNTRYWIDE FINANCIAL CORP'; 45 periodic filings inside the span (1997-07-15 .. 2008-05-12)
+CFL,0000069952,1996-01-02,1998-04-28,CORESTATES FINANCIAL CORP,exact,name 'CoreStates Financial' -> EDGAR 'CORESTATES FINANCIAL CORP'; 9 periodic filings inside the span (1996-03-26 .. 1998-03-30)
+CG,0000022099,1996-01-02,2000-11-02,COLUMBIA ENERGY GROUP,exact,name 'Columbia Energy Group' -> EDGAR 'COLUMBIA ENERGY GROUP'; 20 periodic filings inside the span (1996-02-23 .. 2000-10-26)
+CGP,0000021267,1996-01-02,2001-01-30,EL PASO CGP CO LLC,exact,name 'Coastal Corp' -> EDGAR 'EL PASO CGP CO LLC'; 20 periodic filings inside the span (1996-03-28 .. 2000-11-13); best of 5 same-name entities
+CHA,0000019150,1996-01-02,2000-06-19,CHAMPION INTERNATIONAL CORP,exact,name 'Champion International' -> EDGAR 'CHAMPION INTERNATIONAL CORP'; 18 periodic filings inside the span (1996-03-29 .. 2000-05-12)
+CHIR,0000706539,2000-11-24,2006-04-20,CHIRON CORP,exact,name 'Chiron Corp' -> EDGAR 'CHIRON CORP'; 21 periodic filings inside the span (2001-03-07 .. 2006-03-16); best of 3 same-name entities
+CHK,0000895126,2006-03-03,2009-01-01,EXPAND ENERGY Corp,carry,carried back from the 2009 row (edgar); 12 periodic filings inside the span (2006-03-14 .. 2008-11-10)
+CHKP,0001015922,2007-02-01,2009-01-01,CHECK POINT SOFTWARE TECHNOLOGIES LTD,carry,carried back from the 2009 row (current); 2 periodic filings inside the span (2007-03-15 .. 2008-03-03)
+CHRS,0000019353,1996-01-02,1998-04-08,CHARMING SHOPPES INC,manual,LOW CONFIDENCE: Nasdaq CHRS was Charming Shoppes; no source confirms its S&P 500 membership or the 1998-04-08 removal
+CHRW,0001043277,2007-02-01,2009-01-01,"C. H. ROBINSON WORLDWIDE, INC.",carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-03-01 .. 2008-11-07)
+CI,0000701221,1996-01-02,2009-01-01,Cigna Holding Co,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-29 .. 2008-10-30)
+CIEN,0000936395,2001-08-30,2009-01-01,CIENA CORP,carry,carried back from the 2009 row (current); 29 periodic filings inside the span (2001-12-13 .. 2008-12-23)
+CIN,0000899652,1996-01-02,2006-04-03,CINERGY CORP,exact,name 'Cinergy' -> EDGAR 'CINERGY CORP'; 41 periodic filings inside the span (1996-03-28 .. 2006-03-02)
+CINF,0000020286,1997-12-18,2009-01-01,CINCINNATI FINANCIAL CORP,carry,carried back from the 2009 row (current); 44 periodic filings inside the span (1998-03-23 .. 2008-10-29)
+CIT.A,0000020388,2000-07-17,2001-06-04,CIT GROUP INC,exact,name 'CIT Group' -> EDGAR 'CIT GROUP INC'; 4 periodic filings inside the span (2000-08-14 .. 2001-05-14); best of 15 same-name entities
+CITGQ,0001171825,2004-10-27,2009-01-01,CIT GROUP INC,carry,carried back from the 2009 row (manual); 17 periodic filings inside the span (2004-11-09 .. 2008-11-10)
+CKFR,0000949341,2007-02-01,2007-12-04,CHECKFREE CORP \GA\,exact,name 'CheckFree' -> EDGAR 'CHECKFREE CORP \\GA\\'; 4 periodic filings inside the span (2007-02-08 .. 2007-11-07); best of 4 same-name entities
+CL,0000021665,1996-01-02,2009-01-01,COLGATE PALMOLIVE CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-25 .. 2008-10-30)
+CLX,0000021076,1996-01-02,2009-01-01,CLOROX CO /DE/,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-14 .. 2008-11-03)
+CMA,0000028412,1996-01-02,2009-01-01,COMERICA INC,carry,carried back from the 2009 row (edgar); 52 periodic filings inside the span (1996-03-29 .. 2008-10-31)
+CMB,0000019489,1996-01-02,1996-04-01,CHASE MANHATTAN CORP,manual,"the original Chase Manhattan, merged into Chemical Banking (which took the Chase name and is JPMorgan Chase today) 1996-03-31"
+CMCSA,0000022301,1996-01-02,2002-11-19,COMCAST CORP,manual,the original Comcast Corp (EDGAR now COMCAST HOLDINGS CORP) until the AT&T Broadband close 2002-11-18 put a new parent on the ticker
+CMCSA,0001166691,2002-11-19,2009-01-01,COMCAST CORP,manual,former name AT&T COMCAST CORP
+CME,0001156375,2006-08-11,2009-01-01,CME GROUP INC.,carry,carried back from the 2009 row (current); 9 periodic filings inside the span (2006-11-06 .. 2008-11-10)
+CMI,0000026172,1996-01-02,2009-01-01,CUMMINS INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-05 .. 2008-10-31)
+CMS,0000811156,1999-05-03,2009-01-01,CMS ENERGY CORP,carry,carried back from the 2009 row (current); 39 periodic filings inside the span (1999-05-14 .. 2008-11-05)
+CMVT,0000803014,1999-10-27,2007-02-01,COMVERSE TECHNOLOGY INC/NY/,exact,name 'Comverse Technology' -> EDGAR 'COMVERSE TECHNOLOGY INC/NY/'; 25 periodic filings inside the span (1999-12-13 .. 2005-12-12); best of 2 same-name entities
+CMX,0001000736,2004-03-25,2007-03-23,CAREMARK RX INC,exact,name 'Caremark Rx' -> EDGAR 'CAREMARK RX INC'; 12 periodic filings inside the span (2004-05-10 .. 2007-02-27)
+CNC,0000719241,1997-01-15,2002-07-25,CONSECO INC,exact,name 'Conseco' -> EDGAR 'CONSECO INC'; 22 periodic filings inside the span (1997-03-25 .. 2002-05-15); best of 2 same-name entities
+CNG,0000023738,1996-01-02,2000-01-31,CONSOLIDATED NATURAL GAS CO/VA,exact,name 'Consolidated Natural Gas' -> EDGAR 'CONSOLIDATED NATURAL GAS CO/VA'; 16 periodic filings inside the span (1996-03-28 .. 1999-11-12); best of 2 same-name entities
+CNP,0000202131,1996-01-02,1997-08-06,HOUSTON INDUSTRIES INC /OLD,manual,Houston Industries until the 1997-08-06 NorAm merger moved the parent onto the utility's CIK
+CNP,0000048732,1997-08-06,2002-09-03,RELIANT ENERGY INC,manual,"Houston Industries Inc, renamed Reliant Energy 1999 (EDGAR now CenterPoint Energy Houston Electric); CenterPoint became the parent 2002-08-31"
+CNP,0001130310,2002-09-03,2009-01-01,CENTERPOINT ENERGY INC,manual,CenterPoint Energy
+CNW,0000854884,1996-01-02,1996-12-03,CHICAGO & NORTH WESTERN TRANSPORTATION CO /DE/,manual,"LOW CONFIDENCE: NYSE CNW was the Chicago & North Western, whose last periodic report is 1995-05 (Union Pacific completed its purchase in 1995); the slot runs to 1996-12-03, which fits only if the source carried it late"
+CNX,0001070412,2006-06-28,2009-01-01,CNX Resources Corp,carry,carried back from the 2009 row (current); 10 periodic filings inside the span (2006-08-03 .. 2008-11-04)
+CNXT,0001069353,2000-01-31,2002-06-26,CONEXANT SYSTEMS INC,exact,name 'Conexant Systems' -> EDGAR 'CONEXANT SYSTEMS INC'; 10 periodic filings inside the span (2000-02-11 .. 2002-05-13)
+COC.B,0001066806,1999-08-09,2002-09-03,CONOCOPHILLIPS HOLDING CO,exact,name 'Conoco Inc' -> EDGAR 'CONOCOPHILLIPS HOLDING CO'; 13 periodic filings inside the span (1999-08-13 .. 2002-08-09)
+COF,0000927628,1998-07-01,2009-01-01,CAPITAL ONE FINANCIAL CORP,carry,carried back from the 2009 row (current); 42 periodic filings inside the span (1998-08-14 .. 2008-11-10)
+COL,0001137411,2001-07-02,2009-01-01,Rockwell Collins,carry,carried back from the 2009 row (exact); 30 periodic filings inside the span (2001-08-13 .. 2008-11-25)
+COMS,0000738076,1996-01-02,2000-07-28,3COM CORP,exact,name '3Com' -> EDGAR '3COM CORP'; 17 periodic filings inside the span (1996-01-16 .. 2000-04-04)
+COP,0000078214,1996-01-02,2002-09-03,PHILLIPS PETROLEUM CO,manual,fja05680 back-fills COP over Phillips Petroleum; the Conoco merger closed 2002-08-30
+COP,0001163165,2002-09-03,2009-01-01,CONOCOPHILLIPS,manual,ConocoPhillips
+COR,0001140859,2001-08-30,2009-01-01,"Cencora, Inc.",carry,carried back from the 2009 row (current); 29 periodic filings inside the span (2001-12-28 .. 2008-11-25)
+COST,0000909832,1996-01-02,2009-01-01,COSTCO WHOLESALE CORP /NEW,carry,carried back from the 2009 row (current); 53 periodic filings inside the span (1996-01-09 .. 2008-12-19)
+COV,NONE,1996-01-02,1996-08-16,,manual,"unidentified: a 1996 S&P 500 member under COV in fja05680, eleven years before Covidien; no name source checked (Massive, EODHD, Wikipedia) knows it"
+COV,0001385187,2007-07-02,2009-01-01,Covidien plc,carry,carried back from the 2009 row (manual); 6 periodic filings inside the span (2007-08-10 .. 2008-11-21)
+CPB,0000016732,1996-01-02,2009-01-01,CAMPBELL'S Co,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-11 .. 2008-12-11)
+CPNLQ,0000916457,2000-12-01,2005-12-02,CALPINE CORP,exact,name 'Calpine' -> EDGAR 'CALPINE CORP'; 20 periodic filings inside the span (2001-03-15 .. 2005-11-09)
+CPQ,0000714154,1996-01-02,2002-05-06,COMPAQ COMPUTER CORP,exact,name 'Compaq Computer' -> EDGAR 'COMPAQ COMPUTER CORP'; 26 periodic filings inside the span (1996-03-06 .. 2002-04-24)
+CPWR,0000859014,1999-01-04,2009-01-01,COMPUWARE CORP,manual,"Compuware; ticker_cik.csv's 2009 row names 0000827099 Ocean Thermal Energy, today's holder of the recycled ticker"
+CR,0000025445,1996-01-02,2004-12-20,"Crane NXT, Co.",exact,"name 'Crane Co' -> EDGAR 'Crane NXT, Co.'; 36 periodic filings inside the span (1996-03-22 .. 2004-11-09); best of 6 same-name entities"
+CRM,0001108524,2008-09-15,2009-01-01,"Salesforce, Inc.",carry,carried back from the 2009 row (current); 1 periodic filings inside the span (2008-11-25 .. 2008-11-25)
+CRR,0000897732,1996-01-02,1997-05-27,CONRAIL INC,exact,name 'Conrail' -> EDGAR 'CONRAIL INC'; 6 periodic filings inside the span (1996-03-26 .. 1997-05-12)
+CSCO,0000858877,1996-01-02,2009-01-01,"CISCO SYSTEMS, INC.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-13 .. 2008-11-18)
+CSE,0000922321,1996-01-22,1999-11-15,CASE LLC,exact,name 'Case Corp' -> EDGAR 'CASE LLC'; 15 periodic filings inside the span (1996-05-10 .. 1999-11-10)
+CSR,0000018540,1996-01-02,2000-06-16,CENTRAL & SOUTH WEST CORP,exact,name 'Central & South West' -> EDGAR 'CENTRAL & SOUTH WEST CORP'; 18 periodic filings inside the span (1996-03-28 .. 2000-05-15)
+CSX,0000277948,1996-01-02,2009-01-01,CSX CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-01 .. 2008-10-15)
+CTAS,0000723254,2001-03-01,2009-01-01,CINTAS CORP,carry,carried back from the 2009 row (current); 31 periodic filings inside the span (2001-03-29 .. 2008-10-07)
+CTB,0000024491,1996-01-02,2006-07-18,COOPER TIRE & RUBBER CO,exact,name 'Cooper Tire & Rubber' -> EDGAR 'COOPER TIRE & RUBBER CO'; 42 periodic filings inside the span (1996-03-26 .. 2006-05-03)
+CTL,0000018926,1999-03-25,2009-01-01,"CenturyLink, Inc.",carry,carried back from the 2009 row (exact); 39 periodic filings inside the span (1999-05-14 .. 2008-10-31)
+CTRA,0000858470,2008-06-23,2009-01-01,Coterra Energy Inc.,carry,carried back from the 2009 row (edgar); 2 periodic filings inside the span (2008-07-30 .. 2008-11-03)
+CTSH,0001058290,2006-11-17,2009-01-01,COGNIZANT TECHNOLOGY SOLUTIONS CORP,carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-02-16 .. 2008-11-07)
+CTX,0000068622,1996-01-02,2009-01-01,Qwest Corporation,carry,carried back from the 2009 row (exact); 50 periodic filings inside the span (1996-03-28 .. 2008-10-30)
+CTXS,0000877890,1999-12-01,2009-01-01,CITRIX SYSTEMS INC,carry,carried back from the 2009 row (edgar); 36 periodic filings inside the span (2000-03-23 .. 2008-11-05)
+CVG,0001062047,2000-06-13,2009-01-01,Convergys,carry,carried back from the 2009 row (exact); 34 periodic filings inside the span (2000-08-14 .. 2008-11-05)
+CVH,0001054833,2005-08-30,2009-01-01,COVENTRY HEALTH CARE INC,carry,carried back from the 2009 row (exact); 13 periodic filings inside the span (2005-11-08 .. 2008-11-07)
+CVS,0000064803,1996-01-02,2009-01-01,CVS HEALTH Corp,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-10-31)
+CVX,0000093410,1996-01-02,2009-01-01,CHEVRON CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-27 .. 2008-11-06)
+CYM,0000769589,1996-01-02,1999-10-18,CYPRUS AMAX MINERALS CO,exact,name 'Cyprus Amax Minerals' -> EDGAR 'CYPRUS AMAX MINERALS CO'; 15 periodic filings inside the span (1996-03-29 .. 1999-08-06)
+CYR,0000025506,1996-01-02,1996-03-28,CRAY RESEARCH INC,exact,name 'Cray Research' -> EDGAR 'CRAY RESEARCH INC'; 0 periodic filings inside the span
+D,0000715957,1996-01-02,2009-01-01,"DOMINION ENERGY, INC",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-12 .. 2008-10-30)
+DALRQ,0000027904,1996-01-02,2005-08-19,"DELTA AIR LINES, INC.",exact,"name 'Delta Air Lines' -> EDGAR 'DELTA AIR LINES, INC.'; 38 periodic filings inside the span (1996-02-14 .. 2005-08-15)"
+DCNAQ,0000026780,1996-01-02,2006-03-03,DANA Inc,exact,name 'Dana Corp' -> EDGAR 'DANA Inc'; 40 periodic filings inside the span (1996-03-05 .. 2006-01-18); best of 2 same-name entities
+DD,0000030554,1996-01-02,2009-01-01,"EIDP, Inc.",carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-20 .. 2008-10-28)
+DDR,0000894315,2007-03-23,2009-01-01,DDR Corp.,carry,carried back from the 2009 row (exact); 7 periodic filings inside the span (2007-05-10 .. 2008-11-07)
+DDS,0000028917,1996-01-02,2008-10-22,"DILLARD'S, INC.",exact,"name ""Dillard's"" -> EDGAR ""DILLARD'S, INC.""; 51 periodic filings inside the span (1996-05-02 .. 2008-09-11); best of 2 same-name entities"
+DE,0000315189,1996-01-02,2009-01-01,DEERE & CO,carry,carried back from the 2009 row (current); 53 periodic filings inside the span (1996-01-16 .. 2008-12-18)
+DEC,0000028887,1996-01-02,1998-06-12,DIGITAL EQUIPMENT CORP,exact,name 'Digital Equipment' -> EDGAR 'DIGITAL EQUIPMENT CORP'; 10 periodic filings inside the span (1996-02-13 .. 1998-05-06)
+DELL,0000826083,1996-09-06,2009-01-01,DELL INC,carry,carried back from the 2009 row (manual); 50 periodic filings inside the span (1996-09-06 .. 2008-12-04)
+DF,0000931336,2006-04-03,2009-01-01,DEAN FOODS CO,carry,carried back from the 2009 row (manual); 11 periodic filings inside the span (2006-05-10 .. 2008-11-05)
+DFS,0001393612,2007-07-02,2009-01-01,Discover Financial Services,carry,carried back from the 2009 row (edgar); 6 periodic filings inside the span (2007-07-12 .. 2008-10-09)
+DG,0000029534,1998-07-16,2007-07-09,DOLLAR GENERAL CORP,exact,name 'Dollar General' -> EDGAR 'DOLLAR GENERAL CORP'; 36 periodic filings inside the span (1998-09-14 .. 2007-06-07)
+DGN,0000026999,1996-01-02,1999-10-13,DATA GENERAL CORP,exact,name 'Data General' -> EDGAR 'DATA GENERAL CORP'; 15 periodic filings inside the span (1996-02-12 .. 1999-08-05)
+DGX,0001022079,2002-12-12,2009-01-01,QUEST DIAGNOSTICS INC,carry,carried back from the 2009 row (current); 24 periodic filings inside the span (2003-02-28 .. 2008-10-23)
+DHI,0000882184,2005-07-05,2009-01-01,HORTON D R INC /DE/,carry,carried back from the 2009 row (current); 14 periodic filings inside the span (2005-08-09 .. 2008-11-26)
+DHR,0000313616,1998-11-18,2009-01-01,DANAHER CORP /DE/,carry,carried back from the 2009 row (current); 40 periodic filings inside the span (1999-03-19 .. 2008-10-16)
+DI,0000030099,1996-01-02,1998-09-30,DRESSER INDUSTRIES INC /DE/,exact,name 'Dresser Industries' -> EDGAR 'DRESSER INDUSTRIES INC /DE/'; 12 periodic filings inside the span (1996-01-29 .. 1998-09-14)
+DIGI,0000316004,1996-01-02,1998-08-28,ALCATEL USA INC,exact,name 'DSC Communications' -> EDGAR 'ALCATEL USA INC'; 11 periodic filings inside the span (1996-04-01 .. 1998-08-14)
+DIS,0001001039,1996-01-02,2009-01-01,TWDC Enterprises 18 Corp.,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-02-14 .. 2008-11-20)
+DISCK,0001320482,2007-02-01,2008-09-18,Discovery Holding CO,manual,Nasdaq-100 slot back-filled as DISCK; Discovery Holding until Discovery Communications became the parent 2008-09-17
+DISCK,0001437107,2008-09-18,2009-01-01,"Discovery Communications, Inc.",manual,EDGAR now Warner Bros. Discovery
+DISH,0001001082,2007-02-01,2009-01-01,DISH Network CORP,carry,carried back from the 2009 row (edgar); 8 periodic filings inside the span (2007-03-01 .. 2008-11-10)
+DJ,0000029924,1996-01-02,2007-12-14,DOW JONES & CO INC,exact,name 'Dow Jones & Co' -> EDGAR 'DOW JONES & CO INC'; 48 periodic filings inside the span (1996-03-25 .. 2007-11-09)
+DLX,0000027996,1996-01-02,2004-12-20,DELUXE CORP,exact,name 'Deluxe Corp' -> EDGAR 'DELUXE CORP'; 36 periodic filings inside the span (1996-04-01 .. 2004-11-04); best of 2 same-name entities
+DNB,0001115222,2008-12-02,2009-01-01,DUN & BRADSTREET CORP/NW,carry,carried back from the 2009 row (manual); 0 periodic filings inside the span
+DOC,0000765880,2008-03-31,2009-01-01,"HEALTHPEAK PROPERTIES, INC.",carry,carried back from the 2009 row (current); 3 periodic filings inside the span (2008-04-29 .. 2008-11-04)
+DOV,0000029905,1996-01-02,2009-01-01,DOVER Corp,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-26 .. 2008-10-22)
+DOW,0000029915,1996-01-02,2009-01-01,DOW CHEMICAL CO /DE/,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-15 .. 2008-10-28)
+DPHIQ,0001072342,1999-05-28,2005-10-11,DELPHI CORP,exact,name 'Delphi Corp' -> EDGAR 'DELPHI CORP'; 25 periodic filings inside the span (1999-07-19 .. 2005-08-08); best of 4 same-name entities
+DRI,0000940944,1996-01-02,2009-01-01,DARDEN RESTAURANTS INC,carry,carried back from the 2009 row (current); 50 periodic filings inside the span (1996-08-16 .. 2008-09-24)
+DTE,0000936340,1996-01-02,2009-01-01,DTE ENERGY CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-26 .. 2008-11-05)
+DTV,0000944868,2006-12-04,2009-01-01,DIRECTV GROUP INC,manual,"The DIRECTV Group (former name HUGHES ELECTRONICS CORP), the filer until the 2009-11-19 Liberty Entertainment merger; ticker_cik.csv's 0001465112 filed nothing before 2010"
+DUK,0000030371,1996-01-02,2006-04-03,DUKE ENERGY CORP,manual,"Duke Power, renamed Duke Energy 1997 (EDGAR now Duke Energy Carolinas) until the 2006-04-03 Cinergy merger put a new parent on the ticker"
+DUK,0001326160,2006-04-03,2009-01-01,Duke Energy CORP,manual,former name Duke Energy Holding Corp.
+DVA,0000927066,2008-07-31,2009-01-01,DAVITA INC.,carry,carried back from the 2009 row (current); 2 periodic filings inside the span (2008-08-08 .. 2008-11-06)
+DVN,0001090012,2000-08-30,2009-01-01,DEVON ENERGY CORP/DE,carry,carried back from the 2009 row (current); 33 periodic filings inside the span (2000-11-14 .. 2008-11-06)
+DWD,0000895421,1996-01-02,1997-06-02,MORGAN STANLEY,exact,name 'Dean Witter Discover' -> EDGAR 'MORGAN STANLEY'; 5 periodic filings inside the span (1996-05-15 .. 1997-04-30)
+DXC,0000023082,1996-01-02,2009-01-01,COMPUTER SCIENCES CORP,manual,the DXC slot is Computer Sciences Corp before the 2017 merger that created DXC
+DYN,0000879215,2000-10-03,2007-04-03,DYNEGY INC /IL/,manual,"Dynegy Inc (Illinois, former NGC Corp) until the 2007-04-02 LS Power combination put Dynegy Acquisition Inc on the ticker"
+DYN,0001379895,2007-04-03,2009-01-01,DYNEGY INC.,manual,"former name Dynegy Acquisition, Inc."
+EA,0000712515,2002-07-22,2009-01-01,ELECTRONIC ARTS INC.,carry,carried back from the 2009 row (edgar); 26 periodic filings inside the span (2002-08-13 .. 2008-11-06)
+EBAY,0001065088,2002-07-22,2009-01-01,EBAY INC,carry,carried back from the 2009 row (current); 26 periodic filings inside the span (2002-08-06 .. 2008-10-23)
+EC,0000352947,1996-01-02,2006-06-06,ENGELHARD CORP,exact,name 'Engelhard' -> EDGAR 'ENGELHARD CORP'; 42 periodic filings inside the span (1996-03-25 .. 2006-05-09)
+ECH,0000031348,1996-01-02,1998-07-10,ECHLIN INC,exact,name 'Echlin' -> EDGAR 'ECHLIN INC'; 10 periodic filings inside the span (1996-01-10 .. 1998-04-09)
+ECL,0000031462,1996-01-02,2009-01-01,ECOLAB INC.,carry,carried back from the 2009 row (current); 53 periodic filings inside the span (1996-03-27 .. 2008-10-31)
+ECO,0000722080,1996-01-02,1998-01-20,ECHO BAY MINES LTD,exact,name 'Echo Bay Mines' -> EDGAR 'ECHO BAY MINES LTD'; 7 periodic filings inside the span (1996-05-15 .. 1997-11-19)
+ED,0000023632,1996-01-02,1998-01-02,CONSOLIDATED EDISON CO OF NEW YORK INC,manual,Con Edison of New York until Consolidated Edison Inc became its holding company 1998-01-01
+ED,0001047862,1998-01-02,2009-01-01,CONSOLIDATED EDISON INC,manual,Consolidated Edison Inc
+EDS,0001007456,1998-08-11,2008-08-26,ELECTRONIC DATA SYSTEMS CORP /DE/,exact,name 'Electronic Data Systems' -> EDGAR 'ELECTRONIC DATA SYSTEMS CORP /DE/'; 40 periodic filings inside the span (1998-11-13 .. 2008-08-01); best of 3 same-name entities
+EFU,0000311259,1996-01-02,2000-11-02,EASTERN ENTERPRISES,exact,name 'Eastern Enterprises' -> EDGAR 'EASTERN ENTERPRISES'; 19 periodic filings inside the span (1996-03-15 .. 2000-07-21)
+EFX,0000033185,1997-06-19,2009-01-01,EQUIFAX INC,carry,carried back from the 2009 row (current); 46 periodic filings inside the span (1997-08-14 .. 2008-10-28)
+EHC,0000785161,1997-01-08,2003-03-21,Encompass Health Corp,exact,name 'HealthSouth' -> EDGAR 'Encompass Health Corp'; 24 periodic filings inside the span (1997-03-27 .. 2002-11-14); best of 2 same-name entities
+EIX,0000827052,1996-01-02,2009-01-01,EDISON INTERNATIONAL,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-27 .. 2008-11-07)
+EKDKQ,0000031235,1996-01-02,2009-01-01,EASTMAN KODAK CO,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-12 .. 2008-10-30)
+EL,0001001250,2006-01-05,2009-01-01,ESTEE LAUDER COMPANIES INC,carry,carried back from the 2009 row (current); 12 periodic filings inside the span (2006-01-26 .. 2008-10-28)
+ELV,0001156039,2002-07-25,2009-01-01,"Elevance Health, Inc.",carry,carried back from the 2009 row (current); 26 periodic filings inside the span (2002-08-05 .. 2008-10-22)
+EMC,0000790070,1996-03-28,2009-01-01,EMC CORP,carry,carried back from the 2009 row (manual); 51 periodic filings inside the span (1996-05-10 .. 2008-11-07)
+EMN,0000915389,1996-01-02,2009-01-01,EASTMAN CHEMICAL CO,carry,carried back from the 2009 row (current); 50 periodic filings inside the span (1996-08-06 .. 2008-10-28)
+EMR,0000032604,1996-01-02,2009-01-01,EMERSON ELECTRIC CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-14 .. 2008-11-25)
+ENRNQ,0001024401,1996-01-02,2001-11-30,ENRON CORP/OR/,exact,name 'Enron Corp' -> EDGAR 'ENRON CORP/OR/'; 21 periodic filings inside the span (1996-11-25 .. 2001-11-19); best of 3 same-name entities
+ENS,0000033015,1996-01-02,1997-08-06,TXU GAS CO,exact,name 'Enserch' -> EDGAR 'TXU GAS CO'; 6 periodic filings inside the span (1996-03-27 .. 1997-05-15)
+EOG,0000821189,2000-11-02,2009-01-01,EOG RESOURCES INC,carry,carried back from the 2009 row (current); 32 periodic filings inside the span (2001-03-23 .. 2008-11-03)
+EOP,0001038339,2001-10-10,2007-02-12,EQUITY OFFICE PROPERTIES TRUST,exact,name 'Equity Office Properties Trust' -> EDGAR 'EQUITY OFFICE PROPERTIES TRUST'; 21 periodic filings inside the span (2001-11-14 .. 2006-11-07)
+EP,0001066107,1999-10-26,2009-01-01,EL PASO CORP/DE,manual,"El Paso Energy Corp, renamed El Paso Corp 2001; ticker_cik.csv's 2009 row names 0000887396 Empire Petroleum, today's holder of the recycled ticker"
+EQ,0001350031,2006-05-18,2009-01-01,Embarq CORP,carry,carried back from the 2009 row (manual); 11 periodic filings inside the span (2006-06-09 .. 2008-10-30)
+EQR,0000906107,2001-12-03,2009-01-01,VIVMARK RESIDENTIAL,carry,carried back from the 2009 row (edgar); 28 periodic filings inside the span (2002-03-07 .. 2008-11-06)
+EQT,0000033213,2008-12-19,2009-01-01,EQT Corp,carry,carried back from the 2009 row (current); 0 periodic filings inside the span
+ERIC,0000717826,2007-02-01,2007-12-24,ERICSSON LM TELEPHONE CO,manual,"Ericsson, a 20-F filer"
+ESRX,0000885721,2003-09-26,2009-01-01,EXPRESS SCRIPTS INC,carry,carried back from the 2009 row (manual); 21 periodic filings inside the span (2003-10-30 .. 2008-10-30)
+ESV,0000314808,2007-01-04,2009-01-01,Ensco Rowan plc,carry,carried back from the 2009 row (exact); 8 periodic filings inside the span (2007-02-22 .. 2008-10-23)
+ETFC,0001015780,2004-04-01,2009-01-01,E*Trade Financial Corporation,carry,carried back from the 2009 row (exact); 19 periodic filings inside the span (2004-05-06 .. 2008-11-05)
+ETN,0000031277,1996-01-02,2009-01-01,EATON CORP,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-20 .. 2008-11-04)
+ETR,0000065984,1996-01-02,2009-01-01,ENTERGY CORP /DE/,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-11 .. 2008-11-07)
+ETS,0000846909,1996-01-02,2001-08-06,CABLETRON SYSTEMS INC,manual,"Cabletron Systems, which became Enterasys Networks (NYSE ETS) at its 2001-08-06 reorganisation; fja05680 back-fills the later ticker"
+EXC,0000078100,1996-01-02,2000-10-20,PECO ENERGY CO,manual,PECO Energy until the 2000-10-20 Unicom merger formed Exelon
+EXC,0001109357,2000-10-20,2009-01-01,EXELON CORP,manual,Exelon
+EXPD,0000746515,2007-02-01,2009-01-01,EXPEDITORS INTERNATIONAL OF WASHINGTON INC,carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-03-01 .. 2008-11-07)
+EXPE,0001324424,2007-02-01,2009-01-01,"Expedia Group, Inc.",carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-02-28 .. 2008-10-30)
+F,0000037996,1996-01-02,2009-01-01,FORD MOTOR CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-19 .. 2008-11-07)
+FAST,0000815556,2007-02-01,2009-01-01,FASTENAL CO,carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-02-23 .. 2008-10-22)
+FBF,0000050341,1996-01-02,2004-04-01,FLEETBOSTON FINANCIAL CORP,exact,name 'FleetBoston Financial' -> EDGAR 'FLEETBOSTON FINANCIAL CORP'; 33 periodic filings inside the span (1996-03-28 .. 2004-03-02)
+FBO,0000034891,1996-01-02,1996-03-13,FEDERAL PAPER BOARD CO INC,exact,name 'Federal Paper Board' -> EDGAR 'FEDERAL PAPER BOARD CO INC'; 0 periodic filings inside the span
+FCN,0000070040,1996-01-02,1998-10-02,FIRST CHICAGO NBD CORP,exact,name 'First Chicago NBD' -> EDGAR 'FIRST CHICAGO NBD CORP'; 11 periodic filings inside the span (1996-03-27 .. 1998-08-13)
+FCX,0000831259,1996-01-02,2009-01-01,FREEPORT-MCMORAN INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-27 .. 2008-11-10)
+FDC,0000883980,1996-01-02,2007-09-25,FIRST DATA CORP,exact,name 'First Data' -> EDGAR 'FIRST DATA CORP'; 46 periodic filings inside the span (1996-05-13 .. 2007-08-07); best of 2 same-name entities
+FDO,0000034408,2001-08-06,2009-01-01,FAMILY DOLLAR STORES,carry,carried back from the 2009 row (exact); 29 periodic filings inside the span (2001-11-21 .. 2008-10-28)
+FDX,0000230211,1996-01-02,1998-01-27,FEDERAL EXPRESS CORP,manual,Federal Express Corp until FDX Corp became its holding company at the 1998-01-27 Caliber close
+FDX,0001048911,1998-01-27,2009-01-01,FEDEX CORP,manual,"FDX Corp, renamed FedEx 2000"
+FE,0000073960,1996-01-02,1997-11-10,OHIO EDISON CO,manual,"Ohio Edison until the 1997-11-07 Centerior merger formed FirstEnergy. EDGAR's latest SIC for this CIK is 6189 (asset-backed), so the sector label for this stretch is the not-point-in-time artefact sectors.py documents"
+FE,0001031296,1997-11-10,2009-01-01,FIRSTENERGY CORP,manual,FirstEnergy
+FG,0000354396,1996-01-02,1998-04-27,USF&G CORP,exact,name 'USF&G' -> EDGAR 'USF&G CORP'; 9 periodic filings inside the span (1996-03-29 .. 1998-03-30)
+FHN,0000036966,2002-05-06,2009-01-01,FIRST HORIZON CORP,carry,carried back from the 2009 row (current); 27 periodic filings inside the span (2002-05-13 .. 2008-11-06)
+FII,0001056288,2003-04-16,2009-01-01,"FEDERATED HERMES, INC.",carry,carried back from the 2009 row (manual); 23 periodic filings inside the span (2003-05-15 .. 2008-10-24)
+FIS,0001136893,2006-11-10,2009-01-01,"Fidelity National Information Services, Inc.",carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-03-01 .. 2008-11-10)
+FISV,0000798354,2001-04-02,2009-01-01,FISERV INC,carry,carried back from the 2009 row (current); 31 periodic filings inside the span (2001-04-24 .. 2008-11-06)
+FITB,0000035527,1996-03-08,2009-01-01,FIFTH THIRD BANCORP,carry,carried back from the 2009 row (current); 51 periodic filings inside the span (1996-05-10 .. 2008-11-07)
+FJ,0000053117,1996-01-02,2000-11-24,FORT JAMES CORP,exact,name 'Fort James' -> EDGAR 'FORT JAMES CORP'; 20 periodic filings inside the span (1996-03-29 .. 2000-11-03)
+FL,0000850209,1996-01-02,1999-01-04,"FOOT LOCKER, INC.",exact,"name 'Woolworth' -> EDGAR 'FOOT LOCKER, INC.'; 11 periodic filings inside the span (1996-06-11 .. 1998-12-15)"
+FLEX,0000866374,2007-02-01,2009-01-01,FLEX LTD.,carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-02-07 .. 2008-11-05)
+FLIR,0000354908,2008-07-21,2009-01-01,"Teledyne FLIR, LLC",carry,carried back from the 2009 row (manual); 2 periodic filings inside the span (2008-08-08 .. 2008-11-07)
+FLMIQ,0000352949,1996-01-02,1997-12-24,FLEMING COMPANIES INC /OK/,exact,name 'Fleming Companies' -> EDGAR 'FLEMING COMPANIES INC /OK/'; 7 periodic filings inside the span (1996-05-31 .. 1997-11-18)
+FLR,0001124198,2000-12-22,2009-01-01,FLUOR CORP,carry,carried back from the 2009 row (current); 32 periodic filings inside the span (2001-01-29 .. 2008-11-06)
+FLS,0000030625,2008-10-02,2009-01-01,FLOWSERVE CORP,carry,carried back from the 2009 row (current); 1 periodic filings inside the span (2008-10-28 .. 2008-10-28)
+FLTWQ,0000314132,1996-01-02,2000-01-31,FLEETWOOD ENTERPRISES INC/DE/,exact,name 'Fleetwood Enterprises' -> EDGAR 'FLEETWOOD ENTERPRISES INC/DE/'; 16 periodic filings inside the span (1996-03-05 .. 1999-12-01)
+FMC,0000037785,1996-01-02,2002-01-02,FMC CORP,exact,name 'FMC Corp' -> EDGAR 'FMC CORP'; 24 periodic filings inside the span (1996-03-15 .. 2001-11-07); best of 2 same-name entities
+FMCC,0001026214,1996-01-02,2008-09-11,FEDERAL HOME LOAN MORTGAGE CORP,exact,name 'Federal Home Loan Mortgage' -> EDGAR 'FEDERAL HOME LOAN MORTGAGE CORP'; 1 periodic filings inside the span (2008-08-06 .. 2008-08-06)
+FMCN,0001330017,2007-12-24,2009-01-01,Focus Media Holding LTD,carry,carried back from the 2009 row (manual); 1 periodic filings inside the span (2008-05-06 .. 2008-05-06)
+FMY,0001043273,1998-07-10,1999-05-28,FRED MEYER INC,exact,name 'Fred Meyer' -> EDGAR 'FRED MEYER INC'; 3 periodic filings inside the span (1998-09-28 .. 1999-04-15)
+FNMA,0000310522,1996-01-02,2008-09-11,FEDERAL NATIONAL MORTGAGE ASSOCIATION FANNIE MAE,exact,name 'Federal National Mortgage Association' -> EDGAR 'FEDERAL NATIONAL MORTGAGE ASSOCIATION FANNIE MAE'; 16 periodic filings inside the span (2003-03-31 .. 2008-08-08)
+FOXA,0001308161,2004-12-20,2009-01-01,"TWENTY-FIRST CENTURY FOX, INC.",carry,carried back from the 2009 row (manual); 16 periodic filings inside the span (2005-02-04 .. 2008-11-06)
+FPC,0000357261,1999-06-22,2000-12-01,FLORIDA PROGRESS CORP,exact,name 'Florida Progress' -> EDGAR 'FLORIDA PROGRESS CORP'; 6 periodic filings inside the span (1999-08-11 .. 2000-11-01)
+FRO,0000084567,1997-01-02,1999-09-29,"GLOBAL CROSSING NORTH AMERICA, INC",exact,"name 'Frontier Corp' -> EDGAR 'GLOBAL CROSSING NORTH AMERICA, INC'; 11 periodic filings inside the span (1997-03-28 .. 1999-08-03); best of 3 same-name entities"
+FRX,0000038074,2000-11-22,2009-01-01,"Forest Laboratories, LLC",carry,carried back from the 2009 row (manual); 32 periodic filings inside the span (2001-02-14 .. 2008-11-10)
+FSH,0000880430,2004-08-03,2006-11-10,FISHER SCIENTIFIC INTERNATIONAL INC,exact,name 'Fisher Scientific International' -> EDGAR 'FISHER SCIENTIFIC INTERNATIONAL INC'; 10 periodic filings inside the span (2004-08-09 .. 2006-10-24); best of 2 same-name entities
+FSL,0001272547,2004-12-03,2006-12-04,FREESCALE SEMICONDUCTOR INC,exact,name 'Freescale Semiconductor' -> EDGAR 'FREESCALE SEMICONDUCTOR INC'; 8 periodic filings inside the span (2005-03-02 .. 2006-10-20); best of 2 same-name entities
+FSLR,0001274494,2008-12-22,2009-01-01,"FIRST SOLAR, INC.",carry,carried back from the 2009 row (current); 0 periodic filings inside the span
+FTL.A,0000771298,1996-01-02,1999-10-01,FRUIT OF THE LOOM INC /DE/,exact,name 'Fruit of the Loom' -> EDGAR 'FRUIT OF THE LOOM INC /DE/'; 15 periodic filings inside the span (1996-03-29 .. 1999-08-17); best of 3 same-name entities
+FTR,0000020520,2001-02-27,2009-01-01,Frontier Communications Corp.,carry,carried back from the 2009 row (exact); 32 periodic filings inside the span (2001-03-09 .. 2008-11-10)
+FWLT,0000038321,1996-01-02,2000-01-31,FOSTER WHEELER CORP,manual,the original Foster Wheeler Corp; its 2001 Bermuda successor rejoined the indexes in 2007
+FWLT,0001130385,2007-07-12,2009-01-01,FOSTER WHEELER AG,carry,carried back from the 2009 row (manual); 6 periodic filings inside the span (2007-08-08 .. 2008-11-05)
+G,0000041499,1996-01-02,2005-10-03,GILLETTE CO,exact,name 'Gillette' -> EDGAR 'GILLETTE CO'; 39 periodic filings inside the span (1996-03-22 .. 2005-08-04)
+GAPTQ,0000043300,1996-01-02,2000-08-30,GREAT ATLANTIC & PACIFIC TEA CO INC,exact,name 'Great Atlantic & Pacific Tea' -> EDGAR 'GREAT ATLANTIC & PACIFIC TEA CO INC'; 19 periodic filings inside the span (1996-01-16 .. 2000-07-31)
+GAS,0001004155,1996-01-02,2009-01-01,AGL RESOURCES INC (HOLDING CO),carry,carried back from the 2009 row (exact); 51 periodic filings inside the span (1996-05-15 .. 2008-10-30)
+GD,0000040533,1996-01-02,2009-01-01,GENERAL DYNAMICS CORP,carry,carried back from the 2009 row (current); 51 periodic filings inside the span (1996-03-21 .. 2008-11-04)
+GDT,0000929987,1996-12-19,2006-04-24,GUIDANT CORP,exact,name 'Guidant' -> EDGAR 'GUIDANT CORP'; 37 periodic filings inside the span (1997-03-19 .. 2006-02-22)
+GDW,0000042293,1996-01-02,2006-10-02,GOLDEN WEST FINANCIAL CORP /DE/,exact,name 'Golden West Financial' -> EDGAR 'GOLDEN WEST FINANCIAL CORP /DE/'; 43 periodic filings inside the span (1996-03-28 .. 2006-08-03)
+GE,0000040545,1996-01-02,2009-01-01,GENERAL ELECTRIC CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-20 .. 2008-10-30)
+GEN,0000849399,2003-03-31,2009-01-01,Gen Digital Inc.,carry,carried back from the 2009 row (current); 23 periodic filings inside the span (2003-06-16 .. 2008-11-07)
+GENZ,0000732485,2001-12-14,2009-01-01,GENZYME CORP,carry,carried back from the 2009 row (manual); 28 periodic filings inside the span (2002-04-01 .. 2008-11-07)
+GFS.A,0000041289,1996-01-02,1998-07-16,GIANT FOOD INC,exact,name 'Giant Food' -> EDGAR 'GIANT FOOD INC'; 10 periodic filings inside the span (1996-05-21 .. 1998-07-06)
+GGP,0000895648,2007-07-02,2008-11-13,"GGP, Inc. (fka General Growth Properties Inc. & predecessor to General Growth Properties, Inc.)",exact,"name 'General Growth Properties' -> EDGAR 'GGP, Inc. (fka General Growth Properties Inc. & predecessor to General Growth Properties, Inc.)'; 6 periodic filings inside the span (2007-08-08 .. 2008-11-10); best of 3 same-name entities"
+GHC,0000104889,2007-12-31,2009-01-01,Graham Holdings Co,carry,carried back from the 2009 row (current); 4 periodic filings inside the span (2008-02-28 .. 2008-11-05)
+GIDL,0000851588,1996-01-02,1997-07-17,GIDDINGS & LEWIS INC /WI/,exact,name 'Giddings & Lewis' -> EDGAR 'GIDDINGS & LEWIS INC /WI/'; 6 periodic filings inside the span (1996-03-15 .. 1997-05-14); best of 2 same-name entities
+GILD,0000882095,2004-07-01,2009-01-01,"GILEAD SCIENCES, INC.",carry,carried back from the 2009 row (current); 18 periodic filings inside the span (2004-08-06 .. 2008-10-31)
+GIS,0000040704,1996-01-02,2009-01-01,GENERAL MILLS INC,carry,carried back from the 2009 row (current); 53 periodic filings inside the span (1996-01-08 .. 2008-12-17)
+GL,0000320335,1996-01-02,2009-01-01,GLOBE LIFE INC.,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-26 .. 2008-11-07)
+GLD,0000921754,1996-01-02,1997-05-06,SANTA FE PACIFIC GOLD CORP,exact,name 'Santa Fe Pacific Gold' -> EDGAR 'SANTA FE PACIFIC GOLD CORP'; 3 periodic filings inside the span (1996-08-13 .. 1997-03-19)
+GLK,0000043362,1996-01-02,2005-07-05,GREAT LAKES CHEMICAL CORP,exact,name 'Great Lakes Chemical' -> EDGAR 'GREAT LAKES CHEMICAL CORP'; 38 periodic filings inside the span (1996-03-27 .. 2005-05-06)
+GLW,0000024741,1996-01-02,2009-01-01,CORNING INC /NY,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-07 .. 2008-10-30)
+GME,0001326380,2007-12-14,2009-01-01,GameStop Corp.,carry,carried back from the 2009 row (current); 4 periodic filings inside the span (2008-04-02 .. 2008-12-11)
+GNT,0000890175,1996-03-13,1998-07-01,CONSECO FINANCE CORP,exact,name 'Green Tree Financial' -> EDGAR 'CONSECO FINANCE CORP'; 10 periodic filings inside the span (1996-03-25 .. 1998-05-15)
+GNW,0001276520,2005-12-02,2009-01-01,GENWORTH FINANCIAL INC,carry,carried back from the 2009 row (current); 12 periodic filings inside the span (2006-02-27 .. 2008-11-10)
+GOOG,0001288776,2007-02-01,2009-01-01,GOOGLE INC.,carry,carried back from the 2009 row (manual); 8 periodic filings inside the span (2007-03-01 .. 2008-11-07)
+GOOGL,0001288776,2006-04-03,2009-01-01,GOOGLE INC.,carry,carried back from the 2009 row (manual); 11 periodic filings inside the span (2006-05-10 .. 2008-11-07)
+GP,0000041077,1996-01-02,2005-12-20,GEORGIA PACIFIC CORP,exact,name 'Georgia-Pacific' -> EDGAR 'GEORGIA PACIFIC CORP'; 40 periodic filings inside the span (1996-03-15 .. 2005-10-27); best of 2 same-name entities
+GPC,0000040987,1996-01-02,2009-01-01,GENUINE PARTS CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-19 .. 2008-11-03)
+GPS,0000039911,1996-01-02,2009-01-01,GAP INC,carry,carried back from the 2009 row (edgar); 52 periodic filings inside the span (1996-04-22 .. 2008-12-09)
+GPU,0000040779,1996-01-02,2001-11-07,GPU INC /PA/,exact,name 'GPU Inc' -> EDGAR 'GPU INC /PA/'; 23 periodic filings inside the span (1996-03-12 .. 2001-08-07)
+GR,0000042542,1996-01-02,2009-01-01,GOODRICH CORP,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-02-23 .. 2008-10-27)
+GRA,0000042872,1996-01-02,1996-09-30,GRACE W R & CO /NY/,manual,"the New York W.R. Grace until the 1996-09-30 National Medical Care spin (EDGAR now Fresenius Medical Care Holdings, whose latest SIC 3841 labels Grace's chemical years as health care, the artefact sectors.py documents)"
+GRA,0001012100,1996-09-30,1998-03-31,WR GRACE & CO/DE,manual,"Grace's 1996 holding company, renamed Sealed Air at the 1998-03-31 Cryovac merger"
+GRA,0001045309,1998-03-31,2000-12-11,W R GRACE & CO,manual,the specialty-chemicals Grace spun at the Cryovac merger
+GRMN,0001121788,2007-02-01,2009-01-01,GARMIN LTD,carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-02-28 .. 2008-11-05)
+GRN,0000317745,1996-01-02,1998-12-22,GENERAL RE CORP,exact,name 'General Re' -> EDGAR 'GENERAL RE CORP'; 12 periodic filings inside the span (1996-03-26 .. 1998-11-16)
+GS,0000886982,2002-07-22,2009-01-01,GOLDMAN SACHS GROUP INC,carry,carried back from the 2009 row (current); 25 periodic filings inside the span (2002-10-11 .. 2008-10-08)
+GSX,0000040834,1996-01-02,1998-10-07,GENERAL SIGNAL CORP,exact,name 'General Signal' -> EDGAR 'GENERAL SIGNAL CORP'; 11 periodic filings inside the span (1996-03-25 .. 1998-08-04)
+GT,0000042582,1996-01-02,2009-01-01,GOODYEAR TIRE & RUBBER CO /OH/,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-20 .. 2008-11-03)
+GTE,0000040858,1996-01-02,2000-07-03,GTE CORP,exact,name 'GTE Corp' -> EDGAR 'GTE CORP'; 18 periodic filings inside the span (1996-03-13 .. 2000-05-12); best of 2 same-name entities
+GTW,0000895812,1998-04-27,2006-08-01,GATEWAY INC,exact,name 'Gateway Inc' -> EDGAR 'GATEWAY INC'; 33 periodic filings inside the span (1998-05-15 .. 2006-05-09); best of 3 same-name entities
+GWF,0000043512,1996-01-02,1997-07-02,GREAT WESTERN FINANCIAL CORP,exact,name 'Great Western Financial' -> EDGAR 'GREAT WESTERN FINANCIAL CORP'; 6 periodic filings inside the span (1996-03-15 .. 1997-05-15)
+GWW,0000277135,1996-01-02,2009-01-01,"W.W. GRAINGER, INC.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-25 .. 2008-10-30)
+GX,0001061322,1999-09-29,2001-10-10,GLOBAL CROSSING LTD,exact,name 'Global Crossing' -> EDGAR 'GLOBAL CROSSING LTD'; 8 periodic filings inside the span (1999-11-15 .. 2001-08-14); best of 2 same-name entities
+H,0000040493,1996-01-02,2001-06-29,HARCOURT GENERAL INC,manual,"Harcourt General, acquired by Reed Elsevier 2001; 31 periodic filings 1994-2001"
+H,0001355001,2006-08-01,2007-04-10,REALOGY CORP,manual,"Realogy, spun from Cendant 2006-07-31 under H and taken private by Apollo 2007-04-10 (EDGAR now Anywhere Real Estate Group LLC); H is Hyatt today"
+HAL,0000045012,1996-01-02,2009-01-01,HALLIBURTON CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-11 .. 2008-10-21)
+HANS,0000865752,2007-12-24,2009-01-01,HANSEN NATURAL CORP,carry,carried back from the 2009 row (exact); 4 periodic filings inside the span (2008-02-29 .. 2008-11-10)
+HAR,0000800459,2006-02-01,2009-01-01,HARMAN INTERNATIONAL INDUSTRIES INC /DE/,carry,carried back from the 2009 row (manual); 12 periodic filings inside the span (2006-02-09 .. 2008-11-10)
+HAS,0000046080,1996-01-02,2009-01-01,"HASBRO, INC.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-10-31)
+HBAN,0000049196,1997-08-06,2009-01-01,HUNTINGTON BANCSHARES INC /MD/,carry,carried back from the 2009 row (current); 46 periodic filings inside the span (1997-08-14 .. 2008-11-10)
+HBOC,0000310377,1997-10-23,1999-01-13,HBO & CO,exact,name 'HBO & Co' -> EDGAR 'HBO & CO'; 5 periodic filings inside the span (1997-11-12 .. 1998-10-28)
+HCA,0000860730,1996-01-02,2006-11-20,"HCA Healthcare, Inc.",exact,"name 'Columbia/HCA Healthcare' -> EDGAR 'HCA Healthcare, Inc.'; 42 periodic filings inside the span (1996-04-01 .. 2006-10-31); best of 6 same-name entities"
+HCBK,0000921847,2007-02-15,2009-01-01,HUDSON CITY BANCORP INC,carry,carried back from the 2009 row (exact); 8 periodic filings inside the span (2007-03-01 .. 2008-11-07)
+HCR,0000878736,1998-09-28,2007-11-09,MANOR CARE INC,exact,name 'Manor Care' -> EDGAR 'MANOR CARE INC'; 36 periodic filings inside the span (1998-11-16 .. 2007-08-03); best of 2 same-name entities
+HD,0000354950,1996-01-02,2009-01-01,"HOME DEPOT, INC.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-04-08 .. 2008-12-04)
+HDLM,0000314727,1996-01-02,1996-03-08,HANDLEMAN CO /MI/,exact,name 'Handleman' -> EDGAR 'HANDLEMAN CO /MI/'; 0 periodic filings inside the span
+HES,0000004447,1996-01-02,2009-01-01,HESS CORP,carry,carried back from the 2009 row (edgar); 52 periodic filings inside the span (1996-03-27 .. 2008-11-06)
+HET,0000858339,1996-01-02,2008-01-29,"CAESARS HOLDINGS, INC.",exact,"name ""Harrah's Entertainment"" -> EDGAR 'CAESARS HOLDINGS, INC.'; 48 periodic filings inside the span (1996-03-06 .. 2007-11-07)"
+HFS,0000891104,1996-08-16,1997-12-18,HFS INC,exact,name 'HFS Inc' -> EDGAR 'HFS INC'; 5 periodic filings inside the span (1996-11-14 .. 1997-11-14)
+HI,0000354964,1996-01-02,2003-03-31,HSBC Finance Corp,exact,name 'Household International' -> EDGAR 'HSBC Finance Corp'; 29 periodic filings inside the span (1996-03-28 .. 2003-03-25)
+HIG,0000874766,1996-01-02,2009-01-01,"HARTFORD INSURANCE GROUP, INC.",carry,carried back from the 2009 row (current); 51 periodic filings inside the span (1996-05-15 .. 2008-10-29)
+HLT,0000047580,1996-01-02,2007-10-25,HILTON HOTELS CORP,exact,name 'Hilton Hotels' -> EDGAR 'HILTON HOTELS CORP'; 47 periodic filings inside the span (1996-03-22 .. 2007-08-07); best of 2 same-name entities
+HM,0000743872,1996-01-02,2001-12-17,HOMESTAKE MINING CO /DE/,exact,name 'Homestake Mining' -> EDGAR 'HOMESTAKE MINING CO /DE/'; 24 periodic filings inside the span (1996-03-28 .. 2001-11-14)
+HMA,0000792985,2001-11-07,2007-03-02,"HEALTH MANAGEMENT ASSOCIATES, INC",exact,"name 'Health Management Associates' -> EDGAR 'HEALTH MANAGEMENT ASSOCIATES, INC'; 22 periodic filings inside the span (2001-12-21 .. 2007-02-27); best of 3 same-name entities"
+HNZ,0000046640,1996-01-02,2009-01-01,HEINZ H.J. CO,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-03-18 .. 2008-11-21)
+HOG,0000793952,2000-01-31,2009-01-01,"HARLEY-DAVIDSON, INC.",carry,carried back from the 2009 row (current); 36 periodic filings inside the span (2000-03-28 .. 2008-10-30)
+HOLX,0000859737,2007-12-24,2009-01-01,HOLOGIC INC,carry,carried back from the 2009 row (edgar); 4 periodic filings inside the span (2008-02-07 .. 2008-11-26)
+HON,0000773840,1996-01-02,2009-01-01,HONEYWELL INTERNATIONAL INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-27 .. 2008-10-17)
+HOT,0000316206,2000-11-17,2009-01-01,"STARWOOD HOTELS & RESORTS WORLDWIDE, INC.",carry,carried back from the 2009 row (exact); 32 periodic filings inside the span (2001-03-30 .. 2008-11-05)
+HP,0000046765,1996-01-02,1999-12-31,"Helmerich & Payne, Inc.",exact,"name 'Helmerich & Payne' -> EDGAR 'Helmerich & Payne, Inc.'; 16 periodic filings inside the span (1996-02-13 .. 1999-12-28)"
+HPC,0000046989,1996-01-02,2008-11-14,HERCULES INC,exact,name 'Hercules Inc' -> EDGAR 'HERCULES INC'; 52 periodic filings inside the span (1996-03-28 .. 2008-10-28)
+HPH,0000801898,1996-01-02,1999-06-09,JOY GLOBAL INC,exact,name 'Harnischfeger Industries' -> EDGAR 'JOY GLOBAL INC'; 14 periodic filings inside the span (1996-01-29 .. 1999-03-17)
+HPQ,0000047217,1996-01-02,2009-01-01,HP INC,carry,carried back from the 2009 row (current); 53 periodic filings inside the span (1996-01-29 .. 2008-12-18)
+HRB,0000012659,1996-01-02,2009-01-01,H&R BLOCK INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-18 .. 2008-12-08)
+HSH,0000023666,1996-01-02,2009-01-01,HILLSHIRE BRANDS CO,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-02-12 .. 2008-11-05)
+HSIC,0001000228,2007-02-01,2009-01-01,HENRY SCHEIN INC,carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-02-28 .. 2008-11-05)
+HSP,0001274057,2004-05-03,2009-01-01,HOSPIRA INC,carry,carried back from the 2009 row (exact); 19 periodic filings inside the span (2004-05-27 .. 2008-11-05)
+HST,0001070750,2007-03-20,2009-01-01,"HOST HOTELS & RESORTS, INC.",carry,carried back from the 2009 row (current); 7 periodic filings inside the span (2007-05-01 .. 2008-10-15)
+HSY,0000047111,1996-01-02,2009-01-01,HERSHEY CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-13 .. 2008-11-05)
+HUM,0000049071,1996-01-02,2009-01-01,HUMANA INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-11-03)
+HWM,0000004281,1996-01-02,2009-01-01,Howmet Aerospace Inc.,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-11 .. 2008-10-24)
+I,0000105982,1996-01-02,1996-04-01,FIRST INTERSTATE BANCORP /DE/,manual,"First Interstate, acquired by Wells Fargo 1996-04-01 (EDGAR now WELLS FARGO BANK & CO)"
+IAC,0000891103,2006-12-01,2008-08-21,"Match Group, Inc.",exact,"name 'IAC/InterActiveCorp' -> EDGAR 'Match Group, Inc.'; 7 periodic filings inside the span (2007-03-01 .. 2008-08-06); best of 6 same-name entities"
+IACI,0000891103,2007-02-01,2009-01-01,"Match Group, Inc.",carry,carried back from the 2009 row (manual); 8 periodic filings inside the span (2007-03-01 .. 2008-11-10)
+IBM,0000051143,1996-01-02,2009-01-01,INTERNATIONAL BUSINESS MACHINES CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-26 .. 2008-10-28)
+ICE,0001174746,2007-09-26,2009-01-01,"Intercontinental Exchange Holdings, Inc.",carry,carried back from the 2009 row (manual); 5 periodic filings inside the span (2007-10-26 .. 2008-10-30)
+IFF,0000051253,1996-01-02,2009-01-01,INTERNATIONAL FLAVORS & FRAGRANCES INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-28 .. 2008-10-30)
+IGT,0000353944,2001-09-04,2009-01-01,INTERNATIONAL GAME TECHNOLOGY,carry,carried back from the 2009 row (manual); 29 periodic filings inside the span (2001-12-12 .. 2008-11-26)
+IKN,0000003370,1996-01-02,2000-06-29,IKON OFFICE SOLUTIONS INC,exact,name 'IKON Office Solutions' -> EDGAR 'IKON OFFICE SOLUTIONS INC'; 18 periodic filings inside the span (1996-02-14 .. 2000-05-15)
+ILMN,0001110803,2008-12-22,2009-01-01,"ILLUMINA, INC.",carry,carried back from the 2009 row (current); 0 periodic filings inside the span
+IMNX,0000719529,2001-09-21,2002-07-16,IMMUNEX CORP /DE/,exact,name 'Immunex' -> EDGAR 'IMMUNEX CORP /DE/'; 3 periodic filings inside the span (2001-11-13 .. 2002-05-09)
+INCLF,0000049996,1996-01-02,2002-07-22,INCO LTD,exact,name 'Inco Ltd' -> EDGAR 'INCO LTD'; 3 periodic filings inside the span (2001-10-25 .. 2002-04-22); best of 2 same-name entities
+INFY,0001067491,2007-02-01,2009-01-01,Infosys Ltd,carry,carried back from the 2009 row (current); 2 periodic filings inside the span (2007-05-02 .. 2008-04-30)
+INGR,0000351145,1996-01-02,1997-07-28,INTERGRAPH CORP,manual,LOW CONFIDENCE: Nasdaq INGR was Intergraph; no source confirms its S&P 500 membership or the 1997-07-28 removal
+INTC,0000050863,1996-01-02,2009-01-01,INTEL CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-10-31)
+INTU,0000896878,2000-12-11,2009-01-01,INTUIT INC.,carry,carried back from the 2009 row (current); 33 periodic filings inside the span (2000-12-13 .. 2008-12-04)
+IP,0000051434,1996-01-02,2009-01-01,INTERNATIONAL PAPER CO /NEW/,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-04-01 .. 2008-11-07)
+IPG,0000051644,1996-01-02,2009-01-01,"INTERPUBLIC GROUP OF COMPANIES, INC.",carry,carried back from the 2009 row (edgar); 52 periodic filings inside the span (1996-03-29 .. 2008-10-28)
+IR,0000050485,1996-01-02,2001-12-31,INGERSOLL RAND CO,manual,New Jersey Ingersoll-Rand until the 2001-12-31 Bermuda reorganisation
+IR,0001160497,2001-12-31,2009-01-01,INGERSOLL RAND CO LTD,manual,Ingersoll-Rand Co Ltd
+ISRG,0001035267,2007-02-01,2009-01-01,INTUITIVE SURGICAL INC,carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-02-15 .. 2008-10-17)
+ITT,0000216228,1996-01-02,2009-01-01,ITT INC.,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-25 .. 2008-10-27)
+ITW,0000049826,1996-01-02,2009-01-01,ILLINOIS TOOL WORKS INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-11-05)
+IVZ,0000914208,2008-08-21,2009-01-01,Invesco Ltd.,carry,carried back from the 2009 row (current); 1 periodic filings inside the span (2008-11-07 .. 2008-11-07)
+J,0000052988,2007-10-26,2009-01-01,JACOBS SOLUTIONS INC.,carry,carried back from the 2009 row (current); 5 periodic filings inside the span (2007-11-29 .. 2008-11-26)
+JAVA,0000709519,1996-01-02,2009-01-01,"SUN MICROSYSTEMS, INC.",carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-02-12 .. 2008-11-05)
+JBHT,0000728535,2008-12-22,2009-01-01,HUNT J B TRANSPORT SERVICES INC,carry,carried back from the 2009 row (current); 0 periodic filings inside the span
+JBL,0000898293,2001-01-30,2009-01-01,JABIL INC,carry,carried back from the 2009 row (current); 31 periodic filings inside the span (2001-04-13 .. 2008-10-29)
+JCI,0000833444,1996-01-02,2009-01-01,Johnson Controls International plc,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-05-10 .. 2008-11-19)
+JCP,0000077182,1996-01-02,2002-01-28,J C PENNEY CORP INC,manual,J. C. Penney Co (EDGAR now J C PENNEY CORP INC) until the 2002-01-28 holding company
+JCP,0001166126,2002-01-28,2009-01-01,"J.C. Penney Company, Inc.",manual,the holding company
+JEF,0000096223,2007-08-27,2009-01-01,Jefferies Financial Group Inc.,carry,carried back from the 2009 row (current); 5 periodic filings inside the span (2007-11-08 .. 2008-11-06)
+JH,0000045599,1996-01-02,1998-04-01,HARLAND JOHN H CO,exact,name 'John H. Harland' -> EDGAR 'HARLAND JOHN H CO'; 9 periodic filings inside the span (1996-04-01 .. 1998-03-31)
+JHF,0000736260,2001-06-29,2004-04-29,HANCOCK JOHN FINANCIAL SERVICES INC,exact,name 'John Hancock Financial Services' -> EDGAR 'HANCOCK JOHN FINANCIAL SERVICES INC'; 11 periodic filings inside the span (2001-08-14 .. 2004-03-15)
+JNJ,0000200406,1996-01-02,2009-01-01,JOHNSON & JOHNSON,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-04-01 .. 2008-11-04)
+JNPR,0001043604,2006-06-02,2009-01-01,JUNIPER NETWORKS INC,carry,carried back from the 2009 row (edgar); 10 periodic filings inside the span (2007-03-09 .. 2008-11-10)
+JNS,0001065865,2000-07-13,2009-01-01,JANUS CAPITAL GROUP INC,carry,carried back from the 2009 row (manual); 34 periodic filings inside the span (2000-08-14 .. 2008-10-23)
+JNY,0000874016,2001-12-17,2009-01-01,JONES GROUP INC,carry,carried back from the 2009 row (manual); 28 periodic filings inside the span (2002-03-25 .. 2008-10-29)
+JOS,0000054050,1996-01-02,2000-05-10,JOSTENS INC,exact,name 'Jostens' -> EDGAR 'JOSTENS INC'; 17 periodic filings inside the span (1996-02-09 .. 2000-03-10); best of 2 same-name entities
+JOYG,0000801898,2007-02-01,2009-01-01,JOY GLOBAL INC,carry,carried back from the 2009 row (exact); 8 periodic filings inside the span (2007-03-01 .. 2008-12-19)
+JP,0000053347,1996-01-02,2006-04-03,JEFFERSON PILOT CORP,exact,name 'Jefferson-Pilot' -> EDGAR 'JEFFERSON PILOT CORP'; 41 periodic filings inside the span (1996-03-29 .. 2006-03-14)
+JPM,0000019617,1996-01-02,2009-01-01,JPMORGAN CHASE & CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-20 .. 2008-11-07)
+JWN,0000072333,1996-01-02,2009-01-01,NORDSTROM INC,carry,carried back from the 2009 row (edgar); 52 periodic filings inside the span (1996-03-29 .. 2008-12-09)
+K,0000055067,1996-01-02,2009-01-01,KELLANOVA,carry,carried back from the 2009 row (edgar); 52 periodic filings inside the span (1996-03-29 .. 2008-11-03)
+KATE,0000352363,1996-01-02,2008-12-02,CLAIBORNE LIZ INC,manual,"Liz Claiborne (renamed Fifth & Pacific, then Kate Spade & Co); 0001170403, the other same-name entity, is a different filer"
+KBH,0000795266,1996-01-02,2009-01-01,KB HOME,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-23 .. 2008-10-10)
+KDP,0001418135,2008-10-07,2009-01-01,Keurig Dr Pepper Inc.,carry,carried back from the 2009 row (current); 1 periodic filings inside the span (2008-11-13 .. 2008-11-13)
+KEY,0000091576,1996-01-02,2009-01-01,KEYCORP /NEW/,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-28 .. 2008-11-07)
+KG,0001047699,2000-10-03,2009-01-01,KING PHARMACEUTICALS INC,carry,carried back from the 2009 row (manual); 33 periodic filings inside the span (2000-11-14 .. 2008-11-06)
+KIM,0000879101,2006-04-03,2009-01-01,KIMCO REALTY CORP,carry,carried back from the 2009 row (current); 11 periodic filings inside the span (2006-05-09 .. 2008-11-10)
+KLAC,0000319201,1997-09-15,2009-01-01,KLA CORP,carry,carried back from the 2009 row (current); 46 periodic filings inside the span (1997-09-29 .. 2008-10-31)
+KM,0000056824,1996-01-02,2002-01-17,KMART CORP,exact,name 'Kmart' -> EDGAR 'KMART CORP'; 24 periodic filings inside the span (1996-04-04 .. 2001-11-27); best of 3 same-name entities
+KMB,0000055785,1996-01-02,2009-01-01,KIMBERLY CLARK CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-26 .. 2008-11-07)
+KMG,0000055458,1996-01-02,2001-08-01,KERR MCGEE CORP,manual,the original Kerr-McGee until the 2001-08-01 HS Resources holding company
+KMG,0001141185,2001-08-01,2006-08-11,KERR MCGEE CORP /DE,manual,former Kerr McGee Holdco
+KMI,0000054502,2000-12-12,2007-05-31,"KINDER MORGAN KANSAS, INC.",exact,"name 'Kinder Morgan' -> EDGAR 'KINDER MORGAN KANSAS, INC.'; 26 periodic filings inside the span (2001-03-23 .. 2007-05-10); best of 3 same-name entities"
+KO,0000021344,1996-01-02,2009-01-01,COCA COLA CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-14 .. 2008-10-23)
+KR,0000056873,1996-01-02,2009-01-01,KROGER CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-22 .. 2008-12-17)
+KRB,0000870517,1996-01-02,2006-01-03,MBNA CORP,exact,name 'MBNA' -> EDGAR 'MBNA CORP'; 39 periodic filings inside the span (1996-05-15 .. 2005-11-09)
+KRI,0000205520,1996-01-02,2006-06-28,KNIGHT RIDDER INC,exact,name 'Knight Ridder' -> EDGAR 'KNIGHT RIDDER INC'; 41 periodic filings inside the span (1996-03-20 .. 2006-05-03)
+KSE,0001062379,2000-08-21,2007-08-27,KEYSPAN CORP,exact,name 'KeySpan' -> EDGAR 'KEYSPAN CORP'; 28 periodic filings inside the span (2000-10-31 .. 2007-08-03)
+KSS,0000885639,1998-08-14,2009-01-01,KOHLS Corp,carry,carried back from the 2009 row (current); 42 periodic filings inside the span (1998-09-14 .. 2008-12-05)
+KSU,0000054480,1999-04-05,2000-07-13,KANSAS CITY SOUTHERN,exact,name 'Kansas City Southern Industries' -> EDGAR 'KANSAS CITY SOUTHERN'; 5 periodic filings inside the span (1999-05-14 .. 2000-05-15)
+KWP,0000756764,1996-01-02,1999-11-16,KING WORLD PRODUCTIONS INC,exact,name 'King World Productions' -> EDGAR 'KING WORLD PRODUCTIONS INC'; 15 periodic filings inside the span (1996-01-16 .. 1999-07-08)
+L,0000060086,1996-01-02,2009-01-01,LOEWS CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-28 .. 2008-10-29)
+LAMR,0001090425,2007-02-01,2008-12-22,LAMAR ADVERTISING CO/NEW,manual,the listed company; 0000899045 Lamar Media is its subsidiary
+LBTYA,0001316631,2007-02-01,2009-01-01,"Liberty Global, Inc.",carry,carried back from the 2009 row (manual); 8 periodic filings inside the span (2007-03-01 .. 2008-11-05)
+LDG,0000764762,1996-01-02,2001-07-02,LONGS DRUG STORES CORP,exact,name 'Longs Drug Stores' -> EDGAR 'LONGS DRUG STORES CORP'; 22 periodic filings inside the span (1996-04-19 .. 2001-06-11)
+LDW.B,0000737874,1996-01-02,1999-12-08,LAIDLAW INC,manual,"Laidlaw Inc (EDGAR now LAIDLAW INTERNATIONAL), a Canadian filer with no periodic reports on EDGAR before 2002"
+LEAP,0001065049,2007-10-08,2008-12-22,LEAP WIRELESS INTERNATIONAL INC,exact,name 'Leap Wireless International' -> EDGAR 'LEAP WIRELESS INTERNATIONAL INC'; 5 periodic filings inside the span (2007-12-14 .. 2008-11-07)
+LEG,0000058492,1999-10-18,2009-01-01,LEGGETT &amp; PLATT INC,carry,carried back from the 2009 row (edgar); 37 periodic filings inside the span (1999-11-15 .. 2008-11-06)
+LEHMQ,0000806085,1998-01-12,2008-09-17,LEHMAN BROTHERS HOLDINGS INC. PLAN TRUST,exact,name 'Lehman Brothers Holdings' -> EDGAR 'LEHMAN BROTHERS HOLDINGS INC. PLAN TRUST'; 43 periodic filings inside the span (1998-02-27 .. 2008-07-10); best of 7 same-name entities
+LEN,0000920760,2005-10-04,2009-01-01,LENNAR CORP /NEW/,carry,carried back from the 2009 row (current); 13 periodic filings inside the span (2005-10-17 .. 2008-10-10)
+LH,0000920148,2004-11-01,2009-01-01,LABCORP HOLDINGS INC.,carry,carried back from the 2009 row (current); 17 periodic filings inside the span (2004-11-01 .. 2008-11-04)
+LHX,0000202058,1996-01-02,1999-11-08,HARRIS CORP /DE/,manual,"Harris Corp's first stint, the same filer as the 2009 row"
+LHX,0000202058,2008-09-22,2009-01-01,"L3HARRIS TECHNOLOGIES, INC. /DE/",carry,carried back from the 2009 row (current); 1 periodic filings inside the span (2008-11-04 .. 2008-11-04)
+LIFE,0001073431,2008-11-24,2009-01-01,Life Technologies Corp,carry,carried back from the 2009 row (manual); 0 periodic filings inside the span
+LLL,0001039101,2004-12-01,2009-01-01,"L3 TECHNOLOGIES, INC.",carry,carried back from the 2009 row (manual); 16 periodic filings inside the span (2005-03-15 .. 2008-11-04)
+LLTC,0000791907,2000-04-03,2009-01-01,LINEAR TECHNOLOGY CORP /CA/,carry,carried back from the 2009 row (manual); 35 periodic filings inside the span (2000-05-16 .. 2008-11-04)
+LLX,0000060512,1996-01-02,1997-10-23,LOUISIANA LAND & EXPLORATION CO,exact,name 'Louisiana Land & Exploration' -> EDGAR 'LOUISIANA LAND & EXPLORATION CO'; 7 periodic filings inside the span (1996-03-21 .. 1997-08-01)
+LLY,0000059478,1996-01-02,2009-01-01,ELI LILLY & Co,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-25 .. 2008-11-03)
+LM,0000704051,2006-04-24,2009-01-01,"Legg Mason, Inc.",carry,carried back from the 2009 row (exact); 11 periodic filings inside the span (2006-06-09 .. 2008-11-07)
+LMCK,0001355096,2007-02-01,2009-01-01,LIBERTY MEDIA CORP,manual,"LOW CONFIDENCE: the Nasdaq-100 source carries a Liberty slot back-filled as LMCK from 2007; in 2007-2008 the listed Liberty tracking stocks (LINTA, LCAPA) were all issued by Liberty Media Corp 0001355096 (EDGAR now Old QVC Group), so the filer is right but which tracking stock the slot was is not known"
+LMT,0000936468,1996-01-02,2009-01-01,LOCKHEED MARTIN CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-13 .. 2008-10-24)
+LNC,0000059558,1996-01-02,2009-01-01,LINCOLN NATIONAL CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-27 .. 2008-11-10)
+LO,0001424847,2008-06-11,2009-01-01,"LORILLARD, LLC",carry,carried back from the 2009 row (manual); 2 periodic filings inside the span (2008-08-07 .. 2008-11-04)
+LOGI,0001032975,2007-02-01,2009-01-01,LOGITECH INTERNATIONAL S.A.,carry,carried back from the 2009 row (current); 4 periodic filings inside the span (2007-05-25 .. 2008-11-04)
+LOR,0000060357,1996-01-02,1996-04-23,LORAL CORP /NY/,exact,name 'Loral Corp' -> EDGAR 'LORAL CORP /NY/'; 1 periodic filings inside the span (1996-02-14 .. 1996-02-14)
+LOW,0000060667,1996-01-02,2009-01-01,LOWES COMPANIES INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-04-29 .. 2008-12-02)
+LPX,0000060519,1996-01-02,2006-11-10,LOUISIANA-PACIFIC CORP,exact,name 'Louisiana-Pacific' -> EDGAR 'LOUISIANA-PACIFIC CORP'; 44 periodic filings inside the span (1996-03-29 .. 2006-11-07)
+LRCX,0000707549,2007-02-01,2009-01-01,LAM RESEARCH CORP,carry,carried back from the 2009 row (current); 7 periodic filings inside the span (2007-04-30 .. 2008-11-07)
+LSI,0000944314,1996-01-02,2009-01-01,"LIFE STORAGE, INC.",carry,carried back from the 2009 row (edgar); 51 periodic filings inside the span (1996-05-15 .. 2008-11-07)
+LU,0001006240,1996-10-01,2006-12-01,ALCATEL-LUCENT USA INC.,exact,name 'Lucent Technologies' -> EDGAR 'ALCATEL-LUCENT USA INC.'; 40 periodic filings inside the span (1996-12-30 .. 2006-08-08)
+LUB,0000016099,1996-01-02,1997-01-02,LUB LIQUIDATING TRUST,exact,"name ""Luby's"" -> EDGAR 'LUB LIQUIDATING TRUST'; 4 periodic filings inside the span (1996-01-11 .. 1996-11-26)"
+LUV,0000092380,1996-01-02,2009-01-01,SOUTHWEST AIRLINES CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-28 .. 2008-10-20)
+LVLT,0000794323,2007-02-01,2008-12-22,"Level 3 Parent, LLC",exact,"name 'Level 3 Communications' -> EDGAR 'Level 3 Parent, LLC'; 8 periodic filings inside the span (2007-03-01 .. 2008-11-10); best of 2 same-name entities"
+LXK,0001001288,1999-08-13,2009-01-01,LEXMARK INTERNATIONAL INC /KY/,carry,carried back from the 2009 row (manual); 37 periodic filings inside the span (1999-11-10 .. 2008-11-04)
+M,0000794367,1996-01-02,2009-01-01,"Macy's, Inc.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-04-17 .. 2008-12-08)
+MA,0001141391,2008-07-18,2009-01-01,Mastercard Inc,carry,carried back from the 2009 row (current); 2 periodic filings inside the span (2008-08-01 .. 2008-11-04)
+MAR,0001048286,1998-05-21,2009-01-01,MARRIOTT INTERNATIONAL INC /MD/,carry,carried back from the 2009 row (current); 42 periodic filings inside the span (1998-07-31 .. 2008-10-03)
+MAS,0000062996,1996-01-02,2009-01-01,MASCO CORP /DE/,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-10-29)
+MAT,0000063276,1996-01-02,2009-01-01,MATTEL INC /DE/,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-22 .. 2008-10-24)
+MAY,0000063416,1996-01-02,2005-08-29,MAY DEPARTMENT STORES CO,exact,name 'May Department Stores' -> EDGAR 'MAY DEPARTMENT STORES CO'; 38 periodic filings inside the span (1996-04-24 .. 2005-05-27); best of 2 same-name entities
+MBI,0000814585,1996-12-03,2009-01-01,MBIA INC,carry,carried back from the 2009 row (current); 48 periodic filings inside the span (1997-03-28 .. 2008-11-05)
+MCD,0000063908,1996-01-02,2009-01-01,MCDONALDS CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-28 .. 2008-11-06)
+MCHP,0000827054,2007-02-01,2009-01-01,MICROCHIP TECHNOLOGY INC,carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-02-06 .. 2008-11-07)
+MCIC,0000064079,1996-01-02,1998-09-15,MCI COMMUNICATIONS CORP,exact,name 'MCI Communications' -> EDGAR 'MCI COMMUNICATIONS CORP'; 11 periodic filings inside the span (1996-03-29 .. 1998-08-14)
+MCK,0000927653,1999-01-13,2009-01-01,MCKESSON CORP,carry,carried back from the 2009 row (current); 40 periodic filings inside the span (1999-02-12 .. 2008-10-29)
+MCO,0000030419,1996-01-02,1998-07-01,DUN & BRADSTREET CORP,manual,"the old Dun & Bradstreet (EDGAR now DEX ONE, former R H DONNELLEY); fja05680 back-fills MCO over the D&B slot; the 1998-07-01 split moved D&B onto a new CIK"
+MCO,0001059556,1998-07-01,2009-01-01,MOODYS CORP /DE/,manual,"Dun & Bradstreet 1998-2000, renamed Moody's at the 2000 spin"
+MD,0000063917,1996-01-02,1997-08-01,MCDONNELL DOUGLAS CORP,exact,name 'McDonnell Douglas' -> EDGAR 'MCDONNELL DOUGLAS CORP'; 6 periodic filings inside the span (1996-03-25 .. 1997-05-14)
+MDLZ,0001103982,2007-04-02,2009-01-01,"Mondelez International, Inc.",carry,carried back from the 2009 row (current); 7 periodic filings inside the span (2007-05-09 .. 2008-10-31)
+MDP,0000065011,1996-01-02,2009-01-01,Meredith Corporation,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-02-12 .. 2008-10-29)
+MDR,0000708819,1996-01-02,2003-08-20,MCDERMOTT INTERNATIONAL INC,exact,name 'McDermott International' -> EDGAR 'MCDERMOTT INTERNATIONAL INC'; 30 periodic filings inside the span (1996-02-14 .. 2003-08-12); best of 2 same-name entities
+MDT,0000064670,1996-01-02,2009-01-01,MEDTRONIC INC,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-08 .. 2008-12-03)
+MEA,0000064394,1996-01-02,2002-01-30,MEAD CORP,exact,name 'Mead Corp' -> EDGAR 'MEAD CORP'; 23 periodic filings inside the span (1996-03-14 .. 2001-11-08)
+MEDI,0000873591,2000-06-16,2007-06-01,MEDIMMUNE INC /DE,exact,name 'MedImmune' -> EDGAR 'MEDIMMUNE INC /DE'; 28 periodic filings inside the span (2000-08-10 .. 2007-04-30); best of 2 same-name entities
+MEE,0000037748,1996-01-02,2000-12-22,FLUOR CORP/DE/,manual,"the original Fluor Corp, which kept its CIK and became Massey Energy in the 2000-11-30 reverse spin; EDGAR's latest SIC (coal mining) therefore labels Fluor's engineering years as energy, the not-point-in-time artefact sectors.py documents"
+MEE,0000037748,2008-06-23,2009-01-01,MASSEY ENERGY COMPANY,carry,carried back from the 2009 row (exact); 2 periodic filings inside the span (2008-08-04 .. 2008-11-07)
+MEL,0000064782,1996-01-02,2007-07-02,MELLON FINANCIAL CORP,exact,name 'Mellon Financial' -> EDGAR 'MELLON FINANCIAL CORP'; 45 periodic filings inside the span (1996-03-19 .. 2007-05-04); best of 2 same-name entities
+MER,0000065100,1996-01-02,2009-01-01,"MERRILL, LYNCH & CO INC",carry,carried back from the 2009 row (exact); 53 periodic filings inside the span (1996-03-22 .. 2008-11-05)
+MERQ,0000867058,2000-06-29,2006-01-04,MERCURY INTERACTIVE CORP,exact,name 'Mercury Interactive' -> EDGAR 'MERCURY INTERACTIVE CORP'; 20 periodic filings inside the span (2000-08-14 .. 2005-05-06)
+MET,0001099219,2000-12-11,2009-01-01,METLIFE INC,carry,carried back from the 2009 row (current); 32 periodic filings inside the span (2001-03-14 .. 2008-11-07)
+MFE,0000890801,2008-12-23,2009-01-01,"McAfee, Inc.",carry,carried back from the 2009 row (manual); 0 periodic filings inside the span
+MHS,0001170650,2003-08-20,2009-01-01,"MEDCO HEALTH SOLUTIONS,INC.",carry,carried back from the 2009 row (exact); 22 periodic filings inside the span (2003-09-22 .. 2008-11-05)
+MI,0000062741,2002-02-11,2007-11-01,MARSHALL & ILSLEY CORP/WI/,manual,Marshall & Ilsley until the 2007-11-01 Metavante separation put New M&I on the ticker
+MI,0001399315,2007-11-01,2009-01-01,MARSHALL & ILSLEY CORP,manual,former name NEW M&I CORP
+MICC,0000912958,2007-02-01,2009-01-01,MILLICOM INTERNATIONAL CELLULAR SA,carry,carried back from the 2009 row (manual); 2 periodic filings inside the span (2007-04-20 .. 2008-04-03)
+MII,0000068361,1996-01-02,1997-05-01,MORTON INTERNATIONAL INC,manual,the original Morton until its airbag business merged into Autoliv 1997-05-01
+MII,0001035972,1997-05-01,1999-06-22,MORTON INTERNATIONAL INC /IN/,manual,"the specialty-chemicals Morton spun at the Autoliv merger, acquired by Rohm and Haas 1999-06"
+MIL,0000066479,1996-01-02,2009-01-01,MILLIPORE CORP /MA,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-21 .. 2008-11-05)
+MIR,0000042246,1997-08-07,2000-06-01,MIRAGE RESORTS INC,manual,"Mirage Resorts, acquired by MGM Grand 2000-05-31"
+MIR,0001010775,2001-04-03,2003-07-17,MIRANT CORP,manual,"Mirant, spun from Southern 2001-04-02"
+MKC,0000063754,2003-03-21,2009-01-01,MCCORMICK & CO INC,carry,carried back from the 2009 row (current); 23 periodic filings inside the span (2003-04-11 .. 2008-10-09)
+MKG,0000051396,1996-01-02,2000-10-18,MALLINCKRODT INC /MO,exact,name 'Mallinckrodt' -> EDGAR 'MALLINCKRODT INC /MO'; 19 periodic filings inside the span (1996-02-12 .. 2000-08-28); best of 4 same-name entities
+MMM,0000066740,1996-01-02,2009-01-01,3M CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-11 .. 2008-10-31)
+MNR,0000354604,1996-01-02,1998-09-28,MANOR CARE INC/NEW,exact,name 'Manor Care' -> EDGAR 'MANOR CARE INC/NEW'; 11 periodic filings inside the span (1996-01-16 .. 1998-08-17); best of 2 same-name entities
+MO,0000764180,1996-01-02,2009-01-01,"ALTRIA GROUP, INC.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-28 .. 2008-11-03)
+MOB,0000067182,1996-01-02,1999-12-01,MOBIL CORP,exact,name 'Mobil Corp' -> EDGAR 'MOBIL CORP'; 16 periodic filings inside the span (1996-03-11 .. 1999-11-12)
+MOLX,0000067472,1999-12-01,2009-01-01,MOLEX INC,carry,carried back from the 2009 row (exact); 36 periodic filings inside the span (2000-02-11 .. 2008-10-31)
+MON,0001110783,2002-08-14,2009-01-01,MONSANTO CO /NEW/,carry,carried back from the 2009 row (manual); 24 periodic filings inside the span (2002-11-14 .. 2008-10-24)
+MRK,0000310158,1996-01-02,2009-01-01,"Merck & Co., Inc.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-28 .. 2008-10-29)
+MRO,0000101778,1996-01-02,2009-01-01,MARATHON OIL CORP,carry,carried back from the 2009 row (edgar); 52 periodic filings inside the span (1996-03-06 .. 2008-11-07)
+MRSH,0000062709,1996-01-02,2009-01-01,"MARSH & MCLENNAN COMPANIES, INC.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-28 .. 2008-11-07)
+MRVL,0001058057,2007-02-01,2009-01-01,MARVELL TECHNOLOGY GROUP LTD,carry,carried back from the 2009 row (manual); 10 periodic filings inside the span (2007-07-02 .. 2008-12-11)
+MS,0000895421,1996-01-02,2009-01-01,MORGAN STANLEY,carry,carried back from the 2009 row (current); 51 periodic filings inside the span (1996-05-15 .. 2008-10-09)
+MSFT,0000789019,1996-01-02,2009-01-01,MICROSOFT CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-13 .. 2008-10-23)
+MSI,0000068505,1996-01-02,2009-01-01,"Motorola Solutions, Inc.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-22 .. 2008-10-30)
+MST,0000064923,1996-01-02,1998-08-14,MERCANTILE STORES CO INC,exact,name 'Mercantile Stores' -> EDGAR 'MERCANTILE STORES CO INC'; 10 periodic filings inside the span (1996-04-29 .. 1998-06-16)
+MTB,0000036270,2004-02-27,2009-01-01,M&T BANK CORP,carry,carried back from the 2009 row (current); 19 periodic filings inside the span (2004-05-07 .. 2008-11-07)
+MTG,0000876437,1996-07-19,2008-10-31,MGIC INVESTMENT CORP,exact,name 'MGIC Investment' -> EDGAR 'MGIC INVESTMENT CORP'; 49 periodic filings inside the span (1996-08-09 .. 2008-08-11)
+MTL,0000064907,1998-02-23,1999-09-20,MERCANTILE BANCORPORATION INC,exact,name 'Mercantile Bancorporation' -> EDGAR 'MERCANTILE BANCORPORATION INC'; 7 periodic filings inside the span (1998-03-30 .. 1999-08-13)
+MTLQQ,0000040730,1996-01-02,2009-01-01,Motors Liquidation Co,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-04-01 .. 2008-11-10)
+MTW,0000061986,2007-11-16,2009-01-01,MANITOWOC CO INC,carry,carried back from the 2009 row (current); 4 periodic filings inside the span (2008-02-29 .. 2008-11-10)
+MU,0000723125,1996-01-02,2009-01-01,MICRON TECHNOLOGY INC,carry,carried back from the 2009 row (current); 51 periodic filings inside the span (1996-03-26 .. 2008-10-27)
+MUR,0000717423,2005-08-15,2009-01-01,MURPHY OIL CORP,carry,carried back from the 2009 row (current); 13 periodic filings inside the span (2005-11-07 .. 2008-11-07)
+MWI,0000067931,1996-01-02,1999-05-28,MOORE CORPORATION LTD,manual,"Moore Corp Ltd, renamed Moore Wallace 2003; a Canadian filer with no periodic reports on EDGAR inside the span (filings from 1996-08, periodic from 1999-10)"
+MWV,0000106498,1996-01-02,2002-01-29,WESTVACO CORP,manual,fja05680 back-fills MWV over Westvaco; the Mead merger closed 2002-01-29
+MWV,0001159297,2002-01-29,2009-01-01,MEADWESTVACO CORP,manual,MeadWestvaco
+MWW,0001020416,2001-06-04,2009-01-01,Monster Worldwide Inc,carry,carried back from the 2009 row (exact); 30 periodic filings inside the span (2001-08-14 .. 2008-11-04)
+MXIM,0000743316,2000-05-10,2007-09-27,MAXIM INTEGRATED PRODUCTS INC,manual,"Maxim's first stint, the same filer as the 2009 row"
+MXIM,0000743316,2008-12-22,2009-01-01,Maxim Integrated Products,carry,carried back from the 2009 row (exact); 0 periodic filings inside the span
+MYG,0000063541,1996-01-02,2006-04-03,MAYTAG CORP,exact,name 'Maytag' -> EDGAR 'MAYTAG CORP'; 41 periodic filings inside the span (1996-03-22 .. 2006-02-10)
+MZIAQ,0000716823,1996-01-02,2000-06-29,MI 2009 Inc.,exact,name 'Milacron' -> EDGAR 'MI 2009 Inc.'; 18 periodic filings inside the span (1996-03-14 .. 2000-05-12); best of 3 same-name entities
+NAE,0000007314,1996-01-02,1997-08-07,NORAM ENERGY CORP,manual,"NorAm Energy (former Arkla), NYSE NAE, acquired by Houston Industries 1997-08-06"
+NAV,0000808450,1996-01-02,2006-12-20,NAVISTAR INTERNATIONAL CORP,exact,name 'Navistar International' -> EDGAR 'NAVISTAR INTERNATIONAL CORP'; 40 periodic filings inside the span (1996-01-26 .. 2005-09-09)
+NBL,0000072207,2007-10-08,2009-01-01,"Noble Energy, Inc.",carry,carried back from the 2009 row (exact); 5 periodic filings inside the span (2007-10-31 .. 2008-10-29)
+NBR,0000798943,2000-10-18,2002-06-24,NABORS INDUSTRIES INC,manual,Delaware Nabors until the 2002-06-24 Bermuda reorganisation
+NBR,0001163739,2002-06-24,2009-01-01,NABORS INDUSTRIES LTD,manual,Nabors Industries Ltd
+NC,0000789933,1996-01-02,2000-06-05,NACCO INDUSTRIES INC,exact,name 'NACCO Industries' -> EDGAR 'NACCO INDUSTRIES INC'; 18 periodic filings inside the span (1996-03-29 .. 2000-05-12)
+NCC,0000069970,1996-01-02,2009-01-01,NATIONAL CITY CORP,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-01-30 .. 2008-11-06)
+NCE,0001004858,1998-11-03,2000-08-21,NEW CENTURY ENERGIES INC,exact,name 'New Century Energies' -> EDGAR 'NEW CENTURY ENERGIES INC'; 8 periodic filings inside the span (1998-11-09 .. 2000-08-07)
+NCR,0000070866,2000-01-04,2007-10-01,NCR Voyix Corp,exact,name 'NCR Corp' -> EDGAR 'NCR Voyix Corp'; 31 periodic filings inside the span (2000-03-09 .. 2007-08-08)
+NDAQ,0001120193,2008-10-22,2009-01-01,"NASDAQ, INC.",carry,carried back from the 2009 row (current); 1 periodic filings inside the span (2008-11-07 .. 2008-11-07)
+NDOI,NONE,2007-02-01,2009-01-01,,manual,phantom in the Wikipedia-derived ndx_history.csv; see the NDOI row of ticker_cik.csv
+NE,0000777201,2001-01-16,2002-05-01,NOBLE DRILLING CORP,manual,Noble Drilling until the 2002-04-30 Cayman reorganisation
+NE,0001169055,2002-05-01,2009-01-01,NOBLE CORP,manual,"Noble Corp (Cayman; EDGAR now Noble Finance Co), the parent until the 2009-03-27 Swiss move"
+NEE,0000753308,1996-01-02,2009-01-01,NEXTERA ENERGY INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-12 .. 2008-10-31)
+NEM,0000071824,1996-01-02,2002-02-16,NEWMONT MINING CORP,manual,Newmont Mining (EDGAR now NEWMONT USA LTD) until the 2002-02-15 Normandy/Franco-Nevada holding company
+NEM,0001164727,2002-02-16,2009-01-01,NEWMONT MINING CORP /DE/,manual,former name DELTA HOLDCO
+NFB,0000352510,2002-07-17,2006-12-01,NORTH FORK BANCORPORATION INC,exact,name 'North Fork Bancorporation' -> EDGAR 'NORTH FORK BANCORPORATION INC'; 18 periodic filings inside the span (2002-08-06 .. 2006-11-09)
+NGH,0000847903,1998-09-16,2000-12-12,NABISCO GROUP HOLDINGS CORP,manual,"RJR Nabisco Holdings, renamed Nabisco Group Holdings 1999-06; 0000083612 is the tobacco company spun off then"
+NI,0001111711,2000-11-02,2009-01-01,NISOURCE INC.,carry,carried back from the 2009 row (current); 32 periodic filings inside the span (2001-03-30 .. 2008-11-04)
+NIHD,0001037016,2007-02-01,2009-01-01,NII HOLDINGS INC,carry,carried back from the 2009 row (manual); 8 periodic filings inside the span (2007-02-27 .. 2008-11-05)
+NKE,0000320187,1996-01-02,2009-01-01,"NIKE, Inc.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-01-16 .. 2008-10-06)
+NLC,0000069598,1996-01-02,1999-08-02,NALCO CHEMICAL CO,exact,name 'Nalco Chemical' -> EDGAR 'NALCO CHEMICAL CO'; 14 periodic filings inside the span (1996-04-01 .. 1999-05-13)
+NLTI,0001270400,2007-02-01,2007-08-27,VIRGIN MEDIA INC.,exact,name 'NTL Inc' -> EDGAR 'VIRGIN MEDIA INC.'; 3 periodic filings inside the span (2007-03-01 .. 2007-08-08); best of 7 same-name entities
+NLV,NONE,1996-04-01,2000-01-06,,manual,unidentified: an S&P 500 member 1996-04-01 .. 2000-01-06 under NLV in fja05680; no name source checked knows the ticker
+NMK,0000071932,1996-01-02,2002-02-01,NIAGARA MOHAWK POWER CORP /NY/,exact,name 'Niagara Mohawk Holdings' -> EDGAR 'NIAGARA MOHAWK POWER CORP /NY/'; 24 periodic filings inside the span (1996-03-29 .. 2001-11-14); best of 2 same-name entities
+NOC,0000072945,1996-01-02,2001-04-03,NORTHROP GRUMMAN CORP,manual,the original Northrop Grumman until the 2001-04-03 Litton holding company
+NOC,0001133421,2001-04-03,2009-01-01,NORTHROP GRUMMAN CORP /DE/,manual,former name NNG INC
+NOV,0001021860,2005-03-14,2009-01-01,NOV Inc.,carry,carried back from the 2009 row (current); 15 periodic filings inside the span (2005-05-10 .. 2008-11-04)
+NOVL,0000758004,1996-01-02,2009-01-01,NOVELL INC,carry,carried back from the 2009 row (exact); 53 periodic filings inside the span (1996-01-26 .. 2008-12-23)
+NRTLQ,0000072911,1996-01-02,2002-07-22,NORTEL NETWORKS CORP,manual,"Northern Telecom, renamed Nortel Networks; a Canadian filer whose periodic reports reach EDGAR only from 2000-11 (0001119664 is its operating subsidiary)"
+NSC,0000702165,1996-01-02,2009-01-01,NORFOLK SOUTHERN CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-27 .. 2008-10-24)
+NSI,0000070538,1996-01-02,2001-12-03,NATIONAL SERVICE INDUSTRIES INC,exact,name 'National Service Industries' -> EDGAR 'NATIONAL SERVICE INDUSTRIES INC'; 24 periodic filings inside the span (1996-01-12 .. 2001-11-29)
+NSM,0000070530,1996-01-02,2009-01-01,NATIONAL SEMICONDUCTOR CORP,carry,carried back from the 2009 row (manual); 53 periodic filings inside the span (1996-01-04 .. 2008-12-31)
+NTAP,0001002047,1999-06-25,2009-01-01,"NetApp, Inc.",carry,carried back from the 2009 row (current); 39 periodic filings inside the span (1999-07-12 .. 2008-12-03)
+NTRS,0000073124,1998-01-30,2009-01-01,NORTHERN TRUST CORP,carry,carried back from the 2009 row (current); 44 periodic filings inside the span (1998-03-17 .. 2008-10-31)
+NUE,0000073309,1996-01-02,2009-01-01,NUCOR CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-11-04)
+NVDA,0001045810,2001-11-30,2009-01-01,NVIDIA CORP,carry,carried back from the 2009 row (current); 28 periodic filings inside the span (2002-05-14 .. 2008-12-02)
+NVLS,0000836106,2000-06-19,2009-01-01,NOVELLUS SYSTEMS INC,carry,carried back from the 2009 row (manual); 34 periodic filings inside the span (2000-08-08 .. 2008-11-05)
+NWL,0000814453,1996-01-02,2009-01-01,NEWELL BRANDS INC.,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-13 .. 2008-11-10)
+NXTL,0000824169,1998-04-01,2005-08-15,NEXTEL COMMUNICATIONS INC,exact,name 'Nextel Communications' -> EDGAR 'NEXTEL COMMUNICATIONS INC'; 31 periodic filings inside the span (1998-05-13 .. 2005-07-29); best of 2 same-name entities
+NYN,0000732714,1996-01-02,1997-08-15,NYNEX CORP,exact,name 'NYNEX' -> EDGAR 'NYNEX CORP'; 7 periodic filings inside the span (1996-03-22 .. 1997-08-06)
+NYT,0000071691,1996-01-02,2009-01-01,NEW YORK TIMES CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-11 .. 2008-11-07)
+NYX,0001368007,2007-10-25,2009-01-01,NYSE Euronext,carry,carried back from the 2009 row (manual); 5 periodic filings inside the span (2007-11-13 .. 2008-11-13)
+OAT,0000081371,1996-01-02,2001-08-03,QUAKER OATS CO,exact,name 'Quaker Oats' -> EDGAR 'QUAKER OATS CO'; 21 periodic filings inside the span (1996-05-14 .. 2001-04-27)
+ODP,0000800240,1999-06-24,2009-01-01,ODP Corp,carry,carried back from the 2009 row (edgar); 38 periodic filings inside the span (1999-08-10 .. 2008-10-29)
+OI,0000812074,1997-08-04,2000-12-11,"O-I Glass, Inc. /DE/",exact,"name 'Owens-Illinois' -> EDGAR 'O-I Glass, Inc. /DE/'; 14 periodic filings inside the span (1997-08-14 .. 2000-11-14)"
+OK,0000746969,1999-12-02,2001-04-02,OLD KENT FINANCIAL CORP /MI/,exact,name 'Old Kent Financial' -> EDGAR 'OLD KENT FINANCIAL CORP /MI/'; 4 periodic filings inside the span (2000-03-03 .. 2000-11-14)
+OKE,0000074154,1996-01-02,1997-11-26,ONEOK INC,manual,the original ONEOK until the 1997-11-26 Western Resources gas-asset combination
+OKE,0001039684,1997-11-26,2001-08-30,ONEOK INC /NEW/,manual,former name WAI INC
+OM,0000075149,1996-01-02,1996-10-01,OUTBOARD MARINE CORP,exact,name 'Outboard Marine' -> EDGAR 'OUTBOARD MARINE CORP'; 3 periodic filings inside the span (1996-02-06 .. 1996-08-02)
+OMC,0000029989,1997-12-24,2009-01-01,OMNICOM GROUP INC.,carry,carried back from the 2009 row (current); 44 periodic filings inside the span (1998-03-26 .. 2008-10-24)
+OMX,0000012978,1996-01-02,2008-06-23,MAPLEBY HOLDINGS MERGER Corp,exact,name 'OfficeMax' -> EDGAR 'MAPLEBY HOLDINGS MERGER Corp'; 50 periodic filings inside the span (1996-03-15 .. 2008-05-07); best of 6 same-name entities
+ONE,0000036090,1996-01-02,1998-10-02,BANC ONE CORP /OH/,manual,Banc One until the 1998-10-02 First Chicago NBD merger formed Bank One
+ONE,0001067092,1998-10-02,2004-07-01,BANK ONE CORP,manual,Bank One Corp
+ORCL,0000777676,1996-01-02,2006-02-01,ORACLE CORP /DE/,manual,the original Oracle until the 2006-01-31 Siebel close put Ozark Holding on the ticker
+ORCL,0001341439,2006-02-01,2009-01-01,ORACLE CORP,manual,former name Ozark Holding Inc.
+ORLY,0000898173,2008-12-22,2009-01-01,O REILLY AUTOMOTIVE INC,carry,carried back from the 2009 row (current); 0 periodic filings inside the span
+ORX,0000836442,1996-01-02,1999-03-01,ORYX ENERGY CO,exact,name 'Oryx Energy' -> EDGAR 'ORYX ENERGY CO'; 12 periodic filings inside the span (1996-03-28 .. 1998-11-03)
+OWENQ,0000075234,1996-01-02,2000-10-02,"OWENS CORNING SALES, LLC",exact,"name 'Owens Corning' -> EDGAR 'OWENS CORNING SALES, LLC'; 19 periodic filings inside the span (1996-02-23 .. 2000-08-14); best of 3 same-name entities"
+OXY,0000797468,1996-01-02,2009-01-01,OCCIDENTAL PETROLEUM CORP /DE/,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-11-04)
+PAC,0000732716,1996-01-02,1997-04-01,PACIFIC TELESIS GROUP,exact,name 'Pacific Telesis Group' -> EDGAR 'PACIFIC TELESIS GROUP'; 5 periodic filings inside the span (1996-03-25 .. 1997-03-31)
+PALM,0001100389,2000-07-28,2002-08-14,PALM INC,exact,name 'Palm Inc' -> EDGAR 'PALM INC'; 9 periodic filings inside the span (2000-08-16 .. 2002-07-30)
+PAS,0000049573,1996-01-02,1998-01-30,WHITMAN CORP,manual,"LOW CONFIDENCE: Whitman Corp became PepsiAmericas (NYSE PAS), so a back-filled PAS fits it; nothing independent confirms Whitman left the index 1998-01-30"
+PAYX,0000723531,1998-10-01,2009-01-01,PAYCHEX INC,carry,carried back from the 2009 row (current); 42 periodic filings inside the span (1998-10-15 .. 2008-12-17)
+PBCT,0001378946,2008-11-13,2009-01-01,People's United Financial Inc,carry,carried back from the 2009 row (exact); 0 periodic filings inside the span
+PBG,0001076405,2001-05-14,2009-01-01,PEPSI BOTTLING GROUP,carry,carried back from the 2009 row (exact); 30 periodic filings inside the span (2001-07-27 .. 2008-10-14)
+PBI,0000078814,1996-01-02,2009-01-01,PITNEY BOWES INC /DE/,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-04-01 .. 2008-11-07)
+PBY,0000077449,1996-01-02,2000-04-03,PEP BOYS MANNY MOE & JACK,manual,the full EDGAR name
+PCAR,0000075362,1996-01-02,2009-01-01,PACCAR INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-25 .. 2008-10-27)
+PCG,0001004980,1996-01-02,2009-01-01,PG&E Corp,carry,carried back from the 2009 row (current); 48 periodic filings inside the span (1997-03-04 .. 2008-11-06)
+PCH,0000079716,1996-01-02,2001-07-09,POTLATCH CORP (OLD),exact,name 'Potlatch' -> EDGAR 'POTLATCH CORP (OLD)'; 22 periodic filings inside the span (1996-03-26 .. 2001-05-14); best of 3 same-name entities
+PCL,0000849213,2002-01-17,2009-01-01,PLUM CREEK TIMBER CO INC,carry,carried back from the 2009 row (manual); 28 periodic filings inside the span (2002-03-25 .. 2008-11-06)
+PCP,0000079958,2007-06-01,2009-01-01,PRECISION CASTPARTS CORP,carry,carried back from the 2009 row (exact); 6 periodic filings inside the span (2007-08-10 .. 2008-11-07)
+PCS,0000101830,1998-11-24,2004-04-23,SPRINT LLC,exact,name 'Sprint Corp' -> EDGAR 'SPRINT LLC'; 21 periodic filings inside the span (1999-03-05 .. 2004-03-09); best of 2 same-name entities
+PD,0000078066,1996-01-02,2007-03-20,PHELPS DODGE CORP,exact,name 'Phelps Dodge' -> EDGAR 'PHELPS DODGE CORP'; 45 periodic filings inside the span (1996-03-20 .. 2007-02-27)
+PDCO,0000891024,2005-10-11,2009-01-01,"PATTERSON COMPANIES, INC.",carry,carried back from the 2009 row (edgar); 13 periodic filings inside the span (2005-12-08 .. 2008-12-04)
+PDG,0000819996,1996-01-02,2002-07-22,PLACER DOME INC,exact,name 'Placer Dome' -> EDGAR 'PLACER DOME INC'; 1 periodic filings inside the span (2002-02-22 .. 2002-02-22)
+PEG,0000788784,1996-01-02,2009-01-01,PUBLIC SERVICE ENTERPRISE GROUP INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-23 .. 2008-10-31)
+PEL,0000351696,1996-01-02,1997-06-19,PANENERGY CORP,exact,name 'PanEnergy' -> EDGAR 'PANENERGY CORP'; 6 periodic filings inside the span (1996-03-28 .. 1997-05-14)
+PEP,0000077476,1996-01-02,2009-01-01,PEPSICO INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-26 .. 2008-10-15)
+PET,0000075527,1996-01-02,1998-06-29,PACIFIC ENTERPRISES INC,exact,name 'Pacific Enterprises' -> EDGAR 'PACIFIC ENTERPRISES INC'; 10 periodic filings inside the span (1996-03-21 .. 1998-05-11)
+PETM,0000863157,2007-02-01,2008-12-22,PETSMART INC,exact,name 'PetSmart' -> EDGAR 'PETSMART INC'; 8 periodic filings inside the span (2007-03-28 .. 2008-11-26); best of 2 same-name entities
+PFE,0000078003,1996-01-02,2009-01-01,PFIZER INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-11-07)
+PFG,0001126328,2002-07-22,2009-01-01,PRINCIPAL FINANCIAL GROUP INC,carry,carried back from the 2009 row (current); 26 periodic filings inside the span (2002-08-08 .. 2008-11-05)
+PG,0000080424,1996-01-02,2009-01-01,PROCTER & GAMBLE Co,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-13 .. 2008-10-30)
+PGL,0000077385,1996-01-02,2007-02-22,PEOPLES ENERGY CORP,exact,name 'Peoples Energy' -> EDGAR 'PEOPLES ENERGY CORP'; 44 periodic filings inside the span (1996-02-13 .. 2006-12-14); best of 2 same-name entities
+PGN,0000017797,1996-01-02,2000-06-19,CAROLINA POWER & LIGHT CO,manual,fja05680 back-fills PGN over Carolina Power & Light; CP&L Energy became the holding company 2000-06-19
+PGN,0001094093,2000-06-19,2009-01-01,PROGRESS ENERGY INC,manual,"CP&L Energy, renamed 2000-12"
+PGR,0000080661,1997-08-04,2009-01-01,PROGRESSIVE CORP/OH/,carry,carried back from the 2009 row (current); 46 periodic filings inside the span (1997-08-08 .. 2008-11-10)
+PH,0000076334,1996-01-02,2009-01-01,Parker-Hannifin Corp,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-13 .. 2008-11-06)
+PHA,0000067686,1996-01-02,2003-04-16,PHARMACIA CORP /DE/,exact,name 'Pharmacia Corp' -> EDGAR 'PHARMACIA CORP /DE/'; 29 periodic filings inside the span (1996-03-15 .. 2003-03-25); best of 3 same-name entities
+PHB,0000078716,1996-01-02,1999-10-04,PIONEER HI BRED INTERNATIONAL INC,exact,name 'Pioneer Hi-Bred International' -> EDGAR 'PIONEER HI BRED INTERNATIONAL INC'; 15 periodic filings inside the span (1996-01-11 .. 1999-07-12)
+PHM,0000822416,1996-01-02,2009-01-01,PULTEGROUP INC/MI/,carry,carried back from the 2009 row (current); 51 periodic filings inside the span (1996-05-14 .. 2008-11-06)
+PLD,0001045609,2003-07-17,2009-01-01,"Prologis, Inc.",carry,carried back from the 2009 row (current); 22 periodic filings inside the span (2003-08-13 .. 2008-11-10)
+PLL,0000075829,1996-01-02,2009-01-01,PALL CORP,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-05 .. 2008-12-10)
+PM,0001413329,2008-03-31,2009-01-01,Philip Morris International Inc.,carry,carried back from the 2009 row (current); 3 periodic filings inside the span (2008-05-08 .. 2008-11-07)
+PMCS,0000767920,2001-08-03,2007-07-02,PMC SIERRA INC,exact,name 'PMC-Sierra' -> EDGAR 'PMC SIERRA INC'; 23 periodic filings inside the span (2001-11-14 .. 2007-05-10)
+PMI,0000800575,1996-01-02,1996-05-31,PREMARK INTERNATIONAL INC,manual,"LOW CONFIDENCE: Premark (NYSE PMI) kept filing until 1999, but the slot ends the day its Tupperware spin-off (TUP) joins, consistent with S&P swapping one for the other"
+PNC,0000713676,1996-01-02,2009-01-01,"PNC FINANCIAL SERVICES GROUP, INC.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-27 .. 2008-11-06)
+PNU,0000949573,1996-01-02,2000-04-03,PHARMACIA & UPJOHN INC,exact,name 'Pharmacia & Upjohn' -> EDGAR 'PHARMACIA & UPJOHN INC'; 17 periodic filings inside the span (1996-04-01 .. 2000-03-20)
+PNW,0000764622,1999-10-04,2009-01-01,PINNACLE WEST CAPITAL CORP,carry,carried back from the 2009 row (current); 37 periodic filings inside the span (1999-11-15 .. 2008-11-04)
+POM,0001135971,2007-11-09,2009-01-01,PEPCO HOLDINGS LLC,carry,carried back from the 2009 row (manual); 4 periodic filings inside the span (2008-02-29 .. 2008-11-03)
+PPDI,0001003124,2008-12-22,2009-01-01,"PHARMACEUTICAL PRODUCT DEVELOPMENT, LLC",carry,carried back from the 2009 row (manual); 0 periodic filings inside the span
+PPG,0000079879,1996-01-02,2009-01-01,PPG INDUSTRIES INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-16 .. 2008-10-27)
+PPL,0000922224,1996-01-02,2009-01-01,PPL Corp,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-01 .. 2008-11-04)
+PPW,0000075594,1996-01-02,1999-11-30,PACIFICORP /OR/,exact,name 'PacifiCorp' -> EDGAR 'PACIFICORP /OR/'; 16 periodic filings inside the span (1996-03-29 .. 1999-11-15); best of 3 same-name entities
+PRD,0000079326,1996-01-02,2000-12-12,PRIMARY PDC INC,exact,name 'Polaroid' -> EDGAR 'PRIMARY PDC INC'; 20 periodic filings inside the span (1996-03-21 .. 2000-11-14); best of 2 same-name entities
+PRU,0001137774,2002-07-22,2009-01-01,PRUDENTIAL FINANCIAL INC,carry,carried back from the 2009 row (current); 26 periodic filings inside the span (2002-08-14 .. 2008-10-30)
+PSA,0000318380,2005-08-19,2007-06-01,PUBLIC STORAGE INC /CA,manual,Public Storage Inc until the 2007-06-01 Maryland REIT reorganisation
+PSA,0001393311,2007-06-01,2009-01-01,Public Storage,manual,Public Storage (Maryland)
+PSFT,0000875570,1998-10-02,2004-12-29,PEOPLESOFT INC,exact,name 'PeopleSoft' -> EDGAR 'PEOPLESOFT INC'; 25 periodic filings inside the span (1998-11-16 .. 2004-11-09)
+PSKY,0000813828,1996-01-02,2009-01-01,VIACOM INC,manual,"LOW CONFIDENCE on the company, not the sector: fja05680 back-fills one CBS slot from 1996. Viacom Inc (renamed CBS Corp 2006, now Paramount Global) is the filer whose ticker became PSKY; for 1996-2000 the slot may instead be Westinghouse/CBS Corp (0000106413), which the universe otherwise lacks. Both are television broadcasters (SIC 4833), so the sector label is the same either way"
+PTC,0000857005,1997-04-03,2007-01-03,PTC INC.,exact,name 'Parametric Technology' -> EDGAR 'PTC INC.'; 39 periodic filings inside the span (1997-05-08 .. 2006-12-14)
+PTEN,0000889900,2007-02-01,2007-12-24,PATTERSON UTI ENERGY INC,exact,name 'Patterson-UTI Energy' -> EDGAR 'PATTERSON UTI ENERGY INC'; 4 periodic filings inside the span (2007-02-27 .. 2007-11-05)
+PTV,0001089976,1999-11-05,2009-01-01,PACTIV CORPORATION,carry,carried back from the 2009 row (exact); 37 periodic filings inside the span (1999-11-18 .. 2008-11-04)
+PVN,0000017206,1996-01-02,1997-06-11,PROVIDIAN CORP,manual,"Providian Corp (insurance) until it spun Providian Financial and sold the rest to AEGON, 1997-06"
+PVN,0001035713,1997-06-11,2005-10-03,PROVIDIAN FINANCIAL CORP,manual,Providian Financial
+PVT,0000005513,1998-08-31,1999-07-01,Unum Group,exact,name 'Provident Companies' -> EDGAR 'Unum Group'; 3 periodic filings inside the span (1998-11-13 .. 1999-05-17); best of 2 same-name entities
+PWER,0001042825,2000-10-23,2005-03-14,POWER ONE INC,exact,name 'Power-One' -> EDGAR 'POWER ONE INC'; 17 periodic filings inside the span (2000-11-15 .. 2004-11-04)
+PWJ,0000075754,1999-06-04,2000-11-06,PAINE WEBBER GROUP INC,exact,name 'PaineWebber Group' -> EDGAR 'PAINE WEBBER GROUP INC'; 6 periodic filings inside the span (1999-08-16 .. 2000-11-02)
+PX,0000884905,1996-01-02,2009-01-01,LINDE INC,carry,carried back from the 2009 row (manual); 50 periodic filings inside the span (1996-08-07 .. 2008-10-29)
+PXD,0001038357,2008-09-24,2009-01-01,PIONEER NATURAL RESOURCES CO,carry,carried back from the 2009 row (edgar); 1 periodic filings inside the span (2008-11-07 .. 2008-11-07)
+PZE,0000077320,1996-01-02,1998-12-31,PENNZENERGY CO,exact,name 'Pennzoil' -> EDGAR 'PENNZENERGY CO'; 12 periodic filings inside the span (1996-02-29 .. 1998-11-12)
+Q,0001037949,2000-07-06,2009-01-01,QWEST COMMUNICATIONS INTERNATIONAL INC,carry,carried back from the 2009 row (manual); 32 periodic filings inside the span (2000-08-11 .. 2008-10-29)
+QCOM,0000804328,1999-07-22,2009-01-01,QUALCOMM INC/DE,carry,carried back from the 2009 row (current); 38 periodic filings inside the span (1999-08-06 .. 2008-11-06)
+QLGC,0000918386,2000-12-12,2009-01-01,QLOGIC CORP,carry,carried back from the 2009 row (exact); 32 periodic filings inside the span (2001-02-14 .. 2008-10-29)
+QRTEA,0001355096,2007-02-01,2009-01-01,"Old QVC Group, Inc.",carry,carried back from the 2009 row (edgar); 8 periodic filings inside the span (2007-03-01 .. 2008-11-06)
+QTRN,0000919623,1999-11-16,2003-09-26,QUINTILES TRANSNATIONAL CORP,exact,name 'Quintiles Transnational' -> EDGAR 'QUINTILES TRANSNATIONAL CORP'; 15 periodic filings inside the span (2000-03-30 .. 2003-08-13); best of 2 same-name entities
+R,0000085961,1996-01-02,2009-01-01,RYDER SYSTEM INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-27 .. 2008-10-22)
+RAD,0000084129,1996-01-02,2000-07-27,"NEW RITE AID, LLC",exact,"name 'Rite Aid' -> EDGAR 'NEW RITE AID, LLC'; 18 periodic filings inside the span (1996-05-31 .. 2000-07-18)"
+RAI,0000083612,2002-09-04,2004-07-30,RJ REYNOLDS TOBACCO HOLDINGS INC,manual,R.J. Reynolds Tobacco Holdings until the 2004-07-30 Brown & Williamson combination formed Reynolds American
+RAI,0001275283,2004-07-30,2009-01-01,Reynolds American Inc,manual,Reynolds American
+RAL,0000081870,1996-01-02,2001-12-13,RALSTON PURINA CO,exact,name 'Ralston Purina' -> EDGAR 'RALSTON PURINA CO'; 23 periodic filings inside the span (1996-02-14 .. 2001-08-09); best of 2 same-name entities
+RATL,0000722056,2002-02-01,2003-02-21,RATIONAL SOFTWARE CORP,exact,name 'Rational Software' -> EDGAR 'RATIONAL SOFTWARE CORP'; 5 periodic filings inside the span (2002-02-12 .. 2003-02-11)
+RBD,0000085627,1996-01-02,1999-03-25,RUBBERMAID INC,exact,name 'Rubbermaid' -> EDGAR 'RUBBERMAID INC'; 12 periodic filings inside the span (1996-03-14 .. 1998-11-05)
+RBK,0000770949,1996-01-02,2006-02-01,REEBOK INTERNATIONAL LTD,exact,name 'Reebok International' -> EDGAR 'REEBOK INTERNATIONAL LTD'; 40 periodic filings inside the span (1996-03-29 .. 2005-11-09)
+RDC,0000085408,1996-01-02,2009-01-01,Rowan Companies Plc,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-04-01 .. 2008-11-07)
+RDS.A,0000085486,1996-01-02,2002-07-22,ROYAL DUTCH PETROLEUM CO,exact,name 'Royal Dutch Petroleum' -> EDGAR 'ROYAL DUTCH PETROLEUM CO'; 1 periodic filings inside the span (2002-04-12 .. 2002-04-12)
+RF,0000036032,1998-08-28,2004-07-01,REGIONS FINANCIAL CORP,manual,the original Regions until the 2004-07-01 Union Planters merger
+RF,0001281761,2004-07-01,2009-01-01,REGIONS FINANCIAL CORP,manual,former New Regions
+RHI,0000315213,2000-12-05,2009-01-01,ROBERT HALF INC.,carry,carried back from the 2009 row (current); 32 periodic filings inside the span (2001-03-23 .. 2008-10-31)
+RIG,0001083269,1999-12-31,2008-12-19,TRANSOCEAN INTERNATIONAL Ltd,exact,name 'Transocean' -> EDGAR 'TRANSOCEAN INTERNATIONAL Ltd'; 36 periodic filings inside the span (2000-03-20 .. 2008-11-06); best of 4 same-name entities
+RIMM,0001070235,2007-02-01,2009-01-01,RESEARCH IN MOTION LTD,carry,carried back from the 2009 row (exact); 2 periodic filings inside the span (2007-05-17 .. 2008-04-17)
+RL,0001037038,2007-02-02,2009-01-01,RALPH LAUREN CORP,carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-02-08 .. 2008-11-06)
+RLM,0000083604,1996-01-02,2000-05-04,REYNOLDS METALS CO,exact,name 'Reynolds Metals' -> EDGAR 'REYNOLDS METALS CO'; 18 periodic filings inside the span (1996-03-06 .. 2000-04-28)
+RML,0000085812,1996-01-02,2000-12-12,RUSSELL CORP,exact,name 'Russell Corp' -> EDGAR 'RUSSELL CORP'; 20 periodic filings inside the span (1996-03-28 .. 2000-11-15)
+RNB,0000083246,1996-01-02,2000-01-03,HSBC USA INC /MD/,exact,name 'Republic New York' -> EDGAR 'HSBC USA INC /MD/'; 16 periodic filings inside the span (1996-03-21 .. 1999-11-12)
+ROH,0000084792,1996-01-02,2009-01-01,ROHM & HAAS CO,carry,carried back from the 2009 row (manual); 51 periodic filings inside the span (1996-03-22 .. 2008-10-27)
+ROK,0001024478,1996-01-02,2009-01-01,"ROCKWELL AUTOMATION, INC",carry,carried back from the 2009 row (current); 48 periodic filings inside the span (1996-12-19 .. 2008-11-21)
+ROST,0000745732,2007-02-01,2007-12-24,ROSS STORES INC,manual,"Ross Stores' first Nasdaq-100 stint, the same filer as the 2009 row"
+ROST,0000745732,2008-12-22,2009-01-01,"ROSS STORES, INC.",carry,carried back from the 2009 row (current); 0 periodic filings inside the span
+RRC,0000315852,2007-12-21,2009-01-01,RANGE RESOURCES CORP,carry,carried back from the 2009 row (current); 4 periodic filings inside the span (2008-02-27 .. 2008-10-23)
+RRD,0000029669,1996-01-02,2009-01-01,RR Donnelley & Sons Co.,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-03-11 .. 2008-11-05)
+RSG,0001060391,2008-12-05,2009-01-01,"REPUBLIC SERVICES, INC.",carry,carried back from the 2009 row (current); 0 periodic filings inside the span
+RSHCQ,0000096289,1996-01-02,2009-01-01,RS Legacy Corp,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-28 .. 2008-10-23)
+RTN,0000082267,1996-01-02,1997-12-18,RAYTHEON CO,manual,the original Raytheon until the 1997-12-17 Hughes defense merger
+RTN,0001047122,1997-12-18,2009-01-01,RAYTHEON CO/,manual,former name HE HOLDINGS INC
+RTX,0000101829,1996-01-02,2009-01-01,RTX Corp,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-28 .. 2008-10-21)
+RVTY,0000031791,1996-01-02,2009-01-01,"REVVITY, INC.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-22 .. 2008-11-07)
+RX,0001019876,1996-11-04,1998-07-01,COGNIZANT CORP,manual,Cognizant Corp (EDGAR now NIELSEN MEDIA RESEARCH) until it spun IMS Health 1998-07-01
+RX,0001058083,1998-07-01,2009-01-01,IMS HEALTH INC,manual,IMS Health
+RYAAY,0001038683,2007-02-14,2009-01-01,RYANAIR HOLDINGS PLC,carry,carried back from the 2009 row (current); 2 periodic filings inside the span (2007-09-20 .. 2008-07-31)
+RYAN,NONE,1996-01-02,1997-01-02,,manual,unidentified: a 1996 member under RYAN in fja05680; no name source checked knows it
+RYC,0000082206,1996-01-02,1999-08-13,RAYCHEM CORP,exact,name 'Raychem' -> EDGAR 'RAYCHEM CORP'; 14 periodic filings inside the span (1996-02-14 .. 1999-05-17)
+RYI,0000790528,1996-01-02,1998-07-01,INLAND STEEL INDUSTRIES INC /DE/,manual,"Inland Steel Industries, renamed Ryerson Tull 1999 and Ryerson Inc (NYSE RYI) later; fja05680 back-fills the later ticker; its removal fits the 1998-07 sale of Inland Steel Co to Ispat"
+S,0000101830,1996-01-02,2009-01-01,SPRINT LLC,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-12 .. 2008-11-07)
+SAF,0000086104,1996-01-02,2008-09-23,SAFECO CORP,exact,name 'Safeco' -> EDGAR 'SAFECO CORP'; 51 periodic filings inside the span (1996-03-27 .. 2008-07-29)
+SAI,0000054727,1997-07-17,1999-01-04,SUNAMERICA INC,exact,name 'SunAmerica' -> EDGAR 'SUNAMERICA INC'; 6 periodic filings inside the span (1997-08-14 .. 1998-12-21)
+SANM,0000897723,2000-06-21,2007-07-02,SANMINA CORP,exact,name 'Sanmina' -> EDGAR 'SANMINA CORP'; 28 periodic filings inside the span (2000-08-15 .. 2007-05-04); best of 3 same-name entities
+SAPE,0001008817,2000-05-05,2002-05-13,SAPIENT CORP,exact,name 'Sapient' -> EDGAR 'SAPIENT CORP'; 8 periodic filings inside the span (2000-05-12 .. 2002-03-25); best of 2 same-name entities
+SB,0000200245,1996-01-02,1997-11-28,Citigroup Global Markets Holdings Inc.,exact,name 'Salomon Inc' -> EDGAR 'Citigroup Global Markets Holdings Inc.'; 8 periodic filings inside the span (1996-04-01 .. 1997-11-13)
+SBL,0000278352,2000-12-11,2007-01-10,SYMBOL TECHNOLOGIES INC,exact,name 'Symbol Technologies' -> EDGAR 'SYMBOL TECHNOLOGIES INC'; 24 periodic filings inside the span (2001-03-30 .. 2006-10-31)
+SBUX,0000829224,2000-06-08,2009-01-01,STARBUCKS CORP,carry,carried back from the 2009 row (current); 34 periodic filings inside the span (2000-08-16 .. 2008-11-24)
+SCHW,0000316709,1997-06-02,2009-01-01,SCHWAB CHARLES CORP,carry,carried back from the 2009 row (current); 46 periodic filings inside the span (1997-07-29 .. 2008-11-06)
+SCI,0000089089,1996-01-02,2000-03-16,SERVICE CORP INTERNATIONAL,exact,name 'Service Corp International' -> EDGAR 'SERVICE CORP INTERNATIONAL'; 16 periodic filings inside the span (1996-03-29 .. 1999-11-12)
+SDS,0000789388,2002-07-22,2005-08-12,SUNGARD DATA SYSTEMS INC,exact,name 'SunGard Data Systems' -> EDGAR 'SUNGARD DATA SYSTEMS INC'; 13 periodic filings inside the span (2002-08-14 .. 2005-08-09)
+SE,0001373835,2007-01-03,2009-01-01,Spectra Energy Corp.,carry,carried back from the 2009 row (manual); 8 periodic filings inside the span (2007-04-02 .. 2008-11-07)
+SEBL,0001006835,2000-05-05,2006-02-01,SIEBEL SYSTEMS INC,exact,name 'Siebel Systems' -> EDGAR 'SIEBEL SYSTEMS INC'; 23 periodic filings inside the span (2000-05-12 .. 2005-11-07)
+SEE,0001012100,1998-04-01,2009-01-01,SEALED AIR CORP/DE,carry,carried back from the 2009 row (edgar); 43 periodic filings inside the span (1998-05-15 .. 2008-11-10)
+SEG,0000354952,1996-08-16,2000-11-22,VERITAS SOFTWARE TECHNOLOGY CORP,exact,name 'Seagate Technology' -> EDGAR 'VERITAS SOFTWARE TECHNOLOGY CORP'; 18 periodic filings inside the span (1996-08-23 .. 2000-11-03); best of 4 same-name entities
+SEPR,0000877357,2007-02-01,2007-12-24,Sunovion Pharmaceuticals Inc.,exact,name 'Sepracor' -> EDGAR 'Sunovion Pharmaceuticals Inc.'; 4 periodic filings inside the span (2007-03-01 .. 2007-11-09)
+SFA,0000087777,1996-01-02,2006-02-27,SCIENTIFIC ATLANTA INC,exact,name 'Scientific-Atlanta' -> EDGAR 'SCIENTIFIC ATLANTA INC'; 41 periodic filings inside the span (1996-02-12 .. 2006-02-08)
+SFS,NONE,1996-01-02,1997-07-28,,manual,"unidentified: a 1996-1997 member under SFS in fja05680; Massive and EODHD answer Smart & Final, which was never large enough for the index"
+SGID,0000802301,1996-01-02,2000-06-21,"Graphics Properties Holdings, Inc.",exact,"name 'Silicon Graphics' -> EDGAR 'Graphics Properties Holdings, Inc.'; 18 periodic filings inside the span (1996-02-14 .. 2000-05-15); best of 2 same-name entities"
+SGP,0000310158,1996-01-02,2009-01-01,"Merck & Co., Inc.",carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-02-28 .. 2008-10-29)
+SHLD,0001310067,2005-03-28,2009-01-01,SEARS HOLDINGS CORP,carry,carried back from the 2009 row (manual); 15 periodic filings inside the span (2005-06-07 .. 2008-12-02)
+SHN,0000089902,1996-01-02,1997-01-02,SHONEYS INC,exact,"name ""Shoney's"" -> EDGAR 'SHONEYS INC'; 4 periodic filings inside the span (1996-01-29 .. 1996-09-17)"
+SHW,0000089800,1996-01-02,2009-01-01,SHERWIN WILLIAMS CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-13 .. 2008-10-22)
+SIAL,0000090185,1996-01-02,2009-01-01,SIGMA - ALDRICH CORP,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-03-29 .. 2008-11-10)
+SII,0000721083,2006-10-02,2009-01-01,SMITH INTERNATIONAL INC,carry,carried back from the 2009 row (manual); 9 periodic filings inside the span (2006-11-09 .. 2008-11-10)
+SIRI,0000908937,2007-02-01,2008-12-22,SIRIUS XM HOLDINGS INC.,exact,name 'Sirius Satellite Radio' -> EDGAR 'SIRIUS XM HOLDINGS INC.'; 8 periodic filings inside the span (2007-03-01 .. 2008-11-12); best of 2 same-name entities
+SJM,0000091419,2008-11-06,2009-01-01,J M SMUCKER Co,carry,carried back from the 2009 row (current); 1 periodic filings inside the span (2008-12-09 .. 2008-12-09)
+SK,0000701856,1996-01-02,1998-04-01,SAFETY KLEEN CORP/,exact,name 'Safety-Kleen' -> EDGAR 'SAFETY KLEEN CORP/'; 9 periodic filings inside the span (1996-01-24 .. 1998-01-14); best of 4 same-name entities
+SLB,0000087347,1996-01-02,2009-01-01,SLB LIMITED/NV,carry,carried back from the 2009 row (current); 51 periodic filings inside the span (1996-05-15 .. 2008-10-22)
+SLM,0001032033,1998-07-01,2009-01-01,SLM Corp,carry,carried back from the 2009 row (current); 42 periodic filings inside the span (1998-08-12 .. 2008-11-06)
+SLR,0000835541,1998-12-31,2007-10-02,SOLECTRON CORP,exact,name 'Solectron' -> EDGAR 'SOLECTRON CORP'; 35 periodic filings inside the span (1999-01-08 .. 2007-07-11)
+SMI,0000093102,1996-01-02,2000-12-12,SPRINGS INDUSTRIES INC,exact,name 'Springs Industries' -> EDGAR 'SPRINGS INDUSTRIES INC'; 20 periodic filings inside the span (1996-03-21 .. 2000-11-13)
+SMS,0000089415,1996-01-02,2000-06-08,SHARED MEDICAL SYSTEMS CORP,exact,name 'Shared Medical Systems' -> EDGAR 'SHARED MEDICAL SYSTEMS CORP'; 18 periodic filings inside the span (1996-03-29 .. 2000-05-15)
+SNA,0000091440,1996-01-02,2009-01-01,Snap-on Inc,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-28 .. 2008-10-23)
+SNDK,0001000180,2006-04-20,2009-01-01,SANDISK CORP,carry,carried back from the 2009 row (manual); 11 periodic filings inside the span (2006-05-08 .. 2008-11-07)
+SNI,0001430602,2008-07-01,2009-01-01,"Scripps Networks Interactive, Inc.",carry,carried back from the 2009 row (manual); 2 periodic filings inside the span (2008-08-14 .. 2008-11-14)
+SNT,0000092236,1996-01-02,1999-10-26,SONAT INC,exact,name 'Sonat' -> EDGAR 'SONAT INC'; 15 periodic filings inside the span (1996-03-21 .. 1999-08-11)
+SNV,0000018349,1997-12-01,2008-01-02,SYNOVUS FINANCIAL CORP,exact,name 'Synovus Financial' -> EDGAR 'SYNOVUS FINANCIAL CORP'; 40 periodic filings inside the span (1998-03-20 .. 2007-11-13)
+SO,0000092122,1996-01-02,2009-01-01,SOUTHERN CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-25 .. 2008-11-06)
+SOTR,0000092081,1999-03-01,2004-11-01,SOUTHTRUST CORP,exact,name 'SouthTrust' -> EDGAR 'SOUTHTRUST CORP'; 23 periodic filings inside the span (1999-03-05 .. 2004-08-09)
+SOV,0000811830,2004-07-01,2009-01-01,"Santander Holdings USA, Inc.",carry,carried back from the 2009 row (edgar); 18 periodic filings inside the span (2004-08-09 .. 2008-11-05)
+SPG,0001063761,2002-06-26,2009-01-01,SIMON PROPERTY GROUP INC.,carry,carried back from the 2009 row (current); 26 periodic filings inside the span (2002-08-14 .. 2008-11-07)
+SPGI,0000064040,1996-01-02,2009-01-01,S&P Global Inc.,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-26 .. 2008-10-28)
+SPLS,0000791519,1998-10-07,2009-01-01,STAPLES INC,carry,carried back from the 2009 row (manual); 41 periodic filings inside the span (1998-12-15 .. 2008-12-02)
+SRCL,0000861878,2007-12-24,2009-01-01,STERICYCLE INC,carry,carried back from the 2009 row (edgar); 4 periodic filings inside the span (2008-02-29 .. 2008-11-07)
+SRE,0001032208,1998-06-29,2009-01-01,SEMPRA,carry,carried back from the 2009 row (current); 42 periodic filings inside the span (1998-08-14 .. 2008-11-10)
+SRR,0000094887,1996-01-02,1997-10-07,STRIDE RITE CORP,exact,name 'Stride Rite' -> EDGAR 'STRIDE RITE CORP'; 7 periodic filings inside the span (1996-02-29 .. 1997-07-10)
+SSP,0000832428,2005-12-20,2008-07-01,E.W. SCRIPPS Co,exact,name 'E.W. Scripps' -> EDGAR 'E.W. SCRIPPS Co'; 10 periodic filings inside the span (2006-03-16 .. 2008-05-12)
+STI,0000750556,1996-01-02,2009-01-01,SUNTRUST BANKS INC,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-01 .. 2008-11-07)
+STJ,0000203077,1996-01-02,2009-01-01,St Jude Medical,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-03-27 .. 2008-10-30)
+STLD,0001022671,2007-12-24,2009-01-01,STEEL DYNAMICS INC,carry,carried back from the 2009 row (current); 4 periodic filings inside the span (2008-02-27 .. 2008-11-07)
+STO,0000094610,1996-01-02,1998-11-18,SMURFIT-STONE CONTAINER Corp,exact,name 'Stone Container' -> EDGAR 'SMURFIT-STONE CONTAINER Corp'; 12 periodic filings inside the span (1996-03-27 .. 1998-11-16)
+STR,0000751652,2006-12-01,2009-01-01,DOMINION QUESTAR CORP,carry,carried back from the 2009 row (manual); 8 periodic filings inside the span (2007-02-28 .. 2008-10-31)
+STT,0000093751,1997-08-18,2009-01-01,STATE STREET CORP,carry,carried back from the 2009 row (current); 45 periodic filings inside the span (1997-11-14 .. 2008-11-05)
+STX,0001137789,2008-11-10,2009-01-01,Seagate Technology Holdings plc,carry,carried back from the 2009 row (current); 0 periodic filings inside the span
+STZ,0000016918,2005-07-05,2009-01-01,"CONSTELLATION BRANDS, INC.",carry,carried back from the 2009 row (current); 14 periodic filings inside the span (2005-07-11 .. 2008-10-10)
+SUB,0000101320,1998-01-28,2001-03-01,SUMMIT BANCORP/NJ/,exact,name 'Summit Bancorp' -> EDGAR 'SUMMIT BANCORP/NJ/'; 12 periodic filings inside the span (1998-03-27 .. 2000-11-14); best of 4 same-name entities
+SUN,0000095304,1996-01-02,2009-01-01,SUNOCO INC,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-07 .. 2008-11-06)
+SUNEQ,0000945436,2007-05-31,2009-01-01,"SUNEDISON, INC.",carry,carried back from the 2009 row (manual); 6 periodic filings inside the span (2007-08-08 .. 2008-11-06)
+SVU,0000095521,1996-01-02,2009-01-01,SUPERVALU Inc.,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-01-16 .. 2008-10-16)
+SWK,0000093556,1996-01-02,2009-01-01,"STANLEY BLACK & DECKER, INC.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-27 .. 2008-11-03)
+SWN,0000007332,2008-06-06,2009-01-01,SOUTHWESTERN ENERGY CO,carry,carried back from the 2009 row (edgar); 2 periodic filings inside the span (2008-07-30 .. 2008-10-30)
+SWY,0000086144,1998-11-13,2009-01-01,SAFEWAY INC,carry,carried back from the 2009 row (exact); 40 periodic filings inside the span (1999-03-24 .. 2008-10-08)
+SXCL,0000709804,1999-10-01,2001-05-14,Steel Excel Inc.,exact,name 'Adaptec' -> EDGAR 'Steel Excel Inc.'; 6 periodic filings inside the span (1999-11-08 .. 2001-01-26)
+SYK,0000310764,2000-12-12,2009-01-01,STRYKER CORP,carry,carried back from the 2009 row (current); 32 periodic filings inside the span (2001-03-16 .. 2008-11-03)
+SYY,0000096021,1996-01-02,2009-01-01,SYSCO CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-12 .. 2008-11-04)
+T,0000732717,1996-01-02,2009-01-01,AT&T INC.,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-12 .. 2008-11-05)
+TA,0000099189,1996-01-02,1999-07-22,TRANSAMERICA CORP,exact,name 'Transamerica Corp' -> EDGAR 'TRANSAMERICA CORP'; 14 periodic filings inside the span (1996-03-26 .. 1999-04-29)
+TAP,0000024545,1996-01-02,2009-01-01,MOLSON COORS BEVERAGE CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-04-01 .. 2008-11-07)
+TCOMA,0000925692,1996-01-02,1999-03-10,TELE COMMUNICATIONS INC /CO/,manual,"the 1994 TCI holding company, acquired by AT&T 1999-03-09 (EDGAR now Comcast Cable Holdings); 0000096903 is its TCI Communications subsidiary"
+TDC,0000816761,2007-10-01,2009-01-01,TERADATA CORP /DE/,carry,carried back from the 2009 row (current); 5 periodic filings inside the span (2007-11-13 .. 2008-11-12)
+TDM,0000315180,1996-01-02,1997-09-02,TANDEM COMPUTERS INC /DE/,exact,name 'Tandem Computers' -> EDGAR 'TANDEM COMPUTERS INC /DE/'; 7 periodic filings inside the span (1996-02-14 .. 1997-08-14)
+TE,0000350563,2001-10-10,2009-01-01,TECO ENERGY INC,carry,carried back from the 2009 row (manual); 29 periodic filings inside the span (2001-11-14 .. 2008-10-31)
+TEG,0000916863,2007-02-22,2009-01-01,"INTEGRYS HOLDING, INC.",carry,carried back from the 2009 row (manual); 8 periodic filings inside the span (2007-02-28 .. 2008-11-06)
+TEK,0000096879,1996-01-02,2007-11-16,TEKTRONIX INC,exact,name 'Tektronix' -> EDGAR 'TEKTRONIX INC'; 48 periodic filings inside the span (1996-01-05 .. 2007-10-10)
+TEL,0001385157,2007-07-02,2009-01-01,TE Connectivity plc,carry,carried back from the 2009 row (current); 6 periodic filings inside the span (2007-08-13 .. 2008-11-20)
+TEN,0000823549,1996-01-02,1996-12-12,TENNECO INC /DE/,manual,the original Tenneco until its energy business merged into El Paso 1996-12-12 (EDGAR now El Paso Tennessee Pipeline)
+TEN,0001024725,1996-12-12,1999-11-05,TENNECO INC /DE,manual,"New Tenneco, which spun Pactiv and became Tenneco Automotive 1999-11"
+TER,0000097210,1999-11-15,2009-01-01,"TERADYNE, INC",carry,carried back from the 2009 row (current); 37 periodic filings inside the span (1999-11-19 .. 2008-11-07)
+TEVA,0000818686,2007-02-01,2009-01-01,TEVA PHARMACEUTICAL INDUSTRIES LTD,carry,carried back from the 2009 row (current); 2 periodic filings inside the span (2007-02-28 .. 2008-02-29)
+TEX,0000097216,2006-12-20,2008-11-06,TEREX CORP,exact,name 'Terex' -> EDGAR 'TEREX CORP'; 8 periodic filings inside the span (2007-02-28 .. 2008-11-03)
+TFC,0000092230,1997-12-04,2009-01-01,TRUIST FINANCIAL CORP,carry,carried back from the 2009 row (current); 44 periodic filings inside the span (1998-03-18 .. 2008-11-06)
+TGNA,0000039899,1996-01-02,2009-01-01,TEGNA INC,carry,carried back from the 2009 row (edgar); 52 periodic filings inside the span (1996-03-29 .. 2008-11-06)
+TGT,0000027419,1996-01-02,2009-01-01,TARGET CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-04-18 .. 2008-12-05)
+THC,0000070318,1996-01-02,2009-01-01,TENET HEALTHCARE CORP,carry,carried back from the 2009 row (current); 53 periodic filings inside the span (1996-01-16 .. 2008-11-04)
+THY,NONE,1996-01-02,1996-10-16,,manual,unidentified: a 1996 member under THY in fja05680; no name source checked knows it
+TIE,0001011657,2007-10-29,2009-01-01,TITANIUM METALS CORP(NEW),carry,carried back from the 2009 row (exact); 5 periodic filings inside the span (2007-11-07 .. 2008-11-05)
+TIF,0000098246,2000-06-21,2009-01-01,Tiffany & Co.,carry,carried back from the 2009 row (exact); 34 periodic filings inside the span (2000-08-31 .. 2008-12-02)
+TIN,0000731939,1996-01-02,2007-12-31,TEMPLE INLAND INC,exact,name 'Temple-Inland' -> EDGAR 'TEMPLE INLAND INC'; 48 periodic filings inside the span (1996-03-22 .. 2007-11-07)
+TJX,0000109198,1996-01-02,2009-01-01,TJX COMPANIES INC /DE/,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-04-26 .. 2008-11-21)
+TKR,0000098362,1996-01-02,2001-08-07,TIMKEN CO,exact,name 'Timken' -> EDGAR 'TIMKEN CO'; 22 periodic filings inside the span (1996-03-28 .. 2001-05-14)
+TLAB,0000317771,1996-01-02,2009-01-01,TELLABS INC,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-03-21 .. 2008-11-04)
+TMC,0000925260,1996-01-02,2000-06-13,TIMES MIRROR CO /NEW/,exact,name 'Times Mirror' -> EDGAR 'TIMES MIRROR CO /NEW/'; 18 periodic filings inside the span (1996-03-29 .. 2000-05-10); best of 2 same-name entities
+TMC.A,0000925260,1996-01-02,2000-06-13,TIMES MIRROR CO /NEW/,exact,name 'Times Mirror' -> EDGAR 'TIMES MIRROR CO /NEW/'; 18 periodic filings inside the span (1996-03-29 .. 2000-05-10); best of 2 same-name entities
+TMO,0000097745,1997-01-02,2009-01-01,THERMO FISHER SCIENTIFIC INC.,carry,carried back from the 2009 row (current); 48 periodic filings inside the span (1997-03-20 .. 2008-10-30)
+TNB,0000097854,1996-01-02,2004-08-03,THOMAS & BETTS CORP,exact,name 'Thomas & Betts' -> EDGAR 'THOMAS & BETTS CORP'; 34 periodic filings inside the span (1996-03-29 .. 2004-05-06)
+TOS,0000074091,1999-09-20,2001-09-17,TOSCO CORP,exact,name 'Tosco' -> EDGAR 'TOSCO CORP'; 8 periodic filings inside the span (1999-11-15 .. 2001-08-13)
+TOY,0001005414,1996-01-02,2005-07-22,TOYS R US INC,exact,name 'Toys R Us' -> EDGAR 'TOYS R US INC'; 38 periodic filings inside the span (1996-04-25 .. 2005-06-09); best of 2 same-name entities
+TPR,0001116132,2004-09-01,2009-01-01,"TAPESTRY, INC.",carry,carried back from the 2009 row (current); 18 periodic filings inside the span (2004-09-16 .. 2008-10-31)
+TRB,0000726513,1996-01-02,2007-12-21,TRIBUNE MEDIA CO,exact,name 'Tribune Co' -> EDGAR 'TRIBUNE MEDIA CO'; 48 periodic filings inside the span (1996-03-26 .. 2007-11-02); best of 2 same-name entities
+TROW,0000080255,1999-10-13,2000-12-29,PRICE T ROWE ASSOCIATES INC /MD/,manual,T. Rowe Price Associates until T. Rowe Price Group became the parent 2000-12-28
+TROW,0001113169,2000-12-29,2009-01-01,PRICE T ROWE GROUP INC,manual,T. Rowe Price Group
+TRV,0000086312,1996-01-02,2009-01-01,"TRAVELERS COMPANIES, INC.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-22 .. 2008-10-22)
+TRW,0000100030,1996-01-02,2002-12-12,NORTHROP GRUMMAN SPACE & MISSION SYSTEMS CORP,exact,name 'TRW Inc' -> EDGAR 'NORTHROP GRUMMAN SPACE & MISSION SYSTEMS CORP'; 28 periodic filings inside the span (1996-03-20 .. 2002-11-06)
+TSG,0001020265,2000-03-16,2007-04-02,SABRE HOLDINGS CORP,exact,name 'Sabre Holdings' -> EDGAR 'SABRE HOLDINGS CORP'; 29 periodic filings inside the span (2000-03-24 .. 2007-02-23); best of 3 same-name entities
+TSN,0000100493,2005-08-11,2009-01-01,"TYSON FOODS, INC.",carry,carried back from the 2009 row (current); 14 periodic filings inside the span (2005-08-11 .. 2008-11-20)
+TSS,0000721683,2008-01-02,2009-01-01,"Total System Services, Inc.",carry,carried back from the 2009 row (exact); 4 periodic filings inside the span (2008-02-29 .. 2008-11-05)
+TT,0000836102,2002-05-13,2008-06-06,AMERICAN STANDARD COMPANIES INC,manual,"fja05680 back-fills TT over American Standard, renamed Trane Inc 2007-11 and acquired by Ingersoll-Rand 2008-06-05"
+TUP,0001008654,1996-05-31,2004-03-25,TUPPERWARE BRANDS CORP,exact,name 'Tupperware' -> EDGAR 'TUPPERWARE BRANDS CORP'; 31 periodic filings inside the span (1996-08-09 .. 2004-03-10)
+TWX,0000736157,1996-01-02,1996-10-10,TIME WARNER INC,manual,the 1990 Time Warner (EDGAR now TIME WARNER COMPANIES INC) until the 1996-10-10 TBS merger holding company
+TWX,0001021387,1996-10-10,2001-01-12,TIME WARNER INC/,manual,Time Warner 1996-2001 (EDGAR now HISTORIC TW INC)
+TWX,0001105705,2001-01-12,2009-01-01,AOL TIME WARNER INC,manual,"AOL Time Warner, renamed Time Warner 2003"
+TX,0000097349,1996-01-02,2001-10-10,TEXACO INC,exact,name 'Texaco' -> EDGAR 'TEXACO INC'; 23 periodic filings inside the span (1996-03-28 .. 2001-08-09)
+TXN,0000097476,1996-01-02,2009-01-01,TEXAS INSTRUMENTS INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-02-23 .. 2008-10-31)
+TXT,0000217346,1996-01-02,2009-01-01,TEXTRON INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-14 .. 2008-10-29)
+TXU,0000097561,1996-01-02,1997-08-05,TEXAS UTILITIES CO,manual,the original Texas Utilities until the 1997-08-05 ENSERCH holding company
+TXU,0001023291,1997-08-05,2007-10-10,TEXAS UTILITIES CO /TX/,manual,renamed TXU 2000 (EDGAR now Energy Future Holdings)
+UAUA,0000100517,2007-03-08,2008-07-21,"United Airlines Holdings, Inc.",exact,"name 'UAL Corp' -> EDGAR 'United Airlines Holdings, Inc.'; 6 periodic filings inside the span (2007-03-16 .. 2008-05-09)"
+UAWGQ,0000701345,1996-01-02,2002-05-15,US AIRWAYS GROUP INC,exact,name 'US Airways Group' -> EDGAR 'US AIRWAYS GROUP INC'; 26 periodic filings inside the span (1996-03-29 .. 2002-05-10)
+UCC,0000100783,1996-01-02,1999-05-03,UNION CAMP CORP,exact,name 'Union Camp' -> EDGAR 'UNION CAMP CORP'; 13 periodic filings inside the span (1996-03-28 .. 1999-03-31)
+UCL,0000716039,1996-01-02,2005-08-11,UNOCAL CORP,exact,name 'Unocal' -> EDGAR 'UNOCAL CORP'; 39 periodic filings inside the span (1996-03-29 .. 2005-08-04)
+UCM,0000918040,1996-01-02,2000-10-23,UNICOM CORP,exact,name 'Unicom Corp' -> EDGAR 'UNICOM CORP'; 19 periodic filings inside the span (1996-03-29 .. 2000-08-11); best of 2 same-name entities
+UIS,0000746838,1996-01-02,2008-11-11,UNISYS CORP,exact,name 'Unisys' -> EDGAR 'UNISYS CORP'; 52 periodic filings inside the span (1996-02-22 .. 2008-11-06)
+UK,0000100790,1996-01-02,2001-02-07,UNION CARBIDE CORP /NEW/,exact,name 'Union Carbide' -> EDGAR 'UNION CARBIDE CORP /NEW/'; 20 periodic filings inside the span (1996-03-22 .. 2000-11-03); best of 2 same-name entities
+UMG,0000732718,1996-01-02,2000-06-15,MEDIAONE GROUP INC,manual,"U S West Media Group, a tracking stock of U S West Inc trading as UMG, which became MediaOne Group in the 1998 split and was acquired by AT&T 2000-06-15 (EDGAR now Comcast MO Group)"
+UN,0000110390,1996-01-02,2002-07-22,UNILEVER N V,manual,"Unilever N.V., a foreign private issuer filing 20-F; 0000217410 is Unilever PLC"
+UNH,0000731766,1996-01-02,2009-01-01,UNITEDHEALTH GROUP INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-04-01 .. 2008-11-07)
+UNM,0000005513,1996-01-02,2009-01-01,Unum Group,carry,carried back from the 2009 row (current); 48 periodic filings inside the span (1997-03-26 .. 2008-10-31)
+UNP,0000100885,1996-01-02,2009-01-01,UNION PACIFIC CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-26 .. 2008-10-23)
+UPC,0000100893,1998-10-01,2004-07-01,UNION PLANTERS CORP,exact,name 'Union Planters' -> EDGAR 'UNION PLANTERS CORP'; 23 periodic filings inside the span (1998-11-13 .. 2004-05-10)
+UPR,0000949061,1996-10-16,2000-07-17,UNION PACIFIC RESOURCES GROUP INC,exact,name 'Union Pacific Resources Group' -> EDGAR 'UNION PACIFIC RESOURCES GROUP INC'; 15 periodic filings inside the span (1996-11-13 .. 2000-05-15)
+UPS,0001090727,2002-07-22,2009-01-01,UNITED PARCEL SERVICE INC,carry,carried back from the 2009 row (current); 26 periodic filings inside the span (2002-08-14 .. 2008-11-07)
+URBN,0000912615,2008-12-22,2009-01-01,URBAN OUTFITTERS INC,carry,carried back from the 2009 row (current); 0 periodic filings inside the span
+USB,0000036104,1996-01-02,2009-01-01,US BANCORP DE,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-04 .. 2008-11-10)
+USBC,0000101542,1996-01-02,1997-08-04,US BANCORP /OR/,manual,"the Portland U.S. Bancorp, acquired 1997 by First Bank System, which took its name (0000036104 is that acquirer, today's U.S. Bancorp)"
+USH,0000102420,1996-01-02,1997-06-18,USLIFE CORP,exact,name 'USLIFE' -> EDGAR 'USLIFE CORP'; 6 periodic filings inside the span (1996-03-27 .. 1997-05-14)
+USHC,0000711405,1996-01-02,1996-07-19,U S HEALTHCARE INC,exact,name 'U.S. Healthcare' -> EDGAR 'U S HEALTHCARE INC'; 2 periodic filings inside the span (1996-03-29 .. 1996-05-14)
+USS,0000101788,1996-01-02,1998-10-02,UNITED STATES SURGICAL CORP,exact,name 'United States Surgical' -> EDGAR 'UNITED STATES SURGICAL CORP'; 11 periodic filings inside the span (1996-01-30 .. 1998-07-28)
+UST,0000811669,1996-01-02,2009-01-01,UST INC,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-01 .. 2008-11-03)
+USW,0000732718,1996-01-02,1998-06-15,US WEST INC,manual,U S West Inc (communications group stock) until the 1998-06-12 split of the communications and media groups
+USW,0001054522,1998-06-15,2000-07-03,U S WEST INC /DE/,manual,"the new U S West, acquired by Qwest 2000-06-30"
+UVN,0001017008,2001-02-07,2007-03-29,UNIVISION COMMUNICATIONS INC,exact,name 'Univision Communications' -> EDGAR 'UNIVISION COMMUNICATIONS INC'; 25 periodic filings inside the span (2001-03-30 .. 2007-02-09)
+VAR,0000203527,2007-02-12,2009-01-01,"Varian Medical Systems, Inc.",carry,carried back from the 2009 row (exact); 7 periodic filings inside the span (2007-05-07 .. 2008-11-24)
+VAT,0000063118,1996-01-02,1996-09-06,LUCASVARITY INC,exact,name 'Varity' -> EDGAR 'LUCASVARITY INC'; 2 periodic filings inside the span (1996-04-12 .. 1996-06-05)
+VFC,0000103379,1996-01-02,2009-01-01,V F CORP,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-26 .. 2008-11-05)
+VIAB,0001339947,2006-01-03,2009-01-01,Viacom Inc. Class B,carry,carried back from the 2009 row (exact); 12 periodic filings inside the span (2006-03-16 .. 2008-11-03)
+VIAV,0000912093,2000-07-27,2009-01-01,VIAVI SOLUTIONS INC.,carry,carried back from the 2009 row (current); 34 periodic filings inside the span (2000-09-28 .. 2008-11-03)
+VLO,0001035002,2004-04-29,2009-01-01,VALERO ENERGY CORP/TX,carry,carried back from the 2009 row (current); 19 periodic filings inside the span (2004-05-07 .. 2008-11-07)
+VMC,0000103973,1999-07-01,2007-11-16,VULCAN MATERIALS CO,manual,the original Vulcan (EDGAR now Legacy Vulcan Corp) until the 2007-11-16 Florida Rock holding company
+VMC,0001396009,2007-11-16,2009-01-01,Vulcan Materials CO,manual,former Virginia Holdco
+VMED,0001270400,2007-08-27,2008-12-22,VIRGIN MEDIA INC.,exact,name 'Virgin Media' -> EDGAR 'VIRGIN MEDIA INC.'; 5 periodic filings inside the span (2007-11-08 .. 2008-11-10); best of 7 same-name entities
+VNO,0000899689,2005-08-12,2009-01-01,VORNADO REALTY TRUST,carry,carried back from the 2009 row (current); 13 periodic filings inside the span (2005-11-01 .. 2008-11-04)
+VO,0000088188,1996-01-02,2000-12-11,SEAGRAM CO LTD,exact,name 'Seagram' -> EDGAR 'SEAGRAM CO LTD'; 19 periodic filings inside the span (1996-06-14 .. 2000-11-13)
+VRSN,0001014473,2006-02-01,2009-01-01,VERISIGN INC/CA,carry,carried back from the 2009 row (current); 12 periodic filings inside the span (2006-03-13 .. 2008-11-07)
+VRTS,0001084408,2000-04-03,2005-07-05,VERITAS SOFTWARE CORP /DE/,exact,name 'Veritas Software' -> EDGAR 'VERITAS SOFTWARE CORP /DE/'; 21 periodic filings inside the span (2000-05-12 .. 2005-05-10); best of 2 same-name entities
+VRTX,0000875320,2007-02-01,2009-01-01,VERTEX PHARMACEUTICALS INC / MA,carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-03-01 .. 2008-11-05)
+VSTNQ,0001111335,2000-06-29,2006-01-03,VISTEON CORP,exact,name 'Visteon' -> EDGAR 'VISTEON CORP'; 22 periodic filings inside the span (2000-07-24 .. 2005-11-22)
+VTRS,0000069499,2004-04-23,2009-01-01,MYLAN INC.,manual,the VTRS slot is Mylan Laboratories / Mylan Inc before the 2020 Viatris combination
+VTSS,0000880446,2000-12-12,2002-08-21,VITESSE SEMICONDUCTOR CORP,exact,name 'Vitesse Semiconductor' -> EDGAR 'VITESSE SEMICONDUCTOR CORP'; 8 periodic filings inside the span (2000-12-19 .. 2002-08-13)
+VZ,0000732712,1996-01-02,2009-01-01,VERIZON COMMUNICATIONS INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-28 .. 2008-10-28)
+WAI,0000913340,1996-01-02,1998-08-11,WESTERN ATLAS INC,exact,name 'Western Atlas' -> EDGAR 'WESTERN ATLAS INC'; 9 periodic filings inside the span (1996-05-14 .. 1998-05-15)
+WAMUQ,0000933136,1997-07-02,2008-09-30,"Maverick Merger Sub 2, LLC",exact,"name 'Washington Mutual' -> EDGAR 'Maverick Merger Sub 2, LLC'; 45 periodic filings inside the span (1997-08-14 .. 2008-08-11)"
+WAT,0001000697,2002-01-02,2009-01-01,WATERS CORP /DE/,carry,carried back from the 2009 row (current); 28 periodic filings inside the span (2002-03-28 .. 2008-10-31)
+WB,0000036995,1996-01-02,2009-01-01,WACHOVIA CORP NEW,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-12 .. 2008-10-30)
+WBA,0000104207,1996-01-02,2009-01-01,WALGREEN CO,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-01-11 .. 2008-10-30)
+WBD,0001320482,2007-02-01,2008-09-18,Discovery Holding CO,manual,Nasdaq-100 2007-2008 stint back-filled as WBD; Discovery Holding until 2008-09-17
+WBD,0001437107,2008-09-18,2008-12-22,"Discovery Communications, Inc.",manual,EDGAR now Warner Bros. Discovery
+WCOEQ,0000723527,1996-04-01,2002-05-15,MCI INC,exact,name 'WorldCom' -> EDGAR 'MCI INC'; 25 periodic filings inside the span (1996-04-01 .. 2002-03-13)
+WCRX,0001323854,2008-12-22,2009-01-01,Warner Chilcott plc,carry,carried back from the 2009 row (manual); 0 periodic filings inside the span
+WEC,0000783325,2008-10-31,2009-01-01,"WEC ENERGY GROUP, INC.",carry,carried back from the 2009 row (current); 0 periodic filings inside the span
+WEN,0000105668,1996-01-02,2008-09-30,WENDYS INTERNATIONAL INC,exact,"name ""Wendy's International"" -> EDGAR 'WENDYS INTERNATIONAL INC'; 51 periodic filings inside the span (1996-04-01 .. 2008-08-06)"
+WFC,0000072971,1996-01-02,2009-01-01,WELLS FARGO & COMPANY/MN,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-07 .. 2008-10-30)
+WFM,0000865436,2006-01-03,2009-01-01,WHOLE FOODS MARKET INC,carry,carried back from the 2009 row (manual); 12 periodic filings inside the span (2006-02-24 .. 2008-11-26)
+WFMI,0000865436,2007-02-01,2008-12-22,WHOLE FOODS MARKET INC,exact,name 'Whole Foods Market' -> EDGAR 'WHOLE FOODS MARKET INC'; 8 periodic filings inside the span (2007-02-23 .. 2008-11-26)
+WFT,0001170565,2005-07-22,2009-01-01,WEATHERFORD INTERNATIONAL LTD,carry,carried back from the 2009 row (manual); 14 periodic filings inside the span (2005-08-01 .. 2008-11-03)
+WHR,0000106640,1996-01-02,2009-01-01,WHIRLPOOL CORP /DE/,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-15 .. 2008-10-28)
+WIN,0001282266,2006-07-18,2009-01-01,Windstream Holdings Inc,carry,carried back from the 2009 row (exact); 10 periodic filings inside the span (2006-08-14 .. 2008-11-07)
+WLA,0000104669,1996-01-02,2000-06-20,WARNER LAMBERT CO,exact,name 'Warner-Lambert' -> EDGAR 'WARNER LAMBERT CO'; 18 periodic filings inside the span (1996-03-21 .. 2000-05-10)
+WLL,0000107189,1996-01-02,2002-02-11,WILLAMETTE INDUSTRIES INC,exact,name 'Willamette Industries' -> EDGAR 'WILLAMETTE INDUSTRIES INC'; 24 periodic filings inside the span (1996-02-29 .. 2001-11-08)
+WLP,0001013220,1999-06-09,2004-12-01,WELLPOINT HEALTH NETWORKS INC /DE/,exact,name 'WellPoint Health Networks' -> EDGAR 'WELLPOINT HEALTH NETWORKS INC /DE/'; 22 periodic filings inside the span (1999-08-16 .. 2004-11-09); best of 2 same-name entities
+WM,0000823768,1998-07-17,2009-01-01,WASTE MANAGEMENT INC,carry,carried back from the 2009 row (current); 42 periodic filings inside the span (1998-08-14 .. 2008-10-30)
+WMB,0000107263,1996-01-02,2009-01-01,"WILLIAMS COMPANIES, INC.",carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-27 .. 2008-11-06)
+WMT,0000104169,1996-01-02,2009-01-01,Walmart Inc.,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-04-23 .. 2008-12-09)
+WMX,0000104938,1996-01-02,1998-07-17,WASTE MANAGEMENT HOLDINGS INC,exact,name 'WMX Technologies' -> EDGAR 'WASTE MANAGEMENT HOLDINGS INC'; 10 periodic filings inside the span (1996-03-29 .. 1998-05-15)
+WNDXQ,0000107681,1996-01-02,2004-12-03,WINN DIXIE STORES INC,exact,name 'Winn-Dixie Stores' -> EDGAR 'WINN DIXIE STORES INC'; 36 periodic filings inside the span (1996-01-29 .. 2004-10-25)
+WOR,0000108516,1996-01-02,2004-12-20,"WORTHINGTON ENTERPRISES, INC.",exact,"name 'Worthington Industries' -> EDGAR 'WORTHINGTON ENTERPRISES, INC.'; 36 periodic filings inside the span (1996-01-12 .. 2004-10-12)"
+WU,0001365135,2006-10-02,2009-01-01,Western Union CO,carry,carried back from the 2009 row (current); 9 periodic filings inside the span (2006-11-08 .. 2008-11-03)
+WWY,0000108601,1996-01-02,2008-10-07,WRIGLEY WM JR CO,exact,name 'Wm. Wrigley Jr.' -> EDGAR 'WRIGLEY WM JR CO'; 51 periodic filings inside the span (1996-03-28 .. 2008-08-05)
+WY,0000106535,1996-01-02,2009-01-01,WEYERHAEUSER CO,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-15 .. 2008-11-07)
+WYE,0000005187,1996-01-02,2009-01-01,WYETH,carry,carried back from the 2009 row (exact); 52 periodic filings inside the span (1996-03-27 .. 2008-11-05)
+WYND,0001361658,2006-08-01,2009-01-01,Travel & Leisure Co.,carry,carried back from the 2009 row (manual); 10 periodic filings inside the span (2006-08-18 .. 2008-11-10)
+WYNN,0001174922,2007-02-01,2009-01-01,WYNN RESORTS LTD,carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-03-01 .. 2008-11-10)
+X,0000101778,1996-01-02,2002-01-02,USX CORP,manual,"USX-U.S. Steel Group, a tracking stock of USX Corp, until United States Steel was separated 2001-12-31. USX is now Marathon Oil and EDGAR's latest SIC for it is 1311, so the sector label for this stretch is the not-point-in-time artefact sectors.py documents (steel labelled as energy)"
+X,0001163302,2002-01-02,2009-01-01,UNITED STATES STEEL CORP,manual,United States Steel
+XEL,0000072903,1996-01-02,2009-01-01,XCEL ENERGY INC,carry,carried back from the 2009 row (current); 52 periodic filings inside the span (1996-03-29 .. 2008-10-24)
+XL,0000875159,2001-09-04,2009-01-01,XL GROUP LTD,carry,carried back from the 2009 row (manual); 29 periodic filings inside the span (2001-10-29 .. 2008-11-03)
+XLNX,0000743988,1999-11-08,2009-01-01,Xilinx Inc,carry,carried back from the 2009 row (exact); 37 periodic filings inside the span (1999-11-09 .. 2008-11-04)
+XMSR,0001091530,2007-02-01,2007-12-24,XM SATELLITE RADIO HOLDINGS INC,manual,the listed holding company; 0001116317 is its operating subsidiary
+XOM,0000034088,1996-01-02,2009-01-01,EXXON MOBIL CORP,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-08 .. 2008-11-04)
+XRAY,0000818479,2007-02-01,2009-01-01,DENTSPLY SIRONA Inc.,carry,carried back from the 2009 row (current); 8 periodic filings inside the span (2007-02-23 .. 2008-10-29)
+XRX,0000108772,1996-01-02,2009-01-01,XEROX CORP,carry,carried back from the 2009 row (manual); 52 periodic filings inside the span (1996-03-28 .. 2008-10-27)
+XTO,0000868809,2004-12-29,2009-01-01,XTO ENERGY INC.,carry,carried back from the 2009 row (exact); 16 periodic filings inside the span (2005-03-07 .. 2008-11-05)
+YHOO,0001011006,2007-02-01,2009-01-01,Yahoo Inc,carry,carried back from the 2009 row (exact); 8 periodic filings inside the span (2007-02-23 .. 2008-11-07)
+YNR,0001030048,2000-01-06,2000-10-03,YOUNG & RUBICAM INC.,exact,name 'Young & Rubicam' -> EDGAR 'YOUNG & RUBICAM INC.'; 3 periodic filings inside the span (2000-03-30 .. 2000-08-03)
+YRCW,0000716006,1996-01-02,1996-11-04,Yellow Corp,exact,name 'Yellow Corp' -> EDGAR 'Yellow Corp'; 3 periodic filings inside the span (1996-03-28 .. 1996-08-13)
+YUM,0001041061,1997-10-07,2009-01-01,YUM BRANDS INC,carry,carried back from the 2009 row (current); 45 periodic filings inside the span (1997-10-21 .. 2008-10-14)
+ZBH,0001136869,2001-08-07,2009-01-01,"ZIMMER BIOMET HOLDINGS, INC.",carry,carried back from the 2009 row (current); 30 periodic filings inside the span (2001-08-21 .. 2008-11-10)
+ZION,0000109380,2001-06-25,2009-01-01,"ZIONS BANCORPORATION, NATIONAL ASSOCIATION /UT/",carry,carried back from the 2009 row (current); 30 periodic filings inside the span (2001-08-14 .. 2008-11-07)

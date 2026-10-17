@@ -1,0 +1,1321 @@
+cik,sic,sic_description,entity_name,fetched,source
+0000001800,2834,Pharmaceutical Preparations,ABBOTT LABORATORIES,2026-10-17,edgar-submissions
+0000002135,7374,Services-Computer Processing & Data Preparation,AFFILIATED COMPUTER SERVICES INC,2026-10-17,edgar-submissions
+0000002488,3674,Semiconductors & Related Devices,ADVANCED MICRO DEVICES INC,2026-10-17,edgar-submissions
+0000002648,6321,Accident & Health Insurance,AETNA SERVICES INC /CT/,2026-10-17,edgar-submissions
+0000002969,2810,Industrial Inorganic Chemicals,"Air Products & Chemicals, Inc.",2026-10-17,edgar-submissions
+0000003133,6022,State Commercial Banks,AMSOUTH BANCORPORATION,2026-10-17,edgar-submissions
+0000003327,5990,"Retail-Retail Stores, NEC",New Alberto-Culver LLC,2026-10-17,edgar-submissions
+0000003333,5411,Retail-Grocery Stores,ALBERTSONS INC /DE/,2026-10-17,edgar-submissions
+0000003370,5045,Wholesale-Computers & Peripheral Equipment & Software,IKON OFFICE SOLUTIONS INC,2026-10-17,edgar-submissions
+0000003449,6411,"Insurance Agents, Brokers & Service",ALEXANDER & ALEXANDER SERVICES INC,2026-10-17,edgar-submissions
+0000003673,4911,Electric Services,"ALLEGHENY ENERGY, INC",2026-10-17,edgar-submissions
+0000004127,3674,Semiconductors & Related Devices,"SKYWORKS SOLUTIONS, INC.",2026-10-17,edgar-submissions
+0000004281,3350,Rolling Drawing & Extruding of  Nonferrous Metals,Howmet Aerospace Inc.,2026-10-17,edgar-submissions
+0000004285,3330,Primary Smelting & Refining of  Nonferrous Metals,ALCAN INC,2026-10-17,edgar-submissions
+0000004310,2834,Pharmaceutical Preparations,ALZA CORP,2026-10-17,edgar-submissions
+0000004427,3571,Electronic Computers,AMDAHL CORP,2026-10-17,edgar-submissions
+0000004447,2911,Petroleum Refining,HESS CORP,2026-10-17,edgar-submissions
+0000004904,4911,Electric Services,AMERICAN ELECTRIC POWER CO INC,2026-10-17,edgar-submissions
+0000004962,6199,Finance Services,AMERICAN EXPRESS CO,2026-10-17,edgar-submissions
+0000004977,6321,Accident & Health Insurance,AFLAC INC,2026-10-17,edgar-submissions
+0000005103,6311,Life Insurance,AMERICAN GENERAL CORP /TX/,2026-10-17,edgar-submissions
+0000005133,2771,Greeting Cards,AMERICAN GREETINGS CORP,2026-10-17,edgar-submissions
+0000005187,2834,Pharmaceutical Preparations,WYETH,2026-10-17,edgar-submissions
+0000005272,6331,"Fire, Marine & Casualty Insurance","AMERICAN INTERNATIONAL GROUP, INC.",2026-10-17,edgar-submissions
+0000005513,6321,Accident & Health Insurance,Unum Group,2026-10-17,edgar-submissions
+0000006164,3678,Electronic Connectors,AMP INC,2026-10-17,edgar-submissions
+0000006201,4512,"Air Transportation, Scheduled",American Airlines Group Inc.,2026-10-17,edgar-submissions
+0000006281,3674,Semiconductors & Related Devices,ANALOG DEVICES INC,2026-10-17,edgar-submissions
+0000006769,1311,Crude Petroleum & Natural Gas,APACHE CORP,2026-10-17,edgar-submissions
+0000006951,3674,Semiconductors & Related Devices,APPLIED MATERIALS INC /DE,2026-10-17,edgar-submissions
+0000007084,2070,Fats & Oils,Archer-Daniels-Midland Co,2026-10-17,edgar-submissions
+0000007314,4923,Natural Gas Transmisison & Distribution,NORAM ENERGY CORP/OLD,2026-10-17,edgar-submissions
+0000007332,1311,Crude Petroleum & Natural Gas,SOUTHWESTERN ENERGY CO,2026-10-17,edgar-submissions
+0000007383,3312,"Steel Works, Blast Furnaces & Rolling Mills (Coke Ovens)",ARMCO INC,2026-10-17,edgar-submissions
+0000007431,3089,"Plastics Products, NEC",ARMSTRONG WORLD INDUSTRIES INC,2026-10-17,edgar-submissions
+0000007649,3330,Primary Smelting & Refining of  Nonferrous Metals,ASARCO INC,2026-10-17,edgar-submissions
+0000007694,5160,Wholesale-Chemicals & Allied Products,ASHLAND INC,2026-10-17,edgar-submissions
+0000007974,6141,Personal Credit Institutions,ASSOCIATES FIRST CAPITAL CORP,2026-10-17,edgar-submissions
+0000008670,7374,Services-Computer Processing & Data Preparation,AUTOMATIC DATA PROCESSING INC,2026-10-17,edgar-submissions
+0000008818,2670,Converted Paper & Paperboard Prods (No Contaners/Boxes),Avery Dennison Corp,2026-10-17,edgar-submissions
+0000008868,2844,"Perfumes, Cosmetics & Other Toilet Preparations",AVON PRODUCTS INC,2026-10-17,edgar-submissions
+0000008960,6141,Personal Credit Institutions,BENEFICIAL CORP,2026-10-17,edgar-submissions
+0000009389,3411,Metal Cans,BALL Corp,2026-10-17,edgar-submissions
+0000009435,7990,Services-Miscellaneous Amusement & Recreation,BALLY ENTERTAINMENT CORP,2026-10-17,edgar-submissions
+0000009466,4931,Electric & Other Services Combined,BALTIMORE GAS & ELECTRIC CO,2026-10-17,edgar-submissions
+0000009626,6022,State Commercial Banks,BANK OF NEW YORK CO INC,2026-10-17,edgar-submissions
+0000009749,6022,State Commercial Banks,BANKERS TRUST CORP,2026-10-17,edgar-submissions
+0000009892,3841,Surgical & Medical Instruments & Apparatus,BARD C R INC /NJ/,2026-10-17,edgar-submissions
+0000010012,6022,State Commercial Banks,BARNETT BANKS INC,2026-10-17,edgar-submissions
+0000010081,2834,Pharmaceutical Preparations,BARR PHARMACEUTICALS INC,2026-10-17,edgar-submissions
+0000010427,3851,Ophthalmic Goods,BAUSCH & LOMB INC,2026-10-17,edgar-submissions
+0000010456,3841,Surgical & Medical Instruments & Apparatus,BAXTER INTERNATIONAL INC,2026-10-17,edgar-submissions
+0000010795,3841,Surgical & Medical Instruments & Apparatus,BECTON DICKINSON & CO,2026-10-17,edgar-submissions
+0000011199,2670,Converted Paper & Paperboard Prods (No Contaners/Boxes),"Amcor Flexibles North America, Inc.",2026-10-17,edgar-submissions
+0000011544,6331,"Fire, Marine & Casualty Insurance",BERKLEY W R CORP,2026-10-17,edgar-submissions
+0000011860,3312,"Steel Works, Blast Furnaces & Rolling Mills (Coke Ovens)",BETHLEHEM STEEL CORP /DE/,2026-10-17,edgar-submissions
+0000012208,3826,Laboratory Analytical Instruments,"BIO-RAD LABORATORIES, INC.",2026-10-17,edgar-submissions
+0000012355,3540,Metalworkg Machinery & Equipment,BLACK & DECKER CORP,2026-10-17,edgar-submissions
+0000012659,7200,Services-Personal Services,H&R BLOCK INC,2026-10-17,edgar-submissions
+0000012927,3721,Aircraft,BOEING CO,2026-10-17,edgar-submissions
+0000012978,5110,Wholesale-Paper & Paper Products,MAPLEBY HOLDINGS MERGER Corp,2026-10-17,edgar-submissions
+0000014195,3510,Engines & Turbines,BRIGGS & STRATTON CORP,2026-10-17,edgar-submissions
+0000014272,2834,Pharmaceutical Preparations,BRISTOL MYERS SQUIBB CO,2026-10-17,edgar-submissions
+0000014693,2080,Beverages,BROWN FORMAN CORP,2026-10-17,edgar-submissions
+0000014827,4953,Refuse Systems,BROWNING FERRIS INDUSTRIES INC,2026-10-17,edgar-submissions
+0000014930,3510,Engines & Turbines,BRUNSWICK CORP,2026-10-17,edgar-submissions
+0000016099,5812,Retail-Eating  Places,LUB LIQUIDATING TRUST,2026-10-17,edgar-submissions
+0000016732,2000,Food and Kindred Products,CAMPBELL'S Co,2026-10-17,edgar-submissions
+0000016918,2080,Beverages,"CONSTELLATION BRANDS, INC.",2026-10-17,edgar-submissions
+0000017109,4833,Television Broadcasting Stations,CAPITAL CITIES ABC INC /NY/,2026-10-17,edgar-submissions
+0000017206,6311,Life Insurance,PROVIDIAN CORP,2026-10-17,edgar-submissions
+0000017797,4931,Electric & Other Services Combined,"DUKE ENERGY PROGRESS, LLC.",2026-10-17,edgar-submissions
+0000018230,3531,Construction Machinery & Equip,CATERPILLAR INC,2026-10-17,edgar-submissions
+0000018349,6021,National Commercial Banks,SYNOVUS FINANCIAL CORP,2026-10-17,edgar-submissions
+0000018540,4911,Electric Services,CENTRAL & SOUTH WEST CORP,2026-10-17,edgar-submissions
+0000018568,6021,National Commercial Banks,COMPASS BANCSHARES INC,2026-10-17,edgar-submissions
+0000018926,4813,Telephone Communications (No Radiotelephone),"Lumen Technologies, Inc.",2026-10-17,edgar-submissions
+0000019150,2621,Paper Mills,CHAMPION INTERNATIONAL CORP,2026-10-17,edgar-submissions
+0000019353,5621,Retail-Women's Clothing Stores,CHARMING SHOPPES INC,2026-10-17,edgar-submissions
+0000019489,6021,National Commercial Banks,CHASE MANHATTAN CORP,2026-10-17,edgar-submissions
+0000019617,6021,National Commercial Banks,JPMORGAN CHASE & CO,2026-10-17,edgar-submissions
+0000020286,6331,"Fire, Marine & Casualty Insurance",CINCINNATI FINANCIAL CORP,2026-10-17,edgar-submissions
+0000020388,6172,Finance Lessors,CIT GROUP INC,2026-10-17,edgar-submissions
+0000020405,6021,National Commercial Banks,CITICORP,2026-10-17,edgar-submissions
+0000020520,4813,Telephone Communications (No Radiotelephone),"Frontier Communications Parent, Inc.",2026-10-17,edgar-submissions
+0000021076,2842,"Specialty Cleaning, Polishing and Sanitation Preparations",CLOROX CO /DE/,2026-10-17,edgar-submissions
+0000021267,4922,Natural Gas Transmission,EL PASO CGP CO LLC,2026-10-17,edgar-submissions
+0000021344,2080,Beverages,COCA COLA CO,2026-10-17,edgar-submissions
+0000021665,2844,"Perfumes, Cosmetics & Other Toilet Preparations",COLGATE PALMOLIVE CO,2026-10-17,edgar-submissions
+0000022099,4923,Natural Gas Transmisison & Distribution,COLUMBIA ENERGY GROUP,2026-10-17,edgar-submissions
+0000022301,4841,Cable & Other Pay Television Services,COMCAST HOLDINGS CORP,2026-10-17,edgar-submissions
+0000023082,7373,Services-Computer Integrated Systems Design,COMPUTER SCIENCES CORP,2026-10-17,edgar-submissions
+0000023217,2000,Food and Kindred Products,CONAGRA BRANDS INC.,2026-10-17,edgar-submissions
+0000023632,4931,Electric & Other Services Combined,CONSOLIDATED EDISON CO OF NEW YORK INC,2026-10-17,edgar-submissions
+0000023666,2000,Food and Kindred Products,Hillshire Brands Co,2026-10-17,edgar-submissions
+0000023738,4923,Natural Gas Transmisison & Distribution,CONSOLIDATED NATURAL GAS CO/VA,2026-10-17,edgar-submissions
+0000024454,3640,Electric Lighting & Wiring Equipment,COOPER INDUSTRIES INC,2026-10-17,edgar-submissions
+0000024491,3011,Tires & Inner Tubes,COOPER TIRE & RUBBER CO,2026-10-17,edgar-submissions
+0000024545,2082,Malt Beverages,MOLSON COORS BEVERAGE CO,2026-10-17,edgar-submissions
+0000024741,3357,Drawing & Insulating of  Nonferrous Wire,CORNING INC /NY,2026-10-17,edgar-submissions
+0000025191,6035,"Savings Institution, Federally Chartered",COUNTRYWIDE FINANCIAL CORP,2026-10-17,edgar-submissions
+0000025350,2030,"Canned, Frozen & Preservd Fruit, Veg & Food Specialties",BESTFOODS,2026-10-17,edgar-submissions
+0000025445,3490,Miscellaneous Fabricated Metal Products,"Crane NXT, Co.",2026-10-17,edgar-submissions
+0000025506,3571,Electronic Computers,CRAY RESEARCH INC,2026-10-17,edgar-submissions
+0000025890,3411,Metal Cans,CROWN CORK & SEAL CO INC,2026-10-17,edgar-submissions
+0000026172,3510,Engines & Turbines,CUMMINS INC,2026-10-17,edgar-submissions
+0000026780,3714,Motor Vehicle Parts & Accessories,DANA Inc,2026-10-17,edgar-submissions
+0000026999,3570,Computer & office Equipment,DATA GENERAL CORP,2026-10-17,edgar-submissions
+0000027419,5331,Retail-Variety Stores,TARGET CORP,2026-10-17,edgar-submissions
+0000027904,4512,"Air Transportation, Scheduled","DELTA AIR LINES, INC.",2026-10-17,edgar-submissions
+0000027996,2780,"Blankbooks, Looseleaf Binders & Bookbindg & Relatd Work",DELUXE CORP,2026-10-17,edgar-submissions
+0000028412,6021,National Commercial Banks,COMERICA INC,2026-10-17,edgar-submissions
+0000028887,3570,Computer & office Equipment,DIGITAL EQUIPMENT CORP,2026-10-17,edgar-submissions
+0000028917,5311,Retail-Department Stores,"DILLARD'S, INC.",2026-10-17,edgar-submissions
+0000029534,5331,Retail-Variety Stores,DOLLAR GENERAL CORP,2026-10-17,edgar-submissions
+0000029669,2750,Commercial Printing,RR Donnelley & Sons Co,2026-10-17,edgar-submissions
+0000029905,3530,"Construction, Mining & Materials Handling Machinery & Equip",DOVER Corp,2026-10-17,edgar-submissions
+0000029915,2821,"Plastic Materials, Synth Resins & Nonvulcan Elastomers",DOW CHEMICAL CO /DE/,2026-10-17,edgar-submissions
+0000029924,2711,Newspapers: Publishing or  Publishing & Printing,DOW JONES & CO INC,2026-10-17,edgar-submissions
+0000029989,7311,Services-Advertising Agencies,OMNICOM GROUP INC.,2026-10-17,edgar-submissions
+0000030099,3510,Engines & Turbines,DRESSER INDUSTRIES INC /DE/,2026-10-17,edgar-submissions
+0000030371,4911,Electric Services,"Duke Energy Carolinas, LLC",2026-10-17,edgar-submissions
+0000030419,7310,Services-Advertising,DEX ONE Corp,2026-10-17,edgar-submissions
+0000030554,2820,"Plastic Material, Synth Resin/Rubber, Cellulos (No Glass)","EIDP, Inc.",2026-10-17,edgar-submissions
+0000030625,3561,Pumps & Pumping Equipment,FLOWSERVE CORP,2026-10-17,edgar-submissions
+0000031235,3861,Photographic Equipment & Supplies,EASTMAN KODAK CO,2026-10-17,edgar-submissions
+0000031277,3590,Misc Industrial & Commercial Machinery & Equipment,EATON CORP,2026-10-17,edgar-submissions
+0000031348,3714,Motor Vehicle Parts & Accessories,ECHLIN INC,2026-10-17,edgar-submissions
+0000031462,2840,"Soap, Detergents, Cleang Preparations, Perfumes, Cosmetics",ECOLAB INC.,2026-10-17,edgar-submissions
+0000031791,3826,Laboratory Analytical Instruments,"REVVITY, INC.",2026-10-17,edgar-submissions
+0000032604,3600,Electronic & Other Electrical Equipment (No Computer Equip),EMERSON ELECTRIC CO,2026-10-17,edgar-submissions
+0000033015,4923,Natural Gas Transmisison & Distribution,TXU GAS CO,2026-10-17,edgar-submissions
+0000033185,7320,"Services-Consumer Credit Reporting, Collection Agencies",EQUIFAX INC,2026-10-17,edgar-submissions
+0000033213,1311,Crude Petroleum & Natural Gas,EQT Corp,2026-10-17,edgar-submissions
+0000034088,2911,Petroleum Refining,EXXON MOBIL CORP,2026-10-17,edgar-submissions
+0000034408,5331,Retail-Variety Stores,FAMILY DOLLAR STORES INC,2026-10-17,edgar-submissions
+0000034891,2631,Paperboard Mills,FEDERAL PAPER BOARD CO INC,2026-10-17,edgar-submissions
+0000034903,6798,Real Estate Investment Trusts,FEDERAL REALTY INVESTMENT TRUST,2026-10-17,edgar-submissions
+0000035527,6022,State Commercial Banks,FIFTH THIRD BANCORP,2026-10-17,edgar-submissions
+0000036032,6021,National Commercial Banks,REGIONS FINANCIAL CORP,2026-10-17,edgar-submissions
+0000036090,6021,National Commercial Banks,BANK ONE CORP /OH/,2026-10-17,edgar-submissions
+0000036104,6021,National Commercial Banks,US BANCORP \DE\,2026-10-17,edgar-submissions
+0000036270,6022,State Commercial Banks,M&T BANK CORP,2026-10-17,edgar-submissions
+0000036672,6021,National Commercial Banks,BANKBOSTON CORP,2026-10-17,edgar-submissions
+0000036966,6021,National Commercial Banks,FIRST HORIZON CORP,2026-10-17,edgar-submissions
+0000036995,6021,National Commercial Banks,WACHOVIA CORP NEW,2026-10-17,edgar-submissions
+0000037748,1221,Bituminous Coal & Lignite Surface Mining,"Alpha Appalachia Holdings, Inc.",2026-10-17,edgar-submissions
+0000037785,2800,Chemicals & Allied Products,FMC CORP,2026-10-17,edgar-submissions
+0000037996,3711,Motor Vehicles & Passenger Car Bodies,FORD MOTOR CO,2026-10-17,edgar-submissions
+0000038074,2834,Pharmaceutical Preparations,"Forest Laboratories, LLC",2026-10-17,edgar-submissions
+0000038321,1600,Heavy Construction Other Than Bldg Const - Contractors,FOSTER WHEELER CORP,2026-10-17,edgar-submissions
+0000038777,6282,Investment Advice,FRANKLIN TEMPLETON INC,2026-10-17,edgar-submissions
+0000039899,4833,Television Broadcasting Stations,TEGNA INC,2026-10-17,edgar-submissions
+0000039911,5651,Retail-Family Clothing Stores,GAP INC,2026-10-17,edgar-submissions
+0000040454,6021,National Commercial Banks,BOATMENS BANCSHARES INC /MO,2026-10-17,edgar-submissions
+0000040493,5311,Retail-Department Stores,HARCOURT GENERAL INC,2026-10-17,edgar-submissions
+0000040533,3730,Ship & Boat Building & Repairing,GENERAL DYNAMICS CORP,2026-10-17,edgar-submissions
+0000040545,3600,Electronic & Other Electrical Equipment (No Computer Equip),GENERAL ELECTRIC CO,2026-10-17,edgar-submissions
+0000040704,2040,Grain Mill Products,GENERAL MILLS INC,2026-10-17,edgar-submissions
+0000040730,3711,Motor Vehicles & Passenger Car Bodies,Motors Liquidation Co,2026-10-17,edgar-submissions
+0000040779,4911,Electric Services,GPU INC /PA/,2026-10-17,edgar-submissions
+0000040834,3620,Electrical Industrial Apparatus,GENERAL SIGNAL CORP,2026-10-17,edgar-submissions
+0000040858,4813,Telephone Communications (No Radiotelephone),GTE CORP,2026-10-17,edgar-submissions
+0000040987,5013,Wholesale-Motor Vehicle Supplies & New Parts,GENUINE PARTS CO,2026-10-17,edgar-submissions
+0000041077,2600,Papers & Allied Products,GEORGIA PACIFIC CORP,2026-10-17,edgar-submissions
+0000041289,5411,Retail-Grocery Stores,GIANT FOOD INC,2026-10-17,edgar-submissions
+0000041499,3420,"Cutlery, Handtools & General Hardware",GILLETTE CO,2026-10-17,edgar-submissions
+0000042246,7990,Services-Miscellaneous Amusement & Recreation,MIRAGE RESORTS INC,2026-10-17,edgar-submissions
+0000042293,6035,"Savings Institution, Federally Chartered",GOLDEN WEST FINANCIAL CORP /DE/,2026-10-17,edgar-submissions
+0000042542,3760,Guided Missiles & Space Vehicles & Parts,GOODRICH CORP,2026-10-17,edgar-submissions
+0000042582,3011,Tires & Inner Tubes,GOODYEAR TIRE & RUBBER CO /OH/,2026-10-17,edgar-submissions
+0000042872,3841,Surgical & Medical Instruments & Apparatus,FRESENIUS MEDICAL CARE HOLDINGS INC /NY/,2026-10-17,edgar-submissions
+0000043300,5411,Retail-Grocery Stores,GREAT ATLANTIC & PACIFIC TEA CO INC,2026-10-17,edgar-submissions
+0000043362,2890,Miscellaneous Chemical Products,GREAT LAKES CHEMICAL CORP,2026-10-17,edgar-submissions
+0000043512,6035,"Savings Institution, Federally Chartered",GREAT WESTERN FINANCIAL CORP,2026-10-17,edgar-submissions
+0000045012,1389,"Oil & Gas Field Services, NEC",HALLIBURTON CO,2026-10-17,edgar-submissions
+0000045599,2780,"Blankbooks, Looseleaf Binders & Bookbindg & Relatd Work",HARLAND JOHN H CO,2026-10-17,edgar-submissions
+0000046080,3944,"Games, Toys & Children's Vehicles (No Dolls & Bicycles)","HASBRO, INC.",2026-10-17,edgar-submissions
+0000046640,2030,"Canned, Frozen & Preservd Fruit, Veg & Food Specialties",Kraft Heinz Foods Co,2026-10-17,edgar-submissions
+0000046765,1381,Drilling Oil & Gas Wells,"Helmerich & Payne, Inc.",2026-10-17,edgar-submissions
+0000046989,2890,Miscellaneous Chemical Products,HERCULES INC,2026-10-17,edgar-submissions
+0000047111,2060,Sugar & Confectionery Products,HERSHEY CO,2026-10-17,edgar-submissions
+0000047217,3570,Computer & office Equipment,HP INC,2026-10-17,edgar-submissions
+0000047580,7011,Hotels & Motels,HILTON HOTELS CORP,2026-10-17,edgar-submissions
+0000048039,2911,Petroleum Refining,HollyFrontier Corp,2026-10-17,edgar-submissions
+0000048465,2011,Meat Packing Plants,HORMEL FOODS CORP /DE/,2026-10-17,edgar-submissions
+0000048732,4911,Electric Services,CENTERPOINT ENERGY HOUSTON ELECTRIC LLC,2026-10-17,edgar-submissions
+0000048898,3670,Electronic Components & Accessories,HUBBELL INC,2026-10-17,edgar-submissions
+0000049071,6324,Hospital & Medical Service Plans,HUMANA INC,2026-10-17,edgar-submissions
+0000049196,6021,National Commercial Banks,HUNTINGTON BANCSHARES INC /MD/,2026-10-17,edgar-submissions
+0000049573,2086,Bottled & Canned Soft Drinks & Carbonated Waters,WHITMAN CORP,2026-10-17,edgar-submissions
+0000049826,3560,General Industrial Machinery & Equipment,ILLINOIS TOOL WORKS INC,2026-10-17,edgar-submissions
+0000049996,3330,Primary Smelting & Refining of  Nonferrous Metals,INCO LTD,2026-10-17,edgar-submissions
+0000050104,2911,Petroleum Refining,ANDEAVOR LLC,2026-10-17,edgar-submissions
+0000050341,6021,National Commercial Banks,FLEETBOSTON FINANCIAL CORP,2026-10-17,edgar-submissions
+0000050485,3560,General Industrial Machinery & Equipment,INGERSOLL RAND CO,2026-10-17,edgar-submissions
+0000050863,3674,Semiconductors & Related Devices,INTEL CORP,2026-10-17,edgar-submissions
+0000051143,3570,Computer & office Equipment,INTERNATIONAL BUSINESS MACHINES CORP,2026-10-17,edgar-submissions
+0000051253,2860,Industrial Organic Chemicals,INTERNATIONAL FLAVORS & FRAGRANCES INC,2026-10-17,edgar-submissions
+0000051396,2835,In Vitro & In Vivo Diagnostic Substances,MALLINCKRODT INC /MO,2026-10-17,edgar-submissions
+0000051434,2621,Paper Mills,INTERNATIONAL PAPER CO /NEW/,2026-10-17,edgar-submissions
+0000051644,7311,Services-Advertising Agencies,"INTERPUBLIC GROUP OF COMPANIES, INC.",2026-10-17,edgar-submissions
+0000052988,1600,Heavy Construction Other Than Bldg Const - Contractors,JACOBS SOLUTIONS INC.,2026-10-17,edgar-submissions
+0000053117,2621,Paper Mills,FORT JAMES CORP,2026-10-17,edgar-submissions
+0000053347,6311,Life Insurance,JEFFERSON PILOT CORP,2026-10-17,edgar-submissions
+0000054050,3911,"Jewelry, Precious Metal",JOSTENS INC,2026-10-17,edgar-submissions
+0000054480,4011,"Railroads, Line-Haul Operating",KANSAS CITY SOUTHERN,2026-10-17,edgar-submissions
+0000054502,4923,Natural Gas Transmisison & Distribution,"KINDER MORGAN KANSAS, INC.",2026-10-17,edgar-submissions
+0000054727,6311,Life Insurance,SUNAMERICA INC,2026-10-17,edgar-submissions
+0000055067,2040,Grain Mill Products,KELLANOVA,2026-10-17,edgar-submissions
+0000055458,1311,Crude Petroleum & Natural Gas,KERR MCGEE CHEMICAL WORLDWIDE LLC,2026-10-17,edgar-submissions
+0000055785,2670,Converted Paper & Paperboard Prods (No Contaners/Boxes),KIMBERLY CLARK CORP,2026-10-17,edgar-submissions
+0000056824,5331,Retail-Variety Stores,KMART CORP,2026-10-17,edgar-submissions
+0000056873,5411,Retail-Grocery Stores,KROGER CO,2026-10-17,edgar-submissions
+0000058492,2510,Household Furniture,LEGGETT & PLATT INC,2026-10-17,edgar-submissions
+0000059198,3490,Miscellaneous Fabricated Metal Products,AEROQUIP-VICKERS INC,2026-10-17,edgar-submissions
+0000059478,2834,Pharmaceutical Preparations,ELI LILLY & Co,2026-10-17,edgar-submissions
+0000059558,6311,Life Insurance,LINCOLN NATIONAL CORP,2026-10-17,edgar-submissions
+0000060086,6331,"Fire, Marine & Casualty Insurance",LOEWS CORP,2026-10-17,edgar-submissions
+0000060357,3812,"Search, Detection, Navigation, Guidance, Aeronautical Sys",LORAL CORP /NY/,2026-10-17,edgar-submissions
+0000060512,1311,Crude Petroleum & Natural Gas,LOUISIANA LAND & EXPLORATION CO,2026-10-17,edgar-submissions
+0000060519,2400,Lumber & Wood Products (No Furniture),LOUISIANA-PACIFIC CORP,2026-10-17,edgar-submissions
+0000060667,5211,Retail-Lumber & Other Building Materials Dealers,LOWES COMPANIES INC,2026-10-17,edgar-submissions
+0000061478,3661,Telephone & Telegraph Apparatus,ADC TELECOMMUNICATIONS INC,2026-10-17,edgar-submissions
+0000061986,3531,Construction Machinery & Equip,MANITOWOC CO INC,2026-10-17,edgar-submissions
+0000062709,6411,"Insurance Agents, Brokers & Service","MARSH & MCLENNAN COMPANIES, INC.",2026-10-17,edgar-submissions
+0000062741,6021,National Commercial Banks,MARSHALL & ILSLEY CORP/WI/,2026-10-17,edgar-submissions
+0000062996,3430,"Heating Equip, Except Elec & Warm Air; & Plumbing Fixtures",MASCO CORP /DE/,2026-10-17,edgar-submissions
+0000063118,3714,Motor Vehicle Parts & Accessories,LUCASVARITY INC,2026-10-17,edgar-submissions
+0000063276,3942,Dolls & Stuffed Toys,MATTEL INC /DE/,2026-10-17,edgar-submissions
+0000063416,5311,Retail-Department Stores,MAY DEPARTMENT STORES CO,2026-10-17,edgar-submissions
+0000063541,3630,Household Appliances,MAYTAG CORP,2026-10-17,edgar-submissions
+0000063754,2090,Miscellaneous Food Preparations & Kindred Products,MCCORMICK & CO INC,2026-10-17,edgar-submissions
+0000063908,5812,Retail-Eating  Places,MCDONALDS CORP,2026-10-17,edgar-submissions
+0000063917,3721,Aircraft,MCDONNELL DOUGLAS CORP,2026-10-17,edgar-submissions
+0000064040,7320,"Services-Consumer Credit Reporting, Collection Agencies",S&P Global Inc.,2026-10-17,edgar-submissions
+0000064079,4813,Telephone Communications (No Radiotelephone),MCI COMMUNICATIONS CORP,2026-10-17,edgar-submissions
+0000064394,2631,Paperboard Mills,MEAD CORP,2026-10-17,edgar-submissions
+0000064670,3845,Electromedical & Electrotherapeutic Apparatus,MEDTRONIC INC,2026-10-17,edgar-submissions
+0000064782,6021,National Commercial Banks,MELLON FINANCIAL CORP,2026-10-17,edgar-submissions
+0000064803,5912,Retail-Drug Stores and Proprietary Stores,CVS HEALTH Corp,2026-10-17,edgar-submissions
+0000064907,6021,National Commercial Banks,MERCANTILE BANCORPORATION INC,2026-10-17,edgar-submissions
+0000064923,5311,Retail-Department Stores,MERCANTILE STORES CO INC,2026-10-17,edgar-submissions
+0000065011,2721,Periodicals: Publishing or  Publishing & Printing,"Hawkeye Acquisition, Inc.",2026-10-17,edgar-submissions
+0000065100,6211,"Security Brokers, Dealers & Flotation Companies","MERRILL LYNCH & CO., INC.",2026-10-17,edgar-submissions
+0000065873,4812,Radiotelephone Communications,ALLTEL CORP,2026-10-17,edgar-submissions
+0000065984,4911,Electric Services,ENTERGY CORP /DE/,2026-10-17,edgar-submissions
+0000066479,3826,Laboratory Analytical Instruments,MILLIPORE CORP /MA,2026-10-17,edgar-submissions
+0000066740,3841,Surgical & Medical Instruments & Apparatus,3M CO,2026-10-17,edgar-submissions
+0000067182,2911,Petroleum Refining,MOBIL CORP,2026-10-17,edgar-submissions
+0000067472,3678,Electronic Connectors,MOLEX INC,2026-10-17,edgar-submissions
+0000067686,2800,Chemicals & Allied Products,PHARMACIA CORP /DE/,2026-10-17,edgar-submissions
+0000067931,2761,Manifold Business Forms,MOORE WALLACE INC,2026-10-17,edgar-submissions
+0000068361,2890,Miscellaneous Chemical Products,MORTON INTERNATIONAL INC,2026-10-17,edgar-submissions
+0000068505,3663,Radio & Tv Broadcasting & Communications Equipment,"Motorola Solutions, Inc.",2026-10-17,edgar-submissions
+0000068622,4813,Telephone Communications (No Radiotelephone),QWEST CORP,2026-10-17,edgar-submissions
+0000069499,2834,Pharmaceutical Preparations,MYLAN INC.,2026-10-17,edgar-submissions
+0000069598,2890,Miscellaneous Chemical Products,NALCO CHEMICAL CO,2026-10-17,edgar-submissions
+0000069952,6021,National Commercial Banks,CORESTATES FINANCIAL CORP,2026-10-17,edgar-submissions
+0000069970,6021,National Commercial Banks,NATIONAL CITY CORP,2026-10-17,edgar-submissions
+0000070040,6021,National Commercial Banks,FIRST CHICAGO NBD CORP,2026-10-17,edgar-submissions
+0000070318,8062,"Services-General Medical & Surgical Hospitals, NEC",TENET HEALTHCARE CORP,2026-10-17,edgar-submissions
+0000070530,3674,Semiconductors & Related Devices,NATIONAL SEMICONDUCTOR CORP,2026-10-17,edgar-submissions
+0000070538,7200,Services-Personal Services,NATIONAL SERVICE INDUSTRIES INC,2026-10-17,edgar-submissions
+0000070858,6021,National Commercial Banks,BANK OF AMERICA CORP /DE/,2026-10-17,edgar-submissions
+0000070866,3578,Calculating & Accounting Machines (No Electronic Computers),NCR Voyix Corp,2026-10-17,edgar-submissions
+0000071691,2711,Newspapers: Publishing or  Publishing & Printing,NEW YORK TIMES CO,2026-10-17,edgar-submissions
+0000071824,1040,Gold and Silver Ores,NEWMONT USA LTD,2026-10-17,edgar-submissions
+0000071932,4931,Electric & Other Services Combined,NIAGARA MOHAWK POWER CORP /NY/,2026-10-17,edgar-submissions
+0000072207,1311,Crude Petroleum & Natural Gas,NOBLE ENERGY INC,2026-10-17,edgar-submissions
+0000072331,3569,"General Industrial Machinery & Equipment, NEC",NORDSON CORP,2026-10-17,edgar-submissions
+0000072333,5651,Retail-Family Clothing Stores,NORDSTROM INC,2026-10-17,edgar-submissions
+0000072741,4911,Electric Services,EVERSOURCE ENERGY,2026-10-17,edgar-submissions
+0000072903,4931,Electric & Other Services Combined,XCEL ENERGY INC,2026-10-17,edgar-submissions
+0000072911,3661,Telephone & Telegraph Apparatus,NORTEL NETWORKS CORP,2026-10-17,edgar-submissions
+0000072945,3812,"Search, Detection, Navigation, Guidance, Aeronautical Sys",NORTHROP GRUMMAN SYSTEMS CORP,2026-10-17,edgar-submissions
+0000072971,6021,National Commercial Banks,WELLS FARGO & COMPANY/MN,2026-10-17,edgar-submissions
+0000073124,6022,State Commercial Banks,NORTHERN TRUST CORP,2026-10-17,edgar-submissions
+0000073309,3312,"Steel Works, Blast Furnaces & Rolling Mills (Coke Ovens)",NUCOR CORP,2026-10-17,edgar-submissions
+0000073960,6189,Asset-Backed Securities,OHIO EDISON CO,2026-10-17,edgar-submissions
+0000074091,2911,Petroleum Refining,TOSCO CORP,2026-10-17,edgar-submissions
+0000074154,4923,Natural Gas Transmisison & Distribution,ONEOK INC,2026-10-17,edgar-submissions
+0000074208,6798,Real Estate Investment Trusts,"UDR, Inc.",2026-10-17,edgar-submissions
+0000075149,3510,Engines & Turbines,OUTBOARD MARINE CORP,2026-10-17,edgar-submissions
+0000075234,3290,"Abrasive, Asbestos & Misc Nonmetallic Mineral Prods","OWENS CORNING SALES, LLC",2026-10-17,edgar-submissions
+0000075362,3711,Motor Vehicles & Passenger Car Bodies,PACCAR INC,2026-10-17,edgar-submissions
+0000075527,4924,Natural Gas Distribution,PACIFIC ENTERPRISES INC,2026-10-17,edgar-submissions
+0000075594,4911,Electric Services,PACIFICORP /OR/,2026-10-17,edgar-submissions
+0000075677,2650,Paperboard Containers & Boxes,PACKAGING CORP OF AMERICA,2026-10-17,edgar-submissions
+0000075754,6211,"Security Brokers, Dealers & Flotation Companies",PAINE WEBBER GROUP INC,2026-10-17,edgar-submissions
+0000075829,3569,"General Industrial Machinery & Equipment, NEC",PALL CORP,2026-10-17,edgar-submissions
+0000076334,3490,Miscellaneous Fabricated Metal Products,Parker-Hannifin Corp,2026-10-17,edgar-submissions
+0000077182,5311,Retail-Department Stores,J C PENNEY CORP INC,2026-10-17,edgar-submissions
+0000077320,2911,Petroleum Refining,PENNZENERGY CO,2026-10-17,edgar-submissions
+0000077360,3550,Special Industry Machinery (No Metalworking Machinery),PENTAIR plc,2026-10-17,edgar-submissions
+0000077385,4924,Natural Gas Distribution,PEOPLES ENERGY CORP,2026-10-17,edgar-submissions
+0000077449,5531,Retail-Auto & Home Supply Stores,PEP BOYS MANNY MOE & JACK,2026-10-17,edgar-submissions
+0000077476,2080,Beverages,PEPSICO INC,2026-10-17,edgar-submissions
+0000077551,3826,Laboratory Analytical Instruments,APPLIED BIOSYSTEMS INC.,2026-10-17,edgar-submissions
+0000078003,2834,Pharmaceutical Preparations,PFIZER INC,2026-10-17,edgar-submissions
+0000078066,3330,Primary Smelting & Refining of  Nonferrous Metals,PHELPS DODGE CORP,2026-10-17,edgar-submissions
+0000078100,4931,Electric & Other Services Combined,PECO ENERGY CO,2026-10-17,edgar-submissions
+0000078214,2911,Petroleum Refining,CONOCOPHILLIPS CO,2026-10-17,edgar-submissions
+0000078239,2320,"Men's & Boys' Furnishgs, Work Clothg, & Allied Garments",PVH CORP. /DE/,2026-10-17,edgar-submissions
+0000078716,0100,Agricultural Production-Crops,PIONEER HI BRED INTERNATIONAL INC,2026-10-17,edgar-submissions
+0000078814,3579,"Office Machines, NEC",PITNEY BOWES INC /DE/,2026-10-17,edgar-submissions
+0000079282,6411,"Insurance Agents, Brokers & Service","BROWN & BROWN, INC.",2026-10-17,edgar-submissions
+0000079326,3861,Photographic Equipment & Supplies,PRIMARY PDC INC,2026-10-17,edgar-submissions
+0000079716,2621,Paper Mills,POTLATCH CORP (OLD),2026-10-17,edgar-submissions
+0000079879,2851,"Paints, Varnishes, Lacquers, Enamels & Allied Prods",PPG INDUSTRIES INC,2026-10-17,edgar-submissions
+0000079958,3320,Iron & Steel Foundries,PRECISION CASTPARTS CORP,2026-10-17,edgar-submissions
+0000080255,6200,"Security & Commodity Brokers, Dealers, Exchanges & Services",PRICE T ROWE ASSOCIATES INC /MD/,2026-10-17,edgar-submissions
+0000080424,2840,"Soap, Detergents, Cleang Preparations, Perfumes, Cosmetics",PROCTER & GAMBLE Co,2026-10-17,edgar-submissions
+0000080661,6331,"Fire, Marine & Casualty Insurance",PROGRESSIVE CORP/OH/,2026-10-17,edgar-submissions
+0000081371,2040,Grain Mill Products,QUAKER OATS CO,2026-10-17,edgar-submissions
+0000081870,2040,Grain Mill Products,RALSTON PURINA CO,2026-10-17,edgar-submissions
+0000082206,3640,Electric Lighting & Wiring Equipment,RAYCHEM CORP,2026-10-17,edgar-submissions
+0000082267,3812,"Search, Detection, Navigation, Guidance, Aeronautical Sys",RAYTHEON CO,2026-10-17,edgar-submissions
+0000083246,6021,National Commercial Banks,HSBC USA INC /MD/,2026-10-17,edgar-submissions
+0000083604,3334,Primary Production of  Aluminum,REYNOLDS METALS CO,2026-10-17,edgar-submissions
+0000083612,2111,Cigarettes,RJ REYNOLDS TOBACCO HOLDINGS INC,2026-10-17,edgar-submissions
+0000084129,5912,Retail-Drug Stores and Proprietary Stores,"NEW RITE AID, LLC",2026-10-17,edgar-submissions
+0000084567,4813,Telephone Communications (No Radiotelephone),"GLOBAL CROSSING NORTH AMERICA, INC",2026-10-17,edgar-submissions
+0000084792,2821,"Plastic Materials, Synth Resins & Nonvulcan Elastomers",ROHM & HAAS CO,2026-10-17,edgar-submissions
+0000084839,7340,Services-To Dwellings & Other Buildings,ROLLINS INC,2026-10-17,edgar-submissions
+0000085408,1381,Drilling Oil & Gas Wells,ROWAN COMPANIES PLC,2026-10-17,edgar-submissions
+0000085486,2911,Petroleum Refining,ROYAL DUTCH PETROLEUM CO,2026-10-17,edgar-submissions
+0000085627,3089,"Plastics Products, NEC",RUBBERMAID INC,2026-10-17,edgar-submissions
+0000085812,2253,Knit Outerwear Mills,RUSSELL CORP,2026-10-17,edgar-submissions
+0000085961,7510,Services-Auto Rental & Leasing (No Drivers),RYDER SYSTEM INC,2026-10-17,edgar-submissions
+0000086104,6331,"Fire, Marine & Casualty Insurance",SAFECO CORP,2026-10-17,edgar-submissions
+0000086144,5411,Retail-Grocery Stores,SAFEWAY INC,2026-10-17,edgar-submissions
+0000086312,6331,"Fire, Marine & Casualty Insurance","TRAVELERS COMPANIES, INC.",2026-10-17,edgar-submissions
+0000087347,1389,"Oil & Gas Field Services, NEC",SLB LIMITED/NV,2026-10-17,edgar-submissions
+0000087777,3663,Radio & Tv Broadcasting & Communications Equipment,SCIENTIFIC ATLANTA INC,2026-10-17,edgar-submissions
+0000088188,2080,Beverages,SEAGRAM CO LTD,2026-10-17,edgar-submissions
+0000089089,7200,Services-Personal Services,SERVICE CORP INTERNATIONAL,2026-10-17,edgar-submissions
+0000089415,7373,Services-Computer Integrated Systems Design,SHARED MEDICAL SYSTEMS CORP,2026-10-17,edgar-submissions
+0000089800,5200,"Retail-Building Materials, Hardware, Garden Supply",SHERWIN WILLIAMS CO,2026-10-17,edgar-submissions
+0000089902,5812,Retail-Eating  Places,SHONEYS INC,2026-10-17,edgar-submissions
+0000090185,5160,Wholesale-Chemicals & Allied Products,SIGMA ALDRICH CORP,2026-10-17,edgar-submissions
+0000090811,5411,Retail-Grocery Stores,AMERICAN STORES CO /NEW/,2026-10-17,edgar-submissions
+0000091142,3630,Household Appliances,SMITH A O CORP,2026-10-17,edgar-submissions
+0000091419,2033,"Canned, Fruits, Veg, Preserves, Jams & Jellies",J M SMUCKER Co,2026-10-17,edgar-submissions
+0000091440,3420,"Cutlery, Handtools & General Hardware",Snap-on Inc,2026-10-17,edgar-submissions
+0000091576,6021,National Commercial Banks,KEYCORP /NEW/,2026-10-17,edgar-submissions
+0000092081,6021,National Commercial Banks,SOUTHTRUST CORP,2026-10-17,edgar-submissions
+0000092122,4911,Electric Services,SOUTHERN CO,2026-10-17,edgar-submissions
+0000092230,6021,National Commercial Banks,TRUIST FINANCIAL CORP,2026-10-17,edgar-submissions
+0000092236,4922,Natural Gas Transmission,SONAT INC,2026-10-17,edgar-submissions
+0000092380,4512,"Air Transportation, Scheduled",SOUTHWEST AIRLINES CO,2026-10-17,edgar-submissions
+0000093102,2211,"Broadwoven Fabric Mills, Cotton",SPRINGS INDUSTRIES INC,2026-10-17,edgar-submissions
+0000093397,2911,Petroleum Refining,BP CORP NORTH AMERICA INC,2026-10-17,edgar-submissions
+0000093410,2911,Petroleum Refining,CHEVRON CORP,2026-10-17,edgar-submissions
+0000093556,3420,"Cutlery, Handtools & General Hardware","STANLEY BLACK & DECKER, INC.",2026-10-17,edgar-submissions
+0000093751,6022,State Commercial Banks,STATE STREET CORP,2026-10-17,edgar-submissions
+0000094610,2631,Paperboard Mills,SMURFIT-STONE CONTAINER Corp,2026-10-17,edgar-submissions
+0000094887,3140,"Footwear, (No Rubber)",STRIDE RITE CORP,2026-10-17,edgar-submissions
+0000095304,2911,Petroleum Refining,SUNOCO INC,2026-10-17,edgar-submissions
+0000095521,5141,"Wholesale-Groceries, General Line",SUPERVALU INC,2026-10-17,edgar-submissions
+0000096021,5140,Wholesale-Groceries & Related Products,SYSCO CORP,2026-10-17,edgar-submissions
+0000096223,6211,"Security Brokers, Dealers & Flotation Companies",Jefferies Financial Group Inc.,2026-10-17,edgar-submissions
+0000096289,5731,"Retail-Radio, Tv & Consumer Electronics Stores",RS Legacy Corp,2026-10-17,edgar-submissions
+0000096879,3825,Instruments For Meas & Testing of  Electricity & Elec Signals,TEKTRONIX INC,2026-10-17,edgar-submissions
+0000096943,3841,Surgical & Medical Instruments & Apparatus,TELEFLEX INC,2026-10-17,edgar-submissions
+0000097210,3825,Instruments For Meas & Testing of  Electricity & Elec Signals,"TERADYNE, INC",2026-10-17,edgar-submissions
+0000097216,3537,"Industrial Trucks, Tractors, Trailors & Stackers",TEREX CORP,2026-10-17,edgar-submissions
+0000097349,2911,Petroleum Refining,TEXACO INC,2026-10-17,edgar-submissions
+0000097476,3674,Semiconductors & Related Devices,TEXAS INSTRUMENTS INC,2026-10-17,edgar-submissions
+0000097561,4911,Electric Services,TEXAS ENERGY INDUSTRIES INC,2026-10-17,edgar-submissions
+0000097745,3829,"Measuring & Controlling Devices, NEC",THERMO FISHER SCIENTIFIC INC.,2026-10-17,edgar-submissions
+0000097854,3640,Electric Lighting & Wiring Equipment,THOMAS & BETTS CORP,2026-10-17,edgar-submissions
+0000098246,5944,Retail-Jewelry Stores,TIFFANY & CO,2026-10-17,edgar-submissions
+0000098362,3562,Ball & Roller Bearings,TIMKEN CO,2026-10-17,edgar-submissions
+0000099189,6311,Life Insurance,TRANSAMERICA CORP,2026-10-17,edgar-submissions
+0000100030,3714,Motor Vehicle Parts & Accessories,NORTHROP GRUMMAN SPACE & MISSION SYSTEMS CORP,2026-10-17,edgar-submissions
+0000100493,2015,Poultry Slaughtering and Processing,"TYSON FOODS, INC.",2026-10-17,edgar-submissions
+0000100517,4512,"Air Transportation, Scheduled","United Airlines Holdings, Inc.",2026-10-17,edgar-submissions
+0000100783,2621,Paper Mills,UNION CAMP CORP,2026-10-17,edgar-submissions
+0000100790,2860,Industrial Organic Chemicals,UNION CARBIDE CORP /NEW/,2026-10-17,edgar-submissions
+0000100826,4911,Electric Services,UNION ELECTRIC CO,2026-10-17,edgar-submissions
+0000100885,4011,"Railroads, Line-Haul Operating",UNION PACIFIC CORP,2026-10-17,edgar-submissions
+0000100893,6021,National Commercial Banks,UNION PLANTERS CORP,2026-10-17,edgar-submissions
+0000101320,6021,National Commercial Banks,SUMMIT BANCORP/NJ/,2026-10-17,edgar-submissions
+0000101542,6021,National Commercial Banks,US BANCORP /OR/,2026-10-17,edgar-submissions
+0000101778,1311,Crude Petroleum & Natural Gas,MARATHON OIL CORP,2026-10-17,edgar-submissions
+0000101788,3841,Surgical & Medical Instruments & Apparatus,UNITED STATES SURGICAL CORP,2026-10-17,edgar-submissions
+0000101829,3724,Aircraft Engines & Engine Parts,RTX Corp,2026-10-17,edgar-submissions
+0000101830,4813,Telephone Communications (No Radiotelephone),SPRINT LLC,2026-10-17,edgar-submissions
+0000102420,6311,Life Insurance,USLIFE CORP,2026-10-17,edgar-submissions
+0000103379,2320,"Men's & Boys' Furnishgs, Work Clothg, & Allied Garments",V F CORP,2026-10-17,edgar-submissions
+0000103973,1400,Mining & Quarrying of  Nonmetallic Minerals (No Fuels),Legacy Vulcan Corp.,2026-10-17,edgar-submissions
+0000104169,5331,Retail-Variety Stores,Walmart Inc.,2026-10-17,edgar-submissions
+0000104207,5912,Retail-Drug Stores and Proprietary Stores,WALGREEN CO,2026-10-17,edgar-submissions
+0000104599,5731,"Retail-Radio, Tv & Consumer Electronics Stores",CIRCUIT CITY STORES INC,2026-10-17,edgar-submissions
+0000104669,2834,Pharmaceutical Preparations,WARNER LAMBERT CO,2026-10-17,edgar-submissions
+0000104889,8200,Services-Educational Services,Graham Holdings Co,2026-10-17,edgar-submissions
+0000104938,4953,Refuse Systems,WASTE MANAGEMENT HOLDINGS INC,2026-10-17,edgar-submissions
+0000105634,1731,Electrical Work,"EMCOR Group, Inc.",2026-10-17,edgar-submissions
+0000105668,5812,Retail-Eating  Places,WENDYS INTERNATIONAL INC,2026-10-17,edgar-submissions
+0000105770,3841,Surgical & Medical Instruments & Apparatus,WEST PHARMACEUTICAL SERVICES INC,2026-10-17,edgar-submissions
+0000105982,6021,National Commercial Banks,WELLS FARGO BANK & CO,2026-10-17,edgar-submissions
+0000106040,3572,Computer Storage Devices,WESTERN DIGITAL CORP,2026-10-17,edgar-submissions
+0000106498,2621,Paper Mills,WESTVACO CORP,2026-10-17,edgar-submissions
+0000106535,6798,Real Estate Investment Trusts,WEYERHAEUSER CO,2026-10-17,edgar-submissions
+0000106640,3630,Household Appliances,WHIRLPOOL CORP /DE/,2026-10-17,edgar-submissions
+0000107189,2621,Paper Mills,WILLAMETTE INDUSTRIES INC,2026-10-17,edgar-submissions
+0000107263,4922,Natural Gas Transmission,"WILLIAMS COMPANIES, INC.",2026-10-17,edgar-submissions
+0000107681,5411,Retail-Grocery Stores,WINN DIXIE STORES INC,2026-10-17,edgar-submissions
+0000108516,3310,"Steel Works, Blast Furnaces & Rolling & Finishing Mills","WORTHINGTON ENTERPRISES, INC.",2026-10-17,edgar-submissions
+0000108601,2060,Sugar & Confectionery Products,WRIGLEY WM JR CO,2026-10-17,edgar-submissions
+0000108772,3577,"Computer Peripheral Equipment, NEC",XEROX CORP,2026-10-17,edgar-submissions
+0000109198,5651,Retail-Family Clothing Stores,TJX COMPANIES INC /DE/,2026-10-17,edgar-submissions
+0000109380,6021,National Commercial Banks,"ZIONS BANCORPORATION, NATIONAL ASSOCIATION /UT/",2026-10-17,edgar-submissions
+0000109758,8700,"Services-Engineering, Accounting, Research, Management",ARBITRON INC,2026-10-17,edgar-submissions
+0000110390,2840,"Soap, Detergents, Cleang Preparations, Perfumes, Cosmetics",UNILEVER N V,2026-10-17,edgar-submissions
+0000200245,6211,"Security Brokers, Dealers & Flotation Companies",Citigroup Global Markets Holdings Inc.,2026-10-17,edgar-submissions
+0000200406,2834,Pharmaceutical Preparations,JOHNSON & JOHNSON,2026-10-17,edgar-submissions
+0000202058,3812,"Search, Detection, Navigation, Guidance, Aeronautical Sys","L3HARRIS TECHNOLOGIES, INC. /DE/",2026-10-17,edgar-submissions
+0000202131,4911,Electric Services,HOUSTON INDUSTRIES INC /OLD,2026-10-17,edgar-submissions
+0000203077,3845,Electromedical & Electrotherapeutic Apparatus,"ST JUDE MEDICAL, LLC",2026-10-17,edgar-submissions
+0000203527,3845,Electromedical & Electrotherapeutic Apparatus,VARIAN MEDICAL SYSTEMS INC,2026-10-17,edgar-submissions
+0000205520,2711,Newspapers: Publishing or  Publishing & Printing,KNIGHT RIDDER INC,2026-10-17,edgar-submissions
+0000216228,3561,Pumps & Pumping Equipment,ITT INC.,2026-10-17,edgar-submissions
+0000217346,3720,Aircraft & Parts,TEXTRON INC,2026-10-17,edgar-submissions
+0000230211,4513,Air Courier Services,FEDERAL EXPRESS CORP,2026-10-17,edgar-submissions
+0000277135,5000,Wholesale-Durable Goods,"W.W. GRAINGER, INC.",2026-10-17,edgar-submissions
+0000277948,4011,"Railroads, Line-Haul Operating",CSX CORP,2026-10-17,edgar-submissions
+0000278352,3577,"Computer Peripheral Equipment, NEC",SYMBOL TECHNOLOGIES INC,2026-10-17,edgar-submissions
+0000310158,2834,Pharmaceutical Preparations,"Merck & Co., Inc.",2026-10-17,edgar-submissions
+0000310377,7373,Services-Computer Integrated Systems Design,HBO & CO,2026-10-17,edgar-submissions
+0000310522,6111,Federal & Federally-Sponsored Credit Agencies,FEDERAL NATIONAL MORTGAGE ASSOCIATION FANNIE MAE,2026-10-17,edgar-submissions
+0000310569,2082,Malt Beverages,"ANHEUSER-BUSCH COMPANIES, LLC",2026-10-17,edgar-submissions
+0000310764,3841,Surgical & Medical Instruments & Apparatus,STRYKER CORP,2026-10-17,edgar-submissions
+0000311259,4924,Natural Gas Distribution,EASTERN ENTERPRISES,2026-10-17,edgar-submissions
+0000313616,3823,"Industrial Instruments For Measurement, Display, and Control",DANAHER CORP /DE/,2026-10-17,edgar-submissions
+0000313927,2840,"Soap, Detergents, Cleang Preparations, Perfumes, Cosmetics",CHURCH & DWIGHT CO INC /DE/,2026-10-17,edgar-submissions
+0000314132,3716,Motor Homes,FLEETWOOD ENTERPRISES INC/DE/,2026-10-17,edgar-submissions
+0000314727,5099,"Wholesale-Durable Goods, NEC",HANDLEMAN CO /MI/,2026-10-17,edgar-submissions
+0000314808,1381,Drilling Oil & Gas Wells,Valaris Ltd,2026-10-17,edgar-submissions
+0000315180,3571,Electronic Computers,TANDEM COMPUTERS INC /DE/,2026-10-17,edgar-submissions
+0000315189,3523,Farm Machinery & Equipment,DEERE & CO,2026-10-17,edgar-submissions
+0000315213,7363,Services-Help Supply Services,ROBERT HALF INC.,2026-10-17,edgar-submissions
+0000315293,6411,"Insurance Agents, Brokers & Service",Aon plc,2026-10-17,edgar-submissions
+0000315852,1311,Crude Petroleum & Natural Gas,RANGE RESOURCES CORP,2026-10-17,edgar-submissions
+0000316004,3661,Telephone & Telegraph Apparatus,ALCATEL USA INC,2026-10-17,edgar-submissions
+0000316206,7011,Hotels & Motels,"STARWOOD HOTELS & RESORTS WORLDWIDE, LLC",2026-10-17,edgar-submissions
+0000316709,6211,"Security Brokers, Dealers & Flotation Companies",SCHWAB CHARLES CORP,2026-10-17,edgar-submissions
+0000317093,3357,Drawing & Insulating of  Nonferrous Wire,ANDREW CORP,2026-10-17,edgar-submissions
+0000317745,6331,"Fire, Marine & Casualty Insurance",GENERAL RE CORP,2026-10-17,edgar-submissions
+0000317771,3661,Telephone & Telegraph Apparatus,TELLABS INC,2026-10-17,edgar-submissions
+0000318154,2836,"Biological Products, (No Diagnostic Substances)",AMGEN INC,2026-10-17,edgar-submissions
+0000318380,6798,Real Estate Investment Trusts,PUBLIC STORAGE INC /CA,2026-10-17,edgar-submissions
+0000319201,3827,Optical Instruments & Lenses,KLA CORP,2026-10-17,edgar-submissions
+0000320187,3021,Rubber & Plastics Footwear,"NIKE, Inc.",2026-10-17,edgar-submissions
+0000320193,3571,Electronic Computers,Apple Inc.,2026-10-17,edgar-submissions
+0000320335,6311,Life Insurance,GLOBE LIFE INC.,2026-10-17,edgar-submissions
+0000350563,4911,Electric Services,TECO ENERGY INC,2026-10-17,edgar-submissions
+0000350698,5500,Retail-Auto Dealers & Gasoline Stations,"AUTONATION, INC.",2026-10-17,edgar-submissions
+0000351145,7373,Services-Computer Integrated Systems Design,INTERGRAPH CORP,2026-10-17,edgar-submissions
+0000351346,3842,"Orthopedic, Prosthetic & Surgical Appliances & Supplies",BIOMET INC,2026-10-17,edgar-submissions
+0000351696,4922,Natural Gas Transmission,PANENERGY CORP,2026-10-17,edgar-submissions
+0000352363,2330,"Women's, Misses':  and Juniors Outerwear",Kate Spade & Co,2026-10-17,edgar-submissions
+0000352510,6022,State Commercial Banks,NORTH FORK BANCORPORATION INC,2026-10-17,edgar-submissions
+0000352541,4931,Electric & Other Services Combined,ALLIANT ENERGY CORP,2026-10-17,edgar-submissions
+0000352915,8062,"Services-General Medical & Surgical Hospitals, NEC",UNIVERSAL HEALTH SERVICES INC,2026-10-17,edgar-submissions
+0000352947,2810,Industrial Inorganic Chemicals,ENGELHARD CORP,2026-10-17,edgar-submissions
+0000352949,5141,"Wholesale-Groceries, General Line",FLEMING COMPANIES INC /OK/,2026-10-17,edgar-submissions
+0000353944,3990,Miscellaneous Manufacturing Industries,INTERNATIONAL GAME TECHNOLOGY,2026-10-17,edgar-submissions
+0000354190,6411,"Insurance Agents, Brokers & Service",Arthur J. Gallagher & Co.,2026-10-17,edgar-submissions
+0000354396,6331,"Fire, Marine & Casualty Insurance",USF&G CORP,2026-10-17,edgar-submissions
+0000354604,8051,Services-Skilled Nursing Care Facilities,MANOR CARE INC/NEW,2026-10-17,edgar-submissions
+0000354908,3812,"Search, Detection, Navigation, Guidance, Aeronautical Sys","Teledyne FLIR, LLC",2026-10-17,edgar-submissions
+0000354950,5211,Retail-Lumber & Other Building Materials Dealers,"HOME DEPOT, INC.",2026-10-17,edgar-submissions
+0000354952,3572,Computer Storage Devices,VERITAS SOFTWARE TECHNOLOGY CORP,2026-10-17,edgar-submissions
+0000354964,6141,Personal Credit Institutions,HSBC Finance Corp,2026-10-17,edgar-submissions
+0000356028,7372,Services-Prepackaged Software,"CA, INC.",2026-10-17,edgar-submissions
+0000357261,4911,Electric Services,FLORIDA PROGRESS CORP,2026-10-17,edgar-submissions
+0000701221,6324,Hospital & Medical Service Plans,Cigna Holding Co,2026-10-17,edgar-submissions
+0000701345,4512,"Air Transportation, Scheduled",US AIRWAYS GROUP INC,2026-10-17,edgar-submissions
+0000701708,4213,Trucking (No Local),CALIBER SYSTEM INC,2026-10-17,edgar-submissions
+0000701856,4955,Hazardous Waste Management,SAFETY KLEEN CORP/,2026-10-17,edgar-submissions
+0000701985,5990,"Retail-Retail Stores, NEC","Bath & Body Works, Inc.",2026-10-17,edgar-submissions
+0000702165,4011,"Railroads, Line-Haul Operating",NORFOLK SOUTHERN CORP,2026-10-17,edgar-submissions
+0000704051,6282,Investment Advice,"LEGG MASON, INC.",2026-10-17,edgar-submissions
+0000706539,2834,Pharmaceutical Preparations,CHIRON CORP,2026-10-17,edgar-submissions
+0000707549,3559,"Special Industry Machinery, NEC",LAM RESEARCH CORP,2026-10-17,edgar-submissions
+0000708819,3443,Fabricated Plate Work (Boiler Shops),MCDERMOTT INTERNATIONAL INC,2026-10-17,edgar-submissions
+0000709519,3571,Electronic Computers,"SUN MICROSYSTEMS, INC.",2026-10-17,edgar-submissions
+0000709804,1389,"Oil & Gas Field Services, NEC",Steel Excel Inc.,2026-10-17,edgar-submissions
+0000711065,3674,Semiconductors & Related Devices,APPLIED MICRO CIRCUITS CORP,2026-10-17,edgar-submissions
+0000711404,3851,Ophthalmic Goods,"COOPER COMPANIES, INC.",2026-10-17,edgar-submissions
+0000711405,6324,Hospital & Medical Service Plans,U S HEALTHCARE INC,2026-10-17,edgar-submissions
+0000712515,7372,Services-Prepackaged Software,ELECTRONIC ARTS INC.,2026-10-17,edgar-submissions
+0000713676,6021,National Commercial Banks,"PNC FINANCIAL SERVICES GROUP, INC.",2026-10-17,edgar-submissions
+0000714154,3570,Computer & office Equipment,COMPAQ COMPUTER CORP,2026-10-17,edgar-submissions
+0000714655,2836,"Biological Products, (No Diagnostic Substances)",BIOGEN IDEC MA INC,2026-10-17,edgar-submissions
+0000715096,6021,National Commercial Banks,COMMERCE BANCORP INC /NJ/,2026-10-17,edgar-submissions
+0000715957,4911,Electric Services,"DOMINION ENERGY, INC",2026-10-17,edgar-submissions
+0000716006,4213,Trucking (No Local),Yellow Corp,2026-10-17,edgar-submissions
+0000716039,1311,Crude Petroleum & Natural Gas,UNOCAL CORP,2026-10-17,edgar-submissions
+0000716823,3559,"Special Industry Machinery, NEC",MI 2009 Inc.,2026-10-17,edgar-submissions
+0000717423,1311,Crude Petroleum & Natural Gas,MURPHY OIL CORP,2026-10-17,edgar-submissions
+0000717826,3663,Radio & Tv Broadcasting & Communications Equipment,ERICSSON LM TELEPHONE CO,2026-10-17,edgar-submissions
+0000718877,7372,Services-Prepackaged Software,"Activision Blizzard, Inc.",2026-10-17,edgar-submissions
+0000719241,6321,Accident & Health Insurance,CONSECO INC,2026-10-17,edgar-submissions
+0000719529,2836,"Biological Products, (No Diagnostic Substances)",IMMUNEX CORP /DE/,2026-10-17,edgar-submissions
+0000719739,6022,State Commercial Banks,SVB FINANCIAL GROUP,2026-10-17,edgar-submissions
+0000719955,5700,"Retail-Home Furniture, Furnishings & Equipment Stores",WILLIAMS SONOMA INC,2026-10-17,edgar-submissions
+0000720005,6211,"Security Brokers, Dealers & Flotation Companies",RAYMOND JAMES FINANCIAL INC,2026-10-17,edgar-submissions
+0000721083,3533,Oil & Gas Field Machinery & Equipment,SMITH INTERNATIONAL INC,2026-10-17,edgar-submissions
+0000721371,5122,"Wholesale-Drugs, Proprietaries & Druggists' Sundries",CARDINAL HEALTH INC,2026-10-17,edgar-submissions
+0000721683,7389,"Services-Business Services, NEC",TOTAL SYSTEM SERVICES INC,2026-10-17,edgar-submissions
+0000722056,7372,Services-Prepackaged Software,RATIONAL SOFTWARE CORP,2026-10-17,edgar-submissions
+0000722080,1040,Gold and Silver Ores,ECHO BAY MINES LTD,2026-10-17,edgar-submissions
+0000723125,3674,Semiconductors & Related Devices,MICRON TECHNOLOGY INC,2026-10-17,edgar-submissions
+0000723254,2320,"Men's & Boys' Furnishgs, Work Clothg, & Allied Garments",CINTAS CORP,2026-10-17,edgar-submissions
+0000723527,4813,Telephone Communications (No Radiotelephone),MCI INC,2026-10-17,edgar-submissions
+0000723531,8700,"Services-Engineering, Accounting, Research, Management",PAYCHEX INC,2026-10-17,edgar-submissions
+0000723612,7510,Services-Auto Rental & Leasing (No Drivers),"AVIS BUDGET GROUP, INC.",2026-10-17,edgar-submissions
+0000726513,4833,Television Broadcasting Stations,TRIBUNE MEDIA CO,2026-10-17,edgar-submissions
+0000726728,6798,Real Estate Investment Trusts,REALTY INCOME CORP,2026-10-17,edgar-submissions
+0000726958,5500,Retail-Auto Dealers & Gasoline Stations,CASEYS GENERAL STORES INC,2026-10-17,edgar-submissions
+0000728535,4213,Trucking (No Local),HUNT J B TRANSPORT SERVICES INC,2026-10-17,edgar-submissions
+0000730464,8200,Services-Educational Services,Covista Inc.,2026-10-17,edgar-submissions
+0000731766,6324,Hospital & Medical Service Plans,UNITEDHEALTH GROUP INC,2026-10-17,edgar-submissions
+0000731802,4924,Natural Gas Distribution,ATMOS ENERGY CORP,2026-10-17,edgar-submissions
+0000731939,2631,Paperboard Mills,TEMPLE INLAND INC,2026-10-17,edgar-submissions
+0000732485,2836,"Biological Products, (No Diagnostic Substances)",GENZYME CORP,2026-10-17,edgar-submissions
+0000732712,4813,Telephone Communications (No Radiotelephone),VERIZON COMMUNICATIONS INC,2026-10-17,edgar-submissions
+0000732713,4813,Telephone Communications (No Radiotelephone),BELLSOUTH CORP,2026-10-17,edgar-submissions
+0000732714,4813,Telephone Communications (No Radiotelephone),NYNEX CORP,2026-10-17,edgar-submissions
+0000732715,4813,Telephone Communications (No Radiotelephone),AMERITECH CORP /DE/,2026-10-17,edgar-submissions
+0000732716,4813,Telephone Communications (No Radiotelephone),PACIFIC TELESIS GROUP,2026-10-17,edgar-submissions
+0000732717,4813,Telephone Communications (No Radiotelephone),AT&T INC.,2026-10-17,edgar-submissions
+0000732718,4813,Telephone Communications (No Radiotelephone),COMCAST MO GROUP INC,2026-10-17,edgar-submissions
+0000736157,7812,Services-Motion Picture & Video Tape Production,TIME WARNER COMPANIES INC,2026-10-17,edgar-submissions
+0000736260,6311,Life Insurance,HANCOCK JOHN FINANCIAL SERVICES INC,2026-10-17,edgar-submissions
+0000737874,4100,Local & Suburban Transit & Interurban Hwy Passenger Trans,LAIDLAW INTERNATIONAL INC,2026-10-17,edgar-submissions
+0000738076,3576,Computer Communications Equipment,3COM CORP,2026-10-17,edgar-submissions
+0000739708,4832,Radio Broadcasting Stations,"iHeartCommunications, Inc.",2026-10-17,edgar-submissions
+0000740112,6099,"Functions Related To Depository Banking, NEC",CONCORD EFS INC,2026-10-17,edgar-submissions
+0000740260,6798,Real Estate Investment Trusts,"Ventas, Inc.",2026-10-17,edgar-submissions
+0000743316,3674,Semiconductors & Related Devices,MAXIM INTEGRATED PRODUCTS INC,2026-10-17,edgar-submissions
+0000743872,1040,Gold and Silver Ores,HOMESTAKE MINING CO /DE/,2026-10-17,edgar-submissions
+0000743988,3674,Semiconductors & Related Devices,XILINX INC,2026-10-17,edgar-submissions
+0000745732,5651,Retail-Family Clothing Stores,"ROSS STORES, INC.",2026-10-17,edgar-submissions
+0000746515,4731,Arrangement of  Transportation of  Freight & Cargo,EXPEDITORS INTERNATIONAL OF WASHINGTON INC,2026-10-17,edgar-submissions
+0000746838,7373,Services-Computer Integrated Systems Design,UNISYS CORP,2026-10-17,edgar-submissions
+0000746969,6022,State Commercial Banks,OLD KENT FINANCIAL CORP /MI/,2026-10-17,edgar-submissions
+0000749251,8741,Services-Management Services,GARTNER INC,2026-10-17,edgar-submissions
+0000750556,6021,National Commercial Banks,SUNTRUST BANKS INC,2026-10-17,edgar-submissions
+0000751652,4923,Natural Gas Transmisison & Distribution,DOMINION QUESTAR CORP,2026-10-17,edgar-submissions
+0000753308,4911,Electric Services,NEXTERA ENERGY INC,2026-10-17,edgar-submissions
+0000754737,4931,Electric & Other Services Combined,SCANA CORP,2026-10-17,edgar-submissions
+0000756764,7822,Services-Motion Picture & Video Tape Distribution,KING WORLD PRODUCTIONS INC,2026-10-17,edgar-submissions
+0000756894,1040,Gold and Silver Ores,BARRICK MINING CORP,2026-10-17,edgar-submissions
+0000758004,7372,Services-Prepackaged Software,NOVELL INC,2026-10-17,edgar-submissions
+0000759944,6022,State Commercial Banks,CITIZENS FINANCIAL GROUP INC/RI,2026-10-17,edgar-submissions
+0000764065,1000,Metal Mining,CLEVELAND-CLIFFS INC.,2026-10-17,edgar-submissions
+0000764180,2111,Cigarettes,"ALTRIA GROUP, INC.",2026-10-17,edgar-submissions
+0000764478,5731,"Retail-Radio, Tv & Consumer Electronics Stores",BEST BUY CO INC,2026-10-17,edgar-submissions
+0000764622,4911,Electric Services,PINNACLE WEST CAPITAL CORP,2026-10-17,edgar-submissions
+0000764762,5912,Retail-Drug Stores and Proprietary Stores,LONGS DRUG STORES CORP,2026-10-17,edgar-submissions
+0000765880,6798,Real Estate Investment Trusts,"HEALTHPEAK PROPERTIES, INC.",2026-10-17,edgar-submissions
+0000766421,4512,"Air Transportation, Scheduled","ALASKA AIR GROUP, INC.",2026-10-17,edgar-submissions
+0000766704,6798,Real Estate Investment Trusts,WELLTOWER INC.,2026-10-17,edgar-submissions
+0000767920,3674,Semiconductors & Related Devices,PMC SIERRA INC,2026-10-17,edgar-submissions
+0000768251,3674,Semiconductors & Related Devices,ALTERA CORP,2026-10-17,edgar-submissions
+0000768835,5331,Retail-Variety Stores,FORMER BL STORES INC,2026-10-17,edgar-submissions
+0000769397,7372,Services-Prepackaged Software,"Autodesk, Inc.",2026-10-17,edgar-submissions
+0000769589,1000,Metal Mining,CYPRUS AMAX MINERALS CO,2026-10-17,edgar-submissions
+0000770949,3021,Rubber & Plastics Footwear,REEBOK INTERNATIONAL LTD,2026-10-17,edgar-submissions
+0000771298,2250,Knitting Mills,FRUIT OF THE LOOM INC /DE/,2026-10-17,edgar-submissions
+0000771498,1040,Gold and Silver Ores,BATTLE MOUNTAIN GOLD CO,2026-10-17,edgar-submissions
+0000771667,6035,"Savings Institution, Federally Chartered",AHMANSON H F & CO /DE/,2026-10-17,edgar-submissions
+0000773840,3724,Aircraft Engines & Engine Parts,HONEYWELL INTERNATIONAL INC,2026-10-17,edgar-submissions
+0000773910,1311,Crude Petroleum & Natural Gas,ANADARKO PETROLEUM CORP,2026-10-17,edgar-submissions
+0000775483,2911,Petroleum Refining,ATLANTIC RICHFIELD CO /DE,2026-10-17,edgar-submissions
+0000777001,6211,"Security Brokers, Dealers & Flotation Companies",BEAR STEARNS COMPANIES INC,2026-10-17,edgar-submissions
+0000777201,1381,Drilling Oil & Gas Wells,NOBLE DRILLING CORP,2026-10-17,edgar-submissions
+0000777676,7372,Services-Prepackaged Software,Oracle Systems,2026-10-17,edgar-submissions
+0000779152,7373,Services-Computer Integrated Systems Design,JACK HENRY & ASSOCIATES INC,2026-10-17,edgar-submissions
+0000783280,6798,Real Estate Investment Trusts,DUKE REALTY CORP,2026-10-17,edgar-submissions
+0000783325,4931,Electric & Other Services Combined,"WEC ENERGY GROUP, INC.",2026-10-17,edgar-submissions
+0000785161,8060,Services-Hospitals,Encompass Health Corp,2026-10-17,edgar-submissions
+0000788784,4931,Electric & Other Services Combined,PUBLIC SERVICE ENTERPRISE GROUP INC,2026-10-17,edgar-submissions
+0000789019,7372,Services-Prepackaged Software,MICROSOFT CORP,2026-10-17,edgar-submissions
+0000789073,2080,Beverages,Beam Suntory Inc.,2026-10-17,edgar-submissions
+0000789388,7374,Services-Computer Processing & Data Preparation,SUNGARD DATA SYSTEMS INC,2026-10-17,edgar-submissions
+0000789570,7011,Hotels & Motels,MGM Resorts International,2026-10-17,edgar-submissions
+0000789933,1221,Bituminous Coal & Lignite Surface Mining,NACCO INDUSTRIES INC,2026-10-17,edgar-submissions
+0000790070,3572,Computer Storage Devices,EMC CORP,2026-10-17,edgar-submissions
+0000790528,5051,Wholesale-Metals Service Centers & of fices,RYERSON INC.,2026-10-17,edgar-submissions
+0000791519,5940,Retail-Miscellaneous Shopping Goods Stores,STAPLES INC,2026-10-17,edgar-submissions
+0000791907,3674,Semiconductors & Related Devices,LINEAR TECHNOLOGY CORP /CA/,2026-10-17,edgar-submissions
+0000792985,8062,"Services-General Medical & Surgical Hospitals, NEC","HEALTH MANAGEMENT ASSOCIATES, INC",2026-10-17,edgar-submissions
+0000793952,3751,"Motorcycles, Bicycles & Parts","HARLEY-DAVIDSON, INC.",2026-10-17,edgar-submissions
+0000794323,4813,Telephone Communications (No Radiotelephone),"Level 3 Parent, LLC",2026-10-17,edgar-submissions
+0000794367,5311,Retail-Department Stores,"Macy's, Inc.",2026-10-17,edgar-submissions
+0000795266,1531,Operative Builders,KB HOME,2026-10-17,edgar-submissions
+0000796343,7372,Services-Prepackaged Software,ADOBE INC.,2026-10-17,edgar-submissions
+0000797468,1311,Crude Petroleum & Natural Gas,OCCIDENTAL PETROLEUM CORP /DE/,2026-10-17,edgar-submissions
+0000798354,7389,"Services-Business Services, NEC",FISERV INC,2026-10-17,edgar-submissions
+0000798943,1381,Drilling Oil & Gas Wells,NABORS INDUSTRIES INC,2026-10-17,edgar-submissions
+0000800240,5940,Retail-Miscellaneous Shopping Goods Stores,ODP Corp,2026-10-17,edgar-submissions
+0000800459,3651,Household Audio & Video Equipment,HARMAN INTERNATIONAL INDUSTRIES INC /DE/,2026-10-17,edgar-submissions
+0000800575,3580,Refrigeration & Service Industry Machinery,PREMARK INTERNATIONAL INC,2026-10-17,edgar-submissions
+0000801898,3532,Mining Machinery & Equip (No Oil & Gas Field Mach & Equip),JOY GLOBAL INC,2026-10-17,edgar-submissions
+0000802301,3571,Electronic Computers,"Graphics Properties Holdings, Inc.",2026-10-17,edgar-submissions
+0000803014,3661,Telephone & Telegraph Apparatus,COMVERSE TECHNOLOGY INC/NY/,2026-10-17,edgar-submissions
+0000804055,2086,Bottled & Canned Soft Drinks & Carbonated Waters,"COCA-COLA REFRESHMENTS USA, INC.",2026-10-17,edgar-submissions
+0000804212,5084,Wholesale-Industrial Machinery & Equipment,AIRGAS INC,2026-10-17,edgar-submissions
+0000804328,3663,Radio & Tv Broadcasting & Communications Equipment,QUALCOMM INC/DE,2026-10-17,edgar-submissions
+0000804753,7373,Services-Computer Integrated Systems Design,CERNER Corp,2026-10-17,edgar-submissions
+0000806085,6211,"Security Brokers, Dealers & Flotation Companies",LEHMAN BROTHERS HOLDINGS INC. PLAN TRUST,2026-10-17,edgar-submissions
+0000808362,3533,Oil & Gas Field Machinery & Equipment,Baker Hughes Holdings LLC,2026-10-17,edgar-submissions
+0000808450,3711,Motor Vehicles & Passenger Car Bodies,NAVISTAR INTERNATIONAL CORP,2026-10-17,edgar-submissions
+0000811156,4931,Electric & Other Services Combined,CMS ENERGY CORP,2026-10-17,edgar-submissions
+0000811669,2100,Tobacco Products,UST INC,2026-10-17,edgar-submissions
+0000811830,6021,National Commercial Banks,"Santander Holdings USA, Inc.",2026-10-17,edgar-submissions
+0000812074,3221,Glass Containers,"O-I Glass, Inc. /DE/",2026-10-17,edgar-submissions
+0000812305,8051,Services-Skilled Nursing Care Facilities,BEVERLY ENTERPRISES INC /DE/,2026-10-17,edgar-submissions
+0000813672,7372,Services-Prepackaged Software,CADENCE DESIGN SYSTEMS INC,2026-10-17,edgar-submissions
+0000813828,4833,Television Broadcasting Stations,Paramount Global,2026-10-17,edgar-submissions
+0000814453,3089,"Plastics Products, NEC",NEWELL BRANDS INC.,2026-10-17,edgar-submissions
+0000814547,7389,"Services-Business Services, NEC",FAIR ISAAC CORP,2026-10-17,edgar-submissions
+0000814585,6351,Surety Insurance,MBIA INC,2026-10-17,edgar-submissions
+0000815094,3841,Surgical & Medical Instruments & Apparatus,ABIOMED INC,2026-10-17,edgar-submissions
+0000815097,4400,Water Transportation,Carnival Corp Ltd.,2026-10-17,edgar-submissions
+0000815556,5200,"Retail-Building Materials, Hardware, Garden Supply",FASTENAL CO,2026-10-17,edgar-submissions
+0000816284,2834,Pharmaceutical Preparations,CELGENE CORP /DE/,2026-10-17,edgar-submissions
+0000816761,7372,Services-Prepackaged Software,TERADATA CORP /DE/,2026-10-17,edgar-submissions
+0000817473,,,"AMERICAN CAPITAL, LTD",2026-10-17,edgar-submissions
+0000818479,3843,Dental Equipment & Supplies,DENTSPLY SIRONA Inc.,2026-10-17,edgar-submissions
+0000818686,2834,Pharmaceutical Preparations,TEVA PHARMACEUTICAL INDUSTRIES LTD,2026-10-17,edgar-submissions
+0000819692,6021,National Commercial Banks,CHARTER ONE FINANCIAL INC,2026-10-17,edgar-submissions
+0000819996,1040,Gold and Silver Ores,PLACER DOME INC,2026-10-17,edgar-submissions
+0000820027,6282,Investment Advice,AMERIPRISE FINANCIAL INC,2026-10-17,edgar-submissions
+0000820096,2834,Pharmaceutical Preparations,PERRIGO CO,2026-10-17,edgar-submissions
+0000820313,3678,Electronic Connectors,AMPHENOL CORP /DE/,2026-10-17,edgar-submissions
+0000820318,3827,Optical Instruments & Lenses,COHERENT CORP.,2026-10-17,edgar-submissions
+0000821189,1311,Crude Petroleum & Natural Gas,EOG RESOURCES INC,2026-10-17,edgar-submissions
+0000822416,1531,Operative Builders,PULTEGROUP INC/MI/,2026-10-17,edgar-submissions
+0000823549,4922,Natural Gas Transmission,EL PASO TENNESSEE PIPELINE CO LLC,2026-10-17,edgar-submissions
+0000823768,4953,Refuse Systems,WASTE MANAGEMENT INC,2026-10-17,edgar-submissions
+0000824169,4812,Radiotelephone Communications,NEXTEL COMMUNICATIONS INC,2026-10-17,edgar-submissions
+0000826083,3571,Electronic Computers,DELL INC,2026-10-17,edgar-submissions
+0000827052,4911,Electric Services,EDISON INTERNATIONAL,2026-10-17,edgar-submissions
+0000827054,3674,Semiconductors & Related Devices,MICROCHIP TECHNOLOGY INC,2026-10-17,edgar-submissions
+0000827099,4931,Electric & Other Services Combined,Ocean Thermal Energy Corp,2026-10-17,edgar-submissions
+0000829224,5810,Retail-Eating & Drinking Places,STARBUCKS CORP,2026-10-17,edgar-submissions
+0000831001,6021,National Commercial Banks,CITIGROUP INC,2026-10-17,edgar-submissions
+0000831259,1000,Metal Mining,FREEPORT-MCMORAN INC,2026-10-17,edgar-submissions
+0000832101,3561,Pumps & Pumping Equipment,IDEX CORP /DE/,2026-10-17,edgar-submissions
+0000832428,4833,Television Broadcasting Stations,E.W. SCRIPPS Co,2026-10-17,edgar-submissions
+0000832988,5944,Retail-Jewelry Stores,SIGNET JEWELERS LTD,2026-10-17,edgar-submissions
+0000833320,1311,Crude Petroleum & Natural Gas,BURLINGTON RESOURCES INC,2026-10-17,edgar-submissions
+0000833444,3585,Air-Cond & Warm Air Heatg Equip & Comm & Indl Refrig Equip,Johnson Controls International plc,2026-10-17,edgar-submissions
+0000835541,3672,Printed Circuit Boards,SOLECTRON CORP,2026-10-17,edgar-submissions
+0000835729,7372,Services-Prepackaged Software,BMC SOFTWARE INC,2026-10-17,edgar-submissions
+0000835910,3620,Electrical Industrial Apparatus,AMERICAN POWER CONVERSION CORP,2026-10-17,edgar-submissions
+0000836102,3585,Air-Cond & Warm Air Heatg Equip & Comm & Indl Refrig Equip,TRANE INC.,2026-10-17,edgar-submissions
+0000836106,3559,"Special Industry Machinery, NEC",NOVELLUS SYSTEMS INC,2026-10-17,edgar-submissions
+0000836442,1311,Crude Petroleum & Natural Gas,ORYX ENERGY CO,2026-10-17,edgar-submissions
+0000839923,4812,Radiotelephone Communications,VODAFONE GROUP PUBLIC LTD CO,2026-10-17,edgar-submissions
+0000842023,2836,"Biological Products, (No Diagnostic Substances)",BIO-TECHNE Corp,2026-10-17,edgar-submissions
+0000846909,3576,Computer Communications Equipment,ENTERASYS NETWORKS INC /DE/,2026-10-17,edgar-submissions
+0000847903,2052,Cookies & Crackers,RJR ACQUISITION CORP,2026-10-17,edgar-submissions
+0000848865,4953,Refuse Systems,"Allied Waste Industries, LLC",2026-10-17,edgar-submissions
+0000849213,6798,Real Estate Investment Trusts,PLUM CREEK TIMBER CO INC,2026-10-17,edgar-submissions
+0000849395,3241,"Cement, Hydraulic",CRH PUBLIC LTD CO,2026-10-17,edgar-submissions
+0000849399,7372,Services-Prepackaged Software,Gen Digital Inc.,2026-10-17,edgar-submissions
+0000850209,5661,Retail-Shoe Stores,"FOOT LOCKER, INC.",2026-10-17,edgar-submissions
+0000850693,2834,Pharmaceutical Preparations,ALLERGAN INC,2026-10-17,edgar-submissions
+0000851588,3540,Metalworkg Machinery & Equipment,GIDDINGS & LEWIS INC /WI/,2026-10-17,edgar-submissions
+0000851968,2273,Carpets & Rugs,MOHAWK INDUSTRIES INC,2026-10-17,edgar-submissions
+0000854884,4011,"Railroads, Line-Haul Operating",CHICAGO & NORTH WESTERN TRANSPORTATION CO /DE/,2026-10-17,edgar-submissions
+0000857005,7372,Services-Prepackaged Software,PTC INC.,2026-10-17,edgar-submissions
+0000858339,7011,Hotels & Motels,"CAESARS HOLDINGS, INC.",2026-10-17,edgar-submissions
+0000858470,1311,Crude Petroleum & Natural Gas,Coterra Energy Inc.,2026-10-17,edgar-submissions
+0000858877,3576,Computer Communications Equipment,"CISCO SYSTEMS, INC.",2026-10-17,edgar-submissions
+0000859014,7372,Services-Prepackaged Software,COMPUWARE CORP,2026-10-17,edgar-submissions
+0000859737,3844,X-Ray Apparatus & Tubes & Related Irradiation Apparatus,HOLOGIC INC,2026-10-17,edgar-submissions
+0000860730,8062,"Services-General Medical & Surgical Hospitals, NEC","HCA Healthcare, Inc.",2026-10-17,edgar-submissions
+0000860731,7372,Services-Prepackaged Software,TYLER TECHNOLOGIES INC,2026-10-17,edgar-submissions
+0000861878,4955,Hazardous Waste Management,STERICYCLE INC,2026-10-17,edgar-submissions
+0000863157,5990,"Retail-Retail Stores, NEC",PETSMART INC,2026-10-17,edgar-submissions
+0000864328,1389,"Oil & Gas Field Services, NEC",BJ SERVICES CO LLC,2026-10-17,edgar-submissions
+0000864749,3829,"Measuring & Controlling Devices, NEC",TRIMBLE INC.,2026-10-17,edgar-submissions
+0000865436,5411,Retail-Grocery Stores,WHOLE FOODS MARKET INC,2026-10-17,edgar-submissions
+0000865752,2086,Bottled & Canned Soft Drinks & Carbonated Waters,Monster Beverage Corp,2026-10-17,edgar-submissions
+0000866374,3672,Printed Circuit Boards,FLEX LTD.,2026-10-17,edgar-submissions
+0000866787,5531,Retail-Auto & Home Supply Stores,AUTOZONE INC,2026-10-17,edgar-submissions
+0000867058,7372,Services-Prepackaged Software,MERCURY INTERACTIVE CORP,2026-10-17,edgar-submissions
+0000868809,1311,Crude Petroleum & Natural Gas,XTO ENERGY INC,2026-10-17,edgar-submissions
+0000870517,6021,National Commercial Banks,MBNA CORP,2026-10-17,edgar-submissions
+0000872589,2834,Pharmaceutical Preparations,"REGENERON PHARMACEUTICALS, INC.",2026-10-17,edgar-submissions
+0000873364,2834,Pharmaceutical Preparations,CEPHALON INC,2026-10-17,edgar-submissions
+0000873591,2836,"Biological Products, (No Diagnostic Substances)",MEDIMMUNE INC /DE,2026-10-17,edgar-submissions
+0000874016,2330,"Women's, Misses':  and Juniors Outerwear",JONES GROUP INC,2026-10-17,edgar-submissions
+0000874501,6351,Surety Insurance,OCTAVE SPECIALTY GROUP INC,2026-10-17,edgar-submissions
+0000874716,2835,In Vitro & In Vivo Diagnostic Substances,IDEXX LABORATORIES INC /DE,2026-10-17,edgar-submissions
+0000874761,4991,Cogeneration Services & Small Power Producers,AES CORP,2026-10-17,edgar-submissions
+0000874766,6331,"Fire, Marine & Casualty Insurance","HARTFORD INSURANCE GROUP, INC.",2026-10-17,edgar-submissions
+0000875045,2836,"Biological Products, (No Diagnostic Substances)",BIOGEN INC.,2026-10-17,edgar-submissions
+0000875159,6331,"Fire, Marine & Casualty Insurance",XL GROUP LTD,2026-10-17,edgar-submissions
+0000875320,2834,Pharmaceutical Preparations,VERTEX PHARMACEUTICALS INC / MA,2026-10-17,edgar-submissions
+0000875570,7372,Services-Prepackaged Software,PEOPLESOFT INC,2026-10-17,edgar-submissions
+0000876437,6351,Surety Insurance,MGIC INVESTMENT CORP,2026-10-17,edgar-submissions
+0000876516,3576,Computer Communications Equipment,BAY NETWORKS INC,2026-10-17,edgar-submissions
+0000877212,3560,General Industrial Machinery & Equipment,ZEBRA TECHNOLOGIES CORP,2026-10-17,edgar-submissions
+0000877357,2834,Pharmaceutical Preparations,Sunovion Pharmaceuticals Inc.,2026-10-17,edgar-submissions
+0000877890,7372,Services-Prepackaged Software,CITRIX SYSTEMS INC,2026-10-17,edgar-submissions
+0000878736,8051,Services-Skilled Nursing Care Facilities,MANOR CARE INC,2026-10-17,edgar-submissions
+0000878927,4213,Trucking (No Local),"OLD DOMINION FREIGHT LINE, INC.",2026-10-17,edgar-submissions
+0000879101,6798,Real Estate Investment Trusts,KIMCO REALTY CORP,2026-10-17,edgar-submissions
+0000879169,8731,Services-Commercial Physical & Biological Research,INCYTE CORP,2026-10-17,edgar-submissions
+0000879215,4911,Electric Services,DYNEGY ILLINOIS INC.,2026-10-17,edgar-submissions
+0000880430,5040,Wholesale-Professional & Commercial Equipment & Supplies,FISHER SCIENTIFIC INTERNATIONAL INC,2026-10-17,edgar-submissions
+0000880446,3674,Semiconductors & Related Devices,VITESSE SEMICONDUCTOR CORP,2026-10-17,edgar-submissions
+0000881464,2834,Pharmaceutical Preparations,AMYLIN PHARMACEUTICALS INC,2026-10-17,edgar-submissions
+0000882095,2836,"Biological Products, (No Diagnostic Substances)","GILEAD SCIENCES, INC.",2026-10-17,edgar-submissions
+0000882184,1531,Operative Builders,HORTON D R INC /DE/,2026-10-17,edgar-submissions
+0000882835,3823,"Industrial Instruments For Measurement, Display, and Control",ROPER TECHNOLOGIES INC,2026-10-17,edgar-submissions
+0000883241,7372,Services-Prepackaged Software,SYNOPSYS INC,2026-10-17,edgar-submissions
+0000883569,3873,"Watches, Clocks, Clockwork Operated Devices/Parts","Fossil Group, Inc.",2026-10-17,edgar-submissions
+0000883980,7389,"Services-Business Services, NEC",FIRST DATA CORP,2026-10-17,edgar-submissions
+0000884887,4400,Water Transportation,ROYAL CARIBBEAN CRUISES LTD,2026-10-17,edgar-submissions
+0000884905,2810,Industrial Inorganic Chemicals,LINDE INC,2026-10-17,edgar-submissions
+0000885639,5311,Retail-Department Stores,KOHLS Corp,2026-10-17,edgar-submissions
+0000885721,5912,Retail-Drug Stores and Proprietary Stores,EXPRESS SCRIPTS INC,2026-10-17,edgar-submissions
+0000885725,3841,Surgical & Medical Instruments & Apparatus,BOSTON SCIENTIFIC CORP,2026-10-17,edgar-submissions
+0000886158,5700,"Retail-Home Furniture, Furnishings & Equipment Stores","20230930-DK-Butterfly-1, Inc.",2026-10-17,edgar-submissions
+0000886982,6211,"Security Brokers, Dealers & Flotation Companies",GOLDMAN SACHS GROUP INC,2026-10-17,edgar-submissions
+0000887396,1311,Crude Petroleum & Natural Gas,EMPIRE PETROLEUM CORP,2026-10-17,edgar-submissions
+0000889900,1381,Drilling Oil & Gas Wells,PATTERSON UTI ENERGY INC,2026-10-17,edgar-submissions
+0000890175,6189,Asset-Backed Securities,CONSECO FINANCE CORP,2026-10-17,edgar-submissions
+0000890801,7372,Services-Prepackaged Software,"McAfee, Inc.",2026-10-17,edgar-submissions
+0000891024,5047,"Wholesale-Medical, Dental & Hospital Equipment & Supplies","PATTERSON COMPANIES, INC.",2026-10-17,edgar-submissions
+0000891103,7370,"Services-Computer Programming, Data Processing, Etc.","Match Group, Inc.",2026-10-17,edgar-submissions
+0000891104,6794,Patent Owners & Lessors,HFS INC,2026-10-17,edgar-submissions
+0000894315,6798,Real Estate Investment Trusts,SITE Centers Corp.,2026-10-17,edgar-submissions
+0000895126,1311,Crude Petroleum & Natural Gas,EXPAND ENERGY Corp,2026-10-17,edgar-submissions
+0000895421,6211,"Security Brokers, Dealers & Flotation Companies",MORGAN STANLEY,2026-10-17,edgar-submissions
+0000895648,6798,Real Estate Investment Trusts,"GGP, Inc. (fka General Growth Properties Inc. & predecessor to General Growth Properties, Inc.)",2026-10-17,edgar-submissions
+0000895812,3571,Electronic Computers,GATEWAY INC,2026-10-17,edgar-submissions
+0000896159,6331,"Fire, Marine & Casualty Insurance",Chubb Ltd,2026-10-17,edgar-submissions
+0000896878,7372,Services-Prepackaged Software,INTUIT INC.,2026-10-17,edgar-submissions
+0000897723,3672,Printed Circuit Boards,SANMINA CORP,2026-10-17,edgar-submissions
+0000897732,4011,"Railroads, Line-Haul Operating",CONRAIL INC,2026-10-17,edgar-submissions
+0000898173,5531,Retail-Auto & Home Supply Stores,O REILLY AUTOMOTIVE INC,2026-10-17,edgar-submissions
+0000898293,3672,Printed Circuit Boards,JABIL INC,2026-10-17,edgar-submissions
+0000899051,6331,"Fire, Marine & Casualty Insurance",ALLSTATE CORP,2026-10-17,edgar-submissions
+0000899171,5961,Retail-Catalog & Mail-Order Houses,CDW CORP,2026-10-17,edgar-submissions
+0000899652,4931,Electric & Other Services Combined,CINERGY CORP,2026-10-17,edgar-submissions
+0000899689,6798,Real Estate Investment Trusts,VORNADO REALTY TRUST,2026-10-17,edgar-submissions
+0000899866,2834,Pharmaceutical Preparations,"ALEXION PHARMACEUTICALS, INC.",2026-10-17,edgar-submissions
+0000900075,5500,Retail-Auto Dealers & Gasoline Stations,COPART INC,2026-10-17,edgar-submissions
+0000901832,2834,Pharmaceutical Preparations,ASTRAZENECA PLC,2026-10-17,edgar-submissions
+0000906107,6798,Real Estate Investment Trusts,VIVMARK RESIDENTIAL,2026-10-17,edgar-submissions
+0000906163,1531,Operative Builders,NVR INC,2026-10-17,edgar-submissions
+0000906345,6798,Real Estate Investment Trusts,CAMDEN PROPERTY TRUST,2026-10-17,edgar-submissions
+0000906709,2834,Pharmaceutical Preparations,NEKTAR THERAPEUTICS,2026-10-17,edgar-submissions
+0000908255,3714,Motor Vehicle Parts & Accessories,BORGWARNER INC,2026-10-17,edgar-submissions
+0000908937,4832,Radio Broadcasting Stations,SIRIUS XM HOLDINGS INC.,2026-10-17,edgar-submissions
+0000909832,5331,Retail-Variety Stores,COSTCO WHOLESALE CORP /NEW,2026-10-17,edgar-submissions
+0000909954,2090,Miscellaneous Food Preparations & Kindred Products,"KEURIG GREEN MOUNTAIN, INC.",2026-10-17,edgar-submissions
+0000910521,3021,Rubber & Plastics Footwear,DECKERS OUTDOOR CORP,2026-10-17,edgar-submissions
+0000910606,6798,Real Estate Investment Trusts,REGENCY CENTERS CORP,2026-10-17,edgar-submissions
+0000912093,3674,Semiconductors & Related Devices,VIAVI SOLUTIONS INC.,2026-10-17,edgar-submissions
+0000912242,6798,Real Estate Investment Trusts,MACERICH CO,2026-10-17,edgar-submissions
+0000912595,6798,Real Estate Investment Trusts,MID AMERICA APARTMENT COMMUNITIES INC.,2026-10-17,edgar-submissions
+0000912615,5651,Retail-Family Clothing Stores,URBAN OUTFITTERS INC,2026-10-17,edgar-submissions
+0000912750,1311,Crude Petroleum & Natural Gas,NEWFIELD EXPLORATION CO /DE/,2026-10-17,edgar-submissions
+0000912958,4812,Radiotelephone Communications,MILLICOM INTERNATIONAL CELLULAR SA,2026-10-17,edgar-submissions
+0000913340,1382,Oil & Gas Field Exploration Services,WESTERN ATLAS INC,2026-10-17,edgar-submissions
+0000914208,6282,Investment Advice,Invesco Ltd.,2026-10-17,edgar-submissions
+0000915389,2821,"Plastic Materials, Synth Resins & Nonvulcan Elastomers",EASTMAN CHEMICAL CO,2026-10-17,edgar-submissions
+0000915912,6798,Real Estate Investment Trusts,AVALONBAY COMMUNITIES INC,2026-10-17,edgar-submissions
+0000915913,2821,"Plastic Materials, Synth Resins & Nonvulcan Elastomers",ALBEMARLE CORP,2026-10-17,edgar-submissions
+0000916076,1400,Mining & Quarrying of  Nonmetallic Minerals (No Fuels),MARTIN MARIETTA MATERIALS INC,2026-10-17,edgar-submissions
+0000916365,5200,"Retail-Building Materials, Hardware, Garden Supply",TRACTOR SUPPLY CO /DE/,2026-10-17,edgar-submissions
+0000916457,4911,Electric Services,CALPINE CORP,2026-10-17,edgar-submissions
+0000916863,4931,Electric & Other Services Combined,"INTEGRYS HOLDING, INC.",2026-10-17,edgar-submissions
+0000918040,4911,Electric Services,UNICOM CORP,2026-10-17,edgar-submissions
+0000918160,3312,"Steel Works, Blast Furnaces & Rolling Mills (Coke Ovens)",Cleveland-Cliffs Steel Holding Corp,2026-10-17,edgar-submissions
+0000918386,3576,Computer Communications Equipment,QLOGIC CORP,2026-10-17,edgar-submissions
+0000919012,5651,Retail-Family Clothing Stores,AMERICAN EAGLE OUTFITTERS INC,2026-10-17,edgar-submissions
+0000919623,8731,Services-Commercial Physical & Biological Research,QUINTILES TRANSNATIONAL CORP,2026-10-17,edgar-submissions
+0000920148,8071,Services-Medical Laboratories,LABCORP HOLDINGS INC.,2026-10-17,edgar-submissions
+0000920448,7372,Services-Prepackaged Software,BROADVISION INC,2026-10-17,edgar-submissions
+0000920522,6798,Real Estate Investment Trusts,"ESSEX PROPERTY TRUST, INC.",2026-10-17,edgar-submissions
+0000920760,1520,General Bldg Contractors - Residential Bldgs,LENNAR CORP /NEW/,2026-10-17,edgar-submissions
+0000921146,3576,Computer Communications Equipment,ASCEND COMMUNICATIONS INC,2026-10-17,edgar-submissions
+0000921738,7011,Hotels & Motels,"PENN Entertainment, Inc.",2026-10-17,edgar-submissions
+0000921754,1040,Gold and Silver Ores,SANTA FE PACIFIC GOLD CORP,2026-10-17,edgar-submissions
+0000921847,6036,"Savings Institutions, Not Federally Chartered",HUDSON CITY BANCORP INC,2026-10-17,edgar-submissions
+0000922224,4911,Electric Services,PPL Corp,2026-10-17,edgar-submissions
+0000922321,3523,Farm Machinery & Equipment,CASE LLC,2026-10-17,edgar-submissions
+0000922621,6411,"Insurance Agents, Brokers & Service",ERIE INDEMNITY CO,2026-10-17,edgar-submissions
+0000922864,6798,Real Estate Investment Trusts,APARTMENT INVESTMENT & MANAGEMENT CO,2026-10-17,edgar-submissions
+0000925260,2711,Newspapers: Publishing or  Publishing & Printing,TIMES MIRROR CO /NEW/,2026-10-17,edgar-submissions
+0000925692,4813,Telephone Communications (No Radiotelephone),COMCAST CABLE HOLDINGS LLC,2026-10-17,edgar-submissions
+0000927066,8090,"Services-Misc Health & Allied Services, NEC",DAVITA INC.,2026-10-17,edgar-submissions
+0000927628,6021,National Commercial Banks,CAPITAL ONE FINANCIAL CORP,2026-10-17,edgar-submissions
+0000927653,5122,"Wholesale-Drugs, Proprietaries & Druggists' Sundries",MCKESSON CORP,2026-10-17,edgar-submissions
+0000929887,8200,Services-Educational Services,APOLLO EDUCATION GROUP INC,2026-10-17,edgar-submissions
+0000929987,3841,Surgical & Medical Instruments & Apparatus,GUIDANT CORP,2026-10-17,edgar-submissions
+0000931336,2020,Dairy Products,DEAN FOODS CO,2026-10-17,edgar-submissions
+0000933136,6199,Finance Services,"Maverick Merger Sub 2, LLC",2026-10-17,edgar-submissions
+0000934612,4011,"Railroads, Line-Haul Operating","BURLINGTON NORTHERN SANTA FE, LLC",2026-10-17,edgar-submissions
+0000935703,5331,Retail-Variety Stores,"DOLLAR TREE, INC.",2026-10-17,edgar-submissions
+0000936340,4911,Electric Services,DTE ENERGY CO,2026-10-17,edgar-submissions
+0000936395,3661,Telephone & Telegraph Apparatus,CIENA CORP,2026-10-17,edgar-submissions
+0000936402,2834,Pharmaceutical Preparations,Shire plc,2026-10-17,edgar-submissions
+0000936468,3760,Guided Missiles & Space Vehicles & Parts,LOCKHEED MARTIN CORP,2026-10-17,edgar-submissions
+0000937966,3559,"Special Industry Machinery, NEC",ASML HOLDING NV,2026-10-17,edgar-submissions
+0000940944,5812,Retail-Eating  Places,DARDEN RESTAURANTS INC,2026-10-17,edgar-submissions
+0000941548,3533,Oil & Gas Field Machinery & Equipment,CAMERON INTERNATIONAL CORP,2026-10-17,edgar-submissions
+0000943452,3743,Railroad Equipment,WESTINGHOUSE AIR BRAKE TECHNOLOGIES CORP,2026-10-17,edgar-submissions
+0000943819,3841,Surgical & Medical Instruments & Apparatus,RESMED INC,2026-10-17,edgar-submissions
+0000944314,6798,Real Estate Investment Trusts,"LIFE STORAGE, INC.",2026-10-17,edgar-submissions
+0000944868,4899,"Communications Services, NEC",DIRECTV GROUP INC,2026-10-17,edgar-submissions
+0000945436,3674,Semiconductors & Related Devices,"SUNEDISON, INC.",2026-10-17,edgar-submissions
+0000945764,1311,Crude Petroleum & Natural Gas,DENBURY INC,2026-10-17,edgar-submissions
+0000945841,5090,Wholesale-Misc Durable Goods,POOL CORP,2026-10-17,edgar-submissions
+0000946581,7372,Services-Prepackaged Software,TAKE TWO INTERACTIVE SOFTWARE INC,2026-10-17,edgar-submissions
+0000947484,6331,"Fire, Marine & Casualty Insurance",ARCH CAPITAL GROUP LTD.,2026-10-17,edgar-submissions
+0000949039,1381,Drilling Oil & Gas Wells,"DIAMOND OFFSHORE DRILLING, INC.",2026-10-17,edgar-submissions
+0000949061,1311,Crude Petroleum & Natural Gas,UNION PACIFIC RESOURCES GROUP INC,2026-10-17,edgar-submissions
+0000949341,7389,"Services-Business Services, NEC",CHECKFREE CORP \GA\,2026-10-17,edgar-submissions
+0000949573,2834,Pharmaceutical Preparations,PHARMACIA & UPJOHN INC,2026-10-17,edgar-submissions
+0001000180,3572,Computer Storage Devices,SANDISK CORP,2026-10-17,edgar-submissions
+0001000228,5047,"Wholesale-Medical, Dental & Hospital Equipment & Supplies",HENRY SCHEIN INC,2026-10-17,edgar-submissions
+0001000697,3826,Laboratory Analytical Instruments,WATERS CORP /DE/,2026-10-17,edgar-submissions
+0001000736,5912,Retail-Drug Stores and Proprietary Stores,CAREMARK RX INC,2026-10-17,edgar-submissions
+0001001039,7990,Services-Miscellaneous Amusement & Recreation,TWDC Enterprises 18 Corp.,2026-10-17,edgar-submissions
+0001001082,4841,Cable & Other Pay Television Services,DISH Network CORP,2026-10-17,edgar-submissions
+0001001250,2844,"Perfumes, Cosmetics & Other Toilet Preparations",ESTEE LAUDER COMPANIES INC,2026-10-17,edgar-submissions
+0001001288,3570,Computer & office Equipment,LEXMARK INTERNATIONAL INC /KY/,2026-10-17,edgar-submissions
+0001002047,3572,Computer Storage Devices,"NetApp, Inc.",2026-10-17,edgar-submissions
+0001002517,7372,Services-Prepackaged Software,"Nuance Communications, Inc.",2026-10-17,edgar-submissions
+0001002910,4931,Electric & Other Services Combined,AMEREN CORP,2026-10-17,edgar-submissions
+0001003124,8731,Services-Commercial Physical & Biological Research,"PHARMACEUTICAL PRODUCT DEVELOPMENT, LLC",2026-10-17,edgar-submissions
+0001004155,4924,Natural Gas Distribution,SOUTHERN CO GAS,2026-10-17,edgar-submissions
+0001004434,6282,Investment Advice,"AFFILIATED MANAGERS GROUP, INC.",2026-10-17,edgar-submissions
+0001004440,4911,Electric Services,CONSTELLATION ENERGY GROUP INC,2026-10-17,edgar-submissions
+0001004858,4931,Electric & Other Services Combined,NEW CENTURY ENERGIES INC,2026-10-17,edgar-submissions
+0001004980,4931,Electric & Other Services Combined,PG&E Corp,2026-10-17,edgar-submissions
+0001005414,5945,"Retail-Hobby, Toy & Game Shops",TOYS R US INC,2026-10-17,edgar-submissions
+0001006240,3661,Telephone & Telegraph Apparatus,ALCATEL-LUCENT USA INC.,2026-10-17,edgar-submissions
+0001006835,7372,Services-Prepackaged Software,SIEBEL SYSTEMS INC,2026-10-17,edgar-submissions
+0001007456,7370,"Services-Computer Programming, Data Processing, Etc.",ELECTRONIC DATA SYSTEMS CORP /DE/,2026-10-17,edgar-submissions
+0001008654,3089,"Plastics Products, NEC",TUPPERWARE BRANDS CORP,2026-10-17,edgar-submissions
+0001008817,7373,Services-Computer Integrated Systems Design,SAPIENT CORP,2026-10-17,edgar-submissions
+0001010775,4911,Electric Services,MIRANT CORP,2026-10-17,edgar-submissions
+0001011006,,,ALTABA INC.,2026-10-17,edgar-submissions
+0001011657,3341,Secondary Smelting & Refining of  Nonferrous Metals,TITANIUM METALS CORP,2026-10-17,edgar-submissions
+0001012100,2820,"Plastic Material, Synth Resin/Rubber, Cellulos (No Glass)",SEALED AIR CORP/DE,2026-10-17,edgar-submissions
+0001013220,6324,Hospital & Medical Service Plans,WELLPOINT HEALTH NETWORKS INC /DE/,2026-10-17,edgar-submissions
+0001013237,7370,"Services-Computer Programming, Data Processing, Etc.",FACTSET RESEARCH SYSTEMS INC,2026-10-17,edgar-submissions
+0001013462,7372,Services-Prepackaged Software,ANSYS INC,2026-10-17,edgar-submissions
+0001013761,6324,Hospital & Medical Service Plans,AETNA INC /CT/,2026-10-17,edgar-submissions
+0001013871,4911,Electric Services,"NRG ENERGY, INC.",2026-10-17,edgar-submissions
+0001014473,7371,Services-Computer Programming Services,VERISIGN INC/CA,2026-10-17,edgar-submissions
+0001015780,6035,"Savings Institution, Federally Chartered",E TRADE FINANCIAL CORP,2026-10-17,edgar-submissions
+0001015820,2836,"Biological Products, (No Diagnostic Substances)",QIAGEN N.V.,2026-10-17,edgar-submissions
+0001015922,7372,Services-Prepackaged Software,CHECK POINT SOFTWARE TECHNOLOGIES LTD,2026-10-17,edgar-submissions
+0001017008,4833,Television Broadcasting Stations,UNIVISION COMMUNICATIONS INC,2026-10-17,edgar-submissions
+0001018724,5961,Retail-Catalog & Mail-Order Houses,AMAZON COM INC,2026-10-17,edgar-submissions
+0001018840,5651,Retail-Family Clothing Stores,ABERCROMBIE & FITCH CO /DE/,2026-10-17,edgar-submissions
+0001018963,3317,Steel Pipe & Tubes,ATI INC,2026-10-17,edgar-submissions
+0001019876,7374,Services-Computer Processing & Data Preparation,NIELSEN MEDIA RESEARCH INC,2026-10-17,edgar-submissions
+0001020265,4700,Transportation Services,SABRE HOLDINGS CORP,2026-10-17,edgar-submissions
+0001020416,7363,Services-Help Supply Services,"MONSTER WORLDWIDE, INC.",2026-10-17,edgar-submissions
+0001020569,6798,Real Estate Investment Trusts,IRON MOUNTAIN INC,2026-10-17,edgar-submissions
+0001021387,7812,Services-Motion Picture & Video Tape Production,HISTORIC TW INC,2026-10-17,edgar-submissions
+0001021860,3533,Oil & Gas Field Machinery & Equipment,NOV Inc.,2026-10-17,edgar-submissions
+0001022079,8071,Services-Medical Laboratories,QUEST DIAGNOSTICS INC,2026-10-17,edgar-submissions
+0001022671,3312,"Steel Works, Blast Furnaces & Rolling Mills (Coke Ovens)",STEEL DYNAMICS INC,2026-10-17,edgar-submissions
+0001023291,4911,Electric Services,Energy Future Holdings Corp /TX/,2026-10-17,edgar-submissions
+0001024305,2844,"Perfumes, Cosmetics & Other Toilet Preparations",COTY INC.,2026-10-17,edgar-submissions
+0001024401,6200,"Security & Commodity Brokers, Dealers, Exchanges & Services",ENRON CORP/OR/,2026-10-17,edgar-submissions
+0001024478,3829,"Measuring & Controlling Devices, NEC","ROCKWELL AUTOMATION, INC",2026-10-17,edgar-submissions
+0001024725,3714,Motor Vehicle Parts & Accessories,TENNECO INC,2026-10-17,edgar-submissions
+0001026214,6111,Federal & Federally-Sponsored Credit Agencies,FEDERAL HOME LOAN MORTGAGE CORP,2026-10-17,edgar-submissions
+0001030048,7311,Services-Advertising Agencies,YOUNG & RUBICAM INC.,2026-10-17,edgar-submissions
+0001031296,4911,Electric Services,FIRSTENERGY CORP,2026-10-17,edgar-submissions
+0001031798,7372,Services-Prepackaged Software,BEA SYSTEMS INC,2026-10-17,edgar-submissions
+0001032033,6141,Personal Credit Institutions,SLM Corp,2026-10-17,edgar-submissions
+0001032208,4932,Gas & Other Services Combined,SEMPRA,2026-10-17,edgar-submissions
+0001032975,3577,"Computer Peripheral Equipment, NEC",LOGITECH INTERNATIONAL S.A.,2026-10-17,edgar-submissions
+0001034054,6798,Real Estate Investment Trusts,SBA COMMUNICATIONS CORP,2026-10-17,edgar-submissions
+0001035002,2911,Petroleum Refining,VALERO ENERGY CORP/TX,2026-10-17,edgar-submissions
+0001035267,3842,"Orthopedic, Prosthetic & Surgical Appliances & Supplies",INTUITIVE SURGICAL INC,2026-10-17,edgar-submissions
+0001035443,6798,Real Estate Investment Trusts,"ALEXANDRIA REAL ESTATE EQUITIES, INC.",2026-10-17,edgar-submissions
+0001035713,6021,National Commercial Banks,PROVIDIAN FINANCIAL CORP,2026-10-17,edgar-submissions
+0001035972,2890,Miscellaneous Chemical Products,MORTON INTERNATIONAL INC /IN/,2026-10-17,edgar-submissions
+0001035983,1731,Electrical Work,COMFORT SYSTEMS USA INC,2026-10-17,edgar-submissions
+0001037016,4812,Radiotelephone Communications,NII HOLDINGS INC,2026-10-17,edgar-submissions
+0001037038,2320,"Men's & Boys' Furnishgs, Work Clothg, & Allied Garments",RALPH LAUREN CORP,2026-10-17,edgar-submissions
+0001037540,6798,Real Estate Investment Trusts,"BXP, Inc.",2026-10-17,edgar-submissions
+0001037646,3826,Laboratory Analytical Instruments,METTLER TOLEDO INTERNATIONAL INC/,2026-10-17,edgar-submissions
+0001037868,3823,"Industrial Instruments For Measurement, Display, and Control",AMETEK INC/,2026-10-17,edgar-submissions
+0001037949,4813,Telephone Communications (No Radiotelephone),QWEST COMMUNICATIONS INTERNATIONAL INC,2026-10-17,edgar-submissions
+0001038339,6798,Real Estate Investment Trusts,EQUITY OFFICE PROPERTIES TRUST,2026-10-17,edgar-submissions
+0001038357,1311,Crude Petroleum & Natural Gas,PIONEER NATURAL RESOURCES CO,2026-10-17,edgar-submissions
+0001038683,4512,"Air Transportation, Scheduled",RYANAIR HOLDINGS PLC,2026-10-17,edgar-submissions
+0001039101,3663,Radio & Tv Broadcasting & Communications Equipment,"L3 TECHNOLOGIES, INC.",2026-10-17,edgar-submissions
+0001039684,4923,Natural Gas Transmisison & Distribution,ONEOK INC /NEW/,2026-10-17,edgar-submissions
+0001040971,6798,Real Estate Investment Trusts,SL GREEN REALTY CORP,2026-10-17,edgar-submissions
+0001041061,5812,Retail-Eating  Places,YUM BRANDS INC,2026-10-17,edgar-submissions
+0001042825,3679,"Electronic Components, NEC",POWER ONE INC,2026-10-17,edgar-submissions
+0001043273,5311,Retail-Department Stores,FRED MEYER INC,2026-10-17,edgar-submissions
+0001043277,4731,Arrangement of  Transportation of  Freight & Cargo,"C. H. ROBINSON WORLDWIDE, INC.",2026-10-17,edgar-submissions
+0001043604,3576,Computer Communications Equipment,JUNIPER NETWORKS INC,2026-10-17,edgar-submissions
+0001045309,2800,Chemicals & Allied Products,W R GRACE & CO,2026-10-17,edgar-submissions
+0001045609,6798,Real Estate Investment Trusts,"Prologis, Inc.",2026-10-17,edgar-submissions
+0001045810,3674,Semiconductors & Related Devices,NVIDIA CORP,2026-10-17,edgar-submissions
+0001047122,3812,"Search, Detection, Navigation, Guidance, Aeronautical Sys",RAYTHEON CO/,2026-10-17,edgar-submissions
+0001047699,2834,Pharmaceutical Preparations,KING PHARMACEUTICALS INC,2026-10-17,edgar-submissions
+0001047862,4931,Electric & Other Services Combined,CONSOLIDATED EDISON INC,2026-10-17,edgar-submissions
+0001048286,7011,Hotels & Motels,MARRIOTT INTERNATIONAL INC /MD/,2026-10-17,edgar-submissions
+0001048477,2834,Pharmaceutical Preparations,BIOMARIN PHARMACEUTICAL INC,2026-10-17,edgar-submissions
+0001048695,3576,Computer Communications Equipment,"F5, INC.",2026-10-17,edgar-submissions
+0001048911,4513,Air Courier Services,FEDEX CORP,2026-10-17,edgar-submissions
+0001050446,6199,Finance Services,Strategy Inc,2026-10-17,edgar-submissions
+0001050915,1731,Electrical Work,"QUANTA SERVICES, INC.",2026-10-17,edgar-submissions
+0001051470,6798,Real Estate Investment Trusts,CROWN CASTLE INC.,2026-10-17,edgar-submissions
+0001053112,4841,Cable & Other Pay Television Services,CABLEVISION SYSTEMS CORP /NY,2026-10-17,edgar-submissions
+0001053507,6798,Real Estate Investment Trusts,AMERICAN TOWER CORP /MA/,2026-10-17,edgar-submissions
+0001054374,3674,Semiconductors & Related Devices,BROADCOM CORP,2026-10-17,edgar-submissions
+0001054522,4813,Telephone Communications (No Radiotelephone),CenturyLink Investment Management Co,2026-10-17,edgar-submissions
+0001054833,6324,Hospital & Medical Service Plans,COVENTRY HEALTH CARE INC,2026-10-17,edgar-submissions
+0001056288,6282,Investment Advice,"FEDERATED HERMES, INC.",2026-10-17,edgar-submissions
+0001057352,7389,"Services-Business Services, NEC","COSTAR GROUP, INC.",2026-10-17,edgar-submissions
+0001058057,3674,Semiconductors & Related Devices,MARVELL TECHNOLOGY GROUP LTD,2026-10-17,edgar-submissions
+0001058083,7374,Services-Computer Processing & Data Preparation,IMS HEALTH INC,2026-10-17,edgar-submissions
+0001058090,5812,Retail-Eating  Places,CHIPOTLE MEXICAN GRILL INC,2026-10-17,edgar-submissions
+0001058290,7371,Services-Computer Programming Services,COGNIZANT TECHNOLOGY SOLUTIONS CORP,2026-10-17,edgar-submissions
+0001059556,7320,"Services-Consumer Credit Reporting, Collection Agencies",MOODYS CORP /DE/,2026-10-17,edgar-submissions
+0001060391,4953,Refuse Systems,"REPUBLIC SERVICES, INC.",2026-10-17,edgar-submissions
+0001060736,2836,"Biological Products, (No Diagnostic Substances)",Seagen Inc.,2026-10-17,edgar-submissions
+0001061322,4813,Telephone Communications (No Radiotelephone),GLOBAL CROSSING LTD,2026-10-17,edgar-submissions
+0001062047,7373,Services-Computer Integrated Systems Design,CONCENTRIX CVG Corp,2026-10-17,edgar-submissions
+0001062379,4924,Natural Gas Distribution,KEYSPAN CORP,2026-10-17,edgar-submissions
+0001063761,6798,Real Estate Investment Trusts,SIMON PROPERTY GROUP INC.,2026-10-17,edgar-submissions
+0001064728,1221,Bituminous Coal & Lignite Surface Mining,PEABODY ENERGY CORP,2026-10-17,edgar-submissions
+0001065049,4812,Radiotelephone Communications,LEAP WIRELESS INTERNATIONAL INC,2026-10-17,edgar-submissions
+0001065088,7389,"Services-Business Services, NEC",EBAY INC,2026-10-17,edgar-submissions
+0001065280,7841,Services-Video Tape Rental,NETFLIX INC,2026-10-17,edgar-submissions
+0001065696,5010,Wholesale-Motor Vehicles & Motor Vehicle Parts & Supplies,LKQ CORP,2026-10-17,edgar-submissions
+0001065865,6282,Investment Advice,JANUS CAPITAL GROUP INC,2026-10-17,edgar-submissions
+0001066107,4922,Natural Gas Transmission,EL PASO LLC,2026-10-17,edgar-submissions
+0001066806,2911,Petroleum Refining,CONOCOPHILLIPS HOLDING CO,2026-10-17,edgar-submissions
+0001067092,6021,National Commercial Banks,BANK ONE CORP,2026-10-17,edgar-submissions
+0001067491,7371,Services-Computer Programming Services,Infosys Ltd,2026-10-17,edgar-submissions
+0001067701,7359,"Services-Equipment Rental & Leasing, NEC","UNITED RENTALS, INC.",2026-10-17,edgar-submissions
+0001067983,6331,"Fire, Marine & Casualty Insurance",BERKSHIRE HATHAWAY INC,2026-10-17,edgar-submissions
+0001069183,3480,"Ordnance & Accessories, (No Vehicles/Guided Missiles)","AXON ENTERPRISE, INC.",2026-10-17,edgar-submissions
+0001069202,3585,Air-Cond & Warm Air Heatg Equip & Comm & Indl Refrig Equip,LENNOX INTERNATIONAL INC,2026-10-17,edgar-submissions
+0001069353,3674,Semiconductors & Related Devices,CONEXANT SYSTEMS INC,2026-10-17,edgar-submissions
+0001070235,7372,Services-Prepackaged Software,BLACKBERRY Ltd,2026-10-17,edgar-submissions
+0001070412,1311,Crude Petroleum & Natural Gas,CNX Resources Corp,2026-10-17,edgar-submissions
+0001070750,6798,Real Estate Investment Trusts,"HOST HOTELS & RESORTS, INC.",2026-10-17,edgar-submissions
+0001071739,6324,Hospital & Medical Service Plans,CENTENE CORP,2026-10-17,edgar-submissions
+0001072342,3714,Motor Vehicle Parts & Accessories,DELPHI CORP,2026-10-17,edgar-submissions
+0001073431,2836,"Biological Products, (No Diagnostic Substances)",Life Technologies Corp,2026-10-17,edgar-submissions
+0001075124,2741,Miscellaneous Publishing,THOMSON REUTERS CORP /CAN/,2026-10-17,edgar-submissions
+0001075531,4700,Transportation Services,Booking Holdings Inc.,2026-10-17,edgar-submissions
+0001076405,2080,Beverages,PEPSI BOTTLING GROUP INC,2026-10-17,edgar-submissions
+0001083269,1381,Drilling Oil & Gas Wells,TRANSOCEAN INTERNATIONAL Ltd,2026-10-17,edgar-submissions
+0001084408,7372,Services-Prepackaged Software,VERITAS SOFTWARE CORP /DE/,2026-10-17,edgar-submissions
+0001086222,7389,"Services-Business Services, NEC",AKAMAI TECHNOLOGIES INC,2026-10-17,edgar-submissions
+0001087423,7370,"Services-Computer Programming, Data Processing, Etc.",RED HAT INC,2026-10-17,edgar-submissions
+0001089976,2673,"Plastics, Foil & Coated Paper Bags",PACTIV LLC,2026-10-17,edgar-submissions
+0001090012,1311,Crude Petroleum & Natural Gas,DEVON ENERGY CORP/DE,2026-10-17,edgar-submissions
+0001090425,6798,Real Estate Investment Trusts,LAMAR ADVERTISING CO/NEW,2026-10-17,edgar-submissions
+0001090727,4210,Trucking & Courier Services (No Air),UNITED PARCEL SERVICE INC,2026-10-17,edgar-submissions
+0001090872,3826,Laboratory Analytical Instruments,"AGILENT TECHNOLOGIES, INC.",2026-10-17,edgar-submissions
+0001091530,4899,"Communications Services, NEC",XM SATELLITE RADIO HOLDINGS INC,2026-10-17,edgar-submissions
+0001091667,4841,Cable & Other Pay Television Services,"CHARTER COMMUNICATIONS, INC. /MO/",2026-10-17,edgar-submissions
+0001093557,3841,Surgical & Medical Instruments & Apparatus,DEXCOM INC,2026-10-17,edgar-submissions
+0001094093,4911,Electric Services,PROGRESS ENERGY INC,2026-10-17,edgar-submissions
+0001094285,3812,"Search, Detection, Navigation, Guidance, Aeronautical Sys",TELEDYNE TECHNOLOGIES INC,2026-10-17,edgar-submissions
+0001095073,6331,"Fire, Marine & Casualty Insurance","EVEREST GROUP, LTD.",2026-10-17,edgar-submissions
+0001097149,3842,"Orthopedic, Prosthetic & Surgical Appliances & Supplies",ALIGN TECHNOLOGY INC,2026-10-17,edgar-submissions
+0001097864,3674,Semiconductors & Related Devices,ON SEMICONDUCTOR CORP,2026-10-17,edgar-submissions
+0001099219,6311,Life Insurance,METLIFE INC,2026-10-17,edgar-submissions
+0001099590,7389,"Services-Business Services, NEC",MERCADOLIBRE INC,2026-10-17,edgar-submissions
+0001099800,3842,"Orthopedic, Prosthetic & Surgical Appliances & Supplies",Edwards Lifesciences Corp,2026-10-17,edgar-submissions
+0001100389,3575,Computer Terminals,PALM INC,2026-10-17,edgar-submissions
+0001100682,8731,Services-Commercial Physical & Biological Research,"CHARLES RIVER LABORATORIES INTERNATIONAL, INC.",2026-10-17,edgar-submissions
+0001101215,6141,Personal Credit Institutions,"BREAD FINANCIAL HOLDINGS, INC.",2026-10-17,edgar-submissions
+0001101239,6798,Real Estate Investment Trusts,EQUINIX INC,2026-10-17,edgar-submissions
+0001103982,2000,Food and Kindred Products,"Mondelez International, Inc.",2026-10-17,edgar-submissions
+0001104506,2834,Pharmaceutical Preparations,INSMED Inc,2026-10-17,edgar-submissions
+0001105705,4841,Cable & Other Pay Television Services,"WARNER MEDIA, LLC",2026-10-17,edgar-submissions
+0001108524,7372,Services-Prepackaged Software,"Salesforce, Inc.",2026-10-17,edgar-submissions
+0001108827,1311,Crude Petroleum & Natural Gas,"QEP RESOURCES, INC.",2026-10-17,edgar-submissions
+0001109357,4931,Electric & Other Services Combined,EXELON CORP,2026-10-17,edgar-submissions
+0001110646,7372,Services-Prepackaged Software,"NetEase, Inc.",2026-10-17,edgar-submissions
+0001110783,2870,Agricultural Chemicals,MONSANTO CO /NEW/,2026-10-17,edgar-submissions
+0001110803,3826,Laboratory Analytical Instruments,"ILLUMINA, INC.",2026-10-17,edgar-submissions
+0001111335,3714,Motor Vehicle Parts & Accessories,VISTEON CORP,2026-10-17,edgar-submissions
+0001111711,4931,Electric & Other Services Combined,NISOURCE INC.,2026-10-17,edgar-submissions
+0001111928,3674,Semiconductors & Related Devices,IPG PHOTONICS CORP,2026-10-17,edgar-submissions
+0001113169,6282,Investment Advice,PRICE T ROWE GROUP INC,2026-10-17,edgar-submissions
+0001115222,7320,"Services-Consumer Credit Reporting, Collection Agencies",DUN & BRADSTREET CORP/NW,2026-10-17,edgar-submissions
+0001116132,3100,Leather & Leather Products,"TAPESTRY, INC.",2026-10-17,edgar-submissions
+0001116521,3661,Telephone & Telegraph Apparatus,AVAYA INC,2026-10-17,edgar-submissions
+0001120193,6200,"Security & Commodity Brokers, Dealers, Exchanges & Services","NASDAQ, INC.",2026-10-17,edgar-submissions
+0001121788,3812,"Search, Detection, Navigation, Guidance, Aeronautical Sys",GARMIN LTD,2026-10-17,edgar-submissions
+0001122304,6324,Hospital & Medical Service Plans,AETNA INC /PA/,2026-10-17,edgar-submissions
+0001123360,7389,"Services-Business Services, NEC",GLOBAL PAYMENTS INC,2026-10-17,edgar-submissions
+0001124198,1600,Heavy Construction Other Than Bldg Const - Contractors,FLUOR CORP,2026-10-17,edgar-submissions
+0001126328,6321,Accident & Health Insurance,PRINCIPAL FINANCIAL GROUP INC,2026-10-17,edgar-submissions
+0001130310,4911,Electric Services,CENTERPOINT ENERGY INC,2026-10-17,edgar-submissions
+0001130385,1600,Heavy Construction Other Than Bldg Const - Contractors,FOSTER WHEELER AG,2026-10-17,edgar-submissions
+0001132979,,,FIRST REPUBLIC BANK,2026-10-17,edgar-submissions
+0001133421,3812,"Search, Detection, Navigation, Guidance, Aeronautical Sys",NORTHROP GRUMMAN CORP /DE/,2026-10-17,edgar-submissions
+0001135152,3533,Oil & Gas Field Machinery & Equipment,FMC TECHNOLOGIES INC,2026-10-17,edgar-submissions
+0001135971,4931,Electric & Other Services Combined,PEPCO HOLDINGS LLC,2026-10-17,edgar-submissions
+0001136869,3842,"Orthopedic, Prosthetic & Surgical Appliances & Supplies","ZIMMER BIOMET HOLDINGS, INC.",2026-10-17,edgar-submissions
+0001136893,7389,"Services-Business Services, NEC","Fidelity National Information Services, Inc.",2026-10-17,edgar-submissions
+0001137411,3728,"Aircraft Parts & Auxiliary Equipment, NEC",ROCKWELL COLLINS INC,2026-10-17,edgar-submissions
+0001137774,6311,Life Insurance,PRUDENTIAL FINANCIAL INC,2026-10-17,edgar-submissions
+0001137789,3572,Computer Storage Devices,Seagate Technology Holdings plc,2026-10-17,edgar-submissions
+0001138118,6500,Real Estate,"CBRE GROUP, INC.",2026-10-17,edgar-submissions
+0001138234,4812,Radiotelephone Communications,"NEW CINGULAR WIRELESS SERVICES, INC.",2026-10-17,edgar-submissions
+0001140536,6411,"Insurance Agents, Brokers & Service",WILLIS TOWERS WATSON PLC,2026-10-17,edgar-submissions
+0001140859,5122,"Wholesale-Drugs, Proprietaries & Druggists' Sundries","Cencora, Inc.",2026-10-17,edgar-submissions
+0001141185,1311,Crude Petroleum & Natural Gas,KERR MCGEE CORP /DE,2026-10-17,edgar-submissions
+0001141391,7389,"Services-Business Services, NEC",Mastercard Inc,2026-10-17,edgar-submissions
+0001141982,3670,Electronic Components & Accessories,Cooper Industries plc,2026-10-17,edgar-submissions
+0001144215,3640,Electric Lighting & Wiring Equipment,ACUITY INC. (DE),2026-10-17,edgar-submissions
+0001145197,3841,Surgical & Medical Instruments & Apparatus,INSULET CORP,2026-10-17,edgar-submissions
+0001156039,6324,Hospital & Medical Service Plans,"Elevance Health, Inc.",2026-10-17,edgar-submissions
+0001156375,6200,"Security & Commodity Brokers, Dealers, Exchanges & Services",CME GROUP INC.,2026-10-17,edgar-submissions
+0001156826,6798,Real Estate Investment Trusts,ARCHSTONE SMITH TRUST,2026-10-17,edgar-submissions
+0001158449,5531,Retail-Auto & Home Supply Stores,ADVANCE AUTO PARTS INC,2026-10-17,edgar-submissions
+0001159297,2621,Paper Mills,MEADWESTVACO Corp,2026-10-17,edgar-submissions
+0001160497,3560,General Industrial Machinery & Equipment,INGERSOLL RAND CO LTD,2026-10-17,edgar-submissions
+0001163165,2911,Petroleum Refining,CONOCOPHILLIPS,2026-10-17,edgar-submissions
+0001163302,3312,"Steel Works, Blast Furnaces & Rolling Mills (Coke Ovens)",UNITED STATES STEEL CORP,2026-10-17,edgar-submissions
+0001163739,1381,Drilling Oil & Gas Wells,NABORS INDUSTRIES LTD,2026-10-17,edgar-submissions
+0001164727,1040,Gold and Silver Ores,NEWMONT Corp /DE/,2026-10-17,edgar-submissions
+0001166126,5311,Retail-Department Stores,"Old COPPER Company, Inc.",2026-10-17,edgar-submissions
+0001166691,4841,Cable & Other Pay Television Services,COMCAST CORP,2026-10-17,edgar-submissions
+0001168054,1311,Crude Petroleum & Natural Gas,CIMAREX ENERGY CO,2026-10-17,edgar-submissions
+0001169055,1381,Drilling Oil & Gas Wells,Noble Finance Co,2026-10-17,edgar-submissions
+0001170010,5500,Retail-Auto Dealers & Gasoline Stations,CARMAX INC,2026-10-17,edgar-submissions
+0001170565,1381,Drilling Oil & Gas Wells,WEATHERFORD INTERNATIONAL LTD,2026-10-17,edgar-submissions
+0001170650,5912,Retail-Drug Stores and Proprietary Stores,MEDCO HEALTH SOLUTIONS INC,2026-10-17,edgar-submissions
+0001171825,6021,National Commercial Banks,CIT GROUP INC,2026-10-17,edgar-submissions
+0001174746,6200,"Security & Commodity Brokers, Dealers, Exchanges & Services","Intercontinental Exchange Holdings, Inc.",2026-10-17,edgar-submissions
+0001174922,7011,Hotels & Motels,WYNN RESORTS LTD,2026-10-17,edgar-submissions
+0001175454,7389,"Services-Business Services, NEC","CORPAY, INC.",2026-10-17,edgar-submissions
+0001175580,1040,Gold and Silver Ores,RANDGOLD RESOURCES LTD,2026-10-17,edgar-submissions
+0001176948,6282,Investment Advice,Ares Management Corp,2026-10-17,edgar-submissions
+0001178670,2834,Pharmaceutical Preparations,"ALNYLAM PHARMACEUTICALS, INC.",2026-10-17,edgar-submissions
+0001179929,6324,Hospital & Medical Service Plans,"MOLINA HEALTHCARE, INC.",2026-10-17,edgar-submissions
+0001181412,7370,"Services-Computer Programming, Data Processing, Etc.",SPACE EXPLORATION TECHNOLOGIES CORP,2026-10-17,edgar-submissions
+0001260221,3728,"Aircraft Parts & Auxiliary Equipment, NEC",TransDigm Group INC,2026-10-17,edgar-submissions
+0001261333,7372,Services-Prepackaged Software,"DOCUSIGN, INC.",2026-10-17,edgar-submissions
+0001262039,3577,"Computer Peripheral Equipment, NEC","Fortinet, Inc.",2026-10-17,edgar-submissions
+0001267238,6399,"Insurance Carriers, NEC","ASSURANT, INC.",2026-10-17,edgar-submissions
+0001269238,7389,"Services-Business Services, NEC",Trip.com Group Ltd,2026-10-17,edgar-submissions
+0001270400,4813,Telephone Communications (No Radiotelephone),VIRGIN MEDIA INC.,2026-10-17,edgar-submissions
+0001272547,3674,Semiconductors & Related Devices,FREESCALE SEMICONDUCTOR INC,2026-10-17,edgar-submissions
+0001274057,2834,Pharmaceutical Preparations,HOSPIRA INC,2026-10-17,edgar-submissions
+0001274494,3674,Semiconductors & Related Devices,"FIRST SOLAR, INC.",2026-10-17,edgar-submissions
+0001275283,2111,Cigarettes,REYNOLDS AMERICAN INC,2026-10-17,edgar-submissions
+0001276520,6311,Life Insurance,GENWORTH FINANCIAL INC,2026-10-17,edgar-submissions
+0001278021,6211,"Security Brokers, Dealers & Flotation Companies",MARKETAXESS HOLDINGS INC,2026-10-17,edgar-submissions
+0001279363,6324,Hospital & Medical Service Plans,"WELLCARE HEALTH PLANS, INC.",2026-10-17,edgar-submissions
+0001280452,3674,Semiconductors & Related Devices,"MONOLITHIC POWER SYSTEMS, INC.",2026-10-17,edgar-submissions
+0001281761,6021,National Commercial Banks,REGIONS FINANCIAL CORP,2026-10-17,edgar-submissions
+0001282266,4813,Telephone Communications (No Radiotelephone),"WINDSTREAM HOLDINGS, INC.",2026-10-17,edgar-submissions
+0001283699,4812,Radiotelephone Communications,"T-Mobile US, Inc.",2026-10-17,edgar-submissions
+0001285785,2870,Agricultural Chemicals,MOSAIC CO,2026-10-17,edgar-submissions
+0001286681,5140,Wholesale-Groceries & Related Products,DOMINOS PIZZA INC,2026-10-17,edgar-submissions
+0001288776,7370,"Services-Computer Programming, Data Processing, Etc.",GOOGLE INC.,2026-10-17,edgar-submissions
+0001288784,6022,State Commercial Banks,Signature Bank Corp,2026-10-17,edgar-submissions
+0001289490,6798,Real Estate Investment Trusts,Extra Space Storage Inc.,2026-10-17,edgar-submissions
+0001297996,6798,Real Estate Investment Trusts,"DIGITAL REALTY TRUST, INC.",2026-10-17,edgar-submissions
+0001300514,7011,Hotels & Motels,LAS VEGAS SANDS CORP,2026-10-17,edgar-submissions
+0001301063,1221,Bituminous Coal & Lignite Surface Mining,"Alpha Natural Resources, Inc.",2026-10-17,edgar-submissions
+0001305014,5160,Wholesale-Chemicals & Allied Products,ASHLAND LLC,2026-10-17,edgar-submissions
+0001306830,2820,"Plastic Material, Synth Resin/Rubber, Cellulos (No Glass)",Celanese Corp,2026-10-17,edgar-submissions
+0001308161,4841,Cable & Other Pay Television Services,"TWENTY-FIRST CENTURY FOX, INC.",2026-10-17,edgar-submissions
+0001310067,5311,Retail-Department Stores,SEARS HOLDINGS CORP,2026-10-17,edgar-submissions
+0001316631,4841,Cable & Other Pay Television Services,"Liberty Global, Inc.",2026-10-17,edgar-submissions
+0001316835,5211,Retail-Lumber & Other Building Materials Dealers,"Builders FirstSource, Inc.",2026-10-17,edgar-submissions
+0001318605,3711,Motor Vehicles & Passenger Car Bodies,"Tesla, Inc.",2026-10-17,edgar-submissions
+0001320482,7812,Services-Motion Picture & Video Tape Production,Discovery Holding CO,2026-10-17,edgar-submissions
+0001321655,7372,Services-Prepackaged Software,Palantir Technologies Inc.,2026-10-17,edgar-submissions
+0001323854,2834,Pharmaceutical Preparations,Warner Chilcott plc,2026-10-17,edgar-submissions
+0001324404,2870,Agricultural Chemicals,"CF Industries Holdings, Inc.",2026-10-17,edgar-submissions
+0001324424,4700,Transportation Services,"Expedia Group, Inc.",2026-10-17,edgar-submissions
+0001326160,4931,Electric & Other Services Combined,Duke Energy CORP,2026-10-17,edgar-submissions
+0001326380,5734,Retail-Computer & Computer Software Stores,GameStop Corp.,2026-10-17,edgar-submissions
+0001326801,7370,"Services-Computer Programming, Data Processing, Etc.","Meta Platforms, Inc.",2026-10-17,edgar-submissions
+0001327567,3577,"Computer Peripheral Equipment, NEC",Palo Alto Networks Inc,2026-10-17,edgar-submissions
+0001327811,7374,Services-Computer Processing & Data Preparation,"Workday, Inc.",2026-10-17,edgar-submissions
+0001329099,7370,"Services-Computer Programming, Data Processing, Etc.","Baidu, Inc.",2026-10-17,edgar-submissions
+0001330017,7311,Services-Advertising Agencies,Focus Media Holding LTD,2026-10-17,edgar-submissions
+0001335258,7900,Services-Amusement & Recreation Services,"Live Nation Entertainment, Inc.",2026-10-17,edgar-submissions
+0001336917,2300,Apparel & Other Finishd Prods of  Fabrics & Similar Matl,"Under Armour, Inc.",2026-10-17,edgar-submissions
+0001336920,7373,Services-Computer Integrated Systems Design,"Leidos Holdings, Inc.",2026-10-17,edgar-submissions
+0001339947,4841,Cable & Other Pay Television Services,Viacom Inc.,2026-10-17,edgar-submissions
+0001341439,7372,Services-Prepackaged Software,ORACLE CORP,2026-10-17,edgar-submissions
+0001350031,4813,Telephone Communications (No Radiotelephone),Embarq CORP,2026-10-17,edgar-submissions
+0001352010,7371,Services-Computer Programming Services,"EPAM Systems, Inc.",2026-10-17,edgar-submissions
+0001353283,7372,Services-Prepackaged Software,SPLUNK INC,2026-10-17,edgar-submissions
+0001355001,6531,Real Estate Agents & Managers (For Others),Anywhere Real Estate Group LLC,2026-10-17,edgar-submissions
+0001355096,5961,Retail-Catalog & Mail-Order Houses,"Old QVC Group, Inc.",2026-10-17,edgar-submissions
+0001358071,1311,Crude Petroleum & Natural Gas,CONCHO RESOURCES INC,2026-10-17,edgar-submissions
+0001359841,5600,Retail-Apparel & Accessory Stores,Hanesbrands Inc.,2026-10-17,edgar-submissions
+0001361658,7011,Hotels & Motels,Travel & Leisure Co.,2026-10-17,edgar-submissions
+0001363851,6411,"Insurance Agents, Brokers & Service",Catamaran Corp,2026-10-17,edgar-submissions
+0001364742,6211,"Security Brokers, Dealers & Flotation Companies","BlackRock Finance, Inc.",2026-10-17,edgar-submissions
+0001365135,7389,"Services-Business Services, NEC",Western Union CO,2026-10-17,edgar-submissions
+0001368007,6200,"Security & Commodity Brokers, Dealers, Exchanges & Services",NYSE Euronext,2026-10-17,edgar-submissions
+0001370637,7389,"Services-Business Services, NEC",ETSY INC,2026-10-17,edgar-submissions
+0001373715,7372,Services-Prepackaged Software,"ServiceNow, Inc.",2026-10-17,edgar-submissions
+0001373835,4923,Natural Gas Transmisison & Distribution,Spectra Energy Corp.,2026-10-17,edgar-submissions
+0001374310,6200,"Security & Commodity Brokers, Dealers, Exchanges & Services","Cboe Global Markets, Inc.",2026-10-17,edgar-submissions
+0001375365,3571,Electronic Computers,"Super Micro Computer, Inc.",2026-10-17,edgar-submissions
+0001377013,4841,Cable & Other Pay Television Services,"SPECTRUM MANAGEMENT HOLDING COMPANY, LLC",2026-10-17,edgar-submissions
+0001378946,6035,"Savings Institution, Federally Chartered","People's United Financial, Inc.",2026-10-17,edgar-submissions
+0001379895,4911,Electric Services,DYNEGY INC.,2026-10-17,edgar-submissions
+0001381197,6211,"Security Brokers, Dealers & Flotation Companies","Interactive Brokers Group, Inc.",2026-10-17,edgar-submissions
+0001383312,7389,"Services-Business Services, NEC","BROADRIDGE FINANCIAL SOLUTIONS, INC.",2026-10-17,edgar-submissions
+0001385157,5065,"Wholesale-Electronic Parts & Equipment, NEC",TE Connectivity plc,2026-10-17,edgar-submissions
+0001385187,3841,Surgical & Medical Instruments & Apparatus,Covidien plc,2026-10-17,edgar-submissions
+0001389170,4922,Natural Gas Transmission,Targa Resources Corp.,2026-10-17,edgar-submissions
+0001390777,6022,State Commercial Banks,Bank of New York Mellon Corp,2026-10-17,edgar-submissions
+0001393052,7372,Services-Prepackaged Software,VEEVA SYSTEMS INC,2026-10-17,edgar-submissions
+0001393311,6798,Real Estate Investment Trusts,Public Storage,2026-10-17,edgar-submissions
+0001393612,6141,Personal Credit Institutions,Discover Financial Services,2026-10-17,edgar-submissions
+0001393818,6282,Investment Advice,Blackstone Inc.,2026-10-17,edgar-submissions
+0001396009,1400,Mining & Quarrying of  Nonmetallic Minerals (No Fuels),Vulcan Materials CO,2026-10-17,edgar-submissions
+0001397187,2300,Apparel & Other Finishd Prods of  Fabrics & Similar Matl,lululemon athletica inc.,2026-10-17,edgar-submissions
+0001399315,6022,State Commercial Banks,MARSHALL & ILSLEY CORP,2026-10-17,edgar-submissions
+0001402057,5961,Retail-Catalog & Mail-Order Houses,CDW Corp,2026-10-17,edgar-submissions
+0001403161,7389,"Services-Business Services, NEC",VISA INC.,2026-10-17,edgar-submissions
+0001403568,5990,"Retail-Retail Stores, NEC","Ulta Beauty, Inc.",2026-10-17,edgar-submissions
+0001404912,6282,Investment Advice,KKR & Co. Inc.,2026-10-17,edgar-submissions
+0001408198,7389,"Services-Business Services, NEC",MSCI Inc.,2026-10-17,edgar-submissions
+0001410636,4941,Water Supply,"American Water Works Company, Inc.",2026-10-17,edgar-submissions
+0001413329,2111,Cigarettes,Philip Morris International Inc.,2026-10-17,edgar-submissions
+0001413447,3674,Semiconductors & Related Devices,NXP Semiconductors N.V.,2026-10-17,edgar-submissions
+0001415404,4899,"Communications Services, NEC",EchoStar CORP,2026-10-17,edgar-submissions
+0001418091,7370,"Services-Computer Programming, Data Processing, Etc.","TWITTER, INC.",2026-10-17,edgar-submissions
+0001418135,2080,Beverages,Keurig Dr Pepper Inc.,2026-10-17,edgar-submissions
+0001419612,3674,Semiconductors & Related Devices,"SOLAREDGE TECHNOLOGIES, INC.",2026-10-17,edgar-submissions
+0001424847,2111,Cigarettes,"LORILLARD, LLC",2026-10-17,edgar-submissions
+0001430602,4841,Cable & Other Pay Television Services,"Scripps Networks Interactive, Inc.",2026-10-17,edgar-submissions
+0001437107,4841,Cable & Other Pay Television Services,"Warner Bros. Discovery, Inc.",2026-10-17,edgar-submissions
+0001441634,3674,Semiconductors & Related Devices,Avago Technologies LTD,2026-10-17,edgar-submissions
+0001441816,7372,Services-Prepackaged Software,"MongoDB, Inc.",2026-10-17,edgar-submissions
+0001442145,7374,Services-Computer Processing & Data Preparation,"Verisk Analytics, Inc.",2026-10-17,edgar-submissions
+0001451505,1381,Drilling Oil & Gas Wells,Transocean Ltd.,2026-10-17,edgar-submissions
+0001452575,2000,Food and Kindred Products,Mead Johnson Nutrition Co,2026-10-17,edgar-submissions
+0001457543,3841,Surgical & Medical Instruments & Apparatus,CAREFUSION Corp,2026-10-17,edgar-submissions
+0001458891,1381,Drilling Oil & Gas Wells,Noble Corp,2026-10-17,edgar-submissions
+0001463101,3674,Semiconductors & Related Devices,"Enphase Energy, Inc.",2026-10-17,edgar-submissions
+0001465112,4899,"Communications Services, NEC",DIRECTV,2026-10-17,edgar-submissions
+0001466258,3822,Auto Controls For Regulating Residential & Comml Environments,Trane Technologies plc,2026-10-17,edgar-submissions
+0001467373,7389,"Services-Business Services, NEC",Accenture plc,2026-10-17,edgar-submissions
+0001467858,3711,Motor Vehicles & Passenger Car Bodies,General Motors Co,2026-10-17,edgar-submissions
+0001468091,4812,Radiotelephone Communications,VEON Ltd.,2026-10-17,edgar-submissions
+0001468522,1600,Heavy Construction Other Than Bldg Const - Contractors,Ferrovial N.V.,2026-10-17,edgar-submissions
+0001474432,3572,Computer Storage Devices,"Everpure, Inc.",2026-10-17,edgar-submissions
+0001474735,3621,Motors & Generators,GENERAC HOLDINGS INC.,2026-10-17,edgar-submissions
+0001478242,8731,Services-Commercial Physical & Biological Research,IQVIA HOLDINGS INC.,2026-10-17,edgar-submissions
+0001489393,2860,Industrial Organic Chemicals,LyondellBasell Industries N.V.,2026-10-17,edgar-submissions
+0001491675,2086,Bottled & Canned Soft Drinks & Carbonated Waters,"COCA-COLA EUROPEAN PARTNERS US, LLC",2026-10-17,edgar-submissions
+0001492633,7389,"Services-Business Services, NEC",Nielsen Holdings plc,2026-10-17,edgar-submissions
+0001495569,3663,Radio & Tv Broadcasting & Communications Equipment,"Motorola Mobility Holdings, Inc",2026-10-17,edgar-submissions
+0001496048,6798,Real Estate Investment Trusts,Brookfield Property REIT Inc.,2026-10-17,edgar-submissions
+0001501585,3730,Ship & Boat Building & Repairing,"HUNTINGTON INGALLS INDUSTRIES, INC.",2026-10-17,edgar-submissions
+0001506307,4922,Natural Gas Transmission,"KINDER MORGAN, INC.",2026-10-17,edgar-submissions
+0001507934,4841,Cable & Other Pay Television Services,Starz Acquisition LLC,2026-10-17,edgar-submissions
+0001510295,2911,Petroleum Refining,Marathon Petroleum Corp,2026-10-17,edgar-submissions
+0001512673,7372,Services-Prepackaged Software,"Block, Inc.",2026-10-17,edgar-submissions
+0001513761,4400,Water Transportation,Norwegian Cruise Line Holdings Ltd.,2026-10-17,edgar-submissions
+0001513845,7370,"Services-Computer Programming, Data Processing, Etc.",Nebius Group N.V.,2026-10-17,edgar-submissions
+0001518832,1311,Crude Petroleum & Natural Gas,"WPX ENERGY, INC.",2026-10-17,edgar-submissions
+0001519751,2430,"Millwood, Veneer, Plywood, & Structural Wood Members","Fortune Brands Innovations, Inc.",2026-10-17,edgar-submissions
+0001521332,3714,Motor Vehicle Parts & Accessories,Aptiv PLC,2026-10-17,edgar-submissions
+0001524472,3561,Pumps & Pumping Equipment,Xylem Inc.,2026-10-17,edgar-submissions
+0001526520,7370,"Services-Computer Programming, Data Processing, Etc.","TripAdvisor, Inc.",2026-10-17,edgar-submissions
+0001530721,3100,Leather & Leather Products,Capri Holdings Ltd,2026-10-17,edgar-submissions
+0001532063,5912,Retail-Drug Stores and Proprietary Stores,Express Scripts Holding Co.,2026-10-17,edgar-submissions
+0001534701,2911,Petroleum Refining,Phillips 66,2026-10-17,edgar-submissions
+0001535527,7372,Services-Prepackaged Software,"CrowdStrike Holdings, Inc.",2026-10-17,edgar-submissions
+0001539838,1311,Crude Petroleum & Natural Gas,"Diamondback Energy, Inc.",2026-10-17,edgar-submissions
+0001543151,7389,"Services-Business Services, NEC","Uber Technologies, Inc",2026-10-17,edgar-submissions
+0001545158,2000,Food and Kindred Products,"Kraft Foods Group, Inc.",2026-10-17,edgar-submissions
+0001546640,7381,"Services-Detective, Guard & Armored Car Services",ADT Corp,2026-10-17,edgar-submissions
+0001549802,5990,"Retail-Retail Stores, NEC","JD.com, Inc.",2026-10-17,edgar-submissions
+0001551152,2834,Pharmaceutical Preparations,AbbVie Inc.,2026-10-17,edgar-submissions
+0001551182,3590,Misc Industrial & Commercial Machinery & Equipment,Eaton Corp plc,2026-10-17,edgar-submissions
+0001555280,2834,Pharmaceutical Preparations,Zoetis Inc.,2026-10-17,edgar-submissions
+0001559720,7340,Services-To Dwellings & Other Buildings,"Airbnb, Inc.",2026-10-17,edgar-submissions
+0001560385,4833,Television Broadcasting Stations,Liberty Media Corp,2026-10-17,edgar-submissions
+0001561550,7372,Services-Prepackaged Software,"Datadog, Inc.",2026-10-17,edgar-submissions
+0001564708,2711,Newspapers: Publishing or  Publishing & Printing,NEWS CORP,2026-10-17,edgar-submissions
+0001567892,2834,Pharmaceutical Preparations,Keenova Therapeutics plc,2026-10-17,edgar-submissions
+0001570585,4841,Cable & Other Pay Television Services,Liberty Global Ltd.,2026-10-17,edgar-submissions
+0001571949,6200,"Security & Commodity Brokers, Dealers, Exchanges & Services","Intercontinental Exchange, Inc.",2026-10-17,edgar-submissions
+0001571996,3571,Electronic Computers,Dell Technologies Inc.,2026-10-17,edgar-submissions
+0001579241,7381,"Services-Detective, Guard & Armored Car Services",Allegion plc,2026-10-17,edgar-submissions
+0001585364,2834,Pharmaceutical Preparations,PERRIGO Co plc,2026-10-17,edgar-submissions
+0001585521,7370,"Services-Computer Programming, Data Processing, Etc.","Zoom Communications, Inc.",2026-10-17,edgar-submissions
+0001585689,7011,Hotels & Motels,Hilton Worldwide Holdings Inc.,2026-10-17,edgar-submissions
+0001590895,7011,Hotels & Motels,"Caesars Entertainment, Inc.",2026-10-17,edgar-submissions
+0001590955,7372,Services-Prepackaged Software,"Paycom Software, Inc.",2026-10-17,edgar-submissions
+0001593034,2834,Pharmaceutical Preparations,Endo International plc,2026-10-17,edgar-submissions
+0001593538,6211,"Security Brokers, Dealers & Flotation Companies",NAVIENT CORP,2026-10-17,edgar-submissions
+0001594805,7372,Services-Prepackaged Software,SHOPIFY INC.,2026-10-17,edgar-submissions
+0001596532,3576,Computer Communications Equipment,"Arista Networks, Inc.",2026-10-17,edgar-submissions
+0001596783,2834,Pharmaceutical Preparations,"Catalent, Inc.",2026-10-17,edgar-submissions
+0001598014,7370,"Services-Computer Programming, Data Processing, Etc.",IHS Markit Ltd.,2026-10-17,edgar-submissions
+0001601046,3823,"Industrial Instruments For Measurement, Display, and Control","Keysight Technologies, Inc.",2026-10-17,edgar-submissions
+0001601712,6199,Finance Services,Synchrony Financial,2026-10-17,edgar-submissions
+0001604778,3674,Semiconductors & Related Devices,"Qorvo, Inc.",2026-10-17,edgar-submissions
+0001609711,7373,Services-Computer Integrated Systems Design,GoDaddy Inc.,2026-10-17,edgar-submissions
+0001613103,3845,Electromedical & Electrotherapeutic Apparatus,Medtronic plc,2026-10-17,edgar-submissions
+0001618921,5912,Retail-Drug Stores and Proprietary Stores,"Walgreens Boots Alliance, Inc.",2026-10-17,edgar-submissions
+0001620546,2834,Pharmaceutical Preparations,Baxalta Inc,2026-10-17,edgar-submissions
+0001629995,4922,Natural Gas Transmission,"Columbia Pipeline Group, Inc.",2026-10-17,edgar-submissions
+0001633917,7389,"Services-Business Services, NEC","PayPal Holdings, Inc.",2026-10-17,edgar-submissions
+0001633978,3669,"Communications Equipment, NEC",Lumentum Holdings Inc.,2026-10-17,edgar-submissions
+0001636023,2650,Paperboard Containers & Boxes,WRKCo Inc.,2026-10-17,edgar-submissions
+0001637459,2030,"Canned, Frozen & Preservd Fruit, Veg & Food Specialties",Kraft Heinz Co,2026-10-17,edgar-submissions
+0001639825,3949,"Sporting & Athletic Goods, NEC","PELOTON INTERACTIVE, INC.",2026-10-17,edgar-submissions
+0001645590,3570,Computer & office Equipment,Hewlett Packard Enterprise Co,2026-10-17,edgar-submissions
+0001646383,7373,Services-Computer Integrated Systems Design,CSRA Inc.,2026-10-17,edgar-submissions
+0001650107,2086,Bottled & Canned Soft Drinks & Carbonated Waters,COCA-COLA EUROPACIFIC PARTNERS plc,2026-10-17,edgar-submissions
+0001650132,6798,Real Estate Investment Trusts,"Four Corners Property Trust, Inc.",2026-10-17,edgar-submissions
+0001650372,7372,Services-Prepackaged Software,Atlassian Corp,2026-10-17,edgar-submissions
+0001652044,7370,"Services-Computer Programming, Data Processing, Etc.",Alphabet Inc.,2026-10-17,edgar-submissions
+0001659166,3823,"Industrial Instruments For Measurement, Display, and Control",Fortive Corp,2026-10-17,edgar-submissions
+0001660134,7372,Services-Prepackaged Software,"Okta, Inc.",2026-10-17,edgar-submissions
+0001664703,3620,Electrical Industrial Apparatus,Bloom Energy Corp,2026-10-17,edgar-submissions
+0001666700,2821,"Plastic Materials, Synth Resins & Nonvulcan Elastomers","DuPont de Nemours, Inc.",2026-10-17,edgar-submissions
+0001671933,7370,"Services-Computer Programming, Data Processing, Etc.","Trade Desk, Inc.",2026-10-17,edgar-submissions
+0001674101,3679,"Electronic Components, NEC",Vertiv Holdings Co,2026-10-17,edgar-submissions
+0001678531,8011,Services-Offices & Clinics of  Doctors of  Medicine,Envision Healthcare Corp,2026-10-17,edgar-submissions
+0001679273,2030,"Canned, Frozen & Preservd Fruit, Veg & Food Specialties","Lamb Weston Holdings, Inc.",2026-10-17,edgar-submissions
+0001679788,6199,Finance Services,"Coinbase Global, Inc.",2026-10-17,edgar-submissions
+0001681459,3533,Oil & Gas Field Machinery & Equipment,TechnipFMC plc,2026-10-17,edgar-submissions
+0001682852,2836,"Biological Products, (No Diagnostic Substances)","Moderna, Inc.",2026-10-17,edgar-submissions
+0001685040,6311,Life Insurance,"Brighthouse Financial, Inc.",2026-10-17,edgar-submissions
+0001687229,6510,Real Estate Operators (No Developers) & Lessors,Invitation Homes Inc.,2026-10-17,edgar-submissions
+0001688568,7374,Services-Computer Processing & Data Preparation,DXC Technology Co,2026-10-17,edgar-submissions
+0001690820,5500,Retail-Auto Dealers & Gasoline Stations,CARVANA CO.,2026-10-17,edgar-submissions
+0001692819,4911,Electric Services,Vistra Corp.,2026-10-17,edgar-submissions
+0001699150,3560,General Industrial Machinery & Equipment,Ingersoll Rand Inc.,2026-10-17,edgar-submissions
+0001701605,3533,Oil & Gas Field Machinery & Equipment,Baker Hughes Co,2026-10-17,edgar-submissions
+0001705696,6798,Real Estate Investment Trusts,VICI PROPERTIES INC.,2026-10-17,edgar-submissions
+0001707925,2810,Industrial Inorganic Chemicals,LINDE PLC,2026-10-17,edgar-submissions
+0001709048,3674,Semiconductors & Related Devices,GLOBALFOUNDRIES Inc.,2026-10-17,edgar-submissions
+0001711269,4931,Electric & Other Services Combined,"Evergy, Inc.",2026-10-17,edgar-submissions
+0001713445,7374,Services-Computer Processing & Data Preparation,"Reddit, Inc.",2026-10-17,edgar-submissions
+0001713683,7371,Services-Computer Programming Services,"Zscaler, Inc.",2026-10-17,edgar-submissions
+0001725057,7372,Services-Prepackaged Software,"Dayforce, Inc.",2026-10-17,edgar-submissions
+0001730168,3674,Semiconductors & Related Devices,Broadcom Inc.,2026-10-17,edgar-submissions
+0001732845,2650,Paperboard Containers & Boxes,WestRock Co,2026-10-17,edgar-submissions
+0001736297,3674,Semiconductors & Related Devices,"Astera Labs, Inc.",2026-10-17,edgar-submissions
+0001737806,7389,"Services-Business Services, NEC",PDD Holdings Inc.,2026-10-17,edgar-submissions
+0001739940,6324,Hospital & Medical Service Plans,Cigna Group,2026-10-17,edgar-submissions
+0001744489,7990,Services-Miscellaneous Amusement & Recreation,Walt Disney Co,2026-10-17,edgar-submissions
+0001748790,3990,Miscellaneous Manufacturing Industries,Amcor plc,2026-10-17,edgar-submissions
+0001751008,7370,"Services-Computer Programming, Data Processing, Etc.",AppLovin Corp,2026-10-17,edgar-submissions
+0001751788,2821,"Plastic Materials, Synth Resins & Nonvulcan Elastomers",DOW INC.,2026-10-17,edgar-submissions
+0001754301,4833,Television Broadcasting Stations,Fox Corp,2026-10-17,edgar-submissions
+0001755672,0100,Agricultural Production-Crops,"Corteva, Inc.",2026-10-17,edgar-submissions
+0001757898,3842,"Orthopedic, Prosthetic & Surgical Appliances & Supplies",STERIS plc,2026-10-17,edgar-submissions
+0001769628,7372,Services-Prepackaged Software,"CoreWeave, Inc.",2026-10-17,edgar-submissions
+0001770450,3577,"Computer Peripheral Equipment, NEC",Xerox Holdings Corp,2026-10-17,edgar-submissions
+0001781335,3600,Electronic & Other Electrical Equipment (No Computer Equip),Otis Worldwide Corp,2026-10-17,edgar-submissions
+0001783180,3585,Air-Cond & Warm Air Heatg Equip & Comm & Indl Refrig Equip,CARRIER GLOBAL Corp,2026-10-17,edgar-submissions
+0001783879,6211,"Security Brokers, Dealers & Flotation Companies","Robinhood Markets, Inc.",2026-10-17,edgar-submissions
+0001786842,3824,Totalizing Fluid Meters & Counting Devices,Vontier Corp,2026-10-17,edgar-submissions
+0001792044,2834,Pharmaceutical Preparations,Viatris Inc,2026-10-17,edgar-submissions
+0001792789,7389,"Services-Business Services, NEC","DoorDash, Inc.",2026-10-17,edgar-submissions
+0001811074,6792,Oil Royalty Traders,Texas Pacific Land Corp,2026-10-17,edgar-submissions
+0001811210,3711,Motor Vehicles & Passenger Car Bodies,"Lucid Group, Inc.",2026-10-17,edgar-submissions
+0001819994,3760,Guided Missiles & Space Vehicles & Parts,Rocket Lab Corp,2026-10-17,edgar-submissions
+0001821825,2834,Pharmaceutical Preparations,Organon & Co.,2026-10-17,edgar-submissions
+0001835632,3674,Semiconductors & Related Devices,"Marvell Technology, Inc.",2026-10-17,edgar-submissions
+0001841666,1311,Crude Petroleum & Natural Gas,APA Corp,2026-10-17,edgar-submissions
+0001858681,6282,Investment Advice,"Apollo Global Management, Inc.",2026-10-17,edgar-submissions
+0001868275,4911,Electric Services,Constellation Energy Corp,2026-10-17,edgar-submissions
+0001874178,3711,Motor Vehicles & Passenger Car Bodies,"Rivian Automotive, Inc. / DE",2026-10-17,edgar-submissions
+0001932393,3844,X-Ray Apparatus & Tubes & Related Irradiation Apparatus,GE HealthCare Technologies Inc.,2026-10-17,edgar-submissions
+0001944048,2844,"Perfumes, Cosmetics & Other Toilet Preparations",Kenvue Inc.,2026-10-17,edgar-submissions
+0001964738,3841,Surgical & Medical Instruments & Apparatus,Solventum Corp,2026-10-17,edgar-submissions
+0001967680,3825,Instruments For Meas & Testing of  Electricity & Elec Signals,Veralto Corp,2026-10-17,edgar-submissions
+0001973239,3674,Semiconductors & Related Devices,ARM HOLDINGS PLC /UK,2026-10-17,edgar-submissions
+0001973266,7900,Services-Amusement & Recreation Services,"TKO Group Holdings, Inc.",2026-10-17,edgar-submissions
+0001996810,3600,Electronic & Other Electrical Equipment (No Computer Equip),GE Vernova Inc.,2026-10-17,edgar-submissions
+0001996862,2070,Fats & Oils,Bunge Global SA,2026-10-17,edgar-submissions
+0002005951,2650,Paperboard Containers & Boxes,Smurfit Westrock plc,2026-10-17,edgar-submissions
+0002011286,7389,"Services-Business Services, NEC","Amentum Holdings, Inc.",2026-10-17,edgar-submissions
+0002011641,5070,Wholesale-Hardware & Plumbing & Heating Equipment & Supplies,Ferguson Enterprises Inc. /DE/,2026-10-17,edgar-submissions
+0002012383,6211,"Security Brokers, Dealers & Flotation Companies","BlackRock, Inc.",2026-10-17,edgar-submissions
+0002023554,3572,Computer Storage Devices,Sandisk Corp,2026-10-17,edgar-submissions
+0002041610,4833,Television Broadcasting Stations,Skydance Corp,2026-10-17,edgar-submissions
+0002058873,3674,Semiconductors & Related Devices,"Qnity Electronics, Inc.",2026-10-17,edgar-submissions
+0002064953,2800,Chemicals & Allied Products,Solstice Advanced Materials Inc.,2026-10-17,edgar-submissions
+0002067876,4833,Television Broadcasting Stations,"Versant Media Group, Inc.",2026-10-17,edgar-submissions
+0002082247,4513,Air Courier Services,"FedEx Freight Holding Company, Inc.",2026-10-17,edgar-submissions
+0002089271,3724,Aircraft Engines & Engine Parts,Honeywell Aerospace Inc.,2026-10-17,edgar-submissions
+0002115436,2911,Petroleum Refining,ExxonMobil Holdings Corp,2026-10-17,edgar-submissions

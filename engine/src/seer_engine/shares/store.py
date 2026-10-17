@@ -167,6 +167,60 @@ def split_lines(
     return lines
 
 
+#: A foreign private issuer's annual and interim reports state its ORDINARY shares, while the
+#: index member is its American depositary share (NetEase: 3.29 billion ordinary shares, 25 to
+#: an ADS), so the count times the ADS price is the company 25 times over. Their figures are not
+#: used; a 10-K/10-Q filer's are.
+FOREIGN_FORMS = frozenset({"20-F", "20-F/A", "40-F", "40-F/A", "6-K", "6-K/A"})
+#: A figure this many times above or below the median of the company's other figures filed within
+#: :data:`SCALE_WINDOW_DAYS` is a filer's unit error, not a share count (Yum! Brands' 10-Q of
+#: 2016-10-11 tags 367,005,511,000,000; Garmin's 2016 10-Qs tag 208,077,418,000). No split or
+#: issuance moves a count fifty-fold within two years.
+SCALE_LIMIT = 50.0
+SCALE_WINDOW_DAYS = 730
+
+
+def usable_xbrl(facts: Iterable) -> tuple[list, dict[str, list]]:
+    """``(kept, dropped)``: the store's XBRL share facts less foreign issuers' and unit errors.
+
+    ``facts`` are ``fundamentals.Fact``-shaped (``symbol``, ``tag``, ``val``, ``filed``, ``form``).
+    ``dropped`` maps a reason to the facts dropped for it, so the caller can say what it left out.
+    The cover-page rows before 2009 went through ``shares.checks``; these are the same figures'
+    tagged form and had no such pass until here.
+    """
+    import bisect
+    import statistics
+
+    dropped: dict[str, list] = {"foreign filer": [], "unit error": []}
+    domestic = []
+    for f in facts:
+        if getattr(f, "form", "") in FOREIGN_FORMS:
+            dropped["foreign filer"].append(f)
+        else:
+            domestic.append(f)
+    by: dict[str, list] = {}
+    for f in domestic:
+        if f.tag in history.XBRL_TAGS and math.isfinite(f.val) and f.val > 0:
+            by.setdefault(f.symbol, []).append(f)
+    bad: set[int] = set()
+    for group in by.values():
+        group.sort(key=lambda f: f.filed)
+        days = [f.filed.toordinal() for f in group]
+        for i, f in enumerate(group):
+            lo = bisect.bisect_left(days, days[i] - SCALE_WINDOW_DAYS)
+            hi = bisect.bisect_right(days, days[i] + SCALE_WINDOW_DAYS)
+            others = [g.val for j, g in enumerate(group[lo:hi], start=lo) if j != i]
+            if len(others) < 2:
+                continue
+            ratio = f.val / statistics.median(others)
+            if ratio >= SCALE_LIMIT or ratio <= 1.0 / SCALE_LIMIT:
+                bad.add(id(f))
+    kept = []
+    for f in domestic:
+        (dropped["unit error"] if id(f) in bad else kept).append(f)
+    return kept, dropped
+
+
 #: How far from a split's ex-date the closes either side of it may be to judge it (a week).
 EVIDENCE_GAP_DAYS = 7
 #: Only a split of at least this ratio (either way) is judged on the closes: a smaller one is the

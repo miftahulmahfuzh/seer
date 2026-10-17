@@ -1602,7 +1602,10 @@ every S&P 500 member's filer, 1995-10 to 2010-12, from the cover page of each 10
   a `ShareCounts`, `EMPTY_SHARES` on any market not loaded from such a store, the paper night's
   included); `market_fields = ("shares",)` makes `lab run` / `lab test` refuse a store without it.
   A figure dated before a split but filed after it is read in the filing day's units when that
-  matches the previous figure better (`ShareCounts._units_days`; Netflix Q2 2015). Tests:
+  matches the previous figure better (`ShareCounts._units_days`; Netflix Q2 2015). XBRL facts
+  pass `shares.store.usable_xbrl` first: foreign issuers' 20-F/40-F/6-K counts (ordinary shares,
+  not the ADS that is the index member) and unit errors (50x off the median of the company's
+  figures within two years: Yum! 2016, Garmin 2016, AEP 2010) are left out. Tests:
   `tests/test_shares_store.py`.
 
 ## Exported API

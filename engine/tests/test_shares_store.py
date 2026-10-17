@@ -122,6 +122,32 @@ def test_the_rows_cover_the_seams_the_lookup_has():
     assert all(r.obs is None or r.obs.filed <= r.start for r in rows)
 
 
+@dataclass(frozen=True)
+class FF:
+    symbol: str
+    tag: str
+    period_end: date
+    val: float
+    accn: str
+    filed: date
+    form: str = "10-Q"
+
+
+def test_usable_xbrl_drops_foreign_issuers_and_unit_errors():
+    tag = "EntityCommonStockSharesOutstanding"
+    yum = [FF("YUM", tag, D(f"2016-{m:02d}-01"), v, f"a{m}", D(f"2016-{m:02d}-10"))
+           for m, v in ((2, 408_711_522.0), (4, 407_440_778.0), (7, 389_887_084.0),
+                        (10, 367_005_511_000_000.0), (12, 353_844_095.0))]
+    split = [FF("NVDA", tag, D("2024-04-01"), 2.5e9, "n1", D("2024-04-10")),
+             FF("NVDA", tag, D("2024-07-01"), 24.5e9, "n2", D("2024-07-10")),  # ten-for-one: kept
+             FF("NVDA", tag, D("2024-10-01"), 24.5e9, "n3", D("2024-10-10"))]
+    ntes = [FF("NTES", tag, D("2016-12-31"), 3.28e9, "x", D("2017-04-21"), form="20-F")]
+    kept, dropped = ss.usable_xbrl(yum + split + ntes)
+    assert [f.accn for f in dropped["unit error"]] == ["a10"]
+    assert [f.symbol for f in dropped["foreign filer"]] == ["NTES"]
+    assert {f.accn for f in kept} == {"a2", "a4", "a7", "a12", "n1", "n2", "n3"}
+
+
 def test_shares_lines_round_trip_and_the_reader_refuses_look_ahead(tmp_path):
     lines = ss.shares_lines(ss.change_points(_hist(), ["AAA"], D("1999-01-01"), D("2011-12-31")))
     assert lines[0] == "AAA,2000-05-10,100,2000-04-30,2000-05-10,edgar-cover,0000000001-00-000001"

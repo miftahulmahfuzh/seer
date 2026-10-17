@@ -150,7 +150,7 @@ def write(args: argparse.Namespace) -> int:
         xbrl = store / research.FUNDAMENTALS_FILE
     from seer_engine.shares.build import read_store_facts
 
-    facts = read_store_facts(Path(xbrl))
+    facts, left_out = share_store.usable_xbrl(read_store_facts(Path(xbrl)))
     hist = share_store.history_for(facts, Path(args.data_dir))
     members = sorted(set(research.requested_symbols(window=window)) - set(research.RESEARCH_ETFS))
     rows = share_store.change_points(hist, members, history.FIRST_FILED, window.end)
@@ -187,6 +187,11 @@ def write(args: argparse.Namespace) -> int:
     print(f"shares store {store} ({window.name} window ending {window.end}):")
     print(f"  {len(members)} index members, {len({r.symbol for r in rows})} with a share count, "
           f"{len(shares_lines)} share rows ({len(facts)} XBRL share facts joined from {xbrl})")
+    for why, dropped_facts in left_out.items():
+        if dropped_facts:
+            names = sorted({f.symbol for f in dropped_facts})
+            print(f"  {len(dropped_facts)} XBRL facts left out ({why}): {', '.join(names[:15])}"
+                  f"{'...' if len(names) > 15 else ''}")
     print(f"  {len(served)} symbols with bars, {len(by_symbol)} with a yfinance split list "
           f"({len(unknown)} unknown to Yahoo), {len(split_lines)} split rows, basis {args.basis}")
     if dropped:

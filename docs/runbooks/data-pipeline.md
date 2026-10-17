@@ -126,6 +126,30 @@ Exit codes:
 - Re-running `backfill --symbols X` after a split overwrites X's history with yfinance's newly
   adjusted values, which are consistent with what the nightly applied.
 
+### Company size in the research stores (`shares.csv`, `splits.csv`)
+
+The lab's `Market.market_value` needs each store's own split list (the closes are adjusted as of
+the crawl, Apple's 2020 four-for-one inside its 2015 prices) and the point-in-time share history.
+Both are optional store files; writing them never moves the price fingerprint. After any store
+**rebuild**, write them again, with the new crawl's day as `--basis`:
+
+```bash
+PY=engine/.venv/bin/python; R=/home/miftah/seer/engine          # absolute, never a symlink
+$PY -m seer_engine shares fetch-splits --store $R/.research --splits-cache $R/.cache/yfinance/splits       # network, cached
+$PY -m seer_engine shares fetch-splits --store $R/.research-test --splits-cache $R/.cache/yfinance/splits
+$PY -m seer_engine shares store --store $R/.research --basis 2026-10-04 --evidence-store $R/.research-test
+$PY -m seer_engine shares store --store $R/.research-test --basis 2026-10-17 --xbrl $R/.research/fundamentals.csv
+$PY -m seer_engine survivorship_store --refresh-shares --out $R/.research-sv --source $R/.research --cache $R/.cache/eodhd
+$PY -m seer_engine shares store-report --store $R/.research        # coverage, largest members, split check
+```
+
+The dev store first (the check store copies its `shares.csv`); the test store has no
+`fundamentals.csv`, so it joins the dev store's XBRL facts, which run to 2026. `--evidence-store`
+lets the test store's closes judge the splits Yahoo listed after 2015 (it lists some spin-offs it
+never applied to the closes, and those are left out). EODHD's "raw" close is not a clean
+reference for the check: it is itself adjusted for many spin-offs and special dividends (MO, WY,
+COP, MDLZ, IBM), so most of `store-report`'s residual disagreements are on its side.
+
 ## SEC fundamentals
 
 - SEC's fair-access policy requires a declared `User-Agent` carrying a contact address and caps

@@ -57,6 +57,10 @@ def add_arguments(sub) -> None:
     s.add_argument("--xbrl", type=Path, default=None,
                    help="a fundamentals.csv to join (default: the store's own; required when it has none)")
     s.add_argument("--data-dir", type=Path, default=history.DATA_DIR)
+    s.add_argument("--evidence-store", type=Path, action="append", default=[],
+                   help="another store of the same vendor whose bars run past this one's window (the "
+                        "test store, for the dev store): its closes judge the listed splits after the "
+                        "window as well (repeatable)")
 
     r = sub.add_parser("store-report", help="size coverage, the largest companies, and the split check")
     r.add_argument("--store", type=Path, required=True)
@@ -86,6 +90,24 @@ def bar_symbols(store: Path) -> list[str]:
             s = line.split(",", 1)[0]
             if not out or out[-1] != s:
                 out.append(s)
+    return out
+
+
+def closes_by_symbol(store: Path, symbols: list[str]) -> dict[str, tuple[list[date], list[float]]]:
+    """``symbol -> (dates, closes)`` from a store's ``bars.csv``, for ``symbols`` only. Read-only;
+    the manifest is not checked here (``refresh_shares`` verifies the store it writes)."""
+    want = set(symbols)
+    out: dict[str, tuple[list[date], list[float]]] = {}
+    with open(store / research.BARS_FILE, encoding="utf-8") as fh:
+        next(fh)
+        for line in fh:
+            s, rest = line.split(",", 1)
+            if s not in want:
+                continue
+            f = rest.split(",")
+            days, closes = out.setdefault(s, ([], []))
+            days.append(date.fromisoformat(f[0]))
+            closes.append(float(f[4]))
     return out
 
 
@@ -149,6 +171,16 @@ def write(args: argparse.Namespace) -> int:
         print(f"shares store: {len(missing)} symbols have no cached split list ({', '.join(missing[:10])}"
               f"{'...' if len(missing) > 10 else ''}); run `shares fetch-splits --store {store}` first")
         return 2
+    evidence = [closes_by_symbol(store, sorted(by_symbol))]
+    evidence += [closes_by_symbol(Path(e), sorted(by_symbol)) for e in args.evidence_store]
+    dropped: list[tuple[str, object]] = []
+    for symbol, listed in list(by_symbol.items()):
+        if not listed:
+            continue
+        series = [ev[symbol] for ev in evidence if symbol in ev]
+        applied, never = share_store.applied_by_vendor(listed, series)
+        by_symbol[symbol] = tuple(applied)
+        dropped += [(symbol, x) for x in never]
     split_lines = share_store.split_lines(
         by_symbol, store_start=research.STORE_START, window_end=window.end, basis=args.basis
     )
@@ -157,6 +189,10 @@ def write(args: argparse.Namespace) -> int:
           f"{len(shares_lines)} share rows ({len(facts)} XBRL share facts joined from {xbrl})")
     print(f"  {len(served)} symbols with bars, {len(by_symbol)} with a yfinance split list "
           f"({len(unknown)} unknown to Yahoo), {len(split_lines)} split rows, basis {args.basis}")
+    if dropped:
+        print(f"  {len(dropped)} listed splits the adjusted closes do not carry, left out:")
+        for symbol, x in sorted(dropped, key=lambda t: (t[1].date, t[0])):
+            print(f"    {symbol:<6} {x.date} ratio {x.ratio:g}")
     if getattr(args, "dry_run", False):
         print("  dry run: nothing written")
         return 0
@@ -290,5 +326,5 @@ def report(args: argparse.Namespace) -> int:
             print(f"  {len(bad)} symbols whose median disagreement is above 2%"
                   + (":" if bad else ""))
             for s, med, k in bad[:25]:
-                print(f"    {s:<6} median {med:+.1%} over {k} days")
+                print(f"    {s:<6} off by {med:.1%} (median) over {k} days")
     return 0

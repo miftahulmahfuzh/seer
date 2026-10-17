@@ -319,7 +319,7 @@ class ShareCounts:
     any other market carries ``EMPTY_SHARES``.
     """
 
-    __slots__ = ("_rows", "_from", "_splits")
+    __slots__ = ("_rows", "_from", "_splits", "_units")
 
     def __init__(
         self,
@@ -362,6 +362,38 @@ class ShareCounts:
                 raise ValueError(f"{symbol}: the after-window split factor must be positive, got {after!r}")
             clean[symbol] = (items_, float(after))
         self._splits = clean
+        self._units: Mapping[str, tuple[date | None, ...]] = {
+            s: self._units_days(s, r) for s, r in out.items()
+        }
+
+    def _units_days(
+        self, symbol: str, rows: tuple[tuple[date, ShareCount | None], ...]
+    ) -> tuple[date | None, ...]:
+        """The day each count's figure is stated in the share units of.
+
+        Normally the day it was counted. But a split can fall between the count's date and its
+        filing, and then the figure may already be in post-split shares: XBRL's cover tag is often
+        dated at the period end (Netflix's Q2 2015 10-Q tags its July count at 2015-06-30, eleven
+        days before a seven-for-one, and states the post-split 426 million). The figure is read as
+        post-split (stated in the filing day's units) when that puts it nearer the company's
+        previous figure carried to the filing day than the pre-split reading does; with no
+        previous figure, the count date stands. Decided once, here, from the figures alone.
+        """
+        out: list[date | None] = []
+        prev: tuple[ShareCount, date] | None = None
+        for _, c in rows:
+            if c is None:
+                out.append(None)
+                continue
+            units = c.counted
+            k = self.split_factor(symbol, c.counted, c.filed)
+            if k != 1.0 and prev is not None:
+                before = prev[0].shares * self.split_factor(symbol, prev[1], c.filed)
+                if abs(math.log(c.shares / before)) < abs(math.log(c.shares * k / before)):
+                    units = c.filed
+            prev = (c, units)
+            out.append(units)
+        return tuple(out)
 
     def __len__(self) -> int:
         return sum(len(r) for r in self._rows.values())
@@ -372,11 +404,27 @@ class ShareCounts:
 
     def count(self, symbol: str, data_date: date) -> ShareCount | None:
         """The count public on ``data_date`` for the company trading as ``symbol`` that day."""
+        found = self._at(symbol, data_date)
+        return None if found is None else found[0]
+
+    def _at(self, symbol: str, data_date: date) -> tuple[ShareCount, date] | None:
+        """``count`` and the day its figure is stated in the units of (``_units_days``)."""
         froms = self._from.get(symbol)
         if froms is None:
             return None
         i = bisect_right(froms, _check_date("data_date", data_date))
-        return self._rows[symbol][i - 1][1] if i else None
+        if not i:
+            return None
+        c = self._rows[symbol][i - 1][1]
+        if c is None:
+            return None
+        return c, self._units[symbol][i - 1]  # type: ignore[return-value]
+
+    def units_day(self, symbol: str, data_date: date) -> date | None:
+        """The day whose share units ``count(symbol, data_date)`` is stated in: its count date, or
+        its filing date when a split fell between the two and the figure is already post-split."""
+        found = self._at(symbol, data_date)
+        return None if found is None else found[1]
 
     def split_factor(self, symbol: str, after: date, through: date) -> float:
         """Product of ``symbol``'s in-window split ratios effective in ``(after, through]``."""
@@ -391,10 +439,11 @@ class ShareCounts:
     def shares_on(self, symbol: str, data_date: date) -> float | None:
         """``count(symbol, data_date)`` restated in the share units of ``data_date``: a count taken
         before a split is carried across it, so it pairs with that day's printed price."""
-        c = self.count(symbol, data_date)
-        if c is None:
+        found = self._at(symbol, data_date)
+        if found is None:
             return None
-        return c.shares * self.split_factor(symbol, c.counted, data_date)
+        c, units = found
+        return c.shares * self.split_factor(symbol, units, data_date)
 
     def raw_factor(self, symbol: str, d: date) -> float:
         """What the store's split-adjusted price on ``d`` is multiplied by to give the price as it
@@ -591,9 +640,10 @@ class Market:
         it, so a pre-split count is never multiplied by a post-split price. None when the count or
         the close is unknown. Reads nothing dated after ``d``.
         """
-        c = self.shares.count(symbol, _check_date("d", d))
-        if c is None:
+        found = self.shares._at(symbol, _check_date("d", d))
+        if found is None:
             return None
+        c, units_day = found
         h = self.history.get(symbol)
         if h is None:
             return None
@@ -608,10 +658,10 @@ class Market:
             return None
         # The count in the share units of the close's own day, so both sides of the product are
         # on one side of every split (a count dated after the last close is carried back).
-        if c.counted <= last:
-            units = self.shares.split_factor(symbol, c.counted, last)
+        if units_day <= last:
+            units = self.shares.split_factor(symbol, units_day, last)
         else:
-            units = 1.0 / self.shares.split_factor(symbol, last, c.counted)
+            units = 1.0 / self.shares.split_factor(symbol, last, units_day)
         return c.shares * units * close * self.shares.raw_factor(symbol, last)
 
     def bar(self, symbol: str, d: date) -> Bar | None:

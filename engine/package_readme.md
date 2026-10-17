@@ -1584,6 +1584,26 @@ every S&P 500 member's filer, 1995-10 to 2010-12, from the cover page of each 10
   `market_value(obs, day, raw_close, splits)` carries the count across splits since `as_of`;
   `unadjust(adj_close, day, splits)` rebuilds a raw close from a split-adjusted one.
 - Tests: `tests/test_shares.py`.
+- **In the research stores (2026-10-17).** Two optional store files, written together by
+  `research.refresh_shares` (every other file byte for byte, so the price fingerprint never moves):
+  `shares.csv` (`symbol,from,shares,counted,filed,source,accession`: `shares_on`'s answers as exact
+  change points, `from >= filed`, empty = unknown) and `splits.csv` (`symbol,date,ratio`: the
+  vendor splits behind the adjusted closes inside the window, plus one undated row per symbol with
+  the product of those after it, so no row is dated past the window). `shares.store` writes and
+  reads them; `shares.splits` caches yfinance's lists (`engine/.cache/yfinance/splits`).
+- Commands: `shares fetch-splits --store DIR` (network); `shares store --store DIR --basis
+  <crawl day> [--xbrl FILE] [--evidence-store DIR]` (a listed split the adjusted closes do not carry
+  -- Yahoo lists some spin-offs it never applied -- is left out, judged on the closes across its
+  ex-date, `shares.store.applied_by_vendor`); `shares store-report --store DIR` (coverage by year,
+  the largest members on given dates, rebuilt closes vs EODHD's); `survivorship_store
+  --refresh-shares` (the check store: the source's `shares.csv`, its own merged `splits.csv` from
+  `survivorship.Cleaned.splits`, refused unless the plan reproduces its `bars.csv` hash).
+- Lab API: `Market.shares_on(symbol, day)` and `Market.market_value(symbol, day)` (`Market.shares`,
+  a `ShareCounts`, `EMPTY_SHARES` on any market not loaded from such a store, the paper night's
+  included); `market_fields = ("shares",)` makes `lab run` / `lab test` refuse a store without it.
+  A figure dated before a split but filed after it is read in the filing day's units when that
+  matches the previous figure better (`ShareCounts._units_days`; Netflix Q2 2015). Tests:
+  `tests/test_shares_store.py`.
 
 ## Exported API
 

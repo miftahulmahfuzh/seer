@@ -175,6 +175,17 @@ def test_the_split_reader_refuses_a_row_after_the_window(tmp_path):
         ss.read_splits(path, research.STORE_START, research.DEV_END)
 
 
+def test_a_listed_split_the_adjusted_closes_do_not_carry_is_left_out():
+    days = [D("2026-09-29"), D("2026-09-30"), D("2026-10-01"), D("2026-10-02")]
+    never = [(days, [60.0, 60.5, 9.1, 9.0])]  # fell by the listed 6.665: never applied
+    carried = [(days, [9.0, 9.1, 9.05, 9.0])]  # continuous: applied
+    big = splits.Split(D("2026-10-01"), 6.665)
+    small = splits.Split(D("2026-10-01"), 1.033)  # too small to judge on one day: trusted
+    assert ss.applied_by_vendor([big, small], never) == ([small], [big])
+    assert ss.applied_by_vendor([big], carried) == ([big], [])
+    assert ss.applied_by_vendor([splits.Split(D("2030-01-02"), 2.0)], never)[0]  # no evidence: kept
+
+
 def test_read_yfinance_parses_the_cache_and_tells_unknown_from_never_fetched(tmp_path):
     def fetcher(ticker):
         return None if ticker == "GONE" else [(D("2014-06-09"), 7.0), (D("2005-02-28"), 2.0)]
@@ -359,3 +370,28 @@ def test_the_survivorship_cleaning_lists_the_splits_it_divided_by():
     assert cleaned.splits_applied == 1
     assert cleaned.splits == (sv.Split(split_day, 2.0),)
     assert {b.close for b in cleaned.bars} == {50}
+
+
+def test_a_figure_already_post_split_is_not_carried_across_the_split_again():
+    # Netflix, 10-Q for Q2 2015: XBRL dates the count 2015-06-30, files it 2015-07-17, and states
+    # the post-split 426 million although the seven-for-one went ex on 2015-07-15.
+    counts = ShareCounts(
+        {"NFLX": [
+            (D("2015-04-17"), ShareCount(60_620_721.0, D("2015-03-31"), D("2015-04-17"), "xbrl")),
+            (D("2015-07-17"), ShareCount(426_004_831.0, D("2015-06-30"), D("2015-07-17"), "xbrl")),
+        ]},
+        {"NFLX": ([(D("2015-07-15"), 7.0)], 1.0)},
+    )
+    assert counts.shares_on("NFLX", D("2015-07-16")) == pytest.approx(60_620_721 * 7)
+    assert counts.units_day("NFLX", D("2015-09-30")) == D("2015-07-17")
+    assert counts.shares_on("NFLX", D("2015-09-30")) == 426_004_831
+    # a figure that really was counted before the split is still carried across it
+    pre = ShareCounts(
+        {"NFLX": [
+            (D("2015-04-17"), ShareCount(60_620_721.0, D("2015-03-31"), D("2015-04-17"), "xbrl")),
+            (D("2015-07-17"), ShareCount(60_900_000.0, D("2015-07-10"), D("2015-07-17"), "edgar-cover")),
+        ]},
+        {"NFLX": ([(D("2015-07-15"), 7.0)], 1.0)},
+    )
+    assert pre.units_day("NFLX", D("2015-09-30")) == D("2015-07-10")
+    assert pre.shares_on("NFLX", D("2015-09-30")) == pytest.approx(60_900_000 * 7)

@@ -167,6 +167,57 @@ def split_lines(
     return lines
 
 
+#: How far from a split's ex-date the closes either side of it may be to judge it (a week).
+EVIDENCE_GAP_DAYS = 7
+#: Only a split of at least this ratio (either way) is judged on the closes: a smaller one is the
+#: size of an ordinary day's move -- or of a spin-off's real price drop the adjustment only partly
+#: offsets (Lennar's 1.033 for Millrose, 2025) -- and one day's ratio cannot tell it from noise.
+#: The nightly's split guard uses the same line (``docs/runbooks/data-pipeline.md``, Splits).
+EVIDENCE_MIN_RATIO = 1.25
+
+
+def applied_by_vendor(
+    listed: Sequence[history.SplitLike],
+    closes: Sequence[tuple[Sequence[date], Sequence[float]]],
+) -> tuple[list[history.SplitLike], list[history.SplitLike]]:
+    """``(applied, not applied)``: which of a vendor's listed splits its adjusted closes carry.
+
+    Yahoo lists spin-offs as fractional "splits" (IBM's Kyndryl as 1.046 on 2021-11-04, GE's two
+    as 1.281 and 1.253) and adjusts the closes for some of them and not others. Undoing an
+    adjustment that was never made would misstate the printed price by the ratio, so each listed
+    split is judged on the adjusted closes themselves -- ``closes`` is one or more ``(dates,
+    closes)`` series of the same vendor, ascending, tried in order: across the ex-date an applied
+    split leaves the series continuous, and one never applied shows the price falling by about its
+    ratio. It counts as applied when ``|ln q|`` is smaller than ``|ln(q x ratio)|`` for the one-day
+    ratio ``q`` (the mirror of ``survivorship.applied_splits``, which judges raw closes), when no
+    series has a close within a week on both sides of it -- the list is then all there is -- and
+    when its ratio is under :data:`EVIDENCE_MIN_RATIO` either way, too small to judge.
+    """
+    import bisect
+
+    applied: list[history.SplitLike] = []
+    dropped: list[history.SplitLike] = []
+    for s in listed:
+        verdict: bool | None = None
+        if abs(math.log(float(s.ratio))) < math.log(EVIDENCE_MIN_RATIO):
+            applied.append(s)
+            continue
+        for days, values in closes:
+            i = bisect.bisect_left(days, s.date)
+            if i == 0 or i == len(days):
+                continue
+            before, after = days[i - 1], days[i]
+            if (s.date - before).days > EVIDENCE_GAP_DAYS or (after - s.date).days > EVIDENCE_GAP_DAYS:
+                continue
+            q = values[i] / values[i - 1]
+            if not (q > 0 and math.isfinite(q)):
+                continue
+            verdict = abs(math.log(q)) < abs(math.log(q * float(s.ratio)))
+            break
+        (applied if verdict is not False else dropped).append(s)
+    return applied, dropped
+
+
 # --- readers ----------------------------------------------------------------------------
 
 

@@ -283,6 +283,9 @@ def build_promotion(
     _check_evidence(object_name)
     engine = "bracket" if is_bracket(rules) else "book"
     lookback = obj.lookback if engine == "bracket" else obj.lookback(candidate.params)
+    # 022: an object may under-declare what it reads (M0179's coskewness declares its screen's 253
+    # bars and samples 781); the roster's floor is the same one roster.from_row applies tonight.
+    lookback = roster.history_need(object_name, lookback)
     check_lookback(int(lookback), data_date)
     entry = roster.RosterEntry(
         id=args.id,

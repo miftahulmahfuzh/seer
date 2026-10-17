@@ -97,11 +97,13 @@ MVW_GT = "MVW-FR-GT"
 # of 20, on the same rule set, as a NEW id -- `inner.top` is in the frozen spec, so moving it on
 # RAW-FR-GT would have failed its next night. RAW-FR-GT is retired beside it.
 RAW35_GT = "RAW35-FR-GT"
-#: every entry that ever traded under the assumed flat rate, plus the three 013 retired and the one
-#: 021 retires; none of them ever stepped a paper session, and every one of them keeps every row it
-#: wrote.
-RETIRED = (F4, F1, FND, RM, "A", F4_FR, F1_FR, "SPY", "C", RMW, RAW, MOM, MVW, RAW_GT)
-ACTIVE_IDS = (SPY_GT, C_GT, RMW_GT, RAW35_GT, MOM_GT, MVW_GT)
+# 022 (owner, 2026-10-17): lab M0179-N20, the coskewness book, as an owner override -- not a lab
+# pass. It takes RMW-FR-GT's slot and RMW-FR-GT is retired beside it.
+COSK_GT = "COSK-FR-GT"
+#: every entry that ever traded under the assumed flat rate, plus the three 013 retired and the
+#: ones 021 and 022 retired; every one of them keeps every row it wrote.
+RETIRED = (F4, F1, FND, RM, "A", F4_FR, F1_FR, "SPY", "C", RMW, RAW, MOM, MVW, RAW_GT, RMW_GT)
+ACTIVE_IDS = (SPY_GT, C_GT, COSK_GT, RAW35_GT, MOM_GT, MVW_GT)
 
 # 2026-10-07: every digest moved once, on purpose, when the paper books' starting cash went from
 # 20,000,000 to 10,000,000 IDR (spec "initial_idr"; the owner's own Gotrade money). Production's
@@ -143,6 +145,9 @@ PINS = {
     # and `paper_end` are deliberately outside the frozen spec; retiring it moved nothing. The new
     # entry digests differently from it for exactly one reason: `params["inner.top"]` reads "35".
     RAW35_GT: "f9def72ae37bd7534807e5957a1e48917fe54322b65a5bbb0cd2898db41c443f",
+    # 022: the coskewness book. ONE new pin and not one moved: RMW-FR-GT's digest above is what 017
+    # wrote, because retiring it touches only `status`, `sort` and `paper_end`.
+    COSK_GT: "0733f237aab07882872242a14f0bc073f0125346f97cb33d54c0863b9e46d8c9",
 }
 
 FACTOR_PARAMS_AS_DICT = {
@@ -164,10 +169,10 @@ DISPLAY = ("id", "name", "sub", "icon", "is_champion", "is_benchmark", "sort", "
 
 def test_the_roster_is_the_handover_entries_in_sort_order():
     assert ROSTER_IDS == (
-        SPY_GT, C_GT, RMW_GT, RAW35_GT, MOM_GT, MVW_GT,
-        "SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW, RAW_GT,
+        SPY_GT, C_GT, COSK_GT, RAW35_GT, MOM_GT, MVW_GT,
+        "SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW, RAW_GT, RMW_GT,
     )
-    assert [e.sort for e in ROSTER] == list(range(1, 21))
+    assert [e.sort for e in ROSTER] == list(range(1, 22))
     assert "B" not in ROSTER_IDS
 
 
@@ -329,8 +334,8 @@ def test_strategy_params_round_trip_through_jsonb(pg):
 
 def test_lookbacks():
     assert {e.id: e.lookback for e in ROSTER} == {
-        SPY_GT: 1, C_GT: 200, RMW_GT: 426, RAW35_GT: 401, MOM_GT: 379, MVW_GT: 253,
-        RAW_GT: 401,
+        SPY_GT: 1, C_GT: 200, COSK_GT: 781, RAW35_GT: 401, MOM_GT: 379, MVW_GT: 253,
+        RAW_GT: 401, RMW_GT: 426,
         "SPY": 1, "A": 200, F4: 253, F1: 200, "C": 200, FND: 20, F4_FR: 253, F1_FR: 200,
         RM: 401, RMW: 426, RAW: 401, MOM: 379, MVW: 253,
     }
@@ -338,16 +343,42 @@ def test_lookbacks():
     # date, not a bar count. RMW's 426 is the roster's longest, which is why the night loads 640
     # calendar days, not 550 -- unchanged by 017 (which adds no new object) and unchanged by 021
     # (whose new object is RESIDMOM at a different width: `resid_lookback` does not read `top`).
-    assert MAX_LOOKBACK_BARS == 426
+    # 022's COSK reads 781: its object DECLARES 253 (its screen's need) but samples SPY's last 781
+    # sessions, and paper.roster.HISTORY_FLOOR_BARS states the true number -- see the next tests.
+    assert MAX_LOOKBACK_BARS == 781
 
 
 def test_the_night_window_holds_the_longest_lookback():
     # Plan decision "History at night": bars since data_date − MARKET_WINDOW_DAYS calendar days.
     from seer_engine.paper.store import MARKET_WINDOW_DAYS
 
-    assert MARKET_WINDOW_DAYS == 640
+    assert MARKET_WINDOW_DAYS == 1200  # 640 until 022: COSK needs 781 sessions
     for d in dates.sessions(date(2026, 10, 1), date(2027, 12, 31)):
         assert len(dates.sessions(d - timedelta(days=MARKET_WINDOW_DAYS), d)) >= MAX_LOOKBACK_BARS
+
+
+def test_the_coskewness_entry_is_fed_the_history_its_signal_reads():
+    """022's real bug, pinned so it cannot come back quietly.
+
+    M0179's ``CoskewAllocator.lookback`` declares the member screen's 253 bars, not the 781
+    sessions its 156 weekly returns sample (``SPAN + 1``). Trusting the declaration, the 640-day
+    window looked big enough, and every member would have gone unscored with its slot in SPY: an
+    all-SPY book that looked like a working one. The method file is a frozen pre-registration, so
+    the need is stated on the roster's side and this test checks it against the method's OWN
+    constants rather than a copied number -- and checks that the night's window really feeds it.
+    """
+    from seer_engine.lab.methods.m0179_coskewness import SPAN, STEP, WEEKS
+    from seer_engine.paper.roster import HISTORY_FLOOR_BARS, history_need
+    from seer_engine.paper.store import MARKET_WINDOW_DAYS
+
+    assert SPAN == WEEKS * STEP and SPAN + 1 == 781
+    cosk = entry(COSK_GT)
+    declared = cosk.obj.lookback(cosk.params)
+    assert declared < SPAN + 1, "the object now declares its need; the floor may be redundant"
+    assert HISTORY_FLOOR_BARS["COSKEW"] == SPAN + 1
+    assert cosk.lookback == history_need("COSKEW", declared) == SPAN + 1
+    for d in dates.sessions(date(2026, 10, 1), date(2028, 12, 29)):
+        assert len(dates.sessions(d - timedelta(days=MARKET_WINDOW_DAYS), d)) >= cosk.lookback, d
 
 
 def test_entry_rejects_an_id_off_the_roster():
@@ -525,7 +556,7 @@ def test_active_drops_retired_entries_and_keeps_order():
     )
     entries = from_rows(rows)
     assert [e.id for e in entries] == list(ROSTER_IDS)  # retired rows are never dropped from the roster
-    assert [e.id for e in active(entries)] == [SPY_GT, C_GT, RMW_GT, MOM_GT, MVW_GT]
+    assert [e.id for e in active(entries)] == [SPY_GT, C_GT, COSK_GT, MOM_GT, MVW_GT]
     raw = next(e for e in entries if e.id == RAW35_GT)
     assert (raw.status, raw.paper_end) == ("retired", date(2026, 10, 2))
 
@@ -608,7 +639,7 @@ def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
     # 013 rows are the rest -- every lab-derived row added after `promote` existed names its
     # method here, and only F4, F1 and their fractional twins predate it.
     assert {r.id for r in rows.values() if r.promoted_from is not None} == {
-        FND, RM, RMW, RAW, MOM, MVW, RMW_GT, RAW_GT, MOM_GT, MVW_GT, RAW35_GT,
+        FND, RM, RMW, RAW, MOM, MVW, RMW_GT, RAW_GT, MOM_GT, MVW_GT, RAW35_GT, COSK_GT,
     }
     assert (rows[FND].promoted_from, rows[RM].promoted_from) == ("M0005", "M0011")
     assert (rows[RAW].promoted_from, rows[MOM].promoted_from, rows[MVW].promoted_from) == (
@@ -619,6 +650,7 @@ def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
         "M0007", "M0002", "M0008",
     )
     assert rows[RMW_GT].promoted_from == "M0022"
+    assert rows[COSK_GT].promoted_from == "M0179"  # 022
     assert (rows["A"].object_name, rows["A"].registry_id, rows["A"].gate_applicable) == ("STRATEGY_A", None, True)
     assert (rows[F4].object_name, rows[F4].registry_id) == ("FACTOR", F4)
     assert rows["C"].gate_applicable is False
@@ -658,7 +690,7 @@ from seer_engine.paper.roster import (  # noqa: E402
 #: AND a LAB_PROVENANCE entry in the same commit; this tuple is the third place that has to name
 #: it, and that is the point -- forgetting is a failing test, not a silent gap.
 LAB_DERIVED = (F4, F1, FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW,
-               RMW_GT, RAW_GT, MOM_GT, MVW_GT, RAW35_GT)
+               RMW_GT, RAW_GT, MOM_GT, MVW_GT, RAW35_GT, COSK_GT)
 #: And the five that are not: the two benchmark entries, C and its Gotrade successor (the LLM
 #: strategy the quant gate does not apply to), and A, which predates the lab.
 NOT_LAB_DERIVED = ("SPY", SPY_GT, "A", "C", C_GT)
@@ -700,6 +732,15 @@ def test_the_entries_name_the_variants_the_roster_advertises():
     assert (entry(RAW35_GT).lab_provenance.method_id,
             entry(RAW35_GT).lab_provenance.candidate_id) == ("M0139", "M0139-N35-EBAND")
     assert entry(RAW_GT).lab_provenance.candidate_id == "M0007-N20-RAW"
+    # 022: COSK names the variant the owner chose, M0179-N20 -- not N40-SW, the rung that made
+    # the method dev-eligible -- and trades exactly that Candidate's params.
+    from seer_engine.lab.methods.m0179_coskewness import METHOD as M0179
+
+    cosk = entry(COSK_GT)
+    assert (cosk.lab_provenance.method_id, cosk.lab_provenance.candidate_id) == ("M0179", "M0179-N20")
+    n20 = next(c for c in M0179.candidates if c.id == "M0179-N20")
+    assert cosk.params is n20.params and cosk.obj is n20.allocator
+    assert cosk.rules is n20.rules and cosk.rules_id == "monthly-hold-frac-gotrade"
 
 
 def test_every_override_states_its_basis_and_a_reason():
@@ -718,7 +759,11 @@ def test_every_override_states_its_basis_and_a_reason():
     assert {p.basis for p in LAB_PROVENANCE.values()} == {"owner-override"}
     assert {p.lab_status for p in LAB_PROVENANCE.values()} == {"rejected", "dev-eligible"}
     assert LAB_PROVENANCE[RAW35_GT].lab_status == "dev-eligible"
-    assert {sid for sid, p in LAB_PROVENANCE.items() if p.lab_status != "rejected"} == {RAW35_GT}
+    # 022's COSK is the second, and it is NOT like RAW35: its method is dev-eligible through a
+    # different rung, and the variant admitted here failed the dev screen. Its reason says so.
+    assert LAB_PROVENANCE[COSK_GT].lab_status == "dev-eligible"
+    assert "NOT a lab pass" in LAB_PROVENANCE[COSK_GT].reason
+    assert {sid for sid, p in LAB_PROVENANCE.items() if p.lab_status != "rejected"} == {RAW35_GT, COSK_GT}
     assert set(BASES) == set(lab_store.PROMOTION_BASES)
 
 
@@ -819,7 +864,7 @@ def test_lab_provenance_agrees_with_the_promoted_from_column(pg):
     # their fractional twins were seeded by migration before `promote` existed. 017's four book
     # successors carry the method of the entry each replaces.
     assert {i for i, r in rows.items() if r.promoted_from is not None} == {
-        FND, RM, RMW, RAW, MOM, MVW, RMW_GT, RAW_GT, MOM_GT, MVW_GT, RAW35_GT,
+        FND, RM, RMW, RAW, MOM, MVW, RMW_GT, RAW_GT, MOM_GT, MVW_GT, RAW35_GT, COSK_GT,
     }
 
 
@@ -848,7 +893,7 @@ def test_every_active_entry_pays_gotrade_and_nothing_retired_changed():
     # once per pair; what every pair still states is the thing that matters -- the predecessor is
     # retired, its digest is STILL the one that was pinned for it, and the successor's is not.
     for old, new in (("SPY", SPY_GT), ("C", C_GT), (RMW, RMW_GT), (RAW, RAW_GT),
-                     (MOM, MOM_GT), (MVW, MVW_GT), (RAW_GT, RAW35_GT)):
+                     (MOM, MOM_GT), (MVW, MVW_GT), (RAW_GT, RAW35_GT), (RMW_GT, COSK_GT)):
         assert entry(old).status == "retired", old
         assert spec_digest(spec(entry(old))) == PINS[old], old
         assert spec_digest(spec(entry(new))) != PINS[old], new

@@ -63,7 +63,12 @@ from seer_engine.sim.rules import SHARE_QUANTUM
 from seer_engine.strategies.c import VERDICTS, allowed_map
 
 BENCHMARK_ID = "SPY"
-MARKET_WINDOW_DAYS = 640  # calendar days of bars loaded per night; 550 until RM (401-bar lookback), 2026-10-07
+# Calendar days of bars loaded per night. 550 until RM (401-bar lookback, 2026-10-07), then 640; 1200
+# since 022 (2026-10-17): COSK-FR-GT (lab M0179) samples SPY's last 781 sessions for its 156 weekly
+# returns, and 1200 days hold about 825 sessions (821 at the fewest over the past year), a margin of
+# 40. Its object declares only 253 (paper.roster.HISTORY_FLOOR_BARS states the true need), so this
+# window is the one thing that feeds it.
+MARKET_WINDOW_DAYS = 1200
 
 PRICE_QUANTUM = Decimal("0.0001")  # numeric(12,4) / numeric(14,4)
 DIVIDEND_QUANTUM = Decimal("0.000001")  # dividends.amount numeric(14,6)
@@ -1468,7 +1473,7 @@ def applied_splits_between(
 
 def market_window_since(data_date: date) -> date:
     """The first bar date the night loads: ``data_date - MARKET_WINDOW_DAYS`` calendar days
-    (>= 253-bar lookbacks with margin)."""
+    (>= every roster entry's history need, 781 sessions since 022, with margin)."""
     return _date("data_date", data_date) - timedelta(days=MARKET_WINDOW_DAYS)
 
 

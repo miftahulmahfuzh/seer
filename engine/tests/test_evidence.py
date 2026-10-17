@@ -484,3 +484,80 @@ def test_minvar_never_claims_a_cap_that_did_not_bind(lab_market):
     size = next(f for f in next(iter(out.values())) if "of the money" in f)
     assert "the same as every other holding" in size
     assert "no stock allowed more than" not in size
+
+
+# --------------------------------------------------------- COSKEW (022: lab M0179-N20, COSK-FR-GT)
+#
+# ``labkit.smoke_market`` is 473 sessions and the coskewness signal reads 781, so it would score
+# nothing there -- the very failure 022 fixes on the paper night. This market is the smoke
+# fixture's own price generator over enough sessions to feed the signal.
+
+COSK_FIRST = date(2012, 6, 1)
+
+
+def _members() -> tuple[str, ...]:
+    import labkit
+
+    return labkit.MEMBER_STOCKS
+
+
+@pytest.fixture(scope="module")
+def cosk_market() -> Market:
+    import labkit
+
+    days = dates.sessions(COSK_FIRST, LAB_DATE)
+    symbols = ("SPY",) + labkit.MEMBER_STOCKS
+    history = {s: labkit.smoke_history(s, k, days) for k, s in enumerate(symbols)}
+    return Market(
+        history=history,
+        membership=Membership(intervals=tuple((s, days[0], None) for s in labkit.MEMBER_STOCKS)),
+        fx=(),
+    )
+
+
+def _cosk_targets(history: dict[str, History], market: Market, d: date):
+    members = market.membership.members_on(d)
+    return roster.RESOLVER["COSKEW"].obj.targets(history, members, d, frozenset(), roster.COSKEW_PARAMS)
+
+
+def test_coskew_explains_every_pick_and_the_market_slots(cosk_market):
+    d = LAB_DATE
+    assert len(dates.sessions(COSK_FIRST, d)) > 781
+    targets = _cosk_targets(cut_at(dict(cosk_market.history), d), cosk_market, d)
+    picked = {t.symbol for t in targets}
+    # Eight members and a 20-name book: all eight are held and the other twelve places sit in SPY.
+    assert picked == {"SPY", *_members()}
+    out = evidence.evidence_for("COSKEW", cosk_market, roster.COSKEW_PARAMS, d, sorted(picked))
+    assert set(out) == picked
+    assert_plain(out)
+    assert_distinct({s: f for s, f in out.items() if s != "SPY"})
+    for s in _members():
+        facts = out[s]
+        assert "crash-with-the-market score" in facts[0]
+        assert re.search(r"ranked it \d+(st|nd|rd|th) of 8 stocks", facts[1]), facts[1]
+        assert any("10 worst weeks" in f for f in facts), facts
+        assert any("top 40%" in f for f in facts), facts
+    assert "waits in SPY" in out["SPY"][0]
+    assert out == evidence.evidence_for("COSKEW", cosk_market, roster.COSKEW_PARAMS, d, sorted(picked))
+
+
+def test_coskew_reads_nothing_after_the_data_date(cosk_market):
+    d = date(2015, 9, 1)
+    symbols = ["SPY", *_members()]
+    before = evidence.evidence_for("COSKEW", cosk_market, roster.COSKEW_PARAMS, d, symbols)
+    changed = Market(history=later_bars_changed(dict(cosk_market.history), d),
+                     membership=cosk_market.membership, fx=())
+    assert before and before == evidence.evidence_for("COSKEW", changed, roster.COSKEW_PARAMS, d, symbols)
+
+
+def test_a_short_window_leaves_the_coskew_book_all_in_spy(cosk_market):
+    """The bug 022 fixed, shown on the allocator itself: with fewer than 781 sessions of history
+    no member is scored and every place sits in SPY. The paper night's old 640-day window held
+    about 440 sessions; this keeps the last 473."""
+    d = LAB_DATE
+    full = cut_at(dict(cosk_market.history), d)
+    n = len(dates.sessions(date(2013, 12, 2), d))
+    short = {s: History(s, h.dates[-n:], h.open[-n:], h.high[-n:], h.low[-n:], h.close[-n:], h.volume[-n:])
+             for s, h in full.items()}
+    assert [t.symbol for t in _cosk_targets(short, cosk_market, d)] == ["SPY"]
+    assert {t.symbol for t in _cosk_targets(full, cosk_market, d)} != {"SPY"}

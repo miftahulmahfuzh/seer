@@ -60,11 +60,11 @@ def test_read_strategies_returns_the_roster_rows_in_sort_order(pg):
     rows = store.read_strategies(pg)
     # 017 put the six Gotrade-fee successors at the head and moved the thirteen below them.
     # 021 swapped one of the six: RAW35-FR-GT (35 names) takes RAW-FR-GT's slot, and RAW-FR-GT
-    # goes to the end of the retired block.
+    # goes to the end of the retired block. 022 did the same with COSK-FR-GT and RMW-FR-GT.
     assert [r.id for r in rows] == [
-        "SPY-GT", "C-GT", "RMW-FR-GT", "RAW35-FR-GT", "MOM-FR-GT", "MVW-FR-GT",
+        "SPY-GT", "C-GT", "COSK-FR-GT", "RAW35-FR-GT", "MOM-FR-GT", "MVW-FR-GT",
         "SPY", "A", BOOK_ID, TIMING_ID, "C", "FND", f"{BOOK_ID}-FR", f"{TIMING_ID}-FR", "RM-FR",
-        "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR", "RAW-FR-GT",
+        "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR", "RAW-FR-GT", "RMW-FR-GT",
     ]
     spy = next(r for r in rows if r.id == "SPY-GT")
     assert (spy.engine, spy.rules_id, spy.is_champion, spy.is_benchmark) == ("benchmark", None, True, True)
@@ -556,9 +556,10 @@ def test_market_window_equals_the_full_load_cut_at_since(pg, tmp_path):
     assert window.fx == full.fx
 
 
-def test_market_window_since_is_640_calendar_days_back():
-    # 550 until RM joined (2026-10-07): its 401-bar lookback needs about 582 calendar days.
-    assert store.market_window_since(date(2026, 10, 2)) == date(2026, 10, 2) - timedelta(days=640)
+def test_market_window_since_is_1200_calendar_days_back():
+    # 550 until RM joined (2026-10-07): its 401-bar lookback needs about 582 calendar days. 640
+    # until COSK joined (022, 2026-10-17): its coskewness signal samples 781 sessions.
+    assert store.market_window_since(date(2026, 10, 2)) == date(2026, 10, 2) - timedelta(days=1200)
 
 
 def test_read_bars_frame_default_statement_is_unchanged_and_since_filters(pg, monkeypatch):

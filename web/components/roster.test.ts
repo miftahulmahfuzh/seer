@@ -1,4 +1,4 @@
-import { BookOpen, Gauge, Gavel, Landmark, Scale, Shield, Sigma, Zap } from 'lucide-react';
+import { BookOpen, CloudLightning, Gauge, Gavel, Landmark, Scale, Shield, Sigma, Zap } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 import { selectStrategy, sharesLabel, strategyIcon } from './roster';
 
@@ -36,6 +36,7 @@ describe('strategyIcon', () => {
     expect(strategyIcon('book-open')).toBe(BookOpen);
     expect(strategyIcon('zap')).toBe(Zap);
     expect(strategyIcon('scale')).toBe(Scale);
+    expect(strategyIcon('cloud-lightning')).toBe(CloudLightning);
     expect(strategyIcon('nope')).toBe(Sigma);
   });
 });

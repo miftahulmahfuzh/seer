@@ -18,8 +18,10 @@
 .windowDetail { color: var(--ink-2); }
 .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; }
 .legendItem { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
-/* Mobile: spread edge to edge under the axis labels, never wrapping. */
-.legendRow { flex-wrap: nowrap; justify-content: space-between; gap: 10px; }
+/* Mobile: spread under the axis labels, wrapping onto a second line rather than off the edge: six
+   live codes plus a picked retired one do not fit 390px on one line. */
+.legendRow { flex-wrap: wrap; justify-content: flex-start; gap: 6px 14px; }
+
 .swatch { width: 18px; height: 3px; border-radius: 9px; }
 .swatchDash { width: 18px; height: 0; border-top-width: 2.5px; }
 
@@ -105,6 +107,34 @@
 .metric { display: flex; flex-direction: column; gap: 2px; }
 .ret { font-size: 24px; letter-spacing: -0.03em; }
 .mLabel { font-size: 12px; }
+
+/* The retired shelf: one folded sheet under the live board. Its cards sit inside it on their own
+   gaps (no -40px overlap: they are not part of the stack), each keeping its sheet colour. */
+.shelf { gap: 0; padding-bottom: 66px; }
+.shelfHead { display: flex; align-items: center; gap: 14px; }
+.shelfIcon {
+  flex: none; width: 52px; height: 52px; border-radius: 999px; background: var(--chip);
+  display: flex; align-items: center; justify-content: center; color: var(--ink-2);
+}
+.shelfText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.shelfSub { font-size: 15px; color: var(--ink-2); }
+.shelfCards { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.shelfCards[hidden] { display: none; }
+.shelfCards .card { border-radius: 32px; padding: 22px 20px; }
+/* A picked retired card is not a tab into the sheet above it: it says so with its inverted icon. */
+.cardPicked .icon { background: var(--ink); color: var(--sheet); }
+
+@media (min-width: 1024px) {
+  .shelf { order: 3; margin-top: 12px; border-radius: 40px; padding: 22px 30px 24px; }
+  .shelfIcon { width: 46px; height: 46px; }
+  .shelfSub { font-size: 14px; }
+  .shelfCards {
+    display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr));
+    gap: 12px; margin-top: 18px; container: cards / inline-size; --card-r: 32px;
+  }
+  .shelfCards .card { border-radius: var(--card-r); padding: 22px; }
+  .shelfCards .cardPicked { outline: 2px solid var(--ink); outline-offset: -2px; }
+}
 
 @media (min-width: 1024px) {
   .top { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 12px; order: 0; }

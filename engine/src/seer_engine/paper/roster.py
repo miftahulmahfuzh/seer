@@ -98,7 +98,8 @@ row it ever wrote and stays on the leaderboard: it only stops trading. :func:`ac
 filter the paper night uses.
 
 :data:`MAX_LOOKBACK_BARS` is the most bars through a data date any object on the **seeded** roster
-reads (FACTOR's ``factor_lookback`` = 253); the paper store's windowed history load must cover it.
+reads (781 since 022: COSK's coskewness window, stated by :data:`HISTORY_FLOOR_BARS` because its
+object under-declares it); the paper store's windowed history load must cover it.
 It is a property of :data:`SEED_ROWS`, not of whatever a live database holds, and the paper night
 does not read it: ``commands.paper._check_window`` recomputes the max over the entries that trade
 tonight. The guard against admitting a strategy whose lookback the night's bar window cannot feed
@@ -127,6 +128,9 @@ from seer_engine.lab.methods.m0011_raw_residual_own_vol import RESIDVOL
 from seer_engine.lab.methods.m0022_weekly_brake_residual import METHOD as M0022
 from seer_engine.lab.methods.m0022_weekly_brake_residual import WEEKLYBRAKE
 from seer_engine.lab.methods.m0139_names_on_an_invested_tape import METHOD as M0139
+from seer_engine.lab.methods.m0179_coskewness import COSKEW
+from seer_engine.lab.methods.m0179_coskewness import METHOD as M0179
+from seer_engine.lab.methods.m0179_coskewness import SPAN as COSKEW_SPAN
 from seer_engine.paper.capital import PAPER_INITIAL_IDR
 from seer_engine.sim import COST_RATE
 from seer_engine.sim.costs import CostModel
@@ -181,6 +185,12 @@ MVW_GT_ID = "MVW-FR-GT"
 # fail its next night with a SpecMismatch (store.check_digest). RAW-FR-GT is retired in the same
 # migration, so the board never shows two widths of one book.
 RAW35_GT_ID = "RAW35-FR-GT"
+
+# 022 (owner, 2026-10-17): lab M0179-N20 joins -- the twenty screened members that fall hardest when
+# the market swings hardest (negative coskewness), re-picked quarterly with a keep band, no market
+# switch. RMW-FR-GT is retired in the same migration to make room. The owner means to move real
+# money into whatever this entry picks, so its live picks matter and are not a curiosity.
+COSK_GT_ID = "COSK-FR-GT"
 
 #: The bracket rule set the daily control trades under: design section 5's shape, charging Gotrade's
 #: measured schedule instead of a flat 0.1% a side. Added by the bracket-path work; this module only
@@ -396,6 +406,36 @@ REGIME_PARAMS = next(c.params for c in M0002.candidates if c.id == "M0002-REL-85
 #: variance at a 7% per-name cap, rather than equally.
 MINVAR_PARAMS = next(c.params for c in M0008.candidates if c.id == "M0008-N30-C07")
 
+#: COSK's params: lab M0179's N20 variant -- F4's member screen, the 20 most negative-coskewness
+#: members on 156 weekly returns, kept while under the 40% rank fraction, re-picked on the last close
+#: of each quarter, no SPY 200-day switch, on ``monthly-hold-frac-gotrade``. Read from the frozen
+#: method file like the ones above, so the roster can never drift from the trial it records.
+COSKEW_PARAMS = next(c.params for c in M0179.candidates if c.id == "M0179-N20")
+
+
+#: Bars through a data date an object REALLY reads, where its own ``lookback(params)`` says less.
+#:
+#: ``lookback`` is what the night's window guard (``commands.paper._check_window``) and promotion's
+#: (``commands.promote.check_lookback``) trust, so an object that under-declares it is fed a window
+#: too short for its signal and nobody is told. M0179's ``CoskewAllocator.lookback`` declares only
+#: its member screen's need (253 bars) -- its own comment says so -- while its signal samples SPY's
+#: last ``SPAN + 1`` = 781 sessions (156 weekly returns). On the 640-day window that held until 022
+#: no member could have been scored, and "a member without SPAN + 1 bars is not scored yet and its
+#: slot holds SPY": the entry would have been an all-SPY book that looked as if it were working.
+#:
+#: The method file is a committed pre-registration and is never edited, so the true need is stated
+#: here, keyed by RESOLVER name, and :func:`history_need` takes the larger of the two. Not part of
+#: :func:`spec` -- ``lookback`` never was -- so no digest moves.
+HISTORY_FLOOR_BARS: dict[str, int] = {
+    "COSKEW": COSKEW_SPAN + 1,
+}
+
+
+def history_need(object_name: str, declared: int) -> int:
+    """The bars ``object_name`` reads through a data date: its declared lookback, raised to
+    :data:`HISTORY_FLOOR_BARS` where the object is known to under-declare it."""
+    return max(int(declared), HISTORY_FLOOR_BARS.get(object_name, 0))
+
 
 #: The owner's funding plan, as the roster's own statement of it (owner's decision, 2026-10-08).
 #:
@@ -511,6 +551,9 @@ RESOLVER: dict[str, Binding] = {
     # future width of this book takes the same path. That is a cost of widths, not a defect --
     # the alternative is a resolver that cannot tell two widths apart.
     "RESIDMOM35": Binding(obj=RESIDMOM, params=RESIDMOM35_PARAMS),
+    # 022: lab M0179's coskewness book, its N20 variant (owner, 2026-10-17; replaces RMW-FR-GT).
+    # Its true history need is in HISTORY_FLOOR_BARS, not in its own lookback().
+    "COSKEW": Binding(obj=COSKEW, params=COSKEW_PARAMS),
 }
 
 
@@ -737,6 +780,27 @@ LAB_PROVENANCE: dict[str, LabProvenance] = {
             "the closed record it is"
         ),
     ),
+    # 022: the coskewness book. Admitted at the method's status, 'dev-eligible' -- which M0179
+    # earned through a DIFFERENT variant (N40-SW). The variant admitted here failed the dev screen
+    # itself, and the reason below says so first.
+    COSK_GT_ID: LabProvenance(
+        method_id="M0179",
+        candidate_id="M0179-N20",
+        lab_status="dev-eligible",
+        basis="owner-override",
+        reason=(
+            "owner override, 2026-10-17: the owner admitted it for paper after his own "
+            "calculate-assets run of this variant, and means to move the money he holds in RAW's "
+            "book into its picks. It is NOT a lab pass. M0179 reads dev-eligible only through its "
+            "40-name switched rung; this 20-name variant with no market switch FAILED the dev "
+            "screen -- max DD 51.7% (the screen allows 50%, the owner's real-money bar 25%) and "
+            "recorded DSR 0.500 at its recorded N=116 -- although it beat a deposit-matched SPY TR "
+            "(+359.6% against +257.2%, 10.1% a year against 7.2%; PF 2.20, 506 trades). The hard "
+            "gate also refuses M0179 on its walk-forward folds (2 of 4 won, and the opposite "
+            "picks were preferred before every fold), and its recorded verdict is 'not "
+            "promoted'. It has never had a test-window look. RMW-FR-GT is retired to make room"
+        ),
+    ),
 }
 
 
@@ -904,6 +968,7 @@ def from_row(row: Row) -> RosterEntry:
             obj, params = binding.obj, binding.params
         # Strategy.lookback is an int attribute; Allocator.lookback is a method of its params.
         lookback = obj.lookback(params) if engine == "book" else obj.lookback
+        lookback = history_need(object_name, lookback)
     gate_note = row.gate_note
     if not isinstance(gate_note, str) or not gate_note:
         raise BadRosterRow(
@@ -1028,29 +1093,34 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         ),
         gate_applicable=False,
     ),
+    # 022 (owner, 2026-10-17): the coskewness book takes the slot RMW-FR-GT held; RMW-FR-GT is
+    # retired to the end of this tuple. An owner override, not a lab pass -- see LAB_PROVENANCE.
     RosterRow(
-        id=RMW_GT_ID,
-        name="RMW · Braked momentum",
+        id=COSK_GT_ID,
+        name="COSK · Crash-prone picks",
         sub=(
-            "Top 20 by rise beyond the market, picked monthly; holds less when jumpy, checked "
-            "weekly; fractional shares, real Gotrade fees"
+            "20 stocks that fall hardest in the market's wildest weeks, re-picked each quarter, "
+            "fractional shares, real Gotrade fees"
         ),
-        icon="activity",
+        icon="cloud-lightning",
         is_champion=False,
         is_benchmark=False,
         sort=3,
         engine="book",
-        rules_id="monthly-rank-weekly-resize-frac-gotrade",
-        object_name="WEEKLYBRAKE",
+        rules_id="monthly-hold-frac-gotrade",
+        object_name="COSKEW",
         registry_id=None,
         gate_note=(
-            "Lab M0022 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
-            "0.1% a side: beats SPY TR (+789.2% vs +351.4%), max DD 14.3%, PF 2.06 and 1,589 "
-            "trades all pass; failed only DSR >= 0.95 (0.916 at N=110). Re-measured at Gotrade's "
-            "real fees (449fa34, report only -- the lab's own N is unchanged) it returns +543% "
-            "against SPY's +350% at the same fees, so no verdict moves. Successor of RMW-FR, which "
-            "paid the assumed rate; this entry pays Gotrade's measured schedule from its first "
-            "night. On paper to test it forward"
+            "Owner override, 2026-10-17, admitted for paper after his calculate-assets run; NOT a "
+            "lab pass. Lab M0179 dev window only (1996-01-03..2015-10-16), already in fractional "
+            "shares at Gotrade's measured fees on the owner's funding plan -- the rule set this "
+            "entry runs: +359.6% against a deposit-matched SPY TR's +257.2% (10.1% a year against "
+            "7.2%), PF 2.20, 506 trades, but max DD 51.7% -- outside the lab screen's 50% and twice "
+            "the owner's 25% real-money bar -- and a recorded DSR of 0.500 at its recorded N=116, so "
+            "this variant FAILED the dev screen. M0179 reads dev-eligible only through its 40-name "
+            "switched rung, and the hard gate refuses the method on its walk-forward folds (2 of 4). "
+            "Never had a test-window look. It replaces RMW-FR-GT. On paper because the owner means "
+            "to move the money he holds in RAW's book into its picks"
         ),
     ),
     RosterRow(
@@ -1420,6 +1490,35 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "the brake"
         ),
         status="retired",  # 021: superseded by RAW35-FR-GT, which holds thirty-five names
+    ),
+    # 022: retired (owner, 2026-10-17) to make room for COSK-FR-GT. `status`, `sort` and
+    # `paper_end` are outside the frozen spec, so this entry's digest is unchanged and it keeps every
+    # row it ever wrote.
+    RosterRow(
+        id=RMW_GT_ID,
+        name="RMW · Braked momentum",
+        sub=(
+            "Top 20 by rise beyond the market, picked monthly; holds less when jumpy, checked "
+            "weekly; fractional shares, real Gotrade fees"
+        ),
+        icon="activity",
+        is_champion=False,
+        is_benchmark=False,
+        sort=21,
+        engine="book",
+        rules_id="monthly-rank-weekly-resize-frac-gotrade",
+        object_name="WEEKLYBRAKE",
+        registry_id=None,
+        gate_note=(
+            "Lab M0022 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
+            "0.1% a side: beats SPY TR (+789.2% vs +351.4%), max DD 14.3%, PF 2.06 and 1,589 "
+            "trades all pass; failed only DSR >= 0.95 (0.916 at N=110). Re-measured at Gotrade's "
+            "real fees (449fa34, report only -- the lab's own N is unchanged) it returns +543% "
+            "against SPY's +350% at the same fees, so no verdict moves. Successor of RMW-FR, which "
+            "paid the assumed rate; this entry pays Gotrade's measured schedule from its first "
+            "night. On paper to test it forward"
+        ),
+        status="retired",  # 022: retired to make room for COSK-FR-GT (owner, 2026-10-17)
     ),
 )
 

@@ -225,6 +225,21 @@ def test_check_lookback_refuses_more_bars_than_the_night_loads():
         promote.check_lookback(have + 1, d)
 
 
+def test_promotion_uses_the_rosters_history_floor_not_the_declared_lookback(monkeypatch):
+    """022: M0179's allocator declares 253 bars and reads 781. Promotion must check the window
+    against what the object READS -- the same number roster.from_row gives the night -- or a
+    600-day window would wave through a book that can score nothing."""
+    args = _args(method="M0179", candidate="M0179-N20", id="TEST-COSK", name="T · Coskewness",
+                 sub="t", icon="cloud-lightning", gate_note="t")
+    d = date(2026, 10, 2)
+    p = promote.build_promotion(args, d, sort=99, lab_status="dev-eligible")
+    assert p.entry.lookback == 781 == roster.entry(roster.COSK_GT_ID).lookback
+    assert p.entry.obj.lookback(p.entry.params) < 781  # the declaration the floor corrects
+    monkeypatch.setattr(paper_store, "MARKET_WINDOW_DAYS", 640)
+    with pytest.raises(promote.NotPromotable, match="reads 781 bars"):
+        promote.build_promotion(args, d, sort=99, lab_status="dev-eligible")
+
+
 def test_check_evidence_refuses_an_object_without_evidence(monkeypatch):
     promote._check_evidence("FUNDAMENTAL")  # phase 1 gives the real roster object its facts
     monkeypatch.delitem(evidence.EVIDENCE, "FUNDAMENTAL")

@@ -12,6 +12,7 @@ import { isSeraUser } from '@/lib/sera/access';
 import { methodHref } from '@/lib/sera/paper';
 import { wibDate } from '@/lib/session';
 import { PickName } from './PickName';
+import { RetiredShelf } from './RetiredShelf';
 import {
   BENCHMARK_DASH, compare, LOOK_FALLBACK, looks, MIN_COMMON_SESSIONS, monthLines, NO_GATE, pickResearch,
   researchOf, retiredLabel, scoreOf, sinceStartLine, spyOverSpan, windowLine,
@@ -30,6 +31,10 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
   const q = await searchParams;
   const [board, run, user] = await Promise.all([leaderboard(), runStatus(now), currentUser()]);
 
+  // The live strategies hold the board -- chart, legend, switch and the row of cards. A retired one
+  // that traded keeps its card and its record on the folded shelf under them (`RetiredShelf`).
+  const live = board.rows.filter(r => r.strategy.status !== 'retired');
+  const retiredRows = board.rows.filter(r => r.strategy.status === 'retired');
   const roster = board.rows.map(r => r.strategy);
   const lookMap = looks(roster);
   const lookOf = (id: string): Look => lookMap.get(id) ?? LOOK_FALLBACK;
@@ -51,6 +56,10 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
   // strategies stay selectable (their record is the point) but are never the default.
   const pick = pickResearch(research, q.s);
   const pickRow = pick ? board.rows.find(r => r.strategy.id === pick.id) : undefined;
+  // The chart, the legend and the switch show the live strategies, plus a retired one only while it
+  // is the pick: its line and its switch button are then the context for the sheets it fills.
+  const shown = pickRow && pickRow.strategy.status === 'retired' ? [...live, pickRow] : live;
+  const switchable = researchOf(shown.map(r => r.strategy));
   const gate = pickRow?.strategy.gate ?? null;
   // "Beats SPY" measures the benchmark over the picked strategy's own span, not over SPY's whole
   // record: the two need not have started on the same day once the roster is promotable.
@@ -69,7 +78,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
   // Forward test runs from the earliest paper snapshot; strategies promoted later start later, so
   // this is the board's whole span and NOT the window anything is ranked over (see `wline`).
   const period = board.from && board.to ? `${monthDay(board.from)} – ${monthDay(board.to)}` : 'Not started';
-  const chart = buildChart(board, lookOf);
+  const chart = buildChart({ ...board, rows: shown }, lookOf);
   const ret = (v: number | null) => (v === null ? '—' : signedPct(v, 1));
   const tone = (v: number | null) => (v === null ? '' : v < 0 ? 'neg' : 'pos');
   const champRet = champ?.metrics.totalReturn ?? null;
@@ -113,7 +122,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
             <span className={s.statLabel}>Sessions</span>
           </div>
         </div>
-        <Legend rows={board.rows} lookOf={lookOf} className="desk-only" />
+        <Legend rows={shown} lookOf={lookOf} className="desk-only" />
       </div>
       <div className={`${s.window} ${s.pad}`}>
         <span className={s.windowLabel}>{wline.label}</span>
@@ -129,16 +138,16 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
         ))}
       </svg>
       <div className={`${s.axis} ${s.pad}`}>{chart.labels.map((l, i) => <span key={i}>{l}</span>)}</div>
-      <Legend rows={board.rows} lookOf={lookOf} className={`${s.pad} ${s.legendRow} mobile-only`} />
+      <Legend rows={shown} lookOf={lookOf} className={`${s.pad} ${s.legendRow} mobile-only`} />
     </section>
   );
 
   const checklistSheet = (
     // Butter on mobile (the design's checklist sheet); on desktop it takes the picked strategy's tint.
     <section className={`sheet over ${s.check}`} style={{ '--pick': pick ? lookOf(pick.id).tint : undefined } as CSSProperties}>
-      {pick && research.length > 1 && (
+      {pick && switchable.length > 1 && (
         <div className={s.switch}>
-          <StrategySwitch strategies={research} current={pick.id}
+          <StrategySwitch strategies={switchable} current={pick.id}
             href={id => `/leaderboard?s=${encodeURIComponent(id)}`} label="Strategy" />
         </div>
       )}
@@ -161,7 +170,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
 
   // Desktop: the picked card drops into this sheet as a tab. At either end of the row the tab meets
   // the sheet's own rounded corner, which has to square off for the two to read as one surface.
-  const ids = board.rows.map(r => r.strategy.id);
+  const ids = live.map(r => r.strategy.id);
   const tabEdge = !pick ? undefined : ids[0] === pick.id ? 'first' : ids.at(-1) === pick.id ? 'last' : undefined;
   const monthsSheet = (
     <section className={`sheet over ${pick ? lookOf(pick.id).bg : 'bg-sheet'} ${s.months}`} data-tab={tabEdge}
@@ -200,75 +209,86 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
       <div className="stack">
         <div className={s.top}>{chartSheet}{checklistSheet}</div>
         {monthsSheet}
-        <div className={s.cards}>
-          {board.rows.map(({ strategy: st, metrics: m }) => {
-            const Icon = strategyIcon(st.icon);
-            const look = lookOf(st.id);
-            const dash = (v: string) => (st.isBenchmark ? '—' : v);
-            const cr = cmpOf(st.id);
-            const retired = st.status === 'retired';
-            const active = st.id === pick?.id;
-            // Desktop shows the code only; the full name and the one-line description live in this tip.
-            const tip = `${st.name}\n${st.sub}`;
-            const body = (
-              <>
-                <div className={s.cardHead}>
-                  <div className={s.cardName}>
-                    <div className={s.titleRow}>
-                      {/* Mobile: one row, the name gives way (ellipsis) before the chips wrap under it.
-                          Desktop: the code, with the chips on their own fixed-height line below. */}
-                      <span className={s.name} data-tip={tip}>
-                        <span className={`${s.nameText} mobile-only`}>{st.name}</span>
-                        <span className={`${s.nameText} desk-only`}>{st.short}</span>
-                        {st.isChampion && <span data-tip="Champion" aria-label="Champion" role="img" className={`${s.crown} mobile-only`}><Crown size={20} /></span>}
-                      </span>
-                      {/* Desktop: the status line under the code — champion, retired, not ranked. */}
-                      <span className={s.chips}>
-                        {st.isChampion && <span data-tip="Champion" aria-label="Champion" role="img" className={`${s.crown} desk-only`}><Crown size={20} /></span>}
-                        {retired && (
-                          <span className={`chip ${s.retired}`}
-                            data-tip="Retired: it stopped trading and keeps its whole record">
-                            <Archive size={14} strokeWidth={1.75} aria-hidden="true" />
-                            {retiredLabel(st.paperEnd)}
-                          </span>
-                        )}
-                        {cr?.status === 'insufficient' && (
-                          <span className={`chip ${s.unranked}`}
-                            data-tip={`Not ranked: fewer than ${MIN_COMMON_SESSIONS} sessions shared with the others`}>
-                            Not ranked
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                    <span className={s.cardSub}>{st.sub}</span>
-                  </div>
-                  <span className={s.icon} data-tip={tip}><Icon size={22} strokeWidth={1.6} /></span>
-                </div>
-                <div className={s.metrics}>
-                  <div className={s.metric}><span className={`num ${s.ret} ${tone(m.totalReturn)}`}>{ret(m.totalReturn)}</span><span className={s.mLabel}><span className="mobile-only">Return</span><span className="desk-only">Total return</span></span></div>
-                  <div className={s.metric}><span className="num">{dash(m.winRate === null ? '—' : Math.round(m.winRate * 100) + '%')}</span><span className={s.mLabel}>Win rate</span></div>
-                  <div className={s.metric}><span className="num">{dash(m.profitFactor === null ? '—' : m.profitFactor === Infinity ? '∞' : m.profitFactor.toFixed(2))}</span><span className={s.mLabel}><span className="mobile-only">Profit f.</span><span className="desk-only">Profit factor</span></span></div>
-                  <div className={s.metric}><span className="num">{m.maxDrawdown === null ? '—' : (m.maxDrawdown * 100).toFixed(1) + '%'}</span><span className={s.mLabel}><span className="mobile-only">Max DD</span><span className="desk-only">Max drawdown</span></span></div>
-                  <div className={s.metric}><span className="num">{dash(String(m.trades))}</span><span className={s.mLabel}>Trades</span></div>
-                </div>
-              </>
-            );
-            const cls = `sheet over ${look.bg} ${s.card}${active ? ` ${s.cardActive}` : ''}`;
-            const style = { '--tint': look.tint } as CSSProperties;
-            // SPY is in every month row already, so only research cards pick the month-by-month sheet.
-            return st.isBenchmark ? (
-              <article key={st.id} data-status={cr?.status ?? 'benchmark'} className={cls} style={style}>{body}</article>
-            ) : (
-              <Link key={st.id} href={`/leaderboard?s=${encodeURIComponent(st.id)}`} scroll={false}
-                data-status={cr?.status ?? 'benchmark'} aria-current={active ? 'true' : undefined}
-                className={`${cls} ${s.cardLink}`} style={style}>{body}</Link>
-            );
-          })}
-        </div>
+        <div className={s.cards}>{live.map(r => card(r, true))}</div>
+        {retiredRows.length > 0 && (
+          <RetiredShelf count={retiredRows.length} cols={live.length} open={pick?.status === 'retired'}>
+            {retiredRows.map(r => card(r, false))}
+          </RetiredShelf>
+        )}
         <div className="nav-clear" />
       </div>
     </>
   );
+
+  /**
+   * One strategy's card. `tab`: the picked live card becomes the tab into the month-by-month sheet
+   * right under the live row (desktop); a retired card sits on the shelf below that sheet, so when
+   * it is the pick it is marked as picked instead of pretending to be attached to it.
+   */
+  function card({ strategy: st, metrics: m }: Board['rows'][number], tab: boolean) {
+    const Icon = strategyIcon(st.icon);
+    const look = lookOf(st.id);
+    const dash = (v: string) => (st.isBenchmark ? '—' : v);
+    const cr = cmpOf(st.id);
+    const retired = st.status === 'retired';
+    const active = st.id === pick?.id;
+    // Desktop shows the code only; the full name and the one-line description live in this tip.
+    const tip = `${st.name}\n${st.sub}`;
+    const body = (
+      <>
+        <div className={s.cardHead}>
+          <div className={s.cardName}>
+            <div className={s.titleRow}>
+              {/* Mobile: one row, the name gives way (ellipsis) before the chips wrap under it.
+                  Desktop: the code, with the chips on their own fixed-height line below. */}
+              <span className={s.name} data-tip={tip}>
+                <span className={`${s.nameText} mobile-only`}>{st.name}</span>
+                <span className={`${s.nameText} desk-only`}>{st.short}</span>
+                {st.isChampion && <span data-tip="Champion" aria-label="Champion" role="img" className={`${s.crown} mobile-only`}><Crown size={20} /></span>}
+              </span>
+              {/* Desktop: the status line under the code — champion, retired, not ranked. */}
+              <span className={s.chips}>
+                {st.isChampion && <span data-tip="Champion" aria-label="Champion" role="img" className={`${s.crown} desk-only`}><Crown size={20} /></span>}
+                {retired && (
+                  <span className={`chip ${s.retired}`}
+                    data-tip="Retired: it stopped trading and keeps its whole record">
+                    <Archive size={14} strokeWidth={1.75} aria-hidden="true" />
+                    {retiredLabel(st.paperEnd)}
+                  </span>
+                )}
+                {cr?.status === 'insufficient' && (
+                  <span className={`chip ${s.unranked}`}
+                    data-tip={`Not ranked: fewer than ${MIN_COMMON_SESSIONS} sessions shared with the others`}>
+                    Not ranked
+                  </span>
+                )}
+              </span>
+            </div>
+            <span className={s.cardSub}>{st.sub}</span>
+          </div>
+          <span className={s.icon} data-tip={tip}><Icon size={22} strokeWidth={1.6} /></span>
+        </div>
+        <div className={s.metrics}>
+          <div className={s.metric}><span className={`num ${s.ret} ${tone(m.totalReturn)}`}>{ret(m.totalReturn)}</span><span className={s.mLabel}><span className="mobile-only">Return</span><span className="desk-only">Total return</span></span></div>
+          <div className={s.metric}><span className="num">{dash(m.winRate === null ? '—' : Math.round(m.winRate * 100) + '%')}</span><span className={s.mLabel}>Win rate</span></div>
+          <div className={s.metric}><span className="num">{dash(m.profitFactor === null ? '—' : m.profitFactor === Infinity ? '∞' : m.profitFactor.toFixed(2))}</span><span className={s.mLabel}><span className="mobile-only">Profit f.</span><span className="desk-only">Profit factor</span></span></div>
+          <div className={s.metric}><span className="num">{m.maxDrawdown === null ? '—' : (m.maxDrawdown * 100).toFixed(1) + '%'}</span><span className={s.mLabel}><span className="mobile-only">Max DD</span><span className="desk-only">Max drawdown</span></span></div>
+          <div className={s.metric}><span className="num">{dash(String(m.trades))}</span><span className={s.mLabel}>Trades</span></div>
+        </div>
+      </>
+    );
+    const picked = active ? ` ${tab ? s.cardActive : s.cardPicked}` : '';
+    const cls = `sheet ${tab ? 'over ' : ''}${look.bg} ${s.card}${picked}`;
+    const style = { '--tint': look.tint } as CSSProperties;
+    // SPY is in every month row already, so only research cards pick the month-by-month sheet.
+    return st.isBenchmark ? (
+      <article key={st.id} data-status={cr?.status ?? 'benchmark'} className={cls} style={style}>{body}</article>
+    ) : (
+      <Link key={st.id} href={`/leaderboard?s=${encodeURIComponent(st.id)}`} scroll={false}
+        data-status={cr?.status ?? 'benchmark'} aria-current={active ? 'true' : undefined}
+        className={`${cls} ${s.cardLink}`} style={style}>{body}</Link>
+    );
+  }
 }
 
 function MonthRow({ line, total }: { line: MonthLine; total?: boolean }) {

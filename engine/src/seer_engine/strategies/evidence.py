@@ -675,6 +675,108 @@ def fundamental_evidence(market: Market, params: Any, data_date: date, symbols: 
 # --------------------------------------------------------------------------- the table
 
 
+# --------------------------------------------------------------------------- COSKEW (lab M0179)
+
+#: How many of the market's worst weeks the "falls harder than the market" fact averages over.
+COSKEW_WORST_WEEKS = 10
+
+
+def coskew_evidence(market: Market, params: Any, data_date: date, symbols: Sequence[str]) -> dict[str, Facts]:
+    """``COSKEW`` (lab M0179, coskewness): the stock's crash-with-the-market score on the last
+    three years of weekly prices, its place among the screened members on that score, how it moved
+    in the market's worst weeks of that span against the market itself, and the keep band.
+
+    The score and the ranking are the method's own (``m0179_coskewness.coskewness``, the same
+    weekly sample the decision read), so the site states the number that actually picked the
+    stock, not a re-derivation of it. The worst-weeks fact is new arithmetic on that same sample:
+    the score is unit-free and means little to a reader, while "the market fell 6.1% and this stock
+    fell 9.4%" is the thing the score measures, said in money.
+
+    The book's empty places are held in the market fund (``params.market``), so that symbol is a
+    pick too and gets two facts saying why it is there. The facts never say whether a stock was
+    newly picked or kept by the band: the function is not told what the book held, and guessing
+    would print a claim nothing checked.
+    """
+    # Imported here, not at module level, for the reason residvol_evidence gives.
+    from seer_engine.lab.methods.m0179_coskewness import SPAN, STEP, WEEKS, CoskewParams, coskewness
+    from seer_engine.strategies.f_factor import EXCLUDED
+
+    p: CoskewParams = _typed("COSKEW", params, CoskewParams)
+    wanted = _wanted(symbols)
+    history = _cut(market, data_date)
+    members = market.membership.members_on(data_date)
+    rows = factor_rows(history, members, data_date, p.inner)
+    pool = sorted(r.symbol for r in rows if r.symbol not in EXCLUDED and r.symbol != p.market)
+    scores = coskewness(history, pool, data_date, p.market, p.gamma)
+    sign = -1.0 if p.positive else 1.0
+    ranked = sorted((s for s in scores if math.isfinite(scores[s])), key=lambda s: (sign * scores[s], s))
+    n = len(ranked)
+    first = "the steadiest in the market's wild weeks first" if p.positive else "the most crash-prone first"
+    on = factor_trend_on(history, data_date, p.inner)
+    out: dict[str, Facts] = {}
+
+    mh = history.get(p.market)
+    i = None if mh is None else mh.index_of(data_date)
+    when = None
+    worst: np.ndarray | None = None
+    if mh is not None and i is not None and i >= SPAN:
+        when = mh.dates[i - SPAN : i + 1 : STEP]
+        rm = np.diff(np.log(mh.close[i - SPAN : i + 1 : STEP]))
+        if rm.size >= COSKEW_WORST_WEEKS and bool(np.all(np.isfinite(rm))):
+            worst = np.argsort(rm, kind="stable")[:COSKEW_WORST_WEEKS]
+            market_worst = float(np.mean(np.expm1(rm[worst])))
+
+    for symbol in wanted:
+        if symbol == p.market:
+            facts = [
+                f"The method holds {p.inner.top} stocks at the same size, and any place it cannot "
+                f"fill with a stock that qualifies waits in {p.market}, the market fund, instead of "
+                f"in cash.",
+                f"Tonight {n} stocks passed the price and trading-size check and had {WEEKS} weeks "
+                f"of prices to score.",
+            ]
+            if p.inner.trend is not None:
+                facts.append(_trend_fact(history, data_date, p.inner.trend, on))
+            out[symbol] = tuple(facts[:MAX_FACTS])
+            continue
+        score = scores.get(symbol)
+        if score is None or not math.isfinite(score) or symbol not in ranked:
+            continue
+        k = ranked.index(symbol) + 1
+        side = "below" if score < 0 else "above"
+        lean = "fall" if score < 0 else "hold up"
+        facts = [
+            f"Over the last {WEEKS} weeks its weekly moves tended to {lean} in the weeks the "
+            f"market moved most: its crash-with-the-market score was {_num(score, 2)} {side} zero.",
+            f"That ranked it {_ordinal(k)} of {n} stocks checked, {first}.",
+        ]
+        h = history.get(symbol)
+        j = None if h is None or when is None else h.index_of(data_date)
+        if worst is not None and h is not None and j is not None:
+            pos = np.searchsorted(h.dates[: j + 1], when, side="right") - 1
+            c = h.close[pos]
+            if bool(np.all(pos >= 0)) and bool(np.all(np.isfinite(c))) and bool(np.all(c > 0.0)):
+                mine = float(np.mean(np.expm1(np.diff(np.log(c))[worst])))
+                if _finite(mine, market_worst):
+                    facts.append(
+                        f"In the market's {COSKEW_WORST_WEEKS} worst weeks of that span the market "
+                        f"{_moved(market_worst)} a week on average, and this stock {_moved(mine)}."
+                    )
+        facts.append(
+            f"A holding stays until it drops out of the top {p.keep_pct}% of that list, which is "
+            f"re-ranked once a quarter; in between, the book keeps what it holds."
+        )
+        if not p.positive:
+            facts.append(
+                "Investors tend to shun stocks that crash with the market, and the research behind "
+                "this method found they were priced lower and earned more over time for it."
+            )
+        if p.inner.trend is not None:
+            facts.append(_trend_fact(history, data_date, p.inner.trend, on))
+        out[symbol] = tuple(facts[:MAX_FACTS])
+    return out
+
+
 #: Keyed by ``paper.roster.RESOLVER`` keys; the benchmark key (``buy_and_hold``) has no entry.
 #: ``tests/test_evidence.py`` pins ``set(EVIDENCE) == set(RESOLVER) - {BENCHMARK_OBJECT}``, so a
 #: new resolver entry without evidence fails the suite, and ``promote`` refuses it (phase 4).
@@ -690,6 +792,7 @@ EVIDENCE: dict[str, EvidenceFn] = {
     "RESIDMOM35": residmom_evidence,  # 021: the same book at 35 names; the function is width-agnostic
     "REGIME": regime_evidence,
     "MINVAR": minvar_evidence,
+    "COSKEW": coskew_evidence,  # 022: lab M0179-N20, COSK-FR-GT
 }
 
 

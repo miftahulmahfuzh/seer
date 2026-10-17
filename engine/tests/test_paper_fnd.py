@@ -162,8 +162,9 @@ def test_fnd_is_the_sixth_roster_entry():
     assert ROSTER_IDS.index(FND_ID) == 11
     # 010 adds fractional F4, F1 and RM; 011 RMW; 013 RAW/MOM/MVW; 017 six; 021 the 35-name book.
     # FND is still the twelfth row: 021 put RAW35-FR-GT in the slot RAW-FR-GT held and sent
-    # RAW-FR-GT to the tuple's end, so nothing between the head and FND moved.
-    assert len(ROSTER_IDS) == 20
+    # RAW-FR-GT to the tuple's end, so nothing between the head and FND moved; 022 did the same
+    # with COSK-FR-GT and RMW-FR-GT.
+    assert len(ROSTER_IDS) == 21
     e = entry(FND_ID)
     assert (e.sort, e.engine, e.rules_id, e.is_champion, e.is_benchmark) == (12, "book", "monthly-hold", False, False)
     assert e.obj is FUNDAMENTAL

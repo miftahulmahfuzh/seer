@@ -108,6 +108,31 @@ export async function strategies(): Promise<Strategy[]> {
   return rows.map(toStrategy);
 }
 
+/**
+ * The leaderboard's roster: every live strategy, then every retired one that actually TRADED.
+ *
+ * `strategies()` keeps a retired strategy out of the app, and for the rest of it that is right:
+ * nothing retired has positions to place or picks to show. The leaderboard is the exception,
+ * because a retired strategy that stepped paper sessions has a record, and the record is the
+ * evidence (owner, 2026-10-17: keep each one reachable, folded away below the live ones).
+ * `paper_end` is the test of "traded": the paper night stamps it with the last session the entry
+ * stepped, and leaves it NULL for one that never started -- the day-0-only rows 018 purged, whose
+ * "+0.0% on 0 trades" read as a result and meant "never ran". So that lock still holds.
+ */
+export async function boardStrategies(): Promise<Strategy[]> {
+  const [live, retired] = await Promise.all([
+    strategies(),
+    sql`SELECT id, name, sub, icon, is_champion, is_benchmark, engine, rules_id,
+        paper_start::text AS paper_start, paper_end::text AS paper_end, status,
+        params->'backtest_gate' AS gate,
+        COALESCE(params->'spec'->>'object', object_name) AS spec_object
+      FROM strategies
+      WHERE status = 'retired' AND paper_end IS NOT NULL
+      ORDER BY sort, id`,
+  ]);
+  return [...live, ...retired.map(toStrategy)];
+}
+
 export async function champion(): Promise<Strategy | null> {
   return (await strategies()).find(s => s.isChampion) ?? null;
 }
@@ -494,10 +519,13 @@ export type Board = {
   to: string | null;
 };
 
-/** Every strategy's metrics over all its snapshots (day 0 included) and its own engine's closed trades. */
+/**
+ * Every board strategy's metrics over all its snapshots (day 0 included) and its own engine's
+ * closed trades: the live ones first, then the retired ones that traded (`boardStrategies`).
+ */
 export async function leaderboard(): Promise<Board> {
   const [strats, snaps, pnls] = await Promise.all([
-    strategies(),
+    boardStrategies(),
     sql`SELECT strategy_id, date::text AS date, equity_usd FROM equity_snapshots ORDER BY date`,
     sql`SELECT 'bracket' AS src, strategy_id, pnl_usd FROM orders WHERE status = 'closed'
       UNION ALL SELECT 'book' AS src, strategy_id, pnl_usd FROM book_trades WHERE NOT idle`,
@@ -516,7 +544,8 @@ export async function leaderboard(): Promise<Board> {
  * Leaderboard's monthly sheet. `sessionDate` is runStatus().sessionDate (marks the current month partial).
  */
 export async function monthly(strategyId: string, sessionDate: string | null): Promise<MonthlyTable> {
-  const strats = await strategies();
+  // The board's roster, not `strategies()`: a retired card on the leaderboard opens this sheet too.
+  const strats = await boardStrategies();
   const st = strats.find(x => x.id === strategyId);
   if (!st) return { months: [], sinceStart: null };
   const bench = strats.find(x => x.isBenchmark) ?? null;

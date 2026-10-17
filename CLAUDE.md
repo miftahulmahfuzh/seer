@@ -96,3 +96,5 @@ Use the `run-the-web-app` skill to visually check any change to web/.
 > when user type in "p" : you must git add your work only, then commit and push in a new subagent. USE haiku model for this task.
 
 > when user type in "c" : you must list leftover tasks in this session, then write a handover file, then run a new tmux analyze session using it. USE opus model for this task.
+
+> when user type in "a" : you must spawn calculate-assets 1-4-2018 tmux on each of the sera methods that have been explored. USE opus model for this task.

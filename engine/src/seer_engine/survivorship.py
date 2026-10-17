@@ -206,6 +206,11 @@ class Cleaned:
     fields_repaired: int = 0
     moves_kept: int = 0
     dividends_refused: int = 0
+    # The splits the bars were divided by (rule 6), plus each rule-7 scale break as the split it
+    # is (ratio 1/k at its date): the list that turns these bars back into printed prices
+    # (``shares.store.split_lines``). Rule 9 and 10 rescales are vendor errors, not splits, and
+    # are not listed. Not in the cleaning report.
+    splits: tuple[Split, ...] = ()
 
     @property
     def first(self) -> date | None:
@@ -610,11 +615,13 @@ def clean_symbol(
 
     # 7. scale breaks, latest first: rescaling the rows before i never changes an earlier ratio
     breaks = 0
+    break_splits: list[Split] = []
     for i in range(len(rows) - 1, 0, -1):
         k = _scale_break(rows, i)
         if k is not None:
             rows.scale(0, i, k, 1.0 / k)
             breaks += 1
+            break_splits.append(Split(rows.dates[i], 1.0 / k))
             notes.append(f"rescaled rows before {rows.dates[i]} by {k:g} (a split nobody applied)")
 
     # 8. spikes
@@ -773,6 +780,7 @@ def clean_symbol(
         fields_repaired=fields,
         moves_kept=len(moves_kept),
         dividends_refused=refused,
+        splits=tuple(sorted((*use, *break_splits), key=lambda s: s.date)),
     )
 
 

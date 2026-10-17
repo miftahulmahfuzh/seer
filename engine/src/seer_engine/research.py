@@ -38,6 +38,7 @@ import logging
 import math
 import os
 import shutil
+import tempfile
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -61,6 +62,7 @@ from seer_engine.backtest.io import (
 from seer_engine.backtest.market import (
     EMPTY_FUNDAMENTALS,
     EMPTY_SERIES,
+    EMPTY_SHARES,
     DividendCalendar,
     Market,
     MarketSeries,
@@ -69,6 +71,7 @@ from seer_engine.backtest.market import (
 from seer_engine.backtest.window import WINDOW_NAMES, Window
 from seer_engine.fundamentals import FACT_COLUMNS, Fact, FundamentalPanel as Panel
 from seer_engine.prices import to_decimal
+from seer_engine.shares import store as share_store
 
 log = logging.getLogger(__name__)
 
@@ -116,10 +119,14 @@ UNSERVED_FILE = "unserved.csv"
 FUNDAMENTALS_FILE = "fundamentals.csv"
 ANNOUNCEMENTS_FILE = "dividend_announcements.csv"
 MARKET_SERIES_FILE = "market_series.csv"
+SHARES_FILE = "shares.csv"
+SPLITS_FILE = "splits.csv"
 MANIFEST_FILE = "manifest.json"
 DATA_FILES: tuple[str, ...] = (BARS_FILE, DIVIDENDS_FILE, FX_FILE, UNSERVED_FILE)
 
-OPTIONAL_DATA_FILES: tuple[str, ...] = (FUNDAMENTALS_FILE, ANNOUNCEMENTS_FILE, MARKET_SERIES_FILE)
+OPTIONAL_DATA_FILES: tuple[str, ...] = (
+    FUNDAMENTALS_FILE, ANNOUNCEMENTS_FILE, MARKET_SERIES_FILE, SHARES_FILE, SPLITS_FILE
+)
 """Store files a build MAY write. Deliberately separate from ``DATA_FILES``.
 
 ``fundamentals.csv`` is optional, never a fifth required file: ``_read_manifest`` requires the
@@ -139,6 +146,14 @@ Treasury yields, gold -- read point in time through ``Market.series``. It is opt
 same reason: ``price_fingerprint_of`` hashes ``DATA_FILES`` alone, so writing it moves the store's
 full fingerprint and never the price fingerprint every recorded trial is compared on. A full
 ``build_store`` does not write it; re-run ``market_series --refresh`` after a rebuild.
+
+``shares.csv`` and ``splits.csv`` (2026-10-17) are the fourth and fifth, written together by
+``python -m seer_engine shares store`` through :func:`refresh_shares`: point-in-time shares
+outstanding 1995-on and the splits behind the adjusted closes, so ``Market.market_value`` can say
+how big a company was on any day (``shares.store`` has the formats). Optional for the same reason
+as the rest: the price fingerprint does not move, so every recorded trial keeps comparing. A full
+``build_store`` does not write them; re-run ``shares store`` after a rebuild -- with the new
+crawl's day as ``--basis``, because the split list must be the one the new bars were adjusted by.
 """
 
 BARS_HEADER = "symbol,date,open,high,low,close,volume"
@@ -1185,6 +1200,53 @@ def refresh_market_series(
     return manifest
 
 
+def refresh_shares(
+    store_dir: Path,
+    shares_lines: Sequence[str],
+    split_lines: Sequence[str],
+    *,
+    data_dir: Path | None = None,
+    window: Window = DEV_WINDOW,
+) -> dict[str, Any]:
+    """Write an existing store's ``shares.csv`` and ``splits.csv`` together; return the manifest.
+
+    The lines come from ``shares.store`` (``shares_lines`` / ``split_lines``) and are parsed back
+    with that module's strict readers before anything is written, so a row dated after
+    ``window.end`` (D9) or read before it was filed is refused with nothing on disk changed. Same
+    discipline as :func:`refresh_announcements`: the store is verified first, every other file is
+    carried over byte for byte (so the price fingerprint does not move and no recorded trial stops
+    comparing), and the directory is swapped in whole or not at all. The two files move together
+    because they are one fact -- a company's size -- and a store with one and not the other would
+    answer it half right.
+    """
+    store_dir = Path(store_dir)
+    with tempfile.TemporaryDirectory(prefix="seer-shares-") as tmp:
+        probe = Path(tmp)
+        _write_text(probe / SHARES_FILE, share_store.SHARES_HEADER, list(shares_lines))
+        _write_text(probe / SPLITS_FILE, share_store.SPLITS_HEADER, list(split_lines))
+        share_store.load_counts(probe / SHARES_FILE, probe / SPLITS_FILE, STORE_START, window.end)
+    before, manifest = _refresh_files(
+        store_dir,
+        (
+            (SHARES_FILE, share_store.SHARES_HEADER, shares_lines),
+            (SPLITS_FILE, share_store.SPLITS_HEADER, split_lines),
+        ),
+        data_dir=data_dir,
+        window=window,
+    )
+    log.info(
+        "research: store %s share history refreshed: %d share rows, %d split rows, %d bar rows "
+        "carried over unchanged, fingerprint %s -> %s",
+        store_dir,
+        len(shares_lines),
+        len(split_lines),
+        before["bar_rows"],
+        before["fingerprint"],
+        manifest["fingerprint"],
+    )
+    return manifest
+
+
 def _refresh_optional(
     store_dir: Path,
     name: str,
@@ -1194,7 +1256,18 @@ def _refresh_optional(
     data_dir: Path | None,
     window: Window,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Write one ``OPTIONAL_DATA_FILES`` member anew; carry every other file over byte for byte.
+    """:func:`_refresh_files` for one file."""
+    return _refresh_files(store_dir, ((name, header, lines),), data_dir=data_dir, window=window)
+
+
+def _refresh_files(
+    store_dir: Path,
+    writes: Sequence[tuple[str, str, Sequence[str]]],
+    *,
+    data_dir: Path | None,
+    window: Window,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Write the named ``OPTIONAL_DATA_FILES`` members anew; carry every other file over byte for byte.
 
     Returns ``(manifest before, manifest after)``. The source store is verified with
     ``load_store`` first and refused with ``ResearchStoreError`` when it does not; the other
@@ -1206,8 +1279,12 @@ def _refresh_optional(
     and phase 5's real run proved a refresh otherwise deletes them. They stay unlisted, so they
     never enter the fingerprint.
     """
-    if name not in OPTIONAL_DATA_FILES:
-        raise ValueError(f"{name} is not one of {list(OPTIONAL_DATA_FILES)}")
+    names = [name for name, _, _ in writes]
+    for name in names:
+        if name not in OPTIONAL_DATA_FILES:
+            raise ValueError(f"{name} is not one of {list(OPTIONAL_DATA_FILES)}")
+    if len(set(names)) != len(names):
+        raise ValueError(f"each file is written once, got {names}")
     try:
         data = load_store(store_dir, data_dir=data_dir, window=window)
     except ValueError as exc:
@@ -1219,8 +1296,8 @@ def _refresh_optional(
     before = dict(data.manifest)
     del data
     counts = {key: int(before[key]) for key in _COUNT_KEYS}
-    carried = [n for n in (*DATA_FILES, *OPTIONAL_DATA_FILES) if n in before["files"] and n != name]
-    extra = tuple(n for n in OPTIONAL_DATA_FILES if n == name or n in carried)
+    carried = [n for n in (*DATA_FILES, *OPTIONAL_DATA_FILES) if n in before["files"] and n not in names]
+    extra = tuple(n for n in OPTIONAL_DATA_FILES if n in names or n in carried)
     managed = {MANIFEST_FILE, *DATA_FILES, *OPTIONAL_DATA_FILES}
     side = sorted(p.name for p in store_dir.iterdir() if p.is_file() and p.name not in managed)
 
@@ -1239,7 +1316,8 @@ def _refresh_optional(
                 )
         for report in side:
             shutil.copyfile(store_dir / report, tmp / report)
-        _write_text(tmp / name, header, list(lines))
+        for name, header, lines in writes:
+            _write_text(tmp / name, header, list(lines))
         manifest = _seal(
             tmp, counts, extra_files=extra, window=window, purpose=before.get(PURPOSE_KEY)
         )
@@ -1329,6 +1407,16 @@ def load_store(
             MarketSeries(_read_market_series(store_dir / MARKET_SERIES_FILE, window.end))
             if MARKET_SERIES_FILE in files
             else EMPTY_SERIES
+        ),
+        shares=(
+            share_store.load_counts(
+                store_dir / SHARES_FILE if SHARES_FILE in files else None,
+                store_dir / SPLITS_FILE if SPLITS_FILE in files else None,
+                STORE_START,
+                window.end,
+            )
+            if SHARES_FILE in files or SPLITS_FILE in files
+            else EMPTY_SHARES
         ),
     )
     spy_dividends = tuple(

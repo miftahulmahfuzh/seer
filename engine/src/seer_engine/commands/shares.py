@@ -14,6 +14,15 @@ year, the share of S&P 500 member-days with a usable figure and the median age o
 
 The committed csv is the source of truth: nothing at backtest or paper time reads the cache or
 the network, exactly as with ``cik_sic.csv``.
+
+``fetch-splits``, ``store`` and ``store-report`` put the history into a research store, where the
+lab reads it as ``Market.shares_on`` / ``Market.market_value`` (``shares.integrate``):
+
+    python -m seer_engine shares fetch-splits --store /abs/engine/.research       # network, cached
+    python -m seer_engine shares store --store /abs/engine/.research --basis 2026-10-04
+    python -m seer_engine shares store-report --store /abs/engine/.research
+
+``store`` carries every other store file byte for byte, so the price fingerprint never moves.
 """
 
 from __future__ import annotations
@@ -29,7 +38,10 @@ from seer_engine.shares import edgar_index, fetch
 
 log = logging.getLogger(__name__)
 
-HELP = "Pre-2009 shares outstanding from EDGAR cover pages: download, build, report."
+HELP = (
+    "Pre-2009 shares outstanding from EDGAR cover pages: download, build, report, and write the "
+    "share history and split list into a research store."
+)
 
 CACHE_ENV = "SEER_EDGAR_CACHE"
 
@@ -52,11 +64,18 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     except ImportError:  # pragma: no cover - build lands after the downloader
         return
     build.add_arguments(sub)
+    from seer_engine.shares import integrate
+
+    integrate.add_arguments(sub)
 
 
 def run(args: argparse.Namespace) -> int:
     if args.action == "download":
         return download(args)
+    if args.action in ("fetch-splits", "store", "store-report"):
+        from seer_engine.shares import integrate
+
+        return integrate.run(args)
     from seer_engine.shares import build
 
     return build.run(args)

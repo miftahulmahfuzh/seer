@@ -17,4 +17,11 @@ so it is rebuilt here from the free filings, the way ``sectors`` rebuilt industr
   point-in-time lookup, the join to 2009+ XBRL facts and the market-value helper (pure).
 * ``checks`` -- the validation that makes the numbers usable: XBRL overlap, split
   consistency, implied market value bounds (pure).
+* ``splits`` -- the vendor split lists behind the research stores' adjusted closes, cached from
+  yfinance (network edge).
+* ``store`` -- the research store's ``shares.csv`` (resolved point-in-time change points) and
+  ``splits.csv``, writers and strict readers; the lab reads them as ``Market.shares_on`` and
+  ``Market.market_value`` (pure).
+* ``integrate`` -- ``shares fetch-splits`` / ``store`` / ``store-report``: put the two files into a
+  store without moving its price fingerprint, and report what the size accessor gives.
 """

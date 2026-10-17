@@ -3,6 +3,7 @@
     python -m seer_engine survivorship_store            # clean every cached series, print the coverage report; writes nothing
     python -m seer_engine survivorship_store --build    # write the store at --out (default engine/.research-sv)
     python -m seer_engine survivorship_store --report   # print the reports of the store already at --out
+    python -m seer_engine survivorship_store --refresh-shares  # only shares.csv + splits.csv into --out
 
 The store is ``--source`` (default the dev store, ``engine/.research``, read only) plus a cleaned
 EODHD series for every member the dev store could not serve, read from ``--cache`` (default
@@ -21,6 +22,10 @@ What lands in ``--out``, built in ``<out>.tmp`` and swapped in whole or not at a
   lines inserted at their sorted place; ``fx.csv`` and every optional file (``fundamentals.csv``
   and whatever else the source lists) copied byte for byte and sha-checked;
 - ``unserved.csv``: the members still without a bar, each with the reason the cleaning gave;
+- ``splits.csv`` (when the source has one): the source's rows plus each added symbol's own split
+  list -- the EODHD splits its cleaning divided the bars by, and each scale break it repaired as
+  the split it was -- so ``Market.market_value`` can undo this store's adjustment too;
+  ``shares.csv`` is copied from the source like any other optional file;
 - ``dividend_announcements.csv``: re-matched with ``dividend_announcements.match`` over the merged
   dividends from the cached ``dividends/`` files (carried from the source when the cache has none);
 - ``manifest.json``: sealed for the dev window with ``"purpose": "survivorship-check"``, so its
@@ -34,6 +39,12 @@ What lands in ``--out``, built in ``<out>.tmp`` and swapped in whole or not at a
 would replace the directory a symlink names. The source is verified with ``research.load_store``
 first, and the built store is loaded once more before it is swapped in.
 
+``--refresh-shares`` re-plans the build in memory, refuses unless the merged ``bars.csv`` it would
+write hashes exactly like the one at ``--out`` (so the split list it reads off the plan is that
+store's), and writes only ``shares.csv`` and ``splits.csv`` through ``research.refresh_shares``:
+every other file, the reports included, is carried byte for byte and the price fingerprint does
+not move.
+
 Exit codes: 0 ok; 2 refused (paths, a source that does not verify or is itself a
 survivorship-check store, a store at ``--out`` that is not one, for ``--report``).
 """
@@ -41,6 +52,7 @@ survivorship-check store, a store at ``--out`` that is not one, for ``--report``
 from __future__ import annotations
 
 import argparse
+import hashlib
 import logging
 import os
 import shutil
@@ -56,6 +68,7 @@ from seer_engine import config, dates, eodhd, membership, research, survivorship
 from seer_engine import dividend_announcements as da
 from seer_engine import survivorship as sv
 from seer_engine.commands.dividend_announcements import read_cache
+from seer_engine.shares import store as share_store
 
 log = logging.getLogger(__name__)
 
@@ -101,6 +114,11 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     source = Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR)
     cache = Path(os.environ.get("SEER_EODHD_CACHE") or CACHE_DIR)
     p.add_argument("--build", action="store_true", help="write the store at --out")
+    p.add_argument(
+        "--refresh-shares", action="store_true",
+        help="write only shares.csv and splits.csv into the store at --out (it must hold exactly "
+             "the bars this cache and source build); every other file is kept byte for byte",
+    )
     p.add_argument("--report", action="store_true", help="print the reports of the store at --out")
     p.add_argument(
         "--out", type=Path, default=out,
@@ -325,10 +343,15 @@ def write_store(
         )
         extra_files: list[str] = []
         for name in research.OPTIONAL_DATA_FILES:
-            if name == research.ANNOUNCEMENTS_FILE or name not in files:
+            if name in (research.ANNOUNCEMENTS_FILE, research.SPLITS_FILE) or name not in files:
                 continue
             _copy_checked(source / name, tmp / name, files[name])
             extra_files.append(name)
+        if research.SPLITS_FILE in files:
+            research._write_text(
+                tmp / research.SPLITS_FILE, share_store.SPLITS_HEADER, merged_split_lines(plan)
+            )
+            extra_files.append(research.SPLITS_FILE)
         merged: dict[str, dict[date, Any]] = {s: dict(v) for s, v in plan.source_dividends.items()}
         for s, c in added.items():
             if c.dividends:
@@ -384,6 +407,63 @@ def write_store(
     return manifest
 
 
+def merged_split_lines(plan: BuildPlan) -> list[str]:
+    """``splits.csv`` for the survivorship-check store: the source's rows (its yfinance list, for
+    the bars it carries byte for byte) with each added symbol's own -- the EODHD splits
+    ``survivorship.clean_symbol`` divided its bars by, and the scale breaks it repaired as splits.
+    Those were applied whatever their date, so the adjustment basis is open-ended."""
+    path = plan.source_dir / research.SPLITS_FILE
+    existing = list(_data_lines(path)) if path.is_file() else []
+    added: dict[str, list[str]] = {}
+    for s, c in plan.added.items():
+        lines = share_store.split_lines(
+            {s: c.splits}, store_start=research.STORE_START, window_end=research.DEV_END, basis=date.max
+        )
+        if lines:
+            added[s] = lines
+    return list(sv.merge_sorted_lines(existing, added))
+
+
+def merged_bars_sha256(plan: BuildPlan) -> str:
+    """The sha256 ``bars.csv`` would have if ``plan`` were written: the proof, before a refresh,
+    that the plan reproduces the store on disk bar for bar (so its split list is that store's)."""
+    digest = hashlib.sha256((research.BARS_HEADER + "\n").encode("utf-8"))
+    new = {s: [sv.bar_line(s, b) for b in c.bars] for s, c in plan.added.items()}
+    for line in sv.merge_sorted_lines(_data_lines(plan.source_dir / research.BARS_FILE), new):
+        digest.update((line + "\n").encode("utf-8"))
+    return digest.hexdigest()
+
+
+def refresh_shares(plan: BuildPlan, out: Path) -> dict[str, Any]:
+    """``--refresh-shares``: give the store at ``out`` the source's ``shares.csv`` and the merged
+    ``splits.csv``, carrying every other file byte for byte (``research.refresh_shares``).
+
+    Refused unless ``out`` is a survivorship-check store whose ``bars.csv`` is exactly what this
+    plan would write, and unless the source carries both files (``shares store`` first)."""
+    out = Path(out)
+    _refuse_out(out, plan.source_dir)
+    if not (out / research.MANIFEST_FILE).is_file():
+        raise SurvivorshipStoreError(f"{out} holds no store to refresh; build it with --build")
+    have = research._manifest_json(out)[1]["files"].get(research.BARS_FILE)
+    want = merged_bars_sha256(plan)
+    if have != want:
+        raise SurvivorshipStoreError(
+            f"{out}: its bars.csv ({have}) is not the one this cache and source would build ({want}); "
+            "its split list cannot be read off this plan. Rebuild it with --build instead"
+        )
+    files = plan.source_manifest["files"]
+    missing = [n for n in (research.SHARES_FILE, research.SPLITS_FILE) if n not in files]
+    if missing:
+        raise SurvivorshipStoreError(
+            f"{plan.source_dir} carries no {', '.join(missing)}; run `shares store` on it first"
+        )
+    shares = list(_data_lines(plan.source_dir / research.SHARES_FILE))
+    try:
+        return research.refresh_shares(out, shares, merged_split_lines(plan), window=research.DEV_WINDOW)
+    except research.ResearchStoreError as exc:
+        raise SurvivorshipStoreError(str(exc)) from exc
+
+
 # ---- the command ---------------------------------------------------------------------------
 
 
@@ -425,6 +505,23 @@ def run(args: argparse.Namespace) -> int:
     if fill is not None:
         used = sum(1 for c in plan.cleaned.values() if c.source == survivorship_alias.ALIAS_SOURCE)
         print(f"\nalias fill: {len(fill.sources)} fetched alias series offered, {used} used")
+    if getattr(args, "refresh_shares", False):
+        if getattr(args, "dry_run", False):
+            print(f"\ndry run: would refresh shares.csv and splits.csv in {out}")
+            return 0
+        try:
+            before = research._manifest_json(out)[1]
+            manifest = refresh_shares(plan, out)
+        except (SurvivorshipStoreError, ValueError) as exc:
+            print(f"survivorship_store: {exc}")
+            return 2
+        print(
+            f"\nrefreshed {out}: shares.csv and splits.csv written, fingerprint "
+            f"{before['fingerprint']} -> {manifest['fingerprint']}, price fingerprint "
+            f"{research.price_fingerprint_of(before['files'])} -> "
+            f"{research.price_fingerprint_of(manifest['files'])}"
+        )
+        return 0
     if not args.build:
         print(f"\nnothing written; pass --build to write {out}")
         return 0

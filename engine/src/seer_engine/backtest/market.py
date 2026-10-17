@@ -25,7 +25,7 @@ from typing import NamedTuple
 
 from seer_engine.fundamentals import EMPTY_PANEL, FundamentalPanel as Panel
 from seer_engine.prices import Bar, to_decimal
-from seer_engine.strategies.base import History
+from seer_engine.strategies.base import History, as_day
 
 SPY = "SPY"
 
@@ -282,6 +282,144 @@ EMPTY_SERIES = MarketSeries({})
 """The series a ``Market`` carries when no market series were loaded (one shared instance)."""
 
 
+class ShareCount(NamedTuple):
+    """One company's shares outstanding as it was public on a day (``ShareCounts.count``).
+
+    ``shares`` is the figure the filer stated, in the share units of ``counted`` -- the day the
+    filer counted (the cover's "as of" date, or the filing date when the cover gave none).
+    ``filed`` is when it became public, always on or before the day it is read for. ``source``
+    is ``"edgar-cover"`` (a 10-K/10-Q cover page, 1995-2010) or ``"xbrl"`` (the same figure,
+    tagged, 2009 on).
+    """
+
+    shares: float
+    counted: date
+    filed: date
+    source: str
+
+
+class ShareCounts:
+    """Point-in-time shares outstanding and the splits behind the store's adjusted closes.
+
+    ``rows`` maps a symbol to ``(from_day, ShareCount | None)`` change points, strictly ascending:
+    the count public from ``from_day`` until the next row (None: no usable figure from that day).
+    The research store writes them already resolved (``shares.store``): a figure counts only from
+    its filing date, the later filing wins, XBRL wins a same-day tie, the symbol is resolved to its
+    filer on each day through the date-scoped ticker map, and a figure older than 400 days is not
+    answered. Nothing here re-derives any of that; it only reads.
+
+    ``splits`` maps a symbol to ``(dated, after_window)``: the splits the vendor applied to that
+    symbol's adjusted closes inside the store's window, ascending ``(ex_date, ratio)``, and the
+    product of the ones it applied after the window ends (1.0 when none). The second is held only
+    so :meth:`raw_factor` can undo the adjustment; it is never answered on its own, and an
+    allocator must not reach for it -- it is a fact about the future of the window.
+
+    Every read takes the allocator's ``data_date`` and sees only figures filed on or before it.
+    Built from the store's optional ``shares.csv`` and ``splits.csv`` by ``research.load_store``;
+    any other market carries ``EMPTY_SHARES``.
+    """
+
+    __slots__ = ("_rows", "_from", "_splits")
+
+    def __init__(
+        self,
+        rows: Mapping[str, Iterable[tuple[date, ShareCount | None]]],
+        splits: Mapping[str, tuple[Iterable[tuple[date, float]], float]] | None = None,
+    ) -> None:
+        if not isinstance(rows, Mapping):
+            raise TypeError(f"rows must be a Mapping, got {type(rows).__name__}")
+        out: dict[str, tuple[tuple[date, ShareCount | None], ...]] = {}
+        for symbol in sorted(rows):
+            items = tuple(rows[symbol])
+            prev: date | None = None
+            for item in items:
+                if not (isinstance(item, tuple) and len(item) == 2):
+                    raise TypeError(f"a {symbol} share row is (date, ShareCount | None), got {item!r}")
+                d, count = item
+                _check_date(f"{symbol} from", d)
+                if prev is not None and d <= prev:
+                    raise ValueError(f"{symbol} share rows must be strictly ascending: {d} after {prev}")
+                prev = d
+                if count is not None:
+                    if not isinstance(count, ShareCount):
+                        raise TypeError(f"{symbol} on {d}: expected a ShareCount, got {type(count).__name__}")
+                    if not (math.isfinite(count.shares) and count.shares > 0):
+                        raise ValueError(f"{symbol} on {d}: shares must be positive, got {count.shares!r}")
+                    if count.filed > d:
+                        raise ValueError(f"{symbol} on {d}: a count filed {count.filed} is read before it was public")
+            if items:
+                out[symbol] = items
+        self._rows: Mapping[str, tuple[tuple[date, ShareCount | None], ...]] = out
+        self._from: Mapping[str, tuple[date, ...]] = {s: tuple(d for d, _ in r) for s, r in out.items()}
+        clean: dict[str, tuple[tuple[tuple[date, float], ...], float]] = {}
+        for symbol, (dated, after) in (splits or {}).items():
+            items_ = tuple(sorted(dated))
+            for d, ratio in items_:
+                _check_date(f"{symbol} split", d)
+                if not (math.isfinite(ratio) and ratio > 0):
+                    raise ValueError(f"{symbol} split on {d}: ratio must be positive, got {ratio!r}")
+            if not (math.isfinite(after) and after > 0):
+                raise ValueError(f"{symbol}: the after-window split factor must be positive, got {after!r}")
+            clean[symbol] = (items_, float(after))
+        self._splits = clean
+
+    def __len__(self) -> int:
+        return sum(len(r) for r in self._rows.values())
+
+    def symbols(self) -> tuple[str, ...]:
+        """Every symbol with at least one share row, sorted."""
+        return tuple(self._rows)
+
+    def count(self, symbol: str, data_date: date) -> ShareCount | None:
+        """The count public on ``data_date`` for the company trading as ``symbol`` that day."""
+        froms = self._from.get(symbol)
+        if froms is None:
+            return None
+        i = bisect_right(froms, _check_date("data_date", data_date))
+        return self._rows[symbol][i - 1][1] if i else None
+
+    def split_factor(self, symbol: str, after: date, through: date) -> float:
+        """Product of ``symbol``'s in-window split ratios effective in ``(after, through]``."""
+        dated = self._splits.get(symbol)
+        f = 1.0
+        if dated is not None:
+            for d, ratio in dated[0]:
+                if after < d <= through:
+                    f *= ratio
+        return f
+
+    def shares_on(self, symbol: str, data_date: date) -> float | None:
+        """``count(symbol, data_date)`` restated in the share units of ``data_date``: a count taken
+        before a split is carried across it, so it pairs with that day's printed price."""
+        c = self.count(symbol, data_date)
+        if c is None:
+            return None
+        return c.shares * self.split_factor(symbol, c.counted, data_date)
+
+    def raw_factor(self, symbol: str, d: date) -> float:
+        """What the store's split-adjusted price on ``d`` is multiplied by to give the price as it
+        printed that day: every split the vendor applied after ``d`` (``shares.history.unadjust``)."""
+        dated = self._splits.get(symbol)
+        if dated is None:
+            return 1.0
+        f = dated[1]
+        for s_day, ratio in dated[0]:
+            if s_day > d:
+                f *= ratio
+        return f
+
+    def has_splits(self) -> bool:
+        return bool(self._splits)
+
+
+EMPTY_SHARES = ShareCounts({})
+"""The share counts a ``Market`` carries when the store has none (one shared instance)."""
+
+MARKET_VALUE_MAX_GAP_DAYS = 7
+"""How old the last close may be when :meth:`Market.market_value` prices a company: a week, so a
+long weekend or a halted day still has a size and a company that stopped trading does not."""
+
+
 @dataclass(frozen=True)
 class Membership:
     """Point-in-time index membership, both indices unioned.
@@ -352,6 +490,11 @@ class Market:
     allocator that reads it declares ``market_fields = ("series",)`` so ``lab run`` refuses it on
     a store without series.
 
+    ``shares``: point-in-time shares outstanding and the splits behind the adjusted closes
+    (``ShareCounts``), ``EMPTY_SHARES`` unless the store carries ``shares.csv``. Read it through
+    :meth:`shares_on` and :meth:`market_value` (company size), and declare
+    ``market_fields = ("shares",)`` so ``lab run`` refuses the allocator on a store without them.
+
     ``history``: every symbol with bars (SPY included), keyed by symbol, each ``History``
     ascending. ``fx``: ``(date, usd_idr)`` rows, strictly ascending, ``usd_idr`` a Decimal > 0
     (publishing days only, so not every session has a row). ``fundamentals``: the point-in-time
@@ -369,6 +512,7 @@ class Market:
     fundamentals: Panel = EMPTY_FUNDAMENTALS
     dividends: DividendCalendar = EMPTY_DIVIDENDS
     series: MarketSeries = EMPTY_SERIES
+    shares: ShareCounts = EMPTY_SHARES
     _fx_dates: tuple[date, ...] = field(init=False, repr=False)
     _last: Mapping[str, date] = field(init=False, repr=False)
 
@@ -385,6 +529,8 @@ class Market:
             raise TypeError(f"dividends must be a DividendCalendar, got {type(self.dividends).__name__}")
         if not isinstance(self.series, MarketSeries):
             raise TypeError(f"series must be a MarketSeries, got {type(self.series).__name__}")
+        if not isinstance(self.shares, ShareCounts):
+            raise TypeError(f"shares must be a ShareCounts, got {type(self.shares).__name__}")
         last: dict[str, date] = {}
         for symbol, h in self.history.items():
             if not isinstance(h, History):
@@ -427,6 +573,46 @@ class Market:
     def with_series(self, series: MarketSeries) -> Market:
         """This market with ``series`` attached; every other field is carried over."""
         return replace(self, series=series)
+
+    def with_shares(self, shares: ShareCounts) -> Market:
+        """This market with ``shares`` attached; every other field is carried over."""
+        return replace(self, shares=shares)
+
+    def shares_on(self, symbol: str, d: date) -> float | None:
+        """Shares outstanding of the company trading as ``symbol`` on ``d``, as public that day
+        and in that day's share units; None when no usable figure was filed by ``d``."""
+        return self.shares.shares_on(symbol, d)
+
+    def market_value(self, symbol: str, d: date) -> float | None:
+        """Company size on ``d`` in dollars: :meth:`shares_on` times the close **as it printed**.
+
+        The close is ``symbol``'s last bar on or before ``d`` (at most
+        ``MARKET_VALUE_MAX_GAP_DAYS`` old), un-adjusted for every split the vendor applied after
+        it, so a pre-split count is never multiplied by a post-split price. None when the count or
+        the close is unknown. Reads nothing dated after ``d``.
+        """
+        c = self.shares.count(symbol, _check_date("d", d))
+        if c is None:
+            return None
+        h = self.history.get(symbol)
+        if h is None:
+            return None
+        i = int(h.dates.searchsorted(as_day(d), side="right")) - 1
+        if i < 0:
+            return None
+        last = h.dates[i].item()
+        if (d - last).days > MARKET_VALUE_MAX_GAP_DAYS:
+            return None
+        close = float(h.close[i])
+        if not (close > 0 and math.isfinite(close)):
+            return None
+        # The count in the share units of the close's own day, so both sides of the product are
+        # on one side of every split (a count dated after the last close is carried back).
+        if c.counted <= last:
+            units = self.shares.split_factor(symbol, c.counted, last)
+        else:
+            units = 1.0 / self.shares.split_factor(symbol, last, c.counted)
+        return c.shares * units * close * self.shares.raw_factor(symbol, last)
 
     def bar(self, symbol: str, d: date) -> Bar | None:
         """``symbol``'s bar dated ``d`` as a Decimal ``Bar`` (exact 4 dp), or None."""

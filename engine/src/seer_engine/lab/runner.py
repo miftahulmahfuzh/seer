@@ -396,8 +396,9 @@ def preflight_data(
     Returns None for a method with no candidate that ranks on fundamentals -- a price-only method
     ranks on bars, a calendar method on the dividend calendar, a series method on
     ``Market.series``, and all three must stay runnable against a store with no panel at all. A
-    calendar method on a store with no dividend calendar, and a series method on a store with no
-    market series, are refused outright. A candidate whose rules credit idle cash at a T-bill
+    calendar method on a store with no dividend calendar, a series method on a store with no
+    market series, and a size method (``market_fields`` naming ``"shares"``) on a store with no
+    share history, are refused outright. A candidate whose rules credit idle cash at a T-bill
     yield (``rules.cash_yield``) on a store without that series is refused outright too.
     Otherwise it returns the
     measurement, so the caller can print it whether or not it cleared the floor, and raises
@@ -420,6 +421,14 @@ def preflight_data(
             f"market series ({research.MARKET_SERIES_FILE}); running it would measure the missing "
             "series, not the hypothesis. Nothing has been spent. Write them with "
             "`python -m seer_engine market_series --refresh --store <store>`"
+        )
+    reads_shares = market_aware_candidates(method, "shares")
+    if reads_shares and len(data.market.shares) == 0:
+        raise store.LabError(
+            f"{method.id}: {', '.join(reads_shares)} read Market.shares (company size), and this "
+            f"store carries no share history ({research.SHARES_FILE}); running it would measure the "
+            "missing sizes, not the hypothesis. Nothing has been spent. Write them with "
+            "`python -m seer_engine shares store --store <store> --basis <crawl day>`"
         )
     no_rate = missing_cash_yield(method.all_candidates(), data.market)
     if no_rate:
@@ -1142,6 +1151,12 @@ def run_test(
             f"{candidate.id} ranks on Market.dividends and this test store's market carries no "
             f"dividend calendar; the look would measure the missing calendar, not the hypothesis. "
             f"Nothing has been spent"
+        )
+    if candidate.id in market_aware_candidates(method, "shares") and len(data.market.shares) == 0:
+        raise store.LabError(
+            f"{candidate.id} reads Market.shares (company size) and this test store carries no "
+            f"share history ({research.SHARES_FILE}); the look would measure the missing sizes, "
+            f"not the hypothesis. Nothing has been spent"
         )
     if missing_cash_yield((candidate,), data.market):
         raise store.LabError(

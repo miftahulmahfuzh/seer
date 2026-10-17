@@ -1559,6 +1559,32 @@ regulatory and VAT (PPN), and a closing sentence.
 - Read-only. The read transaction is rolled back, and nothing is written.
 - Tests: `tests/test_sean_calibrate.py` (15).
 
+### `shares` (pre-2009 shares outstanding from EDGAR cover pages)
+
+Company size before XBRL. `seer_engine.shares` rebuilds point-in-time shares outstanding for
+every S&P 500 member's filer, 1995-10 to 2010-12, from the cover page of each 10-K/10-Q.
+
+- `shares download [--cache DIR] [--workers N] [--limit N] [--skip-xbrl]`: fills the gitignored
+  `engine/.cache/edgar/` (or `$SEER_EDGAR_CACHE`): quarterly `master.gz` indexes, the head of
+  every wanted filing (SEC header + first document, cut at `</DOCUMENT>` or 200 KB, gzipped), and
+  each filer's XBRL `dei:EntityCommonStockSharesOutstanding` for the 2009-2010 overlap.
+  Resumable (a cached file is done), paced under SEC's 10 req/s across a 6-thread pool, needs
+  `SEC_CONTACT_EMAIL`.
+- `shares build [--cache DIR] [--out-dir DIR] [--flags FILE]`: no network. Parses (`shares.cover`),
+  checks (`shares.checks`: XBRL overlap, series spikes and level changes, split consistency,
+  implied market value against EODHD raw closes in `prices`) and rewrites
+  `engine/data/shares_outstanding_pre2009.csv` plus `..._excluded.csv`. Prints the parse rate,
+  the XBRL match rate and error bands, and flagged/fixed/excluded counts.
+- `shares report [--xbrl STORE/fundamentals.csv] [--max-age DAYS]`: per year 1996-2015, the share
+  of S&P 500 member-days with a usable figure and its median age. Reads only committed files
+  (and, with `--xbrl`, a store's fundamentals read-only).
+- API: `shares.history.load(data_dir, xbrl_facts)` -> `SharesHistory.shares_on(symbol, day)` ->
+  `Observation(shares, as_of, filed, source, accession, cik)`; usable only from `filed`, never
+  `as_of`; cover rows and XBRL facts joined, last filed wins, the tag wins a same-day tie.
+  `market_value(obs, day, raw_close, splits)` carries the count across splits since `as_of`;
+  `unadjust(adj_close, day, splits)` rebuilds a raw close from a split-adjusted one.
+- Tests: `tests/test_shares.py`.
+
 ## Exported API
 
 ### config

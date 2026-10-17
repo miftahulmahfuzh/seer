@@ -9,7 +9,8 @@ describe('paper provenance (lab.json `paper`)', () => {
     // migration 021 moved the roster's width and retired RAW-FR-GT. The snapshot publishes ACTIVE
     // entries only, so the predecessors are no longer here to be looked up.
     expect(methodHref('RAW35-FR-GT')).toBe('/sera/methods/M0139');
-    expect(methodHref('RMW-FR-GT')).toBe('/sera/methods/M0022');
+    // 2026-10-17: migration 022 put the coskewness book (COSK-FR-GT) in RMW-FR-GT's seat.
+    expect(methodHref('COSK-FR-GT')).toBe('/sera/methods/M0179');
     expect(methodHref('MOM-FR-GT')).toBe('/sera/methods/M0002');
     expect(methodHref('MVW-FR-GT')).toBe('/sera/methods/M0008');
   });
@@ -22,6 +23,8 @@ describe('paper provenance (lab.json `paper`)', () => {
     expect(paperOf('RMW-FR')).toBeNull();
     expect(methodHref('RAW-FR-GT')).toBeNull();
     expect(paperOf('RAW-FR-GT')).toBeNull();
+    // RMW-FR-GT, retired by 022 to make room for COSK-FR-GT.
+    expect(methodHref('RMW-FR-GT')).toBeNull();
   });
 
   it('has no answer for an entry the lab never produced', () => {

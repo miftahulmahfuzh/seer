@@ -71,7 +71,18 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
      `upto(name, data_date, last=K)`): VIX, VIX3M (VXV before 2007-11-13), VIX9D, VXN, VVIX in
      index points; T13W, T5Y, T10Y, T30Y Treasury yields in percent; GOLD in USD/oz. An allocator
      that reads them declares `market_fields = ("series",)`, so `lab run` refuses it on a store
-     without them. If it isn't testable:
+     without them. **Company size** is there too (2026-10-17), point in time from 1996:
+     `market.market_value(symbol, data_date)` is dollars (shares outstanding as filed by that
+     day × the close as it printed, splits handled), `market.shares_on(symbol, data_date)` the
+     share count in that day's units; both return None when unknown (~56% of dev member-days
+     have a value, mostly because ~40% of members have no bars at all; ~95% have a share count).
+     Declare `market_fields = ("shares",)` and `lab run` / `lab test` refuse the method on a
+     store without it. Two listed classes of one company (GOOG/GOOGL, FOX/FOXA, NWS/NWSA) each
+     answer the whole company's count × that class's price — keep one per company before
+     weighting by size; BRK.B's 2010-11 figures count class A shares only (far too small), and
+     companies that tag their count per class in XBRL (Alphabet from 2014) go unknown. A
+     size-weighted book should still carry a weight ceiling (M0047).
+     If it isn't testable:
      `lab block <id> --on "<data>"` plus a `data-wish` insight. Solo: choose another idea.
      Child: report `blocked`.
    - **Executable?** Gotrade means long only and the regular session. Limit orders take

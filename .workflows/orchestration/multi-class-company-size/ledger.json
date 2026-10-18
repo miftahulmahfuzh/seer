@@ -1,0 +1,72 @@
+{
+  "branch": "feature/multi-class-company-size",
+  "coordinator": "orch-multi-class-company-size",
+  "coordinator_session_id": "bc2ec942-5aa6-4c6b-988f-ed801e60d247",
+  "created": "2026-10-18T11:08:26+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "seer_engine.shares",
+      "plan": ".workflows/plan/multi-class-company-size/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Per-class counts from XBRL instances"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "seer_engine.shares`, `backtest",
+      "plan": ".workflows/plan/multi-class-company-size/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2",
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Class-aware share history"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "stores, lab, docs",
+      "plan": ".workflows/plan/multi-class-company-size/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4",
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Refresh the stores, verify, unblock M0225"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/multi-class-company-size/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "multi-class-company-size",
+  "updated": "2026-10-18T11:08:26+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/multi-class-company-size"
+}

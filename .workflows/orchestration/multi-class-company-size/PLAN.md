@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/multi-class-company-size`
 **Branch:** `feature/multi-class-company-size` (base: `origin/main` @ `1297681`)
 **Phases:** 3
-**Status:** phase 1/3 complete
+**Status:** phase 2/3 complete
 **Coordinator:** —
 
 ---
@@ -84,7 +84,7 @@ leftovers.
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
 | 1 | Per-class counts from XBRL instances | R1 | `seer_engine.shares` | 8 | — | HARD | `.workflows/plan/multi-class-company-size/phase-1.md` | P1-ENG-O3MU (done 2026-10-18) | — |
-| 2 | Class-aware share history | R1, R2, R3 | `seer_engine.shares`, `backtest` | 8 | 1 | HARD | `.workflows/plan/multi-class-company-size/phase-2.md` | P1-ENG-IEFK | — |
+| 2 | Class-aware share history | R1, R2, R3 | `seer_engine.shares`, `backtest` | 8 | 1 | HARD | `.workflows/plan/multi-class-company-size/phase-2.md` | P1-ENG-IEFK (done 2026-10-18) | — |
 | 3 | Refresh the stores, verify, unblock M0225 | R4, R5 | stores, lab, docs | 9 (+ 3 stores, Blob) | 1, 2 | NORMAL | `.workflows/plan/multi-class-company-size/phase-3.md` | P1-ENG-7CWT | — |
 
 Phase 2 spans R1-R3 because one attribution function decides all three (summing classes,

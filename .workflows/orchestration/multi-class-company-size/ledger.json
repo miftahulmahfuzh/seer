@@ -23,22 +23,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "0d6d5cb1de31cb85facae5e377988e3f5478a989",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "class table (99 rows/14 filers) + xbrl-class source + attribution; test_dev_trades_bar known pre-existing failure per coordinator (rung 1)",
       "package": "seer_engine.shares`, `backtest",
       "plan": ".workflows/plan/multi-class-company-size/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-18T11:27:32+00:00",
       "satisfies": [
         "R1",
         "R2",
         "R3"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ENG-IEFK",
       "title": "Class-aware share history"
     },
@@ -59,7 +59,7 @@
         "R4",
         "R5"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": "P1-ENG-7CWT",
       "title": "Refresh the stores, verify, unblock M0225"
     }
@@ -67,6 +67,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/multi-class-company-size/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "multi-class-company-size",
-  "updated": "2026-10-18T11:22:15+00:00",
+  "updated": "2026-10-18T11:27:45+00:00",
   "worktree": "/home/miftah/.worktrees/seer/multi-class-company-size"
 }

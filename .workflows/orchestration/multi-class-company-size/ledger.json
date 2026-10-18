@@ -3,6 +3,12 @@
   "coordinator": "orch-multi-class-company-size",
   "coordinator_session_id": "bc2ec942-5aa6-4c6b-988f-ed801e60d247",
   "created": "2026-10-18T11:08:26+00:00",
+  "landed": {
+    "at": "2026-10-18T12:43:47+00:00",
+    "base": "main",
+    "commit": "29429ecf968b1b63741acfbe4e8f49748a519c86",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -44,22 +50,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "4122e61957b309c42806a0b0c2c5df30c2841d63",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "stores staged+verified (dev b683da41->704a21fc, sv 7017e311->1f816759, test b9269bfa->45d0b04d, price fps unchanged); 3 run-proven engine fixes; M0225 idea; no rebase (main lab.sqlite unchanged); merge + Step 11 cutover owed by coordinator",
       "package": "stores, lab, docs",
       "plan": ".workflows/plan/multi-class-company-size/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-18T12:43:08+00:00",
       "satisfies": [
         "R4",
         "R5"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ENG-7CWT",
       "title": "Refresh the stores, verify, unblock M0225"
     }
@@ -67,6 +73,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/multi-class-company-size/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "multi-class-company-size",
-  "updated": "2026-10-18T11:27:45+00:00",
+  "updated": "2026-10-18T12:43:47+00:00",
   "worktree": "/home/miftah/.worktrees/seer/multi-class-company-size"
 }

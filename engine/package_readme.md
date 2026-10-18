@@ -1559,7 +1559,7 @@ regulatory and VAT (PPN), and a closing sentence.
 - Read-only. The read transaction is rolled back, and nothing is written.
 - Tests: `tests/test_sean_calibrate.py` (15).
 
-### `shares` (pre-2009 shares outstanding from EDGAR cover pages)
+### `shares` (shares outstanding from EDGAR: cover pages before 2009, XBRL per class after)
 
 Company size before XBRL. `seer_engine.shares` rebuilds point-in-time shares outstanding for
 every S&P 500 member's filer, 1995-10 to 2010-12, from the cover page of each 10-K/10-Q.
@@ -1607,6 +1607,31 @@ every S&P 500 member's filer, 1995-10 to 2010-12, from the cover page of each 10
   not the ADS that is the index member) and unit errors (50x off the median of the company's
   figures within two years: Yum! 2016, Garmin 2016, AEP 2010) are left out. Tests:
   `tests/test_shares_store.py`.
+- **Share classes (2026-10-18).** `companyfacts` drops class-axis facts, so 2009+ counts of
+  companies that tag their cover count per class (Meta, Visa, Mastercard, Comcast, UPS, Ford,
+  Alphabet from 2014; Berkshire counted class A only) were missing. `shares download-classes
+  --fundamentals STORE/fundamentals.csv [--cache DIR] [--cik CIK ...] [--limit N]` (network,
+  resumable, needs `SEC_CONTACT_EMAIL`) reads each selected 10-K/10-Q's XBRL instance from the
+  EDGAR Archives and caches only its dei share facts
+  (`<cache>/xbrl-instance/<cik>/<accession>.json.gz`); `--cik` reads every filing of that filer
+  (run it for each filer of the class table); `shares build-classes [--cache DIR] [--out FILE]`
+  (no network) writes the vendored
+  `engine/data/shares_xbrl_classes.csv` (`cik,symbol,filed,as_of,form,accession,shares,classes,
+  tagged_total`). The hand-kept `engine/data/share_classes.csv` says which listed symbol each
+  class trades as and at what ratio (Berkshire A = 1,500 B from 2010-01-21, 30 before; Visa B/C
+  as-converted; Accenture X 0; Kinder Morgan's 2011-12 sponsor B/C 0). `SharesHistory` reads the
+  per-class rows as source `xbrl-class` (same accession: the per-class reading wins), so each
+  listed class answers its own count and the classes of one company sum to it; a multi-class
+  filer with no table row is summed one for one, and a tabled filer's class with no row is
+  answered unknown and listed by `shares store`. `store.usable_class_rows` leaves out a reading
+  both neighbouring filings disown (a filer's tagging error: Marriott's 10-Q of 2010-04-23 tags
+  361 trillion shares), and `history.ONE_FOR_ONE_SUCCESSORS` lets Alphabet answer Google's last
+  count across the 2015-10-02 holding-company reorganisation until its own first one.
+  `shares store` reads the csv by default (`--classes FILE`) and refuses without it;
+  `shares store-report --symbols A,B` prints chosen symbols' size on the
+  report dates. Coverage of 2009-2015 dev member-days with a market value went from
+  61.7..68.7% to 61.8..74.5% (close but no count: 45,339 -> 19,407 member-days). Tests:
+  `tests/test_shares_instance.py`, `tests/test_shares_classes.py`, `tests/test_share_class_table.py`.
 
 ## Exported API
 

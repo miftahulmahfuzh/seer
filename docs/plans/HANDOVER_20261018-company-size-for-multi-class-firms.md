@@ -81,3 +81,86 @@ lab run (pre-register first) and can go to the next Sera batch.
   for every method, so children stop hand-building the control.
 - Not this session's: an older idle `sera-20261017-1625` tmux window and four
   `.claude/worktrees/agent-*` worktrees. Leave them unless their owners are confirmed gone.
+
+---
+
+## Close-out — 2026-10-18 (branch `feature/multi-class-company-size`)
+
+Done. Per-class share counts come from each filing's own XBRL instance (free SEC EDGAR), point in
+time from the filing date; Berkshire A is counted as 1,500 B (30 before 2010-01-21); each listed
+class answers its own count (GOOG/GOOGL, FOX/FOXA, NWS/NWSA sum to the company).
+
+| Store | Fingerprint before → after | Price fingerprint |
+|---|---|---|
+| `.research` (dev) | `b683da41…` → `704a21fc…` | `5451195f…` unchanged |
+| `.research-sv` (check) | `7017e311…` → `1f816759…` | `60adae1b…` unchanged |
+| `.research-test` (test) | `b9269bfa…` → `45d0b04d…` | `56e83810…` unchanged |
+
+The new stores were built and verified in `/home/miftah/seer-stage/mcs/` and are moved into
+`engine/` and pushed to Blob (`sync_store.py push --store dev|sv|test`) only after this branch is
+on `origin/main` (the cutover, phase 3 Step 11, run by whichever session lands it). **Other
+machines must pull all three and update to main at or after that merge** — older code refuses the
+new `xbrl-class` rows. Sera worktrees branched before the merge must rebase onto main before their
+next `lab run`.
+
+Dev store, index member-days 2009-2015:
+
+| Year | Share count before → after | Market value before → after |
+|---|---|---|
+| 2009 | 93.4% → 93.5% | 61.7% → 61.8% |
+| 2010 | 95.7% → 95.9% | 65.1% → 65.1% |
+| 2011 | 96.1% → 97.0% | 66.2% → 66.9% |
+| 2012 | 91.0% → 97.2% | 64.7% → 69.0% |
+| 2013 | 91.0% → 97.8% | 66.4% → 71.4% |
+| 2014 | 90.8% → 97.9% | 67.7% → 72.8% |
+| 2015 | 89.8% → 97.8% | 68.7% → 74.5% |
+
+Member-days with a close but no count, 2009-2015: 45,339 (138 symbols) → 19,407
+(62 symbols). META, V, MA, GOOGL, GOOG and BRK.B: none.
+
+Spot checks 2014-06-30 ($B): Apple 560.3 (was 560.3), Meta 172.7, Visa 132.4, Berkshire 312.2,
+GOOGL+GOOG 391.2 (197.2 + 194.0); Mastercard 85.8, Comcast 139.6, UPS 94.0, Ford 68.2.
+
+Still without a count (by design or by the filings): foreign 20-F/40-F filers (BIDU, CHKP, VOD,
+INFY, TEVA, …), successor tickers (PSKY, VTRS, DXC), and:
+- NWSA 2013-07-01 .. 2013-11-11 (94 days): the new News Corp was spun off 2013-06-28 and its first
+  count is its 10-Q of 2013-11-12.
+- LBTYA 2009-2013 (235 days): the ticker map names no filer for LBTYA between 2009-12-21 and
+  2012-12-24, and Liberty Global plc's first count is its 10-Q of 2013-08-01; plus the weeks before
+  the old Liberty Global's first instance count of 2009-05-05.
+- Test window: FOX/FOXA 2019-03-18 .. 2019-05-09 (38 days): Fox Corp's first 10-Q tags a figure
+  without its classes, which the class table cannot split.
+
+Readings the class table could not attribute: LiLAC (LILA/LILAK) on Liberty Global's 10-Q of
+2015-05-07 and the Braves (BATRA/BATRK) on Liberty Media's first 2016 10-Q. Both counts are dated
+before the tracking stock existed, so those lines stay unknown until the next count names them.
+Multi-class filers summed one for one: 103 (list in the staged `logs/store-dev.txt`); each was read
+once, and all convert share for share except Kinder Morgan's, now in the table.
+
+Known limits, accepted:
+- For about three weeks after each class C stock dividend (Alphabet 2014-04-03, Under Armour
+  2016-04-07) both lines answer the whole company until the first count that lists class C, so the
+  company counts twice across GOOGL+GOOG (UAA+UA) in those weeks.
+- Before 2014-04-03 the index lists Google's one listed class under both GOOG and GOOGL, and both
+  answer the identical whole-company count (2009-01-02 .. 2014-03-26 in the dev store; the old store
+  did the same to 2015-04-24). Older methods' "identical share count" dedupe collapses exactly this.
+- Perrigo 2013-11-04 .. 2014-02-05: the ticker map hands PRGO to the new Irish parent at its first
+  10-Q, filed before the Elan merger made it the listed company, so PRGO reads 23.0M shares (the
+  shell's) for three months instead of ~94M. A ticker-map matter, left alone here.
+
+Lab: M0225 back to `idea` with a plain-words note (`lab unblock`). Running it is a lab run for the
+next Sera batch (pre-register first). Existing methods are untouched.
+
+Engine fixes the real run needed:
+- `share_classes.csv`: Visa's (2009-11, 2010-01) and Discovery's (2010-02) class A tagged without
+  the axis, and Kinder Morgan's 2011-12 sponsor classes B/C at ratio 0 (summed one for one they
+  made KMI ~14% too large).
+- `store.usable_class_rows`: seven filers' tagging errors left out (Marriott, Sprint, Viacom x2,
+  Perrigo x2 at a thousand or a million times their count; TripAdvisor's class B alone).
+- `history.ONE_FOR_ONE_SUCCESSORS`: GOOG/GOOGL answer Google's last count across the 2015-10-02
+  Alphabet reorganisation until Alphabet's first 10-Q (11 dev-window sessions were unknown).
+- One extra `download-classes --cik 0001316631` (the old Liberty Global), whose 2009-11 10-Q had a
+  class-A-only companyfacts figure and so was not selected.
+
+Cleanup: `/home/miftah/seer-stage/mcs/old/` (the three previous stores, written at cutover) can go
+a week after the cutover if nothing was rolled back.

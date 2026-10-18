@@ -98,6 +98,15 @@ SOURCE_XBRL_CLASS = "xbrl-class"
 #: Which reading wins when two were filed the same day (higher wins): the per-class instance
 #: reading has every class, the companyfacts tag may have lost some, the cover text was parsed.
 SOURCE_RANK = {SOURCE_COVER: 0, SOURCE_XBRL: 1, SOURCE_XBRL_CLASS: 2}
+#: Holding-company reorganisations that swapped every share one for one, class for class, into
+#: a new registrant whose first count was filed weeks later: successor CIK -> (predecessor CIK,
+#: the day the ticker moved). Until the successor's first per-class reading, its symbols answer
+#: the predecessor's last one, attributed through the predecessor's class-table rows -- the same
+#: shares under a new name, filed before the day it is read, so nothing is looked ahead at. Not a
+#: general rule: a merger or a combination also moves a ticker to a new filer, and there the count
+#: changes. Alphabet: 8-K12B of 2015-10-02 (each Google class A, B and C share became one Alphabet
+#: share of that class); its first count is in its 10-Q of 2015-10-29.
+ONE_FOR_ONE_SUCCESSORS: dict[str, tuple[str, date]] = {"0001652044": ("0001288776", date(2015, 10, 2))}
 
 
 class SharesError(ValueError):
@@ -425,6 +434,11 @@ class SharesHistory:
             best = (x.filed, SOURCE_RANK[SOURCE_XBRL])
             pick = (SOURCE_XBRL, x.accession, x.period_end, x.filed, x.shares, ())
         k = self.latest_class(row_cik, on) if row_cik else None
+        k_cik = row_cik
+        if k is None and row_cik in ONE_FOR_ONE_SUCCESSORS:
+            before, moved = ONE_FOR_ONE_SUCCESSORS[row_cik]
+            if on >= moved:
+                k, k_cik = self.latest_class(before, on), before
         if k is not None and (best is None or (k.filed, SOURCE_RANK[SOURCE_XBRL_CLASS]) > best):
             best = (k.filed, SOURCE_RANK[SOURCE_XBRL_CLASS])
             pick = (SOURCE_XBRL_CLASS, k.accession, k.as_of, k.filed, float(k.shares), tuple(k.classes))
@@ -433,10 +447,11 @@ class SharesHistory:
         source, accession, as_of, filed, total, classes = pick
         if self.max_age_days is not None and (on - (as_of or filed)).days > self.max_age_days:
             return None
-        shares = self._attribute(source, accession, row_cik, symbol, as_of or filed, total, classes)
+        cik = k_cik if source == SOURCE_XBRL_CLASS else row_cik
+        shares = self._attribute(source, accession, cik, symbol, as_of or filed, total, classes)
         if shares is None:
             return None
-        return Observation(symbol, on, shares, as_of, filed, source, accession, row_cik)
+        return Observation(symbol, on, shares, as_of, filed, source, accession, cik)
 
 
 def load(

@@ -287,6 +287,28 @@ def test_kinder_morgan_sponsor_classes_count_once(index, vendored_table):
     assert h.problems == {} and "0001506307" not in h.summed
 
 
+def test_alphabet_answers_googles_last_count_until_its_own_first_one(index, vendored_table):
+    # Found refreshing the stores: GOOG/GOOGL move to Alphabet's filer on 2015-10-02, the day
+    # every Google share became one Alphabet share of the same class, and Alphabet's first count
+    # came with its 10-Q of 2015-10-29; the 18 sessions between went unknown.
+    google = cr("0001288776", "2015-07-23", "2015-07-17", "0001288776-15-000035",
+                [("CommonClassAMember", 289_418_090), ("CommonClassBMember", 52_188_287),
+                 ("CapitalClassCMember", 343_928_872)])
+    alphabet = cr("0001652044", "2015-10-29", "2015-10-22", "0001652044-15-000006",
+                  [("CommonClassAMember", 292_000_000), ("CommonClassBMember", 50_000_000),
+                   ("CapitalClassCMember", 345_000_000)])
+    h = _vendored_history(index, vendored_table, [google, alphabet])
+    on = D("2015-10-05")
+    googl, goog = h.shares_on("GOOGL", on), h.shares_on("GOOG", on)
+    assert (googl.shares, goog.shares) == (289_418_090 + 52_188_287, 343_928_872)
+    assert (googl.accession, googl.cik) == ("0001288776-15-000035", "0001288776")
+    later = h.shares_on("GOOGL", D("2015-10-29"))
+    assert (later.shares, later.cik) == (342_000_000, "0001652044")
+    # Never before the reorganisation's day, and never a count filed after ``on``.
+    assert h.shares_on("GOOGL", D("2015-07-24")).cik == "0001288776"
+    assert h.problems == {}
+
+
 # --- the invariant: a filer the new sources do not touch answers as before --------------------
 
 INDEX = {

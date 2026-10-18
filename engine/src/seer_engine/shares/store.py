@@ -2,8 +2,9 @@
 
 Company size on day t is ``shares x the close as it printed on t``. Both halves have to be in the
 store, fingerprinted, for a lab trial that ranks on size to be reproducible: the share history
-(``engine/data/shares_outstanding_pre2009.csv`` joined to the store's XBRL facts through the
-date-scoped ticker map, ``history.SharesHistory``) and the split list that turns the store's
+(``engine/data/shares_outstanding_pre2009.csv`` and ``shares_xbrl_classes.csv`` joined to the
+store's XBRL facts through the date-scoped ticker map and attributed to each listed class through
+``share_classes.csv``, ``history.SharesHistory``) and the split list that turns the store's
 split-adjusted closes back into printed ones (``splits`` module docstring).
 
 ``shares.csv`` -- ``symbol,from,shares,counted,filed,source,accession``, sorted by symbol then
@@ -11,10 +12,12 @@ split-adjusted closes back into printed ones (``splits`` module docstring).
 from ``from`` until the symbol's next row, with ``shares`` (and the rest) empty where the answer is
 "unknown" (no figure filed yet, the newest one older than 400 days, or no filer behind the ticker
 that day). Writing the resolved answers instead of the raw filings is what lets the reader be a
-bisect: the join rule (later filing wins, XBRL wins a same-day tie), the ticker-to-filer map and the
-age limit are applied once, here, and a store reader can never apply them differently. The rows are
-exact, not sampled: ``shares_on``'s answer can only change on a filing date, a ticker-map boundary
-or the day a figure ages out, and :func:`change_points` evaluates it on every one of those days
+bisect: the join rule (later filing wins; a same-day tie goes to the per-class reading, then the
+companyfacts tag), the ticker-to-filer map, the class table and the age limit are applied once,
+here, and a store reader can never apply them differently. The rows are exact, not sampled:
+``shares_on``'s answer can only change on a filing date, a ticker-map boundary or the day a figure
+ages out -- the class table is keyed on each figure's own count date, so it adds no day of its
+own -- and :func:`change_points` evaluates it on every one of those days
 (``tests/test_shares_store.py`` checks it against a day-by-day evaluation). ``from >= filed`` on
 every row: nothing is readable before it was public.
 
@@ -41,11 +44,11 @@ from pathlib import Path
 
 from seer_engine import cik as cikmod
 from seer_engine.backtest.market import ShareCount, ShareCounts
-from seer_engine.shares import history
+from seer_engine.shares import class_table, history
 
 SHARES_HEADER = "symbol,from,shares,counted,filed,source,accession"
 SPLITS_HEADER = "symbol,date,ratio"
-SOURCES = (history.SOURCE_COVER, history.SOURCE_XBRL)
+SOURCES = (history.SOURCE_COVER, history.SOURCE_XBRL, history.SOURCE_XBRL_CLASS)
 
 
 @dataclass(frozen=True)
@@ -79,6 +82,8 @@ def _candidates(
             continue
         for r in hist._rows.get(row.cik, ()):
             figures.append((r.filed, r.as_of or r.filed))
+        for k in hist._class_rows.get(row.cik, ()):
+            figures.append((k.filed, k.as_of or k.filed))
     for x in hist._xbrl.get(symbol, ()):
         figures.append((x.filed, x.period_end))
     for filed, counted in figures:
@@ -379,10 +384,18 @@ def load_counts(shares_path: Path | None, splits_path: Path | None, start: date,
     return ShareCounts(rows, splits)
 
 
-def history_for(xbrl: Iterable[history.XbrlFact], data_dir: Path = history.DATA_DIR) -> history.SharesHistory:
-    """The vendored cover rows and ticker map joined to ``xbrl``, at the default age limit."""
+def history_for(
+    xbrl: Iterable[history.XbrlFact],
+    data_dir: Path = history.DATA_DIR,
+    *,
+    class_rows: Iterable[history.ClassReading] = (),
+) -> history.SharesHistory:
+    """The vendored cover rows, ticker map and class table joined to ``xbrl`` and the per-class
+    rows, at the default age limit."""
     return history.SharesHistory(
         history.load_rows(data_dir / history.SHARES_FILE),
         cikmod.load_index_with_history(data_dir),
         xbrl,
+        class_rows=class_rows,
+        table=class_table.load_table(data_dir / class_table.TABLE_FILE),
     )

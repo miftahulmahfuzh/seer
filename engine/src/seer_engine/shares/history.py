@@ -1,6 +1,6 @@
 """Point-in-time shares outstanding, 1996-today, and the market value they imply.
 
-Vendored source (``engine/data``, documented in ``SOURCES.md``):
+Vendored sources (``engine/data``, documented in ``SOURCES.md``):
 
 * ``shares_outstanding_pre2009.csv`` -- ``cik,symbol,filed,as_of,form,accession,shares,classes,
   flags,note``. One row per 10-K/10-Q of an S&P 500 member's filer, filed 1995-10 through
@@ -8,6 +8,11 @@ Vendored source (``engine/data``, documented in ``SOURCES.md``):
   build`` from EDGAR (``shares.cover`` parses, ``shares.checks`` validates); every value a check
   flagged and that was kept says why in ``note``, and every value a check threw out is listed,
   with its reason, in ``shares_outstanding_pre2009_excluded.csv`` instead.
+* ``shares_xbrl_classes.csv`` (``shares.classes``) -- one row per 10-K/10-Q filed from 2009 whose
+  share count ``companyfacts`` cannot give: the filing's own XBRL instance read with its class
+  axis, ``classes`` per class member. Passed in as ``class_rows``.
+* ``share_classes.csv`` (``shares.class_table``) -- which listed symbol each class of a
+  multi-class filer stands for, and at what ratio. Passed in as ``table``.
 
 **Two dates, and only one of them is an availability date.** ``as_of`` is the day the filer
 counted ("As of March 2, 1997, ... outstanding"), usually weeks after the period ended and days
@@ -17,12 +22,24 @@ yet been told. :meth:`SharesHistory.latest` enforces exactly that and nothing lo
 rule ``fundamentals.panel`` applies to XBRL facts. ``as_of`` is still needed: a split between the
 count and the day it is used changes what the count means (:func:`market_value`).
 
-**One API across the 2009 seam.** XBRL's ``dei:EntityCommonStockSharesOutstanding`` is the same
-cover-page figure, tagged; the store's ``fundamentals.csv`` carries it per symbol from 2009.
-:meth:`SharesHistory.shares_on` takes both sources, resolves ``symbol`` to its filer on the day
-asked through the date-scoped ticker map (never a bare ticker; ``cik``'s docstring), and returns
-whichever figure was filed last. When a cover row and an XBRL fact share an accession -- the same
-report, read twice -- the tagged figure wins.
+**One API across the 2009 seam, three readings of one cover.** XBRL's
+``dei:EntityCommonStockSharesOutstanding`` is the same cover-page figure, tagged. The store's
+``fundamentals.csv`` carries it per symbol from 2009 (source ``xbrl``) -- but ``companyfacts``,
+where that file comes from, drops every fact tagged with a class axis, so a filer that states its
+count per class (Meta, Visa, Alphabet from 2014, Berkshire) has none there. Those filings are read
+from their own instance documents instead (source ``xbrl-class``). :meth:`SharesHistory.shares_on`
+takes all three, resolves ``symbol`` to its filer on the day asked through the date-scoped ticker
+map (never a bare ticker; ``cik``'s docstring), and returns whichever figure was filed last. Filed
+the same day -- the same report, read more than once -- the per-class reading wins, then the
+companyfacts tag, then the cover text: each is the more complete reading of the one before.
+
+**One company, one size.** A per-class or cover reading lists its classes. Where the class table
+has no row for the filer on the count's date the classes are summed and every symbol of the
+filer answers the whole company, as before the table existed. Where it has rows, each symbol
+answers only the classes the table attributes to it, each times its ratio (``class_table``'s
+docstring): Berkshire's class A counts 1,500 class B shares toward BRK.B, GOOGL answers class A
+and B and GOOG class C. A figure the table cannot attribute is not answered, and why is kept in
+:attr:`SharesHistory.problems`.
 
 **Market value needs the unadjusted close, and the splits since the count.** A count of
 pre-split shares times a post-split price is half the company after a 2-for-1. So
@@ -47,6 +64,8 @@ from typing import Protocol
 
 from seer_engine import cik as cikmod
 from seer_engine.cik import CikError
+from seer_engine.shares import class_table
+from seer_engine.shares.class_table import ClassTable
 
 DATA_DIR = cikmod.DATA_DIR
 SHARES_FILE = "shares_outstanding_pre2009.csv"
@@ -75,6 +94,10 @@ XBRL_TAGS: tuple[str, ...] = ("EntityCommonStockSharesOutstanding", "CommonStock
 
 SOURCE_COVER = "edgar-cover"
 SOURCE_XBRL = "xbrl"
+SOURCE_XBRL_CLASS = "xbrl-class"
+#: Which reading wins when two were filed the same day (higher wins): the per-class instance
+#: reading has every class, the companyfacts tag may have lost some, the cover text was parsed.
+SOURCE_RANK = {SOURCE_COVER: 0, SOURCE_XBRL: 1, SOURCE_XBRL_CLASS: 2}
 
 
 class SharesError(ValueError):
@@ -106,7 +129,7 @@ class Observation:
     shares: float
     as_of: date | None  # when the filer counted; None when the cover gave no date
     filed: date  # when it became public: always <= ``on``
-    source: str  # SOURCE_COVER or SOURCE_XBRL
+    source: str  # SOURCE_COVER, SOURCE_XBRL or SOURCE_XBRL_CLASS
     accession: str
     cik: str | None
 
@@ -125,6 +148,21 @@ class XbrlFact(Protocol):
     val: float
     accn: str
     filed: date
+
+
+class ClassReading(Protocol):
+    """The fields read from a ``classes.ClassRow`` (one filing's XBRL instance, per class).
+
+    ``shares`` is the whole-company figure (the tagged total, else the classes summed);
+    ``classes`` is ``((member, count), ...)``, empty when the instance had no class axis.
+    """
+
+    cik: str
+    filed: date
+    accession: str
+    as_of: date | None
+    shares: int
+    classes: tuple[tuple[str, int], ...]
 
 
 class SplitLike(Protocol):
@@ -278,7 +316,8 @@ def xbrl_by_symbol(facts: Iterable[XbrlFact]) -> dict[str, tuple[_Xbrl, ...]]:
 
 
 class SharesHistory:
-    """Cover rows by filer plus (optionally) XBRL facts by symbol, queried point in time."""
+    """Cover rows and per-class XBRL rows by filer, plus companyfacts XBRL facts by symbol,
+    queried point in time and attributed to the asked symbol through the class table."""
 
     def __init__(
         self,
@@ -287,6 +326,8 @@ class SharesHistory:
         xbrl: Iterable[XbrlFact] = (),
         *,
         max_age_days: int | None = DEFAULT_MAX_AGE_DAYS,
+        class_rows: Iterable[ClassReading] = (),
+        table: ClassTable | None = None,
     ) -> None:
         by: dict[str, list[ShareRow]] = {}
         for r in rows:
@@ -295,8 +336,23 @@ class SharesHistory:
         self._filed = {k: [r.filed for r in v] for k, v in self._rows.items()}
         self._xbrl = xbrl_by_symbol(xbrl)
         self._xfiled = {k: [x.filed for x in v] for k, v in self._xbrl.items()}
+        cby: dict[str, list[ClassReading]] = {}
+        for c in class_rows:
+            if c.shares > 0:
+                cby.setdefault(c.cik, []).append(c)
+        self._class_rows = {k: sorted(v, key=lambda c: (c.filed, c.accession)) for k, v in cby.items()}
+        self._cfiled = {k: [c.filed for c in v] for k, v in self._class_rows.items()}
+        self.table = table if table is not None else ClassTable()
         self.index = index
         self.max_age_days = max_age_days
+        #: ``(cik, accession, symbol) -> why`` for every reading that won on some day asked but
+        #: that the class table could not attribute to the symbol (answered as unknown).
+        self.problems: dict[tuple[str, str, str], str] = {}
+        #: Filers whose winning reading listed several classes on a count date the class table
+        #: has no row for: summed one for one, every symbol the whole company (``class_table``'s
+        #: docstring). Reported by ``shares store``, never refused.
+        self.summed: set[str] = set()
+        self._attributed: dict[tuple[str, str, str | None, str], float | None] = {}
 
     def latest(self, cik: str, on: date) -> ShareRow | None:
         """The cover row of ``cik`` filed last on or before ``on`` (never one filed after)."""
@@ -306,6 +362,14 @@ class SharesHistory:
         i = bisect.bisect_right(filed, on) - 1
         return self._rows[cik][i] if i >= 0 else None
 
+    def latest_class(self, cik: str, on: date) -> ClassReading | None:
+        """The per-class XBRL row of ``cik`` filed last on or before ``on``."""
+        filed = self._cfiled.get(cik)
+        if not filed:
+            return None
+        i = bisect.bisect_right(filed, on) - 1
+        return self._class_rows[cik][i] if i >= 0 else None
+
     def _latest_xbrl(self, symbol: str, on: date) -> _Xbrl | None:
         filed = self._xfiled.get(symbol)
         if not filed:
@@ -313,31 +377,66 @@ class SharesHistory:
         i = bisect.bisect_right(filed, on) - 1
         return self._xbrl[symbol][i] if i >= 0 else None
 
-    def shares_on(self, symbol: str, on: date) -> Observation | None:
-        """The share count public on ``on`` for the company trading as ``symbol`` that day.
+    def _attribute(
+        self,
+        source: str,
+        accession: str,
+        cik: str | None,
+        symbol: str,
+        counted: date,
+        total: float,
+        classes: Sequence[tuple[str, int]],
+    ) -> float | None:
+        """``class_table.ClassTable.attribute`` for one reading, memoised; a problem is kept."""
+        key = (source, accession, cik, symbol)
+        if key in self._attributed:
+            return self._attributed[key]
+        got = self.table.attribute(cik, symbol, counted, total, classes)
+        if got.problem is not None and cik is not None:
+            self.problems[(cik, accession, symbol)] = got.problem
+        elif cik is not None and len(classes) >= 2 and not self.table.rules(cik, counted):
+            self.summed.add(cik)
+        self._attributed[key] = got.shares
+        return got.shares
 
-        None when neither source has a figure filed on or before ``on``, or when the newest one
-        is older than ``max_age_days``.
+    def shares_on(self, symbol: str, on: date) -> Observation | None:
+        """The share count public on ``on`` for the company -- or, where the class table splits
+        it, the listed class -- trading as ``symbol`` that day.
+
+        None when no source has a figure filed on or before ``on``, when the newest one is older
+        than ``max_age_days``, or when the class table cannot attribute it to ``symbol``.
         """
         try:
             row_cik = cikmod.resolve(symbol, on, self.index)
         except CikError:
             row_cik = None
+        # (filed, rank) of the winner so far, and its reading:
+        # (source, accession, as_of, filed, whole-company shares, classes).
+        best: tuple[date, int] | None = None
+        pick: tuple[str, str, date | None, date, float, tuple[tuple[str, int], ...]] | None = None
         cover = self.latest(row_cik, on) if row_cik else None
-        x = self._latest_xbrl(symbol, on)
-        obs: Observation | None = None
         if cover is not None:
-            obs = Observation(symbol, on, float(cover.shares), cover.as_of, cover.filed,
-                              SOURCE_COVER, cover.accession, row_cik)
-        # Filed later wins; filed the same day (the same report, read twice) the tag wins.
-        if x is not None and (obs is None or x.filed >= obs.filed):
-            obs = Observation(symbol, on, x.shares, x.period_end, x.filed, SOURCE_XBRL,
-                              x.accession, row_cik)
-        if obs is None:
+            best = (cover.filed, SOURCE_RANK[SOURCE_COVER])
+            pick = (SOURCE_COVER, cover.accession, cover.as_of, cover.filed, float(cover.shares),
+                    cover.classes)
+        # Filed later wins; filed the same day (the same report, read twice) the richer reading wins.
+        x = self._latest_xbrl(symbol, on)
+        if x is not None and (best is None or (x.filed, SOURCE_RANK[SOURCE_XBRL]) > best):
+            best = (x.filed, SOURCE_RANK[SOURCE_XBRL])
+            pick = (SOURCE_XBRL, x.accession, x.period_end, x.filed, x.shares, ())
+        k = self.latest_class(row_cik, on) if row_cik else None
+        if k is not None and (best is None or (k.filed, SOURCE_RANK[SOURCE_XBRL_CLASS]) > best):
+            best = (k.filed, SOURCE_RANK[SOURCE_XBRL_CLASS])
+            pick = (SOURCE_XBRL_CLASS, k.accession, k.as_of, k.filed, float(k.shares), tuple(k.classes))
+        if pick is None:
             return None
-        if self.max_age_days is not None and obs.age_days > self.max_age_days:
+        source, accession, as_of, filed, total, classes = pick
+        if self.max_age_days is not None and (on - (as_of or filed)).days > self.max_age_days:
             return None
-        return obs
+        shares = self._attribute(source, accession, row_cik, symbol, as_of or filed, total, classes)
+        if shares is None:
+            return None
+        return Observation(symbol, on, shares, as_of, filed, source, accession, row_cik)
 
 
 def load(
@@ -345,13 +444,17 @@ def load(
     xbrl: Iterable[XbrlFact] = (),
     *,
     max_age_days: int | None = DEFAULT_MAX_AGE_DAYS,
+    class_rows: Iterable[ClassReading] = (),
 ) -> SharesHistory:
-    """The vendored cover rows and the date-scoped ticker map, plus any XBRL facts given."""
+    """The vendored cover rows, ticker map and class table, plus any XBRL facts and per-class
+    rows given."""
     return SharesHistory(
         load_rows(data_dir / SHARES_FILE),
         cikmod.load_index_with_history(data_dir),
         xbrl,
         max_age_days=max_age_days,
+        class_rows=class_rows,
+        table=class_table.load_table(data_dir / class_table.TABLE_FILE),
     )
 
 

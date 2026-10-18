@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-18
-**Total Active Tasks**: 5
+**Total Active Tasks**: 4
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 2
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 140
+- Blocked: 0
+- Completed: 141
 
 ---
 
@@ -1430,20 +1430,11 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - No phase unblocked: every phase in this set has `Depends on: —`, so this completion neither unblocks nor re-blocks a sibling.
     - Landing not attempted: this is a swarm-tracked set and the coordinator `orch-roster-35-four-methods` owns the merge (analyze-orchestrator Step 5). Nothing merged; no worktree or branch deleted — the set runs on `main` with no worktree.
 
-- [ ] **P1-ENG-IEFK** Phase 2: Class-aware share history
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `shares/class_table.py` (new, pure) and `engine/data/share_classes.csv` (new, hand-kept, 99 rows, 14 filers, each row citing its filing): `cik,member,symbol,ratio,from,to,note` — which listed symbol a class trades as, its ratio into that symbol's share units over a span of **count dates**, ratio 0 for a class with no economic interest; classes matched by their words (`class_key`), so cover text, XBRL member names and `+`-joined tracking-group labels share rows. Seeded with Alphabet/Google, Fox and Fox Corp, News Corp, Comcast 2015, Discovery, Liberty Global/LiLAC, Liberty Media, Liberty Interactive, Under Armour, Berkshire (A→BRK.B at 30 before 2010-01-21, 1,500 from), Visa (B, B-1..B-3, C at their dated as-converted ratios) and Accenture (class X ratio 0). `shares/history.py`: the per-class rows as a third source `"xbrl-class"` (later filing wins; same-day tie `xbrl-class` > `xbrl` > `edgar-cover`); per-symbol attribution (no table row on the count date: classes summed 1:1, the whole company on each symbol, filer recorded in `SharesHistory.summed`; table rows: each symbol answers its classes × ratio, and any class without a row, a figure without a breakdown or a symbol without a class makes the answer unknown, recorded in `SharesHistory.problems`); the same table applied to pre-2010 cover rows. `shares/store.py`: `SOURCES`, `_candidates` over the new rows, `history_for(..., class_rows=)`. `shares/integrate.py`: `shares store` refuses (exit 2) until `engine/data/shares_xbrl_classes.csv` exists, reads it (`--classes` override), prints `problems` and `summed`; `store-report --symbols`. `backtest/market.py`: docstrings only. The `SOURCES.md` section for `share_classes.csv`, appended after phase 1's. Tests (`test_share_class_table.py`; none reads the committed per-class csv). Exit: ruff clean, full suite green, including: Meta-like class-axis rows answer the sum; a multi-class filer with no table row is summed and listed in `summed`, not `problems`; GOOGL/GOOG answer A+B and C separately and sum to the company; BRK.B answers A×1,500+B after 2010-01-21 and A×30+B before; Visa A + B×0.4254 + C on 2012-07-30; a filer with no table rows and no class rows answers exactly as before; `change_points` stays exact.
-  - **Status**: open
-  - **Plan Set**: `MULTI_CLASS_COMPANY_SIZE_PLAN.md` (phase 2 of 3)
-  - **Satisfies**: R1, R2, R3 — Berkshire valued once (class A in B units, ×1,500; ×30 before 2010-01-21); each listed class valued at its own count × its own price
-  - **Depends on**: P1-ENG-O3MU
-  - **Plan**: `.workflows/plan/P1-ENG-IEFK.md`
 - [ ] **P1-ENG-7CWT** Phase 3: Refresh the stores, verify, unblock M0225
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns staging (`cp -a` of `.research`, `.research-sv`, `.research-test` into `/home/miftah/seer-stage/mcs/`; every write goes to the copies); `shares download-classes --fundamentals <staged dev>/fundamentals.csv`, then the same with one `--cik` per filer of `engine/data/share_classes.csv`, then `build-classes`, reviewing every `set aside:` line, and committing `engine/data/shares_xbrl_classes.csv`; `shares store` on the staged dev store (`--evidence-store` the staged test store) and test store (`--xbrl` the dev store's `fundamentals.csv`), resolving every `problems` entry (a cited `share_classes.csv` row, e.g. Berkshire's bare class A, as a Step 6 data fix with a test, or recorded); `survivorship_store --refresh-shares` for the staged check store; each price fingerprint unchanged; before/after coverage 2009-2015 and the spot checks (Apple 2014-06-30 $540-580B and unchanged, Meta $160-190B, Visa $120-140B, Berkshire $290-335B, GOOGL+GOOG $360-420B); continuity (META/FB, V, MA, GOOGL, GOOG, BRK.B: no 2009-2015 member-day with a close and no count); `lab unblock M0225 --note` (the plain-words note, no separate `lab note`), `lab stage`; docs: the skill's size-accessor caveats, the `shares/__init__.py` docstring (module map gains `instance`, `classes`, `class_table`), `engine/package_readme.md`, the runbook recipe (three class commands, stage-then-cut-over), the placeholder cells of phase 1's `SOURCES.md` section, the handover close-out; the commit naming old and new store fingerprints; **Step 11 cutover**: after the branch is on `origin/main`, move the staged stores into `/home/miftah/seer/engine/`, keep the old ones in `/home/miftah/seer-stage/mcs/old/`, and `sync_store.py push` dev, sv and test. Exit: every number above recorded in the lab note, the commit and the close-out; price fingerprints unchanged on all three stores; M0225 back to `idea`. **Cutover is part of done:** whichever session lands the branch on `origin/main` (this phase's, the completion handler or the swarm coordinator) runs Step 11 right after the push; the set is finished only when the three live stores carry the new `shares.csv` and Blob reports `in_sync: true` for dev, sv and test.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `MULTI_CLASS_COMPANY_SIZE_PLAN.md` (phase 3 of 3)
   - **Satisfies**: R4, R5 — Stores refreshed with price fingerprint unchanged and pushed via sync-research-store; spot checks pass, coverage up, M0225 unblocked with a plain-words note
   - **Depends on**: P1-ENG-O3MU, P1-ENG-IEFK
@@ -1481,6 +1472,21 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-IEFK** Phase 2: Class-aware share history
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `shares/class_table.py` (new, pure) and `engine/data/share_classes.csv` (new, hand-kept, 99 rows, 14 filers, each row citing its filing): `cik,member,symbol,ratio,from,to,note` — which listed symbol a class trades as, its ratio into that symbol's share units over a span of **count dates**, ratio 0 for a class with no economic interest; classes matched by their words (`class_key`), so cover text, XBRL member names and `+`-joined tracking-group labels share rows. Seeded with Alphabet/Google, Fox and Fox Corp, News Corp, Comcast 2015, Discovery, Liberty Global/LiLAC, Liberty Media, Liberty Interactive, Under Armour, Berkshire (A→BRK.B at 30 before 2010-01-21, 1,500 from), Visa (B, B-1..B-3, C at their dated as-converted ratios) and Accenture (class X ratio 0). `shares/history.py`: the per-class rows as a third source `"xbrl-class"` (later filing wins; same-day tie `xbrl-class` > `xbrl` > `edgar-cover`); per-symbol attribution (no table row on the count date: classes summed 1:1, the whole company on each symbol, filer recorded in `SharesHistory.summed`; table rows: each symbol answers its classes × ratio, and any class without a row, a figure without a breakdown or a symbol without a class makes the answer unknown, recorded in `SharesHistory.problems`); the same table applied to pre-2010 cover rows. `shares/store.py`: `SOURCES`, `_candidates` over the new rows, `history_for(..., class_rows=)`. `shares/integrate.py`: `shares store` refuses (exit 2) until `engine/data/shares_xbrl_classes.csv` exists, reads it (`--classes` override), prints `problems` and `summed`; `store-report --symbols`. `backtest/market.py`: docstrings only. The `SOURCES.md` section for `share_classes.csv`, appended after phase 1's. Tests (`test_share_class_table.py`; none reads the committed per-class csv). Exit: ruff clean, full suite green, including: Meta-like class-axis rows answer the sum; a multi-class filer with no table row is summed and listed in `summed`, not `problems`; GOOGL/GOOG answer A+B and C separately and sum to the company; BRK.B answers A×1,500+B after 2010-01-21 and A×30+B before; Visa A + B×0.4254 + C on 2012-07-30; a filer with no table rows and no class rows answers exactly as before; `change_points` stays exact.
+  - **Status**: completed
+  - **Plan Set**: `MULTI_CLASS_COMPANY_SIZE_PLAN.md` (phase 2 of 3)
+  - **Satisfies**: R1, R2, R3 — Berkshire valued once (class A in B units, ×1,500; ×30 before 2010-01-21); each listed class valued at its own count × its own price
+  - **Depends on**: P1-ENG-O3MU
+  - **Plan**: `.workflows/plan/P1-ENG-IEFK.md`
+  - **Completed**: 2026-10-18 19:40
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/shares/class_table.py (new), engine/data/share_classes.csv (new, 99 rows, 14 filers, sha256 5c67b05b...), engine/src/seer_engine/shares/history.py, engine/src/seer_engine/shares/store.py, engine/src/seer_engine/shares/integrate.py, engine/src/seer_engine/backtest/market.py (docstrings only), engine/data/SOURCES.md (share_classes.csv section appended), engine/tests/test_share_class_table.py (new)
+  - **Verified**: ruff check engine clean; pytest engine/tests with PG_TEST_URL: 5739 passed, 1 failed (the known test_dev_trades_bar), 4 skipped (opt-in live tests only); load_table prints 99 14; --classes and --symbols in help
+  - **Decided**:
+    - test_dev_trades_bar fails (already failing on base 6eecfc0; unrelated to shares) → treated as a known failure, not fixed (swarm coordinator note; rung 1: invariant 1 means no phase breaks the suite, and this failure predates every phase)
 - [x] **P1-ENG-O3MU** Phase 1: Per-class counts from XBRL instances
   - **Difficulty**: HARD
   - **Type**: Feature

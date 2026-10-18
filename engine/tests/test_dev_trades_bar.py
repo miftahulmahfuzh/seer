@@ -97,7 +97,40 @@ HELD_OUT_BY_THE_TRADES_BAR: tuple[tuple[str, int], ...] = (
     ("M0113-SMA50-W", 43),
     ("M0113-UP63", 18),
     ("M0143-SPY-UP63", 18),
+    # 2026-10-18, retaken against the snapshot below. Five more SPY switch books recorded on
+    # 2026-10-16/17, again new methods and not a moved bar. Three of them are the first trials the
+    # bar has held out that clear the luck test (``LOAD_BEARING``), so §13's "zero verdicts
+    # change" finding stopped being true on 2026-10-16. Design §19 records the re-measurement.
+    ("M0038-SPY-2KEY", 23),
+    ("M0038-SPY-WATCH", 2),
+    ("M0167-SPY-E200S", 3),
+    ("M0167-SPY-EHIGHL", 2),
+    ("M0205-SPY200", 9),
 )
+
+#: The last ``trials.n`` the two sets in this file were measured against. Only rows at or below it
+#: are compared, so the measurement is taken against a frozen slice of an append-only table.
+#:
+#: **Why a snapshot and not the whole table.** Until 2026-10-18 the third test read every dev row,
+#: and the set above could only grow: Sera sessions record new methods unattended, and every new
+#: SPY switch book trades too seldom to clear 100 by construction. Each one broke ``main`` without
+#: any bar moving, and a test that fails every time the lab does its job gets ignored. That is
+#: exactly what happened from 2026-10-16. The mistake this file guards against is a *constant*
+#: moving, and a moved constant re-judges old rows too, so a frozen slice still catches it. New
+#: trials are new evidence, and adding them to the measurement is a deliberate re-take: raise this
+#: number, re-run, and update both sets and the design doc together.
+SNAPSHOT_N = 736
+
+#: The held-out trials whose **recorded** luck score clears ``DSR_MIN``. These are the ones the
+#: trades bar is the only thing keeping off the leaderboard. Measured 2026-10-18: each one also
+#: clears at the lab's live trial count (0.965, 0.946 and 0.958 at N = 146), and ``store.verdict``
+#: marks all three eligible once ``dev._MIN_TRADES`` is set to 0 in memory. Two of them profit
+#: on every trade they make, two trades in twenty-two years, so their profit factor is infinite.
+#: That is the sample-size case §13 kept the bar for, and here it is doing that job.
+#:
+#: The recorded score is read rather than ``store.dsr_at``'s live one because the live score moves
+#: with every method the lab tries. Pinning it would bring back the drift the snapshot removes.
+LOAD_BEARING: tuple[str, ...] = ("M0038-SPY-2KEY", "M0038-SPY-WATCH", "M0167-SPY-EHIGHL")
 
 
 def test_the_dev_window_gate_still_requires_a_hundred_closed_trades() -> None:
@@ -114,8 +147,10 @@ def test_the_dev_window_gate_still_requires_a_hundred_closed_trades() -> None:
         f"a 20-year backtest produced enough closed trades for its profit factor and drawdown to\n"
         f"mean anything, which is a question about sample size. Deleting the clause from item 1 was\n"
         f"right. Deleting it here moves the sample-size problem out of condition 1 and into\n"
-        f"condition 3: the two trials this bar holds out score profit factors of 75.45 and 14.48\n"
-        f"off 11 and 13 closed trades over twenty years, and neither number means anything.\n"
+        f"condition 3: the trials this bar holds out score profit factors of 75.45, 808.97 and\n"
+        f"infinity off 2 to 43 closed trades over twenty years, and none of those numbers means\n"
+        f"anything. Since 2026-10-16 the bar is also load-bearing: three of them clear the luck\n"
+        f"test and would become eligible the moment it went (design §19).\n"
         f"\n"
         f"It is also not a free edit. All 110 recorded dev trials were judged against this\n"
         f"constant; `lab.store.owner_failures` and `lab.store.published_verdict` re-judge them\n"
@@ -170,35 +205,35 @@ def test_the_forward_paper_bar_and_the_dev_trades_bar_are_two_separate_dials() -
     )
 
 
-def test_the_trades_bar_holds_out_two_trials_and_neither_of_them_has_a_luck_score() -> None:
+def test_the_trades_bar_holds_out_a_known_set_and_three_of_them_clear_the_luck_bar() -> None:
     """The measurement §13 rests on, re-taken from the committed database on every run.
 
-    This is the fact that made the asymmetry cheap rather than merely defensible: the two trials the
-    dev trades bar holds out are both P7a seed imports with ``dsr IS NULL``, and under method-lab
-    design §7.1 a luck test that cannot be evaluated is one that was not passed. So dropping the bar
-    today would newly clear two candidates through the five owner conditions and change **zero**
-    eligibility verdicts. The sample-size argument binds future trials that do carry a DSR; it does
-    not bind these two, and §13 says so.
+    On 2026-10-07 this was the fact that made the asymmetry cheap rather than merely defensible:
+    the two trials the dev trades bar held out were both P7a seed imports with ``dsr IS NULL``, and
+    under method-lab design §7.1 a luck test that cannot be evaluated is one that was not passed. So
+    dropping the bar then would have changed **zero** eligibility verdicts. §13 also said the
+    sample-size argument "binds future trials that do carry a DSR".
 
-    The set is recomputed from the recorded columns against the live constants, never parsed out of
-    ``trials.failed``. It can therefore move for a legitimate reason, and on 2026-10-14 it did:
-    the owner split the lab's dev screen off his real-money bar and set it to 50% (design §18), so
-    trials that had missed both drawdown and trades now miss trades alone and the set grew from
-    five to twelve. Tightening ``tuning.DEV_MAX_DRAWDOWN`` again would shrink it the same way.
-    Later the same day it grew again, twelve to eighteen, for an unrelated reason: M0113 and M0143
-    recorded SPY-only switch books, which hold one instrument and trade 11-43 times in 22 years and
-    so miss the trades bar alone by construction rather than because any bar moved. The finding
-    still holds -- every one of the eighteen either carries no luck score or sits below the bar,
-    the closest being 0.884 -- so dropping the trades bar would still change zero verdicts.
-    That is not a bug in this test: it means the measurement has gone stale and has to be retaken.
-    §13 itself is a dated record of what was true on 2026-10-07 and is **not** amended -- the
-    re-measurement is recorded in design §18, which is where this change belongs.
+    That case has now arrived. The set grew twice for bar moves and new methods (design §18), and
+    the finding held until 2026-10-16, when M0038 and M0167 recorded SPY switch books that trade 2
+    to 23 times in twenty-two years **and** clear ``DSR_MIN``. Three trials now hinge on the trades
+    bar alone (``LOAD_BEARING``). The second assertion therefore no longer says "none of them clears
+    the luck bar". It pins exactly which ones do, so a fourth arriving inside the snapshot, or one
+    of the three dropping out, is a re-take rather than a silent change. §13 is a dated record and
+    is **not** amended. The re-measurement lives in design §19.
 
-    Read-only: ``mode=ro``, no trial recorded, the lab's N unmoved at 110, no test-window look spent.
+    Both sets are recomputed from the recorded columns against the live constants, never parsed out
+    of ``trials.failed``, and only over rows ``n <= SNAPSHOT_N``. A moved ``DEV_MAX_DRAWDOWN``,
+    ``MIN_PROFIT_FACTOR`` or ``_MIN_TRADES`` re-judges those frozen rows and fails here. A new
+    trial does not, because adding new evidence to the measurement is a deliberate re-take.
+
+    Read-only: ``mode=ro``, no trial recorded, the lab's N unmoved, no test-window look spent.
     """
     conn: sqlite3.Connection = store.connect_readonly(store.COMMITTED_DB)
     try:
-        rows = conn.execute("SELECT * FROM trials WHERE window = 'dev'").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM trials WHERE window = 'dev' AND n <= ?", (SNAPSHOT_N,)
+        ).fetchall()
     finally:
         conn.close()
 
@@ -207,30 +242,30 @@ def test_the_trades_bar_holds_out_two_trials_and_neither_of_them_has_a_luck_scor
         for r in rows
         if store.owner_failures(r) == (TRADES_LABEL,)
     )
-    assert [(name, count) for name, count, _ in held_out] == list(HELD_OUT_BY_THE_TRADES_BAR), (
-        f"the set of recorded dev trials whose only miss is the trades bar has changed.\n"
-        f"Measured 2026-10-07 and written into {RECORD}: {list(HELD_OUT_BY_THE_TRADES_BAR)}.\n"
-        f"Measured now:{' ' * 31}{[(name, count) for name, count, _ in held_out]}.\n"
+    assert [(name, count) for name, count, _ in held_out] == sorted(HELD_OUT_BY_THE_TRADES_BAR), (
+        f"the set of recorded dev trials (n <= {SNAPSHOT_N}) whose only miss is the trades bar\n"
+        f"has changed.\n"
+        f"Pinned: {sorted(HELD_OUT_BY_THE_TRADES_BAR)}.\n"
+        f"Now:    {[(name, count) for name, count, _ in held_out]}.\n"
         f"\n"
-        f"This set is recomputed from the recorded columns against the live constants, so an owner\n"
-        f"moving `tuning.MAX_DRAWDOWN`, `tuning.MIN_PROFIT_FACTOR` or `dev._MIN_TRADES`\n"
-        f"legitimately changes it. If that is what happened, re-take the measurement and update\n"
-        f"both this list and the one in {RECORD}, whose argument is built on it."
+        f"These rows are frozen, so new trials cannot cause this. A live constant moved:\n"
+        f"`tuning.DEV_MAX_DRAWDOWN`, `tuning.MIN_PROFIT_FACTOR` or `dev._MIN_TRADES`. If the owner\n"
+        f"moved it with a dated revision, re-take the measurement, update this list and\n"
+        f"LOAD_BEARING, and record the re-measurement in the design doc beside {RECORD}. If\n"
+        f"nobody meant to move it, move it back: every recorded verdict re-derives from it."
     )
-    lucky = [
-        (name, count, dsr)
-        for name, count, dsr in held_out
-        if dsr is not None and float(dsr) >= store.DSR_MIN
-    ]
-    assert not lucky, (
-        f"a trial held out by the dev trades bar now clears the luck bar as well: {lucky}.\n"
+    lucky = tuple(
+        sorted(name for name, _, dsr in held_out if dsr is not None and float(dsr) >= store.DSR_MIN)
+    )
+    assert lucky == LOAD_BEARING, (
+        f"the held-out trials that also clear the luck bar have changed.\n"
+        f"Pinned: {list(LOAD_BEARING)}.\n"
+        f"Now:    {list(lucky)}.\n"
         f"\n"
-        f"{RECORD} argues that dropping the dev trades bar would change zero eligibility verdicts\n"
-        f"today. That argument has exactly one load-bearing fact: no trial whose only miss is the\n"
-        f"trades bar also passes `DSR >= {store.DSR_MIN}`. The two P7a seeds carry `dsr IS NULL`, and\n"
-        f"under method-lab design §7.1 a luck test that cannot be evaluated is one that was not\n"
-        f"passed; the M0084 rows carry real scores below the bar. A trial in this list that clears\n"
-        f"the luck bar would become eligible the moment the trades bar went, so the bar would be\n"
-        f"load-bearing and §13's 'zero verdicts actually change' finding is wrong as written.\n"
-        f"Re-take the measurement and rewrite §13 before anyone leans on it again."
+        f"These are the trials the dev trades bar is the only thing keeping ineligible: each\n"
+        f"clears `DSR >= {store.DSR_MIN}` and misses nothing else. Dropping or lowering the bar\n"
+        f"would put every one of them on the leaderboard off a profit factor measured on a\n"
+        f"handful of trades. If `store.DSR_MIN` moved, that was an owner decision. Re-take the\n"
+        f"measurement and record it in the design doc beside {RECORD} before anyone leans on the\n"
+        f"old count."
     )

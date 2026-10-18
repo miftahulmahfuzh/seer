@@ -661,3 +661,31 @@ accident, and that accident was the single most expensive constraint in the rese
   records, the check applied to a fresh run, the check applied to a recorded row, and the second,
   deliberate repetition of it that guards the write. The two constants are not permitted to
   collapse back into one — that would undo this revision entirely.
+
+## 19. Measured 2026-10-18: the dev trades bar now decides three verdicts
+
+§13 kept the dev-window gate's "at least 100 closed trades" bar when go-live item 1 dropped its own,
+and said keeping it cost nothing: no trial held out by that bar alone also passed the luck test, so
+dropping it would change zero verdicts. §13 added that the bar "binds future trials that do carry a
+DSR". §18 re-measured the set at twelve trials and found the claim still true. It no longer is.
+
+- **What changed.** Nothing about the bars. On 2026-10-16 and 2026-10-17 the lab recorded five more
+  books that hold only SPY and switch in and out of it, from three methods. They trade 2 to 23
+  times in twenty-two years, so each one misses the trades bar by construction. That takes the set
+  of trials whose only miss is the trades bar to 23, out of the 736 trials on record.
+- **Three of them pass the luck test.** `M0038-SPY-WATCH` (2 trades, recorded luck score 0.961),
+  `M0167-SPY-EHIGHL` (2 trades, 0.952) and `M0038-SPY-2KEY` (23 trades, 0.941) clear the 0.90 bar.
+  They also clear it re-scored at today's trial count. With the trades bar removed, all three
+  become eligible. These are the first trials the bar has held out that would otherwise pass.
+- **Why that is the bar working, not the bar being wrong.** Two of the three made two trades in
+  twenty-two years and lost on neither, so their profit factor is infinite. This is the case §13
+  kept the bar for: a profit factor off a handful of trades is not a measurement, and the luck
+  test cannot fix that, because it deflates the Sharpe ratio, not the trade count. The bar stays at
+  100. Moving it is still an owner decision that needs a dated revision.
+- **How the guard reads it now.** `tests/test_dev_trades_bar.py` used to compare every dev trial
+  against a fixed list. Since Sera adds new methods without a human, every new SPY switch book
+  broke that test with no bar moving, and the failure was ignored from 2026-10-16 on. The test now
+  measures only trials up to number 736, which are frozen. It pins the 23 held-out trials and the
+  three that pass the luck test. A moved bar still re-judges those rows and fails it. A new trial
+  does not. Folding newer trials into the measurement is a deliberate re-take, recorded here.
+- §13 and §18 are dated records and are left as written.

@@ -249,6 +249,44 @@ def test_companyfacts_class_a_alone_loses_to_the_per_class_reading_of_the_same_f
     assert h.problems[("0001067983", "0001193125-13-000001", "BRK.B")].startswith("a figure without")
 
 
+def test_a_bare_class_beside_axised_ones_is_named_by_a_cited_row(index, vendored_table):
+    # Found refreshing the stores: Visa's 10-K of 2009-11-20 and 10-Q of 2010-02-03 tag class A
+    # without the class axis (classes B and C on it), and Discovery's 10-K of 2010-02-22 tags
+    # series A the same way; the instance reader keeps each as NoClassAxisMember.
+    visa = cr("0001403161", "2009-11-20", "2009-11-13", "0001193125-09-239249",
+              [("ClassCCommonStockMember", 129429736), ("CommonClassBMember", 245513385),
+               ("NoClassAxisMember", 470210301)])
+    disc = cr("0001437107", "2010-02-22", "2010-02-11", "0001193125-10-035850",
+              [("ClassCCommonStockMember", 141711350), ("CommonClassBMember", 6589084),
+               ("NoClassAxisMember", 135226377)])
+    h = _vendored_history(index, vendored_table, [visa, disc])
+    assert h.shares_on("V", D("2009-12-21")).shares == pytest.approx(
+        470210301 + 245513385 * 0.5824 + 129429736)
+    assert h.shares_on("WBD", D("2010-03-01")).shares == 135226377 + 6589084
+    assert h.shares_on("DISCK", D("2010-03-01")).shares == 141711350
+    assert h.problems == {}
+
+
+def test_kinder_morgan_sponsor_classes_count_once(index, vendored_table):
+    # Found refreshing the stores: KMI's classes A, B and C converted together into a fixed pool
+    # of class P about the size of class A (P + A = 707.0M in 2011, the IPO's total; P reached
+    # 1,035.7M once they converted, against 738.1M P + 298.7M A on 2012-10-28), so B and C
+    # carry no economic interest of their own and summing them one for one overstated KMI ~14%.
+    apr = cr("0001506307", "2012-05-02", "2012-04-27", "0001506307-12-000039",
+             [("ClassPMember", 170922605), ("CommonClassAMember", 535972387),
+              ("CommonClassBMember", 94132596), ("CommonClassCMember", 2318258)])
+    oct_ = cr("0001506307", "2012-11-14", "2012-10-28", "0001506307-12-000118",
+              [("ClassPMember", 738058572), ("CommonClassAMember", 298653287),
+               ("CommonClassBMember", 46592538), ("CommonClassCMember", 1147540)])
+    after = cr("0001506307", "2013-03-01", "2013-01-31", "0001506307-13-000015",
+               [("ClassPMember", 1035669044)])
+    h = _vendored_history(index, vendored_table, [apr, oct_, after])
+    assert h.shares_on("KMI", D("2012-05-25")).shares == 170922605 + 535972387
+    assert h.shares_on("KMI", D("2012-11-14")).shares == 738058572 + 298653287
+    assert h.shares_on("KMI", D("2013-03-01")).shares == 1035669044
+    assert h.problems == {} and "0001506307" not in h.summed
+
+
 # --- the invariant: a filer the new sources do not touch answers as before --------------------
 
 INDEX = {

@@ -24,6 +24,7 @@ cik,member,symbol,ratio,from,to,note
 0001355096,VenturesGroupMember CommonClassBMember,QRTEA,0,2012-08-01,2018-03-10,Liberty Ventures series B: no claim on QRTEA (10-Q 0001558370-17-003997)
 0001355096,VenturesGroupCommonClassMember,QRTEA,0,2012-08-01,2018-03-10,Liberty Interactive's own member name for Liberty Ventures series A (10-Q 0001558370-17-003997): no claim on QRTEA
 0001403161,class A,V,1,2008-03-19,,V is the class A line (10-Q 0001384108-12-000008 tags CommonClassAMember/BMember/CMember)
+0001403161,NoClassAxisMember,V,1,2009-11-13,2010-01-28,class A tagged without the class axis beside classes B and C on it (10-K 0001193125-09-239249 and 10-Q 0001193125-10-020834; the filings either side tag it CommonClassAMember)
 0001403161,class B,V,0.7143,2008-03-19,2008-12-19,class B conversion rate at the IPO (10-Q 0001193125-09-022518)
 0001403161,class B,V,0.6296,2008-12-19,2009-07-16,escrow deposit of 2008-12-19 (10-Q 0001193125-09-022518)
 0001403161,class B,V,0.5824,2009-07-16,2010-05-28,escrow deposit announced 2009-07-16 (8-K 0001193125-09-150142)
@@ -63,10 +64,15 @@ cik,member,symbol,ratio,from,to,note
 0001403161,class C,V,1,2008-03-19,2015-03-19,class C converts share for share into class A before the 2015 split (8-K 0001193125-15-025534)
 0001403161,class C,V,4,2015-03-19,,class C converts into 4 class A from the 4-for-1 split of 2015-03-19 (8-K 0001193125-15-025534)
 0001437107,class A,WBD,1,2008-09-17,2022-04-08,Discovery series A traded as DISCA (WBD in the store's names); series C is DISCK; both index members (10-Q 0001437107-12-000015)
+0001437107,NoClassAxisMember,WBD,1,2010-02-11,2010-02-12,series A tagged without the class axis beside series B and C on it (10-K 0001193125-10-035850; the 10-Q before it tags 135154668 as CommonClassAMember)
 0001437107,class B,WBD,1,2008-09-17,2022-04-08,series B converts share for share into series A (10-Q 0001437107-12-000015)
 0001437107,class C,DISCK,1,2008-09-17,2022-04-08,series C is DISCK; the classes became one WBD common stock at the WarnerMedia close of 2022-04-08 (10-Q 0001437107-12-000015)
 0001467373,class A,ACN,1,2009-09-01,,Accenture plc class A ordinary shares are ACN (10-Q 0001467373-12-000009)
 0001467373,class X,ACN,0,2009-09-01,,class X ordinary shares carry votes and no economic interest (10-Q 0001467373-12-000009 tags acn:CommonClassXMember)
+0001506307,class P,KMI,1,2011-02-11,2013-01-01,class P is the listed KMI line from the IPO of 2011-02-11 (10-Q 0001506307-11-000128 tags ClassPMember and CommonClassA/B/CMember)
+0001506307,class A,KMI,1,2011-02-11,2013-01-01,the sponsors' class A; classes A B and C convert together into a fixed pool of class P about the size of class A (P + A = 707.0M on 2011-10-31 = the IPO total; P = 1035669044 in 10-K 0001506307-13-000015 after the conversion vs 738058572 P + 298653287 A in 10-Q 0001506307-12-000118)
+0001506307,class B,KMI,0,2011-02-11,2013-01-01,management's class B converts out of the same fixed pool as class A so it adds no shares of its own (10-Q 0001506307-11-000128; 10-K 0001506307-13-000015)
+0001506307,class C,KMI,0,2011-02-11,2013-01-01,class C converts out of the same fixed pool as class A so it adds no shares of its own (10-Q 0001506307-11-000128; 10-K 0001506307-13-000015)
 0001560385,class A,LMCA,1,2014-07-01,2016-04-15,series C (LMCK) created by the dividend of 2014-07-23; from then series A is LMCA (10-Q 0001560385-14-000067); earlier both answer the whole company
 0001560385,class B,LMCA,1,2014-07-01,2016-04-15,series B converts share for share into series A (10-Q 0001560385-14-000067)
 0001560385,class C,LMCK,1,2014-07-01,2016-04-15,series C is LMCK (10-Q 0001560385-14-000067)

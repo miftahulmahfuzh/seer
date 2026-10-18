@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-18
-**Total Active Tasks**: 4
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
-- P2 Medium: 2
+- P1 High: 0
+- P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 141
+- Completed: 143
 
 ---
 
@@ -1430,16 +1430,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - No phase unblocked: every phase in this set has `Depends on: —`, so this completion neither unblocks nor re-blocks a sibling.
     - Landing not attempted: this is a swarm-tracked set and the coordinator `orch-roster-35-four-methods` owns the merge (analyze-orchestrator Step 5). Nothing merged; no worktree or branch deleted — the set runs on `main` with no worktree.
 
-- [ ] **P1-ENG-7CWT** Phase 3: Refresh the stores, verify, unblock M0225
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns staging (`cp -a` of `.research`, `.research-sv`, `.research-test` into `/home/miftah/seer-stage/mcs/`; every write goes to the copies); `shares download-classes --fundamentals <staged dev>/fundamentals.csv`, then the same with one `--cik` per filer of `engine/data/share_classes.csv`, then `build-classes`, reviewing every `set aside:` line, and committing `engine/data/shares_xbrl_classes.csv`; `shares store` on the staged dev store (`--evidence-store` the staged test store) and test store (`--xbrl` the dev store's `fundamentals.csv`), resolving every `problems` entry (a cited `share_classes.csv` row, e.g. Berkshire's bare class A, as a Step 6 data fix with a test, or recorded); `survivorship_store --refresh-shares` for the staged check store; each price fingerprint unchanged; before/after coverage 2009-2015 and the spot checks (Apple 2014-06-30 $540-580B and unchanged, Meta $160-190B, Visa $120-140B, Berkshire $290-335B, GOOGL+GOOG $360-420B); continuity (META/FB, V, MA, GOOGL, GOOG, BRK.B: no 2009-2015 member-day with a close and no count); `lab unblock M0225 --note` (the plain-words note, no separate `lab note`), `lab stage`; docs: the skill's size-accessor caveats, the `shares/__init__.py` docstring (module map gains `instance`, `classes`, `class_table`), `engine/package_readme.md`, the runbook recipe (three class commands, stage-then-cut-over), the placeholder cells of phase 1's `SOURCES.md` section, the handover close-out; the commit naming old and new store fingerprints; **Step 11 cutover**: after the branch is on `origin/main`, move the staged stores into `/home/miftah/seer/engine/`, keep the old ones in `/home/miftah/seer-stage/mcs/old/`, and `sync_store.py push` dev, sv and test. Exit: every number above recorded in the lab note, the commit and the close-out; price fingerprints unchanged on all three stores; M0225 back to `idea`. **Cutover is part of done:** whichever session lands the branch on `origin/main` (this phase's, the completion handler or the swarm coordinator) runs Step 11 right after the push; the set is finished only when the three live stores carry the new `shares.csv` and Blob reports `in_sync: true` for dev, sv and test.
-  - **Status**: open
-  - **Plan Set**: `MULTI_CLASS_COMPANY_SIZE_PLAN.md` (phase 3 of 3)
-  - **Satisfies**: R4, R5 — Stores refreshed with price fingerprint unchanged and pushed via sync-research-store; spot checks pass, coverage up, M0225 unblocked with a plain-words note
-  - **Depends on**: P1-ENG-O3MU, P1-ENG-IEFK
-  - **Plan**: `.workflows/plan/P1-ENG-7CWT.md`
-
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"
   - **Difficulty**: EASY
@@ -1472,6 +1462,33 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-7CWT** Phase 3: Refresh the stores, verify, unblock M0225
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns staging (`cp -a` of `.research`, `.research-sv`, `.research-test` into `/home/miftah/seer-stage/mcs/`; every write goes to the copies); `shares download-classes --fundamentals <staged dev>/fundamentals.csv`, then the same with one `--cik` per filer of `engine/data/share_classes.csv`, then `build-classes`, reviewing every `set aside:` line, and committing `engine/data/shares_xbrl_classes.csv`; `shares store` on the staged dev store (`--evidence-store` the staged test store) and test store (`--xbrl` the dev store's `fundamentals.csv`), resolving every `problems` entry (a cited `share_classes.csv` row, e.g. Berkshire's bare class A, as a Step 6 data fix with a test, or recorded); `survivorship_store --refresh-shares` for the staged check store; each price fingerprint unchanged; before/after coverage 2009-2015 and the spot checks (Apple 2014-06-30 $540-580B and unchanged, Meta $160-190B, Visa $120-140B, Berkshire $290-335B, GOOGL+GOOG $360-420B); continuity (META/FB, V, MA, GOOGL, GOOG, BRK.B: no 2009-2015 member-day with a close and no count); `lab unblock M0225 --note` (the plain-words note, no separate `lab note`), `lab stage`; docs: the skill's size-accessor caveats, the `shares/__init__.py` docstring (module map gains `instance`, `classes`, `class_table`), `engine/package_readme.md`, the runbook recipe (three class commands, stage-then-cut-over), the placeholder cells of phase 1's `SOURCES.md` section, the handover close-out; the commit naming old and new store fingerprints; **Step 11 cutover**: after the branch is on `origin/main`, move the staged stores into `/home/miftah/seer/engine/`, keep the old ones in `/home/miftah/seer-stage/mcs/old/`, and `sync_store.py push` dev, sv and test. Exit: every number above recorded in the lab note, the commit and the close-out; price fingerprints unchanged on all three stores; M0225 back to `idea`. **Cutover is part of done:** whichever session lands the branch on `origin/main` (this phase's, the completion handler or the swarm coordinator) runs Step 11 right after the push; the set is finished only when the three live stores carry the new `shares.csv` and Blob reports `in_sync: true` for dev, sv and test.
+  - **Status**: completed
+  - **Plan Set**: `MULTI_CLASS_COMPANY_SIZE_PLAN.md` (phase 3 of 3)
+  - **Satisfies**: R4, R5 — Stores refreshed with price fingerprint unchanged and pushed via sync-research-store; spot checks pass, coverage up, M0225 unblocked with a plain-words note
+  - **Depends on**: P1-ENG-O3MU, P1-ENG-IEFK
+  - **Plan**: `.workflows/plan/P1-ENG-7CWT.md`
+  - **Completed**: 2026-10-18 19:42
+  - **Method**: /do
+  - **Files**: engine/data/shares_xbrl_classes.csv, engine/data/share_classes.csv, engine/data/SOURCES.md, engine/src/seer_engine/shares/store.py, engine/src/seer_engine/shares/integrate.py, engine/src/seer_engine/shares/history.py, engine/src/seer_engine/shares/__init__.py, engine/tests/test_share_class_table.py, engine/tests/test_shares_store.py, engine/package_readme.md, docs/runbooks/data-pipeline.md, docs/plans/HANDOVER_20261018-company-size-for-multi-class-firms.md, .claude/skills/explore-and-experiment-new-method/SKILL.md, lab/lab.sqlite, web/data/lab.json
+  - **Commits**: 3de92ac (class-table rows: Visa's and Discovery's bare class A, KMI's sponsor classes), f56700d (drop a per-class reading both neighbouring filings disown), 24391f8 (GOOG/GOOGL carry Google's last count across the Alphabet reorganisation), 0430f82 (data: per-class share counts from SEC filings), 2a781f8 (lab: M0225 unblocked)
+  - **Fingerprints**: store dev b683da41 -> 704a21fc, sv 7017e311 -> 1f816759, test b9269bfa -> 45d0b04d; price fingerprints 5451195f / 60adae1b / 56e83810 unchanged on all three
+  - **Verified**: ruff clean; pytest 5743 passed, 1 failed (test_dev_trades_bar, failing on base 6eecfc0, unrelated), 4 opt-in skips; web tsc + 688 tests pass; compare-dev/sv/test PASS; manifests PASS x3; rows PASS x2; price fingerprints unchanged
+  - **Remaining (owed by the swarm coordinator `orch-multi-class-company-size`)**: landing the branch on `origin/main`, then the plan's **Step 11 cutover** — move the staged stores in `/home/miftah/seer-stage/mcs/` into `/home/miftah/seer/engine/` (old ones kept in `/home/miftah/seer-stage/mcs/old/`) and `sync_store.py push` dev, sv and test until Blob reports `in_sync: true`. The set is not finished until that is done.
+  - **Drift**:
+    - Step 6 fixes proven by the real run: share_classes.csv rows (Visa/Discovery bare class A, Kinder Morgan sponsor B/C ratio 0); store.usable_class_rows drops per-class readings both neighbouring filings disown (7 filer tagging errors); history.ONE_FOR_ONE_SUCCESSORS carries Google's last count across the 2015-10-02 Alphabet reorg (GOOG/GOOGL had 11 gap days). Each its own commit with a test.
+    - Extra download-classes --cik 0001316631 (old Liberty Global) whose 2009-11 10-Q was not selected.
+    - zsh does not word-split $TABLE_CIKS; the table --cik run was re-run under bash.
+  - **Decided**:
+    - Scale/outlier guard for per-class rows -> neighbour-outlier rule, not usable_xbrl's median rule (median would drop Berkshire's real pre-split rows) (rung 2: exit criteria BRK.B continuous)
+    - Alphabet reorg gap -> shares-only ONE_FOR_ONE_SUCCESSORS, not editing ticker_cik.csv (fundamentals panel reads it by date; would move recorded methods' inputs) (tie-break: narrower blast radius; rung 1: invariant 6)
+    - No rebase before lab write -> main's lab.sqlite unchanged since branch base 1297681, and branch already published (tie-break: reversible)
+    - Pre-2014 GOOG/GOOGL identical whole-company count accepted and documented (pre-existing in the live store to 2015-04; plan decision chose GOOG continuity) (rung 2)
+    - PRGO 2013-11..2014-02 shell count, LILA/LILAK 2015 and BATRA/BATRK 2016 pre-tracking-stock counts, FOX/FOXA 2019 first 10-Q without classes -> recorded in the close-out, not fixed (ticker-map / filing matters outside scope)
+    - Completion bookkeeping: block moved into `## Completed Tasks` beside phases 1 and 2 of this set (their precedent); Quick Stats recounted from the file. Landing not attempted: the swarm coordinator owns the merge and the Step 11 cutover (analyze-orchestrator Step 5).
 - [x] **P1-ENG-IEFK** Phase 2: Class-aware share history
   - **Difficulty**: HARD
   - **Type**: Feature

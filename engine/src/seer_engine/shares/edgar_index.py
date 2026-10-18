@@ -20,6 +20,12 @@ shadow a fresher 10-Q filed in between with a stale count under "latest filed wi
 that was public on it) to its last member day, inside ``[HORIZON_START, HORIZON_END]``. The
 horizon runs two years past the 2009 XBRL floor so the two sources overlap for validation.
 
+**Past 2010** (``shares.classes``, the per-class XBRL reader) the quarters run from
+:data:`XBRL_START` to the last *closed* one (:func:`closed_quarters`): EDGAR keeps appending to the
+current quarter's master index until the quarter is over, and the downloader caches an index
+once and never asks again, so an open quarter's index would hide every filing made after it was
+fetched.
+
 Pure: no network, clock or database.
 """
 
@@ -37,6 +43,14 @@ from seer_engine import membership
 #: report filed before it; through 2010 so every 2009-2010 XBRL figure has a text twin.
 HORIZON_START = date(1995, 10, 1)
 HORIZON_END = date(2010, 12, 31)
+
+#: First filing date the per-class XBRL reader looks at: the dei cover tag starts with the large
+#: accelerated filers' fiscal-2009 reports.
+XBRL_START = date(2009, 1, 1)
+
+#: Days after a quarter ends before its master index is treated as final: a filing accepted on
+#: the quarter's last evening is disseminated, and indexed, the next business day.
+CLOSED_GRACE_DAYS = 7
 
 #: How far before a filer's first member day its reports are wanted. A little over a year, so
 #: even a filer with a long gap between reports has one filed before its first member day.
@@ -75,6 +89,26 @@ def quarters(start: date = HORIZON_START, end: date = HORIZON_END) -> list[tuple
         out.append((y, q))
         y, q = (y + 1, 1) if q == 4 else (y, q + 1)
     return out
+
+
+def quarter_end(year: int, quarter: int) -> date:
+    """The last day of ``quarter`` (1-4) of ``year``."""
+    if quarter == 4:
+        return date(year, 12, 31)
+    return date(year, 3 * quarter + 1, 1) - timedelta(days=1)
+
+
+def closed_quarters(start: date, today: date, *, grace_days: int = CLOSED_GRACE_DAYS) -> list[tuple[int, int]]:
+    """Every (year, quarter) from ``start``'s through the last one closed on ``today``.
+
+    A quarter is closed once ``grace_days`` have passed since its last day (module docstring);
+    empty when none has closed since ``start``.
+    """
+    y, q = today.year, (today.month - 1) // 3 + 1
+    while quarter_end(y, q) + timedelta(days=grace_days) >= today:
+        y, q = (y - 1, 4) if q == 1 else (y, q - 1)
+    last = quarter_end(y, q)
+    return quarters(start, last) if last >= start else []
 
 
 def index_url(year: int, quarter: int) -> str:

@@ -7,16 +7,18 @@
 through ``research.refresh_shares``: every other file is carried over byte for byte, so the price
 fingerprint -- the one every recorded lab trial is compared on -- does not move; the store's full
 fingerprint does, as it did for every optional file before. The share rows are the point-in-time
-answers of ``history.SharesHistory`` (the vendored cover-page csv joined to the store's own XBRL
-facts in ``fundamentals.csv``, or ``--xbrl``'s for a store without a panel) for every index member
-of the store's window; the split rows are yfinance's list for every symbol with bars, cut at
+answers of ``history.SharesHistory`` (the vendored cover-page csv and per-class XBRL csv,
+``shares_xbrl_classes.csv`` or ``--classes``, joined to the store's own XBRL facts in
+``fundamentals.csv``, or ``--xbrl``'s for a store without a panel, and attributed to each listed
+class by ``share_classes.csv``) for every index member of the store's window; the split rows are yfinance's list for every symbol with bars, cut at
 ``--basis``, the day the store's bars were downloaded (``splits`` module docstring). The
 survivorship-check store is refused here: its added symbols were adjusted by its own cleaning, so it
 is refreshed by ``survivorship_store --refresh-shares``, which merges their lists in.
 
 ``store-report`` (no network, writes nothing) loads a store and prints what the size accessor
 gives: per year, the share of index member-days with a market value (and, separately, with a share
-count and with a close), the largest companies by market value on chosen dates, and -- the check
+count and with a close), the largest companies by market value on chosen dates, the size of any
+symbols named with ``--symbols`` on those dates (with the source of each count), and -- the check
 that the split list really is the one behind the adjusted closes -- every member-day close rebuilt
 from the store (``adjusted x raw_factor``) against EODHD's raw close for the same day.
 """
@@ -57,6 +59,8 @@ def add_arguments(sub) -> None:
     s.add_argument("--xbrl", type=Path, default=None,
                    help="a fundamentals.csv to join (default: the store's own; required when it has none)")
     s.add_argument("--data-dir", type=Path, default=history.DATA_DIR)
+    s.add_argument("--classes", type=Path, default=None,
+                   help="the per-class XBRL csv to join (default: shares_xbrl_classes.csv in --data-dir)")
     s.add_argument("--evidence-store", type=Path, action="append", default=[],
                    help="another store of the same vendor whose bars run past this one's window (the "
                         "test store, for the dev store): its closes judge the listed splits after the "
@@ -67,6 +71,8 @@ def add_arguments(sub) -> None:
     r.add_argument("--dates", default=",".join(d.isoformat() for d in DEFAULT_REPORT_DATES),
                    help="comma-separated dates for the largest-companies tables")
     r.add_argument("--top", type=int, default=10)
+    r.add_argument("--symbols", default="",
+                   help="comma-separated symbols whose size is printed on each of --dates")
     r.add_argument("--eodhd-cache", type=Path, default=prices.EODHD_CACHE)
     r.add_argument("--edgar-cache", type=Path, default=None,
                    help="the shares download cache (default $SEER_EDGAR_CACHE or engine/.cache/edgar)")
@@ -148,10 +154,21 @@ def write(args: argparse.Namespace) -> int:
                   "(the dev store's panel runs to 2026 and serves the test window too)")
             return 2
         xbrl = store / research.FUNDAMENTALS_FILE
+    from seer_engine.shares import classes as xbrl_classes
     from seer_engine.shares.build import read_store_facts
 
-    facts, left_out = share_store.usable_xbrl(read_store_facts(Path(xbrl)))
-    hist = share_store.history_for(facts, Path(args.data_dir))
+    classes_path = Path(args.classes) if args.classes else Path(args.data_dir) / xbrl_classes.CLASSES_FILE
+    if not classes_path.is_file():
+        print(f"shares store: no per-class XBRL csv at {classes_path}; run `shares build-classes` "
+              "first or pass --classes")
+        return 2
+    try:
+        class_rows, class_errors = share_store.usable_class_rows(xbrl_classes.load_rows(classes_path))
+        facts, left_out = share_store.usable_xbrl(read_store_facts(Path(xbrl)))
+        hist = share_store.history_for(facts, Path(args.data_dir), class_rows=class_rows)
+    except ValueError as exc:
+        print(f"shares store: {exc}")
+        return 2
     members = sorted(set(research.requested_symbols(window=window)) - set(research.RESEARCH_ETFS))
     rows = share_store.change_points(hist, members, history.FIRST_FILED, window.end)
     shares_lines = share_store.shares_lines(rows)
@@ -186,7 +203,20 @@ def write(args: argparse.Namespace) -> int:
     )
     print(f"shares store {store} ({window.name} window ending {window.end}):")
     print(f"  {len(members)} index members, {len({r.symbol for r in rows})} with a share count, "
-          f"{len(shares_lines)} share rows ({len(facts)} XBRL share facts joined from {xbrl})")
+          f"{len(shares_lines)} share rows ({len(facts)} XBRL share facts joined from {xbrl}, "
+          f"{len(class_rows)} per-class rows from {classes_path}, {len(hist.table)} class-table rows)")
+    if class_errors:
+        print(f"  {len(class_errors)} per-class readings both neighbouring filings disown, left out "
+              "(the filer's tagging error):")
+        for r in sorted(class_errors, key=lambda r: (r.filed, r.cik)):
+            print(f"    {r.symbol:<6} {r.cik} {r.accession} filed {r.filed}: {r.shares:,}")
+    if hist.problems:
+        print(f"  {len(hist.problems)} readings the class table could not attribute, answered as unknown:")
+        for (cik, accession, symbol), why in sorted(hist.problems.items())[:25]:
+            print(f"    {symbol:<6} {cik} {accession}: {why}")
+    if hist.summed:
+        print(f"  {len(hist.summed)} filers with several classes and no class-table row (classes summed "
+              f"one for one, each symbol the whole company): {' '.join(sorted(hist.summed))}")
     for why, dropped_facts in left_out.items():
         if dropped_facts:
             names = sorted({f.symbol for f in dropped_facts})
@@ -248,6 +278,16 @@ def top(data: research.ResearchData, on: date, n: int) -> tuple[date, list[tuple
             rows.append((s, mv, m.shares_on(s, d) or math.nan))
     rows.sort(key=lambda r: -r[1])
     return d, rows[:n]
+
+
+def sizes(
+    data: research.ResearchData, on: date, symbols: list[str]
+) -> tuple[date, list[tuple[str, float | None, float | None, object]]]:
+    """``symbols``' size on the last session on or before ``on``: ``(symbol, market value,
+    shares in that day's units, the ShareCount behind them)``, each None when unknown."""
+    d = dates.sessions(date(on.year - 1, 1, 1), on)[-1]
+    m = data.market
+    return d, [(s, m.market_value(s, d), m.shares_on(s, d), m.shares.count(s, d)) for s in symbols]
 
 
 def split_check(data: research.ResearchData, eodhd_cache: Path, edgar_cache: Path):
@@ -317,6 +357,18 @@ def report(args: argparse.Namespace) -> int:
         print(f"\nLargest {args.top} members by market value on {d}")
         for k, (s, mv, sh) in enumerate(rows, 1):
             print(f"  {k:>2}. {s:<6} ${mv / 1e9:>8.1f}B  ({sh / 1e9:.3f}B shares)")
+    chosen = [s.strip() for s in args.symbols.split(",") if s.strip()]
+    if chosen:
+        for raw in filter(None, args.dates.split(",")):
+            d, rows = sizes(data, date.fromisoformat(raw.strip()), chosen)
+            print(f"\nChosen symbols on {d}")
+            for s, mv, sh, count in rows:
+                if count is None or sh is None:
+                    print(f"  {s:<6} no share count")
+                    continue
+                value = f"${mv / 1e9:>8.1f}B" if mv is not None else "  no close"
+                print(f"  {s:<6} {value}  ({sh / 1e9:.3f}B shares, {count.source}, counted "
+                      f"{count.counted}, filed {count.filed})")
     if not args.no_check:
         from seer_engine.commands.shares import default_cache
 

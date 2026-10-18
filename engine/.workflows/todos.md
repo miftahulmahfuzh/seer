@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-14
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-18
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
 - P1 High: 0
-- P2 Medium: 2
+- P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 139
+- Completed: 143
 
 ---
 
@@ -1462,6 +1462,65 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-7CWT** Phase 3: Refresh the stores, verify, unblock M0225
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns staging (`cp -a` of `.research`, `.research-sv`, `.research-test` into `/home/miftah/seer-stage/mcs/`; every write goes to the copies); `shares download-classes --fundamentals <staged dev>/fundamentals.csv`, then the same with one `--cik` per filer of `engine/data/share_classes.csv`, then `build-classes`, reviewing every `set aside:` line, and committing `engine/data/shares_xbrl_classes.csv`; `shares store` on the staged dev store (`--evidence-store` the staged test store) and test store (`--xbrl` the dev store's `fundamentals.csv`), resolving every `problems` entry (a cited `share_classes.csv` row, e.g. Berkshire's bare class A, as a Step 6 data fix with a test, or recorded); `survivorship_store --refresh-shares` for the staged check store; each price fingerprint unchanged; before/after coverage 2009-2015 and the spot checks (Apple 2014-06-30 $540-580B and unchanged, Meta $160-190B, Visa $120-140B, Berkshire $290-335B, GOOGL+GOOG $360-420B); continuity (META/FB, V, MA, GOOGL, GOOG, BRK.B: no 2009-2015 member-day with a close and no count); `lab unblock M0225 --note` (the plain-words note, no separate `lab note`), `lab stage`; docs: the skill's size-accessor caveats, the `shares/__init__.py` docstring (module map gains `instance`, `classes`, `class_table`), `engine/package_readme.md`, the runbook recipe (three class commands, stage-then-cut-over), the placeholder cells of phase 1's `SOURCES.md` section, the handover close-out; the commit naming old and new store fingerprints; **Step 11 cutover**: after the branch is on `origin/main`, move the staged stores into `/home/miftah/seer/engine/`, keep the old ones in `/home/miftah/seer-stage/mcs/old/`, and `sync_store.py push` dev, sv and test. Exit: every number above recorded in the lab note, the commit and the close-out; price fingerprints unchanged on all three stores; M0225 back to `idea`. **Cutover is part of done:** whichever session lands the branch on `origin/main` (this phase's, the completion handler or the swarm coordinator) runs Step 11 right after the push; the set is finished only when the three live stores carry the new `shares.csv` and Blob reports `in_sync: true` for dev, sv and test.
+  - **Status**: completed
+  - **Plan Set**: `MULTI_CLASS_COMPANY_SIZE_PLAN.md` (phase 3 of 3)
+  - **Satisfies**: R4, R5 — Stores refreshed with price fingerprint unchanged and pushed via sync-research-store; spot checks pass, coverage up, M0225 unblocked with a plain-words note
+  - **Depends on**: P1-ENG-O3MU, P1-ENG-IEFK
+  - **Plan**: `.workflows/plan/P1-ENG-7CWT.md`
+  - **Completed**: 2026-10-18 19:42
+  - **Method**: /do
+  - **Files**: engine/data/shares_xbrl_classes.csv, engine/data/share_classes.csv, engine/data/SOURCES.md, engine/src/seer_engine/shares/store.py, engine/src/seer_engine/shares/integrate.py, engine/src/seer_engine/shares/history.py, engine/src/seer_engine/shares/__init__.py, engine/tests/test_share_class_table.py, engine/tests/test_shares_store.py, engine/package_readme.md, docs/runbooks/data-pipeline.md, docs/plans/HANDOVER_20261018-company-size-for-multi-class-firms.md, .claude/skills/explore-and-experiment-new-method/SKILL.md, lab/lab.sqlite, web/data/lab.json
+  - **Commits**: 3de92ac (class-table rows: Visa's and Discovery's bare class A, KMI's sponsor classes), f56700d (drop a per-class reading both neighbouring filings disown), 24391f8 (GOOG/GOOGL carry Google's last count across the Alphabet reorganisation), 0430f82 (data: per-class share counts from SEC filings), 2a781f8 (lab: M0225 unblocked)
+  - **Fingerprints**: store dev b683da41 -> 704a21fc, sv 7017e311 -> 1f816759, test b9269bfa -> 45d0b04d; price fingerprints 5451195f / 60adae1b / 56e83810 unchanged on all three
+  - **Verified**: ruff clean; pytest 5743 passed, 1 failed (test_dev_trades_bar, failing on base 6eecfc0, unrelated), 4 opt-in skips; web tsc + 688 tests pass; compare-dev/sv/test PASS; manifests PASS x3; rows PASS x2; price fingerprints unchanged
+  - **Remaining (owed by the swarm coordinator `orch-multi-class-company-size`)**: landing the branch on `origin/main`, then the plan's **Step 11 cutover** — move the staged stores in `/home/miftah/seer-stage/mcs/` into `/home/miftah/seer/engine/` (old ones kept in `/home/miftah/seer-stage/mcs/old/`) and `sync_store.py push` dev, sv and test until Blob reports `in_sync: true`. The set is not finished until that is done.
+  - **Drift**:
+    - Step 6 fixes proven by the real run: share_classes.csv rows (Visa/Discovery bare class A, Kinder Morgan sponsor B/C ratio 0); store.usable_class_rows drops per-class readings both neighbouring filings disown (7 filer tagging errors); history.ONE_FOR_ONE_SUCCESSORS carries Google's last count across the 2015-10-02 Alphabet reorg (GOOG/GOOGL had 11 gap days). Each its own commit with a test.
+    - Extra download-classes --cik 0001316631 (old Liberty Global) whose 2009-11 10-Q was not selected.
+    - zsh does not word-split $TABLE_CIKS; the table --cik run was re-run under bash.
+  - **Decided**:
+    - Scale/outlier guard for per-class rows -> neighbour-outlier rule, not usable_xbrl's median rule (median would drop Berkshire's real pre-split rows) (rung 2: exit criteria BRK.B continuous)
+    - Alphabet reorg gap -> shares-only ONE_FOR_ONE_SUCCESSORS, not editing ticker_cik.csv (fundamentals panel reads it by date; would move recorded methods' inputs) (tie-break: narrower blast radius; rung 1: invariant 6)
+    - No rebase before lab write -> main's lab.sqlite unchanged since branch base 1297681, and branch already published (tie-break: reversible)
+    - Pre-2014 GOOG/GOOGL identical whole-company count accepted and documented (pre-existing in the live store to 2015-04; plan decision chose GOOG continuity) (rung 2)
+    - PRGO 2013-11..2014-02 shell count, LILA/LILAK 2015 and BATRA/BATRK 2016 pre-tracking-stock counts, FOX/FOXA 2019 first 10-Q without classes -> recorded in the close-out, not fixed (ticker-map / filing matters outside scope)
+    - Completion bookkeeping: block moved into `## Completed Tasks` beside phases 1 and 2 of this set (their precedent); Quick Stats recounted from the file. Landing not attempted: the swarm coordinator owns the merge and the Step 11 cutover (analyze-orchestrator Step 5).
+- [x] **P1-ENG-IEFK** Phase 2: Class-aware share history
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `shares/class_table.py` (new, pure) and `engine/data/share_classes.csv` (new, hand-kept, 99 rows, 14 filers, each row citing its filing): `cik,member,symbol,ratio,from,to,note` — which listed symbol a class trades as, its ratio into that symbol's share units over a span of **count dates**, ratio 0 for a class with no economic interest; classes matched by their words (`class_key`), so cover text, XBRL member names and `+`-joined tracking-group labels share rows. Seeded with Alphabet/Google, Fox and Fox Corp, News Corp, Comcast 2015, Discovery, Liberty Global/LiLAC, Liberty Media, Liberty Interactive, Under Armour, Berkshire (A→BRK.B at 30 before 2010-01-21, 1,500 from), Visa (B, B-1..B-3, C at their dated as-converted ratios) and Accenture (class X ratio 0). `shares/history.py`: the per-class rows as a third source `"xbrl-class"` (later filing wins; same-day tie `xbrl-class` > `xbrl` > `edgar-cover`); per-symbol attribution (no table row on the count date: classes summed 1:1, the whole company on each symbol, filer recorded in `SharesHistory.summed`; table rows: each symbol answers its classes × ratio, and any class without a row, a figure without a breakdown or a symbol without a class makes the answer unknown, recorded in `SharesHistory.problems`); the same table applied to pre-2010 cover rows. `shares/store.py`: `SOURCES`, `_candidates` over the new rows, `history_for(..., class_rows=)`. `shares/integrate.py`: `shares store` refuses (exit 2) until `engine/data/shares_xbrl_classes.csv` exists, reads it (`--classes` override), prints `problems` and `summed`; `store-report --symbols`. `backtest/market.py`: docstrings only. The `SOURCES.md` section for `share_classes.csv`, appended after phase 1's. Tests (`test_share_class_table.py`; none reads the committed per-class csv). Exit: ruff clean, full suite green, including: Meta-like class-axis rows answer the sum; a multi-class filer with no table row is summed and listed in `summed`, not `problems`; GOOGL/GOOG answer A+B and C separately and sum to the company; BRK.B answers A×1,500+B after 2010-01-21 and A×30+B before; Visa A + B×0.4254 + C on 2012-07-30; a filer with no table rows and no class rows answers exactly as before; `change_points` stays exact.
+  - **Status**: completed
+  - **Plan Set**: `MULTI_CLASS_COMPANY_SIZE_PLAN.md` (phase 2 of 3)
+  - **Satisfies**: R1, R2, R3 — Berkshire valued once (class A in B units, ×1,500; ×30 before 2010-01-21); each listed class valued at its own count × its own price
+  - **Depends on**: P1-ENG-O3MU
+  - **Plan**: `.workflows/plan/P1-ENG-IEFK.md`
+  - **Completed**: 2026-10-18 19:40
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/shares/class_table.py (new), engine/data/share_classes.csv (new, 99 rows, 14 filers, sha256 5c67b05b...), engine/src/seer_engine/shares/history.py, engine/src/seer_engine/shares/store.py, engine/src/seer_engine/shares/integrate.py, engine/src/seer_engine/backtest/market.py (docstrings only), engine/data/SOURCES.md (share_classes.csv section appended), engine/tests/test_share_class_table.py (new)
+  - **Verified**: ruff check engine clean; pytest engine/tests with PG_TEST_URL: 5739 passed, 1 failed (the known test_dev_trades_bar), 4 skipped (opt-in live tests only); load_table prints 99 14; --classes and --symbols in help
+  - **Decided**:
+    - test_dev_trades_bar fails (already failing on base 6eecfc0; unrelated to shares) → treated as a known failure, not fixed (swarm coordinator note; rung 1: invariant 1 means no phase breaks the suite, and this failure predates every phase)
+- [x] **P1-ENG-O3MU** Phase 1: Per-class counts from XBRL instances
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `shares/instance.py` (new, pure: dei share facts and their contexts out of an instance XML, then one per-filing reading: `as_of`, tagged total if any, per-class counts by axis member; a class axis beside a tracking-group axis (`GROUP_AXES`) is kept, labelled `memberA+memberB`; an undimensioned figure that is not the classes' total is dropped when it equals one class and otherwise counted as the class `NoClassAxisMember`); instance download in `shares/fetch.py` (filing `index.json` → instance file → only the parsed dei facts cached as gzip JSON under `<cache>/xbrl-instance/<cik>/<accession>.json.gz`, `.missing` markers, resumable, paced); `edgar_index` able to list 2009Q1..the last **closed** quarter; a new `shares/classes.py` with the filing selection (every 10-K/10-Q of an S&P 500 or Nasdaq-100 member filer, 2009-01-01..today, whose accession has no dei count in the dev store's `fundamentals.csv`, plus every such filing of a filer whose pre-2010 cover rows or companyfacts show more than one class, plus every such filing of a filer named with the repeatable `--cik`), the vendored csv's writer/reader and dataclass, and two CLI actions `shares download-classes --fundamentals <csv> [--cache --through --cik --workers --limit]` (network) and `shares build-classes [--cache --through --cik --out]` (no network → `engine/data/shares_xbrl_classes.csv`, every set-aside figure printed); `commands/shares.py` wiring; the `SOURCES.md` section for `shares_xbrl_classes.csv` (appended at the end of the file, placeholder cells for phase 3); tests with fakes and a trimmed real-instance fixture. Exit: ruff clean, full suite green; on a live sample (Meta 2014-07-24 10-Q) `build-classes` writes a row with `CommonClassAMember=2015048077;CommonClassBMember=585003514`, `shares=2600051591`, `as_of=2014-07-22`; no `engine/data/shares_xbrl_classes.csv` in the commit.
+  - **Status**: completed
+  - **Plan Set**: `MULTI_CLASS_COMPANY_SIZE_PLAN.md` (phase 1 of 3)
+  - **Satisfies**: R1 — Per-class XBRL share counts summed (or the tagged total), point in time from the filing date
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-O3MU.md`
+  - **Completed**: 2026-10-18 18:21
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/shares/instance.py, engine/src/seer_engine/shares/classes.py, engine/src/seer_engine/shares/fetch.py, engine/src/seer_engine/shares/edgar_index.py, engine/src/seer_engine/commands/shares.py, engine/data/SOURCES.md, engine/tests/test_shares_instance.py, engine/tests/test_shares_classes.py
+  - **Drift**:
+    - Live sample row's symbol is META, not FB as the plan's exit line quotes: engine/data/ticker_cik.csv maps META to CIK 0001326801 from 2012-12-12 with no FB tenure. The counts match exactly (as_of 2014-07-22, shares 2600051591, CommonClassAMember=2015048077;CommonClassBMember=585003514, tagged_total false); the unit tests use their own FB tenure and pass. Symbol history for Meta is a data-map matter, not phase 1 code.
+    - Pre-existing failure test_dev_trades_bar on base 6eecfc0 (lab trials vs design §13 list), confirmed failing on an unmodified checkout; left alone, out of phase scope. Full suite otherwise 5713 passed, 4 skipped.
+  - **Decided**:
+    - Pre-existing unrelated failing test left untouched and reported, not fixed in this commit (tie-break: never widen scope; narrower blast radius).
 - [x] **P1-ENG-QK7F** Phase 1: Two constants, and everything that reads them
   - **Difficulty**: HARD
   - **Type**: Update

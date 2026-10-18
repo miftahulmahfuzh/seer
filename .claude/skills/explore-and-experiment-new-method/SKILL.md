@@ -71,16 +71,26 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
      `upto(name, data_date, last=K)`): VIX, VIX3M (VXV before 2007-11-13), VIX9D, VXN, VVIX in
      index points; T13W, T5Y, T10Y, T30Y Treasury yields in percent; GOLD in USD/oz. An allocator
      that reads them declares `market_fields = ("series",)`, so `lab run` refuses it on a store
-     without them. **Company size** is there too (2026-10-17), point in time from 1996:
-     `market.market_value(symbol, data_date)` is dollars (shares outstanding as filed by that
-     day × the close as it printed, splits handled), `market.shares_on(symbol, data_date)` the
-     share count in that day's units; both return None when unknown (~56% of dev member-days
-     have a value, mostly because ~40% of members have no bars at all; ~95% have a share count).
+     without them. **Company size** is there too (2026-10-17; share classes 2026-10-18), point in
+     time from 1996: `market.market_value(symbol, data_date)` is dollars (shares outstanding as
+     filed by that day × the close as it printed, splits handled), `market.shares_on(symbol,
+     data_date)` the share count in that day's units; both return None when unknown (~57% of
+     dev member-days have a value, mostly because ~40% of members have no bars at all;
+     ~97% have a share count; 2009-2015 market-value coverage is 62-75%, up from 62-69%).
      Declare `market_fields = ("shares",)` and `lab run` / `lab test` refuse the method on a
-     store without it. Two listed classes of one company (GOOG/GOOGL, FOX/FOXA, NWS/NWSA) each
-     answer the whole company's count × that class's price — keep one per company before
-     weighting by size; BRK.B's 2010-11 figures count class A shares only (far too small), and
-     companies that tag their count per class in XBRL (Alphabet from 2014) go unknown. A
+     store without it. Since 2009 the counts are read class by class from each filing, so
+     Meta, Visa, Mastercard, Comcast, UPS, Ford and Berkshire have a size. Each **listed**
+     class answers its own count × its own price: GOOG and GOOGL from the 2014 class C
+     dividend (likewise FOX/FOXA, NWS/NWSA, LBTYA/LBTYK in their table spans) are two lines
+     that add up to the company, so a size-weighted book holds the company once at its true
+     size. Before 2014-04-03 the index lists Google's one class under both GOOG and GOOGL, and
+     both answer the identical whole-company count: keep one per identical count before
+     weighting by size (older methods' "identical share count" dedupe does exactly this, and in
+     the dev window collapses nothing else). Unlisted classes are folded into the listed one
+     they convert into (Berkshire A as 1,500 B, Visa B/C as-converted, Accenture's voting-only X
+     and Kinder Morgan's 2011-12 sponsor B/C left out). Still unknown: foreign filers on
+     20-F/40-F (BIDU, CHKP, VOD, …) and a few successor tickers whose filing history does not
+     reach back (PSKY, VTRS, DXC). A
      size-weighted book should still carry a weight ceiling (M0047).
      If it isn't testable:
      `lab block <id> --on "<data>"` plus a `data-wish` insight. Solo: choose another idea.

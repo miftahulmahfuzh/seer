@@ -288,8 +288,12 @@ class ShareCount(NamedTuple):
     ``shares`` is the figure the filer stated, in the share units of ``counted`` -- the day the
     filer counted (the cover's "as of" date, or the filing date when the cover gave none).
     ``filed`` is when it became public, always on or before the day it is read for. ``source``
-    is ``"edgar-cover"`` (a 10-K/10-Q cover page, 1995-2010) or ``"xbrl"`` (the same figure,
-    tagged, 2009 on).
+    is ``"edgar-cover"`` (a 10-K/10-Q cover page, 1995-2010), ``"xbrl"`` (the same figure, tagged,
+    2009 on, from SEC's companyfacts) or ``"xbrl-class"`` (the filing's own XBRL instance read per
+    share class, 2009 on, for filers companyfacts has no count for). Where a filer has several
+    classes the count is the part the symbol's own listed class stands for, in that class's share
+    units (``shares.class_table``): GOOGL and GOOG each answer their own classes, BRK.B counts
+    class A as 1,500 class B shares, so a company is weighted once across its symbols.
     """
 
     shares: float
@@ -304,9 +308,11 @@ class ShareCounts:
     ``rows`` maps a symbol to ``(from_day, ShareCount | None)`` change points, strictly ascending:
     the count public from ``from_day`` until the next row (None: no usable figure from that day).
     The research store writes them already resolved (``shares.store``): a figure counts only from
-    its filing date, the later filing wins, XBRL wins a same-day tie, the symbol is resolved to its
-    filer on each day through the date-scoped ticker map, and a figure older than 400 days is not
-    answered. Nothing here re-derives any of that; it only reads.
+    its filing date, the later filing wins, a same-day tie goes to the per-class XBRL reading and
+    then the companyfacts tag over the cover text, the symbol is resolved to its filer on each day
+    through the date-scoped ticker map, a multi-class filer's classes are attributed to the listed
+    class each stands for, and a figure older than 400 days is not answered. Nothing here
+    re-derives any of that; it only reads.
 
     ``splits`` maps a symbol to ``(dated, after_window)``: the splits the vendor applied to that
     symbol's adjusted closes inside the store's window, ascending ``(ex_date, ratio)``, and the

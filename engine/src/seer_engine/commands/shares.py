@@ -23,6 +23,15 @@ lab reads it as ``Market.shares_on`` / ``Market.market_value`` (``shares.integra
     python -m seer_engine shares store-report --store /abs/engine/.research
 
 ``store`` carries every other store file byte for byte, so the price fingerprint never moves.
+
+``download-classes`` and ``build-classes`` add the 2009+ counts ``companyfacts`` cannot give:
+filers that tag their cover count once per share class (Meta, Visa, Alphabet from 2014). The
+first fetches each such filing's XBRL instance into the same cache (network, resumable; needs
+``SEC_CONTACT_EMAIL``), the second rewrites ``engine/data/shares_xbrl_classes.csv`` from the cache
+alone (``shares.classes``):
+
+    python -m seer_engine shares download-classes --fundamentals /abs/engine/.research/fundamentals.csv
+    python -m seer_engine shares build-classes
 """
 
 from __future__ import annotations
@@ -67,11 +76,18 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     from seer_engine.shares import integrate
 
     integrate.add_arguments(sub)
+    from seer_engine.shares import classes
+
+    classes.add_arguments(sub)
 
 
 def run(args: argparse.Namespace) -> int:
     if args.action == "download":
         return download(args)
+    if args.action in ("download-classes", "build-classes"):
+        from seer_engine.shares import classes
+
+        return classes.run(args)
     if args.action in ("fetch-splits", "store", "store-report"):
         from seer_engine.shares import integrate
 

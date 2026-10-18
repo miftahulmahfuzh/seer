@@ -131,10 +131,16 @@ Exit codes:
 The lab's `Market.market_value` needs each store's own split list (the closes are adjusted as of
 the crawl, Apple's 2020 four-for-one inside its 2015 prices) and the point-in-time share history.
 Both are optional store files; writing them never moves the price fingerprint. After any store
-**rebuild**, write them again, with the new crawl's day as `--basis`:
+**rebuild**, or after `engine/data/shares_xbrl_classes.csv` changes, write them again, with the
+crawl's day as `--basis`:
 
 ```bash
 PY=engine/.venv/bin/python; R=/home/miftah/seer/engine          # absolute, never a symlink
+$PY -m seer_engine shares download-classes --cache $R/.cache/edgar --fundamentals $R/.research/fundamentals.csv  # network, resumable
+# every filing of each class-table filer (a companyfacts figure cannot be split by class):
+$PY -m seer_engine shares download-classes --cache $R/.cache/edgar --fundamentals $R/.research/fundamentals.csv \
+    $(tail -n +2 engine/data/share_classes.csv | cut -d, -f1 | sort -u | sed 's/^/--cik /')
+$PY -m seer_engine shares build-classes --cache $R/.cache/edgar      # rewrites engine/data/shares_xbrl_classes.csv; commit it
 $PY -m seer_engine shares fetch-splits --store $R/.research --splits-cache $R/.cache/yfinance/splits       # network, cached
 $PY -m seer_engine shares fetch-splits --store $R/.research-test --splits-cache $R/.cache/yfinance/splits
 $PY -m seer_engine shares store --store $R/.research --basis 2026-10-04 --evidence-store $R/.research-test
@@ -149,6 +155,13 @@ lets the test store's closes judge the splits Yahoo listed after 2015 (it lists 
 never applied to the closes, and those are left out). EODHD's "raw" close is not a clean
 reference for the check: it is itself adjusted for many spin-offs and special dividends (MO, WY,
 COP, MDLZ, IBM), so most of `store-report`'s residual disagreements are on its side.
+
+**When the new files need new code, stage first.** `shares.store.read_shares` refuses a source it
+does not know, so a store written by newer code breaks every `lab run` from older code that reads
+it (parallel Sera sessions read the main checkout's stores). Copy the three stores to a staging
+directory (`cp -a`), run the commands above against the copies, verify, and move them into
+`engine/` only after main carries the code; then `sync_store.py push` each one. The 2026-10-18
+share-class refresh did exactly this (`docs/plans/HANDOVER_20261018-company-size-for-multi-class-firms.md`).
 
 ## SEC fundamentals
 

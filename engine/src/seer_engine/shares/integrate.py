@@ -163,7 +163,7 @@ def write(args: argparse.Namespace) -> int:
               "first or pass --classes")
         return 2
     try:
-        class_rows = xbrl_classes.load_rows(classes_path)
+        class_rows, class_errors = share_store.usable_class_rows(xbrl_classes.load_rows(classes_path))
         facts, left_out = share_store.usable_xbrl(read_store_facts(Path(xbrl)))
         hist = share_store.history_for(facts, Path(args.data_dir), class_rows=class_rows)
     except ValueError as exc:
@@ -205,6 +205,11 @@ def write(args: argparse.Namespace) -> int:
     print(f"  {len(members)} index members, {len({r.symbol for r in rows})} with a share count, "
           f"{len(shares_lines)} share rows ({len(facts)} XBRL share facts joined from {xbrl}, "
           f"{len(class_rows)} per-class rows from {classes_path}, {len(hist.table)} class-table rows)")
+    if class_errors:
+        print(f"  {len(class_errors)} per-class readings both neighbouring filings disown, left out "
+              "(the filer's tagging error):")
+        for r in sorted(class_errors, key=lambda r: (r.filed, r.cik)):
+            print(f"    {r.symbol:<6} {r.cik} {r.accession} filed {r.filed}: {r.shares:,}")
     if hist.problems:
         print(f"  {len(hist.problems)} readings the class table could not attribute, answered as unknown:")
         for (cik, accession, symbol), why in sorted(hist.problems.items())[:25]:

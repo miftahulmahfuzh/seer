@@ -148,6 +148,35 @@ def test_usable_xbrl_drops_foreign_issuers_and_unit_errors():
     assert {f.accn for f in kept} == {"a2", "a4", "a7", "a12", "n1", "n2", "n3"}
 
 
+def test_usable_class_rows_drops_a_reading_both_neighbours_disown():
+    from seer_engine.shares.classes import ClassRow
+
+    def row(cik, filed, acc, shares, classes=()):
+        return ClassRow(cik, "X", D(filed), D(filed), "10-Q", acc, shares, tuple(classes), False)
+
+    # Real readings, found refreshing the stores: Marriott's 10-Q of 2010-04-23 tags
+    # 361,332,043,000,000 shares; TripAdvisor's of 2014-05-06 tags class B alone in dei.
+    mar = [row("m", "2010-02-12", "m1", 358_522_350), row("m", "2010-04-23", "m2", 361_332_043_000_000),
+           row("m", "2010-07-16", "m3", 362_811_812)]
+    trip = [row("t", "2014-02-11", "t1", 142_232_795), row("t", "2014-05-06", "t2", 12_799_999,
+                                                            [("CommonClassBMember", 12_799_999)]),
+            row("t", "2014-07-28", "t3", 142_785_347)]
+    # Berkshire's 50-for-1 class B split: the jump is kept, since its neighbours disagree.
+    brk = [row("b", "2009-08-07", "b1", 15_902_240), row("b", "2009-11-06", "b2", 15_902_240),
+           row("b", "2010-03-01", "b3", 815_453_685), row("b", "2010-05-07", "b4", 969_747_703)]
+    # One reading alone, or at the end of a filer's run, has no two neighbours to judge it.
+    edge = [row("e", "2014-01-01", "e1", 100), row("e", "2014-04-01", "e2", 100),
+            row("e", "2014-07-01", "e3", 100_000)]
+    # Viacom 2009-2010: a good reading between two bad ones is judged against the last good one.
+    via = [row("v", "2009-07-28", "v1", 607_300_000), row("v", "2009-11-03", "v2", 607_400_000_000_000),
+           row("v", "2010-02-11", "v3", 607_400_000), row("v", "2010-04-29", "v4", 607_377_009_000_000),
+           row("v", "2010-08-05", "v5", 608_154_207)]
+    kept, dropped = ss.usable_class_rows(mar + trip + brk + edge + via)
+    assert [r.accession for r in dropped] == ["m2", "t2", "v2", "v4"]
+    assert {r.accession for r in kept} == {"m1", "m3", "t1", "t3", "b1", "b2", "b3", "b4", "e1", "e2", "e3",
+                                           "v1", "v3", "v5"}
+
+
 def test_shares_lines_round_trip_and_the_reader_refuses_look_ahead(tmp_path):
     lines = ss.shares_lines(ss.change_points(_hist(), ["AAA"], D("1999-01-01"), D("2011-12-31")))
     assert lines[0] == "AAA,2000-05-10,100,2000-04-30,2000-05-10,edgar-cover,0000000001-00-000001"

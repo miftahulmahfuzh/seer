@@ -226,6 +226,46 @@ def usable_xbrl(facts: Iterable) -> tuple[list, dict[str, list]]:
     return kept, dropped
 
 
+#: A per-class reading this many times above or below BOTH of its filer's neighbouring readings,
+#: while those two agree within :data:`NEIGHBOURS_AGREE`, is the filer's tagging error, not a
+#: count: Marriott's 10-Q of 2010-04-23 tags 361,332,043,000,000 shares, Sprint's 10-K of
+#: 2011-02-24 and two of Viacom's 2009-2010 10-Qs a thousand or a million times over, and
+#: TripAdvisor's 10-Q of 2014-05-06 tags its class B alone in dei (12.8M of 142M).
+OUTLIER_RATIO = 3.0
+NEIGHBOURS_AGREE = 1.5
+
+
+def usable_class_rows(rows: Iterable[history.ClassReading]) -> tuple[list, list]:
+    """``(kept, dropped)``: the per-class rows less each one both its neighbours disown.
+
+    Why not :func:`usable_xbrl`'s median rule. A per-class row's ``shares`` sums its classes one
+    for one, so Berkshire's rows fall fifty-fold at the 2010 class B split, and a median over two
+    years would drop the real pre-split readings. A split moves every later reading, though; an
+    error comes back the next quarter. So a row is dropped only when the readings either side of
+    it agree with each other and both stand more than :data:`OUTLIER_RATIO` away from it; the
+    reading before is the last one kept, so a good row between two bad ones (Viacom 2009-2010,
+    Perrigo 2011) is judged against good neighbours. A row at either end of its filer's run has no
+    two neighbours and is kept.
+    """
+    rows = list(rows)
+    by: dict[str, list] = {}
+    for r in rows:
+        by.setdefault(r.cik, []).append(r)
+    bad: set[int] = set()
+    for group in by.values():
+        group.sort(key=lambda r: (r.filed, r.accession))
+        prev = group[0] if group else None
+        for cur, nxt in zip(group[1:], group[2:]):
+            a, b = prev.shares, nxt.shares
+            if min(a, b, cur.shares) > 0 and max(a, b) / min(a, b) <= NEIGHBOURS_AGREE and (
+                cur.shares / max(a, b) > OUTLIER_RATIO or min(a, b) / cur.shares > OUTLIER_RATIO
+            ):
+                bad.add(id(cur))
+            else:
+                prev = cur
+    return [r for r in rows if id(r) not in bad], [r for r in rows if id(r) in bad]
+
+
 #: How far from a split's ex-date the closes either side of it may be to judge it (a week).
 EVIDENCE_GAP_DAYS = 7
 #: Only a split of at least this ratio (either way) is judged on the closes: a smaller one is the

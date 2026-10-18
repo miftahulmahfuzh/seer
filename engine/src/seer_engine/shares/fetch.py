@@ -11,6 +11,12 @@ Network edge of the shares history; everything it writes goes under the gitignor
 * ``xbrl/<cik>.json`` -- ``data.sec.gov`` ``companyconcept`` for
   ``dei:EntityCommonStockSharesOutstanding``, the 2009+ overlap the parser is checked against;
   ``<cik>.missing`` when the filer never tagged it.
+* ``xbrl-instance/<cik>/<accession>.json.gz`` -- the share-count facts of a 2009+ filing's own
+  XBRL instance (``shares.instance``), for the per-class csv (``shares.classes``). Only the parsed
+  facts are kept, never the instance: the cover facts sit at the end of a 1-4 MB document, so the
+  whole of it is downloaded (gzip on the wire, ~60 KB for Meta's 1.2 MB) and parsed in memory.
+  ``<accession>.missing`` holds the reason a filing gave none (no filing index, no instance file,
+  an unreadable instance), so a re-run does not ask again.
 
 **Why only the head.** The share count is on the cover page, the first page of the first
 document. A full submission is the whole annual report with every exhibit (GE's 1997 10-K405 is
@@ -33,6 +39,7 @@ SEC's rate-limit block (it lasts about ten minutes); the worker sleeps it out an
 from __future__ import annotations
 
 import gzip
+import json
 import logging
 import os
 import threading
@@ -45,7 +52,7 @@ from pathlib import Path
 import requests
 
 from seer_engine import config, sec
-from seer_engine.shares import edgar_index
+from seer_engine.shares import edgar_index, instance
 from seer_engine.shares.edgar_index import FilingRef
 
 log = logging.getLogger(__name__)
@@ -67,6 +74,10 @@ BACKOFF_S = 2.0
 #: How long to wait out an Archives 403 (SEC's rate-limit block).
 BLOCK_WAIT_S = 600.0
 END_DOC = b"</DOCUMENT>"
+#: Cache directory of the per-class instance facts, and the version of their JSON layout
+#: (``instance.Fact.to_json``); a file of another version is refused, never misread.
+INSTANCE_DIR = "xbrl-instance"
+INSTANCE_CACHE_VERSION = 1
 
 
 class FetchError(RuntimeError):
@@ -109,6 +120,21 @@ def index_path(cache: Path, year: int, quarter: int) -> Path:
 
 def xbrl_path(cache: Path, cik: str) -> Path:
     return cache / "xbrl" / f"{cik}.json"
+
+
+def instance_path(cache: Path, cik: str, accession: str) -> Path:
+    return cache / INSTANCE_DIR / cik / f"{accession}.json.gz"
+
+
+def instance_missing_path(cache: Path, cik: str, accession: str) -> Path:
+    return cache / INSTANCE_DIR / cik / f"{accession}.missing"
+
+
+def filing_dir(ref: FilingRef) -> str:
+    """The filing's Archives directory, relative to :data:`ARCHIVES`:
+    ``edgar/data/1326801/0001326801-14-000032.txt`` -> ``edgar/data/1326801/000132680114000032/``."""
+    parent, _, _ = ref.path.rpartition("/")
+    return f"{parent}/{ref.accession.replace('-', '')}/"
 
 
 def _atomic_write(path: Path, data: bytes) -> None:
@@ -205,8 +231,9 @@ def fetch_indexes(archive: Archive, cache: Path,
                   qs: Sequence[tuple[int, int]] | None = None) -> list[FilingRef]:
     """Every wanted-form filing of the horizon's quarters, downloading indexes not yet cached.
 
-    A quarter that is still open on EDGAR (the current one) would change after caching; the
-    horizon ends in 2010, so every cached index is final.
+    A quarter that is still open on EDGAR (the current one) would change after caching, so
+    callers pass only closed quarters: the cover horizon ends in 2010, and the per-class reader
+    asks ``edgar_index.closed_quarters``.
     """
     refs: list[FilingRef] = []
     for year, quarter in qs or edgar_index.quarters():
@@ -301,6 +328,123 @@ def fetch_xbrl(archive: Archive, cache: Path, ciks: Iterable[str]) -> Tally:
             _atomic_write(path, body)
             tally.fetched += 1
             tally.bytes_raw += len(body)
+    tally.seconds = time.monotonic() - t0
+    return tally
+
+
+@dataclass(frozen=True)
+class InstanceFetch:
+    """What one filing's instance gave: its file name and share facts, or why there are none."""
+
+    name: str
+    facts: tuple[instance.Fact, ...] | None
+    size: int = 0
+    reason: str = ""
+
+
+def fetch_instance(archive: Archive, ref: FilingRef) -> InstanceFetch:
+    """The filing's index, then its instance, parsed (two requests; module docstring).
+
+    Raises :class:`FetchError` only for what a retry may fix (the network, SEC's rate block);
+    a filing that has no instance, or whose instance is unreadable, answers with a reason.
+    """
+    base = ARCHIVES + filing_dir(ref)
+    listing = archive.get(base + "index.json")
+    if listing is None:
+        return InstanceFetch("", None, reason="no filing index")
+    try:
+        name = instance.instance_name(instance.filing_files(listing))
+    except instance.InstanceError as exc:
+        return InstanceFetch("", None, reason=f"bad filing index: {exc}")
+    if name is None:
+        return InstanceFetch("", None, reason="no XBRL instance")
+    body = archive.get(base + name)
+    if body is None:
+        return InstanceFetch(name, None, reason=f"{name} not found")
+    try:
+        facts = instance.parse(body)
+    except instance.InstanceError as exc:
+        return InstanceFetch(name, None, len(body), reason=f"{name} unreadable: {exc}")
+    return InstanceFetch(name, tuple(facts), len(body))
+
+
+def instance_blob(name: str, facts: Sequence[instance.Fact]) -> bytes:
+    """The cache file for one filing's facts: versioned JSON, gzipped."""
+    doc = {"version": INSTANCE_CACHE_VERSION, "instance": name, "facts": [f.to_json() for f in facts]}
+    text = json.dumps(doc, sort_keys=True, separators=(",", ":"))
+    return gzip.compress(text.encode("utf-8"), compresslevel=6)
+
+
+def read_instance(path: Path) -> tuple[str, tuple[instance.Fact, ...]]:
+    """A cached filing's (instance file name, share facts)."""
+    try:
+        doc = json.loads(gzip.decompress(path.read_bytes()).decode("utf-8"))
+    except (OSError, ValueError) as exc:
+        raise instance.InstanceError(f"{path}: unreadable cache file: {exc}") from exc
+    if not isinstance(doc, dict) or doc.get("version") != INSTANCE_CACHE_VERSION:
+        raise instance.InstanceError(f"{path}: not a version-{INSTANCE_CACHE_VERSION} cache file")
+    facts = doc.get("facts")
+    if not isinstance(facts, list):
+        raise instance.InstanceError(f"{path}: no facts list")
+    return str(doc.get("instance", "")), tuple(instance.Fact.from_json(f) for f in facts)
+
+
+def read_missing(path: Path) -> str:
+    """The reason a ``.missing`` marker records."""
+    return path.read_text(encoding="utf-8").strip() or "missing"
+
+
+def fetch_instances(archive: Archive, cache: Path, refs: Sequence[FilingRef], *,
+                    workers: int = WORKERS, progress_every: int = 500) -> Tally:
+    """Download and parse the instance of every ref not yet cached (module docstring).
+
+    A filing made jointly by several wanted filers is fetched once and cached under each.
+    """
+    by_acc: dict[str, list[FilingRef]] = {}
+    for ref in refs:
+        group = by_acc.setdefault(ref.accession, [])
+        if all(r.cik != ref.cik for r in group):
+            group.append(ref)
+    tally = Tally(wanted=len(by_acc))
+    todo: list[list[FilingRef]] = []
+    for acc, group in by_acc.items():
+        if all(instance_path(cache, r.cik, acc).exists()
+               or instance_missing_path(cache, r.cik, acc).exists() for r in group):
+            tally.cached += 1
+        else:
+            todo.append(group)
+    log.info("edgar: %d instances wanted, %d cached, %d to fetch", tally.wanted, tally.cached, len(todo))
+    t0 = time.monotonic()
+
+    def one(group: list[FilingRef]) -> tuple[list[FilingRef], InstanceFetch]:
+        return group, fetch_instance(archive, group[0])
+
+    done = 0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(one, group) for group in todo]
+        for fut in as_completed(futures):
+            try:
+                group, got = fut.result()
+            except FetchError as exc:
+                tally.failed.append(str(exc))
+                continue
+            for r in group:
+                if got.facts is None:
+                    _atomic_write(instance_missing_path(cache, r.cik, r.accession),
+                                  (got.reason + "\n").encode("utf-8"))
+                else:
+                    _atomic_write(instance_path(cache, r.cik, r.accession),
+                                  instance_blob(got.name, got.facts))
+            if got.facts is None:
+                tally.missing += 1
+            else:
+                tally.fetched += 1
+                tally.bytes_raw += got.size
+            done += 1
+            if done % progress_every == 0:
+                rate = done / max(1e-9, time.monotonic() - t0)
+                log.info("edgar: %d/%d instances (%.1f/s, eta %.0f min)", done, len(todo), rate,
+                         (len(todo) - done) / max(rate, 1e-9) / 60)
     tally.seconds = time.monotonic() - t0
     return tally
 

@@ -1,0 +1,96 @@
+{
+  "branch": "feature/gate-reading-cadence",
+  "coordinator": "orch-gate-reading-cadence",
+  "coordinator_session_id": "421d98f4-b594-4150-a2a9-51b017949d36",
+  "created": "2026-10-19T09:05:20+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 1,
+      "note": null,
+      "package": "docs/backtests",
+      "plan": ".workflows/plan/gate-reading-cadence/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R6"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Measure the prior and prove the anchor"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "engine/src/seer_engine/lab/methods`, `engine/tests",
+      "plan": ".workflows/plan/gate-reading-cadence/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R3",
+        "R4",
+        "R6",
+        "R7"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The method file, its dedicated tests, and the pre-registration commit"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2
+      ],
+      "difficulty": "HARD",
+      "n": 3,
+      "note": null,
+      "package": "lab/` (main checkout)",
+      "plan": ".workflows/plan/gate-reading-cadence/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2",
+        "R5",
+        "R7"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Run and record the verdict"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        3
+      ],
+      "difficulty": "NORMAL",
+      "n": 4,
+      "note": null,
+      "package": "docs/plans`, `.workflows",
+      "plan": ".workflows/plan/gate-reading-cadence/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4",
+        "R5",
+        "R7"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Handover, bookkeeping and the standing correction"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/gate-reading-cadence/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "gate-reading-cadence",
+  "updated": "2026-10-19T09:05:20+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/gate-reading-cadence"
+}

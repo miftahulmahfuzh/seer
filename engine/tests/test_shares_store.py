@@ -9,6 +9,7 @@ import dataclasses
 import json
 from dataclasses import dataclass
 from datetime import date, timedelta
+from decimal import Decimal
 
 import numpy as np
 import pytest
@@ -20,6 +21,7 @@ from seer_engine import research
 from seer_engine import survivorship as sv
 from seer_engine.backtest.market import (
     EMPTY_SHARES,
+    DividendCalendar,
     Market,
     Membership,
     ShareCount,
@@ -450,3 +452,69 @@ def test_a_figure_already_post_split_is_not_carried_across_the_split_again():
     )
     assert pre.units_day("NFLX", D("2015-09-30")) == D("2015-07-10")
     assert pre.shares_on("NFLX", D("2015-09-30")) == pytest.approx(60_900_000 * 7)
+
+
+# --- the announcements guard --------------------------------------------------------------
+
+
+class _AnnouncedAllocator(DividendMonthAllocator):
+    market_fields = ("dividends", "announcements")
+
+
+def _announced_method(mid: str = "M0015") -> Method:
+    cand = dataclasses.replace(
+        M0051.candidates[0], id=f"{mid}-ANN", family=mid, allocator=_AnnouncedAllocator()
+    )
+    return Method(
+        id=mid, name="announcement test", family="ann", source_kind="knowledge", source_ref="",
+        hypothesis="h", expected_failure="f", candidates=(cand,),
+    )
+
+
+def _calendar_with(declared: bool) -> DividendCalendar:
+    """SPY's smoke dividend, with or without a declaration date two weeks before the ex-date."""
+    ex = D("1999-03-19")
+    rows = {"SPY": [(ex, Decimal("0.30"))]}
+    if not declared:
+        return DividendCalendar(rows)
+    return DividendCalendar(rows, declared={"SPY": {ex: ex - timedelta(days=14)}})
+
+
+def test_an_announcement_method_is_refused_when_the_store_has_no_declaration_dates():
+    """The silent one: without the file announced_on falls back to the ex-date, so the book
+    would quietly measure its own control. It must refuse instead."""
+    data = smoke_data()
+    no_dates = dataclasses.replace(
+        data, market=data.market.with_dividends(_calendar_with(declared=False))
+    )
+    assert runner.market_aware_candidates(_announced_method(), "announcements") == ("M0015-ANN",)
+    assert no_dates.market.dividends.declared_count() == 0
+    with pytest.raises(store.LabError, match="no declaration dates"):
+        runner.preflight_data(no_dates, _announced_method())
+
+
+def test_an_announcement_method_passes_once_the_store_carries_declaration_dates():
+    data = smoke_data()
+    with_dates = dataclasses.replace(
+        data, market=data.market.with_dividends(_calendar_with(declared=True))
+    )
+    assert with_dates.market.dividends.declared_count() == 1
+    assert runner.preflight_data(with_dates, _announced_method()) is None
+
+
+def test_a_plain_dividend_method_still_runs_on_a_store_without_declaration_dates():
+    """The guard keys on the declared field, not on the calendar: a book that only reads ex-dates
+    is unaffected, which is what keeps the nine frozen announcement methods runnable."""
+    data = smoke_data()
+    no_dates = dataclasses.replace(
+        data, market=data.market.with_dividends(_calendar_with(declared=False))
+    )
+    plain = dataclasses.replace(
+        M0051.candidates[0], id="M0016-EX", family="M0016", allocator=DividendMonthAllocator()
+    )
+    method = Method(
+        id="M0016", name="ex only", family="ex", source_kind="knowledge", source_ref="",
+        hypothesis="h", expected_failure="f", candidates=(plain,),
+    )
+    assert runner.market_aware_candidates(method, "announcements") == ()
+    assert runner.preflight_data(no_dates, method) is None

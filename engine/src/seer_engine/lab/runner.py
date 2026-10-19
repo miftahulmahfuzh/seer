@@ -400,6 +400,22 @@ def preflight_data(
     market series, and a size method (``market_fields`` naming ``"shares"``) on a store with no
     share history, are refused outright. A candidate whose rules credit idle cash at a T-bill
     yield (``rules.cash_yield``) on a store without that series is refused outright too.
+
+    ``"announcements"`` is the same refusal for a different reason, and the reason is worth
+    stating. The other missing files make a reader return nothing, so the damage is visible. A
+    missing ``dividend_announcements.csv`` does not: ``DividendCalendar`` falls back to treating
+    each dividend as known on its ex-date (``announced_on``'s own contract), so a book whose whole
+    thesis is acting on the declaration *silently becomes its own ex-date control* and records a
+    perfectly ordinary-looking trial. That is the dangerous kind of failure, and it is why an
+    allocator that calls ``announced_on`` must say so in ``market_fields``.
+
+    **What this does not cover.** The nine method files that already call ``announced_on``
+    (M0076-M0086) cannot declare the field: ``preflight_test`` refuses a method whose file no
+    longer hashes to the ``source_sha`` it ran under, so editing them would permanently block
+    their own promotion. They are frozen pre-registrations and stay as they are; the guard
+    protects every method written after it. Keep both stores' announcement files present rather
+    than relying on it -- a store that has the dividends but not the dates is the state this
+    guard exists to make impossible to run against, and the one it cannot catch for those nine.
     Otherwise it returns the
     measurement, so the caller can print it whether or not it cleared the floor, and raises
     ``store.LabError`` when the measured fraction is below ``min_coverage``.
@@ -413,6 +429,16 @@ def preflight_data(
             f"{method.id}: {', '.join(calendar)} rank on Market.dividends, and this store's market "
             "carries no dividend calendar; running it would measure the missing calendar, not the "
             "hypothesis. Nothing has been spent"
+        )
+    announced = market_aware_candidates(method, "announcements")
+    if announced and data.market.dividends.declared_count() == 0:
+        raise store.LabError(
+            f"{method.id}: {', '.join(announced)} act on the day a dividend was declared "
+            f"(Market.dividends.announced_on), and this store carries no declaration dates "
+            f"({research.ANNOUNCEMENTS_FILE}); announced_on falls back to the ex-date silently, so "
+            "running it would measure the ex-date book -- the method's own control -- not the "
+            "hypothesis. Nothing has been spent. Write them with "
+            "`python -m seer_engine dividend_announcements --refresh --store <store>`"
         )
     reads_series = market_aware_candidates(method, "series")
     if reads_series and len(data.market.series) == 0:
@@ -1150,6 +1176,16 @@ def run_test(
         raise store.LabError(
             f"{candidate.id} ranks on Market.dividends and this test store's market carries no "
             f"dividend calendar; the look would measure the missing calendar, not the hypothesis. "
+            f"Nothing has been spent"
+        )
+    if (
+        candidate.id in market_aware_candidates(method, "announcements")
+        and data.market.dividends.declared_count() == 0
+    ):
+        raise store.LabError(
+            f"{candidate.id} acts on the day a dividend was declared and this test store carries "
+            f"no declaration dates ({research.ANNOUNCEMENTS_FILE}); announced_on falls back to the "
+            f"ex-date silently, so the look would measure the ex-date book, not the hypothesis. "
             f"Nothing has been spent"
         )
     if candidate.id in market_aware_candidates(method, "shares") and len(data.market.shares) == 0:

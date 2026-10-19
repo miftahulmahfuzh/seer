@@ -111,8 +111,14 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
      - **SPY's big-company drift is the opponent.** From 2018 every strategy tried lost to SPY
        on the owner's deposits by a similar margin. A book that equal-weights index members, or
        quietly favours the smaller ones (insight 91), is betting against the market's shape, not
-       only picking stocks. The equal-weight S&P (RSP) as a second yardstick is the open idea
-       that separates the two.
+       only picking stocks. A 30-name equal-weight book of index members behind the same switch
+       did lose 8.2 points a year in 2009-2015 — but **that gap was not the weighting**, and
+       insight 457 was corrected on 2026-10-19 by insight 462: ~3.6 points was the switch's time
+       in cash during a rising decade, ~3.8 was fees on 15 turns/yr, and under 0.9 was the pool
+       and the even slices together. Run `lab shortfall <trial> --store ...` before attributing
+       any shortfall; **without `--store` the residual flips sign** and invites the opposite
+       conclusion. The expensive dials are turnover and time out of the market, not the weighting
+       scheme. The equal-weight S&P (RSP) as a second yardstick is still the open idea.
      - **Name the family by what it ranks on**, not by the idea that inspired it (insight 92). The
        gate no longer depends on the name -- since hardgate D14 it also reads how a book moves, so
        a momentum book under a new family is kin of the failed momentum books once it has a curve
@@ -156,6 +162,12 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    origin/main && git push origin HEAD:main`; solo: `git push`.
 6. **Run** `lab run MNNNN`. It takes seconds to minutes. Use `run_in_background` and wait for it.
 7. **Analyze honestly** in a scratch file, then `lab note MNNNN --file F --verdict "<one line>"`.
+   **Never pipe `lab note` — or any `lab` command — through `grep`, `head` or any filter.** The
+   pipeline's exit code is the filter's, so a successful command that matched nothing reads as a
+   failure. Redirect to a file and echo the command's own `$?`. Since 2026-10-19 `lab note` prints
+   a confirmation line and refuses a byte-identical re-append (exit 2, no override), so a retry can
+   no longer land the permanent duplicate that `methods.analysis`'s append-only trigger used to
+   make unremovable — but every other `lab` subcommand still has the silent-success trap.
    The owner reads the analysis and the verdict on seertrade.site/sera (the method's page),
    and is not a quant. Write plainly: short sentences, everyday words, numbers with their meaning ("lost
    at most 13% from a peak, under the 20% limit"), and a plain gloss on any term you can't avoid
@@ -202,8 +214,10 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
       that push. Then give a short report: idea, result vs SPY, verdict, insight, next idea, N, test looks.
     - Child: make sure your method file is on `origin/main`. Then
       `SendMessage` to the coordinator (re-read `ListAgents` first):
-      `DONE MNNNN <rejected|dev-eligible|blocked> — <verdict>; next: M00xx`. If the coordinator
-      is gone, the database already holds everything, so just stop. Never commit `lab/lab.sqlite`
+      `DONE MNNNN <rejected|dev-eligible|blocked> — <verdict>; next: M00xx`. When it reports no
+      agent named the coordinator, the coordinator is not a Claude session (it may be Hermes or
+      another driver): stop there, because the shared database and your tmux pane already carry
+      everything. Never commit `lab/lab.sqlite`
       or `web/data/lab.json`.
 
 ## Promotion (dev-eligible): autonomous, one counted look
@@ -231,6 +245,14 @@ Nobody approves this; you do it. Both commands exist — do not build them:
   something is promoted. `lab test` refuses a dev store pointed at it, and `lab run` refuses this
   one, so the two can never be swapped by accident.
 
+  **A store that exists can still be incomplete.** A rebuild can drop the optional `shares.csv`
+  and `splits.csv`, and a method that reads company size or split dates then sees no pool: it
+  records zero trades, or `lab test` refuses it, for a reason that looks like the method. Check
+  the store directory before a look on any such method, and restore without rebuilding:
+  `shares fetch-splits --store engine/.research-test` (network, resumable, only the missing
+  symbols), then `shares store --store engine/.research-test --basis <today>`. The price
+  fingerprint does not move, so recorded trials stay comparable.
+
 Then:
 0. **Fit check, before anything is promoted.** The candidate's `rules` must be fractional
    (`fractional=True`, a `-frac` preset) whenever it holds more than a handful of names. If the
@@ -254,7 +276,11 @@ Then:
    - `lab regime MNNNN` -- narrow versus broad markets. Read it knowing it does **not**
      discriminate on its own: almost every recorded method reads "pays in both", M0007-N20-RAW
      included at +6.6% narrow and +7.7% broad, and it went on to lose. Its value is the
-     persistence line at the foot, which is what actually separates eras.
+     persistence line at the foot, which is what actually separates eras. When a post-2009
+     shortfall looks like decay, first ask whether that era contained a bear market at all: the
+     safety rule's eleven exits were two real crashes and nine false alarms, and every exit after
+     2009 was a false alarm because 2009-2015 had no bear market (insight 452). A rule that paid
+     nine premiums and made two claims did not decay; it was simply never tested again.
    - `engine/.venv/bin/python engine/scripts/survivorship_coverage.py` -- the edge by era of rising
      data coverage. The dev store prices 48% of index members in 1996 and 74% in 2014, and the 522
      it cannot price are disproportionately the companies that died (AABA, AAMRQ...). **A method

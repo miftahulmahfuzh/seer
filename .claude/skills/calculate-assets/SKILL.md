@@ -53,9 +53,23 @@ the sense `lab costs` is a report.
 
 ## Running it without wasting the owner's time
 
-One run takes about a minute. A bare family id with several variants is refused and lists
+One run takes about a minute when the store is complete, and several minutes when it has to fetch
+split lists first. A bare family id with several variants is refused and lists
 them; when the owner gave no variant, run the method's main variant and its switch variant
 (the docstring names them) side by side instead of asking.
+
+**Across a batch of methods, use one tmux window each** (the owner's "a" request). One window per
+method keeps its own scrollback and stops one failure hiding the others:
+
+```bash
+python3 ~/.claude/skills/swarm/swarm.py launch --name assets-MNNNN --cwd "$REPO" --repo "$REPO" \
+  --permission-mode bypassPermissions --model opus \
+  --prompt "/calculate-assets MNNNN 1-4-2018"
+```
+
+Pass the bare method id so the skill runs the main arm and its switch arm together. Read the
+answers from the panes; a child's `SendMessage` has no coordinator to reach outside a Claude
+coordinator session, so do not wait for a report.
 
 Run several variants as plain background jobs and `wait` for them, all in one command:
 
@@ -83,6 +97,23 @@ python -m seer_engine research_store --test-window --with-fundamentals
 
 About half an hour and a yfinance crawl. Use `--with-fundamentals` — without it the lab ranks on
 bars alone, **silently**, and the answer would be wrong in a way nothing announces.
+
+**A store that exists can still be incomplete.** A rebuild can drop the optional files —
+`shares.csv` and `splits.csv` — and the run then records zero trades, which looks exactly like a
+strategy that bought nothing. The missing-input message names `market_series.csv` even when that
+file is present, so do not trust it: list the store directory and check for `shares.csv` and
+`splits.csv` first. Restore them without rebuilding and without moving the price fingerprint:
+
+```bash
+PYTHONPATH=engine/src engine/.venv/bin/python -m seer_engine shares fetch-splits \
+  --store engine/.research-test
+PYTHONPATH=engine/src engine/.venv/bin/python -m seer_engine shares store \
+  --store engine/.research-test --basis <today, YYYY-MM-DD>
+```
+
+The fetch is network, resumable, and only asks for symbols the cache lacks; the store step is
+offline. A buyback book, a split book, or any method reading company size will otherwise report
+zero trades — and a zero-trade run is a data answer, never a strategy answer.
 
 The test window opens 2015-10-19. A start date before that is refused: earlier is the dev window,
 which every method here was built on, and a result there is the method marking its own homework.

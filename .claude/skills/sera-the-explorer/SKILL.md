@@ -75,9 +75,14 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
      --prompt "/explore-and-experiment-new-method --method MNNNN --coordinator sera-<stamp>"
    ```
    Then subscribe to each child (`SendMessage` with `notify_when_idle: true`, no message) so a
-   child that dies without reporting still wakes you.
-5. **Collect.** Each child sends `DONE MNNNN <status> — <verdict>; next: …`. For every child
-   that reports or goes idle:
+   child that dies without reporting still wakes you. **If this coordinator is not a Claude Code
+   session** — it has no `SendMessage` tool, for example it runs under Hermes — skip the
+   subscription and poll `tmux capture-pane -p -t explore-MNNNN` plus the shared database. A child
+   that reports "no agent named sera-<stamp> is reachable" is behaving correctly; that message is
+   not a failure and needs no relaunch.
+5. **Collect.** Each child sends `DONE MNNNN <status> — <verdict>; next: …` when it can reach the
+   coordinator; with a non-Claude coordinator, read its pane. For every child that reports or goes
+   idle:
    - **Verify, don't believe:**
      - `lab show MNNNN`: status past `registered`, trials present, analysis and verdict non-empty.
      - `git log origin/main -- engine/src/seer_engine/lab/methods/mNNNN_*` is non-empty.
@@ -105,6 +110,8 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
      would trade, or not at all.
    - **Close it out:**
      - Save the scrollback: `tmux capture-pane -p -S - -t <window> > $LOGS/explore-MNNNN.log`.
+       tmux keeps a short history, so a log of about one screen is normal; the database is the
+       audit record, not the log.
      - Kill the window, but only if it is still named `explore-MNNNN`.
      - `git worktree remove --force $WT`, then `git branch -D explore/MNNNN` (only once its method file is on `origin/main`).
    - `lab stage` + commit + push the database and its snapshot, `lab/lab.sqlite` and `web/data/lab.json` ("lab: M00xx <verdict>").
@@ -159,4 +166,5 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
 | "The buy signal fired, I'll ask the owner first" | Never ask, never block. Record the insight, put it first in the report, carry on. |
 | "`lab promote` refused it, I'll find a way round" | There is no way round. No `--force`, no environment variable, no editing the method to dodge the kin walk. Record the refusal, report it, take the next idea. |
 | "Its fold record is 2 of 4 but the twenty-year numbers are great" | That is the gate's entire point, and the 0-for-5 roster is what the twenty-year numbers bought. `lab promote` exits 2. |
+| "That older method sits in the Promotable-now list, so promote it" | The list is the gate's letter, not the durability check. Run `lab walkforward` first; a negative 2009-2015 edge means no look. A batch promotes its own children's results, not an earlier batch's leftovers. |
 | "Its sibling test-failed, but this variant is genuinely different" | Kin is `family` plus every ancestor through `parent_id`. A disproven family does not get a retry under a new id — that is the mechanism the gate exists to close. |

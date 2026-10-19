@@ -3,6 +3,12 @@
   "coordinator": "orch-gate-reading-cadence",
   "coordinator_session_id": "421d98f4-b594-4150-a2a9-51b017949d36",
   "created": "2026-10-19T09:05:20+00:00",
+  "landed": {
+    "at": "2026-10-19T10:57:16+00:00",
+    "base": "main",
+    "commit": "6b77e5d5fa3d014633ec3f99d6511cb44ce2b75a",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -68,22 +74,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "ed684e0",
       "depends_on": [
         3
       ],
       "difficulty": "NORMAL",
       "n": 4,
-      "note": null,
+      "note": "Handover + close-out on the branch, pushed. Closed the existing P1-ROOT-C5RB instead of minting the plan's P1-ROOT-C4DN (index's own TaskID column). Ticked the BRANCH index docs/plans/GATE_READING_CADENCE_PLAN.md to Status: complete, left the orchestration copy alone. Did NOT merge/push main/delete the worktree \u2014 coordinator lands it. Trailer: (1M context) form. Drift: phase 3 wrote no 16-final.txt, so lab counts re-derived read-only (mode=ro, hash verified).",
       "package": "docs/plans`, `.workflows",
       "plan": ".workflows/plan/gate-reading-cadence/phase-4.md",
-      "reported_at": "2026-10-19T09:09:34+00:00",
+      "reported_at": "2026-10-19T10:55:57+00:00",
       "satisfies": [
         "R4",
         "R5",
         "R7"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ROOT-C5RB",
       "title": "Handover, bookkeeping and the standing correction"
     }
@@ -91,7 +97,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/gate-reading-cadence/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "gate-reading-cadence",
-  "updated": "2026-10-19T10:38:17+00:00",
+  "updated": "2026-10-19T10:57:16+00:00",
   "verified_at": "2026-10-19T10:37:38+00:00",
   "worktree": "/home/miftah/.worktrees/seer/gate-reading-cadence"
 }

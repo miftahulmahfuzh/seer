@@ -3,15 +3,15 @@
 **Package Path**: `.`
 **Package Code**: ROOT
 **Last Updated**: 2026-10-19
-**Total Active Tasks**: 1
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 2
 - P2 Medium: 0
-- P3 Low: 0
+- P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
 - Completed: 25
@@ -32,9 +32,38 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R1, R2, R3, R4 — Build §4.1: the brakes-off variants on M0030 and M0053 — the exposure diagnostic's `-FULL` arms, turned into real pre-registered, recorded lab variants; Build §4.2: interrogate the shared SPY 200-day gate that is nearly all one year of value and a drag since 2009; Hold the hard constraint: VARIANTS of the existing method files, free in N, never new method ids — verified with `store.pending_gate` before committing to a shape; Hold the usual lab rules: pre-register by committing the method file before `lab run`; `lab stage` for any database commit; Postgres for DB tests; no hard-gate override; never touch the test window
   - **Depends on**: P1-ENG-J8RM, P1-ENG-T3ZK, P1-ENG-Q6WD
   - **Plan**: `.workflows/plan/P1-ROOT-H5NX.md`
+- [ ] **P1-ROOT-D9TK** Phase 2: D17 supersedes — a declared honest control retires a handicapped one
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `control_shape.py` (the supersession predicate and its `Finding` surface), `hardgate.py` (D17's prose and `mis_shaped_controls`), `commands/lab.py` (the `lab control` report, the run's control print, the subcommand help), and `test_lab_control_shape.py` / `test_lab_hardgate.py`. Does not touch any method file, the lab database, `control_draw.py` or `lab stage`. Why it is needed, plainly: `mis_shaped_controls` returns **every** recorded arm outside the band and `hardgate.check` raises on a non-empty tuple, while the old mis-shaped arm stays in `all_candidates()` and keeps its recorded trial forever — so an amendment alone does not unblock `lab promote`, and D17's own message, which says the way back is to re-draw and amend, is a sentence the code does not honour. The rule, exactly: a `REFUSE` **or `WARN`** finding is **superseded** — reported, never dropped — when the same method holds another `placebo` arm that (a) is a placebo, (b) has verdict `OK` (inside `WARN_BAND` on both axes, not merely inside `REFUSE_BAND`), and (c) **names it** in its own pre-registered declaration `Candidate.supersedes`, read duck-typed through `control_shape.SUPERSEDES_ATTR` exactly as `DECLARATION_ATTR` is; **there is no target-equality condition**, `refusals()` then excludes it, the band does not move, an arm that declares nothing retires nothing, an `unresolved` or `unrecorded` arm is still never a refusal, and the superseded arm stays visible in `lab control` with the id of the arm that superseded it and that arm's own resolved target, so a deliberate re-point is something a reader sees rather than something the rule hides. Not an override: the hard gate still has none, and this is the rule change its own text invites, argued for in the commit. Exit: `lab control` prints a superseded arm as `superseded by <id>` — with `-> <its target>` where the two differ — and still shows its ratios and its verdict; a new test proves the rule is **a no-op on today's lab**, with the committed database leaving all nine methods still failing D17 and **no arm in it declaring anything at all**, which is the stronger reason; new tests prove a band-clean placebo that **declares** a refusal retires it across a *different* resolved target with both targets reported, and that a clean placebo declaring nothing, a `warn` superseder, an arm a clean superseder did not name, an `unrecorded` superseder, an `unresolved` superseder and a dose-response superseder each do **not**, while a declared `warn` finding **is** superseded and stays flagged; D17's docstring in `hardgate.py` carries the change and the argument for it, including both halves of why target equality was rejected; `pytest engine/tests` and `ruff check engine` green.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md` (phase 2 of 8)
+  - **Satisfies**: R4 — `lab promote` must actually stop refusing the nine
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ROOT-D9TK.md`
+  - **Completed**: 2026-10-19 12:47
+  - **Method**: /implement
+  - **Commit**: `c32d274` on `feature/honest-control-redraw` (pushed; the coordinator lands the set)
+  - **Files**: `engine/src/seer_engine/lab/control_shape.py`, `engine/src/seer_engine/lab/hardgate.py`, `engine/src/seer_engine/commands/lab.py`, `engine/tests/test_lab_control_shape.py`, `engine/tests/test_lab_hardgate.py`, `engine/package_readme.md`, `.workflows/plan/P1-ROOT-D9TK.md`
+  - **Result**: D17 now honours its own refusal message. `control_shape` gained `SUPERSEDES_ATTR` + `declared_supersessions()` (duck-typed, exactly as `DECLARATION_ATTR`), `Finding.declares` / `superseded_by` / `superseded_by_target` and a `blocking` property, `superseding_arm()` and `_mark_superseded()`; `refusals()` filters on `blocking` rather than `refused`, which is the single behavioural edit, and `hardgate.mis_shaped_controls` needed **no code change at all** because it already returns `control_shape.refusals`. The predicate is **declared, never inferred from the target**: a `refuse` or `warn` finding is retired only by a same-method `placebo` arm that is itself `ok` on both axes AND names it in its pre-registered `Candidate.supersedes`. The superseded row keeps its verdict, both ratios and its `flagged` status and is still printed with the id that retired it, so this is a measuring-stick rule and not an amnesty. Fourteen new tests. Measured read-only against the branch's `lab/lab.sqlite`: **19 refusals and 0 supersessions, before and after**, `git hash-object` `3969f1fa5d2066a42ed47716dd05a66050073592` on both sides, `git status` clean under `lab/` and `web/data/`, and no `lab` subcommand invoked. Full suite **6114 passed / 4 skipped** (all four opt-in env-gated live-store tests; no DB test skipped) and `ruff check engine` clean. No band moved and no override was added.
+  - **Drift**: The plan's Step 11 code block splits the literal `There is no override` across two f-string pieces; `test_there_is_no_override` greps `hardgate`'s source and strips that exact phrase, so the block as written turns that pre-existing test red. Re-wrapped so the phrase stays contiguous — the rendered message is byte-identical. Separately, the survey reads **66** findings rather than the 64 measured at planning time: phase 1's two re-drawn arms are already in the method files in this shared worktree, and both read `unrecorded`, declare, and retire nothing — the committed-but-unrun case working as intended.
+  - **Decided**:
+    - The planned assertion "no arm in the committed lab declares anything at all" (exit criterion 2's stronger-reason half) -> **replaced with a strictly stronger, forever-true check**: every declaration must name a control arm that exists, belongs to the same method, and is flagged. Rung 1: invariant 10 ("the tree is green at the end of every phase") outranks an exit criterion, and the assertion is unsatisfiable the moment the set's own amendment blocks land — phase 1's M0227/M0243 blocks are already on disk here. The replacement catches a typo'd `supersedes` tuple that the old assertion could never see; the no-op proof itself (nothing is retired) is unchanged and still asserted.
+    - Whether to update `engine/package_readme.md`, which no phase owns -> **yes, four exact-string insertions**, because its `control_shape.py` entry is an exhaustive public-surface list that three new public symbols made stale, and /implement Step 4 chains `readme-updater` by default. But the `**Last Updated**` header paragraph was deliberately left alone (Rung 1, invariant 9): six concurrent sessions each prepending to one line is the shared-file collision the invariant forbids, and phase 8 owns the set's written record.
+    - Whether to commit `.workflows/todos.md` -> **no**. It already carries phase 8's entry (`P3-ROOT-D7MX`) alongside this one, and a pathspec commit of it would ship a peer's bookkeeping under this phase's message (Rung 3: phase 2's own commit block lists five source/test files and no `todos.md`). This entry is left in the working tree for whoever commits that file.
+    - Whether this phase merges and lands -> **it does not**; the set is swarm-tracked and `/implement` Step 5a leaves the merge to `orch-honest-control-redraw`.
 
 ### [P2] Medium
 ### [P3] Low
+- [ ] **P3-ROOT-D7MX** Phase 8: Close-out: which verdicts survived their honest control
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns the handover doc, four `lab insight` rows, the merge of `feature/honest-control-redraw` into `main`, two `lab stage` runs (ordering fixed: merge -> verify -> stage -> suite -> insights -> stage again -> commit/push), and the push. Exit: `lab control` on the nine shows all fourteen new arms `ok` and all fourteen old arms `superseded by …`; the supersession mapping matches the method files read off disk; D17 no longer refuses any of the nine (any other refusal named separately); `M0047-EQ` recorded as having no control arm, its +3.80 sentence withdrawn not re-measured; test-window looks still 4; pytest green on `main` after staging with `lab.sqlite`/`web/data/lab.json` agreeing row for row; pushed.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md` (phase 8 of 8)
+  - **Satisfies**: R3 — Report which of the nine standing verdicts survive their honest control, in trial_funding.mwr, including margins that worsen or reverse; R4 — lab promote must actually stop refusing the nine
+  - **Depends on**: P1-ENG-K9WR, P1-ROOT-D9TK, P2-ENG-R8NQ, P2-ENG-V2HD, P2-ENG-F5WK, P2-ENG-T9LC, P2-ENG-Y3BQ
+  - **Plan**: `.workflows/plan/P3-ROOT-D7MX.md`
 
 ### [P4] Backlog
 

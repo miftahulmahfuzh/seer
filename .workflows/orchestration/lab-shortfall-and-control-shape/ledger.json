@@ -23,19 +23,19 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "7d36ea38a4ef51fe3dff9c9bdae37b2787d17fe7",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "control_shape.py + 31 tests, green (6009 passed, 4 skipped). API is the contract phase 4 was reconciled against: survey/for_method/findings, refusals/flags, describe/band_sentence/format_report. Lab-wide tally matches the plan exactly: 19 refuse, 7 warn, 4 ok, 16 unresolved, 8 not-checked over 46 placebo / 6 dose / 2 ablation arms. Found a THIRD mis-shaped control the handover did not know of: M0243-NEAR20-R at 3.01x/2.98x, beside M0230-C50-R and M0248-R. Verified the nine-method D17 blast radius independently: M0047, M0201, M0202, M0208, M0215, M0221, M0225, M0227, M0243. Staging decision (rung 2, exit criterion 1): committed only my 2 code files + my adopted plan copy + todos.md; no peer file leaked. lab/lab.sqlite byte-identical.",
       "package": "engine/seer_engine/lab",
       "plan": ".workflows/plan/lab-shortfall-and-control-shape/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-19T05:01:25+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-03W0",
       "title": "Control detection, target resolution and the calibrated band"
     },
     {
@@ -53,7 +53,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
+      "status": "pending",
       "task_id": null,
       "title": "lab note` cannot double-append, and says what it did"
     },
@@ -82,7 +82,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-shortfall-and-control-shape/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-shortfall-and-control-shape",
-  "updated": "2026-10-19T04:56:45+00:00",
-  "verified_at": "2026-10-19T04:56:25+00:00",
+  "updated": "2026-10-19T05:02:15+00:00",
+  "verified_at": "2026-10-19T05:02:15+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-shortfall-and-control-shape"
 }

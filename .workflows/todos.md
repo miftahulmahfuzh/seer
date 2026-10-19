@@ -3,18 +3,18 @@
 **Package Path**: `.`
 **Package Code**: ROOT
 **Last Updated**: 2026-10-19
-**Total Active Tasks**: 2
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 24
+- Completed: 25
 
 ---
 
@@ -33,17 +33,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Depends on**: P1-ENG-J8RM, P1-ENG-T3ZK, P1-ENG-Q6WD
   - **Plan**: `.workflows/plan/P1-ROOT-H5NX.md`
 
-- [ ] **P1-ROOT-C5RB** Phase 4: Handover, bookkeeping and the standing correction
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `docs/plans/HANDOVER_20261019-the-gate-reading-cadence.md`, `.workflows/todos.md` (root only), the `**Status:**` tick on the plan index, a memory file under `/home/miftah/.claude/projects/-home-miftah-seer/memory/` with its `MEMORY.md` pointer, the merge of `feature/gate-reading-cadence` to `main`, and the push. Does not touch the lab database or `web/data/lab.json` (phase 3 closed them in the main checkout; the branch never carried them), the method file, the study script, or `engine/.workflows/todos.md`. Exit: handover written in the house style with the lab-state table (**836** dev trials, test looks still 4), the **six**-row ladder with no `M-G2` row, the decomposition with its arithmetic shown, an explicit paragraph naming the **four** monthly arms as promotable and both weekly arms as never promotable, a sentence on why the ladder is six arms and where the two-month rung went, a sentence on the widened lookback and the unchanged `1996-01-03` start, the dead list carried forward and extended and the leftovers list carried forward and re-prioritised, and no surviving `«` placeholder; every number traced to a named `/tmp/m0260` capture file; at least one memory file written with its `MEMORY.md` line, and the parent memory superseded in place rather than duplicated; the plan index set to `**Status:** complete` with phase 4's TaskID filled; branch merged to `main` and pushed, with no `lab.sqlite` or `lab.json` in the merge's diffstat, no rebase, and the worktree and branch deleted.
-  - **Status**: open
-  - **Unblocked**: 2026-10-19 — phase 3 (`P1-ROOT-N8PZ`) recorded six M0260 trials (#835..#840) and landed the lab result commit `3558cd0` in the main checkout, left local for phase 4 to merge and push
-  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/gate-reading-cadence/PLAN.md` (phase 4 of 4)
-  - **Satisfies**: R4, R5, R7 — Check `sim.rules.PRESETS` before calling any arm promotable; say so when a winning cadence has no preset rather than minting one mid-run; Quote `trial_funding.mwr` throughout, never `total_return` or `cagr`; Spend no test-window look
-  - **Depends on**: P1-ROOT-N8PZ
-  - **Plan**: `.workflows/plan/P1-ROOT-C5RB.md`
-
 ### [P2] Medium
 ### [P3] Low
 
@@ -54,6 +43,29 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-C5RB** Phase 4: Handover, bookkeeping and the standing correction
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `docs/plans/HANDOVER_20261019-the-gate-reading-cadence.md`, `.workflows/todos.md` (root only), the `**Status:**` tick on the plan index, a memory file under `/home/miftah/.claude/projects/-home-miftah-seer/memory/` with its `MEMORY.md` pointer, the merge of `feature/gate-reading-cadence` to `main`, and the push. Does not touch the lab database or `web/data/lab.json` (phase 3 closed them in the main checkout; the branch never carried them), the method file, the study script, or `engine/.workflows/todos.md`. Exit: handover written in the house style with the lab-state table (**836** dev trials, test looks still 4), the **six**-row ladder with no `M-G2` row, the decomposition with its arithmetic shown, an explicit paragraph naming the **four** monthly arms as promotable and both weekly arms as never promotable, a sentence on why the ladder is six arms and where the two-month rung went, a sentence on the widened lookback and the unchanged `1996-01-03` start, the dead list carried forward and extended and the leftovers list carried forward and re-prioritised, and no surviving `«` placeholder; every number traced to a named `/tmp/m0260` capture file; at least one memory file written with its `MEMORY.md` line, and the parent memory superseded in place rather than duplicated; the plan index set to `**Status:** complete` with phase 4's TaskID filled; branch merged to `main` and pushed, with no `lab.sqlite` or `lab.json` in the merge's diffstat, no rebase, and the worktree and branch deleted.
+  - **Status**: completed
+  - **Unblocked**: 2026-10-19 — phase 3 (`P1-ROOT-N8PZ`) recorded six M0260 trials (#835..#840) and landed the lab result commit `3558cd0` in the main checkout, left local for phase 4 to merge and push
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/gate-reading-cadence/PLAN.md` (phase 4 of 4)
+  - **Satisfies**: R4, R5, R7 — Check `sim.rules.PRESETS` before calling any arm promotable; say so when a winning cadence has no preset rather than minting one mid-run; Quote `trial_funding.mwr` throughout, never `total_return` or `cagr`; Spend no test-window look
+  - **Depends on**: P1-ROOT-N8PZ
+  - **Plan**: `.workflows/plan/P1-ROOT-C5RB.md`
+  - **Completed**: 2026-10-19 17:43
+  - **Method**: /implement
+  - **Files**: `docs/plans/HANDOVER_20261019-the-gate-reading-cadence.md`, `docs/plans/GATE_READING_CADENCE_PLAN.md`, `.workflows/todos.md`, and (outside the repo) `memory/seer-gate-cadence-separable-only-on-the-slow-side.md`, `memory/seer-gate-cadence-is-worth-more-than-any-band.md`, `memory/seer-walkforward-picks-folds-by-mar.md`, `memory/MEMORY.md`
+  - **Result**: M0260's six trials `#835`-`#840` are written up for a reader who was not here. Dev trials 830 -> **836**, methods 273 -> **275** (M0260 + the queued idea M0261), insights 465 -> **470**, lab N 163 -> **164**, **test-window looks unchanged at 4** — no `lab test`, no read of `SEER_RESEARCH_TEST_STORE`. The ladder's answer: **the gate's reading cadence turns AT monthly and falls away on both sides** — 12.33% money-weighted monthly against 8.78% quarterly, 12.10% half-yearly and 8.64% yearly, with every slow rung falling deeper than monthly's 23.80%, so the cadence the lab already runs by accident is the best one and nothing has to be built. M0258's +7.01 pts/yr splits **+1.05 re-pick frequency / +5.96 gate reading cadence** (residual exactly 0; the fall splits 2.27 / 9.42 of 11.69), so 85% of the money and 81% of the fall is the reading rather than the picking. Both reproduction arms returned M0258's rows on all six fields. Handover carries the six-row ladder, the decomposition arithmetic, the promotability paragraph (four monthly arms promotable, both weekly arms never), the folds arm by arm, the dead list extended with "slowing the gate past monthly", and a nine-item leftovers list; `grep -c '«'` returns 0 and no `total_return`/`cagr` appears outside the sentences saying they are not quoted. Three memory files written or superseded with their `MEMORY.md` pointers (one rewritten in place, one appended, no duplicates). `ruff check engine` clean and `pytest -n0 engine/tests` green from the worktree before the close-out commit.
+  - **Drift**: Phase 3 never wrote the `16-final.txt` the plan's Step 1 names, so the six closing lab counts were re-derived with a read-only `sqlite3 "file:...?mode=ro"` query — Step 1's own documented fallback — with `lab.sqlite`'s `git hash-object` verified identical before and after. Every other number came from a named `/tmp/m0260` capture. The plan's Step 5c conditions did not fire: no weekly arm won, so no `feature-wish` preset task was opened, and the roster-wide cadence item is a lab leftover rather than a repo task.
+  - **Decided**:
+    - Whether to mint the plan's new `P1-ROOT-C4DN` or close the task this phase was already handed -> closed **`P1-ROOT-C5RB`** (Rung 1/2: the plan index's own Phases table names `P1-ROOT-C5RB` as phase 4's TaskID, and the task already existed with this phase's exit criteria in it). Minting C4DN would have left two tracking entries for one phase and an index pointing at the wrong one.
+    - Whether phase 4 merges to `main`, pushes and deletes the worktree, as its exit criteria say -> **it does not**; the swarm coordinator `orch-gate-reading-cadence` lands the set (Rung 1: `/implement` Step 5a refuses to land a swarm-tracked phase, and the coordinator independently instructed the same). This phase commits and pushes `feature/gate-reading-cadence` only.
+    - Which attribution trailer the commits carry -> `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>` rather than plan Decision D5's plain form (Rung 5, the user's own instruction): D5's stated rung was "this session's attribution instruction", and in this session that instruction specifies the (1M context) form and says it replaces earlier guidance. Phases 2 and 3 landed on the same form.
+    - Which copy of the plan index gets the `**Status:** complete` tick -> the branch's tracked `docs/plans/GATE_READING_CADENCE_PLAN.md`, not `.workflows/orchestration/gate-reading-cadence/PLAN.md` (Rung 1: plan Decision D8 says "a tracked file in this worktree"; `git log` confirms the coordinator committed it at `dedc08d`). The orchestration copy is the coordinator's and was left alone.
+  - **Commit**: see the handover and close-out commits on `feature/gate-reading-cadence`
+
 
 - [x] **P1-ROOT-N8PZ** Phase 3: Run and record the verdict
   - **Difficulty**: HARD

@@ -68,6 +68,22 @@
                                     nothing, and the month the $0.10 per-order floor stops
                                     binding. No trial row, no moments, no status change: N and
                                     the looks do not move
+    lab shortfall 828 | M0244-PLACEBO30 [--era 2009-2015] [--store DIR] [--against CID]
+                  [--names N] [--csv PATH]
+                                    report only: where one recorded trial's gap to SPY TR over one
+                                    era went -- the gate premium it paid for being out of the
+                                    market, the fee drag its turnover bought, and ONE residual for
+                                    the pool and the weighting, which is labelled a residual and
+                                    never named after a cause. The gap itself is not recomputed:
+                                    it comes from the same de-funded walk-forward slice against
+                                    REF-SPY-HOLD that lab exposure and lab gate use. With --store
+                                    the era's exposure is resolved from the shared SPY 200-day
+                                    gate's own on-share per era; without one the recorded
+                                    whole-window figure is used and the output says so.
+                                    --against names a sibling arm of the same method and splits
+                                    the residual into what the two share and what this arm owns.
+                                    No trial row, no moments, no status change: N and the looks do
+                                    not move
     lab survivorship M0069 [M0007 ...] [--store DIR] [--sv-store DIR] [--csv PATH] [--no-journal]
                                     report only: re-run every recorded dev variant of each method
                                     at its recorded capital and funding on the dev store and on
@@ -438,6 +454,76 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s.add_argument("method", nargs="*", metavar="M0007")
     s.add_argument("--min-train-years", type=int, default=None, metavar="N")
     s.add_argument("--eval-years", type=int, default=None, metavar="N")
+
+    s = sub.add_parser(
+        "shortfall",
+        # Every `%` in a `help=` below is doubled: argparse runs each one through
+        # %-interpolation (HelpFormatter._expand_help), so a bare `%` is read as a format spec
+        # and `lab --help` dies with "unsupported format character". A doubled `%%` renders as
+        # one `%`. `description=` is NOT interpolated and must stay single. Same rule as the
+        # `costs`, `exposure`, `gate` and `turnover` parsers above.
+        help="report only: where one trial's gap to SPY TR over an era went (gate, fees, residual)",
+        description=(
+            "Split one recorded dev trial's gap to SPY total return over one era into a gate "
+            "premium, a modelled fee drag and one residual for the pool and the weighting. The "
+            "gap is not recomputed: it comes from walkforward.measure over the recorded monthly "
+            "curve, de-funded through hardgate.trial_deposits, against the recorded REF-SPY-HOLD "
+            "curve sliced the same way -- the path lab exposure, lab gate and lab survivorship "
+            "already take. With --store the era's exposure is resolved by scaling the recorded "
+            "whole-window figure by the shared SPY 200-day gate's own on-share in that era "
+            "against its on-share over the whole window; without --store, for a book that "
+            "carries no shared gate, or for a book that held money while the gate was off, the "
+            "recorded whole-window exposure is used and the report says so. The fee drag is a "
+            "MODEL -- what a run really paid is not a trials column -- and is printed with a "
+            "sensitivity band across book sizes so a guessed name count is visibly bounded. The "
+            "residual is a residual: it is the term the two named ones do not explain and it is "
+            "never named after a cause. This is an attribution under stated assumptions, not an "
+            "identity. Records no trial, no moments, no funding, no provenance, no insight and "
+            "no status, so the lab's N and the test-window looks do not move; the test window is "
+            "never read, and a test-window trial is refused by name."
+        ),
+    )
+    s.add_argument(
+        "trial", metavar="828",
+        help="the trial to decompose: a trials.n, or a candidate id like M0244-PLACEBO30",
+    )
+    s.add_argument(
+        "--era", default=None, metavar="2009-2015",
+        help="the era to decompose over (default: 2009-2015). One of the eras in "
+             "lab/exposure.py's ERAS, or `whole` for the trial's whole window",
+    )
+    s.add_argument(
+        "--store", type=Path,
+        default=(Path(os.environ["SEER_RESEARCH_STORE"])
+                 if os.environ.get("SEER_RESEARCH_STORE") else None),
+        help="a dev-window research store, read for the shared SPY 200-day gate's on-share per "
+             "era (default: $SEER_RESEARCH_STORE, else none). Without it the recorded "
+             "whole-window exposure is used instead, which measured 5.11 against 3.60 pts/yr of "
+             "gate premium on trial 828 -- so pass it when you have one. The stores are "
+             "gitignored, so a worktree has none: point this at a checkout that does rather "
+             "than rebuilding one. Only the gate symbol's rows of bars.csv are read; no market "
+             "is loaded and no backtest is run",
+    )
+    s.add_argument(
+        "--against", default=None, metavar="M0244-FRESH30",
+        help="split the pool+weighting residual against this sibling arm of the SAME method: "
+             "what that arm's own residual also carries is attributed to the shared pool and "
+             "frame, and only the remainder to this arm's own weighting and selection. An arm "
+             "of another method, or one whose prices are not the benchmark's (hardgate D10), is "
+             "refused rather than reported",
+    )
+    s.add_argument(
+        "--names", type=int, default=None, metavar="30",
+        help="the book's name count for the fee model (default: read from the recorded "
+             "configuration's outermost `top=`, else the roster's 20). The slot size sets how "
+             "hard Gotrade's $0.10 per-order floor bites; measured, the 2009-2015 drag moves "
+             "only from 3.71 to 3.85 pts/yr across 10 to 50 names, and the report prints that "
+             "band beside its answer",
+    )
+    s.add_argument(
+        "--csv", type=Path, default=None, metavar="PATH",
+        help="also write the terms to PATH as CSV, at full precision",
+    )
 
     s = sub.add_parser(
         "survivorship",
@@ -2477,6 +2563,67 @@ def _walkforward(conn, args) -> int:
     return 0
 
 
+def _shortfall(conn, args) -> int:
+    """``lab shortfall``: where one recorded trial's gap to SPY TR over one era went.
+
+    A report in the sense ``lab regime`` and ``lab turnover`` are reports: it re-runs nothing,
+    inserts no trial, moves no status and spends no look, and it prints the lab's N and the
+    test-window looks before and after so the invariant is visible on the terminal rather than
+    merely asserted in a test.
+
+    The one optional read is ``--store``, and it is narrow: the gate symbol's rows out of the
+    store's own ``bars.csv``, so the shared SPY 200-day gate's on-share can be measured per era.
+    No market is built and no backtest runs. The store is opened only when the recorded
+    configuration actually carries that gate, because for a book that does not there is nothing
+    for it to say.
+
+    A trial whose curves were measured on prices other than the benchmark's gets a ``WARNING``
+    line and its numbers anyway (D10 in ``lab/hardgate.py``): a report warns, the gate refuses.
+    ``--against`` is the exception and refuses, because a residual split across two price
+    fingerprints is a fabricated number rather than a caveated one.
+    """
+    from seer_engine.lab import shortfall
+
+    row = shortfall.resolve_trial(conn, args.trial)
+    against = None if args.against is None else shortfall.resolve_trial(conn, args.against)
+    era = shortfall.DEFAULT_ERA if args.era is None else args.era
+    window = shortfall.trial_window(row)
+    _label, lo, hi = shortfall.era_bounds(era, window)
+
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+
+    gate = None
+    store_given = args.store is not None
+    if store_given:
+        if shortfall.carries_shared_gate(row["config_text"]):
+            t0 = time.perf_counter()
+            gate = shortfall.gate_on_share(Path(args.store), window, (lo, hi))
+            log.info(
+                "gate on-share measured from %s: %.4f whole, %.4f era (%.1fs)",
+                args.store, gate.whole, gate.era, time.perf_counter() - t0,
+            )
+        else:
+            log.info(
+                "%s carries no shared %s %d-day gate; the store is not read",
+                row["candidate_id"], shortfall.GATE_SYMBOL, shortfall.GATE_N,
+            )
+
+    report = shortfall.measure(
+        conn, row, era, gate=gate, names=args.names, against=against, store_given=store_given
+    )
+    print(shortfall.format_report(report))
+    if args.csv is not None:
+        print(f"\nterms written to {shortfall.write_csv(report, Path(args.csv))}")
+    print(
+        f"\nNothing was recorded. Lab N (dev trials): {n_before} before, "
+        f"{store.dev_trial_count(conn)} after; test-window looks used: {looks_before} before, "
+        f"{store.test_looks(conn)} after. No journal entry, so seertrade.site/sera is unchanged "
+        f"and `lab stage` is not needed."
+    )
+    return 0
+
+
 def _survivorship(conn, args) -> int:
     """``lab survivorship M0069 [M0007 ...]``: recorded methods on the survivorship-check store.
 
@@ -2868,6 +3015,7 @@ _HANDLERS = {
     "status": _status,
     "regime": _regime,
     "walkforward": _walkforward,
+    "shortfall": _shortfall,
     "luck": _luck,
     "show": _show,
     "run": _run,

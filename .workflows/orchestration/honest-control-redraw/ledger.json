@@ -1,0 +1,181 @@
+{
+  "branch": "feature/honest-control-redraw",
+  "coordinator": "orch-honest-control-redraw",
+  "coordinator_session_id": "b92f0c79-6609-4682-b4b2-eb93ac2bff85",
+  "created": "2026-10-19T12:28:06+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/honest-control-redraw/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The matched-draw rule, proven on both poles (M0227, M0243)"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 2,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/honest-control-redraw/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "D17 supersedes: a declared honest control retires a handicapped one"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "engine/lab/methods",
+      "plan": ".workflows/plan/honest-control-redraw/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The twin yardsticks: M0221 and M0225"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 4,
+      "note": null,
+      "package": "engine/lab/methods",
+      "plan": ".workflows/plan/honest-control-redraw/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "M0047 \u2014 the size-weighted residual's two placebos"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "HARD",
+      "n": 5,
+      "note": null,
+      "package": "engine/lab/methods",
+      "plan": ".workflows/plan/honest-control-redraw/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "M0201 and M0202 \u2014 the rate-beta chassis, five arms"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 6,
+      "note": null,
+      "package": "engine/lab/methods",
+      "plan": ".workflows/plan/honest-control-redraw/phase-6.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "M0208 \u2014 the 4.41x extreme"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 7,
+      "note": null,
+      "package": "engine/lab/methods",
+      "plan": ".workflows/plan/honest-control-redraw/phase-7.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "M0215 \u2014 the sector-capped placebo pair"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "difficulty": "NORMAL",
+      "n": 8,
+      "note": null,
+      "package": "repo",
+      "plan": ".workflows/plan/honest-control-redraw/phase-8.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Close-out: which verdicts survived their honest control"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "honest-control-redraw",
+  "updated": "2026-10-19T12:28:06+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/honest-control-redraw"
+}

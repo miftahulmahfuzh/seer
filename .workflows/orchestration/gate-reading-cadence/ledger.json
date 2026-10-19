@@ -46,23 +46,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "b4dadaa",
       "depends_on": [
         2
       ],
       "difficulty": "HARD",
       "n": 3,
-      "note": null,
+      "note": "Coordinator override of the derivation. verify derived 'pending' because phase 3's deliverable is split across two refs by design: the lab result (3558cd0, lab.sqlite + lab.json) lives in the MAIN checkout on main and never touches the branch, and only the todos tick (b4dadaa) is a branch commit. Verified instead from the database read-only: 6 M0260 trials #835-840, 6 distinct config_digests matching byte-for-byte the digests computed from the committed method file, methods.source_sha 99f003df26fdc60e == sha256 of the committed file, git diff 41acf12..HEAD over the prereg files empty (invariant 6 holds), test-window looks still 4 (invariant 5 / R7), 836 dev trials, all six arms present in web/data/lab.json.",
       "package": "lab/` (main checkout)",
       "plan": ".workflows/plan/gate-reading-cadence/phase-3.md",
-      "reported_at": "2026-10-19T09:09:34+00:00",
+      "reported_at": "2026-10-19T10:37:59+00:00",
       "satisfies": [
         "R1",
         "R2",
         "R5",
         "R7"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ROOT-N8PZ",
       "title": "Run and record the verdict"
     },
@@ -83,7 +83,7 @@
         "R5",
         "R7"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": "P1-ROOT-C5RB",
       "title": "Handover, bookkeeping and the standing correction"
     }
@@ -91,6 +91,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/gate-reading-cadence/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "gate-reading-cadence",
-  "updated": "2026-10-19T09:48:41+00:00",
+  "updated": "2026-10-19T10:38:17+00:00",
+  "verified_at": "2026-10-19T10:37:38+00:00",
   "worktree": "/home/miftah/.worktrees/seer/gate-reading-cadence"
 }

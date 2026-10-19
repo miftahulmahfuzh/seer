@@ -3,14 +3,14 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-19
-**Total Active Tasks**: 2
+**Total Active Tasks**: 8
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
-- P2 Medium: 1
+- P1 High: 1
+- P2 Medium: 6
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
@@ -1509,6 +1509,14 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Owned the **combined readme pass** for `engine/package_readme.md` on behalf of the whole set: merged into phase 2's existing 80 lines rather than duplicating them, corrected its two now-false sentences ("There is no `lab control` subcommand, no `lab run` annotation and no D17" and "Nothing is wired to it yet" / "Nothing imports `lab.control_shape` yet"), and added what no phase had documented — `lab shortfall` and `lab control` as CLI sections in the `lab turnover` / `lab exposure` shape, a `lab/` module-map line for `shortfall.py`, D17 on the `hardgate.py` map line, and reverse-dependency entries for both modules.
     - Also committed `engine/.workflows/plan/P1-ENG-NVHT.md`, phase 1's adopted plan copy, which phase 1 left untracked — so no bookkeeping is orphaned on the branch.
     - Landing not attempted: swarm coordinator `orch-lab-shortfall-and-control-shape` owns the merge of `feature/lab-shortfall-and-control-shape` into `main`.
+- [ ] **P1-ENG-K9WR** Phase 1: The matched-draw rule, proven on both poles (M0227, M0243)
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns the new `control_draw.py` matched-draw rule module, `Candidate.supersedes` on `backtest/dev.py`, amendment blocks re-drawing `M0227-S20-PLC` and `M0243-NEAR20-PLC` (both poles: 0.07x and 3.01x), and `test_lab_control_draw.py`. Exit: both new arms land inside WARN_BAND [0.80, 1.25] on trades and turnover — the GO/STOP gate the five method phases (3-7) depend on; no new params dataclass; both declare `supersedes`; `phase-1-results.md` written; pytest/ruff green.
+  - **Status**: in_progress
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md` (phase 1 of 8)
+  - **Satisfies**: R1 — Settle ONE reusable way to derive a shape-matched control, and prove it inside the [0.80, 1.25] MATCH band on a pilot before anything else is pre-registered; R2 — Re-draw every mis-shaped control arm as an Amendment under the nine existing method ids — no new method id, no extra N, no moved config_digest, no test-window look; R3 — Report which of the nine standing verdicts survive their honest control, in trial_funding.mwr, including margins that worsen or reverse; R4 — lab promote must actually stop refusing the nine
+  - **Plan**: `.workflows/plan/P1-ENG-K9WR.md`
 
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"
@@ -1525,6 +1533,52 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Plan Set**: `.workflows/orchestration/roster-35-four-methods/PLAN.md` (phase 3 of 5)
   - **Satisfies**: R2 — M0155, a single-name brake: trim a holding falling apart while the market is fine; R6 — the test-window look count is 4 and must stay 4
   - **Plan**: `.workflows/plan/P2-ENG-N60A.md`
+- [ ] **P2-ENG-R8NQ** Phase 3: The twin yardsticks: M0221 and M0225
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns amendment seq 1 on M0221 (`M0221-C50-PLC`) and seq 2 on M0225 (`M0225-C50-PLC`, after its existing E100 seq 1), both re-drawn to supersede `M0221-R50`/`M0225-R50`. Exit: both inside WARN_BAND on both axes; reuse `CapTopParams(50,...)` with no new dataclass; margins restated in `mwr` (currently the control wins both — the family-A hardest case); `phase-3-results.md` written; cap-weighted chassis means names/churn matched only, turnover risk recorded per invariant 13; tests/lint green.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md` (phase 3 of 8)
+  - **Satisfies**: R2 — Re-draw every mis-shaped control arm as an Amendment under the nine existing method ids — no new method id, no extra N, no moved config_digest, no test-window look; R3 — Report which of the nine standing verdicts survive their honest control, in trial_funding.mwr, including margins that worsen or reverse; R4 — lab promote must actually stop refusing the nine
+  - **Depends on**: P1-ENG-K9WR
+  - **Plan**: `.workflows/plan/P2-ENG-R8NQ.md`
+- [ ] **P2-ENG-V2HD** Phase 4: M0047 — the size-weighted residual's two placebos
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns amendment seq 1 on M0047, two arms `M0047-MV10-PLC`/`M0047-MV20-PLC` superseding the ladder's mis-aimed `M0047-PLC1-MV10`/`-MV20` (the latter only warns). Exit: both inside WARN_BAND; margins restated against the true targets (+1.28 pts vs `MV10`, not the old +3.80 vs `EQ`); **`M0047-EQ`'s +3.80 sentence is withdrawn, not re-measured** — it ends this phase with no control arm at all; no new params dataclass; tests/lint green.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md` (phase 4 of 8)
+  - **Satisfies**: R2 — Re-draw every mis-shaped control arm as an Amendment under the nine existing method ids — no new method id, no extra N, no moved config_digest, no test-window look; R3 — Report which of the nine standing verdicts survive their honest control, in trial_funding.mwr, including margins that worsen or reverse; R4 — lab promote must actually stop refusing the nine
+  - **Depends on**: P1-ENG-K9WR
+  - **Plan**: `.workflows/plan/P2-ENG-V2HD.md`
+- [ ] **P2-ENG-F5WK** Phase 5: M0201 and M0202 — the rate-beta chassis, five arms
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns amendment seq 1 on M0201 (`-PLC1`/`-PLC2`, two re-draw seeds) and seq 1 on M0202 (three arms incl. the mis-resolved `HALF-FAST` target). Exit: all five inside WARN_BAND; reuse `SizedYieldBetaParams`/`HalfGuardParams`, no new dataclass; the **only** quarterly-banded chassis in the set — derives its own `prev_repick_session` rather than the monthly helper (measured 0.9549 vs the recorded 2.24); five supersession declarations per the mapping; `phase-5-results.md`; tests/lint green.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md` (phase 5 of 8)
+  - **Satisfies**: R2 — Re-draw every mis-shaped control arm as an Amendment under the nine existing method ids — no new method id, no extra N, no moved config_digest, no test-window look; R3 — Report which of the nine standing verdicts survive their honest control, in trial_funding.mwr, including margins that worsen or reverse; R4 — lab promote must actually stop refusing the nine
+  - **Depends on**: P1-ENG-K9WR
+  - **Plan**: `.workflows/plan/P2-ENG-F5WK.md`
+- [ ] **P2-ENG-T9LC** Phase 6: M0208 — the 4.41x extreme
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns amendment seq 1 on M0208, one arm `M0208-CGO-N20-PLC` superseding `M0208-HASH-N20` — the set's widest miss (4.41x/5.20x) and biggest quoted margin (+5.87 pts), most likely to reverse. Exit: inside WARN_BAND on both axes; the set's one params exception — reuses the value of the arm it **controls** (`OverhangParams(N20, keep=40, signal="high")`), not the arm it replaces, since `scored()` branches on `p.signal`; `phase-6-results.md`; tests/lint green.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md` (phase 6 of 8)
+  - **Satisfies**: R2 — Re-draw every mis-shaped control arm as an Amendment under the nine existing method ids — no new method id, no extra N, no moved config_digest, no test-window look; R3 — Report which of the nine standing verdicts survive their honest control, in trial_funding.mwr, including margins that worsen or reverse; R4 — lab promote must actually stop refusing the nine
+  - **Depends on**: P1-ENG-K9WR
+  - **Plan**: `.workflows/plan/P2-ENG-T9LC.md`
+- [ ] **P2-ENG-Y3BQ** Phase 7: M0215 — the sector-capped placebo pair
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns amendment seq 1 on M0215, two arms `M0215-CTRL-PLC`/`M0215-CAP4-PLC` declaring separate supersession of `M0215-HASH` and `M0215-HASH-CAP4` — both old arms resolve to the same `CTRL` target, the sharpest case for why D17 reads a declaration and not target equality. Exit: both inside WARN_BAND; reuse `CapParams` (hash order, seed 1), no new dataclass; the method's cap-vs-CTRL success condition restated on the re-drawn pair; `phase-7-results.md`; tests/lint green.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md` (phase 7 of 8)
+  - **Satisfies**: R2 — Re-draw every mis-shaped control arm as an Amendment under the nine existing method ids — no new method id, no extra N, no moved config_digest, no test-window look; R3 — Report which of the nine standing verdicts survive their honest control, in trial_funding.mwr, including margins that worsen or reverse; R4 — lab promote must actually stop refusing the nine
+  - **Depends on**: P1-ENG-K9WR
+  - **Plan**: `.workflows/plan/P2-ENG-Y3BQ.md`
+
 ### [P3] Low
 - [ ] **P3-ENG-V2KQ** Append a dated §7.3 revision recording the N policy move to the lab design doc
   - **Difficulty**: EASY

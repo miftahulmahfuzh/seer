@@ -6,39 +6,39 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "22287ea",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "GO: both poles inside WARN_BAND on both axes (M0227-S20-PLC 0.99/0.99, M0243-NEAR20-PLC 1.03/1.03); phases 3-7 unblocked. Margins re-stated in mwr: M0227 +5.22->+3.90 (pre-registered direction did NOT hold, honest control earned MORE than the sticky R20), M0243 +6.07->+1.62 (direction held; this FAILS M0243's own 2-point success condition). Step 5b shape probe predicted both recorded ratios to within 0.01 -- run it before committing. Plan drift: its churn>checked fixture guard is unreachable on smoke_market, so the test selector now ranks by 5-bar change (8->17 entries over 22 decisions) and the guard is a measured moving-majority; copy the new form, not the plan's. No test-window look (still 4), N unchanged at 164, lab.sqlite not committed.",
       "package": "engine/lab",
       "plan": ".workflows/plan/honest-control-redraw/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-19T12:46:18+00:00",
       "satisfies": [
         "R1",
         "R2",
         "R3",
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-K9WR",
       "title": "The matched-draw rule, proven on both poles (M0227, M0243)"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "c32d274f17942617f471c4332b56f03f5bccaafa",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "D17 supersession landed, declared not target-inferred; measured no-op (19 refusals, 0 superseded, lab.sqlite hash unmoved). DECISION: the planned 'no arm declares anything' assertion was unsatisfiable once phase 1's M0227/M0243 blocks landed in this shared worktree -- replaced with a strictly stronger forever-true check (every declaration must name an existing, same-method, flagged arm), per invariant 10 over exit criterion 2. Also re-wrapped D17's 'There is no override' literal, which the plan's Step 11 block split across two strings and broke test_there_is_no_override. Survey reads 66 findings not 64: phase 1's two unrun arms, both unrecorded, retiring nothing.",
       "package": "engine/lab",
       "plan": ".workflows/plan/honest-control-redraw/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-19T12:47:01+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-D9TK",
       "title": "D17 supersedes: a declared honest control retires a handicapped one"
     },
     {
@@ -58,7 +58,7 @@
         "R3",
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The twin yardsticks: M0221 and M0225"
     },
@@ -79,7 +79,7 @@
         "R3",
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "M0047 \u2014 the size-weighted residual's two placebos"
     },
@@ -100,7 +100,7 @@
         "R3",
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "M0201 and M0202 \u2014 the rate-beta chassis, five arms"
     },
@@ -121,7 +121,7 @@
         "R3",
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "M0208 \u2014 the 4.41x extreme"
     },
@@ -142,7 +142,7 @@
         "R3",
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "M0215 \u2014 the sector-capped placebo pair"
     },
@@ -176,6 +176,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "honest-control-redraw",
-  "updated": "2026-10-19T12:28:06+00:00",
+  "updated": "2026-10-19T12:48:34+00:00",
+  "verified_at": "2026-10-19T12:46:49+00:00",
   "worktree": "/home/miftah/.worktrees/seer/honest-control-redraw"
 }

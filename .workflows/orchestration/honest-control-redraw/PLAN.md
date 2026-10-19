@@ -242,14 +242,14 @@ a declaration and not a target match (see **Decisions**).
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | The matched-draw rule, proven on both poles (M0227, M0243) | R1, R2, R3, R4 | `engine/lab` | 6 | — | HARD | `.workflows/plan/honest-control-redraw/phase-1.md` | — | — |
-| 2 | D17 supersedes: a declared honest control retires a handicapped one | R4 | `engine/lab` | 5 | — | NORMAL | `.workflows/plan/honest-control-redraw/phase-2.md` | — | — |
-| 3 | The twin yardsticks: M0221 and M0225 | R2, R3, R4 | `engine/lab/methods` | 3 | 1 | NORMAL | `.workflows/plan/honest-control-redraw/phase-3.md` | — | — |
-| 4 | M0047 — the size-weighted residual's two placebos | R2, R3, R4 | `engine/lab/methods` | 2 | 1 | NORMAL | `.workflows/plan/honest-control-redraw/phase-4.md` | — | — |
-| 5 | M0201 and M0202 — the rate-beta chassis, five arms | R2, R3, R4 | `engine/lab/methods` | 3 | 1 | HARD | `.workflows/plan/honest-control-redraw/phase-5.md` | — | — |
-| 6 | M0208 — the 4.41x extreme | R2, R3, R4 | `engine/lab/methods` | 2 | 1 | NORMAL | `.workflows/plan/honest-control-redraw/phase-6.md` | — | — |
-| 7 | M0215 — the sector-capped placebo pair | R2, R3, R4 | `engine/lab/methods` | 2 | 1 | NORMAL | `.workflows/plan/honest-control-redraw/phase-7.md` | — | — |
-| 8 | Close-out: which verdicts survived their honest control | R3, R4 | repo | 4 | 1,2,3,4,5,6,7 | NORMAL | `.workflows/plan/honest-control-redraw/phase-8.md` | — | — |
+| 1 | The matched-draw rule, proven on both poles (M0227, M0243) | R1, R2, R3, R4 | `engine/lab` | 6 | — | HARD | `.workflows/plan/honest-control-redraw/phase-1.md` | P1-ENG-K9WR | — |
+| 2 | D17 supersedes: a declared honest control retires a handicapped one | R4 | `engine/lab` | 5 | — | NORMAL | `.workflows/plan/honest-control-redraw/phase-2.md` | P1-ROOT-D9TK | — |
+| 3 | The twin yardsticks: M0221 and M0225 | R2, R3, R4 | `engine/lab/methods` | 3 | 1 | NORMAL | `.workflows/plan/honest-control-redraw/phase-3.md` | P2-ENG-R8NQ | — |
+| 4 | M0047 — the size-weighted residual's two placebos | R2, R3, R4 | `engine/lab/methods` | 2 | 1 | NORMAL | `.workflows/plan/honest-control-redraw/phase-4.md` | P2-ENG-V2HD | — |
+| 5 | M0201 and M0202 — the rate-beta chassis, five arms | R2, R3, R4 | `engine/lab/methods` | 3 | 1 | HARD | `.workflows/plan/honest-control-redraw/phase-5.md` | P2-ENG-F5WK | — |
+| 6 | M0208 — the 4.41x extreme | R2, R3, R4 | `engine/lab/methods` | 2 | 1 | NORMAL | `.workflows/plan/honest-control-redraw/phase-6.md` | P2-ENG-T9LC | — |
+| 7 | M0215 — the sector-capped placebo pair | R2, R3, R4 | `engine/lab/methods` | 2 | 1 | NORMAL | `.workflows/plan/honest-control-redraw/phase-7.md` | P2-ENG-Y3BQ | — |
+| 8 | Close-out: which verdicts survived their honest control | R3, R4 | repo | 4 | 1,2,3,4,5,6,7 | NORMAL | `.workflows/plan/honest-control-redraw/phase-8.md` | P3-ROOT-D7MX | — |
 
 Waves the DAG allows: **{1, 2}** → **{3, 4, 5, 6, 7}** → **{8}**. Unchanged by the
 reconciliation, and deliberately so: phase 2 reads `Candidate.supersedes` duck-typed

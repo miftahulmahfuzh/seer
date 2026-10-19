@@ -2,19 +2,19 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-14
-**Total Active Tasks**: 1
+**Last Updated**: 2026-10-19
+**Total Active Tasks**: 4
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 4
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 0
-- Completed: 21
+- Blocked: 2
+- Completed: 22
 
 ---
 
@@ -33,6 +33,37 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Depends on**: P1-ENG-J8RM, P1-ENG-T3ZK, P1-ENG-Q6WD
   - **Plan**: `.workflows/plan/P1-ROOT-H5NX.md`
 
+- [ ] **P1-ROOT-V3KD** Phase 2: The method file, its dedicated tests, and the pre-registration commit
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/lab/methods/m0260_gate_reading_cadence.py`, `engine/tests/test_lab_m0260_cadence.py`, **and the pre-registration commit carrying exactly those two files**. Does not touch `m0258_gate_price_band.py`, `m0072_standardised_earnings_jump.py`, `m0063_earnings_day_jump.py`, `sim/rules.py` or `test_lab_m0258_band.py` — all frozen or out of scope; it does not run `lab run`, and it writes nothing to the lab. Exit: `pytest -n0 engine/tests` green with DB tests not skipped; `ruff check engine` clean; the file declares **exactly six** candidates — `M0260-M-NATIVE`, `M0260-M-G3`, `M0260-M-G6`, `M0260-M-G12`, `M0260-W-NATIVE`, `M0260-W-G1` — with six distinct config digests; all six rationales contain the literal lowercase `dose-response` (invariant 12, checked mechanically); `lookback` is **454**, the same at every rung, and the first scored session reads **`1996-01-03`** (invariant 11); the docstring's prior-grid table has been diffed against phase 1's committed `.md` and phase 1's numbers taken on any disagreement, with every figure in it labelled UNFUNDED; the docstring states the confound, the decomposition, the promotability table, the M0072-not-M0197 argument, the lookback measurement, the pre-registered prediction with signs and sizes, the walk-forward MAR caution and the no-test-look rule in its own words; one commit exists containing exactly those two files, unamended.
+  - **Status**: pending
+  - **Unblocked**: 2026-10-19 — phase 1 (`P1-ROOT-Q7MF`) landed at `e6e39ce`; the prior grid and the anchor probe are committed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/gate-reading-cadence/PLAN.md` (phase 2 of 4)
+  - **Satisfies**: R1, R3, R4, R6, R7 — Sweep the SPY-200 gate's reading cadence weekly→yearly on M0072-Z2-RAWRANK's book, under id M0260, as a dose-response ladder in the checking interval, and find where it turns; Run the axis only on a book whose event hold is counted in sessions, not calendar months; Check `sim.rules.PRESETS` before calling any arm promotable; say so when a winning cadence has no preset rather than minting one mid-run; Separate the gate's reading cadence from the book's re-pick frequency — or state explicitly that it cannot be separated on this chassis and plan the confound in; Spend no test-window look
+  - **Depends on**: P1-ROOT-Q7MF
+  - **Plan**: `.workflows/plan/P1-ROOT-V3KD.md`
+
+- [ ] **P1-ROOT-N8PZ** Phase 3: Run and record the verdict
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `lab run M0260`, `lab walkforward M0260`, `lab control M0260`, `lab costs`, `lab note`, `lab insight`, `lab stage`, the result commit in the main checkout, and the capture directory `/tmp/m0260` (copied to `/home/miftah/.cache/seer-captures-m0260` before close-out, because `/tmp` does not survive a reboot). Does not touch the pre-registration commit (**phase 2 made it**; this phase verifies it and never amends or rebases it), the method file or its test module (frozen), `lab test` (never invoked), the test-window store, the plan index, the handover, or `.workflows/todos.md`. Exit: **six** trials recorded under M0260 with six distinct config digests; `trials.n` read back, never assumed; `methods.source_sha` equals the committed method file's sha256 and every `trials.git_sha` equals phase 2's pre-registration commit; the reproduction arms checked against `M0258-M-B0` and `M0258-W-B0` on mwr, worst fall, trades, turnover, exposure and PF — or the drift recorded as the method's headline finding; the decomposition computed on both axes with `(A−C) + (C−B) = (A−B)` to machine precision; the ladder reported arm by arm with an explicit sentence saying whether it is humped, monotone or flat and where it turns; the folds reported arm by arm with the MAR caveat stated and no fold percentage quoted as the owner's money; `lab control` read and its verdict recorded; a verdict and a plain-language analysis recorded, quoting `trial_funding.mwr` only; at least one insight journalled; `lab stage` run and `lab.sqlite` + `web/data/lab.json` committed from the main checkout with no pathspec; test-window trial count still **4**.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/gate-reading-cadence/PLAN.md` (phase 3 of 4)
+  - **Satisfies**: R1, R2, R5, R7 — Sweep the SPY-200 gate's reading cadence weekly→yearly on M0072-Z2-RAWRANK's book, under id M0260, as a dose-response ladder in the checking interval, and find where it turns; Read the walk-forward folds arm by arm, because they pick by MAR and so favour whichever arm trades least; Quote `trial_funding.mwr` throughout, never `total_return` or `cagr`; Spend no test-window look
+  - **Depends on**: P1-ROOT-V3KD
+  - **Plan**: `.workflows/plan/P1-ROOT-N8PZ.md`
+
+- [ ] **P1-ROOT-C5RB** Phase 4: Handover, bookkeeping and the standing correction
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `docs/plans/HANDOVER_20261019-the-gate-reading-cadence.md`, `.workflows/todos.md` (root only), the `**Status:**` tick on the plan index, a memory file under `/home/miftah/.claude/projects/-home-miftah-seer/memory/` with its `MEMORY.md` pointer, the merge of `feature/gate-reading-cadence` to `main`, and the push. Does not touch the lab database or `web/data/lab.json` (phase 3 closed them in the main checkout; the branch never carried them), the method file, the study script, or `engine/.workflows/todos.md`. Exit: handover written in the house style with the lab-state table (**836** dev trials, test looks still 4), the **six**-row ladder with no `M-G2` row, the decomposition with its arithmetic shown, an explicit paragraph naming the **four** monthly arms as promotable and both weekly arms as never promotable, a sentence on why the ladder is six arms and where the two-month rung went, a sentence on the widened lookback and the unchanged `1996-01-03` start, the dead list carried forward and extended and the leftovers list carried forward and re-prioritised, and no surviving `«` placeholder; every number traced to a named `/tmp/m0260` capture file; at least one memory file written with its `MEMORY.md` line, and the parent memory superseded in place rather than duplicated; the plan index set to `**Status:** complete` with phase 4's TaskID filled; branch merged to `main` and pushed, with no `lab.sqlite` or `lab.json` in the merge's diffstat, no rebase, and the worktree and branch deleted.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/gate-reading-cadence/PLAN.md` (phase 4 of 4)
+  - **Satisfies**: R4, R5, R7 — Check `sim.rules.PRESETS` before calling any arm promotable; say so when a winning cadence has no preset rather than minting one mid-run; Quote `trial_funding.mwr` throughout, never `total_return` or `cagr`; Spend no test-window look
+  - **Depends on**: P1-ROOT-N8PZ
+  - **Plan**: `.workflows/plan/P1-ROOT-C5RB.md`
+
 ### [P2] Medium
 ### [P3] Low
 
@@ -43,6 +74,23 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-Q7MF** Phase 1: Measure the prior and prove the anchor
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `docs/backtests/2026-10-19-gate-reading-cadence.py` and its committed output `docs/backtests/2026-10-19-gate-reading-cadence.md` — a standalone study, sharing no code with the simulator, that (a) runs the SPY-alone gate at reading intervals of 1, 2, 3, 6 and 12 months against the native monthly and weekly readings, as the feasibility table and prior the method file must quote, and (b) probes the real dev store to prove the month-end anchor always resolves inside the bars on hand and always has at least 200 SPY bars behind it, for every rung, on every decision session of the dev window. It takes an **absolute `--store`** and runs from the worktree — deliberately unlike the M0258 precedent. Does not touch anything under `engine/src`, anything under `engine/tests`, the lab database (not even a read — a read migrates the file on connect), the plan index, the analysis document, or the phase plan files. Exit: both files committed; the grid reproduces `M0084-MONTHLY` and `M0084-WEEKLY` in sign and magnitude the way M0258's grid did; the probe reports zero fallbacks, zero late anchors and a minimum SPY bar count ≥ 200 at every rung, or reports the exact sessions where it does not; the monthly `k = 1` identity and the weekly decomposition identity both report zero disagreements; the committed `.md` says in one sentence that **`k = 2` is measured here as a prior only and is deferred to an `Amendment`**, speaks of **six** arms, and carries the `min bars` measurement as what makes phase 2's widened lookback safe, stating the ceiling as `lookback <= 739`; the word **unfunded** sits beside every return it quotes.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/gate-reading-cadence/PLAN.md` (phase 1 of 4)
+  - **Satisfies**: R6 — Separate the gate's reading cadence from the book's re-pick frequency — or state explicitly that it cannot be separated on this chassis and plan the confound in
+  - **Plan**: `.workflows/plan/P1-ROOT-Q7MF.md`
+  - **Completed**: 2026-10-19 16:20
+  - **Method**: /do
+  - **Files**: `docs/backtests/2026-10-19-gate-reading-cadence.py`, `docs/backtests/2026-10-19-gate-reading-cadence.md`, `.workflows/todos.md`, `.workflows/plan/P1-ROOT-Q7MF.md`, `.workflows/plan/P1-ROOT-V3KD.md`, `.workflows/plan/P1-ROOT-N8PZ.md`, `.workflows/plan/P1-ROOT-C5RB.md`
+  - **Drift**: None. The phase plan's code block for the study script was transcribed verbatim and every number it predicted reproduced digit for digit against the real dev store.
+  - **Decided**:
+    - Which todos.md holds the four phase tasks -> the ROOT `.workflows/todos.md` for all four phases, package code ROOT (rung 6, surrounding convention: only three todos.md exist in this repo — root, `engine/`, `web/` — and the precedent plan set `lab-brakes-and-gate` filed all six of its phases in root as `P1-ROOT-H5NX`; creating five new tracking trees under `docs/backtests`, `engine/tests`, `lab/` and `docs/plans` would have been the wider blast radius).
+    - Who makes phase 1's content commit -> this session made it per the phase plan's own Step 4 code block (rung 3, the phase plan's code blocks), which carries the exact pre-written commit message; pusher's job is the remaining bookkeeping files only.
+  - **Commit**: `e6e39ce`
 
 - [x] **P1-ROOT-M2XZ** Phase 2: The dated owner revision, and the before/after
   - **Difficulty**: NORMAL

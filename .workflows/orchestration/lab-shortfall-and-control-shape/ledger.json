@@ -40,21 +40,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "22f6e13",
       "depends_on": [
         1
       ],
       "difficulty": "EASY",
       "n": 3,
-      "note": null,
+      "note": "lab note cannot double-append: store._analysis_key + a pre-write LabError refusal, and _note prints one confirmation line. ruff clean, 6016 passed / 4 skipped, lab.sqlite untouched. Decided: committed own adopted plan copy P1-ENG-ISID.md, left the two peer copies untracked (rung 6, phase 2's precedent at 7d36ea3). No drift \u2014 every quoted anchor matched; _note sat at :2888 after phase 1. readme-updater deliberately NOT run: phase 4 owns the combined package_readme.md pass for lab shortfall + lab control. P1-ENG-DZDN is now unblocked (both deps landed).",
       "package": "engine/seer_engine/lab",
       "plan": ".workflows/plan/lab-shortfall-and-control-shape/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-19T05:06:36+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-ISID",
       "title": "lab note` cannot double-append, and says what it did"
     },
     {
@@ -74,7 +74,7 @@
         "R1",
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "lab control`, the `lab run` annotation, hard gate D17, and the trial-828 note"
     }
@@ -82,7 +82,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-shortfall-and-control-shape/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-shortfall-and-control-shape",
-  "updated": "2026-10-19T05:02:15+00:00",
+  "updated": "2026-10-19T05:07:58+00:00",
   "verified_at": "2026-10-19T05:02:15+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-shortfall-and-control-shape"
 }

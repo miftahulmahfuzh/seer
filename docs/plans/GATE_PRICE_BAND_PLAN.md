@@ -6,7 +6,7 @@
 **Worktree:** `~/.worktrees/seer/gate-price-band`
 **Branch:** `feature/gate-price-band` (base: `origin/main` @ `84123cb`)
 **Phases:** 1
-**Status:** planned
+**Status:** complete
 **Coordinator:** —
 
 ---
@@ -117,7 +117,7 @@ Every one of these is checkable, and a phase that breaks one is not done.
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | M0258: pre-register, run and record the banded gate | R1, R2, R3, R4, R5, R6 | `engine/src/seer_engine/lab` | 6 | — | HARD | `.workflows/plan/gate-price-band/phase-1.md` | `P1-ENG-IPVX` | — |
+| 1 | M0258: pre-register, run and record the banded gate | R1, R2, R3, R4, R5, R6 | `engine/src/seer_engine/lab` | 6 | — | HARD | `.workflows/plan/gate-price-band/phase-1.md` | `P1-ENG-IPVX` ✅ (done 2026-10-19) | — |
 
 ### Phase 1 — M0258: pre-register, run and record the banded gate
 **Satisfies:** R1, R2, R3, R4, R5, R6

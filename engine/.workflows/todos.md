@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-19
-**Total Active Tasks**: 3
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 147
+- Completed: 148
 
 ---
 
@@ -23,15 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ENG-IPVX** Phase 1: M0258: pre-register, run and record the banded gate
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns the cadence study (script + writeup), the method file and its test module, the pre-registration commit, `lab run M0258`, the analysis/verdict/insight/idea, `lab stage` and the staged commit in the main checkout, and the handover. Exit: pytest green + ruff clean; `lab run M0258` exit 0 with six dev trials and one `method_folds` row; `lab show M0258` prints six arms and `lab control M0258` reports no refuse; a `lab note` analysis ending in `My opinion:`, a verdict line, >=1 insight, >=1 queued idea; `lab stage` run and both `lab.sqlite` and `web/data/lab.json` committed from the index in the main checkout; test-window looks still read 4; handover written.
-  - **Status**: in_progress
-  - **Plan Set**: `docs/plans/GATE_PRICE_BAND_PLAN.md` (phase 1 of 1)
-  - **Satisfies**: R1 — a band arm (exit b% below the 200-day average, re-enter b% above) on a book that holds stocks; R2 — a bare-gate arm on the same book, a paired difference; R3 — a dose-response ladder across the band (1.5%-6% plateau); R4 — a control arm matched to the book's own trade count and turnover; R5 — a new method file behind a new allocator id, not riding on `FactorParams.trend`; R6 — no test-window look, dev screen and a majority of walk-forward folds first
-  - **Depends on**: —
-  - **Plan**: `.workflows/plan/P1-ENG-IPVX.md`
 - [x] **P1-ENG-0L6E** Phase 1: Resize band relative to the holding's target (`resize_basis` lever)
   - **Difficulty**: NORMAL
   - **Type**: Feature
@@ -1551,6 +1542,31 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-IPVX** Phase 1: M0258: pre-register, run and record the banded gate
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns the cadence study (script + writeup), the method file and its test module, the pre-registration commit, `lab run M0258`, the analysis/verdict/insight/idea, `lab stage` and the staged commit in the main checkout, and the handover. Exit: pytest green + ruff clean; `lab run M0258` exit 0 with six dev trials and one `method_folds` row; `lab show M0258` prints six arms and `lab control M0258` reports no refuse; a `lab note` analysis ending in `My opinion:`, a verdict line, >=1 insight, >=1 queued idea; `lab stage` run and both `lab.sqlite` and `web/data/lab.json` committed from the index in the main checkout; test-window looks still read 4; handover written.
+  - **Status**: completed
+  - **Plan Set**: `docs/plans/GATE_PRICE_BAND_PLAN.md` (phase 1 of 1)
+  - **Satisfies**: R1 — a band arm (exit b% below the 200-day average, re-enter b% above) on a book that holds stocks; R2 — a bare-gate arm on the same book, a paired difference; R3 — a dose-response ladder across the band (1.5%-6% plateau); R4 — a control arm matched to the book's own trade count and turnover; R5 — a new method file behind a new allocator id, not riding on `FactorParams.trend`; R6 — no test-window look, dev screen and a majority of walk-forward folds first
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-IPVX.md`
+  - **Completed**: 2026-10-19 14:46
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/methods/m0258_gate_price_band.py, engine/tests/test_lab_m0258_band.py, docs/backtests/2026-10-19-gate-band-cadence.py, docs/backtests/2026-10-19-gate-band-cadence.md, docs/plans/HANDOVER_20261019-the-gate-price-band.md, docs/plans/GATE_PRICE_BAND_PLAN.md, docs/analyzer/20261019-135550-B4K2_code_analyzer.md, .workflows/plan/gate-price-band/phase-1.md, engine/.workflows/todos.md, engine/.workflows/plan/P1-ENG-IPVX.md, lab/lab.sqlite (main checkout, via lab stage), web/data/lab.json (main checkout, via lab stage)
+  - **Result**: M0258 pre-registered, run, analysed and recorded. Six dev trials (#829-#834), N 162 -> 163, test-window looks UNCHANGED at 4. Verdict: a price band on the SPY-200 gate is worth nothing on a stock book once the gate is only read monthly (-0.57 pts/yr, 0.25 pts deeper), while the same band read weekly is worth +4.71 pts/yr and 5.75 pts of worst fall - the pre-registered difference-in-differences prediction held on both axes (+5.28 pts/yr, 6.00 pts). Larger unlooked-for finding: reading the gate monthly instead of weekly, with no band at all, is worth +7.01 pts/yr and 11.69 pts of worst fall. Insight 465 journalled; ideas M0259 and M0260 queued. Method reads dev-eligible; its buy signal is earned by the no-band arm (a reproduction of M0072-Z2-RAWRANK), not by the band.
+  - **Verified**: `pytest engine/tests` from the main checkout: 6047 passed, 3 skipped (baseline 6028 + 19), only the three recorded skips. `ruff check engine`: All checks passed. `lab run M0258` exit 0; `lab show M0258` exit 0 with six arms; `lab control M0258` exit 0, four dose-response rows, no refuse. `test_lab_snapshot.py`: 24 passed (lab.sqlite and web/data/lab.json agree).
+  - **Drift**:
+    - The phase plan's Step 1 verification said to run the cadence study from the worktree, but the script opens a RELATIVE path `engine/.research/bars.csv` and no worktree has a research store. Ran it from the main checkout instead, which is what the plan's own Verification section does.
+    - The phase plan's cadence script had a sign inversion in its paired-difference drawdown line: it printed `(gdd - bdd)` while its own comment, the plan's expected output (+8.4), the Step 2 writeup ("8.4 pts better") and the Step 3 method docstring all require the band-fell-less sign. Corrected to `(bdd - gdd)`; the twelve-row grid itself reproduced to the digit unchanged.
+    - The plan's expected weekly paired difference (+2.52 / 15.6) was derived by differencing its own ROUNDED grid; the script computes at full precision and prints +2.53 / 15.5. Documents now quote the full-precision values with a one-line note, since the plan's own standard is that a pre-registration must quote reproducible numbers. Daily and monthly matched exactly.
+    - The zero-band arm reproduced the host book BIT-IDENTICALLY (12.3314%/yr, 23.8026% fall, 1208 trades, turnover 6.529, exposure 0.695, PF 1.98), which is stronger than the plan anticipated ("they will not be bit-identical").
+  - **Decided**:
+    - Run the cadence study from the main checkout, not the worktree -> rung 3, the plan's own Verification section uses that cwd and the research store is never in a worktree
+    - Fix the script's paired-difference drawdown sign to `(bdd - gdd)` -> rung 3, three other code blocks plus the expression's own comment all require positive = band fell less
+    - Quote the weekly pair at full precision (+2.53 / 15.5) rather than the plan's rounded-difference (+2.52 / 15.6) -> rung 3 plus the plan's stated standard that a pre-registration must quote numbers a reader can reproduce
+    - Queue TWO ideas rather than the one the plan named -> rung 2, exit criteria require >=1 queued idea, and the run's largest finding (gate cadence, +7.01 pts/yr) warranted its own entry alongside the planned insight-452 correction row
+    - Completion bookkeeping: block moved into `## Completed Tasks` (the 2026-10-18 precedent of this file); Quick Stats recounted from the file. Landing: no swarm coordinator owns this set, so the completion handler merges `feature/gate-price-band` to `main` itself.
 - [x] **P1-ENG-7CWT** Phase 3: Refresh the stores, verify, unblock M0225
   - **Difficulty**: NORMAL
   - **Type**: Feature

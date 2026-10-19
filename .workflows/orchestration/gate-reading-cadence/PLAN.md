@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/gate-reading-cadence`
 **Branch:** `feature/gate-reading-cadence` (base: `origin/main` @ `5210f35`)
 **Phases:** 4 (strictly sequential: 1 → 2 → 3 → 4)
-**Status:** planned
+**Status:** phase 1/4 complete
 **Coordinator:** —
 
 ---
@@ -141,10 +141,10 @@ Every phase must hold all of these.
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Measure the prior and prove the anchor | R6 | `docs/backtests` | 2 | — | NORMAL | `.workflows/plan/gate-reading-cadence/phase-1.md` | — | — |
-| 2 | The method file, its dedicated tests, and the pre-registration commit | R1, R3, R4, R6, R7 | `engine/src/seer_engine/lab/methods`, `engine/tests` | 2 | 1 | HARD | `.workflows/plan/gate-reading-cadence/phase-2.md` | — | — |
-| 3 | Run and record the verdict | R1, R2, R5, R7 | `lab/` (main checkout) | 2 | 2 | HARD | `.workflows/plan/gate-reading-cadence/phase-3.md` | — | — |
-| 4 | Handover, bookkeeping and the standing correction | R4, R5, R7 | `docs/plans`, `.workflows` | 3 | 3 | NORMAL | `.workflows/plan/gate-reading-cadence/phase-4.md` | — | — |
+| 1 | Measure the prior and prove the anchor | R6 | `docs/backtests` | 2 | — | NORMAL | `.workflows/plan/gate-reading-cadence/phase-1.md` | P1-ROOT-Q7MF (done 2026-10-19) | — |
+| 2 | The method file, its dedicated tests, and the pre-registration commit | R1, R3, R4, R6, R7 | `engine/src/seer_engine/lab/methods`, `engine/tests` | 2 | 1 | HARD | `.workflows/plan/gate-reading-cadence/phase-2.md` | P1-ROOT-V3KD | — |
+| 3 | Run and record the verdict | R1, R2, R5, R7 | `lab/` (main checkout) | 2 | 2 | HARD | `.workflows/plan/gate-reading-cadence/phase-3.md` | P1-ROOT-N8PZ | — |
+| 4 | Handover, bookkeeping and the standing correction | R4, R5, R7 | `docs/plans`, `.workflows` | 3 | 3 | NORMAL | `.workflows/plan/gate-reading-cadence/phase-4.md` | P1-ROOT-C5RB | — |
 
 ### Phase 1 — Measure the prior and prove the anchor
 **Satisfies:** R6

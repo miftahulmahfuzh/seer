@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "3190cec",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": null,
+      "note": "6 of 6 structural checks PASS; every figure matched the plan's measured expectations digit for digit. Appendices A and B both CONFIRMED: monthly k=1 identity exact on all 237 sessions, weekly decomposition exact on all 1032 (1032 agreements), zero fallbacks, zero late anchors, min 738 SPY bars behind any anchor (760 on monthly k=1). Prior FALLS and does not hump (9.08/8.56/6.71/8.39/7.06 unfunded CAGR at k=1/2/3/6/12), so D4's framing holds and phase 2 must not pre-register a slow-gate win. Decomposition unfunded: A-B +3.58 and 15.5 pts fall, splitting +0.59 re-pick and +2.99 gate cadence, ALL the fall on gate cadence. Commits: e6e39ce content (trailer correct), 3190cec bookkeeping. DECISIONS: (1) all four phase tasks filed in the ROOT .workflows/todos.md per the lab-brakes-and-gate precedent, rung 6, not five new per-package trees; (2) readme-updater skipped, docs/backtests is a records directory with no package_readme.md; (3) FOR PHASE 4'S HANDOVER: 3190cec's trailer reads 'Co-Authored-By: Claude Haiku 4.5' instead of D5's 'Claude Opus 5' because pusher runs on haiku and its session attribution overrode the passed line. Deliberately NOT rebased - it is pushed and three phases build on this branch. Record it in the handover as a known deviation from D5; the content commit e6e39ce is correct.",
       "package": "docs/backtests",
       "plan": ".workflows/plan/gate-reading-cadence/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-19T09:26:49+00:00",
       "satisfies": [
         "R6"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-Q7MF",
       "title": "Measure the prior and prove the anchor"
     },
     {
@@ -32,7 +32,7 @@
       "note": null,
       "package": "engine/src/seer_engine/lab/methods`, `engine/tests",
       "plan": ".workflows/plan/gate-reading-cadence/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-19T09:09:34+00:00",
       "satisfies": [
         "R1",
         "R3",
@@ -40,8 +40,8 @@
         "R6",
         "R7"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "spawned",
+      "task_id": "P1-ROOT-V3KD",
       "title": "The method file, its dedicated tests, and the pre-registration commit"
     },
     {
@@ -55,7 +55,7 @@
       "note": null,
       "package": "lab/` (main checkout)",
       "plan": ".workflows/plan/gate-reading-cadence/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-19T09:09:34+00:00",
       "satisfies": [
         "R1",
         "R2",
@@ -63,7 +63,7 @@
         "R7"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ROOT-N8PZ",
       "title": "Run and record the verdict"
     },
     {
@@ -77,20 +77,20 @@
       "note": null,
       "package": "docs/plans`, `.workflows",
       "plan": ".workflows/plan/gate-reading-cadence/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-19T09:09:34+00:00",
       "satisfies": [
         "R4",
         "R5",
         "R7"
       ],
       "status": "pending",
-      "task_id": null,
+      "task_id": "P1-ROOT-C5RB",
       "title": "Handover, bookkeeping and the standing correction"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/gate-reading-cadence/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "gate-reading-cadence",
-  "updated": "2026-10-19T09:05:20+00:00",
+  "updated": "2026-10-19T09:26:49+00:00",
   "worktree": "/home/miftah/.worktrees/seer/gate-reading-cadence"
 }

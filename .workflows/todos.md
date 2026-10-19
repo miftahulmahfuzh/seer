@@ -3,18 +3,18 @@
 **Package Path**: `.`
 **Package Code**: ROOT
 **Last Updated**: 2026-10-19
-**Total Active Tasks**: 3
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 23
+- Blocked: 0
+- Completed: 24
 
 ---
 
@@ -33,22 +33,12 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Depends on**: P1-ENG-J8RM, P1-ENG-T3ZK, P1-ENG-Q6WD
   - **Plan**: `.workflows/plan/P1-ROOT-H5NX.md`
 
-- [ ] **P1-ROOT-N8PZ** Phase 3: Run and record the verdict
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `lab run M0260`, `lab walkforward M0260`, `lab control M0260`, `lab costs`, `lab note`, `lab insight`, `lab stage`, the result commit in the main checkout, and the capture directory `/tmp/m0260` (copied to `/home/miftah/.cache/seer-captures-m0260` before close-out, because `/tmp` does not survive a reboot). Does not touch the pre-registration commit (**phase 2 made it**; this phase verifies it and never amends or rebases it), the method file or its test module (frozen), `lab test` (never invoked), the test-window store, the plan index, the handover, or `.workflows/todos.md`. Exit: **six** trials recorded under M0260 with six distinct config digests; `trials.n` read back, never assumed; `methods.source_sha` equals the committed method file's sha256 and every `trials.git_sha` equals phase 2's pre-registration commit; the reproduction arms checked against `M0258-M-B0` and `M0258-W-B0` on mwr, worst fall, trades, turnover, exposure and PF — or the drift recorded as the method's headline finding; the decomposition computed on both axes with `(A−C) + (C−B) = (A−B)` to machine precision; the ladder reported arm by arm with an explicit sentence saying whether it is humped, monotone or flat and where it turns; the folds reported arm by arm with the MAR caveat stated and no fold percentage quoted as the owner's money; `lab control` read and its verdict recorded; a verdict and a plain-language analysis recorded, quoting `trial_funding.mwr` only; at least one insight journalled; `lab stage` run and `lab.sqlite` + `web/data/lab.json` committed from the main checkout with no pathspec; test-window trial count still **4**.
-  - **Status**: open
-  - **Unblocked**: 2026-10-19 — phase 2 (`P1-ROOT-V3KD`) landed at `41acf12`; the M0260 method file and its test module are committed and pre-registered
-  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/gate-reading-cadence/PLAN.md` (phase 3 of 4)
-  - **Satisfies**: R1, R2, R5, R7 — Sweep the SPY-200 gate's reading cadence weekly→yearly on M0072-Z2-RAWRANK's book, under id M0260, as a dose-response ladder in the checking interval, and find where it turns; Read the walk-forward folds arm by arm, because they pick by MAR and so favour whichever arm trades least; Quote `trial_funding.mwr` throughout, never `total_return` or `cagr`; Spend no test-window look
-  - **Depends on**: P1-ROOT-V3KD
-  - **Plan**: `.workflows/plan/P1-ROOT-N8PZ.md`
-
 - [ ] **P1-ROOT-C5RB** Phase 4: Handover, bookkeeping and the standing correction
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `docs/plans/HANDOVER_20261019-the-gate-reading-cadence.md`, `.workflows/todos.md` (root only), the `**Status:**` tick on the plan index, a memory file under `/home/miftah/.claude/projects/-home-miftah-seer/memory/` with its `MEMORY.md` pointer, the merge of `feature/gate-reading-cadence` to `main`, and the push. Does not touch the lab database or `web/data/lab.json` (phase 3 closed them in the main checkout; the branch never carried them), the method file, the study script, or `engine/.workflows/todos.md`. Exit: handover written in the house style with the lab-state table (**836** dev trials, test looks still 4), the **six**-row ladder with no `M-G2` row, the decomposition with its arithmetic shown, an explicit paragraph naming the **four** monthly arms as promotable and both weekly arms as never promotable, a sentence on why the ladder is six arms and where the two-month rung went, a sentence on the widened lookback and the unchanged `1996-01-03` start, the dead list carried forward and extended and the leftovers list carried forward and re-prioritised, and no surviving `«` placeholder; every number traced to a named `/tmp/m0260` capture file; at least one memory file written with its `MEMORY.md` line, and the parent memory superseded in place rather than duplicated; the plan index set to `**Status:** complete` with phase 4's TaskID filled; branch merged to `main` and pushed, with no `lab.sqlite` or `lab.json` in the merge's diffstat, no rebase, and the worktree and branch deleted.
-  - **Status**: blocked
+  - **Status**: open
+  - **Unblocked**: 2026-10-19 — phase 3 (`P1-ROOT-N8PZ`) recorded six M0260 trials (#835..#840) and landed the lab result commit `3558cd0` in the main checkout, left local for phase 4 to merge and push
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/gate-reading-cadence/PLAN.md` (phase 4 of 4)
   - **Satisfies**: R4, R5, R7 — Check `sim.rules.PRESETS` before calling any arm promotable; say so when a winning cadence has no preset rather than minting one mid-run; Quote `trial_funding.mwr` throughout, never `total_return` or `cagr`; Spend no test-window look
   - **Depends on**: P1-ROOT-N8PZ
@@ -64,6 +54,28 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-N8PZ** Phase 3: Run and record the verdict
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `lab run M0260`, `lab walkforward M0260`, `lab control M0260`, `lab costs`, `lab note`, `lab insight`, `lab stage`, the result commit in the main checkout, and the capture directory `/tmp/m0260` (copied to `/home/miftah/.cache/seer-captures-m0260` before close-out, because `/tmp` does not survive a reboot). Does not touch the pre-registration commit (**phase 2 made it**; this phase verifies it and never amends or rebases it), the method file or its test module (frozen), `lab test` (never invoked), the test-window store, the plan index, the handover, or `.workflows/todos.md`. Exit: **six** trials recorded under M0260 with six distinct config digests; `trials.n` read back, never assumed; `methods.source_sha` equals the committed method file's sha256 and every `trials.git_sha` equals phase 2's pre-registration commit; the reproduction arms checked against `M0258-M-B0` and `M0258-W-B0` on mwr, worst fall, trades, turnover, exposure and PF — or the drift recorded as the method's headline finding; the decomposition computed on both axes with `(A−C) + (C−B) = (A−B)` to machine precision; the ladder reported arm by arm with an explicit sentence saying whether it is humped, monotone or flat and where it turns; the folds reported arm by arm with the MAR caveat stated and no fold percentage quoted as the owner's money; `lab control` read and its verdict recorded; a verdict and a plain-language analysis recorded, quoting `trial_funding.mwr` only; at least one insight journalled; `lab stage` run and `lab.sqlite` + `web/data/lab.json` committed from the main checkout with no pathspec; test-window trial count still **4**.
+  - **Status**: completed
+  - **Unblocked**: 2026-10-19 — phase 2 (`P1-ROOT-V3KD`) landed at `41acf12`; the M0260 method file and its test module are committed and pre-registered
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/gate-reading-cadence/PLAN.md` (phase 3 of 4)
+  - **Satisfies**: R1, R2, R5, R7 — Sweep the SPY-200 gate's reading cadence weekly→yearly on M0072-Z2-RAWRANK's book, under id M0260, as a dose-response ladder in the checking interval, and find where it turns; Read the walk-forward folds arm by arm, because they pick by MAR and so favour whichever arm trades least; Quote `trial_funding.mwr` throughout, never `total_return` or `cagr`; Spend no test-window look
+  - **Depends on**: P1-ROOT-V3KD
+  - **Plan**: `.workflows/plan/P1-ROOT-N8PZ.md`
+  - **Completed**: 2026-10-19 17:34 — six dev trials recorded under M0260 (`#835`..`#840`), six distinct config digests, method status `dev-eligible`; verdict, analysis, two insights and one queued follow-up written; `lab stage` run and the result committed in the main checkout at `3558cd0`, left local for phase 4 to merge and push
+  - **Method**: /do
+  - **Files**: `lab/lab.sqlite`, `web/data/lab.json`, `.workflows/todos.md`
+  - **Verified**: `ruff check engine` clean; `pytest -n0 engine/tests` green **both before and after** the runs — 6068 passed, 4 skipped, and all four skips are opt-in live-store sweeps, **no DB test skipped**. Six trials read back from `trials.n`, never assumed: `#835`..`#840`, six distinct config digests, `methods.M0260.status` `dev-eligible`. Both reproduction arms reproduced the parent **exactly on all six fields**: `M0260-M-NATIVE` returned `M0258-M-B0`'s row (12.3314% money-weighted, 23.8026% worst fall, 1208 trades, 6.5288 turnover, 0.6949 exposure, 1.9781 profit factor) and `M0260-W-NATIVE` returned `M0258-W-B0`'s (5.3178%, 35.4908%, 1923, 10.0021, 0.6855, 1.2767) — no drift to record as a finding. The decomposition closes with residual **exactly 0** on both axes: of the +7.0136 pts/yr, re-pick frequency is +1.0489 and gate reading cadence is +5.9647; of the 11.6882 points of worst fall, re-pick is 2.2712 and cadence is 9.4170. The ladder is **flat-to-falling and non-monotone, turning at monthly** — 12.3314% monthly, 8.7806% quarterly, 12.0963% half-yearly, 8.6423% yearly, against 7.188% for the same deposits in SPY TR — and every slower rung fell deeper than monthly's 23.8026% (33.6414%, 30.3353%, 25.6435%). Folds read arm by arm with the MAR caveat stated: three of four picked a slow rung (`M-G12` once, `M-G6` twice) and two of those three lost, while the fourth picked `M-NATIVE` and won; 2 of 4 folds won overall. `lab control` classified all six arms `dose-response`, verdict `not-checked`, nothing refused. Verdict and plain-language analysis recorded once (verified, not double-appended); insights `#469` (synthesis) and `#470` (risk) journalled; follow-up queued as M0261; three `lab costs` observations journalled (`#466`, `#467`, `#468`). Test-window looks still **4** — `lab test` never invoked. Closing lab state: 836 dev trials, 275 methods, 470 insights, next free id M0262. Every number traced to a capture in `/tmp/m0260`, copied to `/home/miftah/.cache/seer-captures-m0260`.
+  - **Drift**: No code drift. Every one of the plan's code blocks applied verbatim.
+  - **Decided**:
+    - Step 6 asserts every `trials.git_sha` equals the pre-registration commit, but HEAD is phase 2's bookkeeping commit `f3cf29d` sitting one above the pre-registration `41acf12`, so `git_sha` reads `f3cf29d` -> accepted as passing (Rung 1, invariant 6, "the method file is frozen by its pre-registration commit"): `git diff 41acf12 HEAD` over both files is empty and `methods.source_sha` matches the committed bytes, so the file that ran *is* the file pre-registered. The prose equated HEAD with the pre-registration commit only because it assumed nothing landed on top.
+    - Whether to run a third `lab costs`, on `M0260-M-G3`, when the plan gates it on the ladder peaking at an interior rung and the ladder peaks at `M-NATIVE` -> ran it (Rung 4, R1, "find where it turns"): the ladder turns twice in the interior, and the fee-vs-timing read at the trough is what separates a zigzag that is fees from one that is calendar phase.
+    - Which attribution trailer the commits carry -> `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>` rather than plan Decision D5's plain form (Rung 5, the user's own instruction): D5's stated rung was "this session's attribution instruction", and in this session that instruction specifies the (1M context) form and says it replaces earlier guidance; phase 2's landed commit at `f3cf29d` uses it too.
+    - Whether to tick `.workflows/todos.md` at all, given phase 3's plan lists it under "does not touch" -> ticked it (Rung 2/6): that line reserves phase 4's *handover* bookkeeping, not the closing of phase 3's own task, and phase 2 ticked its own task on this same branch at `f3cf29d`.
+  - **Commit**: `3558cd0` (the lab result commit — `lab/lab.sqlite` + `web/data/lab.json`, staged by `lab stage` and committed with no pathspec in the main checkout; deliberately left local for phase 4 to merge and push)
 
 - [x] **P1-ROOT-V3KD** Phase 2: The method file, its dedicated tests, and the pre-registration commit
   - **Difficulty**: HARD

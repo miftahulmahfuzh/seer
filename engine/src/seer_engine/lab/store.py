@@ -961,12 +961,46 @@ def update_method(conn: sqlite3.Connection, method_id: str, **values: Any) -> No
         raise LabError(f"{method_id}: {e}") from e
 
 
+def _analysis_key(text: str) -> str:
+    r"""Normalise one analysis section so two writings of the same note compare equal.
+
+    Only the *comparison* is normalised; what gets stored is the author's own bytes. Line
+    endings are folded to ``\n`` and trailing spaces dropped per line, because a file re-saved
+    by a different editor between two tries of the same note is still the same note, and the
+    retry this guards against is seconds old rather than a revision. Nothing visible is
+    collapsed -- no blank-line squashing, no case folding, no punctuation stripping -- so two
+    notes a reader would call different can never normalise to one string, and the refusal
+    built on this can never swallow a real addition to the record.
+    """
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    return "\n".join(line.rstrip() for line in lines).strip()
+
+
 def append_analysis(conn: sqlite3.Connection, method_id: str, text: str) -> None:
     """Append a dated section to a method's analysis (never rewrites what is there).
 
     The author's own ``### <today>`` opening line counts as the section head. A note written
     that way used to land under a second, identical heading, and the site then showed the date
     twice; the analysis is append-only, so the duplicate could never be taken back out.
+
+    The same append-only rule has since bitten one layer up, twice. ``lab note`` printed
+    nothing at all on success, so a piped invocation handed its exit code to the filter in the
+    pipe; the filter matched no lines, failed, and the terminal said the write had failed when
+    it had not. The retry appended ten thousand characters of M0245's analysis a second time,
+    ``methods_analysis_grows`` permits only growth, and the duplicate is on the site for good.
+    So an append whose section is already the newest one on the record is refused **here**,
+    before the write -- the only place a duplicate can still be stopped, because afterwards
+    there is no statement that removes it. There is no override: a second identical section is
+    never the act anyone intended, and a flag to force one would only be reached by the same
+    confused retry this refusal exists to catch.
+
+    The comparison is against the **newest section only**, and the section carries its
+    ``### <today>`` head, so the refusal reads "this is already what was written today". That is
+    the shape of the damage -- a retry minutes later -- and it leaves a deliberate re-note on a
+    later day free to land, which is a different act on a different date and belongs on an
+    append-only record. Whitespace around the body, trailing spaces on a line and CRLF endings
+    do not make it a new note (:func:`_analysis_key`); the bytes that get stored are still the
+    author's.
     """
     row = get_method(conn, method_id)
     if row is None:
@@ -977,6 +1011,17 @@ def append_analysis(conn: sqlite3.Connection, method_id: str, text: str) -> None
     head = f"### {date.today().isoformat()}"
     if text != head and not text.startswith(head + "\n"):
         text = head + "\n\n" + text
+    stored, section = _analysis_key(row["analysis"]), _analysis_key(text)
+    if stored and (stored == section or stored.endswith("\n" + section)):
+        raise LabError(
+            f"{method_id}: this is already the newest section of the analysis, so nothing was "
+            f"appended and the stored copy is untouched. The analysis is append-only, so a "
+            f"second copy could never be taken back out -- an identical re-append is refused "
+            f"rather than written, and there is no override. If the command that wrote this "
+            f"looked like it failed, the exit code belonged to something else in the pipeline "
+            f"and not to the write: confirm with `python -m seer_engine lab show {method_id}`. "
+            f"To add to the record, change the text."
+        )
     new = (row["analysis"] + "\n\n" if row["analysis"] else "") + text + "\n"
     conn.execute(
         "UPDATE methods SET analysis = ?, updated = ? WHERE id = ?", (new, now_iso(), method_id)

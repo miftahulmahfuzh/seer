@@ -1,8 +1,15 @@
 """The lab database's rules (method lab design §1): append-only trials, forward-only status,
-growing analysis, one test look per configuration, the seed import and the export."""
+growing analysis that refuses an identical re-append, one test look per configuration, the seed
+import and the export.
+
+The duplicate-note refusal is tested from both ends here: at ``store.append_analysis``, and
+through ``lab note`` itself, because the bug it exists to stop was half a store bug and half a
+silent command."""
 
 from __future__ import annotations
 
+import argparse
+import logging
 import sqlite3
 from dataclasses import replace
 from datetime import date
@@ -11,6 +18,7 @@ from decimal import Decimal
 import pytest
 
 from seer_engine.backtest.registry import REGISTRY
+from seer_engine.commands import lab as lab_cmd
 from seer_engine.lab import store
 from seer_engine.lab import seed as seed_mod
 from seer_engine.lab.method import config_digest
@@ -200,6 +208,52 @@ def test_analysis_grows_and_hypothesis_freezes(conn):
         store.update_method(conn, "M0001", status="registered")
     with pytest.raises(store.LabError, match="frozen"):
         store.update_method(conn, "M0001", hypothesis="h3")
+
+
+def test_append_analysis_refuses_an_identical_re_append(conn):
+    """The M0245 bug: the same body twice, minutes apart, because the terminal said it failed."""
+    _method(conn)
+    body = "The six arms all beat the placebo.\n\n- FRESH30 +1.5\n- STALE30 +3.9\n"
+    with conn:
+        store.append_analysis(conn, "M0001", body)
+    before = store.get_method(conn, "M0001")["analysis"]
+    with pytest.raises(store.LabError, match="already the newest section"):
+        with conn:
+            store.append_analysis(conn, "M0001", body)
+    assert store.get_method(conn, "M0001")["analysis"] == before
+
+
+def test_append_analysis_catches_a_retry_that_only_differs_in_whitespace(conn):
+    """A re-save between two tries is not a new note; the stored bytes stay the author's own."""
+    _method(conn)
+    body = "A note with trailing spaces   \nand a second line\n"
+    with conn:
+        store.append_analysis(conn, "M0001", body)
+    before = store.get_method(conn, "M0001")["analysis"]
+    for retry in (
+        "\n\n  " + body + "   \n\n",                          # surrounding whitespace
+        body.replace("\n", "\r\n"),                           # CRLF endings
+        "A note with trailing spaces\nand a second line",     # per-line trailing spaces gone
+    ):
+        with pytest.raises(store.LabError, match="nothing was appended"):
+            with conn:
+                store.append_analysis(conn, "M0001", retry)
+    assert store.get_method(conn, "M0001")["analysis"] == before
+    assert "trailing spaces   \n" in before  # normalised for the compare, never for the record
+
+
+def test_append_analysis_still_takes_a_different_body_and_still_heads_it(conn):
+    """Newest section only: a body that is no longer the newest one is a new act and lands."""
+    today = date.today().isoformat()
+    _method(conn)
+    with conn:
+        store.append_analysis(conn, "M0001", "first")
+        store.append_analysis(conn, "M0001", "second")
+        store.append_analysis(conn, "M0001", "first")
+    text = store.get_method(conn, "M0001")["analysis"]
+    assert text.count(f"### {today}") == 3
+    assert f"### {today}\n\n### {today}" not in text
+    assert text.index("second") < text.rindex("first")
 
 
 def test_source_sha_is_set_once_and_later_shas_go_to_method_amendments(conn):
@@ -449,3 +503,108 @@ def test_seed_records_the_p7a_capital_and_price_fingerprint(conn):
     assert seed_mod.P7A_INITIAL_IDR == store.BACKFILL_LUMP_SUM_IDR
     assert seed_mod.P7A_FINGERPRINT == store.P7A_PRICE_FINGERPRINT
     assert store.BACKFILL_PRICE_FINGERPRINTS[seed_mod.P7A_FINGERPRINT] == store.P7A_PRICE_FINGERPRINT
+
+
+# ----------------------------------------------------------- the duplicate note, end to end
+
+
+def _note_db(tmp_path):
+    db = tmp_path / "note.sqlite"
+    c = store.connect(db)
+    with c:
+        store.add_method(
+            c, id="M0001", name="placebo shape", family="control",
+            source_kind="knowledge", hypothesis="h",
+        )
+    c.close()
+    return db
+
+
+def _lab(db, command, **kw):
+    return lab_cmd.run(argparse.Namespace(db=db, lab_command=command, **kw))
+
+
+def _read(db, mid="M0001"):
+    c = store.connect(db)
+    try:
+        return dict(store.get_method(c, mid))
+    finally:
+        c.close()
+
+
+def test_lab_note_says_what_it_wrote(tmp_path, capsys):
+    """One line, naming the method and both halves of what landed. A pipe can match this."""
+    db = _note_db(tmp_path)
+    note = tmp_path / "note.md"
+    note.write_text("The placebo is a control, not a constant.\n", encoding="utf-8")
+
+    assert _lab(db, "note", method="M0001", file=note,
+                verdict="  rejected -- the wrapper, not the signal  ") == 0
+    out = capsys.readouterr().out.strip().splitlines()
+    assert len(out) == 1
+    assert out[0] == (
+        'M0001: analysis appended (41 characters); '
+        'verdict set to "rejected -- the wrapper, not the signal".'
+    )
+    row = _read(db)
+    assert "The placebo is a control, not a constant." in row["analysis"]
+    assert row["verdict"] == "rejected -- the wrapper, not the signal"
+
+
+def test_lab_note_with_only_a_verdict_still_prints_one_line(tmp_path, capsys):
+    db = _note_db(tmp_path)
+    assert _lab(db, "note", method="M0001", file=None,
+                verdict="rejected: the control was handicapped") == 0
+    assert capsys.readouterr().out.strip() == (
+        'M0001: verdict set to "rejected: the control was handicapped".'
+    )
+    row = _read(db)
+    assert row["verdict"] == "rejected: the control was handicapped"
+    assert row["analysis"] == ""
+
+
+def test_lab_note_exits_2_on_the_second_identical_file_and_writes_nothing(tmp_path, capsys, caplog):
+    """Exit 2 (the lab's rules refused), the refusal on the log, and the whole row untouched."""
+    db = _note_db(tmp_path)
+    note = tmp_path / "note.md"
+    note.write_text("The placebo is a control, not a constant.\n", encoding="utf-8")
+    assert _lab(db, "note", method="M0001", file=note, verdict="first verdict") == 0
+    capsys.readouterr()
+    before = _read(db)
+
+    with caplog.at_level(logging.ERROR):
+        assert _lab(db, "note", method="M0001", file=note, verdict="a different verdict") == 2
+    assert "already the newest section" in caplog.text
+    assert "lab show M0001" in caplog.text
+    assert "no override" in caplog.text
+    assert capsys.readouterr().out == ""          # nothing claims success
+
+    after = _read(db)
+    assert after["analysis"] == before["analysis"]
+    assert after["verdict"] == "first verdict"    # the whole transaction rolled back
+
+
+def test_the_duplicate_refusal_leaves_the_lab_s_own_generated_notes_alone(tmp_path, capsys):
+    """``lab unblock`` and ``record_promotion`` both guard themselves before they ever append."""
+    db = _note_db(tmp_path)
+    assert _lab(db, "block", method="M0001", on="CBOE VIX3M daily closes") == 0
+    assert _lab(db, "unblock", method="M0001", note="Covers 46.8% of the dev window.") == 0
+    assert _lab(db, "block", method="M0001", on="EODHD split ex-dates") == 0
+    assert _lab(db, "unblock", method="M0001", note="splits.csv arrived; the whole window.") == 0
+    row = _read(db)
+    assert row["status"] == "idea"
+    assert row["analysis"].count("Unblocked: the missing data arrived.") == 2
+    capsys.readouterr()
+
+    c = store.connect(db)
+    try:
+        for _ in range(2):  # the second call returns on PROMOTION_MARKER, never reaching the append
+            with c:
+                store.record_promotion(
+                    c, method_id="M0001", strategy_id="FND", candidate_id="M0001-A",
+                    object_name="FUNDAMENTAL", spec_digest="d" * 64, move_status=False,
+                    reason="the lab has not passed it; on paper to test it forward",
+                )
+        assert store.get_method(c, "M0001")["analysis"].count(store.PROMOTION_MARKER) == 1
+    finally:
+        c.close()

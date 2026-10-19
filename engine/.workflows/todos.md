@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-19
-**Total Active Tasks**: 6
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 145
+- Blocked: 0
+- Completed: 146
 
 ---
 
@@ -1464,25 +1464,41 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Plan index: phase 2's TaskID cell ticked `(done 2026-10-19)`; the document's `**Status:** planned` header left alone (rung 6: the coordinator's ledger is the status of record while phases 1, 3 and 4 are still open, and a `phase 2/4 complete` line would be wrong the moment phase 1 lands). The index lives in the main checkout and is left uncommitted for the coordinator.
     - `P1-ENG-ISID` (phase 3) unblocked `blocked` -> `pending`. Its only dependency is `P1-ENG-NVHT` (phase 1), not this phase; phase 1 landed as `c5c39c9` while this handler was running, so `lab/shortfall.py` is on the branch and phase 3 can start (rung 1: the task's own stated `Depends on`). `P1-ENG-DZDN` (phase 4) stays blocked — it needs phase 3 as well. Quick Stats were recounted from the file rather than blind-decremented, because phase 1's concurrent write to this same file had already consumed one decrement.
     - Landing not attempted: this is a swarm-tracked set and the coordinator owns the merge of `feature/lab-shortfall-and-control-shape` into `main` (analyze-orchestrator Step 5). Nothing merged; no worktree or branch deleted.
-- [ ] **P1-ENG-ISID** Phase 3: `lab note` cannot double-append, and says what it did
+- [x] **P1-ENG-ISID** Phase 3: `lab note` cannot double-append, and says what it did
   - **Difficulty**: EASY
   - **Type**: Bug
   - **Context**: Owns `lab/store.py` (`append_analysis`), `commands/lab.py` (`_note` only), and `tests/test_lab_store.py`. Exit: appending the same body twice raises `LabError` (exit 2) with the stored analysis unchanged; a different body still appends with its `### <date>` heading as before; a re-append differing only in leading/trailing whitespace is still caught; `lab note` prints a confirmation line naming the method and what was written; `ruff`/`pytest` green.
-  - **Status**: pending
+  - **Status**: completed
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/lab-shortfall-and-control-shape/PLAN.md` (phase 3 of 4)
   - **Satisfies**: R3 — The `PIPESTATUS` / duplicate-note fix: `lab note` must not be able to double-append an identical analysis.
   - **Depends on**: P1-ENG-NVHT
   - **Plan**: `.workflows/plan/P1-ENG-ISID.md`
   - **Unblocked**: 2026-10-19 11:55 — its only dependency `P1-ENG-NVHT` (phase 1) landed as `c5c39c9`.
+  - **Completed**: 2026-10-19 12:03
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/store.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_store.py, engine/.workflows/plan/P1-ENG-ISID.md (new, adopted plan copy), engine/.workflows/todos.md
+  - **Built**: new module-private `_analysis_key(text)` directly above `store.append_analysis`, normalising a section for *comparison only* (CRLF folded, per-line trailing spaces dropped, whole string stripped) while the stored bytes stay the author's own. `append_analysis` now refuses with `store.LabError` an append whose headed `### <today>` section already *is* the newest stored section — the check sits **before** the `UPDATE`, the only place a duplicate can still be stopped, because `methods_analysis_grows` permits only growth and a landed duplicate is permanent. The refusal names the method, says nothing was appended and the stored copy is untouched, says there is no override, and points at `lab show <id>`. `commands/lab.py` `_note` (no parser, no `_HANDLERS` entry, no import) now prints exactly one confirmation line after the transaction commits — e.g. `M0001: analysis appended (41 characters); verdict set to "rejected -- ...".` — the character count distinguishing "the note landed" from "an empty file landed", the verdict echoed post-`strip()` and truncated at 72 chars.
+  - **Verified**: `engine/.venv/bin/ruff check engine` -> exit 0, "All checks passed!". `pytest engine/tests/test_lab_store.py engine/tests/test_lab_unblock.py -q` -> 37 passed. Full suite `PYTHONPATH=engine/src PG_TEST_URL=postgresql://postgres:pg@localhost:55432/postgres pytest engine/tests` -> **6016 passed, 4 skipped** in 113.76s; the 4 skips are the known opt-in live-store ones and no Postgres DB test skipped. Seven new tests in `test_lab_store.py`: three at the store level (identical re-append refused; whitespace/CRLF/trailing-space variants refused with the stored bytes intact; a different body still appends and still gets exactly one `### <today>` head) and four end to end (`lab note` prints one line; verdict-only prints one line; a duplicate exits 2, prints nothing on stdout, logs the refusal, and rolls back the verdict too; `lab unblock` and a repeated `record_promotion` are unaffected because both guard themselves before appending).
+  - **Measured**: manual scratch-DB run (never `lab/lab.sqlite`) — first `lab note` printed `M0001: analysis appended (15 characters); verdict set to "a scratch verdict".` and exited 0; the identical re-append exited 2 with the full refusal on the log; the verdict-only call piped into `grep -v` produced a matched line. Confirmed against `/usr/bin/grep` that empty input exits 1 — the old lie behind the M0245 double-append — and that the new confirmation line makes it exit 0. `md5sum lab/lab.sqlite` unchanged at `2962b4134720c003f85695faa976d693` and `git status --porcelain lab/lab.sqlite` empty: no lab command was run against the committed database.
+  - **Drift**: No drift. Every anchor the plan quoted (`store.append_analysis` at `store.py:964`, `_note` in `commands/lab.py`, the `test_lab_store.py` docstring/imports/anchor) matched the tree byte for byte, with `_note` sitting at `:2888` after phase 1's committed insertions.
+  - **Decided**:
+    - Include this phase's own adopted plan copy `engine/.workflows/plan/P1-ENG-ISID.md` in the commit, and leave the two peer copies untracked -> included. Rung 6 (surrounding convention): phase 2's commit `7d36ea3` committed its own copy `P1-ENG-03W0.md` and explicitly left the peers' for their own phases; phase 1 committed none, so the later and more complete precedent wins.
+    - `engine/.workflows/todos.md` was listed as a peer's uncommitted file in the phase brief -> it is now clean, because phase 2 committed it in `7d36ea3`. Normal todos.md bookkeeping for this task is therefore safe and carries no peer work.
+    - Completion bookkeeping: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this set's own precedent, set by phases 1 and 2 — phase 4 shares this worktree and appends to this same file, and a cross-section block move is the one edit that silently loses a peer's append).
+    - No readme pass: `engine/package_readme.md` is left untouched and `readme-updater` was not dispatched (rung 1: the phase brief gives phase 4 one combined readme pass covering both `lab shortfall` and `lab control`; a second writer on that file in a shared worktree is a lost edit).
+    - `P1-ENG-DZDN` (phase 4) unblocked `blocked` -> `pending`: both its dependencies are now complete — `P1-ENG-03W0` landed as `7d36ea3` and `P1-ENG-ISID` is this task.
+    - Plan index: phase 3's TaskID cell ticked `(done 2026-10-19)`; the document's `**Status:** planned` header left alone (rung 6: the coordinator's ledger is the status of record while phase 4 is open). The index lives in the main checkout and is left uncommitted for the coordinator.
+    - Landing not attempted: this is a swarm-tracked set and the coordinator owns the merge of `feature/lab-shortfall-and-control-shape` into `main` (analyze-orchestrator Step 5). Nothing merged; no worktree or branch deleted.
 - [ ] **P1-ENG-DZDN** Phase 4: `lab control`, the `lab run` annotation, hard gate D17, and the trial-828 note
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns the `control` subparser/dispatch/`_control` and the `_run` annotation block in `commands/lab.py`, hard gate D17 (`mis_shaped_controls` + the `check` clause) in `lab/hardgate.py`, `tests/test_lab_hardgate.py`, and new `docs/backtests/2026-10-19-trial-828-shortfall.md`. Exit: `lab control` (bare, and per-method) prints the verdict table; `lab run` annotates a mis-shaped control and still exits 0; `lab promote` refuses such a method naming the arm, both ratios, the band, and the amendment remedy (no method id spent); `Promotable now:` is unchanged by D17 while nine dev-eligible methods (M0047, M0201, M0202, M0208, M0215, M0221, M0225, M0227, M0243) would be refused if promoted; the backtest note records the trial-828 run, the `lab control` table, and the three corrections (MEMORY.md, insight 461, `/sera`) with exact numbers; `ruff`/`pytest` green; `lab/lab.sqlite` unchanged in git.
-  - **Status**: blocked
+  - **Status**: pending
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/lab-shortfall-and-control-shape/PLAN.md` (phase 4 of 4)
   - **Satisfies**: R1, R2 — the written acceptance run of the shortfall decomposition on trial 828; and the `lab control`/`lab run`/hard-gate bindings of the control-shape check.
   - **Depends on**: P1-ENG-03W0, P1-ENG-ISID
   - **Plan**: `.workflows/plan/P1-ENG-DZDN.md`
+  - **Unblocked**: 2026-10-19 12:03 — both dependencies are complete: `P1-ENG-03W0` (phase 2) landed as `7d36ea3` and `P1-ENG-ISID` (phase 3) is done.
 
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"

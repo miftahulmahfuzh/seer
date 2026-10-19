@@ -2886,13 +2886,32 @@ def _idea(conn, args) -> int:
 
 
 def _note(conn, args) -> int:
+    """Append a dated analysis section and/or set the verdict, and say on one line what landed.
+
+    The confirmation is not decoration. Both writes are irreversible -- the analysis is
+    append-only and the verdict is the method's standing summary -- and this command used to
+    succeed in complete silence. Piped through any filter, silence and failure are the same
+    observation and the filter owns the exit code; that is how the same ten-thousand-character
+    note came to be appended to M0245 twice. One line of output gives a pipeline something to
+    match, and makes ``store.append_analysis``'s refusal visible to anyone who retries anyway.
+
+    The line is printed after the transaction commits, so a refused analysis never reports a
+    verdict that rolled back with it.
+    """
     if args.file is None and args.verdict is None:
         raise store.LabError("give --file and/or --verdict")
+    wrote: list[str] = []
     with conn:
         if args.file is not None:
-            store.append_analysis(conn, args.method, Path(args.file).read_text(encoding="utf-8"))
+            body = Path(args.file).read_text(encoding="utf-8")
+            store.append_analysis(conn, args.method, body)
+            wrote.append(f"analysis appended ({len(body.strip()):,} characters)")
         if args.verdict is not None:
-            store.update_method(conn, args.method, verdict=args.verdict.strip())
+            verdict = args.verdict.strip()
+            store.update_method(conn, args.method, verdict=verdict)
+            shown = verdict if len(verdict) <= 72 else verdict[:69].rstrip() + "..."
+            wrote.append(f'verdict set to "{shown}"')
+    print(f"{args.method}: " + "; ".join(wrote) + ".")
     return 0
 
 

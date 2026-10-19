@@ -1,0 +1,87 @@
+{
+  "branch": "feature/lab-shortfall-and-control-shape",
+  "coordinator": "orch-lab-shortfall-and-control-shape",
+  "coordinator_session_id": "82094c7b-51cb-4d0d-8541-af16afec02f3",
+  "created": "2026-10-19T04:46:51+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "engine/seer_engine/lab",
+      "plan": ".workflows/plan/lab-shortfall-and-control-shape/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The shortfall decomposition, and `lab shortfall"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 2,
+      "note": null,
+      "package": "engine/seer_engine/lab",
+      "plan": ".workflows/plan/lab-shortfall-and-control-shape/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Control detection, target resolution and the calibrated band"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "EASY",
+      "n": 3,
+      "note": null,
+      "package": "engine/seer_engine/lab",
+      "plan": ".workflows/plan/lab-shortfall-and-control-shape/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "lab note` cannot double-append, and says what it did"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2,
+        3
+      ],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": null,
+      "package": "engine/seer_engine/lab` + `commands` + `docs/backtests",
+      "plan": ".workflows/plan/lab-shortfall-and-control-shape/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "lab control`, the `lab run` annotation, hard gate D17, and the trial-828 note"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/lab-shortfall-and-control-shape/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "lab-shortfall-and-control-shape",
+  "updated": "2026-10-19T04:46:51+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/lab-shortfall-and-control-shape"
+}

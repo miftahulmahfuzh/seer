@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "c5c39c9",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "lab shortfall built and verified; trial 828 reproduced every target exactly: gap -8.24, gate -3.59 at era-resolved exposure 0.784, fees -3.78, residual -0.87 (--against M0244-FRESH30 splits it -0.39 shared / -0.48 own). The 8.2 pt equal-weight handicap is retired. Decision: dropped the plan's test-block call store.add_method(id='M0001-X') -- the schema refuses that id and the test never referenced it (M0001 already exists; the row is a second ARM) -- rung 2, exit criteria require a green suite and the D10 intent is unchanged. commands/lab.py now has my 4 insertions (docstring :71, parser :458, _shortfall after _walkforward :2566, _HANDLERS :3018); phases 3 and 4 should quote it as pushed.",
       "package": "engine/seer_engine/lab",
       "plan": ".workflows/plan/lab-shortfall-and-control-shape/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-19T04:55:40+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-NVHT",
       "title": "The shortfall decomposition, and `lab shortfall"
     },
     {
@@ -53,7 +53,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "lab note` cannot double-append, and says what it did"
     },
@@ -82,6 +82,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-shortfall-and-control-shape/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-shortfall-and-control-shape",
-  "updated": "2026-10-19T04:46:51+00:00",
+  "updated": "2026-10-19T04:56:45+00:00",
+  "verified_at": "2026-10-19T04:56:25+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-shortfall-and-control-shape"
 }

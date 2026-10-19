@@ -9,12 +9,12 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 146
+- Completed: 147
 
 ---
 
@@ -1489,7 +1489,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - `P1-ENG-DZDN` (phase 4) unblocked `blocked` -> `pending`: both its dependencies are now complete — `P1-ENG-03W0` landed as `7d36ea3` and `P1-ENG-ISID` is this task.
     - Plan index: phase 3's TaskID cell ticked `(done 2026-10-19)`; the document's `**Status:** planned` header left alone (rung 6: the coordinator's ledger is the status of record while phase 4 is open). The index lives in the main checkout and is left uncommitted for the coordinator.
     - Landing not attempted: this is a swarm-tracked set and the coordinator owns the merge of `feature/lab-shortfall-and-control-shape` into `main` (analyze-orchestrator Step 5). Nothing merged; no worktree or branch deleted.
-- [ ] **P1-ENG-DZDN** Phase 4: `lab control`, the `lab run` annotation, hard gate D17, and the trial-828 note
+- [x] **P1-ENG-DZDN** Phase 4: `lab control`, the `lab run` annotation, hard gate D17, and the trial-828 note
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns the `control` subparser/dispatch/`_control` and the `_run` annotation block in `commands/lab.py`, hard gate D17 (`mis_shaped_controls` + the `check` clause) in `lab/hardgate.py`, `tests/test_lab_hardgate.py`, and new `docs/backtests/2026-10-19-trial-828-shortfall.md`. Exit: `lab control` (bare, and per-method) prints the verdict table; `lab run` annotates a mis-shaped control and still exits 0; `lab promote` refuses such a method naming the arm, both ratios, the band, and the amendment remedy (no method id spent); `Promotable now:` is unchanged by D17 while nine dev-eligible methods (M0047, M0201, M0202, M0208, M0215, M0221, M0225, M0227, M0243) would be refused if promoted; the backtest note records the trial-828 run, the `lab control` table, and the three corrections (MEMORY.md, insight 461, `/sera`) with exact numbers; `ruff`/`pytest` green; `lab/lab.sqlite` unchanged in git.
@@ -1499,6 +1499,16 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Depends on**: P1-ENG-03W0, P1-ENG-ISID
   - **Plan**: `.workflows/plan/P1-ENG-DZDN.md`
   - **Unblocked**: 2026-10-19 12:03 — both dependencies are complete: `P1-ENG-03W0` (phase 2) landed as `7d36ea3` and `P1-ENG-ISID` (phase 3) is done.
+  - **Completed**: 2026-10-19. All eight exit criteria met and verified in this session.
+    - Measured, and recorded in `docs/backtests/2026-10-19-trial-828-shortfall.md`: trial 828's gap **-8.24** pts/yr = gate **-3.59** at an era-resolved exposure of **0.784** + fees **-3.78** (15.05 turns x 0.2510%) + residual **-0.87**, which `--against M0244-FRESH30` splits into -0.39 shared pool/frame and -0.48 this arm's own weighting. **30 names** were read from the recorded configuration with no `--names` flag (`names_from` line), sensitivity band 10:-3.71 / 20:-3.74 / 30:-3.78 / 50:-3.85.
+    - **One number differs from the plan's expectation block and the run is what is recorded**: the plan expected a gate premium of -3.60; the report prints **-3.59** at the same 0.784 exposure. Last-digit rounding on a term computed from the era's own on-share; gap, fees and residual reproduced to the digit.
+    - `lab control` over the whole lab: **54 rows — 19 refuse, 7 warn, 4 clean, 16 unresolved**, beside 6 dose-response and 2 within-frame arms listed and never flagged. Independently reproduces phase 2's tally, including the third mis-shaped control `M0243-NEAR20-R` (3.01x / 2.98x) beside `M0230-C50-R` (0.07x / 0.14x) and `M0248-R` (3.18x / 3.08x).
+    - **The reconciled fact, both halves, verified rather than asserted**: `Promotable now:` is **unchanged** by D17 — `lab status` taken before the first edit and again at the end differ in nothing (`diff` -> PROMOTABLE UNCHANGED; M0072, M0092, M0197, none holding a control arm) — **AND** nine dev-eligible methods would be refused at `lab promote` if they reached it: M0047, M0201, M0202, M0208, M0215, M0221, M0225, M0227, M0243. Each was checked with its own `lab control MNNNN` run and each confirmed `dev-eligible` against the committed database; M0222/M0226/M0230/M0248 hold refuse-band arms and are already `rejected`, M0241 is dev-eligible and warn-only. The nine are the rule working, not a defect, and D17's refusal names the way back (re-draw the control at the book's own trade count and turnover, recorded as an amendment, costing no method id).
+    - Nothing recorded: N 824 -> 824 and test-window looks 4 -> 4 across every run; `lab/lab.sqlite` md5 `2962b413...` identical before and after and clean in git; `web/data/lab.json` untouched and `lab stage` never called.
+    - `ruff check engine` clean; `pytest engine/tests` **6027 passed, 4 skipped** (6016 at `22f6e13` + this phase's 11; the 4 skips are the opt-in live-store tests, no DB test skipped).
+    - Owned the **combined readme pass** for `engine/package_readme.md` on behalf of the whole set: merged into phase 2's existing 80 lines rather than duplicating them, corrected its two now-false sentences ("There is no `lab control` subcommand, no `lab run` annotation and no D17" and "Nothing is wired to it yet" / "Nothing imports `lab.control_shape` yet"), and added what no phase had documented — `lab shortfall` and `lab control` as CLI sections in the `lab turnover` / `lab exposure` shape, a `lab/` module-map line for `shortfall.py`, D17 on the `hardgate.py` map line, and reverse-dependency entries for both modules.
+    - Also committed `engine/.workflows/plan/P1-ENG-NVHT.md`, phase 1's adopted plan copy, which phase 1 left untracked — so no bookkeeping is orphaned on the branch.
+    - Landing not attempted: swarm coordinator `orch-lab-shortfall-and-control-shape` owns the merge of `feature/lab-shortfall-and-control-shape` into `main`.
 
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 from math import comb
@@ -1288,3 +1289,300 @@ def test_the_module_records_the_survivorship_drawdown_decision():
     assert "M0007-N20-RAW" in doc and "23.46" in doc
     assert "-9.03" in doc and "+14.44" in doc      # the spread that forbids a blanket haircut
     assert "absence is not evidence" in doc.lower()
+
+
+# ------------------------------------------------------------------ control shape (D17)
+#
+# The seam these tests turn on: `control_shape.for_method` reads a method's arms from its
+# `lab/methods/mNNNN_*.py` file, and every fixture in this module builds its method straight into
+# the database with no file. Without `_declare` below, `for_method` returns () for a synthetic id
+# -- or, for `M0001`, finds the REAL method file of that name and judges these rows against its
+# candidate ids -- and D17 never fires, so every test here would pass while testing nothing.
+
+
+R_IDEA = "The idea: the twenty strongest names in the pool, equal slots, nothing timed"
+R_DRAW = "Placebo: the same frame with 20 hash-drawn names from the same scored pool"
+R_DOSE = "the same names one to two years stale and none since: does the date do any work?"
+R_PLAIN = "the same book, held a month longer"
+
+
+@dataclass(frozen=True)
+class _Arm:
+    """An arm as `control_shape` sees one: an id and the one line of prose its author wrote.
+
+    Detection is by the rationale and never by the id suffix -- `M0005-ALL-R` carries a `-R` and
+    is a rank-weighting variant, not a control -- so these strings are load-bearing, not labels.
+    """
+
+    id: str
+    rationale: str
+
+
+def _declare(monkeypatch, **by_method: list) -> None:
+    """Make `control_shape.for_method` and `survey` see `arms` for each method, with no file.
+
+    See the section header: this is the seam, and it is the only way D17 can fire in this module.
+    `for_method` imports `discover` inside its body, so patching the attribute on
+    `seer_engine.lab.method` is enough.
+    """
+    import types
+    from pathlib import Path
+
+    from seer_engine.lab import method as method_mod
+
+    files = {
+        mid: (types.SimpleNamespace(id=mid, all_candidates=lambda arms=arms: tuple(arms)),
+              Path(f"{mid}.py"))
+        for mid, arms in by_method.items()
+    }
+    monkeypatch.setattr(method_mod, "discover", lambda: files)
+
+
+def _control_arm(conn, mid: str, suffix: str, *, trades: int, turnover: float,
+                 annual: float = 0.15) -> None:
+    """A recorded control arm of ``mid``: one dev trial carrying a trade count and a turnover.
+
+    The arm it controls is `{mid}-A`, which `_method` records with trades 250 and turnover 1.1.
+    """
+    with conn:
+        ns = store.insert_trials(conn, [_trial(
+            method_id=mid, candidate_id=f"{mid}-{suffix}", config_digest=f"d-{mid}-{suffix}",
+            trades=trades, turnover=turnover,
+            curve_json=_curve(_months(*DEV_SPAN), annual),
+        )])
+        stamp_provenance(conn, ns, price_fingerprint=SAME_PRICES)
+
+
+def _with_control(monkeypatch, mid: str = "M0001") -> None:
+    """The ordinary shape: one book that names itself the idea, one placebo drawn against it."""
+    _declare(monkeypatch, **{mid: [_Arm(f"{mid}-A", R_IDEA), _Arm(f"{mid}-R", R_DRAW)]})
+
+
+def test_the_module_records_the_control_shape_decision():
+    """(D17) is written down where the other sixteen are, with its calibration in it."""
+    doc = hardgate.__doc__ or ""
+    assert "(D17)" in doc
+    assert "M0248-R" in doc and "M0230-C50-R" in doc and "M0243-NEAR20-R" in doc
+    assert "dose-response" in doc
+    # The two cases the band has to separate, both named in the text.
+    assert "M0226-RAND2" in doc and "M0241-PLACEBO" in doc
+    # The reconciled fact, both halves, and the way back.
+    assert "M0072" in doc and "M0047" in doc
+    assert "amendment" in doc
+
+
+def test_a_mis_shaped_control_refuses_promotion_and_names_both_ratios(conn, monkeypatch):
+    """M0248's shape: the blind draw trades about three times the book it controls."""
+    from seer_engine.lab import control_shape as cs
+
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)                      # M0001-A, 250 trades, turnover 1.1
+    _control_arm(conn, "M0001", "R", trades=800, turnover=3.5)
+    _with_control(monkeypatch)
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0001")
+    said = str(e.value)
+    assert "M0001-R" in said and "M0001-A" in said
+    assert "3.20x" in said and "3.18x" in said               # 800/250 and 3.5/1.1
+    assert cs.RUNG_IDEA in said                              # describe() names the rung
+    assert f"{cs.REFUSE_BAND[0]:.2f}x to {cs.REFUSE_BAND[1]:.2f}x" in said
+    assert "D17" in said and "no override" in said
+    assert "amendment" in said and "costs no method id" in said   # the way back is named
+
+
+def test_a_control_handicapped_the_other_way_is_refused_too(conn, monkeypatch):
+    """M0230's shape: a control that barely trades at all is just as unusable as one that churns."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _control_arm(conn, "M0001", "R", trades=18, turnover=0.15)
+    _with_control(monkeypatch)
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0001")
+    assert "M0001-R" in str(e.value)
+
+
+def test_a_matched_control_promotes(conn, monkeypatch):
+    """M0244-PLACEBO30's shape -- about 1.01x / 0.98x -- is what a control should look like."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _control_arm(conn, "M0001", "R", trades=252, turnover=1.08)
+    _with_control(monkeypatch)
+    hardgate.check(conn, "M0001")                            # returns: no refusal
+
+
+def test_a_dose_response_arm_is_never_refused_for_its_shape(conn, monkeypatch):
+    """The permanent-false-alarm case. A dose arm trades a fifth as often BY DESIGN."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _control_arm(conn, "M0001", "STALE", trades=50, turnover=0.22)
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-STALE", R_DOSE)])
+    hardgate.check(conn, "M0001")                            # not-checked, never refuse
+
+
+def test_a_method_with_no_control_arm_promotes_exactly_as_before(conn, monkeypatch):
+    """Most of the lab draws no control. (D17) makes no claim about a book nobody drew one for."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _variant(conn, "M0001", "B", annual=0.14)
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-B", R_PLAIN)])
+    hardgate.check(conn, "M0001")
+
+
+def test_a_shape_that_cannot_be_read_does_not_refuse(conn, monkeypatch):
+    """Absence is not evidence (D16's sentence). Only a measured mismatch refuses.
+
+    Two ways a shape goes unread, both pinned: the reader raising (the `except` in
+    `mis_shaped_controls`), and the reader coming back with a verdict that is not `refuse` --
+    here `unresolved`, because every arm of the method is itself a placebo and none of them
+    controls another.
+    """
+    from seer_engine.lab import control_shape as cs
+
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _control_arm(conn, "M0001", "R", trades=800, turnover=3.5)
+
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_DRAW), _Arm("M0001-R", R_DRAW)])
+    found = cs.for_method(conn, "M0001")
+    assert {f.verdict for f in found} == {cs.UNRESOLVED}
+    assert hardgate.mis_shaped_controls(conn, "M0001") == ()
+    hardgate.check(conn, "M0001")                            # and the gate stays silent
+
+    def refuses(*_a, **_k):
+        raise store.LabError("cannot resolve what M0001-R controls")
+
+    monkeypatch.setattr(cs, "for_method", refuses)
+    assert hardgate.mis_shaped_controls(conn, "M0001") == ()
+    hardgate.check(conn, "M0001")
+
+
+def test_lab_promote_exits_2_and_writes_nothing_on_a_mis_shaped_control(tmp_path, monkeypatch):
+    db, prereg_dir = tmp_path / "lab.sqlite", tmp_path / "prereg"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0001", annual=0.15)
+    _control_arm(c, "M0001", "R", trades=800, turnover=3.5)
+    before = db.read_bytes()
+    c.close()
+    _with_control(monkeypatch)
+
+    assert _cli(tmp_path, db, prereg_dir) == 2
+    assert not prereg_dir.exists()
+    assert db.read_bytes() == before
+
+
+def _stub_full_run(monkeypatch, tmp_path, method_id: str, arms: list):
+    """`lab run` all the way to its printing, with no method file, no store and no backtest.
+
+    Extends `_stub_run` past the store pin: `preflight_data` returns None and `run_method` hands
+    back the attributes `_run` reads off it. The verdict is the reason-carrying kind (D15's own
+    bootstrap case), so no fold geometry is needed.
+
+    The stub method carries `all_candidates`, because `_run`'s control-shape block reads the
+    method's arms through `control_shape.for_method` -> this same `discover` -- the seam described
+    at the top of this section. A bare `SimpleNamespace(id=...)` would raise `AttributeError`
+    inside `_run` instead of printing the block.
+    """
+    import types
+
+    from seer_engine import research
+    from seer_engine.lab import runner
+
+    _declare(monkeypatch, **{method_id: arms})
+    monkeypatch.setattr(runner, "preflight", lambda *a, **k: None)
+    monkeypatch.setattr(
+        research, "load_store",
+        lambda _path: types.SimpleNamespace(fingerprint="f" * 64, price_fingerprint=SAME_PRICES),
+    )
+    monkeypatch.setattr(runner, "preflight_data", lambda *a, **k: None)
+    verdict = hardgate.FoldVerdict(
+        method=method_id, bench_n=None, total=None, scored=None, won=None, majority=None,
+        stable=None, picks_json="[]", summary="", reason="stubbed: no fold record in this test",
+    )
+    monkeypatch.setattr(
+        runner, "run_method",
+        lambda *a, **k: types.SimpleNamespace(ran=(), folds=None, verdict=verdict),
+    )
+
+
+def test_lab_run_prints_the_control_block_and_still_exits_zero(tmp_path, monkeypatch, capsys):
+    """(D15), tested rather than quoted: the run ANNOTATES a handicapped control and completes.
+
+    This is the decision, not an implementation detail. A run-time refusal would only spend method
+    ids to say what `lab promote` already says, and a fresh lab has to be able to run before it
+    has anything to compare -- so the block is loud and the exit code is 0.
+    """
+    from seer_engine.commands import lab as lab_cmd
+
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0099", annual=0.15)
+    _control_arm(c, "M0099", "R", trades=800, turnover=3.5)
+    c.close()
+
+    _stub_full_run(monkeypatch, tmp_path, "M0099",
+                   [_Arm("M0099-A", R_IDEA), _Arm("M0099-R", R_DRAW)])
+    assert lab_cmd.run(argparse.Namespace(
+        db=db, lab_command="run", method="M0099", store=tmp_path / "store", allow_coverage=0.8,
+    )) == 0
+    out = capsys.readouterr().out
+    assert "Control shape:" in out
+    assert "M0099-R" in out
+    assert "outside" in out                  # the loud line fired
+    assert "lab/hardgate.py, D17" in out     # and it names where the refusal lives
+
+
+def test_lab_run_says_so_when_there_is_no_control_arm(tmp_path, monkeypatch, capsys):
+    from seer_engine.commands import lab as lab_cmd
+
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0099", annual=0.15)
+    c.close()
+
+    _stub_full_run(monkeypatch, tmp_path, "M0099", [_Arm("M0099-A", R_IDEA)])
+    assert lab_cmd.run(argparse.Namespace(
+        db=db, lab_command="run", method="M0099", store=tmp_path / "store", allow_coverage=0.8,
+    )) == 0
+    assert "no control or placebo arm" in capsys.readouterr().out
+
+
+def test_lab_control_reports_every_arm_and_writes_nothing(tmp_path, monkeypatch, capsys):
+    """Shape (A): N and the looks are printed either side, and the database bytes do not move."""
+    from seer_engine.commands import lab as lab_cmd
+
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0001", family="a", annual=0.15)
+    _control_arm(c, "M0001", "R", trades=800, turnover=3.5)
+    _method(c, "M0002", family="b", annual=0.15)
+    _control_arm(c, "M0002", "R", trades=252, turnover=1.08)
+    n_before = store.dev_trial_count(c)
+    looks_before = store.test_looks(c)
+    c.close()
+    before = db.read_bytes()
+
+    _declare(
+        monkeypatch,
+        M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-R", R_DRAW)],
+        M0002=[_Arm("M0002-A", R_IDEA), _Arm("M0002-R", R_DRAW)],
+    )
+
+    rc = lab_cmd.run(argparse.Namespace(db=db, lab_command="control", method=[]))
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "M0001-R" in out and "M0002-R" in out
+    assert "refuse" in out and "ok" in out        # one of each, so the band is not refusing all
+    assert f"recorded dev trials {n_before} -> {n_before}" in out
+    assert f"test-window looks {looks_before} -> {looks_before}" in out
+    assert db.read_bytes() == before
+
+    rc = lab_cmd.run(argparse.Namespace(db=db, lab_command="control", method=["M0001"]))
+    assert rc == 0
+    one = capsys.readouterr().out
+    assert "M0001-R" in one and "M0002-R" not in one
+
+    assert lab_cmd.run(argparse.Namespace(db=db, lab_command="control", method=["M9999"])) == 2

@@ -519,6 +519,96 @@ any recorded row, and does not re-open a closed verdict: the grid was always a s
 a second opinion is still what refuses here -- it just now refuses *before* a test look is spent
 rather than after. 1996 and 1997 remain under half covered in **both** histories and 111 index
 members are missing from both, so the fuller history is better evidence, not true evidence.
+
+**(D17) Does the gate check that a method's control arm has the shape of the book it controls?
+-- Yes, and from 2026-10-19 ``check`` REFUSES a method whose control arm is measured outside the
+band.**
+
+A control arm is the book's shape with none of its identity: the same number of names, drawn from
+the same pool, re-picked on the same calendar, chosen at random or by a scrambled key instead of
+by the signal. Every sentence of the form "the signal beat its blind draw by X points" is a
+subtraction, and a subtraction is only as good as the thing subtracted. When the control trades
+three times as often as the book it controls, X carries the fees and the churn the control paid
+and the book did not, and nobody can say how much of it.
+
+Two recorded cases, and seventeen nobody had noticed. Each control is measured against **the arm
+it controls**, which ``control_shape``'s resolution ladder finds and names:
+
+    control             the arm it controls      resolved by      trades x   tov x
+    M0230-C50-R         M0230-C50                sibling-stem        0.067   0.138
+    M0222-RAND1         M0222-CORE               declared-idea       0.984   4.451
+    M0226-RAND1         M0226-CORE               declared-idea       0.979   6.934
+    M0222-RAND2         M0222-CORE               declared-idea       1.063   8.856
+    M0226-RAND2         M0226-CORE               declared-idea       1.330  14.528
+    M0243-NEAR20-R      M0243-NEAR20             sibling-stem        3.013   2.976
+    M0248-R             M0248-EQ                 declared-idea       3.180   3.078
+
+M0248's is the case the 2026-10-19 handover was written about: its blind draw trades 3.18x and
+turns over 3.08x the arm it controls, and the sentence then standing in the record read "all six
+arms beat the blind draw by 3.6 to 13.5 points, so the buyback signal itself is real". The gap is
+probably still real; the margin was quoted against a handicapped opponent and is overstated by
+something like one and a half to three points a year. M0230's is the opposite handicap -- a
+control that barely trades at all, 0.067x -- and the lab already wrote the habit down after it
+(``seer-placebo-sticky-vs-redrawn``: "line the trade counts of all arms up against each other").
+M0243's was found by turning that habit into a measurement and running it over every recorded arm,
+which is the ordinary return on writing a rule down. Over all 46 placebo arms the lab holds, the
+measured tally is **19 refuse, 7 warn, 4 clean, 16 with no arm to compare against**.
+
+**Both axes, always.** ``M0226-RAND2`` sits within 1.33x of its sibling on trades and 14.53x on
+turnover -- about the same number of orders, a fifteen-times-bigger book moved through them. A
+trade-count check alone reads it as clean. This rule therefore refuses on the trade ratio OR the
+turnover ratio, and an arm that has only one of the two is judged on the one it has.
+
+**The band is calibrated on the lab's own control arms, not chosen.** Measured over every recorded
+dev candidate on 2026-10-19, each against the arm the ladder resolves for it: the clean arms sit
+at 0.98-1.02 on both axes, and every handicapped one is at 2.976x or worse, or 0.138x or less, on
+at least one. ``control_shape.WARN_BAND`` is 0.80x..1.25x and ``control_shape.REFUSE_BAND`` is
+0.50x..2.00x; both are log-symmetric (1.25 = 1/0.80, 2.00 = 1/0.50), because trading twice as much
+and half as much are the same sin. The bar sits in the gap between 1.372 (``M0241-PLACEBO``, the
+single arm that warns and does not refuse) and 2.976, and it is not moved from inside the code.
+
+**A dose-response arm is not a control.** ``M0244-STALE30`` trades about a fifth as often as the
+arm beside it, and that is *supposed* to be true: the stale signal date is the dose, and trading a
+fifth as often is the treatment rather than a handicap. ``M0241-STALE`` is the same shape of arm,
+and its rationale even carries the word "control" ("the dose-response control on the date
+itself"), which is why ``control_shape`` tests for a dose **before** it tests for a draw. Both are
+classified dose-response, carry the verdict ``not-checked``, hold no ratio at all, and this rule
+never reads them. A permanent false alarm on a correct arm is how a rule gets switched off.
+
+**The way back, and why the refusal names it.** A control is not a verdict on the signal; it is
+a measuring stick, and a bent stick can be straightened. Re-draw the control at the book's own
+trade count and turnover and run it again. That costs **no method id** -- an amendment appends
+trials under the method's existing id -- and it is exactly what the 2026-10-19 handover asks for
+on M0248 (section 2). A refusal that named no way back would be a dead end, and this rule meets
+nine methods that need one, so the message says it and so does this paragraph.
+
+**What it does not do.** It does not refuse a method with no control arm -- most of the lab has
+none, and the rule makes no claim about a book nobody drew a control for. It does not refuse a
+method whose control shape cannot be read: an arm with no resolvable sibling, a row carrying
+neither a trade count nor a turnover, an arm whose own trial was never recorded. Those come back
+as ``unresolved`` or ``unrecorded`` and are left to the other clauses, because absence is not
+evidence -- the same sentence (D16) writes about the survivorship grid. Only a measured
+``refuse`` refuses. It does not touch a recorded row, move a recorded ``trades`` or ``turnover``,
+or re-open a closed verdict. And it does not reach into ``lab run``: at run time the same reading
+is printed beside the fold verdict and nothing is refused, for (D15)'s reason exactly -- a second
+gate at run time would only spend method ids to say what this one already says, and a fresh lab
+has to be able to run before it has anything to compare.
+
+**Who it stops today, measured.** ``lab status`` reads ``Promotable now:`` M0072, M0092 and
+M0197, and none of the three holds a control arm at all, so **the promotable set does not move**.
+But *dev-eligible* is a wider set than *promotable now*, and **nine dev-eligible methods hold a
+control arm in the refuse band and would be stopped here if they reached it**: M0047, M0201,
+M0202, M0208, M0215, M0221, M0225, M0227 and M0243. The arms named in the table above belong to
+M0222, M0226, M0230 and M0248, all four already rejected, so those four change nothing either
+way; M0241 is dev-eligible and warns rather than refuses.
+
+Those nine are not an accident of the band and they are not collateral. They are the rule working:
+each of them quotes, or could quote, "this beat its control by X" against a control that was not
+the shape of the book. The lab had already written that rule down twice in its own memory and had
+no mechanism to apply it. Each of the nine has the same way back as M0248 -- re-draw the control
+at the book's own turnover and amend, no method id spent. As with (D12) and (D14), the real point
+is forward: the next method to draw a handicapped control and quote the margin against it is
+stopped before a look is spent, rather than after the sentence is published.
 """
 
 from __future__ import annotations
@@ -735,6 +825,37 @@ def benchmark_n(conn: sqlite3.Connection) -> int | None:
         (regime.BENCH_CANDIDATE,),
     ).fetchone()
     return None if row is None else int(row["n"])
+
+
+def mis_shaped_controls(conn: sqlite3.Connection, method_id: str) -> tuple:
+    """Every control arm of ``method_id`` whose shape is outside the refuse band (D17).
+
+    Returns a tuple of ``control_shape.Finding`` in the method's own declaration order, and
+    **never raises**. A control arm whose shape cannot be read at all -- no arm the id stems to
+    and none that names itself the idea, a row carrying neither a trade count nor a turnover, a
+    method with no file to read its arms from -- comes back from the reader as ``unresolved`` or
+    ``unrecorded``, never as ``refuse``, and is not evidence of a handicap. Refusing a promotion
+    on a number nobody computed is the mechanism by which a rule stops being about the thing it
+    was written for. The same sentence is (D16)'s about the survivorship grid: absence is not
+    evidence.
+
+    ``control_shape`` is imported inside the body, not at this module's scope. It reads recorded
+    ``trials`` rows and nothing else today, so a module-level import would work -- and would make
+    the next edit to either module a fifty-fifty bet on an import cycle, exactly as ``Run``'s
+    docstring in ``lab/runner.py`` says about this module. One dictionary lookup per promotion is
+    the price.
+
+    ``for_method`` reads the method's arms from its ``lab/methods/mNNNN_*.py`` file, which is the
+    right reader here: a method with no file cannot be promoted at all -- ``prereg`` refuses it on
+    the source sha long before anything reaches this clause.
+    """
+    from seer_engine.lab import control_shape
+
+    try:
+        found = control_shape.for_method(conn, method_id)
+    except store.LabError:
+        return ()
+    return control_shape.refusals(found)
 
 
 def mismatches(
@@ -1651,6 +1772,30 @@ def check(conn: sqlite3.Connection, method_id: str) -> None:
                 f"and no status moved. There is no override -- if the rule is wrong, change it in "
                 f"seer_engine/lab/hardgate.py and argue for it in the commit"
             )
+
+    # (D17) A control arm exists to be the book's shape with none of its identity, so a margin
+    # measured against a control that traded three times as often is partly fees and churn. The
+    # reader never raises and only a measured mismatch refuses: a shape nobody could read comes
+    # back `unresolved` or `unrecorded` and is left to the clauses below, because absence is not
+    # evidence (D16). `lab run` prints this same reading and refuses nothing (D15).
+    off_shape = mis_shaped_controls(conn, method_id)
+    if off_shape:
+        from seer_engine.lab import control_shape
+
+        low, high = control_shape.REFUSE_BAND
+        said = "; ".join(control_shape.describe(f) for f in off_shape)
+        raise store.LabError(
+            f"{method_id} is not promoted: {said}. The band is {low:.2f}x to {high:.2f}x on both "
+            f"axes, calibrated on every control arm the lab holds (D17). A control is the book's "
+            f"shape with none of its identity, so 'this method beat its control by X' is not "
+            f"sound when the control was handicapped -- part of X is the fees and the churn the "
+            f"control paid and the book did not, and no one can say how much. The way back: "
+            f"re-draw the control at the book's own trade count and turnover and run it again as "
+            f"an amendment. That costs no method id, because an amendment appends trials under "
+            f"this id, and it is what the 2026-10-19 handover asks for on M0248. Nothing was "
+            f"written and no status moved. There is no override -- if the rule is wrong, change "
+            f"it in seer_engine/lab/hardgate.py and argue for it in the commit"
+        )
 
     bad = failed_kin(conn, method_id)
     if bad:

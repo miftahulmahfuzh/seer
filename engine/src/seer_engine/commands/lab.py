@@ -109,6 +109,16 @@
                                     cannot be identified is listed, never run as if it were off.
                                     No method file changes and no new method id. No trial row, no
                                     moments, no status change: N and the looks do not move
+    lab control [M0248 ...]         report only: whether each control, placebo or blind-draw arm
+                                    has the shape of the arm it controls -- its trade count and
+                                    its turnover as ratios -- so a margin quoted against it is
+                                    sound. Arithmetic over recorded trial rows: no research store,
+                                    no backtest, no method file read. A dose-response arm, whose
+                                    different shape is the treatment, is listed and never flagged.
+                                    The refuse half of the band is what `lab promote` refuses on
+                                    (lab/hardgate.py, D17); `lab run` prints the same reading and
+                                    refuses nothing (D15). No trial row, no moments, no status
+                                    change: N and the looks do not move
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
@@ -679,6 +689,32 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
                    help="print the report and write nothing at all, not even the observation")
     s.add_argument("--csv", type=Path, default=None, metavar="PATH",
                    help="also write the full grid (variant x column) to PATH as CSV, full precision")
+
+    s = sub.add_parser(
+        "control",
+        # No literal `%` in any `help=` string below, and none may be added: argparse runs every
+        # `help=` through %-interpolation (HelpFormatter._expand_help), so a bare `%` is read as a
+        # format spec and `lab --help` dies. A doubled `%%` renders as one `%`. `description=` is
+        # NOT interpolated and must stay single. See the `gate` parser above.
+        help="report only: whether each control arm trades like the arm it controls",
+        description=(
+            "A control arm exists to be the real book's shape with none of its identity, so "
+            "'the signal beat its control by X' is only sound when the two traded about as often "
+            "and turned the book over about as fast. This prints every control, placebo and "
+            "blind-draw arm the lab holds beside the arm it controls, as a trade-count ratio and "
+            "a turnover ratio, and says whether each is clean, worth a warning, or outside the "
+            "band the hard gate refuses on (lab/hardgate.py, D17). Both axes are mandatory: one "
+            "recorded arm sits within 1.33x of its sibling on trades and 14.5x on turnover, so a "
+            "trade-count check alone reads it as clean. A dose-response arm -- one whose "
+            "different shape IS the treatment, like a deliberately stale signal date -- is listed "
+            "as such and never flagged. Pure arithmetic over recorded trial rows: no research "
+            "store is opened, no backtest runs, and no trial row, moments row, funding row, "
+            "status or journal entry is written, so the lab's N and the test-window looks cannot "
+            "move, web/data/lab.json does not change and `lab stage` is not needed."
+        ),
+    )
+    s.add_argument("method", nargs="*", metavar="M0248",
+                   help="methods to report (default: every method that has a control arm)")
 
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
@@ -1712,6 +1748,54 @@ def _run(conn, args) -> int:
         "  Folds share training data, so they are a sanity check, never a significance test, and "
         "nothing here enters a DSR."
     )
+    # The run's control-shape reading, printed from the rows that were just recorded (R2, D17).
+    # Beside the walk-forward verdict and for the same reason: until now a researcher met this
+    # only at `lab promote`, by which time the method id was spent and the dev write-up was often
+    # already written.
+    #
+    # It ANNOTATES; it does not gate (hardgate D15). A second gate at run time would only spend
+    # method ids to say what `lab promote` already says, and the lab has to be able to bootstrap.
+    # `format_report(..., show_clean=False)` is the shape this wants: a clean control prints one
+    # line saying so, and only what must be acted on is listed. It is the same formatter
+    # `lab control` and nothing else uses, so the two can never drift on one arm.
+    #
+    # `control_shape` raises nothing of its own; the guard is for `method.discover()`, which
+    # `for_method` calls, and whose failure must not take down a run whose trials are already
+    # recorded.
+    from seer_engine.lab import control_shape as cs
+
+    try:
+        found = cs.for_method(conn, method.id)
+    except store.LabError as e:
+        print(f"\nControl shape: not read ({e}). The trials above are recorded either way.")
+    else:
+        if not found:
+            print("\nControl shape: this method declares no control or placebo arm, so there is "
+                  "nothing to match and nothing is claimed either way.")
+        else:
+            print("\nControl shape: does each control arm trade like the arm it controls?")
+            print(cs.format_report(found, show_clean=False))
+            off = cs.refusals(found)
+            warned = [f for f in cs.flags(found) if not f.refused]
+            if off:
+                low, high = cs.REFUSE_BAND
+                print(f"  *** {len(off)} control arm(s) outside {low:.2f}x..{high:.2f}x on at "
+                      f"least one axis.")
+                print("      A sentence of the form 'this beat its control by X' is quoted "
+                      "against a handicapped opponent: part")
+                print("      of X is the fees and the churn the control paid and this book did "
+                      "not. Re-draw the control at")
+                print("      this book's own trade count and turnover and amend -- that costs no "
+                      "method id. `lab promote` refuses")
+                print("      this method until then (lab/hardgate.py, D17); the trials above are "
+                      "recorded either way (D15).")
+            elif warned:
+                print(f"  {len(warned)} control arm(s) outside {cs.WARN_BAND[0]:.2f}x.."
+                      f"{cs.WARN_BAND[1]:.2f}x but inside the refuse band -- worth a look before "
+                      f"the margin is written up, not a refusal.")
+            else:
+                print("  Every control arm matches the arm it controls on both axes. A margin "
+                      "measured against them is this book's own.")
     if amendment is not None:
         g = store.gate(conn)
         seq = len(store.amendments_of(conn, method.id))
@@ -2734,6 +2818,61 @@ def _kin(conn, args) -> int:
     return 0
 
 
+def _control(conn, args) -> int:
+    """``lab control [M0248 ...]``: does each control arm trade like the arm it controls?
+
+    Report only, in the sense ``lab kin`` is a report: pure arithmetic over recorded trial rows.
+    No research store is opened, no backtest runs, no trial is inserted, no status moves and no
+    look is spent. N and the test-window looks are printed before and after, so the "nothing was
+    recorded" invariant is visible on the terminal rather than merely asserted in a test.
+
+    With no method named it reports every control arm the lab holds -- forty-six placebo arms on
+    the committed database, of which nineteen are outside the band, plus the dose-response and
+    within-frame arms it lists and never flags. The band it prints is ``control_shape``'s,
+    calibrated on this same evidence, and its refuse half is what ``lab promote`` refuses on
+    (``hardgate`` D17). ``lab run`` prints the same rows through the same ``format_report`` and
+    refuses nothing (``hardgate`` D15), so the three bindings can never disagree about one arm.
+
+    One thing this does read that the rest of the report path does not: ``control_shape.survey``
+    reads each method's arms from its ``lab/methods/mNNNN_*.py`` file, because a control arm is
+    identified by the one-line ``rationale`` its author wrote and no recorded row carries that.
+    It is a read; no method file is written, hashed against, or re-registered.
+    """
+    from seer_engine.lab import control_shape as cs
+
+    wanted = [m.upper() for m in args.method]
+    if wanted:
+        known = {
+            str(r["method_id"])
+            for r in conn.execute("SELECT DISTINCT method_id FROM trials WHERE window = 'dev'")
+        }
+        missing = sorted(set(wanted) - known)
+        if missing:
+            raise store.LabError(f"no dev trial for {', '.join(missing)}")
+
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+
+    found = cs.survey(conn, wanted) if wanted else cs.survey(conn)
+    print(cs.format_report(found))
+
+    refused = cs.refusals(found)
+    if refused:
+        low, high = cs.REFUSE_BAND
+        print()
+        print(f"{len(refused)} control arm(s) sit outside {low:.2f}x..{high:.2f}x on at least one")
+        print("axis. `lab promote` refuses a method holding one (lab/hardgate.py, D17), and any")
+        print("sentence already written about one of those margins is quoted against a")
+        print("handicapped opponent. The way back costs no method id: re-draw the control at the")
+        print("book's own trade count and turnover and run it again as an amendment.")
+
+    print()
+    print(f"recorded dev trials {n_before} -> {store.dev_trial_count(conn)}; "
+          f"test-window looks {looks_before} -> {store.test_looks(conn)}. "
+          f"Nothing was written, no research store was opened and no method id was minted.")
+    return 0
+
+
 def _exposure(conn, args) -> int:
     """``lab exposure M0030 [M0024 ...]``: a method's own picks, apart from what it parks.
 
@@ -3049,6 +3188,7 @@ _HANDLERS = {
     "exposure": _exposure,
     "kin": _kin,
     "gate": _gate,
+    "control": _control,
     "idea": _idea,
     "note": _note,
     "block": _block,

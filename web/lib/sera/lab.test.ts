@@ -146,14 +146,32 @@ describe('lab snapshot (web/data/lab.json)', () => {
   });
 
   it('links every trial to a method and parses curves as [date, value] pairs', () => {
+    // Scanned rather than asserted point by point: the curves hold millions of samples between
+    // them, and one `expect` per sample spent most of a five-second budget on matcher overhead
+    // alone -- the test timed out on roughly two runs in three, and every new trial made it
+    // worse. Collecting the first offender keeps the same meaning, reports a better message
+    // (which trial, which point) and runs in milliseconds.
+    const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+    const orphans: string[] = [];
+    const unlabelled: string[] = [];
+    const badPoints: string[] = [];
     for (const t of lab.trials) {
-      expect(methodById(t.methodId)).toBeDefined();
-      expect(Array.isArray(t.failed)).toBe(true);
-      for (const [d, v] of t.curve) {
-        expect(d).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-        expect(typeof v).toBe('number');
+      if (methodById(t.methodId) === undefined) orphans.push(`n=${t.n} -> ${t.methodId}`);
+      if (!Array.isArray(t.failed)) unlabelled.push(`n=${t.n}`);
+      for (let i = 0; i < t.curve.length; i++) {
+        const [d, v] = t.curve[i];
+        if (typeof d !== 'string' || !ISO_DAY.test(d) || typeof v !== 'number') {
+          badPoints.push(`n=${t.n}[${i}] = ${JSON.stringify(t.curve[i])}`);
+          break; // one example per trial is enough to name the offender
+        }
       }
     }
+    expect(orphans).toEqual([]);
+    expect(unlabelled).toEqual([]);
+    expect(badPoints).toEqual([]);
+    // The scan is only meaningful if it actually walked something.
+    expect(lab.trials.length).toBeGreaterThan(0);
+    expect(lab.trials.some((t) => t.curve.length > 0)).toBe(true);
   });
 
   it('serves accessors consistent with the raw lists', () => {

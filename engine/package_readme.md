@@ -167,6 +167,7 @@ engine/
       hardgate.py           the hard gate `lab promote` refuses on (lab-hard-gate phase 1): MIN_FOLDS = 4, COIN_FLIP_NULL, trial_deposits(), Geometry/geometry(), fold_record() -> walkforward.Record, promoted_variant()/variant_record() scoring the variant `lab promote` would pre-register on its own curve (D11), fold_summary(), ingredients() reading `<MNNNN>` allocators out of `trials.config_text` (D12), failed_kin()/family_state() walking `family` ∪ transitive `parent_id` ancestors ∪ ingredients and their family ∪ ancestors, check() raising store.LabError, summary(). SQL plus arithmetic on recorded curves -- no research store, no backtest, no look
       tree_rank.py          a pure tree-model allocator (measure-then-learn, P1-ENG-H3RM): point-in-time features, labels the rank of each name's forward 21-session return, refits a fixed-seed HistGradientBoostingRegressor walk-forward once a year on data before the refit, and holds the top N equal-weight. TREE_RANK (and TREE_RANK_FUND, which adds fundamentals), TreeRankParams, TreeRankPrepared. fit_model fills a feature column with no finite value (the fundamentals before EDGAR's 2009 start) with a constant 0.0 so the trees can never split on it, since sklearn 1.9 raises on a zero-valued column; columns with any finite value pass through, so earlier fits are bit-identical (P1-ENG-SHJJ, first used by M0130). Beside that rank API and sharing none of its names, the fall-sizing API (fold-verdict-and-fall-label phase 2, P1-ENG-4KJE, first used by M0132): `forward_fall()` -- the worst peak-to-trough fall over the next quarter, `QUARTER` sessions ahead -- and `fall_labels()`, which returns that fall as a RAW LEVEL and never rank-normalises it, because a per-date rank label beside per-date rank features leaves the prediction distribution stationary and the head can then only select a count that moves with composition noise (D13; `test_two_dates_labels_live_on_a_shared_scale` is the tripwire that goes red if anyone re-adds the ranking). `build_fall_section()` COMPOSES `build_section` and appends three un-normalised market-level columns -- SPY's distance below its trailing 252-session high, SPY's 60-session realised volatility, and the date's cross-sectional momentum dispersion -- each a per-date scalar broadcast down the rows, so the model has a level to read; the first seven columns stay byte-identical to the ranker's. `FALL_FEATURE_LOOKBACK = max(FEATURE_LOOKBACK, MARKET_HIGH_N, MARKET_VOL_N + 1)` = 401, written as arithmetic so the "no extra reach" claim is checkable against the 473-bar smoke fixture. `FallSizeParams` (the book-size field is `slots`, not `top_n`, and `model_key()` excludes both `slots` and `size` exactly as `TreeRankParams.model_key()` excludes `top_n`, so one annual refit ladder serves every book size), `fall_training_set()`, `fit_fall_model()`, `FallModel`, and `FALL_SIZE` / `FallSizeAllocator`, whose head SIZES rather than selects: the date's cross-sectional mean predicted fall is located in the model's own in-sample distribution of date-level means and the book holds `slots - floor(danger * slots)` whole slots, so no number in the cut was hand-chosen. `size=False` is the ready-made always-full control. There is deliberately NO `FALL_SIZE_FUND` and the allocator id `FALLF` is left unclaimed (D14): the EDGAR panel starts in 2009, so no method may pre-register on it and an exported allocator nothing can use would claim that id for ever
       survivorship_record.py the committed survivorship grid, read as evidence `check` can refuse on (fold-verdict era, design doc §17 / hardgate (D16)): GRID_PATH = <repo>/docs/lab/survivorship/grid.csv, SV_LABEL = "survivorship", sv_drawdown() -> float|None and over_bar() -> the figure when it is AT OR ABOVE the bar, else None. Pure and offline -- one cached CSV read, no store, no network, no database -- because `engine/.research-sv` is not on every machine and the gate must still refuse on this evidence on a laptop that never bought the EODHD month. **Absence is not evidence**: an unmeasured variant reads None and never refuses, since blocking every unmeasured book would stop the lab rather than tighten it; what becomes impossible is promoting a variant measured and found over the bar. Reads only `store == "survivorship"` rows, so the dev rows in the same file are ignored; a missing file, a blank cell or a malformed number is an unmeasured variant, not a crash. Measured 2026-10-13 on the committed grid: of the 28 variants clearing the bar on the dev store, 11 cross it on the fuller history, deltas -9.03 to +14.44 points (mean +1.42), so no blanket haircut can replace the per-variant number -- M0007-N20-RAW 19.59% -> 23.46%, M0020-W-NOSTOP 19.27% -> 23.42%, M0019-RAW20-S15 18.56% -> 24.48%
+      control_shape.py      is a placebo actually shaped like the book it controls (lab-shortfall-and-control-shape, P1-ENG-03W0): WINDOW = "dev", DECLARATION_ATTR = "controls", DOSE_MARKERS / DRAW_MARKERS / ABLATION_MARKERS / IDEA_MARKERS (measured phrase lists, each entry carrying its hit count over the lab's 770 candidates), KIND_PLACEBO / KIND_DOSE / KIND_ABLATION / KIND_NONE, OK / WARN / REFUSE / UNRESOLVED / UNRECORDED / NOT_CHECKED, RUNG_DECLARED / RUNG_STEM / RUNG_IDEA / RUNG_FIRST, WARN_BAND = (0.8, 1.25) and REFUSE_BAND = (0.5, 2.0); Arm (a Protocol), Shape, Finding, kind_of(), declared_target(), resolve_target(), band_verdict(), worst(), findings(), for_method(), survey(), refusals(), flags(), describe(), band_sentence(), format_report(). A pure reader: one `window = 'dev'` SELECT, no insert, no status move, no file, no clock, no randomness, no research store and no printing — `format_report` returns a string and the caller prints it. It decides nothing; `commands/lab.py` will own where a warn is printed and where a refusal stops a promotion (D15), and neither exists yet
       universe_rank.py      point-in-time membership for a dollar-volume universe (2026-10-14): Sample, read_samples(), intervals() -> [(index_id, symbol, start, end)] with end EXCLUSIVE and None while still in, members_on(), DEFAULT_BAND = (1, 2000). There is no index to read for a liquidity band -- membership.py's vendored S&P 500 / Nasdaq-100 snapshots cover large caps and nothing else -- so membership is derived from what the market did: a symbol is a member on the sessions following a month-end at which its dollar volume ranked inside the band, and leaves at the first month-end it does not. Strictly point-in-time: a rank known on M governs membership only from M onward, a symbol that leaves and returns keeps TWO spells rather than one long one, and there is deliberately NO persistence filter -- requiring a year in the band would halve the store and look like prudence, but it would drop a name briefly liquid in 2001 from the 2001 cross-section because of what happened to it later, the same shape of error as a price history that quietly omits the companies that went bankrupt. Measured on the 214-sample sweep: 67,336 intervals over 9,977 symbols, exactly 2,000 members on every date, 7,816 symbols with more than one spell
       seed.py               one-time import of the pre-lab record (P7a's 54 candidates); since trial-reproducibility writes a source='backfill' trial_provenance row per seed trial
       methods/              one file per method, mNNNN_<slug>.py exporting METHOD
@@ -3556,6 +3557,84 @@ one write path that acts on it.
   themselves, so `import store` — which the whole lab does — still drags in neither the estimator's
   curve arithmetic nor the backtest package, and no module-scope cycle is closed.
 
+### lab: the control-shape check (lab-shortfall-and-control-shape, P1-ENG-03W0)
+
+`lab/control_shape.py` answers one question over rows the lab has already recorded: when a method
+quotes the gap between its book and its own placebo as the worth of the signal, is the placebo
+actually shaped like the book it controls? A control that trades three times as often pays three
+times the fees, so the gap is quoted against an opponent running with weights on.
+
+- **Why it exists.** The lab wrote this rule into its own memory twice after being bitten twice —
+  *match the placebo to the book's exact shape* (on M0241 that split a 3.8 point lead into 1.9
+  points of shape and 1.9 of signal) and *two things are both called "the placebo"* (a sticky draw
+  and a monthly re-drawn draw differ fourteenfold in turnover). Nothing checked either rule.
+  `M0248-R`, the blind draw whose gap carries *"all six arms beat the blind draw by 3.6-13.5
+  points, so the buyback signal itself is real"*, trades **3.18x** and turns over **3.08x** the arm
+  it controls; `M0230-C50-R` is the mirror, trading **0.067x** — the book it controls is being
+  asked to beat a stone. Both were caught by a human reading a table, months apart.
+- **Detection is on the `rationale`, never the id suffix.** Every control in the lab carries a
+  suffix that looks diagnostic (`-R`, `-RAND1`, `-PLACEBO`, `-HASH`) and the suffix is a trap:
+  `M0005-ALL-R`'s rationale is *"The same composite with linear rank weights"* — a variant, not a
+  control. The rationale is one line, non-empty, enforced at `backtest.dev.Candidate`
+  construction, and **outside `config_digest`** (`lab.method.config_text` reads rules, allocator id
+  and params only), so reading it moves no recorded digest. `DOSE_MARKERS`, `DRAW_MARKERS`,
+  `ABLATION_MARKERS` and `IDEA_MARKERS` are measured lists, not a regex: derived 2026-10-19 by
+  scanning all 770 candidates in the lab's 271 method files, each phrase carrying its hit count,
+  and five phrases that sound right but hit nothing ("blind draw", "randomly drawn", "coin-flip",
+  "drawn at random", "random draw") are deliberately absent. The forward path for a method written
+  tomorrow is `DECLARATION_ATTR` (`controls`), read duck-typed; existing files cannot gain it,
+  because `methods.source_sha` is written once and trigger-protected.
+- **Three kinds, one of them checked.** `placebo` (46 arms) is shape-checked: its whole job is the
+  book's shape with none of its identity. `dose-response` (6) is not — the different date or mix
+  **is** the dose, so `M0244-STALE30` at 0.28x trades is the experiment working. `within-frame
+  control` (2, the ablations) is not — its trade count is a property of the ingredient under test.
+  `kind_of` tests dose **before** draw, and the order is load-bearing: `M0241-STALE`'s rationale
+  contains the word "control", and a permanent false alarm on a correct arm is the worst outcome
+  available to this module, because a check nobody believes is worse than no check.
+- **A four-rung ladder resolves the target, and the rung is reported.** `declared` (through
+  `DECLARATION_ATTR`), `sibling-stem` (`M0230-C50-R` -> `M0230-C50`, the strongest signal because
+  the author wrote the target's whole name into the control's), `declared-idea` (the arm whose
+  rationale opens "The idea:" or "The yardstick:" — `M0248-EQ` is candidate **[2]**, not [0]), then
+  `first-declared`, which is a guess and is reported as one. **Every rung draws only from arms that
+  are not themselves placebo or dose-response**: without that exclusion the ladder produced sixteen
+  nonsense resolutions, all in the three methods whose every arm is a placebo (M0187, M0193,
+  M0207), including a 13.7x "refusal" of `M0193-S1-SW` against `M0193-S1` where neither controls
+  the other. When no eligible arm exists the verdict is `UNRESOLVED`, which carries no ratio and
+  **never refuses** — fail open on "I cannot tell who this controls", loud only on "I can tell, and
+  it does not match".
+- **The band is calibrated, not chosen.** Measured over every control arm the committed lab holds:
+  clean arms sit at 0.98-1.02 on both axes, and every mis-shaped one is at 2.98x or worse, or 0.14x
+  or less, on at least one axis. The widest gap in the evidence is 1.372 to 2.976, and
+  `REFUSE_BAND = (0.5, 2.0)` sits inside it with room on both sides; `WARN_BAND = (0.8, 1.25)` is
+  the tightest band that still passes the one genuinely clean arm. Both are log-symmetric
+  (`1.25 = 1/0.8`, `2.0 = 1/0.5`) because trading twice as much and half as much are the same sin.
+  **Both axes are mandatory**: `M0226-RAND2` is 1.330 on trades — a warn — and 14.528 on turnover,
+  so a trades-only check passes it outright, which is why the verdict takes the worse of two
+  numbers. Lab-wide over the 46 placebo arms: 19 refuse, 7 warn, 4 clean, 16 unresolved. The
+  handover that asked for this check knew of two mis-shaped controls.
+- **Surface.** Records `Shape(candidate_id, n, trades, turnover)` and `Finding(method_id,
+  control_id, kind, target_id, rung, control, target, trade_ratio, turnover_ratio, verdict,
+  reason)`. Entry points `findings(conn, method_id, arms)`, `for_method(conn, method_id)` (reads
+  the arms off the method file) and `survey(conn, method_ids=None)` (the whole lab). Filters
+  `refusals()` (what a gate acts on) and `flags()` (warns and refusals, what a researcher should
+  read before quoting a gap). Text `describe()`, `band_sentence()` and `format_report()`. The
+  verdicts are `OK` / `WARN` / `REFUSE` plus three ways of not knowing — `UNRESOLVED` (no target),
+  `UNRECORDED` (a `trials` column is NULL) and `NOT_CHECKED` (a dose or ablation arm). **Every
+  uncertainty is a verdict, never an exception**: the module prints nothing, raises nothing and
+  writes nothing.
+- **A reader, not a writer, and it never names the test window.** The one query it issues is pinned
+  to `WINDOW = "dev"` — the test window is a budget spent once per method and no report may touch
+  it, not even to count. No `trials`, `trial_moments`, `insights` or `method_folds` row is
+  inserted, no status moves, no file is written, so `store.dev_trial_count` and `store.test_looks`
+  cannot change. It opens no research store, runs no backtest and makes no network call.
+  `shapes(conn, method_id) -> dict[str, Shape]` is the internal reader behind all three entry
+  points, not an entry point itself. `lab.method.discover` is imported *inside* `for_method` and
+  `survey`, the way `prereg` and `runner` do it, so importing this module does not import all 271
+  method files. Its only package import at module scope is `backtest.metrics.DASH`.
+- **Nothing is wired to it yet.** There is no `lab control` subcommand, no `lab run` annotation and
+  no hard-gate rule D17 — those are a later phase (P1-ENG-DZDN). Covered by
+  `tests/test_lab_control_shape.py` (31 tests).
+
 ### paper (P4)
 
 `seer_engine.paper` is nightly paper trading. Every module but `store.py` is pure (no psycopg,
@@ -3928,6 +4007,7 @@ re-reads the orders and replaces `sean_equity` whole. In `nightly.yml` it is the
 - `survivorship` (eodhd-survivorship-market phase 1) imports numpy, `research` (window constants and the store's line formats), `bars` (`to_volume`), `prices` (`to_decimal`) and `yahoo` (`DIVIDEND_QUANTUM`); never `lab`, `db` or `http`, and it makes no network call. `commands.survivorship_store` imports numpy, `config`, `dates`, `research`, `survivorship`, `dividend_announcements` and `commands.dividend_announcements` (`read_cache`); since phase 2 also `survivorship_alias`, `eodhd` and `membership`. `survivorship_alias` imports `dates`, `eodhd`, `research`, `survivorship` and `backtest.market` (`Membership`); never `lab` or `db`, and its one network call is through the client it is handed. `lab.remeasure` imports `refuse_survivorship_store` from `lab.runner`. Phase 3: `commands.market_series` imports `config`, `dates`, `research` and `backtest.window` (`Window`) only; no `http`, `db` or `lab`, and no network call. `research` imports `MarketSeries` and `EMPTY_SERIES` from `backtest.market`.
 - `lab.exposure` (lab-exposure-diagnostic) imports `research`, `backtest.dev`, `backtest.metrics` (formatters), `lab.store`, `lab.runner`, `lab.hardgate`, `lab.walkforward` (for the per-era `measure`), `lab.method`, `lab.real_costs` (`REPRO_TOL`), `sim.book` (`Target`), `sim.rules`, `sim.contributions` and `strategies.allocator` (`Allocator`, `prepare_for`, `scale_weight`) — plus `commands.backtest_dev.month_end_curve`, its one `lab` -> `commands` edge, so the monthly curve the era cuts are made on is the one the dev report draws. Nothing imports `lab.exposure`: `commands.lab`'s `exposure` handler imports it inside the function, the way `costs` does.
 - `lab.turnover` (fold-verdict-and-fall-label phase 4) imports almost nothing: `csv`, `collections.abc`, `dataclasses`, `datetime`, `decimal` and `pathlib` from the standard library, plus `lab.store` (for `LabError` alone), `sim.costs`, `sim.contributions` (`OWNER_MONTHLY`), `sim.model` (`q`), `paper.capital` (`PAPER_INITIAL_IDR`) and `paper.compare` (`SESSIONS_PER_YEAR`). `paper.capital` rather than `backtest.runner` deliberately: the two hold the same opening capital and a test asserts they still agree, but `paper.capital` is stdlib-only, so the module pulls in no numpy, no `research`, no `backtest` and no psycopg. It imports no `research` module because it opens no store, and nothing imports it: `commands.lab`'s `turnover` handler imports it inside the function, the way `costs` and `exposure` do.
+- `lab.control_shape` (lab-shortfall-and-control-shape, P1-ENG-03W0) imports `sqlite3`, `collections.abc`, `dataclasses` and `typing.Protocol` from the standard library, plus exactly one package name at module scope: `backtest.metrics.DASH`. It does not import `lab.store` — it is handed a connection and issues one `SELECT` — and it does not import `backtest.dev`: the candidates it reads are described by a local `Arm` Protocol (`id`, `rationale`), so a duck-typed arm is enough and the `controls` declaration is reached with `getattr` rather than a field. `lab.method.discover` is imported *inside* `for_method` and `survey`, because at module scope it would import all 271 method modules on any import of this one. Nothing imports `lab.control_shape` yet; the `lab control` command, the `lab run` annotation and the hard gate's D17 are a later phase.
 ### Standard library
 `argparse`, `importlib`/`pkgutil` (command discovery), `logging`, `contextlib`, `dataclasses`, `decimal`, `functools.lru_cache`, `re`, `time`.
 

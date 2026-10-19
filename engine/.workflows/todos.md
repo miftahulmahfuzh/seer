@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-18
-**Total Active Tasks**: 2
+**Last Updated**: 2026-10-19
+**Total Active Tasks**: 6
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 2
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 0
-- Completed: 143
+- Blocked: 1
+- Completed: 145
 
 ---
 
@@ -1429,6 +1429,60 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Plan index: phase 5's TaskID cell ticked `(done 2026-10-14)`, matching phase 4's cell; the document's `**Status:** planned` header left alone (rung 6: phase 4 left it, and the coordinator's ledger is the status of record while phases 1–3 are still running).
     - No phase unblocked: every phase in this set has `Depends on: —`, so this completion neither unblocks nor re-blocks a sibling.
     - Landing not attempted: this is a swarm-tracked set and the coordinator `orch-roster-35-four-methods` owns the merge (analyze-orchestrator Step 5). Nothing merged; no worktree or branch deleted — the set runs on `main` with no worktree.
+
+- [x] **P1-ENG-NVHT** Phase 1: The shortfall decomposition, and `lab shortfall`
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `lab/shortfall.py` and the `shortfall` subparser/dispatch in `commands/lab.py`, plus new `tests/test_lab_shortfall.py`; splits a trial's gap to SPY TR into gate premium, fee drag, and a pool+weighting residual, purely from recorded rows (one optional store read for era-resolved gate exposure). Exit: `lab shortfall 828` and `lab shortfall M0244-PLACEBO30` work with `--era`, `--store` and `--against`; the terms sum back to the gap exactly (tested); run on trial 828 it reproduces gap -8.24, gate ~-3.60 at exposure 0.784, fees ~-3.78, residual ~-0.87; `ruff`/`pytest` green.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/lab-shortfall-and-control-shape/PLAN.md` (phase 1 of 4)
+  - **Satisfies**: R1 — A shortfall decomposition: split any trial's gap to SPY TR over an era into gate premium, fee drag, pool and residual weighting, from inputs already in the trials row.
+  - **Plan**: `.workflows/plan/P1-ENG-NVHT.md`
+  - **Completed**: 2026-10-19 04:55
+  - **Method**: /implement
+  - **Commit**: c5c39c9
+  - **Files**: engine/src/seer_engine/lab/shortfall.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_shortfall.py
+  - **Verified**: trial 828 reproduced every planned target exactly — gap -8.24, gate -3.59 at era-resolved exposure 0.784, fees -3.78 (15.05 turns x 0.2510%, 30 names read from the configuration), residual -0.87; --against M0244-FRESH30 splits it -0.39 shared / -0.48 own; --era whole -0.58/-2.44/-4.01/+5.87; no-store -5.11/+0.65. A test-window trial exits 2, an --against from another method exits 2. N 824 before and after, looks 4 before and after, lab/lab.sqlite hash unmoved. test_lab_shortfall.py 31/31; full suite 6009 passed, 4 skipped; ruff clean.
+  - **Decisions**: the plan's test block called `store.add_method(id="M0001-X")`, which the methods-table CHECK refuses and which the test never referenced (M0001 already exists; the row is a second ARM of it) → dropped the call with a comment. Rung 2: the exit criteria require a green suite, and the test's intent — a D10 refusal across two price fingerprints — is unchanged and still asserted.
+- [x] **P1-ENG-03W0** Phase 2: Control detection, target resolution and the calibrated band
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns new `lab/control_shape.py` and new `tests/test_lab_control_shape.py`; a pure module (no CLI) that detects a placebo/control arm, resolves which arm it controls via a four-rung ladder, and checks trade-count and turnover ratios against a calibrated band (warn [0.8,1.25], refuse [0.5,2.0]). Exit: `M0230-C50-R`, `M0248-R` and `M0243-NEAR20-R` land in the refuse band; `M0244-PLACEBO30` passes clean; dose-response arms (`M0244-STALE30`, `M0241-STALE`) are classified not-checked and never flagged; `M0005-ALL-R` produces no finding; a test pins the whole table built from the committed `lab/lab.sqlite` opened read-only; `ruff`/`pytest` green.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/lab-shortfall-and-control-shape/PLAN.md` (phase 2 of 4)
+  - **Satisfies**: R2 — A control-shape check: compare a placebo/control arm's trade count and turnover against the arm it controls, and refuse or loudly flag a mismatch.
+  - **Plan**: `.workflows/plan/P1-ENG-03W0.md`
+  - **Completed**: 2026-10-19 11:55
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/control_shape.py (new, 696 lines), engine/tests/test_lab_control_shape.py (new, 31 tests), engine/.workflows/plan/P1-ENG-03W0.md (new, adopted plan copy), engine/.workflows/todos.md
+  - **Verified**: `engine/.venv/bin/ruff check engine` -> "All checks passed!" (exit 0). `PYTHONPATH=engine/src pytest engine/tests/test_lab_control_shape.py -q` -> 31 passed in 3.99s. Full suite `PYTHONPATH=engine/src PG_TEST_URL=postgresql://postgres:pg@localhost:55432/postgres pytest engine/tests -q -n auto` -> 6009 passed, 4 skipped in 179s (baseline at ad8792d was 5947 passed, 4 skipped; the +62 is this phase's 31 plus phase 1's 31 landing concurrently in the shared worktree). The 4 skips are the same opt-in live-store ones as the baseline; the Postgres DB tests did not skip. `md5sum lab/lab.sqlite` identical before and after every run (2962b4134720c003f85695faa976d693) and `git status --porcelain lab/lab.sqlite web/data/` empty.
+  - **Measured**: Lab-wide survey over every control arm the committed lab holds reads 19 refuse, 7 warn, 4 ok, 16 unresolved, 8 not-checked, over 46 placebo arms, 6 dose-response arms and 2 within-frame controls — exactly the plan's prediction. The handover named two mis-shaped controls; the check finds three in the calibration set: `M0230-C50-R` (0.07x trades / 0.14x turnover against `M0230-C50`), `M0248-R` (3.18x / 3.08x against `M0248-EQ`) and `M0243-NEAR20-R` (3.01x / 2.98x against `M0243-NEAR20`). `M0244-PLACEBO30` passes clean (1.015 / 0.984); `M0241-PLACEBO` is the single warn-only arm. The nine-method D17 blast radius was verified independently rather than inherited: the methods holding a refuse-band control arm AND dev-eligible are exactly M0047, M0201, M0202, M0208, M0215, M0221, M0225, M0227, M0243 — the nine the plan names. M0222, M0226, M0230 and M0248 also hold refusing controls but are already `rejected`.
+  - **Drift**: No drift. Every symbol the plan quotes was verified present before any edit — `backtest.metrics.DASH`, `store.COMMITTED_DB`/`TrialRow`/`add_method`/`insert_trials`/`dev_trial_count`/`test_looks`/`connect`, `lab.method.discover` and `Method.all_candidates`. The plan's code blocks applied verbatim and passed on the first run.
+  - **Decided**:
+    - What to stage, given one shared index -> this phase's two code files, its own adopted plan copy, and `engine/.workflows/todos.md` (rung 2: phase 2's exit criterion 1, "naming only these two files and this plan file"). `todos.md` is added because this phase's own bookkeeping wrote it and it is one atomic file, so it necessarily carries all four phases' task entries. The three peer adopted-plan copies (`P1-ENG-NVHT.md`, `P1-ENG-ISID.md`, `P1-ENG-DZDN.md`) are left for their own phases.
+    - Completion bookkeeping: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own precedent for every swarm-tracked set — phases 1, 3 and 4 share this worktree and append here concurrently, and a cross-section block move is the one edit that silently loses a peer's append).
+    - Plan index: phase 2's TaskID cell ticked `(done 2026-10-19)`; the document's `**Status:** planned` header left alone (rung 6: the coordinator's ledger is the status of record while phases 1, 3 and 4 are still open, and a `phase 2/4 complete` line would be wrong the moment phase 1 lands). The index lives in the main checkout and is left uncommitted for the coordinator.
+    - `P1-ENG-ISID` (phase 3) unblocked `blocked` -> `pending`. Its only dependency is `P1-ENG-NVHT` (phase 1), not this phase; phase 1 landed as `c5c39c9` while this handler was running, so `lab/shortfall.py` is on the branch and phase 3 can start (rung 1: the task's own stated `Depends on`). `P1-ENG-DZDN` (phase 4) stays blocked — it needs phase 3 as well. Quick Stats were recounted from the file rather than blind-decremented, because phase 1's concurrent write to this same file had already consumed one decrement.
+    - Landing not attempted: this is a swarm-tracked set and the coordinator owns the merge of `feature/lab-shortfall-and-control-shape` into `main` (analyze-orchestrator Step 5). Nothing merged; no worktree or branch deleted.
+- [ ] **P1-ENG-ISID** Phase 3: `lab note` cannot double-append, and says what it did
+  - **Difficulty**: EASY
+  - **Type**: Bug
+  - **Context**: Owns `lab/store.py` (`append_analysis`), `commands/lab.py` (`_note` only), and `tests/test_lab_store.py`. Exit: appending the same body twice raises `LabError` (exit 2) with the stored analysis unchanged; a different body still appends with its `### <date>` heading as before; a re-append differing only in leading/trailing whitespace is still caught; `lab note` prints a confirmation line naming the method and what was written; `ruff`/`pytest` green.
+  - **Status**: pending
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/lab-shortfall-and-control-shape/PLAN.md` (phase 3 of 4)
+  - **Satisfies**: R3 — The `PIPESTATUS` / duplicate-note fix: `lab note` must not be able to double-append an identical analysis.
+  - **Depends on**: P1-ENG-NVHT
+  - **Plan**: `.workflows/plan/P1-ENG-ISID.md`
+  - **Unblocked**: 2026-10-19 11:55 — its only dependency `P1-ENG-NVHT` (phase 1) landed as `c5c39c9`.
+- [ ] **P1-ENG-DZDN** Phase 4: `lab control`, the `lab run` annotation, hard gate D17, and the trial-828 note
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns the `control` subparser/dispatch/`_control` and the `_run` annotation block in `commands/lab.py`, hard gate D17 (`mis_shaped_controls` + the `check` clause) in `lab/hardgate.py`, `tests/test_lab_hardgate.py`, and new `docs/backtests/2026-10-19-trial-828-shortfall.md`. Exit: `lab control` (bare, and per-method) prints the verdict table; `lab run` annotates a mis-shaped control and still exits 0; `lab promote` refuses such a method naming the arm, both ratios, the band, and the amendment remedy (no method id spent); `Promotable now:` is unchanged by D17 while nine dev-eligible methods (M0047, M0201, M0202, M0208, M0215, M0221, M0225, M0227, M0243) would be refused if promoted; the backtest note records the trial-828 run, the `lab control` table, and the three corrections (MEMORY.md, insight 461, `/sera`) with exact numbers; `ruff`/`pytest` green; `lab/lab.sqlite` unchanged in git.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/lab-shortfall-and-control-shape/PLAN.md` (phase 4 of 4)
+  - **Satisfies**: R1, R2 — the written acceptance run of the shortfall decomposition on trial 828; and the `lab control`/`lab run`/hard-gate bindings of the control-shape check.
+  - **Depends on**: P1-ENG-03W0, P1-ENG-ISID
+  - **Plan**: `.workflows/plan/P1-ENG-DZDN.md`
 
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"

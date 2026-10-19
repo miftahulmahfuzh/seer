@@ -3,13 +3,13 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-19
-**Total Active Tasks**: 2
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 1
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
@@ -23,6 +23,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [ ] **P1-ENG-IPVX** Phase 1: M0258: pre-register, run and record the banded gate
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns the cadence study (script + writeup), the method file and its test module, the pre-registration commit, `lab run M0258`, the analysis/verdict/insight/idea, `lab stage` and the staged commit in the main checkout, and the handover. Exit: pytest green + ruff clean; `lab run M0258` exit 0 with six dev trials and one `method_folds` row; `lab show M0258` prints six arms and `lab control M0258` reports no refuse; a `lab note` analysis ending in `My opinion:`, a verdict line, >=1 insight, >=1 queued idea; `lab stage` run and both `lab.sqlite` and `web/data/lab.json` committed from the index in the main checkout; test-window looks still read 4; handover written.
+  - **Status**: in_progress
+  - **Plan Set**: `docs/plans/GATE_PRICE_BAND_PLAN.md` (phase 1 of 1)
+  - **Satisfies**: R1 — a band arm (exit b% below the 200-day average, re-enter b% above) on a book that holds stocks; R2 — a bare-gate arm on the same book, a paired difference; R3 — a dose-response ladder across the band (1.5%-6% plateau); R4 — a control arm matched to the book's own trade count and turnover; R5 — a new method file behind a new allocator id, not riding on `FactorParams.trend`; R6 — no test-window look, dev screen and a majority of walk-forward folds first
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-IPVX.md`
 - [x] **P1-ENG-0L6E** Phase 1: Resize band relative to the holding's target (`resize_basis` lever)
   - **Difficulty**: NORMAL
   - **Type**: Feature

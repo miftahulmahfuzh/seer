@@ -7,7 +7,9 @@ tests must keep passing on the day it does.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import sqlite3
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
@@ -1369,6 +1371,9 @@ def test_the_module_records_the_control_shape_decision():
     # The reconciled fact, both halves, and the way back.
     assert "M0072" in doc and "M0047" in doc
     assert "amendment" in doc
+    # The supersession rule, and the measurement that made it `ok` and not `ok or warn`.
+    assert "SUPERSEDES" in doc or "superseded" in doc
+    assert "M0047-PLC1-MV20" in doc
 
 
 def test_a_mis_shaped_control_refuses_promotion_and_names_both_ratios(conn, monkeypatch):
@@ -1408,6 +1413,93 @@ def test_a_matched_control_promotes(conn, monkeypatch):
     _control_arm(conn, "M0001", "R", trades=252, turnover=1.08)
     _with_control(monkeypatch)
     hardgate.check(conn, "M0001")                            # returns: no refusal
+
+
+def test_an_honest_control_supersedes_the_handicapped_one_and_the_gate_passes(conn, monkeypatch):
+    """(D17) The way back, tested rather than quoted.
+
+    `M0001-R` is M0230's shape -- 18 trades against 250, 0.15 turnover against 1.1 -- and refuses.
+    `M0001-A-PLC` is a later control of the same arm at 1.01x / 0.98x. The old arm cannot be
+    removed: a method file's recorded trials pin its candidates and `trials` is append-only by
+    trigger. Before this rule the re-draw changed nothing and the method stayed blocked forever.
+    """
+    from seer_engine.lab import control_shape as cs
+
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)                      # M0001-A, 250 trades, turnover 1.1
+    _control_arm(conn, "M0001", "R", trades=18, turnover=0.15)
+    _control_arm(conn, "M0001", "A-PLC", trades=252, turnover=1.08)
+    plc = _Arm("M0001-A-PLC", R_DRAW)
+    object.__setattr__(plc, cs.SUPERSEDES_ATTR, ("M0001-R",))   # the declaration IS the rule
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-R", R_DRAW), plc])
+
+    found = {f.control_id: f for f in cs.for_method(conn, "M0001")}
+    assert found["M0001-A-PLC"].verdict == cs.OK
+    assert found["M0001-R"].verdict == cs.REFUSE          # still measured, still reported
+    assert found["M0001-R"].superseded_by == "M0001-A-PLC"
+    assert found["M0001-R"].blocking is False
+
+    assert hardgate.mis_shaped_controls(conn, "M0001") == ()
+    hardgate.check(conn, "M0001")                            # and the gate no longer refuses
+
+
+def test_a_clean_redraw_that_declares_nothing_does_not_pass_the_gate(conn, monkeypatch):
+    """The condition that makes the rule a no-op on today's lab, at the gate.
+
+    `M0001-A-PLC` is clean, is a placebo and resolves to the same arm `M0001-R` does. Under the
+    target-equality rule the draft proposed, that would clear D17. It does not clear it here,
+    because the arm never said it was replacing anything -- and the lab holds 46 placebo arms
+    that were never asked to say so.
+    """
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _control_arm(conn, "M0001", "R", trades=18, turnover=0.15)
+    _control_arm(conn, "M0001", "A-PLC", trades=252, turnover=1.08)
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-R", R_DRAW),
+                                 _Arm("M0001-A-PLC", R_DRAW)])
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0001")
+    assert "M0001-R" in str(e.value)
+
+
+def test_a_redraw_that_only_warns_does_not_supersede_at_the_gate(conn, monkeypatch):
+    """1.40x / 1.41x is inside the refuse band and outside the match band: still a bent stick.
+
+    Measured on the committed lab, the loose reading would retire M0047's 0.549x control with its
+    own 0.545x twin and unblock the method with nothing honest drawn. The replacement has to clear
+    WARN_BAND.
+    """
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _control_arm(conn, "M0001", "R", trades=18, turnover=0.15)
+    _control_arm(conn, "M0001", "A-PLC", trades=350, turnover=1.55)
+    from seer_engine.lab import control_shape as cs
+
+    plc = _Arm("M0001-A-PLC", R_DRAW)
+    object.__setattr__(plc, cs.SUPERSEDES_ATTR, ("M0001-R",))
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-R", R_DRAW), plc])
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0001")
+    assert "M0001-R" in str(e.value)
+
+
+def test_an_unrun_redraw_does_not_supersede_at_the_gate(conn, monkeypatch):
+    """The commit is the pre-registration, and it lands BEFORE the run. Between the two the new
+    arm has no trial row, reads `unrecorded`, and must not clear the gate: otherwise D17 would be
+    satisfied by an intention rather than by a measurement."""
+    from seer_engine.lab import control_shape as cs
+
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _control_arm(conn, "M0001", "R", trades=18, turnover=0.15)
+    plc = _Arm("M0001-A-PLC", R_DRAW)
+    object.__setattr__(plc, cs.SUPERSEDES_ATTR, ("M0001-R",))   # declared, but never run
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-R", R_DRAW), plc])
+    found = {f.control_id: f for f in cs.for_method(conn, "M0001")}
+    assert found["M0001-A-PLC"].verdict == cs.UNRECORDED
+    assert found["M0001-R"].superseded_by is None
+    with pytest.raises(store.LabError):
+        hardgate.check(conn, "M0001")
 
 
 def test_a_dose_response_arm_is_never_refused_for_its_shape(conn, monkeypatch):
@@ -1454,6 +1546,49 @@ def test_a_shape_that_cannot_be_read_does_not_refuse(conn, monkeypatch):
     monkeypatch.setattr(cs, "for_method", refuses)
     assert hardgate.mis_shaped_controls(conn, "M0001") == ()
     hardgate.check(conn, "M0001")
+
+
+# The nine dev-eligible methods D17 stops today, named in (D17)'s own text. Measured read-only on
+# 2026-10-19 against this tree's committed lab: all nine refuse, on thirteen arms between them.
+BLOCKED_NINE: tuple[str, ...] = (
+    "M0047", "M0201", "M0202", "M0208", "M0215", "M0221", "M0225", "M0227", "M0243",
+)
+
+
+def test_supersession_unblocks_none_of_the_nine_until_an_honest_control_runs():
+    """(D17) The no-op proof at the gate. A rule change that quietly promoted nine methods would
+    be the worst possible outcome of this edit, so it is asserted rather than reasoned about.
+
+    `store.COMMITTED_DB` -- this tree's `lab/lab.sqlite`, opened mode=ro and never through
+    `store.connect`, which migrates and so dirties the file on a read. The bytes are hashed either
+    side.
+
+    Each method is allowed one of exactly two states, and never neither: still blocking, or holding
+    the band-clean control that retired its refusal -- with the refusal still reported. On this
+    tree today every one of the nine is in the first state.
+    """
+    from seer_engine.lab import control_shape as cs
+
+    if not store.COMMITTED_DB.exists():
+        pytest.skip("no lab database")
+    before = hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest()
+    conn = sqlite3.connect(f"file:{store.COMMITTED_DB}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        for mid in BLOCKED_NINE:
+            found = cs.for_method(conn, mid)
+            if not found:
+                pytest.skip(f"{mid} has no method file or no control arm in this tree")
+            off = hardgate.mis_shaped_controls(conn, mid)
+            retired = [f for f in found if f.superseded_by is not None]
+            assert off or retired, f"{mid} is no longer read by D17 at all"
+            assert off == cs.refusals(found)
+            for f in retired:
+                assert f.verdict == cs.REFUSE      # superseded, never dropped
+                assert f.trade_ratio is not None or f.turnover_ratio is not None
+    finally:
+        conn.close()
+    assert hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest() == before
 
 
 def test_lab_promote_exits_2_and_writes_nothing_on_a_mis_shaped_control(tmp_path, monkeypatch):

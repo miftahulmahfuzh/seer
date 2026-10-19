@@ -707,10 +707,21 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
             "recorded arm sits within 1.33x of its sibling on trades and 14.5x on turnover, so a "
             "trade-count check alone reads it as clean. A dose-response arm -- one whose "
             "different shape IS the treatment, like a deliberately stale signal date -- is listed "
-            "as such and never flagged. Pure arithmetic over recorded trial rows: no research "
-            "store is opened, no backtest runs, and no trial row, moments row, funding row, "
-            "status or journal entry is written, so the lab's N and the test-window looks cannot "
-            "move, web/data/lab.json does not change and `lab stage` is not needed."
+            "as such and never flagged. An arm marked superseded is one a LATER control has "
+            "retired by naming it: that later draw declared, before it ran, which measurement it "
+            "replaces, and it matches its own book's shape on both axes, so the hard gate reads "
+            "it and stops refusing on this one. A later arm never retires an earlier one merely "
+            "by happening to control the same book -- a re-drawn control is usually aimed at a "
+            "different arm on purpose, the one the old one should have been scored against -- so "
+            "where the two differ the later arm's own target is printed beside its id. The "
+            "superseded row is still printed, with its ratios and its verdict, because every "
+            "margin already written against it was quoted against a handicapped opponent and "
+            "that has to stay readable. Only a clean draw supersedes; a draw that merely warns "
+            "does not, and neither does one with no recorded trial yet. Pure arithmetic "
+            "over recorded trial rows: no research store is opened, no backtest runs, and no "
+            "trial row, moments row, funding row, status or journal entry is written, so the "
+            "lab's N and the test-window looks cannot move, web/data/lab.json does not change "
+            "and `lab stage` is not needed."
         ),
     )
     s.add_argument("method", nargs="*", metavar="M0248",
@@ -1776,7 +1787,17 @@ def _run(conn, args) -> int:
             print("\nControl shape: does each control arm trade like the arm it controls?")
             print(cs.format_report(found, show_clean=False))
             off = cs.refusals(found)
+            retired = [f for f in found if f.superseded_by is not None]
             warned = [f for f in cs.flags(found) if not f.refused]
+            if retired:
+                said = ", ".join(f"{f.control_id} by {f.superseded_by}" for f in retired)
+                print(f"  {len(retired)} earlier control arm(s) superseded ({said}): a later draw "
+                      f"of the same book matches")
+                print("      its shape on both axes, so `lab promote` reads that one and no "
+                      "longer refuses on the earlier")
+                print("      arm (lab/hardgate.py, D17). The earlier rows stay above with their "
+                      "ratios, because every margin")
+                print("      written against them was quoted against a handicapped opponent.")
             if off:
                 low, high = cs.REFUSE_BAND
                 print(f"  *** {len(off)} control arm(s) outside {low:.2f}x..{high:.2f}x on at "
@@ -1786,14 +1807,15 @@ def _run(conn, args) -> int:
                 print("      of X is the fees and the churn the control paid and this book did "
                       "not. Re-draw the control at")
                 print("      this book's own trade count and turnover and amend -- that costs no "
-                      "method id. `lab promote` refuses")
-                print("      this method until then (lab/hardgate.py, D17); the trials above are "
-                      "recorded either way (D15).")
+                      "method id and the new draw")
+                print("      supersedes this one. `lab promote` refuses this method until then "
+                      "(lab/hardgate.py, D17); the")
+                print("      trials above are recorded either way (D15).")
             elif warned:
                 print(f"  {len(warned)} control arm(s) outside {cs.WARN_BAND[0]:.2f}x.."
                       f"{cs.WARN_BAND[1]:.2f}x but inside the refuse band -- worth a look before "
                       f"the margin is written up, not a refusal.")
-            else:
+            elif not retired:
                 print("  Every control arm matches the arm it controls on both axes. A margin "
                       "measured against them is this book's own.")
     if amendment is not None:
@@ -2833,6 +2855,17 @@ def _control(conn, args) -> int:
     (``hardgate`` D17). ``lab run`` prints the same rows through the same ``format_report`` and
     refuses nothing (``hardgate`` D15), so the three bindings can never disagree about one arm.
 
+    An arm the table marks ``superseded`` is one a later control has retired by NAMING it: that
+    later draw declared, in the commit that pre-registered it, which measurement it replaces, and
+    it is clean on both axes of its own book, so ``lab promote`` reads it and stops refusing on
+    the earlier one (``hardgate`` D17). Where the two control different arms -- which is usual,
+    because a re-drawn control is deliberately aimed at the arm the old one should have been
+    scored against -- the later arm's own target is printed beside its id. The earlier row is
+    still printed, with its ratios and its ``refuse`` verdict, because this report is also the
+    record of which written margins were quoted against a handicapped opponent. Only a clean draw
+    supersedes -- not a warn, not an arm it did not name, and not one whose trial is not recorded
+    yet.
+
     One thing this does read that the rest of the report path does not: ``control_shape.survey``
     reads each method's arms from its ``lab/methods/mNNNN_*.py`` file, because a control arm is
     identified by the one-line ``rationale`` its author wrote and no recorded row carries that.
@@ -2857,6 +2890,7 @@ def _control(conn, args) -> int:
     print(cs.format_report(found))
 
     refused = cs.refusals(found)
+    retired = [f for f in found if f.superseded_by is not None]
     if refused:
         low, high = cs.REFUSE_BAND
         print()
@@ -2864,7 +2898,19 @@ def _control(conn, args) -> int:
         print("axis. `lab promote` refuses a method holding one (lab/hardgate.py, D17), and any")
         print("sentence already written about one of those margins is quoted against a")
         print("handicapped opponent. The way back costs no method id: re-draw the control at the")
-        print("book's own trade count and turnover and run it again as an amendment.")
+        print("book's own trade count and turnover and run it again as an amendment, and the new")
+        print("draw supersedes the old one here.")
+    if retired:
+        print()
+        print(f"{len(retired)} control arm(s) are superseded: a later draw of the same book lands")
+        print(f"inside {cs.WARN_BAND[0]:.2f}x..{cs.WARN_BAND[1]:.2f}x on both axes, so "
+              f"`lab promote` reads that one and no longer")
+        print("refuses on the earlier arm (lab/hardgate.py, D17). A later draw retires an")
+        print("earlier one only by naming it in the declaration committed before it ran, so where")
+        print("the two control different arms the later one's own target is printed beside its")
+        print("id. The earlier rows stay in the table above, with their ratios and their verdict,")
+        print("because every margin already written against them was quoted against the")
+        print("handicapped opponent and the record of that has to stay readable.")
 
     print()
     print(f"recorded dev trials {n_before} -> {store.dev_trial_count(conn)}; "

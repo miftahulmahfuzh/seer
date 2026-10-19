@@ -582,6 +582,61 @@ trials under the method's existing id -- and it is exactly what the 2026-10-19 h
 on M0248 (section 2). A refusal that named no way back would be a dead end, and this rule meets
 nine methods that need one, so the message says it and so does this paragraph.
 
+**And from 2026-10-19 the way back actually works: an honest control SUPERSEDES a handicapped
+one.** Until this change it did not, and the gap was not a detail -- it was the rule failing at
+the one thing it told people to do. A method file is append-only in practice, because its recorded
+trials pin its candidates and ``trials`` is append-only by trigger. So re-drawing added the clean
+arm beside the bent one, ``control_shape.refusals`` kept returning the bent one, and this clause
+kept raising. All nine of the methods named below would have drawn an honest control, measured it,
+written it up, and stayed exactly as blocked. A rule whose stated remedy does not remedy anything
+is a rule nobody can satisfy, and this module has already written down (D16) what it thinks of
+those.
+
+The rule, exactly, and it is narrow on purpose: a ``refuse`` or ``warn`` finding is
+**superseded** when the same method holds another ``placebo`` arm that is itself clean on both
+axes **and that NAMES it** in its own pre-registered declaration
+(``control_shape.superseding_arm``, reading ``control_shape.SUPERSEDES_ATTR`` off the candidate).
+``refusals`` then drops it, so this clause does not raise on it.
+
+**Declared, not inferred from the target, and that is the whole design.** The obvious rule --
+"another clean placebo resolving to the same arm" -- fails in both directions on the very methods
+named below. It is too strict, because a re-drawn control named ``<target-id>-PLC`` is
+deliberately re-pointed at the book it actually controls: ``M0047-MV10-PLC`` resolves to
+``M0047-MV10`` while ``M0047-PLC1-MV10`` resolves, on the ladder's weakest rung, to ``M0047-EQ``,
+so equality would leave M0047 and M0202 blocked after every measurement had been taken. And it is
+too loose, because ``M0215-HASH`` and ``M0215-HASH-CAP4`` both resolve to ``M0215-CTRL``, so one
+honest control of ``CTRL`` would excuse an arm whose stated job is to price what a cap does. A
+resolution this module labels a guess is not a fact to build a gate rule on; a declaration made
+before any result exists is. ``lab control`` prints the superseded arm, its target, the
+superseding arm **and the superseding arm's own target**, so a re-point is visible to a reader.
+
+Four things deliberately do **not** supersede. A ``warn`` superseder -- it is itself outside the
+match band. An arm that **declares nothing** -- which is every arm in the lab today, and is why
+this change retires nothing. An ``unresolved``, ``unrecorded`` or ``not-checked`` superseder --
+absence is not evidence (D16's own sentence), and an arm declared in a method file but not yet
+run is exactly what a half-finished re-draw looks like; letting it supersede would clear the gate
+on an *intention*. A dose-response or within-frame arm -- it carries no ratio at all, and
+admitting one would turn ``control_shape``'s dose-before-draw ordering into a way of clearing
+this clause by wording the rationale.
+
+**Why clean and not merely inside the refuse band, measured.** Over the whole committed lab on
+2026-10-19 the tight rule supersedes **nothing**: 64 findings, 19 refusals, 19 refusals. The loose
+rule supersedes one -- ``M0047-PLC1-MV10`` (0.549x trades / 0.496x turnover) would be retired by
+``M0047-PLC1-MV20`` (0.545x / 0.508x), its own equally handicapped twin, which clears
+``REFUSE_BAND`` only because its turnover rounds to the clean side of 0.50. M0047 would be
+unblocked by a second bent stick with no honest control in existence. So the replacement must
+clear ``WARN_BAND``, the *match* band, which is also the bar the 2026-10-19 plan set holds every
+re-drawn arm to.
+
+**This moves no band and grants no override.** ``WARN_BAND`` and ``REFUSE_BAND`` are untouched and
+are read nowhere new. The superseded arm keeps its ``refuse`` verdict, keeps both ratios, and is
+still printed by ``lab control`` and by ``lab run``, annotated with the id of the arm that retired
+it -- because every sentence already written about that margin was quoted against a handicapped
+opponent, and a reader who meets the new number has to be able to see the old one. This is a
+measuring-stick rule, not an amnesty: nothing is forgiven, something better is measured. And the
+hard gate still has no override -- this is the argued rule change its own refusal message invites,
+made in code and argued in the commit, which is the only mechanism it has ever offered.
+
 **What it does not do.** It does not refuse a method with no control arm -- most of the lab has
 none, and the rule makes no claim about a book nobody drew a control for. It does not refuse a
 method whose control shape cannot be read: an arm with no resolvable sibling, a row carrying
@@ -838,6 +893,13 @@ def mis_shaped_controls(conn: sqlite3.Connection, method_id: str) -> tuple:
     on a number nobody computed is the mechanism by which a rule stops being about the thing it
     was written for. The same sentence is (D16)'s about the survivorship grid: absence is not
     evidence.
+
+    **A superseded arm is not returned**, and that is ``control_shape.refusals``' doing rather
+    than this function's: a refusal that a later, band-clean control of the same arm has retired
+    reads ``blocking`` false while keeping its ``refuse`` verdict and both its ratios. The reader
+    still reports it, ``lab control`` still prints it with the id of the arm that superseded it,
+    and only this clause stops acting on it. Keeping the narrowing in one function is why the
+    gate, ``lab run`` and ``lab control`` cannot disagree about one arm -- all three call it.
 
     ``control_shape`` is imported inside the body, not at this module's scope. It reads recorded
     ``trials`` rows and nothing else today, so a module-level import would work -- and would make
@@ -1778,6 +1840,11 @@ def check(conn: sqlite3.Connection, method_id: str) -> None:
     # reader never raises and only a measured mismatch refuses: a shape nobody could read comes
     # back `unresolved` or `unrecorded` and is left to the clauses below, because absence is not
     # evidence (D16). `lab run` prints this same reading and refuses nothing (D15).
+    #
+    # `mis_shaped_controls` is `control_shape.refusals`, which drops a refusal that a later,
+    # band-clean control of the same arm has superseded. So re-drawing the control and running it
+    # as an amendment -- the way back this message names -- is the way back this clause takes.
+    # The superseded row keeps its verdict and still prints; it just stops blocking.
     off_shape = mis_shaped_controls(conn, method_id)
     if off_shape:
         from seer_engine.lab import control_shape
@@ -1792,9 +1859,13 @@ def check(conn: sqlite3.Connection, method_id: str) -> None:
             f"control paid and the book did not, and no one can say how much. The way back: "
             f"re-draw the control at the book's own trade count and turnover and run it again as "
             f"an amendment. That costs no method id, because an amendment appends trials under "
-            f"this id, and it is what the 2026-10-19 handover asks for on M0248. Nothing was "
-            f"written and no status moved. There is no override -- if the rule is wrong, change "
-            f"it in seer_engine/lab/hardgate.py and argue for it in the commit"
+            f"this id, and it is what the 2026-10-19 handover asks for on M0248. Once the new "
+            f"draw is recorded and lands inside "
+            f"{control_shape.WARN_BAND[0]:.2f}x..{control_shape.WARN_BAND[1]:.2f}x on both axes "
+            f"it supersedes this one here, and the arm above stays in the record with its ratios "
+            f"rather than disappearing. Nothing was written and no status moved. "
+            f"There is no override -- if the rule is wrong, change it in "
+            f"seer_engine/lab/hardgate.py and argue for it in the commit"
         )
 
     bad = failed_kin(conn, method_id)

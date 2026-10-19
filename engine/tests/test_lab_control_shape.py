@@ -359,6 +359,240 @@ def test_show_clean_false_keeps_only_what_must_be_acted_on(conn):
     assert "M9011-R" in cs.format_report(found, show_clean=True)
 
 
+# ------------------------------------------------------------------ supersession
+
+
+def _declaring(stub, *ids):
+    """``stub`` with a ``supersedes`` declaration on it, however ``Stub`` is built.
+
+    ``control_shape`` reads the attribute duck-typed through ``SUPERSEDES_ATTR``, exactly as it
+    reads ``DECLARATION_ATTR``, so a test arm declares by carrying the attribute and nothing in
+    this module has to import ``backtest.dev``."""
+    object.__setattr__(stub, cs.SUPERSEDES_ATTR, tuple(ids))
+    return stub
+
+
+def _finding(**kw) -> cs.Finding:
+    """A Finding built by hand, for the one case `findings` cannot produce in a single method.
+
+    An `unresolved` arm and a resolved refusal cannot coexist under one method id: `resolve_target`
+    returns (None, None) only when the eligible set is empty, and an eligible set that is empty for
+    one placebo is empty for all of them. So the predicate is exercised directly for that case.
+    """
+    base = dict(
+        method_id="M9999", control_id="M9999-R", kind=cs.KIND_PLACEBO, target_id="M9999-CORE",
+        rung=cs.RUNG_STEM, control=None, target=None, trade_ratio=1.0, turnover_ratio=1.0,
+        verdict=cs.OK, reason="r", declares=(),
+    )
+    base.update(kw)
+    return cs.Finding(**base)
+
+
+def test_a_band_clean_placebo_that_declares_a_refused_one_supersedes_it(conn):
+    """The whole point of the rule: an honest control retires the handicapped one it NAMES.
+
+    The refusal is NOT dropped. Its verdict is still refuse, both ratios are still there and it is
+    still flagged -- the sentence already written about its margin was quoted against a
+    handicapped opponent and that stays readable. Only `blocking` goes false, and `refusals` --
+    which is what `hardgate` acts on -- is what reads `blocking`.
+    """
+    _lab(conn, "M9020", [("M9020-CORE", 500, 2.0),
+                         ("M9020-R", 35, 0.14),
+                         ("M9020-CORE-PLC", 505, 2.02)])
+    arms = [Stub("M9020-CORE", R_CORE), Stub("M9020-R", R_C50_R),
+            _declaring(Stub("M9020-CORE-PLC", R_C50_R), "M9020-R")]
+    found = cs.findings(conn, "M9020", arms)
+    by_id = {f.control_id: f for f in found}
+
+    old, new = by_id["M9020-R"], by_id["M9020-CORE-PLC"]
+    assert old.verdict == cs.REFUSE and round(old.trade_ratio, 2) == 0.07
+    assert new.verdict == cs.OK and new.superseded_by is None
+    assert new.declares == ("M9020-R",)
+
+    assert old.superseded_by == "M9020-CORE-PLC"
+    assert old.superseded_by_target == new.target_id
+    assert old.refused is True and old.flagged is True       # still reported, never dropped
+    assert old.blocking is False                             # and no longer stopping a promotion
+    assert cs.refusals(found) == ()
+    assert old in cs.flags(found)
+    assert "superseded by M9020-CORE-PLC" in cs.describe(old)
+
+
+def test_a_clean_placebo_that_declares_nothing_supersedes_nothing(conn):
+    """The condition that makes this a measured no-op on the committed lab, where no arm declares.
+
+    It is also the half of the rule that replaced target equality: a well-shaped control of the
+    same book is NOT evidence that it was drawn to replace the bent one, and before 2026-10-19
+    nobody had ever been asked to say so.
+    """
+    _lab(conn, "M9027", [("M9027-CORE", 500, 2.0),
+                         ("M9027-R", 35, 0.14),
+                         ("M9027-CORE-PLC", 505, 2.02)])
+    arms = [Stub("M9027-CORE", R_CORE), Stub("M9027-R", R_C50_R), Stub("M9027-CORE-PLC", R_C50_R)]
+    found = cs.findings(conn, "M9027", arms)
+    by_id = {f.control_id: f for f in found}
+    assert by_id["M9027-CORE-PLC"].verdict == cs.OK          # same target, clean, declares nothing
+    assert by_id["M9027-CORE-PLC"].target_id == by_id["M9027-R"].target_id
+    assert by_id["M9027-R"].superseded_by is None
+    assert [f.control_id for f in cs.refusals(found)] == ["M9027-R"]
+
+
+def test_a_warn_superseder_does_not_supersede_even_when_it_declares(conn):
+    """Measured on the committed lab: under an OK-or-WARN band M0047-PLC1-MV20 (0.545x) would
+    retire M0047-PLC1-MV10 (0.549x) -- one bent stick replacing another, with no honest control
+    drawn. The arm doing the retiring has to clear the MATCH band, not merely the refuse band."""
+    _lab(conn, "M9021", [("M9021-CORE", 500, 2.0),
+                         ("M9021-R", 35, 0.14),
+                         ("M9021-CORE-PLC", 700, 2.8)])
+    arms = [Stub("M9021-CORE", R_CORE), Stub("M9021-R", R_C50_R),
+            _declaring(Stub("M9021-CORE-PLC", R_C50_R), "M9021-R")]
+    found = cs.findings(conn, "M9021", arms)
+    by_id = {f.control_id: f for f in found}
+    assert by_id["M9021-CORE-PLC"].verdict == cs.WARN      # 1.40x: inside refuse, outside match
+    assert by_id["M9021-R"].superseded_by is None
+    assert [f.control_id for f in cs.refusals(found)] == ["M9021-R"]
+
+
+def test_a_declared_supersession_crosses_a_different_target_on_purpose(conn):
+    """The reason target equality was dropped, as a test rather than as an argument.
+
+    `M9022-R` resolves to `M9022-CORE` -- the ladder's own guess. The arm drawn to replace it is
+    named after its TRUE target and so resolves to `M9022-WIDE`. Under a target-equality rule
+    nothing would be superseded and the method would stay blocked after all the measuring; under
+    the declaration it is superseded, and BOTH targets are reported so the re-point is visible.
+    """
+    _lab(conn, "M9022", [("M9022-CORE", 500, 2.0),
+                         ("M9022-WIDE", 900, 3.6),
+                         ("M9022-R", 35, 0.14),
+                         ("M9022-WIDE-PLC", 909, 3.64)])
+    arms = [Stub("M9022-CORE", R_CORE), Stub("M9022-WIDE", R_PLAIN),
+            Stub("M9022-R", R_C50_R),
+            _declaring(Stub("M9022-WIDE-PLC", R_C50_R), "M9022-R")]
+    found = cs.findings(conn, "M9022", arms)
+    by_id = {f.control_id: f for f in found}
+    old, new = by_id["M9022-R"], by_id["M9022-WIDE-PLC"]
+    assert old.target_id == "M9022-CORE" and new.target_id == "M9022-WIDE"
+    assert new.verdict == cs.OK
+    assert old.superseded_by == "M9022-WIDE-PLC"
+    assert old.superseded_by_target == "M9022-WIDE"
+    assert cs.refusals(found) == ()
+    said = cs.describe(old)
+    assert "M9022-WIDE-PLC" in said and "M9022-WIDE" in said and "M9022-CORE" in said
+    assert "M9022-WIDE-PLC -> M9022-WIDE" in cs.format_report(found)
+
+
+def test_one_clean_arm_does_not_excuse_a_sibling_it_did_not_name(conn):
+    """The other half of why target equality went. `M0215-HASH` and `M0215-HASH-CAP4` both resolve
+    to `M0215-CTRL`, so under equality one honest control of CTRL would excuse an arm whose job is
+    to price what a cap does and which was never scored against CTRL in spirit. Each old arm is
+    retired by the arm that names it, and by no other."""
+    _lab(conn, "M9028", [("M9028-CORE", 500, 2.0),
+                         ("M9028-R", 35, 0.14),
+                         ("M9028-R2", 36, 0.15),
+                         ("M9028-CORE-PLC", 505, 2.02)])
+    arms = [Stub("M9028-CORE", R_CORE), Stub("M9028-R", R_C50_R), Stub("M9028-R2", R_C50_R),
+            _declaring(Stub("M9028-CORE-PLC", R_C50_R), "M9028-R")]
+    found = cs.findings(conn, "M9028", arms)
+    by_id = {f.control_id: f for f in found}
+    assert by_id["M9028-R"].target_id == by_id["M9028-R2"].target_id == "M9028-CORE"
+    assert by_id["M9028-R"].superseded_by == "M9028-CORE-PLC"
+    assert by_id["M9028-R2"].superseded_by is None
+    assert [f.control_id for f in cs.refusals(found)] == ["M9028-R2"]
+
+
+def test_a_warn_arm_is_superseded_too_although_it_never_blocked(conn):
+    """`M0047-PLC1-MV20` is the lab's one such arm: 0.545x / 0.508x, inside the refuse band and
+    outside the match band. It stops no promotion, so retiring it moves no gate -- but every
+    margin written against it is as little evidence as its refused twin's, and leaving one of a
+    re-drawn pair unmarked would tell a reader the opposite."""
+    _lab(conn, "M9029", [("M9029-CORE", 500, 2.0),
+                         ("M9029-W", 350, 1.40),
+                         ("M9029-CORE-PLC", 505, 2.02)])
+    arms = [Stub("M9029-CORE", R_CORE), Stub("M9029-W", R_C50_R),
+            _declaring(Stub("M9029-CORE-PLC", R_C50_R), "M9029-W")]
+    found = cs.findings(conn, "M9029", arms)
+    by_id = {f.control_id: f for f in found}
+    assert by_id["M9029-W"].verdict == cs.WARN
+    assert by_id["M9029-W"].superseded_by == "M9029-CORE-PLC"
+    assert by_id["M9029-W"].blocking is False
+    assert by_id["M9029-W"] in cs.flags(found)               # still a "read this" row
+    assert cs.refusals(found) == ()
+
+
+def test_an_unrecorded_or_unresolved_sibling_never_supersedes(conn):
+    """Absence is not evidence (D16's sentence), and this is the case that matters in practice.
+
+    A re-drawn control is committed to the method file BEFORE it is run -- the commit is the
+    pre-registration. Between that commit and the run the new arm has no trial row, so its finding
+    is `unrecorded`. If that superseded, the gate would clear on the intention rather than on the
+    measurement, and the whole pre-registration discipline would be bypassable by writing a
+    docstring.
+    """
+    _lab(conn, "M9023", [("M9023-CORE", 500, 2.0), ("M9023-R", 35, 0.14)])
+    arms = [Stub("M9023-CORE", R_CORE), Stub("M9023-R", R_C50_R),
+            _declaring(Stub("M9023-CORE-PLC", R_C50_R), "M9023-R")]
+    found = cs.findings(conn, "M9023", arms)
+    by_id = {f.control_id: f for f in found}
+    assert by_id["M9023-CORE-PLC"].verdict == cs.UNRECORDED
+    assert by_id["M9023-R"].superseded_by is None
+    assert [f.control_id for f in cs.refusals(found)] == ["M9023-R"]
+
+    bent = _finding(method_id="M9023", control_id="M9023-R", verdict=cs.REFUSE,
+                    trade_ratio=0.07, turnover_ratio=0.07, target_id="M9023-CORE")
+    unresolved = _finding(method_id="M9023", control_id="M9023-S", verdict=cs.UNRESOLVED,
+                          target_id=None, rung=None, trade_ratio=None, turnover_ratio=None)
+    assert cs.superseding_arm(bent, (bent, unresolved)) is None
+
+
+def test_a_dose_response_sibling_never_supersedes(conn):
+    """A dose arm carries no ratio at all, so it is nobody's measuring stick.
+
+    If it superseded, `kind_of`'s dose-before-draw ordering would become the way to clear D17: word
+    the re-drawn control as a dose and the refusal disappears with nothing measured. The ordering
+    exists to protect a correct arm from a false alarm, not to hand out a bypass.
+    """
+    _lab(conn, "M9024", [("M9024-CORE", 500, 2.0),
+                         ("M9024-R", 35, 0.14),
+                         ("M9024-STALE", 505, 2.02)])
+    arms = [Stub("M9024-CORE", R_CORE), Stub("M9024-R", R_C50_R),
+            _declaring(Stub("M9024-STALE", R_STALE30), "M9024-R")]
+    found = cs.findings(conn, "M9024", arms)
+    by_id = {f.control_id: f for f in found}
+    assert by_id["M9024-STALE"].kind == cs.KIND_DOSE
+    assert by_id["M9024-STALE"].verdict == cs.NOT_CHECKED
+    assert by_id["M9024-R"].superseded_by is None
+    assert [f.control_id for f in cs.refusals(found)] == ["M9024-R"]
+    # And a shape-matched arm that is not a control at all (M9024-CORE itself) produces no
+    # finding, so it cannot supersede either.
+    assert "M9024-CORE" not in by_id
+
+
+def test_a_superseded_arm_stays_in_the_report_with_its_ratios(conn):
+    """Still reported, never dropped -- in both the full report and the act-on-this-only one."""
+    _lab(conn, "M9025", [("M9025-CORE", 500, 2.0),
+                         ("M9025-R", 35, 0.14),
+                         ("M9025-CORE-PLC", 505, 2.02)])
+    arms = [Stub("M9025-CORE", R_CORE), Stub("M9025-R", R_C50_R),
+            _declaring(Stub("M9025-CORE-PLC", R_C50_R), "M9025-R")]
+    found = cs.findings(conn, "M9025", arms)
+
+    text = cs.format_report(found)
+    assert "M9025-R" in text and "0.07" in text and cs.REFUSE in text
+    assert "superseded by" in text and "M9025-CORE-PLC" in text
+    assert "has to stay readable" in text
+
+    loud = cs.format_report(found, show_clean=False)
+    assert "M9025-R" in loud and "superseded by" in loud
+
+
+def test_the_report_grows_no_column_when_nothing_is_superseded(conn):
+    """Sixty-four rows of dashes to carry information in none of them is noise, so the column
+    appears only when it says something, and today's report is unchanged."""
+    _lab(conn, "M9026", [("M9026-CORE", 500, 2.0), ("M9026-R", 2000, 8.0)])
+    arms = [Stub("M9026-CORE", R_CORE), Stub("M9026-R", R_C50_R)]
+    assert "superseded by" not in cs.format_report(cs.findings(conn, "M9026", arms))
+
+
 # ------------------------------------------------------------------ the calibration table
 
 
@@ -485,3 +719,132 @@ def test_nothing_refuses_without_both_a_resolved_target_and_a_measured_ratio():
         measured = [r for r in (f.trade_ratio, f.turnover_ratio) if r is not None]
         assert measured, f"{f.control_id} refuses on no measured axis"
         assert any(cs.band_verdict(r) == cs.REFUSE for r in measured)
+
+
+# ------------------------------------------------------------------ the nine D17 blocks
+
+# The thirteen refuse-band control arms the committed lab holds across the nine dev-eligible
+# methods D17 stops, re-derived read-only on 2026-10-19 and matching `lab control` to the second
+# decimal. These rows are frozen (trials_no_update, trials_no_delete), so the ratios can never
+# move; the method files that name the arms are append-only in practice for the same reason.
+BLOCKED_NINE: dict[str, tuple[tuple[str, str, float, float], ...]] = {
+    "M0047": (("M0047-PLC1-MV10", "M0047-EQ", 0.549, 0.496),),
+    "M0201": (("M0201-PLC1-MV10", "M0201-Y20-MV10", 2.266, 2.135),
+              ("M0201-PLC2-MV10", "M0201-Y20-MV10", 2.261, 2.117)),
+    "M0202": (("M0202-PLC1-HALF", "M0202-Y20-HALF", 2.248, 2.005),
+              ("M0202-PLC2-HALF", "M0202-Y20-HALF", 2.245, 1.993),
+              ("M0202-PLC1-HALF-FAST", "M0202-Y20-HALF", 2.248, 2.200)),
+    "M0208": (("M0208-HASH-N20", "M0208-CGO-N20", 4.405, 5.197),),
+    "M0215": (("M0215-HASH", "M0215-CTRL", 0.339, 0.428),
+              ("M0215-HASH-CAP4", "M0215-CTRL", 0.339, 0.429)),
+    "M0221": (("M0221-R50", "M0221-C50", 0.211, 0.498),),
+    "M0225": (("M0225-R50", "M0225-C50", 0.195, 0.424),),
+    "M0227": (("M0227-R20", "M0227-S20", 0.067, 0.117),),
+    "M0243": (("M0243-NEAR20-R", "M0243-NEAR20", 3.013, 2.976),),
+}
+
+
+def test_supersession_moves_no_verdict_on_the_committed_lab():
+    """The no-op proof, at the finding level: every one of the thirteen still reads `refuse`.
+
+    This is the half of the rule that is true forever. `superseded_by` narrows what a GATE acts on;
+    it never moves a verdict and never removes a row, because the old draw is the record of what
+    every margin written against it was worth. A refusal that vanished from the report would be an
+    amnesty, and this assertion is what stops one being written by accident.
+    """
+    conn = _committed_lab()
+    if conn is None:
+        pytest.skip("no lab database")
+    before = hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest()
+    try:
+        found = cs.survey(conn, tuple(BLOCKED_NINE))
+    finally:
+        conn.close()
+    assert hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest() == before
+
+    by_id = {f.control_id: f for f in found}
+    for mid, arms in BLOCKED_NINE.items():
+        for control_id, target_id, trades, turnover in arms:
+            if control_id not in by_id:
+                pytest.skip(f"{control_id} is not in this tree's lab database")
+            f = by_id[control_id]
+            assert (f.method_id, f.kind, f.target_id) == (mid, cs.KIND_PLACEBO, target_id)
+            assert f.verdict == cs.REFUSE, f"{control_id} is no longer reported as a refusal"
+            assert round(f.trade_ratio, 3) == trades
+            assert round(f.turnover_ratio, 3) == turnover
+
+
+def test_nothing_in_the_committed_lab_is_superseded_today():
+    """The no-op proof, lab-wide: on this tree's database the rule retires nothing at all.
+
+    Measured 2026-10-19 over every method file: 64 findings, 19 refusals, 0 supersessions, before
+    the change and after it. The nine blocked methods stay blocked until an honest control is drawn
+    and RUN -- a committed-but-unrun amendment reads `unrecorded` and never supersedes, which is
+    why this stays true for the whole of the 2026-10-19 plan set and flips only once phase 8 stages
+    the new trials into lab/lab.sqlite.
+    """
+    conn = _committed_lab()
+    if conn is None:
+        pytest.skip("no lab database")
+    try:
+        found = cs.survey(conn)
+    finally:
+        conn.close()
+    assert found, "the committed lab holds control arms; the survey found none"
+    for f in found:
+        if f.superseded_by is None:
+            continue
+        honest = {g.control_id: g for g in found}[f.superseded_by]
+        assert honest.verdict == cs.OK
+        assert honest.kind == cs.KIND_PLACEBO
+        assert honest.target_id == f.target_id
+        assert honest.method_id == f.method_id
+    assert cs.refusals(found) == tuple(f for f in found if f.verdict == cs.REFUSE), (
+        "supersession retired a refusal on the committed lab; it must retire none until an "
+        "honestly shaped control has been drawn, DECLARED and run"
+    )
+    # Until 2026-10-19 the stronger reason for the no-op was that NO arm declared anything at
+    # all. That stopped being true the moment the 2026-10-19 plan set's own amendment blocks
+    # landed in the method files, which is the work this rule exists to make count -- so the
+    # claim that survives is the one above: nothing is RETIRED, because a declared-but-unrun arm
+    # reads `unrecorded` and never supersedes. What is checked here instead is forever-true and
+    # is the hazard the old assertion could not see: a declaration that names an arm which does
+    # not exist, or belongs to another method, or was never flagged, is a typo that would
+    # silently retire nothing and be found only in phase 8.
+    by_id = {g.control_id: g for g in found}
+    for f in found:
+        for named in f.declares:
+            g = by_id.get(named)
+            assert g is not None, (
+                f"{f.control_id} declares it supersedes {named}, which is not a control arm of "
+                f"any method in this lab"
+            )
+            assert g.method_id == f.method_id, (
+                f"{f.control_id} declares {named}, which belongs to {g.method_id}: a supersession "
+                f"only ever reaches inside one method"
+            )
+            assert g.flagged, (
+                f"{f.control_id} declares {named}, which is {g.verdict}: there is nothing to "
+                f"retire, so the declaration is pointed at the wrong arm"
+            )
+
+
+def test_every_blocked_method_keeps_a_d17_reading_either_way():
+    """Forever-true: each of the nine either still blocks, or holds the honest control that
+    retired it -- never neither, and never a refusal that simply disappeared."""
+    conn = _committed_lab()
+    if conn is None:
+        pytest.skip("no lab database")
+    try:
+        found = cs.survey(conn, tuple(BLOCKED_NINE))
+    finally:
+        conn.close()
+    for mid, arms in BLOCKED_NINE.items():
+        mine = [f for f in found if f.method_id == mid]
+        if not mine:
+            pytest.skip(f"{mid} is not in this tree's lab database")
+        reported = {f.control_id for f in mine if f.verdict == cs.REFUSE}
+        assert {a[0] for a in arms} <= reported, f"{mid}: a refusal disappeared from the report"
+        assert cs.refusals(mine) or [f for f in mine if f.superseded_by is not None], (
+            f"{mid} is no longer read by D17 at all"
+        )

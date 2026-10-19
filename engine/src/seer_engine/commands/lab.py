@@ -68,6 +68,22 @@
                                     nothing, and the month the $0.10 per-order floor stops
                                     binding. No trial row, no moments, no status change: N and
                                     the looks do not move
+    lab shortfall 828 | M0244-PLACEBO30 [--era 2009-2015] [--store DIR] [--against CID]
+                  [--names N] [--csv PATH]
+                                    report only: where one recorded trial's gap to SPY TR over one
+                                    era went -- the gate premium it paid for being out of the
+                                    market, the fee drag its turnover bought, and ONE residual for
+                                    the pool and the weighting, which is labelled a residual and
+                                    never named after a cause. The gap itself is not recomputed:
+                                    it comes from the same de-funded walk-forward slice against
+                                    REF-SPY-HOLD that lab exposure and lab gate use. With --store
+                                    the era's exposure is resolved from the shared SPY 200-day
+                                    gate's own on-share per era; without one the recorded
+                                    whole-window figure is used and the output says so.
+                                    --against names a sibling arm of the same method and splits
+                                    the residual into what the two share and what this arm owns.
+                                    No trial row, no moments, no status change: N and the looks do
+                                    not move
     lab survivorship M0069 [M0007 ...] [--store DIR] [--sv-store DIR] [--csv PATH] [--no-journal]
                                     report only: re-run every recorded dev variant of each method
                                     at its recorded capital and funding on the dev store and on
@@ -93,6 +109,16 @@
                                     cannot be identified is listed, never run as if it were off.
                                     No method file changes and no new method id. No trial row, no
                                     moments, no status change: N and the looks do not move
+    lab control [M0248 ...]         report only: whether each control, placebo or blind-draw arm
+                                    has the shape of the arm it controls -- its trade count and
+                                    its turnover as ratios -- so a margin quoted against it is
+                                    sound. Arithmetic over recorded trial rows: no research store,
+                                    no backtest, no method file read. A dose-response arm, whose
+                                    different shape is the treatment, is listed and never flagged.
+                                    The refuse half of the band is what `lab promote` refuses on
+                                    (lab/hardgate.py, D17); `lab run` prints the same reading and
+                                    refuses nothing (D15). No trial row, no moments, no status
+                                    change: N and the looks do not move
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
@@ -440,6 +466,76 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s.add_argument("--eval-years", type=int, default=None, metavar="N")
 
     s = sub.add_parser(
+        "shortfall",
+        # Every `%` in a `help=` below is doubled: argparse runs each one through
+        # %-interpolation (HelpFormatter._expand_help), so a bare `%` is read as a format spec
+        # and `lab --help` dies with "unsupported format character". A doubled `%%` renders as
+        # one `%`. `description=` is NOT interpolated and must stay single. Same rule as the
+        # `costs`, `exposure`, `gate` and `turnover` parsers above.
+        help="report only: where one trial's gap to SPY TR over an era went (gate, fees, residual)",
+        description=(
+            "Split one recorded dev trial's gap to SPY total return over one era into a gate "
+            "premium, a modelled fee drag and one residual for the pool and the weighting. The "
+            "gap is not recomputed: it comes from walkforward.measure over the recorded monthly "
+            "curve, de-funded through hardgate.trial_deposits, against the recorded REF-SPY-HOLD "
+            "curve sliced the same way -- the path lab exposure, lab gate and lab survivorship "
+            "already take. With --store the era's exposure is resolved by scaling the recorded "
+            "whole-window figure by the shared SPY 200-day gate's own on-share in that era "
+            "against its on-share over the whole window; without --store, for a book that "
+            "carries no shared gate, or for a book that held money while the gate was off, the "
+            "recorded whole-window exposure is used and the report says so. The fee drag is a "
+            "MODEL -- what a run really paid is not a trials column -- and is printed with a "
+            "sensitivity band across book sizes so a guessed name count is visibly bounded. The "
+            "residual is a residual: it is the term the two named ones do not explain and it is "
+            "never named after a cause. This is an attribution under stated assumptions, not an "
+            "identity. Records no trial, no moments, no funding, no provenance, no insight and "
+            "no status, so the lab's N and the test-window looks do not move; the test window is "
+            "never read, and a test-window trial is refused by name."
+        ),
+    )
+    s.add_argument(
+        "trial", metavar="828",
+        help="the trial to decompose: a trials.n, or a candidate id like M0244-PLACEBO30",
+    )
+    s.add_argument(
+        "--era", default=None, metavar="2009-2015",
+        help="the era to decompose over (default: 2009-2015). One of the eras in "
+             "lab/exposure.py's ERAS, or `whole` for the trial's whole window",
+    )
+    s.add_argument(
+        "--store", type=Path,
+        default=(Path(os.environ["SEER_RESEARCH_STORE"])
+                 if os.environ.get("SEER_RESEARCH_STORE") else None),
+        help="a dev-window research store, read for the shared SPY 200-day gate's on-share per "
+             "era (default: $SEER_RESEARCH_STORE, else none). Without it the recorded "
+             "whole-window exposure is used instead, which measured 5.11 against 3.60 pts/yr of "
+             "gate premium on trial 828 -- so pass it when you have one. The stores are "
+             "gitignored, so a worktree has none: point this at a checkout that does rather "
+             "than rebuilding one. Only the gate symbol's rows of bars.csv are read; no market "
+             "is loaded and no backtest is run",
+    )
+    s.add_argument(
+        "--against", default=None, metavar="M0244-FRESH30",
+        help="split the pool+weighting residual against this sibling arm of the SAME method: "
+             "what that arm's own residual also carries is attributed to the shared pool and "
+             "frame, and only the remainder to this arm's own weighting and selection. An arm "
+             "of another method, or one whose prices are not the benchmark's (hardgate D10), is "
+             "refused rather than reported",
+    )
+    s.add_argument(
+        "--names", type=int, default=None, metavar="30",
+        help="the book's name count for the fee model (default: read from the recorded "
+             "configuration's outermost `top=`, else the roster's 20). The slot size sets how "
+             "hard Gotrade's $0.10 per-order floor bites; measured, the 2009-2015 drag moves "
+             "only from 3.71 to 3.85 pts/yr across 10 to 50 names, and the report prints that "
+             "band beside its answer",
+    )
+    s.add_argument(
+        "--csv", type=Path, default=None, metavar="PATH",
+        help="also write the terms to PATH as CSV, at full precision",
+    )
+
+    s = sub.add_parser(
         "survivorship",
         help="report only: recorded methods re-run on the survivorship-check store beside the dev store",
         description=(
@@ -593,6 +689,32 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
                    help="print the report and write nothing at all, not even the observation")
     s.add_argument("--csv", type=Path, default=None, metavar="PATH",
                    help="also write the full grid (variant x column) to PATH as CSV, full precision")
+
+    s = sub.add_parser(
+        "control",
+        # No literal `%` in any `help=` string below, and none may be added: argparse runs every
+        # `help=` through %-interpolation (HelpFormatter._expand_help), so a bare `%` is read as a
+        # format spec and `lab --help` dies. A doubled `%%` renders as one `%`. `description=` is
+        # NOT interpolated and must stay single. See the `gate` parser above.
+        help="report only: whether each control arm trades like the arm it controls",
+        description=(
+            "A control arm exists to be the real book's shape with none of its identity, so "
+            "'the signal beat its control by X' is only sound when the two traded about as often "
+            "and turned the book over about as fast. This prints every control, placebo and "
+            "blind-draw arm the lab holds beside the arm it controls, as a trade-count ratio and "
+            "a turnover ratio, and says whether each is clean, worth a warning, or outside the "
+            "band the hard gate refuses on (lab/hardgate.py, D17). Both axes are mandatory: one "
+            "recorded arm sits within 1.33x of its sibling on trades and 14.5x on turnover, so a "
+            "trade-count check alone reads it as clean. A dose-response arm -- one whose "
+            "different shape IS the treatment, like a deliberately stale signal date -- is listed "
+            "as such and never flagged. Pure arithmetic over recorded trial rows: no research "
+            "store is opened, no backtest runs, and no trial row, moments row, funding row, "
+            "status or journal entry is written, so the lab's N and the test-window looks cannot "
+            "move, web/data/lab.json does not change and `lab stage` is not needed."
+        ),
+    )
+    s.add_argument("method", nargs="*", metavar="M0248",
+                   help="methods to report (default: every method that has a control arm)")
 
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
@@ -1626,6 +1748,54 @@ def _run(conn, args) -> int:
         "  Folds share training data, so they are a sanity check, never a significance test, and "
         "nothing here enters a DSR."
     )
+    # The run's control-shape reading, printed from the rows that were just recorded (R2, D17).
+    # Beside the walk-forward verdict and for the same reason: until now a researcher met this
+    # only at `lab promote`, by which time the method id was spent and the dev write-up was often
+    # already written.
+    #
+    # It ANNOTATES; it does not gate (hardgate D15). A second gate at run time would only spend
+    # method ids to say what `lab promote` already says, and the lab has to be able to bootstrap.
+    # `format_report(..., show_clean=False)` is the shape this wants: a clean control prints one
+    # line saying so, and only what must be acted on is listed. It is the same formatter
+    # `lab control` and nothing else uses, so the two can never drift on one arm.
+    #
+    # `control_shape` raises nothing of its own; the guard is for `method.discover()`, which
+    # `for_method` calls, and whose failure must not take down a run whose trials are already
+    # recorded.
+    from seer_engine.lab import control_shape as cs
+
+    try:
+        found = cs.for_method(conn, method.id)
+    except store.LabError as e:
+        print(f"\nControl shape: not read ({e}). The trials above are recorded either way.")
+    else:
+        if not found:
+            print("\nControl shape: this method declares no control or placebo arm, so there is "
+                  "nothing to match and nothing is claimed either way.")
+        else:
+            print("\nControl shape: does each control arm trade like the arm it controls?")
+            print(cs.format_report(found, show_clean=False))
+            off = cs.refusals(found)
+            warned = [f for f in cs.flags(found) if not f.refused]
+            if off:
+                low, high = cs.REFUSE_BAND
+                print(f"  *** {len(off)} control arm(s) outside {low:.2f}x..{high:.2f}x on at "
+                      f"least one axis.")
+                print("      A sentence of the form 'this beat its control by X' is quoted "
+                      "against a handicapped opponent: part")
+                print("      of X is the fees and the churn the control paid and this book did "
+                      "not. Re-draw the control at")
+                print("      this book's own trade count and turnover and amend -- that costs no "
+                      "method id. `lab promote` refuses")
+                print("      this method until then (lab/hardgate.py, D17); the trials above are "
+                      "recorded either way (D15).")
+            elif warned:
+                print(f"  {len(warned)} control arm(s) outside {cs.WARN_BAND[0]:.2f}x.."
+                      f"{cs.WARN_BAND[1]:.2f}x but inside the refuse band -- worth a look before "
+                      f"the margin is written up, not a refusal.")
+            else:
+                print("  Every control arm matches the arm it controls on both axes. A margin "
+                      "measured against them is this book's own.")
     if amendment is not None:
         g = store.gate(conn)
         seq = len(store.amendments_of(conn, method.id))
@@ -2477,6 +2647,67 @@ def _walkforward(conn, args) -> int:
     return 0
 
 
+def _shortfall(conn, args) -> int:
+    """``lab shortfall``: where one recorded trial's gap to SPY TR over one era went.
+
+    A report in the sense ``lab regime`` and ``lab turnover`` are reports: it re-runs nothing,
+    inserts no trial, moves no status and spends no look, and it prints the lab's N and the
+    test-window looks before and after so the invariant is visible on the terminal rather than
+    merely asserted in a test.
+
+    The one optional read is ``--store``, and it is narrow: the gate symbol's rows out of the
+    store's own ``bars.csv``, so the shared SPY 200-day gate's on-share can be measured per era.
+    No market is built and no backtest runs. The store is opened only when the recorded
+    configuration actually carries that gate, because for a book that does not there is nothing
+    for it to say.
+
+    A trial whose curves were measured on prices other than the benchmark's gets a ``WARNING``
+    line and its numbers anyway (D10 in ``lab/hardgate.py``): a report warns, the gate refuses.
+    ``--against`` is the exception and refuses, because a residual split across two price
+    fingerprints is a fabricated number rather than a caveated one.
+    """
+    from seer_engine.lab import shortfall
+
+    row = shortfall.resolve_trial(conn, args.trial)
+    against = None if args.against is None else shortfall.resolve_trial(conn, args.against)
+    era = shortfall.DEFAULT_ERA if args.era is None else args.era
+    window = shortfall.trial_window(row)
+    _label, lo, hi = shortfall.era_bounds(era, window)
+
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+
+    gate = None
+    store_given = args.store is not None
+    if store_given:
+        if shortfall.carries_shared_gate(row["config_text"]):
+            t0 = time.perf_counter()
+            gate = shortfall.gate_on_share(Path(args.store), window, (lo, hi))
+            log.info(
+                "gate on-share measured from %s: %.4f whole, %.4f era (%.1fs)",
+                args.store, gate.whole, gate.era, time.perf_counter() - t0,
+            )
+        else:
+            log.info(
+                "%s carries no shared %s %d-day gate; the store is not read",
+                row["candidate_id"], shortfall.GATE_SYMBOL, shortfall.GATE_N,
+            )
+
+    report = shortfall.measure(
+        conn, row, era, gate=gate, names=args.names, against=against, store_given=store_given
+    )
+    print(shortfall.format_report(report))
+    if args.csv is not None:
+        print(f"\nterms written to {shortfall.write_csv(report, Path(args.csv))}")
+    print(
+        f"\nNothing was recorded. Lab N (dev trials): {n_before} before, "
+        f"{store.dev_trial_count(conn)} after; test-window looks used: {looks_before} before, "
+        f"{store.test_looks(conn)} after. No journal entry, so seertrade.site/sera is unchanged "
+        f"and `lab stage` is not needed."
+    )
+    return 0
+
+
 def _survivorship(conn, args) -> int:
     """``lab survivorship M0069 [M0007 ...]``: recorded methods on the survivorship-check store.
 
@@ -2584,6 +2815,61 @@ def _kin(conn, args) -> int:
     print(f"recorded dev trials {n_before} -> {store.dev_trial_count(conn)}; "
           f"test-window looks {looks_before} -> {store.test_looks(conn)}. "
           f"Nothing was written and no method id was minted.")
+    return 0
+
+
+def _control(conn, args) -> int:
+    """``lab control [M0248 ...]``: does each control arm trade like the arm it controls?
+
+    Report only, in the sense ``lab kin`` is a report: pure arithmetic over recorded trial rows.
+    No research store is opened, no backtest runs, no trial is inserted, no status moves and no
+    look is spent. N and the test-window looks are printed before and after, so the "nothing was
+    recorded" invariant is visible on the terminal rather than merely asserted in a test.
+
+    With no method named it reports every control arm the lab holds -- forty-six placebo arms on
+    the committed database, of which nineteen are outside the band, plus the dose-response and
+    within-frame arms it lists and never flags. The band it prints is ``control_shape``'s,
+    calibrated on this same evidence, and its refuse half is what ``lab promote`` refuses on
+    (``hardgate`` D17). ``lab run`` prints the same rows through the same ``format_report`` and
+    refuses nothing (``hardgate`` D15), so the three bindings can never disagree about one arm.
+
+    One thing this does read that the rest of the report path does not: ``control_shape.survey``
+    reads each method's arms from its ``lab/methods/mNNNN_*.py`` file, because a control arm is
+    identified by the one-line ``rationale`` its author wrote and no recorded row carries that.
+    It is a read; no method file is written, hashed against, or re-registered.
+    """
+    from seer_engine.lab import control_shape as cs
+
+    wanted = [m.upper() for m in args.method]
+    if wanted:
+        known = {
+            str(r["method_id"])
+            for r in conn.execute("SELECT DISTINCT method_id FROM trials WHERE window = 'dev'")
+        }
+        missing = sorted(set(wanted) - known)
+        if missing:
+            raise store.LabError(f"no dev trial for {', '.join(missing)}")
+
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+
+    found = cs.survey(conn, wanted) if wanted else cs.survey(conn)
+    print(cs.format_report(found))
+
+    refused = cs.refusals(found)
+    if refused:
+        low, high = cs.REFUSE_BAND
+        print()
+        print(f"{len(refused)} control arm(s) sit outside {low:.2f}x..{high:.2f}x on at least one")
+        print("axis. `lab promote` refuses a method holding one (lab/hardgate.py, D17), and any")
+        print("sentence already written about one of those margins is quoted against a")
+        print("handicapped opponent. The way back costs no method id: re-draw the control at the")
+        print("book's own trade count and turnover and run it again as an amendment.")
+
+    print()
+    print(f"recorded dev trials {n_before} -> {store.dev_trial_count(conn)}; "
+          f"test-window looks {looks_before} -> {store.test_looks(conn)}. "
+          f"Nothing was written, no research store was opened and no method id was minted.")
     return 0
 
 
@@ -2739,13 +3025,32 @@ def _idea(conn, args) -> int:
 
 
 def _note(conn, args) -> int:
+    """Append a dated analysis section and/or set the verdict, and say on one line what landed.
+
+    The confirmation is not decoration. Both writes are irreversible -- the analysis is
+    append-only and the verdict is the method's standing summary -- and this command used to
+    succeed in complete silence. Piped through any filter, silence and failure are the same
+    observation and the filter owns the exit code; that is how the same ten-thousand-character
+    note came to be appended to M0245 twice. One line of output gives a pipeline something to
+    match, and makes ``store.append_analysis``'s refusal visible to anyone who retries anyway.
+
+    The line is printed after the transaction commits, so a refused analysis never reports a
+    verdict that rolled back with it.
+    """
     if args.file is None and args.verdict is None:
         raise store.LabError("give --file and/or --verdict")
+    wrote: list[str] = []
     with conn:
         if args.file is not None:
-            store.append_analysis(conn, args.method, Path(args.file).read_text(encoding="utf-8"))
+            body = Path(args.file).read_text(encoding="utf-8")
+            store.append_analysis(conn, args.method, body)
+            wrote.append(f"analysis appended ({len(body.strip()):,} characters)")
         if args.verdict is not None:
-            store.update_method(conn, args.method, verdict=args.verdict.strip())
+            verdict = args.verdict.strip()
+            store.update_method(conn, args.method, verdict=verdict)
+            shown = verdict if len(verdict) <= 72 else verdict[:69].rstrip() + "..."
+            wrote.append(f'verdict set to "{shown}"')
+    print(f"{args.method}: " + "; ".join(wrote) + ".")
     return 0
 
 
@@ -2868,6 +3173,7 @@ _HANDLERS = {
     "status": _status,
     "regime": _regime,
     "walkforward": _walkforward,
+    "shortfall": _shortfall,
     "luck": _luck,
     "show": _show,
     "run": _run,
@@ -2882,6 +3188,7 @@ _HANDLERS = {
     "exposure": _exposure,
     "kin": _kin,
     "gate": _gate,
+    "control": _control,
     "idea": _idea,
     "note": _note,
     "block": _block,

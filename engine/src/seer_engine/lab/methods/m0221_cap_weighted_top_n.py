@@ -60,7 +60,8 @@ from typing import Any
 import numpy as np
 
 from seer_engine.backtest.dev import Candidate
-from seer_engine.lab.method import Method
+from seer_engine.lab import control_draw
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0034_size_tilt_residual import _apply_ceiling, _floor_weight
 from seer_engine.lab.methods.m0198_size_weighted_placebo import trading_value
 from seer_engine.sim.book import Target, equal_weight
@@ -73,6 +74,16 @@ ADDED = date(2026, 10, 18)
 DV_N = 60  # sessions of trading value that decide which share class of a company stays
 WEIGHTINGS = ("cap", "equal")
 PICKS = ("size", "random")
+
+#: The matched-draw amendment's own date. The originals were written on 2026-10-18; this block
+#: was written on 2026-10-19 and pre-registered by the commit that added it.
+AMENDED = date(2026, 10, 19)
+
+#: The hash namespace of every blind draw on this chassis. It is the literal ``draw`` already
+#: keys on, and M0225 deliberately reuses it (its own ``R50`` does, through ``draw``) so the two
+#: blind books hold the same names wherever both stores size the same company. Changing it would
+#: put a draw difference on top of the data difference the twin exists to measure.
+DRAW_KEY = "M0221"
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +133,19 @@ def _check(params: object) -> CapTopParams:
 
 def _gate(p: CapTopParams) -> FactorParams:
     return FactorParams(rank="momentum", top=p.top, trend=p.trend)
+
+
+def _check_control(params: object) -> CapTopParams:
+    """``_check``, plus the one thing a control may not be: a book that ranks on size.
+
+    The matched draw differs from ``R50`` in its allocator id and in nothing else -- the params
+    are byte-identical -- so the params must still say ``pick="random"``. Saying ``"size"`` would
+    record a configuration whose text claims a size ranking the allocator never performs.
+    """
+    p = _check(params)
+    if p.pick != "random":
+        raise ValueError(f"the matched draw is a control: pick must be 'random', got {p.pick!r}")
+    return p
 
 
 def draw(seed: int, symbol: str) -> int:
@@ -239,6 +263,124 @@ class CapTopAllocator:
 
 CAPTOP = CapTopAllocator()
 
+
+# ---- amendment 1 (2026-10-19): the honest control ---------------------------------------------
+#
+# R50's hash order keys on (seed, symbol) and carries no date, so its book changes only when the
+# sized pool does: 76 trades and 0.222 turnover on the dev window against C50's 360 and 0.445,
+# which is 0.21x and 0.50x and which D17 refuses. A control that trades a fifth as often pays a
+# fifth of Gotrade's fees, so C50's recorded 1.09-point deficit to R50 was quoted against an
+# opponent running downhill. This block replaces it with the lab's one matched-draw rule
+# (``lab.control_draw``) under a NEW allocator id, so not one byte of what the six recorded M0221
+# trials read is touched. The params are R50's own, reused verbatim -- ``CapTopParams`` already
+# carries every input the matched draw reads, and a field added to it would move every recorded
+# M0221 and M0225 digest (``registry._canon`` renders a dataclass by ``dataclasses.fields()``).
+
+
+class MatchedCapTopAllocator(CapTopAllocator):
+    """The same blind book as ``R50``, re-keyed at the real arm's OWN churn instead of never.
+
+    ``R50`` draws its fifty names in ``draw(seed, symbol)``, a hash with no date term, so its
+    book changes only when the pool does. Measured on the dev window: 76 trades against C50's
+    360 and 0.222 turnover against 0.445 -- 0.21x and 0.50x, which ``lab control`` refuses (D17).
+    A control that trades a fifth as often pays a fifth of the fees, so C50's recorded 1.09-point
+    deficit to R50 was quoted against an opponent running downhill, and the deficit is not
+    evidence about size ranking. M0243's own file records the same error with the sign flipped --
+    its author saw a sticky draw trade 41 times in twenty years, re-drew monthly by hand, and
+    overshot to 3.01x. The re-key period is not something to choose; it is something to derive.
+
+    So this allocator keeps everything about R50 except that period, and takes it from the book
+    it controls. At each monthly decision it recomputes the real arm's own selection -- the top
+    ``top`` of the day's sized pool -- at this data date and at the previous decision's data date
+    (``control_draw.previous_decision_date``), counts the names that entered, keeps that many
+    fewer of its own holdings in R50's date-free hash order, and draws the rest fresh from the
+    same eligible pool in a hash order seeded on the current month
+    (``control_draw.matched_names``). The entry count per rebalance is matched by construction, so
+    the trade axis is ~1.00 analytically rather than by tuning -- which is the whole reason the
+    rule lives in one shared module and is not re-invented per method file.
+
+    **It is still blind.** Nothing it reads about a name decides whether that name is drawn. The
+    only thing it takes from the real arm is HOW MANY names changed this month, which is shape,
+    not identity. The weighting is R50's unchanged: the drawn names' own market values,
+    cap-weighted with the same 10% ceiling, so the only difference between R50 and this arm is
+    the draw's re-key period and nothing else at all.
+
+    **The hash namespace** is ``DRAW_KEY``, not the allocator id, for the same reason ``draw``
+    hardcodes "M0221": M0225's twin of this arm inherits this class and must draw the same names
+    wherever both stores size the same company, or the before-and-after would carry a draw change
+    on top of the data change it exists to measure.
+
+    No share counts (the history-only path): no size, so no churn to match and no targets.
+    """
+
+    id = "M0221-A1"
+
+    def lookback(self, params: Any) -> int:
+        """One month more than the real arm's: ``DV_N`` bars of trading value at the PREVIOUS
+        decision's data date. ``control_draw.lookback_for`` adds the 26 bars phase 1 measured as
+        the widest gap on the dev calendar, so 86 at the default -- far inside the 473-bar smoke
+        fixture ``test_allocator_contract`` runs."""
+        p = _check_control(params)
+        return max(control_draw.lookback_for(DV_N), 0 if p.trend is None else p.trend[1])
+
+    def _selection(self, prepared: CapTopPrepared, members: AbstractSet[str], at: date,
+                   p: CapTopParams) -> tuple[tuple[str, ...], dict[str, float]]:
+        """The real arm's own book at ``at``, and the sized pool it was drawn from.
+
+        Membership is the caller's -- today's -- at both dates: the index's composition today is
+        known today, so reading it at an earlier date adds no look-ahead, and the prices and share
+        counts are still read only as of ``at``.
+        """
+        pool = sized_pool(prepared, members, at)
+        if not pool:
+            return (), {}
+        return tuple(sorted(pool, key=lambda s: (-pool[s], s))[: p.top]), pool
+
+    def _matched(self, prepared: CapTopPrepared, members: AbstractSet[str], data_date: date,
+                 held: frozenset[str], p: CapTopParams) -> tuple[Target, ...]:
+        if prepared.market is None:
+            return ()
+        if not trend_on(prepared.history, data_date, _gate(p)):
+            return ()
+        now, pool = self._selection(prepared, members, data_date, p)
+        if not pool:
+            return ()
+        prev, _ = self._selection(
+            prepared, members, control_draw.previous_decision_date(data_date), p
+        )
+        picks = control_draw.matched_names(
+            pool=tuple(sorted(pool)),
+            held=held,
+            real_now=now,
+            real_prev=prev,
+            tag=DRAW_KEY,
+            seed=p.seed,
+            data_date=data_date,
+        )
+        out: list[Target] = []
+        for s, w in zip(picks, weights([pool[s] for s in picks], p), strict=True):
+            if w is None:
+                continue
+            t = target_from_close(s, last_close(prepared.history[s], data_date), w)
+            if t is not None:
+                out.append(t)
+        return tuple(out)
+
+    def targets(self, history: Mapping[str, History], members: AbstractSet[str], data_date: date,
+                held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        """The history-only path: no share counts, so no size, no churn to match and no target."""
+        _check_control(params)
+        return ()
+
+    def targets_prepared(self, prepared: Any, members: AbstractSet[str], data_date: date,
+                         held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        if not isinstance(prepared, CapTopPrepared):
+            raise TypeError(f"prepared must be CapTopPrepared, got {type(prepared).__name__}")
+        return self._matched(prepared, members, data_date, held, _check_control(params))
+
+
+MATCHED = MatchedCapTopAllocator()
+
 SW = ("SPY", 200)
 
 
@@ -246,6 +388,72 @@ def _v(suffix: str, params: CapTopParams, rationale: str) -> Candidate:
     return Candidate(id=f"M0221-{suffix}", family="M0221", rules=MONTHLY_HOLD_FRAC_GOTRADE,
                      allocator=CAPTOP, params=params, rationale=rationale, added=ADDED,
                      owner_inputs=())
+
+
+def _a(suffix: str, allocator: Any, params: CapTopParams, rationale: str,
+       supersedes: tuple[str, ...]) -> Candidate:
+    """An amendment candidate: its own ``added`` date, its own allocator and the declaration of
+    which recorded arm it replaces, otherwise ``_v``.
+
+    ``supersedes`` is what D17 reads (``control_shape.SUPERSEDES_ATTR``). It is DECLARED and never
+    inferred from the target, and it is outside ``config_digest`` because ``config_text`` names
+    its three attributes by hand. An arm that declares nothing retires nothing, so leaving this
+    off would leave M0221 blocked after the measurement was taken."""
+    return Candidate(id=f"M0221-{suffix}", family="M0221", rules=MONTHLY_HOLD_FRAC_GOTRADE,
+                     allocator=allocator, params=params, rationale=rationale, added=AMENDED,
+                     owner_inputs=(), supersedes=supersedes)
+
+
+MATCHED_AMENDMENT = Amendment(
+    added=AMENDED,
+    why=(
+        "R50, the control C50's margin is quoted against, trades 0.21x and turns over 0.50x what "
+        "C50 does, so D17 refuses it; re-draw it at C50's own monthly churn and re-state the gap"
+    ),
+    hypothesis=(
+        "Written before any result. C50 earned 5.63% a year of the owner's money on the dev "
+        "window and R50 earned 6.72% against the same 7.19% SPY total return, so the blind draw "
+        "currently BEATS the book by 1.09 points -- and R50 got there on 76 trades where C50 "
+        "paid for 360. R50's hash has no date term, so it drew fifty names once and held them "
+        "for twenty years whatever the market did; the only fees it ever paid were the ones "
+        "membership forced on it. C50-PLC is the same fifty-name cap-weighted blind book with "
+        "one thing changed: the number of names it re-draws each month is C50's own number of "
+        "entrants that month, taken from C50's calendar rather than chosen by hand. Prediction, "
+        "and the direction is the point: the honest control trades about five times as often, "
+        "pays those fees, and therefore earns LESS than R50 did, so C50's deficit NARROWS -- to "
+        "somewhere between 0 and 1 point, and possibly past zero into a lead. Second prediction, "
+        "about shape rather than money, and the one that decides whether the first is readable "
+        "at all: C50-PLC lands inside 0.80x-1.25x of C50 on both trades and turnover, which is "
+        "what makes the re-stated gap evidence instead of a handicap. Success here is a yardstick "
+        "whose control is honest, not an arm that wins: no arm of this method is for promotion."
+    ),
+    expected_failure=(
+        "The fee channel is small in absolute terms and the identity channel may swamp it. C50 "
+        "turns over only 0.445 of the account a year, so matching it raises the control's "
+        "turnover by about 0.22 a year, and Gotrade's bill on that is tens of basis points, not "
+        "a point -- while re-keying the draw monthly changes WHICH names the control holds for "
+        "twenty years, and a draw re-sampled every month converges on the sized pool's own mean "
+        "return instead of resting on one lucky 1996 sample. If that mean is above what R50's "
+        "single sticky draw happened to earn, the matched control earns MORE, C50's deficit "
+        "WIDENS rather than narrows, and the pre-registered direction is simply wrong. That is "
+        "the finding and it is reported as one; it is not re-drawn for. Second, the shape may "
+        "miss on the turnover axis alone: E50 holds C50's exact names and trades C50's exact 360 "
+        "times, yet turns over 1.60x as much, because a flatter weight vector crosses the resize "
+        "band more often -- and a blind draw from the sized pool is flatter than the top fifty "
+        "are, since it rarely holds a name big enough for the 10% ceiling to bind. If C50-PLC "
+        "clears the trade axis and lands above 1.25x on turnover, the matched-draw rule does not "
+        "settle this chassis and the honest answer is to say so rather than to re-draw. Third, "
+        "the previous decision's selection is recomputed with TODAY's membership, so a name that "
+        "joined the index in between is counted as a non-entrant and the matched entry count "
+        "reads slightly low; the effect is one or two names a year on a 50-name book."
+    ),
+    candidates=(
+        _a("C50-PLC", MATCHED, CapTopParams(50, pick="random", seed=1, trend=None),
+           "Placebo, shape-matched: the same fifty-name cap-weighted blind book, hash-drawn at "
+           "C50's own monthly churn instead of once and forever",
+           supersedes=("M0221-R50",)),
+    ),
+)
 
 
 METHOD = Method(
@@ -313,4 +521,5 @@ METHOD = Method(
         "concept:cap-weighted-top-n",
         "concept:market-shape-yardstick-real-cap",
     ),
+    amendments=(MATCHED_AMENDMENT,),
 )

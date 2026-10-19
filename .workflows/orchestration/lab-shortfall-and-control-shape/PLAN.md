@@ -6,8 +6,8 @@
 **Worktree:** `/home/miftah/.worktrees/seer/lab-shortfall-and-control-shape`
 **Branch:** `feature/lab-shortfall-and-control-shape` (base: `origin/main` @ `ad8792d`)
 **Phases:** 4
-**Status:** planned
-**Coordinator:** —
+**Status:** landed — all four phases merged to `main` 2026-10-19 as `da9d326`
+**Coordinator:** `orch-lab-shortfall-and-control-shape`
 
 ---
 
@@ -159,10 +159,10 @@ Phases 1 and 2 run at the same time in this one worktree; two `pip install -e` r
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | The shortfall decomposition, and `lab shortfall` | R1 | `engine/seer_engine/lab` | 3 | — | HARD | `.workflows/plan/lab-shortfall-and-control-shape/phase-1.md` | — | — |
-| 2 | Control detection, target resolution and the calibrated band | R2 | `engine/seer_engine/lab` | 2 | — | NORMAL | `.workflows/plan/lab-shortfall-and-control-shape/phase-2.md` | — | — |
-| 3 | `lab note` cannot double-append, and says what it did | R3 | `engine/seer_engine/lab` | 3 | 1 | EASY | `.workflows/plan/lab-shortfall-and-control-shape/phase-3.md` | — | — |
-| 4 | `lab control`, the `lab run` annotation, hard gate D17, and the trial-828 note | R1, R2 | `engine/seer_engine/lab` + `commands` + `docs/backtests` | 4 | 2, 3 | HARD | `.workflows/plan/lab-shortfall-and-control-shape/phase-4.md` | — | — |
+| 1 | The shortfall decomposition, and `lab shortfall` | R1 | `engine/seer_engine/lab` | 3 | — | HARD | `.workflows/plan/lab-shortfall-and-control-shape/phase-1.md` | P1-ENG-NVHT (done 2026-10-19) | — |
+| 2 | Control detection, target resolution and the calibrated band | R2 | `engine/seer_engine/lab` | 2 | — | NORMAL | `.workflows/plan/lab-shortfall-and-control-shape/phase-2.md` | P1-ENG-03W0 (done 2026-10-19) | — |
+| 3 | `lab note` cannot double-append, and says what it did | R3 | `engine/seer_engine/lab` | 3 | 1 | EASY | `.workflows/plan/lab-shortfall-and-control-shape/phase-3.md` | P1-ENG-ISID (done 2026-10-19) | — |
+| 4 | `lab control`, the `lab run` annotation, hard gate D17, and the trial-828 note | R1, R2 | `engine/seer_engine/lab` + `commands` + `docs/backtests` | 4 | 2, 3 | HARD | `.workflows/plan/lab-shortfall-and-control-shape/phase-4.md` | P1-ENG-DZDN (done 2026-10-19) | — |
 
 **Files** counts, after reconciliation: phase 1 = `lab/shortfall.py` (new), `commands/lab.py`,
 `tests/test_lab_shortfall.py` (new). Phase 2 = `lab/control_shape.py` (new),

@@ -3,6 +3,12 @@
   "coordinator": "orch-lab-shortfall-and-control-shape",
   "coordinator_session_id": "82094c7b-51cb-4d0d-8541-af16afec02f3",
   "created": "2026-10-19T04:46:51+00:00",
+  "landed": {
+    "at": "2026-10-19T05:29:11+00:00",
+    "base": "main",
+    "commit": "da9d326b846db0a01bba9e9965d2144fab863ea3",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -59,30 +65,30 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "1d2c0b2",
       "depends_on": [
         2,
         3
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "lab control + lab run annotation (D15, annotates only) + hardgate D17 refusal, whose message names the amendment remedy (no method id). Trial 828: gap -8.24 = gate -3.59 at era-resolved exposure 0.784 + fees -3.78 (15.05 turns x 0.2510%, 30 names from config) + residual -0.87, split -0.39 pool/frame and -0.48 own weighting vs M0244-FRESH30. Plan expected gate -3.60; report printed -3.59 and the run is what is recorded. lab control: 54 rows, 19 refuse / 7 warn / 4 clean / 16 unresolved, incl the third mis-shaped control M0243-NEAR20-R. Promotable now UNCHANGED (M0072/M0092/M0197, verified by diff of before/after lab status) AND the nine dev-eligible refusals confirmed individually. Nothing recorded: N 824->824, looks 4->4, lab.sqlite byte-identical. ruff clean, pytest 6027 passed 4 skipped. Also owned the combined package_readme pass (merged into phase 2's section, fixed its two now-false sentences, documented lab shortfall) and committed phase 1's orphaned P1-ENG-NVHT.md.",
       "package": "engine/seer_engine/lab` + `commands` + `docs/backtests",
       "plan": ".workflows/plan/lab-shortfall-and-control-shape/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-19T05:25:32+00:00",
       "satisfies": [
         "R1",
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-DZDN",
       "title": "lab control`, the `lab run` annotation, hard gate D17, and the trial-828 note"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/lab-shortfall-and-control-shape/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-shortfall-and-control-shape",
-  "updated": "2026-10-19T05:07:58+00:00",
+  "updated": "2026-10-19T05:29:11+00:00",
   "verified_at": "2026-10-19T05:02:15+00:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-shortfall-and-control-shape"
 }

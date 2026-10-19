@@ -23,16 +23,16 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "41acf12",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "M0260 pre-registered at 41acf12 (two files, unamended, pushed); bookkeeping f3cf29d. Six arms, six digests, all six classify dose-response via control_shape.kind_of. lookback 454, all six arms open 1996-01-03 on the real dev store. Full suite 6068 passed / 4 skipped (no DB skips), ruff clean. Two decisions: prior-grid decomposition taken to phase 1's committed +3.58=+0.59++2.99 over this file's independent +3.57/+2.98 (exit criterion 10, D10); and plan D8 is wrong about the index \u2014 it is not on the feature branch at all but tracked on main, so phase 2's tick was made in the main checkout and LEFT UNCOMMITTED for the coordinator.",
       "package": "engine/src/seer_engine/lab/methods`, `engine/tests",
       "plan": ".workflows/plan/gate-reading-cadence/phase-2.md",
-      "reported_at": "2026-10-19T09:09:34+00:00",
+      "reported_at": "2026-10-19T09:46:21+00:00",
       "satisfies": [
         "R1",
         "R3",
@@ -40,7 +40,7 @@
         "R6",
         "R7"
       ],
-      "status": "spawned",
+      "status": "done",
       "task_id": "P1-ROOT-V3KD",
       "title": "The method file, its dedicated tests, and the pre-registration commit"
     },
@@ -62,7 +62,7 @@
         "R5",
         "R7"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": "P1-ROOT-N8PZ",
       "title": "Run and record the verdict"
     },
@@ -91,6 +91,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/gate-reading-cadence/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "gate-reading-cadence",
-  "updated": "2026-10-19T09:26:49+00:00",
+  "updated": "2026-10-19T09:48:41+00:00",
   "worktree": "/home/miftah/.worktrees/seer/gate-reading-cadence"
 }

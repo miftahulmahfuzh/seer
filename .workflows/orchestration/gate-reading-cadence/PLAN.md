@@ -6,8 +6,39 @@
 **Worktree:** `/home/miftah/.worktrees/seer/gate-reading-cadence`
 **Branch:** `feature/gate-reading-cadence` (base: `origin/main` @ `5210f35`)
 **Phases:** 4 (strictly sequential: 1 → 2 → 3 → 4)
-**Status:** phase 1/4 complete
-**Coordinator:** —
+**Status:** phase 2/4 complete
+**Coordinator:** `orch-gate-reading-cadence`
+
+---
+
+## Coordinator note — there are TWO copies of this index, and they are not interchangeable
+
+Read this before acting on any instruction below that says "this index".
+
+| copy | path | lives on | who owns it |
+|---|---|---|---|
+| **the deliverable** | `docs/plans/GATE_READING_CADENCE_PLAN.md` | `feature/gate-reading-cadence`, tracked in the worktree | **phase 4 edits this one**; the close-out commit and the merge carry it |
+| the coordinator's record | `.workflows/orchestration/gate-reading-cadence/PLAN.md` | `main`, in the main checkout `/home/miftah/seer` | the coordinator; it is the file `swarm.py spawn` hands every phase as `-f`, and the coordinator commits it each round |
+
+**Decision D8 is correct as written and is NOT superseded.** It says the coordinator committed
+the index, the analysis document and all four phase plan files on `feature/gate-reading-cadence`
+before phase 1 — and it did, in `dedc08d`, at these paths:
+
+    docs/plans/GATE_READING_CADENCE_PLAN.md
+    docs/analyzer/20261019-152028-SSYJ_code_analyzer.md
+    .workflows/plan/gate-reading-cadence/phase-{1,2,3,4}.md
+
+Phase 2 reported D8 as wrong after looking for them under
+`.workflows/orchestration/gate-reading-cadence/` **in the worktree** and finding nothing. That
+directory is the coordinator's durable copy and by design exists only on `main`; the branch
+carries the same six files at their own paths. Verified: `git ls-files` on the branch lists all
+six. Nothing about D8 or about phase 4's plan needs correcting.
+
+**So, for phase 4:** its exit criterion "this index set to `**Status:** complete` with phase 4's
+TaskID filled" means **`docs/plans/GATE_READING_CADENCE_PLAN.md` in the worktree** — a tracked
+file there, exactly as its plan and D8 say. Do not edit the orchestration copy; the coordinator
+keeps that one in step and commits it on `main`. A tick applied only to the orchestration copy
+never reaches the merge, which is the failure this note exists to prevent.
 
 ---
 
@@ -142,7 +173,7 @@ Every phase must hold all of these.
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
 | 1 | Measure the prior and prove the anchor | R6 | `docs/backtests` | 2 | — | NORMAL | `.workflows/plan/gate-reading-cadence/phase-1.md` | P1-ROOT-Q7MF (done 2026-10-19) | — |
-| 2 | The method file, its dedicated tests, and the pre-registration commit | R1, R3, R4, R6, R7 | `engine/src/seer_engine/lab/methods`, `engine/tests` | 2 | 1 | HARD | `.workflows/plan/gate-reading-cadence/phase-2.md` | P1-ROOT-V3KD | — |
+| 2 | The method file, its dedicated tests, and the pre-registration commit | R1, R3, R4, R6, R7 | `engine/src/seer_engine/lab/methods`, `engine/tests` | 2 | 1 | HARD | `.workflows/plan/gate-reading-cadence/phase-2.md` | P1-ROOT-V3KD (done 2026-10-19) | — |
 | 3 | Run and record the verdict | R1, R2, R5, R7 | `lab/` (main checkout) | 2 | 2 | HARD | `.workflows/plan/gate-reading-cadence/phase-3.md` | P1-ROOT-N8PZ | — |
 | 4 | Handover, bookkeeping and the standing correction | R4, R5, R7 | `docs/plans`, `.workflows` | 3 | 3 | NORMAL | `.workflows/plan/gate-reading-cadence/phase-4.md` | P1-ROOT-C5RB | — |
 

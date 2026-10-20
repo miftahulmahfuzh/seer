@@ -64,7 +64,20 @@ Invariants to enforce in `lab/store.py`, not only by convention:
 - `kind` **may** change along a chain — a `hypothesis` that becomes an `observation` is the normal
   life of a lab idea — but the change should be visible in the rendered history, not silent.
 
-### 2. The trigger decision — THE ONE REAL DECISION IN THIS PLAN
+### 2. The trigger decision — SETTLED BY THE OWNER, 2026-10-20: **(a)**
+
+> **Owner decision, 2026-10-20: go with (a).** The trigger is narrowed to protect content while
+> letting `supersedes` be set once. Phase 6 (backfilling the existing duplicates, starting
+> 500→499) is therefore in scope. The analysis below is kept as the record of what was weighed;
+> (b) is no longer a live option.
+>
+> This makes the narrowed trigger the thing standing between this lab and a rewritten prediction,
+> so it must be tested harder than the trigger it replaces. **Write the tests before the trigger.**
+> Required cases: an UPDATE to `body` aborts; an UPDATE to `kind`/`title`/`method_id`/`added` each
+> aborts; `supersedes` NULL→value succeeds exactly once; value→different value aborts; value→NULL
+> aborts; **a multi-column UPDATE touching `supersedes` *and* `body` aborts** — a naive "is
+> supersedes changing?" check lets the allowed column smuggle a forbidden one through; DELETE
+> still aborts, unchanged.
 
 `insights_no_update` fires on **any** UPDATE. So **the existing 500 rows cannot be threaded
 retroactively** without touching it, and 499/500 — the case that prompted this — is exactly a
@@ -125,12 +138,18 @@ first thing to re-argue.
 
 | # | What | Depends on |
 |---|---|---|
-| 1 | Settle the trigger decision (a) or (b) with the owner. **Nothing else starts first.** | — |
+| 1 | ~~Settle the trigger decision.~~ **DONE 2026-10-20: owner chose (a).** | — |
 | 2 | Schema 8: column, invariants, unique index, trigger change if (a). Tests first, especially "UPDATE to body still aborts". | 1 |
 | 3 | Writer: `--supersedes`, validation, and auto-linking in `lab survivorship`. | 2 |
 | 4 | Export: `lab stage` emits `supersedes`/`version`; snapshot test moves with it. | 2 |
 | 5 | Reader: heads-only journal with version label and history disclosure; counts by document. | 4 |
-| 6 | Backfill the existing duplicate chains — **only if (a)** — starting with 500→499. | 2, 3 |
+| 6 | Backfill the existing duplicate chains, starting with 500→499. **In scope** under (a). | 2, 3 |
+
+**Still open, and the owner wants a straight answer:** whether the *cheap alternative* — just
+teaching auto-journalling commands to supersede their own previous note instead of appending a
+sibling — solves enough of the complaint on its own. Choosing (a) does not pre-commit to building
+all six phases. If phases 1–3 plus that fix already give one document per topic, and 4–6 are
+gold-plating, say so rather than building them by default.
 
 ## Traps specific to this repo
 

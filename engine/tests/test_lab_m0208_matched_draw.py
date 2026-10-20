@@ -1,4 +1,4 @@
-"""M0208's amendment-1 arm, ``M0208-CGO-N20-PLC``: the guards that cost nothing to check.
+"""M0208's two re-drawn controls, ``M0208-CGO-N20-PLC`` and ``-PLC2``: the free guards.
 
 A dedicated module rather than more cases inside ``test_lab_control_draw``, which belongs to the
 pilot phase and is being extended by four sibling sessions in the same checkout at the same time.
@@ -8,10 +8,11 @@ moved no recorded digest, and that its widened lookback still fits the smoke fix
 
 **What this module deliberately does not claim.** ``labkit.smoke_market`` gives 473 sessions and
 ``overhangs`` needs 780 before it scores anything, so on the fixture ``scored`` returns ``{}``,
-``_targets`` falls straight through to ``_book(..., (), ...)`` and the matched draw is never
-exercised -- which is already true of all four recorded M0208 arms. The draw's arithmetic is
-proved session by session in ``test_lab_control_draw``; the only evidence that it matched *this*
-book's shape is the recorded ``lab control M0208`` reading after the run.
+``_targets`` falls straight through to ``_book(..., (), ...)`` and neither the matched draw nor
+the shadow replay above it is ever exercised -- which is already true of all four recorded M0208
+arms. The draw's arithmetic is proved session by session in ``test_lab_control_draw``, the
+replay's in ``test_lab_control_draw_shadow``; the only evidence that either matched *this* book's
+shape is the recorded ``lab control M0208`` reading after the run.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ SMOKE_BARS = 473  # labkit.SMOKE_FIRST through DEV_END; the lookback cut every l
 NEW = "M0208-CGO-N20-PLC"
 OLD = "M0208-HASH-N20"
 TARGET = "M0208-CGO-N20"
+SHADOW = "M0208-CGO-N20-PLC2"
 
 # The four digests trials 677-680 hold, read read-only from the committed lab on 2026-10-19.
 RECORDED = {
@@ -145,10 +147,110 @@ def test_the_declaration_is_outside_the_configuration():
     assert "supersedes" not in config_text(new)
 
 
-def test_m0208_carries_exactly_one_amendment_of_one_arm():
+def test_m0208_carries_two_amendments_of_one_arm_each():
+    """This used to pin "exactly one amendment", which is a pre-run fact about the database and
+    goes red the moment the next amendment is pre-registered. Inverted to the post-run truth,
+    which is the stronger assertion: both blocks exist, in order, the recorded one is still FIRST
+    and still carries its own date, and neither grew a second arm. ``runner.pending_amendment``
+    requires the record to be an exact prefix of the file, so an amendment that was reordered or
+    reworded would refuse the next run; this is the import-time half of that check."""
     amendments = m0208.METHOD.amendments
-    assert len(amendments) == 1
+    assert len(amendments) == 2
     assert amendments[0].added == date(2026, 10, 19)
+    assert amendments[1].added == date(2026, 10, 20)
     assert [c.id for c in amendments[0].candidates] == [NEW]
+    assert [c.id for c in amendments[1].candidates] == [SHADOW]
     assert len(m0208.METHOD.candidates) == 4
-    assert len(m0208.METHOD.all_candidates()) == 5
+    assert len(m0208.METHOD.all_candidates()) == 6
+
+
+def test_the_shadow_arm_reads_as_a_placebo_on_the_book_it_means_to_control():
+    """Same guard as the A1 arm's, for the same reason: D17 tests dose BEFORE draw, so an arm
+    worded as a dose-response one would carry no ratio at all and its refusal would vanish with
+    the handicap still in place."""
+    arms = list(m0208.METHOD.all_candidates())
+    arm = _arm(SHADOW)
+    text = arm.rationale.lower()
+    assert cs.kind_of(arm) == cs.KIND_PLACEBO
+    assert any(m in text for m in cs.DRAW_MARKERS)
+    assert not any(m in text for m in cs.DOSE_MARKERS)
+    assert cs.resolve_target(arm, arms) == (TARGET, cs.RUNG_STEM)
+
+
+def test_the_shadow_arm_moves_neither_earlier_controls_resolution():
+    """What makes this amendment additive. ``_eligible_targets`` excludes placebo arms, so a third
+    placebo arriving cannot become anybody's target and no existing finding moves."""
+    arms = list(m0208.METHOD.all_candidates())
+    assert cs.resolve_target(_arm(OLD), arms) == (TARGET, cs.RUNG_FIRST)
+    assert cs.resolve_target(_arm(NEW), arms) == (TARGET, cs.RUNG_STEM)
+
+
+def test_the_shadow_allocator_is_a_third_id_and_names_no_ingredient():
+    assert m0208.SHADOW.id == "M0208-A2"
+    assert m0208.MATCHED.id == "M0208-A1" and m0208.OVERHANG.id == "M0208"
+    assert _INGREDIENT.findall("allocator=<M0208-A2>") == []
+
+
+def test_the_shadow_replay_fits_the_fixture_and_pays_for_every_step_it_takes():
+    """The lookback is ``PREVIOUS_DECISION_BARS`` per replayed decision, through the module's own
+    arithmetic and never a number guessed per file, and the cap is absolute: ``labkit.smoke_market``
+    is 473 sessions, so 8 steps (461) is the deepest replay that can run at all. This arm asks for
+    two, 305 bars, and leaves 168 of headroom."""
+    p = _arm(SHADOW).params
+    inner = factor_lookback(p.inner)
+    assert m0208.SHADOW.lookback(p) == cd.shadow_lookback_for(inner, m0208.SHADOW_DEPTH)
+    assert m0208.SHADOW.lookback(p) == inner + m0208.SHADOW_DEPTH * cd.PREVIOUS_DECISION_BARS
+    assert cd.shadow_lookback_for(inner, 1) == cd.lookback_for(inner)
+    assert 1 <= m0208.SHADOW_DEPTH <= cd.max_shadow_depth(inner) == 8
+    assert m0208.SHADOW.lookback(p) <= SMOKE_BARS == cd.FIXTURE_BARS
+
+
+def test_the_shadow_replays_the_calendar_this_chassis_actually_decides_on():
+    """``shadow_selection`` derives its dates with ``control_draw.previous_decision_date``, while
+    this file's own ``previous_month_end`` reads the market symbol's grid. On this chassis they are
+    the same session -- the last one before the first of the month -- and the arm would be replaying
+    a calendar the book never used if they were not. The free pre-run probe asserted it over every
+    one of the dev window's 238 decisions before this file was committed; this pins the one-step
+    identity so a later calendar change goes red here rather than inside a recorded trial."""
+    for d in (date(2015, 6, 30), date(2009, 1, 30), date(2001, 2, 28)):
+        assert cd.shadow_decision_dates(d, 1)[0] == cd.previous_decision_date(d)
+        assert cd.shadow_decision_dates(d, 3) == [
+            cd.previous_decision_date(cd.previous_decision_date(cd.previous_decision_date(d))),
+            cd.previous_decision_date(cd.previous_decision_date(d)),
+            cd.previous_decision_date(d),
+            d,
+        ]
+
+
+def test_the_shadow_arm_declares_both_controls_it_replaces():
+    """D17 supersedes a ``warn`` finding as well as a ``refuse`` one, so both earlier draws are
+    named. Declared, never inferred: an arm that declares nothing retires nothing."""
+    assert _arm(SHADOW).supersedes == ("M0208-CGO-N20-PLC", "M0208-HASH-N20")
+    assert _arm(NEW).supersedes == (OLD,)
+    for c in m0208.METHOD.candidates:
+        assert c.supersedes == (), f"{c.id}: an original arm declares nothing"
+
+
+def test_the_shadow_arm_minted_no_params_dataclass_and_moved_no_recorded_digest():
+    """The set's one params rule. ``registry._canon`` renders a dataclass by
+    ``dataclasses.fields()``, so one more field on ``OverhangParams`` would move all FIVE recorded
+    M0208 digests, trial 853's included."""
+    assert [f.name for f in fields(m0208.OverhangParams)] == [
+        "inner", "keep", "signal", "seed", "market"
+    ]
+    assert not hasattr(m0208, "ShadowParams"), "no new params dataclass: reuse, do not mint"
+    shadow, target, prior = _arm(SHADOW), _arm(TARGET), _arm(NEW)
+    assert shadow.params == target.params == prior.params
+    assert config_digest(shadow) not in {config_digest(target), config_digest(prior)}
+    one, other = config_text(shadow).splitlines(), config_text(prior).splitlines()
+    assert [a == b for a, b in zip(one, other, strict=True)].count(False) == 1
+
+
+def test_the_shadow_draw_refuses_to_shadow_anything_but_the_high_side():
+    import pytest
+
+    p = m0208.OverhangParams(m0208.N20, keep=40, signal="hash")
+    rows = [m0208.FactorRow("AAA", 1.0, 0.0, 0.0, 0.0)]
+    grid = object.__new__(m0208.WeekGrid)
+    with pytest.raises(ValueError, match="signal must be 'high'"):
+        m0208.SHADOW._targets({}, rows, grid, date(2015, 6, 30), frozenset(), p)

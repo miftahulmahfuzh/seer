@@ -61,6 +61,23 @@ as many fresh names as ``CGO-N20``'s own banded selection replaced that month
 (``lab.control_draw``). Nothing above this paragraph changes: ``HASH-N20``'s trial is recorded and
 stays exactly as it was measured.
 
+Amendment 2 (2026-10-20). ``CGO-N20-PLC`` above is an honest draw and it is still not a match: it
+trades 455 times against ``CGO-N20``'s 624 and turns over 2.313 against 3.061, 0.73x and 0.76x,
+inside D17's refuse band and outside its match band. The cause is in the stand-in, not in the
+draw. ``MatchedDrawAllocator`` has no record of what ``CGO-N20`` actually held -- no allocator
+does -- so it reconstructs the previous held set from the plain top twenty at the previous month
+end. A freshly taken top twenty is ranked 1-20 and the band drops a name only past rank 40, so
+almost nothing falls out of it; the real held set has accumulated names that entered near the top
+and have since drifted toward the edge, and those fall out far faster. Measured over all 169
+decisions with the switch on and a scored pool: 304 estimated entries against 624 real, 0.487x,
+uniform across 1996-2002, 2003-2008 and 2009-2015 (0.444 / 0.509 / 0.500). ``CGO-N20-PLC2``
+replaces the stand-in with a bounded replay: start from an empty book a fixed number of decisions
+back and apply ``CGO-N20``'s own band, its own switch and its own ranking forward, one decision at
+a time, to reconstruct the drifted set the book is actually coming into this decision with. The
+draw itself, the pool, the twenty 1/20 slots, the band, the switch and the SPY fill are all
+unchanged. Nothing above this paragraph changes: ``HASH-N20``'s and ``CGO-N20-PLC``'s trials are
+recorded and stay exactly as they were measured.
+
 Rules are ``monthly-hold-frac-gotrade``: fractional shares at Gotrade's real fees on the owner's
 monthly deposits. Pure: no clock, randomness, files or network; reads only columns at or before d.
 """
@@ -78,7 +95,12 @@ from typing import Any
 import numpy as np
 
 from seer_engine.backtest.dev import Candidate
-from seer_engine.lab.control_draw import lookback_for, matched_names
+from seer_engine.lab.control_draw import (
+    lookback_for,
+    matched_names,
+    shadow_lookback_for,
+    shadow_selection,
+)
 from seer_engine.lab.method import Amendment, Method
 from seer_engine.sim.book import Target, equal_weight
 from seer_engine.sim.rules import MONTHLY_HOLD_FRAC_GOTRADE
@@ -599,6 +621,275 @@ MATCHED_DRAW = Amendment(
 )
 
 
+# --------------------------------------------- amendment 2: the matched draw, under the shadow
+#
+# Why a second allocator id and not a widened A1. ``MatchedDrawAllocator`` drew trial 853 and is
+# part of the record. Its body is outside ``config_digest`` -- a digest is rules, allocator id and
+# params -- so Python would let it be widened and nothing would complain, and the recorded arm's
+# behaviour would have moved because a later amendment wanted its lines. So the shadow gets its
+# own id, exactly as the matched draw copied ``choose``'s band rather than refactoring it, and A1
+# is left byte-identical.
+#
+# ``_banded_picks``, ``_book`` and ``previous_month_end`` are now read by TWO recorded allocators
+# instead of one. They were already frozen; this makes them doubly so.
+
+A2_ADDED = date(2026, 10, 20)
+
+SHADOW_DEPTH = 2
+"""How many decisions back the shadow starts from an empty book before replaying forward.
+
+The number is a measurement, not a taste: it is the smallest depth whose replayed entry count
+reaches 0.90 of ``CGO-N20``'s real entry count, read off the dev store before this amendment was
+committed. Two steps read 592 entries against the real 624, 0.949x, where one step reads 446,
+0.715x; and the ladder is flat above two -- 0.941, 0.950, 0.947, 0.950, 0.955, 0.954 at three
+through eight -- so no deeper replay buys accuracy and every one of them costs lookback and run
+time. The mechanism behind the step from one to two is the band itself: this book holds the top
+twenty and drops a name only once it falls past rank forty, and a replay seeded one decision back
+hands the band a fresh top twenty ranked one to twenty, from which almost nothing falls past
+forty in a single month. The second step is what gives the intermediate book a month to drift
+toward the edge, which is all the band needs to start evicting at the real book's rate.
+
+It is also capped from above and the cap is absolute. ``lookback`` below is
+``control_draw.shadow_lookback_for(factor_lookback(inner), SHADOW_DEPTH)`` = 253 + 26K, and
+``labkit.smoke_market``'s fixture is 473 sessions, so K = 8 (461) fits and K = 9 (487) cannot run
+at all -- ``shadow_lookback_for`` raises rather than returning a number no test can drive. At
+K = 2 the arm asks for 305 bars and leaves 168 of headroom, so the cap is nowhere near binding
+here. It costs this arm no window either: it declares only SPY, whose store history opens in
+1993, and ``backtest.dev.candidate_window`` floors a member-reading candidate at
+``MEMBERSHIP_START``, so the trial's window is ``CGO-N20``'s own and the number is comparable to
+trials 677 and 853.
+
+It lives HERE and not in ``control_draw`` on purpose. ``shadow_selection`` takes ``depth`` as a
+required keyword-only argument with no default, because how far back a chassis's band has to be
+rolled before its shadow stops moving is a property of that band and that ranking. The shared
+module owns the mechanism; the method file owns the number.
+
+It is deliberately a module constant and NOT a params field. ``OverhangParams`` is the dataclass
+all five recorded M0208 arms are digested through, and ``registry._canon`` renders a dataclass by
+``dataclasses.fields()``: one more field would move every one of those five recorded digests. The
+record of this number is therefore the pre-registering commit's source sha, which
+``method_amendments`` holds, plus this docstring -- which is the same record ``RATE`` and
+``TAU_MAX`` have had since the method's first run.
+"""
+
+
+class ShadowDrawAllocator(OverhangAllocator):
+    """``CGO-N20``'s shape with none of its identity, drawn against a REPLAYED held set.
+
+    Everything but the stand-in is ``MatchedDrawAllocator``'s rule and most of it is literally
+    ``OverhangAllocator``'s: this class inherits ``symbols``, ``holds``, ``uses_members``,
+    ``prepare`` and both target entry points, so the screen, the SPY 200-day switch, the weekly
+    grid and the SPY-remainder fill are the same code and not a re-implementation of it. Only
+    ``_targets``, ``lookback`` and ``id`` differ, and ``_targets`` differs from A1's in exactly
+    one place: where A1 reads a fresh top twenty at the previous month end, this reads a replay.
+
+    **The replay, and why it is a fold and not carried state.** At each decision
+    ``control_draw.shadow_selection`` walks ``SHADOW_DEPTH`` decisions back, starts from an empty
+    book there, and applies ``CGO-N20``'s own band forward one decision at a time. The result is
+    what the real book would hold coming into the previous decision, given that it had been
+    running for ``SHADOW_DEPTH`` months. It is a PURE FUNCTION of the dates it is handed:
+    ``backtest.dev.run_registry`` reuses one allocator object per id across candidates and across
+    walk-forward folds, so any per-instance memory of a previous decision would leak between them
+    and the arm would not be reproducible. Nothing is stored on ``self``.
+
+    **The switch is part of the band, and that is the half A1 was missing.** On a decision where
+    ``trend_on`` is false the real book holds nothing of the pool -- ``targets_prepared`` returns
+    no targets and the book sells out -- so the replay resets the shadow to the empty set there,
+    and the month the switch comes back on the real book re-enters its whole twenty. A1's fresh
+    top twenty cannot see that: it hands the draw a full book at a date the real book was in cash,
+    and reads two or three entries where the truth is twenty. Measured on the dev store before
+    this block was committed: closing the switch inside a one-step replay carries the estimate
+    from 304 entries to 446 on its own, before any extra depth is paid for.
+
+    **The ``Replay`` seam.** ``shadow_selection`` wants a ``(date, held) -> (pool, book)``
+    callable and derives its own calendar from ``control_draw.previous_decision_date``, which on
+    this chassis is the same session ``previous_month_end`` returns -- the last session before the
+    first of the month, read off the NYSE calendar instead of off SPY's own grid. The phase's
+    pre-registration probe asserted that agreement over every one of the dev window's 238
+    decisions, with no mismatch, before this file was committed.
+
+    **The pool goes back through ``Replay`` in symbol order, never in score order**, so no part of
+    the real ranking can reach the draw through a tie-break, and the entry count and the draw are
+    counted against the SAME pool because one callable hands back both. ``rows`` is read once, at
+    ``data_date``, and used for every replayed date too -- deliberate, and it looks ahead at
+    nothing, because today's member list is known today and every earlier reading uses only prices
+    dated at or before that earlier date. It means the entry count measures the SIGNAL's churn and
+    not the index's, which is right: the control draws from today's pool either way.
+
+    **No memo.** Consecutive decisions replay overlapping dates and a cache would pay for itself
+    several times over. It is not written, because the only places to hang one are the allocator
+    (forbidden -- see above) or ``OverhangPrepared`` (which ``targets`` does not have), and a draw
+    that is cheap and reproducible beats a draw that is cheaper and conditionally reproducible.
+    The cost is about ``SHADOW_DEPTH / 2`` times A1's, paid once.
+
+    ``signal`` must be ``"high"``: this arm shadows the paper's long side, and the params say
+    which arm it shadows. A ``"hash"`` or ``"low"`` value would be a placebo of a placebo or of
+    the contrast, which is not what was pre-registered.
+    """
+
+    id = "M0208-A2"
+
+    def lookback(self, params: Any) -> int:
+        return shadow_lookback_for(factor_lookback(_check(params).inner), SHADOW_DEPTH)
+
+    def _targets(self, history: Mapping[str, History], rows: list[FactorRow],
+                 grid: WeekGrid | None, data_date: date, held: frozenset[str],
+                 p: OverhangParams) -> tuple[Target, ...]:
+        if not rows or grid is None:
+            return ()
+        if p.signal != "high":
+            raise ValueError(
+                f"the matched draw shadows the high-overhang book, so signal must be 'high', "
+                f"got {p.signal!r}"
+            )
+
+        def replay(d: date, carried: AbstractSet[str]) -> tuple[Sequence[str], Sequence[str]]:
+            """``CGO-N20``'s own decision at ``d``, given what the replay says it held before it.
+
+            ``control_draw.Replay``: it hands back the pool it actually ranked AND the book it
+            ranked out of it, so the entry count and the draw can never be counted against two
+            different pools. The pool goes back in SYMBOL order so no part of the real ranking can
+            reach the draw through a tie-break.
+
+            The SPY 200-day switch is part of the band here and that is the half amendment 1 was
+            missing: on a month where ``trend_on`` is false the real book held nothing of the
+            pool, so this returns an empty book and ``shadow_selection`` reseeds the shadow to
+            empty. A1's fresh top twenty cannot see that -- it hands the draw a full book at a
+            date the real book was in cash, and reads two or three entries where the truth is
+            twenty.
+            """
+            if not trend_on(history, d, p.inner):
+                return (), ()
+            at_d = scored(grid, rows, d, p)
+            if not at_d:
+                return (), ()
+            back = sorted(at_d, key=lambda s: (-at_d[s], s))
+            return tuple(sorted(at_d)), _banded_picks(back, carried, p.inner.top, p.keep)
+
+        reading = shadow_selection(replay, data_date, depth=SHADOW_DEPTH)
+        if not reading.real_now:
+            return _book(history, rows, (), data_date, p)
+        drawn = matched_names(
+            pool=reading.pool,
+            held=held,
+            real_now=reading.real_now,
+            real_prev=reading.real_prev,
+            tag="M0208",
+            seed=p.seed,
+            data_date=data_date,
+        )
+        return _book(history, rows, drawn, data_date, p)
+
+
+SHADOW = ShadowDrawAllocator()
+
+
+def _a2(suffix: str, params: OverhangParams, rationale: str,
+        supersedes: tuple[str, ...]) -> Candidate:
+    """An amendment-2 candidate, with the declaration of which recorded arms it replaces.
+
+    **This arm does NOT declare ``controls=`` (Decision D9), and the reason is measured.**
+    ``control_shape.DECLARATION_ATTR = "controls"`` exists but no method file in the lab sets it,
+    so the ``declared`` resolver rung never fires today. On M0208 it does not need to: a third
+    placebo cannot become anybody's target, because ``_eligible_targets`` excludes placebo arms,
+    and this amendment's tests assert the arm still resolves to ``M0208-CGO-N20`` on the ``stem``
+    rung while neither earlier control's resolution moves. A ``controls=`` declaration here would
+    be a new ``Candidate`` field exercised for the first time inside a recorded trial, which is a
+    strictly worse place to find out it is wrong. *(It would be SAFE to add -- ``Candidate``
+    already carries ``supersedes``, added the same way, and ``lab.method.config_text`` renders
+    only rules + allocator id + params, so a new ``Candidate`` field is outside ``config_digest``
+    by construction. It is simply not needed here.)*
+
+    ``supersedes`` is what D17 reads (``control_shape.SUPERSEDES_ATTR``): declared, never inferred
+    from the target, and outside ``config_digest`` because ``config_text`` names its three
+    attributes by hand. It names BOTH earlier controls, because D17 supersedes a ``warn`` finding
+    as well as a ``refuse`` one -- every margin written against either was quoted against an
+    opponent of the wrong shape, and leaving one of a re-drawn pair unmarked would say the
+    opposite. It retires neither unless this arm reads ``OK`` on both axes."""
+    return Candidate(id=f"M0208-{suffix}", family="M0208", rules=MONTHLY_HOLD_FRAC_GOTRADE,
+                     allocator=SHADOW, params=params, rationale=rationale, added=A2_ADDED,
+                     owner_inputs=(), supersedes=supersedes)
+
+
+SHADOW_DRAW = Amendment(
+    added=A2_ADDED,
+    why=(
+        "CGO-N20-PLC is an honest draw that is still not a match -- 455 trades against 624 and "
+        "2.313 turnover against 3.061, 0.73x and 0.76x -- because it reconstructs the book's "
+        "previous holdings from a fresh top twenty instead of the drifted set the book actually "
+        "holds; replay the band forward from an empty book instead and draw against that"
+    ),
+    hypothesis=(
+        "Written before the run, and before any result for this arm was seen. The standing "
+        "sentence about this method is that CGO-N20 beat a meaningless book by AT LEAST 4.3 "
+        "points a year - 13.879% against CGO-N20-PLC's 9.532% on the owner's deposits, where SPY "
+        "TR on the same deposits earned 7.188% - published as a floor rather than a measurement, "
+        "because even the fairest control the lab could draw still traded a quarter less than the "
+        "book. This arm exists to turn that floor into a number, and the bar it has to clear is "
+        "arithmetic and is written here before it runs: D17's match band is 0.80-1.25 inclusive "
+        "on BOTH axes, so against 624 trades and 3.0614 turnover the arm must record AT LEAST "
+        "500 trades and 2.4492 turnover, and at most 780 trades and 3.8268 turnover. On an "
+        "equal-slot chassis turnover follows trades arithmetically - the recorded pair gives "
+        "1.0362 turnover per trade against the book's - so the low side is set by the trade count "
+        "and the high side by turnover, and the clean window is 500 to 752 trades. A warn arm "
+        "retires nothing, so anything outside that window leaves the published sentence a floor. "
+        "Predicted direction. The estimator was measured at 304 entries against the real book's "
+        "624 - 0.487x, uniform across 1996-2002, 2003-2008 and 2009-2015 - and the two-step "
+        "replay reads 592 against the same 624, 0.949x, on the dev store before this block was "
+        "committed. The realised trade count will NOT rise in proportion, and that is the "
+        "prediction's most falsifiable part: the draw keeps at most as many of its own names as "
+        "are still in the pool, so a control name that leaves the index is forced out whatever "
+        "the entry count says, and the realised figure is the sum over decisions of the larger of "
+        "the two. That attrition already did half the work at 304 entries, lifting the recorded "
+        "arm from 0.49 to 0.73, and it stops binding as the entry count rises. So the predicted "
+        "landing is a RANGE and not a point: 560 to 700 trades, 0.90x to 1.12x, and 2.85 to 3.55 "
+        "turnover, 0.93x to 1.16x - band-clean on both axes, with the high side the live risk and "
+        "not the low one. Money: the arm trades more than CGO-N20-PLC did, pays more of Gotrade's "
+        "fees for it, and therefore EARNS LESS than its 9.532%, somewhere in 8.5% to 9.5%, so the "
+        "margin WIDENS from +4.346 to between 4.4 and 5.4 points and the word 'at least' comes "
+        "out of the published sentence. A reversal - the control earning MORE than 9.532% - is an "
+        "admissible outcome of this prediction and would say that the extra churn bought more of "
+        "the dev store's survivorship lottery than it paid in fees, which is a mechanism this lab "
+        "has already measured and declined to assign a sign to. Whatever the number is, it is "
+        "reported and the arm is not drawn again: this is one re-draw of one book at one replay "
+        "depth, and a second one would only ever be justified by the shape missing its band, "
+        "never by the margin coming out wrong. And none of it promotes anything: hardgate.check "
+        "tests the walk-forward folds, the promoted variant's own folds and the survivorship "
+        "drawdown before D17, and immediately behind D17 stands the kin rule, where M0208's kin "
+        "is M0002, which has already spent and failed its test-window look. A clean arm here "
+        "changes the refusal message and not the answer."
+    ),
+    expected_failure=(
+        "The ways this is wrong, stated so each can be recognised. First, on shape and high: the "
+        "replay recovers the drift AND pool attrition stacks on top of it, so the arm lands above "
+        "752 trades or above 3.8268 turnover and misses the band from the other side - the "
+        "mirror of amendment 1's miss, and it would say the two effects are additive where this "
+        "hypothesis says the larger of the two binds. Second, on shape and low: the replay depth "
+        "is too shallow for a book whose names drift toward the band's edge over more months than "
+        "the lookback can pay for, the arm lands under 500 trades again, and the honest reading "
+        "is that a bounded replay is not the remedy on this chassis at all - at which point the "
+        "published sentence stays a floor and the right next move is a different mechanism, not a "
+        "deeper replay, because the ladder measured before this block was committed is flat from "
+        "two steps to the eight-step lookback cap and buys nothing further. Third, on money: "
+        "the margin barely moves, which would say the fee bill between 455 and 620 trades is "
+        "worth well under a point a year and the whole 'floor' caveat was about a quantity too "
+        "small to matter - a useful and slightly embarrassing result that should be written down "
+        "as such. Fourth, the direction reverses and the honest control earns more rather than "
+        "less; the lab has measured that an honest control's effect on a margin is not a bias of "
+        "known sign but an arbitrary one, so this is the outcome the prediction is least "
+        "entitled to be surprised by. A shape miss is reported as a shape miss and the quoted "
+        "margin stays provisional; it is not a reason to try another seed, another depth, or "
+        "another draw."
+    ),
+    candidates=(
+        _a2("CGO-N20-PLC2", OverhangParams(N20, keep=40),
+            "Placebo for CGO-N20, re-drawn: the same pool, slots, band and switch, filled in a "
+            "hash order at the entry count of a replayed shadow of the real book's own holdings",
+            supersedes=("M0208-CGO-N20-PLC", "M0208-HASH-N20")),
+    ),
+)
+
+
 METHOD = Method(
     id="M0208",
     name=("Paper gains and paper losses: buy the stocks whose recent holders sit on the biggest "
@@ -657,7 +948,7 @@ METHOD = Method(
         _v("HASH-N20", OverhangParams(N20, keep=40, signal="hash"),
            "Placebo: the same pool, band, slots and switch in a fixed hash order"),
     ),
-    amendments=(MATCHED_DRAW,),
+    amendments=(MATCHED_DRAW, SHADOW_DRAW),
     seen_keys=(
         "concept:capital-gains-overhang",
         "concept:disposition-effect",

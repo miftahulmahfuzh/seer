@@ -1,0 +1,130 @@
+{
+  "branch": "main",
+  "coordinator": "orch-honest-control-redraw",
+  "coordinator_session_id": "d73093cd-bb4d-4aa3-a3bc-b9bb1c1bcf1c",
+  "created": "2026-10-20T05:18:45+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 1,
+      "note": null,
+      "package": ".workflows/plan/` (+ scratchpad)",
+      "plan": ".workflows/plan/control-draw-remedies/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Measure the shadow on every chassis, before it is built"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "engine/src/seer_engine/lab",
+      "plan": ".workflows/plan/control-draw-remedies/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The shadow rule, written beside v1"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2
+      ],
+      "difficulty": "HARD",
+      "n": 3,
+      "note": null,
+      "package": "engine/.../lab/methods` + `engine/tests` + lab db",
+      "plan": ".workflows/plan/control-draw-remedies/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R3",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "M0208's honest control, re-drawn under the shadow"
+    },
+    {
+      "card": null,
+      "commit": "0e8e494",
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": "GO (rule D) / branch key G-bottom, M0221+M0225 only; M0201 draws no arm. NOT a STOP: rule D 1.011x and rule B 1.010x turnover on 0.992x trades vs the re-run book, against the shipped draw's 1.900x -- the entrant rung buys 98.8%% of the excess, not 15%%. The planner's 1.67x deflation is invalid: the L1 probe's over-statement runs 1.20x-2.68x and is anti-correlated with rule quality. M0201's 0.0059 gap does not exist -- its control re-runs at 0.8008x, inside the band; the published 0.794 crossed a store boundary worth 0.0067. Confirmed: 425 entries on all six arms, entrant weight 1.884x vs 1.900x excess, rule C near-dead (sharper reason: keep_key has no size term). Decided rung 2: the Handoffs line 'two rules clearing is S' is an ambiguity guard, not a finding rule, and loses to the STOP rule's own firing condition; one winner named on pre-registered grounds, no rule E invented. Free phase: no trial, no method id, no lab command, looks 4->4, lab.sqlite 607b78cf unmoved.",
+      "package": ".workflows/plan/` (+ scratchpad)",
+      "plan": ".workflows/plan/control-draw-remedies/phase-4.md",
+      "reported_at": "2026-10-20T05:34:09+00:00",
+      "satisfies": [
+        "R2"
+      ],
+      "status": "done",
+      "task_id": "P1-ROOT-Z7BD",
+      "title": "Measure the weight vector, before it is built"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        4
+      ],
+      "difficulty": "HARD",
+      "n": 5,
+      "note": null,
+      "package": "engine/.../lab` + methods + `engine/tests` + lab db",
+      "plan": ".workflows/plan/control-draw-remedies/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The weight rule, and the arms it earns"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        3,
+        5
+      ],
+      "difficulty": "NORMAL",
+      "n": 6,
+      "note": null,
+      "package": "docs/plans` + `.workflows/plan/` + lab db",
+      "plan": ".workflows/plan/control-draw-remedies/phase-6.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The R1 verdict, the sentences, and the close-out"
+    }
+  ],
+  "plan": "/home/miftah/seer/docs/plans/CONTROL_DRAW_REMEDIES_PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "control-draw-remedies",
+  "updated": "2026-10-20T05:34:09+00:00",
+  "worktree": "none"
+}

@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "7c6d4ba",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": null,
+      "note": "GO, stop:false. Shadow needed on M0208 alone (0.487x, close-out reproduced to the unit on all 7 figures); other eight 0.988-1.001, M0201/M0202 borderline at 0.920 (0.020 inside band, 0.827 in 2009-2015) and handed to the coordinator, not absorbed. REPLAY DEPTH K=2 (0.989, 305 of 473 bars, 168 spare) - smallest that clears AND the convergence point: K=3..8 oscillate in [0.987,1.019], so no depth beats two; coverage also falls with depth. 624 SETTLED as an entry count by independent forward replay - but trials.trades counts closed round trips, so it equals the entry count by construction on a constant-name book and is not independent evidence. Membership convention CORRECTED: M0208's 320 missed entries split 140 cash-month / 42 membership / 138 freshness, so phase 6 carries 0.067 of ratio, not 0.202; the plan's '0.034 on M0047' is that chassis's 1996-2002 era, 0.012 whole-window. Decisions: (1) borderline != shadow_needed, so shadow_needed=[M0208] per the band rule (rung 2); (2) probe logs committed as .txt not .log - root .gitignore ignores *.log and the predecessor set's committed artefacts use .txt (rung 6); (3) bookkeeping done by hand, no completion-handler/pusher subagents, per the brief's no-spawn rule. lab.sqlite unmoved 607b78cf, looks 4->4, 6183 passed, ruff clean.",
       "package": ".workflows/plan/` (+ scratchpad)",
       "plan": ".workflows/plan/control-draw-remedies/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T05:51:35+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-J6WT",
       "title": "Measure the shadow on every chassis, before it is built"
     },
     {
@@ -125,6 +125,6 @@
   "plan": "/home/miftah/seer/docs/plans/CONTROL_DRAW_REMEDIES_PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "control-draw-remedies",
-  "updated": "2026-10-20T05:34:09+00:00",
+  "updated": "2026-10-20T05:51:35+00:00",
   "worktree": "none"
 }

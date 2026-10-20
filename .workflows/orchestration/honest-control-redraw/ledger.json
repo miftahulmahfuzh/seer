@@ -127,23 +127,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "23994ec",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 7,
-      "note": null,
+      "note": "M0215 write-up only; trials 846/847 already recorded 2026-10-19 at c0f9bcf and lab run correctly refuses both digests. Shape repaired: CTRL-PLC 0.99x/0.98x -> M0215-CTRL, CAP4-PLC 0.97x/0.96x -> M0215-CAP4, both sibling-stem, both old arms superseded. Margins: CTRL +1.96 -> +2.16 (widened 0.20), CAP4 +1.73 -> +1.61 (NARROWED). Pre-registered 'both widen 0.3-1.5 pts' MISSED on both arms. Headline: the success condition is a placebo-vs-placebo DiD and its placebo half flips -0.05 -> +0.27, so -0.28 > +0.27 FAILS by 0.55 not 0.23 -- a cap of 4 helps a blind book and hurts the raise book. Forks decided: (a) no seer-pg container up, ran pytest without PG_TEST_URL matching phase 4's precedent, 5748 passed / 413 skipped (rung 6); (b) run-time lab.sqlite hashes do not exist, substituted source_sha/run_at/git_sha per the resume brief, and noted the rows' git_sha is phase 5's 4e5359a (HEAD at run time, a descendant of c0f9bcf) not phase 7's own commit.",
       "package": "engine/lab/methods",
       "plan": ".workflows/plan/honest-control-redraw/phase-7.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T02:23:37+00:00",
       "satisfies": [
         "R2",
         "R3",
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P2-ENG-Y3BQ",
       "title": "M0215 \u2014 the sector-capped placebo pair"
     },
     {
@@ -176,7 +176,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "honest-control-redraw",
-  "updated": "2026-10-20T02:16:43+00:00",
+  "updated": "2026-10-20T02:23:37+00:00",
   "verified_at": "2026-10-20T02:09:49+00:00",
   "worktree": "/home/miftah/.worktrees/seer/honest-control-redraw"
 }

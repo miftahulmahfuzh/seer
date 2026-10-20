@@ -1724,3 +1724,369 @@ def test_lab_control_reports_every_arm_and_writes_nothing(tmp_path, monkeypatch,
     assert "M0001-R" in one and "M0002-R" not in one
 
     assert lab_cmd.run(argparse.Namespace(db=db, lab_command="control", method=["M9999"])) == 2
+
+
+# --- (D18): the arm that takes the money may not be the arm registered to be beaten ------------
+#
+# Same seam as (D17) above and for the same reason: `_declare` is what lets a synthetic arm's
+# rationale be read at all. These tests turn on which arm `store.best_dev_eligible` names, which
+# is MAR then `n`, so they move MAR -- `_control_arm` records at the fixture default and loses the
+# tie-break to the book itself.
+
+R_CONTROL = "Control: the same book with the brake taken out, nothing else changed"
+
+# The nineteen dev-eligible methods whose pre-registered arm reads `control`, measured read-only
+# on 2026-10-20 against this tree's committed lab. Named in (D18)'s own text.
+CONTROL_PROMOTED: tuple[tuple[str, str], ...] = (
+    ("M0033", "M0033-TV22-N21"), ("M0035", "M0035-CTRL"), ("M0044", "M0044-NOBRAKE"),
+    ("M0047", "M0047-EQ"), ("M0076", "M0076-X-M-D"), ("M0083", "M0083-X-UP-D"),
+    ("M0085", "M0085-EX-M"), ("M0101", "M0101-CTRL"), ("M0107", "M0107-HOST"),
+    ("M0122", "M0122-CALM-EQ"), ("M0137", "M0137-EXP"), ("M0168", "M0168-CTRL"),
+    ("M0169", "M0169-L20-SW"), ("M0187", "M0187-H3-SW"), ("M0193", "M0193-S2-SW"),
+    ("M0202", "M0202-PLC1-HALF"), ("M0215", "M0215-CTRL"), ("M0223", "M0223-TOP20"),
+    ("M0242", "M0242-R-H6"),
+)
+
+# The negative control, on real arms. Both of these pre-register a DOSE-RESPONSE rung, and both
+# are methods the audit's refused fork (A) would have flipped to promotable -- so they are exactly
+# the pair a careless widening of ROLE_CONTROL would catch. The rung IS the measurement (D17).
+DOSE_PROMOTED: tuple[tuple[str, str], ...] = (
+    ("M0174", "M0174-C40-SW"), ("M0179", "M0179-N40-SW"),
+)
+
+
+def _arm_row(conn, monkeypatch, mid: str, suffix: str, *, mar: float = 0.95, trades: int = 252,
+             turnover: float = 1.08, annual: float = 0.15) -> None:
+    """Record one more dev arm of ``mid`` AND make it the arm `lab promote` would pre-register.
+
+    (D18) turns on exactly which arm `store.best_dev_eligible` names, so the arm has to be named
+    rather than merely recorded. It is named the way every other `promoted_variant` test in this
+    module names one -- by patching `store.best_dev_eligible` to the row -- and not by out-MARing
+    the book, because this module's autouse fixture pins `DSR_POLICY` to `all-trials` and every
+    synthetic trial here carries the same `sharpe`, so the dev-Sharpe variance is zero, `dsr_at`
+    cannot invert a recorded DSR at the gate's N, and EVERY arm reads ineligible. A higher `mar`
+    would therefore name nothing at all. The `mar` is still recorded, because the refusal's own
+    argument is about what MAR rewards and a row that did not carry one would be a misleading
+    fixture.
+
+    The default shape -- 252 trades, 1.08 turnover against the book's 250 and 1.1 -- is inside
+    `WARN_BAND`, so (D17) stays silent and only the clause under test can speak.
+    """
+    with conn:
+        ns = store.insert_trials(conn, [_trial(
+            method_id=mid, candidate_id=f"{mid}-{suffix}", config_digest=f"d-{mid}-{suffix}",
+            mar=mar, trades=trades, turnover=turnover,
+            curve_json=_curve(_months(*DEV_SPAN), annual),
+        )])
+        stamp_provenance(conn, ns, price_fingerprint=SAME_PRICES)
+    row = conn.execute(
+        "SELECT * FROM trials WHERE candidate_id = ?", (f"{mid}-{suffix}",)
+    ).fetchone()
+    monkeypatch.setattr(store, "best_dev_eligible", lambda _c, _m, **_k: row)
+
+
+def _promote_the_book(conn, monkeypatch, mid: str = "M0001") -> None:
+    """Name ``{mid}-A`` -- the book itself -- as the arm that would be pre-registered.
+
+    Same seam and same reason as `_arm_row`: under this module's `all-trials` fixture nothing is
+    eligible, so even the only arm a method holds has to be named explicitly.
+    """
+    row = conn.execute("SELECT * FROM trials WHERE candidate_id = ?", (f"{mid}-A",)).fetchone()
+    monkeypatch.setattr(store, "best_dev_eligible", lambda _c, _m, **_k: row)
+
+
+def test_the_module_records_the_promoted_arm_role_decision():
+    """(D18) is argued where the other seventeen are, with its measurement and its live case."""
+    doc = hardgate.__doc__ or ""
+    assert "(D18)" in doc
+    assert "M0202-PLC1-HALF" in doc                        # the live case, named
+    assert "best_dev_eligible" in doc and "no role filter" in doc
+    # The three the fold clauses already clear, stopped only by the kin rule -- the luck.
+    assert "M0033" in doc and "M0035" in doc and "M0044" in doc
+    assert "M0044-NOBRAKE" in doc
+    # The fork the same audit refused, recorded beside the one it took.
+    assert "M0174" in doc and "M0178" in doc and "walkforward.pick" in doc
+    # Fails open, and says whose sentence that is.
+    assert "absence is not evidence" in doc.lower()
+    # The way back, and that it is free.
+    assert "amendment" in doc and "costs no method id" in doc
+
+
+def test_a_promotion_whose_variant_is_a_control_is_refused_and_quotes_the_rationale(
+    conn, monkeypatch
+):
+    """M0202's shape: the highest-MAR eligible arm is the placebo, so the placebo takes the look."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)                    # M0001-A, the idea, MAR 0.8
+    _arm_row(conn, monkeypatch, "M0001", "PLC1", mar=0.95)              # the placebo, higher MAR
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-PLC1", R_DRAW)])
+
+    assert hardgate.promoted_variant(conn, "M0001") == "M0001-PLC1"
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0001")
+    said = str(e.value)
+    assert "M0001-PLC1" in said
+    assert "control arm" in said and "registered in order to beat it" in said
+    assert "hash-drawn names" in said                      # the author's own sentence, quoted back
+    assert "D18" in said
+    assert "Nothing was written and no status moved" in said
+    assert "There is no override" in said
+    assert "amendment" in said and "costs no method id" in said
+
+
+def test_a_control_arm_that_is_not_the_promoted_one_does_not_refuse(conn, monkeypatch):
+    """The ordinary method: it holds a placebo and its idea out-MARs it. (D18) is silent.
+
+    This is the half of the rule that matters most -- most of the lab holds a control arm, and a
+    clause that refused all of them would be a stopped lab rather than a stricter one.
+    """
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)                    # MAR 0.8
+    _arm_row(conn, monkeypatch, "M0001", "PLC1", mar=0.50)              # the placebo, lower MAR
+    _promote_the_book(conn, monkeypatch)                   # ...and the book out-MARs it
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-PLC1", R_DRAW)])
+
+    assert hardgate.promoted_variant(conn, "M0001") == "M0001-A"
+    hardgate.check(conn, "M0001")                          # returns: no refusal
+
+
+def test_a_promoted_dose_rung_is_not_a_control(conn, monkeypatch):
+    """(D17)'s dose-before-draw ordering, carried into this clause: the rung IS the measurement.
+
+    `M0244-STALE30` is the live shape. A permanent false alarm on a correct arm is how a rule gets
+    switched off, so the dose arms have to pass here as they pass the shape check.
+    """
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _arm_row(conn, monkeypatch, "M0001", "STALE30", mar=0.95)
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-STALE30", R_DOSE)])
+
+    assert hardgate.promoted_variant(conn, "M0001") == "M0001-STALE30"
+    hardgate.check(conn, "M0001")
+
+
+def test_a_plain_treatment_arm_promotes_exactly_as_before(conn, monkeypatch):
+    """A method whose only arm is the book itself: no role to object to, nothing refused."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _promote_the_book(conn, monkeypatch)
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_PLAIN)])
+
+    hardgate.check(conn, "M0001")
+
+
+def test_an_arm_the_method_file_does_not_declare_does_not_refuse(conn, monkeypatch):
+    """Fails OPEN, for (D16)'s reason: absence is not evidence.
+
+    The recorded id is `M0001-A` and the file declares only `M0001-Z`, so the role cannot be read
+    at all. A reader's limitation is not a verdict about a method, and the clauses below still run.
+    """
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _promote_the_book(conn, monkeypatch)
+    _declare(monkeypatch, M0001=[_Arm("M0001-Z", R_DRAW)])
+
+    assert hardgate.promoted_arm_role("M0001", "M0001-A") is None
+    hardgate.check(conn, "M0001")
+
+
+def test_a_method_with_no_file_does_not_refuse(conn, monkeypatch):
+    """And deleting the file is not a way past the rule: `prereg` refuses a method with no file on
+    its source sha long before this clause, so an empty answer here is a missing role, not a
+    waiver."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _promote_the_book(conn, monkeypatch)
+    _declare(monkeypatch)                                   # discover() -> {}
+
+    assert hardgate.promoted_arm_role("M0001", "M0001-A") is None
+    hardgate.check(conn, "M0001")
+
+
+def test_the_role_is_read_from_the_prose_and_never_from_the_id(conn, monkeypatch):
+    """`control_shape`'s founding rule, asserted at the gate: `M0005-ALL-R`'s `-R` is a
+    rank-weighting variant, not a control. An id-suffix rule would refuse this promotion."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _arm_row(conn, monkeypatch, "M0001", "R", mar=0.95)
+    _declare(monkeypatch, M0001=[
+        _Arm("M0001-A", R_IDEA),
+        _Arm("M0001-R", "The same composite with linear rank weights: does conviction pay"),
+    ])
+
+    assert hardgate.promoted_variant(conn, "M0001") == "M0001-R"
+    hardgate.check(conn, "M0001")
+
+
+def test_a_perfectly_shaped_control_is_still_a_control(conn, monkeypatch):
+    """(D17) and (D18) ask different questions of one arm, and both have to be asked.
+
+    A placebo drawn at exactly the book's trade count and turnover clears the shape band -- and is
+    still the wrong thing to spend a counted look on.
+    """
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _arm_row(conn, monkeypatch, "M0001", "PLC1", mar=0.95, trades=250, turnover=1.1)
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-PLC1", R_DRAW)])
+
+    assert not hardgate.mis_shaped_controls(conn, "M0001")   # 1.00x / 1.00x: (D17) is content
+    with pytest.raises(store.LabError, match="D18"):
+        hardgate.check(conn, "M0001")
+
+
+def test_the_fold_clauses_still_speak_first(conn, monkeypatch):
+    """Order inside `check`: evidence before identity.
+
+    A control arm that also loses its own folds is refused by (D11b), which is the more basic thing
+    wrong with it, and the researcher reads that sentence rather than this one.
+    """
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    # promoted, and loses every fold
+    _arm_row(conn, monkeypatch, "M0001", "PLC1", mar=0.95, annual=0.02)
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-PLC1", R_DRAW)])
+
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0001")
+    said = str(e.value)
+    assert "(D11)" in said and "D18" not in said
+
+
+def test_a_control_prefixed_rationale_is_a_control_here(conn, monkeypatch):
+    """M0044's live shape -- "Control: M0036-BLEND re-stated under this allocator, no brake".
+
+    Phase 1 widened `control_shape`'s vocabulary to the `Control:` prefix that most of the lab's
+    control arms actually use; this is the gate asserting it reads one.
+    """
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _arm_row(conn, monkeypatch, "M0001", "NOBRAKE", mar=0.95)
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-NOBRAKE", R_CONTROL)])
+
+    with pytest.raises(store.LabError, match="D18"):
+        hardgate.check(conn, "M0001")
+
+
+def test_lab_promote_exits_2_and_writes_nothing_when_the_variant_is_a_control(
+    tmp_path, monkeypatch
+):
+    db, prereg_dir = tmp_path / "lab.sqlite", tmp_path / "prereg"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0001", annual=0.15)
+    _arm_row(c, monkeypatch, "M0001", "PLC1", mar=0.95)
+    before = db.read_bytes()
+    c.close()
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-PLC1", R_DRAW)])
+
+    assert _cli(tmp_path, db, prereg_dir) == 2
+    assert not prereg_dir.exists()
+    assert db.read_bytes() == before
+
+
+def test_the_nineteen_are_still_the_nineteen_or_have_moved_on(monkeypatch):
+    """(D18)'s population, on the committed lab, allowed exactly two states and never neither.
+
+    Each named method either still pre-registers the control arm (D18)'s text names, or has since
+    amended an arm that out-MARs it -- the way back, working. Pinning only "still a control" would
+    go red the day a method takes the remedy the refusal asks for, which is the wrong direction for
+    a test to fail in.
+
+    `store.COMMITTED_DB` opened `mode=ro` and never through `store.connect`, which migrates and so
+    dirties the file on a read. The bytes are hashed either side. `DSR_POLICY` is put back to the
+    lab's real default, because this module's autouse fixture pins it to the one its own synthetic
+    rows were recorded under and the committed lab is not judged under that one.
+    """
+    from seer_engine.lab import npolicy
+
+    if not store.COMMITTED_DB.exists():
+        pytest.skip("no lab database")
+    monkeypatch.setattr(store, "DSR_POLICY", npolicy.DEFAULT_POLICY)
+    store._GATE_CACHE.clear()
+
+    before = hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest()
+    conn = sqlite3.connect(f"file:{store.COMMITTED_DB}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        from seer_engine.lab import control_shape as cs
+
+        for mid, named_arm in CONTROL_PROMOTED:
+            if store.get_method(conn, mid) is None:
+                pytest.skip(f"{mid} is not in this tree's lab")
+            arm = hardgate.promoted_variant(conn, mid)
+            if arm is None:
+                pytest.skip(f"{mid} has no eligible dev variant in this tree")
+            role = hardgate.promoted_arm_role(mid, arm)
+            if role is None:
+                pytest.skip(f"{mid} has no method file in this tree")
+            if arm == named_arm:
+                assert role[0] == cs.ROLE_CONTROL, f"{mid}: {arm} no longer reads as a control"
+            else:
+                # It moved. The only acceptable direction is away from a control arm.
+                assert role[0] != cs.ROLE_CONTROL, (
+                    f"{mid} now pre-registers {arm}, a different control arm"
+                )
+    finally:
+        conn.close()
+    assert hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest() == before
+
+
+def test_a_dose_rung_on_the_committed_lab_is_not_refused(monkeypatch):
+    """The negative control, on real arms rather than on a fixture's prose.
+
+    M0174 and M0179 pre-register a dose-response rung. They are also the two methods the audit's
+    refused fork (A) would have flipped to promotable, so they are precisely the pair that a
+    widened `ROLE_CONTROL` would sweep up by accident -- and a permanent false alarm on a correct
+    arm is how a rule gets switched off (D17). Nine of the 78 pre-register a rung; none of them may
+    be refused here.
+
+    Same read-only discipline as the test above: `mode=ro`, never `store.connect`, bytes hashed
+    either side, and `DSR_POLICY` put back to the lab's real default.
+    """
+    from seer_engine.lab import control_shape as cs
+    from seer_engine.lab import npolicy
+
+    if not store.COMMITTED_DB.exists():
+        pytest.skip("no lab database")
+    monkeypatch.setattr(store, "DSR_POLICY", npolicy.DEFAULT_POLICY)
+    store._GATE_CACHE.clear()
+
+    before = hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest()
+    conn = sqlite3.connect(f"file:{store.COMMITTED_DB}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        for mid, named_arm in DOSE_PROMOTED:
+            if store.get_method(conn, mid) is None:
+                pytest.skip(f"{mid} is not in this tree's lab")
+            arm = hardgate.promoted_variant(conn, mid)
+            if arm != named_arm:
+                pytest.skip(f"{mid} now pre-registers {arm}, not {named_arm}")
+            role = hardgate.promoted_arm_role(mid, arm)
+            if role is None:
+                pytest.skip(f"{mid} has no method file in this tree")
+            assert role[0] == cs.ROLE_DOSE, f"{mid}: {arm} reads {role[0]}, not a dose rung"
+            assert role[0] != cs.ROLE_CONTROL
+    finally:
+        conn.close()
+    assert hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest() == before
+
+
+def test_this_rule_retires_no_promotion_that_already_happened():
+    """(D3): a pre-registration is a promise, and `check` is silent for any status but
+    `dev-eligible`. None of the nineteen is `promoted`, so nothing already committed to is
+    re-judged -- asserted rather than reasoned about, because a rule that retroactively unpicked a
+    promise would be the worst available outcome of this edit."""
+    if not store.COMMITTED_DB.exists():
+        pytest.skip("no lab database")
+    before = hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest()
+    conn = sqlite3.connect(f"file:{store.COMMITTED_DB}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        for mid, _arm in CONTROL_PROMOTED:
+            row = store.get_method(conn, mid)
+            if row is None:
+                continue
+            assert str(row["status"]) != "promoted", mid
+    finally:
+        conn.close()
+    assert hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest() == before

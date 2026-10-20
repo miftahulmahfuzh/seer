@@ -664,6 +664,150 @@ no mechanism to apply it. Each of the nine has the same way back as M0248 -- re-
 at the book's own turnover and amend, no method id spent. As with (D12) and (D14), the real point
 is forward: the next method to draw a handicapped control and quote the margin against it is
 stopped before a look is spent, rather than after the sentence is published.
+
+**(D18) Does the gate check WHAT the variant it is about to pre-register IS? -- Yes, and from
+2026-10-20 ``check`` REFUSES a promotion whose pre-registered variant is a control arm.**
+
+(D11) asks whether the variant ``lab promote`` would pre-register won its own folds. It never asks
+what that variant *is*. ``store.best_dev_eligible`` -- the very call ``prereg.promote_method``
+makes -- is ``ORDER BY mar DESC, n ASC`` over the method's dev trials with an eligibility filter
+and **no role filter**, so the arm that takes the pre-registration, the counted look and later the
+owner's money is simply the highest-MAR eligible arm of the family. A **control arm** -- an arm
+the method registered in order to beat it -- is ranked there like any other.
+
+It is worse than an oversight, because the two facts lean the same way. A control is
+systematically the lowest-turnover and the shallowest-falling arm a method holds, and MAR is
+return over fall: the property that makes an arm a good control is the property that wins this
+ranking. The audit that produced this rule predicted *"fewer than a third"* and measured 55%
+on the neighbouring question, for exactly that reason.
+
+Measured 2026-10-20 over the 78 dev-eligible methods, the role -- read by ``control_shape.role_of``
+from the arm's own pre-registered rationale -- of the arm ``lab promote`` would pre-register:
+
+=====================  =========  ===============================================================
+role of that arm       methods    treated how
+=====================  =========  ===============================================================
+treatment              46         promoted as before; this clause is silent
+**control**            **19**     **refused here**
+dose-response          9          the rung **is** the measurement (D17); never refused here
+no eligible variant    4          nothing to pre-register; (D11) is already silent, and so is this
+=====================  =========  ===============================================================
+
+**Why 78 and not 86.** ``store.best_dev_eligible`` returns a row for 86 methods, and 21 of those
+rows are control arms. The extra twelve -- M0012, M0021, M0022, M0029, M0075, M0077, M0156, M0161,
+M0176, M0180, M0203, M0213 -- are nine ``rejected`` and three ``test-failed``, and ``check`` is
+silent for every status but ``dev-eligible``: ``store.TRANSITIONS`` admits exactly one edge into
+``promoted`` and it starts there. Quoting the wider number would claim this clause stops a
+promotion the status machine has already stopped, which is a count nobody earned. The other
+direction is the same discipline. Four dev-eligible methods -- M0007, M0011, M0019, M0020 -- hold
+no trial the current gate and N call eligible, so ``best_dev_eligible`` names nothing for them and
+this clause is silent for the reason (D11)'s own *"Silent when ``best_dev_eligible`` names
+nothing"* paragraph gives. All of it measured against the live lab at sha1 ``23c8ced4``, 280
+methods and 879 trials.
+
+The nineteen, each with the arm it would have pre-registered:
+
+=========  =====================  =========  =====================  =========  =================
+method     arm                    method     arm                    method     arm
+=========  =====================  =========  =====================  =========  =================
+M0033      M0033-TV22-N21         M0101      M0101-CTRL             M0193      M0193-S2-SW
+M0035      M0035-CTRL             M0107      M0107-HOST             M0202      M0202-PLC1-HALF
+M0044      M0044-NOBRAKE          M0122      M0122-CALM-EQ          M0215      M0215-CTRL
+M0047      M0047-EQ               M0137      M0137-EXP              M0223      M0223-TOP20
+M0076      M0076-X-M-D            M0168      M0168-CTRL             M0242      M0242-R-H6
+M0083      M0083-X-UP-D           M0169      M0169-L20-SW
+M0085      M0085-EX-M             M0187      M0187-H3-SW
+=========  =====================  =========  =====================  =========  =================
+
+**Why the fold clauses do not already catch it.** Three of the nineteen -- M0033, M0035 and M0044
+-- clear **both** (D11) clauses at 3 of 4 and are stopped only by (K). That is luck. Kin is a
+statement about the company a method keeps; it has nothing to say about which of the method's own
+arms was chosen, and the next method of this shape with a clean family is promotable today. M0202
+is the case that says the problem out loud: its pre-registered arm would be ``M0202-PLC1-HALF`` --
+*"Placebo: the same scoreable names in a fixed hash order (seed 1), same guard"* -- and (D11b) was
+asking in earnest whether that hash order won its folds.
+
+**What the refusal means, and why it is not a technicality.** When a method's control out-MARs
+every treatment arm it holds, the control has beaten the idea on the dev window. That is a result,
+and it is the result the control was drawn to look for. Promoting it would spend one of the lab's
+counted looks on the null and then hand the owner a book of hash-ordered names. The gate exists
+because four of four looks have already failed on *beats SPY TR*; it may not spend the fifth on an
+arm nobody is proposing.
+
+**Why in ``check`` and not in ``best_dev_eligible``.** A role filter in the ranking would be silent
+and retroactive. ``best_dev_eligible`` is what every recorded sentence in this lab means by "its
+best version" -- ``lab survivorship``'s *"the numbers below are for its best version"*, ``lab
+status``'s closest-to-eligible block, every insight that quoted a method's number. Re-ranking would
+move what all of them refer to, with no line of output anywhere saying so. A gate clause measures
+nothing new and moves no recorded row: it refuses, by name, with the arm and its author's own
+sentence quoted back, and it is argued in git where a reader can disagree with it. That is the only
+mechanism this module has ever offered.
+
+**Why this is not the selector change the same audit refused.** The audit asked whether
+``walkforward.pick`` should stop ranking controls inside each fold, and answered **no**. The fold's
+stated question is *"which variant would the lab's own rule have named at this point in time"*, and
+the lab's own rule ranks the whole family; a selector that excluded controls would simulate a
+promotion rule the lab does not have and report a cleaner out-of-sample record than the lab's real
+behaviour has earned. Measured over the 44 kin-clean fold-refused methods, constraining it left 31
+records unchanged, flipped exactly two complete verdicts -- M0174 and M0178, both to *promotable*
+on a **negative** 2009-2015 era edge (-0.6% and -2.1%) -- and made M0107 worse, 2 of 4 -> 1 of 4,
+because the arms it had been winning on were its own controls. Four methods (M0187, M0193, M0260,
+M0261) hold no treatment arm at all, so the restriction is undefined for them. This clause takes
+the opposite road deliberately: leave the simulation honest about what the lab does, and refuse
+what the lab does.
+
+**Absence is not evidence, here as everywhere.** The role is read from the arm's one-line rationale
+in the method's own ``lab/methods/mNNNN_*.py`` file. When no file declares the method, or the file
+declares no arm carrying the recorded candidate id, ``promoted_arm_role`` returns **None and
+nothing is refused**. That is (D16)'s sentence and (D17)'s behaviour, and it costs nothing real: a
+method with no file cannot be promoted at all -- ``prereg`` refuses it on ``methods.source_sha``
+long before anything reaches this clause -- so deleting a file is not a way past this rule, it is a
+way out of ``lab promote`` altogether. The alternative, refusing every arm whose prose could not be
+read, would turn a reader's limitation into a verdict about a method, which is the mechanism by
+which a rule stops being about the thing it was written for. (D10) fails *closed* on an unknown and
+this one fails open, and the difference is what the unknown is about: there, a missing price
+fingerprint would let two curves be compared across two histories, so the unknown corrupts a
+measurement the gate is making; here there is simply no claim to make, and the other clauses still
+run.
+
+**A dose rung is not a control, and neither is an idea arm.** ``control_shape.role_of`` tests dose
+before draw for (D17)'s reason -- ``M0241-STALE``'s rationale carries the word "control" and is a
+dose-response arm, and a permanent false alarm on a correct arm is how a rule gets switched off.
+Nine of the 78 would pre-register a dose rung; the rung **is** the measurement, so they pass to the
+clauses below without comment. Only ``ROLE_CONTROL`` refuses.
+
+**The way back, and it costs no method id.** Register an arm that is actually the idea, run it as
+an amendment -- an amendment appends trials under the method's existing id -- and let it out-MAR
+the control. ``best_dev_eligible`` then names it and this clause goes silent. If no treatment arm
+the method can write will out-MAR its own placebo, the method has its answer already and should not
+be spending a look to confirm it. Same shape of remedy as (D17)'s re-draw, for the same reason: a
+refusal that named no way back would be a dead end.
+
+**M0044 is in (D11)'s table and in this one, and the arm has changed.** (D11) was measured on
+2026-10-09, when ``M0044-TV14-N21`` was M0044's only eligible variant. Today ``best_dev_eligible``
+names ``M0044-NOBRAKE`` -- *"Control: M0036-BLEND re-stated under this allocator, no brake"*.
+Nothing in (D11)'s argument moves. What the change shows is that "the arm that gets the money" is a
+live query over a growing trial set and not a fact anybody wrote down, which is exactly why this
+clause asks it at promote time rather than recording an answer.
+
+**Where it sits in ``check``, and why.** After (D11)'s two clauses and before (D16). The fold
+clauses are about evidence and read first; (D16) and (D17) are both statements about *this same
+arm*, so "what is this arm" belongs in front of "is its fall honest" and "is its control shaped
+right". It is one dictionary lookup and one string scan over a module (D17) already imports, so the
+order is about the sentence a refused researcher reads, not about cost.
+
+**What it does not reach.** ``walkforward.buy_signal``, for (D13)'s reason exactly: the signal
+follows (K) through its caller and does not follow (D11)'s own-variant clause either, and whether
+it should follow this one is an edit to ``walkforward.py`` and the owner's to decide. It does not
+reach ``lab run`` (D15): a second gate at run time would only spend method ids to say what this one
+already says. And it moves no band, no recorded row and no closed verdict.
+
+**Who it stops today, measured.** Nineteen dev-eligible methods, every one of them already refused
+by the gate on another clause -- three of them (M0033, M0035, M0044) by (K) alone -- so **no
+promotion that would happen today stops happening** and ``lab status``'s ``Promotable now:`` line
+does not move. As with (D12), (D14) and (D17), the point is forward: the next method whose placebo
+out-MARs its idea is stopped before the look is spent, rather than after the owner is holding the
+book.
 """
 
 from __future__ import annotations
@@ -918,6 +1062,47 @@ def mis_shaped_controls(conn: sqlite3.Connection, method_id: str) -> tuple:
     except store.LabError:
         return ()
     return control_shape.refusals(found)
+
+
+def promoted_arm_role(method_id: str, candidate_id: str) -> tuple[str, str] | None:
+    """``candidate_id``'s declared role and the one line its author wrote for it. See (D18).
+
+    ``(role, rationale)``, where ``role`` is one of ``control_shape``'s ``ROLE_*`` values, or
+    **None** when the arm cannot be read at all -- no method file declares ``method_id``, or the
+    file declares no arm carrying that id.
+
+    **None is not a verdict, and the gate refuses nothing on it.** A method with no file cannot be
+    promoted anyway: ``prereg`` refuses it on ``methods.source_sha`` long before anything reaches
+    this clause, which is the same reason ``control_shape.for_method``'s docstring gives for
+    reading the file here. And a recorded candidate id that no arm in the file carries is the
+    reader failing, not the method failing -- absence is not evidence (D16), and the clauses below
+    still run on it. Refusing on a role nobody could read is the mechanism by which a rule stops
+    being about the thing it was written for.
+
+    It takes no connection. The role is the author's prose, pre-registered in the method file and
+    outside ``config_text``, so no recorded row is consulted and no digest can move by reading it.
+
+    Both imports are inside the body. ``control_shape`` for ``mis_shaped_controls``' reason -- a
+    module-level import would make the next edit to either module a fifty-fifty bet on an import
+    cycle, exactly as ``Run``'s docstring in ``lab/runner.py`` says about this module. ``discover``
+    for ``for_method``'s reason: at module scope it would import every method module in the lab on
+    any import of this one.
+
+    ``discover``'s own ``ValueError`` -- two modules claiming one id -- is deliberately **not**
+    caught. ``mis_shaped_controls`` one clause later does not catch it either, and a checkout whose
+    method package cannot be enumerated is a broken tree, not a promotion question.
+    """
+    from seer_engine.lab import control_shape
+    from seer_engine.lab.method import discover
+
+    entry = discover().get(method_id)
+    if entry is None:
+        return None
+    method, _path = entry
+    for arm in method.all_candidates():
+        if str(arm.id) == candidate_id:
+            return control_shape.role_of(arm), str(arm.rationale)
+    return None
 
 
 def mismatches(
@@ -1762,8 +1947,11 @@ def check(conn: sqlite3.Connection, method_id: str) -> None:
     which is what the researcher asked about; (K) is about the company it keeps, and reads better
     second. Within (F) the picks' record comes first and the promoted variant's own record second
     (D11): the first says whether the lab's way of choosing works out of sample, the second
-    whether the variant actually chosen won its folds itself. All of it is cheap -- SQL and
-    arithmetic on recorded curves -- so the order is about the message, not the cost.
+    whether the variant actually chosen won its folds itself. (D18) then asks what that variant
+    *is* and refuses a control arm, before (D16) and (D17) ask whether its fall is honest and its
+    own control is shaped right -- all three are statements about the same one arm, and "what is
+    it" reads in front of the other two. All of it is cheap -- SQL, arithmetic on recorded curves
+    and one read of the method file -- so the order is about the message, not the cost.
     """
     row = store.get_method(conn, method_id)
     if row is None:
@@ -1821,6 +2009,38 @@ def check(conn: sqlite3.Connection, method_id: str) -> None:
                 f"the commit"
             )
 
+        # (D18) `best_dev_eligible` ranks every eligible arm by MAR with no role filter, so the
+        # arm that takes the pre-registration, the look and the money can be the arm the method
+        # registered in order to beat it -- 19 of the 78 dev-eligible methods, measured. A control
+        # is systematically the lowest-turnover, shallowest-falling arm a method holds, which is
+        # what MAR rewards, so this is the ranking's own tendency rather than an accident.
+        #
+        # Only a role the method file actually declares refuses. An arm `promoted_arm_role` cannot
+        # find comes back None and is left to the clauses below, because absence is not evidence
+        # (D16) and a method with no file is refused by `prereg` on its source sha anyway. A dose
+        # rung is not a control -- the rung IS the measurement (D17) -- and neither is an idea arm.
+        arm_role = promoted_arm_role(method_id, candidate)
+        if arm_role is not None:
+            from seer_engine.lab import control_shape
+
+            role, rationale = arm_role
+            if role == control_shape.ROLE_CONTROL:
+                raise store.LabError(
+                    f"{method_id} is not promoted: {candidate} -- the variant `lab promote` "
+                    f"would pre-register -- is a control arm, one this method registered in "
+                    f"order to beat it: {rationale!r}. `store.best_dev_eligible` ranks every "
+                    f"eligible arm by MAR with no role filter, and a control is systematically "
+                    f"the lowest-turnover, shallowest-falling arm a method holds, which is what "
+                    f"MAR rewards. So when a method's control out-ranks its idea, the finding is "
+                    f"that the idea did not beat its own placebo on the dev window -- not that "
+                    f"the placebo is ready for a counted look and the owner's money (D18). The "
+                    f"way back: register an arm that is the idea and run it as an amendment, "
+                    f"which costs no method id because an amendment appends trials under this "
+                    f"id; once it out-MARs this one, `best_dev_eligible` names it instead and "
+                    f"this clause is silent. Nothing was written and no status moved. There is "
+                    f"no override -- if the rule is wrong, change it in "
+                    f"seer_engine/lab/hardgate.py and argue for it in the commit"
+                )
         sv_dd = survivorship_record.over_bar(method_id, candidate, tuning.MAX_DRAWDOWN)
         if sv_dd is not None:
             raise store.LabError(

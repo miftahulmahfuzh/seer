@@ -5,7 +5,7 @@ import { DSR_POLICIES, INSIGHT_KINDS, METHOD_STATUSES, SOURCE_KINDS } from './ty
 
 describe('lab snapshot (web/data/lab.json)', () => {
   it('has exactly the contract keys', () => {
-    expect(lab.version).toBe(5);
+    expect(lab.version).toBe(6);
     expect(Object.keys(lab).sort()).toEqual(
       ['asOf', 'benchmark', 'data', 'gate', 'ideasSeen', 'insights', 'methods', 'paper', 'summary',
         'trials', 'version'].sort(),
@@ -133,7 +133,10 @@ describe('lab snapshot (web/data/lab.json)', () => {
   it('agrees with its own summary', () => {
     expect(lab.summary.methods).toBe(lab.methods.length);
     expect(lab.summary.devTrials).toBe(lab.trials.filter((t) => t.window === 'dev').length);
-    expect(lab.summary.insights).toBe(lab.insights.length);
+    // Rows against rows. `summary.insights` counts **documents** since snapshot 6, so it is
+    // `insightRows` that matches the published array; the two are equal only until a chain exists.
+    expect(lab.summary.insightRows).toBe(lab.insights.length);
+    expect(lab.summary.insights).toBe(lab.insights.filter((i) => i.supersededBy === null).length);
   });
 
   it('uses only known statuses, kinds and sources', () => {

@@ -10,6 +10,10 @@ const ins = (over: Partial<LabInsight> & Pick<LabInsight, 'id' | 'kind'>): LabIn
   body: 'b',
   methodId: null,
   added: '2026-10-04T10:00:00+00:00',
+  supersedes: null,
+  docKey: null,
+  version: 1,
+  supersededBy: null,
   ...over,
 });
 

@@ -85,10 +85,14 @@ const insight = (id: number, kind: LabInsight['kind'], added: string): LabInsigh
   body: `Body of ${id}`,
   methodId: null,
   added,
+  supersedes: null,
+  docKey: null,
+  version: 1,
+  supersededBy: null,
 });
 
 const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
-  version: 5,
+  version: 6,
   asOf: '2026-10-04T14:12:24+00:00',
   gate: {
     maxDrawdown: 0.2,
@@ -112,7 +116,7 @@ const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
     symbolsServed: 0,
     dividendRows: 0,
   },
-  summary: { devTrials: 4, testLooks: 0, methods: 4, labMethods: 2, historicalMethods: 2, insights: 0, byStatus: {} },
+  summary: { devTrials: 4, testLooks: 0, methods: 4, labMethods: 2, historicalMethods: 2, insights: 0, insightRows: 0, byStatus: {} },
   benchmark: { spyTr: [], spyPrice: [] },
   methods: [
     method('H-A'),

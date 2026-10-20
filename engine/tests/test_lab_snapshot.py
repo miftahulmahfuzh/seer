@@ -138,6 +138,8 @@ TRIAL_KEYS = {"n", "methodId", "candidateId", "rulesId", "allocatorId", "configT
               "sharpe", "exposure", "turnover", "worstYear", "worstYearReturn", "spyTrReturn", "spyTrCagr", "mar",
               "failed", "eligible", "dsr", "nTrialsAtRun", "luckGated", "failedNow", "eligibleNow", "dsrNow",
               "mwr", "spyTrMwr", "curve"}
+INSIGHT_KEYS = {"id", "kind", "title", "body", "methodId", "added",
+                "supersedes", "docKey", "version", "supersededBy"}
 
 
 def _v1_db(path):
@@ -665,7 +667,7 @@ def test_the_v6_to_v7_migration_moves_not_one_byte_of_the_web_snapshot(tmp_path)
         assert store.snapshot_json(ro) == before
     finally:
         ro.close()
-    assert store.SNAPSHOT_VERSION == 5
+    assert store.SNAPSHOT_VERSION == 6
 
 
 def _v7_db(path):
@@ -928,7 +930,7 @@ def test_the_snapshot_follows_the_contract(lab):
     s = store.snapshot(lab)
     assert list(s) == ["version", "asOf", "gate", "data", "summary", "benchmark", "methods", "trials",
                        "insights", "ideasSeen", "paper"]
-    assert s["version"] == 5
+    assert s["version"] == 6
     gate = s["gate"]
     assert list(gate) == [
         "maxDrawdown", "minProfitFactor", "minTrades", "dsrMin",
@@ -957,7 +959,8 @@ def test_the_snapshot_follows_the_contract(lab):
     }
     summary = s["summary"]
     assert {k: v for k, v in summary.items() if k != "byStatus"} == {
-        "devTrials": 55, "testLooks": 0, "methods": 15, "labMethods": 1, "historicalMethods": 14, "insights": 2,
+        "devTrials": 55, "testLooks": 0, "methods": 15, "labMethods": 1, "historicalMethods": 14,
+        "insights": 2, "insightRows": 2,
     }
     assert list(summary["byStatus"]) == list(store.STATUSES)
     assert summary["byStatus"]["rejected"] == 14 and summary["byStatus"]["registered"] == 1
@@ -1004,7 +1007,12 @@ def test_the_snapshot_follows_the_contract(lab):
     assert t55["curve"] == [["2000-01-31", 1.0], ["2000-02-29", 1.012346]]
     assert not any(t["pfInfinite"] for t in s["trials"][:54])
 
+    assert all(set(i) == INSIGHT_KEYS for i in s["insights"])
     assert [(i["id"], i["kind"], i["methodId"]) for i in s["insights"]] == [(1, "observation", "M0001"), (2, "synthesis", None)]
+    # Nothing in this fixture is linked, so every row is its own document at version 1 -- the
+    # state of the committed lab at this phase too, before the backfill runs.
+    assert all(i["supersedes"] is None and i["docKey"] is None for i in s["insights"])
+    assert all(i["version"] == 1 and i["supersededBy"] is None for i in s["insights"])
     keys = [x["key"] for x in s["ideasSeen"]]
     assert keys == sorted(keys) and "url:https://example.com/paper" in keys
     assert set(s["ideasSeen"][0]) == {"key", "methodId", "note", "added"}
@@ -1012,6 +1020,74 @@ def test_the_snapshot_follows_the_contract(lab):
     stamps = ([m["updated"] for m in s["methods"]] + [t["runAt"] for t in s["trials"]]
               + [i["added"] for i in s["insights"]] + [x["added"] for x in s["ideasSeen"]])
     assert s["asOf"] == max(stamps)
+
+
+def test_a_chain_of_insights_publishes_one_document_and_counts_its_versions(lab):
+    """The owner's request, as the export sees it: three rows on one topic become one document at
+    version 3, with the two earlier rows published as the history behind it.
+
+    The chain is built here rather than read from the committed lab on purpose -- at this phase
+    nothing in ``lab/lab.sqlite`` is linked yet (the backfill is a later phase), so a test that
+    leaned on it would assert nothing.
+    """
+    with lab:
+        a = store.add_insight(lab, kind="observation", title="Width", body="v1", method_id="M0001")
+        b = store.add_insight(lab, kind="observation", title="Width", body="v2", method_id="M0001")
+        c = store.add_insight(lab, kind="observation", title="Width", body="v3", method_id="M0001")
+        store.set_supersedes(lab, b, a)
+        store.set_supersedes(lab, c, b)
+    s = store.snapshot(lab)
+    chain = {i["id"]: i for i in s["insights"] if i["id"] in (a, b, c)}
+    assert [chain[a]["version"], chain[b]["version"], chain[c]["version"]] == [1, 2, 3]
+    assert chain[a]["supersededBy"] == b and chain[b]["supersededBy"] == c
+    assert chain[c]["supersededBy"] is None          # the head: the one the journal shows
+    assert chain[a]["supersedes"] is None and chain[b]["supersedes"] == a and chain[c]["supersedes"] == b
+    # Five rows, three of them one document: the count the owner reads does not move when a
+    # command re-journals the same observation.
+    assert s["summary"]["insightRows"] == 5
+    assert s["summary"]["insights"] == 3
+    assert store.insight_document_count(lab) == s["summary"]["insights"]
+
+
+def test_two_variants_under_one_title_stay_two_documents(lab):
+    """The measured failure the design exists to avoid, asserted at the export.
+
+    ``real_costs`` titles on the method name, so three arms of one method -- M0260-M-NATIVE,
+    -M-G12, -M-G3 -- wrote three rows under one identical title 25 seconds apart. They are three
+    measurements, not a triple-write. Unlinked rows publish as separate documents however alike
+    their titles are, and this test is here so that a later "helpful" change to the export cannot
+    quietly collapse a measurement off the page.
+    """
+    with lab:
+        for body in ("23.8% / 1.98", "25.6% / 1.62", "33.6% / 1.60"):
+            store.add_insight(lab, kind="observation", title="Real costs", body=body, method_id="M0001")
+    s = store.snapshot(lab)
+    same_title = [i for i in s["insights"] if i["title"] == "Real costs"]
+    assert len(same_title) == 3
+    assert all(i["version"] == 1 and i["supersededBy"] is None for i in same_title)
+    assert s["summary"]["insights"] == s["summary"]["insightRows"] == 5
+
+
+def test_the_chain_fields_are_published_for_a_database_that_predates_them(tmp_path):
+    """``snapshot`` answers on an unmigrated read-only connection, and the chain fields must not
+    be what breaks that: a v1 row has no ``supersedes`` column at all, and publishes exactly what
+    a migrated row with a NULL one publishes -- a document of one, at version 1.
+
+    This is the stronger half of ``test_the_snapshot_reads_a_v1_database_read_only_and_migration
+    _does_not_change_it``: that test asserts the bytes do not move, this one says what they say.
+    """
+    db = tmp_path / "lab" / "lab.sqlite"
+    db.parent.mkdir()
+    _v1_db(db)
+    ro = store.connect_readonly(db)
+    try:
+        insights = store.snapshot(ro)["insights"]
+    finally:
+        ro.close()
+    assert [i["id"] for i in insights] == [1, 2, 3]
+    assert all(set(i) == INSIGHT_KEYS for i in insights)
+    assert all(i["supersedes"] is None and i["docKey"] is None for i in insights)
+    assert all(i["version"] == 1 and i["supersededBy"] is None for i in insights)
 
 
 def test_a_funded_trial_publishes_what_its_money_earned(lab):

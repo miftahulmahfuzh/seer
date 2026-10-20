@@ -2964,6 +2964,31 @@ def export_xlsx(conn: sqlite3.Connection, path: Path = XLSX_PATH) -> Path:
     return path
 
 
+# A journal *document* is a chain of ``insights`` rows linked by ``supersedes``; its **head** is
+# the row nothing supersedes -- the current version. Counting heads instead of rows is the
+# owner's complaint answered in a number: before this, re-running a command that auto-journals
+# pushed the count up by one even when the new row said the same thing as the old one. Rows are
+# still worth printing (they are what the append-only store actually holds), so both are
+# published, under names that cannot be mistaken for each other.
+#
+# This SQL needs schema v8. ``summary_rows`` is only ever called on a connection opened through
+# ``connect`` (``lab status``, ``export_xlsx``), which migrates first, so that is safe here --
+# and deliberately NOT safe enough for ``snapshot``, which must also answer on an unmigrated
+# read-only database. ``snapshot`` therefore counts heads from the rows it has already read.
+INSIGHT_DOCUMENTS_SQL = (
+    "SELECT count(*) FROM insights i "
+    "WHERE NOT EXISTS (SELECT 1 FROM insights s WHERE s.supersedes = i.id)"
+)
+
+
+def insight_document_count(conn: sqlite3.Connection) -> int:
+    """How many journal documents the lab holds: insight rows that nothing supersedes.
+
+    Requires schema v8. For a connection that may predate it, derive the count from the exported
+    rows instead (``snapshot`` does)."""
+    return int(conn.execute(INSIGHT_DOCUMENTS_SQL).fetchone()[0])
+
+
 def summary_rows(conn: sqlite3.Connection) -> list[tuple[str, Any]]:
     by_status = conn.execute("SELECT status, count(*) FROM methods GROUP BY status ORDER BY status").fetchall()
     out: list[tuple[str, Any]] = [
@@ -2975,7 +3000,13 @@ def summary_rows(conn: sqlite3.Connection) -> list[tuple[str, Any]]:
         ("dev trials (one row per recorded backtest)", dev_trial_count(conn)),
         ("test-window looks used", test_looks(conn)),
         ("methods", int(conn.execute("SELECT count(*) FROM methods").fetchone()[0])),
-        ("insights", int(conn.execute("SELECT count(*) FROM insights").fetchone()[0])),
+        # Two numbers, never one. The old single ``insights`` row counted rows and so rose every
+        # time a command re-journalled the same observation; "journal documents" is the number
+        # the owner means when he asks how much is in the journal. They are equal until a chain
+        # exists, and the gap between them is the amount of re-run that has happened since.
+        ("journal documents", insight_document_count(conn)),
+        ("journal entries (every version counts)",
+         int(conn.execute("SELECT count(*) FROM insights").fetchone()[0])),
     ]
     out += [(f"methods {r[0]}", r[1]) for r in by_status]
     return out
@@ -3016,7 +3047,18 @@ def as_mapping(row: sqlite3.Row) -> Mapping[str, Any]:
 # (7.6%), the difference being the owner's own deposits piling up. Nothing published them, so the
 # site could only show the flattering number -- and the one consumer that needed them read the
 # database directly with raw SQL.
-SNAPSHOT_VERSION = 5
+#
+# 6 adds the journal's version chain: every insight publishes ``supersedes`` and ``docKey`` as
+# written, plus two fields derived here and nowhere else -- ``version`` (its depth in the chain,
+# 1 for a row that supersedes nothing) and ``supersededBy`` (the id of the row that replaced it,
+# null when this row is the current one). They are derived at export time on purpose:
+# ``web/app/sera/journal/view.ts`` is a file of pure helpers with no data access, and chasing a
+# linked list once per card inside a React component is the shape that makes a reader slow and
+# wrong at the same time. 6 also splits the journal count in two: ``summary.insights`` now counts
+# **documents** (heads) and ``summary.insightRows`` counts rows. The old field kept its name and
+# changed its meaning, which is exactly why this number moved -- a consumer pinned to 5 is
+# reading "insights" as a row count and must be told.
+SNAPSHOT_VERSION = 6
 EXPECTED_FAILURE_SEP = "\n\nExpected failure: "  # how lab ideas write their hypothesis
 
 
@@ -3037,11 +3079,62 @@ def _num(x: Any) -> float | None:
     return round(x, 6) if math.isfinite(x) else None
 
 
+def _opt_int(x: Any) -> int | None:
+    """A nullable integer column as JSON: None stays None, anything else becomes ``int``.
+
+    ``_num``'s sibling for columns that are counts or row ids rather than measurements.
+    ``supersedes`` is an ``INTEGER`` foreign key and must reach the web as ``2``, not ``2.0``:
+    the reader compares it against ``id``, which is published as an int."""
+    return None if x is None else int(x)
+
+
 def _dicts(conn: sqlite3.Connection, sql: str) -> list[dict[str, Any]]:
     """Rows as dicts, whatever the connection's row_factory."""
     cur = conn.execute(sql)
     names = [d[0] for d in cur.description]
     return [dict(zip(names, row)) for row in cur.fetchall()]
+
+
+def _insight_chains(
+    rows: Iterable[Mapping[str, Any]],
+) -> tuple[dict[int, int], dict[int, int]]:
+    """``(version_by_id, successor_by_id)`` for a set of ``insights`` rows, in one pass.
+
+    A journal *document* is a chain of rows linked by ``supersedes``: each row supersedes at most
+    one predecessor, and ``insights_one_successor`` (schema v8) makes sure at most one row
+    supersedes any given predecessor. The chain is therefore a simple path, and the two things a
+    reader wants from it are:
+
+    * ``version`` -- how deep in its chain a row sits. 1 for a row that supersedes nothing, 2 for
+      the row that replaced it, and so on. This is the number the owner asked for: *"we will say
+      this is the fourth version"*.
+    * ``supersededBy`` -- the id of the row that replaced this one, absent when the row is the
+      **head** (the current version, and the only one ``/sera/journal`` shows by default).
+
+    Derived here rather than in the web, because ``web/app/sera/journal/view.ts`` is documented as
+    pure helpers with no data access, and a component that walks a linked list per card does the
+    work once per render for every reader instead of once per export.
+
+    Terminating by construction: ``version`` is resolved in ascending id order and
+    ``store.set_supersedes`` refuses a link to anything but a **lower** id, so a predecessor is
+    always already resolved when its successor is reached. Nothing recurses and nothing loops, so
+    a database hand-edited past that guard yields a wrong number -- never a hang. Rows whose
+    ``supersedes`` points at an id this set does not contain are treated as chain starts.
+    """
+    predecessor: dict[int, int | None] = {}
+    successor: dict[int, int] = {}
+    for r in rows:
+        rid = int(r["id"])
+        raw = r.get("supersedes")
+        prev = None if raw is None else int(raw)
+        predecessor[rid] = prev
+        if prev is not None:
+            successor[prev] = rid
+    version: dict[int, int] = {}
+    for rid in sorted(predecessor):
+        prev = predecessor[rid]
+        version[rid] = 1 if prev is None else version.get(prev, 0) + 1
+    return version, successor
 
 
 def _snapshot_method(m: Mapping[str, Any]) -> dict[str, Any]:
@@ -3225,6 +3318,15 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
         "SELECT max(added) FROM ideas_seen)"
     ).fetchone()[0]
     bench = seed.benchmark_curves()
+    # Read once, derive once. ``.get`` rather than ``[...]`` on the two v8 columns is load-bearing:
+    # this function is documented to answer on a read-only connection to a database that has not
+    # been migrated, and ``test_the_snapshot_reads_a_v1_database_read_only_and_migration_does_not
+    # _change_it`` asserts the v1 export is byte-identical to the export after migration. A v1 row
+    # has no ``supersedes``; it is a document of one, at version 1, exactly like a migrated row
+    # whose column is NULL -- so the bytes match.
+    insight_rows = _dicts(conn, "SELECT * FROM insights ORDER BY id")
+    insight_version, insight_successor = _insight_chains(insight_rows)
+    insight_documents = sum(1 for i in insight_rows if int(i["id"]) not in insight_successor)
     gate_block, g = _gate_n(conn)
     return {
         "version": SNAPSHOT_VERSION,
@@ -3259,7 +3361,11 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
             "methods": count("SELECT count(*) FROM methods"),
             "labMethods": count("SELECT count(*) FROM methods WHERE id GLOB 'M*'"),
             "historicalMethods": count("SELECT count(*) FROM methods WHERE id GLOB 'H-*'"),
-            "insights": count("SELECT count(*) FROM insights"),
+            # Documents, not rows: a re-run that supersedes its own previous note leaves this
+            # number where it was, which is the whole point. ``insightRows`` beside it is what
+            # the append-only store actually holds.
+            "insights": insight_documents,
+            "insightRows": len(insight_rows),
             "byStatus": by_status,
         },
         "benchmark": {
@@ -3273,10 +3379,18 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
             _snapshot_trial(t, published_verdict(conn, t, at=g), funding_of(conn, t["n"]))
             for t in _dicts(conn, "SELECT * FROM trials ORDER BY n")
         ],
+        # ``supersedes`` and ``docKey`` as the writer recorded them; ``version`` and
+        # ``supersededBy`` derived by ``_insight_chains`` above. A head is a row with
+        # ``supersededBy: null`` -- that is the test ``/sera/journal`` applies to decide what to
+        # show, and it is a field read rather than a graph walk precisely so the reader can stay
+        # a pure function.
         "insights": [
             {"id": int(i["id"]), "kind": i["kind"], "title": i["title"], "body": i["body"],
-             "methodId": i["method_id"], "added": i["added"]}
-            for i in _dicts(conn, "SELECT * FROM insights ORDER BY id")
+             "methodId": i["method_id"], "added": i["added"],
+             "supersedes": _opt_int(i.get("supersedes")), "docKey": i.get("doc_key"),
+             "version": insight_version[int(i["id"])],
+             "supersededBy": insight_successor.get(int(i["id"]))}
+            for i in insight_rows
         ],
         "ideasSeen": [
             {"key": s["key"], "methodId": s["method_id"], "note": s["note"], "added": s["added"]}

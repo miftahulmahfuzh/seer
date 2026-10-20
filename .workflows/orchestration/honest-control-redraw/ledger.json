@@ -1,7 +1,7 @@
 {
   "branch": "feature/honest-control-redraw",
   "coordinator": "orch-honest-control-redraw",
-  "coordinator_session_id": "f7e15da4-82f1-418f-a0f5-e4de5510223c",
+  "coordinator_session_id": "d73093cd-bb4d-4aa3-a3bc-b9bb1c1bcf1c",
   "created": "2026-10-19T12:28:06+00:00",
   "phases": [
     {
@@ -79,7 +79,7 @@
         "R3",
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "M0047 \u2014 the size-weighted residual's two placebos"
     },
@@ -176,7 +176,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "honest-control-redraw",
-  "updated": "2026-10-20T02:09:49+00:00",
+  "updated": "2026-10-20T02:10:22+00:00",
   "verified_at": "2026-10-20T02:09:49+00:00",
   "worktree": "/home/miftah/.worktrees/seer/honest-control-redraw"
 }

@@ -50,3 +50,42 @@ these counts, not as a footnote.
 - The membership convention prices at **0.067 of ratio on M0208, not 0.202** — the plan's raw
   shipped-vs-K=1 method over-counted it threefold by absorbing two other components. The quoted
   "0.034 on M0047" is that chassis's **1996-2002 era**; whole-window it is **0.012**.
+
+---
+
+## CORRECTION, after phase 3 — the cross-store finding was stated too strongly
+
+Section 2 above says every published shape ratio in the honest-control set "divides a control
+measured on one store by a book measured on another". That description is correct and the counts
+stand: twelve fingerprints across 859 trials, ten of fifteen comparisons crossing a boundary.
+
+**But it implied those ratios are wrong, and that does not follow.** Phase 3 measured the boundary
+cost directly instead of assuming it. Re-running M0208's book and both its controls in ONE sweep
+on ONE store reproduced the recorded figures **to every digit, money included** — book mwr
+0.1387873198052101 against a recorded 0.13878731980521. **The boundary costs exactly zero on that
+chassis.**
+
+So the honest statement is:
+
+> **A shape ratio computed across two store fingerprints is not a comparison until it has been
+> re-measured in one sweep. Whether re-measuring moves it is chassis-dependent and must be
+> measured, not assumed.**
+
+Phase 3's own reading of why: M0208 declares only SPY and reads members through a screen, which is
+about as store-insensitive as a lab chassis gets. M0201 holds its names directly and sits near a
+band edge, which is where the boundary was worth 0.0067 and flipped a verdict. The defect is real,
+it is mechanically detectable from a recorded column, and it is worth a plan set — but "re-measure
+before quoting" is the rule, not "discard every cross-store number".
+
+## And the floor that was not a floor
+
+M0208's published margin was "at least 4.3 points a year, PROVISIONAL and a floor rather than a
+measurement". The honest control now measures **3.749** — BELOW the floor. The floor's reasoning
+was that a correctly-shaped control trades more, pays more fees, earns less, so the true margin
+could only widen. Phase 3's arm trades 455 -> 596 and **earned MORE** (9.53 -> 10.13).
+
+**The mechanism is measured false: a blind draw's return varies by more than the fee bill between
+455 and 596 trades on this chassis.** So an under-shaped control's margin is an estimate of
+UNKNOWN SIGN, never a bound — which is the same lesson the honest-control close-out reached from
+thirteen arms ("a handicapped control is arbitrary, not a fee drag of known sign"), now confirmed
+independently on a fourteenth. Phase 6 should publish the two together.

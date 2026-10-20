@@ -43,23 +43,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "8cbc4c1",
       "depends_on": [
         2
       ],
       "difficulty": "HARD",
       "n": 3,
-      "note": null,
+      "note": "BAND-CLEAN. M0208-CGO-N20-PLC2, trial #860, allocator M0208-A2, SHADOW_DEPTH=2 (lookback 305 of 473): 0.955x trades (596 vs 624) / 1.027x turnover (3.14472 vs 3.061406), ok on both axes. mis_shaped_controls(M0208) is now (); check() still refuses on the KIN rule, failed_kin=('M0002',), already test-failed. Honest control, no promotion. ALL THREE PROBE ANCHORS EXACT: 0 calendar mismatches over 238 decisions, 624 real entries (phase 1's number), 304 unguarded K=1 (amendment 1's estimator). My own guarded ladder: 0.715 at K=1, 0.949 at K=2, flat 0.941-0.955 to the K=8 cap - so K=2 independently confirmed on a differently-built ladder (phase 1 read 0.989 over covered decisions; guard and denominator differ, answer does not). Switch guard alone worth 142 entries (304->446), confirming phase 1's cash-month 140 from an independent direction. CROSS-STORE RULE HONOURED: book on 77c37d55, controls on 640fc25e, so all three arms re-run in ONE sweep on ONE store - they reproduce to every digit, money included, so the boundary costs EXACTLY ZERO on this chassis and lab control's reading is a true comparison, measured not assumed. Phase 6 should state the finding as 'a ratio across two fingerprints must be re-measured before it is quoted', NOT 'every cross-store ratio is wrong'. THE FLOOR BECAME A NUMBER AND THE NUMBER IS LOWER: 3.7 points a year, not 'at least 4.3'. Every pre-registered shape range hit and the sublinearity prediction hit (entries 1.95x, realised trades 1.31x); the MONEY direction REVERSED - the fairer control earned 10.13%% against the old control's 9.53%%, not less - which expected_failure named as admissible. So 'at least 4.3' was never a floor: its mechanism (more trades => more fees => less return => wider margin) is measured FALSE, and an under-shaped control's margin is an estimate of unknown sign. That is handed to phase 6 as the most portable of three unjournalled candidate insights; this phase journalled none. Decisions: (1) shipped my own K not phase 1's, per exit criteria rung 2 - both reported; (2) re-measured the shape in one sweep before quoting anything, rung 1 / I8; (3) wrote that the margin NARROWED rather than following the note template's 'widens', rung 4; (4) no plan-index tick - phases 1/2/4 of this set left it untouched, rung 6. lab.sqlite 607b78cf -> 7a701f11, trials 859->860 contiguous, N 164->165, LOOKS 4->4, no method id spent. 6206 passed / 3 skipped, ruff clean. Commits: 280aca6 pre-reg, 6d3b14f lab, 5d464e1 results, 8cbc4c1 todos.",
       "package": "engine/.../lab/methods` + `engine/tests` + lab db",
       "plan": ".workflows/plan/control-draw-remedies/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T06:28:51+00:00",
       "satisfies": [
         "R1",
         "R3",
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-E9QL",
       "title": "M0208's honest control, re-drawn under the shadow"
     },
     {
@@ -125,6 +125,6 @@
   "plan": "/home/miftah/seer/docs/plans/CONTROL_DRAW_REMEDIES_PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "control-draw-remedies",
-  "updated": "2026-10-20T06:05:36+00:00",
+  "updated": "2026-10-20T06:28:51+00:00",
   "worktree": "none"
 }

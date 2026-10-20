@@ -402,3 +402,60 @@ def test_each_pilot_method_carries_exactly_one_amendment_of_one_arm():
         assert [c.id for c in amendments[0].candidates] == [cid]
         assert len(module.METHOD.candidates) == 5
         assert len(module.METHOD.all_candidates()) == 6
+
+
+# ---- the golden vector: the frozen path, pinned where nothing else would catch it ----------------
+
+GOLD_POOL = ("AAPL", "ADBE", "AMGN", "BAC", "CAT", "CSCO", "DIS", "GE", "IBM", "JNJ", "KO", "MSFT")
+GOLD_HELD = frozenset({"AAPL", "CAT", "DIS", "IBM", "KO"})
+GOLD_TAG = "M0208"
+GOLD_SEED = 1
+GOLD_DATE = date(2015, 6, 30)
+
+
+def test_the_shipped_draw_still_produces_the_vector_the_recorded_arms_were_drawn_from():
+    r"""A frozen input and its frozen output, so an in-place edit to v1's body goes red.
+
+    **Nothing else in this repository would catch one.** A ``config_digest`` is the rules, the
+    allocator id and ``dataclasses.fields()`` of the params (``backtest.registry._canon``); a
+    module BODY is in none of them, so
+    ``test_lab_methods.test_every_recorded_configuration_still_digests_to_its_recorded_digest``
+    stays green while the thirteen recorded matched-draw arms (lab trials 841-853) quietly
+    describe a different book than the one they ran. ``m0208``'s own file names the same trap
+    above ``_banded_picks`` and answers it by copying ``choose``'s band rather than sharing it.
+
+    **Measured, 2026-10-20.** Appending one ``"|"`` to ``keep_key``'s hash input moves this keep
+    order from ``['KO', 'CAT', 'AAPL']`` to ``['DIS', 'KO', 'CAT']`` -- a different book for every
+    recorded arm -- and all thirty-four tests in this module and its twin, and the recorded-digest
+    test, pass anyway. Under this test the same edit fails on the first assertion.
+
+    **The other tests here are relative and this one is absolute, and that is the difference.**
+    ``test_the_keep_hash_is_date_free_and_the_entry_hash_turns_with_the_month`` asserts that a key
+    equals itself and differs from its neighbours; every such property survives a re-keying of the
+    whole hash. Only a literal survives nothing.
+
+    The literals are the shipped functions' own output on ``main`` @ ``e3aeeff``. A deliberate
+    change to the rule belongs in a NEW path beside this one -- ``shadow_book``, and whatever
+    comes after it -- never in an edit that re-blesses these numbers.
+    """
+    assert cd.keep_key(GOLD_TAG, GOLD_SEED, "AAPL") == 11772521752773708193
+    assert cd.keep_key(GOLD_TAG, GOLD_SEED, "MSFT") == 14969734582403058465
+    assert cd.entry_key(GOLD_TAG, GOLD_SEED, "AAPL", GOLD_DATE) == 8778277638079604380
+    assert cd.entry_key(GOLD_TAG, GOLD_SEED, "MSFT", GOLD_DATE) == 26777536067865861
+
+    keep, tail = cd.matched_partition(pool=GOLD_POOL, held=GOLD_HELD, keep_n=3,
+                                      tag=GOLD_TAG, seed=GOLD_SEED, data_date=GOLD_DATE)
+    assert keep == ["KO", "CAT", "AAPL"]
+    assert tail == ["MSFT", "BAC", "AMGN", "GE", "CSCO", "ADBE", "JNJ", "IBM", "DIS"]
+
+    assert cd.churn(("X1", "X2", "X3", "X4", "X5"), ("X1", "X2", "X3", "X9", "X8")) == 2
+    book = cd.matched_names(pool=GOLD_POOL, held=GOLD_HELD,
+                            real_now=("X1", "X2", "X3", "X4", "X5"),
+                            real_prev=("X1", "X2", "X3", "X9", "X8"),
+                            tag=GOLD_TAG, seed=GOLD_SEED, data_date=GOLD_DATE)
+    assert book == ["MSFT", "CAT", "BAC", "AAPL", "KO"]
+
+    assert cd.previous_decision_date(GOLD_DATE) == date(2015, 5, 29)
+    assert cd.PREVIOUS_DECISION_BARS == 26
+    assert cd.lookback_for(279) == 305
+    assert cd.RULE_ID == "matched-draw-v1"

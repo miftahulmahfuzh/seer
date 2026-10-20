@@ -116,3 +116,65 @@ and tested, so this is redundancy rather than a defect.
 file. Data only."*, and it is the one phase that writes the committed database and must run alone.
 Trading that risk for a cosmetic consolidation is a bad deal. Phase 5 cannot take it either — its
 "Does not touch" bars every engine file. It is a clean, small follow-up for after the merge.
+
+## Phase 6 — the proof, and one test it was right to rewrite
+
+**The number the whole branch exists to produce**, measured by the coordinator after the five
+writes, read-only, with the plan's own recipe:
+
+```
+rows=500 digest=04af46875bef3498f783a3154265b760cd2c4471d018a740d82e0113721673ed
+```
+
+Identical to base, to post-phase-1, and to post-wave-1. Five `UPDATE`s ran against the narrowed
+trigger and not one byte of `kind`, `title`, `body`, `method_id` or `added` moved on any of the
+500 rows. Invariant 2 is no longer an assertion; it is a measurement on real data.
+
+Links confirmed exactly as specified — `(230,227) (290,289) (498,493) (499,320) (500,499)` —
+495 heads of 500 rows, `doc_key` written on 0 existing rows, `lab.json` still the exact export,
+`testLooks` still 4, main checkout never written. Full suite 6405 passed / 4 skipped / 0 failed,
+ruff clean.
+
+| # | Fork | Chosen | Rung |
+|---|------|--------|------|
+| C6 | Phase 6's own scope says *"Does not touch: any source file. Data only."* — but the moment the backfill landed, phase 1's `test_the_v7_to_v8_migration_moves_not_one_byte_of_the_web_snapshot` went red on its third assertion, `count(*) WHERE supersedes IS NOT NULL OR doc_key IS NOT NULL == 0` | **Rewrite the assertion, in a separate commit** (data commit `33ac3ad`, test commit `08e4b68`) | 1: plan invariant 1 — the suite is green at the end of every phase — outranks a phase plan's scope prose, and phase 6's own exit criteria demand pytest green. Decided by phase 6 without asking; **the coordinator checked the replacement rather than accepting the reasoning.** |
+
+**Why the rewrite is sound, verified line by line rather than taken on the phase's word:**
+
+- The old assertion pinned the committed database's *contents on the day phase 1 wrote it*, not a
+  rule. It reads "nobody has used the feature yet" and goes red for the reason the feature works.
+- The replacement compares the whole `(id, supersedes, doc_key)` map before and after `connect`.
+  That is **strictly stronger**: it catches a connect that invents a link *and* one that destroys
+  one, and it keeps saying so at 5 links or 500. The old form caught only invention, and only
+  while the journal happened to be empty of chains.
+- The guarantee that a v7→v8 migration threads nothing *by itself* was not lost. It is a claim
+  about a genuine v7 database and it is still pinned where it belongs — `test_lab_snapshot.py:736`,
+  on the synthetic V7 fixture: `count(*) WHERE supersedes IS NULL AND doc_key IS NULL ==
+  len(V7_INSIGHTS)`. Confirmed present and passing.
+- Separate commits so the data commit stays data-only and revertible alone, which that phase's
+  Rollback section depends on. Correct.
+
+## What phase 5 will render, measured
+
+Four chains, maximum depth 3 — so the history disclosure never hides more than two versions:
+
+| head | version | method | note |
+|---|---|---|---|
+| 230 | 2 | M0131 | a slower target for the learned ranker |
+| 290 | 2 | M0024 | same-month seasonality |
+| 498 | 2 | M0127 | rebalance on the slot, not the account |
+| 500 | 3 | M0179 | companies that crash with the market — the 320→499→500 chain |
+
+The "N entries in all" line must read **495**.
+
+## Carried forward, owned by nobody — named so they are not lost
+
+1. **Entry 126 says in its own prose that it replaces 125**, but the two are not byte-identical,
+   so threading them is a judgment call about document identity. Phase 6 correctly did not make
+   it. This is the one case in the journal where the relation is known and unrecorded.
+2. **`real_costs.py:226` titles on `cmp.method_name` when it has `cmp.candidate_id` to hand** —
+   the original cause of M0260's three colliding titles. Phase 3 fixed the *linking*, not the
+   titles, so those three cards still read alike. If the owner asks why M0260 shows three
+   near-identical cards, the answer is that they are `-M-NATIVE`, `-M-G12` and `-M-G3`: three
+   different measurements at 23.8%, 25.6% and 33.6% max drawdown, correctly kept apart.
+3. **Fold `_status`'s inline `NOT EXISTS` onto `store.INSIGHT_DOCUMENTS_SQL`** (see above).

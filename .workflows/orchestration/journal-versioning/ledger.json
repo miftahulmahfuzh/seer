@@ -95,35 +95,35 @@
         "R1",
         "R5"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Reader: heads-only, version chip, history disclosure, \"Revised\""
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "08e4b68",
       "depends_on": [
         2,
         4
       ],
       "difficulty": "NORMAL",
       "n": 6,
-      "note": null,
+      "note": "Five links written, digest 04af4687\u2026 unchanged before and after \u2014 invariant 2 proven on real data. 495 documents from 500 rows, M0179 version 3, testLooks still 4. Data commit 33ac3ad carries lab.sqlite + lab.json only. Decided (rung 1, invariant 1): phase 1's test_the_v7_to_v8_migration\u2026 pinned 'the committed lab carries zero links'; inverted to 'a connect invents no link and destroys none' in commit 08e4b68 \u2014 strictly stronger, and the migration-threads-nothing claim stays pinned on the synthetic v7 fixture. Suite 6405 passed / 4 skipped, ruff clean.",
       "package": "lab/` data",
       "plan": ".workflows/plan/journal-versioning/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T10:46:32+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-N7FS",
       "title": "Backfill the 5 byte-identical pairs, 500\u2192499 first"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "journal-versioning",
-  "updated": "2026-10-20T10:37:06+00:00",
+  "updated": "2026-10-20T10:50:12+00:00",
   "verified_at": "2026-10-20T10:25:47+00:00",
   "worktree": "/home/miftah/.worktrees/seer/journal-versioning"
 }

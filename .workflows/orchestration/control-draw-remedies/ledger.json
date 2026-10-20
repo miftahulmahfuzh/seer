@@ -95,7 +95,7 @@
         "R2",
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The weight rule, and the arms it earns"
     },
@@ -125,6 +125,6 @@
   "plan": "/home/miftah/seer/docs/plans/CONTROL_DRAW_REMEDIES_PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "control-draw-remedies",
-  "updated": "2026-10-20T06:28:51+00:00",
+  "updated": "2026-10-20T06:30:51+00:00",
   "worktree": "none"
 }

@@ -212,7 +212,7 @@ Every phase holds all of these. A phase that cannot is a phase that stops and re
 | 2 | The shadow rule, written beside v1 | R1, R4 | `engine/src/seer_engine/lab` | **3** | 1 | HARD | `.workflows/plan/control-draw-remedies/phase-2.md` | P1-ROOT-X4PN | — |
 | 3 | M0208's honest control, re-drawn under the shadow | R1, R3, R4 | `engine/.../lab/methods` + `engine/tests` + lab db | **5** (+1 scratch) | 2 | HARD | `.workflows/plan/control-draw-remedies/phase-3.md` | P1-ROOT-E9QL | — |
 | 4 | Measure the weight vector, before it is built | R2 | `.workflows/plan/` (+ scratchpad) | **2** | — | HARD | `.workflows/plan/control-draw-remedies/phase-4.md` | P1-ROOT-Z7BD | — |
-| 5 | The weight rule, and the arms it earns | R2, R4 | `engine/.../lab` + methods + `engine/tests` + lab db | **9** branch G / **1** branch S | 4 | HARD | `.workflows/plan/control-draw-remedies/phase-5.md` | P1-ROOT-M4HV | — |
+| 5 | ✅ The weight rule, and the arms it earns | R2, R4 | `engine/.../lab` + methods + `engine/tests` + lab db | **9** branch G / **1** branch S | 4 | HARD | `.workflows/plan/control-draw-remedies/phase-5.md` | P1-ROOT-M4HV | — |
 | 6 | The R1 verdict, the sentences, and the close-out | R2, R3, R4 | `docs/plans` + `.workflows/plan/` + lab db | **9** | 3, 5 | NORMAL | `.workflows/plan/control-draw-remedies/phase-6.md` | P1-ROOT-A8RK | — |
 
 **Files** counts repository files the phase writes; scratchpad files are noted separately and are

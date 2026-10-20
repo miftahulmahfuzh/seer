@@ -127,7 +127,12 @@
                                            appended to the analysis
     lab drop M0007 --why "..."             an idea dropped before running
     lab seen KEY [--method M] [--note N] | lab seen --find TEXT
-    lab insight --kind K --title T (--body B | --file F) [--method M]   the lab journal
+    lab insight --kind K --title T (--body B | --file F) [--method M] [--doc-key K]
+                [--supersedes ID]   the lab journal. --supersedes says this new entry is the
+                                    newer version of entry ID; ID keeps every word it has
+    lab link ID --supersedes OLDER  thread an entry already written onto the one it replaces:
+                                    the only change the append-only journal allows, and only
+                                    once, from nothing to a link
     lab stage                       under the write lock: write web/data/lab.json, git-add it and the database
     lab next-id                     the next free method id
     lab export [--out F]            the lab as an xlsx workbook (gitignored)
@@ -764,6 +769,36 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s.add_argument("--body", default=None)
     s.add_argument("--file", type=Path, default=None)
     s.add_argument("--method", default=None)
+    s.add_argument(
+        "--doc-key", default=None, metavar="KEY",
+        help="stable identity of the document this entry is a version of, e.g. "
+             "real-costs:M0260-M-G3. Two entries sharing one key are versions of one thing; "
+             "two entries with different keys are two things, whatever their titles say",
+    )
+    s.add_argument(
+        "--supersedes", type=int, default=None, metavar="ID",
+        help="this new entry is the newer version of journal entry ID. ID is not rewritten, "
+             "not hidden and not deleted: it keeps its place and gains a successor",
+    )
+
+    s = sub.add_parser(
+        "link",
+        help="thread a journal entry already written onto the one it replaces",
+        description=(
+            "Set the supersedes link on an insight that is already in the journal. This is the "
+            "one UPDATE the append-only triggers permit, and only from nothing to a link, once: "
+            "no word of either entry changes, and the link can never afterwards be moved or "
+            "removed. It exists for entries written before the journal had versions, where the "
+            "fact that one note replaces another is recorded only in the prose inside it."
+        ),
+    )
+    s.add_argument("insight", type=int, metavar="ID",
+                   help="the newer entry: the one being threaded onto its predecessor")
+    s.add_argument(
+        "--supersedes", type=int, required=True, metavar="OLDER",
+        help="the older entry that ID replaces. It must be the same method and a lower id, "
+             "and it must not already have a successor",
+    )
 
     sub.add_parser("stage", help="write the web snapshot and git-add it with the database, under the write lock")
     sub.add_parser("next-id", help="the next free method id")
@@ -3154,13 +3189,56 @@ def _seen(conn, args) -> int:
 
 
 def _insight(conn, args) -> int:
+    """Append one entry to the lab journal, optionally as the newer version of an entry already
+    in it.
+
+    ``--supersedes`` writes the link on the NEW row at birth rather than inserting and then
+    calling ``lab link``: a row that is never unlinked for an instant cannot be read mid-write
+    by a parallel session, and the whole insert is one transaction, so a refused link leaves no
+    orphan entry behind.
+
+    Every rule about what may supersede what -- the predecessor must exist, belong to the same
+    method, carry a lower id and have no successor yet -- lives in the store. Restating any of
+    them here would give the lab two places to disagree about its own rules, and the five
+    auto-journalling writers do not come through this function at all."""
     if (args.body is None) == (args.file is None):
         raise store.LabError("give exactly one of --body or --file")
     body = args.body if args.body is not None else Path(args.file).read_text(encoding="utf-8")
     with conn:
-        n = store.add_insight(conn, kind=args.kind, title=args.title, body=body, method_id=args.method)
+        n = store.add_insight(
+            conn,
+            kind=args.kind,
+            title=args.title,
+            body=body,
+            method_id=args.method,
+            doc_key=args.doc_key,
+            supersedes=args.supersedes,
+        )
     print(n)
     return 0
+
+
+def _link(conn, args) -> int:
+    """Thread an entry already in the journal onto the one it replaces.
+
+    ``lab insight --supersedes`` covers everything written from here on. This covers what was
+    written before the journal had versions, where the only record that one note replaces
+    another is a sentence inside it -- insight 126 says so in prose, because the schema had
+    nowhere to put it.
+
+    It is a subcommand of its own rather than a flag on ``lab note`` on purpose: this is the
+    single UPDATE the append-only triggers allow, and it deserves a name in the shell history,
+    so an audit of what moved in this database can find it by reading the commands that ran.
+
+    Every refusal -- no such entry, no such predecessor, a predecessor under a different method,
+    an entry that is already linked, a predecessor that already has a successor, a link pointing
+    forward or at itself -- is the store's, raised as ``LabError`` and turned into exit 2 by
+    ``run``. Nothing is re-checked here."""
+    with conn:
+        store.set_supersedes(conn, args.insight, args.supersedes)
+    print(f"{args.insight} supersedes {args.supersedes}")
+    return 0
+
 
 
 def _stage(conn, args) -> int:
@@ -3242,6 +3320,7 @@ _HANDLERS = {
     "drop": _drop,
     "seen": _seen,
     "insight": _insight,
+    "link": _link,
     "stage": _stage,
     "next-id": _next_id,
     "export": _export,

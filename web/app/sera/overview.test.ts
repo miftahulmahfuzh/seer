@@ -78,7 +78,12 @@ const trial = (n: number, methodId: string, over: Partial<LabTrial> = {}): LabTr
   ...over,
 }, over);
 
-const insight = (id: number, kind: LabInsight['kind'], added: string): LabInsight => ({
+const insight = (
+  id: number,
+  kind: LabInsight['kind'],
+  added: string,
+  over: Partial<LabInsight> = {},
+): LabInsight => ({
   id,
   kind,
   title: `${kind} ${id}`,
@@ -89,6 +94,7 @@ const insight = (id: number, kind: LabInsight['kind'], added: string): LabInsigh
   docKey: null,
   version: 1,
   supersededBy: null,
+  ...over,
 });
 
 const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
@@ -219,6 +225,39 @@ describe('state', () => {
     }));
     expect(s.story.source).toBe('synthesis');
     expect(s.story.title).toBe('synthesis 2');
+  });
+  it('never headlines a synthesis the lab has already replaced', () => {
+    // The hole the head filter closes. `kind` is allowed to change along a chain -- a hypothesis
+    // that becomes an observation is the normal life of a lab idea -- so a synthesis superseded by
+    // an observation is still the newest *synthesis*. Newest-by-date alone would publish it.
+    const s = state(snap({
+      insights: [
+        insight(1, 'synthesis', '2026-10-04T10:00:00+00:00'),
+        insight(2, 'synthesis', '2026-10-04T11:00:00+00:00', { supersededBy: 3 }),
+        insight(3, 'observation', '2026-10-04T12:00:00+00:00', { supersedes: 2, version: 2 }),
+      ],
+    }));
+    expect(s.story.source).toBe('synthesis');
+    expect(s.story.title).toBe('synthesis 1');
+  });
+  it('headlines the head of a synthesis chain, not its first version', () => {
+    const s = state(snap({
+      insights: [
+        insight(1, 'synthesis', '2026-10-04T10:00:00+00:00', { supersededBy: 2 }),
+        insight(2, 'synthesis', '2026-10-04T11:00:00+00:00', { supersedes: 1, version: 2 }),
+      ],
+    }));
+    expect(s.story.source).toBe('synthesis');
+    expect(s.story.title).toBe('synthesis 2');
+  });
+  it('computes a plain story when every synthesis has been superseded by another kind', () => {
+    const s = state(snap({
+      insights: [
+        insight(1, 'synthesis', '2026-10-04T10:00:00+00:00', { supersededBy: 2 }),
+        insight(2, 'risk', '2026-10-04T11:00:00+00:00', { supersedes: 1, version: 2 }),
+      ],
+    }));
+    expect(s.story.source).toBe('computed');
   });
   it('never headlines a non-synthesis note: it computes a plain story instead', () => {
     const s = state(snap({ insights: [insight(1, 'risk', '2026-10-04T10:00:00+00:00'), insight(2, 'observation', '2026-10-04T12:00:00+00:00')] }));

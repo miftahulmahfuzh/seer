@@ -1,5 +1,6 @@
 import {
-  ArrowUpRight, Database, FlaskRound, Layers, ListFilter, Sparkles, TriangleAlert, Wrench, type LucideIcon,
+  ArrowUpRight, ChevronRight, Database, FlaskRound, Layers, ListFilter, Sparkles, TriangleAlert,
+  Wrench, type LucideIcon,
 } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -10,10 +11,11 @@ import { INSIGHT_KIND_LABEL } from '@/lib/sera/glossary';
 import { lab, methodById } from '@/lib/sera/lab';
 import { renderMarkdown } from '@/lib/sera/markdown';
 import { seenInsightIds } from '@/lib/sera/seen';
-import { INSIGHT_KINDS, type InsightKind, type LabInsight } from '@/lib/sera/types';
+import { INSIGHT_KINDS, type InsightKind } from '@/lib/sera/types';
 import {
-  SEEN_COPY, badgeTip, dayLabel, journalGroups, journalHref, kindCounts, parseKind, unseenCounts,
-  type KindFilter,
+  SEEN_COPY, badgeTip, dayLabel, documentCount, historyTip, isHead, journalGroups, journalHref,
+  kindCounts, markerCopy, parseKind, pastVersionLabel, unseenCounts, versionLabel,
+  type JournalEntry, type KindFilter,
 } from './view';
 import { JournalSeen } from './JournalSeen';
 import s from './journal.module.css';
@@ -43,7 +45,11 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
   const counts = kindCounts(lab.insights);
   const fresh = unseenCounts(lab.insights, seenIds);
   const groups = journalGroups(lab.insights, filter, seenIds);
-  const total = lab.insights.length;
+
+  // DOCUMENTS, not rows. A chain of superseding rows is one entry on this page, so re-running a
+  // command and writing the same note again must not move this number — which is the whole point
+  // of the change. `documentCount` counts heads; `lab.insights.length` would count versions.
+  const total = documentCount(lab.insights);
 
   // heading + total ride along on every option: they are badgeTip's other two arguments, and the
   // client island (phase 4) reads them off this array to keep the tooltip honest as `n` falls.
@@ -67,11 +73,18 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
   ];
 
   // The ids the server still calls unseen, per kind. This is all the client island needs to count
-  // the badges down, and it is one integer per unseen insight — 26 today — so lab.json's 0.89 MB
-  // of titles and markdown bodies still never reaches the browser. Derived straight from the
-  // snapshot and the seen-set, so the island takes no dependency on view.ts's partition shape.
+  // the badges down, and it is one integer per unseen document — so lab.json's 0.89 MB of titles
+  // and markdown bodies still never reaches the browser. Derived straight from the snapshot and
+  // the seen-set, so the island takes no dependency on view.ts's partition shape.
+  //
+  // `isHead` is the one thing it DOES borrow, and it has to: the island subtracts these ids from
+  // badgeMeta's totals, which are kindCounts' document counts. A superseded row's id in here would
+  // be an id the denominator never counted, and the badge would under-run.
   const unseenByKind = Object.fromEntries(
-    INSIGHT_KINDS.map(k => [k, lab.insights.filter(i => i.kind === k && !seenIds.has(i.id)).map(i => i.id)]),
+    INSIGHT_KINDS.map(k => [
+      k,
+      lab.insights.filter(i => isHead(i) && i.kind === k && !seenIds.has(i.id)).map(i => i.id),
+    ]),
   ) as Record<InsightKind, number[]>;
 
   // The other two arguments badgeTip takes beside the live count, per tab. The island calls
@@ -122,13 +135,13 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
               ) : (
                 <div className={s.cards}>
                   {g.unseen.map(e => (
-                    <InsightCard key={e.insight.id} insight={e.insight} tone={g.tone} unseen />
+                    <InsightCard key={e.insight.id} entry={e} tone={g.tone} />
                   ))}
                   {g.unseenCount > 0 && g.unseenCount < n && (
                     <p className={s.boundary}>{SEEN_COPY.boundary}</p>
                   )}
                   {g.seen.map(e => (
-                    <InsightCard key={e.insight.id} insight={e.insight} tone={g.tone} unseen={false} />
+                    <InsightCard key={e.insight.id} entry={e} tone={g.tone} />
                   ))}
                 </div>
               )}
@@ -142,24 +155,64 @@ export default async function JournalPage({ searchParams }: { searchParams: Prom
   );
 }
 
-function InsightCard({ insight, tone, unseen }: { insight: LabInsight; tone: string; unseen: boolean }) {
+/**
+ * One document: its current version as the card, and every earlier version behind a disclosure.
+ *
+ * Version 1 — ~495 of the ~500 documents — renders exactly what it rendered before this change:
+ * no line, no disclosure, nothing extra in the DOM. A version chip on every card would be noise,
+ * not information.
+ */
+function InsightCard({ entry, tone }: { entry: JournalEntry; tone: string }) {
+  const { insight, unseen, history } = entry;
   const method = insight.methodId ? methodById(insight.methodId) : undefined;
+  const marker = markerCopy(insight);
+  const label = versionLabel(insight.version, history.length);
+  const revised = insight.version > 1;
   return (
     <article
       className={`${s.card} ${tone}`}
       data-insight-id={insight.id}
       data-unseen={unseen ? 'true' : 'false'}
+      data-revised={revised ? 'true' : 'false'}
     >
       <header className={s.cardHead}>
         <h3 className={s.cardTitle}>
-          <span className={s.new} data-tip={SEEN_COPY.marker}>
-            <span className={s.sr}>{SEEN_COPY.markerLabel}: </span>
+          <span className={s.new} data-tip={marker.marker}>
+            <span className={s.sr}>{marker.label}: </span>
           </span>
           {insight.title}
         </h3>
         <time className={s.date} dateTime={insight.added}>{dayLabel(insight.added)}</time>
       </header>
+
       <div className={s.body} dangerouslySetInnerHTML={{ __html: renderMarkdown(insight.body) }} />
+
+      {label && history.length > 0 && (
+        <details className={s.history}>
+          <summary className={s.historySummary} aria-label={historyTip(history.length)} data-tip={historyTip(history.length)}>
+            <span className={s.historyChevron} aria-hidden="true"><ChevronRight size={16} /></span>
+            <span className={s.historyLabel}>{label}</span>
+          </summary>
+          <div className={s.historyBody}>
+            {/* No data-insight-id on these: JournalSeen observes that attribute, and an earlier
+                version is not a card the reader can be said to have "seen". */}
+            {history.map(old => (
+              <section key={old.id} className={s.past}>
+                <header className={s.pastHead}>
+                  <span className={s.pastVersion}>{pastVersionLabel(old.version)}</span>
+                  <time className={s.date} dateTime={old.added}>{dayLabel(old.added)}</time>
+                </header>
+                <div className={s.body} dangerouslySetInnerHTML={{ __html: renderMarkdown(old.body) }} />
+              </section>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {/* A revised head whose earlier rows are not in this snapshot: the line without a
+          disclosure, so the version is never silently dropped. */}
+      {label && history.length === 0 && <p className={s.versionOnly}>{label}</p>}
+
       {insight.methodId && (
         <footer className={s.cardFoot}>
           <span className={s.about}>

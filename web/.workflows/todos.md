@@ -3,18 +3,18 @@
 **Package Path**: `web`
 **Package Code**: WEB
 **Last Updated**: 2026-10-20
-**Total Active Tasks**: 2
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 24
+- Blocked: 0
+- Completed: 26
 
 ---
 
@@ -23,16 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-WEB-K6DR** Phase 5: Reader: heads-only, version chip, history disclosure, "Revised"
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `/sera/journal` rendering **heads only**, each labelled with its version, earlier versions behind an icon-only Lucide disclosure (`aria-label` + tooltip, Seer v2); `kindCounts`, `unseenCounts`, `journalGroups`, `badgeTip`, the "N entries in all" line and `page.tsx`'s `unseenByKind` counting **documents, not rows**; a revised document reappearing as unseen with the marker reading **"Revised"**, not "New"; plus three one-line row-vs-document fixes in `layout.tsx:28`, `how/page.tsx:39` and `overview.ts:130` (filter to heads before taking the newest synthesis), each with a test. History entries behind the disclosure must **not** carry `data-insight-id`. Does not touch any engine file, `types.ts`, `seen-client.ts`, the seen API route, or `/sera/methods`. Exit: `npx tsc --noEmit && npm test` green; screenshots at phone (390) and desktop width in both themes, showing a version chip and an expanded history against the **real chains phase 6 committed**.
-  - **Status**: blocked
-  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 5 of 6)
-  - **Satisfies**: R1 — Render a chain of rows as **one document labelled with its version**, history behind a disclosure; R5 — Counts and filters count **documents, not rows**; a new version reads as *revised*, not *new*
-  - **Depends on**: P1-ENG-Q9XB, P1-ROOT-N7FS
-  - **Plan**: `.workflows/plan/P1-WEB-K6DR.md`
-
 
 ### [P2] Medium
 
@@ -45,6 +35,29 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-K6DR** Phase 5: Reader: heads-only, version chip, history disclosure, "Revised"
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `/sera/journal` rendering **heads only**, each labelled with its version, earlier versions behind an icon-only Lucide disclosure (`aria-label` + tooltip, Seer v2); `kindCounts`, `unseenCounts`, `journalGroups`, `badgeTip`, the "N entries in all" line and `page.tsx`'s `unseenByKind` counting **documents, not rows**; a revised document reappearing as unseen with the marker reading **"Revised"**, not "New"; plus three one-line row-vs-document fixes in `layout.tsx:28`, `how/page.tsx:39` and `overview.ts:130` (filter to heads before taking the newest synthesis), each with a test. History entries behind the disclosure must **not** carry `data-insight-id`. Does not touch any engine file, `types.ts`, `seen-client.ts`, the seen API route, or `/sera/methods`. Exit: `npx tsc --noEmit && npm test` green; screenshots at phone (390) and desktop width in both themes, showing a version chip and an expanded history against the **real chains phase 6 committed**.
+  - **Status**: done — unblocked 2026-10-20: both dependencies have landed. `P1-ENG-Q9XB` (phase 4, the export) at `3aba437` publishes `supersedes`, `docKey`, `version` and `supersededBy` in the snapshot, and `P1-ROOT-N7FS` (phase 6, the backfill) at `33ac3ad` committed the five real chains this phase must screenshot against — 495 documents from 500 rows, M0179 at version 3. Phase 5 is the only phase of the set still open.
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 5 of 6)
+  - **Satisfies**: R1 — Render a chain of rows as **one document labelled with its version**, history behind a disclosure; R5 — Counts and filters count **documents, not rows**; a new version reads as *revised*, not *new*
+  - **Depends on**: P1-ENG-Q9XB, P1-ROOT-N7FS
+  - **Plan**: `.workflows/plan/P1-WEB-K6DR.md`
+  - **Completed**: 2026-10-20 21:40
+  - **Method**: /do
+  - **Files**: web/app/sera/journal/view.ts, web/app/sera/journal/page.tsx, web/app/sera/journal/journal.module.css, web/app/sera/journal/view.test.ts, web/app/sera/layout.tsx, web/app/sera/how/page.tsx, web/app/sera/overview.ts, web/app/sera/overview.test.ts, engine/tests/test_lab_gate_wording.py, .workflows/todos.md, docs/plans/JOURNAL_VERSIONING_PLAN.md, web/.workflows/todos.md
+  - **Drift**:
+    - The phase-5 plan's Handoffs section said `how/page.tsx:39` and `overview.ts:130` were "left alone on purpose". The plan INDEX's Reconciliation Log and the phase's "Also owns" line — both written after that phase plan, at reconciliation — explicitly assign both to phase 5 under R5. Implemented all three outside-`journal/` fixes.
+    - The phase-5 plan's Step 7 required a temporary hand-edit of `web/data/lab.json` to fake a chain for screenshots. Not needed: the index added the `6 → 5` edge precisely so the chains would be real, and phase 6 landed. Screenshots taken against the four real committed chains. `lab.json` never touched.
+    - The phase-5 plan said "Does not touch: all of `engine/`". One engine TEST file had to change: `engine/tests/test_lab_gate_wording.py` pins `overview.ts`'s headline selector by regex AND mirrors it in a SQL sweep. Narrowing `overview.ts` to heads broke the pin. Fixed the mirror on BOTH sides rather than relaxing it — the SQL sweep now also skips superseded rows, which is strictly stronger. `hardgate.py` (invariant 9) untouched.
+  - **Decided**:
+    - phase-5 plan's Handoffs vs the index's Reconciliation Log on the three outside-`journal/` fixes → implement all three (rung 1/4: the index's reconciliation postdates the phase plan and names R5)
+    - temporary hand-edit of `web/data/lab.json` for screenshots → skipped, shot against the real chains (rung 1: the index added the `6 → 5` edge for exactly this)
+    - tests for `layout.tsx` and `how/page.tsx` one-line fixes → covered by `isHead`'s own suite in `view.test.ts`; no RSC render harness exists anywhere in `web/` (tie-break: never widen scope to settle an ambiguity). `overview.ts` got three real cases in `overview.test.ts`, which has a harness.
+    - engine `test_lab_gate_wording.py` mirror broken by the head filter → fixed the mirror on both sides, never relaxed the check (tie-break: a failing verification is never settled by relaxing the check)
+
 
 - [x] **P1-WEB-V4CD** Phase 4: /sera/methods/[id]: the variants table, same treatment
   - **Difficulty**: HARD

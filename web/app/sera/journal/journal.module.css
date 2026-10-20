@@ -39,7 +39,10 @@
    toward. Shown by the data-unseen attribute rather than by React, so the client island can
    retire one card's marker by flipping attributes (plan invariant 5: it never moves a card).
    [data-seen-now] is set by phase 4's island on a card marked during this visit: the dot KEEPS
-   its box and fades, so retiring it never reflows the title beside it. */
+   its box and fades, so retiring it never reflows the title beside it.
+   [data-revised] draws the same dot hollow. A revised document comes back unseen because its head
+   id changed, which is correct and wanted — the ring is what stops it reading as brand new at a
+   glance, the way SEEN_COPY.revised stops it in words. */
 .new { display: none; margin-right: 9px; }
 .card[data-unseen='true'] .new, .card[data-seen-now] .new { display: inline-block; }
 .card[data-seen-now] .new { opacity: 0; transition: opacity 240ms ease; }
@@ -47,6 +50,45 @@
   content: ''; display: inline-block; width: 8px; height: 8px;
   border-radius: 999px; background: var(--coral); vertical-align: 0.12em;
 }
+.card[data-revised='true'] .new::before {
+  background: transparent; box-shadow: inset 0 0 0 2px var(--coral);
+}
+
+/* ---- Versions ---------------------------------------------------------------------------
+   A document that has been revised carries one plain line — "Version 3 · two earlier versions" —
+   and its earlier bodies behind it. <details> is the repo's own server-side disclosure (the Tech
+   block on /sera/methods/[id]): no JavaScript, so this page stays a server component, and the
+   chevron is the only moving part.
+
+   Almost every card is a lone version 1 and renders NONE of this, so it must stay cheap: these
+   rules only ever match inside a card that actually has a history. */
+.history { border-radius: 22px; background: var(--chip); }
+.historySummary {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px; border-radius: 22px;
+  list-style: none; cursor: pointer;
+  font-size: 14px; color: var(--ink-2);
+}
+.historySummary::-webkit-details-marker { display: none; }
+.historySummary::marker { content: ''; }
+.historySummary:hover { background: var(--chip-solid); }
+.historySummary:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.historyChevron { display: inline-flex; flex: none; transition: transform 0.12s; }
+.history[open] .historyChevron { transform: rotate(90deg); }
+.historyLabel { overflow-wrap: anywhere; }
+
+.historyBody { padding: 2px 16px 16px; display: grid; gap: 14px; }
+.historyBody .body { font-size: 14.5px; color: var(--ink-2); }
+.past { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--hair); }
+.past:first-child { padding-top: 2px; border-top: 0; }
+.pastHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.pastVersion {
+  font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2);
+}
+
+/* The same line when this snapshot does not hold the earlier rows: the label alone, no control,
+   so a revised card never silently loses its version. */
+.versionOnly { font-size: 14px; color: var(--ink-2); }
 
 /* The line between what is new and what has already been read. A labelled hairline spanning the
    whole grid — a quiet divider, deliberately not a second section header. */

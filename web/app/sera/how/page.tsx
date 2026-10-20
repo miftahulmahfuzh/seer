@@ -10,6 +10,7 @@ import { Term } from '@/components/sera/Term';
 import { requireSera } from '@/lib/sera/gate';
 import { GLOSSARY, GLOSSARY_ORDER, type GlossaryKey } from '@/lib/sera/glossary';
 import { lab } from '@/lib/sera/lab';
+import { isHead } from '../journal/view';
 import { dataFacts, honestyRules, hurdles, pipelineLabel, pipelineStages, windowsModel, type Rule } from './view';
 import s from './how.module.css';
 
@@ -36,7 +37,9 @@ export default async function HowPage() {
   const hs = hurdles(lab.gate, lab.summary.devTrials);
   const rules = honestyRules(lab);
   const facts = dataFacts(lab.data, lab.gate);
-  const wishes = lab.insights.filter(i => i.kind === 'data-wish').length;
+  // Documents, not rows: a data wish rewritten by a later version is still one wish.
+  // The same rule /sera/journal's badges count by — see journal/view.ts's isHead.
+  const wishes = lab.insights.filter(i => isHead(i) && i.kind === 'data-wish').length;
   const blocked = lab.methods.filter(m => m.status === 'blocked-data').length;
 
   return (

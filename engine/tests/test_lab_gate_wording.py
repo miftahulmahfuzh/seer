@@ -377,8 +377,20 @@ def test_the_newest_synthesis_does_not_state_a_bar_the_lab_does_not_apply() -> N
     while the gate panel beneath it read 0.90, on the same page, in prod. The ordering below
     mirrors ``newest()`` in ``web/app/sera/overview.ts``: newest ``added`` first, ties to the
     larger id.
+
+    **Heads only**, mirroring the same filter the page applies. A journal document is a chain of
+    rows linked by ``supersedes`` and only its head -- the row nothing supersedes -- is current.
+    ``kind`` is allowed to change along a chain (a hypothesis that becomes an observation is the
+    normal life of a lab idea), so a synthesis superseded by an observation is still the newest
+    *synthesis* in this table while being a row the Overview has already replaced. Sweeping it
+    would flag prose no reader sees, which is the exact scope failure the paragraph above rules
+    out -- one page over.
     """
-    rows = _insights("WHERE kind = 'synthesis' ORDER BY added DESC, id DESC")
+    rows = _insights(
+        "WHERE kind = 'synthesis' "
+        "AND id NOT IN (SELECT supersedes FROM insights WHERE supersedes IS NOT NULL) "
+        "ORDER BY added DESC, id DESC"
+    )
     assert rows, "the committed lab database holds no synthesis insight for the Overview to headline"
     row = rows[0]
     hits = [
@@ -473,7 +485,8 @@ def test_the_prose_matcher_reads_a_superseding_sentence_as_history() -> None:
 #: over "the newest synthesis" is guarding a row nobody sees if the page stops headlining that row,
 #: so the selection is pinned the same way the label prefixes above are: by reading the source.
 _HEADLINE = re.compile(
-    r"newest\(\s*snap\.insights\.filter\(\s*(\w+)\s*=>\s*\1\.kind\s*===\s*'synthesis'\s*\)\s*\)"
+    r"newest\(\s*snap\.insights\.filter\(\s*(\w+)\s*=>\s*\1\.kind\s*===\s*'synthesis'"
+    r"\s*&&\s*\1\.supersededBy\s*===\s*null\s*\)\s*\)"
 )
 _NEWEST_ORDER = re.compile(r"\.added\.localeCompare\(\s*\w+\.added\s*\)\s*\|\|\s*\w+\.id\s*-\s*\w+\.id")
 
@@ -482,16 +495,19 @@ def test_the_site_still_headlines_the_newest_synthesis() -> None:
     """``overview.ts`` picks the row the test above sweeps, and picks it the same way.
 
     Two halves, because the scope rule rests on both: *which kind* is headlined (only a synthesis
-    asserts the current state; other journal notes can be machine records), and *which one of them*
-    (newest ``added``, ties to the larger id). ``web/app/sera/overview.test.ts`` covers the
+    asserts the current state; other journal notes can be machine records, and only a **head** --
+    a row nothing supersedes -- is still current), and *which one of them* (newest ``added``, ties
+    to the larger id). ``web/app/sera/overview.test.ts`` covers the
     ordering's behaviour on the web side; this pins that the Python sweep is aimed at the same row.
     """
     src = (config.REPO_ROOT / "web" / "app" / "sera" / "overview.ts").read_text(encoding="utf-8")
     assert _HEADLINE.search(src), (
         "web/app/sera/overview.ts no longer headlines `newest(insights.filter(kind === "
-        "'synthesis'))`. The journal sweep is scoped to exactly that row -- if the page now "
-        "headlines something else, scope the sweep to the new selection or this guard is watching "
-        "a row no reader ever sees"
+        "'synthesis' && supersededBy === null))`. The journal sweep is scoped to exactly that row "
+        "-- if the page now headlines something else, scope the sweep to the new selection or this "
+        "guard is watching a row no reader ever sees. The `supersededBy === null` half is not "
+        "decoration: `kind` may change along a supersedes chain, so without it the page can "
+        "headline a synthesis the lab has already replaced"
     )
     assert _NEWEST_ORDER.search(src), (
         "web/app/sera/overview.ts no longer resolves `newest()` by `added` then `id`; the sweep's "

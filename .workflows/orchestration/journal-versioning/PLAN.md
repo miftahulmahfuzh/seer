@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/journal-versioning`
 **Branch:** `feature/journal-versioning` (base: `origin/main` @ `15a9a9a`)
 **Phases:** 6
-**Status:** phase 1/6 complete
+**Status:** phases 1, 3 and 4 of 6 complete (2 in flight)
 **Coordinator:** —
 
 > This file supersedes the design note of the same name written earlier today. The design is
@@ -256,7 +256,7 @@ Two more, both measured on this machine:
 | 1 | Schema 8: the narrowed trigger, `supersedes`, `doc_key` | R4 | `engine/lab` | 4 | — | HARD | `.workflows/plan/journal-versioning/phase-1.md` | P1-ENG-JV1K (done 2026-10-20) | — |
 | 2 | Writer CLI: `lab insight --supersedes`, `lab link` | R3 | `engine/commands` | 2 | 1 | NORMAL | `.workflows/plan/journal-versioning/phase-2.md` | P1-ENG-H4ZQ | — |
 | 3 | Auto-link the five journalling writers on `doc_key` | R2 | `engine/lab` | 7 | 1 | NORMAL | `.workflows/plan/journal-versioning/phase-3.md` | P1-ENG-T2MD | — |
-| 4 | Export: snapshot emits the chain; TS mirror; document counts | R1 | `engine/lab` + `web/lib` | 4 | 1 | NORMAL | `.workflows/plan/journal-versioning/phase-4.md` | P1-ENG-Q9XB | — |
+| 4 | Export: snapshot emits the chain; TS mirror; document counts | R1 | `engine/lab` + `web/lib` | 4 | 1 | NORMAL | `.workflows/plan/journal-versioning/phase-4.md` | P1-ENG-Q9XB (done 2026-10-20) | — |
 | 5 | Reader: heads-only, version chip, history disclosure, "Revised" | R1, R5 | `web/app/sera` | 8 | 4, 6 | HARD | `.workflows/plan/journal-versioning/phase-5.md` | P1-WEB-K6DR | — |
 | 6 | Backfill the 5 byte-identical pairs, 500→499 first | R3 | `lab/` data | 2 | 2, 4 | NORMAL | `.workflows/plan/journal-versioning/phase-6.md` | P1-ROOT-N7FS | — |
 

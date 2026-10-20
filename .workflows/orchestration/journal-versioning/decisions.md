@@ -33,3 +33,20 @@ plan index; nothing was left open, so nothing needed deciding here.
 - Commit file lists checked against the ownership table: the branch touches `store.py`, `test_lab_insights_trigger.py`, `test_lab_snapshot.py`, `lab/lab.sqlite` and bookkeeping only. No CLI, no writer, no web source. `hardgate.py` untouched (0 lines), as invariant 9 requires.
 - The trigger itself exercised at raw SQL on a scratch copy: UPDATE of body/title/kind/method_id/added/doc_key and DELETE all ABORT; `supersedes` NULL→value succeeds exactly once; value→other and value→NULL ABORT; and the owner's named trap, `SET supersedes=?, body='z'`, ABORTs leaving `supersedes` still NULL.
 - Phase 1 could not reproduce the plan's literal digest because the plan index does not publish its hashing recipe. The recipe **is** published, in `phase-6.md` lines 235-252. The coordinator used it; both sides match. No content moved.
+
+## Phase 6's premise, checked ahead of time by the coordinator
+
+Measured read-only on the v8 database while wave 1 ran, so a plan error would surface before
+phase 6 writes anything:
+
+- All **five** backfill pairs are byte-identical in `title` **and** `body`, share a `method_id`,
+  and run predecessor→successor in ascending id: 227→230 (M0131), 289→290 (M0024),
+  493→498 (M0127), 320→499 (M0179), 499→500 (M0179). None can trip `_check_supersedes`'s
+  cross-method refusal, the id-ordering refusal, or `insights_one_successor`.
+- All **seven** title-collisions the plan deliberately leaves as siblings have genuinely
+  differing bodies: 50/52, 51/53, 48/54, 466/467, 467/468, 125/126, 390/391. Threading any of
+  them would hide a measurement, which invariant 2 forbids — the plan's split of 12 into 5+7 is
+  correct on the data.
+
+| C4 | C2 framed the shared-worktree commit as index-vs-pathspec. Phase 2 found both are wrong for a file **two phases edit at once**: the index form sweeps in a peer's staged work, the pathspec form re-reads a working tree the peer is mid-edit in and ships their half-written code under your message | **Isolated index** (`GIT_INDEX_FILE` + `read-tree` + `update-index` + `commit-tree` + `update-ref OLD NEW`) for any file two phases share; plain pathspec for a file one phase owns | tie-break, narrower blast radius. Found and first used by phase 2 on `commands/lab.py`, which it and phase 3 were editing simultaneously. `update-ref`'s OLD argument is the compare-and-swap that makes it safe against a peer committing underneath. Verified by the coordinator: b0a48d5 carries exactly 2 files and zero phase-3 symbols, and phases 3/4 kept every uncommitted file. C2 still stands for `store.py`, `types.ts`, `lab.sqlite`, `lab.json` — phase 4's alone. |
+| C5 | `commands/lab.py`'s `_status` "Latest insights" SELECT prints the newest eight **rows**, so once phase 6 links its five pairs the terminal status block prints 320, 499 and 500 as three entries while `/sera/journal` renders them as one document at version 3. Phase 2's plan assigned it to phase 4; phase 4 declined it as a shared-file risk and reported it unowned; phase 2 refused to self-assign, calling it drift | **Assigned to phase 2** as a coordinator scope extension | 3 then tie-break. Phase 2's Handoffs section (rung 3) names phase 4, but phase 4 declined and R5's engine-side half has no other home — phase 5's "Does not touch" bars every engine file and phase 6's bars every source file, so the plan genuinely leaves it unowned, which is the coordinator's call and not drift when the coordinator makes it. Between phase 2 and phase 4 the tie-break is blast radius: phase 2 authored that file this wave and already holds the isolated-index recipe for it. Phase 2 was right to refuse to take it on its own authority. |

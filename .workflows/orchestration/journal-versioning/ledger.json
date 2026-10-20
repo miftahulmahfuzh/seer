@@ -23,21 +23,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "b0a48d5",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "lab insight --supersedes/--doc-key + new lab link; every refusal exits 2 via store.LabError, 15 tests. Decided: commands/lab.py is shared with phase 3, so committed only my hunks through an ISOLATED git index (read-tree HEAD + update-index + commit-tree + update-ref), never a pathspec commit and never the shared index \u2014 a pathspec commit would have shipped phase 3's half-written work under my message. Rung: tie-break narrower blast radius. Verified on a pristine git-archive copy of HEAD + my two files (6369 passed); the worktree's 5 failures are phase 3's and phase 4's mid-edit files and pass without them. lab.sqlite and web/data/lab.json untouched. UNOWNED one-liner needing your assignment: commands/lab.py _status 'Latest insights' SELECT (now ~line 844) still counts rows not heads \u2014 phase 4 skipped it, my plan's Handoffs assigns it to phase 4; I did not widen scope to take it.",
       "package": "engine/commands",
       "plan": ".workflows/plan/journal-versioning/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T10:23:17+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-H4ZQ",
       "title": "Writer CLI: `lab insight --supersedes`, `lab link"
     },
     {
@@ -55,7 +55,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
+      "status": "pending",
       "task_id": null,
       "title": "Auto-link the five journalling writers on `doc_key"
     },
@@ -74,7 +74,7 @@
       "satisfies": [
         "R1"
       ],
-      "status": "spawned",
+      "status": "pending",
       "task_id": null,
       "title": "Export: snapshot emits the chain; TS mirror; document counts"
     },
@@ -123,6 +123,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "journal-versioning",
-  "updated": "2026-10-20T10:06:23+00:00",
+  "updated": "2026-10-20T10:25:47+00:00",
+  "verified_at": "2026-10-20T10:25:47+00:00",
   "worktree": "/home/miftah/.worktrees/seer/journal-versioning"
 }

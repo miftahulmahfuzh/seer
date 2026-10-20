@@ -1,0 +1,128 @@
+{
+  "branch": "feature/journal-versioning",
+  "coordinator": "orch-journal-versioning",
+  "coordinator_session_id": "ca0126c9-652f-431c-99f8-50ae9b33aeb7",
+  "created": "2026-10-20T09:44:04+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/journal-versioning/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R4"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Schema 8: the narrowed trigger, `supersedes`, `doc_key"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 2,
+      "note": null,
+      "package": "engine/commands",
+      "plan": ".workflows/plan/journal-versioning/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Writer CLI: `lab insight --supersedes`, `lab link"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/journal-versioning/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Auto-link the five journalling writers on `doc_key"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 4,
+      "note": null,
+      "package": "engine/lab` + `web/lib",
+      "plan": ".workflows/plan/journal-versioning/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Export: snapshot emits the chain; TS mirror; document counts"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        4,
+        6
+      ],
+      "difficulty": "HARD",
+      "n": 5,
+      "note": null,
+      "package": "web/app/sera",
+      "plan": ".workflows/plan/journal-versioning/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R5"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Reader: heads-only, version chip, history disclosure, \"Revised\""
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        2,
+        4
+      ],
+      "difficulty": "NORMAL",
+      "n": 6,
+      "note": null,
+      "package": "lab/` data",
+      "plan": ".workflows/plan/journal-versioning/phase-6.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Backfill the 5 byte-identical pairs, 500\u2192499 first"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "journal-versioning",
+  "updated": "2026-10-20T09:44:04+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/journal-versioning"
+}

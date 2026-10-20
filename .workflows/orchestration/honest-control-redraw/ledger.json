@@ -43,23 +43,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "4adb55c",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "STOP, recorded (invariant 13): M0221-C50-PLC trades 1.03x but turns over 1.95x, warn not ok, so it supersedes nothing; mwr deficit narrows -1.09 -> -0.42 and the -1.09 sentence is withdrawn. M0225 deliberately NOT pre-registered and NOT run -- decided on rung 1, invariant 13 ('a turnover miss is a recorded STOP ... the phase stops'), which itself already carries M0225's 1.68x for the same structural miss. Mapping row M0225-C50-PLC stays unfilled; M0225 stays blocked on M0225-R50. Trial 843's git_sha IS d3367a4 (not 4e5359a) and d3367a4 is an ancestor of 4e5359a, so the wave ordering is sound.",
       "package": "engine/lab/methods",
       "plan": ".workflows/plan/honest-control-redraw/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T02:32:15+00:00",
       "satisfies": [
         "R2",
         "R3",
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P2-ENG-R8NQ",
       "title": "The twin yardsticks: M0221 and M0225"
     },
     {
@@ -176,7 +176,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "honest-control-redraw",
-  "updated": "2026-10-20T02:23:37+00:00",
+  "updated": "2026-10-20T02:32:15+00:00",
   "verified_at": "2026-10-20T02:09:49+00:00",
   "worktree": "/home/miftah/.worktrees/seer/honest-control-redraw"
 }

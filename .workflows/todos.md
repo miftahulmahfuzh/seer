@@ -109,7 +109,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: NORMAL
   - **Type**: Update
   - **Context**: Owns running `lab link` over exactly five byte-identical pairs, in id order — 227→230 (M0131), 289→290 (M0024), 493→498 (M0127), 320→499 and 499→500 (M0179), **500→499 last so the chain 320→499→500 builds in the right direction** — then `lab stage` and one commit carrying `lab.sqlite` and `web/data/lab.json` together. The seven rows whose bodies differ are different variants and are deliberately left as siblings. Touches no source file; data only. Exit: the journal renders 495 documents from 500 rows; M0179's note reads version 3; the test-window look count still reads **4**; `pytest engine/tests` green after `lab stage`.
-  - **Status**: blocked
+  - **Status**: open — **both dependencies have landed.** `P1-ENG-Q9XB` (phase 4, the export) completed 2026-10-20 at `3aba437`: the snapshot emits the chain and counts documents, so the renderer side of the backfill is ready. `P1-ENG-H4ZQ` (phase 2) landed at `b0a48d5`, which is where `lab link` — the tool this phase runs five times — comes from.
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 6 of 6)
   - **Satisfies**: R3 — Thread the duplicates that already exist, starting 500→499
   - **Depends on**: P1-ENG-H4ZQ, P1-ENG-Q9XB

@@ -1,0 +1,20 @@
+ANCHOR 0  calendar agreement over 238 decisions: 0 mismatches   [must be 0]
+decisions with the switch on and a scored pool: 169
+ANCHOR 1  real book entries (forward replay): 624   [must equal phase 1's m0208_true_entries = 624]
+ANCHOR 2  K=1 without the switch guard: 304   [must be 304]
+          one ladder pass took 0.8s
+
+ K   entries   ratio   cov  covratio   1996-2002  2003-2008  2009-2015
+ 1       446   0.715   169     0.715   0.656  0.743  0.734      lookback 279
+ 2       592   0.949   169     0.949   0.856  0.991  0.982      lookback 305
+ 3       587   0.941   169     0.941   0.850  0.947  1.009      lookback 331
+ 4       593   0.950   169     0.950   0.867  0.991  0.977      lookback 357
+ 5       591   0.947   169     0.947   0.889  0.960  0.982      lookback 383
+ 6       593   0.950   169     0.950   0.900  0.973  0.968      lookback 409
+ 7       596   0.955   169     0.955   0.894  0.978  0.982      lookback 435
+ 8       595   0.954   169     0.954   0.900  0.960  0.991      lookback 461
+
+era months: {'1996-2002': 52, '2003-2008': 52, '2009-2015': 65}
+real entries by era: {'1996-2002': 180, '2003-2008': 226, '2009-2015': 218}
+smallest K reaching 0.90: K=2, 592 entries, 0.949
+GO: set SHADOW_DEPTH = 2 (lookback 305 <= 473)

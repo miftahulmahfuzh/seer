@@ -44,11 +44,30 @@ documents.** Superseding *adds* a row; it never mutates one. The guarantee is un
 
 ### 1. Schema (migration to version 8, additive)
 
-Add one nullable column:
+Add **two** nullable columns:
 
 ```sql
 ALTER TABLE insights ADD COLUMN supersedes INTEGER REFERENCES insights(id);
+ALTER TABLE insights ADD COLUMN doc_key    TEXT;  -- "real-costs:M0260-M-G3", "prereg:M0022"
 ```
+
+> **CORRECTED 2026-10-20, before any code was written.** This section originally added
+> `supersedes` alone and keyed auto-linking on `method_id`. **That was wrong and would have
+> destroyed measurements.** All five auto-journalling writers title on the METHOD, never the
+> VARIANT (e.g. `real_costs.py:407` builds its title from `cmp.method_name` while `Comparison`
+> carries `candidate_id` at line 226 and never uses it). So insights 466/467/468 — written 25 and
+> 30 seconds apart, looking exactly like an accidental triple-write — are in fact three different
+> arms of M0260 (`M-NATIVE` dd .238/pf 1.98, `M-G12` .256/1.62, `M-G3` .336/1.60; trials 835, 838,
+> 836). Keying on `method_id` would have buried the 23.8%-drawdown arm under the 33.6% one and
+> shown the owner only the last. **A measurement vanishing off the rendered page is precisely what
+> append-only exists to prevent** — arriving through the front door of the feature built to
+> respect it.
+>
+> `doc_key` is the writer-computed identity of the *document* a row is a version of. Same
+> `doc_key` → supersede. Different → sibling. 466/467/468 stay three documents. §3 is
+> unimplementable without it: `insights` has no column saying what produced a row or which variant
+> it concerns, and `title` is the only other candidate key — which is exactly the key that fails.
+> **The same bug kills the cheap alternative if it is keyed on title.**
 
 A chain of rows linked by `supersedes` is one **document**. Its **version** is its depth in the
 chain; the **head** is the row nothing supersedes. Rendering shows heads.
@@ -78,6 +97,23 @@ Invariants to enforce in `lab/store.py`, not only by convention:
 > aborts; **a multi-column UPDATE touching `supersedes` *and* `body` aborts** — a naive "is
 > supersedes changing?" check lets the allowed column smuggle a forbidden one through; DELETE
 > still aborts, unchanged.
+>
+> **Implement it as a WHITELIST, not a blacklist.** `supersedes` is the only column permitted to
+> change, and only from NULL; every other column is named explicitly, `id` and `doc_key`
+> included. This makes the smuggling case impossible *by construction* rather than by
+> enumeration, and auto-protects any column added later:
+>
+> ```sql
+> SELECT RAISE(ABORT, 'insights are append-only: add a newer one instead')
+> WHERE OLD.id IS NOT NEW.id OR OLD.kind IS NOT NEW.kind OR OLD.title IS NOT NEW.title
+>    OR OLD.body IS NOT NEW.body OR OLD.method_id IS NOT NEW.method_id
+>    OR OLD.added IS NOT NEW.added OR OLD.doc_key IS NOT NEW.doc_key
+>    OR OLD.supersedes IS NOT NULL;
+> ```
+>
+> The last clause refuses value→different-value and value→NULL in one line. A 16-case abort suite
+> in a dedicated test module, written **before** the trigger, each case re-reading the row to
+> prove it is unchanged.
 
 `insights_no_update` fires on **any** UPDATE. So **the existing 500 rows cannot be threaded
 retroactively** without touching it, and 499/500 — the case that prompted this — is exactly a
@@ -102,10 +138,12 @@ a test that an UPDATE to `body` still aborts is the single most important test i
 
 - `lab insight --supersedes <id>` on the CLI, validated against every invariant above, exit 2 on
   violation (the lab's "refused by the rules" code), never exit 1.
-- **Auto-journalling commands link automatically.** `lab survivorship` (and anything else that
-  journals one observation per method per run) looks for its own most recent head for that
-  `method_id` and supersedes it rather than appending a sibling. **This is the 499/500 fix**, and
-  it is the behaviour that stops the pile-up growing.
+- **Auto-journalling commands link automatically — by `doc_key`, NEVER by `method_id` or
+  `title`.** Each writer computes a `doc_key` that includes the **variant** it is reporting on
+  (`"real-costs:M0260-M-G3"`), looks for its own most recent head with that exact key, and
+  supersedes it. Rows with different keys stay siblings. **This is the 499/500 fix**, and keyed
+  this way it stops the pile-up growing without collapsing distinct arms. Keying it any other way
+  is the bug described in §1 — re-read that box before implementing this.
 - A `--no-supersede` escape for the case where a genuinely new observation happens to share a
   method.
 
@@ -143,7 +181,18 @@ first thing to re-argue.
 | 3 | Writer: `--supersedes`, validation, and auto-linking in `lab survivorship`. | 2 |
 | 4 | Export: `lab stage` emits `supersedes`/`version`; snapshot test moves with it. | 2 |
 | 5 | Reader: heads-only journal with version label and history disclosure; counts by document. | 4 |
-| 6 | Backfill the existing duplicate chains, starting with 500→499. **In scope** under (a). | 2, 3 |
+| 6 | Backfill **exactly 5 pairs**, not 12. **In scope** under (a). | 2, 3 |
+
+**The backfill list is settled and needs no judgment** — all five are byte-identical in title
+*and* body: `227→230` (M0131), `289→290` (M0024), `493→498` (M0127), `320→499` (M0179),
+`499→500` (M0179). Twelve rows share a title with an earlier row, but only these five are真
+true duplicates; the other seven are different arms under one generated title and **stay
+siblings**.
+
+**Also: insight 126 already supersedes 125 — in prose, inside its own body** ("*This replaces the
+entry just before it, which miscounted the pairs as 20…*"). The relation exists in this journal
+today and is hand-written because the schema has nowhere to put it. That is the strongest single
+argument that this feature is worth building.
 
 **Still open, and the owner wants a straight answer:** whether the *cheap alternative* — just
 teaching auto-journalling commands to supersede their own previous note instead of appending a

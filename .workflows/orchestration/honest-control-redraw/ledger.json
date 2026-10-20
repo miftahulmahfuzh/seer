@@ -85,23 +85,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "c0a5eea",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 5,
-      "note": null,
+      "note": "M0202 D17-CLEAR on all 3 arms (0.961/0.871, 0.966/0.892, 0.961/0.887); M0201 HALF-REPAIRED -- Y20-MV10-PLC2 ok at 0.961/0.839 but Y20-MV10-PLC1 is WARN at 0.79410 turnover vs the 0.80000 bar, 0.0059 short, so it supersedes nothing and hardgate.mis_shaped_controls(M0201) still returns ['M0201-PLC1-MV10']. R4 served for M0202, NOT for M0201. Miss left standing per invariant 12 -- no seed re-rolled, no weight vector copied; two seeds at 0.794 and 0.839 on the same rule = draw property of a market-value-weighted chassis, the set's 4th case and 1st in the LOW direction. PRE-REGISTERED DIRECTION MISSED 0-for-5: every lead WIDENED (M0201 -0.712->+2.395 sign flip, +1.478->+2.475; M0202 +1.352->+3.616, +3.089->+3.803, +0.760->+3.531). Cause reverses phases 4 and 7's sign: a 989-trade monthly re-draw over 539 survivorship-biased symbols EARNS more than its fees, so handicapped placebos were too STRONG. Both methods' own success conditions move FAIL->PASS (3rd and 4th in the set after M0047). M0202's published headline WITHDRAWN: re-scored at common N=164, both placebos that cleared its screen were handicapped (0.9449, 0.9165), the honest three are 0.770/0.756/0.651. Trials 848-852; lab.sqlite hash 288b7e47 -> 994467ca across the M0202 run; test looks 4->4; lab stage NOT run.",
       "package": "engine/lab/methods",
       "plan": ".workflows/plan/honest-control-redraw/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T02:43:42+00:00",
       "satisfies": [
         "R2",
         "R3",
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P2-ENG-F5WK",
       "title": "M0201 and M0202 \u2014 the rate-beta chassis, five arms"
     },
     {
@@ -176,7 +176,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "honest-control-redraw",
-  "updated": "2026-10-20T02:32:15+00:00",
+  "updated": "2026-10-20T02:43:42+00:00",
   "verified_at": "2026-10-20T02:09:49+00:00",
   "worktree": "/home/miftah/.worktrees/seer/honest-control-redraw"
 }

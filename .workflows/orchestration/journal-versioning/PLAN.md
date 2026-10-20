@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/journal-versioning`
 **Branch:** `feature/journal-versioning` (base: `origin/main` @ `15a9a9a`)
 **Phases:** 6
-**Status:** phases 1, 2, 3 and 4 of 6 complete (2 in flight)
+**Status:** phases 1, 2, 3 and 4 of 6 complete — 5 in flight, 6 now unblocked
 **Coordinator:** —
 
 > This file supersedes the design note of the same name written earlier today. The design is

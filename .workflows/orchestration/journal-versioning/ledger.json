@@ -23,16 +23,16 @@
     },
     {
       "card": null,
-      "commit": "b0a48d5",
+      "commit": "79341e4",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": "lab insight --supersedes/--doc-key + new lab link; every refusal exits 2 via store.LabError, 15 tests. Decided: commands/lab.py is shared with phase 3, so committed only my hunks through an ISOLATED git index (read-tree HEAD + update-index + commit-tree + update-ref), never a pathspec commit and never the shared index \u2014 a pathspec commit would have shipped phase 3's half-written work under my message. Rung: tie-break narrower blast radius. Verified on a pristine git-archive copy of HEAD + my two files (6369 passed); the worktree's 5 failures are phase 3's and phase 4's mid-edit files and pass without them. lab.sqlite and web/data/lab.json untouched. UNOWNED one-liner needing your assignment: commands/lab.py _status 'Latest insights' SELECT (now ~line 844) still counts rows not heads \u2014 phase 4 skipped it, my plan's Handoffs assigns it to phase 4; I did not widen scope to take it.",
+      "note": "C5 DONE. Code half is NOT in my commit: phase 3's pathspec commit 5b5d16d swept my uncommitted lab.py edit in under its message while I was rebuilding on a moved HEAD. Per the workflow I did not re-implement it \u2014 verified present and correct at HEAD. My commit 79341e4 carries the two tests it was missing, via isolated index. Test proven to fail against the old SELECT for the right reason (superseded row present). Decided: self-contained NOT EXISTS, not phase 4's store.INSIGHT_DOCUMENTS_SQL, which was uncommitted when written \u2014 fold onto the shared helper at the end of the set. _status counts insights nowhere else, so C5 was one SELECT as you expected. Full suite with all phases in: 6405 passed, 4 skipped, 0 failed; ruff clean. This is the live argument for C4: pathspec is wrong for a shared file in BOTH directions \u2014 it ships a peer's work under your name, and it ships your work under theirs.",
       "package": "engine/commands",
       "plan": ".workflows/plan/journal-versioning/phase-2.md",
-      "reported_at": "2026-10-20T10:23:17+00:00",
+      "reported_at": "2026-10-20T10:34:00+00:00",
       "satisfies": [
         "R3"
       ],
@@ -42,40 +42,40 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "5b5d16db9d3fdd4b783c764a769d2de19aa5c715",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "doc_key grammar prefix:method_id:scope for all five writers per the Reconciliation Log, not the brief's bare candidate_id; head_for delegates to phase 1's store.head_for_doc_key; append() retries on LabError too since phase 1 validates before the INSERT; head_for returns None across methods rather than letting _check_supersedes raise mid-write. M0260's three arms stay three documents. lab.sqlite byte-identical to HEAD; test-window looks still 4.",
       "package": "engine/lab",
       "plan": ".workflows/plan/journal-versioning/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T10:32:18+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-T2MD",
       "title": "Auto-link the five journalling writers on `doc_key"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "3aba437",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 4,
-      "note": null,
+      "note": "Snapshot 6: insights publish supersedes/docKey/version/supersededBy; summary.insights counts documents with insightRows beside it. Decided: SKIPPED plan Step 10 (commands/lab.py heads-only 'Latest insights', now line 844) \u2014 tie-break rung, narrower blast radius; that file was contended by phase 2 then phase 3 throughout, so it is UNOWNED and needs an assignee. Decided: lab.test.ts:8 version pin 5->6 (rung 2, same cause as line 136 which reconciliation gave phase 4). lab.sqlite untouched; lab.json +32,018 bytes exactly as predicted.",
       "package": "engine/lab` + `web/lib",
       "plan": ".workflows/plan/journal-versioning/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T10:32:26+00:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-Q9XB",
       "title": "Export: snapshot emits the chain; TS mirror; document counts"
     },
     {
@@ -115,7 +115,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Backfill the 5 byte-identical pairs, 500\u2192499 first"
     }
@@ -123,7 +123,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "journal-versioning",
-  "updated": "2026-10-20T10:25:47+00:00",
+  "updated": "2026-10-20T10:37:06+00:00",
   "verified_at": "2026-10-20T10:25:47+00:00",
   "worktree": "/home/miftah/.worktrees/seer/journal-versioning"
 }

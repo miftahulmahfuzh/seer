@@ -1,0 +1,210 @@
+store /home/miftah/seer/engine/.research
+loaded 539 symbols in 10.5s; shares=40379 series=yes dividends=yes
+
+--- probing M0047 ...
+
+=== M0047  (M0047-A1, lookback 427, step 26 bars, K_max 2)
+    real book reads `held`: NO -- exact by construction
+    decisions 170 (no book on 68)   elapsed 1.8s
+    (a) TRUE forward replay          1610 entries over 170 decisions
+    (b) SHIPPED estimator            1591 entries   ratio 0.988   (170 decisions)
+    (c) K=1  backward replay        1430 entries   ratio 1.000   (161 decisions)
+    (c) K=2  backward replay        1392 entries   ratio 1.000   (154 decisions)
+    eras, shipped against true on the same decisions:
+      1996-2002  true   477 | shipped   461 | 0.966
+      2003-2008  true   513 | shipped   512 | 0.998
+      2009-2015  true   620 | shipped   618 | 0.997
+    VERDICT: no-op  (shipped/true = 0.988, band 0.9-1.1)
+
+--- probing M0201 ...
+
+=== M0201  (M0201-A1, lookback 331, step 70 bars, K_max 3)
+    real book reads `held`: YES
+    decisions 79 (no book on 1)   elapsed 1.6s
+    (a) TRUE forward replay           460 entries over 79 decisions
+    (b) SHIPPED estimator             423 entries   ratio 0.920   (79 decisions)
+    (c) K=1  backward replay         425 entries   ratio 0.966   (78 decisions)
+    (c) K=2  backward replay         410 entries   ratio 0.947   (77 decisions)
+    (c) K=3  backward replay         405 entries   ratio 0.946   (76 decisions)
+    eras, shipped against true on the same decisions:
+      1996-2002  true   182 | shipped   169 | 0.929
+      2003-2008  true   116 | shipped   120 | 1.034
+      2009-2015  true   162 | shipped   134 | 0.827
+    VERDICT: no-op  (shipped/true = 0.920, band 0.9-1.1)
+
+--- probing M0202 ...
+
+=== M0202  (M0202-A1, lookback 331, step 70 bars, K_max 3)
+    real book reads `held`: YES
+    decisions 79 (no book on 1)   elapsed 1.5s
+    (a) TRUE forward replay           460 entries over 79 decisions
+    (b) SHIPPED estimator             423 entries   ratio 0.920   (79 decisions)
+    (c) K=1  backward replay         425 entries   ratio 0.966   (78 decisions)
+    (c) K=2  backward replay         410 entries   ratio 0.947   (77 decisions)
+    (c) K=3  backward replay         405 entries   ratio 0.946   (76 decisions)
+    eras, shipped against true on the same decisions:
+      1996-2002  true   182 | shipped   169 | 0.929
+      2003-2008  true   116 | shipped   120 | 1.034
+      2009-2015  true   162 | shipped   134 | 0.827
+    VERDICT: no-op  (shipped/true = 0.920, band 0.9-1.1)
+
+--- probing M0208 ...
+
+=== M0208  (M0208-A1, lookback 279, step 26 bars, K_max 8)
+    real book reads `held`: YES
+    decisions 169 (no book on 69)   elapsed 2.8s
+    (a) TRUE forward replay           624 entries over 169 decisions
+    (b) SHIPPED estimator             304 entries   ratio 0.487   (169 decisions)
+    (c) K=1  backward replay         306 entries   ratio 0.689   (160 decisions)
+    (c) K=2  backward replay         461 entries   ratio 0.989   (153 decisions)
+    (c) K=3  backward replay         461 entries   ratio 0.987   (147 decisions)
+    (c) K=4  backward replay         476 entries   ratio 1.019   (142 decisions)
+    (c) K=5  backward replay         466 entries   ratio 1.004   (138 decisions)
+    (c) K=6  backward replay         467 entries   ratio 1.000   (135 decisions)
+    (c) K=7  backward replay         459 entries   ratio 0.994   (133 decisions)
+    (c) K=8  backward replay         441 entries   ratio 0.995   (130 decisions)
+    eras, shipped against true on the same decisions:
+      1996-2002  true   180 | shipped    80 | 0.444
+      2003-2008  true   226 | shipped   115 | 0.509
+      2009-2015  true   218 | shipped   109 | 0.500
+    VERDICT: SHADOW-NEEDED  (shipped/true = 0.487, band 0.9-1.1)
+    smallest K reaching >= 0.90 of true: K=2 (ratio 0.989, lookback 305 of 473)
+
+--- probing M0215 ...
+
+=== M0215  (M0215-A1, lookback 279, step 26 bars, K_max 8)
+    real book reads `held`: YES
+    decisions 170 (no book on 68)   elapsed 6.1s
+    (a) TRUE forward replay           519 entries over 170 decisions
+    (b) SHIPPED estimator             515 entries   ratio 0.992   (170 decisions)
+    (c) K=1  backward replay         453 entries   ratio 0.996   (161 decisions)
+    (c) K=2  backward replay         449 entries   ratio 0.996   (154 decisions)
+    (c) K=3  backward replay         442 entries   ratio 1.002   (148 decisions)
+    (c) K=4  backward replay         441 entries   ratio 1.000   (143 decisions)
+    (c) K=5  backward replay         436 entries   ratio 1.000   (139 decisions)
+    (c) K=6  backward replay         443 entries   ratio 1.000   (136 decisions)
+    (c) K=7  backward replay         436 entries   ratio 1.000   (134 decisions)
+    (c) K=8  backward replay         421 entries   ratio 1.000   (131 decisions)
+    eras, shipped against true on the same decisions:
+      1996-2002  true    42 | shipped    42 | 1.000
+      2003-2008  true   197 | shipped   196 | 0.995
+      2009-2015  true   280 | shipped   277 | 0.989
+    VERDICT: no-op  (shipped/true = 0.992, band 0.9-1.1)
+
+--- probing M0221 ...
+
+=== M0221  (M0221-A1, lookback 86, step 26 bars, K_max 15)
+    real book reads `held`: NO -- exact by construction
+    decisions 237 (no book on 1)   elapsed 3.4s
+    (a) TRUE forward replay           425 entries over 237 decisions
+    (b) SHIPPED estimator             424 entries   ratio 0.998   (237 decisions)
+    (c) K=1  backward replay         375 entries   ratio 1.000   (236 decisions)
+    (c) K=2  backward replay         374 entries   ratio 1.000   (235 decisions)
+    (c) K=3  backward replay         373 entries   ratio 1.000   (234 decisions)
+    (c) K=4  backward replay         372 entries   ratio 1.000   (233 decisions)
+    (c) K=5  backward replay         370 entries   ratio 1.000   (232 decisions)
+    (c) K=6  backward replay         370 entries   ratio 1.000   (231 decisions)
+    (c) K=7  backward replay         370 entries   ratio 1.000   (230 decisions)
+    (c) K=8  backward replay         369 entries   ratio 1.000   (229 decisions)
+    (c) K=9  backward replay         368 entries   ratio 1.000   (228 decisions)
+    (c) K=10 backward replay         366 entries   ratio 1.000   (227 decisions)
+    (c) K=11 backward replay         365 entries   ratio 1.000   (226 decisions)
+    (c) K=12 backward replay         364 entries   ratio 1.000   (225 decisions)
+    (c) K=13 backward replay         363 entries   ratio 1.000   (224 decisions)
+    (c) K=14 backward replay         362 entries   ratio 1.000   (223 decisions)
+    (c) K=15 backward replay         361 entries   ratio 1.000   (222 decisions)
+    eras, shipped against true on the same decisions:
+      1996-2002  true   199 | shipped   198 | 0.995
+      2003-2008  true    86 | shipped    86 | 1.000
+      2009-2015  true   140 | shipped   140 | 1.000
+    VERDICT: no-op  (shipped/true = 0.998, band 0.9-1.1)
+
+--- probing M0225 ...
+
+=== M0225  (M0221-A1, lookback 86, step 26 bars, K_max 15)
+    real book reads `held`: NO -- exact by construction
+    decisions 237 (no book on 1)   elapsed 3.3s
+    (a) TRUE forward replay           425 entries over 237 decisions
+    (b) SHIPPED estimator             424 entries   ratio 0.998   (237 decisions)
+    (c) K=1  backward replay         375 entries   ratio 1.000   (236 decisions)
+    (c) K=2  backward replay         374 entries   ratio 1.000   (235 decisions)
+    (c) K=3  backward replay         373 entries   ratio 1.000   (234 decisions)
+    (c) K=4  backward replay         372 entries   ratio 1.000   (233 decisions)
+    (c) K=5  backward replay         370 entries   ratio 1.000   (232 decisions)
+    (c) K=6  backward replay         370 entries   ratio 1.000   (231 decisions)
+    (c) K=7  backward replay         370 entries   ratio 1.000   (230 decisions)
+    (c) K=8  backward replay         369 entries   ratio 1.000   (229 decisions)
+    (c) K=9  backward replay         368 entries   ratio 1.000   (228 decisions)
+    (c) K=10 backward replay         366 entries   ratio 1.000   (227 decisions)
+    (c) K=11 backward replay         365 entries   ratio 1.000   (226 decisions)
+    (c) K=12 backward replay         364 entries   ratio 1.000   (225 decisions)
+    (c) K=13 backward replay         363 entries   ratio 1.000   (224 decisions)
+    (c) K=14 backward replay         362 entries   ratio 1.000   (223 decisions)
+    (c) K=15 backward replay         361 entries   ratio 1.000   (222 decisions)
+    eras, shipped against true on the same decisions:
+      1996-2002  true   199 | shipped   198 | 0.995
+      2003-2008  true    86 | shipped    86 | 1.000
+      2009-2015  true   140 | shipped   140 | 1.000
+    VERDICT: no-op  (shipped/true = 0.998, band 0.9-1.1)
+
+--- probing M0227 ...
+
+=== M0227  (M0227-A1, lookback 86, step 26 bars, K_max 15)
+    real book reads `held`: NO -- exact by construction
+    decisions 225 (no book on 13)   elapsed 3.2s
+    (a) TRUE forward replay           628 entries over 225 decisions
+    (b) SHIPPED estimator             624 entries   ratio 0.994   (225 decisions)
+    (c) K=1  backward replay         608 entries   ratio 1.000   (224 decisions)
+    (c) K=2  backward replay         606 entries   ratio 1.000   (223 decisions)
+    (c) K=3  backward replay         599 entries   ratio 1.000   (222 decisions)
+    (c) K=4  backward replay         597 entries   ratio 1.000   (221 decisions)
+    (c) K=5  backward replay         594 entries   ratio 1.000   (220 decisions)
+    (c) K=6  backward replay         594 entries   ratio 1.000   (219 decisions)
+    (c) K=7  backward replay         594 entries   ratio 1.000   (218 decisions)
+    (c) K=8  backward replay         590 entries   ratio 1.000   (217 decisions)
+    (c) K=9  backward replay         589 entries   ratio 1.000   (216 decisions)
+    (c) K=10 backward replay         588 entries   ratio 1.000   (215 decisions)
+    (c) K=11 backward replay         582 entries   ratio 1.000   (214 decisions)
+    (c) K=12 backward replay         581 entries   ratio 1.000   (213 decisions)
+    (c) K=13 backward replay         581 entries   ratio 1.000   (212 decisions)
+    (c) K=14 backward replay         581 entries   ratio 1.000   (211 decisions)
+    (c) K=15 backward replay         577 entries   ratio 1.000   (210 decisions)
+    eras, shipped against true on the same decisions:
+      1996-2002  true   194 | shipped   194 | 1.000
+      2003-2008  true   199 | shipped   199 | 1.000
+      2009-2015  true   235 | shipped   231 | 0.983
+    VERDICT: no-op  (shipped/true = 0.994, band 0.9-1.1)
+
+--- probing M0243 ...
+
+=== M0243  (M0243-A1, lookback 278, step 26 bars, K_max 8)
+    real book reads `held`: NO -- exact by construction
+    decisions 225 (no book on 13)   elapsed 4.1s
+    (a) TRUE forward replay          1308 entries over 225 decisions
+    (b) SHIPPED estimator            1309 entries   ratio 1.001   (225 decisions)
+    (c) K=1  backward replay        1288 entries   ratio 1.000   (224 decisions)
+    (c) K=2  backward replay        1281 entries   ratio 1.000   (223 decisions)
+    (c) K=3  backward replay        1271 entries   ratio 1.000   (222 decisions)
+    (c) K=4  backward replay        1266 entries   ratio 1.000   (221 decisions)
+    (c) K=5  backward replay        1259 entries   ratio 1.000   (220 decisions)
+    (c) K=6  backward replay        1251 entries   ratio 1.000   (219 decisions)
+    (c) K=7  backward replay        1244 entries   ratio 1.000   (218 decisions)
+    (c) K=8  backward replay        1235 entries   ratio 1.000   (217 decisions)
+    eras, shipped against true on the same decisions:
+      1996-2002  true   382 | shipped   382 | 1.000
+      2003-2008  true   433 | shipped   433 | 1.000
+      2009-2015  true   493 | shipped   494 | 1.002
+    VERDICT: no-op  (shipped/true = 1.001, band 0.9-1.1)
+
+
+=== SUMMARY =================================================================
+chassis  held?   dec   true  shipped   ratio  Kmax  K@0.90  verdict
+M0047    no      170   1610     1591   0.988     2       1  no-op
+M0201    yes      79    460      423   0.920     3       1  no-op
+M0202    yes      79    460      423   0.920     3       1  no-op
+M0208    yes     169    624      304   0.487     8       2  SHADOW-NEEDED
+M0215    yes     170    519      515   0.992     8       1  no-op
+M0221    no      237    425      424   0.998    15       1  no-op
+M0225    no      237    425      424   0.998    15       1  no-op
+M0227    no      225    628      624   0.994    15       1  no-op
+M0243    no      225   1308     1309   1.001     8       1  no-op

@@ -1,0 +1,27 @@
+store 640fc25e...  loaded 539 symbols in 10.9s
+
+=== M0208, 169 decisions with a book
+
+  ALL DECISIONS
+    shipped                        304 /   624 = 0.487   (169 decisions)
+    shipped_hist                   346 /   624 = 0.554   (169 decisions)
+    k1                             306 /   444 = 0.689   (160 decisions)
+
+  AFTER A CASH MONTH (9 decisions -- the real book held nothing,
+                       so the truth is a full refill)
+    shipped                         38 /   180 = 0.211   (9 decisions)
+    shipped_hist                    40 /   180 = 0.222   (9 decisions)
+    k1                               0 /     0 = nan   (0 decisions)
+
+  AFTER A MONTH WITH A BOOK (160 decisions)
+    shipped                        266 /   444 = 0.599   (160 decisions)
+    shipped_hist                   306 /   444 = 0.689   (160 decisions)
+    k1                             306 /   444 = 0.689   (160 decisions)
+
+  DECOMPOSITION of the shipped estimator's shortfall, in ratio points
+    shipped                          0.487
+    + read the earlier date's own members and rows  -> 0.554   (membership convention = +0.067)
+    + reset to empty on a cash month (the K=1 chain) -> 0.689
+    + replay two steps instead of one (the shadow)   -> see the main probe's K curve
+
+    the cash-month months alone: true 180, shipped 38, missed 142 entries of the whole window's 320 shortfall (44%)

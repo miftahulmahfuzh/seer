@@ -45,10 +45,15 @@ only bars and share counts dated <= ``data_date``.
 from __future__ import annotations
 
 from datetime import date
+from typing import Any
 
 from seer_engine.backtest.dev import Candidate
 from seer_engine.lab.method import Amendment, Method
-from seer_engine.lab.methods.m0221_cap_weighted_top_n import CapTopAllocator, CapTopParams
+from seer_engine.lab.methods.m0221_cap_weighted_top_n import (
+    CapTopAllocator,
+    CapTopParams,
+    WeightMatchedCapTopAllocator,
+)
 from seer_engine.sim.rules import MONTHLY_HOLD_FRAC_GOTRADE
 
 ADDED = date(2026, 10, 18)
@@ -97,6 +102,117 @@ E100_AMENDMENT = Amendment(
     ),
 )
 
+
+# ---- amendment 2 (2026-10-20): the honest control this method has never had --------------------
+#
+# M0225 has no shape-matched control at all. Its margin is still quoted against R50, which trades
+# 0.195x and turns over 0.424x what C50 does -- a stone, not a measuring stick. The previous set
+# deliberately did not draw one: the identical chassis had just missed on M0221 at 1.95x turnover,
+# and drawing the twin under the same rule would have spent a run to re-observe the same structural
+# miss under a different id. The rule that closes that axis now exists (`lab.control_weight`), so
+# the twin is drawn with both halves at once: M0221's matched draw for the names and the weight
+# assignment for the vector.
+#
+# The hash namespace stays M0221's (`DRAW_KEY`, inherited through `WeightMatchedCapTopAllocator`),
+# so this arm draws the same names AND pays them the same rungs as M0221's wherever both stores
+# size the same company -- which is the only way the before-and-after measures the data repair and
+# nothing else. That is the same reason `draw` hardcodes "M0221" and it now covers two axes.
+
+WEIGHT_AMENDED = date(2026, 10, 20)
+
+
+class RepairedWeightMatchedAllocator(WeightMatchedCapTopAllocator):
+    """M0221's weight-matched blind book, recorded under M0225: the same rule on the repaired data.
+
+    Not one line of behaviour differs from ``M0221-A2``. A new allocator id is the honest way to
+    record the same rule measured on new data -- a trial's configuration is its rules, its
+    allocator id and its params, and M0221's is already recorded -- and it is also the only way,
+    since ``trials`` carries a global ``UNIQUE (config_digest, window)``.
+    """
+
+    id = "M0225-A2"
+
+
+WMATCHED = RepairedWeightMatchedAllocator()
+
+
+def _aw(suffix: str, allocator: Any, params: CapTopParams, rationale: str,
+        supersedes: tuple[str, ...]) -> Candidate:
+    """An amendment candidate: its own ``added``, its own allocator, and the declaration of which
+    recorded arm it replaces.
+
+    ``supersedes`` is what D17 reads (``control_shape.SUPERSEDES_ATTR``). It is DECLARED and never
+    inferred from the target, and it sits outside ``config_digest`` because ``config_text`` names
+    its three attributes by hand. An arm that declares nothing retires nothing, so leaving this off
+    would leave M0225 blocked after the measurement was taken."""
+    return Candidate(id=f"M0225-{suffix}", family="M0225", rules=MONTHLY_HOLD_FRAC_GOTRADE,
+                     allocator=allocator, params=params, rationale=rationale, added=WEIGHT_AMENDED,
+                     owner_inputs=(), supersedes=supersedes)
+
+
+WEIGHT_AMENDMENT = Amendment(
+    added=WEIGHT_AMENDED,
+    why=(
+        "M0225 has no shape-matched control at all: its margin is quoted against R50, which trades "
+        "0.195x and turns over 0.424x the book it controls, and the twin was deliberately not "
+        "drawn until a rule existed that closes the weight axis as well as the name axis"
+    ),
+    hypothesis=(
+        "Written before this arm ran. C50 earned 5.85% a year of the owner's money on the dev "
+        "window and R50 earned 6.74% against the same 7.19% SPY total return, so the recorded "
+        "reading is that the blind draw BEATS the book by 0.89 points -- and R50 got there on 73 "
+        "trades where C50 paid for 375. R50's hash carries no date term, so it drew fifty names "
+        "once in 1996 and held them for twenty years; the only fees it ever paid were the ones "
+        "membership forced on it. C50-PLC is the same fifty-name blind book with two things "
+        "changed and nothing else: the number of names it re-draws each month is C50's own number "
+        "of entrants that month, and the weights it pays them are C50's own weights that month, "
+        "largest first, down a ladder that puts the names it already held above the ones entering "
+        "this month. Predictions. Shape, and it is the one that decides whether the money reading "
+        "is admissible: C50-PLC lands inside 0.80x-1.25x of C50 on both trades and turnover. "
+        "Twin, and it is the sharpest prediction available here because the twin has already run: "
+        "M0221's identical arm landed at 372 trades and 0.4620 turnover against a book re-run at "
+        "375 and 0.4568, and earned 9.94% against that book's 5.85%. M0225's book re-runs on "
+        "today's store at the same 375 and 0.4568 -- the repair is exactly what made M0221's book "
+        "read like M0225's -- so this arm should land within about 0.02x of M0221's on both axes "
+        "and within a few tenths of a point of its 9.94%, and a wider gap than that is the "
+        "remaining share-count difference showing up in the control, which is itself worth "
+        "knowing. Money: an honest control trades about five times as often as R50 and pays those "
+        "fees, which on its own would make it earn LESS than R50's 6.74% -- but M0221's twin says "
+        "the ladder's effect dominates the fee bill by a wide margin, so the prediction here is "
+        "the uncomfortable one: this control earns MORE than R50, C50's deficit WIDENS from -0.89 "
+        "to somewhere near -4, and the lab will have replaced a small unexplained gap with a large "
+        "one. No arm of this method is for promotion; it is a yardstick."
+    ),
+    expected_failure=(
+        "M0221's own matched draw on this identical chassis landed at 1.03x trades and 1.95x "
+        "turnover, so the name axis is the half already known to work here and the weight axis is "
+        "the half the new rule closes. M0225's E50 pays 1.68x against M0221's 1.60x on identical "
+        "names and identical trades, so the repaired store is slightly MORE dispersed and the "
+        "control has slightly further to travel; if this arm misses the band where M0221's "
+        "cleared it, the repair is the difference and that is the finding. Second, paying a "
+        "foreign vector can raise turnover rather than lower it: C50 is cheap because a "
+        "cap-weighted book is nearly drift-neutral, and a control whose target moves with the real "
+        "book's prices while its holding moves with its own crosses the 1%-of-equity resize band "
+        "more often, not less. If that is what happens, it is the finding, it is recorded, and no "
+        "fifth assignment rule is tried. Third, and this is the one that would matter most: the "
+        "margin this arm produces may be large and may not be about stock picking at all. A "
+        "control matched on trades and turnover is still a FIXED-weight book pushed back to its "
+        "proportions every month, while the book it controls lets its biggest companies run and "
+        "never trims them, and rebalancing is a return source in its own right -- this chassis "
+        "already shows a smaller version of it, since E50 earns more than C50 on identical names. "
+        "If the deficit lands near M0221's -4, that reading is the honest one and it must be "
+        "published with the mechanism beside it, not as evidence that blind picking beats size. "
+        "Fourth, one blind draw is one sample: the top rung sits on a single name for twenty "
+        "years, and seed 1 is the only seed either twin has. A second seed is not run here and the "
+        "arm is not re-drawn for a better number under any result."
+    ),
+    candidates=(
+        _aw("C50-PLC", WMATCHED, CapTopParams(50, pick="random", seed=1, trend=None),
+            "Placebo, shape-matched on both axes: the same fifty-name blind book hash-drawn at "
+            "C50's own monthly churn, and paid C50's own weight vector instead of its own sizes",
+            supersedes=("M0225-R50",)),
+    ),
+)
 
 METHOD = Method(
     id="M0225",
@@ -159,5 +275,5 @@ METHOD = Method(
         "concept:cap-weighted-top-n-repaired-share-classes",
         "concept:market-shape-yardstick-before-after-data-fix",
     ),
-    amendments=(E100_AMENDMENT,),
+    amendments=(E100_AMENDMENT, WEIGHT_AMENDMENT),
 )

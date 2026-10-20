@@ -16,9 +16,9 @@ of the names: M0221-E50 holds C50's exact names and records C50's exact 360 trad
 enough for the 10% ceiling to bind. That was a recorded STOP (plan invariant 13) and M0225's block was
 never written under it. Amendment 2 is what closes it: ``lab.control_weight`` pays the drawn names
 C50's own weight vector down a ladder that puts this control's own entrants at the bottom, and
-``WeightMatchedCapTopAllocator`` carries both halves. M0225's twin rides on it next, under
-``M0225-A2`` -- which is what ``test_the_matched_allocator_is_reusable_by_a_twin`` was keeping
-intact.
+``WeightMatchedCapTopAllocator`` carries both halves, and M0225's twin finally rides on it
+under ``M0225-A2`` -- which is what ``test_the_matched_allocator_is_reusable_by_a_twin`` was
+keeping intact.
 """
 
 from __future__ import annotations
@@ -128,6 +128,7 @@ def test_the_new_arms_declare_the_arms_they_supersede():
     assert _arm(m0221.METHOD, "M0221-C50-PLCW").supersedes == (
         "M0221-C50-PLC", "M0221-R50",
     ), "Candidate.__post_init__ requires the declaration sorted and unique"
+    assert _arm(m0225.METHOD, "M0225-C50-PLC").supersedes == ("M0225-R50",)
     for c in m0221.METHOD.candidates:
         assert c.supersedes == (), f"{c.id}: an original arm declares nothing"
     for c in m0225.METHOD.candidates + tuple(m0225.E100_AMENDMENT.candidates):
@@ -158,7 +159,7 @@ def test_the_amendment_blocks_are_the_expected_shape():
     """Two amendments on M0221, in declaration order, which is the order `pending_amendment`
     resolves them in: the record must be an exact prefix of the file, so a reordered or reworded
     block is a refusal and a recorded batch of trials can never be filed under a hypothesis nobody
-    committed to before seeing it. M0225's second block lands in the next commit of this phase."""
+    committed to before seeing it."""
     assert len(m0221.METHOD.amendments) == 2
     assert m0221.METHOD.amendments[0].added == date(2026, 10, 19)
     assert [c.id for c in m0221.METHOD.amendments[0].candidates] == ["M0221-C50-PLC"]
@@ -167,29 +168,36 @@ def test_the_amendment_blocks_are_the_expected_shape():
     assert len(m0221.METHOD.candidates) == 6
     assert len(m0221.METHOD.all_candidates()) == 8
 
+    assert len(m0225.METHOD.amendments) == 2
     assert m0225.METHOD.amendments[0] is m0225.E100_AMENDMENT
+    assert m0225.METHOD.amendments[1] is m0225.WEIGHT_AMENDMENT
+    assert [c.id for c in m0225.METHOD.amendments[1].candidates] == ["M0225-C50-PLC"]
+    assert len(m0225.METHOD.all_candidates()) == 8
 
 
-def test_the_weight_matched_arm_reads_as_a_placebo_on_the_book_it_controls():
+def test_the_weight_matched_arms_read_as_placebos_on_the_books_they_control():
     """D17 classifies by prose and tests dose BEFORE draw, so an arm that read as dose-response
     would carry no ratio and its refusal would vanish with the handicap still in place. The rung
-    matters as much as the kind: `sibling-stem` is what the `<target>-PLC...` name buys, and the
-    new id keeps it -- `"M0221-C50-PLCW".rsplit("-", 1)[0]` is `"M0221-C50"`."""
-    arm = _arm(m0221.METHOD, "M0221-C50-PLCW")
-    text = arm.rationale.lower()
-    assert cs.kind_of(arm) == cs.KIND_PLACEBO
-    assert any(m in text for m in cs.DRAW_MARKERS)
-    assert not any(m in text for m in cs.DOSE_MARKERS)
-    assert cs.resolve_target(arm, list(m0221.METHOD.all_candidates())) == (
-        "M0221-C50", cs.RUNG_STEM,
-    )
+    matters as much as the kind: `sibling-stem` is what the `<target>-PLC...` name buys, and both
+    new ids keep it -- `"M0221-C50-PLCW".rsplit("-", 1)[0]` is `"M0221-C50"`."""
+    for method, cid, target in (
+        (m0221.METHOD, "M0221-C50-PLCW", "M0221-C50"),
+        (m0225.METHOD, "M0225-C50-PLC", "M0225-C50"),
+    ):
+        arm = _arm(method, cid)
+        text = arm.rationale.lower()
+        assert cs.kind_of(arm) == cs.KIND_PLACEBO
+        assert any(m in text for m in cs.DRAW_MARKERS)
+        assert not any(m in text for m in cs.DOSE_MARKERS)
+        assert cs.resolve_target(arm, list(method.all_candidates())) == (target, cs.RUNG_STEM)
 
 
-def test_the_weight_allocator_is_a_new_id_that_names_no_ingredient():
-    r"""``hardgate._INGREDIENT`` is ``<(M\d{4})>``, so ``<M0221-A2>`` matches nothing and D12's
-    ingredient map is exactly what it was."""
+def test_the_weight_allocators_are_new_ids_that_name_no_ingredient():
+    r"""``hardgate._INGREDIENT`` is ``<(M\d{4})>``, so ``<M0221-A2>`` and ``<M0225-A2>`` match
+    nothing and D12's ingredient map is exactly what it was."""
     assert m0221.WMATCHED.id == "M0221-A2"
-    assert _INGREDIENT.findall("allocator=<M0221-A2>") == []
+    assert m0225.WMATCHED.id == "M0225-A2"
+    assert _INGREDIENT.findall("allocator=<M0221-A2> <M0225-A2>") == []
 
 
 def test_the_weight_rule_costs_no_extra_lookback():
@@ -199,20 +207,26 @@ def test_the_weight_rule_costs_no_extra_lookback():
     every lab allocator clears."""
     assert m0221.WMATCHED.lookback(CONTROL_PARAMS) == m0221.MATCHED.lookback(CONTROL_PARAMS)
     assert m0221.WMATCHED.lookback(CONTROL_PARAMS) == cd.lookback_for(m0221.DV_N)
-    assert m0221.WMATCHED.lookback(CONTROL_PARAMS) <= SMOKE_BARS
+    assert m0225.WMATCHED.lookback(CONTROL_PARAMS) <= SMOKE_BARS
 
 
-def test_the_weight_arm_reuses_the_params_value_and_mints_no_dataclass():
+def test_the_weight_arms_reuse_the_params_value_and_mint_no_dataclass():
     """The set's one params rule, carried into the second amendment: no new dataclass anywhere,
     the allocator id is the whole difference. ``CapTopParams`` is shared by M0221 and M0225, so one
     added field -- even a defaulted one -- would move every recorded digest of both."""
-    new = _arm(m0221.METHOD, "M0221-C50-PLCW")
-    assert new.params == CONTROL_PARAMS
-    assert new.params.pick == "random", "a blind book must not describe itself as a ranked one"
+    for method, cid in ((m0221.METHOD, "M0221-C50-PLCW"), (m0225.METHOD, "M0225-C50-PLC")):
+        new = _arm(method, cid)
+        assert new.params == CONTROL_PARAMS
+        assert new.params.pick == "random", "a blind book must not describe itself as a ranked one"
     assert [f.name for f in fields(m0221.CapTopParams)] == [
         "top", "weighting", "cap", "pick", "seed", "trend"
     ]
-    assert config_digest(new) != config_digest(_arm(m0221.METHOD, "M0221-C50-PLC"))
+    assert config_digest(_arm(m0221.METHOD, "M0221-C50-PLCW")) != config_digest(
+        _arm(m0221.METHOD, "M0221-C50-PLC")
+    )
+    assert config_digest(_arm(m0225.METHOD, "M0225-C50-PLC")) != config_digest(
+        _arm(m0221.METHOD, "M0221-C50-PLCW")
+    )
 
 
 def test_the_shipped_ladder_is_one_control_weight_recognises():

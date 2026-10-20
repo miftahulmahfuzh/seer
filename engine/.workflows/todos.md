@@ -1562,29 +1562,29 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Context**: `engine/src/seer_engine/lab/name_count.py:27` (module docstring) equates the two quantities outright — ``store.dev_trial_count`` **(the lab's N)**. That was true under `DSR_POLICY = "all-trials"`, where N was one look per dev trial row. Since 2026-10-08 the shipped policy is `methods` (lab-realistic-gate R1, `P1-ENG-L4ND`) and N is the distinct-method count floored at the measured participation ratio — 28, against 126 dev trial rows. The parenthetical now names the wrong quantity, and it sits in the docstring a reader consults to learn what the module guarantees. The fix is the wording: `dev_trial_count` is still the right number for that sentence's purpose (it is what stays unchanged), it is simply no longer "the lab's N" — that is `store.gate(conn).n`. Found during phase 1 and deliberately left: `name_count.py` is outside that phase's Owns, so it is carded rather than edited. **Checked and NOT a defect — do not "fix" it:** `:477`, the `format_report` footer, says "the lab's N and the test-window looks do not move". That is a claim about `lab names` writing nothing, and it stays true under every policy. `:27` is the only site that mislabels the quantity.
   - **Status**: pending
   - **Found by**: `P1-ENG-L4ND` (lab-realistic-gate phase 1)
-- [ ] **P2-ENG-D9KX** Phase 1: Widen `control_shape`'s role vocabulary
+- [x] **P2-ENG-D9KX** Phase 1: Widen `control_shape`'s role vocabulary
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `ROLE_*` vocabulary and `role_of(arm) -> control|dose|idea|treatment` in `control_shape.py`. Phase 1 builds the reader that phases 2 and 3 need to identify the control arms the audit found. Leaves the fold selector, promotion ranking, and gate verdicts untouched. Exit: `role_of` reproduces the audit's 189-control classification over all 821 arms; every new marker carries its measured hit count; `lab control` is byte-identical.
-  - **Status**: in_progress
+  - **Status**: completed 2026-10-20 — b5307d3
   - **Plan Set**: `docs/plans/FOLD_SELECTOR_AUDIT_PLAN.md` (phase 1 of 3)
   - **Satisfies**: R3 — A recommendation on `hardgate.py` with the argument
   - **Depends on**: —
   - **Plan**: `.workflows/plan/P2-ENG-D9KX.md`
-- [ ] **P2-ENG-Q4LP** Phase 2: D18 — refuse a promotion whose pre-registered variant is a control
+- [x] **P2-ENG-Q4LP** Phase 2: D18 — refuse a promotion whose pre-registered variant is a control
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns a new D18 clause in `hardgate.check()` that refuses a promotion whose pre-registered arm is a control (an arm registered to be beaten). Measured 2026-10-20: 19 of 78 dev-eligible methods would pre-register a control. Three are stopped only by kin luck today; phase 2 guards them. Exit: the 19 are refused by name with their rationale quoted; every other method that is promotable today stays promotable; suite green.
-  - **Status**: blocked
+  - **Status**: completed 2026-10-20 — dba434f
   - **Plan Set**: `docs/plans/FOLD_SELECTOR_AUDIT_PLAN.md` (phase 2 of 3)
   - **Satisfies**: R3 — A recommendation on `hardgate.py` with the argument written out, in code
   - **Depends on**: P2-ENG-D9KX
   - **Plan**: `.workflows/plan/P2-ENG-Q4LP.md`
-- [ ] **P2-ENG-X7WG** Phase 3: Measure the era edge on the promoted variant
+- [x] **P2-ENG-X7WG** Phase 3: Measure the era edge on the promoted variant
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns the `2009-15 edge` column in `lab walkforward` and the `high_coverage_edge` the buy signal reads. Changes them to measure on the promoted variant (the arm `lab promote` pre-registers) instead of the hindsight-best arm. Adds a `(hindsight)` column and a footnote for sign disagreements. Exit: the firing set goes {M0092, M0197, M0243, M0258} → {M0072, M0092, M0258}; promotion outcomes unchanged; suite green.
-  - **Status**: blocked
+  - **Status**: completed 2026-10-20 — 71b6cde
   - **Plan Set**: `docs/plans/FOLD_SELECTOR_AUDIT_PLAN.md` (phase 3 of 3)
   - **Satisfies**: R4 — Resolve the M0179 era-edge thread
   - **Depends on**: P2-ENG-D9KX

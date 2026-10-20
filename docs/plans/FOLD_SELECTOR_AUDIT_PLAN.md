@@ -6,9 +6,9 @@
 **Worktree:** none — written against `main` @ `89b4220`
 **Branch:** `main`
 **Phases:** 3
-**Status:** planned — **not launched.** The brief asked for an audit and a recommendation, not an
-implementation; phases 2 and 3 change what the lab will promote and when it fires a buy signal,
-which is the owner's call. Launch with the command at the bottom when he says so.
+**Status:** **implemented 2026-10-20** — all three phases, on owner approval the same day.
+Phase 1 `b5307d3`, phase 2 `dba434f`, phase 3 `71b6cde`, pushed to `origin/main`. No method id
+spent, no trial written, no status moved; test-window looks read 4 before and 4 after.
 **Coordinator:** —
 
 ---
@@ -29,17 +29,21 @@ From the brief, preserved because it is the specification for what may and may n
 > engine/src/seer_engine/lab/hardgate.py must be argued in the commit message. There is no
 > override flag and you must not add one.
 
-Every change below makes the lab **stricter about promotion**. No phase adds an override, a flag
-or an env var, and no phase makes a refused method promotable — `hardgate.check()` has no era
-clause, so phase 3 cannot move a promotion either way.
+Every change below makes the lab stricter **about promotion**, and no phase adds an override, a
+flag or an env var. **It is not one-way overall**, and this plan must not be read as if it were:
+phase 3 corrects the buy signal, and a correction has losers *and* a winner. `hardgate.check()`
+has no era clause, so no promotion outcome moves either way — that invariant is about promotion
+and nothing else.
 
-**One carve-out, measured, not a tightening:** phase 3 corrects the buy signal, which is a
-recommendation to *buy price data*, not a promotion. Today it fires on `{M0092, M0197, M0243,
-M0258}`; after the fix it fires on `{M0072, M0092, M0258}`. M0197 and M0243 stop — both were
-firing on an arm that is not the one that would be promoted, whose promoted arm has a negative
-era edge — and **M0072 starts**, because the same bug was running the other way on it. A winner
-and two losers, not a one-way clamp. The two methods the audit found would flip under (A)
-— M0174 and M0178 — stay refused, because (A) is not adopted.
+**The carve-out, measured, and verified after implementation:** the buy signal is a recommendation
+to *buy price data*, not a promotion. It fired on `{M0092, M0197, M0243, M0258}`; after the fix it
+fires on `{M0072, M0092, M0258}`. M0197 and M0243 stop — both were firing on an arm that is not
+the one that would be promoted, whose promoted arm has a **negative** era edge (M0197 read +7.02
+on `M0197-Y20` while `M0197-Y20-SW` is −3.34; M0243 read +1.91 on a dose rung while
+`M0243-NEAR20-SW` is −3.92). And **M0072 starts**: its hindsight arm `M0072-Z2` reads −1.09 while
+its promoted `M0072-Z2-RAWRANK` reads +2.26. Two false alarms removed, **one true positive
+added** — not a one-way clamp. The two methods the audit found would flip under (A) — M0174 and
+M0178 — stay refused, because (A) is not adopted.
 
 ## Requirements
 

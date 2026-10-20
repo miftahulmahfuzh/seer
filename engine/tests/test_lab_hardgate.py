@@ -2221,3 +2221,65 @@ def test_a_method_with_no_promotable_variant_shows_a_dash_and_cannot_fire(
     assert "+7.0%" in row                               # the hindsight arm is still reported
     assert "no 2009-2015 edge for the variant that would be promoted" in row
     assert "No buy signal" in out
+
+
+# The firing set on the committed lab, before and after 2026-10-20. Pinned because the correction
+# is NOT one-way and that is the thing most easily lost: two methods stop firing and one starts.
+# A test that only pinned the suppressions would let a later edit quietly re-break M0072 while
+# still reading green.
+BUY_SIGNAL_BEFORE: frozenset[str] = frozenset({"M0092", "M0197", "M0243", "M0258"})
+BUY_SIGNAL_AFTER: frozenset[str] = frozenset({"M0072", "M0092", "M0258"})
+
+
+def test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways(
+    tmp_path, capsys, monkeypatch
+):
+    """`lab walkforward` over the committed lab names exactly M0072, M0092 and M0258.
+
+    M0197 and M0243 stopped: each fired on an arm that is not the one `lab promote` would
+    pre-register, and each of those promoted arms reads NEGATIVE over 2009-2015 -- the one era
+    the condition exists to examine. M0072 started: its hindsight arm reads -1.09 pts and its
+    promoted arm +2.26, so the old column was suppressing a true positive. Both directions are
+    asserted, because "the fix makes the lab stricter" is the false summary of this change.
+
+    The committed lab is COPIED first and the command run against the copy: a lab command migrates
+    its database on connect, so even a read dirties the real file. The real file's bytes are
+    hashed either side to prove it. `DSR_POLICY` goes back to the lab's real default, because this
+    module's autouse fixture pins it to the one its own synthetic rows were recorded under.
+    """
+    import shutil
+
+    from seer_engine.lab import npolicy
+
+    if not store.COMMITTED_DB.exists():
+        pytest.skip("no lab database")
+    monkeypatch.setattr(store, "DSR_POLICY", npolicy.DEFAULT_POLICY)
+    store._GATE_CACHE.clear()
+
+    before = hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest()
+    db = tmp_path / "lab-copy.sqlite"
+    shutil.copy(store.COMMITTED_DB, db)
+
+    from seer_engine.commands import lab as lab_cmd
+
+    assert lab_cmd.run(_wf_args(db)) == 0
+    out = capsys.readouterr().out
+    assert hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest() == before
+
+    block = out.split("*** BUY SIGNAL ***", 1)
+    fired = set()
+    if len(block) == 2:
+        for line in block[1].splitlines():
+            head = line.strip().split(":", 1)[0]
+            if head.startswith("M") and head[1:].isdigit():
+                fired.add(head)
+
+    assert fired == set(BUY_SIGNAL_AFTER), (
+        f"the buy signal now names {sorted(fired)}, not {sorted(BUY_SIGNAL_AFTER)}"
+    )
+    # the two false alarms are gone...
+    assert not (fired & (BUY_SIGNAL_BEFORE - BUY_SIGNAL_AFTER)), "a suppressed false alarm is back"
+    # ...and the true positive the old column was hiding is present. This half is the one a
+    # one-way reading of the change would drop.
+    assert "M0072" in fired, "M0072 is the true positive the hindsight column was suppressing"
+    assert "M0072" not in BUY_SIGNAL_BEFORE

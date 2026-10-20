@@ -2,19 +2,19 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-19
-**Total Active Tasks**: 3
+**Last Updated**: 2026-10-20
+**Total Active Tasks**: 8
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 7
 - P2 Medium: 0
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 0
-- Completed: 25
+- Blocked: 3
+- Completed: 26
 
 ---
 
@@ -23,6 +23,58 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [ ] **P1-ROOT-J6WT** Phase 1: Measure the shadow on every chassis, before it is built
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns a scratchpad probe script and `.workflows/plan/control-draw-remedies/phase-1-results.md`. Touches no engine source, no method file, not `lab/lab.sqlite`, not `web/data/lab.json`. Exit: a table, one row per chassis (M0047, M0201, M0202, M0208, M0215, M0221, M0225, M0227, M0243), giving over the whole dev window the TRUE cumulative entry count from a full forward replay of the book's own band, the CURRENT estimator's count, and a K-step backward replay's count for every affordable K; a one-word per-chassis verdict (*shadow needed* / *shadow is a measured no-op*) with the deciding ratio; for M0208 the smallest K reaching >= 0.90 of the true entry count and the bars it costs against `473 - lookback` — a PROPOSAL only, phase 3 ships its own; `m0208_true_entries` and `m0208_shipped_entries` carried into the contract block so phase 3 anchors on a measured number and not the close-out's 624; the membership decomposition ((b) SHIPPED against (c) K=1), priced and handed to phase 6 as a new leftover, never folded into phase 2; the corrected quarterly step `m0201.PREV_SPAN = 70` so `K_max = 3`; `git hash-object lab/lab.sqlite` identical before and after; looks 4 -> 4. STOP rule: if no affordable K reaches 0.90 on M0208, record it and stop — a bounded replay is then not the remedy and phases 2 and 3 do not run as designed.
+  - **Status**: pending
+  - **Plan Set**: `docs/plans/CONTROL_DRAW_REMEDIES_PLAN.md` (phase 1 of 6)
+  - **Satisfies**: R1 — Carry a shadow of the real held set across decisions instead of re-deriving a fresh top-N stand-in for `real_prev`; apply it to every chassis at once, never to one file; say what happens to the recorded arms drawn under the current contract
+  - **Plan**: `.workflows/plan/P1-ROOT-J6WT.md`
+- [ ] **P1-ROOT-X4PN** Phase 2: The shadow rule, written beside v1
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/lab/control_draw.py` (ADDITIONS ONLY), `engine/tests/test_lab_control_draw_shadow.py` (new) and one added golden-vector test in `engine/tests/test_lab_control_draw.py`. Touches no method file, not the lab database, and not the existing bodies of `matched_names`, `matched_partition`, `matched_book`, `keep_key`, `entry_key`, `churn`, `previous_decision_date`, `lookback_for`. Exit: a pure, stateless, bounded backward replay reconstructing the real book's held set at the previous decision, the lookback arithmetic that pays for it, and `SHADOW_RULE_ID` (`"matched-draw-v2"`) BESIDE `RULE_ID`, which is not bumped; the plan set's one vocabulary — `Replay`, `ShadowReading`, `max_shadow_depth`, `shadow_lookback_for`, `shadow_decision_dates`, `shadow_selection`, `shadow_book`, `SHADOW_RULE_ID`, `FIXTURE_BARS` — which phases 3 and 5 code against verbatim; NO K baked anywhere (`depth` keyword-only, no default, on both entry points, so the number lives in the method file as `SHADOW_DEPTH`); the membership convention NOT attempted (the v2 block takes no `members` argument); a golden-vector test pinning v1's output so a future in-place edit to the frozen path goes red — nothing would catch it today, a module body being outside `config_digest`; new tests in their own module, every allocator still inside 473 bars; `ruff check engine` clean and `pytest engine/tests` green including `test_every_recorded_configuration_still_digests_to_its_recorded_digest`; `git hash-object lab/lab.sqlite` unmoved; looks 4 -> 4.
+  - **Status**: blocked
+  - **Plan Set**: `docs/plans/CONTROL_DRAW_REMEDIES_PLAN.md` (phase 2 of 6)
+  - **Satisfies**: R1 — Carry a shadow of the real held set across decisions instead of re-deriving a fresh top-N stand-in for `real_prev`; apply it to every chassis at once, never to one file; say what happens to the recorded arms drawn under the current contract, R4 — Recorded trials and closed records frozen; a re-draw is a NEW arm under an amendment; no test-window look in any phase
+  - **Depends on**: P1-ROOT-J6WT
+  - **Plan**: `.workflows/plan/P1-ROOT-X4PN.md`
+- [ ] **P1-ROOT-E9QL** Phase 3: M0208's honest control, re-drawn under the shadow
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/lab/methods/m0208_capital_gains_overhang.py` (append plus three pin-point edits: the import line, an Amendment-2 docstring paragraph, the `amendments=` tuple), `engine/tests/test_lab_m0208_matched_draw.py`, the lab rows it writes, `web/data/lab.json` and `.workflows/plan/control-draw-remedies/phase-3-results.md`. Touches `control_draw.py` only by quotation; never `MatchedDrawAllocator`, the `MATCHED_DRAW` amendment block, `choose`, `_banded_picks`, `previous_month_end`, `OverhangParams`, or ANY other method file at all. Exit: a new allocator id (`M0208-A2`) and a new `Amendment` block APPENDED after the existing one, with `why`, `hypothesis` and `expected_failure` written before any result is seen; a free pre-run probe giving the calendar agreement between `control_draw.previous_decision_date` and `m0208.previous_month_end` over the whole dev window (anchor 0), the true entry count against phase 1's measured number (anchor 1), the unguarded K=1 ladder reproducing 304 (anchor 2), and the whole K ladder — all before the amendment is committed; `SHADOW_DEPTH` set from THIS phase's own ladder, not phase 1's proposal, with both numbers reported and one sentence on why they may differ; pre-registration committed, then `lab run M0208 --amend`, then `lab control M0208`; the new arm's ratios reported against the band-clean window 500 ... 752 trades / 2.4492 ... 3.8268 turnover, and D17's live state re-read through `store.connect_readonly`; the published sentence moved by `lab note` ONLY if the arm is band-clean, rehearsed on a DB copy via `SEER_LAB_DB` first (`--dry-run` does not protect `lab note`); `lab stage`, commit, push, MERGING never rebasing on a rejected push; looks 4 -> 4; an explicit statement that the gate still refuses M0208 on the kin rule whatever D17 now says. No-op branch: if phase 1 handed over `stop: true` or this phase's probe returns NO-GO, no file is edited and no `lab` command is run — write `phase-3-results.md` with verdict `STOP`, the ladder, both anchors, "M0208's published lead stays a floor", `published_sentence_moved: false` for phase 6, and tell the coordinator to run phase 4 next.
+  - **Status**: blocked
+  - **Plan Set**: `docs/plans/CONTROL_DRAW_REMEDIES_PLAN.md` (phase 3 of 6)
+  - **Satisfies**: R1 — Carry a shadow of the real held set across decisions instead of re-deriving a fresh top-N stand-in for `real_prev`; apply it to every chassis at once, never to one file; say what happens to the recorded arms drawn under the current contract, R3 — State plainly what this buys — honest controls, not promotions, R4 — Recorded trials and closed records frozen; a re-draw is a NEW arm under an amendment; no test-window look in any phase
+  - **Depends on**: P1-ROOT-X4PN
+  - **Plan**: `.workflows/plan/P1-ROOT-E9QL.md`
+- [x] **P1-ROOT-Z7BD** Phase 4: Measure the weight vector, before it is built
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `.workflows/plan/control-draw-remedies/phase-4-weight-probe.py` (prototypes, free probe and sweep harness — a committed `.workflows/plan/` file, NOT under `engine/`, imported by nothing) and `.workflows/plan/control-draw-remedies/phase-4-results.md`. Touches no file under `engine/src`, no method file, no test, not `lab/lab.sqlite`, not `web/data/lab.json`; the prototypes SUBCLASS the shipped allocators and override only the weighting step, never mutating a shipped class, rebinding a module attribute or reusing a recorded allocator id. Exit: turnover and trade counts for `M0221-C50`, `M0221-C50-PLC` and FOUR prototype weight-assignment rules, all measured inside ONE `dev.run_registry` sweep per chassis so every comparison is re-run against re-run (I8), with M0221 and M0201 swept in SEPARATE processes one at a time; the four rules are (A) the real book's sorted weight vector in the control's month-keyed order, (B) the same vector in the date-free keep order, (C) the control's own sizes re-shaped so the ceiling binds at the real book's rate, (D) keeps first in keep order and entrants last down the sorted vector — D pre-registered in the plan before any number is seen; a yes/no WITH THE NUMBER on whether any rule brings M0221's control to <= 0.5563 turnover (1.25x) while holding trades inside 0.8-1.25x; the same measurement for M0201's 0.0059 gap, answered INDEPENDENTLY so an M0221 STOP cannot suppress an M0201 GO or the reverse; the winner named by BOTH its letter and phase 5's branch key (`G-entry`/`G-ladder`/`G-size`/`G-bottom`); `git hash-object lab/lab.sqlite` unmoved, looks 4 -> 4, no `lab` command run at all. STOP rule: if no rule lands M0221 inside `WARN_BAND`, phase 5 draws neither M0221 nor M0225, leftover 2 closes with a number instead of being carried a third time, and phase 6 writes that up as the answer — a legitimate outcome, not a failure. Four rules, measured, then stop. There is no rule E, under any result.
+  - **Status**: completed
+  - **Plan Set**: `docs/plans/CONTROL_DRAW_REMEDIES_PLAN.md` (phase 4 of 6)
+  - **Satisfies**: R2 — Give the drawn names the real arm's own weight vector; confront that it is a second mechanism on three of nine chassis and has already failed the original "one reusable rule" requirement
+  - **Plan**: `.workflows/plan/P1-ROOT-Z7BD.md`
+- [ ] **P1-ROOT-M4HV** Phase 5: The weight rule, and the arms it earns
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `engine/src/seer_engine/lab/control_weight.py` (new), `engine/tests/test_lab_control_weight.py` (new), appends to `m0221_cap_weighted_top_n.py`, `m0225_cap_weighted_top_n_repaired.py` and (only if phase 4 showed the rule closes its gap) `m0201_treasury_beta_size_weighted.py`, `engine/tests/test_lab_control_draw_twins.py`, the lab rows it writes, `web/data/lab.json` and `.workflows/plan/control-draw-remedies/phase-5-results.md`. Touches `control_draw.py` only by quotation (it imports exactly one name, `keep_key`, and never reads the v2 shadow); not phase 2's or phase 3's test modules; not m0047, m0202, m0215, m0227, m0243. Exit: §0's branch key written FIRST, in writing, before an editor is opened — one of S, G-entry (A), G-ladder (B), G-size (C), G-bottom (D), with any ambiguity in phase 4's file resolving to S and no sixth key and no re-measurement; under branch G the weight-assignment contract in its own module with its own tests and a per-chassis adapter in each method file, the same shape `matched_partition` already has, with the module docstring saying so rather than claiming one rule; new allocator ids and new `Amendment` blocks appended, pre-registration committed before each `lab run --amend`, ONE `lab run` at a time; `lab control M0221 M0225` (and M0201 if drawn) reporting the measured ratios, with the supersession declarations retiring `M0221-R50`, `M0221-C50-PLC` and `M0225-R50` ONLY if the new arms read `OK`; M0225's -0.890 stated accurately — it appears in no owner-facing string, so a band-clean arm gives M0225 an honest margin sentence for the first time rather than correcting a wrong one, and if no arm is drawn the phase records that M0225 still has no honest control and invents no sentence; `controls=` NOT declared on M0221's or M0225's arms (D9), with M0201's stem re-checked before its id is written; every `lab note` rehearsed on a DB copy via `SEER_LAB_DB` first; `lab stage` after each run, commit with NO pathspec, push, MERGING never rebasing; the suite run at each `lab stage` boundary and at the end, never between a `lab run` and its stage; looks 4 -> 4; Decision D6 recorded under either branch, M0047 excluded on measurement not omitted. Branch S: one results section and NO code at all — no module, no test, no method-file edit, no `lab` command, no commit to `engine/`, and the database hash identical before and after.
+  - **Status**: pending
+  - **Plan Set**: `docs/plans/CONTROL_DRAW_REMEDIES_PLAN.md` (phase 5 of 6)
+  - **Satisfies**: R2 — Give the drawn names the real arm's own weight vector; confront that it is a second mechanism on three of nine chassis and has already failed the original "one reusable rule" requirement, R4 — Recorded trials and closed records frozen; a re-draw is a NEW arm under an amendment; no test-window look in any phase
+  - **Depends on**: P1-ROOT-Z7BD
+  - **Plan**: `.workflows/plan/P1-ROOT-M4HV.md`
+- [ ] **P1-ROOT-A8RK** Phase 6: The R1 verdict, the sentences, and the close-out
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `docs/plans/HANDOVER_20261020-control-draw-remedies.md` (new), `.workflows/plan/control-draw-remedies/phase-6-results.md` and its `insights/*`, `methods.verdict` and `methods.analysis` via `lab note`, the `lab insight` rows and the final `lab stage`. Touches no file under `engine/src`, never edits phases 1/3/4/5's results files, never edits the `trials`, `method_amendments` or `candidates` rows phases 3 and 5 recorded. Exit: the R1 answer written where a reader will find it — two rules on two axes, R1 as literally written unmeetable, R1 in the sense `control_draw` already satisfies it met — with the two structural reasons and the `E50` number behind them; a sweep of EVERY `methods.verdict` and `methods.analysis` in the lab (all 276 methods, not just the nine), because the previous close-out's six phases missed four sentences, three of them in `verdict` — the three sentences this set names are a FLOOR on the list, never the list; every sentence the sweep marks MOVED corrected in plain language with no ids or digests, at minimum M0208's "at least 4.3 points a year" and M0221's "between 0 and 0.4", with M0225's -0.890 explicitly NOT among them (verified read-only, it appears in no owner-facing string, so the handover records that M0225 has no honest control and the lab publishes no claim resting on the figure — it invents no sentence to correct); the 624 figure settled, with the ratio unaffected and remaining the finding; all counts re-derived read-only never copied (855/276/11/478/859, N=165 at `e3aeeff`), with leftovers 4, 5 and 7 of the honest-control handover VERIFIED closed rather than assumed and none of them re-done; every `lab note` and `lab insight` rehearsed on a DB copy via `SEER_LAB_DB`; insights journalled LAST, one command at a time, exit code read directly and never piped (I4); `lab stage` run last with `lab/lab.sqlite` and `web/data/lab.json` agreeing row for row, committed together with no pathspec and pushed, MERGING never rebasing, and the suite run AFTER the final stage; a leftovers list closing leftovers 1, 2 and 3 of the honest-control handover with a result each — including a STOP if that is what phase 4 measured — and carrying the membership convention as a NEW leftover with phase 1's number attached; a set in which phase 5 wrote no code (branch S) handled by its SHAPE-B input block; looks 4 -> 4, asserted and stated.
+  - **Status**: blocked
+  - **Plan Set**: `docs/plans/CONTROL_DRAW_REMEDIES_PLAN.md` (phase 6 of 6)
+  - **Satisfies**: R2 — Give the drawn names the real arm's own weight vector; confront that it is a second mechanism on three of nine chassis and has already failed the original "one reusable rule" requirement, R3 — State plainly what this buys — honest controls, not promotions, R4 — Recorded trials and closed records frozen; a re-draw is a NEW arm under an amendment; no test-window look in any phase
+  - **Depends on**: P1-ROOT-E9QL, P1-ROOT-M4HV
+  - **Plan**: `.workflows/plan/P1-ROOT-A8RK.md`
 - [ ] **P1-ROOT-H5NX** Phase 5: Pre-register, run, record, stage and write up
   - **Difficulty**: NORMAL
   - **Type**: Feature

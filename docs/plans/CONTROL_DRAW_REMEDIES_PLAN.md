@@ -147,11 +147,14 @@ wrote this file and own no phase.
 
 - A shadow of the real held set, carried across decisions, written **beside** the shipped rule and
   never in place of it.
-- A measurement, on every one of the eight chassis that call `control_draw`, of what that shadow
-  changes — so "the shadow is a no-op here" is a recorded number.
-- A new arm, under a new `Amendment`, on every chassis where the shadow moves the entry count.
-- A free, trial-free measurement of the weight-vector mechanism on M0221, with three candidate
-  assignment rules and an explicit STOP.
+- A measurement, on every one of the nine chassis that call `control_draw` (eight method files;
+  M0225 shares M0221's allocator), of what that shadow changes — so "the shadow is a no-op here" is
+  a recorded number.
+- A new arm, under a new `Amendment`, on every chassis where the shadow moves the entry count **and
+  phase 3's three-condition rule admits it** — which, measured against the current table, is
+  **M0208 and nothing else**.
+- A free, trial-free measurement of the weight-vector mechanism on M0221 (and on M0201, in the
+  opposite direction), with **four** candidate assignment rules and an explicit STOP.
 - If it clears: a weight contract in a new module, and new arms on M0221, M0225 and (if it closes
   the 0.0059 gap) M0201.
 - The close-out: the R1 verdict, the owner-facing sentences the set moves, the journalled insights
@@ -166,7 +169,14 @@ wrote this file and own no phase.
   no amount of control re-drawing touches.
 - **M0047's honest arms.** They already read 0.99/0.92 and 0.98/0.89 — band-clean, superseding.
   Re-drawing them retires nothing and spends compute (Decision D6).
-- **M0202, M0215, M0227, M0243's honest arms**, unless phase 1 measures the shadow moving them.
+- **M0202, M0215, M0227, M0243's honest arms.** All are already `OK`, so phase 3's rule excludes
+  them even if phase 1 measures the shadow moving them; a chassis phase 1 names that this rule does
+  not cover is handed to the coordinator, never absorbed into a running phase.
+- **The membership convention** — every method file reads *today's* member list at the earlier
+  date. Phase 1 prices it for free (0.034 on M0047 in validation) because the measurement is one
+  column of a table it is already building, but **no phase repairs it**: it is a second,
+  independent defect that no replay depth closes, and phase 6 carries it forward as a new leftover
+  with that number attached.
 - **Any edit to a recorded candidate, a recorded `Amendment` block, `choose`, `_banded_picks`, or
   any closed record.**
 - **`lab test`.** Not invoked in any phase. Looks stay at 4.
@@ -198,12 +208,12 @@ Every phase holds all of these. A phase that cannot is a phase that stops and re
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Measure the shadow on every chassis, before it is built | R1 | `.workflows/plan/` (+ scratchpad) | **2** (+2 scratch) | — | NORMAL | `.workflows/plan/control-draw-remedies/phase-1.md` | — | — |
-| 2 | The shadow rule, written beside v1 | R1, R4 | `engine/src/seer_engine/lab` | **3** | 1 | HARD | `.workflows/plan/control-draw-remedies/phase-2.md` | — | — |
-| 3 | M0208's honest control, re-drawn under the shadow | R1, R3, R4 | `engine/.../lab/methods` + `engine/tests` + lab db | **5** (+1 scratch) | 2 | HARD | `.workflows/plan/control-draw-remedies/phase-3.md` | — | — |
-| 4 | Measure the weight vector, before it is built | R2 | `.workflows/plan/` (+ scratchpad) | **2** | — | HARD | `.workflows/plan/control-draw-remedies/phase-4.md` | — | — |
-| 5 | The weight rule, and the arms it earns | R2, R4 | `engine/.../lab` + methods + `engine/tests` + lab db | **9** branch G / **1** branch S | 4 | HARD | `.workflows/plan/control-draw-remedies/phase-5.md` | — | — |
-| 6 | The R1 verdict, the sentences, and the close-out | R2, R3, R4 | `docs/plans` + `.workflows/plan/` + lab db | **9** | 3, 5 | NORMAL | `.workflows/plan/control-draw-remedies/phase-6.md` | — | — |
+| 1 | Measure the shadow on every chassis, before it is built | R1 | `.workflows/plan/` (+ scratchpad) | **2** (+2 scratch) | — | NORMAL | `.workflows/plan/control-draw-remedies/phase-1.md` | P1-ROOT-J6WT | — |
+| 2 | The shadow rule, written beside v1 | R1, R4 | `engine/src/seer_engine/lab` | **3** | 1 | HARD | `.workflows/plan/control-draw-remedies/phase-2.md` | P1-ROOT-X4PN | — |
+| 3 | M0208's honest control, re-drawn under the shadow | R1, R3, R4 | `engine/.../lab/methods` + `engine/tests` + lab db | **5** (+1 scratch) | 2 | HARD | `.workflows/plan/control-draw-remedies/phase-3.md` | P1-ROOT-E9QL | — |
+| 4 | Measure the weight vector, before it is built | R2 | `.workflows/plan/` (+ scratchpad) | **2** | — | HARD | `.workflows/plan/control-draw-remedies/phase-4.md` | P1-ROOT-Z7BD | — |
+| 5 | The weight rule, and the arms it earns | R2, R4 | `engine/.../lab` + methods + `engine/tests` + lab db | **9** branch G / **1** branch S | 4 | HARD | `.workflows/plan/control-draw-remedies/phase-5.md` | P1-ROOT-M4HV | — |
+| 6 | The R1 verdict, the sentences, and the close-out | R2, R3, R4 | `docs/plans` + `.workflows/plan/` + lab db | **9** | 3, 5 | NORMAL | `.workflows/plan/control-draw-remedies/phase-6.md` | P1-ROOT-A8RK | — |
 
 **Files** counts repository files the phase writes; scratchpad files are noted separately and are
 never committed. Phase 5's count is branch-dependent by design (§0 of its plan).

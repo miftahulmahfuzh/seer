@@ -82,11 +82,11 @@ vocabulary so both can be asked.
 
 ## Phases
 
-| # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan |
-|---|-------|-----------|---------|-------|-----------|------------|------|
-| 1 | Widen `control_shape`'s role vocabulary | R3 | `lab/` | 2 | — | NORMAL | `.workflows/plan/fold-selector-audit/phase-1.md` |
-| 2 | D18: refuse a promotion whose pre-registered variant is a control | R3 | `lab/` | 2 | 1 | HARD | `.workflows/plan/fold-selector-audit/phase-2.md` |
-| 3 | Measure the era edge on the promoted variant | R4 | `lab/`, `commands/` | 3 | 1 | NORMAL | `.workflows/plan/fold-selector-audit/phase-3.md` |
+| # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID |
+|---|-------|-----------|---------|-------|-----------|------------|------|--------|
+| 1 | Widen `control_shape`'s role vocabulary | R3 | `lab/` | 2 | — | NORMAL | `.workflows/plan/fold-selector-audit/phase-1.md` | P2-ENG-D9KX |
+| 2 | D18: refuse a promotion whose pre-registered variant is a control | R3 | `lab/` | 2 | 1 | HARD | `.workflows/plan/fold-selector-audit/phase-2.md` | P2-ENG-Q4LP |
+| 3 | Measure the era edge on the promoted variant | R4 | `lab/`, `commands/` | 3 | 1 | NORMAL | `.workflows/plan/fold-selector-audit/phase-3.md` | P2-ENG-X7WG |
 
 ### Phase 1 — Widen `control_shape`'s role vocabulary
 **Owns:** `DRAW_MARKERS` and a new `ROLE_*` vocabulary plus `role_of(arm) -> control|dose|idea|treatment`.

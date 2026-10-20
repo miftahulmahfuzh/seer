@@ -862,3 +862,232 @@ def test_every_blocked_method_keeps_a_d17_reading_either_way():
         assert cs.refusals(mine) or [f for f in mine if f.superseded_by is not None], (
             f"{mid} is no longer read by D17 at all"
         )
+
+
+# ------------------------------------------------------------------ the role reader
+
+# Real rationales, quoted from the method files on 2026-10-20. Like the block at the top of this
+# file they are frozen records: an arm with a recorded trial cannot have its rationale edited
+# without breaking `store.latest_source_sha` for its method, so a literal here cannot drift.
+R_CTRL_OPEN = "Control: M0036-BLEND re-stated under this allocator, no brake"
+R_PAIRED = "Paired control: no sector cap (= M0168-CTRL = M0088-C-LIVE-63)"
+R_REACTION = "Reaction-negative control: raises that lagged SPY from the declaration day"
+R_YARDSTICK = "Yardstick: the same book with no gate at all and cash for the empty slots"
+R_TRAILING = "The 20 most liquid members, behind the gate: the control, expected to trail"
+R_PAIRED_TRAILING = (
+    "The 40 worst by the same score, behind the switch: the paired control, expected to trail"
+)
+R_POSITIVE = "Control: the 20 most positive-coskewness members, same band and switch"
+R_PLC1_HALF = "Placebo: the same scoreable names in a fixed hash order (seed 1), same guard"
+R_RUNG = "A 40-name rung of the low-correlation book behind the switch"
+R_IDEA = "The idea: equal parts buyback intensity and discount from the yearly high"
+
+
+def test_role_of_answers_with_one_of_the_four_published_roles():
+    """A role is a closed vocabulary, and `ROLES` is what a caller validates against.
+
+    Nothing outside this module may test a literal, because a caller that compared against a
+    misspelled string would silently read every arm as "not a control" and refuse nothing.
+    """
+    assert cs.ROLES == (cs.ROLE_CONTROL, cs.ROLE_DOSE, cs.ROLE_IDEA, cs.ROLE_TREATMENT)
+    assert len(set(cs.ROLES)) == 4
+    for rationale in (R_CTRL_OPEN, R_RUNG, R_IDEA, R_PLAIN, R_B100, R_ALL_R):
+        assert cs.role_of(Stub("M9999-X", rationale)) in cs.ROLES
+
+
+def test_every_role_marker_is_lowercase_so_it_can_actually_fire():
+    """role_of lowercases the rationale; a mixed-case marker would match nothing, ever."""
+    groups = (cs.ROLE_CONTROL_OPENERS, cs.ROLE_CONTROL_PHRASES, cs.ROLE_DOSE_MARKERS)
+    for group in groups:
+        for marker in group:
+            assert marker == marker.lower(), f"{marker!r} can never match a lowercased rationale"
+            assert marker.strip() == marker and marker, f"{marker!r} is padded or empty"
+
+
+def test_the_prefixes_the_lab_actually_writes_all_read_as_controls():
+    """The 127 arms kind_of cannot see, one per phrasing the lab uses.
+
+    This is the whole reason the phase exists: kind_of finds 62 placebo arms and the rationales
+    contain 189 control arms, because most of the lab's controls announce themselves in prose
+    rather than by being a draw.
+    """
+    for rationale in (
+        R_CTRL_OPEN, R_PAIRED, R_REACTION, R_YARDSTICK, R_TRAILING, R_PAIRED_TRAILING, R_POSITIVE,
+        "Control for the fee drag alone: the same book with no signal at all",
+        "Control paired with the switch arm: the same names, switch off",
+        "Control and correctness check: should reproduce M0032-N20 exactly",
+    ):
+        arm = Stub("M9999-X", rationale)
+        assert cs.role_of(arm) == cs.ROLE_CONTROL, rationale
+        # and not one of them is visible to the shape checker at all, which is the whole gap
+        assert cs.kind_of(arm) == cs.KIND_NONE, rationale
+
+
+def test_a_word_that_merely_begins_with_control_is_not_a_control():
+    """The anchored marker's whole job: one character of look-ahead instead of a startswith.
+
+    The lab writes about what a brake controls as often as it writes about a control arm, so a
+    substring rule would mark the idea as its own foil -- the same class of error as reading the
+    id suffix, which this module exists to refuse.
+    """
+    assert cs.role_of(Stub("M9999-A", "Controlled exposure: half the book, half the time")) == (
+        cs.ROLE_TREATMENT
+    )
+    assert cs.role_of(Stub("M9999-B", "Controls the fall by stepping down one rung at a time")) == (
+        cs.ROLE_TREATMENT
+    )
+    assert cs.role_of(Stub("M9999-C", "The brake that governs the controlling idea here")) == (
+        cs.ROLE_TREATMENT
+    )
+    # ...while the same words, used as the lab uses them about a foil, still fire
+    assert cs.role_of(Stub("M9999-D", "Control- the same book, no brake")) == cs.ROLE_CONTROL
+    assert cs.role_of(Stub("M9999-E", "the same book, no brake: the control")) == cs.ROLE_CONTROL
+
+
+def test_role_of_can_never_contradict_kind_of():
+    """The structural guarantee phases 2 and 3 import.
+
+    role_of asks kind_of first, so a dose arm is `dose` and a placebo arm is `control` whatever
+    else the prose contains. Asserted on the one sentence that carries two marks at once -- the
+    same sentence test_dose_is_tested_before_draw_so_a_dose_arm_is_never_a_placebo uses -- so the
+    two orderings are pinned against each other and not merely each against itself.
+    """
+    both = Stub("M9999-X", "Placebo: the same names at a one-to-two-year dose-response spacing")
+    assert cs.kind_of(both) == cs.KIND_DOSE
+    assert cs.role_of(both) == cs.ROLE_DOSE
+    assert cs.role_of(Stub("M0202-PLC1-HALF", R_PLC1_HALF)) == cs.ROLE_CONTROL
+    assert cs.kind_of(Stub("M0202-PLC1-HALF", R_PLC1_HALF)) == cs.KIND_PLACEBO
+    assert cs.role_of(Stub("M0241-STALE", R_STALE)) == cs.ROLE_DOSE
+    assert cs.role_of(Stub("M0244-STALE30", R_STALE30)) == cs.ROLE_DOSE
+
+
+def test_an_ablation_is_a_treatment_arm_although_it_says_control():
+    """M0248-B100 opens `Within-frame control:` and is a signal arm in its own right.
+
+    This module already says so about its shape -- "its trade count is a property of the
+    ingredient under test" -- and the role must agree: nobody registered it to be beaten, so
+    nothing downstream may refuse a promotion for landing on it.
+    """
+    arm = Stub("M0248-B100", R_B100)
+    assert cs.kind_of(arm) == cs.KIND_ABLATION
+    assert cs.role_of(arm) == cs.ROLE_TREATMENT
+
+
+def test_the_idea_markers_outrank_every_looser_bucket():
+    """An author who wrote `The idea:` has named the arm; no wider marker may swallow it.
+
+    M0222-CORE says `The yardstick: ...` and the control openers carry the bare word `yardstick`
+    for M0107-NONE's `Yardstick: ...`. The order is what keeps the two apart, and the two arms
+    are one word different, so it is pinned here rather than left to the next reader to notice.
+    """
+    assert cs.role_of(Stub("M0248-EQ", R_IDEA)) == cs.ROLE_IDEA
+    assert cs.role_of(Stub("M0222-CORE", R_CORE)) == cs.ROLE_IDEA
+    assert cs.role_of(Stub("M0107-NONE", R_YARDSTICK)) == cs.ROLE_CONTROL
+
+
+def test_a_rank_weighting_variant_is_not_a_control_in_this_vocabulary_either():
+    """M0005-ALL-R again, through the wider reader: the id trap must stay shut.
+
+    The point of widening the vocabulary is to find the controls kind_of misses, not to start
+    reading suffixes. If this ever goes red the widening has gone wrong in the one direction the
+    module warns about, and the next -R that is a real variant will be judged the same wrong way.
+    """
+    assert cs.role_of(Stub("M0005-ALL-R", R_ALL_R)) == cs.ROLE_TREATMENT
+    assert cs.role_of(Stub("M9999-RAND1", R_PLAIN)) == cs.ROLE_TREATMENT
+    assert cs.role_of(Stub("M9999-PLACEBO", R_PLAIN)) == cs.ROLE_TREATMENT
+
+
+# The audit of 2026-10-20 classified all 821 arms in the lab's 157 method files as
+# 594 treatment / 189 control / 33 dose / 5 idea. These sixteen are the arms the plan's argument
+# names, pinned by id so a rationale edit or a marker change is caught on the arm it would move
+# rather than on a total. They are frozen rows: each has a recorded dev trial, so its method file
+# cannot be edited without breaking store.latest_source_sha for that method.
+ROLE_SPOT_CHECK: dict[str, str] = {
+    "M0179-P20-SW": cs.ROLE_CONTROL,       # "Control: the 20 most positive-coskewness members"
+    "M0202-PLC1-HALF": cs.ROLE_CONTROL,    # the placebo lab promote would pre-register
+    "M0044-NOBRAKE": cs.ROLE_CONTROL,      # "Control: M0036-BLEND re-stated ... no brake"
+    "M0035-CTRL": cs.ROLE_CONTROL,         # "The control: M0032's book ... switch off"
+    "M0215-CTRL": cs.ROLE_CONTROL,         # "Paired control: no sector cap"
+    "M0107-NONE": cs.ROLE_CONTROL,         # "Yardstick: the same book with no gate at all"
+    "M0083-A-DN": cs.ROLE_CONTROL,         # "Reaction-negative control: ..."
+    "M0058-LIQ20-T": cs.ROLE_CONTROL,      # "...: the control, expected to trail"
+    "M0262-LOCK-0": cs.ROLE_CONTROL,       # "The control, and the bridge back to M0261's arm"
+    "M0248-B100": cs.ROLE_TREATMENT,       # an ablation is a signal arm
+    "M0005-ALL-R": cs.ROLE_TREATMENT,      # the id trap
+    "M0241-STALE": cs.ROLE_DOSE,
+    "M0244-STALE30": cs.ROLE_DOSE,         # the one arm the audit prototype read as treatment
+    "M0258-M-B30": cs.ROLE_DOSE,
+    "M0174-C40-SW": cs.ROLE_DOSE,          # a width rung: the coarse edge, pinned deliberately
+    "M0248-EQ": cs.ROLE_IDEA,
+    "M0222-CORE": cs.ROLE_IDEA,
+}
+
+
+def test_the_named_arms_read_the_way_the_audit_read_them():
+    """Every arm the plan's argument quotes, re-derived from the method files themselves."""
+    from seer_engine.lab.method import discover
+
+    files = discover()
+    arms = {
+        c.id: c for _mid, (method, _p) in files.items() for c in method.all_candidates()
+    }
+    for candidate_id, role in ROLE_SPOT_CHECK.items():
+        arm = arms.get(candidate_id)
+        if arm is None:
+            pytest.skip(f"{candidate_id} is not in this tree's method files")
+        assert cs.role_of(arm) == role, (
+            f"{candidate_id} now reads as {cs.role_of(arm)}: {arm.rationale}"
+        )
+
+
+def test_the_lab_holds_at_least_the_one_hundred_and_eighty_nine_controls_the_audit_counted():
+    """The audit's count, pinned as a floor rather than as an equality.
+
+    Measured 2026-10-20: 821 arms across 157 method files, 189 of them controls. An equality here
+    would go red the next time a method lands, which is a test that fails when the lab works; a
+    floor goes red only when the vocabulary NARROWS, which is the regression worth catching --
+    phase 2 refuses a promotion on this answer, and a marker quietly stopping firing would unblock
+    methods nobody argued for.
+
+    A tree with fewer method files than the measurement had is skipped rather than failed: a
+    trimmed worktree is not evidence that a marker broke.
+    """
+    from seer_engine.lab.method import discover
+
+    files = discover()
+    if len(files) < 157:
+        pytest.skip(f"this tree holds {len(files)} method files, fewer than the 157 measured")
+    arms = [c for _mid, (method, _p) in files.items() for c in method.all_candidates()]
+    assert len(arms) >= 821
+    roles = [cs.role_of(a) for a in arms]
+    assert all(r in cs.ROLES for r in roles)
+    assert roles.count(cs.ROLE_CONTROL) >= 189, (
+        "the role vocabulary has narrowed: fewer control arms are visible than the 2026-10-20 "
+        "audit counted, and anything that refuses on this answer has quietly stopped refusing"
+    )
+    # and the structural guarantee, over every arm the lab holds rather than over three stubs
+    for arm in arms:
+        kind = cs.kind_of(arm)
+        if kind == cs.KIND_PLACEBO:
+            assert cs.role_of(arm) == cs.ROLE_CONTROL, arm.id
+        elif kind == cs.KIND_DOSE:
+            assert cs.role_of(arm) == cs.ROLE_DOSE, arm.id
+
+
+def test_asking_for_a_role_opens_no_database_and_moves_no_file():
+    """role_of is pure: it reads one string off one object and nothing else.
+
+    The committed lab is hashed around a full sweep of every arm, which is the same guarantee the
+    calibration test makes about `survey` and the same one `lab control`'s docstring makes about
+    the whole report path.
+    """
+    from seer_engine.lab.method import discover
+
+    if not store.COMMITTED_DB.exists():
+        pytest.skip("no lab database")
+    before = hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest()
+    files = discover()
+    for _mid, (method, _p) in files.items():
+        for arm in method.all_candidates():
+            cs.role_of(arm)
+    assert hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest() == before

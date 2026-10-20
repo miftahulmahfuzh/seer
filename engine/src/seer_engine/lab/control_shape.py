@@ -214,6 +214,57 @@ gate by wording.
 
 ---
 
+**The second question, and why it needed a second vocabulary.** ``kind_of`` answers *"is this arm
+shape-checkable?"* and its three kinds are cut for that job: a ``placebo`` gets a ratio, a
+``dose-response`` arm and a ``within-frame control`` are reported and never flagged. The hard gate
+asks a different question one clause downstream -- *"is the arm that gets the counted look and the
+owner's money an arm that exists to be beaten?"* -- and ``kind_of``'s vocabulary cannot answer it.
+Measured 2026-10-20 over the 821 candidates in the lab's 157 method files: ``kind_of`` finds 62
+placebo arms, and the rationales contain **189** control arms. The 127 it cannot see are not
+placebos. They are the lab's ordinary controls, and they announce themselves in prose --
+``Control: M0036-BLEND re-stated under this allocator, no brake`` (``M0044-NOBRAKE``),
+``Paired control: no sector cap`` (``M0215-CTRL``), ``Reaction-negative control: raises that
+lagged SPY from the declaration day`` (``M0083-A-DN``), ``Yardstick: the same book with no gate at
+all`` (``M0107-NONE``), ``...the control, expected to trail`` (``M0058-LIQ20-T``). Widening
+``DRAW_MARKERS`` to reach them is not available: ``DRAW_MARKERS`` decides which arms get a shape
+ratio and which arms are excluded from the resolution ladder, so one phrase added there moves D17
+on nine dev-eligible methods and silently re-points the ladder. ``role_of`` is therefore a reader
+beside ``kind_of``, not a replacement of it, and it is wired to nothing in this file.
+
+**``role_of`` honours ``kind_of`` first, structurally.** It asks ``kind_of`` before it reads a
+marker of its own, so a ``KIND_DOSE`` arm is always ``dose`` and a ``KIND_PLACEBO`` arm is always
+``control``, whatever else its prose happens to contain. The alternative -- two independent marker
+sweeps over the same sentence -- can disagree about one arm the day somebody writes a rationale
+carrying both an idea marker and a draw marker, and a role reader that contradicts the kind reader
+on a recorded arm is a broken instrument before it is ever a broken gate. Measured 2026-10-20:
+zero arms disagree, and the ordering is what keeps that true rather than the luck of today's prose.
+
+**Why the control markers are anchored and ``kind_of``'s are not.** ``DRAW_MARKERS`` are
+substrings because "placebo" anywhere in a sentence means the same thing. "Control" does not: an
+arm that says *"the brake that controls the fall"* is the idea, and an arm that opens ``Control:``
+is the foil. So ``ROLE_CONTROL_OPENERS`` matches only at the start of the rationale and only on a
+word boundary -- ``Controlled exposure...`` is not a control -- and
+``ROLE_CONTROL_PHRASES`` carries the two phrases that are unambiguous wherever they appear, ``the
+control`` and ``the paired control``, again on word boundaries so ``the controlling idea`` is
+untouched. Both lists were derived the same way the 2026-10-19 lists were: by reading every arm
+that fires and keeping only phrases that actually do.
+
+**An ablation stays a treatment arm, on purpose.** ``M0248-B100`` opens ``Within-frame control:``
+and ``kind_of`` calls it ``KIND_ABLATION``, but ``role_of`` calls it ``treatment``, because this
+file already says why: *"an ablation is a signal arm in its own right; its trade count is a
+property of the signal being measured"*. An arm nobody registered to be beaten must not be refused
+as one.
+
+**A width rung reads as ``dose``, and that is the coarse edge of this reader.** ``rung of the`` is
+a measured dose marker -- 21 arms on 2026-10-20, from ``M0258-M-B30``'s *"Middle rung of the
+dose-response ladder"* to ``M0174-C40-SW``'s *"A 40-name rung of the low-correlation book behind
+the switch"*. A 40-name rung beside a 20-name rung **is** a width dose, so the answer is defensible
+and it is the audit's own prototype answer. But it means ``dose`` and ``treatment`` are not a sharp
+pair, and no caller should read ``treatment`` as "this is the method's idea". The split this reader
+is calibrated for, and the only one the lab acts on, is ``control`` against everything else.
+
+---
+
 **A reader, not a writer.** No ``trials``, ``trial_moments``, ``insights`` or ``method_folds`` row
 is inserted, no method status moves, no file is written. ``store.dev_trial_count`` and
 ``store.test_looks`` cannot change because nothing here executes anything but ``SELECT``. The one
@@ -308,12 +359,68 @@ IDEA_MARKERS: tuple[str, ...] = (
 )
 """How a method names the arm its controls exist to be compared with."""
 
+# ----------------------------------------------------------------------- the role markers
+#
+# Measured 2026-10-20 over all 821 candidates in the lab's 157 method files -- the population
+# `method.discover()` returns, which is the population `role_of` is called on. A separate sweep
+# from the 2026-10-19 one above, with its own date and its own denominator: the two blocks are
+# two measurements and neither is evidence for the other. The number beside each phrase is how
+# many of the 821 that phrase matches on its own, under this block's own matching rule.
+
+ROLE_CONTROL_OPENERS: tuple[str, ...] = (
+    "control",                    # 98: M0013-TGT-D8-MW, M0038-DIV-OPEN, M0039-SPY-200, M0044-NOBRAKE
+    "paired control",             # 18: M0076-X-M, M0076-X-W, M0076-X-M-D, M0081-X-W12, M0215-CTRL
+    "reaction-negative control",  # 2: M0083-A-DN, M0083-X-DN
+    "yardstick",                  # 1: M0107-NONE
+)
+"""Phrases a control arm's rationale OPENS with, matched on a word boundary and nowhere else.
+
+Anchored because "control" is a word the lab also uses about what a brake does to a fall, and a
+substring rule would call the brake a foil. ``M0005-ALL-R`` is the standing reminder that a
+confident-looking rule applied to the wrong field quietly mis-reads a real variant forever.
+"""
+
+ROLE_CONTROL_PHRASES: tuple[str, ...] = (
+    "the control",         # 14: M0033-TV22-N21, M0035-CTRL, M0036-DISC, M0047-EQ, M0050-ID
+    "the paired control",  # 3: M0108-WORST20, M0133-N40, M0143-CALM-UP63
+)
+"""Phrases that mean a foil wherever they sit in the sentence, matched on both word boundaries.
+
+The lab's second-commonest way of saying it is a trailing clause -- ``M0058-LIQ20-T``'s "the 20
+most liquid members, behind the gate: the control, expected to trail". The boundaries are what
+keep "the controlling idea" out, and they are why this is a phrase list and not a substring list.
+``the paired control`` is carried separately because it does not contain ``the control``.
+"""
+
+ROLE_DOSE_MARKERS: tuple[str, ...] = DOSE_MARKERS + (
+    "rung of the",  # 21: M0155-Z15-FILL, M0174-C40-SW, M0179-N40-SW, M0258-M-B30, M0260-M-G3
+)
+"""``DOSE_MARKERS`` plus the one wider phrase a role reader needs and a shape checker must not have.
+
+``rung of the`` reaches 21 arms, of which `kind_of` sees 4. Adding it to ``DOSE_MARKERS`` itself
+would be a different and much larger change: ``DOSE_MARKERS`` decides what is excluded from
+``_eligible_targets`` and what is reported ``NOT_CHECKED``, so seventeen more dose arms there would
+re-point the resolution ladder and move D17. Here it only sorts an arm into a bucket nobody
+refuses on, which is why the wider phrase is safe in this list and not in that one.
+"""
+
+
 # --------------------------------------------------------------------------- the vocabulary
 
 KIND_PLACEBO = "placebo"
 KIND_DOSE = "dose-response"
 KIND_ABLATION = "within-frame control"
 KIND_NONE = ""
+
+ROLE_CONTROL = "control"
+ROLE_DOSE = "dose"
+ROLE_IDEA = "idea"
+ROLE_TREATMENT = "treatment"
+
+ROLES: tuple[str, ...] = (ROLE_CONTROL, ROLE_DOSE, ROLE_IDEA, ROLE_TREATMENT)
+"""Every value ``role_of`` can return. Published so a caller validates against this and not a
+literal, because the one thing a reader of an arm's role must never do is quietly fall through to
+"not a control" on a spelling it did not recognise."""
 
 OK = "ok"
 WARN = "warn"
@@ -438,6 +545,87 @@ def kind_of(arm: Arm) -> str:
     if any(m in text for m in ABLATION_MARKERS):
         return KIND_ABLATION
     return KIND_NONE
+
+
+def _is_word_char(ch: str) -> bool:
+    """True for a character that would continue a word. The empty string is not one.
+
+    Taking ``""`` as "not a word character" is what lets the two matchers below treat the start
+    and the end of a rationale as boundaries without a special case at either edge.
+    """
+    return ch.isalnum() or ch == "_"
+
+
+def _opens_with(text: str, phrase: str) -> bool:
+    """True when ``text`` begins with ``phrase`` as a whole word.
+
+    ``text`` is expected lowercased and stripped. ``Controlled exposure...`` must not read as a
+    control arm, and a bare ``startswith`` says it does; one character of look-ahead is the whole
+    difference between a rule and a guess.
+    """
+    if not text.startswith(phrase):
+        return False
+    return not _is_word_char(text[len(phrase):len(phrase) + 1])
+
+
+def _holds(text: str, phrase: str) -> bool:
+    """True when ``phrase`` occurs anywhere in ``text`` with a word boundary on both sides.
+
+    Every occurrence is tried, not just the first: a sentence may say "the controlling idea" and
+    then "the control" later, and stopping at the first near-miss would lose the real one.
+    """
+    start = text.find(phrase)
+    while start != -1:
+        before = text[start - 1:start] if start else ""
+        after = text[start + len(phrase):start + len(phrase) + 1]
+        if not _is_word_char(before) and not _is_word_char(after):
+            return True
+        start = text.find(phrase, start + 1)
+    return False
+
+
+def role_of(arm: Arm) -> str:
+    """What part ``arm`` plays in its method's experiment, from its rationale. One of ``ROLES``.
+
+    ``control`` is the answer that matters and the only one anything is allowed to refuse on: an
+    arm registered to be beaten -- a paired or reproduction baseline, an opposite-sign mirror, a
+    placebo, a yardstick. ``dose`` is a rung of a ladder, where differing IS the measurement.
+    ``idea`` is the arm a method's controls exist to be compared with. ``treatment`` is everything
+    else, and it is a residue rather than a claim: see the module docstring on why a width rung
+    reads as ``dose`` and why no caller should read ``treatment`` as "this is the method's idea".
+
+    ``kind_of`` is asked first and its answer is final for the two kinds it is sure about, so this
+    function can never contradict the arm-kind D17 already acts on. A ``KIND_ABLATION`` arm falls
+    through on purpose: an ablation is a signal arm in its own right and nobody registered it to
+    be beaten.
+
+    Then, in order: the idea markers, because an author who wrote "The idea:" has named the arm
+    outright and no looser bucket may swallow it; the wider dose markers, because a rung that also
+    says "control" is still a rung, which is the same ordering and the same reason ``kind_of``
+    tests dose before draw; the anchored control openers; the unanchored control phrases; and
+    finally the draw markers, so a placebo that reached here through prose rather than through
+    ``kind_of`` still lands on ``control``.
+
+    Total and pure. Never raises, never returns ``None``, opens nothing, writes nothing. An arm
+    whose ``rationale`` is not a string is read through ``str`` exactly as ``kind_of`` reads it.
+    """
+    kind = kind_of(arm)
+    if kind == KIND_DOSE:
+        return ROLE_DOSE
+    if kind == KIND_PLACEBO:
+        return ROLE_CONTROL
+    text = str(arm.rationale).strip().lower()
+    if any(m in text for m in IDEA_MARKERS):
+        return ROLE_IDEA
+    if any(m in text for m in ROLE_DOSE_MARKERS):
+        return ROLE_DOSE
+    if any(_opens_with(text, p) for p in ROLE_CONTROL_OPENERS):
+        return ROLE_CONTROL
+    if any(_holds(text, p) for p in ROLE_CONTROL_PHRASES):
+        return ROLE_CONTROL
+    if any(m in text for m in DRAW_MARKERS):
+        return ROLE_CONTROL
+    return ROLE_TREATMENT
 
 
 def declared_target(arm: Arm) -> str | None:

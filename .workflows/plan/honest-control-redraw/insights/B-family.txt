@@ -1,0 +1,56 @@
+Seven of the thirteen D17-blocked control arms traded far too MUCH -- 2.25x to 4.41x on trades and
+1.99x to 5.20x on turnover (M0208-HASH-N20 at 4.41x/5.20x, M0243-NEAR20-R 3.01x/2.98x, M0201's two
+seeds 2.26-2.27x, M0202's three 2.25x). The mechanism is the mirror image of family A: the draw
+was re-keyed on the MONTH using m0187.draw(seed, symbol, data_date), so the whole control book was
+redrawn at every decision while the real book's ranking persisted. M0243's own file records the
+overshoot in prose -- "M0227's own placebo used a sticky hash order and traded 41 times in twenty
+years ... this one is redrawn each month" -- so the author saw family A, corrected by hand, and
+landed in family B. One sentence, two errors, and the lesson is that the re-key period must be
+DERIVED from the book it controls, never chosen.
+
+Pre-registered direction: an over-trading control over-pays its fees, so an honestly shaped
+replacement earns MORE, so the book's lead NARROWS or REVERSES. Measured in trial_funding.mwr
+against SPY TR 7.188 %/yr:
+
+  old control             h      old margin   new margin   moved as predicted?
+  M0202-PLC1-HALF       2.25x      +1.352       +3.616     NO  (widened 2.263)
+  M0202-PLC2-HALF       2.25x      +3.089       +3.803     NO  (widened 0.714)
+  M0202-PLC1-HALF-FAST  2.25x      +0.760       +3.531     NO  (widened 2.771)
+  M0201-PLC2-MV10       2.26x      +1.479       +2.475     NO  (widened 0.996)
+  M0201-PLC1-MV10       2.27x      -0.712       +2.395     NO  (widened 3.107, sign flipped)
+  M0243-NEAR20-R        3.01x      +6.068       +1.619     yes (narrowed 4.449)
+  M0208-HASH-N20        4.41x      +5.872       +4.346     yes (narrowed 1.526)
+
+Score: 2 of 7 arms and 2 of 4 methods moved in the pre-registered direction -- and the split by
+handicap ratio is perfect: every arm at 2.25-2.27x widened, both arms at 3.01x and above narrowed.
+The tempting reading is a single crossover where churn stops paying for itself somewhere between
+2.27x and 3.01x. THAT READING WAS TESTED ACROSS ALL THIRTEEN ARMS AND IS NOT SUPPORTED. Three
+things refute it. (1) Family A's signs contradict it four times out of six: under one curve, the
+stickiest arm in the lab (M0227-R20 at 0.07x) should show the largest POSITIVE move of all and it
+shows -1.318; and M0047's arms put the curve's peak below 0.55x while M0202's put it above 2.25x,
+which no one curve can do. (2) The seed noise at a FIXED handicap is as large as the whole effect:
+M0202's two seeds, same book, same guard, same 2.25x, differ by 1.55 points of move and M0201's by
+2.11, against a between-group gap of 2.24. (3) It is a two-chassis-versus-two-chassis split, not
+seven arms versus two; a random 2/2 assignment lands this way with probability 1/6.
+
+What all thirteen arms DO support is not a direction but a collapse of variance. The handicapped
+controls earned 4.381% to 11.381% a year (sd 1.918); the honest ones earn 6.047% to 9.532% (sd
+0.988) -- 3.77x less variance. On the two chassis carrying two seeds, the handicapped seeds sit
+2.190 and 1.737 points apart and the honest ones 0.079 and 0.187: 27.6x and 9.3x tighter. A
+handicapped control is not a weaker or a stronger opponent. It is an ARBITRARY one, arbitrary to
+within about seven points a year, which is larger than any margin in this set. That is why two
+phases measuring faithfully reached opposite conclusions, and it is why there is no correction
+factor for a margin quoted against a mis-shaped control -- only a re-draw.
+
+M0208 was the arm most at risk: +5.87 pts was the lab's biggest quoted placebo margin and it was
+quoted against an opponent trading 4.41x as often. It now reads +4.346 -- and that is PROVISIONAL
+and a LOWER BOUND, because the honest control still trades only 0.73x, so a correctly-shaped one
+would pay the rest of the fee bill and earn less than 9.532. The method's own 2-point success
+condition stays PASS either way.
+
+M0243 is the one that broke: its own written condition was "NEAR20 must beat its placebo by 2 or
+more points a year", it passed at +6.068 against a 3.01x opponent, and against an honest one it
+reads +1.619 and FAILS. Its analysis claim that the blind draw was "paying the same fees" is
+measurably false and is withdrawn with it.
+
+Source: docs/plans/HANDOVER_20261019-the-honest-control.md.

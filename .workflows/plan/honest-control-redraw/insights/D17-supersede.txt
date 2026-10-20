@@ -1,0 +1,53 @@
+D17 refused a method on any recorded control arm outside [0.50, 2.00] on trades or turnover, and a
+recorded arm is recorded forever -- trials carries append-only triggers. So the remedy D17's own
+refusal message names ("re-draw it and amend") could never clear the refusal it caused: nine
+dev-eligible methods would have stayed blocked by an arm that had already been replaced.
+
+The rule now has a supersession clause. A REFUSE or WARN finding is superseded -- reported, never
+dropped -- when the same method holds another placebo arm that is itself clean on both axes AND
+that NAMES it in its own pre-registered declaration (Candidate.supersedes, read duck-typed through
+control_shape.SUPERSEDES_ATTR). refusals() excludes it; `lab control` still prints it with its
+ratios, names the arm that superseded it, and prints that arm's own resolved target beside it
+where the two differ.
+
+DECLARED, and deliberately not inferred from the target. "Another clean placebo on the same
+target_id" was the obvious rule and it fails in both directions on these very nine. Too strict:
+the <target-id>-PLC naming re-points a re-drawn arm at the book it actually controls, so
+M0047-MV10-PLC resolves to M0047-MV10 while the arm it replaces resolves, on the ladder's weakest
+rung, to M0047-EQ -- target equality would have left M0047 and M0202 blocked after every
+measurement was taken. Too loose: M0215-HASH and M0215-HASH-CAP4 both resolve to M0215-CTRL, so
+one honest control of CTRL would have excused an arm whose job is to price what a cap does -- and
+the measurement shows exactly why that would have been wrong, since CAP4-PLC earns 0.268 points a
+year MORE than CTRL-PLC. A resolution the module itself labels a guess is not a fact to build a
+gate rule on; a declaration written before any result exists is.
+
+Measured outcome, 2026-10-20, read-only: ten of the fourteen old arms are superseded and four are
+not. The four that are not give four distinct causes, and only one of them is a mistake of any
+kind:
+  - M0221: structural. Turnover on a cap-weighted book is a property of the weight VECTOR, not the
+    names. M0221-E50 pays 1.60x turnover holding C50's exact names and recording its exact 360
+    trades; the re-drawn control pays 1.95x on 1.03x name changes.
+  - M0201: a near miss. 0.79410 turnover against a 0.80000 bar, 0.0059 short, on one of two seeds
+    -- the other seed landed at 0.839 and did supersede.
+  - M0208: the entry-count estimator. The only miss on the TRADES axis in the whole set: one
+    unrolled step of a keep band off a freshly-derived top-N under-counts the churn of a band
+    whose held set has drifted, measured at 0.487x over 169 decisions and uniform across eras.
+  - M0225: never drawn. Its twin's draw had already missed on the identical chassis, so invariant
+    13 stopped the phase rather than spending a run to measure the same structural miss twice.
+
+What this deliberately does NOT change: the bands do not move (WARN_BAND stays 0.80-1.25,
+REFUSE_BAND stays 0.50-2.00); a `warn` SUPERSEDER does not excuse anything, which is exactly what
+keeps M0201, M0208 and M0221 refused; an arm that declares nothing excuses nothing, which is every
+arm the lab held before this batch; an unresolved or unrecorded arm is still never a refusal; and
+there is still no override. A test asserts the clause is a no-op on the lab as it stood before any
+honest control existed -- all nine still failed D17 then, and no arm declared anything at all.
+
+And the line that keeps this honest: unblocking D17 promoted nothing and made nothing promotable.
+hardgate.check tests the walk-forward folds BEFORE D17, so for M0201, M0221 and M0225 the live
+D17 refusal is inert -- it is never the sentence lab promote prints. Of the nine, only M0208 has
+D17 as its operative clause, and behind D17 stands the kin rule (M0002 read test-failed). Every
+one of the nine is still refused today, eight of them on the fold majority. What the clause buys
+is that the lab can never again be in a state where a recorded, append-only arm blocks a book that
+has already replaced it -- and it buys it for the price of no method ids at all.
+
+Source: lab/hardgate.py (D17), lab/control_shape.py, docs/plans/HONEST_CONTROL_REDRAW_PLAN.md.

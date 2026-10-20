@@ -1,0 +1,53 @@
+The lab's previous best shape-matched placebo was M0241's cohort mirror (m0241.placebo_book): for
+each trailing calendar month it counted how many eligible members really split that month and drew
+that many names in a hash order seeded on that month. Its own docstring claimed the monthly draws
+were stable enough that turnover matched. Measured, it lands at 1.372x trades and 1.131x turnover
+-- inside the refuse band but OUTSIDE the 0.80-1.25 match band. So the state of the art was a
+warn, and a rule that merely imitated it would not have cleared the bar.
+
+control_draw.py derives the churn instead of imitating it: at each decision session it recomputes
+the real arm's own selection at this and at the previous decision session, takes the entry count e
+as the size of the set difference, keeps n - e of its own held names in a date-free hash order,
+and draws e fresh names from the same eligible pool -- with every non-held name sorted ahead of
+every just-dropped holding, so a name the book has just dropped is never taken straight back. The
+entry count per rebalance is matched BY CONSTRUCTION, not empirically, which is why it holds at
+both poles of the failure rather than at one.
+
+Measured on the two poles, where the hand-chosen draws read 0.07x/0.12x and 3.01x/2.98x:
+  M0227-S20-PLC      0.99x trades  0.99x turnover
+  M0243-NEAR20-PLC   1.03x trades  1.03x turnover
+Across all thirteen re-drawn arms, ten land inside 0.80-1.25 on both axes, with trade ratios from
+0.95 to 1.03 and turnover ratios from 0.84 to 1.03 -- against M0241's 1.372x.
+
+The three that miss say where the rule reaches and where it does not, and all three misses are
+measurements rather than failures:
+  - Equal-slot chassis: it works on both axes, because turnover follows the trade ratio
+    arithmetically. Seven of the thirteen arms are of this kind and all seven land ok.
+  - Weight-varying chassis: it closes the TRADE axis and not the TURNOVER axis. A blind draw from
+    a sized pool is flatter than the real top-N, so its weights cross the book engine's
+    1%-of-equity resize band at a different rate on the same names. M0221-E50 pays 1.60x turnover
+    on identical names and identical trades; M0221-C50-PLC pays 1.95x on 1.03x name changes, and
+    M0201's two seeds land at 0.794 and 0.839 -- the same residual in the LOW direction, with two
+    seeds of one rule straddling the bar.
+  - Books whose churn cannot be reconstructed from one unrolled step of their keep band:
+    matched_names has no record of what the real book held, so it re-derives the previous held set
+    from the plain top-N. A freshly-taken top-20 is ranked 1-20 and a band that drops a name only
+    past rank 40 drops almost none of it, while the real held set has drifted toward the edge and
+    falls out far faster. Replayed over all 169 of M0208's decisions: 304 estimated entries
+    against the real book's 624, 0.487x, uniform across 1996-2002, 2003-2008 and 2009-2015 (0.444
+    / 0.509 / 0.500). The replay reproduces the real 624 exactly, so the diagnostic is faithful.
+
+The transferable rule: a control's re-key period must be derived from the book it controls, each
+rebalance, from that book's own calendar. Choosing the period by hand produced BOTH families of
+failure in this lab -- sticky at 0.07x and churny at 5.20x -- from the same author correcting the
+first by hand and overshooting into the second.
+
+And what a matched draw is worth, beyond clearing a gate: it makes the opponent DEFINED. The
+thirteen handicapped controls earned 4.381% to 11.381% a year (sd 1.918); their thirteen honest
+replacements earn 6.047% to 9.532% (sd 0.988), 3.77x less variance. On the two chassis carrying
+two seeds of one control, the handicapped seeds sit 2.190 and 1.737 points apart and the honest
+ones 0.079 and 0.187. What an honest control buys is not a better margin in a known direction --
+it is a margin whose opponent is not arbitrary.
+
+Source: engine/src/seer_engine/lab/control_draw.py,
+docs/plans/HANDOVER_20261019-the-honest-control.md.

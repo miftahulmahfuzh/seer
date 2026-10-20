@@ -1,0 +1,43 @@
+Six of the thirteen D17-blocked control arms traded far too LITTLE -- 0.07x to 0.55x the book's
+own trade count (M0227-R20 at 0.07x, M0225-R50 0.19x, M0221-R50 0.21x, M0215-HASH and
+M0215-HASH-CAP4 0.34x, M0047-PLC1-MV10 and -MV20 0.55x). The mechanism was one error repeated:
+the draw's hash carried no date term at all, or was re-keyed on a calendar quarter, so the
+control's book changed only when the eligible pool did. A control that trades a fifteenth as
+often pays a fifteenth of the fee bill, so it is not the book's shape with the identity removed
+-- it is a cheaper strategy, and every margin quoted against it was a margin against a handicap.
+
+Pre-registered direction, written into each Amendment before any result was seen: an honestly
+shaped control pays the real fee bill, so it earns LESS, so the book's lead WIDENS or its deficit
+NARROWS. Measured in trial_funding.mwr against SPY TR 7.188 %/yr on the same deposits:
+
+  old control        h     old margin   new margin   moved as predicted?
+  M0227-R20        0.07x      +5.220       +3.903    NO  (the control earned MORE: 7.733 -> 9.050)
+  M0221-R50        0.21x      -1.090       -0.420    yes (deficit narrowed, as predicted)
+  M0215-HASH       0.34x      +1.962       +2.163    yes (but by 0.20, not the predicted 0.3-1.5)
+  M0215-HASH-CAP4  0.34x      +1.727       +1.613    NO  (reversed: the honest control earned more)
+  M0047-PLC1-MV10  0.55x      +1.283       +3.333    yes (overshot its predicted band by 0.33)
+  M0047-PLC1-MV20  0.55x      +0.533       +2.427    yes
+
+Score: 4 of 6 arms, and 3 of 5 methods, moved in the pre-registered direction. The two misses are
+at the OPPOSITE ends of the family, which is what makes them informative rather than noise.
+M0227-R20's 41 trades in nineteen years were not a cheap book, they were a STALE one: twenty names
+drawn in 1996 and essentially never revisited, whose concentration drag outweighed the fee bill it
+avoided. Paying fifteen times the fees to redraw the same blind book was worth +1.32 points a
+year. So on that chassis the sticky draw's handicap ran the opposite way from the one the whole
+family assumed.
+
+M0221 and M0225 were the hardest case, because there the handicapped control already BEAT its
+book (-1.09 and -0.89 pts): the family-A prediction is that the deficit narrows, and that is the
+one that could have turned a losing book into a winning one. On M0221 it narrowed to -0.42 and
+did NOT cross zero. M0225 was never re-drawn at all -- its chassis is cap-weighted and the twin's
+draw had already missed turnover at 1.95x -- so its -0.89 is still quoted against an arm trading
+0.19x as often and remains the one unrepaired sentence in the set.
+
+One consequence to state rather than bury: M0047-EQ now has NO control arm at all. Its only two
+placebos were size-weighted arms the ladder mis-aimed at it by first-declared, and both were
+replaced by arms aimed at MV10 and MV20 where they belong. So the standing sentence about EQ's
++3.80-point lead over its placebo is WITHDRAWN rather than re-measured: it was never supported by
+a correctly-aimed control. A method arm with no placebo produces an empty findings tuple and is
+not refused, so this is consistent with D17 and is not a gap to be filled with a third arm.
+
+Source: docs/plans/HANDOVER_20261019-the-honest-control.md.

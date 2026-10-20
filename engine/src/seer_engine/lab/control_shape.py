@@ -150,6 +150,70 @@ asked for this check knew of two mis-shaped controls. The measured answer is nin
 
 ---
 
+**A bent stick can be straightened, and then the straight one is the stick.** The refusal this
+module feeds says so in its own words -- *"re-draw the control at the book's own trade count and
+turnover and run it again as an amendment"* -- and until 2026-10-19 the code did not honour that
+sentence. A method file is append-only in practice: its recorded trials pin its candidates, and
+``trials`` is append-only by trigger, so the handicapped arm stays in ``all_candidates()`` and
+keeps its row forever. Re-drawing therefore added a clean arm beside the bent one and changed
+nothing at all: ``refusals`` still returned the bent one and ``hardgate`` still raised. Nine
+dev-eligible methods would have done all of the measuring work and stayed exactly as blocked.
+
+So a ``REFUSE`` or ``WARN`` finding is now **superseded** when the same method holds another
+``placebo`` arm that is itself clean on both axes **and that NAMES it** in its own pre-registered
+declaration (``SUPERSEDES_ATTR``). ``superseding_arm`` is that predicate and
+``Finding.superseded_by`` carries its answer; ``refusals`` -- and only ``refusals`` -- drops a
+superseded refusal, so the gate reads the honest draw and nothing else moves.
+
+**Declared, and deliberately not inferred from the target.** The obvious rule was "a clean
+placebo on the same ``target_id``", and it is wrong in both directions. Too strict: a re-drawn
+arm named ``<target-id>-PLC`` is deliberately re-pointed at the book it actually controls, so
+``M0047-MV10-PLC`` resolves to ``M0047-MV10`` while the arm it replaces resolves, by the ladder's
+weakest rung, to ``M0047-EQ``; under equality M0047 and M0202 would do all the measuring and stay
+blocked. Too loose: ``M0215-HASH`` and ``M0215-HASH-CAP4`` both resolve to ``M0215-CTRL``, so one
+honest control of ``CTRL`` would excuse an arm that exists to price a cap. Equality is an
+inference about intent from a resolution this module itself labels a guess; a declaration is the
+author of the re-draw saying which measurement this one replaces, written into the commit that
+pre-registers it and before any result exists. The report prints **both** targets -- the
+superseded arm's and the superseding arm's -- so a re-point is something a reader sees.
+
+**``WARN`` is superseded too, though it never blocked.** ``M0047-PLC1-MV20`` is 0.545x / 0.508x:
+inside the refuse band, outside the match band, and every margin written against it is as little
+evidence as its refused twin's. It stops no promotion, so retiring it changes no gate -- but a
+reader meeting the honest number has to be told the old one was answered, and leaving one of a
+re-drawn pair unmarked would say the opposite.
+
+**The superseded row is still computed, still carries both ratios, and is still printed.** Its
+``verdict`` stays ``REFUSE`` and ``flagged`` stays true. That is deliberate and it is the whole
+difference between this and an amnesty: every sentence already written about that margin was
+quoted against the handicapped opponent, and a reader who meets the new number needs to be able to
+see the old one and what was wrong with it. ``blocking`` -- not ``refused`` -- is the property a
+gate acts on.
+
+**Why the superseding arm must be ``OK`` and not merely inside ``REFUSE_BAND``.** Measured over
+the whole committed lab on 2026-10-19: with the tight rule, **zero** findings are superseded, so
+the change moves no verdict anywhere. With the loose rule, one is -- ``M0047-PLC1-MV10`` (0.549x /
+0.496x) would be retired by ``M0047-PLC1-MV20`` (0.545x / 0.508x), its own equally handicapped
+twin, which clears ``REFUSE_BAND`` only because its turnover ratio rounds to the clean side of
+0.50. A stick that is 0.545x as long as the book is not a measuring stick, and letting one retire
+another would unblock a method with no honest control in existence. The band is unchanged and
+unread anywhere new; it is the *match* band, ``WARN_BAND``, that the replacement has to clear,
+which is the same bar every re-drawn arm in the 2026-10-19 plan set is held to.
+
+**Four things do not supersede, each for its own reason.** A ``warn`` **superseder** (above) --
+the arm doing the retiring must be inside the match band. An arm that **declares nothing** -- no
+declaration, no supersession, however well-shaped it is and whatever it happens to resolve to;
+this is why the rule is a measured no-op on the committed lab, where no arm declares anything at
+all. An ``unresolved``, ``unrecorded`` or ``not-checked`` superseder -- absence is not evidence
+(D16's sentence), and an arm that has been declared in a method file but not yet run is exactly
+the state a half-finished re-draw is in; letting it supersede would unblock the method the moment
+the *intention* was committed, before a single trial existed. A dose-response or ablation arm --
+it is not a control of shape at all and carries no ratio, so it cannot be anybody's measuring
+stick, and admitting it would turn ``kind_of``'s dose-before-draw ordering into a way to game the
+gate by wording.
+
+---
+
 **A reader, not a writer.** No ``trials``, ``trial_moments``, ``insights`` or ``method_folds`` row
 is inserted, no method status moves, no file is written. ``store.dev_trial_count`` and
 ``store.test_looks`` cannot change because nothing here executes anything but ``SELECT``. The one
@@ -164,7 +228,7 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 from seer_engine.backtest.metrics import DASH
@@ -183,6 +247,32 @@ written once and trigger-protected, so editing a method file whose trials are re
 importing a field costs nothing, keeps this module free of a ``backtest.dev`` dependency, and
 works unchanged on the day a defaulted ``Candidate.controls`` field lands.
 """
+
+SUPERSEDES_ATTR = "supersedes"
+"""The attribute a re-drawn control names the arms it replaces in. Declared, never inferred.
+
+Read exactly as ``DECLARATION_ATTR`` is -- ``getattr(arm, SUPERSEDES_ATTR, ())`` -- so this module
+imports nothing from ``backtest.dev`` and an arm without the attribute simply declares nothing.
+``backtest.dev.Candidate`` carries it as a defaulted, validated ``tuple[str, ...]`` from
+2026-10-19; it is outside ``config_digest`` because ``lab.method.config_text`` and
+``registry.candidate_text`` both name their fields by hand and nothing passes a whole
+``Candidate`` to ``registry._canon``.
+"""
+
+
+def declared_supersessions(arm: Arm) -> tuple[str, ...]:
+    """The candidate ids ``arm`` declares it supersedes. Duck-typed: see ``SUPERSEDES_ATTR``.
+
+    Tolerant of anything that is not a tuple of non-empty strings, because this is a reader and
+    every uncertainty it meets must become a verdict a human can see rather than an exception a
+    caller has to catch. A malformed declaration therefore declares nothing, and the import-time
+    validation in ``Candidate.__post_init__`` is what stops one being written in the first place.
+    """
+    declared = getattr(arm, SUPERSEDES_ATTR, ())
+    if not isinstance(declared, (tuple, list)):
+        return ()
+    return tuple(s for s in declared if isinstance(s, str) and s)
+
 
 # --------------------------------------------------------------------------- the markers
 #
@@ -281,6 +371,18 @@ class Finding:
     ``rung`` names which step of the ladder chose ``target_id``, so a resolution the author would
     dispute is visible in the output rather than buried in a ratio. ``reason`` is one plain
     sentence; ``describe`` wraps it with the ids.
+
+    ``declares`` is what THIS arm says it supersedes, read off the candidate at construction
+    through ``SUPERSEDES_ATTR``. ``superseded_by`` is the id of the later, band-clean arm that
+    declared THIS one, and ``superseded_by_target`` is that arm's own resolved target -- which may
+    differ from this one's, because the ``<target-id>-PLC`` convention deliberately re-points a
+    re-drawn control at the book it actually controls. Both are set by ``_mark_superseded`` when
+    ``findings`` has the whole method in hand. Printing both targets is the point: a reader who
+    meets a re-pointed replacement must be able to see that it was re-pointed.
+
+    A superseded finding keeps its ``REFUSE`` (or ``WARN``) verdict, both ratios and its reason,
+    and is still printed: the old draw is the record of what every margin quoted against it was
+    actually worth. Only ``blocking`` goes false, and only ``refusals`` reads ``blocking``.
     """
 
     method_id: str
@@ -294,11 +396,23 @@ class Finding:
     turnover_ratio: float | None
     verdict: str
     reason: str
+    declares: tuple[str, ...] = ()
+    superseded_by: str | None = None
+    superseded_by_target: str | None = None
 
     @property
     def refused(self) -> bool:
-        """True only for a measured mismatch outside ``REFUSE_BAND``. Never for an unknown."""
+        """True only for a measured mismatch outside ``REFUSE_BAND``. Never for an unknown.
+
+        Still true once the arm is superseded: the measurement does not stop being what it was
+        because a better stick was cut later. A gate wants ``blocking``.
+        """
         return self.verdict == REFUSE
+
+    @property
+    def blocking(self) -> bool:
+        """A refusal nothing has retired: what ``refusals`` keeps and what the hard gate acts on."""
+        return self.verdict == REFUSE and self.superseded_by is None
 
     @property
     def flagged(self) -> bool:
@@ -464,6 +578,76 @@ def _not_checked_reason(kind: str) -> str:
     )
 
 
+def superseding_arm(f: Finding, found: Sequence[Finding]) -> tuple[str, str | None] | None:
+    """The honest control that retires ``f`` and its own target, or None when nothing does.
+
+    ``f`` is retired only when **all** of these hold of some other finding ``g`` of the same
+    method:
+
+    - ``f`` is itself a measured placebo mismatch -- ``REFUSE`` or ``WARN``. Nothing retires an
+      ``unresolved``, an ``unrecorded`` or a ``not-checked``, because none of them is a
+      measurement. ``WARN`` is included because a warn arm is still outside the match band and
+      every margin quoted against it is still quoted against a handicap; it does not block a
+      promotion, but a reader meeting the new number still needs to be told the old one was
+      answered. ``M0047-PLC1-MV20`` is the one such arm in this lab;
+    - ``g`` is a ``placebo``. A dose-response or within-frame arm carries no ratio at all and is
+      not a measuring stick for anyone's shape -- admitting one would make ``kind_of``'s
+      dose-before-draw ordering into a way of clearing the gate by wording;
+    - ``g``'s verdict is ``OK`` -- inside ``WARN_BAND`` on every axis it has, not merely inside
+      ``REFUSE_BAND``. See the module docstring for the measurement: the loose reading lets
+      ``M0047-PLC1-MV20`` (0.545x) retire ``M0047-PLC1-MV10`` (0.549x), one bent stick replacing
+      another, on today's lab and with no honest control drawn at all;
+    - ``g`` **names ``f.control_id`` in its own declaration** (``SUPERSEDES_ATTR``, carried on the
+      finding as ``declares``).
+
+    **There is no target-equality condition, and its absence is the decision this rule turns on.**
+    Equality is an inference about intent drawn from a resolution the ladder itself reports as a
+    guess, and it is wrong in both directions. Too strict: the ``<target-id>-PLC`` convention
+    deliberately re-points a re-drawn arm at its TRUE target, so ``M0047-MV10-PLC`` resolves to
+    ``M0047-MV10`` while the arm it replaces resolves to ``M0047-EQ`` -- under equality M0047 and
+    M0202 would stay blocked after all the measuring. Too loose: ``M0215-HASH`` and
+    ``M0215-HASH-CAP4`` both resolve to ``M0215-CTRL``, so one honest control of ``CTRL`` would
+    excuse an arm that exists to price a cap and was never scored against ``CTRL`` in spirit. A
+    declaration is the author of the re-draw saying which measurement this one replaces, before
+    any result exists.
+
+    The second element of the answer is ``g``'s own ``target_id``, so the caller can print both
+    and a re-point is visible rather than hidden.
+
+    Ties go to the first such arm in ``findings``' own order, so the answer is deterministic and a
+    reader can find the arm in the file. Reads no band constant of its own: ``OK`` is already the
+    band's answer.
+    """
+    if f.verdict not in (REFUSE, WARN) or f.kind != KIND_PLACEBO:
+        return None
+    for g in found:
+        if g.control_id == f.control_id or g.method_id != f.method_id:
+            continue
+        if g.kind != KIND_PLACEBO or g.verdict != OK:
+            continue
+        if f.control_id not in g.declares:
+            continue
+        return g.control_id, g.target_id
+    return None
+
+
+def _mark_superseded(found: Sequence[Finding]) -> tuple[Finding, ...]:
+    """``found`` with ``superseded_by`` filled in. Nothing is dropped and no verdict is moved.
+
+    A second pass rather than a branch inside ``findings``' loop, because supersession is a
+    property of the whole method and not of one arm: the arm that retires a refusal is in practice
+    declared *after* it, at the foot of the file in an ``Amendment`` block.
+    """
+    out: list[Finding] = []
+    for f in found:
+        by = superseding_arm(f, found)
+        if by is None:
+            out.append(f)
+        else:
+            out.append(replace(f, superseded_by=by[0], superseded_by_target=by[1]))
+    return tuple(out)
+
+
 def findings(
     conn: sqlite3.Connection, method_id: str, arms: Sequence[Arm]
 ) -> tuple[Finding, ...]:
@@ -473,6 +657,11 @@ def findings(
     arm produces an empty tuple, which is the correct answer and not an error. Nothing is written
     and no ``LabError`` is raised: this is a reader, and every uncertainty it meets becomes a
     verdict a human can see rather than an exception a caller has to catch.
+
+    The last thing it does is ``_mark_superseded``: a refusal that a later, band-clean control of
+    the same arm has retired comes back carrying that arm's id. The refusal itself is untouched --
+    same verdict, same ratios, same reason, same place in the order. This is the one step that
+    needs the whole method at once, which is why it is a pass and not a branch in the loop above.
     """
     arms = tuple(arms)
     recorded = shapes(conn, method_id)
@@ -488,6 +677,7 @@ def findings(
                 target_id=None, rung=None, control=mine, target=None,
                 trade_ratio=None, turnover_ratio=None,
                 verdict=NOT_CHECKED, reason=_not_checked_reason(kind),
+                declares=declared_supersessions(arm),
             ))
             continue
         target_id, rung = resolve_target(arm, arms)
@@ -501,6 +691,7 @@ def findings(
                     "every other arm of this method is itself a control, so there is no book "
                     "whose shape this one was meant to match and nothing to compare it with"
                 ),
+                declares=declared_supersessions(arm),
             ))
             continue
         theirs = recorded.get(target_id)
@@ -512,6 +703,7 @@ def findings(
                 trade_ratio=None, turnover_ratio=None,
                 verdict=UNRECORDED,
                 reason=f"{missing} has no recorded dev trial, so there is no shape to compare",
+                declares=declared_supersessions(arm),
             ))
             continue
         trade_ratio = _ratio(mine.trades, theirs.trades)
@@ -527,6 +719,7 @@ def findings(
                     f"{target_id} recorded no trades and no turnover, so neither axis has a "
                     f"denominator and the shapes cannot be compared"
                 ),
+                declares=declared_supersessions(arm),
             ))
             continue
         verdict = worst(axes)
@@ -535,8 +728,9 @@ def findings(
             target_id=target_id, rung=rung, control=mine, target=theirs,
             trade_ratio=trade_ratio, turnover_ratio=turnover_ratio,
             verdict=verdict, reason=_shape_reason(verdict, trade_ratio, turnover_ratio),
+            declares=declared_supersessions(arm),
         ))
-    return tuple(out)
+    return _mark_superseded(out)
 
 
 def _shape_reason(verdict: str, trade_ratio: float | None, turnover_ratio: float | None) -> str:
@@ -599,8 +793,14 @@ def survey(
 
 
 def refusals(found: Iterable[Finding]) -> tuple[Finding, ...]:
-    """Only the measured mismatches outside ``REFUSE_BAND``. What a gate acts on."""
-    return tuple(f for f in found if f.refused)
+    """Measured mismatches outside ``REFUSE_BAND`` that nothing has retired. What a gate acts on.
+
+    Reads ``blocking`` and not ``refused``: an arm a later band-clean control of the same book has
+    superseded stays in ``found``, stays flagged and still prints, but it no longer stops a
+    promotion. The refusal said "re-draw the control and run it again as an amendment"; this is
+    the line that makes doing so mean something.
+    """
+    return tuple(f for f in found if f.blocking)
 
 
 def flags(found: Iterable[Finding]) -> tuple[Finding, ...]:
@@ -612,10 +812,28 @@ def flags(found: Iterable[Finding]) -> tuple[Finding, ...]:
 
 
 def describe(f: Finding) -> str:
-    """One sentence naming the control, the arm it controls and why the verdict is what it is."""
+    """One sentence naming the control, the arm it controls and why the verdict is what it is.
+
+    A superseded arm says so at the end, with the id of the arm that retired it, because this is
+    the sentence the hard gate and both report surfaces quote and a reader meeting the old ratios
+    needs to know they have already been answered.
+    """
     if f.target_id is None:
-        return f"{f.control_id}: {f.reason}"
-    return f"{f.control_id} (against {f.target_id}, resolved by {f.rung}): {f.reason}"
+        said = f"{f.control_id}: {f.reason}"
+    else:
+        said = f"{f.control_id} (against {f.target_id}, resolved by {f.rung}): {f.reason}"
+    if f.superseded_by is None:
+        return said
+    aimed = (
+        "" if f.superseded_by_target in (None, f.target_id)
+        else f" (which controls {f.superseded_by_target}, not {f.target_id or 'this arm'})"
+    )
+    return (
+        f"{said} -- superseded by {f.superseded_by}{aimed}, a later control that declares it "
+        f"replaces this one and matches its own book's shape on both axes, so the gate reads that "
+        f"one instead; this row stays because it is the record of what the margins written "
+        f"against it were worth"
+    )
 
 
 def band_sentence() -> str:
@@ -633,9 +851,21 @@ _HEAD: tuple[str, ...] = (
     "method", "control", "kind", "controls", "resolved by", "trades x", "turnover x", "verdict",
 )
 
+_SUPERSEDED_HEAD = "superseded by"
+"""The ninth column, added only when a row in the report has one.
 
-def _cells(f: Finding) -> tuple[str, ...]:
-    return (
+A column that is a dash on every line of every report the lab prints today would be noise in
+sixty-four rows to carry information in none of them. It appears when it says something, and every
+report that has no superseded arm prints exactly the eight columns it printed before.
+"""
+
+
+def _head(with_superseded: bool) -> tuple[str, ...]:
+    return (*_HEAD, _SUPERSEDED_HEAD) if with_superseded else _HEAD
+
+
+def _cells(f: Finding, with_superseded: bool = False) -> tuple[str, ...]:
+    row = (
         f.method_id,
         f.control_id,
         f.kind or KIND_NONE,
@@ -645,15 +875,35 @@ def _cells(f: Finding) -> tuple[str, ...]:
         DASH if f.turnover_ratio is None else f"{f.turnover_ratio:.2f}",
         f.verdict,
     )
+    if not with_superseded:
+        return row
+    if f.superseded_by is None:
+        cell = DASH
+    elif f.superseded_by_target in (None, f.target_id):
+        cell = f.superseded_by
+    else:
+        # The replacement was deliberately re-pointed at its TRUE target. Print both, or a reader
+        # sees one id retiring a row that names a different book and has no way to tell why.
+        cell = f"{f.superseded_by} -> {f.superseded_by_target}"
+    return (*row, cell)
 
 
 def _table(head: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
+    """Head plus rows, columns padded to the widest cell.
+
+    The first five columns are names and read left-justified; the ratios and the verdict are
+    numbers and a word and read right-justified against them. ``superseded by`` is a candidate id,
+    so it goes back to the left -- by its heading rather than by its index, because it is the last
+    column only while it is the only optional one.
+    """
     body = [tuple(head), *(tuple(r) for r in rows)]
     widths = [max(len(r[i]) for r in body) for i in range(len(head))]
     out: list[str] = []
     for k, row in enumerate(body):
         cells = [
-            row[i].ljust(widths[i]) if i < 5 else row[i].rjust(widths[i])
+            row[i].ljust(widths[i])
+            if i < 5 or head[i] == _SUPERSEDED_HEAD
+            else row[i].rjust(widths[i])
             for i in range(len(head))
         ]
         out.append("    " + "  ".join(cells).rstrip())
@@ -668,6 +918,10 @@ def format_report(found: Sequence[Finding], *, show_clean: bool = True) -> str:
     ``show_clean=False`` keeps only what a reader must act on, which is what the annotation at
     ``lab run`` wants; the standalone report shows everything, because a control that passed is
     the evidence the band is not simply refusing everything.
+
+    A superseded arm is kept by **both** settings: it is still ``flagged``, because the sentence
+    already written about its margin is still in the record and still wrong. The extra column and
+    the paragraph under the table appear only when there is one.
     """
     rows = list(found) if show_clean else [f for f in found if f.flagged]
     out = [
@@ -684,7 +938,8 @@ def format_report(found: Sequence[Finding], *, show_clean: bool = True) -> str:
             else "    no control arm to report: every one of them matches its book's shape"
         )
         return "\n".join(out)
-    out += _table(_HEAD, [_cells(f) for f in rows])
+    retired = [f for f in rows if f.superseded_by is not None]
+    out += _table(_head(bool(retired)), [_cells(f, bool(retired)) for f in rows])
     bad = flags(rows)
     out.append("")
     if not bad:
@@ -693,4 +948,15 @@ def format_report(found: Sequence[Finding], *, show_clean: bool = True) -> str:
         out.append("    what to read before quoting a control gap")
         for f in bad:
             out.append(f"      {describe(f)}")
+    if retired:
+        out.append("")
+        out.append(
+            "    superseded: a later control of the same arm matches its shape, so the gate reads "
+            "that one. The"
+        )
+        out.append(
+            "    row above stays, with its ratios, because every margin already written against "
+            "it was quoted"
+        )
+        out.append("    against a handicapped opponent and the record of that has to stay readable.")
     return "\n".join(out)

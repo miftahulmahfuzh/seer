@@ -31,6 +31,18 @@ The sector map is loaded once from the vendored EDGAR files (no network, no cloc
 is a filer's latest, not point in time; that blurs a cap, it cannot leak a price.
 
 Rules are ``monthly-hold-frac-gotrade``: fractional shares at Gotrade's real fees, monthly.
+
+Amendment 1 (2026-10-19). The two placebos above are mis-shaped and D17 refuses them: the hash is
+re-keyed on the calendar quarter and held names sort first, a double stickiness, so each traded 179
+times in twenty years against the 528 of ``CTRL`` and the 500 of ``CAP4`` -- 0.34x trades, 0.43x
+turnover. Their slot count was already the raise book's own, so the size axis was matched and only
+the churn was not. ``CTRL-PLC`` and ``CAP4-PLC`` keep every other part of the frame and take their
+entry count each month from the arm each one controls (``lab.control_draw``, the lab's one
+matched-draw rule). They also fix a resolution: ``HASH-CAP4`` resolves to ``CTRL`` because its own
+stem is a placebo, while the book it exists to price is ``CAP4``; ``<target>-PLC`` names put both
+new arms on the ``sibling-stem`` rung. The six recorded configurations are untouched -- the matched
+draw reuses the two replaced arms' own ``CapParams`` values byte for byte and rides behind its own
+allocator id, ``M0215-A1``, which is the whole of the difference.
 """
 
 from __future__ import annotations
@@ -49,7 +61,8 @@ import numpy as np
 from seer_engine import sectors
 from seer_engine.backtest.dev import Candidate
 from seer_engine.backtest.market import EMPTY_DIVIDENDS, DividendCalendar
-from seer_engine.lab.method import Method
+from seer_engine.lab import control_draw
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0070_dividend_raise_drift import RaisePrepared, _first_bar, live_event
 from seer_engine.lab.methods.m0076_dividend_raise_on_announcement import events
 from seer_engine.lab.methods.m0088_calm_big_raisers import CalmParams, admits, swing
@@ -237,10 +250,266 @@ def _band(params: Any) -> BandParams:
 CAPPED = SectorCappedRaiseAllocator()
 
 
+# --------------------------------------------------------------------------- amendment 1
+#
+# The churn-matched placebo (2026-10-19). See the module docstring's last paragraph and
+# ``seer_engine.lab.control_draw`` for the rule itself; what lives here is this method's half of
+# it: which arm is being controlled, and how its shape is read off.
+
+
+def _check_matched(params: object) -> CapParams:
+    """``CapParams``, plus the one thing a control's params may not say.
+
+    The matched draw differs from ``HASH`` / ``HASH-CAP4`` in its allocator id and in nothing
+    else, so the params must still read ``order="hash"``. Saying ``"raise"`` would record a
+    configuration whose text claims the raise ordering this allocator never performs -- it
+    *replays* that ordering to count the real book's entries, and then draws blind.
+
+    Reused and not replaced: ``CapParams`` already carries ``calm``, ``cap``, ``order`` and
+    ``seed``, which is every input this allocator reads, so a wrapper dataclass would hold
+    nothing new. ``backtest.registry._canon`` renders a dataclass by ``dataclasses.fields()``,
+    not by ``as_dict()``, so a new field on ``CapParams`` -- even defaulted, even local to this
+    file -- would move the ``config_digest`` of all six recorded M0215 trials, and a
+    ``compare=False`` field would make the new arm's configuration identical to the old one's,
+    which ``Method.__post_init__`` refuses. Reusing the old value under a new allocator id does
+    neither.
+    """
+    if not isinstance(params, CapParams):
+        raise TypeError(f"params must be CapParams, got {type(params).__name__}")
+    if params.order != "hash":
+        raise ValueError(
+            f"the matched draw is a control: order must be 'hash', got {params.order!r}"
+        )
+    return params
+
+
+def _rows_on(prepared: Any, members: AbstractSet[str], data_date: date,
+             inner: Any) -> list[FactorRow]:
+    """``_run``'s factor-row read, lifted so a previous session can use it too."""
+    if prepared.factor is None:
+        return factor_rows(prepared.history, members, data_date, inner)
+    return prepared.factor.rows_on(members, data_date, inner)
+
+
+def _raise_picks(prepared: Any, rows: list[FactorRow], data_date: date, held: frozenset[str],
+                 book: CapParams) -> list[str]:
+    """What the controlled arm holds on ``data_date``: ``choose``'s raise path, names only."""
+    b = book.calm.ann.base
+    raisers = calm_raisers(prepared.history, rows, prepared.calendar, data_date, held, book.calm)
+    return _fill([r.symbol for r in raisers], data_date, b.inner.top, book.cap)
+
+
+def _target_shape(prepared: Any, members: AbstractSet[str], rows: list[FactorRow],
+                  data_date: date, book: CapParams) -> tuple[list[str], list[str]]:
+    """(the controlled arm's book now, its book at the previous monthly decision session).
+
+    One allocator cannot see another candidate's ``held`` set, so the previous session is replayed
+    from an empty book and its result is fed forward as ``held`` for the current one. That is a
+    one-step replay and not a guess: all ``held`` buys inside ``calm_raisers`` and ``_fill`` is the
+    ordering rule "a name already in the book sorts first", and one month of it is exactly what
+    separates an entry from a hold. It reads no bar dated after ``data_date``.
+    """
+    b = book.calm.ann.base
+    prev_date = control_draw.previous_decision_date(data_date)
+    prev: list[str] = []
+    if trend_on(prepared.history, prev_date, b.inner):
+        prev = _raise_picks(prepared, _rows_on(prepared, members, prev_date, b.inner), prev_date,
+                            frozenset(), book)
+    now = _raise_picks(prepared, rows, data_date, frozenset(prev), book)
+    return now, prev
+
+
+def _parked(history: Mapping[str, History], rows: list[FactorRow], data_date: date,
+            picks: list[str], book: CapParams) -> tuple[Target, ...]:
+    """``choose``'s tail for an already-chosen list: ``1/top`` each, the rest parked in SPY.
+
+    A copy of ``choose``'s last twelve lines and deliberately not a refactor of them: ``choose`` is
+    the recorded path of six closed trials and this file does not touch it. An empty ``picks``
+    parks the whole book in SPY, which is what the controlled arm does on a month with no raiser.
+    """
+    b = book.calm.ann.base
+    top = b.inner.top
+    close = {r.symbol: r.close for r in rows}
+    w = equal_weight(top)
+    out: list[Target] = []
+    for s in picks:
+        t = target_from_close(s, close[s], w)
+        if t is not None:
+            out.append(t)
+    if b.park:
+        rest = Decimal(1) - w * len(out)
+        mh = history.get(b.market)
+        if rest > 0 and mh is not None and mh.index_of(data_date) is not None:
+            t = target_from_close(b.market, last_close(mh, data_date), rest)
+            if t is not None:
+                out.append(t)
+    return tuple(out)
+
+
+class MatchedCapPlaceboAllocator(SectorCappedRaiseAllocator):
+    """M0215's frame filled by a churn-matched blind draw (amendment 1, 2026-10-19).
+
+    The original placebo (``order="hash"``) re-keys its hash on the calendar *quarter* and sorts
+    held names first, so its book changes about once a quarter: 179 trades against the 528 of the
+    arm it controls, 0.34x, which D17 refuses. Its slot count was already the real book's own
+    (``choose`` takes ``k = min(len(raisers), top)``), so the size axis was never the problem --
+    only the stickiness was. This allocator keeps everything else and replaces that stickiness with
+    the controlled arm's own: each decision session it replays that arm at this date and at the
+    previous one, counts the names it *entered*, keeps all but that many of its own holdings in a
+    date-free hash order, and draws the rest from the screened members in a month-keyed hash order,
+    through the same ``_fill`` (and so the same FF12 cap). Entries match by construction; exits
+    follow, because the book's size is the real arm's size that day and the placebo's previous size
+    was the real arm's previous size.
+
+    Everything else is ``SectorCappedRaiseAllocator``'s and so M0168's: the same ``prepare``, the
+    same ``prepare_market``, the same ``market_fields = ("dividends",)``, the same SPY-200 switch,
+    the same SPY parking, the same ``1/20`` slots, the same screened member pool, the same seed.
+
+    A new id, ``M0215-A1``: a trial's configuration is its rules, its allocator id and its params,
+    and the six recorded M0215 configurations keep the digests they were recorded under.
+    """
+
+    id = "M0215-A1"
+
+    def lookback(self, params: Any) -> int:
+        return control_draw.lookback_for(CAPPED.lookback(_check_matched(params)))
+
+    def symbols(self, params: Any) -> tuple[str, ...]:
+        return CAPPED.symbols(_check_matched(params))
+
+    def holds(self, params: Any) -> tuple[str, ...]:
+        return CAPPED.holds(_check_matched(params))
+
+    def uses_members(self, params: Any) -> bool:
+        return CAPPED.uses_members(_check_matched(params))
+
+    def _run(self, prepared: Any, members: AbstractSet[str], data_date: date,
+             held: frozenset[str], p: Any) -> tuple[Target, ...]:
+        book = _check_matched(p)
+        b = book.calm.ann.base
+        if len(prepared.calendar) == 0:  # no panel: target nothing (market-aware contract)
+            return ()
+        if not trend_on(prepared.history, data_date, b.inner):
+            return ()
+        rows = _rows_on(prepared, members, data_date, b.inner)
+        now, prev = _target_shape(prepared, members, rows, data_date, book)
+        n = len(now)
+        pool = sorted(r.symbol for r in rows if r.symbol not in EXCLUDED and r.symbol != b.market)
+        keep, tail = control_draw.matched_partition(
+            pool=pool, held=held, keep_n=max(0, n - control_draw.churn(now, prev)),
+            tag="M0215", seed=book.seed, data_date=data_date,
+        )
+        # keep + tail is the whole pool in take order, fresh names ahead of dropped holdings;
+        # `_fill` truncates it to n under the FF12 cap, exactly as it truncates the raise order.
+        return _parked(prepared.history, rows, data_date,
+                       _fill(keep + tail, data_date, n, book.cap), book)
+
+    def targets(self, history: Mapping[str, History], members: AbstractSet[str], data_date: date,
+                held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        return self._run(RaisePrepared(history, None, EMPTY_DIVIDENDS), members, data_date, held,
+                         _check_matched(params))
+
+    def targets_prepared(self, prepared: Any, members: AbstractSet[str], data_date: date,
+                         held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        if not isinstance(prepared, RaisePrepared):
+            raise TypeError(f"prepared must be RaisePrepared, got {type(prepared).__name__}")
+        return self._run(prepared, members, data_date, held, _check_matched(params))
+
+
+MATCHED = MatchedCapPlaceboAllocator()
+
+
 def _v(suffix: str, params: CapParams, rationale: str) -> Candidate:
     return Candidate(id=f"M0215-{suffix}", family="M0215", rules=MONTHLY_HOLD_FRAC_GOTRADE,
                      allocator=CAPPED, params=params, rationale=rationale, added=ADDED,
                      owner_inputs=())
+
+
+AMENDED = date(2026, 10, 19)
+
+
+def _a1(suffix: str, params: CapParams, rationale: str,
+        supersedes: tuple[str, ...]) -> Candidate:
+    """An amendment candidate, with the declaration of which recorded arm it replaces.
+
+    ``supersedes`` is what D17 reads (``control_shape.SUPERSEDES_ATTR``): declared, never
+    inferred. It is what pairs each new arm with the right old one here -- ``HASH`` and
+    ``HASH-CAP4`` BOTH resolve to ``M0215-CTRL``, so a rule that matched targets would have let
+    ``CTRL-PLC`` excuse the capped arm as well, which was never scored against ``CTRL`` in
+    spirit."""
+    return Candidate(id=f"M0215-{suffix}", family="M0215", rules=MONTHLY_HOLD_FRAC_GOTRADE,
+                     allocator=MATCHED, params=params, rationale=rationale, added=AMENDED,
+                     owner_inputs=(), supersedes=supersedes)
+
+
+MATCHED_DRAW_AMENDMENT = Amendment(
+    added=AMENDED,
+    why=(
+        "Both hash-order placebos trade a third as often as the books they control (179 against "
+        "528 and 500: 0.34x trades, 0.43x turnover), so neither quoted lead is evidence -- "
+        "re-draw each to the shape of the arm it actually controls"
+    ),
+    hypothesis=(
+        "Written and committed before the run. M0215's two placebos re-key their hash on the "
+        "calendar quarter (`draw`) and sort held names first (`choose`), a double stickiness, so "
+        "each turned over 179 times in twenty years against M0215-CTRL's 528 and M0215-CAP4's "
+        "500 -- 0.34x trades and 0.43x turnover, outside the [0.50, 2.00] band D17 refuses on. "
+        "Their slot count was already the raise book's own (k = min(len(raisers), top)), so the "
+        "size axis was matched and only the churn was not; that is all this amendment changes. "
+        "CTRL-PLC and CAP4-PLC keep the whole frame -- the SPY-200 switch, the SPY parking, "
+        "twenty 1/20 slots, the screened member pool, the FF12 cap where the controlled arm has "
+        "one, seed 1 -- and take their entry count each month from the arm each one controls, "
+        "keeping the rest of the book in a date-free hash order. They also repair a resolution: "
+        "HASH-CAP4 today resolves to CTRL because its own stem is a placebo, while the book it "
+        "exists to price is CAP4; CTRL-PLC and CAP4-PLC resolve to CTRL and CAP4 on the "
+        "sibling-stem rung. Three predictions, in trial_funding.mwr against SPY TR 7.19%/yr on "
+        "the same deposits. (1) SHAPE: both arms land inside 0.80-1.25 of their own target on "
+        "both axes -- CTRL-PLC near 528 trades and 4.78 turnover, CAP4-PLC near 500 and 4.56. "
+        "(2) DIRECTION: an honestly-shaped blind book trades about three times as often and pays "
+        "about three times the Gotrade fee bill, so both new arms earn LESS than the 8.66% and "
+        "8.62% the sticky draws recorded, and both quoted leads WIDEN -- CTRL's +1.96 points over "
+        "its placebo and CAP4's +1.72 each grow by between 0.3 and 1.5 points a year. (3) THE "
+        "SUCCESS CONDITION: this method's own bar is a difference between two placebos ('its gain "
+        "over CTRL is larger than HASH-CAP4's over HASH'), so re-drawing the pair re-states the "
+        "verdict and not merely a margin. The real half does not move -- CAP4 minus CTRL is -0.28 "
+        "points and stays there. The placebo half, -0.04 today, is predicted to stay within 0.15 "
+        "points of zero, because a cap of four over twenty slots drawn blind from the whole "
+        "screened pool binds in far fewer months than it does on a book that is 25% banks and 19% "
+        "retailers. So the re-stated condition, -0.28 > (CAP4-PLC minus CTRL-PLC), still FAILS by "
+        "roughly the 0.2 to 0.3 points it fails by today, and M0215's standing verdict survives "
+        "its honest control unchanged."
+    ),
+    expected_failure=(
+        "The honest draws may earn MORE, not less. The quarter-keyed draw froze a 2008-era book it "
+        "could not exit and fell 21.9% against CTRL's 18.7%; a book re-drawn every month rides the "
+        "recovery and pays its fees out of a bigger number, so both leads could NARROW or reverse. "
+        "If they do, the finding is that the +1.96 in this file was an artifact of a handicapped "
+        "opponent and that the frame -- twenty equal slots behind the SPY-200 switch with the rest "
+        "parked in SPY -- is what the book earns, not the raise signal. That is reported as the "
+        "finding and not re-drawn (design section 4). Second, the churn match is estimated rather "
+        "than known: one candidate's allocator cannot see another's held set, so the previous "
+        "decision session is replayed from an empty book and fed forward one step, and if that "
+        "one-step replay mis-states the entry count the ratios miss the 0.80-1.25 match band. The "
+        "measured ratios are then recorded and the work stops; the seed and the re-key period are "
+        "not dials. Third, a cap of four may bind more often on a blind draw than predicted if the "
+        "screened pool is itself concentrated, which would make the placebo half of the "
+        "difference-in-differences larger than 0.15 points and could flip the re-stated condition "
+        "on what is noise rather than a cap effect -- in which case the honest reading is that "
+        "twenty names cannot resolve a 0.3 point cap effect at all. Fourth, the extra replay "
+        "roughly triples the allocator's per-session work: the run is slower and nothing else."
+    ),
+    candidates=(
+        _a1("CTRL-PLC", CapParams(C63, None, "hash", 1),
+            "Placebo, re-drawn to M0215-CTRL's own shape: as many slots and as many fresh names "
+            "each month as the uncapped raise book, filled in hash order by members that know "
+            "nothing about dividends",
+            supersedes=("M0215-HASH",)),
+        _a1("CAP4-PLC", CapParams(C63, 4, "hash", 1),
+            "Placebo capped at 4 per industry, re-drawn to M0215-CAP4's own shape and filled in "
+            "hash order, to price what a cap does to any book this shape",
+            supersedes=("M0215-HASH-CAP4",)),
+    ),
+)
 
 
 METHOD = Method(
@@ -310,4 +579,5 @@ METHOD = Method(
         "concept:sector-cap",
         "concept:hash-order-yardstick",
     ),
+    amendments=(MATCHED_DRAW_AMENDMENT,),
 )

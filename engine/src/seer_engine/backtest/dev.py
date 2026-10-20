@@ -185,6 +185,19 @@ class Candidate:
     simulator (``sim.rules.is_bracket``), and an ``Allocator`` otherwise. ``owner_inputs`` is sorted
     and unique; the registry test checks it equals ``candidate_owner_inputs(self)``, and D8
     always uses the computed value.
+
+    ``supersedes`` names the candidate ids this arm declares it replaces, for ``lab.control_shape``'s
+    D17 supersession (2026-10-19). Declared and never inferred. A control arm whose shape D17 refuses
+    is recorded forever -- ``trials`` is append-only by trigger -- so the only way a re-drawn control
+    can retire the bent one is to say which one it retires, in the commit that pre-registers it.
+    Target equality was the obvious alternative and is wrong in both directions: it misses a re-drawn
+    arm that deliberately re-points at its TRUE target (``M0047-MV10-PLC`` resolves to ``M0047-MV10``
+    while the arm it replaces resolves to ``M0047-EQ``), and it over-reaches when two
+    differently-aimed placebos happen to resolve to one arm (``M0215-HASH`` and ``M0215-HASH-CAP4``
+    both land on ``M0215-CTRL``). It is read duck-typed, through ``control_shape.SUPERSEDES_ATTR``,
+    exactly as ``DECLARATION_ATTR`` is, so no lab module imports this one. It is outside
+    ``config_digest`` by construction: ``lab.method.config_text`` and ``registry.candidate_text`` both
+    name their fields by hand and nothing passes a whole ``Candidate`` to ``registry._canon``.
     """
 
     id: str
@@ -195,6 +208,7 @@ class Candidate:
     rationale: str
     added: date
     owner_inputs: tuple[str, ...]
+    supersedes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, str) or _ID.fullmatch(self.id) is None:
@@ -220,6 +234,17 @@ class Candidate:
                 raise ValueError(f"{self.id}: owner_inputs holds {item!r}, not a non-empty str")
         if self.owner_inputs != tuple(sorted(set(self.owner_inputs))):
             raise ValueError(f"{self.id}: owner_inputs must be sorted and unique, got {self.owner_inputs!r}")
+        if not isinstance(self.supersedes, tuple):
+            raise TypeError(f"{self.id}: supersedes must be a tuple of candidate ids")
+        for item in self.supersedes:
+            if not isinstance(item, str) or _ID.fullmatch(item) is None:
+                raise ValueError(f"{self.id}: supersedes holds {item!r}, not a candidate id")
+            if item == self.id:
+                raise ValueError(f"{self.id}: an arm cannot supersede itself")
+        if self.supersedes != tuple(sorted(set(self.supersedes))):
+            raise ValueError(
+                f"{self.id}: supersedes must be sorted and unique, got {self.supersedes!r}"
+            )
 
 
 def _reads(c: Candidate) -> tuple[tuple[str, ...], int, bool]:

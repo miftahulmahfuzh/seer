@@ -58,7 +58,8 @@ from datetime import date, timedelta
 from typing import Any
 
 from seer_engine.backtest.dev import Candidate
-from seer_engine.lab.method import Method
+from seer_engine.lab import control_draw
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0198_size_weighted_placebo import trading_value
 from seer_engine.sim.book import Target, equal_weight
 from seer_engine.sim.rules import MONTHLY_HOLD_FRAC_GOTRADE
@@ -250,6 +251,191 @@ def _v(suffix: str, params: IssuanceParams, rationale: str) -> Candidate:
                      owner_inputs=())
 
 
+# ---- amendment 1 (2026-10-19): the honest control ---------------------------------------------
+#
+# R20's hash order keys on (seed, symbol) and carries no date, so its book changes only when the
+# scored pool does: 41 trades in nineteen years against S20's 608, which is 0.07x, and a control
+# that does not trade does not pay Gotrade's fees. This block replaces it with the lab's one
+# matched-draw rule (`lab.control_draw`) under a NEW allocator id, so not one byte of what the
+# five recorded M0227 trials read is touched.
+#
+# The params are R20's own, reused verbatim. `IssuanceParams` already carries every input the
+# matched draw reads -- `top`, `seed`, `trend` -- so there is nothing a new dataclass could hold.
+# A field added to `IssuanceParams` would move all five recorded M0227 digests and all five
+# M0243 ones (`registry._canon` renders a dataclass by `dataclasses.fields()`, not by `as_dict`),
+# and a new dataclass would be a second way of saying the same thing in nine files. The new
+# allocator id is the whole of the difference, and it is enough: `config_text` is rules, allocator
+# id and params, so `<M0227-A1>` against R20's `<M0227>` is a configuration the lab has not run.
+
+
+def _check_control(params: object) -> IssuanceParams:
+    """``IssuanceParams``, plus the one thing a control's params may not say.
+
+    The matched draw differs from ``R20`` in its allocator id and in nothing else, so the params
+    must still read ``side="random"``. Saying ``"shrink"`` would record a configuration whose text
+    claims a buyback ranking this allocator never performs -- the config text is the public record
+    of what an arm did, and a blind book must not describe itself as a ranked one.
+    """
+    if not isinstance(params, IssuanceParams):
+        raise TypeError(f"params must be IssuanceParams, got {type(params).__name__}")
+    if params.side != "random":
+        raise ValueError(f"the matched draw is a control: side must be 'random', got {params.side!r}")
+    return params
+
+
+class MatchedDrawAllocator:
+    r"""S20's shape with none of its identity: ``lab.control_draw``'s matched draw on M0227's pool.
+
+    Each month it recomputes S20's own selection at this decision and at the previous one, keeps
+    all but ``e`` of its names in a date-free hash order and draws ``e`` fresh ones from the same
+    scored pool in a hash order keyed on the month, where ``e`` is how many names S20 itself is
+    adding. Equal slots, fully invested, same switch, same fees.
+
+    Its own allocator id, ``M0227-A1``: a trial's identity is its rules, its allocator id and its
+    params, so a new id is what makes this a configuration the lab has not run without touching
+    anything the five recorded ones read. ``hardgate._INGREDIENT`` is ``<(M\d{4})>``, so
+    ``<M0227-A1>`` names no ingredient and D12 reads exactly what it read before.
+    """
+
+    id = "M0227-A1"
+    market_fields = ("shares",)
+
+    def lookback(self, params: Any) -> int:
+        p = _check_control(params)
+        inner = max(DV_N, 0 if p.trend is None else p.trend[1])
+        return control_draw.lookback_for(inner)
+
+    def symbols(self, params: Any) -> tuple[str, ...]:
+        p = _check_control(params)
+        return ("SPY",) if p.trend is None else tuple(sorted({"SPY", p.trend[0]}))
+
+    def holds(self, params: Any) -> tuple[str, ...]:
+        _check_control(params)
+        return ()
+
+    def uses_members(self, params: Any) -> bool:
+        _check_control(params)
+        return True
+
+    def _select(self, prepared: IssuancePrepared, members: AbstractSet[str], data_date: date,
+                p: IssuanceParams) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        """(the eligible pool, S20's own book) on ``data_date`` -- the shrink arm's own two."""
+        pool = scored_pool(prepared, members, data_date)
+        if not pool:
+            return (), ()
+        order = sorted(pool, key=lambda s: (pool[s], s))
+        return tuple(sorted(pool)), tuple(order[: p.top])
+
+    def _run(self, prepared: IssuancePrepared, members: AbstractSet[str], data_date: date,
+             held: frozenset[str], p: IssuanceParams) -> tuple[Target, ...]:
+        if prepared.market is None:
+            return ()
+        gate = FactorParams(rank="momentum", top=p.top, trend=p.trend)
+        if not trend_on(prepared.history, data_date, gate):
+            return ()
+        names = control_draw.matched_book(
+            lambda d: self._select(prepared, members, d, p),
+            data_date, held, tag="M0227", seed=p.seed,
+        )
+        w = equal_weight(p.top)
+        out: list[Target] = []
+        for s in names:
+            t = target_from_close(s, last_close(prepared.history[s], data_date), w)
+            if t is not None:
+                out.append(t)
+        return tuple(out)
+
+    def targets(self, history: Mapping[str, History], members: AbstractSet[str], data_date: date,
+                held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        """The history-only path: no share counts, so no pool and no target."""
+        return self._run(IssuancePrepared(history, None), members, data_date, held,
+                         _check_control(params))
+
+    def prepare(self, history: Mapping[str, History]) -> IssuancePrepared:
+        return IssuancePrepared(history, None)
+
+    def prepare_market(self, market: Any) -> IssuancePrepared:
+        if not hasattr(market, "shares") or len(market.shares) == 0:
+            return IssuancePrepared(market.history, None)
+        return IssuancePrepared(market.history, market)
+
+    def targets_prepared(self, prepared: Any, members: AbstractSet[str], data_date: date,
+                         held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        if not isinstance(prepared, IssuancePrepared):
+            raise TypeError(f"prepared must be IssuancePrepared, got {type(prepared).__name__}")
+        return self._run(prepared, members, data_date, held, _check_control(params))
+
+
+MATCHED = MatchedDrawAllocator()
+
+
+def _vm(suffix: str, params: IssuanceParams, rationale: str, supersedes: tuple[str, ...]) -> Candidate:
+    return Candidate(id=f"M0227-{suffix}", family="M0227", rules=MONTHLY_HOLD_FRAC_GOTRADE,
+                     allocator=MATCHED, params=params, rationale=rationale,
+                     added=date(2026, 10, 19), owner_inputs=(), supersedes=supersedes)
+
+
+MATCHED_DRAW_AMENDMENT = Amendment(
+    added=date(2026, 10, 19),
+    why=(
+        "R20's hash order has no date in it, so the control traded 0.07x S20 and the +5.22 point "
+        "lead was quoted against a book that barely paid a fee"
+    ),
+    hypothesis=(
+        "Written before any result and frozen by the commit that adds this block. `lab control` "
+        "on 2026-10-19 reports M0227-R20 trading 41 times against M0227-S20's 608 -- 0.07x, with "
+        "0.12x the turnover -- because its hash order keys on (seed, symbol) and carries no date, "
+        "so its book changes only when the scored pool does. A control that does not trade does "
+        "not pay Gotrade's fees, and S20's recorded lead of +5.22 points a year on the owner's "
+        "deposits (12.95% against R20's 7.73%, total-return SPY on the same deposits 7.19%) was "
+        "therefore quoted against a handicapped opponent. S20-PLC replaces it with the lab's one "
+        "matched-draw rule (seer_engine/lab/control_draw.py): the same scored pool, the same "
+        "twenty equal slots, the same monthly clock, the same fees, but each month it keeps all "
+        "but e of its names in a date-free hash order and draws e fresh ones in a hash order "
+        "keyed on that month, where e is how many names S20 itself is adding -- read off S20's "
+        "own selection at this decision and at the one before it, never chosen. Two falsifiable "
+        "predictions. SHAPE: S20-PLC lands inside 0.80-1.25 of S20 on BOTH recorded trades and "
+        "recorded turnover, not merely inside D17's 0.50-2.00 refuse band, because its entries "
+        "per rebalance are matched by construction and not calibrated. MARGIN, and its DIRECTION "
+        "is the pre-registration: an honest control trades roughly fifteen times as often as R20 "
+        "did, so it pays roughly fifteen times R20's fee bill, EARNS LESS than R20's 7.73%, and "
+        "S20's quoted lead WIDENS beyond +5.22 points a year. The widening is the cost of about "
+        "570 extra trades on a twenty-name book over nineteen years at Gotrade's minimums on a "
+        "20M IDR account, which is one to three points a year. If S20-PLC instead earns MORE than "
+        "R20, the difference is the draw and not the fees, and that is the finding -- it is "
+        "reported, not redrawn. Nothing about S20 moves: its trial is recorded and this adds one "
+        "arm beside it. No test-window look is spent."
+    ),
+    expected_failure=(
+        "Four ways, in order of likelihood. (1) SHAPE, the one that stops the fan-out: the "
+        "control's own pool attrition exceeds S20's churn. S20 adds only about 1.3 names a month "
+        "(608 trades over roughly 228 monthly decisions on a twenty-name book), which is a very "
+        "sticky book, and a blindly drawn twenty leaves the scored pool at its own rate; where "
+        "that rate is higher, the control's entries are its attrition rather than e and the trade "
+        "ratio lands above 1.25. That is a miss on the rule, not on the method, and it stops the "
+        "re-draw of the other twelve arms rather than being tuned away. (2) The margin reverses: "
+        "twenty names drawn from a pool of 250-400 is a wide distribution and one seed is one "
+        "draw, so S20-PLC may earn more than S20 for reasons that have nothing to do with "
+        "buybacks. One seed is what this amendment pre-registers; a second seed would be a second "
+        "look and is not taken here. (3) The widening is smaller than the fee arithmetic says, "
+        "because Gotrade's minimum bites hardest on the smallest slots and the smallest slots are "
+        "in the early years of a 20M IDR account, so most of the extra trading costs less than it "
+        "would at the end of the window. (4) The band is cleared and the margin is unchanged to "
+        "within a tenth of a point, which would say the fee handicap was never material on this "
+        "book -- D17's refusal still correct, and this re-draw having bought nothing but an "
+        "honest number. Any of these is reported as it lands. None is a reason to redraw: a "
+        "second amendment on this arm is admissible only under (1), and only because the SHAPE "
+        "missed."
+    ),
+    candidates=(
+        _vm("S20-PLC", IssuanceParams(20, side="random", seed=1, trend=None),
+            "Placebo, shape-matched: 20 names from S20's own scored pool, kept in a date-free "
+            "hash order and entered in a monthly hash order, as many each month as S20 enters",
+            supersedes=("M0227-R20",)),
+    ),
+)
+
+
 METHOD = Method(
     id="M0227",
     name=(
@@ -316,4 +502,5 @@ METHOD = Method(
         "concept:net-share-issuance",
         "concept:buyback-shrinkers",
     ),
+    amendments=(MATCHED_DRAW_AMENDMENT,),
 )

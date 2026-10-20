@@ -78,7 +78,8 @@ from datetime import date
 from typing import Any
 
 from seer_engine.backtest.dev import Candidate
-from seer_engine.lab.method import Method
+from seer_engine.lab import control_draw
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0015_52week_high import HIGH_N, nearness
 from seer_engine.lab.methods.m0187_placebo_hash_order import draw
 from seer_engine.lab.methods.m0227_net_share_shrinkers import (
@@ -257,6 +258,196 @@ def _v(suffix: str, params: NearShrinkParams, rationale: str) -> Candidate:
                      owner_inputs=())
 
 
+# ---- amendment 1 (2026-10-19): the honest control ---------------------------------------------
+#
+# NEAR20-R is this file's own overcorrection of M0227's sticky draw -- see the PICK paragraph at
+# the top -- and it overshot: redrawn in full every month, it traded 3872 times against NEAR20's
+# 1285, which is 3.01x, and paid three fee bills for one book. This block replaces it with the
+# lab's one matched-draw rule under a NEW allocator id, leaving every recorded configuration
+# byte-identical.
+
+
+def _check_control(params: object) -> NearShrinkParams:
+    """``NearShrinkParams``, plus the one thing a control's params may not say.
+
+    The matched draw differs from ``NEAR20-R`` in its allocator id and in nothing else, so the
+    params must still read ``pick="random"``. Saying ``"shrink"`` would record a configuration
+    whose text claims a buyback ranking this allocator never performs.
+
+    Reused and not replaced: ``NearShrinkParams`` already carries ``top``, ``cut``, ``side``,
+    ``seed`` and ``trend``, which is every input the matched draw reads, and ``band`` reads only
+    ``cut`` and ``side`` (`m0243:161-178`) so the real arm's own band is reproduced by handing it
+    this same object. A field added here would move the recorded ``config_digest`` of all five
+    M0243 trials, and a new dataclass beside it would buy nothing.
+    """
+    if not isinstance(params, NearShrinkParams):
+        raise TypeError(f"params must be NearShrinkParams, got {type(params).__name__}")
+    if params.pick != "random":
+        raise ValueError(f"the matched draw is a control: pick must be 'random', got {params.pick!r}")
+    return params
+
+
+class MatchedNearAllocator:
+    """NEAR20's shape with none of its identity: the matched draw inside NEAR20's own near band.
+
+    Each month it recomputes NEAR20's selection at this decision and at the previous one, keeps
+    all but ``e`` of its names in a date-free hash order and draws ``e`` fresh ones from the
+    IDENTICAL nearness band in a hash order keyed on that month, where ``e`` is how many names
+    NEAR20 itself is adding. The filter is held constant and only the pick is blind, which is what
+    NEAR20-R was always for; what moves is that the draw now turns over like the book instead of
+    three times as fast.
+
+    Its own allocator id, ``M0243-A1``, for the reason ``MatchedDrawAllocator`` gives in M0227.
+    """
+
+    id = "M0243-A1"
+    market_fields = ("shares",)
+
+    def lookback(self, params: Any) -> int:
+        p = _check_control(params)
+        inner = max(DV_N, HIGH_N, 0 if p.trend is None else p.trend[1])
+        return control_draw.lookback_for(inner)
+
+    def symbols(self, params: Any) -> tuple[str, ...]:
+        p = _check_control(params)
+        return ("SPY",) if p.trend is None else tuple(sorted({"SPY", p.trend[0]}))
+
+    def holds(self, params: Any) -> tuple[str, ...]:
+        _check_control(params)
+        return ()
+
+    def uses_members(self, params: Any) -> bool:
+        _check_control(params)
+        return True
+
+    def _select(self, prepared: IssuancePrepared, members: AbstractSet[str], data_date: date,
+                p: NearShrinkParams) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        """(the kept nearness band, NEAR20's own book inside it) on ``data_date``."""
+        pool = scored_pool(prepared, members, data_date)
+        if not pool:
+            return (), ()
+        kept = band(pool, prepared.history, data_date, p)
+        if not kept:
+            return (), ()
+        order = sorted(kept, key=lambda s: (pool[s], s))
+        return tuple(sorted(kept)), tuple(order[: p.top])
+
+    def _run(self, prepared: IssuancePrepared, members: AbstractSet[str], data_date: date,
+             held: frozenset[str], p: NearShrinkParams) -> tuple[Target, ...]:
+        if prepared.market is None:
+            return ()
+        gate = FactorParams(rank="momentum", top=p.top, trend=p.trend)
+        if not trend_on(prepared.history, data_date, gate):
+            return ()
+        names = control_draw.matched_book(
+            lambda d: self._select(prepared, members, d, p),
+            data_date, held, tag="M0243", seed=p.seed,
+        )
+        w = equal_weight(p.top)
+        out: list[Target] = []
+        for s in names:
+            t = target_from_close(s, last_close(prepared.history[s], data_date), w)
+            if t is not None:
+                out.append(t)
+        return tuple(out)
+
+    def targets(self, history: Mapping[str, History], members: AbstractSet[str], data_date: date,
+                held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        """The history-only path: no share counts, so no pool and no target."""
+        return self._run(IssuancePrepared(history, None), members, data_date, held,
+                         _check_control(params))
+
+    def prepare(self, history: Mapping[str, History]) -> IssuancePrepared:
+        return IssuancePrepared(history, None)
+
+    def prepare_market(self, market: Any) -> IssuancePrepared:
+        if not hasattr(market, "shares") or len(market.shares) == 0:
+            return IssuancePrepared(market.history, None)
+        return IssuancePrepared(market.history, market)
+
+    def targets_prepared(self, prepared: Any, members: AbstractSet[str], data_date: date,
+                         held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        if not isinstance(prepared, IssuancePrepared):
+            raise TypeError(f"prepared must be IssuancePrepared, got {type(prepared).__name__}")
+        return self._run(prepared, members, data_date, held, _check_control(params))
+
+
+MATCHED_NEAR = MatchedNearAllocator()
+
+
+def _vm(suffix: str, params: NearShrinkParams, rationale: str,
+        supersedes: tuple[str, ...]) -> Candidate:
+    return Candidate(id=f"M0243-{suffix}", family="M0243", rules=MONTHLY_HOLD_FRAC_GOTRADE,
+                     allocator=MATCHED_NEAR, params=params, rationale=rationale,
+                     added=date(2026, 10, 19), owner_inputs=(), supersedes=supersedes)
+
+
+MATCHED_DRAW_AMENDMENT = Amendment(
+    added=date(2026, 10, 19),
+    why=(
+        "NEAR20-R is redrawn in full every month, so the control traded 3.01x NEAR20 and the "
+        "+6.07 point lead was quoted against a book paying three fee bills"
+    ),
+    hypothesis=(
+        "Written before any result and frozen by the commit that adds this block. This file's own "
+        "PICK paragraph says why NEAR20-R is redrawn each month: M0227's placebo used a sticky "
+        "hash order and traded 41 times in nineteen years, so this one was redrawn monthly 'so it "
+        "turns over like the book it controls for'. Measured, it does not: `lab control` on "
+        "2026-10-19 reports 3872 trades against NEAR20's 1285 -- 3.01x, with 2.98x the turnover. "
+        "The correction was made by hand and overshot, which is the argument for deriving the "
+        "re-key period from the book instead of choosing one. NEAR20's recorded lead of +6.07 "
+        "points a year on the owner's deposits (10.45% against NEAR20-R's 4.38%, total-return SPY "
+        "on the same deposits 7.19%) is therefore quoted against an opponent paying about three "
+        "times its fee bill. NEAR20-PLC replaces it with the lab's one matched-draw rule "
+        "(seer_engine/lab/control_draw.py): the IDENTICAL nearness band, the same twenty equal "
+        "slots, the same monthly clock, the same fees, but each month it keeps all but e of its "
+        "names in a date-free hash order and draws e fresh ones in a hash order keyed on that "
+        "month, where e is how many names NEAR20 itself is adding -- read off NEAR20's own "
+        "selection at this decision and at the one before it, never chosen. Two falsifiable "
+        "predictions. SHAPE: NEAR20-PLC lands inside 0.80-1.25 of NEAR20 on BOTH recorded trades "
+        "and recorded turnover, not merely inside D17's 0.50-2.00 refuse band. MARGIN, and its "
+        "DIRECTION is the pre-registration: an honest control trades about a third as often as "
+        "NEAR20-R did, pays about a third of its fee bill, EARNS MORE than NEAR20-R's 4.38%, and "
+        "NEAR20's quoted lead NARROWS from +6.07 points or REVERSES. Reversal is a live outcome "
+        "and this method's own hypothesis already names it: prediction (2) there is that NEAR20 "
+        "must beat its placebo by 2 or more points a year, and 'if it does not, the nearness "
+        "filter is doing all the work and this is M0015 in disguise, which already lost'. That "
+        "sentence is now read against an honest opponent for the first time. Nothing about NEAR20 "
+        "moves: its trial is recorded and this adds one arm beside it. No test-window look is "
+        "spent."
+    ),
+    expected_failure=(
+        "Four ways, in order of likelihood. (1) The lead does not merely narrow, it vanishes: "
+        "NEAR20-R's 4.38% was dragged down by 2587 trades it should never have made, and a third "
+        "of that fee bill back could be worth several points a year on a twenty-name book at "
+        "Gotrade's minimums. If NEAR20-PLC lands within 2 points of NEAR20's 10.45%, this "
+        "method's own success condition (2) fails and the finding is that the near-high filter, "
+        "not the buyback signal, was carrying the book -- which closes the direction rather than "
+        "opening a tuning exercise, exactly as this file's expected_failure (1) already said. "
+        "(2) SHAPE, the one that stops the fan-out: the control's own attrition from the nearness "
+        "band differs from NEAR20's. The band is recomputed every month from the whole scored "
+        "pool's nearness ranking, so a blindly drawn name can fall out of the near half for a "
+        "reason a top-twenty shrinker would not, and the trade ratio lands above 1.25. That is a "
+        "miss on the rule, not on the method, and it stops the re-draw of the other twelve arms. "
+        "(3) The opposite shape failure: the near band is the churniest pool in this set (NEAR20 "
+        "itself changes about 5.6 names a month), so if a matched draw over-keeps -- the keep "
+        "hash being stable while the band membership is not -- the ratio could land below 0.80 "
+        "instead. (4) The band is cleared, the lead narrows by a point or two and survives, and "
+        "the finding is the narrow one: part of the +6.07 was fees and the rest is signal. Any of "
+        "these is reported as it lands. None is a reason to redraw: a second amendment on this "
+        "arm is admissible only under (2) or (3), and only because the SHAPE missed."
+    ),
+    candidates=(
+        _vm("NEAR20-PLC",
+            NearShrinkParams(20, cut=2, side="near", pick="random", seed=1, trend=None),
+            "Placebo, shape-matched: 20 names from NEAR20's identical near half, kept in a "
+            "date-free hash order and entered in a monthly hash order, as many each month as "
+            "NEAR20 enters",
+            supersedes=("M0243-NEAR20-R",)),
+    ),
+)
+
+
 METHOD = Method(
     id="M0243",
     name=(
@@ -355,4 +546,5 @@ METHOD = Method(
         "concept:buyback-shrinkers-near-high",
         "concept:net-share-issuance-nearness-filter",
     ),
+    amendments=(MATCHED_DRAW_AMENDMENT,),
 )

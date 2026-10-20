@@ -60,7 +60,7 @@ from typing import Any
 import numpy as np
 
 from seer_engine.backtest.dev import Candidate
-from seer_engine.lab import control_draw
+from seer_engine.lab import control_draw, control_weight
 from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0034_size_tilt_residual import _apply_ceiling, _floor_weight
 from seer_engine.lab.methods.m0198_size_weighted_placebo import trading_value
@@ -456,6 +456,210 @@ MATCHED_AMENDMENT = Amendment(
 )
 
 
+# ---- amendment 2 (2026-10-20): the weight vector ----------------------------------------------
+#
+# Amendment 1 closed one of the two axes and said in its own `expected_failure` that it might not
+# close the other: "E50 holds C50's exact names and trades C50's exact 360 times, yet turns over
+# 1.60x as much, because a flatter weight vector crosses the resize band more often -- and a blind
+# draw from the sized pool is flatter than the top fifty are". It landed at 1.03x trades and 1.95x
+# turnover, and that is exactly what happened. The names are matched; the weights are not.
+#
+# This block changes one thing and nothing else: the fifty drawn names are paid C50's OWN weight
+# vector -- the fifty weights C50 holds that month, sorted, paid down a ladder that puts the names
+# this control already held first and this month's entrants last -- instead of being weighted by
+# their own market values. The draw, the pool, the churn match, the hash namespace, the seed, the
+# ceiling and the params value are all amendment 1's, untouched. `MatchedCapTopAllocator` and its
+# `_matched` are a recorded arm's code (trial #843) and are NOT refactored: a module body is
+# outside `config_digest`, so editing A1 to share a helper with A2 would silently change what a
+# recorded trial means while every test stayed green. The new `_matched` is therefore a full copy
+# with one step replaced, and this comment is why.
+#
+# WHICH ladder is the whole experiment, and four were measured on this chassis before a line of
+# this block was written -- in one `dev.run_registry` sweep, re-run against re-run, against a book
+# turning over 0.4568: the month-keyed order `matched_names` already returns (14.96x the book, the
+# literal reading of the brief and the worst of the four), the control's own sizes re-shaped to the
+# real book's concentration (1.76x), the date-free keep order alone (1.010x) and this one (1.011x).
+
+WEIGHT_AMENDED = date(2026, 10, 20)
+
+#: Which of ``control_weight.ORDERS`` this chassis pays the vector onto. Phase 4 measured all four
+#: on this chassis before a line of this block was written; this is the one it chose. The keep
+#: order alone measured the same to within 0.001, which is noise -- it is not shipped because it
+#: gets there by accident on this chassis (``matched_partition`` keeps the SMALLEST ``keep_key``
+#: holdings, so an entrant lands low without being put there) and a chassis with a different keep
+#: band inherits none of that. M0201 is the measured evidence: the keep order alone degrades to
+#: 0.687 there where this one holds 0.735.
+WEIGHT_RULE = "bottom-entry"
+
+
+class WeightMatchedCapTopAllocator(MatchedCapTopAllocator):
+    """Amendment 1's matched draw, paid the real arm's own weight vector instead of its own sizes.
+
+    ``M0221-C50-PLC`` matched C50's entry count by construction and recorded 371 trades against
+    360 -- 1.03x, with a free pre-run probe reading 1.000 basket changes -- and still turned over
+    0.8681 against 0.4450, **1.95x**. Turnover on a cap-weighted book is a property of the weight
+    vector and not of the names: ``E50`` holds C50's exact fifty names and records C50's exact 360
+    trades and still pays 1.60x, because fifty equal slots cross the book engine's 1%-of-equity
+    resize band on every relative price move while C50's market-value weights track their own
+    prices and rarely cross it. A blind draw from the sized pool is flatter still -- it almost never
+    holds a name big enough for the 10% ceiling to bind -- so it pays the 1.60x and then some.
+
+    So this arm takes C50's **shape** as well as C50's size and churn. Each month it computes C50's
+    own fifty weights with ``weights`` -- the identical function, the identical ceiling, over C50's
+    own top fifty -- and pays them out, largest first, down the ladder
+    ``control_weight.bottom_entry_order`` builds: the names this control already held first, in the
+    date-free keep order, and this month's entrants last. ``control_weight`` owns that assignment
+    and the renormalisation that fits the vector to this book's own length and exposure, and
+    nothing else; the vector is this chassis's own, because no shared module can produce one (see
+    that module's docstring).
+
+    **Why the entrants go last, which is the mechanism and was written down before it was
+    measured.** On a cap-weighted top-N the name that ENTERS is the new number ``top``: it comes in
+    at the smallest weight the book holds, and the name it replaced left from there too. Under
+    amendment 1 and under the two ladders that lose, a blind entrant takes an average rung instead
+    -- about 1/top of the account against the real book's rank-``top`` weight -- so every entry
+    trade is three or four times too large, and 371 of them is the whole excess. This ladder
+    reproduces WHERE the churn happens as well as how much of it there is.
+
+    **It is still blind, and the blindness is narrower than amendment 1's rather than wider.**
+    Amendment 1 took from the real arm how many names changed. This one additionally takes the
+    multiset of weights the real arm holds -- a shape, never an identity. ``control_weight.assigned``
+    reads the vector's VALUES and never its order, so which real name held which weight is not
+    something this arm can see; and the rung a drawn name takes is decided by a date-free hash of
+    its own symbol and by whether this control itself already held it, so nothing it reads about a
+    name decides that name's weight either.
+
+    **No state and no extra lookback.** The real arm's vector is computed from the selection
+    ``_matched`` already takes at ``data_date``, so this costs one extra ``weights`` call per
+    decision and not one extra pass of the pool; ``lookback`` is amendment 1's, unchanged at
+    ``control_draw.lookback_for(DV_N)``. ``held`` is the only thing this allocator knows about its
+    own past and it is the only thing it reads: the entrants are ``picks - held`` by definition, at
+    no cost and with no state. ``dev.run_registry`` reuses one allocator object per id across
+    candidates and across folds, so an allocator that remembered a rung would leak it between them.
+
+    The hash namespace is ``DRAW_KEY`` for amendment 1's reason, which now covers two axes: M0225's
+    twin inherits this class and must draw the same names AND pay them the same rungs wherever both
+    stores size the same company, or the before-and-after would carry a draw change on top of the
+    data change it exists to measure.
+
+    No share counts (the history-only path): no size, no vector and no targets.
+    """
+
+    id = "M0221-A2"
+
+    def _matched(self, prepared: CapTopPrepared, members: AbstractSet[str], data_date: date,
+                 held: frozenset[str], p: CapTopParams) -> tuple[Target, ...]:
+        if prepared.market is None:
+            return ()
+        if not trend_on(prepared.history, data_date, _gate(p)):
+            return ()
+        now, pool = self._selection(prepared, members, data_date, p)
+        if not pool:
+            return ()
+        prev, _ = self._selection(
+            prepared, members, control_draw.previous_decision_date(data_date), p
+        )
+        picks = control_draw.matched_names(
+            pool=tuple(sorted(pool)),
+            held=held,
+            real_now=now,
+            real_prev=prev,
+            tag=DRAW_KEY,
+            seed=p.seed,
+            data_date=data_date,
+        )
+        if not picks:
+            return ()
+        # The exposure this arm keeps is its OWN -- what amendment 1 would have invested in these
+        # same fifty names -- so the vector changes the book's shape and never how much of it is
+        # invested. Only the shape crosses from the real arm.
+        own = weights([pool[s] for s in picks], p)
+        total = sum((w for w in own if w is not None), Decimal(0))
+        rungs = control_weight.assigned(
+            control_weight.bottom_entry_order(
+                picks, held=held, tag=DRAW_KEY, seed=p.seed, data_date=data_date
+            ),
+            control_weight.rescaled(
+                weights([pool[s] for s in now], p), slots=len(picks), total=total
+            ),
+        )
+        out: list[Target] = []
+        for s in picks:
+            w = rungs.get(s)
+            if w is None:
+                continue
+            fw = _floor_weight(float(w))
+            if fw is None:
+                continue
+            t = target_from_close(s, last_close(prepared.history[s], data_date), fw)
+            if t is not None:
+                out.append(t)
+        return tuple(out)
+
+
+WMATCHED = WeightMatchedCapTopAllocator()
+
+
+WEIGHT_AMENDMENT = Amendment(
+    added=WEIGHT_AMENDED,
+    why=(
+        "C50-PLC matched C50's names and entries (1.03x) and missed its turnover (1.95x); pay the "
+        "same blind book C50's own weight vector and re-state the margin against a control that "
+        "matches on both axes"
+    ),
+    hypothesis=(
+        "Written before this arm ran. C50-PLC is the honest control on the name axis and a "
+        "handicapped one on the weight axis: it trades 1.03x and turns over 1.95x, so the -0.42 "
+        "point deficit it re-stated is quoted against an opponent paying roughly twice C50's "
+        "trading cost per trade. The cause was measured before either arm ran -- E50 holds C50's "
+        "exact fifty names and records its exact 360 trades and still turns over 1.60x -- so most "
+        "of the excess is the weight vector and none of it is the draw. C50-PLCW changes exactly "
+        "one thing from C50-PLC: the fifty drawn names are paid C50's own fifty weights that "
+        "month, largest first, down a ladder that puts the names this control already held above "
+        "the ones entering this month, instead of being weighted by their own market values. Four "
+        "such ladders were measured on this chassis in one sweep before this block was written, "
+        "against a book re-run at 375 trades and 0.4568 turnover, and this one read 372 and "
+        "0.4620 -- 0.992x and 1.011x -- so the SHAPE prediction here is a confirmation of an "
+        "uncommitted prototype and is stated as one: C50-PLCW lands inside 0.80x-1.25x of C50 on "
+        "both trades and turnover, near 372 and 0.462, and a shipped arm landing far from that is "
+        "a wiring bug rather than a finding. The MONEY has not been measured at all, by any "
+        "prototype, and this is the real prediction: a control that stops over-paying turnover "
+        "pays less of Gotrade's bill than C50-PLC did, so it earns MORE than C50-PLC's 6.05% a "
+        "year of the owner's money and C50's -0.42 deficit WIDENS, to somewhere between -0.4 and "
+        "-1.0 against the same 7.19% SPY total return. That is a deficit growing, and it is "
+        "predicted deliberately: no arm of this method is for promotion and this one is a "
+        "measuring stick, not a candidate. Success is a yardstick whose control is honest on both "
+        "axes; the margin is whatever it comes out as."
+    ),
+    expected_failure=(
+        "The remedy may push turnover the other way, and the direction was argued before any "
+        "number existed. C50 turns over only 0.445 because a cap-weighted book is nearly "
+        "drift-neutral: a name's target weight is its own market-value share, so the target moves "
+        "with the same price the holding does and the resize band rarely fires. C50-PLC is "
+        "drift-neutral too, for the same reason on its own drawn names. Paying a FOREIGN vector "
+        "breaks that: the control's target for a rung moves with the real book's k-th name's price "
+        "while its holding moves with its own, and two uncorrelated drifts cross a 1% band more "
+        "often than one tracked drift does. The prototype says that effect is dominated by the "
+        "entry-rung repair on this chassis; the shipped arm quantizes its weights where the "
+        "prototype did not and fills in rank order, so if it lands materially above the prototype "
+        "the drift cost is real and the prototype was flattering it. Second, the ladder is itself "
+        "a turnover generator: the keeps half is date-free, but a name leaving the book shifts "
+        "every rung below it, so a month with several exits re-prices survivors that did not move. "
+        "Third, the real vector is computed with TODAY's membership at both dates, as amendment "
+        "1's selection is, so a name that joined the index in between is sized as though it had "
+        "always been there; the effect is one or two names a year on a fifty-name book. Fourth, if "
+        "the shape lands clean and the money moves the other way from the prediction, the "
+        "direction is wrong and the number is the record -- the arm is not re-drawn for a better "
+        "one, and no fifth ladder is tried under any result."
+    ),
+    candidates=(
+        _a("C50-PLCW", WMATCHED, CapTopParams(50, pick="random", seed=1, trend=None),
+           "Placebo, shape-matched on both axes: the same fifty-name blind book hash-drawn at "
+           "C50's own monthly churn, and paid C50's own weight vector instead of its own sizes",
+           supersedes=("M0221-C50-PLC", "M0221-R50")),
+    ),
+)
+
 METHOD = Method(
     id="M0221",
     name=(
@@ -521,5 +725,5 @@ METHOD = Method(
         "concept:cap-weighted-top-n",
         "concept:market-shape-yardstick-real-cap",
     ),
-    amendments=(MATCHED_AMENDMENT,),
+    amendments=(MATCHED_AMENDMENT, WEIGHT_AMENDMENT),
 )

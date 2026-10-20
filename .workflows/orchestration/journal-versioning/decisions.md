@@ -178,3 +178,91 @@ The "N entries in all" line must read **495**.
    near-identical cards, the answer is that they are `-M-NATIVE`, `-M-G12` and `-M-G3`: three
    different measurements at 23.8%, 25.6% and 33.6% max drawdown, correctly kept apart.
 3. **Fold `_status`'s inline `NOT EXISTS` onto `store.INSIGHT_DOCUMENTS_SQL`** (see above).
+
+---
+
+# LANDING: the `lab.sqlite` conflict, and the resolution REHEARSED AND PROVEN
+
+**Found before the merge, not during it.** While this set was being built, the peer session
+`analyze-fold-selector` committed `4799701` straight to `main`, touching **the same two files
+this branch touches**: `lab/lab.sqlite` and `web/data/lab.json`. `lab.sqlite` is a binary; git
+cannot merge it, and the conflict is guaranteed.
+
+| | insights | schema | |
+|---|---|---|---|
+| base `15a9a9a` | 500 | 7 | where the branch was cut |
+| `origin/main` | **501** | 7 | peer added insight 501, a `risk` note, `added` 2026-10-20T09:49:05+00:00, body 2587 chars |
+| `feature/journal-versioning` | 500 | **8** | migrated, plus the five links |
+
+**Neither side may simply win.** Taking main's `lab.sqlite` discards schema 8, both new columns
+and all five links — the entire branch. Taking ours destroys insight 501, a real measurement
+another session wrote, which is precisely what invariant 2 forbids and what this whole change
+exists to prevent. Resolving a binary conflict by picking a side is the one move that silently
+loses a journal entry.
+
+## The resolution — rehearsed on scratch copies, every number verified
+
+Take **our** v8 database, then re-insert main's row 501 into it preserving id and every byte.
+`INSERT` is permitted — only `UPDATE` and `DELETE` are blocked by the triggers — so this needs no
+exception to the append-only rule and writes nothing to any existing row.
+
+```python
+# read main's row exactly as it is
+src = sqlite3.connect(f"{main_db.as_uri()}?mode=ro", uri=True); src.row_factory = sqlite3.Row
+row = dict(src.execute("SELECT * FROM insights WHERE id = 501").fetchone())
+# insert into our v8 copy; supersedes and doc_key stay NULL on it
+shared = [c for c in row if c in our_columns]          # id, kind, title, body, method_id, added
+dst.execute(f"INSERT INTO insights ({','.join(shared)}) VALUES ({','.join('?'*len(shared))})",
+            [row[c] for c in shared])
+dst.execute("UPDATE sqlite_sequence SET seq = (SELECT max(id) FROM insights) WHERE name='insights'")
+```
+
+`sqlite_sequence` must be bumped or the next journal entry re-uses id 501.
+
+Then **regenerate** `web/data/lab.json` with `lab stage` — never hand-merge it, it is a generated
+file and its conflict is an artifact of the binary one underneath.
+
+## Measured results of the rehearsal — all three hold at once
+
+| check | result |
+|---|---|
+| digest over rows 1-500 | `04af46875bef3498f783a3154265b760cd2c4471d018a740d82e0113721673ed` — **unchanged**, the branch's work intact |
+| digest over all 501 rows | `2d3fb90fac51a5651e6155008910dab56863ba303ae2b83b21a5aebb709c5fd7` — **identical to main's own**, so row 501 survives byte for byte |
+| v8 code opens the merged file | yes: **496 documents from 501 rows**, `testLooks` 4 |
+| the five links | `(230,227) (290,289) (498,493) (499,320) (500,499)` all present |
+
+496 = 495 heads + the peer's new entry. Correct.
+
+## Re-measure at merge time before executing
+
+`analyze-fold-selector` has exited, so `main` should still be at 501 — but its own 3-phase plan
+set is on `main` and may be resumed by someone. **Re-read `origin/main`'s `lab.sqlite` and redo
+this comparison before resolving**; if it carries more than row 501, insert every row above 500,
+in id order, and re-check both digests.
+
+**If a resume picks this set up on another machine: do not merge `lab.sqlite` by choosing a
+side.** Follow the recipe above.
+
+---
+
+# LANDED
+
+`main` @ **`db48956`** — merge of 6 phases, pushed first attempt, `4110b98..db48956`.
+
+| Conflict | Resolved | Rung |
+|---|---|---|
+| `lab/lab.sqlite` (binary, unmergeable) | branch's v8 database, then `main`'s row 501 re-INSERTed with id and every byte preserved, `sqlite_sequence` bumped to 501 | the rehearsed recipe above. **`--ours` was a trap**: `land --step merge` cuts the land worktree from `origin/main`, so "ours" is main's v7 side. Took `origin/feature/journal-versioning:lab/lab.sqlite` explicitly instead of trusting ours/theirs. |
+| `web/data/lab.json` (generated) | regenerated with `store.write_snapshot`, the writer `lab stage` itself calls | 6: never hand-merge a generated file. `lab stage` has no `--db` and targets the main checkout, so the writer was called directly, scoped to the land worktree. Validated first by a control: regenerating from the branch's own database reproduced the branch's committed `lab.json` byte for byte. |
+| `docs/plans/JOURNAL_VERSIONING_PLAN.md` | branch's version entire | 3: the file's own first line says it supersedes the design note of the same name, and `main`'s two commits (`984dbea`, `7cbb301`) corrected that earlier *note*. The substance of the correction — that titles collide across variants, with the 466/467/468 table — is carried forward and expanded in the plan's §Verdict and §Design correction. |
+
+**Verified on the committed merge object, not the working tree:**
+
+- rows 1-500 digest `04af46875bef3498f783a3154265b760cd2c4471d018a740d82e0113721673ed` — unchanged from base. The branch's work is intact and no content moved, through a migration, five links and a merge.
+- all 501 rows digest `2d3fb90fac51a5651e6155008910dab56863ba303ae2b83b21a5aebb709c5fd7` — **identical to `origin/main`'s own**, so the peer's insight 501 survived byte for byte. No journal entry was lost to the merge.
+- engine 6405 passed / 4 skipped / 0 failed against the merged 501-row database, with Postgres up.
+- web 725 passed / 50 files, `tsc --noEmit` exit 0, run against the merged `lab.json` (`node_modules` hardlinked in, never symlinked, and removed before the commit).
+- `main` now serves **496 documents from 501 rows**, four chains — 230 v2, 290 v2, 498 v2, 500 v3 — and `testLooks` still reads 4.
+
+**Migrations: none.** The branch adds no file under `db/migrations/`; both sides carry the same 22. The only schema change is `lab.sqlite`'s internal version 8, which travels as a committed binary rather than a Neon migration. Nothing was applied to production, and nothing needed to be.
+
+**Cleanup:** land worktree and `land-journal-versioning` removed; the set's worktree removed; `feature/journal-versioning` deleted local and remote.

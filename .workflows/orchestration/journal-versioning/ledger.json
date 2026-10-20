@@ -3,6 +3,12 @@
   "coordinator": "orch-journal-versioning",
   "coordinator_session_id": "ca0126c9-652f-431c-99f8-50ae9b33aeb7",
   "created": "2026-10-20T09:44:04+00:00",
+  "landed": {
+    "at": "2026-10-20T11:20:29+00:00",
+    "base": "main",
+    "commit": "db48956f1721fc2b1a50717ecc794a917bc8782c",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -80,23 +86,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "2a01e43",
       "depends_on": [
         4,
         6
       ],
       "difficulty": "HARD",
       "n": 5,
-      "note": null,
+      "note": "Reader done: heads-only, version chip, history disclosure, Revised marker. Three ladder decisions \u2014 (1) implemented ALL THREE outside-journal/ fixes (layout.tsx rail badge, how/page.tsx wish count, overview.ts head filter) per the index's Reconciliation Log, overruling the phase-5 plan's stale Handoffs prose that called two of them 'left alone'; (2) skipped Step 7's temporary lab.json hand-edit \u2014 the 6->5 edge made the chains real, so lab.json and lab.sqlite were never touched; (3) ONE ENGINE TEST FILE CHANGED, engine/tests/test_lab_gate_wording.py \u2014 it pins overview.ts's headline selector by regex AND mirrors it in a SQL sweep, so narrowing the page to heads broke the pin. Fixed the mirror on BOTH sides rather than relaxing it: the sweep now also skips superseded rows, which is strictly stronger. hardgate.py untouched. Measured live: 495 docs from 500 rows, 'Everything 280 new of 495', 'What we learned 150 new of 326' (was 331), eyebrow 326 ENTRIES, rail aria-label 'Journal, 280 new' matching the page's own badge, 4 data-revised cards, and ZERO elements inside any history disclosure carrying data-insight-id.",
       "package": "web/app/sera",
       "plan": ".workflows/plan/journal-versioning/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T11:10:52+00:00",
       "satisfies": [
         "R1",
         "R5"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-K6DR",
       "title": "Reader: heads-only, version chip, history disclosure, \"Revised\""
     },
     {
@@ -123,7 +129,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "journal-versioning",
-  "updated": "2026-10-20T10:50:12+00:00",
+  "updated": "2026-10-20T11:20:29+00:00",
   "verified_at": "2026-10-20T10:25:47+00:00",
   "worktree": "/home/miftah/.worktrees/seer/journal-versioning"
 }

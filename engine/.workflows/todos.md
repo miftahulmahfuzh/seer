@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-20
-**Total Active Tasks**: 12
+**Total Active Tasks**: 11
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 4
+- P1 High: 3
 - P2 Medium: 6
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 149
+- Completed: 150
 
 ---
 
@@ -1532,15 +1532,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Decided**:
     - `test_a_chain_of_three_is_allowed` compared `sqlite3.Row` objects to tuples -> tupled the rows (rung 3: `store.connect` sets `row_factory=sqlite3.Row`, and the module's own `_row` helper already tuples for exactly this reason).
     - The v7->v8 migration test's `set_supersedes(2, 1)` crosses `method_id` (the V7 fixture's row 1 is M0001, row 2 is NULL) and `_check_supersedes` correctly refuses -> relinked as 3->1, both M0001 (rung 3+2: the cross-method refusal is named in the plan index's abort matrix and in the phase-3 handoff, and keeps its own dedicated passing test; the migration test's call was incidental to its stated purpose, which is that the 500 rows survive byte-identical).
-- [ ] **P1-ENG-H4ZQ** Phase 2: Writer CLI: `lab insight --supersedes`, `lab link`
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `lab insight --supersedes ID` (link a new row at birth) and `lab link ID --supersedes ID` (the backfill tool phase 6 runs). Both validate through `store.set_supersedes` and exit **2** on a rules refusal, never 1; help strings escape `%` as `%%`; the `lab insight` usage line at `commands/lab.py:130` is updated. Does not touch `store.py`, any writer module or any web file. Exit: both commands covered by tests, including the exit-2 path for every invariant; `pytest engine/tests` green.
-  - **Status**: pending
-  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 2 of 6)
-  - **Satisfies**: R3 — Thread the duplicates that already exist, starting 500→499
-  - **Depends on**: P1-ENG-JV1K
-  - **Plan**: `.workflows/plan/P1-ENG-H4ZQ.md`
 - [ ] **P1-ENG-T2MD** Phase 3: Auto-link the five journalling writers on `doc_key`
   - **Difficulty**: NORMAL
   - **Type**: Feature
@@ -1656,6 +1647,27 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-H4ZQ** Phase 2: Writer CLI: `lab insight --supersedes`, `lab link`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `lab insight --supersedes ID` (link a new row at birth) and `lab link ID --supersedes ID` (the backfill tool phase 6 runs). Both validate through `store.set_supersedes` and exit **2** on a rules refusal, never 1; help strings escape `%` as `%%`; the `lab insight` usage line at `commands/lab.py:130` is updated. Does not touch `store.py`, any writer module or any web file. Exit: both commands covered by tests, including the exit-2 path for every invariant; `pytest engine/tests` green.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 2 of 6)
+  - **Satisfies**: R3 — Thread the duplicates that already exist, starting 500→499
+  - **Depends on**: P1-ENG-JV1K
+  - **Plan**: `.workflows/plan/P1-ENG-H4ZQ.md`
+  - **Completed**: 2026-10-20 18:05
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_link.py
+  - **Result**: `lab insight --supersedes ID` links a new entry to the one it replaces at birth, and the new `lab link ID --supersedes ID` threads two entries that already exist — the backfill tool phase 6 runs. Both validate through phase 1's `store.set_supersedes` / `_check_supersedes` and exit **2** on a rules refusal (relink, missing entry, cross-method, self-link), never 1. Committed and pushed at `b0a48d5`.
+  - **Verified**: `PYTHONPATH=engine/src ruff check engine` clean. `pytest engine/tests/test_lab_link.py engine/tests/test_cli.py` — 29 passed (the `test_cli` half is the `%%`-interpolation guard on the new help strings). Full suite on a pristine `git archive` copy of HEAD plus only this phase's two files, `PG_TEST_URL` exported: **6369 passed**; the only 3 failures shell out to `git rev-parse HEAD` and hit exit 128 because a scratch dir is not a git repo — a harness artifact, and those 3 pass in the real worktree. Phase 3 independently ran the full shared worktree with all three phases' work in: **6403 passed, 4 skipped, 0 failed** (the 4 skips are the documented opt-in live-store ones), and this phase's two files were on disk and collected in that run. Manual: `lab link --help` renders; `lab link` sets the link on a throwaway db printing one line, exit 0; relink and missing-entry both exit 2 with the store's own message. `git status --short lab/ web/data/` empty — this phase moved no database and no snapshot.
+  - **Drift**:
+    - Plan line numbers had shifted (3156 -> 3235 etc.) after phase 1 landed; anchors matched by content, not by line. No semantic drift.
+    - The plan's Step 3 Contingency was NOT needed: phase 1's `store.add_insight` does validate `supersedes` on the insert path via `_check_supersedes`, so the main form of the code block applies.
+    - The plan's Interface Contract assumed phase 2 was the only editor of `commands/lab.py`. In fact phase 3 concurrently edits four other regions of it (`--no-supersede` parsers, a `journal_docs` import, four handler journal blocks). Disjoint hunks, but a shared file.
+  - **Decided**:
+    - `commands/lab.py` is shared with concurrent phase 3 -> committed ONLY this phase's hunks through an isolated git index (`GIT_INDEX_FILE` + `read-tree HEAD` + `update-index --cacheinfo` + `commit-tree` + `update-ref`), never a pathspec commit and never the shared index. Rung: tie-break "narrower blast radius", plus this phase's own Leaves-alone list, which assigns those parsers to phase 3. A pathspec commit re-reads the working tree and would have shipped phase 3's half-written, then-failing work under this phase's message.
+    - The unowned one-liner at `commands/lab.py:~844` (`_status` "Latest insights" counts rows, not heads) was NOT taken. Rung: tie-break "never widen scope to settle an ambiguity"; no phase-2 exit criterion reaches it. Phase 4 skipped it too; reported to the coordinator for assignment.
 - [x] **P1-ENG-IPVX** Phase 1: M0258: pre-register, run and record the banded gate
   - **Difficulty**: HARD
   - **Type**: Feature

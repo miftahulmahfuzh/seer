@@ -106,23 +106,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "8e60b5b",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 6,
-      "note": null,
+      "note": "M0208 trial 853 recorded. Lead NARROWED +5.872 -> +4.346 mwr (honest placebo 9.532 vs handicapped 8.007, SPY TR 7.188) -- the set's FIRST correct pre-registered direction. But shape missed LOW on BOTH axes, 0.73x trades / 0.76x turnover, so the arm is warn not ok, supersedes nothing, and M0208 is STILL D17-blocked. Recorded as a STOP per invariant 13: no re-rolled seed, no second arm, no weight vector. Cause measured read-only over all 169 decisions: the draw's one-unrolled-step estimator off a FRESH top-20 halves the real churn (304 vs 624, 0.487x, uniform across eras); pool attrition lifts the realised count to 455. Replay reproduces trial 677's 624 trades exactly. Pre-registration predicted the miss ABOVE 1.25x -- wrong sign. Fifth distinct cause of a missing supersession, and the set's only TRADES-axis miss. Set-wide: 5 of 9 unblocked (M0047 M0202 M0215 M0227 M0243); M0201/M0208/M0221 short on shape, M0225 has no arm. +5.87 sentence WITHDRAWN, +4.35 is provisional and a LOWER bound. Remedy carried to phase 8, not applied: matched_names should take a carried-forward shadow of the real held set as real_prev (phase 1's module, 5 arms depend on it).",
       "package": "engine/lab/methods",
       "plan": ".workflows/plan/honest-control-redraw/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T02:59:32+00:00",
       "satisfies": [
         "R2",
         "R3",
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P2-ENG-T9LC",
       "title": "M0208 \u2014 the 4.41x extreme"
     },
     {
@@ -176,7 +176,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "honest-control-redraw",
-  "updated": "2026-10-20T02:43:42+00:00",
+  "updated": "2026-10-20T02:59:32+00:00",
   "verified_at": "2026-10-20T02:09:49+00:00",
   "worktree": "/home/miftah/.worktrees/seer/honest-control-redraw"
 }

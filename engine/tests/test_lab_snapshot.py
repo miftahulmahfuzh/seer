@@ -779,22 +779,32 @@ def test_connect_migrates_a_v7_database_keeping_every_insight_byte_identical(tmp
 
 @pytest.mark.skipif(not store.COMMITTED_DB.is_file(), reason="no committed lab database here")
 def test_the_v7_to_v8_migration_moves_not_one_byte_of_the_web_snapshot(tmp_path):
-    """The real lab, on a copy: 500 journal entries through a table rebuild, and the published
-    JSON is unchanged.
+    """The real lab, on a copy: 500 journal entries through a connect, and the published JSON is
+    unchanged.
 
-    ``store.snapshot``'s insights block names its six fields and ignores the rest of the row, so
-    two new columns cannot reach ``web/data/lab.json`` in this phase -- but "cannot" is an
-    argument and this is the measurement. It is also the reason ``lab stage`` is still mandatory
-    in this phase even though it will rewrite nothing: the committed database moves, and the
-    snapshot guard compares the two.
+    Opening the committed database is never a no-op -- ``connect`` runs ``executescript(_SCHEMA)``
+    and ``_migrate`` inside a write transaction, so even a read can dirty the file. What this
+    pins is that none of that reaches the owner: the snapshot out the far side is byte-identical.
 
-    Phase 4 is what makes this number move, deliberately, by publishing the chain.
+    The links half of this test used to read ``count(...) == 0``, because when it was written the
+    committed lab carried no chain and the migration had just been proved not to invent one. Phase
+    6 threaded five byte-identical re-runs, so the constant now says only "nobody has used the
+    feature yet" and goes red the moment somebody does -- while the thing actually worth pinning,
+    that a connect neither *invents* a link nor *destroys* one, was never asserted at all. The map
+    comparison below says that instead, and keeps saying it however many chains the journal grows.
+
+    That the migration itself threads nothing is a claim about a genuine v7 database, and it is
+    pinned where it belongs, on the synthetic fixture in
+    ``test_connect_migrates_a_v7_database_keeping_every_insight_byte_identical``.
     """
     db = tmp_path / "lab.sqlite"
     shutil.copyfile(store.COMMITTED_DB, db)
     ro = store.connect_readonly(db)
     try:
         before = store.snapshot_json(ro)
+        links_before = ro.execute(
+            "SELECT id, supersedes, doc_key FROM insights ORDER BY id"
+        ).fetchall()
     finally:
         ro.close()
     store.connect(db).close()  # migrates in place
@@ -802,9 +812,10 @@ def test_the_v7_to_v8_migration_moves_not_one_byte_of_the_web_snapshot(tmp_path)
     try:
         assert store.schema_version(ro) == store.SCHEMA_VERSION == "8"
         assert store.snapshot_json(ro) == before
-        assert ro.execute(
-            "SELECT count(*) FROM insights WHERE supersedes IS NOT NULL OR doc_key IS NOT NULL"
-        ).fetchone()[0] == 0
+        assert [
+            tuple(r)
+            for r in ro.execute("SELECT id, supersedes, doc_key FROM insights ORDER BY id")
+        ] == [tuple(r) for r in links_before]
     finally:
         ro.close()
 

@@ -64,23 +64,23 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "70bad31",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 4,
-      "note": null,
+      "note": "Measurement was already recorded (trials 844/845 at pre-reg c82558b); lab run correctly refused the digests, so this session wrote up the rows instead of re-running. Both arms ok on both axes (0.99x/0.92x, 0.98x/0.89x); margins +3.33 and +2.43 pts/yr in mwr, pre-registered direction held on both. M0047's 2-point success clause moves FAIL->PASS once the opponent is honest. M0047-EQ's +3.80 sentence withdrawn, not re-measured -- EQ now has no control arm, which is correct under D17. Fork settled: did not touch the plan index (phase 1's 'does not touch the plan index' + phase 8 owns the Status line, rung 1).",
       "package": "engine/lab/methods",
       "plan": ".workflows/plan/honest-control-redraw/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T02:16:43+00:00",
       "satisfies": [
         "R2",
         "R3",
         "R4"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P2-ENG-V2HD",
       "title": "M0047 \u2014 the size-weighted residual's two placebos"
     },
     {
@@ -176,7 +176,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "honest-control-redraw",
-  "updated": "2026-10-20T02:10:22+00:00",
+  "updated": "2026-10-20T02:16:43+00:00",
   "verified_at": "2026-10-20T02:09:49+00:00",
   "worktree": "/home/miftah/.worktrees/seer/honest-control-redraw"
 }

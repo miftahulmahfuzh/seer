@@ -1,0 +1,35 @@
+To draw a fair blind opponent, the lab has to know how many names the real book takes in
+each month. It was estimating that by taking a fresh top-N at the previous month end and
+asking how many of those names would have survived into this month. That stand-in is too
+fresh: a just-taken top twenty is ranked 1 to 20, and a book that only drops a name once it
+falls past rank 40 almost never drops one from there. A REAL held set has accumulated names
+that drifted toward the edge, and it sheds them far faster.
+
+Measured on the paper-gains book over 169 monthly decisions: the estimator read 304 entries
+where the real book takes 624. Just under half.
+
+The fix is to replay the book's own rule backwards a couple of steps instead of guessing -
+reconstruct what it actually held at the previous decision. Two steps is enough and more
+buys nothing: the estimate goes 0.72 of the truth at one step, 0.95 at two, and then wanders
+inside 0.94 to 0.96 all the way out to eight steps. Two steps costs 305 bars of history
+against a 473-bar ceiling, leaving 168 spare.
+
+The 320 missing entries split three ways, and only one of the three is what anybody was
+looking for:
+
+- 44% was the market switch. This book sits in cash for 69 of the window's 238 months, and
+  the old stand-in scored a phantom top twenty at the previous month end regardless. On the
+  nine decisions that follow a cash month it read 38 entries where the truth is a complete
+  180-name refill. A backward replay closes this for free, because the chain empties itself
+  on a cash month exactly as the real book does. Nobody had separated this before and it is
+  the largest single piece.
+- 43% was the freshness problem the fix was proposed for.
+- 13% is a different defect entirely, and no replay depth closes it: every book reads
+  TODAY'S membership list when scoring an earlier date. It is worth 0.067 of ratio here and
+  no more than 0.046 on any other book measured. It is carried forward unrepaired.
+
+And the measurement that mattered most for cost: on eight of the nine books, the old
+estimator was already right - ratios from 0.988 to 1.001, and for the four whose real books
+cannot read their own holdings the replay returns identically 1.000 at every depth from one
+to fifteen. The shadow was needed on exactly one book of nine. Measuring every book before
+building anything is what kept this from being eight unnecessary re-draws.

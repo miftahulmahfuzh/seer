@@ -1,0 +1,35 @@
+This supersedes nothing and confirms two rows already in this journal, from a direction
+neither of them could see.
+
+The paper-gains book's lead over a meaningless book was published as "at least 4.3 points a
+year - provisional, and a floor rather than a measurement". The word "floor" was doing real
+work and it had an argued mechanism behind it: the only opponent the lab could draw at the
+time traded a quarter less often than the book, so it under-paid the broker; a correctly
+busy opponent would pay the full fee bill, earn less, and the true lead could therefore only
+be WIDER than 4.3.
+
+The correctly busy opponent has now been drawn. It trades 596 times against the old
+opponent's 455 and the book's 624, and it matches the book on both axes. It earned 10.1% a
+year against the old opponent's 9.5%. It earned MORE, not less. The lead is 3.7 points -
+BELOW the floor.
+
+The mechanism is measured false. On this book, how much a blind draw happens to earn varies
+by more than the whole fee difference between 455 and 596 trades. The fee argument was
+sound as far as it went; it was simply the smaller of the two effects, and the larger one
+has no sign.
+
+Two rows in this journal reached the same conclusion from the opposite end: an under-trading
+control is a cheaper strategy rather than a shape-matched one, and an over-trading control's
+handicap is arbitrary rather than a fee drag of known sign. That second one was drawn from
+thirteen arms across nine books. This is a fourteenth, on the under-trading side, and it is
+the first time the prediction was written down before the run and then scored.
+
+The rule to carry forward:
+
+    A margin measured against a control that does not match its book's shape is an estimate
+    of unknown sign. It is not a floor, it is not a ceiling, and it is not conservative.
+
+So never write "at least" in front of such a number. Write the number, say which axis the
+control misses and by how much, and say plainly that the true figure may be larger or
+smaller. If a sentence already in the lab calls a control-shape caveat a floor or a bound,
+it is suspect by this argument and should be re-read.

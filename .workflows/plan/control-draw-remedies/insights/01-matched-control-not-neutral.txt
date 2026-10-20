@@ -1,0 +1,36 @@
+Two books were drawn this week that match the book they control on both of the things the
+lab checks: how often it trades, and how much money it moves. One of them, against the top
+fifty by company size, matches to within one per cent on both axes. It then earned four
+points a year MORE than the book it was drawn to test.
+
+That is not evidence that picking names blindly beats ranking them by size, and nobody
+should read it that way.
+
+The reason is in how the two books hold their money, which is the one thing nobody matched.
+A blind control hands each of its fifty names a slot decided once, by a fixed rule, and it
+re-imposes those slots every month. So every month it sells a little of whatever went up
+and buys a little of whatever went down. The book it controls does the opposite by
+construction: a book weighted by company size lets its biggest companies grow into bigger
+slots and never trims them. Re-balancing like that is a source of return in its own right,
+quite separate from which names are held.
+
+This lab has priced that effect independently, with no control in it at all. An equal-weight
+version of the same top fifty holds the IDENTICAL fifty names and records the IDENTICAL 360
+trades as the size-weighted one, and earns 6.9% a year against 5.6% - one and a quarter
+points, from the weighting arrangement alone, with names and trade count held fixed. The new
+control is that same effect with a steeper and stickier ladder behind it.
+
+Two more things the shape check does not match, and neither is small:
+
+- How much money is actually invested. The control sits 88% invested against the book's 81%.
+  Six points more money at work, over twenty years, is worth a few tenths of a point by
+  itself.
+- What the trading costs. At turnover matched to within one per cent, the control still paid
+  about one and a half times the book's fee bill, because turnover is measured as money
+  moved against average equity while the broker charges a minimum per order, and the control
+  spreads the same money across differently-sized trades.
+
+So: matching trades and turnover is necessary and it is demonstrably not sufficient. A
+control that matches both can still differ from its book in how it holds its money, how much
+of it is invested, and what it pays to trade. When a margin against a shape-matched control
+is published, say which of those three were matched and which were not.

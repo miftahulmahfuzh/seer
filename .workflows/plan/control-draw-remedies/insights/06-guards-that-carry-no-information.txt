@@ -1,0 +1,34 @@
+Three things this set found that look like checks and are not. Each was verified by trying
+to break it.
+
+ONE. The test that is supposed to catch a changed draw does not catch it. Every recorded
+arm stores a digest of its configuration, and a test asserts every recorded configuration
+still digests to its recorded digest. That reads like protection for the draw rule. It is
+not: the digest is built from the rule names, the allocator id and the parameter fields, and
+a module BODY is outside it entirely. Two perturbations were applied to the shipped draw -
+one changing the order in which names survive, one changing the order they are filled in
+under a cash shortage - each of which silently rewrites all thirteen recorded arms. Under
+both, that test PASSED, and so did the other forty-five in the three relevant modules. A
+golden-vector test pinning the rule's actual output for a fixed input was added, and it is
+now the only thing in the tree that goes red when the frozen path is edited.
+
+TWO. The trade count is not an independent check on an entry count. A book's recorded trade
+count counts CLOSED ROUND TRIPS. On a book that holds a constant number of names, every
+entry eventually becomes exactly one round trip, so the entry count and the trade count
+agree BY CONSTRUCTION. The paper-gains book's 624 entries and 624 trades looked like
+evidence somebody had confused the two quantities; it is a tautology and carries no
+information either way. The 624 was confirmed instead by a forward replay that never reads
+the trials table.
+
+THREE. A refusal the gate holds may be one it never prints. The hard gate tests its clauses
+in order and stops at the first failure: fold count, then fold majority, then the chosen
+variant's own folds, then the survivorship fall, then the control-shape rule, then kin. So a
+book that loses its walk-forward folds can carry a live control-shape refusal that is never
+the sentence the gate reports, and clearing it changes nothing about that book. Of the four
+books carrying one at the start of this set, three were inert in exactly that way. The
+fourth - the only one whose operative clause really was the shape rule - had the kin rule
+standing immediately behind it, refusing it for a different reason. Read the shape refusals
+directly rather than inferring them from the message.
+
+The common shape: a check is only a check once you have watched it fail. All three of these
+were believed to be informative, and none of them was.

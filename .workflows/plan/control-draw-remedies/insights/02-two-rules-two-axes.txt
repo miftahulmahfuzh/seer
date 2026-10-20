@@ -1,0 +1,41 @@
+A fair opponent for a strategy has to match it on two separate things, and the lab had been
+trying to buy both with one rule. It cannot be done, and this set measured why three
+different ways.
+
+The lab's matched draw is a rule about NAMES: given a real book, it works out how many names
+that book takes in each month and hands the blind opponent the same amount of churn. The
+original requirement asked for one reusable rule of that kind to fix everything. Here is why
+one rule was never available.
+
+FIRST, how much money a book moves is not a question about names at all. The equal-weight
+version of the top fifty holds the identical fifty names and records the identical 360
+trades as the size-weighted version, and still moves 1.6 times as much money. No rule
+deciding WHICH names an opponent holds can reach that, however cleverly the churn is
+derived.
+
+SECOND, a shared piece of code cannot work out the weights. Every book computes its own
+slots its own way - one by company size under a ceiling, one by size under a different
+ceiling, one by sizing each company separately and splitting share classes. A shared rule
+has no way to produce any of those. What can be shared is the ASSIGNMENT: the book hands
+over its own list of slot sizes with the names stripped off, and the shared rule decides
+which of the opponent's names gets which slot.
+
+THIRD, and this one is new and was measured rather than argued: the books do not even agree
+on which direction needs fixing. On the top-fifty-by-size book, the blind opponent was
+handing a brand-new name almost twice the slot the real book gives a brand-new name, and
+that one fact accounted for essentially all of its excess trading. On the bond-like
+size-weighted book, the opponent's new-name slot was already right - 0.97 of the book's. So
+a rule that repairs the first HARMS the second: applied there it takes a compliant opponent
+from 0.80 to 0.74 and pushes it out of the band it was already inside. A weight rule's scope
+is per-book by measurement, not only by construction.
+
+What DOES work, and shipped: one shared assignment contract, with each book supplying its
+own slot list - the same arrangement the name rule already has, where five different books
+each hand it their own slot count, sector cap or keep band. By the standard already in force
+in that module, one shared contract plus a thin per-book adapter IS one reusable rule. On
+the book it was built for it took the opponent's money movement from 1.90 times the book's
+to 1.011 times - closing 98.8% of the excess, on identical names and within 1.003 of
+identical trades.
+
+So the honest shape of the answer is two rules on two axes: a name rule and a weight rule,
+in two modules. A future set should not spend effort trying to collapse them into one.

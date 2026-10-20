@@ -1,0 +1,44 @@
+A control is always drawn and run LATER than the book it controls - often weeks later,
+sometimes months. The research store is rebuilt in between. So by default the lab compares a
+control measured against one vintage of the price data with a book measured against another,
+and calls the ratio a shape check.
+
+How widespread: twelve distinct research-store fingerprints across the 862 recorded trials,
+and ten of the fifteen recorded book-against-control comparisons cross a boundary. This is
+structural, not an accident of one batch.
+
+The important part is what it costs, because that was measured on four books this week
+rather than assumed, and the answer is that it varies enormously:
+
+- On the paper-gains book: EXACTLY ZERO. Re-running the book and both its controls in one
+  sweep on one store reproduced every recorded figure to every digit, money included - the
+  book's return came back as 0.1387873198052101 against a recorded 0.13878731980521. That
+  book names only one market series and reads its members through a screen, which is about
+  as insensitive to a store rebuild as a book gets.
+- On the bond-like size-weighted book: 0.0067 of ratio - and it flipped a verdict. That
+  book's control was published as missing the match band by 0.0059. Re-measured in one
+  sweep it reads 0.8008 and is INSIDE the band. The "near miss" was measurement error, not
+  draw error. It holds its names directly and it sat on a band edge, which is exactly where
+  a boundary is decisive.
+- On the top-fifty-by-size book: 0.22 points of MONEY. The book's recorded return is 5.63%
+  a year on one store and 5.85% re-run on the current one. No verdict turned on it, but a
+  published margin would move by that much depending on which is quoted.
+- On its repaired twin: the whole of the difference. The twin exists to measure a share-count
+  repair, and the two books' recorded returns differ - 5.63% against 5.85%. On the shared
+  current store they are identical to four decimal places on every column: same trades, same
+  turnover, same money. The difference still printed between those two pages is a difference
+  between two vintages of the DATA, not between two books. A reader subtracting one page's
+  figure from the other's is measuring a store rebuild.
+
+So the rule is narrower than "every cross-store number is wrong", and the narrow version is
+the one that survives:
+
+    A shape ratio or a margin computed across two store fingerprints is not a comparison
+    until it has been re-measured in one sweep. Whether re-measuring moves it is
+    book-dependent and must be measured, not assumed.
+
+And the reason this is worth more than the one verdict it moved: the store fingerprint is
+recorded on every single trial, so a cross-boundary comparison is MECHANICALLY DETECTABLE.
+The shape check could refuse one, or flag it, instead of quietly reporting it as a number.
+That is a change to the shape checker and a plan set of its own - it was deliberately not
+attempted here.

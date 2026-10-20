@@ -104,7 +104,7 @@ from seer_engine.backtest import dev
 from seer_engine.backtest.dev import Candidate, DevRow
 from seer_engine.backtest.metrics import fmt_num, fmt_pct, fmt_pf, fmt_signed_pct
 from seer_engine.commands.backtest_dev import month_end_curve
-from seer_engine.lab import hardgate, runner, store
+from seer_engine.lab import hardgate, journal_docs, runner, store
 from seer_engine.lab import method as method_module
 from seer_engine.lab import walkforward as wf
 from seer_engine.lab.exposure import ERA_LABELS, ERAS, WHOLE, Arm, StoreRun, Tally, load_dev_store
@@ -1392,11 +1392,40 @@ def insight_text(rep: MethodReport) -> tuple[str, str]:
     return title, body
 
 
-def journal(conn: sqlite3.Connection, rep: MethodReport) -> int:
-    """One ``observation`` on the method. The caller owns the transaction. Returns its id."""
+#: The command half of this writer's document keys. See ``lab/journal_docs.py``.
+DOC_PREFIX = "gate"
+
+
+def doc_key(rep: MethodReport, *, narrowed: bool = False) -> str:
+    """The document this report is a version of.
+
+    ``narrowed`` is True when the run was restricted to particular arms -- ``--only`` names them,
+    and ``--gated-only`` drops every variant the walk found no gate in; ``plan_methods`` applies
+    both. A narrowed run is a deliberate question about the arms it kept, so it is keyed on them
+    and a later narrowed run about different arms stands beside it. An un-narrowed run measured
+    everything the method has, so it is keyed on the method and a later one is its next version.
+    """
+    ids = [r.variant.candidate.id for r in rep.rows] if narrowed else None
+    return journal_docs.doc_key(DOC_PREFIX, rep.method_id, ids)
+
+
+def journal(
+    conn: sqlite3.Connection,
+    rep: MethodReport,
+    *,
+    narrowed: bool = False,
+    supersede: bool = True,
+) -> tuple[int, int | None]:
+    """One ``observation`` on the method, as the newest version of its gate document.
+
+    The caller owns the transaction. Returns ``(insight id, the id it supersedes or None)``.
+    ``narrowed`` must be True whenever the run was restricted by ``--only`` or ``--gated-only``.
+    ``supersede=False`` writes a sibling instead (``--no-supersede``).
+    """
     title, body = insight_text(rep)
-    return store.add_insight(
-        conn, kind="observation", title=title, body=body, method_id=rep.method_id
+    return journal_docs.append(
+        conn, kind="observation", title=title, body=body, method_id=rep.method_id,
+        key=doc_key(rep, narrowed=narrowed), supersede=supersede,
     )
 
 

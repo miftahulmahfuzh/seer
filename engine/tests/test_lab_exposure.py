@@ -480,8 +480,10 @@ def test_the_journal_entry_is_plain_words(lab, dev_data, recorded, tmp_path, mon
     (rep,), _run = _measure(conn, dev_data, tmp_path, monkeypatch)
     before = _untouched(conn)
     with conn:
-        entry = exp.journal(conn, rep)
+        entry, revised = exp.journal(conn, rep)
+    assert revised is None  # the first version of this method's document supersedes nothing
     row = conn.execute("SELECT * FROM insights WHERE id = ?", (entry,)).fetchone()
+    assert row["doc_key"] == "exposure:M0001:all"
     assert row["kind"] == "observation" and row["method_id"] == "M0001"
     assert row["title"].endswith("what its own picks did, apart from the money it parks")
     for text in (row["title"], row["body"]):
@@ -501,3 +503,28 @@ def test_the_help_strings_still_format(capsys):
     with pytest.raises(SystemExit):
         cli.main(["lab", "--help"])
     assert "exposure" in capsys.readouterr().out
+
+
+def test_a_narrowed_run_is_a_sibling_of_an_unnarrowed_one(lab, dev_data, recorded, tmp_path, monkeypatch):
+    conn, _ = lab
+    (rep,), _run = _measure(conn, dev_data, tmp_path, monkeypatch)
+    with conn:
+        wide, _ = exp.journal(conn, rep)
+    with conn:
+        narrow, revised = exp.journal(conn, rep, narrowed=True)
+    assert revised is None, "a narrowed run did not measure the same book as a wide one"
+    assert exp.doc_key(rep) == "exposure:M0001:all"
+    assert exp.doc_key(rep, narrowed=True).startswith("exposure:M0001:M0001-")
+    assert conn.execute(
+        "SELECT supersedes FROM insights WHERE id = ?", (narrow,)
+    ).fetchone()[0] is None
+    with conn:
+        _again, revised_again = exp.journal(conn, rep)
+    assert revised_again == wide
+
+
+def test_the_exposure_help_strings_still_format_with_no_supersede(capsys):
+    with pytest.raises(SystemExit) as e:
+        cli.main(["lab", "exposure", "--help"])
+    assert e.value.code == 0
+    assert "--no-supersede" in capsys.readouterr().out

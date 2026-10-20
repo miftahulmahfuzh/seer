@@ -199,14 +199,85 @@ def test_the_journal_entry_is_one_plain_observation(lab, data, recorded):
     )
     before = _untouched(conn)
     with conn:
-        entry = real_costs.journal(conn, cmp)
+        entry, revised = real_costs.journal(conn, cmp)
+    assert revised is None  # the first version of this arm's document supersedes nothing
     row = conn.execute("SELECT * FROM insights WHERE id = ?", (entry,)).fetchone()
+    assert row["doc_key"] == f"real-costs:M0001:{cmp.candidate_id}"
     assert row["kind"] == "observation" and row["method_id"] == "M0001"
     assert row["title"] == "SPY above its average: what Gotrade's real fees do to it"
     for text in (row["title"], row["body"]):
         assert "M0001" not in text and "`" not in text and "cost_model" not in text
     assert "count of tries did not move" in row["body"]
     assert _untouched(conn) == before
+
+
+def test_a_second_run_of_the_same_arm_revises_rather_than_repeats(lab, data, recorded):
+    conn, _ = lab
+    c, trial = real_costs.pick_candidate(conn, recorded, None)
+    kw = dict(
+        contributions=runner.recorded_contributions(conn, int(trial["n"])),
+        initial_idr=runner.recorded_capital(conn, int(trial["n"])),
+    )
+    cmp = real_costs.measure(recorded, c, trial, data, **kw)
+    with conn:
+        first, _ = real_costs.journal(conn, cmp)
+    with conn:
+        second, revised = real_costs.journal(conn, cmp)
+    assert revised == first
+    rows = conn.execute(
+        "SELECT id, supersedes FROM insights WHERE doc_key = ? ORDER BY id",
+        (real_costs.doc_key(cmp),),
+    ).fetchall()
+    assert [tuple(r) for r in rows] == [(first, None), (second, first)]
+
+
+def test_a_different_arm_of_the_same_method_is_a_sibling_not_a_version(lab, data, recorded):
+    conn, _ = lab
+
+    def kw_for(t):
+        return dict(
+            contributions=runner.recorded_contributions(conn, int(t["n"])),
+            initial_idr=runner.recorded_capital(conn, int(t["n"])),
+        )
+
+    a, ta = real_costs.pick_candidate(conn, recorded, "M0001-A")
+    b, tb = real_costs.pick_candidate(conn, recorded, "M0001-B")
+    with conn:
+        first, _ = real_costs.journal(conn, real_costs.measure(recorded, a, ta, data, **kw_for(ta)))
+    with conn:
+        second, revised = real_costs.journal(
+            conn, real_costs.measure(recorded, b, tb, data, **kw_for(tb))
+        )
+    assert revised is None, "two arms are two measurements and must be two documents"
+    rows = [
+        conn.execute("SELECT * FROM insights WHERE id = ?", (i,)).fetchone()
+        for i in (first, second)
+    ]
+    assert rows[0]["title"] == rows[1]["title"], "the generated title is the same for both"
+    assert rows[0]["doc_key"] != rows[1]["doc_key"], "and that is why the title is not the key"
+
+
+def test_cli_no_supersede_writes_a_sibling(lab, data, recorded, monkeypatch, capsys, tmp_path):
+    conn, path = lab
+    monkeypatch.setattr(research, "load_store", lambda *a, **k: data)
+    monkeypatch.setattr(real_costs, "discover", lambda: {"M0001": (recorded, HERE)})
+    argv = ["lab", "--db", str(path), "costs", "M0001", "--store", str(tmp_path / "store")]
+    assert cli.main(argv) == 0
+    assert cli.main(argv) == 0
+    assert "revises #" in capsys.readouterr().out
+    assert cli.main([*argv, "--no-supersede"]) == 0
+    assert "revises #" not in capsys.readouterr().out
+    assert conn.execute(
+        "SELECT count(*) FROM insights WHERE supersedes IS NULL AND doc_key IS NOT NULL"
+    ).fetchone()[0] == 2
+
+
+def test_the_costs_help_strings_still_format(capsys):
+    """argparse %-interpolates every help= string; a bare % there kills `lab --help`."""
+    with pytest.raises(SystemExit) as e:
+        cli.main(["lab", "costs", "--help"])
+    assert e.value.code == 0
+    assert "--no-supersede" in capsys.readouterr().out
 
 
 def _side(model, beats, failed=()):

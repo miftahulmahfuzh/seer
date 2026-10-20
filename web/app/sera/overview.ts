@@ -127,7 +127,13 @@ export function state(snap: LabSnapshot): State {
 
   // Only Sera's batch synthesis is written for the owner. Other journal notes can be machine records
   // (a promotion's spec digest, roster columns), so without a synthesis the headline is computed.
-  const synth = newest(snap.insights.filter(i => i.kind === 'synthesis'));
+  //
+  // HEADS ONLY (`supersededBy === null`). Newest-by-date already lands on a chain's head, because
+  // a successor is always inserted after its predecessor — but `kind` is allowed to change along a
+  // chain, which is the normal life of a lab idea: a hypothesis becomes an observation. So a
+  // synthesis superseded by an observation would still be the newest *synthesis*, and this would
+  // publish a story the lab has already replaced. Filter first, then take the newest.
+  const synth = newest(snap.insights.filter(i => i.kind === 'synthesis' && i.supersededBy === null));
   const nameOf = (id: string) => snap.methods.find(m => m.id === id)?.name ?? id;
   const story: Story = synth
     ? { title: synth.title, body: synth.body, added: synth.added, source: 'synthesis' }

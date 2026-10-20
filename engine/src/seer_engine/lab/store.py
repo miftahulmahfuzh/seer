@@ -15,7 +15,13 @@ Tables:
   window and gets at most one look at the test window.
 - ``ideas_seen``: dedupe keys (``url:…``, ``concept:…``) of sources already explored.
 - ``insights``: the lab journal (observations, hypotheses, data and feature wishes, risks, and
-  batch syntheses). Triggers refuse every UPDATE and DELETE.
+  batch syntheses). A trigger refuses every DELETE and every UPDATE but one: ``supersedes`` may
+  go from NULL to the id of an earlier entry, once, which says *this entry replaces that one* so
+  that a chain of rows renders as one document labelled with its version. Nothing else about a
+  row can ever move -- not its body, not its title, not even ``doc_key``, the writer-computed
+  identity of the document a row is a version of. Superseding **adds** a row; it never rewrites
+  one, which is what keeps the journal's whole point intact: nobody can quietly change what a
+  method predicted after seeing how it turned out.
 - ``trial_moments``: the deflated Sharpe's inputs for one dev trial -- its daily Sharpe, the
   number of daily returns, the skew, the kurtosis, and the ``var_trials`` and N it was judged
   against -- so a recorded verdict can be recomputed later without re-running the backtest.
@@ -56,7 +62,11 @@ money-weighted return of a trial that received deposits, and of the SPY fed the 
 the ``trial_provenance`` side table and backfills it for every trial already recorded; 6 adds the
 ``method_amendments`` side table (empty: nothing is backfilled, because no amendment predates it);
 7 adds the ``method_folds`` side table (empty for the same reason: the verdict of a run that has
-already happened cannot be recomputed as it was, because the lab has recorded curves since).
+already happened cannot be recomputed as it was, because the lab has recorded curves since);
+8 adds ``insights.supersedes`` and ``insights.doc_key`` and narrows ``insights_no_update`` from a
+blanket refusal to a whitelist -- the only version so far that relaxes a rule rather than adding a
+table, and therefore the only one whose test suite is the deliverable rather than the migration.
+Nothing is threaded by the migration itself: all 500 rows arrive with both columns NULL.
 ``connect`` migrates an older database in place; ``connect_readonly`` never does.
 
 The **verdict** a trial reads is derived, not frozen: ``DSR_MIN`` is the threshold (0.90 since
@@ -96,7 +106,7 @@ COMMITTED_DB = config.REPO_ROOT / "lab" / "lab.sqlite"
 # database through SEER_LAB_DB; only the coordinator commits it.
 DB_PATH = Path(os.environ.get("SEER_LAB_DB") or COMMITTED_DB)
 XLSX_PATH = config.REPO_ROOT / "lab" / "lab.xlsx"  # gitignored
-SCHEMA_VERSION = "7"  # 2: synthesis kind; 3: trial_moments; 4: trial_funding; 5: trial_provenance; 6: method_amendments; 7: method_folds (see _migrate)
+SCHEMA_VERSION = "8"  # 2: synthesis kind; 3: trial_moments; 4: trial_funding; 5: trial_provenance; 6: method_amendments; 7: method_folds; 8: insights.supersedes/doc_key + the narrowed trigger (see _migrate)
 
 SOURCE_KINDS: tuple[str, ...] = ("paper", "blog", "github", "knowledge", "variation", "seed")
 STATUSES: tuple[str, ...] = (
@@ -229,21 +239,75 @@ def _quoted(values: Iterable[str]) -> str:
     return ", ".join(f"'{v}'" for v in values)
 
 
-# The insights table and its two triggers, one statement each. ``_SCHEMA`` creates them on a new
-# database; ``_migrate`` recreates them when it rebuilds a v1 table (SQLite cannot alter a CHECK).
+# The insights table, its two triggers and its one index, one statement each. ``_SCHEMA`` creates
+# the table and the triggers on a new database; ``_migrate`` recreates them when it rebuilds the
+# table (SQLite cannot alter a CHECK, and ``CREATE TRIGGER IF NOT EXISTS`` silently skips a name
+# that is already taken, so a narrowed trigger can only arrive by rebuild).
+#
+# ``supersedes`` is the versioning link: this row replaces that one, so a chain of rows renders as
+# one document labelled with its version (JOURNAL_VERSIONING_PLAN.md). It is the only column of
+# the only table in this lab that a row may ever change, and it may change exactly once, from
+# NULL. ``CHECK (supersedes < id)`` is the floor under that: a successor is always a *later* row
+# than what it replaces, which makes self-reference and cycles impossible by construction rather
+# than by a graph walk nobody would remember to write.
+#
+# ``doc_key`` is the writer-computed identity of the *document* a row is a version of --
+# ``real-costs:M0260-M-G3``, ``prereg:M0022``. It exists because the generated title is not a
+# document identity and the measurement proved it: insights 466, 467 and 468 share one title and
+# are three different arms of M0260, so a writer that auto-linked on title would have buried a
+# 23.8%-drawdown measurement underneath a 33.6% one. Rows written by hand carry NULL and are
+# linked explicitly. It is protected like content: the owner permitted one column to move, and a
+# column added in the same migration is not a new permission.
 _INSIGHTS_TABLE = f"""CREATE TABLE IF NOT EXISTS insights (
-    id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    kind      TEXT NOT NULL CHECK (kind IN ({_quoted(INSIGHT_KINDS)})),
-    title     TEXT NOT NULL CHECK (length(trim(title)) > 0),
-    body      TEXT NOT NULL CHECK (length(trim(body)) > 0),
-    method_id TEXT REFERENCES methods(id),
-    added     TEXT NOT NULL
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind       TEXT NOT NULL CHECK (kind IN ({_quoted(INSIGHT_KINDS)})),
+    title      TEXT NOT NULL CHECK (length(trim(title)) > 0),
+    body       TEXT NOT NULL CHECK (length(trim(body)) > 0),
+    method_id  TEXT REFERENCES methods(id),
+    added      TEXT NOT NULL,
+    supersedes INTEGER REFERENCES insights(id) CHECK (supersedes IS NULL OR supersedes < id),
+    doc_key    TEXT CHECK (doc_key IS NULL OR length(trim(doc_key)) > 0)
 )"""
+# A whitelist, not a blacklist: every column is named and only ``supersedes`` is left out of the
+# refusal, so a column added in some later version is refused by default rather than by somebody
+# remembering to add it here. ``IS NOT`` is SQLite's null-safe distinct operator, so a column
+# going to or from NULL is caught where ``<>`` would have yielded NULL and aborted nothing. The
+# last clause refuses value -> different-value and value -> NULL in one line: once set, the link
+# is frozen. And because every other column is named, ``UPDATE insights SET supersedes = ?,
+# body = ?`` trips the ``body`` clause and aborts -- the permitted column cannot smuggle a
+# forbidden one through in the same statement, which is the trap this design was chosen for.
 _INSIGHTS_TRIGGERS: tuple[str, ...] = (
     """CREATE TRIGGER IF NOT EXISTS insights_no_update BEFORE UPDATE ON insights
-BEGIN SELECT RAISE(ABORT, 'insights are append-only: add a newer one instead'); END""",
+BEGIN
+  SELECT RAISE(ABORT, 'insights are append-only: add a newer one instead')
+  WHERE OLD.id         IS NOT NEW.id
+     OR OLD.kind       IS NOT NEW.kind
+     OR OLD.title      IS NOT NEW.title
+     OR OLD.body       IS NOT NEW.body
+     OR OLD.method_id  IS NOT NEW.method_id
+     OR OLD.added      IS NOT NEW.added
+     OR OLD.doc_key    IS NOT NEW.doc_key
+     OR OLD.supersedes IS NOT NULL;
+END""",
     """CREATE TRIGGER IF NOT EXISTS insights_no_delete BEFORE DELETE ON insights
 BEGIN SELECT RAISE(ABORT, 'insights are append-only'); END""",
+)
+# One successor per predecessor. The index is partial so that "unlinked" is not a value that
+# collides -- the 500 rows that predate schema 8 all carry NULL and none of them is a duplicate of
+# the others. A predecessor with two successors is a fork, and a fork has no single latest version
+# to render: the reader would have to choose one and hide the other, which is the measurement
+# disappearing off the page that this whole change exists to prevent.
+#
+# It is NOT in ``_SCHEMA``, and that is deliberate rather than an oversight. ``connect`` runs
+# ``_SCHEMA`` before ``_migrate``, and on a v7 database ``CREATE TABLE IF NOT EXISTS insights`` is
+# a no-op while ``CREATE UNIQUE INDEX ... ON insights(supersedes)`` is not: it would resolve the
+# column name against the v7 table, fail with "no such column: supersedes", and take ``connect``
+# down before the migration that adds the column could run. So it is created in ``_v7_to_v8``, and
+# again by ``connect`` after ``_migrate`` returns -- which is the path a brand-new database takes,
+# since a fresh database never runs a migration step at all.
+_INSIGHTS_INDEXES: tuple[str, ...] = (
+    """CREATE UNIQUE INDEX IF NOT EXISTS insights_one_successor
+ON insights(supersedes) WHERE supersedes IS NOT NULL""",
 )
 
 # The trial_moments side table and its two triggers, one statement each. ``_SCHEMA`` creates them
@@ -642,7 +706,15 @@ def now_iso() -> str:
 
 def connect(path: Path = DB_PATH) -> sqlite3.Connection:
     """Open (creating when missing) the lab database with the schema, triggers and transitions,
-    migrating an older database to ``SCHEMA_VERSION`` first."""
+    migrating an older database to ``SCHEMA_VERSION`` first.
+
+    ``_INSIGHTS_INDEXES`` is issued *after* ``_migrate`` rather than from ``_SCHEMA``, and the
+    order is load-bearing: ``_SCHEMA`` runs first, and on a v7 database an index over
+    ``insights(supersedes)`` would be asked to resolve a column the migration has not added yet
+    and would fail the open outright. After ``_migrate`` the column exists on every path -- a
+    fresh database got it from ``_SCHEMA``, an old one from ``_v7_to_v8`` -- and the statement is
+    a no-op on the second and every later connect.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path, timeout=120)  # parallel explorer sessions share one file
@@ -657,6 +729,9 @@ def connect(path: Path = DB_PATH) -> sqlite3.Connection:
                 "INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', ?)", (SCHEMA_VERSION,)
             )
         _migrate(conn)
+        with conn:
+            for index in _INSIGHTS_INDEXES:
+                conn.execute(index)
     except BaseException:
         conn.close()
         raise
@@ -835,25 +910,80 @@ def _v6_to_v7(conn: sqlite3.Connection) -> None:
         conn.execute(trigger)
 
 
+def _v7_to_v8(conn: sqlite3.Connection) -> None:
+    """Add ``insights.supersedes`` and ``insights.doc_key``, and narrow ``insights_no_update``
+    from a blanket refusal to a whitelist.
+
+    The first insights migration since v1 -> v2 and, like it, a **rebuild** rather than an
+    ``ALTER TABLE ADD COLUMN``. Two reasons, either of which alone would be enough. SQLite can add
+    a column but cannot add the ``supersedes < id`` CHECK that makes a cycle impossible. And
+    ``CREATE TRIGGER IF NOT EXISTS`` silently skips a name that is already taken, so an additive
+    migration would leave the v7 blanket trigger in place, still refusing the one UPDATE this
+    whole version exists to allow -- and would do it quietly, which is the worst way for a
+    migration to be wrong.
+
+    So: ``_v1_to_v2``'s recipe, which is this repo's proven one for this exact table. The v7 table
+    is renamed aside, the v8 table is created from ``_INSIGHTS_TABLE``, every row is copied **with
+    its id**, the AUTOINCREMENT counter is carried over, the v7 table is dropped (which drops its
+    triggers and fires none), and only then are the triggers and the one-successor index created.
+    The triggers come last for the reason ``_v1_to_v2`` gives: while the v7 table still exists its
+    triggers hold their names, and ``IF NOT EXISTS`` would skip the new ones.
+
+    The copy names the six v7 columns rather than ``*`` because a genuine v7 table **has** only
+    six -- ``SELECT *`` would be a column-count mismatch, and naming ``supersedes`` on the read
+    side would not even parse. So every migrated row arrives with ``supersedes`` and ``doc_key``
+    NULL, which is what "schema 8 threads nothing by itself" means: it makes a version chain
+    expressible, and leaves every existing chain for someone to state deliberately.
+
+    Nothing is read-modify-written. ``kind``, ``title``, ``body``, ``method_id`` and ``added`` are
+    copied by SQL and never pass through Python, and ``methods`` and ``trials`` are not touched at
+    all -- ``test_connect_migrates_a_v7_database_keeping_every_insight_byte_identical`` and
+    ``test_the_v7_to_v8_migration_moves_not_one_byte_of_the_web_snapshot`` pin both halves, the
+    second of them on a copy of the real 500-row lab.
+    """
+    seq = conn.execute("SELECT seq FROM sqlite_sequence WHERE name = 'insights'").fetchone()
+    conn.execute("ALTER TABLE insights RENAME TO insights_v7")
+    conn.execute(_INSIGHTS_TABLE)
+    conn.execute(
+        "INSERT INTO insights (id, kind, title, body, method_id, added) "
+        "SELECT id, kind, title, body, method_id, added FROM insights_v7 ORDER BY id"
+    )
+    conn.execute("DROP TABLE insights_v7")
+    if seq is not None:
+        cur = conn.execute(
+            "UPDATE sqlite_sequence SET seq = max(seq, ?) WHERE name = 'insights'", (seq[0],)
+        )
+        if cur.rowcount == 0:
+            conn.execute("INSERT INTO sqlite_sequence (name, seq) VALUES ('insights', ?)", (seq[0],))
+    for trigger in _INSIGHTS_TRIGGERS:
+        conn.execute(trigger)
+    for index in _INSIGHTS_INDEXES:
+        conn.execute(index)
+
+
 def _migrate(conn: sqlite3.Connection) -> None:
     """Bring an older database up to ``SCHEMA_VERSION`` in one transaction under the write lock.
 
-    A ladder: each step moves the database up exactly one version, so a v1 database reaches v7 in
-    one open by running all six steps in order. v1 -> v2 adds the ``synthesis`` insight kind
+    A ladder: each step moves the database up exactly one version, so a v1 database reaches v8 in
+    one open by running all seven steps in order. v1 -> v2 adds the ``synthesis`` insight kind
     (``_v1_to_v2``); v2 -> v3 adds the ``trial_moments`` side table (``_v2_to_v3``); v3 -> v4 adds
     the ``trial_funding`` side table (``_v3_to_v4``); v4 -> v5 adds the ``trial_provenance`` side
     table and backfills it (``_v4_to_v5``) -- after v3 -> v4, because the backfill reads
     ``trial_funding``; v5 -> v6 adds the ``method_amendments`` side table (``_v5_to_v6``); v6 -> v7
     adds the ``method_folds`` side table (``_v6_to_v7``), empty, because a past run's fold record
-    cannot be recomputed as it read. A version this code does not know is refused rather than
-    guessed at -- **which makes this a one-way door for every other checkout**: a v7 database
-    opened by v6 code raises ``LabError`` on connect, so the code and the migrated committed
-    database must land together.
+    cannot be recomputed as it read; v7 -> v8 adds ``insights.supersedes`` and
+    ``insights.doc_key`` and narrows ``insights_no_update`` to a whitelist (``_v7_to_v8``) -- the
+    first step since v1 -> v2 that rebuilds a table, and the only one that has ever *relaxed* a
+    rule, which is why it rebuilds rather than alters. A version this code does not know is
+    refused rather than guessed at -- **which makes this a one-way door for every other
+    checkout**: a v8 database opened by v7 code raises ``LabError`` on connect, so the code and
+    the migrated committed database must land together.
 
     Parallel sessions may connect at once, so the version is read again after
     ``BEGIN IMMEDIATE``: only the first one migrates, the others find the current version and do
     nothing. The backfill runs inside this same transaction, so a database is never seen at v5
-    with its provenance half-written.
+    with its provenance half-written, and the insights rebuild runs inside it too, so a database
+    is never seen with ``insights`` renamed aside.
     """
     if schema_version(conn) == SCHEMA_VERSION:
         return
@@ -879,6 +1009,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
         if version == "6":
             _v6_to_v7(conn)
             version = "7"
+        if version == "7":
+            _v7_to_v8(conn)
+            version = "8"
         if version != SCHEMA_VERSION:
             raise LabError(
                 f"lab database schema version {found!r} is unknown to this code "
@@ -2623,20 +2756,161 @@ def seen(conn: sqlite3.Connection, pattern: str) -> list[sqlite3.Row]:
 # --------------------------------------------------------------------------- insights
 
 
+def get_insight(conn: sqlite3.Connection, insight_id: int) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM insights WHERE id = ?", (int(insight_id),)).fetchone()
+
+
+def head_for_doc_key(conn: sqlite3.Connection, doc_key: str | None) -> sqlite3.Row | None:
+    """The current version of the document ``doc_key`` names: the row carrying that key that no
+    other row supersedes, or None when the lab has never written one.
+
+    The affordance an auto-journalling writer calls before it writes: *have I measured this exact
+    thing before?* It is keyed on the document, never on the title, and the distinction is the
+    whole reason ``doc_key`` exists. Insights 466, 467 and 468 share one generated title and are
+    three different arms of M0260; a writer that asked "is there an earlier note with this title
+    for this method" would have threaded a 23.8%-drawdown measurement underneath a 33.6% one and
+    shown the owner only the last.
+
+    A NULL or blank key is not a question with an answer -- the 500 rows that predate schema 8 all
+    carry NULL and none of them is the head of anything -- so it answers None rather than matching
+    them all.
+    """
+    key = (doc_key or "").strip()
+    if not key:
+        return None
+    return conn.execute(
+        "SELECT * FROM insights i WHERE i.doc_key = ? "
+        "AND NOT EXISTS (SELECT 1 FROM insights s WHERE s.supersedes = i.id) "
+        "ORDER BY i.id DESC LIMIT 1",
+        (key,),
+    ).fetchone()
+
+
+def _check_supersedes(conn: sqlite3.Connection, *, supersedes: int,
+                      method_id: str | None, successor_id: int | None = None) -> int:
+    """Validate a ``supersedes`` link and answer it as an int, or raise ``LabError``.
+
+    The invariants, all four of them, stated once here so ``add_insight`` and ``set_supersedes``
+    cannot drift apart and so the CLI (phase 2) has nothing of its own to validate:
+
+    - the predecessor exists;
+    - it is *earlier* than its successor, which makes self-reference and cycles impossible. For
+      ``add_insight`` the successor does not exist yet and ``successor_id`` is None, and the
+      property holds by construction instead: ``id`` is AUTOINCREMENT, so a row that already
+      exists has a lower id than the one about to be inserted, and the table's own
+      ``CHECK (supersedes < id)`` is the floor under that assumption;
+    - the predecessor has no successor already -- the friendly path to ``insights_one_successor``,
+      which raises an ``IntegrityError`` about an index nobody asked about;
+    - predecessor and successor share a ``method_id``, both NULL counting as shared. A version of
+      a note about M0001 is still about M0001; crossing methods is a different document, and the
+      reader would merge two subjects onto one card.
+
+    ``kind`` is deliberately **not** checked: a hypothesis that has been measured becomes an
+    observation, and the lab should be able to say so by superseding rather than by leaving two
+    cards that disagree.
+    """
+    try:
+        predecessor_id = int(supersedes)
+    except (TypeError, ValueError):
+        raise LabError(f"supersedes must be an insight id, got {supersedes!r}") from None
+    row = get_insight(conn, predecessor_id)
+    if row is None:
+        raise LabError(f"no insight {predecessor_id}")
+    if successor_id is not None and predecessor_id >= int(successor_id):
+        raise LabError(
+            f"insight {successor_id} can only supersede an earlier entry, and {predecessor_id} "
+            f"is not earlier"
+        )
+    taken = conn.execute(
+        "SELECT id FROM insights WHERE supersedes = ?", (predecessor_id,)
+    ).fetchone()
+    if taken is not None and (successor_id is None or int(taken[0]) != int(successor_id)):
+        raise LabError(
+            f"insight {predecessor_id} is already superseded by {int(taken[0])}; "
+            f"supersede that one instead"
+        )
+    if row["method_id"] != method_id:
+        raise LabError(
+            f"insight {predecessor_id} belongs to method {row['method_id']!r} and its successor "
+            f"to {method_id!r}; a version of a note keeps the note's method"
+        )
+    return predecessor_id
+
+
+def _clean_doc_key(doc_key: str | None) -> str | None:
+    if doc_key is None:
+        return None
+    key = doc_key.strip()
+    if not key:
+        raise LabError("doc_key must be a non-empty identity (real-costs:M0260-M-G3), or omitted")
+    return key
+
+
 def add_insight(conn: sqlite3.Connection, *, kind: str, title: str, body: str,
-                method_id: str | None = None) -> int:
+                method_id: str | None = None, doc_key: str | None = None,
+                supersedes: int | None = None) -> int:
     """Append one entry to the lab journal: an observation across methods, a hypothesis worth
     testing, data or a feature the lab lacks, a risk, or a batch synthesis (the state of the
-    search after a batch of methods). The food-for-thought record, shown at seertrade.site/sera."""
+    search after a batch of methods). The food-for-thought record, shown at seertrade.site/sera.
+
+    ``doc_key`` is the writer-computed identity of the *document* this entry is a version of
+    (``real-costs:M0260-M-G3``, ``prereg:M0022``). ``supersedes`` is the id of the entry this one
+    replaces -- pass both together to append a new version of a document, neither to append a
+    fresh one. Entries written by hand carry neither and are linked afterwards, deliberately,
+    through ``set_supersedes``.
+
+    Both are validated before the INSERT, so a refused link leaves no half-written entry behind.
+    """
     if kind not in INSIGHT_KINDS:
         raise LabError(f"insight kind must be one of {INSIGHT_KINDS}, got {kind!r}")
     if method_id is not None and get_method(conn, method_id) is None:
         raise LabError(f"no method {method_id}")
+    key = _clean_doc_key(doc_key)
+    link = None if supersedes is None else _check_supersedes(
+        conn, supersedes=supersedes, method_id=method_id
+    )
     cur = conn.execute(
-        "INSERT INTO insights (kind, title, body, method_id, added) VALUES (?, ?, ?, ?, ?)",
-        (kind, title.strip(), body.strip(), method_id, now_iso()),
+        "INSERT INTO insights (kind, title, body, method_id, added, supersedes, doc_key) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (kind, title.strip(), body.strip(), method_id, now_iso(), link, key),
     )
     return int(cur.lastrowid)
+
+
+def set_supersedes(conn: sqlite3.Connection, insight_id: int, supersedes: int) -> None:
+    """Record that insight ``insight_id`` replaces insight ``supersedes``: the one UPDATE the lab
+    journal permits, and the only way an entry already written can be threaded to its predecessor.
+
+    This exists because of the 2026-10-20 owner decision. Before schema 8 the journal's trigger
+    refused every UPDATE, so the duplicate chains already in the lab -- 500 and 499 are
+    byte-identical -- could not be threaded at all without rewriting history. Narrowing the
+    trigger makes exactly this operation possible and nothing else: no body, no title, no kind, no
+    method, no ``added``, no ``doc_key``, and no second thought about a link once made.
+
+    Every invariant is checked here, in Python, before the UPDATE is issued, so a caller gets a
+    sentence it can print and a CLI gets its exit 2 -- ``_check_supersedes`` has the list. The
+    database refuses the same things underneath (the whitelist trigger, the
+    ``supersedes < id`` CHECK, the ``insights_one_successor`` index), and that redundancy is the
+    point: the Python is the friendly path, the SQL is the floor, and a future caller that reaches
+    past this function still cannot corrupt the chain.
+
+    The caller owns the transaction, as it does for ``add_insight``: ``with conn: set_supersedes(…)``.
+    """
+    successor = get_insight(conn, insight_id)
+    if successor is None:
+        raise LabError(f"no insight {int(insight_id)}")
+    if successor["supersedes"] is not None:
+        raise LabError(
+            f"insight {int(insight_id)} already supersedes {int(successor['supersedes'])}; "
+            f"a link is set once and never moved"
+        )
+    link = _check_supersedes(
+        conn, supersedes=supersedes, method_id=successor["method_id"],
+        successor_id=int(successor["id"]),
+    )
+    conn.execute(
+        "UPDATE insights SET supersedes = ? WHERE id = ?", (link, int(successor["id"]))
+    )
 
 
 # --------------------------------------------------------------------------- export
@@ -2690,6 +2964,31 @@ def export_xlsx(conn: sqlite3.Connection, path: Path = XLSX_PATH) -> Path:
     return path
 
 
+# A journal *document* is a chain of ``insights`` rows linked by ``supersedes``; its **head** is
+# the row nothing supersedes -- the current version. Counting heads instead of rows is the
+# owner's complaint answered in a number: before this, re-running a command that auto-journals
+# pushed the count up by one even when the new row said the same thing as the old one. Rows are
+# still worth printing (they are what the append-only store actually holds), so both are
+# published, under names that cannot be mistaken for each other.
+#
+# This SQL needs schema v8. ``summary_rows`` is only ever called on a connection opened through
+# ``connect`` (``lab status``, ``export_xlsx``), which migrates first, so that is safe here --
+# and deliberately NOT safe enough for ``snapshot``, which must also answer on an unmigrated
+# read-only database. ``snapshot`` therefore counts heads from the rows it has already read.
+INSIGHT_DOCUMENTS_SQL = (
+    "SELECT count(*) FROM insights i "
+    "WHERE NOT EXISTS (SELECT 1 FROM insights s WHERE s.supersedes = i.id)"
+)
+
+
+def insight_document_count(conn: sqlite3.Connection) -> int:
+    """How many journal documents the lab holds: insight rows that nothing supersedes.
+
+    Requires schema v8. For a connection that may predate it, derive the count from the exported
+    rows instead (``snapshot`` does)."""
+    return int(conn.execute(INSIGHT_DOCUMENTS_SQL).fetchone()[0])
+
+
 def summary_rows(conn: sqlite3.Connection) -> list[tuple[str, Any]]:
     by_status = conn.execute("SELECT status, count(*) FROM methods GROUP BY status ORDER BY status").fetchall()
     out: list[tuple[str, Any]] = [
@@ -2701,7 +3000,13 @@ def summary_rows(conn: sqlite3.Connection) -> list[tuple[str, Any]]:
         ("dev trials (one row per recorded backtest)", dev_trial_count(conn)),
         ("test-window looks used", test_looks(conn)),
         ("methods", int(conn.execute("SELECT count(*) FROM methods").fetchone()[0])),
-        ("insights", int(conn.execute("SELECT count(*) FROM insights").fetchone()[0])),
+        # Two numbers, never one. The old single ``insights`` row counted rows and so rose every
+        # time a command re-journalled the same observation; "journal documents" is the number
+        # the owner means when he asks how much is in the journal. They are equal until a chain
+        # exists, and the gap between them is the amount of re-run that has happened since.
+        ("journal documents", insight_document_count(conn)),
+        ("journal entries (every version counts)",
+         int(conn.execute("SELECT count(*) FROM insights").fetchone()[0])),
     ]
     out += [(f"methods {r[0]}", r[1]) for r in by_status]
     return out
@@ -2742,7 +3047,18 @@ def as_mapping(row: sqlite3.Row) -> Mapping[str, Any]:
 # (7.6%), the difference being the owner's own deposits piling up. Nothing published them, so the
 # site could only show the flattering number -- and the one consumer that needed them read the
 # database directly with raw SQL.
-SNAPSHOT_VERSION = 5
+#
+# 6 adds the journal's version chain: every insight publishes ``supersedes`` and ``docKey`` as
+# written, plus two fields derived here and nowhere else -- ``version`` (its depth in the chain,
+# 1 for a row that supersedes nothing) and ``supersededBy`` (the id of the row that replaced it,
+# null when this row is the current one). They are derived at export time on purpose:
+# ``web/app/sera/journal/view.ts`` is a file of pure helpers with no data access, and chasing a
+# linked list once per card inside a React component is the shape that makes a reader slow and
+# wrong at the same time. 6 also splits the journal count in two: ``summary.insights`` now counts
+# **documents** (heads) and ``summary.insightRows`` counts rows. The old field kept its name and
+# changed its meaning, which is exactly why this number moved -- a consumer pinned to 5 is
+# reading "insights" as a row count and must be told.
+SNAPSHOT_VERSION = 6
 EXPECTED_FAILURE_SEP = "\n\nExpected failure: "  # how lab ideas write their hypothesis
 
 
@@ -2763,11 +3079,62 @@ def _num(x: Any) -> float | None:
     return round(x, 6) if math.isfinite(x) else None
 
 
+def _opt_int(x: Any) -> int | None:
+    """A nullable integer column as JSON: None stays None, anything else becomes ``int``.
+
+    ``_num``'s sibling for columns that are counts or row ids rather than measurements.
+    ``supersedes`` is an ``INTEGER`` foreign key and must reach the web as ``2``, not ``2.0``:
+    the reader compares it against ``id``, which is published as an int."""
+    return None if x is None else int(x)
+
+
 def _dicts(conn: sqlite3.Connection, sql: str) -> list[dict[str, Any]]:
     """Rows as dicts, whatever the connection's row_factory."""
     cur = conn.execute(sql)
     names = [d[0] for d in cur.description]
     return [dict(zip(names, row)) for row in cur.fetchall()]
+
+
+def _insight_chains(
+    rows: Iterable[Mapping[str, Any]],
+) -> tuple[dict[int, int], dict[int, int]]:
+    """``(version_by_id, successor_by_id)`` for a set of ``insights`` rows, in one pass.
+
+    A journal *document* is a chain of rows linked by ``supersedes``: each row supersedes at most
+    one predecessor, and ``insights_one_successor`` (schema v8) makes sure at most one row
+    supersedes any given predecessor. The chain is therefore a simple path, and the two things a
+    reader wants from it are:
+
+    * ``version`` -- how deep in its chain a row sits. 1 for a row that supersedes nothing, 2 for
+      the row that replaced it, and so on. This is the number the owner asked for: *"we will say
+      this is the fourth version"*.
+    * ``supersededBy`` -- the id of the row that replaced this one, absent when the row is the
+      **head** (the current version, and the only one ``/sera/journal`` shows by default).
+
+    Derived here rather than in the web, because ``web/app/sera/journal/view.ts`` is documented as
+    pure helpers with no data access, and a component that walks a linked list per card does the
+    work once per render for every reader instead of once per export.
+
+    Terminating by construction: ``version`` is resolved in ascending id order and
+    ``store.set_supersedes`` refuses a link to anything but a **lower** id, so a predecessor is
+    always already resolved when its successor is reached. Nothing recurses and nothing loops, so
+    a database hand-edited past that guard yields a wrong number -- never a hang. Rows whose
+    ``supersedes`` points at an id this set does not contain are treated as chain starts.
+    """
+    predecessor: dict[int, int | None] = {}
+    successor: dict[int, int] = {}
+    for r in rows:
+        rid = int(r["id"])
+        raw = r.get("supersedes")
+        prev = None if raw is None else int(raw)
+        predecessor[rid] = prev
+        if prev is not None:
+            successor[prev] = rid
+    version: dict[int, int] = {}
+    for rid in sorted(predecessor):
+        prev = predecessor[rid]
+        version[rid] = 1 if prev is None else version.get(prev, 0) + 1
+    return version, successor
 
 
 def _snapshot_method(m: Mapping[str, Any]) -> dict[str, Any]:
@@ -2951,6 +3318,15 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
         "SELECT max(added) FROM ideas_seen)"
     ).fetchone()[0]
     bench = seed.benchmark_curves()
+    # Read once, derive once. ``.get`` rather than ``[...]`` on the two v8 columns is load-bearing:
+    # this function is documented to answer on a read-only connection to a database that has not
+    # been migrated, and ``test_the_snapshot_reads_a_v1_database_read_only_and_migration_does_not
+    # _change_it`` asserts the v1 export is byte-identical to the export after migration. A v1 row
+    # has no ``supersedes``; it is a document of one, at version 1, exactly like a migrated row
+    # whose column is NULL -- so the bytes match.
+    insight_rows = _dicts(conn, "SELECT * FROM insights ORDER BY id")
+    insight_version, insight_successor = _insight_chains(insight_rows)
+    insight_documents = sum(1 for i in insight_rows if int(i["id"]) not in insight_successor)
     gate_block, g = _gate_n(conn)
     return {
         "version": SNAPSHOT_VERSION,
@@ -2985,7 +3361,11 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
             "methods": count("SELECT count(*) FROM methods"),
             "labMethods": count("SELECT count(*) FROM methods WHERE id GLOB 'M*'"),
             "historicalMethods": count("SELECT count(*) FROM methods WHERE id GLOB 'H-*'"),
-            "insights": count("SELECT count(*) FROM insights"),
+            # Documents, not rows: a re-run that supersedes its own previous note leaves this
+            # number where it was, which is the whole point. ``insightRows`` beside it is what
+            # the append-only store actually holds.
+            "insights": insight_documents,
+            "insightRows": len(insight_rows),
             "byStatus": by_status,
         },
         "benchmark": {
@@ -2999,10 +3379,18 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
             _snapshot_trial(t, published_verdict(conn, t, at=g), funding_of(conn, t["n"]))
             for t in _dicts(conn, "SELECT * FROM trials ORDER BY n")
         ],
+        # ``supersedes`` and ``docKey`` as the writer recorded them; ``version`` and
+        # ``supersededBy`` derived by ``_insight_chains`` above. A head is a row with
+        # ``supersededBy: null`` -- that is the test ``/sera/journal`` applies to decide what to
+        # show, and it is a field read rather than a graph walk precisely so the reader can stay
+        # a pure function.
         "insights": [
             {"id": int(i["id"]), "kind": i["kind"], "title": i["title"], "body": i["body"],
-             "methodId": i["method_id"], "added": i["added"]}
-            for i in _dicts(conn, "SELECT * FROM insights ORDER BY id")
+             "methodId": i["method_id"], "added": i["added"],
+             "supersedes": _opt_int(i.get("supersedes")), "docKey": i.get("doc_key"),
+             "version": insight_version[int(i["id"])],
+             "supersededBy": insight_successor.get(int(i["id"]))}
+            for i in insight_rows
         ],
         "ideasSeen": [
             {"key": s["key"], "methodId": s["method_id"], "note": s["note"], "added": s["added"]}

@@ -13,8 +13,8 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 3
-- Completed: 26
+- Blocked: 4
+- Completed: 27
 
 ---
 
@@ -133,6 +133,25 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-ROOT-N7FS** Phase 6: Backfill the 5 byte-identical pairs, 500→499 first
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns running `lab link` over exactly five byte-identical pairs, in id order — 227→230 (M0131), 289→290 (M0024), 493→498 (M0127), 320→499 and 499→500 (M0179), **500→499 last so the chain 320→499→500 builds in the right direction** — then `lab stage` and one commit carrying `lab.sqlite` and `web/data/lab.json` together. The seven rows whose bodies differ are different variants and are deliberately left as siblings. Touches no source file; data only. Exit: the journal renders 495 documents from 500 rows; M0179's note reads version 3; the test-window look count still reads **4**; `pytest engine/tests` green after `lab stage`.
+  - **Status**: completed — both dependencies had landed before it ran: `P1-ENG-Q9XB` (phase 4, the export) at `3aba437`, and `P1-ENG-H4ZQ` (phase 2) at `b0a48d5`, which is where `lab link` — the tool this phase ran five times — comes from.
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 6 of 6)
+  - **Satisfies**: R3 — Thread the duplicates that already exist, starting 500→499
+  - **Depends on**: P1-ENG-H4ZQ, P1-ENG-Q9XB
+  - **Plan**: `.workflows/plan/P1-ROOT-N7FS.md`
+  - **Completed**: 2026-10-20 17:48
+  - **Method**: /do
+  - **Files**: lab/lab.sqlite, web/data/lab.json, engine/tests/test_lab_snapshot.py
+  - **Commits**: `33ac3ad` lab: the journal's five identical re-runs are now versions, not new entries (data only — `lab.sqlite` + `lab.json`); `08e4b68` test(lab): a connect invents no link and destroys none, however many the journal holds
+  - **Result**: Five `supersedes` links written by `lab link`, in id order with 500→499 last: (230,227) M0131, (290,289) M0024, (498,493) M0127, (499,320) M0179, (500,499) M0179. **The deliverable is a digest that did not move**: over `(id, kind, title, body, method_id, added)` across all 500 rows, before and after the five writes, `04af46875bef3498f783a3154265b760cd2c4471d018a740d82e0113721673ed` both times — five UPDATEs ran against phase 1's narrowed append-only trigger and not one byte of content moved, so invariant 2 is proven on real data rather than asserted. 495 documents from 500 rows, asserted in SQL; M0131's, M0024's and M0127's notes read version 2, M0179's reads version 3 via the chain 320 → 499 → 500 (that last pair is the one the owner pointed at). `doc_key` written on 0 existing rows. `summary.insights` 500 → 495, `summary.insightRows` 500, `summary.testLooks` still **4** — no test-window look spent. The seven other title-collisions (48/54, 50/52, 51/53, 125/126, 390/391, 466/467/468) are deliberately left as siblings: their bodies differ, they are different variants, and threading them would hide a measurement. Rehearsed in full on a throwaway copy before the real file was opened for writing, including all four refusal cases (already-linked, self, higher-id predecessor, predecessor already superseded) — each exited **2**, confirming phase 1's guard rails live. Suite **6405 passed, 4 skipped** (the documented opt-in `SEER_LAB_*_LIVE` store tests; no DB test skipped), `ruff check engine` clean, Postgres up. Main checkout never written: `/home/miftah/seer` `lab/` and `web/data/` clean, its `lab.sqlite` still hashes `415efeda…`.
+  - **Drift**: The phase plan said "no source file is edited in this phase". One test file had to be, and the plan could not have known: phase 1's `test_the_v7_to_v8_migration_moves_not_one_byte_of_the_web_snapshot` carried a third assertion, `count(*) FROM insights WHERE supersedes IS NOT NULL OR doc_key IS NOT NULL == 0`, which is a pin on the committed database's contents rather than on a rule. It went red the moment the backfill succeeded. Its two real assertions (schema 8, snapshot byte-identical) both still passed.
+  - **Decided**: Fix that failing test rather than leave the suite red or stop -> **FIXED** (rung 1: plan invariant 1, "the tree builds and `pytest engine/tests` passes at the end of every phase", outranks the phase plan's "no source file is edited" prose; rung 2: phase 6's own exit criteria require pytest green). Not a relaxation: the assertion was replaced with a strictly stronger one — the whole `(id, supersedes, doc_key)` map compared before and after the connect, which asserts "a connect invents no link and destroys none" and holds at 5 links or 500. The claim the old constant really defended, that the v7→v8 migration threads nothing by itself, is a claim about a genuine v7 database and stays pinned on the synthetic fixture in `test_connect_migrates_a_v7_database_keeping_every_insight_byte_identical`.
+  - **Decided**: Commit the test fix separately from the data -> **SEPARATE COMMIT** (rung 2: phase 6's exit criterion is "one commit, data only, no source file in its diff", which `33ac3ad` satisfies; and the phase's Rollback section depends on `git revert <data sha>` restoring the `lab.sqlite` blob wholesale, which bundling would have entangled).
+  - **Carried forward** (deliberately not done, owned by nobody): (1) Entry 126 says in its own prose that it replaces 125 ("This replaces the entry just before it, which miscounted the pairs as 20…"). Not byte-identical, so threading it is a judgment call about document identity; recorded, not done. (2) `real_costs.py:226` has `cmp.candidate_id` available and titles on `cmp.method_name` instead, which is what generated M0260's three colliding titles. Phase 3 fixed the linking, not the titles, so those three cards keep reading alike. A one-line title change would fix the display and would also change what future generated titles look like — a separate decision for the owner.
 
 - [x] **P1-ROOT-C5RB** Phase 4: Handover, bookkeeping and the standing correction
   - **Difficulty**: NORMAL

@@ -22,6 +22,48 @@ from seer_engine.lab import seed as seed_mod
 from seer_engine.lab import store
 from seer_engine.lab.seed import seed
 
+# ``insights`` as it read at v7: six columns, and an ``insights_no_update`` that refused every
+# UPDATE outright. Frozen history -- v7 can never gain a column now -- with one exception: the
+# kind list is interpolated from ``store.INSIGHT_KINDS`` rather than pasted, so a seventh insight
+# kind does not make this fixture quietly lie about what a v7 database would have accepted.
+V7_INSIGHTS_TABLE = f"""CREATE TABLE IF NOT EXISTS insights (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind      TEXT NOT NULL CHECK (kind IN ({store._quoted(store.INSIGHT_KINDS)})),
+    title     TEXT NOT NULL CHECK (length(trim(title)) > 0),
+    body      TEXT NOT NULL CHECK (length(trim(body)) > 0),
+    method_id TEXT REFERENCES methods(id),
+    added     TEXT NOT NULL
+)"""
+V7_INSIGHTS_NO_UPDATE = """CREATE TRIGGER IF NOT EXISTS insights_no_update BEFORE UPDATE ON insights
+BEGIN SELECT RAISE(ABORT, 'insights are append-only: add a newer one instead'); END"""
+
+
+def _without_supersedes(schema: str) -> str:
+    """``schema`` as it read at v7: ``insights`` without ``supersedes`` and ``doc_key``, and the
+    blanket ``insights_no_update`` back in place of the narrowed one.
+
+    The first stripper in this file that *replaces* rather than removes, because v7 -> v8 is the
+    first migration that rewrites an existing statement instead of adding a new table. Chained
+    ahead of ``_without_folds`` for the reason that one gives: a "v6" fixture must not quietly
+    carry a v8 column. The assertions fail loudly if the statements stop being laid out one per
+    paragraph, which is what makes the replacement exact.
+
+    ``store._INSIGHTS_INDEXES`` is deliberately not stripped: it is not in ``_SCHEMA`` at all
+    (see ``store.connect``), so there is nothing here to take out.
+    """
+    for new, old in ((store._INSIGHTS_TABLE, V7_INSIGHTS_TABLE),
+                     (store._INSIGHTS_TRIGGERS[0], V7_INSIGHTS_NO_UPDATE)):
+        assert f"{new};\n\n" in schema
+        schema = schema.replace(f"{new};\n\n", f"{old};\n\n")
+    assert "supersedes" not in schema
+    assert "doc_key" not in schema
+    assert "insights_one_successor" not in schema
+    return schema
+
+
+V7_SCHEMA = _without_supersedes(store._SCHEMA)
+
+
 def _without_folds(schema: str) -> str:
     """``schema`` as it read at v6: the ``method_folds`` table and its triggers removed.
 
@@ -50,7 +92,7 @@ def _without_amendments(schema: str) -> str:
     return schema
 
 
-V6_SCHEMA = _without_folds(store._SCHEMA)
+V6_SCHEMA = _without_folds(V7_SCHEMA)
 V5_SCHEMA = _without_amendments(V6_SCHEMA)
 
 
@@ -75,6 +117,16 @@ V1_INSIGHTS = [
     (2, "data-wish", "Delisted stocks", "Survivorship.", None, "2026-10-02T00:00:01+00:00"),
     (3, "risk", "The 15% bar", "2008 is in the window.", None, "2026-10-02T00:00:02+00:00"),
 ]
+# A v7 journal with every shape the migration has to carry across: a methodded row, an
+# unmethodded one, non-ASCII, an embedded newline and an embedded quote. The copy is a straight
+# SQL ``INSERT ... SELECT``, so if it ever started mangling text this is where it would show.
+V7_INSIGHTS = [
+    (1, "observation", "Width buys no safety behind a gate", "20 -> 70 cost 2.8 pts/yr.", "M0001", "2026-10-14T00:00:00+00:00"),
+    (2, "risk", "The 25% bar", "2008 is in the window.", None, "2026-10-14T00:00:01+00:00"),
+    (3, "synthesis", "Batch 0", "Line one.\nLine two, and a 'quote'.", "M0001", "2026-10-14T00:00:02+00:00"),
+    (4, "data-wish", "Delisted stocks — survivorship", "The dead companies are missing.", None, "2026-10-14T00:00:03+00:00"),
+    (5, "feature-wish", "A版 report", "Non-ASCII survives the rebuild.", None, "2026-10-14T00:00:04+00:00"),
+]
 # The recorded labels this fixture lab wrote (the bars of its own run date) and the live ones a
 # verdict is written in today. `failed` draws from the first set, `failedNow` from the second.
 LABELS = {"beats SPY TR", "max DD <= 15%", "PF >= 1.3", ">= 100 trades", "owner inputs", "DSR >= 0.95"}
@@ -86,6 +138,8 @@ TRIAL_KEYS = {"n", "methodId", "candidateId", "rulesId", "allocatorId", "configT
               "sharpe", "exposure", "turnover", "worstYear", "worstYearReturn", "spyTrReturn", "spyTrCagr", "mar",
               "failed", "eligible", "dsr", "nTrialsAtRun", "luckGated", "failedNow", "eligibleNow", "dsrNow",
               "mwr", "spyTrMwr", "curve"}
+INSIGHT_KEYS = {"id", "kind", "title", "body", "methodId", "added",
+                "supersedes", "docKey", "version", "supersededBy"}
 
 
 def _v1_db(path):
@@ -145,7 +199,7 @@ def test_connect_migrates_a_v1_database_keeping_rows_and_triggers(tmp_path):
 def test_a_new_database_starts_at_the_current_schema_version(tmp_path):
     conn = store.connect(tmp_path / "lab.sqlite")
     try:
-        assert store.schema_version(conn) == store.SCHEMA_VERSION == "7"
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "8"
         assert "synthesis" in store.INSIGHT_KINDS
         with conn:
             assert store.add_insight(conn, kind="synthesis", title="t", body="b") == 1
@@ -389,7 +443,7 @@ def test_connect_migrates_a_v4_database_backfilling_provenance_and_touching_no_t
     conn = store.connect(db)
     fresh = store.connect(tmp_path / "fresh.sqlite")
     try:
-        assert store.schema_version(conn) == store.SCHEMA_VERSION == "7"
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "8"
         assert _trials_bytes(db) == before
         assert [tuple(r) for r in conn.execute("SELECT * FROM trial_funding ORDER BY trial_n")] == funding_before
         assert _provenance_schema(conn) == _provenance_schema(fresh)
@@ -466,7 +520,7 @@ def test_connect_migrates_a_v5_database_adding_method_amendments_and_touching_no
     conn = store.connect(db)
     fresh = store.connect(tmp_path / "fresh.sqlite")
     try:
-        assert store.schema_version(conn) == store.SCHEMA_VERSION == "7"
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "8"
         assert _trials_bytes(db) == before
         assert [tuple(r) for r in conn.execute("SELECT * FROM methods ORDER BY id")] == [
             tuple(r) for r in methods_before
@@ -553,7 +607,7 @@ def test_connect_migrates_a_v6_database_adding_method_folds_and_touching_no_row(
     conn = store.connect(db)
     fresh = store.connect(tmp_path / "fresh.sqlite")
     try:
-        assert store.schema_version(conn) == store.SCHEMA_VERSION == "7"
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "8"
         assert _trials_bytes(db) == before
         assert [tuple(r) for r in conn.execute("SELECT * FROM methods ORDER BY id")] == [
             tuple(r) for r in methods_before
@@ -609,11 +663,161 @@ def test_the_v6_to_v7_migration_moves_not_one_byte_of_the_web_snapshot(tmp_path)
     store.connect(db).close()  # migrates in place, whatever version the committed file is at
     ro = store.connect_readonly(db)
     try:
-        assert store.schema_version(ro) == store.SCHEMA_VERSION == "7"
+        assert store.schema_version(ro) == store.SCHEMA_VERSION == "8"
         assert store.snapshot_json(ro) == before
     finally:
         ro.close()
-    assert store.SNAPSHOT_VERSION == 5
+    assert store.SNAPSHOT_VERSION == 6
+
+
+def _v7_db(path):
+    """A schema-v7 database: one method that has run, one dev trial, and five journal entries
+    whose ``insights`` table has six columns and a trigger that refuses every UPDATE."""
+    c = sqlite3.connect(path)
+    c.executescript(V7_SCHEMA)
+    c.executemany("INSERT INTO transitions (src, dst) VALUES (?, ?)", store.TRANSITIONS)
+    c.execute("INSERT INTO meta (key, value) VALUES ('schema_version', '7')")
+    c.execute(
+        "INSERT INTO methods (id, name, family, source_kind, hypothesis, status, source_sha, "
+        "created, updated) VALUES ('M0001', 'n', 'f', 'knowledge', 'h', 'dev-eligible', ?, "
+        "'2026-10-01T00:00:00+00:00', '2026-10-01T00:00:00+00:00')",
+        ("a" * 64,),
+    )
+    c.execute(
+        'INSERT INTO trials (method_id, candidate_id, config_digest, config_text, rules_id, '
+        'allocator_id, window, start, "end", store_fingerprint, git_sha, run_at, trades, '
+        "sharpe, mar, failed, eligible, dsr, n_trials_at_run, curve_json) VALUES "
+        "('M0001', 'M0001-A', 'd1', 't', 'r', 'a', 'dev', '2000-01-03', '2015-10-16', 'fp', "
+        "'abc', '2026-10-05T00:00:00+00:00', 200, 0.945, 0.82, '', 0, 0.9, 110, '[]')"
+    )
+    c.execute(
+        "INSERT INTO trial_provenance (trial_n, initial_idr, price_fingerprint, source, measured) "
+        "VALUES (1, '20000000', NULL, 'backfill', '2026-10-09T00:00:00+00:00')"
+    )
+    c.executemany(
+        "INSERT INTO insights (id, kind, title, body, method_id, added) VALUES (?, ?, ?, ?, ?, ?)",
+        V7_INSIGHTS,
+    )
+    c.commit()
+    # The v7 rule, as the fixture's own assertion: every UPDATE aborted, which is exactly why the
+    # 500 committed rows could not be threaded retroactively before this version.
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+        c.execute("UPDATE insights SET body = 'x' WHERE id = 1")
+    with pytest.raises(sqlite3.OperationalError, match="supersedes"):
+        c.execute("UPDATE insights SET supersedes = 1 WHERE id = 2")
+    c.close()
+
+
+def test_connect_migrates_a_v7_database_keeping_every_insight_byte_identical(tmp_path):
+    """v7 -> v8 rebuilds ``insights``, and a rebuild is the one migration shape that *could*
+    lose content -- so this test is about the content, not about the new columns.
+
+    Every row arrives with the same id, kind, title, body, method_id and added, in the same order,
+    and with ``supersedes`` and ``doc_key`` NULL: schema 8 threads nothing by itself, it only
+    makes threading expressible. ``methods`` and ``trials`` are not read by the migration at all
+    and are pinned byte for byte, and the migrated table, its triggers and its index are the same
+    objects a fresh v8 database creates -- which is also how the one-successor index gets its
+    only proof that the migration path creates it and not just ``connect``.
+    """
+    db = tmp_path / "lab.sqlite"
+    _v7_db(db)
+    before = _trials_bytes(db)
+    methods_before = sqlite3.connect(db).execute("SELECT * FROM methods ORDER BY id").fetchall()
+
+    conn = store.connect(db)
+    fresh = store.connect(tmp_path / "fresh.sqlite")
+    try:
+        assert store.schema_version(conn) == store.SCHEMA_VERSION == "8"
+        rows = conn.execute(
+            "SELECT id, kind, title, body, method_id, added FROM insights ORDER BY id"
+        ).fetchall()
+        assert [tuple(r) for r in rows] == V7_INSIGHTS
+        assert conn.execute(
+            "SELECT count(*) FROM insights WHERE supersedes IS NULL AND doc_key IS NULL"
+        ).fetchone()[0] == len(V7_INSIGHTS)
+        assert _insights_schema(conn) == _insights_schema(fresh)
+        assert conn.execute(
+            "SELECT count(*) FROM sqlite_master WHERE name = 'insights_one_successor'"
+        ).fetchone()[0] == 1
+        assert conn.execute("SELECT count(*) FROM sqlite_master WHERE name = 'insights_v7'").fetchone()[0] == 0
+        assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+        assert _trials_bytes(db) == before
+        assert [tuple(r) for r in conn.execute("SELECT * FROM methods ORDER BY id")] == [
+            tuple(r) for r in methods_before
+        ]
+
+        # The narrowed rule arrived with the migration, not only with a fresh database.
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            conn.execute("UPDATE insights SET body = 'x' WHERE id = 1")
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            conn.execute("DELETE FROM insights WHERE id = 1")
+        conn.rollback()
+        # 3 supersedes 1, not 2 supersedes 1: both of those are M0001, and ``_check_supersedes``
+        # refuses a link that crosses ``method_id`` (fixture row 2 has none). What this asserts is
+        # that the *narrowed* rule arrived with the migration and not only with a fresh database;
+        # the cross-method refusal has its own test in ``test_lab_insights_trigger.py``.
+        with conn:
+            store.set_supersedes(conn, 3, 1)
+        assert store.get_insight(conn, 3)["supersedes"] == 1
+
+        with conn:
+            n = store.add_insight(conn, kind="synthesis", title="Batch 1", body="Where it stands.")
+        assert n == len(V7_INSIGHTS) + 1  # the AUTOINCREMENT counter carried over
+    finally:
+        conn.close()
+        fresh.close()
+
+    again = store.connect(db)  # idempotent: a second connect rebuilds nothing
+    try:
+        assert store.schema_version(again) == store.SCHEMA_VERSION
+        assert again.execute("SELECT count(*) FROM insights").fetchone()[0] == len(V7_INSIGHTS) + 1
+        assert again.execute("SELECT supersedes FROM insights WHERE id = 3").fetchone()[0] == 1
+        assert _trials_bytes(db) == before
+    finally:
+        again.close()
+
+
+@pytest.mark.skipif(not store.COMMITTED_DB.is_file(), reason="no committed lab database here")
+def test_the_v7_to_v8_migration_moves_not_one_byte_of_the_web_snapshot(tmp_path):
+    """The real lab, on a copy: 500 journal entries through a connect, and the published JSON is
+    unchanged.
+
+    Opening the committed database is never a no-op -- ``connect`` runs ``executescript(_SCHEMA)``
+    and ``_migrate`` inside a write transaction, so even a read can dirty the file. What this
+    pins is that none of that reaches the owner: the snapshot out the far side is byte-identical.
+
+    The links half of this test used to read ``count(...) == 0``, because when it was written the
+    committed lab carried no chain and the migration had just been proved not to invent one. Phase
+    6 threaded five byte-identical re-runs, so the constant now says only "nobody has used the
+    feature yet" and goes red the moment somebody does -- while the thing actually worth pinning,
+    that a connect neither *invents* a link nor *destroys* one, was never asserted at all. The map
+    comparison below says that instead, and keeps saying it however many chains the journal grows.
+
+    That the migration itself threads nothing is a claim about a genuine v7 database, and it is
+    pinned where it belongs, on the synthetic fixture in
+    ``test_connect_migrates_a_v7_database_keeping_every_insight_byte_identical``.
+    """
+    db = tmp_path / "lab.sqlite"
+    shutil.copyfile(store.COMMITTED_DB, db)
+    ro = store.connect_readonly(db)
+    try:
+        before = store.snapshot_json(ro)
+        links_before = ro.execute(
+            "SELECT id, supersedes, doc_key FROM insights ORDER BY id"
+        ).fetchall()
+    finally:
+        ro.close()
+    store.connect(db).close()  # migrates in place
+    ro = store.connect_readonly(db)
+    try:
+        assert store.schema_version(ro) == store.SCHEMA_VERSION == "8"
+        assert store.snapshot_json(ro) == before
+        assert [
+            tuple(r)
+            for r in ro.execute("SELECT id, supersedes, doc_key FROM insights ORDER BY id")
+        ] == [tuple(r) for r in links_before]
+    finally:
+        ro.close()
 
 
 @pytest.mark.skipif(not store.COMMITTED_DB.is_file(), reason="no committed lab database here")
@@ -737,7 +941,7 @@ def test_the_snapshot_follows_the_contract(lab):
     s = store.snapshot(lab)
     assert list(s) == ["version", "asOf", "gate", "data", "summary", "benchmark", "methods", "trials",
                        "insights", "ideasSeen", "paper"]
-    assert s["version"] == 5
+    assert s["version"] == 6
     gate = s["gate"]
     assert list(gate) == [
         "maxDrawdown", "minProfitFactor", "minTrades", "dsrMin",
@@ -766,7 +970,8 @@ def test_the_snapshot_follows_the_contract(lab):
     }
     summary = s["summary"]
     assert {k: v for k, v in summary.items() if k != "byStatus"} == {
-        "devTrials": 55, "testLooks": 0, "methods": 15, "labMethods": 1, "historicalMethods": 14, "insights": 2,
+        "devTrials": 55, "testLooks": 0, "methods": 15, "labMethods": 1, "historicalMethods": 14,
+        "insights": 2, "insightRows": 2,
     }
     assert list(summary["byStatus"]) == list(store.STATUSES)
     assert summary["byStatus"]["rejected"] == 14 and summary["byStatus"]["registered"] == 1
@@ -813,7 +1018,12 @@ def test_the_snapshot_follows_the_contract(lab):
     assert t55["curve"] == [["2000-01-31", 1.0], ["2000-02-29", 1.012346]]
     assert not any(t["pfInfinite"] for t in s["trials"][:54])
 
+    assert all(set(i) == INSIGHT_KEYS for i in s["insights"])
     assert [(i["id"], i["kind"], i["methodId"]) for i in s["insights"]] == [(1, "observation", "M0001"), (2, "synthesis", None)]
+    # Nothing in this fixture is linked, so every row is its own document at version 1 -- the
+    # state of the committed lab at this phase too, before the backfill runs.
+    assert all(i["supersedes"] is None and i["docKey"] is None for i in s["insights"])
+    assert all(i["version"] == 1 and i["supersededBy"] is None for i in s["insights"])
     keys = [x["key"] for x in s["ideasSeen"]]
     assert keys == sorted(keys) and "url:https://example.com/paper" in keys
     assert set(s["ideasSeen"][0]) == {"key", "methodId", "note", "added"}
@@ -821,6 +1031,74 @@ def test_the_snapshot_follows_the_contract(lab):
     stamps = ([m["updated"] for m in s["methods"]] + [t["runAt"] for t in s["trials"]]
               + [i["added"] for i in s["insights"]] + [x["added"] for x in s["ideasSeen"]])
     assert s["asOf"] == max(stamps)
+
+
+def test_a_chain_of_insights_publishes_one_document_and_counts_its_versions(lab):
+    """The owner's request, as the export sees it: three rows on one topic become one document at
+    version 3, with the two earlier rows published as the history behind it.
+
+    The chain is built here rather than read from the committed lab on purpose -- at this phase
+    nothing in ``lab/lab.sqlite`` is linked yet (the backfill is a later phase), so a test that
+    leaned on it would assert nothing.
+    """
+    with lab:
+        a = store.add_insight(lab, kind="observation", title="Width", body="v1", method_id="M0001")
+        b = store.add_insight(lab, kind="observation", title="Width", body="v2", method_id="M0001")
+        c = store.add_insight(lab, kind="observation", title="Width", body="v3", method_id="M0001")
+        store.set_supersedes(lab, b, a)
+        store.set_supersedes(lab, c, b)
+    s = store.snapshot(lab)
+    chain = {i["id"]: i for i in s["insights"] if i["id"] in (a, b, c)}
+    assert [chain[a]["version"], chain[b]["version"], chain[c]["version"]] == [1, 2, 3]
+    assert chain[a]["supersededBy"] == b and chain[b]["supersededBy"] == c
+    assert chain[c]["supersededBy"] is None          # the head: the one the journal shows
+    assert chain[a]["supersedes"] is None and chain[b]["supersedes"] == a and chain[c]["supersedes"] == b
+    # Five rows, three of them one document: the count the owner reads does not move when a
+    # command re-journals the same observation.
+    assert s["summary"]["insightRows"] == 5
+    assert s["summary"]["insights"] == 3
+    assert store.insight_document_count(lab) == s["summary"]["insights"]
+
+
+def test_two_variants_under_one_title_stay_two_documents(lab):
+    """The measured failure the design exists to avoid, asserted at the export.
+
+    ``real_costs`` titles on the method name, so three arms of one method -- M0260-M-NATIVE,
+    -M-G12, -M-G3 -- wrote three rows under one identical title 25 seconds apart. They are three
+    measurements, not a triple-write. Unlinked rows publish as separate documents however alike
+    their titles are, and this test is here so that a later "helpful" change to the export cannot
+    quietly collapse a measurement off the page.
+    """
+    with lab:
+        for body in ("23.8% / 1.98", "25.6% / 1.62", "33.6% / 1.60"):
+            store.add_insight(lab, kind="observation", title="Real costs", body=body, method_id="M0001")
+    s = store.snapshot(lab)
+    same_title = [i for i in s["insights"] if i["title"] == "Real costs"]
+    assert len(same_title) == 3
+    assert all(i["version"] == 1 and i["supersededBy"] is None for i in same_title)
+    assert s["summary"]["insights"] == s["summary"]["insightRows"] == 5
+
+
+def test_the_chain_fields_are_published_for_a_database_that_predates_them(tmp_path):
+    """``snapshot`` answers on an unmigrated read-only connection, and the chain fields must not
+    be what breaks that: a v1 row has no ``supersedes`` column at all, and publishes exactly what
+    a migrated row with a NULL one publishes -- a document of one, at version 1.
+
+    This is the stronger half of ``test_the_snapshot_reads_a_v1_database_read_only_and_migration
+    _does_not_change_it``: that test asserts the bytes do not move, this one says what they say.
+    """
+    db = tmp_path / "lab" / "lab.sqlite"
+    db.parent.mkdir()
+    _v1_db(db)
+    ro = store.connect_readonly(db)
+    try:
+        insights = store.snapshot(ro)["insights"]
+    finally:
+        ro.close()
+    assert [i["id"] for i in insights] == [1, 2, 3]
+    assert all(set(i) == INSIGHT_KEYS for i in insights)
+    assert all(i["supersedes"] is None and i["docKey"] is None for i in insights)
+    assert all(i["version"] == 1 and i["supersededBy"] is None for i in insights)
 
 
 def test_a_funded_trial_publishes_what_its_money_earned(lab):

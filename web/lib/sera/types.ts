@@ -5,9 +5,11 @@ export type LabSnapshot = {
    * 2 added the derived verdict to every trial (`failedNow` / `eligibleNow` / `dsrNow`);
    * 3 added `paper`, which names the lab method behind each roster entry;
    * 4 added `luckGated`, which says whether the luck hurdle applies to a trial at all;
-   * 5 added `mwr` / `spyTrMwr`, what a funded trial's money actually earned.
+   * 5 added `mwr` / `spyTrMwr`, what a funded trial's money actually earned;
+   * 6 added the journal's version chain (`supersedes` / `docKey` / `version` / `supersededBy`)
+   *   and split the journal count: `summary.insights` now counts documents, not rows.
    */
-  version: 5;
+  version: 6;
   asOf: string;
   gate: {
     maxDrawdown: number;
@@ -41,7 +43,13 @@ export type LabSnapshot = {
     methods: number;
     labMethods: number;
     historicalMethods: number;
+    /**
+     * Journal **documents**: insight rows that nothing supersedes. A re-run that supersedes its
+     * own previous note leaves this number where it was. Counted rows until snapshot 5.
+     */
     insights: number;
+    /** Journal rows, every version of every document. `insights` is the one to show a reader. */
+    insightRows: number;
     byStatus: Record<string, number>;
   };
   benchmark: { spyTr: [string, number][]; spyPrice: [string, number][] };
@@ -204,6 +212,16 @@ export type LabTrial = {
   curve: [string, number][];
 };
 
+/**
+ * One journal row. Rows are linked into **documents** by `supersedes`: a re-run of the command
+ * that wrote a note appends a new row pointing at the old one rather than a sibling, and
+ * `/sera/journal` renders the chain as one document labelled with its version.
+ *
+ * The store is append-only and stays that way — superseding *adds* a row, it never rewrites one.
+ * `version` and `supersededBy` are derived by the engine at export time (`store._insight_chains`)
+ * so that nothing here has to walk a linked list: show rows with `supersededBy === null`, and
+ * reach the history through `supersedes`.
+ */
 export type LabInsight = {
   id: number;
   kind: 'observation' | 'hypothesis' | 'data-wish' | 'feature-wish' | 'risk' | 'synthesis';
@@ -211,6 +229,18 @@ export type LabInsight = {
   body: string;
   methodId: string | null;
   added: string;
+  /** The row this one replaces, or null when it starts a document. Always a lower `id`. */
+  supersedes: number | null;
+  /**
+   * The writer-computed identity of the document this row is a version of
+   * (`real-costs:M0260-M-G3`, `prereg:M0022`). Null on rows written by hand and on every row
+   * written before snapshot 6. Never a display string — it is a key.
+   */
+  docKey: string | null;
+  /** Depth in the chain: 1 for a row that supersedes nothing, 2 for the row that replaced it. */
+  version: number;
+  /** The row that replaced this one, or null when this row is the head — the current version. */
+  supersededBy: number | null;
 };
 
 export type LabSeen = { key: string; methodId: string | null; note: string; added: string };

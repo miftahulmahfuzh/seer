@@ -3,6 +3,7 @@ import { SeraNav } from '@/components/sera/SeraNav';
 import { requireSera } from '@/lib/sera/gate';
 import { lab } from '@/lib/sera/lab';
 import { unseenCount } from '@/lib/sera/seen';
+import { isHead } from './journal/view';
 import s from './sera.module.css';
 
 export const metadata: Metadata = { title: { default: 'Sera', template: '%s · Sera' } };
@@ -17,6 +18,10 @@ export const metadata: Metadata = { title: { default: 'Sera', template: '%s · S
  * seven badges /sera/journal renders for itself. unseenCount only looks at the ids it is given,
  * so handing it lab.insights' ids is the derivation rule, enforced.
  *
+ * HEADS ONLY, for exactly that agreement. A chain of superseding rows is one entry on the Journal
+ * and its badges count documents; sending every row id here would make the rail say 30 while the
+ * page says 27, over the same snapshot. `isHead` is the one predicate both sides share.
+ *
  * unseenCount returns null when the read failed, which is why it is the function this layout
  * calls rather than seenInsightIds: an empty Set cannot say whether nothing is unseen or Neon is
  * down, and invariant 9 asks for no badge in the second case rather than a confident 26. The
@@ -25,7 +30,7 @@ export const metadata: Metadata = { title: { default: 'Sera', template: '%s · S
  */
 async function journalUnseen(): Promise<number> {
   try {
-    return (await unseenCount(lab.insights.map(i => i.id))) ?? 0;
+    return (await unseenCount(lab.insights.filter(isHead).map(i => i.id))) ?? 0;
   } catch {
     return 0;
   }

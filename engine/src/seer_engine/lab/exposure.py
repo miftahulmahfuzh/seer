@@ -88,7 +88,7 @@ from seer_engine.backtest import dev
 from seer_engine.backtest.dev import Candidate, DevRow
 from seer_engine.backtest.metrics import DASH, fmt_num, fmt_pct, fmt_pf, fmt_signed_pct
 from seer_engine.commands.backtest_dev import month_end_curve
-from seer_engine.lab import hardgate, runner, store
+from seer_engine.lab import hardgate, journal_docs, runner, store
 from seer_engine.lab import walkforward as wf
 from seer_engine.lab.method import METHOD_ID, Method, discover
 from seer_engine.lab.real_costs import REPRO_TOL
@@ -1094,11 +1094,39 @@ def insight_text(rep: MethodReport) -> tuple[str, str]:
     return title, body
 
 
-def journal(conn: sqlite3.Connection, rep: MethodReport) -> int:
-    """One ``observation`` on the method. The caller owns the transaction. Returns its id."""
+#: The command half of this writer's document keys. See ``lab/journal_docs.py``.
+DOC_PREFIX = "exposure"
+
+
+def doc_key(rep: MethodReport, *, narrowed: bool = False) -> str:
+    """The document this report is a version of.
+
+    ``narrowed`` is True when ``--only`` restricted the run to particular recorded variants. A
+    narrowed run is keyed on the arms it kept, so a later narrowed run about different arms stands
+    beside it rather than burying it; an un-narrowed run measured every recorded variant and is
+    keyed on the method, so a later one is its next version.
+    """
+    ids = [r.variant.candidate.id for r in rep.rows] if narrowed else None
+    return journal_docs.doc_key(DOC_PREFIX, rep.method_id, ids)
+
+
+def journal(
+    conn: sqlite3.Connection,
+    rep: MethodReport,
+    *,
+    narrowed: bool = False,
+    supersede: bool = True,
+) -> tuple[int, int | None]:
+    """One ``observation`` on the method, as the newest version of its exposure document.
+
+    The caller owns the transaction. Returns ``(insight id, the id it supersedes or None)``.
+    ``narrowed`` must be True whenever ``--only`` restricted the run. ``supersede=False``
+    writes a sibling instead (``--no-supersede``).
+    """
     title, body = insight_text(rep)
-    return store.add_insight(
-        conn, kind="observation", title=title, body=body, method_id=rep.method_id
+    return journal_docs.append(
+        conn, kind="observation", title=title, body=body, method_id=rep.method_id,
+        key=doc_key(rep, narrowed=narrowed), supersede=supersede,
     )
 
 

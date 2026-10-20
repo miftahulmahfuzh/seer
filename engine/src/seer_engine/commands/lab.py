@@ -52,7 +52,7 @@
                                     DSR, so the re-run is verified against the six metrics the lab
                                     did record, and a trial that does not reproduce them is
                                     reported and not written (exit 1)
-    lab costs M0007 [--candidate M0007-N20-RAW] [--store DIR]
+    lab costs M0007 [--candidate M0007-N20-RAW] [--store DIR] [--no-supersede]
                                     report only: re-run a recorded method's best dev variant (by
                                     MAR, or --candidate) at the flat 0.1% and at Gotrade's real
                                     fees (sim/costs.py, measured from the owner's receipts), print
@@ -84,13 +84,15 @@
                                     the residual into what the two share and what this arm owns.
                                     No trial row, no moments, no status change: N and the looks do
                                     not move
-    lab survivorship M0069 [M0007 ...] [--store DIR] [--sv-store DIR] [--csv PATH] [--no-journal]
+    lab survivorship M0069 [M0007 ...] [--store DIR] [--sv-store DIR] [--csv PATH]
+                     [--no-journal] [--no-supersede]
                                     report only: re-run every recorded dev variant of each method
                                     at its recorded capital and funding on the dev store and on
                                     the survivorship-check store (engine/.research-sv), side by
                                     side; journal one observation per method. No trial row, no
                                     moments, no status change: N and the looks do not move
     lab exposure M0030 [M0024 ...] [--only IDS] [--store DIR] [--csv PATH] [--no-journal]
+                 [--no-supersede]
                                     report only: what share of a method's money was ever in its
                                     own picks rather than parked in the market, and what those
                                     picks did alone against SPY per era, with the parked holding
@@ -98,7 +100,7 @@
                                     no method file changed and no new method id. No trial row, no
                                     moments, no status change: N and the looks do not move
     lab gate [M0030 ...] [--all] [--only IDS] [--store DIR] [--csv PATH] [--gated-only]
-             [--no-journal] [--dry-run]
+             [--no-journal] [--no-supersede] [--dry-run]
                                     report only: what the shared SPY 200-day trend gate is worth,
                                     book by book. Re-runs every recorded dev variant twice -- as
                                     recorded, and with that one gate switched off and nothing else
@@ -127,7 +129,12 @@
                                            appended to the analysis
     lab drop M0007 --why "..."             an idea dropped before running
     lab seen KEY [--method M] [--note N] | lab seen --find TEXT
-    lab insight --kind K --title T (--body B | --file F) [--method M]   the lab journal
+    lab insight --kind K --title T (--body B | --file F) [--method M] [--doc-key K]
+                [--supersedes ID]   the lab journal. --supersedes says this new entry is the
+                                    newer version of entry ID; ID keeps every word it has
+    lab link ID --supersedes OLDER  thread an entry already written onto the one it replaces:
+                                    the only change the append-only journal allows, and only
+                                    once, from nothing to a link
     lab stage                       under the write lock: write web/data/lab.json, git-add it and the database
     lab next-id                     the next free method id
     lab export [--out F]            the lab as an xlsx workbook (gitignored)
@@ -345,6 +352,10 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
         help=f"dev-window research store (default: {research.STORE_DIR}, or $SEER_RESEARCH_STORE); "
              "a test-window store is refused",
     )
+    s.add_argument("--no-supersede", action="store_true",
+                   help="write the observation as a new entry beside the previous one for this "
+                        "variant instead of as its next version; for a genuinely new reading that "
+                        "happens to be about the same thing")
 
     s = sub.add_parser(
         "names",
@@ -567,6 +578,9 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     )
     s.add_argument("--no-journal", action="store_true",
                    help="print the report and write nothing at all, not even the observation")
+    s.add_argument("--no-supersede", action="store_true",
+                   help="write each observation as a new entry beside the previous one for this "
+                        "method instead of as its next version")
     s.add_argument("--csv", type=Path, default=None, metavar="PATH",
                    help="also write the full grid (variant x store) to PATH as CSV, full precision")
 
@@ -630,6 +644,9 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     )
     s.add_argument("--no-journal", action="store_true",
                    help="print the report and write nothing at all, not even the observation")
+    s.add_argument("--no-supersede", action="store_true",
+                   help="write each observation as a new entry beside the previous one for this "
+                        "method instead of as its next version")
     s.add_argument("--csv", type=Path, default=None, metavar="PATH",
                    help="also write the full grid (variant x column) to PATH as CSV, full precision")
 
@@ -687,6 +704,9 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
                         "store, reads no bar, writes nothing")
     s.add_argument("--no-journal", action="store_true",
                    help="print the report and write nothing at all, not even the observation")
+    s.add_argument("--no-supersede", action="store_true",
+                   help="write each observation as a new entry beside the previous one for this "
+                        "method instead of as its next version")
     s.add_argument("--csv", type=Path, default=None, metavar="PATH",
                    help="also write the full grid (variant x column) to PATH as CSV, full precision")
 
@@ -764,6 +784,36 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s.add_argument("--body", default=None)
     s.add_argument("--file", type=Path, default=None)
     s.add_argument("--method", default=None)
+    s.add_argument(
+        "--doc-key", default=None, metavar="KEY",
+        help="stable identity of the document this entry is a version of, e.g. "
+             "real-costs:M0260-M-G3. Two entries sharing one key are versions of one thing; "
+             "two entries with different keys are two things, whatever their titles say",
+    )
+    s.add_argument(
+        "--supersedes", type=int, default=None, metavar="ID",
+        help="this new entry is the newer version of journal entry ID. ID is not rewritten, "
+             "not hidden and not deleted: it keeps its place and gains a successor",
+    )
+
+    s = sub.add_parser(
+        "link",
+        help="thread a journal entry already written onto the one it replaces",
+        description=(
+            "Set the supersedes link on an insight that is already in the journal. This is the "
+            "one UPDATE the append-only triggers permit, and only from nothing to a link, once: "
+            "no word of either entry changes, and the link can never afterwards be moved or "
+            "removed. It exists for entries written before the journal had versions, where the "
+            "fact that one note replaces another is recorded only in the prose inside it."
+        ),
+    )
+    s.add_argument("insight", type=int, metavar="ID",
+                   help="the newer entry: the one being threaded onto its predecessor")
+    s.add_argument(
+        "--supersedes", type=int, required=True, metavar="OLDER",
+        help="the older entry that ID replaces. It must be the same method and a lower id, "
+             "and it must not already have a successor",
+    )
 
     sub.add_parser("stage", help="write the web snapshot and git-add it with the database, under the write lock")
     sub.add_parser("next-id", help="the next free method id")
@@ -841,7 +891,16 @@ def _status(conn, args) -> int:
     out += _promotion_path(conn)
     out.append("")
     out.append("Latest insights:")
-    for i in conn.execute("SELECT * FROM insights ORDER BY id DESC LIMIT 8"):
+    # Heads only: a row some later row supersedes is an earlier version of a document, not a
+    # separate note. Printing both would show the owner 320, 499 and 500 as three "latest
+    # insights" while /sera/journal renders them as one document at version 3 -- the terminal
+    # contradicting the site about the same five rows. The journal keeps every row; this block
+    # reports the current version of each, which is what "latest" already promised.
+    for i in conn.execute(
+        "SELECT * FROM insights i "
+        "WHERE NOT EXISTS (SELECT 1 FROM insights s WHERE s.supersedes = i.id) "
+        "ORDER BY i.id DESC LIMIT 8"
+    ):
         out.append(f"  [{i['kind']}] {i['title']}" + (f" ({i['method_id']})" if i["method_id"] else ""))
     out.append("")
     out.append("Latest verdicts:")
@@ -2267,7 +2326,7 @@ def _costs(conn, args) -> int:
     window and ``real_costs.journal`` appends one observation. Nothing else is written: N and the
     test-window looks are printed before and after so the invariant is visible, not just tested.
     """
-    from seer_engine.lab import real_costs, runner
+    from seer_engine.lab import journal_docs, real_costs, runner
 
     method, _path = real_costs.resolve_method(args.method)
     candidate, trial = real_costs.pick_candidate(conn, method, args.candidate)
@@ -2301,11 +2360,12 @@ def _costs(conn, args) -> int:
     )
     print(real_costs.format_report(cmp))
     with conn:
-        entry = real_costs.journal(conn, cmp)
+        entry, revised = real_costs.journal(conn, cmp, supersede=not args.no_supersede)
     print(
-        f"\njournal entry #{entry} written (an observation on {method.id}). Lab N (dev trials): "
-        f"{n_before} before, {store.dev_trial_count(conn)} after; test-window looks used: "
-        f"{looks_before} before, {store.test_looks(conn)} after."
+        f"\njournal entry {journal_docs.entry_label(entry, revised)} written (an observation on "
+        f"{method.id}). Lab N (dev trials): {n_before} before, "
+        f"{store.dev_trial_count(conn)} after; test-window looks used: {looks_before} before, "
+        f"{store.test_looks(conn)} after."
     )
     print("Solo: `python -m seer_engine lab stage` so seertrade.site/sera shows it. "
           "A Sera child leaves staging to the coordinator.")
@@ -2766,11 +2826,16 @@ def _survivorship(conn, args) -> int:
     if args.no_journal:
         tail = "No journal entry (--no-journal), so `lab stage` is not needed."
     else:
+        from seer_engine.lab import journal_docs
+
         with conn:
-            entries = [svc.journal(conn, rep) for rep in reports]
+            entries = [
+                svc.journal(conn, rep, supersede=not args.no_supersede) for rep in reports
+            ]
+        labels = ", ".join(journal_docs.entry_label(n, prev) for n, prev in entries)
         tail = (
-            f"journal entries {', '.join(f'#{e}' for e in entries)} written (one observation per "
-            f"method). Solo: `python -m seer_engine lab stage` so seertrade.site/sera shows them."
+            f"journal entries {labels} written (one observation per method). Solo: "
+            f"`python -m seer_engine lab stage` so seertrade.site/sera shows them."
         )
     print(
         f"\nNo trial was recorded. Lab N (dev trials): {n_before} before, "
@@ -2953,11 +3018,21 @@ def _exposure(conn, args) -> int:
     if args.no_journal:
         tail = "No journal entry (--no-journal), so `lab stage` is not needed."
     else:
+        from seer_engine.lab import journal_docs
+
         with conn:
-            entries = [exp.journal(conn, rep) for rep in reports]
+            entries = [
+                exp.journal(
+                    conn, rep,
+                    narrowed=args.only is not None,
+                    supersede=not args.no_supersede,
+                )
+                for rep in reports
+            ]
+        labels = ", ".join(journal_docs.entry_label(n, prev) for n, prev in entries)
         tail = (
-            f"journal entries {', '.join(f'#{e}' for e in entries)} written (one observation per "
-            f"method). Solo: `python -m seer_engine lab stage` so seertrade.site/sera shows them."
+            f"journal entries {labels} written (one observation per method). Solo: "
+            f"`python -m seer_engine lab stage` so seertrade.site/sera shows them."
         )
     print(
         f"\nNo trial was recorded and no method id was minted. Lab N (dev trials): {n_before} "
@@ -3030,11 +3105,23 @@ def _gate(conn, args) -> int:
     if args.no_journal:
         tail = "No journal entry (--no-journal), so `lab stage` is not needed."
     else:
+        from seer_engine.lab import journal_docs
+
+        # Both flags narrow which recorded variants were measured: --only names them and
+        # --gated-only drops the ones with no gate site (gate_probe.plan_methods). A narrowed run
+        # must not supersede an un-narrowed one -- it did not measure the same book.
+        narrowed = args.only is not None or bool(args.gated_only)
         with conn:
-            entries = [gp.journal(conn, rep) for rep in reports]
+            entries = [
+                gp.journal(
+                    conn, rep, narrowed=narrowed, supersede=not args.no_supersede
+                )
+                for rep in reports
+            ]
+        labels = ", ".join(journal_docs.entry_label(n, prev) for n, prev in entries)
         tail = (
-            f"journal entries {', '.join(f'#{e}' for e in entries)} written (one observation per "
-            f"method). Solo: `python -m seer_engine lab stage` so seertrade.site/sera shows them."
+            f"journal entries {labels} written (one observation per method). Solo: "
+            f"`python -m seer_engine lab stage` so seertrade.site/sera shows them."
         )
     # Two numbers, two labels, and neither of them called "Lab N". The ten strings §5.1 puts to
     # the owner print the lab's N as `Lab N` qualified by `(dev trials)`, set to
@@ -3154,12 +3241,54 @@ def _seen(conn, args) -> int:
 
 
 def _insight(conn, args) -> int:
+    """Append one entry to the lab journal, optionally as the newer version of an entry already
+    in it.
+
+    ``--supersedes`` writes the link on the NEW row at birth rather than inserting and then
+    calling ``lab link``: a row that is never unlinked for an instant cannot be read mid-write
+    by a parallel session, and the whole insert is one transaction, so a refused link leaves no
+    orphan entry behind.
+
+    Every rule about what may supersede what -- the predecessor must exist, belong to the same
+    method, carry a lower id and have no successor yet -- lives in the store. Restating any of
+    them here would give the lab two places to disagree about its own rules, and the five
+    auto-journalling writers do not come through this function at all."""
     if (args.body is None) == (args.file is None):
         raise store.LabError("give exactly one of --body or --file")
     body = args.body if args.body is not None else Path(args.file).read_text(encoding="utf-8")
     with conn:
-        n = store.add_insight(conn, kind=args.kind, title=args.title, body=body, method_id=args.method)
+        n = store.add_insight(
+            conn,
+            kind=args.kind,
+            title=args.title,
+            body=body,
+            method_id=args.method,
+            doc_key=args.doc_key,
+            supersedes=args.supersedes,
+        )
     print(n)
+    return 0
+
+
+def _link(conn, args) -> int:
+    """Thread an entry already in the journal onto the one it replaces.
+
+    ``lab insight --supersedes`` covers everything written from here on. This covers what was
+    written before the journal had versions, where the only record that one note replaces
+    another is a sentence inside it -- insight 126 says so in prose, because the schema had
+    nowhere to put it.
+
+    It is a subcommand of its own rather than a flag on ``lab note`` on purpose: this is the
+    single UPDATE the append-only triggers allow, and it deserves a name in the shell history,
+    so an audit of what moved in this database can find it by reading the commands that ran.
+
+    Every refusal -- no such entry, no such predecessor, a predecessor under a different method,
+    an entry that is already linked, a predecessor that already has a successor, a link pointing
+    forward or at itself -- is the store's, raised as ``LabError`` and turned into exit 2 by
+    ``run``. Nothing is re-checked here."""
+    with conn:
+        store.set_supersedes(conn, args.insight, args.supersedes)
+    print(f"{args.insight} supersedes {args.supersedes}")
     return 0
 
 
@@ -3242,6 +3371,7 @@ _HANDLERS = {
     "drop": _drop,
     "seen": _seen,
     "insight": _insight,
+    "link": _link,
     "stage": _stage,
     "next-id": _next_id,
     "export": _export,

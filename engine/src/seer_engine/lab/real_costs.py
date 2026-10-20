@@ -37,7 +37,7 @@ from seer_engine.backtest import dev
 from seer_engine.backtest.dev import FAILURE_LABELS, Candidate, DevRow
 from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.backtest.metrics import fmt_num, fmt_pct, fmt_pf, fmt_signed_pct
-from seer_engine.lab import store
+from seer_engine.lab import journal_docs, store
 from seer_engine.lab.method import METHOD_ID, Method, discover
 from seer_engine.sim.rules import TradeRules
 
@@ -431,8 +431,36 @@ def insight_text(cmp: Comparison) -> tuple[str, str]:
     return title, body
 
 
-def journal(conn: sqlite3.Connection, cmp: Comparison) -> int:
-    """Append the comparison to the lab journal as one ``observation`` on the method. The caller
-    owns the transaction (``with conn:``). Returns the insight id."""
+#: The command half of this writer's document keys. See ``lab/journal_docs.py``.
+DOC_PREFIX = "real-costs"
+
+
+def doc_key(cmp: Comparison) -> str:
+    """The document this comparison is a version of: the real-fee reading of THIS ARM.
+
+    Keyed on the arm and never on the method, because `lab costs` reports one variant's numbers
+    and nothing else, so two runs on two arms are two measurements and must be two documents.
+    Insights 466, 467 and 468 are ``M0260-M-NATIVE``, ``M0260-M-G12`` and ``M0260-M-G3``, written
+    25 and 30 seconds apart under one generated title (this module titles on ``method_name`` and
+    has never used the ``candidate_id`` it is holding at ``Comparison.candidate_id``). A
+    method-keyed document would have buried a 23.8% drawdown underneath a 33.6% one and shown the
+    owner only the last.
+    """
+    return journal_docs.doc_key(DOC_PREFIX, cmp.method_id, [cmp.candidate_id])
+
+
+def journal(
+    conn: sqlite3.Connection, cmp: Comparison, *, supersede: bool = True
+) -> tuple[int, int | None]:
+    """Append the comparison to the lab journal as one ``observation`` on the method, as the
+    newest version of this arm's real-fee document.
+
+    The caller owns the transaction (``with conn:``). Returns ``(insight id, the id it supersedes
+    or None)``. ``supersede=False`` is the ``--no-supersede`` escape: the row is written as a
+    sibling, for a genuinely new observation that happens to share a document key.
+    """
     title, body = insight_text(cmp)
-    return store.add_insight(conn, kind="observation", title=title, body=body, method_id=cmp.method_id)
+    return journal_docs.append(
+        conn, kind="observation", title=title, body=body, method_id=cmp.method_id,
+        key=doc_key(cmp), supersede=supersede,
+    )

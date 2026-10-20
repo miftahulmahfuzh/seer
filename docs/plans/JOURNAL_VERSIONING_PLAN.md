@@ -185,7 +185,7 @@ first thing to re-argue.
 
 **The backfill list is settled and needs no judgment** — all five are byte-identical in title
 *and* body: `227→230` (M0131), `289→290` (M0024), `493→498` (M0127), `320→499` (M0179),
-`499→500` (M0179). Twelve rows share a title with an earlier row, but only these five are真
+`499→500` (M0179). Twelve rows share a title with an earlier row, but only these five are
 true duplicates; the other seven are different arms under one generated title and **stay
 siblings**.
 

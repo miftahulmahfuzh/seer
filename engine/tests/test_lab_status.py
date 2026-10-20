@@ -582,3 +582,62 @@ def test_a_test_failed_method_is_not_offered_a_way_back(tmp_path, status):
         if "status 'test-failed'" in line:
             assert "lab reevaluate" not in line, line
             assert "final" in line, line
+
+
+# ------------------------------------------------------- the journal block prints documents
+
+
+def _latest_insights(out: str) -> list[str]:
+    """The indented lines under "Latest insights:", in the order `lab status` printed them."""
+    lines = out.splitlines()
+    start = lines.index("Latest insights:") + 1
+    block = []
+    for line in lines[start:]:
+        if not line.startswith("  "):
+            break
+        block.append(line.strip())
+    return block
+
+
+def test_the_latest_insights_block_prints_the_newest_version_not_every_row(tmp_path, status):
+    """A superseded entry is an earlier version of a document, not a separate note.
+
+    This is the terminal's half of the row-vs-document rule `/sera/journal` follows. Phase 6
+    threads five byte-identical pairs in the real lab -- 320 -> 499 -> 500 among them -- and
+    without this the status block would print all three as "latest insights" while the site
+    renders them as one document at version 3: the two readers of one database disagreeing
+    about how many notes it holds.
+
+    Nothing is hidden. Every row is still in the journal, still exported, and still reachable
+    behind the version disclosure; what this block reports is the current version of each."""
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    with c:
+        older = store.add_insight(
+            c, kind="observation", title="the first reading", body="what the fees did",
+        )
+        store.add_insight(
+            c, kind="observation", title="the second reading", body="what the fees really did",
+            supersedes=older,
+        )
+    c.close()
+
+    block = _latest_insights(status(db))
+
+    assert block == ["[observation] the second reading"]
+
+
+def test_an_unsuperseded_entry_still_prints(tmp_path, status):
+    """The guard against fixing the duplicate by printing nothing: two notes that are two notes
+    stay two lines, newest first."""
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    with c:
+        store.add_insight(c, kind="observation", title="one thing", body="a")
+        store.add_insight(c, kind="hypothesis", title="a different thing", body="b")
+    c.close()
+
+    assert _latest_insights(status(db)) == [
+        "[hypothesis] a different thing",
+        "[observation] one thing",
+    ]

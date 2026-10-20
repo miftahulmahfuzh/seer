@@ -1584,7 +1584,10 @@ def test_supersession_unblocks_none_of_the_nine_until_an_honest_control_runs():
             assert off or retired, f"{mid} is no longer read by D17 at all"
             assert off == cs.refusals(found)
             for f in retired:
-                assert f.verdict == cs.REFUSE      # superseded, never dropped
+                # Still reported, never dropped. A retired arm keeps whatever flagged verdict it
+                # earned -- usually `refuse`, but `M0047-PLC1-MV20` was only ever a `warn` and is
+                # superseded all the same, which is strictly the smaller claim of the two.
+                assert f.flagged
                 assert f.trade_ratio is not None or f.turnover_ratio is not None
     finally:
         conn.close()

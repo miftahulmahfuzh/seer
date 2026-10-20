@@ -774,14 +774,19 @@ def test_supersession_moves_no_verdict_on_the_committed_lab():
             assert round(f.turnover_ratio, 3) == turnover
 
 
-def test_nothing_in_the_committed_lab_is_superseded_today():
-    """The no-op proof, lab-wide: on this tree's database the rule retires nothing at all.
+def test_every_supersession_in_the_committed_lab_is_honestly_shaped():
+    """What a supersession must look like, now that some exist.
 
-    Measured 2026-10-19 over every method file: 64 findings, 19 refusals, 0 supersessions, before
-    the change and after it. The nine blocked methods stay blocked until an honest control is drawn
-    and RUN -- a committed-but-unrun amendment reads `unrecorded` and never supersedes, which is
-    why this stays true for the whole of the 2026-10-19 plan set and flips only once phase 8 stages
-    the new trials into lab/lab.sqlite.
+    This test used to prove the opposite -- that the rule retired nothing at all -- and said in
+    its own docstring that it would flip once the honest arms were drawn and RUN. They were, so
+    it flipped: measured 2026-10-20 the committed lab reads 77 findings, 10 refusals and 10
+    supersessions, where on 2026-10-19 it read 64, 19 and 0.
+
+    A count is a snapshot and would go stale again on the next amendment, so what is asserted
+    here is the shape every supersession must have for as long as the rule exists. The hazard is
+    unchanged and it is why D17 was written: an arm that retired a refusal without being an
+    honest, band-clean control of the same method would quietly promote a method on a comparison
+    nobody checked.
     """
     conn = _committed_lab()
     if conn is None:
@@ -797,11 +802,20 @@ def test_nothing_in_the_committed_lab_is_superseded_today():
         honest = {g.control_id: g for g in found}[f.superseded_by]
         assert honest.verdict == cs.OK
         assert honest.kind == cs.KIND_PLACEBO
-        assert honest.target_id == f.target_id
         assert honest.method_id == f.method_id
-    assert cs.refusals(found) == tuple(f for f in found if f.verdict == cs.REFUSE), (
-        "supersession retired a refusal on the committed lab; it must retire none until an "
-        "honestly shaped control has been drawn, DECLARED and run"
+        # The superseder may aim somewhere ELSE than the arm it retires. Four of the ten
+        # supersessions here are re-aimings: the old arm was pointed at the wrong sibling
+        # (M0047's two placebos both controlled `M0047-EQ`, which is not the book their margin
+        # was quoted against) and the honest one resolves by sibling-stem onto the true target.
+        # Repairing that aim is half the point of the 2026-10-19 set, so asserting the two
+        # targets are equal would forbid the fix. Both must still name THIS method.
+        assert honest.target_id.startswith(f.method_id)
+        assert f.target_id.startswith(f.method_id)
+    assert cs.refusals(found) == tuple(
+        f for f in found if f.verdict == cs.REFUSE and f.superseded_by is None
+    ), (
+        "a live refusal is exactly a REFUSE finding that nothing has retired: a refusal may "
+        "leave the live set only by supersession, and supersession may not reach anything else"
     )
     # Until 2026-10-19 the stronger reason for the no-op was that NO arm declared anything at
     # all. That stopped being true the moment the 2026-10-19 plan set's own amendment blocks

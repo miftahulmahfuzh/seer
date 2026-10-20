@@ -50,10 +50,13 @@ from pathlib import Path
 from typing import Any
 
 from seer_engine import config
-from seer_engine.lab import store
+from seer_engine.lab import journal_docs, store
 from seer_engine.lab.method import METHOD_ID, config_digest, source_sha
 
 log = logging.getLogger(__name__)
+
+#: The command half of this writer's document keys. See ``lab/journal_docs.py``.
+DOC_PREFIX = "prereg"
 
 PREREG_DIR = config.REPO_ROOT / "docs" / "lab" / "prereg"
 FENCE = "---"
@@ -728,7 +731,13 @@ def promote_method(
                 conn, method_id, "# Pre-registration\n\n" + _analysis_body(p, path)
             )
             # The journal note is read by the owner, not an auditor: plain words, no digests.
-            store.add_insight(
+            #
+            # Keyed on the method, not on the chosen variant: a pre-registration is written once
+            # per method and never rewritten (design 3), and the guard above makes a second row
+            # for this key unreachable. The key is still carried so the reader can group it, and
+            # the write still goes through `journal_docs.append` so that if the guard is ever
+            # relaxed a second note becomes version 2 rather than a second card.
+            journal_docs.append(
                 conn,
                 kind="observation",
                 title=f"{row['name']} is pre-registered for its one test-window look",
@@ -741,6 +750,7 @@ def promote_method(
                     f"different question."
                 ),
                 method_id=method_id,
+                key=journal_docs.doc_key(DOC_PREFIX, method_id),
             )
         moved = status == "dev-eligible"
         if moved:

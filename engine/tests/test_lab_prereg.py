@@ -752,3 +752,21 @@ def test_the_promote_command_prints_the_fold_record_and_the_family_state(
     p = prereg.parse((prereg_dir / "M0001.md").read_text(encoding="utf-8"))
     assert f"  folds          {p.folds}" in out
     assert f"  family         {p.family_state}" in out
+
+
+def test_the_prereg_note_carries_its_document_key(conn, prereg_dir):
+    """One pre-registration per method is correct, so the key is the method and nothing else.
+
+    The note is still a journal *document* even though it can only ever have one version: the
+    reader groups by `doc_key`, and a row with none is a card that cannot be grouped at all.
+    """
+    _eligible(conn)
+    prereg.promote_method(conn, "M0001", git_sha="deadbeef", directory=prereg_dir,
+                          check_method_file=False)
+    row = conn.execute(
+        "SELECT * FROM insights WHERE title LIKE ? ORDER BY id DESC LIMIT 1",
+        ("%is pre-registered for its one test-window look",),
+    ).fetchone()
+    assert row is not None
+    assert row["doc_key"] == "prereg:M0001:all"
+    assert row["supersedes"] is None

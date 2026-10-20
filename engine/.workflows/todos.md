@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-20
-**Total Active Tasks**: 11
+**Total Active Tasks**: 9
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 1
 - P2 Medium: 6
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 150
+- Completed: 152
 
 ---
 
@@ -1532,24 +1532,28 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Decided**:
     - `test_a_chain_of_three_is_allowed` compared `sqlite3.Row` objects to tuples -> tupled the rows (rung 3: `store.connect` sets `row_factory=sqlite3.Row`, and the module's own `_row` helper already tuples for exactly this reason).
     - The v7->v8 migration test's `set_supersedes(2, 1)` crosses `method_id` (the V7 fixture's row 1 is M0001, row 2 is NULL) and `_check_supersedes` correctly refuses -> relinked as 3->1, both M0001 (rung 3+2: the cross-method refusal is named in the plan index's abort matrix and in the phase-3 handoff, and keeps its own dedicated passing test; the migration test's call was incidental to its stated purpose, which is that the 500 rows survive byte-identical).
-- [ ] **P1-ENG-T2MD** Phase 3: Auto-link the five journalling writers on `doc_key`
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns a `doc_key` for each of the five auto-journalling writers and auto-linking through it — `real_costs` → `real-costs:{candidate_id}`, `prereg` → `prereg:{method_id}`, and `prefix:method_id:scope` for `survivorship_check`, `gate_probe` and `exposure` — superseding the existing head when the `doc_key` matches and appending a sibling otherwise, with a `--no-supersede` escape on each command. Does not touch `store.py`, `commands/lab.py`'s `_insight`/`_link`, any web file, `hardgate.py`. Exit: a regression test replaying M0260's three arms produces **three documents, not one**; re-running the *same* arm produces one document at version 2; `pytest engine/tests` green.
-  - **Status**: pending
-  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 3 of 6)
-  - **Satisfies**: R2 — Stop the pile-up growing: auto-journalling links a re-run instead of appending a sibling
-  - **Depends on**: P1-ENG-JV1K
-  - **Plan**: `.workflows/plan/P1-ENG-T2MD.md`
-- [ ] **P1-ENG-Q9XB** Phase 4: Export: snapshot emits the chain; TS mirror; document counts
+- [x] **P1-ENG-Q9XB** Phase 4: Export: snapshot emits the chain; TS mirror; document counts
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `store.snapshot` emitting `supersedes`, `docKey` and the derived `version` and `supersededBy` per insight, so `view.ts` stays a pure helper with no graph-walking in a component; `summary.insights` counting **documents** (heads); `LabInsight` in `web/lib/sera/types.ts` gaining the same fields; the snapshot contract test, `web/lib/sera/lab.test.ts:136` and `view.test.ts`'s `ins()` factory defaults. Regenerate `web/data/lab.json` with `lab stage` **before** running the suite. Does not touch the journal page or its helpers, or any writer. Exit: `lab.json` is the export of `lab.sqlite`; `npx tsc --noEmit` clean; `pytest engine/tests` green.
-  - **Status**: pending
+  - **Status**: completed
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 4 of 6)
   - **Satisfies**: R1 — Render a chain of rows as **one document labelled with its version**, history behind a disclosure
   - **Depends on**: P1-ENG-JV1K
   - **Plan**: `.workflows/plan/P1-ENG-Q9XB.md`
+  - **Completed**: 2026-10-20 18:30
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/store.py, engine/tests/test_lab_snapshot.py, web/lib/sera/types.ts, web/lib/sera/lab.test.ts, web/app/sera/overview.test.ts, web/app/sera/journal/view.test.ts, web/data/lab.json
+  - **Verified**: `ruff check engine` clean; `PYTHONPATH=engine/src pytest engine/tests` with `PG_TEST_URL` set — 6403 passed, 4 skipped, 0 failed; `npx tsc --noEmit` exit 0; `npm test` 688 passed across 50 files, 0 failed. `lab status` reads `journal documents: 500`, `journal entries (every version counts): 500`, test-window looks still 4. `web/data/lab.json` is at `"version": 6` with `summary.insightRows` present and all four chain fields on all 500 insights; the delta is exactly +32,018 bytes, as the phase plan predicted. `lab/lab.sqlite` sha256 unchanged at `98b1216d1235d3c919d4705af142c56c8c8e5ccd318b47f97290f7f41cae4a1e` — this phase writes no database row, so the commit carries `web/data/lab.json` alone. Committed **by pathspec**, not by index: phases 2, 3 and 5 are live in this shared worktree and the index is shared with them.
+  - **Drift**:
+    - Phase 1 did not rewrite `test_the_v6_to_v7_migration_moves_not_one_byte_of_the_web_snapshot` as the plan's Step 8a assumed; it kept that function (now asserting v8) and added a separate `test_the_v7_to_v8_migration_...`. The trailing `assert store.SNAPSHOT_VERSION == 5` still lived in the v6_to_v7 function, so that is the single line moved to 6, exactly as Step 8a intended.
+    - `commands/lab.py`'s "Latest insights" SELECT is at line 844, not 843 as the plan says. Not edited anyway — see Decided.
+    - `lab stage` left `lab/lab.sqlite` byte-identical (sha256 `98b1216d…` before and after), so the commit carries `web/data/lab.json` alone. This phase writes no database row, as its plan promised.
+  - **Decided**:
+    - Step 10 (`commands/lab.py:844`, the heads-only "Latest insights" SELECT) -> **SKIPPED and handed to phase 2** (tie-break rung: narrower blast radius). Phase 2 holds that file with ~140 uncommitted lines in this shared worktree; committing the path by pathspec would sweep their whole phase under this message, and leaving the edit uncommitted there gets it swept into theirs. The phase plan itself records the edit as byte-identical at this phase ("it becomes correct the moment phase 6 lands") and no phase-4 exit criterion mentions it.
+    - `web/lib/sera/lab.test.ts:8` `expect(lab.version).toBe(5)` -> `6` (rung 2: the exit criterion is `npm test` green, and that assertion pins the exact number this phase's Interface Contract moves). The reconciliation log named only line 136 of this file; line 8 has the same cause and no other phase owns it.
+    - `web/lib/sera/lab.test.ts:136` `summary.insights === insights.length` -> split into `summary.insightRows === insights.length` plus `summary.insights === heads.length` (rung 1: the reconciliation log assigns this line to phase 4 as the phase that changes the meaning).
+    - The completed block is left in place under `### [P1] High` rather than moved to `## Completed Tasks` (rung 6: existing convention — phase 1 of this same plan set did the same, and peer phases are editing neighbouring blocks in this very file right now, so a move is pure diff churn in a file three sessions hold at once).
 
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"
@@ -1668,6 +1672,33 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Decided**:
     - `commands/lab.py` is shared with concurrent phase 3 -> committed ONLY this phase's hunks through an isolated git index (`GIT_INDEX_FILE` + `read-tree HEAD` + `update-index --cacheinfo` + `commit-tree` + `update-ref`), never a pathspec commit and never the shared index. Rung: tie-break "narrower blast radius", plus this phase's own Leaves-alone list, which assigns those parsers to phase 3. A pathspec commit re-reads the working tree and would have shipped phase 3's half-written, then-failing work under this phase's message.
     - The unowned one-liner at `commands/lab.py:~844` (`_status` "Latest insights" counts rows, not heads) was NOT taken. Rung: tie-break "never widen scope to settle an ambiguity"; no phase-2 exit criterion reaches it. Phase 4 skipped it too; reported to the coordinator for assignment.
+- [x] **P1-ENG-T2MD** Phase 3: Auto-link the five journalling writers on `doc_key`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns a `doc_key` for each of the five auto-journalling writers and auto-linking through it — `real_costs` → `real-costs:{candidate_id}`, `prereg` → `prereg:{method_id}`, and `prefix:method_id:scope` for `survivorship_check`, `gate_probe` and `exposure` — superseding the existing head when the `doc_key` matches and appending a sibling otherwise, with a `--no-supersede` escape on each command. Does not touch `store.py`, `commands/lab.py`'s `_insight`/`_link`, any web file, `hardgate.py`. Exit: a regression test replaying M0260's three arms produces **three documents, not one**; re-running the *same* arm produces one document at version 2; `pytest engine/tests` green.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 3 of 6)
+  - **Satisfies**: R2 — Stop the pile-up growing: auto-journalling links a re-run instead of appending a sibling
+  - **Depends on**: P1-ENG-JV1K
+  - **Plan**: `.workflows/plan/P1-ENG-T2MD.md`
+  - **Completed**: 2026-10-20 17:22
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/journal_docs.py (new), engine/src/seer_engine/lab/real_costs.py, engine/src/seer_engine/lab/survivorship_check.py, engine/src/seer_engine/lab/gate_probe.py, engine/src/seer_engine/lab/exposure.py, engine/src/seer_engine/lab/prereg.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_journal_docs.py (new), engine/tests/test_lab_costs.py, engine/tests/test_lab_survivorship.py, engine/tests/test_lab_gate_probe.py, engine/tests/test_lab_exposure.py, engine/tests/test_lab_prereg.py, engine/.workflows/todos.md, docs/plans/JOURNAL_VERSIONING_PLAN.md
+  - **Result**: Phase 3 auto-links the five journalling writers on a new `doc_key`, so a re-run of a command becomes the next VERSION of a document instead of another card, while three different arms of one method stay three documents. The headline regression replays insights 466/467/468 from the committed lab: they share one generated title but are M0260-M-NATIVE (23.8% max DD), M0260-M-G12 (25.6%) and M0260-M-G3 (33.6%) - a method-keyed or title-keyed auto-linker would have buried the safest arm under the worst.
+  - **Verified**: `ruff check engine`: All checks passed. Full suite with Postgres (`PG_TEST_URL=postgresql://postgres:pg@localhost:55432/postgres`, `PYTHONPATH=engine/src`): **6403 passed, 4 skipped** in 242s - the 4 skips are the documented opt-in live-store tests (`SEER_LAB_*_LIVE`), not Postgres skips. New module `test_lab_journal_docs.py`: 17/17 passing, including `test_m0260s_three_arms_stay_three_documents`. `lab --help` and all four of `lab costs|survivorship|exposure|gate --help` format and list `--no-supersede`. Test-window looks still read 4 (budget untouched).
+  - **Drift**:
+    - Phase 1 shipped `store.head_for_doc_key`, which the phase plan (written before phase 1 landed) did not know about. `journal_docs.head_for` now delegates to it instead of re-implementing the head query.
+    - Phase 1 validates `supersedes` in Python BEFORE the INSERT, so the concurrent-link race raises `store.LabError`, not only `sqlite3.IntegrityError`. The retry in `journal_docs.append` catches both; the plan's block caught only IntegrityError and would never have retried.
+    - `commands/lab.py` line numbers had drifted ~+36 from the plan's citations; content identical, all edits anchored on exact strings.
+    - The plan's test fixture INSERT into `methods` named columns that do not exist (`expected_failure`, `added`). Used `store.add_method(...)` instead.
+    - SHARED FILE: `engine/src/seer_engine/commands/lab.py` also carries phase 2's complete, green `lab insight --supersedes` / `lab link` work, because the file is dirty with it right now. Committing it under this phase's message is deliberate - see Decided. Phase 2 must NOT re-implement it.
+  - **Decided**:
+    - real_costs doc_key grammar: coordinator's message said `real-costs:{candidate_id}`, phase plan ships `real-costs:{method_id}:{candidate_id}` -> phase plan's `prefix:method_id:scope` for all five writers (rung 1: the plan index's Reconciliation Log settled this grammar; rung 3: the phase plan's code blocks and tests are written against it; nothing downstream parses the literal)
+    - journal_docs.head_for delegates to phase 1's store.head_for_doc_key rather than duplicating the head SQL (rung 3: keeps the signature the plan's tests monkeypatch, avoids two copies drifting)
+    - append() retries on store.LabError as well as sqlite3.IntegrityError (rung 1: the Reconciliation Log made LabError the refusal type for the already-has-a-successor case)
+    - head_for returns None for a head belonging to a different method rather than letting store._check_supersedes raise mid-write (rung 1, invariant 2: nothing is hidden - the stray stays its own document)
+    - handler locals named `entries`, not the plan's `written`, which already holds the CSV path three lines above in all three handlers (rung 6: surrounding convention; no behaviour change)
+    - committed `commands/lab.py` despite it carrying phase 2's in-flight half (rung 2: this phase's exit criteria require the four --no-supersede flags to work; holding the file back would leave the phase incomplete on the branch, and waiting on a peer is blocking)
 - [x] **P1-ENG-IPVX** Phase 1: M0258: pre-register, run and record the banded gate
   - **Difficulty**: HARD
   - **Type**: Feature

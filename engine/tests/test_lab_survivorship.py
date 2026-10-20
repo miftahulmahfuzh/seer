@@ -282,8 +282,10 @@ def test_the_journal_entry_is_plain_words(lab, dev_data, sv_data, recorded, tmp_
     (rep,), *_ = _measure(conn, dev_data, sv_data, tmp_path, monkeypatch)
     before = _untouched(conn)
     with conn:
-        entry = svc.journal(conn, rep)
+        entry, revised = svc.journal(conn, rep)
+    assert revised is None  # the first version of this method's document supersedes nothing
     row = conn.execute("SELECT * FROM insights WHERE id = ?", (entry,)).fetchone()
+    assert row["doc_key"] == "survivorship:M0001:all"
     assert row["kind"] == "observation" and row["method_id"] == "M0001"
     assert row["title"] == "Quiet stocks held equally: what the missing companies did to it"
     for text in (row["title"], row["body"]):
@@ -407,3 +409,32 @@ def test_lab_survivorship_m0069_on_the_real_stores(tmp_path, capsys):
     assert cli.main(argv) == 0
     out = capsys.readouterr().out
     assert "lab survivorship M0069" in out and "No journal entry" in out
+
+
+def test_a_second_run_revises_the_same_document(lab, dev_data, sv_data, recorded, tmp_path, monkeypatch):
+    conn, _ = lab
+    (rep,), *_ = _measure(conn, dev_data, sv_data, tmp_path, monkeypatch)
+    with conn:
+        first, _ = svc.journal(conn, rep)
+    with conn:
+        second, revised = svc.journal(conn, rep)
+    assert revised == first
+    assert svc.doc_key(rep) == "survivorship:M0001:all"
+    with conn:
+        third, nothing = svc.journal(conn, rep, supersede=False)
+    assert nothing is None
+    assert conn.execute(
+        "SELECT supersedes FROM insights WHERE id = ?", (third,)
+    ).fetchone()[0] is None
+    assert second != third
+
+
+def test_survivorship_cannot_be_narrowed_so_its_key_may_stay_method_wide(capsys):
+    """If `lab survivorship` ever gains --only, `svc.doc_key` must gain the narrowed branch the
+    other writers have, or a narrowed run would bury an un-narrowed one. This is that alarm."""
+    with pytest.raises(SystemExit) as e:
+        cli.main(["lab", "survivorship", "--help"])
+    assert e.value.code == 0
+    out = capsys.readouterr().out
+    assert "--only" not in out, "survivorship gained --only: give svc.doc_key the narrowed branch"
+    assert "--no-supersede" in out

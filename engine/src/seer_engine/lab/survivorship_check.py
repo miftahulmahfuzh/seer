@@ -48,7 +48,7 @@ from seer_engine.backtest import dev
 from seer_engine.backtest.dev import Candidate, DevRow
 from seer_engine.backtest.metrics import DASH, fmt_num, fmt_pct, fmt_pf, fmt_signed_pct
 from seer_engine.commands.backtest_dev import daily_moments, month_end_curve
-from seer_engine.lab import hardgate, runner, store
+from seer_engine.lab import hardgate, journal_docs, runner, store
 from seer_engine.lab import walkforward as wf
 from seer_engine.lab.method import METHOD_ID, Method, discover
 from seer_engine.lab.real_costs import REPRO_TOL
@@ -734,10 +734,39 @@ def insight_text(rep: MethodReport) -> tuple[str, str]:
     return title, body
 
 
-def journal(conn: sqlite3.Connection, rep: MethodReport) -> int:
-    """One ``observation`` on the method. The caller owns the transaction. Returns its id."""
+#: The command half of this writer's document keys. See ``lab/journal_docs.py``.
+DOC_PREFIX = "survivorship"
+
+
+def doc_key(rep: MethodReport) -> str:
+    """The document this report is a version of: the survivorship reading of the whole method.
+
+    Method-wide rather than per-arm, and that is a measured choice rather than a shortcut.
+    ``MethodReport.rows`` is every recorded dev variant of the method -- ``lab survivorship`` has
+    no ``--only`` and cannot be narrowed -- and ``insight_text`` reports the headline arm beside a
+    roll-up over all of them. There is no single arm this document is about. A re-run after new
+    dev trials land covers a grown set and is version 2 of the same question; the earlier row
+    stays in the store and is read as the earlier version, so no measurement is hidden.
+
+    If this command ever gains an ``--only``, this function must gain the narrowed branch the
+    other writers have, or a narrowed run would bury an un-narrowed one. A test pins that.
+    """
+    return journal_docs.doc_key(DOC_PREFIX, rep.method_id)
+
+
+def journal(
+    conn: sqlite3.Connection, rep: MethodReport, *, supersede: bool = True
+) -> tuple[int, int | None]:
+    """One ``observation`` on the method, as the newest version of its survivorship document.
+
+    The caller owns the transaction. Returns ``(insight id, the id it supersedes or None)``.
+    ``supersede=False`` writes a sibling instead (``--no-supersede``).
+    """
     title, body = insight_text(rep)
-    return store.add_insight(conn, kind="observation", title=title, body=body, method_id=rep.method_id)
+    return journal_docs.append(
+        conn, kind="observation", title=title, body=body, method_id=rep.method_id,
+        key=doc_key(rep), supersede=supersede,
+    )
 
 
 # --------------------------------------------------------------------------- the CSV grid

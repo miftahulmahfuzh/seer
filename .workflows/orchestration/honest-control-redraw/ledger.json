@@ -3,6 +3,12 @@
   "coordinator": "orch-honest-control-redraw",
   "coordinator_session_id": "d73093cd-bb4d-4aa3-a3bc-b9bb1c1bcf1c",
   "created": "2026-10-19T12:28:06+00:00",
+  "landed": {
+    "at": "2026-10-20T03:29:27+00:00",
+    "base": "main",
+    "commit": "de4144500ef6485cf43c0adb5f817acd4627d321",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -176,7 +182,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "honest-control-redraw",
-  "updated": "2026-10-20T03:19:52+00:00",
+  "updated": "2026-10-20T03:29:27+00:00",
   "verified_at": "2026-10-20T02:09:49+00:00",
   "worktree": "/home/miftah/.worktrees/seer/honest-control-redraw"
 }

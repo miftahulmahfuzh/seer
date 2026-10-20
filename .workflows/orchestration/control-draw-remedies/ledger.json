@@ -23,22 +23,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "3225610",
       "depends_on": [
         1
       ],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "v2 ships beside v1, additions only (one docstring line removed, audited). No K baked: depth keyword-only, no default, both entry points; shadow_lookback_for(253,2)==305 == phase 1's lookback_after. SHADOW_RULE_ID is a second constant, RULE_ID not bumped. Golden vector is real \u2014 two perturbations of v1 (keep_key hash input; matched_names fill order) each go red on exactly one test while the recorded-digest test passes under both; reverted by inverse string replacement, sha-verified, NOT git checkout (which would have discarded the uncommitted phase \u2014 flagged for anyone re-running it). Cash-month reset is implemented and asserted: empty book mid-chain reseeds the shadow to empty with no cash branch, closing the 44%% / 0.211x component for free. Four reads_held:false chassis now proved no-ops name for name, not merely measured. Decisions: (1) perturbation revert by inverse replacement not git checkout \u2014 reversible-option tie-break; (2) criterion 6's 'pytest test_lab_methods -k lookback' selects ZERO tests, covered by whole suite + FIXTURE_BARS-vs-fixture test + live reading \u2014 rung 2 over rung 3; (3) one test and two docstring paragraphs added for the cash-month property per the coordinator's brief \u2014 rung 5; (4) phase-2-results.md written though not in the Files table \u2014 criterion 4 says 'the phase's own report'. 47 passed three modules, 6196/3 whole suite, ruff clean, lab.sqlite 607b78cf unmoved, looks 4->4.",
       "package": "engine/src/seer_engine/lab",
       "plan": ".workflows/plan/control-draw-remedies/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T06:05:36+00:00",
       "satisfies": [
         "R1",
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-X4PN",
       "title": "The shadow rule, written beside v1"
     },
     {
@@ -125,6 +125,6 @@
   "plan": "/home/miftah/seer/docs/plans/CONTROL_DRAW_REMEDIES_PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "control-draw-remedies",
-  "updated": "2026-10-20T05:51:35+00:00",
+  "updated": "2026-10-20T06:05:36+00:00",
   "worktree": "none"
 }

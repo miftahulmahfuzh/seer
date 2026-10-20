@@ -83,6 +83,7 @@ from seer_engine.sim.rules import (
     is_decision_session,
     is_rank_session,
     is_resize_session,
+    resize_band_of,
     rule_owner_inputs,
 )
 from seer_engine.sim.sizing import Pick, RejectReason, Rejection, SizingResult, size_picks
@@ -156,6 +157,7 @@ __all__ = [
     "new_portfolio",
     "order_fee",
     "q",
+    "resize_band_of",
     "rule_owner_inputs",
     "sell_cash",
     "sell_proceeds",

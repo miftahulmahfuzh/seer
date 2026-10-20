@@ -23,9 +23,10 @@ One session, in this exact order (all money ``Decimal``; ``q`` at every product;
    whose targets omit the symbol). A position the targets drop that has no bar on S is
    marked ``exit_pending`` and sold at its next bar's open. Nothing sold here is re-bought on S;
 3. trims (decision sessions; ``rules.resize`` or the idle instrument): a held target worth
-   more than its target weight by at least the band (``_beyond_band``: ``RESIZE_BAND × equity``
-   under ``rules.resize_basis == "equity"``, ``TARGET_RESIZE_BAND × weight × equity`` under
-   "target") is sold down at the open;
+   more than its target weight by at least the band (``_beyond_band``: ``band × equity`` under
+   ``rules.resize_basis == "equity"``, ``band × weight × equity`` under "target", where ``band``
+   is ``sim.rules.resize_band_of(rules)``, the basis's constant unless the rule set names its
+   own) is sold down at the open;
 4. buys, targets in rank order with the idle instrument last: new entries (``max_positions``
    counted as the night before, exactly as ``sim.size_picks``) and adds (same band as trims,
    upward), sized the night before from the last snapshot's equity and the cash the night's
@@ -65,7 +66,7 @@ from seer_engine import dates
 from seer_engine.prices import Bar
 from seer_engine.sim.costs import gotrade_cash, gotrade_shares_for
 from seer_engine.sim.model import q
-from seer_engine.sim.rules import OPEN_LIMIT_BAND, RESIZE_BAND, SHARE_QUANTUM, TARGET_RESIZE_BAND, TradeRules
+from seer_engine.sim.rules import OPEN_LIMIT_BAND, SHARE_QUANTUM, TradeRules, resize_band_of
 from seer_engine.sim.split_adjust import _q_exact, _rescale_price, _split_ratio
 
 WEIGHT_QUANTUM = Decimal("0.000001")
@@ -449,18 +450,23 @@ def _beyond_band(gap: Decimal, last: Decimal, weight: Decimal, equity: Decimal, 
     The one place trims, adds and the night's planned trims decide "big enough", so the three
     can never disagree. ``rules.resize_basis``:
 
-    - "equity" (every rule set before the lever): ``gap × last >= RESIZE_BAND × equity``, 1% of
-      the whole account -- byte-for-byte the comparison the engine always made;
-    - "target": ``gap × last >= TARGET_RESIZE_BAND × weight × equity``, 20% of the holding's own
+    - "equity" (every rule set before the lever): ``gap × last >= band × equity``, by default 1%
+      of the whole account -- byte-for-byte the comparison the engine always made;
+    - "target": ``gap × last >= band × weight × equity``, by default 20% of the holding's own
       target value, so a 2% holding in a 50-name book is resized as readily as a 50% one.
+
+    ``band`` is ``sim.rules.resize_band_of(rules)``: the basis's own constant (``RESIZE_BAND``,
+    ``TARGET_RESIZE_BAND``) unless the rule set names a band of its own. A band of 0 makes every
+    non-zero gap beyond it, which is a full rebalance back to target on every decision session.
 
     ``equity`` is the last snapshot's (``book.equity``), the same equity the sizing uses.
     """
     if gap <= 0:
         return False
+    band = resize_band_of(rules)
     if rules.resize_basis == "target":
-        return gap * last >= TARGET_RESIZE_BAND * weight * equity
-    return gap * last >= RESIZE_BAND * equity
+        return gap * last >= band * weight * equity
+    return gap * last >= band * equity
 
 
 def _sizing_price(t: Target, rules: TradeRules) -> Decimal:

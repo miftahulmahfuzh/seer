@@ -28,6 +28,14 @@ account, which in a 20-50 name book means a holding must drift 50-100% of its ow
 of its own target value. The default is a pinned no-op (``LEVERS_SINCE_PINS``), so no recorded
 result, digest or live paper strategy moves.
 
+``resize_band`` optionally overrides HOW FAR off target is far enough, for either basis.
+``None`` (every rule set before 2026-10-20) means "the basis's own constant": ``RESIZE_BAND``
+(1% of equity) under "equity", ``TARGET_RESIZE_BAND`` (20% of the holding's own target) under
+"target". A Decimal in [0, 1) replaces that constant, so a rule set can ask for a band of 10% or
+33% of a slot, or 0 (trade every holding back to its target on every decision session, the
+textbook monthly rebalance). ``resize_band_of`` is the one reader. The default is a pinned no-op
+(``LEVERS_SINCE_PINS``), so no recorded result, digest or live paper strategy moves.
+
 ``cash_yield`` names a market series (``CASH_YIELD_SERIES``: only ``"T13W"``, the 13-week Treasury
 bill yield the research store caches from EODHD) whose annual percent idle cash is credited at,
 by ``sim.book.step_book`` at each open, read point in time by ``backtest.book_runner.run_book``.
@@ -117,6 +125,7 @@ class TradeRules:
     cost_model: CostModel = "flat"
     resize_basis: ResizeBasis = "equity"
     cash_yield: str | None = None
+    resize_band: Decimal | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, str):
@@ -189,6 +198,17 @@ class TradeRules:
                     f"cash_yield {self.cash_yield!r} and idle_symbol {self.idle_symbol!r} are two answers to "
                     "one question (what idle money earns); use one"
                 )
+        if self.resize_band is not None:
+            if not isinstance(self.resize_band, Decimal):
+                raise TypeError(f"resize_band must be a Decimal or None, got {type(self.resize_band).__name__}")
+            if not self.resize_band.is_finite() or not (0 <= self.resize_band < 1):
+                raise ValueError(f"resize_band must be a Decimal in [0, 1), got {self.resize_band}")
+            if self.engine != "book":
+                raise ValueError(
+                    f"resize_band is a book-engine lever; the {self.engine} simulator never resizes"
+                )
+            if not self.resize:
+                raise ValueError("resize_band needs resize=True: a band with nothing to resize is a no-op")
         is_v0 = _lever_values(self) == _V0_LEVERS
         if self.engine == "bracket_v0" and not is_v0:
             raise ValueError("engine 'bracket_v0' is reserved for DESIGN_V0 (the unchanged §5 simulator)")
@@ -216,6 +236,7 @@ _V0_LEVERS: tuple[object, ...] = (
     _DEFAULT_COST,
     "flat",
     "equity",
+    None,
     None,
 )
 
@@ -340,6 +361,7 @@ LEVERS_SINCE_PINS: dict[str, object] = {
     "cost_model": "flat",  # Gotrade's measured fee schedule (sim.costs), 2026-10-07
     "resize_basis": "equity",  # the band measured against the holding's own target, 2026-10-12
     "cash_yield": None,  # interest on idle cash at a T-bill yield, 2026-10-12
+    "resize_band": None,  # the band's size, overriding the basis's constant, 2026-10-20
 }
 
 
@@ -363,6 +385,21 @@ def is_bracket(rules: TradeRules) -> bool:
     """
     _rules(rules)
     return rules.engine in BRACKET_ENGINES
+
+
+def resize_band_of(rules: TradeRules) -> Decimal:
+    """How far off its target a holding must be before it is traded back, for ``rules``.
+
+    ``rules.resize_band`` when it is set; otherwise the constant its basis has always used:
+    ``TARGET_RESIZE_BAND`` under "target", ``RESIZE_BAND`` under "equity". What the number is a
+    fraction OF is the basis's business (``sim.book._beyond_band``): equity, or the holding's own
+    target value. The one place the band's size is decided, so the engine, the owner's reminders
+    and the rule-set description can never disagree.
+    """
+    _rules(rules)
+    if rules.resize_band is not None:
+        return rules.resize_band
+    return TARGET_RESIZE_BAND if rules.resize_basis == "target" else RESIZE_BAND
 
 
 def _first_of(cadence: str, session: date) -> bool:
@@ -525,12 +562,12 @@ def describe_rules(rules: TradeRules) -> tuple[str, ...]:
     if rules.resize and rules.resize_basis == "target":
         lines.append(
             f"Rebalance: on decision sessions, a held position is traded back to its target weight "
-            f"at the open when it is off by at least {_pct(TARGET_RESIZE_BAND)} of its own target value."
+            f"at the open when it is off by at least {_pct(resize_band_of(rules))} of its own target value."
         )
     elif rules.resize:
         lines.append(
             f"Rebalance: on decision sessions, a held position is traded back to its target weight "
-            f"at the open when it is off by at least {_pct(RESIZE_BAND)} of equity."
+            f"at the open when it is off by at least {_pct(resize_band_of(rules))} of equity."
         )
     else:
         lines.append("Rebalance: none; a held position keeps its shares until it exits.")

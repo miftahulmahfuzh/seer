@@ -101,30 +101,30 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "8f1d1ae",
       "depends_on": [
         3,
         5
       ],
       "difficulty": "NORMAL",
       "n": 6,
-      "note": null,
+      "note": "Close-out landed. Six insights journalled 479-484 (one command each, no pipe, each rehearsed on a DB copy, all exit 0). ZERO lab notes: three-pass sweep over all 276 verdicts + 276 analyses found NO sentence the phases missed - M0208/M0221/M0225 were already correct. hardgate.check re-read live refuses all nine; only M0201's D17 refusal is still live and it is one of the three that were inert all along. lab.sqlite 5a4011f1 -> fe8978fb; looks 4->4; trials 862 contiguous, unchanged. 6241 passed/3 skipped, ruff clean, after the final stage. Two corrections owned: phase 3's N 164->165 is a slip (an amendment creates no method); membership convention is 0.067 on M0208 not 0.202, and the quoted 0.034 on M0047 is its 1996-2002 era vs 0.012 whole-window. Six new leftovers 14-19; 16 and 17 are a SEPARATE plan set.",
       "package": "docs/plans` + `.workflows/plan/` + lab db",
       "plan": ".workflows/plan/control-draw-remedies/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T07:15:55+00:00",
       "satisfies": [
         "R2",
         "R3",
         "R4"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ROOT-A8RK",
       "title": "The R1 verdict, the sentences, and the close-out"
     }
   ],
   "plan": "/home/miftah/seer/docs/plans/CONTROL_DRAW_REMEDIES_PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "control-draw-remedies",
-  "updated": "2026-10-20T06:58:33+00:00",
+  "updated": "2026-10-20T07:15:55+00:00",
   "worktree": "none"
 }

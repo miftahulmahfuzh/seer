@@ -148,7 +148,7 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "20513b4",
       "depends_on": [
         1,
         2,
@@ -160,23 +160,23 @@
       ],
       "difficulty": "NORMAL",
       "n": 8,
-      "note": null,
+      "note": "Close-out written, set NOT landed (coordinator's). Verified 5/9 D17-unblocked; M0201/M0208/M0221 warn, M0225 never drawn. RECONCILIATION REFUSED: phase 6's crossover is not supported -- family A's signs contradict it 4/6 (M0227-R20 at 0.07x moved -1.318), seed noise at fixed handicap (1.55/2.11 pts) equals the 2.24 between-group gap, and it is 2 chassis vs 2 (p~1/6); pooled corr(handicap, move) = -0.215. What 13 arms DO support: variance collapse, control sd 1.918 -> 0.988 (3.77x), seed spreads 2.190->0.079 and 1.737->0.187. NEW: hardgate.check tests folds BEFORE D17, so 3 of 4 live D17 refusals are inert; M0208 is the only method D17 actually blocks and the kin rule stands behind it -- the gate takes NONE of the nine. 4 causes not 5. Success conditions 3 FAIL->PASS but M0243 PASS->FAIL (+6.068 -> +1.619), which the set never counted. 4 more withdrawn sentences found, 3 in methods.verdict. 4 insight bodies written, NOT journalled (append-only + no lab stage here would redden the snapshot test on main) -- run them after the merge, before the final lab stage; commands in .workflows/plan/honest-control-redraw/insights/README.md. lab.sqlite untouched at 58d9601887db. pytest 6157 passed/4 skipped, ruff clean.",
       "package": "repo",
       "plan": ".workflows/plan/honest-control-redraw/phase-8.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T03:19:52+00:00",
       "satisfies": [
         "R3",
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P3-ROOT-D7MX",
       "title": "Close-out: which verdicts survived their honest control"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "honest-control-redraw",
-  "updated": "2026-10-20T02:59:32+00:00",
+  "updated": "2026-10-20T03:19:52+00:00",
   "verified_at": "2026-10-20T02:09:49+00:00",
   "worktree": "/home/miftah/.worktrees/seer/honest-control-redraw"
 }

@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "1acbd8f",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "Schema 8 landed: insights.supersedes + doc_key, insights_no_update narrowed to a whitelist. 5948 tests pass, ruff clean, lab.sqlite at v8 with 500 rows all-NULL, test-window looks still 4, insight content digest unchanged across the migration. Two ladder decisions (rung 3): (1) test_a_chain_of_three_is_allowed compared sqlite3.Row to tuples -> tupled, store.connect sets row_factory; (2) the v7->v8 migration test's set_supersedes(2,1) crosses method_id (V7 fixture row 1 is M0001, row 2 NULL) and _check_supersedes rightly refuses -> relinked 3->1, both M0001; the cross-method rule keeps its own dedicated test. PHASES 2/3/4 NOTE: _check_supersedes refuses a cross-method link, so a writer computing doc_key must keep the successor's method_id equal to its predecessor's. Docs commit f3ddeff. Coordinator's PLAN.md copy on main has 7 uncommitted lines (TaskID column + status tick) to pick up.",
       "package": "engine/lab",
       "plan": ".workflows/plan/journal-versioning/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-10-20T10:03:45+00:00",
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-JV1K",
       "title": "Schema 8: the narrowed trigger, `supersedes`, `doc_key"
     },
     {
@@ -36,7 +36,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Writer CLI: `lab insight --supersedes`, `lab link"
     },
@@ -55,7 +55,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Auto-link the five journalling writers on `doc_key"
     },
@@ -74,7 +74,7 @@
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Export: snapshot emits the chain; TS mirror; document counts"
     },
@@ -123,6 +123,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "journal-versioning",
-  "updated": "2026-10-20T09:44:04+00:00",
+  "updated": "2026-10-20T10:06:23+00:00",
   "worktree": "/home/miftah/.worktrees/seer/journal-versioning"
 }

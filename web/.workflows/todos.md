@@ -2,18 +2,18 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-10-12
-**Total Active Tasks**: 1
+**Last Updated**: 2026-10-20
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 0
+- Blocked: 1
 - Completed: 24
 
 ---
@@ -23,6 +23,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [ ] **P1-WEB-K6DR** Phase 5: Reader: heads-only, version chip, history disclosure, "Revised"
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `/sera/journal` rendering **heads only**, each labelled with its version, earlier versions behind an icon-only Lucide disclosure (`aria-label` + tooltip, Seer v2); `kindCounts`, `unseenCounts`, `journalGroups`, `badgeTip`, the "N entries in all" line and `page.tsx`'s `unseenByKind` counting **documents, not rows**; a revised document reappearing as unseen with the marker reading **"Revised"**, not "New"; plus three one-line row-vs-document fixes in `layout.tsx:28`, `how/page.tsx:39` and `overview.ts:130` (filter to heads before taking the newest synthesis), each with a test. History entries behind the disclosure must **not** carry `data-insight-id`. Does not touch any engine file, `types.ts`, `seen-client.ts`, the seen API route, or `/sera/methods`. Exit: `npx tsc --noEmit && npm test` green; screenshots at phone (390) and desktop width in both themes, showing a version chip and an expanded history against the **real chains phase 6 committed**.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 5 of 6)
+  - **Satisfies**: R1 — Render a chain of rows as **one document labelled with its version**, history behind a disclosure; R5 — Counts and filters count **documents, not rows**; a new version reads as *revised*, not *new*
+  - **Depends on**: P1-ENG-Q9XB, P1-ROOT-N7FS
+  - **Plan**: `.workflows/plan/P1-WEB-K6DR.md`
 
 
 ### [P2] Medium

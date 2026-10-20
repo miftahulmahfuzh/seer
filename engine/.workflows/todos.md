@@ -2,18 +2,18 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-19
-**Total Active Tasks**: 8
+**Last Updated**: 2026-10-20
+**Total Active Tasks**: 12
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 5
 - P2 Medium: 6
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 0
+- Blocked: 3
 - Completed: 148
 
 ---
@@ -1517,6 +1517,41 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/honest-control-redraw/PLAN.md` (phase 1 of 8)
   - **Satisfies**: R1 — Settle ONE reusable way to derive a shape-matched control, and prove it inside the [0.80, 1.25] MATCH band on a pilot before anything else is pre-registered; R2 — Re-draw every mis-shaped control arm as an Amendment under the nine existing method ids — no new method id, no extra N, no moved config_digest, no test-window look; R3 — Report which of the nine standing verdicts survive their honest control, in trial_funding.mwr, including margins that worsen or reverse; R4 — lab promote must actually stop refusing the nine
   - **Plan**: `.workflows/plan/P1-ENG-K9WR.md`
+- [ ] **P1-ENG-JV1K** Phase 1: Schema 8: the narrowed trigger, `supersedes`, `doc_key`
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `SCHEMA_VERSION = "8"`; `_INSIGHTS_TABLE` gaining `supersedes INTEGER REFERENCES insights(id)` and `doc_key TEXT`; the rewritten whitelist `insights_no_update` trigger; the `insights_one_successor` partial unique index (in a new `_INSIGHTS_INDEXES`, never `_SCHEMA`); `_v7_to_v8` following `_v1_to_v2`'s rebuild recipe exactly; `store.add_insight(doc_key=, supersedes=)` and a new `store.set_supersedes`; the migration test and a dedicated trigger test module. Touches no CLI, no writer, no web file, not `hardgate.py`. Exit: the full abort suite passes (written first, watched failing against the old trigger); a v7 fixture migrates to v8 with all 500 rows byte-identical; `lab.sqlite` committed at v8 alongside a regenerated `lab.json`; `pytest engine/tests` green.
+  - **Status**: in_progress
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 1 of 6)
+  - **Satisfies**: R4 — Narrow `insights_no_update` to protect content, and test it harder than the trigger it replaces
+  - **Plan**: `.workflows/plan/P1-ENG-JV1K.md`
+- [ ] **P1-ENG-H4ZQ** Phase 2: Writer CLI: `lab insight --supersedes`, `lab link`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `lab insight --supersedes ID` (link a new row at birth) and `lab link ID --supersedes ID` (the backfill tool phase 6 runs). Both validate through `store.set_supersedes` and exit **2** on a rules refusal, never 1; help strings escape `%` as `%%`; the `lab insight` usage line at `commands/lab.py:130` is updated. Does not touch `store.py`, any writer module or any web file. Exit: both commands covered by tests, including the exit-2 path for every invariant; `pytest engine/tests` green.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 2 of 6)
+  - **Satisfies**: R3 — Thread the duplicates that already exist, starting 500→499
+  - **Depends on**: P1-ENG-JV1K
+  - **Plan**: `.workflows/plan/P1-ENG-H4ZQ.md`
+- [ ] **P1-ENG-T2MD** Phase 3: Auto-link the five journalling writers on `doc_key`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns a `doc_key` for each of the five auto-journalling writers and auto-linking through it — `real_costs` → `real-costs:{candidate_id}`, `prereg` → `prereg:{method_id}`, and `prefix:method_id:scope` for `survivorship_check`, `gate_probe` and `exposure` — superseding the existing head when the `doc_key` matches and appending a sibling otherwise, with a `--no-supersede` escape on each command. Does not touch `store.py`, `commands/lab.py`'s `_insight`/`_link`, any web file, `hardgate.py`. Exit: a regression test replaying M0260's three arms produces **three documents, not one**; re-running the *same* arm produces one document at version 2; `pytest engine/tests` green.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 3 of 6)
+  - **Satisfies**: R2 — Stop the pile-up growing: auto-journalling links a re-run instead of appending a sibling
+  - **Depends on**: P1-ENG-JV1K
+  - **Plan**: `.workflows/plan/P1-ENG-T2MD.md`
+- [ ] **P1-ENG-Q9XB** Phase 4: Export: snapshot emits the chain; TS mirror; document counts
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `store.snapshot` emitting `supersedes`, `docKey` and the derived `version` and `supersededBy` per insight, so `view.ts` stays a pure helper with no graph-walking in a component; `summary.insights` counting **documents** (heads); `LabInsight` in `web/lib/sera/types.ts` gaining the same fields; the snapshot contract test, `web/lib/sera/lab.test.ts:136` and `view.test.ts`'s `ins()` factory defaults. Regenerate `web/data/lab.json` with `lab stage` **before** running the suite. Does not touch the journal page or its helpers, or any writer. Exit: `lab.json` is the export of `lab.sqlite`; `npx tsc --noEmit` clean; `pytest engine/tests` green.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 4 of 6)
+  - **Satisfies**: R1 — Render a chain of rows as **one document labelled with its version**, history behind a disclosure
+  - **Depends on**: P1-ENG-JV1K
+  - **Plan**: `.workflows/plan/P1-ENG-Q9XB.md`
 
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"

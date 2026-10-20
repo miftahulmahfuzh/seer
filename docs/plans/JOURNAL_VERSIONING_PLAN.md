@@ -253,12 +253,12 @@ Two more, both measured on this machine:
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Schema 8: the narrowed trigger, `supersedes`, `doc_key` | R4 | `engine/lab` | 4 | — | HARD | `.workflows/plan/journal-versioning/phase-1.md` | — | — |
-| 2 | Writer CLI: `lab insight --supersedes`, `lab link` | R3 | `engine/commands` | 2 | 1 | NORMAL | `.workflows/plan/journal-versioning/phase-2.md` | — | — |
-| 3 | Auto-link the five journalling writers on `doc_key` | R2 | `engine/lab` | 7 | 1 | NORMAL | `.workflows/plan/journal-versioning/phase-3.md` | — | — |
-| 4 | Export: snapshot emits the chain; TS mirror; document counts | R1 | `engine/lab` + `web/lib` | 4 | 1 | NORMAL | `.workflows/plan/journal-versioning/phase-4.md` | — | — |
-| 5 | Reader: heads-only, version chip, history disclosure, "Revised" | R1, R5 | `web/app/sera` | 8 | 4, 6 | HARD | `.workflows/plan/journal-versioning/phase-5.md` | — | — |
-| 6 | Backfill the 5 byte-identical pairs, 500→499 first | R3 | `lab/` data | 2 | 2, 4 | NORMAL | `.workflows/plan/journal-versioning/phase-6.md` | — | — |
+| 1 | Schema 8: the narrowed trigger, `supersedes`, `doc_key` | R4 | `engine/lab` | 4 | — | HARD | `.workflows/plan/journal-versioning/phase-1.md` | P1-ENG-JV1K | — |
+| 2 | Writer CLI: `lab insight --supersedes`, `lab link` | R3 | `engine/commands` | 2 | 1 | NORMAL | `.workflows/plan/journal-versioning/phase-2.md` | P1-ENG-H4ZQ | — |
+| 3 | Auto-link the five journalling writers on `doc_key` | R2 | `engine/lab` | 7 | 1 | NORMAL | `.workflows/plan/journal-versioning/phase-3.md` | P1-ENG-T2MD | — |
+| 4 | Export: snapshot emits the chain; TS mirror; document counts | R1 | `engine/lab` + `web/lib` | 4 | 1 | NORMAL | `.workflows/plan/journal-versioning/phase-4.md` | P1-ENG-Q9XB | — |
+| 5 | Reader: heads-only, version chip, history disclosure, "Revised" | R1, R5 | `web/app/sera` | 8 | 4, 6 | HARD | `.workflows/plan/journal-versioning/phase-5.md` | P1-WEB-K6DR | — |
+| 6 | Backfill the 5 byte-identical pairs, 500→499 first | R3 | `lab/` data | 2 | 2, 4 | NORMAL | `.workflows/plan/journal-versioning/phase-6.md` | P1-ROOT-N7FS | — |
 
 Waves the DAG allows: **[1] → [2, 3, 4] → [6] → [5]**.
 

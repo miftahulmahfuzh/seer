@@ -3,17 +3,17 @@
 **Package Path**: `.`
 **Package Code**: ROOT
 **Last Updated**: 2026-10-20
-**Total Active Tasks**: 8
+**Total Active Tasks**: 9
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 7
+- P1 High: 8
 - P2 Medium: 0
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 3
+- Blocked: 4
 - Completed: 26
 
 ---
@@ -105,6 +105,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Whether to update `engine/package_readme.md`, which no phase owns -> **yes, four exact-string insertions**, because its `control_shape.py` entry is an exhaustive public-surface list that three new public symbols made stale, and /implement Step 4 chains `readme-updater` by default. But the `**Last Updated**` header paragraph was deliberately left alone (Rung 1, invariant 9): six concurrent sessions each prepending to one line is the shared-file collision the invariant forbids, and phase 8 owns the set's written record.
     - Whether to commit `.workflows/todos.md` -> **no**. It already carries phase 8's entry (`P3-ROOT-D7MX`) alongside this one, and a pathspec commit of it would ship a peer's bookkeeping under this phase's message (Rung 3: phase 2's own commit block lists five source/test files and no `todos.md`). This entry is left in the working tree for whoever commits that file.
     - Whether this phase merges and lands -> **it does not**; the set is swarm-tracked and `/implement` Step 5a leaves the merge to `orch-honest-control-redraw`.
+- [ ] **P1-ROOT-N7FS** Phase 6: Backfill the 5 byte-identical pairs, 500→499 first
+  - **Difficulty**: NORMAL
+  - **Type**: Update
+  - **Context**: Owns running `lab link` over exactly five byte-identical pairs, in id order — 227→230 (M0131), 289→290 (M0024), 493→498 (M0127), 320→499 and 499→500 (M0179), **500→499 last so the chain 320→499→500 builds in the right direction** — then `lab stage` and one commit carrying `lab.sqlite` and `web/data/lab.json` together. The seven rows whose bodies differ are different variants and are deliberately left as siblings. Touches no source file; data only. Exit: the journal renders 495 documents from 500 rows; M0179's note reads version 3; the test-window look count still reads **4**; `pytest engine/tests` green after `lab stage`.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/journal-versioning/PLAN.md` (phase 6 of 6)
+  - **Satisfies**: R3 — Thread the duplicates that already exist, starting 500→499
+  - **Depends on**: P1-ENG-H4ZQ, P1-ENG-Q9XB
+  - **Plan**: `.workflows/plan/P1-ROOT-N7FS.md`
 
 ### [P2] Medium
 ### [P3] Low

@@ -2090,3 +2090,134 @@ def test_this_rule_retires_no_promotion_that_already_happened():
     finally:
         conn.close()
     assert hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest() == before
+
+
+# ------------------------------------------------------------------ the era edge names its arm
+#
+# F5 of the 2026-10-20 fold-selector audit. The column reported whichever arm had the highest MAR
+# over 2009-2015 itself; the buy signal spends its recommendation on the arm `lab promote` would
+# pre-register. Over the committed lab those were different arms for 39 of 74 dev-eligible
+# methods and disagreed on sign for 18. Both directions are pinned here, because the defect is
+# not that the old number was generous -- it was wrong in both directions.
+
+_ERA = (date(2009, 1, 1), date(2015, 10, 16))
+
+
+def _dipped(months: list[date], annual: float, dip: date, depth: float, recover: int = 6) -> str:
+    """``_curve``'s trend with one temporary fall of ``depth`` beginning at ``dip``.
+
+    The book leaves the fall exactly back on trend, so the slice's CAGR is the trend's and only its
+    max drawdown -- and therefore its MAR -- moves. That is how an arm can earn the most over an
+    era and still not be the era's highest-MAR arm, which is the whole shape of M0072.
+    """
+    def idx(d: date) -> int:
+        return d.year * 12 + d.month
+
+    out, v = [], 1.0
+    for d in months:
+        f = 1.0
+        if idx(d) >= idx(dip):
+            k = idx(d) - idx(dip)
+            if k < recover:
+                f = 1.0 - depth * (1.0 - k / recover)
+        out.append([d.isoformat(), round(v * f, 8)])
+        v *= (1.0 + annual) ** (1.0 / 12.0)
+    return json.dumps(out)
+
+
+def _wf_args(db):
+    return argparse.Namespace(
+        db=db, lab_command="walkforward", method=[], min_train_years=None, eval_years=None,
+    )
+
+
+def test_the_era_column_reports_the_promoted_variant_and_keeps_the_hindsight_arm(
+    tmp_path, capsys, monkeypatch
+):
+    """M0197's and M0243's live shape: the hindsight arm is positive, the promoted arm is not.
+
+    `M0001-A` grows 15% a year and wins every fold; `M0001-Z` grows 2%. The hindsight column names
+    A at +7.0% -- and a buy signal fired on that number until 2026-10-20. The arm that would be
+    pre-registered is Z, at -6.0%, and that is what the signal is now handed.
+    """
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0001", annual=0.15)
+    _variant(c, "M0001", "Z", annual=0.02)
+    z = c.execute("SELECT * FROM trials WHERE candidate_id = 'M0001-Z'").fetchone()
+    c.close()
+    monkeypatch.setattr(store, "best_dev_eligible", lambda _c, _m, **_k: z)
+
+    from seer_engine.commands import lab as lab_cmd
+
+    assert lab_cmd.run(_wf_args(db)) == 0
+    out = capsys.readouterr().out
+    row = next(line for line in out.splitlines() if line.strip().startswith("M0001"))
+    assert "6.0%" in row and "+7.0%" in row          # promoted left, hindsight right
+    assert row.index("6.0%") < row.index("+7.0%")
+    assert "negative 2009-2015 edge on the variant that would be promoted" in row
+    assert "No buy signal" in out
+    assert "(hindsight)" in out
+    assert "Nothing was recorded. No research store was opened." in out
+
+
+def test_the_era_column_can_release_a_method_the_hindsight_arm_was_suppressing(
+    tmp_path, capsys, monkeypatch
+):
+    """M0072's live shape, and the reason this is a correction rather than a tightening.
+
+    `M0001-A` earns 15% a year through the era but falls 40% inside it, so its era MAR is 0.38;
+    `M0001-Z` creeps along at 2% and never falls, so its era MAR is infinite and it is the
+    hindsight arm at -6.0%. A is what `lab promote` would pre-register, and it reads +7.0%. The
+    old column refused this method on an arm nobody would have traded.
+
+    A is named the way every other `promoted_variant` test in this module names one -- by patching
+    `store.best_dev_eligible` -- and not by out-MARing Z: this module's autouse fixture pins
+    `DSR_POLICY` to `all-trials` and every synthetic trial carries the same `sharpe`, so the
+    dev-Sharpe variance is zero and no arm is eligible at all. On the real lab the ranking does
+    the naming; here the ranking has nothing to rank.
+    """
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0001", curve_json=_dipped(_months(*DEV_SPAN), 0.15, date(2013, 3, 31), 0.40))
+    _variant(c, "M0001", "Z", annual=0.02)
+    a = c.execute("SELECT * FROM trials WHERE candidate_id = 'M0001-A'").fetchone()
+    c.close()
+    monkeypatch.setattr(store, "best_dev_eligible", lambda _c, _m, **_k: a)
+
+    from seer_engine.commands import lab as lab_cmd
+
+    assert lab_cmd.run(_wf_args(db)) == 0
+    out = capsys.readouterr().out
+    row = next(line for line in out.splitlines() if line.strip().startswith("M0001"))
+    assert "+7.0%" in row and "6.0%" in row
+    assert row.index("+7.0%") < row.index("6.0%")
+    assert "*** BUY SIGNAL ***" in out
+    assert "2009-2015 edge on the promoted variant +7.0 pts" in out
+    # and the two arms are named underneath, because the signs disagree
+    note = next(line for line in out.splitlines() if "hindsight M0001-Z" in line)
+    assert "promoted M0001-A" in note
+
+
+def test_a_method_with_no_promotable_variant_shows_a_dash_and_cannot_fire(
+    tmp_path, capsys, monkeypatch
+):
+    """Four dev-eligible methods are in this state today. The hindsight column still carries their
+    number, so no row loses information; the signal gets None and refuses."""
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0001", annual=0.15)
+    c.close()
+    monkeypatch.setattr(store, "best_dev_eligible", lambda _c, _m, **_k: None)
+
+    from seer_engine.commands import lab as lab_cmd
+
+    assert lab_cmd.run(_wf_args(db)) == 0
+    out = capsys.readouterr().out
+    row = next(line for line in out.splitlines() if line.strip().startswith("M0001"))
+    assert "+7.0%" in row                               # the hindsight arm is still reported
+    assert "no 2009-2015 edge for the variant that would be promoted" in row
+    assert "No buy signal" in out

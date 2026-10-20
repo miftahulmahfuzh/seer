@@ -2601,6 +2601,65 @@ def _regime(conn, args) -> int:
 HIGH_COVERAGE = (date(2009, 1, 1), date(2015, 10, 16))
 
 
+def _promoted_variant(conn, method_id: str) -> str | None:
+    """The candidate ``lab promote`` would pre-register, or None; never raises.
+
+    ``hardgate.promoted_variant`` and not a second query beside it, for exactly the reason
+    Decision D9 gives about the kin rule: two commands giving different answers about one method is
+    worse than either answer. The gate and this column must name the same arm, or the number the
+    buy signal reads is about a book the owner would not be holding.
+
+    None covers two different situations and the caller treats them the same, because for this
+    column they are the same: no eligible dev trial at all (``best_dev_eligible`` returns None --
+    four ``dev-eligible`` methods are in that state today), and a lab whose gate cannot be resolved
+    at all. Measured at 0.86s for all 168 methods in the committed lab, the per-method gate read
+    served from ``store._GATE_CACHE``.
+    """
+    from seer_engine.lab import hardgate
+
+    try:
+        return hardgate.promoted_variant(conn, method_id)
+    except store.LabError:
+        return None
+
+
+def _arm_roles(method_ids: Sequence[str]) -> dict[tuple[str, str], str]:
+    """``(method, candidate) -> " (control)"`` for every arm of ``method_ids``; ``{}`` when unreadable.
+
+    An arm's role is written in its rationale and nowhere else -- never in its id, which is why
+    ``control_shape`` reads the prose (``M0005-ALL-R``'s ``-R`` is a rank weighting, not a
+    control). Reading it needs the method files, so this is the one part of ``lab walkforward``
+    that opens anything outside the database. It is called **only** when the footnote below has
+    rows, so a lab with no sign disagreement -- every test fixture -- never imports a method module
+    at all. Measured on the committed lab: 0.96s for the first ``discover()``, 0.005s after.
+
+    It swallows everything. A method with no file, a file that will not import, a
+    ``control_shape`` without ``role_of`` because this phase landed before the one that adds it --
+    all come back as no label, and the footnote still names both arms and both numbers. The label
+    is the adjective on a line that is already complete without it, and a report that crashed
+    while annotating a footnote would be a worse answer than a report with a plainer footnote.
+    """
+    try:
+        from seer_engine.lab import control_shape
+        from seer_engine.lab.method import discover
+
+        found = discover()
+    except Exception:  # noqa: BLE001 -- a reader, deliberately: see the docstring
+        return {}
+    out: dict[tuple[str, str], str] = {}
+    for mid in method_ids:
+        entry = found.get(mid)
+        if entry is None:
+            continue
+        method, _path = entry
+        for arm in method.all_candidates():
+            try:
+                out[(mid, arm.id)] = f" ({control_shape.role_of(arm)})"
+            except Exception:  # noqa: BLE001
+                continue
+    return out
+
+
 def _walkforward(conn, args) -> int:
     """``lab walkforward``: the lab's selection rule, scored out of sample many times.
 
@@ -2656,18 +2715,25 @@ def _walkforward(conn, args) -> int:
     print(f"Walk-forward over {len(the_folds)} folds, {the_folds[0].eval_start} to "
           f"{the_folds[-1].eval_end}. Each fold picks the variant the lab's own rule would have")
     print("named knowing nothing past the train end, then scores it on months it has never seen.")
-    print("Folds share training data, so they are a sanity check and never a significance test.\n")
+    print("Folds share training data, so they are a sanity check and never a significance test.")
+    print("`2009-15 edge` is the variant `lab promote` would pre-register -- the arm the counted")
+    print("look and the owner's money are spent on, and the one the buy signal reads. `(hindsight)`")
+    print("is the column as it read before 2026-10-20: the arm with the highest MAR over 2009-2015")
+    print("itself, chosen after seeing that era. They name different arms for 46 of the 86 methods")
+    print("that have both, so every record written before then quotes the right-hand column.\n")
     warnings = _comparability_warnings(conn, int(bench_row["n"]), rows, wanted)
     for line in warnings:
         print(line)
     if warnings:
         print()
-    head = f"  {'method':<8}{'folds won':>11}{'stable':>9}{'2009-15 edge':>15}   verdict"
+    head = (f"  {'method':<8}{'folds won':>11}{'stable':>9}"
+            f"{'2009-15 edge':>15}{'(hindsight)':>14}   verdict")
     print(head)
     print("  " + "-" * (len(head) + 16))
 
     fired: list[str] = []
     majorities = 0
+    disagreed: list[tuple[str, str, float, str, float]] = []
     for mid, trials in sorted(by_method.items()):
         curves = {r["candidate_id"]: curve_of(r) for r in trials}
         deps = {
@@ -2675,16 +2741,18 @@ def _walkforward(conn, args) -> int:
             for r in trials
         }
         rec = wf.Record(mid, wf.evaluate(curves, bench, the_folds, deps))
-        best = max(
-            (c for c in curves),
-            key=lambda c: (wf.measure(curves[c], HIGH_COVERAGE[0], HIGH_COVERAGE[1], deps[c])
-                           or wf.Slice(0, None, None, None, None)).mar or -1e9,
-        )
-        mine = wf.measure(curves[best], *HIGH_COVERAGE, deps[best])
-        theirs = wf.measure(bench, *HIGH_COVERAGE)
+        # Two era edges, and which one is which is the whole of this report's 2026-10-20 change.
+        # `best` is the hindsight arm -- highest MAR over 2009-2015 itself, from every arm the
+        # method registered, controls and placebos included. It is printed because the archive
+        # quotes it and never handed to the signal. `edge` is the arm `lab promote` would
+        # pre-register: the one the counted look and the money are spent on. For M0201 those were
+        # a placebo at +1.8 pts and the real book at -7.8.
+        best, best_edge = wf.best_era_arm(curves, bench, *HIGH_COVERAGE, deps)
+        promoted = _promoted_variant(conn, mid)
         edge = (
-            None if mine is None or theirs is None or mine.cagr is None or theirs.cagr is None
-            else mine.cagr - theirs.cagr
+            None
+            if promoted is None or promoted not in curves
+            else wf.era_edge(curves[promoted], bench, *HIGH_COVERAGE, deps.get(promoted))
         )
         row = store.get_method(conn, mid)
         eligible = row is not None and row["status"] == "dev-eligible"
@@ -2711,11 +2779,30 @@ def _walkforward(conn, args) -> int:
             fired.append(f"{mid}: {why}")
         if rec.majority:
             majorities += 1
+        if (
+            eligible
+            and edge is not None
+            and best_edge is not None
+            and promoted is not None
+            and (edge > 0) != (best_edge > 0)
+        ):
+            disagreed.append((mid, promoted, edge, best, best_edge))
         print(f"  {mid:<8}{rec.won:>6} of {len(rec.scored):<3}"
               f"{('yes' if rec.stable else 'no'):>9}"
-              f"{(fmt_signed_pct(edge) if edge is not None else '-'):>15}   {why}")
+              f"{(fmt_signed_pct(edge) if edge is not None else '-'):>15}"
+              f"{(fmt_signed_pct(best_edge) if best_edge is not None else '-'):>14}   {why}")
 
     print(f"\n{majorities} of {len(by_method)} methods beat the benchmark in a majority of folds.")
+    if disagreed:
+        roles = _arm_roles([mid for mid, *_rest in disagreed])
+        print(f"\n{len(disagreed)} dev-eligible method(s) where the two columns disagree on sign --")
+        print("the only place the fourth buy condition's answer turns on which arm is read. The")
+        print("left arm is the one `lab promote` would pre-register and `lab survivorship` reports;")
+        print("the right is the arm chosen by hindsight over 2009-2015 itself.")
+        for mid, prom, prom_edge, best, best_edge in disagreed:
+            print(f"  {mid:<8}promoted {prom}{roles.get((mid, prom), '')} "
+                  f"{fmt_signed_pct(prom_edge)}   hindsight {best}{roles.get((mid, best), '')} "
+                  f"{fmt_signed_pct(best_edge)}")
     if fired:
         print("\n  *** BUY SIGNAL ***")
         for line in fired:

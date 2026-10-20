@@ -159,6 +159,68 @@ def measure(
     return Slice(len(seg), total, cagr, fall, mar)
 
 
+def era_edge(
+    curve: Sequence[tuple[date, float]],
+    bench: Sequence[tuple[date, float]],
+    start: date,
+    end: date,
+    deposits: Mapping[date, float] | None = None,
+) -> float | None:
+    """``curve``'s annualised lead over ``bench`` between ``start`` and ``end``; None if unmeasurable.
+
+    De-funded on both sides by ``measure``, so a book that was fed monthly is not credited with its
+    own deposits against a benchmark that received none. None when either side has fewer than two
+    months in the slice or no computable CAGR -- "nobody could measure it" is not a zero edge, and
+    ``buy_signal`` refuses on it rather than treating it as a pass.
+
+    This is the same arithmetic ``lab survivorship`` does per variant (``survivorship_check.py``),
+    which is why the two commands can now be quoted in the same sentence about the same arm. They
+    disagreed for a year because they were measuring different arms, not different numbers.
+    """
+    mine = measure(curve, start, end, deposits)
+    theirs = measure(bench, start, end)
+    if mine is None or theirs is None or mine.cagr is None or theirs.cagr is None:
+        return None
+    return mine.cagr - theirs.cagr
+
+
+def best_era_arm(
+    curves: Mapping[str, Sequence[tuple[date, float]]],
+    bench: Sequence[tuple[date, float]],
+    start: date,
+    end: date,
+    deposits: Mapping[str, Mapping[date, float]] | None = None,
+) -> tuple[str | None, float | None]:
+    """The arm with the highest MAR **over the era itself**, and its edge. Hindsight, by design.
+
+    Nothing here is a selection rule the lab could have followed: the era is chosen after the fact
+    and the arm is ranked on it, so the answer is "which of these arms turned out best in
+    2009-2015", not "which arm would a researcher have named". It is kept, and kept under a name
+    that says so, because every insight, handover and analysis the lab wrote before 2026-10-20
+    quotes this number as the ``2009-15 edge``, and a record whose numbers cannot be reproduced is
+    not a record.
+
+    Two details are preserved from the inline expression in ``commands/lab.py`` this replaces,
+    deliberately and not as an oversight, because changing either would silently move a figure in
+    the archive:
+
+    - ties go to the **first arm in ``curves``** (insertion order, which the caller builds in
+      trial order), not to the first by id. ``pick`` sorts and this does not;
+    - ``or -1e9`` ranks an arm whose era MAR is exactly ``0.0`` below every other arm, because
+      ``0.0`` is falsy. No recorded dev curve hits it; it is written down rather than fixed.
+    """
+    dep = deposits or {}
+    if not curves:
+        return None, None
+
+    def rank(cid: str) -> float:
+        got = measure(curves[cid], start, end, dep.get(cid))
+        return ((got or Slice(0, None, None, None, None)).mar or -1e9)
+
+    best = max((c for c in curves), key=rank)
+    return best, era_edge(curves[best], bench, start, end, dep.get(best))
+
+
 def pick(
     curves: Mapping[str, Sequence[tuple[date, float]]],
     fold: Fold,
@@ -251,9 +313,9 @@ class Record:
 
 BUY_CONDITIONS = (
     "dev-eligible",
-    "no kin has test-failed (family union ancestors)",
+    "no kin has test-failed (family union ancestors union blend ingredients union behaviour)",
     "majority of folds",
-    "positive 2009-2015 edge",
+    "positive 2009-2015 edge on the variant that would be promoted",
 )
 
 
@@ -267,8 +329,9 @@ def buy_signal(
 
     All four must hold: the method is dev-eligible at the bars in force; no method in its family
     has already failed the test window; it beat the benchmark in a majority of walk-forward folds;
-    and its edge in the highest-coverage era (2009-2015) is positive, so the edge is not an
-    artefact of the half of the universe the store cannot price.
+    and **the variant that would be promoted** has a positive edge in the highest-coverage era
+    (2009-2015), so the edge is not an artefact of the half of the universe the store cannot
+    price.
 
     **The kin condition was added after running this.** Without it the signal fired on M0007,
     M0019 and M0020 -- and every one of the three is in a family that had *already* failed out of
@@ -279,18 +342,43 @@ def buy_signal(
     disproven is not a fresh candidate.
 
     ``family_failed`` is whatever the caller's kin rule found. ``lab walkforward`` passes
-    ``hardgate.failed_kin``, the **same** rule the promote gate enforces -- family union transitive
-    ancestors. They were briefly different: the gate walked ancestry and this did not, so the
-    signal called M0030's family clean while the gate refused it on its parent M0029 and
-    grandparent M0021. Two commands giving opposite answers about one method is worse than either
-    answer, which is why Decision D9 was resolved by aligning them rather than documenting the
-    gap.
+    ``hardgate.failed_kin``, the **same** rule the promote gate enforces -- family, union transitive
+    ancestors, union the blend ingredients a variant runs and their families (hardgate D12), union
+    the tested books a variant moves with at 0.85 correlation (hardgate D14). They were briefly
+    different: the gate walked ancestry and this did not, so the signal called M0030's family clean
+    while the gate refused it on its parent M0029 and grandparent M0021. Two commands giving
+    opposite answers about one method is worse than either answer, which is why Decision D9 was
+    resolved by aligning them rather than documenting the gap. ``BUY_CONDITIONS`` above said
+    "family union ancestors" until 2026-10-20, which under-described it; hardgate D13 is the record
+    of that debt and this is the paragraph that pays it.
 
     The third is what makes the purchase about *data*. The dev store prices 48% of index members
     in 1996 and 74% in 2014, and the 522 it cannot price are disproportionately the companies that
     died. A method whose edge lives in the thin early years and dies by 2009-2015 is probably
     reading that hole, and it can be rejected for free. A method that passes all three has used up
     the free evidence, and the next two things that happen are a counted look and real money.
+
+    **Which arm the era edge is measured on, and why it is the promoted one.** The condition is
+    the last thing standing between a report and spending money, so it has to be about the book the
+    money goes into: ``store.best_dev_eligible``, the variant ``lab promote`` pre-registers and
+    ``lab survivorship`` reports. Until 2026-10-20 ``lab walkforward`` handed in the edge of
+    whichever arm had the highest MAR over 2009-2015 **itself** -- chosen with hindsight over the
+    very era it is judged on, from every arm including the ones registered to be beaten. Measured
+    over the 74 dev-eligible methods where both numbers exist, that was a different arm for 39, a
+    **control** arm for 19, and the two disagreed on sign for 18: eleven read positive while the
+    arm that would be traded was negative, and seven the reverse. The worst was M0201, reporting
+    +1.82 pts on ``M0201-PLC2-MV10`` -- *"Placebo: hash order seed 2, sized by market value"* --
+    while ``M0201-Y20-MV10-SW``, the arm it would have promoted, sat at -7.82. It was not merely
+    generous: M0072 was **refused** at -1.09 pts on ``M0072-Z2`` while ``M0072-Z2-RAWRANK``, its
+    own promoted arm, was at +2.26. A condition that can be wrong in both directions is not a
+    conservative condition, it is a condition about the wrong thing.
+
+    ``high_coverage_edge`` is therefore ``None`` for a method with no promotable variant at all --
+    ``best_dev_eligible`` returning ``None``, which is true of four ``dev-eligible`` methods today
+    (M0007, M0011, M0019, M0020, whose frozen status predates the N policy move of 2026-10-08) --
+    and the signal refuses on it. Each of those four is already refused one condition earlier, by
+    kin; the rule is written down anyway rather than left resting on that, because the next method
+    in that shape may have clean kin. There is no arm to buy data for, so there is nothing to buy.
 
     Returns ``(fired, why)``; ``why`` names the first condition that failed, so a report can say
     what is missing rather than only that nothing happened.
@@ -302,10 +390,13 @@ def buy_signal(
     if not record.majority:
         return False, f"fails the folds: {record.summary()}"
     if high_coverage_edge is None:
-        return False, "no 2009-2015 edge measured"
+        return False, "no 2009-2015 edge for the variant that would be promoted"
     if high_coverage_edge <= 0:
-        return False, f"negative 2009-2015 edge ({high_coverage_edge * 100:+.1f} pts)"
+        return False, (
+            f"negative 2009-2015 edge on the variant that would be promoted "
+            f"({high_coverage_edge * 100:+.1f} pts)"
+        )
     return True, (
         f"cleared all {len(BUY_CONDITIONS)}: dev-eligible, kin clean, {record.summary()}, "
-        f"2009-2015 edge {high_coverage_edge * 100:+.1f} pts"
+        f"2009-2015 edge on the promoted variant {high_coverage_edge * 100:+.1f} pts"
     )

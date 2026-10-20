@@ -166,6 +166,61 @@ def test_evaluate_on_no_candidates_is_empty_not_an_error():
     assert wf.evaluate({}, curve(M240, 0.005), wf.folds(M240)) == ()
 
 
+def test_era_edge_is_the_slice_lead_over_the_benchmark():
+    ms = months(date(2000, 1, 1), 60)
+    mine, theirs = curve(ms, 0.01), curve(ms, 0.005)
+    got = wf.era_edge(mine, theirs, ms[0], ms[-1])
+    a = wf.measure(mine, ms[0], ms[-1]).cagr
+    b = wf.measure(theirs, ms[0], ms[-1]).cagr
+    assert got == pytest.approx(a - b)
+
+
+def test_era_edge_strips_deposits_before_it_compares():
+    """A fed book must not be credited with its own deposits against a benchmark that got none."""
+    ms = months(date(2000, 1, 1), 25)
+    fed = [(d, 100.0 + 10.0 * i) for i, d in enumerate(ms)]
+    flat = [(d, 100.0) for d in ms]
+    dep = {d: 10.0 for d in ms[1:]}
+    assert wf.era_edge(fed, flat, ms[0], ms[-1], dep) == pytest.approx(0.0, abs=1e-9)
+    assert wf.era_edge(fed, flat, ms[0], ms[-1]) > 0.1
+
+
+def test_era_edge_is_none_rather_than_zero_when_the_slice_cannot_be_read():
+    ms = months(date(2000, 1, 1), 24)
+    assert wf.era_edge(curve(ms, 0.01), curve(ms, 0.005), ms[3], ms[3]) is None
+
+
+def test_best_era_arm_ranks_on_the_era_itself_which_is_hindsight():
+    """The arm with the best MAR *inside* the era wins, even when another earns far more there.
+
+    This is the measurement the column kept until 2026-10-20 and it is kept, under a name that
+    says what it is: `M0072-Z2` beat `M0072-Z2-RAWRANK` on era MAR while earning 3.3 points less.
+    """
+    ms = months(date(2009, 1, 1), 72)
+    smooth = curve(ms, 0.002)                       # never falls: MAR is infinite
+    rich = [(d, v) for d, v in curve(ms, 0.012)]
+    rich[30] = (rich[30][0], rich[30][1] * 0.6)     # one fall, so its MAR is finite
+    bench = curve(ms, 0.005)
+    arm, edge = wf.best_era_arm({"RICH": rich, "SMOOTH": smooth}, bench, ms[0], ms[-1])
+    assert arm == "SMOOTH"
+    assert edge == pytest.approx(wf.era_edge(smooth, bench, ms[0], ms[-1]))
+    assert edge < wf.era_edge(rich, bench, ms[0], ms[-1])
+
+
+def test_best_era_arm_breaks_ties_on_insertion_order_not_on_the_id():
+    """`pick` sorts the ids; this does not, and the difference is in the archive. Pinned so a
+    later tidy-up cannot silently move a number every recorded insight quotes."""
+    ms = months(date(2009, 1, 1), 72)
+    bench = curve(ms, 0.005)
+    both = {"Z-FIRST": curve(ms, 0.01), "A-SECOND": curve(ms, 0.01)}
+    assert wf.best_era_arm(both, bench, ms[0], ms[-1])[0] == "Z-FIRST"
+
+
+def test_best_era_arm_on_no_curves_is_empty_not_an_error():
+    ms = months(date(2009, 1, 1), 24)
+    assert wf.best_era_arm({}, curve(ms, 0.005), ms[0], ms[-1]) == (None, None)
+
+
 # --------------------------------------------------------------------------- the buy signal
 
 def winner() -> wf.Record:
@@ -250,3 +305,30 @@ def test_buy_signal_refuses_kin_that_has_already_failed_out_of_sample():
 
 def test_the_kin_check_does_not_block_clean_kin():
     assert wf.buy_signal(True, winner(), 0.03, family_failed=None)[0] is True
+
+
+def test_the_era_condition_says_which_arm_it_means():
+    """R4: the column said +0.3% for M0179 and `lab survivorship` said -5.6%, and both were right
+    -- about different arms. A condition that spends the owner's money has to name its arm."""
+    assert "promoted" in wf.BUY_CONDITIONS[3]
+    _f, why = wf.buy_signal(True, winner(), -0.021)
+    assert "negative 2009-2015 edge on the variant that would be promoted" in why
+    _f, why = wf.buy_signal(True, winner(), None)
+    assert "no 2009-2015 edge for the variant that would be promoted" in why
+    fired, why = wf.buy_signal(True, winner(), 0.026)
+    assert fired and "2009-2015 edge on the promoted variant +2.6 pts" in why
+
+
+def test_the_kin_condition_describes_the_rule_it_is_actually_handed():
+    """hardgate D13's other outstanding item: the text said "family union ancestors" while the
+    caller hands it `failed_kin`, which is also D12's ingredients and D14's behaviour."""
+    kin = wf.BUY_CONDITIONS[1]
+    assert "ancestors" in kin and "ingredients" in kin and "behaviour" in kin
+
+
+def test_a_method_with_no_promotable_variant_cannot_fire():
+    """`best_dev_eligible` returns None for four dev-eligible methods today (M0007, M0011, M0019,
+    M0020): their status is frozen at their run date and the N policy moved under them. All four
+    are refused by kin one condition earlier; the rule does not rest on that."""
+    fired, why = wf.buy_signal(True, winner(), None, family_failed=None)
+    assert fired is False and "no 2009-2015 edge" in why

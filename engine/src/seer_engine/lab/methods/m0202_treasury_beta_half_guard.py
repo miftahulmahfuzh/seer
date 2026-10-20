@@ -33,6 +33,22 @@ orders exactly the names M0197's loadings could score by M0187's hash of (seed, 
 the frame with no idea in it. Two placebo seeds under "half" and one under "half-fast", so the
 idea's lead is read against a spread and not a single draw.
 
+Amendment 1 (2026-10-19), the shape-matched placebo. Those three arms trade about 2.25x the book
+each controls and turn over 1.99x to 2.20x it, so every gap quoted against them was read against an
+opponent paying twice the fees, and D17 refuses the method on it. The cause is the re-key period,
+chosen by hand: M0187's hash is keyed on the month, so the whole book is re-drawn at every
+quarterly re-pick, while M0197's 40% keep band holds a name unless it slips out of the top 40% of
+the pool. ``Y20-HALF-PLC1``, ``Y20-HALF-PLC2`` and ``Y20-HALF-FAST-PLC1`` keep the frame, the
+guard and the seeds and derive the re-key from the bond book's own calendar: at each re-pick the
+allocator re-reads M0197's bond ranking at this date and at the previous quarter's re-pick, counts
+how many of that quarter's twenty are still under the band, and lets the blind draw replace exactly
+the rest. Measured over the dev window's 79 re-picks before any of this ran: 423 entries against
+the real book's 443, a ratio of 0.955, where the recorded arms sit at 2.24. The names also change:
+``PLC1-HALF-FAST`` is resolved by ``lab control`` against ``Y20-HALF`` rather than its real target
+``Y20-HALF-FAST``, because its stem is itself a placebo and the ladder steps past it;
+``Y20-HALF-FAST-PLC1`` puts the target's whole name in the control's, so the strongest rung reaches
+the right arm. The cost is the lookback -- 331 bars instead of 253 -- which moves no window.
+
 Market-aware (``market_fields = ("series",)``): the history-only path has no yield, so by the
 contract it targets nothing. Rules are ``monthly-hold-frac-gotrade``, as M0197: fractional shares,
 Gotrade's real fees, the owner's monthly deposits, resized when a slot is off by 1% of the account
@@ -48,12 +64,17 @@ from datetime import date
 from decimal import ROUND_DOWN, Decimal
 from typing import Any
 
+import numpy as np
+
 from seer_engine.backtest.dev import Candidate
 from seer_engine.backtest.market import EMPTY_SERIES, MarketSeries
-from seer_engine.lab.method import Method
+from seer_engine.lab.control_draw import matched_partition
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0187_placebo_hash_order import draw
 from seer_engine.lab.methods.m0197_treasury_yield_beta import (
     REPICK_MONTHS,
+    STEP,
+    WEEKS,
     YieldBetaParams,
     YieldBetaPrepared,
     choose,
@@ -243,6 +264,260 @@ def _v(suffix: str, params: HalfGuardParams, rationale: str) -> Candidate:
                      owner_inputs=())
 
 
+# ------------------------------------------------------------------ amendment 1 (2026-10-19)
+#
+# The shape-matched placebo. See the module docstring for why the recorded arms trade 2.25x the
+# book each controls; what follows is the repair. Nothing above this line changes: a new allocator
+# id is the only safe way to add an arm, because `registry._canon` renders a params dataclass by
+# `dataclasses.fields()` and a field added to `HalfGuardParams` -- even a defaulted one -- would
+# move every recorded config_digest that used it.
+
+AMENDED = date(2026, 10, 19)
+PREV_SPAN = 70  # sessions in a quarter, with room for the longest one in the dev window
+MATCHED_LOOKBACK = WEEKS * STEP + PREV_SPAN + 1  # 331: a year of weekly marks before the previous
+                                                 # re-pick, which the matched draw re-reads
+REAL_SIDE = "bond"  # the side of the book these three arms are the controls for
+
+
+def _check_control(params: object) -> HalfGuardParams:
+    """``HalfGuardParams``, plus the one thing a control's params may not say.
+
+    The matched draw differs from the three recorded placebo arms in its allocator id and in
+    nothing else, so the params must still read ``side="placebo"``. Saying ``"bond"`` would record
+    a configuration whose text claims a yield ranking this allocator never performs -- the config
+    text is the public record of what an arm did, and a blind book must not describe itself as a
+    ranked one.
+    """
+    p = _check(params)
+    if p.side != "placebo":
+        raise ValueError(
+            f"the matched draw is a control: side must be 'placebo', got {p.side!r}"
+        )
+    return p
+
+
+def prev_repick_session(history: Mapping[str, History], data_date: date,
+                        market: str) -> date | None:
+    """The session this chassis last re-picked on, or None when the history does not reach it.
+
+    Derived from the calendar, never carried in state: an allocator is called once per session and
+    holds nothing between calls. The rules are ``monthly-hold-frac-gotrade``, so a decision session
+    is the first session of a month and the ``data_date`` the allocator is handed is the last
+    session of the month before it; a re-pick month is one of ``REPICK_MONTHS``, three apart. So
+    the previous re-pick's data date is the last session ``market`` printed in the month three
+    calendar months back. The search is bounded by ``data_date``'s own index, so it can see no bar
+    the session cannot.
+
+    This chassis does NOT call ``control_draw.previous_decision_date``, and must not: that helper
+    answers the previous *monthly* decision, which is the right question wherever a basket moves
+    every month. Here ``_run`` passes an empty ``frac`` on every non-``REPICK_MONTHS`` month, so
+    the allocator is called monthly but the basket only moves quarterly, behind M0197's 40% keep
+    band, and there is no monthly entry count to match. Written out here rather than imported from
+    M0201 on purpose: importing it would make M0202's recorded trials depend on M0201's file while
+    only M0201's ``method_amendments.source_sha`` moved.
+    """
+    h = history.get(market)
+    if h is None:
+        return None
+    i = h.index_of(data_date)
+    if i is None:
+        return None
+    year, month = data_date.year, data_date.month - 3
+    if month <= 0:
+        year, month = year - 1, month + 12
+    after = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    k = int(np.searchsorted(h.dates[: i + 1], np.datetime64(after, "D"), side="left")) - 1
+    if k < 0:
+        return None
+    out = h.dates[k].item()
+    return out if (out.year, out.month) == (year, month) else None
+
+
+def real_frac_at(prepared: YieldBetaPrepared, members: AbstractSet[str], data_date: date,
+                 p: HalfGuardParams) -> dict[str, float]:
+    """M0197's own bond-side rank fractions on ``data_date``, over ``members``.
+
+    ``members`` is the set the allocator was handed for its own session and is used unchanged at
+    the previous quarter: a control is never given the membership of a past date, and reading
+    today's set backwards uses no data the session does not already have. ``YieldBetaPrepared``
+    carries no Market and so could not reach a past membership even if that were wanted, and M0201
+    runs the identical rule on purpose, so the two amendments are one rule and not two.
+    """
+    inner = p.yb.inner
+    if prepared.factor is None:
+        rows = factor_rows(prepared.history, members, data_date, inner)
+    else:
+        rows = prepared.factor.rows_on(members, data_date, inner)
+    return yb_scored(prepared.history, prepared.series, rows, data_date,
+                     replace(p.yb, side=REAL_SIDE))
+
+
+def matched_entries(prepared: YieldBetaPrepared, members: AbstractSet[str], data_date: date,
+                    now: Mapping[str, float], p: HalfGuardParams) -> int:
+    """How many names the bond book itself takes in on ``data_date``.
+
+    Its own keep band, applied to the book it would have held at the previous quarter's re-pick:
+    every name of that book still under ``keep_pct`` stays, and the rest of the twenty slots are
+    entries. The band and not a symmetric difference, because a name that slips from rank 18 to
+    rank 40 is kept by this chassis and is not an entry; counting ``control_draw.churn`` over two
+    top-20 lists would over-state it and re-make the error this amendment exists to undo. With no
+    previous re-pick in reach the whole book is an entry, which is what the chassis does on its
+    first session anyway.
+    """
+    top = p.yb.inner.top
+    before_date = prev_repick_session(prepared.history, data_date, p.yb.market)
+    if before_date is None:
+        return top
+    before = real_frac_at(prepared, members, before_date, p)
+    if not before:
+        return top
+    book = [s for _, s in sorted((v, s) for s, v in before.items())][:top]
+    cut = p.yb.keep_pct / 100.0
+    kept = min(sum(1 for s in book if now.get(s, 1.0) < cut), top)
+    return max(0, top - kept)
+
+
+def matched_frac(prepared: YieldBetaPrepared, members: AbstractSet[str], data_date: date,
+                 held: frozenset[str], p: HalfGuardParams) -> dict[str, float]:
+    """Rank fractions that drive M0197's ``choose`` to a blind book of the bond book's own shape.
+
+    ``choose`` keeps a holding whose fraction is under ``keep_pct`` and fills the rest of the
+    twenty slots from the top of the order, so a fraction below the band is an instruction to hold
+    and one above it an instruction to enter. The names the matched draw keeps are laid out under
+    the band in keep order, and every other name above it in the order the control would take it --
+    ``matched_partition``'s ``tail``, which guarantees the names the control does not hold come
+    before the holdings it is dropping, so a just-dropped name is never taken straight back.
+    ``choose`` itself is called unchanged, and so is the guard that halves what it returns, so the
+    band, the quarterly calendar, the SPY filler and the half-size rule are byte-identical to the
+    arm this controls; the only thing that differs is which names fill the slots.
+    """
+    now = real_frac_at(prepared, members, data_date, p)
+    if not now:
+        return {}
+    cut = p.yb.keep_pct / 100.0
+    top = p.yb.inner.top
+    keep, tail = matched_partition(
+        pool=sorted(now),
+        held=held,
+        keep_n=max(0, top - matched_entries(prepared, members, data_date, now, p)),
+        tag="M0202",
+        seed=p.seed,
+        data_date=data_date,
+    )
+    out: dict[str, float] = {s: cut * (i + 1) / (len(keep) + 1) for i, s in enumerate(keep)}
+    for j, s in enumerate(tail):
+        out[s] = cut + (1.0 - cut) * (j + 1) / (len(tail) + 1)
+    return out
+
+
+class MatchedHalfGuardPlaceboAllocator(HalfGuardAllocator):
+    """M0202's guarded book filled by a blind draw of the bond book's own shape, under its own id.
+
+    Everything but the order is ``HalfGuardAllocator``'s: the screen, the band, the quarterly
+    calendar, the SPY filler and the half-size guard in both its speeds. Two things change. The
+    order on a re-pick comes from ``matched_frac`` instead of ``ranked``. And the lookback rises to
+    ``MATCHED_LOOKBACK``, because this control re-reads the bond ranking at the previous quarter's
+    re-pick and ``loadings`` wants a year of weekly marks before whatever date it is given; the
+    rise moves no window, since ``candidate_window`` floors at the member index's 1996-01-02 and
+    SPY's 331st bar is 1994-05-19.
+    """
+
+    id = "M0202-A1"
+
+    def lookback(self, params: Any) -> int:
+        return max(super().lookback(params), MATCHED_LOOKBACK)
+
+    def _run(self, prepared: YieldBetaPrepared, members: AbstractSet[str], data_date: date,
+             held: frozenset[str], p: HalfGuardParams) -> tuple[Target, ...]:
+        p = _check_control(p)
+        if len(prepared.series) == 0:  # no series: target nothing (market-aware contract)
+            return ()
+        stocks = [s for s in held if s != p.yb.market and s not in EXCLUDED]
+        repick = not stocks or data_date.month in REPICK_MONTHS
+        frac = matched_frac(prepared, members, data_date, held, p) if repick else {}
+        out = choose(prepared.history, members, frac, data_date, held, p.yb)
+        return out if full_size(prepared.history, data_date, p) else halved(out)
+
+
+MATCHED = MatchedHalfGuardPlaceboAllocator()
+
+
+def _vm(suffix: str, params: HalfGuardParams, rationale: str,
+        supersedes: tuple[str, ...]) -> Candidate:
+    """An amendment candidate, with the declaration of which recorded arm it replaces.
+
+    It matters most on the third arm: ``PLC1-HALF-FAST`` resolves to ``Y20-HALF`` while its
+    replacement resolves to ``Y20-HALF-FAST``, so a supersession rule that matched targets would
+    retire nothing there. D17's rule is a declaration, and this is where it is made."""
+    return Candidate(id=f"M0202-{suffix}", family="M0202", rules=MONTHLY_HOLD_FRAC_GOTRADE,
+                     allocator=MATCHED, params=params, rationale=rationale, added=AMENDED,
+                     owner_inputs=(), supersedes=supersedes)
+
+
+MATCHED_CONTROL_AMENDMENT = Amendment(
+    added=AMENDED,
+    why=(
+        "The guarded placebo re-drawn to the bond book's own churn, because the recorded three "
+        "trade about 2.25x the book each controls and the gaps were quoted against them"
+    ),
+    hypothesis=(
+        "Written before any result. PLC1-HALF, PLC2-HALF and PLC1-HALF-FAST order the same "
+        "scoreable names by a hash re-keyed every month, so the whole book is re-drawn at every "
+        "quarterly re-pick while the bond book's own 40% keep band holds about fourteen of its "
+        "twenty names; measured, they trade 2.25x, 2.25x and 2.25x the arms they control and turn "
+        "over 2.01x, 1.99x and 1.91x, outside or at the edge of D17's refuse band. These three "
+        "arms keep the frame, the guard and the seeds and change only where the re-key comes "
+        "from: at each re-pick the blind draw replaces exactly as many names as the bond book's "
+        "own band lets go, counted by re-reading M0197's bond ranking at this date and at the "
+        "previous quarter's re-pick. The direction, pre-registered: a control that traded 2.25x "
+        "was over-paying Gotrade's fees on about twelve entries a quarter instead of five or six, "
+        "so an honestly-shaped replacement pays less and earns MORE, and every lead quoted "
+        "against the old three NARROWS or REVERSES. Concretely, on the deposits (SPY TR 7.19% a "
+        "year): Y20-HALF's 12.65% against PLC1-HALF's 11.30% is a 1.35 point lead that shrinks "
+        "and may cross zero; against PLC2-HALF's 9.56% the 3.09 point lead shrinks; "
+        "Y20-HALF-FAST's 12.14% against PLC1-HALF-FAST's 11.38% is a 0.76 point lead that is the "
+        "likeliest of the three to reverse. The third arm is also re-aimed: PLC1-HALF-FAST is "
+        "resolved today against Y20-HALF rather than Y20-HALF-FAST, and Y20-HALF-FAST-PLC1 puts "
+        "the target's whole name in the control's so the margin is read against the arm it "
+        "actually controls. Two seeds under the slow guard are kept deliberately, so the lead is "
+        "read against a spread and not a single draw. Success for the amendment is only this: all "
+        "three new arms land inside 0.80x-1.25x on trades and on turnover against the arm each "
+        "resolves to. Whatever the margin then says is the finding and is reported as it comes; "
+        "no seed is tuned and no arm is re-drawn for a better one."
+    ),
+    expected_failure=(
+        "The shape may match and the leads may still move the other way, and if they do the cause "
+        "is not fees but name identity: a blind book of twenty members drawn with the real book's "
+        "churn still holds a different twenty, and over 1996-2015 the dev store's surviving "
+        "members earned enough that a random slow-turning book can beat a bond-like book on luck "
+        "alone -- PLC1-HALF's 11.30% against PLC2-HALF's 9.56% is already a 1.7 point spread "
+        "between two draws of the same rule. Second, the match itself may miss on the fast guard "
+        "rather than the slow one: HALF-FAST flips between full and half size far more often than "
+        "HALF (2.71 turnover against 2.35 on the same 440 trades), those flips are resize trades "
+        "the entry-count derivation does not control, and a blind book's weights sit differently "
+        "under a halving than a bond book's. Third, the entry count is derived by re-reading the "
+        "bond ranking at the previous quarter with today's member set, which the walk put at "
+        "0.955 of the real book's entries rather than 1.00. If any arm lands outside the band the "
+        "amendment has failed its own test and the number is recorded as the failure, not "
+        "corrected."
+    ),
+    candidates=(
+        _vm("Y20-HALF-PLC1", _p("placebo", "half", seed=1),
+            "Placebo, shape-matched: the same scoreable names in a hash order (seed 1), re-drawn "
+            "only as often as the bond book's own picks turn over, same half-size guard",
+            supersedes=("M0202-PLC1-HALF",)),
+        _vm("Y20-HALF-PLC2", _p("placebo", "half", seed=2),
+            "Placebo, shape-matched: hash order seed 2, the same matched churn, same half-size "
+            "guard",
+            supersedes=("M0202-PLC2-HALF",)),
+        _vm("Y20-HALF-FAST-PLC1", _p("placebo", "half-fast", seed=1),
+            "Placebo, shape-matched: hash order seed 1, the same matched churn, under the fast "
+            "guard",
+            supersedes=("M0202-PLC1-HALF-FAST",)),
+    ),
+)
+
+
 METHOD = Method(
     id="M0202",
     name=(
@@ -306,4 +581,5 @@ METHOD = Method(
         "concept:treasury-beta",
         "concept:half-size-trend-guard",
     ),
+    amendments=(MATCHED_CONTROL_AMENDMENT,),
 )

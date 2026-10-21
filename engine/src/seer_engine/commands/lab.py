@@ -2016,6 +2016,66 @@ def _run(conn, args) -> int:
             elif not retired:
                 print("  Every control arm matches the arm it controls on both axes. A margin "
                       "measured against them is this book's own.")
+
+    # The run's mirror-pair reading, from the rows that were just recorded. Insight 523: a rule
+    # run beside its own mirror proves the SIGNAL is real and says NOTHING about what ACTING on it
+    # costs, because both arms pay that cost equally and it cancels. Learning the cost needs a
+    # third arm -- the same book never stepping aside and never switching. Of 28 reversed pairs
+    # across 23 methods recorded before this annotation existed, only SIX could be priced.
+    #
+    # This is a FORWARDER and deliberately nothing more. It asks `dressing.survey` the same
+    # question `lab dressing` asks and prints its answer, so the two can never disagree about a
+    # pair and an improvement to dressing's endpoint test improves this line for free. In
+    # particular it owns no bars of its own: whether an endpoint exists is dressing's judgement,
+    # not this module's.
+    #
+    # It ANNOTATES; it does not gate (hardgate D15). Whether a method measured its own cost is a
+    # question about EXPERIMENT DESIGN, and the gate exists to refuse bad books -- a method can be
+    # perfectly promotable and still have failed to price its own habits. It prints here, at the
+    # one moment the repair is still free: an amendment appends arms under this method's own id,
+    # so no method id and no luck-gate N is spent.
+    #
+    # `survey` records nothing on any path -- no trial, no moments, no funding, no insight, no
+    # status, no journal entry -- and never reads the test window.
+    from seer_engine.lab import dressing
+
+    try:
+        seen = dressing.survey(conn, [method.id])
+    except Exception as e:  # pragma: no cover - a reader must never fail a recorded run
+        print(f"\nMirror pairs: not read ({e}). The trials above are recorded either way.")
+    else:
+        if seen.found:
+            n = len(seen.found)
+            many = "pairs of arms" if n > 1 else "pair of arms"
+            print(f"\nMirror pairs: {n} {many} of {method.id} differ in exactly one reversing "
+                  f"setting, so one")
+            print("      reverses the other. Detection is structural, off the recorded "
+                  "configurations and never off names.")
+            for d in seen.found:
+                print(f"  {d.pairing.straight_id} vs {d.pairing.reversed_id} "
+                      f"({d.pairing.field}) -- {d.verdict}")
+            blind = seen.unpriced
+            if blind:
+                said = f"{len(blind)} of them" if n > 1 else "It"
+                print(f"  *** {said} cannot be priced: no always-invested, opinion-free arm "
+                      f"covers")
+                print("      this window. A reversed arm is only half an experiment. It proves "
+                      "the SIGNAL is real and")
+                print("      says nothing about what ACTING on it costs, because both arms pay "
+                      "that cost equally and it")
+                print("      cancels -- so this method knows its rule carries information and "
+                      "cannot tell whether the")
+                print("      information was worth having. The third arm is the same book never "
+                      "stepping aside and")
+                print("      never switching; for a stock screen whose habit is a gate, it is "
+                      "the pair re-run with the")
+                print("      gate off. Adding it is an Amendment in this method file, so it "
+                      "costs no method id and no N.")
+                print(f"      `lab dressing {method.id}` says the rest and journals nothing.")
+            else:
+                print(f"  Every pair is priced against an always-invested arm. "
+                      f"`lab dressing {method.id}` splits what the")
+                print("      opinion knows from what the habits cost.")
     if amendment is not None:
         g = store.gate(conn)
         seq = len(store.amendments_of(conn, method.id))

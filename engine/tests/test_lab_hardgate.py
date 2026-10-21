@@ -1687,6 +1687,136 @@ def test_lab_run_says_so_when_there_is_no_control_arm(tmp_path, monkeypatch, cap
     assert "no control or placebo arm" in capsys.readouterr().out
 
 
+# --------------------------------------------------------------------------- the mirror-pair block
+#
+# Insight 523: a rule run beside its own mirror proves the SIGNAL is real and says nothing about
+# what ACTING on it costs, because both arms pay that cost equally and it cancels. `lab run`
+# annotates that, beside the control-shape block and for the same reason (D15): the repair is an
+# Amendment, which costs no method id, and the one moment it is cheap is before the write-up.
+#
+# The block is a FORWARDER over `dressing.survey`, so these tests pin the forwarding and the
+# wording -- never the arithmetic, which `test_lab_dressing.py` owns.
+
+
+def _mirror_config(**params) -> str:
+    """A ``config_text`` in the shape `method.config_text` writes, for `dressing.fields_of`."""
+    body = ",".join(f"{k}={v}" for k, v in params.items())
+    return (
+        "rules=TradeRules(id='monthly-hold-frac-gotrade',resize=True)\n"
+        "allocator=<M0099>\n"
+        f"params=FakeParams({body})\n"
+    )
+
+
+def _mirror_pair(conn, mid: str, *, annual_straight: float, annual_reversed: float) -> None:
+    """Two arms of ``mid`` differing in exactly one reversing setting: `mirror` False -> True."""
+    with conn:
+        ns = store.insert_trials(conn, [
+            _trial(method_id=mid, candidate_id=f"{mid}-GATE", config_digest=f"d-{mid}-gate",
+                   config_text=_mirror_config(mirror="False"),
+                   curve_json=_curve(_months(*DEV_SPAN), annual_straight)),
+            _trial(method_id=mid, candidate_id=f"{mid}-MIRROR", config_digest=f"d-{mid}-mirror",
+                   config_text=_mirror_config(mirror="True"),
+                   curve_json=_curve(_months(*DEV_SPAN), annual_reversed)),
+        ])
+        stamp_provenance(conn, ns, price_fingerprint=SAME_PRICES)
+
+
+def test_lab_run_names_a_reversed_pair_that_has_no_always_invested_arm(
+    tmp_path, monkeypatch, capsys
+):
+    """The hole insight 523 measured, caught at the one moment the repair is still free.
+
+    Of 28 reversed pairs across 23 methods recorded before this block existed, only six could be
+    priced; the other 22 never registered the third arm, so their cost is unrecoverable from the
+    record. The run has to say so, and it has to say the repair costs no method id -- a child
+    that reads `lab run`'s output and not the skill is exactly the case this exists for.
+    """
+    from seer_engine.commands import lab as lab_cmd
+
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0099", annual=0.15)
+    _mirror_pair(c, "M0099", annual_straight=0.18, annual_reversed=0.10)
+    c.close()
+
+    _stub_full_run(monkeypatch, tmp_path, "M0099",
+                   [_Arm("M0099-A", R_IDEA), _Arm("M0099-GATE", R_IDEA),
+                    _Arm("M0099-MIRROR", R_DRAW)])
+    assert lab_cmd.run(argparse.Namespace(
+        db=db, lab_command="run", method="M0099", store=tmp_path / "store", allow_coverage=0.8,
+    )) == 0
+    out = capsys.readouterr().out
+    assert "Mirror pairs:" in out
+    assert "M0099-GATE vs M0099-MIRROR" in out
+    assert "cannot be priced" in out
+    assert "no method id" in out          # the repair is an Amendment, and it is free
+    assert "lab dressing M0099" in out    # and the report that says the rest
+
+
+def test_lab_run_says_nothing_about_mirrors_when_no_arm_reverses_another(
+    tmp_path, monkeypatch, capsys
+):
+    """The predicate that keeps the block off the 147 methods it does not apply to.
+
+    A warning that fired on every stock screen would be wallpaper inside a week. It is structural
+    -- two arms differing in exactly one reversing setting, read off recorded `config_text` and
+    never off names -- which is 23 of the lab's 170 methods with dev trials, and falling, because
+    the explore skill now asks for the third arm at design time.
+    """
+    from seer_engine.commands import lab as lab_cmd
+
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0099", annual=0.15)
+    _control_arm(c, "M0099", "R", trades=250, turnover=1.1)
+    c.close()
+
+    _stub_full_run(monkeypatch, tmp_path, "M0099",
+                   [_Arm("M0099-A", R_IDEA), _Arm("M0099-R", R_DRAW)])
+    assert lab_cmd.run(argparse.Namespace(
+        db=db, lab_command="run", method="M0099", store=tmp_path / "store", allow_coverage=0.8,
+    )) == 0
+    assert "Mirror pairs:" not in capsys.readouterr().out
+
+
+def test_the_mirror_block_never_contradicts_lab_dressing(tmp_path, monkeypatch, capsys):
+    """It forwards `dressing.survey` rather than re-deciding, so the two cannot drift.
+
+    The temptation this closes is a second endpoint test living in `commands/lab.py`: dressing's
+    bars were calibrated on the lab's ten always-invested arms and will move again when a stock
+    book finally registers one. A copy would then say `unpriced` where the report says priced,
+    and the run's output is the half a researcher actually reads.
+    """
+    from seer_engine.commands import lab as lab_cmd
+    from seer_engine.lab import dressing
+
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0099", annual=0.15)
+    _mirror_pair(c, "M0099", annual_straight=0.18, annual_reversed=0.10)
+    c.close()
+
+    _stub_full_run(monkeypatch, tmp_path, "M0099",
+                   [_Arm("M0099-A", R_IDEA), _Arm("M0099-GATE", R_IDEA),
+                    _Arm("M0099-MIRROR", R_DRAW)])
+    assert lab_cmd.run(argparse.Namespace(
+        db=db, lab_command="run", method="M0099", store=tmp_path / "store", allow_coverage=0.8,
+    )) == 0
+    out = capsys.readouterr().out
+
+    c = store.connect(db)
+    seen = dressing.survey(c, ["M0099"])
+    c.close()
+    assert len(seen.found) == 1
+    assert len(seen.unpriced) == 1
+    for d in seen.found:
+        assert d.verdict in out
+
+
 def test_lab_control_reports_every_arm_and_writes_nothing(tmp_path, monkeypatch, capsys):
     """Shape (A): N and the looks are printed either side, and the database bytes do not move."""
     from seer_engine.commands import lab as lab_cmd

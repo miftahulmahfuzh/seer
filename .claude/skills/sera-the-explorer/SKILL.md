@@ -87,6 +87,18 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
      - `lab show MNNNN`: status past `registered`, trials present, analysis and verdict non-empty.
      - `git log origin/main -- engine/src/seer_engine/lab/methods/mNNNN_*` is non-empty.
      - At least one insight and one queued idea since the child started.
+     - **If one arm reverses another, is there a third arm with no opinion in it?** `lab run`
+       prints a `Mirror pairs:` block when two of a method's arms differ in exactly one
+       reversing setting, and says `unpriced` when nothing always-invested can price them. The
+       explore skill asks children for that third arm at design time; this is the only place
+       anything re-checks. A reversed arm alone proves the *signal* is real and says nothing
+       about what *acting* on it costs, because both arms pay that cost equally and it cancels —
+       measured 2026-10-21 (insight 523), 22 of 28 recorded pairs can never be priced. The
+       repair is an Amendment in the child's own method file, so it costs no method id and no N:
+       ask the child for it while its worktree is still open, or write it yourself. `lab
+       dressing MNNNN` says what is recoverable and journals nothing. Report it in the
+       synthesis either way — a batch that measured its signals and not their price is a finding
+       about the batch.
 
      Whatever is missing, finish it yourself from the scrollback and the data. If the method
      never ran, relaunch it once; if it fails again, `lab drop MNNNN --why "<reason>"` plus a `risk` insight.

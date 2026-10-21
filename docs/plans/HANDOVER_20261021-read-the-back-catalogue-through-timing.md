@@ -1,6 +1,35 @@
 # Handover — 2026-10-21: re-read the back catalogue through `lab timing`
 
-Written by `sera-20261020-1417` after a two-day run. Nothing is half-finished: every session is
+> ## CORRECTED 2026-10-21 09:14, by the session this handover commissioned (`024b2ac`)
+>
+> **Read this box before anything below it.** Three of this file's framings were wrong, and the
+> measurements refuting them are in that commit. The sections are corrected in place, but the
+> short version:
+>
+> 1. **The eight reversals need NO correction — that job is void.** All eight already carry
+>    `beats SPY TR` in their `failed` column, because that condition reads the **funded,
+>    deposit-matched** curve. The lab has judged on the owner's money since the beginning. The
+>    de-funded "paper lead" is the NEWCOMER, introduced by `lab timing` this morning. I had it
+>    backwards: I was using a new tool's headline to audit records that were already more honest
+>    than it.
+> 2. **The gate is NOT the front-loaded ingredient — the stock picking is.** Seven gate/no-gate
+>    pairs, each book run twice with nothing different but the rule: **six of seven delivered
+>    103-129% of their paper lead.** For a cash-stepping gate the payday is 2008, at 66.1% of
+>    deposits, not 2000-2002 at 36%. Inside M0203 the split is explicit — picking alone delivers
+>    **−78%** of its paper lead, the gate alone **+125%**.
+> 3. **I cited the wrong entry.** The gate premium is **insight 463**, not 494 (494 is the resize
+>    band). And my instruction to qualify its 3.6 pts/yr was backwards: that is a **2009-2015
+>    rate**, by which point 100% of the owner's deposits have arrived, making it the most
+>    money-faithful headline in the journal. The real asymmetry is sharper — **the gate's COST
+>    sits on 100% of the money, its PAYOUT on 66%.** 463 stands unchanged; entry 522 records the
+>    addition beside it.
+>
+> Two supersedes were written as a result: **515 → 521** (its M0267 numbers all kept; only the
+> generalisation from one chassis to crash rules in general was wrong) and **397 → 520** (a
+> genuinely wrong row — it judged M0201 against control arms retired three days later as
+> arbitrary to within seven points a year, and one of its two margins had the OPPOSITE SIGN).
+>
+> Written by `sera-20261020-1417` after a two-day run. Nothing is half-finished: every session is
 reaped, every worktree removed, the tree is clean and everything is pushed. This is what is open
 and what the evidence says to do next.
 
@@ -24,7 +53,11 @@ straight, and a lead earned at a steady rate per dollar held crosses halfway exa
 Everything under 50% means the twenty-year average is flattering the method.
 
 **Front-loading is not a rare failure to watch for. It is the normal shape of this lab's entire
-record, and until 2026-10-21 nobody had measured it.** (Insights 515, 519.)
+record, and until 2026-10-21 nobody had measured it.** (Insight 519.)
+
+**But it belongs to the STOCK PICKING, not to the safety gate** — corrected the same day; see
+section 3 and the box at the top. Insight 515, which generalised it to crash rules, is superseded
+by 521.
 
 The floor does not make the answer — re-counted at four lead thresholds, the median and the 50%
 count hold (33.9/33.9/34.7/34.7% and 478/436/377/288). The tight tail does not (46/22/13/7), so
@@ -35,9 +68,30 @@ count hold (33.9/33.9/34.7/34.7% and 478/436/377/288). The tight tail does not (
 `lab timing` is report-only, journals nothing on any path, opens no store and spends no look. It
 can be re-run freely. Use it.
 
-### 1. The eight reversals — lead on paper, LOSE on the owner's money
+### 1. ~~The eight reversals~~ — DONE, AND THERE WAS NOTHING TO CORRECT
 
-No threshold involved: two recorded columns and a subtraction.
+**Resolved 2026-10-21. Do not re-run this.** All eight already carry `beats SPY TR` in their
+`failed` column — that condition reads the funded deposit-matched curve, not the de-funded one.
+Every verdict and every journal claim on those seven methods was checked against
+`trial_funding.mwr`, claim by claim, and they all hold; several quote `mwr` exactly (M0203's
+"+10.4% vs +7.2% at best" is `TF-N40`'s 10.404 against 7.188; M0222's "+6.3% against SPY's +7.2%"
+is `TILT1`'s 6.318; M0201's "about 2.4 points" is 2.395 and 2.474). Insight 217 even names
+`M0130-P20-GATE` directly, at 7.0 vs 7.2 "on the same deposits", and records it as a near miss.
+
+**The lab's verdicts were written on the money column from the start.** Zero supersedes on this
+ground.
+
+**The real finding here, which is more interesting than the one I asked for:** the disagreement
+between the two columns runs **both ways — 30 of 761**. Eight lead on prices and lose on money;
+**twenty-two lose on prices and win on money.** And the one place the price column actually gates
+a decision is the walk-forward fold majority (`walkforward.measure` de-funds before it slices,
+`walkforward.py:135`). All 15 methods that ever won a majority were audited: every fold-picked
+arm beat SPY on the owner's money by **+1.4 to +11.8 pts/yr**. Real in principle, never once
+opened in practice — worth re-checking only if that test changes.
+
+The original (wrong) framing, kept so the error is legible:
+
+~~No threshold involved: two recorded columns and a subtraction.~~
 
 | candidate | paper | delivered |
 |---|---|---|
@@ -60,19 +114,37 @@ Named by the sweep's headline-arm pass: start from `M0054` (two arms, `-ALWAYS-I
 `-PARK-SPY` at 21.8%), `M0176-BIG` (21.8%), `M0110-DP20-UP` (21.8%), `M0201-Y20-MV10-PLC2`
 (20.5%). Run `lab timing <trial> --against <control>` on each and read the era table.
 
-### 3. The gate is now suspect twice over, and nearly every book stands on it
+### 3. The gate — CORRECTED. It is NOT the front-loaded ingredient; the stock picking is.
 
-- **Insight 516:** 20,000 uninformed sticky switches drawn at the gate's own transition rates —
-  arithmetic, no trial spent. Over 2009-2015 the real gate earned +3.47 pts/yr against SPY; the
-  average placebo earned **+3.87**. The gate sits at the **38th percentile of its own
-  imitators**. Whole-window it reaches the 85th, all of it 2000-2002.
-- **Insight 515:** its premium is largely pre-deposit.
-- **Insight 494** still records the premium as "a constant 3.6 pts/yr across 824 trials". That
-  number is real lump-sum and largely fictional for a monthly saver. **It should not be quoted
-  again without the era split beside it.**
+**My framing here was backwards and the measurement is unambiguous.** Seven gate/no-gate pairs
+were run — each one book, run twice, nothing different but the rule. **Six of seven delivered
+103-129% of their paper lead:** `M0030-SAT100` +3.10 paper → **+4.01 delivered** (129%),
+`M0054-PARK-SPY` 127%, `M0203-TF-N20` 125%, `M0130-P20-GATE` 118%, `M0080-ANN-S200-T` 103%. Only
+`M0222-TILT2-T` came in under, at 72%.
 
-This is the biggest open question in the lab. It is not a new method; it is re-reading what the
-shared ingredient is actually worth.
+The reason is in the era table: **for a cash-stepping gate the payday is 2008, at 66.1% of
+deposits** — not 2000-2002 at 36%. Inside M0203 the decomposition is explicit: the **picking**
+alone (`NOSW` vs SPY) delivers **−78%** of its paper lead; the **gate** alone delivers **+125%**.
+
+So the 85.7% front-loading finding stands, but **it belongs to the stock picking, not to the
+safety rule.** M0267's 21% is a property of its chassis: it steps sideways into another share
+fund, so 2008 could not separate the two arms and only the early crash could.
+
+- **Insight 515 is superseded by 521** on exactly that sentence. All its M0267 numbers are kept;
+  only the generalisation from one chassis to crash rules in general was wrong.
+- **Insight 516 STANDS and was deliberately not superseded.** The sticky-imitator study (20,000
+  uninformed switches at the gate's own transition rates — arithmetic, no trial spent) put the
+  real gate at the **38th percentile of its own imitators** over 2009-2015, +3.47 against the
+  average placebo's +3.87. Nothing measured since contradicts it, and it was never run on a stock
+  book — so superseding it would be disagreeing with its reach, not correcting a fact. **That
+  distinction is the right one and should be kept.**
+- **Insight 463** (NOT 494 — 494 is the resize band) is the 824-trial gate-premium row, and its
+  3.6 pts/yr **should not be qualified.** It is a 2009-2015 rate, and 100% of the owner's
+  deposits have arrived by then, so it is the most money-faithful headline in the journal. 463
+  stands unchanged; entry **522** records the addition beside it.
+
+**The asymmetry, stated correctly:** the gate's **cost** sits on 100% of the money; its **payout**
+sits on 66%.
 
 ## Decided, do not re-litigate
 
@@ -160,7 +232,15 @@ checked it against the outcome it proxies for, it missed three times out of thre
   `PYTHONPATH=$PWD/engine/src`, and use `/home/miftah/seer/engine/.venv/bin/python`.
 - 15 GB laptop. One store-loading session at a time; three non-store sessions are fine.
 
-## Two things I got wrong, recorded so the next session does not inherit them
+## Reaping trap, added 2026-10-21
+
+**A session may rename itself mid-run, and `tmux kill-window` on a name that no longer exists
+silently matches nothing** — which looks exactly like a successful kill. `analyze-backcatalogue-reread`
+reported in as `analyze-back-catalogue-timing`; the first reap printed no confirmation and left
+the window and its scrollback alive. Check for the confirmation line, or re-list the windows after
+killing. The idle notice carries the name you subscribed under, not the name the window now has.
+
+## Things I got wrong, recorded so the next session does not inherit them
 
 - **Insight 508 was wrong and is superseded by 509.** It quoted the hindsight era-edge column
   (replaced by commit `71b6cde` the day before) and credited the gate's catches to both
@@ -168,3 +248,15 @@ checked it against the outcome it proxies for, it missed three times out of thre
   the folds clause is 3-for-4 and **the era edge is 0-for-4** — it has never caught anything.
 - **I argued for two days that the two-fund cap was the binding constraint.** Measured, it is the
   non-binding half. See insight 518.
+- **I framed the eight reversals as verdicts needing correction.** They were already correct; the
+  lab judges on the funded curve and always has. Added 2026-10-21 — see the box at the top.
+- **I framed the safety gate as the front-loaded ingredient.** It is the opposite: six of seven
+  gate/no-gate pairs deliver 103-129% of their paper lead. The front-loading is in the picking.
+  Added 2026-10-21.
+- **I cited insight 494 for the gate premium when it is 463,** in a handover a session was told to
+  act on — and told it to qualify a figure that needed no qualifying. Added 2026-10-21.
+
+**Five of my framings were refuted by measurement across these two days, three of them in one
+morning.** That is the system working, not failing, and the next session should expect to do the
+same to whatever this file now asserts. Prefer `lab timing`, `lab walkforward` and a read-only
+copy of the database over anything written here in prose — including this sentence.

@@ -381,7 +381,25 @@ def _plain_miss(label: str) -> str:
 
 
 def insight_text(cmp: Comparison) -> tuple[str, str]:
-    """``(title, body)`` for the journal: plain words for a non-trader, no ids or code."""
+    """``(title, body)`` for the journal: plain words for a non-trader, no code.
+
+    **The title names the arm, and the body still names nothing.** `lab costs` reports ONE
+    variant's numbers, so a title built from the method name alone describes every arm of the
+    method equally and distinguishes none of them. Insights 466, 467 and 468 are three different
+    arms of M0260 -- a 23.8% fall at 1.98 times gains, a 25.6% at 1.62, a 33.6% at 1.60 -- written
+    under one identical generated title, so the owner's journal showed three cards that read alike
+    and no way to tell which fall belonged to which. ``doc_key`` below already keyed them apart as
+    three documents; this is the half of that fix the reader can see.
+
+    An arm id is code-shaped, and the rest of this module keeps ids out of the owner's way on
+    purpose. It is used here because it is the lab's only arm name that is unique by construction,
+    and because it is already the word the owner meets for an arm everywhere else: the Sera method
+    page labels its curves with it and writes "Its best variant, M0260-M-G12, cleared 5 of 6
+    hurdles" in a sentence. The alternative, the arm's one-line ``rationale``, was measured and
+    rejected -- its leading clause repeats across sibling arms in 33 of 157 methods ("Control",
+    "Top-20", "Same at 14%"), so it would have left the cards reading alike in exactly the case
+    this exists to fix.
+    """
     f, g = cmp.flat, cmp.real
     if f.beats_spy and not g.beats_spy:
         verdict = (
@@ -404,7 +422,8 @@ def insight_text(cmp: Comparison) -> tuple[str, str]:
         if not misses
         else f"At the real fees it falls short on {', '.join(misses)}."
     )
-    title = f"{cmp.method_name}: what Gotrade's real fees do to it"
+    arm = "" if cmp.candidate_id in cmp.method_name else f" ({cmp.candidate_id})"
+    title = f"{cmp.method_name}{arm}: what Gotrade's real fees do to it"
     body = "\n\n".join(
         (
             f"The lab re-ran this method over its {cmp.start.year}–{cmp.end.year} history twice, "
@@ -441,10 +460,12 @@ def doc_key(cmp: Comparison) -> str:
     Keyed on the arm and never on the method, because `lab costs` reports one variant's numbers
     and nothing else, so two runs on two arms are two measurements and must be two documents.
     Insights 466, 467 and 468 are ``M0260-M-NATIVE``, ``M0260-M-G12`` and ``M0260-M-G3``, written
-    25 and 30 seconds apart under one generated title (this module titles on ``method_name`` and
-    has never used the ``candidate_id`` it is holding at ``Comparison.candidate_id``). A
-    method-keyed document would have buried a 23.8% drawdown underneath a 33.6% one and shown the
-    owner only the last.
+    25 and 30 seconds apart under one generated title -- this module titled on ``method_name``
+    alone and left the ``candidate_id`` it holds at ``Comparison.candidate_id`` unread, until
+    ``insight_text`` was given the arm on 2026-10-21. A method-keyed document would have buried a
+    23.8% drawdown underneath a 33.6% one and shown the owner only the last. Those three rows keep
+    their written titles: insights are append-only, and a frozen row is not re-worded to match a
+    later generator.
     """
     return journal_docs.doc_key(DOC_PREFIX, cmp.method_id, [cmp.candidate_id])
 

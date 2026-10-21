@@ -202,10 +202,16 @@ M0260_ARMS = (
 
 
 def test_m0260s_three_arms_stay_three_documents(lab):
-    """The measured bug, replayed. Three arms, one generated title, three documents.
+    """The measured bug, replayed. Three arms, three documents, three titles.
 
     Keyed on the method or on the title, the 23.8% arm would be buried under the 33.6% one and
     the owner would see only the last. That is a measurement vanishing off the page.
+
+    The incident had a second half. The three ROWS were kept apart by ``doc_key`` while the three
+    generated TITLES stayed identical, so the owner's journal showed three cards that read alike.
+    ``real_costs.insight_text`` now names the arm (2026-10-21). The keying below is unchanged and
+    still does the separating -- a title is prose and nothing keys on it -- which is why this test
+    goes on asserting the doc_keys and the heads as well as the titles.
     """
     written = []
     for candidate_id, dd, pf in M0260_ARMS:
@@ -218,8 +224,11 @@ def test_m0260s_three_arms_stay_three_documents(lab):
     rows = [_row(lab, i) for i in ids]
     assert len({r["doc_key"] for r in rows}) == 3
     assert [r["supersedes"] for r in rows] == [None, None, None]
-    # One generated title across all three, which is exactly why the title is not the key.
-    assert len({r["title"] for r in rows}) == 1
+    # Three distinct generated titles, so the three cards do not read alike. This is NOT what
+    # keeps them apart -- the doc_keys above are -- it is what lets the owner tell them apart.
+    assert len({r["title"] for r in rows}) == 3
+    for (candidate_id, _dd, _pf), row in zip(M0260_ARMS, rows, strict=True):
+        assert candidate_id in row["title"]
     # And all three are still readable as their own documents.
     heads = lab.execute(
         "SELECT count(*) FROM insights WHERE doc_key IS NOT NULL AND id NOT IN "

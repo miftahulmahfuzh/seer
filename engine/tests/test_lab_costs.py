@@ -204,9 +204,16 @@ def test_the_journal_entry_is_one_plain_observation(lab, data, recorded):
     row = conn.execute("SELECT * FROM insights WHERE id = ?", (entry,)).fetchone()
     assert row["doc_key"] == f"real-costs:M0001:{cmp.candidate_id}"
     assert row["kind"] == "observation" and row["method_id"] == "M0001"
-    assert row["title"] == "SPY above its average: what Gotrade's real fees do to it"
+    # The title names the ARM, because `lab costs` reports one arm and the method name alone
+    # describes all of them equally (insights 466-468 were three M0260 arms under one title).
+    assert row["title"] == (
+        "SPY above its average (M0001-B): what Gotrade's real fees do to it"
+    )
+    assert cmp.candidate_id in row["title"]
+    # The BODY stays free of every id, and neither half may leak code.
+    assert "M0001" not in row["body"]
     for text in (row["title"], row["body"]):
-        assert "M0001" not in text and "`" not in text and "cost_model" not in text
+        assert "`" not in text and "cost_model" not in text
     assert "count of tries did not move" in row["body"]
     assert _untouched(conn) == before
 
@@ -253,8 +260,11 @@ def test_a_different_arm_of_the_same_method_is_a_sibling_not_a_version(lab, data
         conn.execute("SELECT * FROM insights WHERE id = ?", (i,)).fetchone()
         for i in (first, second)
     ]
-    assert rows[0]["title"] == rows[1]["title"], "the generated title is the same for both"
-    assert rows[0]["doc_key"] != rows[1]["doc_key"], "and that is why the title is not the key"
+    assert rows[0]["doc_key"] != rows[1]["doc_key"], "two arms, two documents"
+    # And the owner can tell them apart on the page: the title carries the arm too. The doc_key is
+    # still what separates the documents -- the title is prose and nothing keys on it.
+    assert rows[0]["title"] != rows[1]["title"], "two arms must not read alike"
+    assert "M0001-A" in rows[0]["title"] and "M0001-B" in rows[1]["title"]
 
 
 def test_cli_no_supersede_writes_a_sibling(lab, data, recorded, monkeypatch, capsys, tmp_path):

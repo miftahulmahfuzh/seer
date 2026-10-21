@@ -1,0 +1,99 @@
+the gate transform reproduced all 6 recorded gate-off controls
+
+dev store 640fc25e5c7b  prices 5451195fd552  benchmark REF-SPY-HOLD trial 1
+
+  measured M0007-N20-RAW
+  measured M0001-TV12
+  measured M0008-C10
+  measured M0015-N20-BLEND
+  measured M0024-SAME-N20-RANKSUM
+  measured M0028-BLEND-RM
+  measured M0069-L60-N20-T
+  measured M0091-HI5-N20-T
+  measured M0169-D20-SW
+  measured M0179-N40-SW
+  measured M0197-Y20-SW
+  measured M0030-C50T
+
+trials 909 -> 909, journal entries 533 -> 533: this script wrote nothing
+
+=== whole window: the gate's cost against its time in cash (a point of cash = 0.0623 pts/yr) ===
+variant                   cash pts  measured  predicted   ratio  residual
+-------------------------------------------------------------------------
+M0007-N20-RAW                25.73    -3.348     +1.603   -2.09    -4.951
+M0001-TV12                   12.14    -0.421     +0.756   -0.56    -1.177
+M0008-C10                    27.00    -0.845     +1.682   -0.50    -2.528
+M0015-N20-BLEND              25.51    -2.342     +1.589   -1.47    -3.931
+M0024-SAME-N20-RANKSUM       25.47    -1.643     +1.586   -1.04    -3.229
+M0028-BLEND-RM               26.60    -2.644     +1.657   -1.60    -4.301
+M0069-L60-N20-T              27.47    +0.211     +1.711    0.12    -1.500
+M0091-HI5-N20-T              26.78    -4.840     +1.668   -2.90    -6.508
+M0169-D20-SW                 27.26    -0.866     +1.698   -0.51    -2.564
+M0179-N40-SW                 25.64    -0.454     +1.598   -0.28    -2.052
+M0197-Y20-SW                 27.46    +1.117     +1.711    0.65    -0.594
+M0030-C50T                   27.67    -2.411     +1.724   -1.40    -4.135
+median ratio                                         -0.80
+range                                         -2.90 to 0.65
+median residual pts/yr                              -2.564
+ratio of 1 would mean    the gate is nothing but its time in cash
+
+=== 1996-2002: the gate's cost against its time in cash (a point of cash = 0.0756 pts/yr) ===
+variant                   cash pts  measured  predicted   ratio  residual
+-------------------------------------------------------------------------
+M0007-N20-RAW                33.44    -0.980     +2.528   -0.39    -3.509
+M0001-TV12                   19.41    -0.112     +1.467   -0.08    -1.579
+M0008-C10                    33.95    +2.702     +2.567    1.05    +0.135
+M0015-N20-BLEND              34.14    -1.612     +2.581   -0.62    -4.193
+M0024-SAME-N20-RANKSUM       32.69    +1.078     +2.471    0.44    -1.393
+M0028-BLEND-RM               34.52    -1.021     +2.610   -0.39    -3.630
+M0069-L60-N20-T              34.93    +5.699     +2.641    2.16    +3.058
+M0091-HI5-N20-T              34.66    -9.122     +2.620   -3.48   -11.743
+M0169-D20-SW                 34.65    +2.350     +2.620    0.90    -0.270
+M0179-N40-SW                 33.13    -2.255     +2.505   -0.90    -4.760
+M0197-Y20-SW                 35.09    +4.378     +2.653    1.65    +1.725
+M0030-C50T                   35.24    -1.955     +2.664   -0.73    -4.619
+median ratio                                         -0.23
+range                                         -3.48 to 2.16
+median residual pts/yr                              -1.579
+ratio of 1 would mean    the gate is nothing but its time in cash
+
+=== 2003-2008: the gate's cost against its time in cash (a point of cash = 0.0051 pts/yr) ===
+variant                   cash pts  measured  predicted   ratio  residual
+-------------------------------------------------------------------------
+M0007-N20-RAW                26.47    -9.518     +0.135  -70.51    -9.653
+M0001-TV12                   11.40    -1.542     +0.058  -26.53    -1.600
+M0008-C10                    27.47    -6.369     +0.140  -45.46    -6.509
+M0015-N20-BLEND              25.83    -6.338     +0.132  -48.12    -6.470
+M0024-SAME-N20-RANKSUM       26.08    -6.786     +0.133  -51.03    -6.919
+M0028-BLEND-RM               26.50    -7.230     +0.135  -53.49    -7.365
+M0069-L60-N20-T              27.45    -9.305     +0.140  -66.48    -9.445
+M0091-HI5-N20-T              26.07    -7.053     +0.133  -53.06    -7.186
+M0169-D20-SW                 26.80    -9.908     +0.137  -72.49   -10.045
+M0179-N40-SW                 25.87    -4.145     +0.132  -31.41    -4.277
+M0197-Y20-SW                 27.44    -8.320     +0.140  -59.45    -8.460
+M0030-C50T                   27.53    -7.737     +0.140  -55.11    -7.878
+median ratio                                        -53.28
+range                                        -72.49 to -26.53
+median residual pts/yr                              -7.186
+ratio of 1 would mean    the gate is nothing but its time in cash
+
+=== 2009-2015: the gate's cost against its time in cash (a point of cash = 0.1732 pts/yr) ===
+variant                   cash pts  measured  predicted   ratio  residual
+-------------------------------------------------------------------------
+M0007-N20-RAW                17.12    +3.012     +2.965    1.02    +0.046
+M0001-TV12                    5.30    +0.604     +0.917    0.66    -0.313
+M0008-C10                    19.44    +2.577     +3.366    0.77    -0.790
+M0015-N20-BLEND              16.34    +3.099     +2.831    1.09    +0.268
+M0024-SAME-N20-RANKSUM       17.48    +4.911     +3.027    1.62    +1.884
+M0028-BLEND-RM               18.53    +1.893     +3.209    0.59    -1.316
+M0069-L60-N20-T              19.80    +7.508     +3.430    2.19    +4.078
+M0091-HI5-N20-T              19.29    +5.205     +3.341    1.56    +1.864
+M0169-D20-SW                 20.04    +6.696     +3.471    1.93    +3.225
+M0179-N40-SW                 17.73    +6.175     +3.070    2.01    +3.105
+M0197-Y20-SW                 19.62   +10.370     +3.399    3.05    +6.971
+M0030-C50T                   19.98    +4.464     +3.461    1.29    +1.003
+median ratio                                          1.42
+range                                          0.59 to 3.05
+median residual pts/yr                              +1.864
+ratio of 1 would mean    the gate is nothing but its time in cash
+

@@ -1,0 +1,30 @@
+2009-2015, 81 months, 6.71 years, de-funded, dev store 640fc25e5c7b
+  the gated arm held nothing in 16 of them
+
+                                     no-gate      gated     SPY TR
+months the gate stayed IN (65)        11.48%     11.07%     11.74%
+months the gate sat OUT (16)           5.07%     -0.59%      4.35%
+the whole era (81)                    17.12%     10.41%     16.60%
+
+THE DECOMPOSITION (logs add, so these are exact and sum to the whole gap):
+  the gap, no-gate minus gated, over the era:   +6.079 pts/yr
+    of which the OUT months -- market return the gate gave up:   +5.694 pts/yr
+    of which the IN  months -- fees, and the different book it
+                               owns after each round trip:      +0.364 pts/yr
+
+  for reference: a book that simply held the same share of cash every day would have
+  paid 0.1732 points a year per point of cash (M0270, this chassis, this era).
+
+THE OUT-EPISODES ONE AT A TIME
+        from           to  months   the book would have earned   a typical month pays   episode judgement, pts/yr
+  2009-02-27   2009-06-30       5                       17.20%                  5.77%                       1.542
+  2010-06-30   2010-09-30       4                        7.55%                  4.59%                       0.418
+  2011-09-30   2012-01-31       5                        7.40%                  5.77%                       0.229
+  2015-09-30   2015-10-16       2                        2.89%                  2.27%                       0.091
+                                                                                total                       2.280
+                                                               largest single episode                       1.542   (2009-02-27 to 2009-06-30)
+
+Each episode is priced against what an AVERAGE month of the book would have paid over
+the same number of months, so the last column is the cost of that episode's judgement
+rather than of being in cash at all. If one line carries the total, five re-entries
+were never a sample and this era has settled nothing.

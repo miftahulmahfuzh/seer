@@ -155,6 +155,21 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
      fair. Another cadence at real fees is `replace(<book preset>, cost_model="gotrade")`: it
      runs on dev, but `promote` needs a preset of its id, so queue a `feature-wish` insight for
      one if it wins.
+   - **If one arm reverses another, register a third arm with no opinion in it.** A rule run
+     beside its own mirror proves the *signal* is real. It says nothing about what *acting* on
+     the signal costs, because both arms pay that cost equally and it cancels. To learn the cost
+     you need the same book never stepping aside and never switching — always invested, opinion
+     removed. Without it the lab can tell a real signal from a lucky one and **cannot** tell a
+     dead rule from a badly dressed one.
+     Measured 2026-10-21 (insight 523, `lab dressing --all`): of 28 reversed pairs across 23
+     methods, only **6** could be priced. The other 22 never registered the third arm, so their
+     cost is unrecoverable from the record — and "is the opinion worth what the habit costs" is
+     the question that decided *every* timing rule settled this month (M0251, M0254, M0265,
+     M0267). It costs no method id: one more variant inside the same pre-registration.
+     Applies whenever a variant inverts, mirrors or falsifies another. A stock screen whose
+     "habit" is a gate or its churn needs the 2×2 instead — the pair with the habit on and off.
+     Check your own method with `lab dressing MNNNN` after it runs; it journals nothing and can
+     be re-run freely.
    - Pure. Reads only bars dated ≤ `data_date`. Set `seen_keys`.
 5. **Test, then commit** only the method file. Run `pytest -q tests/test_lab_methods.py` and
    `ruff check src tests`. If the contract test fails, fix the method; never weaken the test.

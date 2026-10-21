@@ -314,10 +314,12 @@ report's output is unchanged: no signal fires before or after, and M0024 and M00
 "fails the folds", the first condition they fail.
 
 Left for the owner, because each is an edit to ``walkforward.py``, which this decision does not
-make: ``BUY_CONDITIONS`` and the ``buy_signal`` docstring still describe kin as "family union
-ancestors", which now under-describes the rule they are handed; and the signal's fold condition
-reads the picks' record only. Whether the buy signal should also require (D11)'s own-variant
-majority is a change to ``buy_signal`` itself.
+make: ``BUY_CONDITIONS`` and the ``buy_signal`` docstring described kin as "family union
+ancestors", which under-described the rule they are handed. **That half was paid on 2026-10-20**:
+both now spell out the whole of ``failed_kin`` -- family, ancestry, blend ingredients, behaviour --
+and ``buy_signal``'s docstring names this paragraph as the record of the debt. What is still the
+owner's: the signal's fold condition reads the picks' record only, so whether the buy signal should
+also require (D11)'s own-variant majority remains a change to ``buy_signal`` itself.
 
 **(D14) Does (K) read what a method does, as well as what it is called? -- Yes. A test-failed
 method is kin when any dev variant's monthly return, de-funded and less its own fit on SPY's,
@@ -447,8 +449,8 @@ The one change at the caller is that ``lab walkforward`` now catches a ``store.L
 ``failed_kin`` -- (D14) compares curves, so it can refuse on prices (D10) -- and hands
 "kin unknown (...)" to the signal as the failed kin: the signal cannot fire on a kin nobody could
 check, and the report still prints the row. ``BUY_CONDITIONS`` and the ``buy_signal`` docstring
-still say "family union ancestors", which under-describes the rule further; they remain the
-owner's to edit.
+said "family union ancestors", which under-described the rule further; both were corrected on
+2026-10-20 and now name behaviour beside family, ancestry and ingredients.
 
 **(D15) Does `lab run` see the folds, and does a lost majority refuse it? -- it SEES them and
 RECORDS them; it does not refuse.** Until now a researcher met the fold record only at

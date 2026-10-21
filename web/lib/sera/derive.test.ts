@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   bestVariant,
+  books,
   closest,
   conditionsPassed,
   drawdownSeries,
@@ -333,5 +334,46 @@ describe('yearlyReturns', () => {
     expect(out[1].ret).toBeCloseTo(0.5, 10);
     expect(out[2].ret).toBeCloseTo(-0.1, 10);
     expect(yearlyReturns([])).toEqual([]);
+  });
+});
+
+describe('books', () => {
+  const ms = [
+    method({ id: 'M0072', name: 'Earnings-day jumps' }),
+    method({ id: 'M0092', name: 'News-day picks sized toward the giants' }),
+    method({ id: 'M0258', name: 'A price band on the safety gate' }),
+  ];
+
+  it('fills every reason with "this one", never the lead name and never an id', () => {
+    // The reasons render directly under the lead's own row, and a lab method's name is a full
+    // sentence — repeating it turns a four-word reason into a paragraph. Insight 529's whole
+    // point is that these rows must read at a glance.
+    const [b] = books(
+      [{ lead: 'M0072', others: ['M0092'], why: { M0092: 'written as a version of {lead}' } }],
+      ms,
+    );
+    expect(b.lead).toEqual({ id: 'M0072', name: 'Earnings-day jumps' });
+    expect(b.others).toEqual([
+      { id: 'M0092', name: 'News-day picks sized toward the giants', why: 'written as a version of this one' },
+    ]);
+    expect(b.others[0].why).not.toContain('{lead}');
+  });
+
+  it('keeps every name reachable rather than dropping the ones it collapses', () => {
+    const [b] = books(
+      [{
+        lead: 'M0072',
+        others: ['M0092', 'M0258'],
+        why: { M0092: 'written as a version of {lead}', M0258: 'written as a version of {lead}' },
+      }],
+      ms,
+    );
+    expect([b.lead.id, ...b.others.map((o) => o.id)]).toEqual(['M0072', 'M0092', 'M0258']);
+  });
+
+  it('falls back to the id when the snapshot has no method row, and to a plain reason', () => {
+    const [b] = books([{ lead: 'M9999', others: ['M8888'], why: {} }], ms);
+    expect(b.lead.name).toBe('M9999');
+    expect(b.others[0]).toEqual({ id: 'M8888', name: 'M8888', why: 'the same strategy as this one' });
   });
 });

@@ -21,7 +21,7 @@
  * shape of `failedNow`.
  */
 import { pct, signedPct } from '../format';
-import type { Benchmark, Gate, LabMethod, LabTrial, Point } from './types';
+import type { Benchmark, Gate, LabBook, LabMethod, LabTrial, Point } from './types';
 
 export const CONDITION_KEYS = ['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr'] as const;
 export type ConditionKey = (typeof CONDITION_KEYS)[number];
@@ -386,4 +386,46 @@ export function yearlyReturns(curve: Point[]): YearReturn[] {
   }
   if (year !== null) out.push({ year, ret: lastValue / prev - 1 });
   return out;
+}
+
+// ---- Books: one strategy, several method ids --------------------------------------------------
+
+/**
+ * One strategy as the page shows it: the row, and the other names folded under it.
+ *
+ * A method id is not a strategy, and the two places that mattered most were both getting it
+ * wrong in a way that cost the owner. The buy signal named three methods and they were one book,
+ * which read as three independent reasons to spend real money. The spent-look counter said four
+ * and the looks had bought two, which made the evidence against the lab's own approach look
+ * twice as strong as it is. Neither number is hidden here — the others are kept beside the lead
+ * so a collapsed row can be opened.
+ */
+export type Book = {
+  lead: { id: string; name: string };
+  /** `why` is already a finished sentence with the lead's **name** in it, never its id. */
+  others: { id: string; name: string; why: string }[];
+};
+
+/**
+ * `snapshot.books` entries with the method names filled in.
+ *
+ * The engine ships each reason with `{lead}` still in it precisely so this substitution happens
+ * once, here: the terminal report fills the same template with ids and the correlation that
+ * confirmed it, and the owner's page may carry neither. What goes in here is **"this one"**, not
+ * the lead's name — these sentences are always rendered directly beneath the lead's own row, and
+ * a lab method's name is a full sentence of its own, so repeating it turns a four-word reason
+ * into a paragraph. The name is still carried on `lead` for whoever needs to print it.
+ *
+ * An id with no method row falls back to the id, which is the only thing left to show.
+ */
+export function books(rows: LabBook[], methods: LabMethod[]): Book[] {
+  const nameOf = new Map(methods.map(m => [m.id, m.name]));
+  return rows.map(b => ({
+    lead: { id: b.lead, name: nameOf.get(b.lead) ?? b.lead },
+    others: b.others.map(id => ({
+      id,
+      name: nameOf.get(id) ?? id,
+      why: (b.why[id] ?? 'the same strategy as {lead}').replace('{lead}', 'this one'),
+    })),
+  }));
 }

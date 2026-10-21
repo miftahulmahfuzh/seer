@@ -3,7 +3,9 @@ import type { LineSeries } from '../../components/sera/charts/LineChart';
 import type { ScatterPoint, ScatterRegion } from '../../components/sera/charts/ScatterChart';
 import { type Domain, type RefLine, type Tick, niceDomain } from '../../components/sera/charts/scale';
 import {
+  type Book,
   CONDITION_LABEL,
+  books,
   closest,
   conditionsPassed,
   excessCagr,
@@ -95,6 +97,8 @@ export type State = {
   tried: { total: number; lab: number; historical: number };
   tries: number;
   looks: number;
+  /** How many distinct strategies those looks bought. Never equal to `looks` by accident. */
+  lookBooks: Book[];
   eligible: number;
   closest: Closest | null;
   bestBeat: BestBeat | null;
@@ -139,7 +143,18 @@ export function state(snap: LabSnapshot): State {
     ? { title: synth.title, body: synth.body, added: synth.added, source: 'synthesis' }
     : computedStory(dev.length, tried.total, eligible, closestRow, latestPromotion(snap), nameOf);
 
-  return { story, tried, tries: dev.length, looks: snap.summary.testLooks, eligible, closest: closestRow, bestBeat };
+  return {
+    story,
+    tried,
+    tries: dev.length,
+    looks: snap.summary.testLooks,
+    // Four looks, two books. The counter has to carry both or it misstates the evidence against
+    // the lab's own approach by a factor of two -- see `summary.testBooks` in the contract.
+    lookBooks: books(snap.books.testLooks, snap.methods),
+    eligible,
+    closest: closestRow,
+    bestBeat,
+  };
 }
 
 /** Mirrors engine lab/store.py PROMOTION_MARKER, which record_promotion writes into a method's analysis. */
@@ -467,6 +482,30 @@ export function latestMethods(snap: LabSnapshot, k = 6): MethodCard[] {
     });
 }
 
+// ---- (8) Is the paid data worth buying yet? ----------------------------------------------------
+
+export type Firing = {
+  /** One entry per distinct strategy, never per method id. This is the number that gates money. */
+  books: Book[];
+  /** How many method ids fired, so the page can say plainly when those two numbers differ. */
+  methods: number;
+};
+
+/**
+ * What the lab says is worth paying for survivorship-free price history, **by strategy**.
+ *
+ * The engine decides whether a method fires (`lab/firings.py`, five conditions, the same ones
+ * `lab walkforward` prints) and does the collapsing; the web only reshapes it, exactly as it
+ * never re-judges a trial. Three ids fired on 2026-10-21 and were one strategy — M0258 is M0072's
+ * book with a setting that does nothing, and both younger methods were written as versions of it.
+ * Shown as three rows it read as three independent confirmations that it was finally time to
+ * spend, which is the direction a page like this must never be wrong in.
+ */
+export function firing(snap: LabSnapshot): Firing {
+  const rows = books(snap.books.firing, snap.methods);
+  return { books: rows, methods: rows.reduce((n, b) => n + 1 + b.others.length, 0) };
+}
+
 // ---- All of it ----------------------------------------------------------------------------------
 
 export type Overview = {
@@ -477,6 +516,7 @@ export type Overview = {
   luck: Luck | null;
   families: Families;
   latest: MethodCard[];
+  firing: Firing;
 };
 
 export function overview(snap: LabSnapshot): Overview {
@@ -488,5 +528,6 @@ export function overview(snap: LabSnapshot): Overview {
     luck: luck(snap),
     families: familyBars(snap),
     latest: latestMethods(snap),
+    firing: firing(snap),
   };
 }

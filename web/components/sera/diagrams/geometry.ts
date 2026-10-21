@@ -9,8 +9,16 @@ export type PipelineStage = {
   title: string[];
   /** 1–5 short lines (≤ 18 characters, ≤ 26 on a weight-1.35 box). */
   detail: string[];
-  /** The pill at the bottom, e.g. '58 tries'. */
+  /** The pill at the bottom, e.g. '58 tries' (≤ 18 characters: the pill is ~123px wide). */
   count: string;
+  /**
+   * A second line inside the pill, for a stage whose honest count is two numbers.
+   * The exam-years stage is the one: four looks are spent and they bought two strategies, and
+   * printing only the looks overstates the evidence against the lab by a factor of two. Two
+   * numbers do not fit on one line of a 123px pill, so the pill grows a line rather than the
+   * sentence being cut down to whichever half is less true.
+   */
+  countSub?: string;
   /** Tooltip on the pill. */
   countTip: string;
   /** Draws a dashed "fails" arrow from this box down to the journal lane. */

@@ -667,7 +667,7 @@ def test_the_v6_to_v7_migration_moves_not_one_byte_of_the_web_snapshot(tmp_path)
         assert store.snapshot_json(ro) == before
     finally:
         ro.close()
-    assert store.SNAPSHOT_VERSION == 6
+    assert store.SNAPSHOT_VERSION == 7
 
 
 def _v7_db(path):
@@ -939,9 +939,9 @@ def lab(tmp_path):
 
 def test_the_snapshot_follows_the_contract(lab):
     s = store.snapshot(lab)
-    assert list(s) == ["version", "asOf", "gate", "data", "summary", "benchmark", "methods", "trials",
-                       "insights", "ideasSeen", "paper"]
-    assert s["version"] == 6
+    assert list(s) == ["version", "asOf", "gate", "data", "summary", "benchmark", "books",
+                       "methods", "trials", "insights", "ideasSeen", "paper"]
+    assert s["version"] == 7
     gate = s["gate"]
     assert list(gate) == [
         "maxDrawdown", "minProfitFactor", "minTrades", "dsrMin",
@@ -971,8 +971,12 @@ def test_the_snapshot_follows_the_contract(lab):
     summary = s["summary"]
     assert {k: v for k, v in summary.items() if k != "byStatus"} == {
         "devTrials": 55, "testLooks": 0, "methods": 15, "labMethods": 1, "historicalMethods": 14,
-        "insights": 2, "insightRows": 2,
+        "insights": 2, "insightRows": 2, "testBooks": 0,
     }
+    # Snapshot 7: distinct STRATEGIES, not method ids, for the two counts that gate money. This
+    # fixture has spent no look and has no recorded benchmark to cut folds from, so both lists are
+    # empty -- which is the shape the site renders as "nothing is asking to be bought".
+    assert s["books"] == {"firing": [], "testLooks": []}
     assert list(summary["byStatus"]) == list(store.STATUSES)
     assert summary["byStatus"]["rejected"] == 14 and summary["byStatus"]["registered"] == 1
     assert sum(summary["byStatus"].values()) == 15

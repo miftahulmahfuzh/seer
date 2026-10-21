@@ -21,7 +21,7 @@ const snap = (over: Partial<HowInput> = {}): HowInput => ({
   asOf: '2026-10-04T14:12:24+00:00',
   gate: GATE,
   data: DATA,
-  summary: { devTrials: 58, testLooks: 0 },
+  summary: { devTrials: 58, testLooks: 0, testBooks: 0 },
   methods: [
     method({ id: 'H-P7A-F1', status: 'rejected', historical: true }),
     method({ id: 'M0001', status: 'rejected' }),
@@ -49,7 +49,7 @@ describe('pctLabel', () => {
 
 describe('stageCounts', () => {
   it('counts each stage from statuses and dev trials', () => {
-    expect(stageCounts(snap())).toEqual({ ideas: 2, registered: 2, devTrials: 58, eligible: 1, testLooks: 0, paper: 1 });
+    expect(stageCounts(snap())).toEqual({ ideas: 2, registered: 2, devTrials: 58, eligible: 1, testLooks: 0, testBooks: 0, paper: 1 });
   });
 });
 
@@ -98,7 +98,7 @@ describe('windowsModel', () => {
     expect(w.bears).toBe(BEARS);
   });
   it('counts looks used and handles nothing on paper', () => {
-    const w = windowsModel(snap({ summary: { devTrials: 58, testLooks: 2 }, methods: [] }));
+    const w = windowsModel(snap({ summary: { devTrials: 58, testLooks: 2, testBooks: 2 }, methods: [] }));
     expect(w.testNote).toBe('2 looks used');
     expect(w.paperSince).toBeNull();
     expect(w.label).toContain('no lab method on paper yet');
@@ -124,7 +124,7 @@ describe('hurdles', () => {
 
 describe('honestyRules', () => {
   it('quotes the live tries and looks', () => {
-    const r = honestyRules(snap({ summary: { devTrials: 1, testLooks: 3 } }));
+    const r = honestyRules(snap({ summary: { devTrials: 1, testLooks: 3, testBooks: 3 } }));
     expect(r.map(x => x.key)).toEqual(['counted', 'first', 'reroll', 'append', 'look', 'bar']);
     expect(r[0].body.startsWith('1 try so far')).toBe(true);
     expect(r[4].body).toContain('Looks used so far: 3');
@@ -139,5 +139,41 @@ describe('dataFacts', () => {
     expect(f.has[0].body).toContain('1,234,567 daily price rows for 650 of the 700');
     expect(f.has[4].title).toBe('One frozen copy of the data');
     expect(f.lacks.map(x => x.key)).toEqual(['fundamentals', 'delisted', 'intraday', 'options', 'sentiment']);
+  });
+});
+
+describe('the spent-look counter carries both numbers', () => {
+  // Three of the four spent looks went to one strategy under three names. Quoting only the looks
+  // makes the evidence against the lab's own approach look twice as strong as it is; quoting only
+  // the strategies hides that its scarcest resource was spent twice on the same thing. Every one
+  // of the three places this page prints the number has to say both.
+  const spent = snap({ summary: { devTrials: 905, testLooks: 4, testBooks: 2 } });
+
+  it('says it on the pipeline stage, on a second line the pill is widened for', () => {
+    const test = pipelineStages(spent).find(s => s.key === 'test');
+    expect(test?.count).toBe('4 looks used');
+    expect(test?.countSub).toBe('on 2 strategies');
+    expect(test?.countTip).toContain('2 strategies');
+  });
+
+  it('says it on the timeline', () => {
+    expect(windowsModel(spent).testNote).toBe('4 looks used on 2 strategies');
+    expect(windowsModel(spent).label).toContain('4 looks used on 2 strategies');
+  });
+
+  it('says it in the honesty rules', () => {
+    const look = honestyRules(spent).find(r => r.key === 'look');
+    expect(look?.body).toContain('Looks used so far: 4');
+    expect(look?.body).toContain('2 different strategies');
+    expect(look?.body).toContain('the same strategy under another name');
+  });
+
+  it('stays the plain sentence when every look bought its own strategy', () => {
+    const clean = snap({ summary: { devTrials: 905, testLooks: 2, testBooks: 2 } });
+    const test = pipelineStages(clean).find(s => s.key === 'test');
+    expect(test?.count).toBe('2 looks used');
+    expect(test?.countSub).toBeUndefined();
+    expect(windowsModel(clean).testNote).toBe('2 looks used');
+    expect(honestyRules(clean).find(r => r.key === 'look')?.body).toContain('Looks used so far: 2.');
   });
 });

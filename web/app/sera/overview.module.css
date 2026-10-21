@@ -1,7 +1,7 @@
 /* Overview: one column below 1024px (readable, not designed); a 12-column sheet grid on desktop. */
 .grid { display: flex; flex-direction: column; gap: 12px; }
 
-.state, .landing, .hurdles, .closer, .luck, .families, .latest { min-width: 0; }
+.state, .buy, .landing, .hurdles, .closer, .luck, .families, .latest { min-width: 0; }
 
 .stateBody { display: flex; flex-direction: column; gap: 24px; }
 
@@ -84,6 +84,31 @@
 .fillTicks { align-self: start; height: 26px; }
 .fillTick { position: absolute; top: 8px; transform: translateX(-50%); font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 
+/* Worth buying the paid data? One row per STRATEGY, with the other names it goes by folded
+   underneath it. A <details>, like the journal's version history and the method page's technical
+   block: no JavaScript, so this page stays a server component, and the chevron is the only moving
+   part. Nothing is hidden by collapsing — the row opens. */
+.buyList { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.buyRow { min-width: 0; border-radius: 28px; padding: 16px 16px 16px 22px; background: var(--sheet); display: grid; gap: 8px; }
+.buyHead { display: flex; align-items: flex-start; gap: 12px; }
+.buyName { flex: 1; min-width: 0; font-size: 19px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.25; }
+.buyAlso { border-radius: 22px; background: var(--chip); }
+.buyAlsoSummary {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; border-radius: 22px;
+  list-style: none; cursor: pointer;
+  font-size: 14px; color: var(--ink-2);
+}
+.buyAlsoSummary::-webkit-details-marker { display: none; }
+.buyAlsoSummary::marker { content: ''; }
+.buyAlsoSummary:hover { background: var(--chip-solid); }
+.buyAlsoSummary:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.buyChevron { display: inline-flex; flex: none; transition: transform 0.12s; }
+.buyAlso[open] .buyChevron { transform: rotate(90deg); }
+.buyAlsoBody { list-style: none; margin: 0; padding: 2px 14px 14px; display: grid; gap: 8px; font-size: 14.5px; line-height: 1.45; }
+.buyAlsoName { color: var(--ink); text-decoration: underline; text-decoration-color: var(--outline); text-underline-offset: 3px; }
+.buyAlsoWhy { color: var(--ink-2); }
+
 /* Status chips: one quiet fill per stage of the pipeline. */
 .status { height: 30px; padding: 0 12px; font-size: 14px; background: var(--chip-solid); }
 .status[data-status='idea'], .status[data-status='registered'] { background: var(--lav); }
@@ -120,6 +145,7 @@
   .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
 
   .state { grid-column: span 12; }
+  .buy { grid-column: span 12; }
   .landing { grid-column: span 8; }
   .hurdles { grid-column: span 4; }
   .closer { grid-column: span 6; }

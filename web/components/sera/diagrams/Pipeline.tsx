@@ -58,9 +58,26 @@ export function Pipeline({ stages, failLabel, label }: Props) {
             {st.detail.map((line, j) => (
               <text key={`d${j}`} x={b.x + PAD} y={detailY + j * 17} className={s.detail}>{line}</text>
             ))}
+            {/* A two-number count gets a taller pill and a second line, rather than one line
+                clipped by the box. The pill keeps its bottom edge either way, so the row of
+                pills still reads as a row. */}
             <g data-tip={st.countTip}>
-              <rect x={b.x + 12} y={b.y + b.h - 44} width={b.w - 24} height={32} rx={16} className={s.count} />
-              <text x={b.x + b.w / 2} y={b.y + b.h - 23} textAnchor="middle" className={s.countText}>{st.count}</text>
+              <rect
+                x={b.x + 12}
+                y={b.y + b.h - (st.countSub ? 56 : 44)}
+                width={b.w - 24}
+                height={st.countSub ? 44 : 32}
+                rx={16}
+                className={s.count}
+              />
+              <text x={b.x + b.w / 2} y={b.y + b.h - (st.countSub ? 36 : 23)} textAnchor="middle" className={s.countText}>
+                {st.count}
+              </text>
+              {st.countSub ? (
+                <text x={b.x + b.w / 2} y={b.y + b.h - 20} textAnchor="middle" className={s.countSub}>
+                  {st.countSub}
+                </text>
+              ) : null}
             </g>
           </g>
         );

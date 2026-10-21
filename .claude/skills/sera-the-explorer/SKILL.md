@@ -104,8 +104,11 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
      never ran, relaunch it once; if it fails again, `lab drop MNNNN --why "<reason>"` plus a `risk` insight.
    - **dev-eligible:** run the explore skill's **Promotion** yourself, now, in `$REPO`, one at a time.
      Start with its step 0, the fit check, then **step 0b, the durability check** -- `lab regime`,
-     `survivorship_coverage.py`, and `lab walkforward`. Four of four test looks have failed on
-     `beats SPY TR`; a good twenty-year average is not evidence any more.
+     `survivorship_coverage.py`, and `lab walkforward`. Four test looks are spent and all four
+     failed on `beats SPY TR` -- but they bought **two** distinct books, not four (M0021, M0022
+     and M0029 are one book; only M0002 is separate), so the record is 0-for-2 and the budget was
+     spent twice on the same thing. Quote both numbers. A good twenty-year average is still not
+     evidence, and `lab walkforward`'s buy signal now reports one row per book, not per method id.
      **`lab promote` now refuses, it does not warn.** Since 2026-10-09 it exits 2 unless the method
      beat SPY in a majority of at least four scoreable walk-forward folds **and** no kin reads
      `test-failed` -- kin being its `family` plus every ancestor through `parent_id`. **There is no
@@ -174,7 +177,7 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
 | "Promote that old flat-fee winner, it passed dev" | Never as is. Run `lab costs` first, then its real-fee twin as a one-variant variation method; promote the twin. |
 | "Promote in parallel" | Promotions are serial and done by Sera. Each spends one counted test-window look. |
 | "`git pull --rebase --autostash` before each lab commit" | Only at preflight, before any child runs. Mid-batch, autostash rewrites `lab/lab.sqlite` on disk under a child's open connection (SQLite then reports "readonly database", and a write in that window is lost). Sync with `git fetch` + `git merge --ff-only origin/main` (it leaves untouched dirty files alone), then `lab stage`, commit, push; if the push is rejected, `git reset --soft HEAD~1 && git reset` and repeat. |
-| "It passed dev, that's the gate" | Not since 2026-10-09. Four of four test looks failed on `beats SPY TR`. Run Promotion step 0b before every look. |
+| "It passed dev, that's the gate" | Not since 2026-10-09. Four test looks are spent, all four failed on `beats SPY TR`, and they bought two distinct books, not four -- 0-for-2, and three looks went to one book (insight 529). Run Promotion step 0b before every look, and check the candidate against the books already spent. |
 | "The buy signal fired, I'll ask the owner first" | Never ask, never block. Record the insight, put it first in the report, carry on. |
 | "`lab promote` refused it, I'll find a way round" | There is no way round. No `--force`, no environment variable, no editing the method to dodge the kin walk. Record the refusal, report it, take the next idea. |
 | "Its fold record is 2 of 4 but the twenty-year numbers are great" | That is the gate's entire point, and the 0-for-5 roster is what the twenty-year numbers bought. `lab promote` exits 2. |

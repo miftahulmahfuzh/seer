@@ -7,6 +7,7 @@ import {
   ELIGIBLE_COLOR,
   familyBars,
   familyLabel,
+  firing,
   HISTORICAL_COLOR,
   hurdles,
   LAB_COLOR,
@@ -98,7 +99,7 @@ const insight = (
 });
 
 const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
-  version: 6,
+  version: 7,
   asOf: '2026-10-04T14:12:24+00:00',
   gate: {
     maxDrawdown: 0.2,
@@ -122,7 +123,7 @@ const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
     symbolsServed: 0,
     dividendRows: 0,
   },
-  summary: { devTrials: 4, testLooks: 0, methods: 4, labMethods: 2, historicalMethods: 2, insights: 0, insightRows: 0, byStatus: {} },
+  summary: { devTrials: 4, testLooks: 0, methods: 4, labMethods: 2, historicalMethods: 2, insights: 0, insightRows: 0, testBooks: 0, byStatus: {} },
   benchmark: { spyTr: [], spyPrice: [] },
   methods: [
     method('H-A'),
@@ -144,6 +145,7 @@ const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
   insights: [],
   ideasSeen: [],
   paper: [],
+  books: { firing: [], testLooks: [] },
   ...over,
 });
 
@@ -360,5 +362,72 @@ describe('latest methods', () => {
   it('caps at k', () => {
     const many = Array.from({ length: 9 }, (_, i) => method(`M00${10 + i}`, { updated: `2026-10-0${1 + (i % 4)}T00:00:00+00:00` }));
     expect(latestMethods(snap({ methods: many }))).toHaveLength(6);
+  });
+});
+
+describe('firing', () => {
+  const ms = [
+    method('M0072', { name: 'Earnings-day jumps' }),
+    method('M0092', { name: 'News-day picks sized toward the giants' }),
+    method('M0258', { name: 'A price band on the safety gate' }),
+  ];
+  const three: LabSnapshot['books']['firing'] = [{
+    lead: 'M0072',
+    others: ['M0092', 'M0258'],
+    why: { M0092: 'written as a version of {lead}', M0258: 'written as a version of {lead}' },
+  }];
+
+  it('counts STRATEGIES on the row and method ids only beside it', () => {
+    // Insight 529: three method ids fired and they are one strategy. Three rows read as three
+    // independent reasons to spend real money, which is the direction this panel must never be
+    // wrong in. `books.length` is the number the heading prints; `methods` is the audit trail.
+    const f = firing(snap({ methods: ms, books: { firing: three, testLooks: [] } }));
+    expect(f.books).toHaveLength(1);
+    expect(f.methods).toBe(3);
+    expect(f.books[0].lead.name).toBe('Earnings-day jumps');
+    expect(f.books[0].others.map(o => o.name)).toEqual([
+      'News-day picks sized toward the giants', 'A price band on the safety gate',
+    ]);
+  });
+
+  it('is empty when nothing fires, which can never read as a reason to buy', () => {
+    expect(firing(snap())).toEqual({ books: [], methods: 0 });
+  });
+
+  it('counts two separate strategies as two', () => {
+    const f = firing(snap({
+      methods: ms,
+      books: { firing: [{ lead: 'M0072', others: [], why: {} }, { lead: 'M0092', others: [], why: {} }], testLooks: [] },
+    }));
+    expect(f.books).toHaveLength(2);
+    expect(f.methods).toBe(2);
+  });
+});
+
+describe('state: the spent-look counter', () => {
+  it('carries the strategies the looks bought beside the looks themselves', () => {
+    // Four looks bought two strategies, so the lab's out-of-sample record is 0-for-2 and its
+    // scarcest resource was spent twice on the same thing. Both halves matter and they cut
+    // opposite ways, so the model must carry both numbers.
+    const st = state(snap({
+      methods: [method('M0021'), method('M0022'), method('M0029'), method('M0002')],
+      summary: { ...snap().summary, testLooks: 4, testBooks: 2 },
+      books: {
+        firing: [],
+        testLooks: [
+          { lead: 'M0021', others: ['M0022', 'M0029'], why: { M0022: 'grew out of the same earlier method as {lead}', M0029: 'written as a version of {lead}' } },
+          { lead: 'M0002', others: [], why: {} },
+        ],
+      },
+    }));
+    expect(st.looks).toBe(4);
+    expect(st.lookBooks).toHaveLength(2);
+    expect(st.lookBooks[0].others.map(o => o.why)).toEqual([
+      'grew out of the same earlier method as this one', 'written as a version of this one',
+    ]);
+  });
+
+  it('is empty on a lab that has spent no look', () => {
+    expect(state(snap()).lookBooks).toEqual([]);
   });
 });

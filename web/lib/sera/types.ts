@@ -7,9 +7,11 @@ export type LabSnapshot = {
    * 4 added `luckGated`, which says whether the luck hurdle applies to a trial at all;
    * 5 added `mwr` / `spyTrMwr`, what a funded trial's money actually earned;
    * 6 added the journal's version chain (`supersedes` / `docKey` / `version` / `supersededBy`)
-   *   and split the journal count: `summary.insights` now counts documents, not rows.
+   *   and split the journal count: `summary.insights` now counts documents, not rows;
+   * 7 added `books` and `summary.testBooks` — the buy signal and the spent looks collapsed from
+   *   method ids to distinct strategies, because a method id is not a strategy.
    */
-  version: 6;
+  version: 7;
   asOf: string;
   gate: {
     maxDrawdown: number;
@@ -50,6 +52,13 @@ export type LabSnapshot = {
     insights: number;
     /** Journal rows, every version of every document. `insights` is the one to show a reader. */
     insightRows: number;
+    /**
+     * How many **distinct books** those `testLooks` bought — never how many looks were spent.
+     * Four are spent and they bought two: M0021, M0022 and M0029 are one strategy under three
+     * names, so the lab's out-of-sample record is 0-for-2 and three of the four looks bought
+     * nearly the same information. `books.testLooks` is the same fact with the names in it.
+     */
+    testBooks: number;
     byStatus: Record<string, number>;
   };
   benchmark: { spyTr: [string, number][]; spyPrice: [string, number][] };
@@ -59,7 +68,24 @@ export type LabSnapshot = {
   ideasSeen: LabSeen[];
   /** Where each paper roster entry came from in the lab (`paper.roster.LAB_PROVENANCE`). */
   paper: LabPaper[];
+  /**
+   * One entry per distinct strategy, for the two places a method id has been standing in for one:
+   * `firing` is what the buy signal says is worth paying for survivorship-free price history, and
+   * `testLooks` is what the spent looks actually bought. Written by `lab/firings.py`, which reads
+   * the declared parent of each method and confirms it against the recorded curves.
+   */
+  books: { firing: LabBook[]; testLooks: LabBook[] };
 };
+
+/**
+ * One strategy, and every method id that turned out to be it.
+ *
+ * `lead` is the method the row is shown under — the one the others were derived from. `others`
+ * are the same book under another name. `why` says of each how that is known, as a sentence with
+ * `{lead}` still in it: substitute the **lead method's name**, never its id, because this text is
+ * read by the owner. `bookText` in `derive.ts` is the one place that substitution happens.
+ */
+export type LabBook = { lead: string; others: string[]; why: Record<string, string> };
 
 /**
  * One roster entry's lab provenance, as the engine records it. A fact about the night the entry

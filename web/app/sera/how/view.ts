@@ -17,7 +17,7 @@ export type HowInput = {
   asOf: string;
   gate: Gate;
   data: LabSnapshot['data'];
-  summary: Pick<LabSnapshot['summary'], 'devTrials' | 'testLooks'>;
+  summary: Pick<LabSnapshot['summary'], 'devTrials' | 'testLooks' | 'testBooks'>;
   methods: readonly Pick<LabMethod, 'status' | 'historical' | 'updated'>[];
   trials: readonly Pick<LabTrial, 'window' | 'eligibleNow'>[];
 };
@@ -34,6 +34,23 @@ export const count = (n: number) => INT.format(n);
 const plural = (n: number, one: string, many: string) => `${count(n)} ${n === 1 ? one : many}`;
 const num = (v: number) => String(Number(v.toFixed(4)));
 
+/**
+ * The exam-years counter, which must carry two numbers whenever they differ.
+ *
+ * A look is spent for good, and four are gone. Three of those four bought one strategy wearing
+ * three names, so "four looks, four failures" overstates the evidence against the lab's approach
+ * by a factor of two while understating how narrowly its budget was spent. Printing only the
+ * looks hides the first; printing only the strategies hides the second.
+ */
+const looksSub = (bks: number): string =>
+  `on ${plural(bks, 'strategy', 'strategies')}`;
+
+const looksTip = (looks: number, bks: number): string =>
+  looks === bks
+    ? `${count(looks)} one-time looks used so far`
+    : `${count(looks)} one-time looks used so far, on ${plural(bks, 'strategy', 'strategies')} — ` +
+      'the rest went twice to the same one';
+
 /** 0.15 -> '15%', 0.125 -> '12.5%' */
 export const pctLabel = (v: number) => `${Number((v * 100).toFixed(1))}%`;
 
@@ -43,6 +60,13 @@ export type StageCounts = {
   devTrials: number;
   eligible: number;
   testLooks: number;
+  /**
+   * How many distinct strategies those looks bought. Three of the four spent looks went to one
+   * strategy under three names, so the record against the lab's own approach is nought for two
+   * and not nought for four — and the scarcest resource it owns was spent twice on the same
+   * thing. The counter has to carry both numbers or it misstates one of them.
+   */
+  testBooks: number;
   paper: number;
 };
 
@@ -56,6 +80,7 @@ export function stageCounts(snap: HowInput): StageCounts {
     // Today's verdict, not the run-date record: this panel counts what the lab holds now.
     eligible: snap.trials.filter(t => t.window === 'dev' && t.eligibleNow).length,
     testLooks: snap.summary.testLooks,
+    testBooks: snap.summary.testBooks,
     paper: snap.methods.filter(m => m.status === 'paper').length,
   };
 }
@@ -108,7 +133,12 @@ export function pipelineStages(snap: HowInput): PipelineStage[] {
       title: ['One look at', `${year(g.testStart)}–today`],
       detail: ['Years never used', 'to build anything.', 'One look, final'],
       count: `${plural(c.testLooks, 'look', 'looks')} used`,
-      countTip: c.testLooks === 0 ? 'The exam years are untouched' : `${count(c.testLooks)} one-time looks used so far`,
+      // Both numbers, because either on its own misstates the record -- see `looksTip`.
+      countSub: c.testLooks === c.testBooks ? undefined : looksSub(c.testBooks),
+      countTip:
+        c.testLooks === 0
+          ? 'The exam years are untouched'
+          : looksTip(c.testLooks, c.testBooks),
       fails: true,
     },
     {
@@ -150,7 +180,13 @@ export type WindowsModel = {
 export function windowsModel(snap: HowInput): WindowsModel {
   const g = snap.gate;
   const looks = snap.summary.testLooks;
-  const testNote = looks === 0 ? 'untouched, no look used yet' : `${plural(looks, 'look', 'looks')} used`;
+  const bks = snap.summary.testBooks;
+  const testNote =
+    looks === 0
+      ? 'untouched, no look used yet'
+      : looks === bks
+        ? `${plural(looks, 'look', 'looks')} used`
+        : `${plural(looks, 'look', 'looks')} used on ${plural(bks, 'strategy', 'strategies')}`;
   const onPaper = snap.methods.filter(m => m.status === 'paper').map(m => m.updated.slice(0, 10)).sort();
   const paperSince = onPaper[0] ?? null;
   const paperText = paperSince ? `paper trading since ${monthYear(paperSince)}` : 'no lab method on paper yet';
@@ -211,7 +247,7 @@ export function hurdles(gate: Gate, tries: number): Hurdle[] {
 export type Rule = { key: 'counted' | 'first' | 'reroll' | 'append' | 'look' | 'bar'; title: string; body: string };
 
 export function honestyRules(snap: Pick<HowInput, 'gate' | 'summary'>): Rule[] {
-  const { devTrials, testLooks } = snap.summary;
+  const { devTrials, testLooks, testBooks } = snap.summary;
   const g = snap.gate;
   return [
     {
@@ -237,7 +273,13 @@ export function honestyRules(snap: Pick<HowInput, 'gate' | 'summary'>): Rule[] {
     {
       key: 'look',
       title: 'One look at the exam years',
-      body: `The ${year(g.testStart)}–today years are opened once per finalist, and a fail is final. Looks used so far: ${count(testLooks)}.`,
+      body:
+        `The ${year(g.testStart)}–today years are opened once per finalist, and a fail is final. ` +
+        `Looks used so far: ${count(testLooks)}` +
+        (testLooks === testBooks
+          ? '.'
+          : `, but on only ${plural(testBooks, 'different strategy', 'different strategies')} — ` +
+            'some of those finalists turned out to be the same strategy under another name.'),
     },
     {
       key: 'bar',

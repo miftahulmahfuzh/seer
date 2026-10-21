@@ -283,9 +283,17 @@ Then:
    on the `-gotrade` preset, run it on dev, and promote that one if it is still eligible. Paper
    pays real fees, so the look is spent on the configuration paper would trade, or not at all.
 0b. **Durability check, and the one moment buying data is worth it.** A twenty-year average hides
-   a regime, and this lab has the scar: four of four test-window looks have failed on
+   a regime, and this lab has the scar: four test-window looks are spent and all four failed on
    `beats SPY TR`, and all four roster strategies lost to a deposit-matched SPY over 2018-2026
-   (insight 58). Before spending a look, run all four. Every one is report only -- no trial, no
+   (insight 58). **Say "four looks, two books" and not "four of four".** Three of those looks went
+   to one book -- M0021, M0022 and M0029 agree at 0.93-0.99, M0029 is M0021's child and both it
+   and M0022 grew out of M0011 -- so the out-of-sample record is 0-for-2, the evidence against the
+   lab's approach is half as strong as it has been quoted, and the scarcest resource the lab owns
+   was spent twice on nearly the same information (insight 529). Before spending the fifth look,
+   check the candidate against the books already bought: 0.992 between M0021 and M0029 was knowable
+   from curves the lab already held. `lab walkforward`'s buy signal collapses firings the same way,
+   so a block naming three methods under one book is **one** reason to buy, not three.
+   Before spending a look, run all four reports. Every one is report only -- no trial, no
    look, N unchanged:
 
    - `lab regime MNNNN` -- narrow versus broad markets. Read it knowing it does **not**

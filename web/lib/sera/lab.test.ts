@@ -5,10 +5,10 @@ import { DSR_POLICIES, INSIGHT_KINDS, METHOD_STATUSES, SOURCE_KINDS } from './ty
 
 describe('lab snapshot (web/data/lab.json)', () => {
   it('has exactly the contract keys', () => {
-    expect(lab.version).toBe(6);
+    expect(lab.version).toBe(7);
     expect(Object.keys(lab).sort()).toEqual(
-      ['asOf', 'benchmark', 'data', 'gate', 'ideasSeen', 'insights', 'methods', 'paper', 'summary',
-        'trials', 'version'].sort(),
+      ['asOf', 'benchmark', 'books', 'data', 'gate', 'ideasSeen', 'insights', 'methods', 'paper',
+        'summary', 'trials', 'version'].sort(),
     );
     expect(typeof lab.asOf).toBe('string');
     for (const k of ['maxDrawdown', 'minProfitFactor', 'minTrades', 'dsrMin', 'dsrN'] as const) {
@@ -19,6 +19,34 @@ describe('lab snapshot (web/data/lab.json)', () => {
     expect(Number.isInteger(lab.gate.dsrN) && lab.gate.dsrN >= 0).toBe(true);
     expect(lab.gate.dsrNBasis.length).toBeGreaterThan(0);
     expect(lab.gate.devStart).toBe('1993-01-29');
+  });
+
+  it('collapses the spent looks and the buy signal to distinct strategies', () => {
+    // Insight 529, against the real snapshot rather than a fixture: four looks are spent and they
+    // bought two strategies, and the three firing method ids are one. Both numbers gate decisions
+    // the owner makes with real money, and the firing one is the direction that encourages
+    // spending — this is the test that notices if either collapse quietly stops happening.
+    const members = (bs: typeof lab.books.testLooks) => bs.flatMap((b) => [b.lead, ...b.others]);
+
+    expect(lab.summary.testLooks).toBe(4);
+    expect(lab.summary.testBooks).toBe(lab.books.testLooks.length);
+    expect(members(lab.books.testLooks).length).toBe(lab.summary.testLooks);
+
+    for (const b of [...lab.books.testLooks, ...lab.books.firing]) {
+      // Every id resolves to a method, so the page can print a name instead of an id...
+      for (const id of [b.lead, ...b.others]) expect(methodById(id)).toBeTruthy();
+      // ...and every reason is a template the page fills, carrying no id and no coefficient.
+      for (const id of b.others) {
+        expect(b.why[id]).toContain('{lead}');
+        expect(b.why[id]).not.toMatch(/M\d{4}|0\.\d/);
+      }
+      expect(Object.keys(b.why).sort()).toEqual([...b.others].sort());
+    }
+
+    // No method id appears in two strategies, in either list.
+    for (const list of [lab.books.testLooks, lab.books.firing]) {
+      expect(new Set(members(list)).size).toBe(members(list).length);
+    }
   });
 
   it('writes every failure label in a shape conditionOk can read', () => {

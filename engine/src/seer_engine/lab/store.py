@@ -3058,7 +3058,15 @@ def as_mapping(row: sqlite3.Row) -> Mapping[str, Any]:
 # **documents** (heads) and ``summary.insightRows`` counts rows. The old field kept its name and
 # changed its meaning, which is exactly why this number moved -- a consumer pinned to 5 is
 # reading "insights" as a row count and must be told.
-SNAPSHOT_VERSION = 6
+#
+# 7 adds ``books``: the buy signal and the spent test-window looks collapsed from method ids to
+# distinct **books**, plus ``summary.testBooks``. A method id is not a strategy -- on 2026-10-21
+# the signal named M0072, M0092 and M0258 and all three are one book, and four spent looks turned
+# out to have bought two. Both numbers gate decisions the owner makes with real money, and the
+# page was overstating the first and the lab was overstating the second. Derived at export time
+# like the version chain above, and for the same reason: it cuts walk-forward folds and runs the
+# kin rule, which is not work a React component may do. See ``lab/books.py`` and ``lab/firings.py``.
+SNAPSHOT_VERSION = 7
 EXPECTED_FAILURE_SEP = "\n\nExpected failure: "  # how lab ideas write their hypothesis
 
 
@@ -3324,6 +3332,7 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
     # _change_it`` asserts the v1 export is byte-identical to the export after migration. A v1 row
     # has no ``supersedes``; it is a document of one, at version 1, exactly like a migrated row
     # whose column is NULL -- so the bytes match.
+    the_books = _snapshot_books(conn)
     insight_rows = _dicts(conn, "SELECT * FROM insights ORDER BY id")
     insight_version, insight_successor = _insight_chains(insight_rows)
     insight_documents = sum(1 for i in insight_rows if int(i["id"]) not in insight_successor)
@@ -3366,12 +3375,23 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
             # the append-only store actually holds.
             "insights": insight_documents,
             "insightRows": len(insight_rows),
+            # How many DISTINCT books those looks bought, which is not how many were spent. Four
+            # looks are spent; three of them went to one book (M0021, M0022, M0029 -- M0029 is
+            # M0021's child, both it and M0022 grew out of M0011, and they agree at 0.93-0.99),
+            # so the lab's out-of-sample record is 0-for-2, not 0-for-4. See lab/firings.py.
+            "testBooks": len(the_books["testLooks"]),
             "byStatus": by_status,
         },
         "benchmark": {
             "spyTr": [[d, v] for d, v in bench["spy_tr"]],
             "spyPrice": [[d, v] for d, v in bench["spy_price"]],
         },
+        # One row per distinct BOOK, not per method id, for the two places a method id has been
+        # standing in for a strategy: the buy signal the owner reads before paying for
+        # survivorship-free price history, and the looks he has already spent. Three ids fired on
+        # 2026-10-21 and they are one book; four looks are spent and they bought two. The others
+        # are kept beside each lead rather than dropped, so a collapsed row opens.
+        "books": the_books,
         "methods": [_snapshot_method(m) for m in _dicts(conn, "SELECT * FROM methods ORDER BY id")],
         # One gate, resolved once and passed down: `published_verdict` judges every row against
         # the same N, which is also the `gate.dsrN` published above.
@@ -3409,6 +3429,42 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
             if sid in {e.id for e in roster.active()}
         ],
     }
+
+
+def _snapshot_books(conn: sqlite3.Connection) -> dict[str, Any]:
+    """The firing books and the spent-look books, as the site reads them.
+
+    ``why`` carries the **template** out of ``books.SAME_BOOK_TEXT`` with ``{lead}`` still in it,
+    not the report's rendered sentence. The site fills it with the lead method's *name*, because
+    text the owner reads carries no ids and no correlation coefficients; the report fills the same
+    template with ids and the number that confirmed it. One wording, two audiences.
+
+    Fails quiet. This is the one part of the snapshot that is derived rather than read: it cuts
+    walk-forward folds and runs the kin rule, and any of that can refuse on a lab that has no
+    recorded benchmark -- which is every fresh fixture, and the snapshot is documented to answer
+    on a database that has never been migrated. An empty block renders as "nothing is asking to
+    be bought", which is the truth about a lab with no evidence, and it can never render as a
+    reason to spend money.
+    """
+    from seer_engine.lab import books as _books
+    from seer_engine.lab import firings as _firings
+
+    def block(bs: list[_books.Book]) -> list[dict[str, Any]]:
+        return [
+            {
+                "lead": b.lead,
+                "others": list(b.others),
+                "why": {m: _books.SAME_BOOK_TEXT[s.kind] for m, s in b.why.items()},
+            }
+            for b in bs
+        ]
+
+    try:
+        firing, _why = _firings.firing(conn)
+        looks = _firings.test_look_books(conn)
+    except (LabError, sqlite3.Error):
+        return {"firing": [], "testLooks": []}
+    return {"firing": block(firing), "testLooks": block(looks)}
 
 
 def snapshot_json(conn: sqlite3.Connection) -> str:

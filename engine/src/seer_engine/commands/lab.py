@@ -196,6 +196,7 @@ from seer_engine import config, research
 from seer_engine.backtest import dev, tuning
 from seer_engine.backtest.metrics import fmt_num, fmt_pct, fmt_pf, fmt_signed_pct
 from seer_engine.fundamentals import coverage
+from seer_engine.lab import firings as _firings
 from seer_engine.lab import store
 
 log = logging.getLogger(__name__)
@@ -2797,29 +2798,10 @@ def _regime(conn, args) -> int:
 
 
 #: The era in which the store can price the most of the index -- the buy signal's condition (c).
-HIGH_COVERAGE = (date(2009, 1, 1), date(2015, 10, 16))
-
-
-def _promoted_variant(conn, method_id: str) -> str | None:
-    """The candidate ``lab promote`` would pre-register, or None; never raises.
-
-    ``hardgate.promoted_variant`` and not a second query beside it, for exactly the reason
-    Decision D9 gives about the kin rule: two commands giving different answers about one method is
-    worse than either answer. The gate and this column must name the same arm, or the number the
-    buy signal reads is about a book the owner would not be holding.
-
-    None covers two different situations and the caller treats them the same, because for this
-    column they are the same: no eligible dev trial at all (``best_dev_eligible`` returns None --
-    four ``dev-eligible`` methods are in that state today), and a lab whose gate cannot be resolved
-    at all. Measured at 0.86s for all 168 methods in the committed lab, the per-method gate read
-    served from ``store._GATE_CACHE``.
-    """
-    from seer_engine.lab import hardgate
-
-    try:
-        return hardgate.promoted_variant(conn, method_id)
-    except store.LabError:
-        return None
+#: Defined in ``lab/firings.py`` and re-exported here, because ``lab stage`` now reads the same
+#: signal for the site and two spellings of one era would be two answers to one question. The
+#: name stays because the archive and ``test_lab_hardgate`` both reach for ``lab_cmd.HIGH_COVERAGE``.
+HIGH_COVERAGE = _firings.HIGH_COVERAGE
 
 
 def _arm_roles(method_ids: Sequence[str]) -> dict[tuple[str, str], str]:
@@ -2873,7 +2855,7 @@ def _walkforward(conn, args) -> int:
     import json
 
     from seer_engine.backtest import regime
-    from seer_engine.lab import hardgate
+    from seer_engine.lab import books, firings, hardgate
     from seer_engine.lab import walkforward as wf
 
     rows = list(conn.execute(
@@ -2934,7 +2916,7 @@ def _walkforward(conn, args) -> int:
     print(head)
     print("  " + "-" * (len(head) + 16))
 
-    fired: list[str] = []
+    fired: dict[str, str] = {}
     majorities = 0
     disagreed: list[tuple[str, str, float, str, float]] = []
     for mid, trials in sorted(by_method.items()):
@@ -2943,60 +2925,22 @@ def _walkforward(conn, args) -> int:
             r["candidate_id"]: hardgate.trial_deposits(conn, r, curves[r["candidate_id"]])
             for r in trials
         }
-        rec = wf.Record(mid, wf.evaluate(curves, bench, the_folds, deps))
-        # Two era edges, and which one is which is the whole of this report's 2026-10-20 change.
-        # `best` is the hindsight arm -- highest MAR over 2009-2015 itself, from every arm the
-        # method registered, controls and placebos included. It is printed because the archive
-        # quotes it and never handed to the signal. `edge` is the arm `lab promote` would
+        # Every buy condition, and the promoted arm's own record and era edge beside them, in one
+        # call. `lab/firings.py` owns that work because /sera prints the same signal now, and a
+        # page that says "buy" while this report says "not yet" is worse than either answer --
+        # the lesson Decision D9 in lab/hardgate.py already paid for over the kin rule. The folds
+        # travel in as an argument so --min-train-years and --eval-years still reach it.
+        v = firings.verdict(conn, mid, curves, deps, bench, the_folds)
+        rec, own, promoted, edge, se = v.record, v.own, v.promoted, v.edge, v.edge_se
+        # The second era edge, which this report prints and never hands to the signal: `best` is
+        # the hindsight arm -- highest MAR over 2009-2015 itself, from every arm the method
+        # registered, controls and placebos included. `edge` above is the arm `lab promote` would
         # pre-register: the one the counted look and the money are spent on. For M0201 those were
-        # a placebo at +1.8 pts and the real book at -7.8.
+        # a placebo at +1.8 pts and the real book at -7.8, which is why the columns are both here.
         best, best_edge = wf.best_era_arm(curves, bench, *HIGH_COVERAGE, deps)
-        promoted = _promoted_variant(conn, mid)
-        # The promoted arm's own fold record, and the era edge's own noise scale -- both on the
-        # one curve `lab promote` would pre-register. `own` is hardgate (D11)'s question asked of
-        # the signal (BUY_CONDITIONS[3]): it is an AND beside `rec`, never a swap, because reading
-        # only the winning arm's hindsight record is the fitting the fold-selector audit refused.
-        # It is built inline rather than through `hardgate.variant_record` because this report
-        # takes --min-train-years and --eval-years, so its folds are not always the gate's fixed
-        # geometry; everything else -- the de-funding, the benchmark, the one-entry mapping -- is
-        # the same. `se` refuses nothing at all; it is printed beside the edge so a sub-noise
-        # number cannot read as a measurement (insight 509).
-        if promoted is None or promoted not in curves:
-            own, edge, se = None, None, None
-        else:
-            own = wf.Record(
-                mid,
-                wf.evaluate(
-                    {promoted: curves[promoted]}, bench, the_folds, {promoted: deps.get(promoted)}
-                ),
-            )
-            edge = wf.era_edge(curves[promoted], bench, *HIGH_COVERAGE, deps.get(promoted))
-            se = wf.era_edge_se(curves[promoted], bench, *HIGH_COVERAGE, deps.get(promoted))
-        row = store.get_method(conn, mid)
-        eligible = row is not None and row["status"] == "dev-eligible"
-        # The SAME kin rule the promote gate uses (hardgate.failed_kin: family union transitive
-        # ancestors union blend ingredients and theirs, hardgate D12, union the tested books one
-        # of its variants moves with, hardgate D14), not a second query beside it. Decision D9 is
-        # what happens when these two disagree: the signal said M0030's family was clean while
-        # the gate refused it on ancestry, which is a worse answer than either one alone. That
-        # the signal widens with D12 and D14 is recorded as hardgate Decision D13. When the kin
-        # cannot be read -- D14 compares curves, and refuses on other or unknown prices (D10) --
-        # the reason goes in as the failed kin, so the signal cannot fire on a kin nobody could
-        # check, and the report still prints the row.
-        if row is None:
-            family_failed = None
-        else:
-            try:
-                kin = hardgate.failed_kin(conn, mid)
-            except store.LabError as e:
-                family_failed = f"kin unknown ({e})"
-            else:
-                family_failed = ", ".join(kin) if kin else None
-        signal, why = wf.buy_signal(
-            eligible, rec, edge, family_failed, own_record=own, edge_se=se
-        )
-        if signal:
-            fired.append(f"{mid}: {why}")
+        eligible, why = v.eligible, v.why
+        if v.fired:
+            fired[mid] = why
         if rec.majority:
             majorities += 1
         if (
@@ -3026,10 +2970,27 @@ def _walkforward(conn, args) -> int:
                   f"{fmt_signed_pct(prom_edge)}   hindsight {best}{roles.get((mid, best), '')} "
                   f"{fmt_signed_pct(best_edge)}")
     if fired:
-        print("\n  *** BUY SIGNAL ***")
-        for line in fired:
-            print(f"  {line}")
-        print("  This is the moment survivorship-free price history is worth buying: the free")
+        # ONE ROW PER BOOK, not per method id. Three ids fired here on 2026-10-21 -- M0072, M0092
+        # and M0258 -- and they are one book: `M0258-M-B0` is `M0072-Z2-RAWRANK`'s curve with a
+        # no-op band (+1.0000 residual correlation) and both younger methods record M0072 as
+        # `parent_id`. Printing three lines told the reader that three independent pieces of
+        # evidence said buy, when there was one piece of evidence named three times, and it is
+        # the direction that encourages spending. `lab/books.py` has the rule and insight 529 the
+        # measurement. Nothing is hidden: the other names are printed under the row they collapse
+        # onto, with how each is known to be the same book.
+        the_books = books.group(conn, fired)
+        n = len(the_books)
+        print(f"\n  *** BUY SIGNAL: {n} distinct book{'' if n == 1 else 's'} "
+              f"from {len(fired)} method{'' if len(fired) == 1 else 's'} ***")
+        for bk in the_books:
+            print(f"  {bk.lead}: {fired[bk.lead]}")
+            if bk.others:
+                print("      the same book under another name, and not a second reason to buy:")
+            for other in bk.others:
+                print(f"        {other} -- {bk.why[other].sentence(bk.lead)}")
+                print(f"        {' ' * len(other)}    {fired[other]}")
+        print(f"  This is the moment survivorship-free price history is worth buying for "
+              f"{'this book' if n == 1 else f'these {n} books'}: the free")
         print("  evidence is used up, and the next two things that happen are a counted look and")
         print("  real money. See the explore skill's Promotion step 0b.")
     else:

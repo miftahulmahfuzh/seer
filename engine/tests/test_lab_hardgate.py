@@ -2351,7 +2351,7 @@ def test_the_era_column_can_release_a_method_the_hindsight_arm_was_suppressing(
     row = next(line for line in out.splitlines() if line.strip().startswith("M0001"))
     assert "+7.0%" in row and "6.0%" in row
     assert row.index("+7.0%") < row.index("6.0%")
-    assert "*** BUY SIGNAL ***" in out
+    assert "*** BUY SIGNAL: 1 distinct book from 1 method ***" in out
     assert "2009-2015 edge on the promoted variant +7.0 pts" in out
     # and the two arms are named underneath, because the signs disagree
     note = next(line for line in out.splitlines() if "hindsight M0001-Z" in line)
@@ -2425,13 +2425,22 @@ def test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways(
     out = capsys.readouterr().out
     assert hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest() == before
 
-    block = out.split("*** BUY SIGNAL ***", 1)
+    # (2026-10-21) The block is one entry per distinct BOOK now, with the other names and their
+    # own reasons printed underneath -- insight 529: these three ids are one strategy and three
+    # rows read as three independent reasons to spend money. Every method that fires is still
+    # named and still carries its five-condition sentence, so this parse reads both shapes: a
+    # lead line `M0072: cleared all 5...` and an `M0092 -- written as a version of M0072` line.
+    block = out.split("*** BUY SIGNAL", 1)
     fired = set()
     if len(block) == 2:
         for line in block[1].splitlines():
-            head = line.strip().split(":", 1)[0]
+            head = line.strip().split(":", 1)[0].split(" ", 1)[0]
             if head.startswith("M") and head[1:].isdigit():
                 fired.add(head)
+
+    # The collapse itself, pinned: three method ids, ONE book, and the header says both numbers.
+    assert "*** BUY SIGNAL: 1 distinct book from 3 methods ***" in out
+    assert out.count("the same book under another name") == 1
 
     assert fired == set(BUY_SIGNAL_AFTER), (
         f"the buy signal now names {sorted(fired)}, not {sorted(BUY_SIGNAL_AFTER)}"
@@ -2446,10 +2455,11 @@ def test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways(
     # (2026-10-21) The own-arm fold majority, BUY_CONDITIONS[3]. The set above did NOT move when
     # it was added, and that is the assertion worth keeping: each of the three wins its folds on
     # the promoted arm ALONE, not merely on whatever variant each training slice happened to name.
-    for line in block[1].splitlines():
-        if line.strip().split(":", 1)[0] in BUY_SIGNAL_AFTER:
-            assert "promoted arm 3 of 4 folds" in line, line
-            assert "SE " in line and "indistinguishable from zero" in line, line
+    reasons = [ln for ln in block[1].splitlines() if "cleared all 5" in ln]
+    assert len(reasons) == len(BUY_SIGNAL_AFTER), "a collapsed name lost its own reason"
+    for line in reasons:
+        assert "promoted arm 3 of 4 folds" in line, line
+        assert "SE " in line and "indistinguishable from zero" in line, line
 
     # ...and M0243, the one verdict the clause moved, is refused by it. Two clauses can speak for
     # an absent arm -- it has no fold record of its own AND no era edge -- and since 2026-10-21

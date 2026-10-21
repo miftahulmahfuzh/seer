@@ -9,6 +9,7 @@
 .detail { fill: var(--ink-2); font-size: 12px; }
 .count { fill: var(--sheet); }
 .countText { fill: var(--ink); font-size: 13px; font-variant-numeric: tabular-nums; }
+.countSub { fill: var(--ink-2); font-size: 11.5px; font-variant-numeric: tabular-nums; }
 .arrow { stroke: var(--ink-2); stroke-width: 1.5; fill: none; }
 .arrowHead { fill: var(--ink-2); }
 .failArrow { stroke: var(--neg); stroke-width: 1.5; stroke-dasharray: 4 4; fill: none; }

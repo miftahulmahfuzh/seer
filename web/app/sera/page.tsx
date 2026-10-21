@@ -1,4 +1,4 @@
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, ChevronRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { type CSSProperties, Fragment, type ReactNode } from 'react';
@@ -23,6 +23,7 @@ import {
   HISTORICAL_COLOR,
   HURDLES,
   LAB_COLOR,
+  methodHref,
   overview,
   pctText,
   ratioText,
@@ -35,6 +36,30 @@ export const metadata: Metadata = { title: 'Overview' };
 
 const year = (ymd: string) => ymd.slice(0, 4);
 const tryNumber = (v: number) => `#${v}`;
+
+/**
+ * The sentence under the spent-looks number, and the reason this tile shows two numbers.
+ *
+ * The exam years are the lab's scarcest resource and a look is spent for good. Four are spent,
+ * and three of them went to one strategy wearing three names — so the lab's record against its
+ * own approach is nought for two, not nought for four, and the budget was spent twice on nearly
+ * the same information. Both halves are worth saying and they cut opposite ways.
+ */
+const looksSub = (looks: number, bks: number, test: string): string =>
+  looks === bks
+    ? `Each look at ${test} is spent for good`
+    : `Spent on only ${bks} different ${bks === 1 ? 'strategy' : 'strategies'} — the rest went ` +
+      'twice to the same one';
+
+const buyTitle = (n: number): string =>
+  n === 0
+    ? 'Not yet'
+    : n === 1
+      ? 'One strategy is asking for it'
+      : `${n} different strategies are asking for it`;
+
+const alsoLabel = (n: number): string =>
+  `Also firing under ${n === 1 ? 'one other name' : `${n} other names`} — the same strategy`;
 
 /** A glossary term: the definition comes from lib/sera/glossary (Term itself takes plain strings). */
 function T({ k, children }: { k: GlossaryKey; children?: ReactNode }) {
@@ -52,7 +77,7 @@ export default async function SeraOverview() {
   const dd = pctText(g.maxDrawdown, 0);
   const dev = `${year(g.devStart)}–${year(g.devEnd)}`;
   const test = `${year(g.testStart)}–today`;
-  const { state: st, landing: ld, hurdles: hu, closer: cl, luck: lk, families: fa, latest } = v;
+  const { state: st, landing: ld, hurdles: hu, closer: cl, luck: lk, families: fa, latest, firing: fi } = v;
 
   const storyFrom = st.story.source === 'synthesis' ? 'Latest batch summary' : 'Summary from the numbers';
 
@@ -95,8 +120,13 @@ export default async function SeraOverview() {
                     <T k="testWindow">Test-window</T> looks used
                   </>
                 }
-                value={String(st.looks)}
-                sub={st.looks === 0 ? `The ${test} data is still untouched` : `Each look at ${test} is spent for good`}
+                value={st.lookBooks.length ? `${st.looks} · ${st.lookBooks.length} books` : String(st.looks)}
+                size={st.lookBooks.length ? 'md' : 'lg'}
+                sub={
+                  st.looks === 0
+                    ? `The ${test} data is still untouched`
+                    : looksSub(st.looks, st.lookBooks.length, test)
+                }
               />
               <Stat
                 label="Closest result"
@@ -132,6 +162,61 @@ export default async function SeraOverview() {
               <div className={s.prose} dangerouslySetInnerHTML={{ __html: renderMarkdown(st.story.body) }} />
             </article>
           </div>
+        </Section>
+
+        {/* (8) Is the paid data worth buying yet? ONE ROW PER STRATEGY. */}
+        <Section
+          id="buy"
+          className={s.buy}
+          bg="butter"
+          eyebrow="Worth buying the paid data?"
+          title={buyTitle(fi.books.length)}
+          caption={
+            <>
+              Seer only sees the companies that survived, so a strategy can look good because the
+              failures are missing. Buying price history that includes them costs real money, and
+              this says when one has run out of free evidence. One line per strategy — a strategy
+              that was written as a version of another one is the same strategy, and counts once.
+            </>
+          }
+        >
+          {fi.books.length === 0 ? (
+            <p className={s.empty}>Nothing is asking to be bought. The free evidence has not run out.</p>
+          ) : (
+            <ul className={s.buyList}>
+              {fi.books.map(b => (
+                <li key={b.lead.id} className={s.buyRow}>
+                  <div className={s.buyHead}>
+                    <p className={s.buyName}>{b.lead.name}</p>
+                    <Link
+                      href={methodHref(b.lead.id)}
+                      className="icon-btn sm soft"
+                      aria-label={`Open ${b.lead.name}`}
+                      data-tip="Open this strategy"
+                    >
+                      <ArrowUpRight size={20} strokeWidth={1.75} />
+                    </Link>
+                  </div>
+                  {b.others.length > 0 ? (
+                    <details className={s.buyAlso}>
+                      <summary className={s.buyAlsoSummary} data-tip="Show the other names this strategy goes by">
+                        <span className={s.buyChevron} aria-hidden="true"><ChevronRight size={16} /></span>
+                        <span>{alsoLabel(b.others.length)}</span>
+                      </summary>
+                      <ul className={s.buyAlsoBody}>
+                        {b.others.map(o => (
+                          <li key={o.id}>
+                            <Link href={methodHref(o.id)} className={s.buyAlsoName}>{o.name}</Link>
+                            <span className={s.buyAlsoWhy}> — {o.why}.</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
         </Section>
 
         {/* (2) Where every try landed */}

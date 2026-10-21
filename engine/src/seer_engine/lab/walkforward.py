@@ -42,6 +42,7 @@ Pure: no I/O, no database, no clock. ``lab walkforward`` supplies the curves.
 from __future__ import annotations
 
 import math
+import statistics
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -184,6 +185,93 @@ def era_edge(
     return mine.cagr - theirs.cagr
 
 
+def era_edge_se(
+    curve: Sequence[tuple[date, float]],
+    bench: Sequence[tuple[date, float]],
+    start: date,
+    end: date,
+    deposits: Mapping[date, float] | None = None,
+) -> float | None:
+    """The year-to-year noise scale of ``era_edge``: the standard error of its annual leads.
+
+    **Why a number nobody gates on is worth computing.** ``MIN_FOLDS`` states its null -- a strict
+    majority of four folds is 0.3125 under a coin flip, written into ``hardgate.COIN_FLIP_NULL``
+    and pinned by a test -- so a reader of "3 of 4 folds" is handed the scale against which to
+    read it. The era-edge condition stated neither a null nor a noise scale, and that asymmetry is
+    exactly how an edge of ``+0.22 pts`` came to be printed inside the phrase "cleared all 4" with
+    nothing in the system objecting. This function is the missing scale. It refuses nothing.
+
+    **A margin was considered and refused** (the working is in
+    ``docs/plans/2026-10-21-gate-era-edge-margin-finding.md``). Every candidate threshold is a
+    quarter to two-thirds of one standard error, it would be fitted to the single method the
+    condition ever bound on, and the defensible one -- ``edge > 1.645 x SE``, about +5.1 pts/yr --
+    refuses all 86 scoreable methods including the lab's best. A quantity that can support either
+    a cosmetic bar or a total one cannot support a bar. So the answer is to print the noise, not
+    to threshold on it.
+
+    **The arithmetic**, identical to that study's, which is why the two can be quoted together:
+    cut the era into calendar years; in each, take this book's annualised return less the
+    benchmark's, both de-funded by ``measure``; take the sample standard deviation of those annual
+    leads and divide by the root of their count. For 2009-01-01 to 2015-10-16 that is seven
+    numbers, the last a ten-month stub that ``measure`` annualises.
+
+    Three honest limits, stated rather than hidden:
+
+    - the annual leads are **arithmetic** differences of annualised returns while ``era_edge``
+      itself is a geometric difference of CAGRs over the whole era, so this is the scale of the
+      yearly numbers, not literally the sampling error of the headline figure;
+    - a calendar year's slice runs January value to December value, so the December-to-January
+      month falls between two years and is in neither. That is what the margin study measured and
+      it is kept so the numbers reproduce;
+    - seven years of one book in one market are not seven independent draws. Like the folds, this
+      is a **sanity scale and never a significance test**, and nothing here may enter a DSR.
+
+    None when fewer than two years can be measured -- one number has no spread, and a spread
+    nobody could compute is not a spread of zero.
+    """
+    leads: list[float] = []
+    for year in range(start.year, end.year + 1):
+        s = max(start, date(year, 1, 1))
+        e = min(end, date(year, 12, 31))
+        mine = measure(curve, s, e, deposits)
+        theirs = measure(bench, s, e)
+        if mine is None or theirs is None or mine.cagr is None or theirs.cagr is None:
+            continue
+        leads.append(mine.cagr - theirs.cagr)
+    if len(leads) < 2:
+        return None
+    return statistics.stdev(leads) / math.sqrt(len(leads))
+
+
+#: Two standard errors, near enough, for a 95% interval. Named so the one place it is used reads
+#: as an interval rather than as a magic number -- and so nobody mistakes it for a bar: it decides
+#: nothing, it only chooses how wide the printed interval is.
+TWO_SIDED_95 = 1.96
+
+
+def describe_era_edge(edge: float, se: float | None) -> str:
+    """``"+0.2 pts (SE 4.2, indistinguishable from zero)"`` -- the edge carrying its own scale.
+
+    A bare ``+0.2 pts`` inside a success phrase reads as a measurement. With the scale beside it,
+    the same number reads as what it is. Nothing here refuses anything: every string this returns
+    is attached to a verdict that was already decided by the sign of ``edge`` alone.
+
+    "Indistinguishable from zero" is said when the 95% interval straddles zero, which on the
+    committed lab is **true of every method it holds**, the best of them included. That is not a
+    defect in the phrasing; it is the finding.
+    """
+    pts = f"{edge * 100:+.1f} pts"
+    if se is None:
+        return f"{pts} (year-to-year noise unmeasurable)"
+    half = TWO_SIDED_95 * se
+    if abs(edge) <= half:
+        return f"{pts} (SE {se * 100:.1f}, indistinguishable from zero)"
+    return (
+        f"{pts} (SE {se * 100:.1f}, 95% interval "
+        f"{(edge - half) * 100:+.1f} to {(edge + half) * 100:+.1f})"
+    )
+
+
 def best_era_arm(
     curves: Mapping[str, Sequence[tuple[date, float]]],
     bench: Sequence[tuple[date, float]],
@@ -314,7 +402,8 @@ class Record:
 BUY_CONDITIONS = (
     "dev-eligible",
     "no kin has test-failed (family union ancestors union blend ingredients union behaviour)",
-    "majority of folds",
+    "majority of folds on the variants the lab's own rule would have picked",
+    "majority of folds on the variant that would be promoted, on its own curve",
     "positive 2009-2015 edge on the variant that would be promoted",
 )
 
@@ -324,14 +413,39 @@ def buy_signal(
     record: Record,
     high_coverage_edge: float | None,
     family_failed: str | None = None,
+    *,
+    own_record: Record | None,
+    edge_se: float | None = None,
 ) -> tuple[bool, str]:
     """Is this the moment survivorship-free price history becomes worth paying for?
 
-    All four must hold: the method is dev-eligible at the bars in force; no method in its family
-    has already failed the test window; it beat the benchmark in a majority of walk-forward folds;
-    and **the variant that would be promoted** has a positive edge in the highest-coverage era
+    All five must hold: the method is dev-eligible at the bars in force; no method in its family
+    has already failed the test window; the lab's own way of choosing beat the benchmark in a
+    majority of walk-forward folds; **the variant that would be promoted** won a majority of those
+    folds on its own curve; and that same variant has a positive edge in the highest-coverage era
     (2009-2015), so the edge is not an artefact of the half of the universe the store cannot
     price.
+
+    **The two fold counts are an AND, never a swap, and that distinction is the whole of the
+    2026-10-21 change.** ``record`` is the SELECTOR's record: at each fold the lab's own rule
+    chooses a variant knowing nothing past the train end, and that choice is scored unseen. It
+    says whether the lab's *way of choosing* works out of sample. ``own_record`` is the narrower
+    question hardgate (D11) already asks of a promotion: did the one variant that takes the
+    pre-registration, the counted look and the owner's money win those folds **by itself**.
+
+    Measured over the committed lab before the clause was added, requiring both **changes exactly
+    one verdict** and costs nothing: M0072, M0092 and M0258 each win 3 of 4 on the promoted arm
+    alone and keep firing, and M0243 -- selector 3 of 4, promoted arm 2 of 4 -- is caught. Caught
+    for the second time, not the first: the 2026-10-20 era-edge repair already suppressed it. That
+    is the point of adding it. A condition whose only catch is a method another condition also
+    catches is defence in depth, and it is cheap.
+
+    **Replacing one count with the other would be the opposite change**, and it is the one to
+    refuse. Thirteen methods lose the selector's majority while their own arm wins all four folds
+    in hindsight -- which is to say the lab's rule, choosing without hindsight, named a worse
+    variant every time. Reading only the winning arm's record is the exact fitting the
+    fold-selector audit rejected as its verdict (B). So the swap is not a stricter reading or a
+    looser one; it is a different and wrong question. Both counts, or neither.
 
     **The kin condition was added after running this.** Without it the signal fired on M0007,
     M0019 and M0020 -- and every one of the three is in a family that had *already* failed out of
@@ -352,11 +466,12 @@ def buy_signal(
     "family union ancestors" until 2026-10-20, which under-described it; hardgate D13 is the record
     of that debt and this is the paragraph that pays it.
 
-    The third is what makes the purchase about *data*. The dev store prices 48% of index members
-    in 1996 and 74% in 2014, and the 522 it cannot price are disproportionately the companies that
-    died. A method whose edge lives in the thin early years and dies by 2009-2015 is probably
-    reading that hole, and it can be rejected for free. A method that passes all three has used up
-    the free evidence, and the next two things that happen are a counted look and real money.
+    The era condition is what makes the purchase about *data*. The dev store prices 48% of index
+    members in 1996 and 74% in 2014, and the 522 it cannot price are disproportionately the
+    companies that died. A method whose edge lives in the thin early years and dies by 2009-2015 is
+    probably reading that hole, and it can be rejected for free. A method that passes all five has
+    used up the free evidence, and the next two things that happen are a counted look and real
+    money.
 
     **Which arm the era edge is measured on, and why it is the promoted one.** The condition is
     the last thing standing between a report and spending money, so it has to be about the book the
@@ -373,12 +488,23 @@ def buy_signal(
     own promoted arm, was at +2.26. A condition that can be wrong in both directions is not a
     conservative condition, it is a condition about the wrong thing.
 
-    ``high_coverage_edge`` is therefore ``None`` for a method with no promotable variant at all --
-    ``best_dev_eligible`` returning ``None``, which is true of four ``dev-eligible`` methods today
-    (M0007, M0011, M0019, M0020, whose frozen status predates the N policy move of 2026-10-08) --
-    and the signal refuses on it. Each of those four is already refused one condition earlier, by
-    kin; the rule is written down anyway rather than left resting on that, because the next method
-    in that shape may have clean kin. There is no arm to buy data for, so there is nothing to buy.
+    **``edge_se`` is printed and never tested against.** It is ``era_edge_se`` on the same arm:
+    the year-to-year scale of the number the condition turns on. The condition is still the bare
+    sign of ``high_coverage_edge``, because a margin cannot be calibrated from the evidence the lab
+    owns -- see ``era_edge_se`` and ``docs/plans/2026-10-21-gate-era-edge-margin-finding.md``. What
+    the scale fixes is the *reporting*: ``MIN_FOLDS`` hands its reader an explicit null
+    (``hardgate.COIN_FLIP_NULL``) and the era-edge clause handed its reader nothing, which is how
+    ``+0.2 pts`` came to be printed inside "cleared all 4" with nothing objecting. Now it reads
+    ``+0.2 pts (SE 4.2, indistinguishable from zero)``. No status moves and nothing is refused that
+    was not refused before; passing ``None`` only drops the parenthesis.
+
+    ``high_coverage_edge`` and ``own_record`` are therefore both ``None`` for a method with no
+    promotable variant at all -- ``best_dev_eligible`` returning ``None``, true today of M0007,
+    M0011, M0019, M0020 (whose frozen status predates the N policy move of 2026-10-08) and, since
+    N reached 170, of M0243 -- and the signal refuses on the first of them. There is no arm to buy
+    data for, so there is nothing to buy. That refusal is written down rather than left resting on
+    the kin condition catching those methods one clause earlier, because the next method in that
+    shape may have clean kin.
 
     Returns ``(fired, why)``; ``why`` names the first condition that failed, so a report can say
     what is missing rather than only that nothing happened.
@@ -389,14 +515,25 @@ def buy_signal(
         return False, f"kin already failed the test window ({family_failed})"
     if not record.majority:
         return False, f"fails the folds: {record.summary()}"
+    if own_record is None:
+        return False, (
+            "no variant would be promoted, so the arm that would take the look and the money "
+            "has no fold record of its own"
+        )
+    if not own_record.majority:
+        return False, (
+            f"the lab's rule wins {record.summary()}, but the variant that would be promoted "
+            f"wins only {own_record.summary()} on its own curve"
+        )
     if high_coverage_edge is None:
         return False, "no 2009-2015 edge for the variant that would be promoted"
     if high_coverage_edge <= 0:
         return False, (
-            f"negative 2009-2015 edge on the variant that would be promoted "
-            f"({high_coverage_edge * 100:+.1f} pts)"
+            f"negative 2009-2015 edge on the variant that would be promoted: "
+            f"{describe_era_edge(high_coverage_edge, edge_se)}"
         )
     return True, (
         f"cleared all {len(BUY_CONDITIONS)}: dev-eligible, kin clean, {record.summary()}, "
-        f"2009-2015 edge on the promoted variant {high_coverage_edge * 100:+.1f} pts"
+        f"promoted arm {own_record.summary()}, 2009-2015 edge on the promoted variant "
+        f"{describe_era_edge(high_coverage_edge, edge_se)}"
     )

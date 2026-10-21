@@ -235,41 +235,58 @@ def loser() -> wf.Record:
                                           curve(ms, 0.006), wf.folds(ms)))
 
 
-def test_buy_signal_needs_all_three():
-    assert wf.buy_signal(True, winner(), 0.03)[0] is True
+def record_of(wins: list[bool], method: str = "M0243") -> wf.Record:
+    """A `Record` with a chosen win/loss pattern, for the clauses that read only the count.
+
+    The era-edge and fold conditions never look inside a `FoldPick` beyond `beat`, so a hand-built
+    record states the shape under test -- "3 of 4" or "2 of 4" -- instead of leaving it to the
+    arithmetic of a synthetic curve, where a later tweak to the growth rate could silently change
+    which condition a test is exercising.
+    """
+    up = wf.Slice(12, 0.20, 0.20, 0.10, 2.0)
+    down = wf.Slice(12, -0.10, -0.10, 0.20, -0.5)
+    flat = wf.Slice(12, 0.00, 0.00, 0.10, 0.0)
+    return wf.Record(method, tuple(
+        wf.FoldPick(fold, f"{method}-A", 1.0, up if w else down, flat)
+        for fold, w in zip(wf.folds(M240), wins, strict=True)
+    ))
+
+
+def test_buy_signal_needs_all_five():
+    assert wf.buy_signal(True, winner(), 0.03, own_record=winner())[0] is True
 
 
 def test_buy_signal_refuses_a_method_the_lab_has_not_cleared():
-    fired, why = wf.buy_signal(False, winner(), 0.03)
+    fired, why = wf.buy_signal(False, winner(), 0.03, own_record=winner())
     assert fired is False and "not dev-eligible" in why
 
 
 def test_buy_signal_refuses_a_good_average_that_loses_the_folds():
-    fired, why = wf.buy_signal(True, loser(), 0.03)
+    fired, why = wf.buy_signal(True, loser(), 0.03, own_record=winner())
     assert fired is False and "fails the folds" in why
 
 
 def test_buy_signal_refuses_an_edge_that_dies_where_the_data_is_best():
     """The condition that makes the purchase about data rather than enthusiasm."""
-    fired, why = wf.buy_signal(True, winner(), -0.021)
+    fired, why = wf.buy_signal(True, winner(), -0.021, own_record=winner())
     assert fired is False and "negative 2009-2015 edge" in why
 
 
 def test_buy_signal_refuses_when_the_era_edge_was_never_measured():
-    fired, why = wf.buy_signal(True, winner(), None)
+    fired, why = wf.buy_signal(True, winner(), None, own_record=winner())
     assert fired is False and "never" not in why and "no 2009-2015 edge" in why
 
 
 def test_buy_signal_says_what_it_cleared_so_a_report_can_quote_it():
-    fired, why = wf.buy_signal(True, winner(), 0.026)
+    fired, why = wf.buy_signal(True, winner(), 0.026, own_record=winner())
     assert fired and "dev-eligible" in why and "folds" in why and "+2.6" in why
 
 
 def test_the_success_line_counts_the_conditions_it_actually_has():
     """It said 'all three' for a while after a fourth condition was added."""
-    _fired, why = wf.buy_signal(True, winner(), 0.026)
+    _fired, why = wf.buy_signal(True, winner(), 0.026, own_record=winner())
     assert f"cleared all {len(wf.BUY_CONDITIONS)}" in why
-    assert len(wf.BUY_CONDITIONS) == 4
+    assert len(wf.BUY_CONDITIONS) == 5
     assert "kin clean" in why
 
 
@@ -298,24 +315,24 @@ def test_buy_signal_refuses_kin_that_has_already_failed_out_of_sample():
     A status column is not the evidence. M0007 read dev-eligible only because no formal look had
     been spent on it, while its own realistic twin had lost to a deposit-matched SPY.
     """
-    fired, why = wf.buy_signal(True, winner(), 0.03, family_failed="M0022")
+    fired, why = wf.buy_signal(True, winner(), 0.03, family_failed="M0022", own_record=winner())
     assert fired is False
     assert "kin already failed" in why and "M0022" in why
 
 
 def test_the_kin_check_does_not_block_clean_kin():
-    assert wf.buy_signal(True, winner(), 0.03, family_failed=None)[0] is True
+    assert wf.buy_signal(True, winner(), 0.03, family_failed=None, own_record=winner())[0] is True
 
 
 def test_the_era_condition_says_which_arm_it_means():
     """R4: the column said +0.3% for M0179 and `lab survivorship` said -5.6%, and both were right
     -- about different arms. A condition that spends the owner's money has to name its arm."""
-    assert "promoted" in wf.BUY_CONDITIONS[3]
-    _f, why = wf.buy_signal(True, winner(), -0.021)
+    assert "promoted" in wf.BUY_CONDITIONS[4]
+    _f, why = wf.buy_signal(True, winner(), -0.021, own_record=winner())
     assert "negative 2009-2015 edge on the variant that would be promoted" in why
-    _f, why = wf.buy_signal(True, winner(), None)
+    _f, why = wf.buy_signal(True, winner(), None, own_record=winner())
     assert "no 2009-2015 edge for the variant that would be promoted" in why
-    fired, why = wf.buy_signal(True, winner(), 0.026)
+    fired, why = wf.buy_signal(True, winner(), 0.026, own_record=winner())
     assert fired and "2009-2015 edge on the promoted variant +2.6 pts" in why
 
 
@@ -327,8 +344,135 @@ def test_the_kin_condition_describes_the_rule_it_is_actually_handed():
 
 
 def test_a_method_with_no_promotable_variant_cannot_fire():
-    """`best_dev_eligible` returns None for four dev-eligible methods today (M0007, M0011, M0019,
-    M0020): their status is frozen at their run date and the N policy moved under them. All four
-    are refused by kin one condition earlier; the rule does not rest on that."""
-    fired, why = wf.buy_signal(True, winner(), None, family_failed=None)
+    """`best_dev_eligible` returns None for five dev-eligible methods today (M0007, M0011, M0019,
+    M0020 and, since N reached 170, M0243): their status is frozen at their run date and the N
+    policy moved under them. The first four are refused by kin one condition earlier; the rule
+    does not rest on that.
+
+    Since 2026-10-21 the clause that catches them is the own-arm fold record rather than the era
+    edge, because that condition is asked first. Both are statements about the same absent arm and
+    neither is reachable without it, so which one speaks is a matter of the sentence a reader
+    gets -- but it must be ONE of them, and never a fired signal.
+    """
+    fired, why = wf.buy_signal(True, winner(), None, family_failed=None, own_record=None)
+    assert fired is False and "no variant would be promoted" in why
+    # and with an own record but no edge, the era clause still speaks.
+    fired, why = wf.buy_signal(True, winner(), None, family_failed=None, own_record=winner())
     assert fired is False and "no 2009-2015 edge" in why
+
+
+# ------------------------------------------------- the own-arm fold majority (BUY_CONDITIONS[3])
+
+def test_the_two_fold_counts_are_an_and_never_a_swap():
+    """M0243's exact shape: the lab's rule wins 3 of 4, the arm that would be traded wins 2 of 4.
+
+    This is the one verdict the clause moved when it was added on 2026-10-21, and it is pinned
+    with M0243's own numbers rather than a convenient pair so that the test still describes the
+    measurement it came from. (On the committed lab today M0243 is caught a clause earlier still,
+    because N reaching 170 cost `M0243-NEAR20-SW` its DSR eligibility and it has no promotable arm
+    at all -- see the firing-set test in test_lab_hardgate.py. The shape is what is load-bearing.)
+    """
+    selector = record_of([True, True, True, False])
+    own = record_of([True, True, False, False])
+    assert selector.majority and not own.majority
+    fired, why = wf.buy_signal(True, selector, 0.03, own_record=own)
+    assert fired is False
+    assert "3 of 4 folds" in why and "2 of 4 folds" in why
+    assert "variant that would be promoted" in why
+
+
+def test_the_selector_record_still_binds_so_the_clause_cannot_be_read_as_a_swap():
+    """The mirror image, and the reason ADD was chosen over REPLACE.
+
+    Thirteen methods win all four folds on their own arm while the lab's rule -- choosing without
+    hindsight -- named something worse each time. Reading only the own-arm count would let every
+    one of them through, which is the fitting the fold-selector audit rejected as verdict (B). So
+    a method that loses the selector's majority is still refused no matter how good its own arm's
+    hindsight record looks.
+    """
+    selector = record_of([True, False, False, False])
+    own = record_of([True, True, True, True])
+    assert not selector.majority and own.majority
+    fired, why = wf.buy_signal(True, selector, 0.03, own_record=own)
+    assert fired is False and "fails the folds" in why
+
+
+def test_the_condition_list_names_both_counts_and_says_which_arm_each_reads():
+    picks, arm = wf.BUY_CONDITIONS[2], wf.BUY_CONDITIONS[3]
+    assert "folds" in picks and "own rule" in picks
+    assert "folds" in arm and "would be promoted" in arm and "own curve" in arm
+
+
+def test_both_counts_winning_fires_exactly_as_before():
+    """The half of the change most easily lost: it is not meant to refuse anybody who was firing.
+
+    M0072, M0092 and M0258 each win 3 of 4 on the promoted arm alone, which is this shape.
+    """
+    fired, _why = wf.buy_signal(
+        True, record_of([True, True, True, False]), 0.0226,
+        own_record=record_of([True, True, True, False]),
+    )
+    assert fired is True
+
+
+# ---------------------------------------------------- the era edge's own noise (insight 509)
+
+def test_era_edge_se_is_the_spread_of_the_annual_leads_not_a_bar():
+    """Two books growing at flat but different rates lead by the same amount every year, so the
+    spread of those leads is zero -- and a zero SE is a real answer, not a missing one.
+
+    Not exactly zero: `measure` annualises on elapsed days, so a leap year and a ten-month stub
+    annualise a constant monthly rate to very slightly different numbers. The residual is three
+    thousandths of a point a year, which is the arithmetic's own grain and not a property of
+    either book. Pinned below a hundredth of a point so a real spread could never hide under it.
+    """
+    ms = months(date(2009, 1, 1), 84)
+    se = wf.era_edge_se(curve(ms, 0.010), curve(ms, 0.005), date(2009, 1, 1), date(2015, 10, 16))
+    assert se == pytest.approx(0.0, abs=1e-4)
+
+
+def test_era_edge_se_needs_two_years_before_it_is_a_spread_at_all():
+    ms = months(date(2009, 1, 1), 10)
+    assert wf.era_edge_se(curve(ms, 0.01), curve(ms, 0.005), date(2009, 1, 1), date(2009, 10, 1)) \
+        is None
+
+
+def test_era_edge_se_grows_with_a_book_that_leads_unevenly():
+    """The same era edge, earned smoothly or in one year, is not the same evidence. Nothing in
+    the lab could say so before: the condition read the sign and printed the number bare."""
+    ms = months(date(2009, 1, 1), 84)
+    bench = curve(ms, 0.005)
+    lumpy = [(d, v) for d, v in curve(ms, 0.005)]
+    for i in range(30, len(lumpy)):          # one step change, so one year carries the whole lead
+        lumpy[i] = (lumpy[i][0], lumpy[i][1] * 1.4)
+    steady = wf.era_edge_se(curve(ms, 0.010), bench, date(2009, 1, 1), date(2015, 10, 16))
+    assert wf.era_edge_se(lumpy, bench, date(2009, 1, 1), date(2015, 10, 16)) > steady
+
+
+def test_a_sub_noise_edge_is_described_as_indistinguishable_from_zero():
+    """Insight 509's whole point: `+0.2 pts` inside "cleared all 4" read as a measurement."""
+    said = wf.describe_era_edge(0.0022, 0.042)
+    assert "+0.2 pts" in said and "SE 4.2" in said and "indistinguishable from zero" in said
+
+
+def test_an_edge_clear_of_its_noise_gets_an_interval_instead():
+    said = wf.describe_era_edge(0.10, 0.01)
+    assert "+10.0 pts" in said and "95% interval" in said and "+8.0 to +12.0" in said
+    assert "indistinguishable" not in said
+
+
+def test_an_unmeasurable_noise_scale_is_said_out_loud_not_omitted():
+    said = wf.describe_era_edge(0.0022, None)
+    assert "+0.2 pts" in said and "unmeasurable" in said
+
+
+def test_the_noise_scale_refuses_nothing():
+    """A margin was considered and refused: the defensible one (1.645 SE, about +5.1 pts/yr)
+    refuses all 86 scoreable methods including the lab's best. So the SE is printed and the
+    verdict is still the bare sign of the edge -- the same verdict with or without it."""
+    quiet = wf.buy_signal(True, winner(), 0.0022, own_record=winner(), edge_se=None)
+    loud = wf.buy_signal(True, winner(), 0.0022, own_record=winner(), edge_se=0.042)
+    assert quiet[0] is loud[0] is True
+    assert "indistinguishable from zero" in loud[1] and "indistinguishable" not in quiet[1]
+    # ...and on the other side of zero it is the sign that refuses, not the scale.
+    assert wf.buy_signal(True, winner(), -0.0022, own_record=winner(), edge_se=0.042)[0] is False

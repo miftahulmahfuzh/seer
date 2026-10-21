@@ -2103,6 +2103,22 @@ def test_this_rule_retires_no_promotion_that_already_happened():
 _ERA = (date(2009, 1, 1), date(2015, 10, 16))
 
 
+def _broken(months: list[date], annual: float, when: date, loss: float) -> str:
+    """``_curve``'s trend with one PERMANENT fall of ``loss`` at ``when``, never recovered.
+
+    Unlike ``_dipped``, which leaves the book back on trend so only its drawdown moves, this
+    moves the slice's CAGR for every slice that contains ``when`` and for none that does not.
+    That is how an arm can win the folds outside one era and still trail the benchmark across an
+    era that contains its one bad year -- the shape the era-edge condition exists to catch, and
+    the only shape in which that condition, rather than a fold count, is what refuses.
+    """
+    out, v = [], 1.0
+    for d in months:
+        out.append([d.isoformat(), round(v * (1.0 - loss) if d >= when else v, 8)])
+        v *= (1.0 + annual) ** (1.0 / 12.0)
+    return json.dumps(out)
+
+
 def _dipped(months: list[date], annual: float, dip: date, depth: float, recover: int = 6) -> str:
     """``_curve``'s trend with one temporary fall of ``depth`` beginning at ``dip``.
 
@@ -2134,17 +2150,25 @@ def _wf_args(db):
 def test_the_era_column_reports_the_promoted_variant_and_keeps_the_hindsight_arm(
     tmp_path, capsys, monkeypatch
 ):
-    """M0197's and M0243's live shape: the hindsight arm is positive, the promoted arm is not.
+    """M0197's live shape: the hindsight arm is positive, the promoted arm is not.
 
-    `M0001-A` grows 15% a year and wins every fold; `M0001-Z` grows 2%. The hindsight column names
-    A at +7.0% -- and a buy signal fired on that number until 2026-10-20. The arm that would be
-    pre-registered is Z, at -6.0%, and that is what the signal is now handed.
+    `M0001-A` grows 15% a year and wins every fold; the hindsight column names it at +7.0%, and a
+    buy signal fired on that number until 2026-10-20. The arm that would be pre-registered is
+    `M0001-Z`, and that is what the signal is now handed.
+
+    Z grows 10% a year -- comfortably past the 8% benchmark -- and loses 35% permanently in June
+    2010. So it wins three of its four folds on its own curve and clears the own-arm clause added
+    on 2026-10-21, and the era edge is still what refuses it: 2009-2015 is the one era that holds
+    its bad year, and across it Z trails at -4.9 pts. Before that clause existed Z was a flat 2%
+    arm, which lost every fold; it would now be caught one condition earlier and this test would
+    no longer reach the condition it is about.
     """
     db = tmp_path / "lab.sqlite"
     c = store.connect(db)
     _benchmark(c)
     _method(c, "M0001", annual=0.15)
-    _variant(c, "M0001", "Z", annual=0.02)
+    _variant(c, "M0001", "Z", curve_json=_broken(
+        _months(*DEV_SPAN), 0.10, date(2010, 6, 30), 0.35), annual=0.10)
     z = c.execute("SELECT * FROM trials WHERE candidate_id = 'M0001-Z'").fetchone()
     c.close()
     monkeypatch.setattr(store, "best_dev_eligible", lambda _c, _m, **_k: z)
@@ -2154,9 +2178,12 @@ def test_the_era_column_reports_the_promoted_variant_and_keeps_the_hindsight_arm
     assert lab_cmd.run(_wf_args(db)) == 0
     out = capsys.readouterr().out
     row = next(line for line in out.splitlines() if line.strip().startswith("M0001"))
-    assert "6.0%" in row and "+7.0%" in row          # promoted left, hindsight right
-    assert row.index("6.0%") < row.index("+7.0%")
+    assert "4.9%" in row and "+7.0%" in row          # promoted left, hindsight right
+    assert row.index("4.9%") < row.index("+7.0%")
+    assert "3 of 4" in row                           # the promoted arm cleared the own-arm clause
     assert "negative 2009-2015 edge on the variant that would be promoted" in row
+    # ...and the number it refuses on carries its own scale, so nobody reads -4.9 as settled.
+    assert "SE 5.9, indistinguishable from zero" in row
     assert "No buy signal" in out
     assert "(hindsight)" in out
     assert "Nothing was recorded. No research store was opened." in out
@@ -2204,8 +2231,10 @@ def test_the_era_column_can_release_a_method_the_hindsight_arm_was_suppressing(
 def test_a_method_with_no_promotable_variant_shows_a_dash_and_cannot_fire(
     tmp_path, capsys, monkeypatch
 ):
-    """Four dev-eligible methods are in this state today. The hindsight column still carries their
-    number, so no row loses information; the signal gets None and refuses."""
+    """Five dev-eligible methods are in this state today (M0243 joined them when N reached 170).
+    The hindsight column still carries their number, so no row loses information; the signal gets
+    None for both the promoted arm's fold record and its era edge, and refuses on the first --
+    which since 2026-10-21 is the fold record."""
     db = tmp_path / "lab.sqlite"
     c = store.connect(db)
     _benchmark(c)
@@ -2219,7 +2248,7 @@ def test_a_method_with_no_promotable_variant_shows_a_dash_and_cannot_fire(
     out = capsys.readouterr().out
     row = next(line for line in out.splitlines() if line.strip().startswith("M0001"))
     assert "+7.0%" in row                               # the hindsight arm is still reported
-    assert "no 2009-2015 edge for the variant that would be promoted" in row
+    assert "no variant would be promoted" in row
     assert "No buy signal" in out
 
 
@@ -2283,3 +2312,82 @@ def test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways(
     # one-way reading of the change would drop.
     assert "M0072" in fired, "M0072 is the true positive the hindsight column was suppressing"
     assert "M0072" not in BUY_SIGNAL_BEFORE
+
+    # (2026-10-21) The own-arm fold majority, BUY_CONDITIONS[3]. The set above did NOT move when
+    # it was added, and that is the assertion worth keeping: each of the three wins its folds on
+    # the promoted arm ALONE, not merely on whatever variant each training slice happened to name.
+    for line in block[1].splitlines():
+        if line.strip().split(":", 1)[0] in BUY_SIGNAL_AFTER:
+            assert "promoted arm 3 of 4 folds" in line, line
+            assert "SE " in line and "indistinguishable from zero" in line, line
+
+    # ...and M0243, the one verdict the clause moved, is refused by it. Two clauses can speak for
+    # an absent arm -- it has no fold record of its own AND no era edge -- and since 2026-10-21
+    # the fold clause is asked first. Either way the refusal must name the promoted arm, and
+    # M0243 must never be in `fired`: pinned both ways so a later edit cannot re-break one half
+    # while reading green.
+    m0243 = next(ln for ln in out.splitlines() if ln.strip().startswith("M0243 "))
+    assert "M0243" not in fired
+    assert "no variant would be promoted" in m0243, m0243
+
+
+def test_the_era_edge_carries_the_noise_scale_the_margin_study_measured(tmp_path, monkeypatch):
+    """`era_edge_se` on the committed lab reproduces
+    docs/plans/2026-10-21-gate-era-edge-margin-finding.md, to the tenth of a point it quotes.
+
+    That document is why there is no margin: every candidate threshold is a quarter to two-thirds
+    of one standard error, and the defensible one refuses the whole lab. An analysis nobody can
+    reproduce cannot carry that weight, so the four numbers it leans on are pinned here against
+    the real curves -- M0029 at SE 4.2 with a 95% interval of [-8.1, +8.5] around +0.22, and the
+    three it is compared with. Same copy-first discipline as the test above: a lab command
+    migrates its database on connect, so the committed file is hashed either side.
+    """
+    import shutil
+    from datetime import date as _date
+
+    from seer_engine.commands import lab as lab_cmd
+    from seer_engine.lab import npolicy
+    from seer_engine.lab import walkforward as wf
+
+    if not store.COMMITTED_DB.exists():
+        pytest.skip("no lab database")
+    monkeypatch.setattr(store, "DSR_POLICY", npolicy.DEFAULT_POLICY)
+    store._GATE_CACHE.clear()
+
+    before = hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest()
+    db = tmp_path / "lab-copy.sqlite"
+    shutil.copy(store.COMMITTED_DB, db)
+    conn = store.connect(db)
+    try:
+        rows = list(conn.execute(
+            "SELECT n, method_id, candidate_id, start, end, curve_json FROM trials "
+            "WHERE window = 'dev' AND curve_json IS NOT NULL"
+        ))
+        import json as _json
+
+        def curve_of(row):
+            return [(_date.fromisoformat(d), float(v)) for d, v in _json.loads(row["curve_json"])]
+
+        bench = curve_of(next(r for r in rows if r["candidate_id"] == "REF-SPY-HOLD"))
+        # The arms the study names. M0029's is its only arm; the other three are the arms
+        # `best_dev_eligible` named for it, which is the column the gate reads since D18.
+        expected = {
+            "M0029-B70-RAW-FRAC": (+0.22, 4.2),
+            "M0021-B70-RAW": (-0.17, 4.2),
+            "M0072-Z2-RAWRANK": (+2.26, 3.0),
+            "M0092-SQRT-CAP10": (+1.73, 3.0),
+        }
+        for cid, (edge_pts, se_pts) in expected.items():
+            row = next(r for r in rows if r["candidate_id"] == cid)
+            curve = curve_of(row)
+            dep = {row["candidate_id"]: hardgate.trial_deposits(conn, row, curve)}[cid]
+            edge = wf.era_edge(curve, bench, *lab_cmd.HIGH_COVERAGE, dep)
+            se = wf.era_edge_se(curve, bench, *lab_cmd.HIGH_COVERAGE, dep)
+            assert edge * 100 == pytest.approx(edge_pts, abs=0.05), cid
+            assert se * 100 == pytest.approx(se_pts, abs=0.05), cid
+            # and every one of them is reported as indistinguishable from zero, which is the
+            # finding rather than a quirk of the phrasing.
+            assert "indistinguishable from zero" in wf.describe_era_edge(edge, se), cid
+    finally:
+        conn.close()
+    assert hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest() == before

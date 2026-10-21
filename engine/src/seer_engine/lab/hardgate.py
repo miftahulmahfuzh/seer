@@ -304,7 +304,8 @@ so nothing a variant actually runs is missed. What one hop declines to follow is
 connected-component blob arrived at by another road. Measured, it changes nothing today.
 
 **(D13) Does the buy signal follow (D12)? -- Yes, through its caller, with no edit to
-``walkforward.buy_signal``. What it does not follow is (D11), and that is the owner's to decide.**
+``walkforward.buy_signal``. It now follows (D11) too, as of 2026-10-21, by an edit the owner
+made.**
 
 ``lab walkforward`` passes ``hardgate.failed_kin`` as the signal's ``family_failed``, and (D9)
 aligned the two on purpose: two commands giving opposite answers about one method is worse than
@@ -317,9 +318,14 @@ Left for the owner, because each is an edit to ``walkforward.py``, which this de
 make: ``BUY_CONDITIONS`` and the ``buy_signal`` docstring described kin as "family union
 ancestors", which under-described the rule they are handed. **That half was paid on 2026-10-20**:
 both now spell out the whole of ``failed_kin`` -- family, ancestry, blend ingredients, behaviour --
-and ``buy_signal``'s docstring names this paragraph as the record of the debt. What is still the
-owner's: the signal's fold condition reads the picks' record only, so whether the buy signal should
-also require (D11)'s own-variant majority remains a change to ``buy_signal`` itself.
+and ``buy_signal``'s docstring names this paragraph as the record of the debt. **The other half was
+paid on 2026-10-21**: the signal's fold condition read the picks' record only, and
+``BUY_CONDITIONS`` now carries (D11)'s own-variant majority **beside** it as a fifth condition. An
+AND, not a swap -- ``check`` has always asked both and for the same reason, and swapping them would
+read only the arm that won in hindsight, which is the fitting the fold-selector audit refused.
+Measured before the edit: the firing set does not move (M0072, M0092 and M0258 each win 3 of 4 on
+the promoted arm alone), and the one method the new clause catches, M0243, was already caught by
+the 2026-10-20 era-edge repair. Defence in depth, bought for nothing.
 
 **(D14) Does (K) read what a method does, as well as what it is called? -- Yes. A test-failed
 method is kin when any dev variant's monthly return, de-funded and less its own fit on SPY's,
@@ -799,8 +805,9 @@ right". It is one dictionary lookup and one string scan over a module (D17) alre
 order is about the sentence a refused researcher reads, not about cost.
 
 **What it does not reach.** ``walkforward.buy_signal``, for (D13)'s reason exactly: the signal
-follows (K) through its caller and does not follow (D11)'s own-variant clause either, and whether
-it should follow this one is an edit to ``walkforward.py`` and the owner's to decide. It does not
+follows (K) through its caller, and it follows (D11)'s own-variant clause since 2026-10-21 by an
+edit to ``walkforward.py``; whether it should follow *this* one is another such edit and the
+owner's to decide. It does not
 reach ``lab run`` (D15): a second gate at run time would only spend method ids to say what this one
 already says. And it moves no band, no recorded row and no closed verdict.
 

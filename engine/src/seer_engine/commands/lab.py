@@ -2790,14 +2790,18 @@ def _walkforward(conn, args) -> int:
     print("look and the owner's money are spent on, and the one the buy signal reads. `(hindsight)`")
     print("is the column as it read before 2026-10-20: the arm with the highest MAR over 2009-2015")
     print("itself, chosen after seeing that era. They name different arms for 46 of the 86 methods")
-    print("that have both, so every record written before then quotes the right-hand column.\n")
+    print("that have both, so every record written before then quotes the right-hand column.")
+    print("`SE` is that edge's own year-to-year noise, in points a year. It is printed, never")
+    print("tested against: no margin survives calibration, and the whole lab's 95% interval")
+    print("straddles zero. `own folds` is the promoted arm's fold record on its own curve --")
+    print("a second condition beside the picks' record, not a replacement for it.\n")
     warnings = _comparability_warnings(conn, int(bench_row["n"]), rows, wanted)
     for line in warnings:
         print(line)
     if warnings:
         print()
-    head = (f"  {'method':<8}{'folds won':>11}{'stable':>9}"
-            f"{'2009-15 edge':>15}{'(hindsight)':>14}   verdict")
+    head = (f"  {'method':<8}{'folds won':>11}{'stable':>9}{'own folds':>11}"
+            f"{'2009-15 edge':>15}{'SE':>7}{'(hindsight)':>14}   verdict")
     print(head)
     print("  " + "-" * (len(head) + 16))
 
@@ -2819,11 +2823,26 @@ def _walkforward(conn, args) -> int:
         # a placebo at +1.8 pts and the real book at -7.8.
         best, best_edge = wf.best_era_arm(curves, bench, *HIGH_COVERAGE, deps)
         promoted = _promoted_variant(conn, mid)
-        edge = (
-            None
-            if promoted is None or promoted not in curves
-            else wf.era_edge(curves[promoted], bench, *HIGH_COVERAGE, deps.get(promoted))
-        )
+        # The promoted arm's own fold record, and the era edge's own noise scale -- both on the
+        # one curve `lab promote` would pre-register. `own` is hardgate (D11)'s question asked of
+        # the signal (BUY_CONDITIONS[3]): it is an AND beside `rec`, never a swap, because reading
+        # only the winning arm's hindsight record is the fitting the fold-selector audit refused.
+        # It is built inline rather than through `hardgate.variant_record` because this report
+        # takes --min-train-years and --eval-years, so its folds are not always the gate's fixed
+        # geometry; everything else -- the de-funding, the benchmark, the one-entry mapping -- is
+        # the same. `se` refuses nothing at all; it is printed beside the edge so a sub-noise
+        # number cannot read as a measurement (insight 509).
+        if promoted is None or promoted not in curves:
+            own, edge, se = None, None, None
+        else:
+            own = wf.Record(
+                mid,
+                wf.evaluate(
+                    {promoted: curves[promoted]}, bench, the_folds, {promoted: deps.get(promoted)}
+                ),
+            )
+            edge = wf.era_edge(curves[promoted], bench, *HIGH_COVERAGE, deps.get(promoted))
+            se = wf.era_edge_se(curves[promoted], bench, *HIGH_COVERAGE, deps.get(promoted))
         row = store.get_method(conn, mid)
         eligible = row is not None and row["status"] == "dev-eligible"
         # The SAME kin rule the promote gate uses (hardgate.failed_kin: family union transitive
@@ -2844,7 +2863,9 @@ def _walkforward(conn, args) -> int:
                 family_failed = f"kin unknown ({e})"
             else:
                 family_failed = ", ".join(kin) if kin else None
-        signal, why = wf.buy_signal(eligible, rec, edge, family_failed)
+        signal, why = wf.buy_signal(
+            eligible, rec, edge, family_failed, own_record=own, edge_se=se
+        )
         if signal:
             fired.append(f"{mid}: {why}")
         if rec.majority:
@@ -2859,7 +2880,9 @@ def _walkforward(conn, args) -> int:
             disagreed.append((mid, promoted, edge, best, best_edge))
         print(f"  {mid:<8}{rec.won:>6} of {len(rec.scored):<3}"
               f"{('yes' if rec.stable else 'no'):>9}"
+              f"{(f'{own.won} of {len(own.scored)}' if own is not None else '-'):>11}"
               f"{(fmt_signed_pct(edge) if edge is not None else '-'):>15}"
+              f"{(f'{se * 100:.1f}' if se is not None else '-'):>7}"
               f"{(fmt_signed_pct(best_edge) if best_edge is not None else '-'):>14}   {why}")
 
     print(f"\n{majorities} of {len(by_method)} methods beat the benchmark in a majority of folds.")

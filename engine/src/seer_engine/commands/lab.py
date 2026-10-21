@@ -84,6 +84,21 @@
                                     the residual into what the two share and what this arm owns.
                                     No trial row, no moments, no status change: N and the looks do
                                     not move
+    lab timing 886 | M0267-GATE [--against M0267-MIRROR] [--csv PATH]
+    lab timing --all [M0267 ...] [--csv PATH] [--limit K]
+                                    report only: WHEN in its window a trial earned its lead, era
+                                    by era, beside the share of the owner's deposits that had
+                                    arrived by then. Arithmetic over the recorded monthly curves:
+                                    no research store, no backtest, no method file. Every month is
+                                    assigned to the era it ends in, so the shares add to the whole
+                                    and no month is dropped at a boundary. Prints the paper lead
+                                    (de-funded) beside the lead the owner's money actually
+                                    received (the recorded money-weighted returns), and the one
+                                    line that would have caught M0267: half the lead was earned by
+                                    <date>, when <x>% of the money had arrived. --all sweeps the
+                                    back catalogue and counts how many recorded leads were earned
+                                    early. No trial row, no moments, no status change, and no
+                                    journal entry on any path: N and the looks do not move
     lab survivorship M0069 [M0007 ...] [--store DIR] [--sv-store DIR] [--csv PATH]
                      [--no-journal] [--no-supersede]
                                     report only: re-run every recorded dev variant of each method
@@ -544,6 +559,61 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s.add_argument(
         "--csv", type=Path, default=None, metavar="PATH",
         help="also write the terms to PATH as CSV, at full precision",
+    )
+
+    s = sub.add_parser(
+        "timing",
+        # Every `%` in a `help=` below is doubled, for the reason the `shortfall` parser above
+        # gives: argparse %%-interpolates every help string and a bare `%` kills `lab --help`.
+        help="report only: WHEN in its window a trial earned its lead, era by era",
+        description=(
+            "Split one recorded dev trial's lead over a control into the eras the lab already "
+            "reasons in (lab/exposure.py's ERAS, imported and never restated) and print how much "
+            "of the lead each era earned, beside the share of the owner's deposits that had "
+            "arrived by the end of it. Each month belongs to the era it ENDS in, so every month "
+            "is counted once and the shares add to the whole -- unlike a per-era slice, which "
+            "begins at the first curve point inside the era and drops the month that straddles "
+            "each boundary. The familiar per-era lead a year is printed beside the share and IS "
+            "that slice, so this report reconciles with lab exposure, lab gate and lab "
+            "survivorship. Both curves are de-funded through hardgate.trial_deposits before any "
+            "return is read. The lead the owner's money actually received is not reconstructed: "
+            "it is the recorded money-weighted returns in trial_funding, subtracted. Records no "
+            "trial, no moments, no funding, no provenance, no insight, no status AND NO JOURNAL "
+            "ENTRY on any path, so the lab's N and the test-window looks do not move and "
+            "seertrade.site/sera is unchanged; the test window is never read, and a test-window "
+            "trial is refused by name."
+        ),
+    )
+    s.add_argument(
+        "trial", nargs="?", default=None, metavar="886",
+        help="the trial to attribute: a trials.n, or a candidate id like M0267-GATE",
+    )
+    s.add_argument(
+        "--against", default=None, metavar="M0267-MIRROR",
+        help="the control to measure the lead against (default: the recorded REF-SPY-HOLD "
+             "curve, which every dev trial can be read against). A sibling arm of the same "
+             "method is the sharper comparison when one exists: M0267's whole finding is its "
+             "gate arm against its mirror arm, not against SPY",
+    )
+    s.add_argument(
+        "--all", action="store_true",
+        help="sweep the back catalogue instead of one trial: score every funded dev trial that "
+             "leads REF-SPY-HOLD and count how many earned half that lead before a quarter of "
+             "the owner's money had arrived. A lump-sum trial is skipped by name -- all of its "
+             "money was there on the first day, so the question does not arise for it",
+    )
+    s.add_argument(
+        "method", nargs="*", metavar="M0267",
+        help="with --all, limit the sweep to these methods (default: every method)",
+    )
+    s.add_argument(
+        "--limit", type=int, default=25, metavar="K",
+        help="with --all, how many trials to list in the terminal table, worst first "
+             "(default 25). The rest are in --csv",
+    )
+    s.add_argument(
+        "--csv", type=Path, default=None, metavar="PATH",
+        help="also write every era share to PATH as CSV, at full precision",
     )
 
     s = sub.add_parser(
@@ -2877,6 +2947,63 @@ def _shortfall(conn, args) -> int:
     return 0
 
 
+def _timing(conn, args) -> int:
+    """``lab timing``: when in its window a recorded trial earned its lead.
+
+    A report in the sense ``lab shortfall`` and ``lab turnover`` are reports, and one step
+    stricter: it journals nothing on any path, so unlike ``lab survivorship`` and ``lab costs``
+    there is no append-only row to undo if it is run twice. It opens no research store, builds no
+    market and runs no backtest -- every number comes out of ``trials.curve_json`` and
+    ``trial_funding``, which are already recorded.
+
+    N and the test-window looks are printed before and after so the invariant is visible on the
+    terminal rather than merely asserted in a test.
+    """
+    from seer_engine.lab import timing
+
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+
+    if args.all:
+        if args.against is not None:
+            raise store.LabError(
+                "--against names one sibling arm and --all sweeps every method, so the two "
+                "cannot be combined. Sweep against the benchmark, or attribute one trial"
+            )
+        # argparse fills the optional `trial` positional before the `method` list, so
+        # `lab timing --all M0267` lands M0267 in `trial`. With --all every positional is a
+        # method id, and folding it back here is cheaper than two mutually exclusive parsers.
+        wanted = ([args.trial] if args.trial is not None else []) + list(args.method)
+        t0 = time.perf_counter()
+        result = timing.sweep(conn, methods=wanted)
+        log.info("scored %d trial(s) in %.1fs", len(result.scored), time.perf_counter() - t0)
+        print(timing.format_sweep(result, limit=args.limit))
+        reports = result.scored
+    else:
+        if args.trial is None:
+            raise store.LabError(
+                "name a trial (`lab timing 886`, `lab timing M0267-GATE`) or sweep the back "
+                "catalogue with `lab timing --all`"
+            )
+        row = timing.shortfall.resolve_trial(conn, args.trial)
+        control = (
+            None if args.against is None else timing.shortfall.resolve_trial(conn, args.against)
+        )
+        report = timing.measure(conn, row, control)
+        print(timing.format_report(report))
+        reports = (report,)
+
+    if args.csv is not None:
+        print(f"\nera shares written to {timing.write_csv(reports, Path(args.csv))}")
+    print(
+        f"\nNothing was recorded. Lab N (dev trials): {n_before} before, "
+        f"{store.dev_trial_count(conn)} after; test-window looks used: {looks_before} before, "
+        f"{store.test_looks(conn)} after. No journal entry, so seertrade.site/sera is unchanged "
+        f"and `lab stage` is not needed."
+    )
+    return 0
+
+
 def _survivorship(conn, args) -> int:
     """``lab survivorship M0069 [M0007 ...]``: recorded methods on the survivorship-check store.
 
@@ -3436,6 +3563,7 @@ _HANDLERS = {
     "regime": _regime,
     "walkforward": _walkforward,
     "shortfall": _shortfall,
+    "timing": _timing,
     "luck": _luck,
     "show": _show,
     "run": _run,

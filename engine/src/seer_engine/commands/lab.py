@@ -99,6 +99,21 @@
                                     back catalogue and counts how many recorded leads were earned
                                     early. No trial row, no moments, no status change, and no
                                     journal entry on any path: N and the looks do not move
+    lab dressing M0254 | M0254-FLOOR50 [--against M0254-MIRROR50] [--csv PATH]
+    lab dressing --all [M0254 ...] [--csv PATH] [--limit K]
+                                    report only: what a timing rule KNOWS, apart from what its
+                                    HABITS COST. For any method that ran a reversed arm beside
+                                    its straight one, half the gap between them is what the
+                                    opinion is worth and their midpoint against the
+                                    always-invested arm is what the arrangement costs. Printed in
+                                    both return columns (the de-funded prices and the owner's
+                                    money-weighted return) and over 2009-2015 as well as the
+                                    whole window, with the flip count beside every toll -- a
+                                    chassis toll is a per-flip price and not a constant. Says
+                                    which rejected rules are DEAD and which were only BADLY
+                                    DRESSED. Pairs are found from the recorded configurations,
+                                    not from names. No trial row, no moments, no status change,
+                                    and no journal entry on any path: N and the looks do not move
     lab survivorship M0069 [M0007 ...] [--store DIR] [--sv-store DIR] [--csv PATH]
                      [--no-journal] [--no-supersede]
                                     report only: re-run every recorded dev variant of each method
@@ -614,6 +629,60 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s.add_argument(
         "--csv", type=Path, default=None, metavar="PATH",
         help="also write every era share to PATH as CSV, at full precision",
+    )
+
+    s = sub.add_parser(
+        "dressing",
+        # Every `%` in a `help=` below is doubled: argparse %%-interpolates every help string and
+        # a bare `%` kills `lab --help`. Same reason as the `shortfall` and `timing` parsers.
+        help="report only: what a timing rule knows, apart from what its habits cost",
+        description=(
+            "Split a recorded mirror pair -- a straight arm and the reversed arm registered "
+            "beside it -- into what the opinion is worth and what the arrangement costs. Half "
+            "the gap between the two arms is the opinion, one-sided; their midpoint against the "
+            "method's always-invested arm is the habit, because averaging a rule with its own "
+            "mirror cancels the opinion exactly and leaves the fees, the churn and the cash the "
+            "arrangement sits in. A ratio at or above 1 means the rule was only BADLY DRESSED "
+            "and deserves a cheaper chassis; below 1 it is DEAD by arithmetic at every dose, "
+            "because dilution halves both halves together. Both return columns are printed -- "
+            "the de-funded prices and the owner's money-weighted return -- and a ratio is never "
+            "taken across them. Every toll carries the pair's flip count: a chassis toll is a "
+            "per-flip price, not a constant. Pairs are found from recorded `config_text`, not "
+            "from arm names: two arms that differ in exactly one reversing setting and in "
+            "nothing else are a mirror pair whatever they are called. Records no trial, no "
+            "moments, no funding, no provenance, no insight, no status AND NO JOURNAL ENTRY on "
+            "any path, so the lab's N and the test-window looks do not move and "
+            "seertrade.site/sera is unchanged; the test window is never read."
+        ),
+    )
+    s.add_argument(
+        "method", nargs="?", default=None, metavar="M0254",
+        help="the method whose mirror pair to split, or one arm of it (M0254-FLOOR50), or a "
+             "trials.n. With --all, the first of the methods to sweep",
+    )
+    s.add_argument(
+        "--against", default=None, metavar="M0254-MIRROR50",
+        help="split the named arm against this one instead of the pair the recorded "
+             "configurations imply. Use it for a reversal the structural rule does not see; the "
+             "report then says the orientation is `unresolved` rather than pretending otherwise",
+    )
+    s.add_argument(
+        "--all", action="store_true",
+        help="sweep the catalogue instead of one pair: every recorded mirror pair in the lab, "
+             "ranked by verdict, with the ones that could not be priced named and counted",
+    )
+    s.add_argument(
+        "--more", nargs="*", default=[], metavar="M0265",
+        help="with --all, further methods to limit the sweep to (default: every method)",
+    )
+    s.add_argument(
+        "--limit", type=int, default=40, metavar="K",
+        help="with --all, how many pairs to list in the terminal table (default 40). The rest "
+             "are in --csv",
+    )
+    s.add_argument(
+        "--csv", type=Path, default=None, metavar="PATH",
+        help="also write every split to PATH as CSV, at full precision",
     )
 
     s = sub.add_parser(
@@ -2970,6 +3039,59 @@ def _shortfall(conn, args) -> int:
     return 0
 
 
+def _dressing(conn, args) -> int:
+    """``lab dressing``: what a recorded timing rule knows, apart from what its habits cost.
+
+    A report in the sense ``lab timing`` is a report, and held to the same discipline: it journals
+    nothing on any path, so there is no append-only row to undo if it is run twice. It opens no
+    research store, builds no market and runs no backtest -- every number comes out of
+    ``trials.curve_json``, ``trials.config_text`` and the recorded deposit schedule.
+
+    N and the test-window looks are printed before and after so the invariant is visible on the
+    terminal rather than merely asserted in a test.
+    """
+    from seer_engine.lab import dressing
+
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+
+    if args.all:
+        if args.against is not None:
+            raise store.LabError(
+                "--against names one arm of one pair and --all sweeps every method, so the two "
+                "cannot be combined. Split one pair, or sweep the catalogue"
+            )
+        # argparse fills the optional `method` positional before `--more`, so `lab dressing --all
+        # M0254` lands M0254 in `method`. Folding it back here is cheaper than two parsers.
+        wanted = ([args.method] if args.method is not None else []) + list(args.more)
+        t0 = time.perf_counter()
+        result = dressing.survey(conn, methods=wanted)
+        log.info("decomposed %d pair(s) in %.1fs", len(result.found), time.perf_counter() - t0)
+        print(dressing.format_survey(result, limit=args.limit))
+        found = result.found
+    else:
+        if args.method is None:
+            raise store.LabError(
+                "name a method (`lab dressing M0254`), one of its arms (`lab dressing "
+                "M0254-FLOOR50`) or a trial number, or sweep the catalogue with "
+                "`lab dressing --all`"
+            )
+        pairing, rows = dressing.resolve_pairing(conn, args.method, args.against)
+        one = dressing.measure(conn, pairing, rows)
+        print(dressing.format_report(one))
+        found = (one,)
+
+    if args.csv is not None:
+        print(f"\nsplits written to {dressing.write_csv(found, Path(args.csv))}")
+    print(
+        f"\nNothing was recorded. Lab N (dev trials): {n_before} before, "
+        f"{store.dev_trial_count(conn)} after; test-window looks used: {looks_before} before, "
+        f"{store.test_looks(conn)} after. No journal entry, so seertrade.site/sera is unchanged "
+        f"and `lab stage` is not needed."
+    )
+    return 0
+
+
 def _timing(conn, args) -> int:
     """``lab timing``: when in its window a recorded trial earned its lead.
 
@@ -3587,6 +3709,7 @@ _HANDLERS = {
     "walkforward": _walkforward,
     "shortfall": _shortfall,
     "timing": _timing,
+    "dressing": _dressing,
     "luck": _luck,
     "show": _show,
     "run": _run,

@@ -2387,13 +2387,19 @@ def test_a_method_with_no_promotable_variant_shows_a_dash_and_cannot_fire(
 # A test that only pinned the suppressions would let a later edit quietly re-break M0072 while
 # still reading green.
 BUY_SIGNAL_BEFORE: frozenset[str] = frozenset({"M0092", "M0197", "M0243", "M0258"})
-BUY_SIGNAL_AFTER: frozenset[str] = frozenset({"M0072", "M0092", "M0258"})
+BUY_SIGNAL_AFTER: frozenset[str] = frozenset({"M0072", "M0092", "M0258", "M0284"})
+# (2026-10-23) M0284 joined, and it is the cleanest possible instance of what this block exists
+# to collapse: its promoted arm's curve is byte-identical to M0072's -- trials 283, 914, 934 and
+# 952 share one total return to fourteen digits, 1208 trades, the same fall and the same curve
+# hash under four config digests. The header still says ONE book, which is the assertion that
+# matters; the method count moved from three to four. Sera declined the look it fired, because
+# the 2009-2015 edge it fired on reverses to -0.1 pts on the survivorship-check store.
 
 
 def test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways(
     tmp_path, capsys, monkeypatch
 ):
-    """`lab walkforward` over the committed lab names exactly M0072, M0092 and M0258.
+    """`lab walkforward` over the committed lab names exactly M0072, M0092, M0258 and M0284.
 
     M0197 and M0243 stopped: each fired on an arm that is not the one `lab promote` would
     pre-register, and each of those promoted arms reads NEGATIVE over 2009-2015 -- the one era
@@ -2439,7 +2445,7 @@ def test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways(
                 fired.add(head)
 
     # The collapse itself, pinned: three method ids, ONE book, and the header says both numbers.
-    assert "*** BUY SIGNAL: 1 distinct book from 3 methods ***" in out
+    assert "*** BUY SIGNAL: 1 distinct book from 4 methods ***" in out
     assert out.count("the same book under another name") == 1
 
     assert fired == set(BUY_SIGNAL_AFTER), (
@@ -2466,9 +2472,24 @@ def test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways(
     # the fold clause is asked first. Either way the refusal must name the promoted arm, and
     # M0243 must never be in `fired`: pinned both ways so a later edit cannot re-break one half
     # while reading green.
+    # (2026-10-23) The clause moved, and NOT because M0243 changed. Its best arm sits on the luck
+    # bar: measured at 0.898278 on the pre-batch database at N=181 and 0.900449 on this one at
+    # N=185, with the bar at 0.90. Adding four unrelated methods (a calm-stock mix, a volume
+    # ladder, a re-weighting grid, a trend vote) moved it across, upward, even though a higher N
+    # should make the bar harder -- the score reads the whole curve population's resemblance, not
+    # N alone, and that moved from 0.643577 to 0.644004. So M0243 now HAS a promotable arm and is
+    # refused by the fold clause instead of the absent-arm clause. Journal entry 579.
+    #
+    # Pinning one exact sentence here pins the lab's borderline population, which any later batch
+    # re-rolls. What this test actually means to guarantee is in its own docstring: M0243 must
+    # never fire, and whichever clause refuses it must speak about the arm that would be promoted.
+    # Both clauses are asserted as acceptable, so the guarantee survives the next batch.
     m0243 = next(ln for ln in out.splitlines() if ln.strip().startswith("M0243 "))
     assert "M0243" not in fired
-    assert "no variant would be promoted" in m0243, m0243
+    assert (
+        "no variant would be promoted" in m0243          # absent-arm clause
+        or "the variant that would be promoted" in m0243  # fold clause, on its own curve
+    ), m0243
 
 
 def test_the_era_edge_carries_the_noise_scale_the_margin_study_measured(tmp_path, monkeypatch):

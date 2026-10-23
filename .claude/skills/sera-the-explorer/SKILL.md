@@ -133,7 +133,13 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
 6. **Refill.** While launched < num-methods, pick the next idea for the free slot from the
    **current** lab, so later ideas learn from earlier results (the children's queued ideas
    included), then reserve and launch. Never let a slot sit idle while ideas remain.
-7. **Synthesize** when num-methods children are closed out. Add **one batch insight**
+7. **Synthesize** when num-methods children are closed out. **Gate it before you write it.**
+   Every figure in a synthesis arrived in a child's `DONE` line or its pane, so all of them are
+   someone else's measurement, and the synthesis itself is append-only: it cannot be edited once
+   it is in. Read the batch's numbers back from the database yourself: the verdict table,
+   each method's eligibility, and above all the buy signal, whose four conditions are claims
+   about runs you did not watch finish. The explore skill's **The gate** is the pass;
+   `/verify-claims` is the long form. Then add **one batch insight**
    (`lab insight --kind synthesis --title "Sera <stamp>: <theme>" --body …`). The newest
    synthesis is the headline of seertrade.site/sera, the first thing the owner reads, and the owner
    is not a trader: write it in everyday words, name methods by what they do (not `MNNNN` or

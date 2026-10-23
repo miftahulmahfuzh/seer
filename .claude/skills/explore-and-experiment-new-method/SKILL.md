@@ -205,6 +205,8 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    origin/main && git push origin HEAD:main`; solo: `git push`.
 6. **Run** `lab run MNNNN`. It takes seconds to minutes. Use `run_in_background` and wait for it.
 7. **Analyze honestly** in a scratch file, then `lab note MNNNN --file F --verdict "<one line>"`.
+   Run **The gate** (below) before the `lab note`: the analysis only ever grows, so a number
+   that goes in wrong stays on the owner's page with its correction underneath it.
    **Never pipe `lab note` — or any `lab` command — through `grep`, `head` or any filter.** The
    pipeline's exit code is the filter's, so a successful command that matched nothing reads as a
    failure. Redirect to a file and echo the command's own `$?`. Since 2026-10-19 `lab note` prints
@@ -235,7 +237,8 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    - end with a paragraph that starts **`My opinion:`**. Say plainly whether this direction is
      worth more trials, what you would try next, and why. Commit to a view; no hedging.
    The verdict is one plain line the site shows next to the method's name.
-8. **Journal at least one insight**: `lab insight --kind observation|hypothesis|data-wish|feature-wish|risk
+8. **Journal at least one insight** — gate it first; journal rows accept no edit and no delete:
+   `lab insight --kind observation|hypothesis|data-wish|feature-wish|risk
    --title … --body … --method MNNNN`. Useful kinds: what this taught about markets, data you
    wish the lab had, a feature that would make the search better, a risk you noticed. The owner
    reads these on seertrade.site/sera (Journal and Ideas) as food for thought, and is not a trader.
@@ -255,13 +258,53 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
       (the snapshot seertrade.site/sera is built from) and `git add`s both files. Never
       `git add lab/lab.sqlite` by hand. Commit both files and push; Vercel redeploys the site from
       that push. Then give a short report: idea, result vs SPY, verdict, insight, next idea, N, test looks.
-    - Child: make sure your method file is on `origin/main`. Then
+    - Child: make sure your method file is on `origin/main`. Run **The gate** once more on the
+      verdict and the status you are about to send — the coordinator will quote them in the
+      synthesis and cannot check them. Then
       `SendMessage` to the coordinator (re-read `ListAgents` first):
       `DONE MNNNN <rejected|dev-eligible|blocked> — <verdict>; next: M00xx`. When it reports no
       agent named the coordinator, the coordinator is not a Claude session (it may be Hermes or
       another driver): stop there, because the shared database and your tmux pane already carry
       everything. Never commit `lab/lab.sqlite`
       or `web/data/lab.json`.
+
+## The gate: nothing numeric leaves this run unmeasured
+
+Run this **before step 7**, again before step 8, and once more before the report in step 11. Not
+after. Three of this run's outputs cannot be taken back:
+
+- `methods.analysis` grows and never rewrites (`methods_analysis_grows`), so a wrong number in
+  the analysis is corrected only by appending a correction under it, on the owner's page.
+- `insights` rows accept no update and no delete. A wrong journal entry is permanent and can only
+  gain a successor.
+- A `SendMessage` to the coordinator is gone the moment it is sent, and the coordinator may have
+  already folded it into the batch synthesis — the headline of seertrade.site/sera.
+
+The pass itself is one table, written out before any of the three:
+
+```
+claim about to be made | the command that produces it | measured now | MATCH / UNVERIFIED
+```
+
+Every number you are about to write goes in a row — result vs SPY, N, the DSR bar, DSR itself,
+worst year, the fall, exposure, turnover, trades, the parent comparison, the fold record, every
+method, candidate and insight id. A claim whose source is memory, a handover brief, the step 2
+packet, or a run you did not watch finish is **UNVERIFIED** until a command in this session
+reproduces it. Run the commands now; the table is clean when no row is left UNVERIFIED.
+
+`/verify-claims` is the long form, with the trap list and the correction paths. Use it when the
+run leans on figures it did not produce. The traps that catch this run in particular:
+
+- **Which return column.** Say funded or de-funded. They disagree in sign on some trials, and the
+  pass/fail screen and the fold majority read different ones.
+- **A partial run is not a result.** A buy signal or an eligibility read off a run still in flight
+  is the most expensive claim in the lab, because it reaches the coordinator as fact. Wait for the
+  process to exit and read the record, not the scroll.
+- **An id is a claim.** A wrong method or insight id sends the owner to the wrong page and the
+  coordinator to the wrong row. Read it back from the database, not from what you typed earlier.
+- **A pre-M0031 parent** was measured at the flat 0.1%. Compare with `lab costs <id>`, never with
+  the parent's recorded trial.
+- **N comes from `lab status`**, not from counting trial rows: a method's variants are one look.
 
 ## Promotion (dev-eligible): autonomous, one counted look
 

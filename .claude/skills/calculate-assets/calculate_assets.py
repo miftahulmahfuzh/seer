@@ -47,6 +47,7 @@ from seer_engine.lab import store as lab_store
 from seer_engine.lab.method import discover
 from seer_engine.lab.methods.m0039_vix_term_structure_gate import DAILY_HOLD_FRAC_GOTRADE
 from seer_engine.lab.methods.m0063_earnings_day_jump import WEEKLY_HOLD_FRAC_GOTRADE
+from seer_engine.lab.methods.m0127_slot_relative_resize_band import T00
 from seer_engine.sim.contributions import OWNER_MONTHLY
 from seer_engine.sim.rules import (
     MONTHLY_HOLD_FRAC_GOTRADE,
@@ -73,6 +74,12 @@ REALISTIC: dict[str, object] = {
     # against a holding's own target rather than the whole account, which is the band the owner
     # actually trades, so a method built on it is left exactly as it was recorded.
     "monthly-hold-frac-gotrade-tband": MONTHLY_HOLD_FRAC_GOTRADE_TBAND,
+    # M0127's T00 is that same fixed tape with the resize band set to zero, so every holding is
+    # traded back to its slot every month. It is already fractional at Gotrade's real fees with
+    # no cash credit, so it too maps to itself: there is nothing to swap in. The band is part of
+    # the method being asked about, not part of the money model, so it is not quietly widened to
+    # the owner's own 20%. M0266, M0270, M0271 and M0287 share this chassis.
+    "monthly-hold-frac-gotrade-tband00": T00,
     # M0039's daily tape is MONTHLY_HOLD_FRAC_GOTRADE checked every session instead of every
     # month: the same fractional shares and Gotrade fees, so it too maps to itself. The SPY hosts
     # of the gate methods (M0039, M0167) run on it.

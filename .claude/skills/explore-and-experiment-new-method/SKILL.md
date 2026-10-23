@@ -280,7 +280,21 @@ after. Three of this run's outputs cannot be taken back:
 - A `SendMessage` to the coordinator is gone the moment it is sent, and the coordinator may have
   already folded it into the batch synthesis — the headline of seertrade.site/sera.
 
-The pass itself is one table, written out before any of the three:
+**The pass is not self-service.** Hand the whole draft bundle — analysis, insight body, verdict
+line, the `DONE` message, each number carrying the `by:` command that produced it — to the
+`claim-verifier` subagent before the first irreversible write:
+
+```
+Agent(subagent_type="claim-verifier", prompt="Repo root <checkout>. Verify this draft bundle.
+<the drafts, verbatim, with the claims block>")
+```
+
+It re-derives every claim with its own fresh read-only queries and returns `PASS` or `BLOCK` with
+a claimed-vs-measured diff. **`BLOCK` stops the write.** Fix the draft and re-run it — never argue
+with it from your own context, which is the thing it exists to distrust. The claim format and the
+emission map are in `/verify-claims`; its regression corpus is five drafts that went out or nearly
+did. Checking yourself first is still worth it, because a clean table is one agent turn instead of
+two:
 
 ```
 claim about to be made | the command that produces it | measured now | MATCH / UNVERIFIED

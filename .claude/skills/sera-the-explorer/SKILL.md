@@ -138,8 +138,11 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
    someone else's measurement, and the synthesis itself is append-only: it cannot be edited once
    it is in. Read the batch's numbers back from the database yourself: the verdict table,
    each method's eligibility, and above all the buy signal, whose four conditions are claims
-   about runs you did not watch finish. The explore skill's **The gate** is the pass;
-   `/verify-claims` is the long form. Then add **one batch insight**
+   about runs you did not watch finish. Hand the draft synthesis and the closing table to the
+   `claim-verifier` subagent — `Agent(subagent_type="claim-verifier", …)` — and treat `BLOCK` as
+   final: a synthesis is the one artifact built entirely from other agents' numbers, so it is the
+   one where self-checking is weakest. The explore skill's **The gate** is the pass; the claim
+   format and emission map are in `/verify-claims`. Then add **one batch insight**
    (`lab insight --kind synthesis --title "Sera <stamp>: <theme>" --body …`). The newest
    synthesis is the headline of seertrade.site/sera, the first thing the owner reads, and the owner
    is not a trader: write it in everyday words, name methods by what they do (not `MNNNN` or

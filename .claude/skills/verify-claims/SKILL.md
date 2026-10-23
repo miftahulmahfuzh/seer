@@ -131,3 +131,70 @@ and name every one that needs correcting, whether or not you can correct it your
 Lead with the verdict — how many claims, how many matched — then the mismatches with their
 corrections, then the table. If everything matched, say that in one line and name the commands
 that proved it, so the next session can re-run them instead of trusting this one.
+
+## Where claims leave the lab
+
+Mapped 2026-10-23 by reading `/explore-and-experiment-new-method` and `/sera-the-explorer`. Eleven
+emission points, in three classes — and the class decides how expensive a wrong number is:
+
+**Append-only lab writes** (frozen the instant they land; correctable only by a successor entry)
+- `lab note MNNNN --verdict` — the analysis and the one-line verdict on the owner's method page
+- `lab insight` — the journal, owner-facing
+- `lab insight --kind risk` — a fired buy signal
+- `lab idea --hypothesis` — the backlog, read by every future session as premise
+- `lab insight --kind synthesis` — Sera's batch headline on seertrade.site/sera
+- `lab note` on a hard-gate refusal, and on a promotion or test result
+
+**The published snapshot** (one push from the owner's screen)
+- `lab stage` → `web/data/lab.json` → seertrade.site
+
+**Messages and reports** (unrecallable, and quoted onward by whoever receives them)
+- `SendMessage` → `DONE MNNNN <status> — <verdict>; next: …`
+- a child's tmux pane, when the coordinator is not a Claude session and reads it instead
+- the solo run's closing report to the owner
+- Sera's closing table: method, verdict, CAGR vs SPY, max DD, PF, trades, DSR
+
+## The claim format
+
+Every number headed for any of those carries its provenance, in the scratch analysis file — not in
+the owner-facing prose, which stays plain. One block, machine-readable, so the verifier has
+something to check against and a MATCH is re-runnable by the next reader:
+
+```yaml
+claims:
+  - id: C1
+    says: "beat SPY total return by 3.4 points a year"
+    value: 3.4
+    by: "engine/.venv/bin/python -c \"...select total_return, spy_tr_return from trials where n=1031\""
+    scope: "dev window, de-funded column, candidate M0260-N35-G3, store 9f21a4…"
+  - id: C2
+    says: "judged at N=28 against the 0.90 bar"
+    value: 28
+    by: "python -m seer_engine lab status"
+    scope: "DSR_POLICY=methods, as printed today"
+```
+
+`by:` must be a command that can be pasted and run, not a description of one. `scope:` must name
+the window, the column, the arm and the store wherever those could differ — a claim whose scope is
+ambiguous is blocked as ambiguous, not waved through as approximately right.
+
+## The mandatory verifier
+
+Before the first irreversible write of a run — that is, **before `lab note`, not before the
+report** — hand the whole draft bundle (analysis, insight body, verdict line, the `DONE` message)
+to the `claim-verifier` subagent (`.claude/agents/claim-verifier.md`):
+
+```
+Agent(subagent_type="claim-verifier", prompt="Repo root /home/miftah/seer. Verify this draft
+bundle. <the drafts, verbatim, with the claims block>")
+```
+
+It re-derives every claim with its own fresh queries and returns `PASS` or `BLOCK` with a
+claimed-vs-measured diff. **`BLOCK` stops the write.** Fix the draft and re-run it; do not argue
+with it from context, because context is the thing it exists to distrust. Two invocations per
+method is the budget: one before the writes, one on the outgoing report if the verdict changed
+after it. Sera runs it once more on her synthesis, whose every input is a child's claim.
+
+Its regression corpus is `regression_corpus.md` in this folder: five drafts that went out or
+nearly did. Run the corpus after any edit to the verifier prompt — a verifier that passes any row
+there is not shippable.

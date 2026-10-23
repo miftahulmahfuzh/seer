@@ -1,1 +1,13 @@
+# lab/lab.sqlite: binary implies -diff -merge -text, so a both-changed merge conflicts
+# instead of being stitched. Resolve it by taking one side and re-INSERTing the other's
+# rows, proved with two digests -- never by picking a side blind.
 lab/lab.sqlite binary
+
+# web/data/lab.json is 11 MB of GENERATED JSON (the `lab stage` snapshot of lab.sqlite).
+# Without this, git happily line-merges two branches' versions: MEASURED 2026-10-23 in a
+# scratch repo, two edits ~100 lines apart in a generated JSON merged clean and silently,
+# producing a file that matched NEITHER source database and would still pass tsc and
+# vitest, because it is valid JSON of the right shape. `-merge` (not `binary`, which would
+# also kill the diff) makes such a merge conflict and leaves our copy intact with no
+# markers injected into 11 MB. The resolution is always to regenerate: `lab stage`.
+web/data/lab.json -merge

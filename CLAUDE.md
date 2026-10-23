@@ -6,6 +6,14 @@ It is built to kill bad strategies, not to make predictions. Read `README.md` fo
 The rules that bind everything are in `docs/plans/2026-10-03-seer-design.md` (§1, the bar for
 real money) and `docs/plans/2026-10-04-method-lab-design.md` (the lab).
 
+## Claim verification
+
+Never state a number — a count, a method id, a population size, a denominator, a benchmark
+comparison — until this session has read it back from the lab DB or the research store, or
+recomputed it here. A figure that comes from memory, a handover brief or a half-finished run is
+unverified: label it as such, and measure it before it reaches an analysis doc, a journal entry,
+a report or another agent.
+
 ## Layout
 
 - `engine/`: Python 3.11 package `seer_engine`, the whole pipeline. GitHub Actions cron runs it
@@ -65,6 +73,14 @@ Use the `run-the-web-app` skill to visually check any change to web/.
 - Commit messages follow the existing style: `lab: M00NN pre-registered — …` and
   `lab: M00NN rejected (plain reason)`.
 
+## Experiment protocol
+
+Every method experiment runs in the same order: verify the data store is the one you mean →
+pre-register the hypothesis and every arm in a committed method file → run the control arms beside
+the treatment → survivorship and sanity check → record the verdict (accept or reject) in the
+journal → queue the follow-up ideas → report to the coordinator. Pre-registration is not skippable,
+least of all when the result looks obvious.
+
 ## Invariants that are easy to break
 
 - Tests must never reach production. An autouse fixture points them at a nonexistent env file and
@@ -89,7 +105,19 @@ Use the `run-the-web-app` skill to visually check any change to web/.
 - UI: every button is icon-only (Lucide) with an `aria-label` and a tooltip. Follow the Seer v2
   design and avoid generic styling.
 - Text the owner reads (site summaries, Sera pages) uses plain language: no ids, digests or code.
+- Smallest change that satisfies the request. Before adding a module, a panel or an
+  abstraction layer nobody asked for, state the proposed scope in one line and wait.
 - Once a change is verified, commit and push to `main`.
+
+## Concurrency in shared worktrees
+
+Other phases and agents may be working in this same checkout at the same time.
+
+- Commit explicit file paths only. Never `git commit -a`, never a broad pathspec: you will land
+  someone else's half-finished work under your message.
+- A failure a peer reports is not a failure until you re-run that test file yourself. A concurrent
+  `lab run` reddens tests that read like you broke a frozen record.
+- Re-verify before reporting a failure as real, and say which run you verified it in.
 
 > [!IMPORTANT]
 

@@ -94,7 +94,7 @@ from typing import Any
 
 from seer_engine.backtest.dev import Candidate
 from seer_engine.backtest.market import EMPTY_SERIES, MarketSeries
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0197_treasury_yield_beta import (
     REPICK_MONTHS,
     YieldBetaParams,
@@ -300,6 +300,84 @@ def _v(suffix: str, drop_frac: Decimal, side: str, rationale: str) -> Candidate:
                      rationale=rationale, added=ADDED, owner_inputs=())
 
 
+# --------------------------------------------------------------------------- amendment 1
+
+# The run with the switch on answered the question it was asked and raised a sharper one. Every
+# arm got the identical +34.8% lead in 2008, because the SPY 200-day switch had already taken the
+# whole book to cash -- so the one crash in the window was spent out of the market and the calm
+# filter's safety claim was never put in front of a falling tape at all. The 22.0% -> 20.3% the
+# quarter-drop bought was bought somewhere else entirely. `lab run` said the same thing from its
+# own side: the HI25/LO25 mirror pair cannot be priced while no arm of this method is ever fully
+# invested. This block re-runs the whole experiment with the switch off, where 2008 is live.
+
+NOSW = YieldBetaParams(FactorParams(rank="momentum", top=20, trend=None), side="bond")
+
+
+def _a(suffix: str, drop_frac: Decimal, side: str, rationale: str) -> Candidate:
+    return Candidate(id=f"M0293-{suffix}", family="M0293", rules=MONTHLY_HOLD_FRAC_GOTRADE,
+                     allocator=CALMFILTER,
+                     params=CalmFilterParams(NOSW, drop_frac=drop_frac, side=side),
+                     rationale=rationale, added=date(2026, 10, 23), owner_inputs=())
+
+
+GATE_OFF = Amendment(
+    added=date(2026, 10, 23),
+    why=(
+        "With the SPY 200-day switch on, all five arms sat in cash through 2008 and scored the "
+        "identical +34.8% lead there, so the one crash in the dev window never tested the filter. "
+        "These four arms are the same 2x2 with the switch off, where the crash is live."
+    ),
+    hypothesis=(
+        "A safety filter has to be judged against a falling tape, and the first run never showed "
+        "it one. Every arm of M0293 sits behind M0197's SPY 200-day switch, every arm was "
+        "therefore in cash through 2008, and all five scored the same +34.8% lead in that year to "
+        "the decimal -- the switch's doing, not the filter's. So the 22.0% to 20.3% the "
+        "quarter-drop bought came from somewhere other than crash protection, and whether "
+        "calmness protects anything is still unmeasured. These four arms are the first four with "
+        "the switch set to None and nothing else changed: REF-NOSW, HI25-NOSW, LO25-NOSW and "
+        "BLIND25-NOSW. The host's own gate-off twin is already recorded as M0197-Y20 (worst fall "
+        "62.1%, +12.5% a year on the deposits, luck score 0.732), so REF-NOSW has a reference to "
+        "reproduce exactly as REF had. None of these four can be a candidate -- a book that falls "
+        "sixty per cent is nowhere near the owner's 25% bar -- and none is meant to be. They are "
+        "evidence about one question. Predictions, written before the run: REF-NOSW reproduces "
+        "M0197-Y20 bar for bar, and if it does not the block is void and the analysis says so; "
+        "HI25-NOSW's worst fall is at least 8 points shallower than REF-NOSW's 62.1%, because "
+        "M0197's own 2008 fit put Fannie Mae, Freddie Mac, KeyCorp and Fifth Third on the "
+        "bond-like side at an average beta of 2.0 and the jumpiest quarter is exactly where they "
+        "sit; HI25-NOSW's fall is at least 4 points shallower than BLIND25-NOSW's, without which "
+        "the shrink is the swapping and not the calmness; and LO25-NOSW falls deeper than "
+        "REF-NOSW. If HI25-NOSW does not beat BLIND25-NOSW on the fall, then calmness is not a "
+        "safety filter on this host and the gate-on result was an accident of which names the "
+        "quarterly band happened to hold."
+    ),
+    expected_failure=(
+        "A trailing one-year beta is backward-looking and a crash is forward-looking, so the "
+        "names that destroyed 2008 may still have read calm in 2007: Fannie Mae and the regional "
+        "banks spent 2006 and most of 2007 moving less than the market, and their beta only "
+        "caught up after the damage. If so the filter leaves them in, every arm falls about sixty "
+        "per cent together, and the honest answer is that market beta measured over the year "
+        "before a crash does not see the crash coming. The second way this fails is the opposite "
+        "and just as instructive: HI25-NOSW's fall shrinks, but BLIND25-NOSW's shrinks as much, "
+        "because dropping any quarter of a pool of several hundred names moves a 20-name book off "
+        "its concentrated corner and diversification alone buys the points. Third, with the "
+        "switch off the book is a utilities-and-REITs portfolio through a falling-rate window, so "
+        "the gate-off arms may differ mostly in how much REIT they held into 2008, which is a "
+        "sector accident and not a statement about beta. None of these is a reason to change the "
+        "quarter, the half or the host afterwards."
+    ),
+    candidates=(
+        _a("REF-NOSW", Decimal("0"), "high",
+           "Nothing dropped, switch off: the gate-off reference, which must reproduce M0197-Y20"),
+        _a("HI25-NOSW", Decimal("0.25"), "high",
+           "Drop the jumpiest quarter with the switch off: the idea, finally shown a crash"),
+        _a("LO25-NOSW", Decimal("0.25"), "low",
+           "Drop the calmest quarter with the switch off: the mirror, which must move the other way"),
+        _a("BLIND25-NOSW", Decimal("0.25"), "blind",
+           "Drop the same count blindly with the switch off: what dropping any quarter buys in a crash"),
+    ),
+)
+
+
 METHOD = Method(
     id="M0293",
     name="Calmness as a safety filter on someone else's picks, not a ranking of its own",
@@ -404,6 +482,7 @@ METHOD = Method(
            "Drop the same count by a fixed per-symbol hash: the arm with no opinion in it, which "
            "prices what dropping any quarter costs"),
     ),
+    amendments=(GATE_OFF,),
     seen_keys=(
         "concept:market-beta-as-a-safety-filter-on-a-host-book",
         "concept:drop-jumpiest-quartile-of-the-scored-pool",

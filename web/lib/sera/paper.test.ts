@@ -12,7 +12,9 @@ describe('paper provenance (lab.json `paper`)', () => {
     // 2026-10-17: migration 022 put the coskewness book (COSK-FR-GT) in RMW-FR-GT's seat.
     expect(methodHref('COSK-FR-GT')).toBe('/sera/methods/M0179');
     expect(methodHref('MOM-FR-GT')).toBe('/sera/methods/M0002');
-    expect(methodHref('MVW-FR-GT')).toBe('/sera/methods/M0008');
+    // 2026-10-23: migration 023 put the always-invested control (FULL50-FR-GT) in MVW-FR-GT's
+    // seat, so MVW-FR-GT is retired and withheld like the other predecessors below.
+    expect(methodHref('FULL50-FR-GT')).toBe('/sera/methods/M0287');
   });
 
   it('has no answer for a retired entry, even one the lab did produce', () => {

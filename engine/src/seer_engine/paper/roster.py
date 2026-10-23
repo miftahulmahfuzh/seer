@@ -131,6 +131,8 @@ from seer_engine.lab.methods.m0139_names_on_an_invested_tape import METHOD as M0
 from seer_engine.lab.methods.m0179_coskewness import COSKEW
 from seer_engine.lab.methods.m0179_coskewness import METHOD as M0179
 from seer_engine.lab.methods.m0179_coskewness import SPAN as COSKEW_SPAN
+from seer_engine.lab.methods.m0287_graded_trend_vote import BOOK as ALLINVESTED
+from seer_engine.lab.methods.m0287_graded_trend_vote import METHOD as M0287
 from seer_engine.paper.capital import PAPER_INITIAL_IDR
 from seer_engine.sim import COST_RATE
 from seer_engine.sim.costs import CostModel
@@ -191,6 +193,19 @@ RAW35_GT_ID = "RAW35-FR-GT"
 # switch. RMW-FR-GT is retired in the same migration to make room. The owner means to move real
 # money into whatever this entry picks, so its live picks matter and are not a curiosity.
 COSK_GT_ID = "COSK-FR-GT"
+
+# 023 (owner, 2026-10-23): lab M0287-FULL joins -- the fifty most-traded members at equal weight,
+# rebalanced in full every month, that NEVER steps aside. MVW-FR-GT is retired in the same
+# migration to make room; the owner named the three entries he wanted kept (C, COSK, RAW35) and
+# MVW was chosen over MOM because the thing MVW does -- weighting momentum picks for minimum
+# variance rather than equally -- is the one the lab has the most evidence against.
+#
+# IT IS A CONTROL AND THE ROW SAYS SO. Its sibling on this roster is C, which is here permanently
+# as the daily-trading control because measuring how bad daily trading would have been IS the
+# finding. This is the complement: how bad, or good, NEVER stepping aside would have been. Every
+# other book entry carries a market switch or a brake; nothing on the roster has ever measured
+# their absence forward.
+ALLIN_GT_ID = "FULL50-FR-GT"
 
 #: The bracket rule set the daily control trades under: design section 5's shape, charging Gotrade's
 #: measured schedule instead of a flat 0.1% a side. Added by the bracket-path work; this module only
@@ -412,6 +427,12 @@ MINVAR_PARAMS = next(c.params for c in M0008.candidates if c.id == "M0008-N30-C0
 #: method file like the ones above, so the roster can never drift from the trial it records.
 COSKEW_PARAMS = next(c.params for c in M0179.candidates if c.id == "M0179-N20")
 
+#: FULL50's params: lab M0287's FULL arm -- the fifty most-traded members over $20m a day and above
+#: $5, equal weight, ``horizons=None`` so no trend vote is read and the book is never out of the
+#: market. Read from the frozen method file like the ones above, so the roster can never drift from
+#: the trial it records.
+ALLIN_PARAMS = next(c.params for c in M0287.candidates if c.id == "M0287-FULL")
+
 
 #: Bars through a data date an object REALLY reads, where its own ``lookback(params)`` says less.
 #:
@@ -554,6 +575,11 @@ RESOLVER: dict[str, Binding] = {
     # 022: lab M0179's coskewness book, its N20 variant (owner, 2026-10-17; replaces RMW-FR-GT).
     # Its true history need is in HISTORY_FLOOR_BARS, not in its own lookback().
     "COSKEW": Binding(obj=COSKEW, params=COSKEW_PARAMS),
+    # 023: lab M0287's always-invested arm (owner, 2026-10-23; replaces MVW-FR-GT). The allocator
+    # is M0287's GradedVoteBook with `horizons=None`, which is the gate switched off rather than a
+    # second object: the same code path every graded arm runs, asked for no opinion. That is the
+    # point of admitting it -- a control has to be the same machine with the opinion removed.
+    "ALLINVESTED": Binding(obj=ALLINVESTED, params=ALLIN_PARAMS),
 }
 
 
@@ -799,6 +825,30 @@ LAB_PROVENANCE: dict[str, LabProvenance] = {
             "gate also refuses M0179 on its walk-forward folds (2 of 4 won, and the opposite "
             "picks were preferred before every fold), and its recorded verdict is 'not "
             "promoted'. It has never had a test-window look. RMW-FR-GT is retired to make room"
+        ),
+    ),
+    ALLIN_GT_ID: LabProvenance(
+        method_id="M0287",
+        candidate_id="M0287-FULL",
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "owner override, 2026-10-23, after his calculate-assets run of this arm. It is NOT a "
+            "lab pass and it is not a near miss either: M0287 is REJECTED, and this arm failed "
+            "every dev condition -- it lost to a deposit-matched SPY TR (+250.3% against +257.2%, "
+            "6.9% a year against 7.2%), fell 59.5% (the screen allows 50%, the owner's real-money "
+            "bar 25%), made PF 1.25 against the 1.30 bar, and read a recorded DSR of 0.414 at its "
+            "recorded N=184 on 1,338 trades. It is admitted as a CONTROL and not a candidate: the "
+            "always-invested complement of C, measuring what never stepping aside costs, exactly "
+            "as C measures what daily trading costs. M0287 registered it deliberately as the "
+            "no-opinion endpoint, and it reproduces two earlier recorded trials to the digit "
+            "(M0270-S100 and M0271-OFF), so it is the same book the lab has priced three times "
+            "under three ids. What made the owner want it on the board is the other window: on "
+            "2018-04-02..2026-10-08, on his real deposits at Gotrade's real fees, it returned "
+            "+24.6% a year against SPY's +20.4% -- the only arm of this batch's four methods to "
+            "beat the market -- while falling 33.3%. The dev verdict was earned in 1996-2002 and "
+            "2008; his money has never lived through a fall of that kind, and this entry is how "
+            "the roster finds out what happens when it does. MVW-FR-GT is retired to make room"
         ),
     ),
 }
@@ -1178,29 +1228,61 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "the assumed rate. On paper to test it forward"
         ),
     ),
+    # 023, the always-invested control (owner, 2026-10-23). The owner asked for M0287-FULL on the
+    # roster after its calculate-assets run, naming C, COSK and RAW35 as the entries to keep. It
+    # replaces MVW-FR-GT.
+    #
+    # WHY THIS ENTRY IS NOT LIKE THE OTHERS. Every other book here expresses an opinion and then
+    # protects it -- a market switch, a volatility brake, a weighting scheme. This one has no
+    # opinion to protect: fifty liquid members, equal slices, rebalanced in full every month,
+    # never out of the market. It is on the roster for the same reason C is on it permanently:
+    # C measures what daily trading would have cost, and this measures what never stepping aside
+    # would have cost, or paid. Both are findings whether they win or lose, and neither is a
+    # candidate for the owner's money. The gate note says so in its first sentence.
+    #
+    # WHAT IT FAILED, AND WHY IT IS HERE ANYWAY. On the dev window it fails ALL FOUR conditions:
+    # it loses to a deposit-matched SPY TR, falls 59.5% against the screen's 50% and the owner's
+    # 25%, makes a profit factor of 1.25 against 1.30, and reads 0.414 on the luck test. M0287
+    # itself is REJECTED. On 2018-2026, the owner's own window, the same arm is the only thing in
+    # the batch that beat SPY. Those two facts are the entry: a book with no defence wins a decade
+    # with no long bear market in it and loses the one that has two. Watching it forward is how
+    # the roster finds out which kind of decade it is in.
+    #
+    # THE CHASSIS IS PART OF THE BOOK. It runs monthly-hold-frac-gotrade-tband00 -- the band shut,
+    # every holding traded back to its slot every month -- because that is what M0287 measured and
+    # what the +24.6% was earned on. Admitting it on the roster's usual preset would have been a
+    # different book wearing this one's number. 023 adds the preset to sim.rules rather than move
+    # the entry onto an approximation.
     RosterRow(
-        id=MVW_GT_ID,
-        name="MVW · Steady weights",
+        id=ALLIN_GT_ID,
+        name="FULL50 · Never steps aside",
         sub=(
-            "Top 30 by last year's rise, weighted to swing least together, monthly, fractional "
-            "shares, real Gotrade fees"
+            "The 50 most-traded members at equal weight, fully rebalanced monthly, never in cash, "
+            "fractional shares, real Gotrade fees"
         ),
-        icon="scale",
+        icon="anchor",
         is_champion=False,
         is_benchmark=False,
         sort=6,
         engine="book",
-        rules_id="monthly-hold-frac-gotrade",
-        object_name="MINVAR",
+        rules_id="monthly-hold-frac-gotrade-tband00",
+        object_name="ALLINVESTED",
         registry_id=None,
         gate_note=(
-            "Lab M0008 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
-            "0.1% a side: beats SPY TR (+726.7% vs +351.4%), max DD 20.0%, PF 2.14 and 1,223 "
-            "trades all pass; failed only the luck test, on a recorded DSR of 0.817 at its "
-            "recorded N=74. Re-measured at Gotrade's real fees (449fa34, report only) it "
-            "returns +536% against SPY's +350% at the same fees. Successor of MVW-FR, which paid "
-            "the assumed rate. Its drawdown sits exactly on the 20% bar, with no margin. On paper "
-            "to test it forward"
+            "A CONTROL, not a candidate: the always-invested complement of C, here to measure what "
+            "never stepping aside costs or pays. Owner override, 2026-10-23, after his "
+            "calculate-assets run; NOT a lab pass, and the method it comes from is REJECTED. Lab "
+            "M0287 dev window only (1996-01-03..2015-10-16), already in fractional shares at "
+            "Gotrade's measured fees on the owner's funding plan -- the rule set this entry runs: "
+            "it FAILED every condition, losing to a deposit-matched SPY TR (+250.3% against "
+            "+257.2%, 6.9% a year against 7.2%), max DD 59.5% -- outside the lab screen's 50% and "
+            "well past the owner's 25% real-money bar -- PF 1.25 against the 1.30 bar, and a "
+            "recorded DSR of 0.414 at its recorded N=184, on 1,338 trades. Never had a "
+            "test-window look. What put it here is the other window: over 2018-04-02..2026-10-08 "
+            "on the owner's real deposits it ended at Rp 1,558,671,049, +24.6% a year against "
+            "SPY's +20.4%, the only arm of the four methods explored that beat the market -- and "
+            "it fell 33.3% doing it. A book with no defence wins a decade without a long bear "
+            "market and loses the one with two in it. It replaces MVW-FR-GT"
         ),
     ),
     RosterRow(
@@ -1519,6 +1601,32 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "night. On paper to test it forward"
         ),
         status="retired",  # 022: retired to make room for COSK-FR-GT (owner, 2026-10-17)
+    ),
+    RosterRow(
+        id=MVW_GT_ID,
+        name="MVW · Steady weights",
+        sub=(
+            "Top 30 by last year's rise, weighted to swing least together, monthly, fractional "
+            "shares, real Gotrade fees"
+        ),
+        icon="scale",
+        is_champion=False,
+        is_benchmark=False,
+        sort=22,
+        engine="book",
+        rules_id="monthly-hold-frac-gotrade",
+        object_name="MINVAR",
+        registry_id=None,
+        gate_note=(
+            "Lab M0008 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
+            "0.1% a side: beats SPY TR (+726.7% vs +351.4%), max DD 20.0%, PF 2.14 and 1,223 "
+            "trades all pass; failed only the luck test, on a recorded DSR of 0.817 at its "
+            "recorded N=74. Re-measured at Gotrade's real fees (449fa34, report only) it "
+            "returns +536% against SPY's +350% at the same fees. Successor of MVW-FR, which paid "
+            "the assumed rate. Its drawdown sits exactly on the 20% bar, with no margin. On paper "
+            "to test it forward"
+        ),
+        status="retired",  # 023: retired to make room for FULL50-FR-GT (owner, 2026-10-23)
     ),
 )
 

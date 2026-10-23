@@ -22,6 +22,7 @@ from seer_engine.sim.rules import (
     MONTHLY_HOLD_FRAC_GOTRADE,
     MONTHLY_HOLD_FRAC_GOTRADE_TBAND,
     MONTHLY_HOLD_FRAC_GOTRADE_TBAND_CASH,
+    MONTHLY_HOLD_FRAC_GOTRADE_TBAND00,
     PRESETS,
     WEEKLY_HOLD,
     WEEKLY_HOLD_FRAC_GOTRADE_TBAND_CASH,
@@ -64,11 +65,32 @@ def test_the_shared_levers():
 
 
 def test_they_are_appended_last_in_order_and_nothing_else_moved():
-    assert PRESETS[16:] == TAPE
-    assert len(PRESETS) == 19
+    # (2026-10-23) A twentieth preset was appended for 023: MONTHLY_HOLD_FRAC_GOTRADE_TBAND00, the
+    # target-basis tape with the band shut, which M0127 had defined inside its own method file and
+    # which the roster could not name because `rules_for` resolves against PRESETS alone. It is
+    # field-for-field equal to that T00, so no recorded trial's digest moves -- asserted below.
+    # The three TAPE presets keep slots 16-18 and everything before 16 is untouched, which is what
+    # this test is for.
+    assert PRESETS[16:19] == TAPE
+    assert PRESETS[19] is MONTHLY_HOLD_FRAC_GOTRADE_TBAND00
+    assert len(PRESETS) == 20
     assert PRESETS[14] is MONTHLY_HOLD_FRAC_GOTRADE
     assert [r.resize_basis for r in PRESETS[:16]] == ["equity"] * 16
     assert [r.cash_yield for r in PRESETS[:16]] == [None] * 16
+
+
+def test_the_band_zero_preset_is_m0127s_t00_field_for_field():
+    """023 defines the band-zero tape in sim.rules so a roster entry can name it. M0127 keeps its
+    own ``T00``: a method file is a pre-registration and is never edited. The two must stay equal,
+    or a lab trial recorded on M0127's object and a paper entry running this one would be two
+    different books wearing one id."""
+    from dataclasses import asdict
+
+    from seer_engine.lab.methods.m0127_slot_relative_resize_band import T00
+
+    assert asdict(MONTHLY_HOLD_FRAC_GOTRADE_TBAND00) == asdict(T00)
+    assert MONTHLY_HOLD_FRAC_GOTRADE_TBAND00.resize_band == 0
+    assert MONTHLY_HOLD_FRAC_GOTRADE_TBAND00.resize_basis == "target"
 
 
 def test_owner_inputs():

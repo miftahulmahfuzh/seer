@@ -4,7 +4,7 @@
  * lib/db); never unit-tested (plan invariant 7) -- the logic lives in the pure reminders.ts.
  */
 import { cache } from 'react';
-import { resizeBasisOf } from '@/lib/cadence';
+import { bandFractionOf, resizeBasisOf } from '@/lib/cadence';
 import { sql } from '@/lib/db';
 import { cashUsd, OWNER_MONTHLY, OWNER_USD_IDR } from '@/lib/sean/cash';
 import { ledgerOrders, ownOrderIds } from '@/lib/sean/data';
@@ -190,6 +190,7 @@ export async function planState(): Promise<PlanState | null> {
     targets: decision?.targets ?? [],
     resizes: resizes(l.rulesId),
     resizeBasis: resizeBasisOf(l.rulesId),
+    resizeBand: bandFractionOf(l.rulesId),
     held,
     outside,
     closes,

@@ -100,10 +100,16 @@ RAW35_GT = "RAW35-FR-GT"
 # 022 (owner, 2026-10-17): lab M0179-N20, the coskewness book, as an owner override -- not a lab
 # pass. It takes RMW-FR-GT's slot and RMW-FR-GT is retired beside it.
 COSK_GT = "COSK-FR-GT"
+# 023 (owner, 2026-10-23): lab M0287-FULL, the always-invested control -- no market switch, no
+# brake, fully rebalanced monthly on the band-zero tape. An owner override and not a lab pass: the
+# method is rejected and this arm failed every dev condition. It takes MVW-FR-GT's slot and
+# MVW-FR-GT is retired beside it.
+ALLIN_GT = "FULL50-FR-GT"
 #: every entry that ever traded under the assumed flat rate, plus the three 013 retired and the
 #: ones 021 and 022 retired; every one of them keeps every row it wrote.
-RETIRED = (F4, F1, FND, RM, "A", F4_FR, F1_FR, "SPY", "C", RMW, RAW, MOM, MVW, RAW_GT, RMW_GT)
-ACTIVE_IDS = (SPY_GT, C_GT, COSK_GT, RAW35_GT, MOM_GT, MVW_GT)
+RETIRED = (F4, F1, FND, RM, "A", F4_FR, F1_FR, "SPY", "C", RMW, RAW, MOM, MVW, RAW_GT, RMW_GT,
+           MVW_GT)
+ACTIVE_IDS = (SPY_GT, C_GT, COSK_GT, RAW35_GT, MOM_GT, ALLIN_GT)
 
 # 2026-10-07: every digest moved once, on purpose, when the paper books' starting cash went from
 # 20,000,000 to 10,000,000 IDR (spec "initial_idr"; the owner's own Gotrade money). Production's
@@ -148,6 +154,10 @@ PINS = {
     # 022: the coskewness book. ONE new pin and not one moved: RMW-FR-GT's digest above is what 017
     # wrote, because retiring it touches only `status`, `sort` and `paper_end`.
     COSK_GT: "0733f237aab07882872242a14f0bc073f0125346f97cb33d54c0863b9e46d8c9",
+    # 023: the always-invested control, on the band-zero tape (monthly-hold-frac-gotrade-tband00,
+    # added to sim.rules.PRESETS by the same migration so a roster entry can name it). Adding an
+    # entry must never re-digest another one, which the equality below is what checks.
+    ALLIN_GT: "b715ff05be21858c89ad3728bee0d9c2f3e549ba0fe6047412d89aa92438561e",
 }
 
 FACTOR_PARAMS_AS_DICT = {
@@ -169,10 +179,11 @@ DISPLAY = ("id", "name", "sub", "icon", "is_champion", "is_benchmark", "sort", "
 
 def test_the_roster_is_the_handover_entries_in_sort_order():
     assert ROSTER_IDS == (
-        SPY_GT, C_GT, COSK_GT, RAW35_GT, MOM_GT, MVW_GT,
+        SPY_GT, C_GT, COSK_GT, RAW35_GT, MOM_GT, ALLIN_GT,
         "SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW, RAW_GT, RMW_GT,
+        MVW_GT,
     )
-    assert [e.sort for e in ROSTER] == list(range(1, 22))
+    assert [e.sort for e in ROSTER] == list(range(1, 23))
     assert "B" not in ROSTER_IDS
 
 
@@ -335,6 +346,7 @@ def test_strategy_params_round_trip_through_jsonb(pg):
 def test_lookbacks():
     assert {e.id: e.lookback for e in ROSTER} == {
         SPY_GT: 1, C_GT: 200, COSK_GT: 781, RAW35_GT: 401, MOM_GT: 379, MVW_GT: 253,
+        ALLIN_GT: 275,
         RAW_GT: 401, RMW_GT: 426,
         "SPY": 1, "A": 200, F4: 253, F1: 200, "C": 200, FND: 20, F4_FR: 253, F1_FR: 200,
         RM: 401, RMW: 426, RAW: 401, MOM: 379, MVW: 253,
@@ -556,7 +568,7 @@ def test_active_drops_retired_entries_and_keeps_order():
     )
     entries = from_rows(rows)
     assert [e.id for e in entries] == list(ROSTER_IDS)  # retired rows are never dropped from the roster
-    assert [e.id for e in active(entries)] == [SPY_GT, C_GT, COSK_GT, MOM_GT, MVW_GT]
+    assert [e.id for e in active(entries)] == [SPY_GT, C_GT, COSK_GT, MOM_GT, ALLIN_GT]
     raw = next(e for e in entries if e.id == RAW35_GT)
     assert (raw.status, raw.paper_end) == ("retired", date(2026, 10, 2))
 
@@ -640,6 +652,7 @@ def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
     # method here, and only F4, F1 and their fractional twins predate it.
     assert {r.id for r in rows.values() if r.promoted_from is not None} == {
         FND, RM, RMW, RAW, MOM, MVW, RMW_GT, RAW_GT, MOM_GT, MVW_GT, RAW35_GT, COSK_GT,
+        ALLIN_GT,
     }
     assert (rows[FND].promoted_from, rows[RM].promoted_from) == ("M0005", "M0011")
     assert (rows[RAW].promoted_from, rows[MOM].promoted_from, rows[MVW].promoted_from) == (
@@ -690,7 +703,7 @@ from seer_engine.paper.roster import (  # noqa: E402
 #: AND a LAB_PROVENANCE entry in the same commit; this tuple is the third place that has to name
 #: it, and that is the point -- forgetting is a failing test, not a silent gap.
 LAB_DERIVED = (F4, F1, FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW,
-               RMW_GT, RAW_GT, MOM_GT, MVW_GT, RAW35_GT, COSK_GT)
+               RMW_GT, RAW_GT, MOM_GT, MVW_GT, RAW35_GT, COSK_GT, ALLIN_GT)
 #: And the five that are not: the two benchmark entries, C and its Gotrade successor (the LLM
 #: strategy the quant gate does not apply to), and A, which predates the lab.
 NOT_LAB_DERIVED = ("SPY", SPY_GT, "A", "C", C_GT)
@@ -865,6 +878,7 @@ def test_lab_provenance_agrees_with_the_promoted_from_column(pg):
     # successors carry the method of the entry each replaces.
     assert {i for i, r in rows.items() if r.promoted_from is not None} == {
         FND, RM, RMW, RAW, MOM, MVW, RMW_GT, RAW_GT, MOM_GT, MVW_GT, RAW35_GT, COSK_GT,
+        ALLIN_GT,
     }
 
 

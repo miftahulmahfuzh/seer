@@ -94,10 +94,39 @@ export const TARGET_BAND_RULES: readonly string[] = [
   'monthly-hold-frac-gotrade-tband',
   'monthly-hold-frac-gotrade-tband-cash',
   'weekly-hold-frac-gotrade-tband-cash',
+  // 023: the same target basis with the band shut (resize_band = 0), so every non-zero gap is
+  // beyond it and every holding is traded back to its slot each month. FULL50-FR-GT runs it.
+  'monthly-hold-frac-gotrade-tband00',
 ];
+
+/**
+ * Engine rule sets that name their OWN `resize_band`, overriding the basis constant. The lever
+ * lives in sim/rules.py LEVERS_SINCE_PINS at its no-op `None`, which means "use the basis
+ * constant"; a preset that sets it explicitly is saying something the two constants above cannot
+ * express. A hand mirror of every preset whose `resize_band is not None`, guarded by
+ * engine/tests/test_resize_band_pins.py -- which goes red the day a preset names a band, so that
+ * this table learns the lever before a paper strategy can carry it.
+ *
+ * 023 is the first: the band-zero tape, where every non-zero gap is beyond the band, so a holding
+ * is traded back to its slot every month rather than only when it has drifted a fifth of the way.
+ */
+export const RULE_SET_BANDS: Readonly<Record<string, number>> = {
+  'monthly-hold-frac-gotrade-tband00': 0,
+};
 
 /** What a resize gap is measured against: the whole account, or the holding's own target. */
 export type ResizeBasis = 'equity' | 'target';
+
+/**
+ * The band fraction a rule set applies, on its own basis: its named band where it names one,
+ * otherwise the constant its basis implies. Multiply by the holding's target on the target basis,
+ * or by equity on the equity basis -- exactly what sim/book.py does.
+ */
+export function bandFractionOf(rulesId: string | null | undefined): number {
+  const named = typeof rulesId === 'string' ? RULE_SET_BANDS[rulesId] : undefined;
+  if (named !== undefined) return named;
+  return resizeBasisOf(rulesId) === 'target' ? TARGET_RESIZE_BAND : RESIZE_BAND;
+}
 
 /** The engine `resize_basis` of a rule set: 'target' for TARGET_BAND_RULES, else 'equity'. */
 export function resizeBasisOf(rulesId: string | null | undefined): ResizeBasis {

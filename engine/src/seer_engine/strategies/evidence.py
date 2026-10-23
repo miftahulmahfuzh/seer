@@ -777,6 +777,57 @@ def coskew_evidence(market: Market, params: Any, data_date: date, symbols: Seque
     return out
 
 
+def allinvested_evidence(
+    market: Market, params: Any, data_date: date, symbols: Sequence[str]
+) -> dict[str, Facts]:
+    """``ALLINVESTED`` (lab M0287-FULL): the ``top`` most-traded members at an equal slice, always.
+
+    This is the roster's no-opinion control, so there is deliberately very little to say about any
+    one holding: the book has no view on it beyond "a lot of this trades". Saying so plainly is the
+    point -- the owner should be able to see at a glance that nothing here was chosen for a reason
+    a stock picker would recognise, which is what makes the entry a yardstick for the ones that
+    were.
+
+    The facts are the screen, the slice, and the one thing that really distinguishes this book from
+    every other on the roster: it never steps aside, so there is never a trend fact to print.
+    """
+    from seer_engine.lab.methods.m0109_book_drawdown_brake import book_rows, chosen
+    from seer_engine.lab.methods.m0287_graded_trend_vote import VoteParams
+
+    p: VoteParams = _typed("ALLINVESTED", params, VoteParams)
+    wanted = _wanted(symbols)
+    history = _cut(market, data_date)
+    members = market.membership.members_on(data_date)
+    brake = p.book.as_brake() if hasattr(p.book, "as_brake") else p.book
+    rows = book_rows(history, members, data_date, brake)
+    picked = list(chosen(rows, brake))
+    if not picked:
+        return {}
+    rank = {row.symbol: i + 1 for i, row in enumerate(picked)}
+    dv = {row.symbol: row.dollar_volume for row in picked}
+    slice_pct = 100.0 / float(p.book.top)
+    out: dict[str, Facts] = {}
+    for symbol in picked:
+        name = symbol.symbol
+        if name not in wanted:
+            continue
+        facts = [
+            f"It is one of the {p.book.top} most heavily traded companies in the index right now: "
+            f"number {rank[name]} by the average dollars that changed hands over the last "
+            f"{A_DV_N} trading days.",
+            f"About ${dv[name] / 1e6:,.0f} million of it traded on an average day over that span, "
+            f"against the ${p.book.min_dollar_volume / 1e6:,.0f} million a company needs to "
+            f"qualify at all.",
+            f"Every holding gets the same share of the money -- about {slice_pct:.1f}% each -- and "
+            f"is traded back to that share every month. Nothing is weighted by size or by any "
+            f"opinion about the company.",
+            "This book never steps aside. There is no market switch and no brake, so it stays "
+            "fully invested through every fall. That is what it is here to measure.",
+        ]
+        out[name] = tuple(facts[:MAX_FACTS])
+    return out
+
+
 #: Keyed by ``paper.roster.RESOLVER`` keys; the benchmark key (``buy_and_hold``) has no entry.
 #: ``tests/test_evidence.py`` pins ``set(EVIDENCE) == set(RESOLVER) - {BENCHMARK_OBJECT}``, so a
 #: new resolver entry without evidence fails the suite, and ``promote`` refuses it (phase 4).
@@ -793,6 +844,7 @@ EVIDENCE: dict[str, EvidenceFn] = {
     "REGIME": regime_evidence,
     "MINVAR": minvar_evidence,
     "COSKEW": coskew_evidence,  # 022: lab M0179-N20, COSK-FR-GT
+    "ALLINVESTED": allinvested_evidence,  # 023: lab M0287-FULL, FULL50-FR-GT
 }
 
 

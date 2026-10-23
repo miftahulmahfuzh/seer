@@ -90,6 +90,7 @@ def test_flat_is_absent_from_every_canonical_form():
         "monthly-hold-frac-gotrade-tband",
         "monthly-hold-frac-gotrade-tband-cash",
         "weekly-hold-frac-gotrade-tband-cash",
+        "monthly-hold-frac-gotrade-tband00",  # 023
     ]
 
 

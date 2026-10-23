@@ -113,6 +113,8 @@ def test_preset_ids_are_unique_and_in_order():
         "monthly-hold-frac-gotrade-tband",
         "monthly-hold-frac-gotrade-tband-cash",
         "weekly-hold-frac-gotrade-tband-cash",
+        # 023: the band-zero tape, lifted out of M0127 so a roster entry can name it.
+        "monthly-hold-frac-gotrade-tband00",
     ]
     assert len(set(ids)) == len(ids)
 

@@ -303,6 +303,26 @@ DESIGN_V0_GOTRADE = replace(DESIGN_V0, id="design-v0-gotrade", engine="bracket",
 MONTHLY_HOLD_FRAC_GOTRADE_TBAND = replace(
     MONTHLY_HOLD_FRAC_GOTRADE, id="monthly-hold-frac-gotrade-tband", resize_basis="target"
 )
+# The same tape with the band shut: resize_band = 0, so every non-zero gap is beyond it and every
+# holding is traded back to its slot each month. M0127 registered it as the zero rung of its band
+# ladder and M0266, M0270, M0271 and M0287 have all measured on it since, because a book that
+# rebalances completely every month is the only chassis on which an exposure experiment means what
+# it says -- any live band lets a drifting holding quietly change the exposure being measured.
+#
+# WHY IT IS HERE NOW AND NOT IN M0127. 023 admits M0287-FULL to the roster, and paper.roster's
+# `rules_for` resolves a rules_id against PRESETS alone, so a roster entry cannot name a preset that
+# lives in a lab method file. The object is defined here and M0127 is left exactly as committed: a
+# method file is a pre-registration and is never edited. The two are field-for-field equal (only
+# `id` and `resize_band` differ from MONTHLY_HOLD_FRAC_GOTRADE_TBAND, in both), so nothing a lab
+# trial recorded on M0127's T00 moves, and the digest of every recorded trial stays byte for byte.
+#
+# A new id, never an edit, for the usual reason: `resize_band` sits in LEVERS_SINCE_PINS at its
+# no-op None, so moving it on a started entry would re-digest that entry. Carries no owner input,
+# so paper will run it, and it resizes, so the web mirrors must know it (cadence.ts
+# TARGET_BAND_RULES, sean/reminders.ts RESIZING_RULES; tests/test_sean_mirrors.py derives both).
+MONTHLY_HOLD_FRAC_GOTRADE_TBAND00 = replace(
+    MONTHLY_HOLD_FRAC_GOTRADE_TBAND, id="monthly-hold-frac-gotrade-tband00", resize_band=Decimal("0")
+)
 # The same tape with idle cash earning the 13-week T-bill yield (cash_yield="T13W", read
 # point-in-time from the store's market series). Cash that waits for the month-start rotation, and
 # the money a rule steps aside with, used to earn nothing. It raises the owner input "cash-yield"
@@ -346,6 +366,7 @@ PRESETS: tuple[TradeRules, ...] = (
     MONTHLY_HOLD_FRAC_GOTRADE_TBAND,
     MONTHLY_HOLD_FRAC_GOTRADE_TBAND_CASH,
     WEEKLY_HOLD_FRAC_GOTRADE_TBAND_CASH,
+    MONTHLY_HOLD_FRAC_GOTRADE_TBAND00,
 )
 
 

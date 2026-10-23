@@ -18,12 +18,13 @@ it is there. These tests are the proof, in the shape ``test_resize_basis_pins.py
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from decimal import Decimal
 
 import pytest
 
-from seer_engine import sim
+from seer_engine import config, sim
 from seer_engine.backtest.registry import REGISTRY, candidate_text
 from seer_engine.lab.method import config_text, discover
 from seer_engine.paper import roster
@@ -56,10 +57,17 @@ FULL = replace(MONTHLY_HOLD_FRAC_GOTRADE_TBAND, id="x-full", resize_band=Decimal
 def test_resize_band_defaults_to_the_basis_constant_everywhere():
     assert TradeRules(id="x", engine="book").resize_band is None
     assert DESIGN_V0.resize_band is None and V0_BOOK.resize_band is None
-    assert all(r.resize_band is None for r in PRESETS)
+    # (2026-10-23) Every preset but the band-zero tape leaves the lever at None and so takes its
+    # basis constant. 023 added that one so a roster entry could name it; the test above
+    # (test_every_preset_that_names_a_band_is_mirrored_in_the_web) pins the exception and checks
+    # the web mirror knows it. Everything else must still default, which is what this asserts.
+    named = {"monthly-hold-frac-gotrade-tband00"}
+    assert {r.id for r in PRESETS if r.resize_band is not None} == named
     assert resize_band_of(MONTHLY_HOLD_FRAC_GOTRADE) == RESIZE_BAND
     assert resize_band_of(MONTHLY_HOLD_FRAC_GOTRADE_TBAND) == TARGET_RESIZE_BAND
     for r in PRESETS:
+        if r.id in named:
+            continue
         expected = TARGET_RESIZE_BAND if r.resize_basis == "target" else RESIZE_BAND
         assert resize_band_of(r) == expected, r.id
 
@@ -94,17 +102,38 @@ def test_resize_band_is_a_lever_since_the_pins():
     assert is_pinned_default("resize_band", Decimal("0.10")) is False
 
 
-def test_no_preset_names_a_band_so_no_live_spec_digest_moves():
-    """No preset carries the lever, which is also what keeps the web mirror honest.
+def test_every_preset_that_names_a_band_is_mirrored_in_the_web():
+    """A preset MAY name a band since 023, and the TS side must know every one that does.
 
-    ``web/lib/cadence.ts`` sizes the owner's resize reminders from two hand-mirrored constants
-    (``RESIZE_BAND``, ``TARGET_RESIZE_BAND``) and knows nothing of a per-rule-set band. It only
-    ever sees roster rule sets, and a roster rule set must be a preset, so the mirror is exact for
-    everything it can be handed. The day a preset names a band, this test goes red first and the
-    TS side has to learn the lever before any paper strategy can carry it.
+    This test used to assert that no preset carried the lever at all, because
+    ``web/lib/cadence.ts`` sized the owner's resize reminders from two hand-mirrored constants
+    (``RESIZE_BAND``, ``TARGET_RESIZE_BAND``) and knew nothing of a per-rule-set band. Its
+    docstring said what should happen the day a preset named one: the test goes red first, and the
+    TS side learns the lever before any paper strategy can carry it. 023 is that day --
+    FULL50-FR-GT runs ``monthly-hold-frac-gotrade-tband00``, whose band is 0 -- so the tripwire
+    did its job and ``cadence.ts`` grew ``RULE_SET_BANDS`` and ``bandFractionOf``.
+
+    What is asserted now is the thing that actually protects the owner: every preset naming a band
+    appears in that TS table with the same number, and every preset that does not name one is
+    absent from it, so the mirror is still exact for everything the web can be handed. A live spec
+    digest still cannot move, because naming a band is only ever done on a NEW preset id.
     """
-    for r in PRESETS:
-        assert "resize_band" not in roster.rules_dict(r), r.id
+    named = {r.id: roster.rules_dict(r)["resize_band"] for r in PRESETS
+             if "resize_band" in roster.rules_dict(r)}
+    assert named == {"monthly-hold-frac-gotrade-tband00": "0"}, named
+
+    src = (config.REPO_ROOT / "web/lib/cadence.ts").read_text(encoding="utf-8")
+    block = re.search(r"export const RULE_SET_BANDS[^=]*=\s*\{(.*?)\n\};", src, re.S)
+    assert block is not None, "web/lib/cadence.ts: no RULE_SET_BANDS object literal; fix this parse"
+    mirrored = {m.group(1): m.group(2)
+                for m in re.finditer(r"'([^']+)'\s*:\s*([0-9.]+)\s*,", block.group(1))}
+    assert set(mirrored) == set(named), (
+        f"RULE_SET_BANDS drifted: only in TS {sorted(set(mirrored) - set(named))}, "
+        f"only in the engine {sorted(set(named) - set(mirrored))}"
+    )
+    for rid, band in named.items():
+        assert Decimal(mirrored[rid]) == Decimal(band), rid
+
     assert roster.rules_dict(T10)["resize_band"] == "0.10"
 
 

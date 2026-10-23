@@ -80,6 +80,8 @@ export const RESIZING_RULES: readonly string[] = [
   'monthly-hold-frac-gotrade-tband',
   'monthly-hold-frac-gotrade-tband-cash',
   'weekly-hold-frac-gotrade-tband-cash',
+  // 023: band shut, so it resizes every holding every month -- the most reminders of any preset.
+  'monthly-hold-frac-gotrade-tband00',
 ];
 
 /** Does this rule set trade a held pick back to its weight? */
@@ -143,6 +145,13 @@ export type ReminderInput = {
   resizes: boolean;
   /** resizeBasisOf(rulesId) of the followed method: which band an add or a trim must clear. */
   resizeBasis: ResizeBasis;
+  /**
+   * bandFractionOf(rulesId): the band as a fraction of the holding's target (target basis) or of
+   * the plan (equity basis). Optional so a caller that predates 023 still gets the basis
+   * constant; a rule set that names its own band (sim/rules.py `resize_band`) needs this, because
+   * the two basis constants cannot express it.
+   */
+  resizeBand?: number;
   /** Plan shares per stock (sharesBySymbol over planOrders). */
   held: ReadonlyMap<string, number>;
   /** Shares held from outside the plan per stock (outsideShares). */
@@ -332,9 +341,9 @@ export function buildReminders(input: ReminderInput): ReminderPlan {
       }
       if (!input.resizes || planSize === null) continue;
       const gap = t.weight * planSize - shares * t.last;
-      const band = input.resizeBasis === 'target'
-        ? TARGET_RESIZE_BAND * (t.weight * planSize)
-        : RESIZE_BAND * planSize;
+      const frac = input.resizeBand
+        ?? (input.resizeBasis === 'target' ? TARGET_RESIZE_BAND : RESIZE_BAND);
+      const band = input.resizeBasis === 'target' ? frac * (t.weight * planSize) : frac * planSize;
       if (Math.abs(gap) < Math.max(MIN_TRADE_USD, band)) continue;
       const action: ReminderAction = gap > 0 ? 'add' : 'trim';
       drafts.push({

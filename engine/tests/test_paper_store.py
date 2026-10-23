@@ -62,9 +62,9 @@ def test_read_strategies_returns_the_roster_rows_in_sort_order(pg):
     # 021 swapped one of the six: RAW35-FR-GT (35 names) takes RAW-FR-GT's slot, and RAW-FR-GT
     # goes to the end of the retired block. 022 did the same with COSK-FR-GT and RMW-FR-GT.
     assert [r.id for r in rows] == [
-        "SPY-GT", "C-GT", "COSK-FR-GT", "RAW35-FR-GT", "MOM-FR-GT", "MVW-FR-GT",
+        "SPY-GT", "C-GT", "COSK-FR-GT", "RAW35-FR-GT", "MOM-FR-GT", "FULL50-FR-GT",
         "SPY", "A", BOOK_ID, TIMING_ID, "C", "FND", f"{BOOK_ID}-FR", f"{TIMING_ID}-FR", "RM-FR",
-        "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR", "RAW-FR-GT", "RMW-FR-GT",
+        "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR", "RAW-FR-GT", "RMW-FR-GT", "MVW-FR-GT",
     ]
     spy = next(r for r in rows if r.id == "SPY-GT")
     assert (spy.engine, spy.rules_id, spy.is_champion, spy.is_benchmark) == ("benchmark", None, True, True)

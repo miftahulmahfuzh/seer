@@ -128,6 +128,9 @@ describe('the target-basis band', () => {
       'monthly-hold-frac-gotrade-tband',
       'monthly-hold-frac-gotrade-tband-cash',
       'weekly-hold-frac-gotrade-tband-cash',
+      // 023: the same basis with the band shut. It is on the target basis like the three above,
+      // but its band is its own (RULE_SET_BANDS), not TARGET_RESIZE_BAND.
+      'monthly-hold-frac-gotrade-tband00',
     ]);
     for (const id of TARGET_BAND_RULES) expect(resizeBasisOf(id)).toBe('target');
     for (const id of ['monthly-hold-frac-gotrade', 'weekly-hold', 'design-v0', '']) {

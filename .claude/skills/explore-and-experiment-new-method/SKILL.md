@@ -51,8 +51,34 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    not the ones the lab's benchmark was measured on (D10 in `lab/hardgate.py`), and a fresh build
    re-fetches prices. Build (`python -m seer_engine research_store`) only when no copy exists
    anywhere; a refused build records nothing and spends no method id.
-2. **Read the lab.** `lab status` shows N, test looks, families, the trials closest to eligible,
-   backlog, blocked ideas and the latest insights. Use `lab show <id>` for detail.
+2. **Gather the lab's state with a Task agent, not inline.** The read phase — `lab status`, a
+   `lab show` per near-miss, the parent's method file, `method_template.py`, what the siblings
+   already concluded — is the longest Bash stretch in a run, and it has left sessions with no
+   room for the experiment they were started to do. Delegate it with `Explore` (it has no Edit or
+   Write tool) and keep the conclusion, not the dumps:
+
+   > Read-only lab state for `<MNNNN, or the idea in one line>`. Run no experiment and write
+   > nothing: no `lab run`, `test`, `promote`, `note`, `insight`, `idea`, `stage`, no git, no
+   > file edits. (Child mode: `export SEER_LAB_DB=… SEER_RESEARCH_STORE=… SEER_SV_STORE=…`
+   > first, and call python as `PYTHONPATH=$PWD/engine/src
+   > /home/miftah/seer/engine/.venv/bin/python`.)
+   > Read: `lab status`; `lab show` for the parent and for the trials closest to eligible;
+   > `lab seen --find <the idea's words>`; the parent's
+   > `engine/src/seer_engine/lab/methods/mNNNN_*.py`; `method_template.py` in the skill folder.
+   > Return ONLY this, each line naming the command it came from:
+   > • parent method id and family, or none
+   > • the parent's chassis — `TradeRules` preset, allocator id, variant ids and their params
+   > • the three prior verdicts most relevant to this idea, one line each
+   > • which pre-registration fields the template requires, and which the parent left thin
+   > • whether `lab seen` already holds this idea, and under what key
+   > • N, the DSR bar, and test looks spent, as `lab status` prints them
+   > No file dumps, no trial tables, no narration.
+
+   What comes back is **someone else's measurement**. It is good enough to choose the idea and
+   shape the variants; it is not good enough to quote. Every figure that reaches the analysis,
+   the journal or the owner — N, the bar, the parent's numbers — gets re-read here with the
+   command the packet names. That is one cheap command each, and the context saved is the
+   browsing, not the reading. `/verify-claims` on the packet if the run leans on it heavily.
 3. **Choose one idea** (child: it was chosen; start from the reserved row's name and hypothesis).
    Solo: pick the most promising of:
    - **variation**: attack the most common failure among the closest-to-eligible trials.
@@ -63,7 +89,9 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    - **backlog**: an `idea` row. Reuse its id.
 
    Then check:
-   - `lab seen --find <words>`. If it was already explored, pick another idea or make a real variation.
+   - `lab seen --find <words>` — the step 2 packet already answered this. Re-run it yourself
+     only if the idea changed shape since. If it was already explored, pick another idea or
+     make a real variation.
    - **Testable?** The store has daily OHLCV for 1993 → 2015-10-16 (~539 stocks plus ETFs,
      no delisted names), cash dividends, and point-in-time S&P 500 / Nasdaq-100 membership. No
      fundamentals, intraday, options, short interest or sentiment. Market-wide daily series are
@@ -432,6 +460,7 @@ Then:
 | "`lab costs` showed it survives, call it eligible" | Never. `lab costs` is a report, not a trial. Only a new variation method on the `-gotrade` preset can be judged at real fees. |
 | "Max DD 21% is basically 20%" | The bar is 20% since 2026-10-07 (design §1 item 4, the owner's call) and "basically" is not a comparison. Never edit §1/§5, `tuning` thresholds or the P7a registry — they are the owner's dials, not yours. |
 | "The luck bar is still too high; nudge it" | Never. `DSR_MIN` is the owner's risk appetite and `DSR_POLICY` is the owner's call on what counts as an independent look (design §7). Run `lab luck` to see the sensitivity, journal what you found, and leave both alone. |
+| "The gather agent already read N, just use its number" | A subagent's figure is unverified by construction. Re-read anything that lands in the analysis, the journal or a report with the command the packet names. |
 | "Nothing worked, stop here" | Journal the insight and queue the next idea. |
 | "Child: commit lab.sqlite too" | Never, and never `web/data/lab.json` either. A binary file committed by two sessions is a conflict nobody can merge. |
 | "Solo: `git add lab/lab.sqlite` is quicker" | Always `lab stage`. It is the only thing that keeps `web/data/lab.json` in sync, and CI fails a lab commit without it. |

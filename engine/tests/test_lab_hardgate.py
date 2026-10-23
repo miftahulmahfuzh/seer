@@ -2440,6 +2440,11 @@ def test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways(
     fired = set()
     if len(block) == 2:
         for line in block[1].splitlines():
+            # (2026-10-23) The block now also names the ids that promote the SAME curve and were
+            # refused, so that "1 book from 4 methods" cannot read as unanimity when it is 3 of
+            # 6. Those lines start with an id too, and they are not firings -- stop here.
+            if "AND REFUSED UNDER" in line:
+                break
             head = line.strip().split(":", 1)[0].split(" ", 1)[0]
             if head.startswith("M") and head[1:].isdigit():
                 fired.add(head)
@@ -2490,6 +2495,106 @@ def test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways(
         "no variant would be promoted" in m0243          # absent-arm clause
         or "the variant that would be promoted" in m0243  # fold clause, on its own curve
     ), m0243
+
+
+def test_a_fired_book_names_every_id_that_promotes_the_same_curve_and_was_refused(
+    tmp_path, capsys, monkeypatch
+):
+    """Every id the buy-signal block calls "this very book" really does promote that exact curve.
+
+    **The hazard, measured 2026-10-23.** Six method ids promote the byte-identical curve
+    ``caa33dc4844b`` -- M0072, M0258, M0260, M0277, M0279 and M0284 -- and their SELECTOR fold
+    records read 3, 3, 2, 1, 2 and 3 of 4. Three fire and three are refused, on one book. Before
+    this block existed the signal printed only the firings, so "1 distinct book from 4 methods"
+    read as unanimity when it was 3 of 6, and the thing that moved between them was which
+    siblings each method happened to register -- not any property of the book.
+
+    **Why the claim is identity and not behaviour.** The first cut of this block reused
+    ``books.group``, which merges on residual correlation as well as lineage. That is right for
+    counting independent confirmations and wrong here: it named M0177, whose promoted arm is a
+    DIFFERENT curve (``c8ed8c1eed62``), and omitted M0277 and M0279, which really do carry the
+    lead's. A sentence that says "these ids promote this very book" has to be exactly true, so
+    the block compares the promoted arm's recorded curve byte for byte.
+
+    This test pins the INVARIANT, not the population: whatever the lab holds, every id listed
+    under a fired book must promote a curve identical to the lead's, and no id that does so and
+    was refused may be left out. A test that pinned the ids would go red on an unrelated batch,
+    which is the lesson of the M0243 clause above.
+    """
+    import hashlib
+    import shutil
+
+    from seer_engine.lab import npolicy
+
+    if not store.COMMITTED_DB.exists():
+        pytest.skip("no lab database")
+    monkeypatch.setattr(store, "DSR_POLICY", npolicy.DEFAULT_POLICY)
+    store._GATE_CACHE.clear()
+
+    db = tmp_path / "lab-copy.sqlite"
+    shutil.copy(store.COMMITTED_DB, db)
+
+    from seer_engine.commands import lab as lab_cmd
+
+    assert lab_cmd.run(_wf_args(db)) == 0
+    out = capsys.readouterr().out
+    if "*** BUY SIGNAL" not in out:
+        pytest.skip("no buy signal on the committed lab")
+
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+
+    def promoted_curve(mid: str) -> str | None:
+        best = store.best_dev_eligible(conn, mid)
+        if best is None:
+            return None
+        row = conn.execute(
+            "SELECT curve_json FROM trials WHERE candidate_id = ?", (best["candidate_id"],)
+        ).fetchone()
+        if row is None or not row["curve_json"]:
+            return None
+        return hashlib.sha256(row["curve_json"].encode("utf-8")).hexdigest()
+
+    block = out.split("*** BUY SIGNAL", 1)[1]
+    lead = next(
+        ln.strip().split(":", 1)[0]
+        for ln in block.splitlines()
+        if ln.strip()[:1] == "M" and ":" in ln and "cleared all" in ln
+    )
+    lead_curve = promoted_curve(lead)
+    assert lead_curve is not None, lead
+
+    listed: list[str] = []
+    fired: set[str] = set()
+    inside = False
+    for line in block.splitlines():
+        if "AND REFUSED UNDER" in line:
+            inside = True
+            continue
+        if inside and "ids whose promoted arm" in line:
+            break
+        head = line.strip().split(":", 1)[0].split(" ", 1)[0]
+        if not (head.startswith("M") and head[1:].isdigit()):
+            continue
+        if inside:
+            listed.append(head)
+        else:
+            fired.add(head)
+
+    # Everything named is the identical curve -- the claim the sentence makes.
+    for mid in listed:
+        assert promoted_curve(mid) == lead_curve, f"{mid} does not promote the lead's curve"
+
+    # And nothing that shares it and was refused is left out.
+    sharers = {
+        r["id"]
+        for r in conn.execute("SELECT id FROM methods WHERE status = 'dev-eligible'")
+        if promoted_curve(r["id"]) == lead_curve
+    }
+    assert set(listed) == sharers - fired, (
+        f"listed {sorted(listed)}, but the refused sharers are {sorted(sharers - fired)}"
+    )
+    conn.close()
 
 
 def test_the_era_edge_carries_the_noise_scale_the_margin_study_measured(tmp_path, monkeypatch):

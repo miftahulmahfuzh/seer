@@ -183,6 +183,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import hashlib
 import logging
 import math
 import os
@@ -2855,8 +2856,15 @@ def _walkforward(conn, args) -> int:
     import json
 
     from seer_engine.backtest import regime
-    from seer_engine.lab import books, firings, hardgate
+    from seer_engine.lab import books, firings, hardgate, npolicy
     from seer_engine.lab import walkforward as wf
+
+    # The lab's current look count, for the on-the-line check below. Degrades to None rather than
+    # raising: a fresh fixture has no population to read and the block simply does not print.
+    try:
+        lab_n: int | None = npolicy.effective_n(conn, store.DSR_POLICY).n
+    except Exception:
+        lab_n = None
 
     rows = list(conn.execute(
         "SELECT n, method_id, candidate_id, start, end, curve_json FROM trials "
@@ -2917,6 +2925,23 @@ def _walkforward(conn, args) -> int:
     print("  " + "-" * (len(head) + 16))
 
     fired: dict[str, str] = {}
+    # Dev-eligible methods that did NOT fire, with the reason. They are collected because a
+    # method's selector fold record depends on the siblings registered beside it, so the SAME
+    # recorded curve can clear the folds under one method id and fail under another -- measured
+    # 2026-10-23: five ids promote the byte-identical curve caa33dc4844b, and their selector
+    # records read 3, 3, 3, 1 and 2 of 4. The block below prints the refusals beside the firings
+    # so "1 book from 3 methods" can never be read as unanimity when it is 3 of 5.
+    refused: dict[str, str] = {}
+    #: method id -> sha256 of its promoted arm's recorded curve. Identity, not behaviour: the
+    #: block below claims "these ids promote THIS VERY BOOK", and only a byte-identical curve
+    #: earns that sentence. `books.group` deliberately merges on residual correlation too, which
+    #: is right for counting independent confirmations and wrong for this claim -- it put M0177
+    #: (a different curve, c8ed8c1eed62) in the group and left out M0277 and M0279, which really
+    #: do carry caa33dc4844b. Measured 2026-10-23, before this code was trusted.
+    promoted_curve: dict[str, str] = {}
+    #: method id -> its promoted arm's DSR at the lab's CURRENT population, for methods sitting
+    #: within `ON_THE_LINE` of the bar. See the block that prints them for the measurement.
+    on_the_line: dict[str, float] = {}
     majorities = 0
     disagreed: list[tuple[str, str, float, str, float]] = []
     for mid, trials in sorted(by_method.items()):
@@ -2941,6 +2966,23 @@ def _walkforward(conn, args) -> int:
         eligible, why = v.eligible, v.why
         if v.fired:
             fired[mid] = why
+        elif eligible:
+            refused[mid] = why
+        if promoted is not None:
+            raw = next((r["curve_json"] for r in trials if r["candidate_id"] == promoted), None)
+            if raw:
+                promoted_curve[mid] = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+            # The full row, not the narrow one this report selects: `dsr_at` falls back to the
+            # recorded `dsr`, `sharpe` and `n_trials_at_run` columns when a trial has no recorded
+            # moments, and those are not in the projection above.
+            if lab_n:
+                arm = next((r for r in trials if r["candidate_id"] == promoted), None)
+                full = conn.execute(
+                    "SELECT * FROM trials WHERE n = ?", (arm["n"],)
+                ).fetchone() if arm is not None else None
+                d = store.dsr_at(conn, full, lab_n) if full is not None else None
+                if d is not None and abs(d - store.DSR_MIN) < ON_THE_LINE:
+                    on_the_line[mid] = d
         if rec.majority:
             majorities += 1
         if (
@@ -2959,6 +3001,25 @@ def _walkforward(conn, args) -> int:
               f"{(fmt_signed_pct(best_edge) if best_edge is not None else '-'):>14}   {why}")
 
     print(f"\n{majorities} of {len(by_method)} methods beat the benchmark in a majority of folds.")
+    if on_the_line:
+        print(f"\n{len(on_the_line)} dev-eligible method(s) sit within {ON_THE_LINE:g} of the "
+              f"{store.DSR_MIN:g} luck bar, where work on an")
+        print("UNRELATED method can move them across it. The deflated Sharpe is not a function of "
+              "the")
+        print("trial and the look count alone: it also reads how much the lab's curves resemble "
+              "one")
+        print("another, so every new method re-scores every recorded one. Measured 2026-10-23 "
+              "over the")
+        print("four methods of one batch: all 75 dev-eligible methods moved +0.0016 to +0.0021, "
+              "every")
+        print("one of them UPWARD -- the direction a larger look count should forbid -- and "
+              "M0243's arm")
+        print("crossed from 0.898278 to 0.900449 without being touched. Read these as unresolved "
+              "rather")
+        print("than as passed or failed, and re-read the number before anything is built on it:")
+        for mid, d in sorted(on_the_line.items(), key=lambda kv: abs(kv[1] - store.DSR_MIN)):
+            side = "above" if d >= store.DSR_MIN else "below"
+            print(f"  {mid:<8}{d:.6f}  {abs(d - store.DSR_MIN):.6f} {side} the bar")
     if disagreed:
         roles = _arm_roles([mid for mid, *_rest in disagreed])
         print(f"\n{len(disagreed)} dev-eligible method(s) where the two columns disagree on sign --")
@@ -2989,6 +3050,27 @@ def _walkforward(conn, args) -> int:
             for other in bk.others:
                 print(f"        {other} -- {bk.why[other].sentence(bk.lead)}")
                 print(f"        {' ' * len(other)}    {fired[other]}")
+            # Refusals of the IDENTICAL curve, anywhere in the lab. Not the behavioural group:
+            # the sentence printed is an identity claim and must be exactly true.
+            # The LEAD's curve alone, not every curve in the behavioural group: M0092 merges
+            # with M0072 at 0.98 residual correlation but promotes a different curve, and
+            # counting it here would put a method in the denominator of a sentence that says
+            # "this exact curve".
+            lead_curve = promoted_curve.get(bk.lead)
+            shared = sorted(m for m, h in promoted_curve.items() if lead_curve and h == lead_curve)
+            held_back = [m for m in shared if m in refused]
+            if held_back:
+                total = len(shared)
+                print(f"      AND REFUSED UNDER {len(held_back)} OTHER NAME"
+                      f"{'' if len(held_back) == 1 else 'S'}. A method's fold record depends on "
+                      f"which siblings")
+                print("      were registered beside it, so one curve can clear the folds on one "
+                      "menu and fail on")
+                print("      another. These ids promote this very book and did not fire:")
+                for m in held_back:
+                    print(f"        {m} -- {refused[m]}")
+                print(f"      {total - len(held_back)} of the {total} ids whose promoted arm is "
+                      f"this exact curve fired. Read that before spending.")
         print(f"  This is the moment survivorship-free price history is worth buying for "
               f"{'this book' if n == 1 else f'these {n} books'}: the free")
         print("  evidence is used up, and the next two things that happen are a counted look and")
@@ -2997,6 +3079,14 @@ def _walkforward(conn, args) -> int:
         print("No buy signal. Survivorship-free price history is not worth buying yet.")
     print("\nNothing was recorded. No research store was opened.")
     return 0
+
+
+#: How close to :data:`store.DSR_MIN` counts as "on the line", where an unrelated batch can move
+#: a verdict across the bar. NOT a tuned number: one four-method batch moved every one of 75
+#: dev-eligible methods by +0.0016 to +0.0021 on 2026-10-23, so this is a little over two such
+#: batches' drift. It gates a WARNING and never a verdict -- no method passes or fails because of
+#: it, and `lab promote` does not read it.
+ON_THE_LINE = 0.005
 
 
 def _shortfall(conn, args) -> int:

@@ -378,6 +378,74 @@ GATE_OFF = Amendment(
 )
 
 
+# --------------------------------------------------------------------------- amendment 2
+
+# Both headline numbers rest on ONE blind draw. With the switch on, HI25 fell 3.2 points less
+# than BLIND25; with it off, HI25-NOSW lost 9.6 points less in 2008 than BLIND25-NOSW. A single
+# hash is a single coin toss, and the lab has just been reminded that one coin toss is not a
+# control when the thing being measured may be smaller than one coin toss. These six arms are
+# three more blind draws on each side of the switch. They put a spread on the control and can
+# only confirm the claim or withdraw it.
+
+
+def _s(suffix: str, inner: YieldBetaParams, seed: int, rationale: str) -> Candidate:
+    return Candidate(id=f"M0293-{suffix}", family="M0293", rules=MONTHLY_HOLD_FRAC_GOTRADE,
+                     allocator=CALMFILTER,
+                     params=CalmFilterParams(inner, drop_frac=Decimal("0.25"), side="blind",
+                                             seed=seed),
+                     rationale=rationale, added=date(2026, 10, 23), owner_inputs=())
+
+
+BLIND_SPREAD = Amendment(
+    added=date(2026, 10, 23),
+    why=(
+        "Both headline gaps are measured against a single blind draw. These are three more draws "
+        "on each side of the switch, so the control gets a spread instead of a point."
+    ),
+    hypothesis=(
+        "The two numbers this method rests on are differences against ONE blind draw: with the "
+        "switch on the calm quarter-drop fell 3.2 points less than the blind quarter-drop (20.3% "
+        "against 23.5%), and with the switch off it lost 9.6 points less in 2008 (−24.5% against "
+        "−34.1%). One hash is one coin toss. The lab already knows that a blind-draw lead on "
+        "RETURN under about 1.5 points a year is unreadable because the seed alone moves a "
+        "twenty-year return by 0.06 to 2.70 points, and it believes the worst fall and the "
+        "gains-to-losses ratio are the seed-stable readings -- but believes is not measures, and "
+        "nobody has put a spread on a blind drop of a POOL, which is a different operation from "
+        "a blind draw of a BOOK. Three more seeds on each side: 294, 295 and 296, drop fraction "
+        "and everything else untouched. Predictions, written before the run: across the four "
+        "gate-on blind draws the worst fall spans less than 2 points, so the 3.2-point margin "
+        "survives with room; across the four gate-off blind draws the 2008 calendar loss spans "
+        "less than 4 points, so the 9.6-point margin survives with room; and the four gate-on "
+        "draws' yearly money returns span MORE than the 1.2 points the calm arm trails by, "
+        "confirming that the return cost is unreadable while the fall saving is not. If a blind "
+        "spread covers either margin, that margin is withdrawn in the analysis, in those words, "
+        "and the method's claim shrinks to whatever is left."
+    ),
+    expected_failure=(
+        "The sticky draw is the reason this could go either way. One hash per symbol with no date "
+        "in it means a seed does not just reshuffle the order, it decides for the whole twenty "
+        "years which quarter of the universe this book may never own -- so an unlucky seed can "
+        "quietly bar most of the utilities, or most of the banks, for the entire window. That is "
+        "a far heavier draw than a re-drawn monthly placebo, and the spread may be correspondingly "
+        "wide: wide enough to swallow 3.2 points of worst fall, in which case the gate-on half of "
+        "this method is withdrawn and only the 2008 result stands. The second way it disappoints "
+        "is the reverse: all four draws land on top of each other because a quarter of several "
+        "hundred names is a large enough sample that which quarter barely matters, in which case "
+        "the control is tight, the margins stand, and the lab learns that a pool drop is much "
+        "quieter than a book draw. Either answer is worth the arms; neither is a reason to change "
+        "the drop fraction or the host afterwards."
+    ),
+    candidates=(
+        _s("BLIND25-S2", HOST, 294, "A second blind quarter, switch on"),
+        _s("BLIND25-S3", HOST, 295, "A third blind quarter, switch on"),
+        _s("BLIND25-S4", HOST, 296, "A fourth blind quarter, switch on"),
+        _s("BLIND25-NOSW-S2", NOSW, 294, "A second blind quarter, switch off, where 2008 is live"),
+        _s("BLIND25-NOSW-S3", NOSW, 295, "A third blind quarter, switch off"),
+        _s("BLIND25-NOSW-S4", NOSW, 296, "A fourth blind quarter, switch off"),
+    ),
+)
+
+
 METHOD = Method(
     id="M0293",
     name="Calmness as a safety filter on someone else's picks, not a ranking of its own",
@@ -482,7 +550,7 @@ METHOD = Method(
            "Drop the same count by a fixed per-symbol hash: the arm with no opinion in it, which "
            "prices what dropping any quarter costs"),
     ),
-    amendments=(GATE_OFF,),
+    amendments=(GATE_OFF, BLIND_SPREAD),
     seen_keys=(
         "concept:market-beta-as-a-safety-filter-on-a-host-book",
         "concept:drop-jumpiest-quartile-of-the-scored-pool",

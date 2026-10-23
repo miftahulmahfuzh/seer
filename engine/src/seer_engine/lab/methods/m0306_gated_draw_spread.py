@@ -1,4 +1,4 @@
-"""M0306 — The same error bar, for the book that keeps its safety switch on.
+"""M0306 — Finish the gated coin: take the switch-on draw population from seven to nineteen.
 
 Source: variation of M0296 (the blind-draw spread for the industry lead-lag book). The question
 is the lab's own, and it is a question about the lab's instruments rather than about the market.
@@ -17,32 +17,41 @@ been read against since.
 uses.** ``inner=OPEN`` turns the SPY 200-day switch off. Every near miss on the leaderboard keeps
 it on, and the switch is exactly what flattens the fall: M0295's four gated arms fall 27.6% to
 33.9% where its two switch-off arms fall 58.1% and 59.9%. An error bar measured on a chassis that
-falls sixty percent is being applied, daily, to books that fall thirty. Nobody has measured
-whether it transfers, in which direction, or by how much — and the lab has no second instrument
-to catch the mistake if it does not.
+falls sixty percent is being applied, daily, to books that fall thirty.
 
-**What this file registers.** The identical population, on the gated chassis. Seeds 2 through 19
-of M0295's engine with ``inner=GATED``, ``side="matched"``, ``industries=3``,
-``leader="largest"`` — the same allocator object, the same params class, the same real fees, the
-same deposits, differing from M0296's draws in exactly one field and from each other in exactly
-one field. Seed 1 is **not** here: it is already recorded, as ``M0295-MATCHED-T3``, produced by
-the engine this file imports, and re-registering it would run one configuration twice under a
-renamed allocator — the thing the lab forbids and the reason ``config_digest`` ignores the
-candidate id. So the gated draw population is ``M0295-MATCHED-T3`` plus the eighteen registered
-here: **nineteen gated draws against nineteen switch-off draws.**
+**What this file registers, and why it is not what the reserved idea row said.** The idea row
+asked for six gated draws, seeds 2 through 7, and allowed an amendment to nineteen "if the first
+seven leave the question open". Seeds 2 through 7 are gone: M0307, a sibling exploration started
+minutes before this one and parented to the same M0296, registered and ran the identical six
+configurations, and ``lab run`` refused this method's first block as a repeat of
+``M0307-GDRAW-S2``. That refusal recorded nothing — M0306 held no trial, no amendment and no
+source sha when this file was rewritten — so this pre-registration is being written before any
+result of its own exists, which is the only condition the freeze cares about. The duplication is
+noted here rather than hidden, because a reader comparing the two files deserves to know which
+seeds came from which run.
 
-**Why nineteen and not the seven the idea row asked for, decided before any arm ran.** The idea
-row reserved six draws and allowed an amendment to nineteen "if the first seven leave the
-question open". They cannot do otherwise, and the reason is arithmetic rather than judgement:
-**the range of a sample grows with the size of the sample.** The spread of seven draws from a
-fixed distribution is systematically narrower than the spread of nineteen draws from that same
-distribution, by a wide margin and with no exceptions. The comparison this method exists to make
-is gated spread against switch-off spread, and the switch-off spread is a nineteen-draw range.
-Reading a seven-draw gated range beside it would have found the gated chassis "narrower" even if
-the two distributions were identical — it would have manufactured the paper's own conclusion out
-of sample size, and the lab would have had no way to tell. So all three blocks are pre-registered
-in this one commit, before any of them runs, and the comparison is nineteen against nineteen.
-That costs nothing extra in method ids and removes every choice about when to stop.
+So the six slots move to **seeds 8 through 13**, the amendment to **seeds 14 through 19**, and
+what M0306 contributes is the thing M0307 could not: the other twelve draws. The gated population
+then reads
+
+    M0295-MATCHED-T3  (seed 1, recorded by M0295)
+  + M0307-GDRAW-S2 .. S7   (seeds 2-7, recorded by M0307)
+  + M0306-GDRAW-S8 .. S19  (seeds 8-19, this method)
+  = nineteen gated draws, on the same engine, differing only in the seed.
+
+**Why that completion is the whole point, and not a tidying-up.** The range of a sample grows
+with the size of the sample. The spread of seven draws from a fixed distribution is
+systematically narrower than the spread of nineteen draws from that same distribution, by a wide
+margin and with no exceptions. The comparison both M0307 and this method exist to make is gated
+spread against switch-off spread, and the switch-off spread is a **nineteen**-draw range. Reading
+a seven-draw gated range beside it finds the gated chassis "narrower" even when the two
+distributions are identical: it manufactures the conclusion out of sample size alone. M0307's own
+pre-registered expected failure names this exactly — "seven gated draws may land so close
+together that the measured range is dominated by whichever single seed happens to sit furthest
+out, in which case this buys a lower bound on the gated width rather than the width". M0306 is
+what turns that lower bound into the width, and it is the only way the two spreads can be put
+side by side without the sample size deciding the answer. Nineteen against nineteen, seed for
+seed, on the same hashes.
 
 **The null this method is really testing, written as a number.** The switch does not depend on
 the seed. Every gated draw sits in cash in exactly the same months as every other gated draw,
@@ -68,37 +77,45 @@ That is the pre-registered null, and it makes the result readable instead of mer
 **What the deliverable is, and what it is not.** Success is not a strategy. No arm here is
 expected to be dev-eligible and none is designed to be: each is a placebo by construction, with
 no opinion in it anywhere. The deliverable is six numbers — the gated spread in money return,
-worst fall, worst year, gains-to-losses, turnover and trades — and the ratio of each to M0296's
-switch-off spread. A secondary reading comes free: the rank of M0295's gated idea arm
-``M0295-FOLLOW-T3`` inside its own nineteen-draw gated population, whole window, which M0295's
-verdict ("a blind draw beat following the biggest name's lead") asserted against a single draw
-and could not then calibrate.
+worst fall, worst year, gains-to-losses, turnover and trades, measured on all nineteen draws —
+and the ratio of each to M0296's switch-off spread. Two readings come free. The first is how far
+the seven-draw gated range understated the nineteen-draw one, which is the correction factor
+every future short draw population in this lab will need. The second is the rank of M0295's gated
+idea arm ``M0295-FOLLOW-T3`` inside its own nineteen-draw gated population, which M0295's verdict
+("a blind draw beat following the biggest name's lead") asserted against a single draw and could
+not then calibrate.
 
 **The reading rule, fixed here before any arm runs.** Report every seed. No seed is dropped for
 any reason, none is added beyond nineteen, and no window other than the full dev window and the
 2009-2015 slice is read. The spread statistic is the plain range, min to max, because that is the
 statistic M0296 published and the two must be comparable; the standard deviation is reported
 beside it because the range is the more sample-size-sensitive of the two and a reader deserves
-both. The ranks are reported whatever they are.
+both. The seven-draw-versus-nineteen-draw correction is computed from this method's own draws, by
+reading the first seven of the gated population and then all nineteen, so it is measured rather
+than assumed. The ranks are reported whatever they are.
 
 Rules are ``monthly-hold-frac-gotrade``: fractional shares at Gotrade's real fees on the owner's
-monthly deposits, identical to M0296's draws and to the two M0295 arms this is read against.
-Pure: the engine is M0295's, which reads only bars dated at or before d and has no clock,
-randomness, file or network of its own.
+monthly deposits, identical to M0296's draws, to M0307's draws, and to the two M0295 arms this is
+read against. Pure: the engine is M0295's, which reads only bars dated at or before d and has no
+clock, randomness, file or network of its own.
 
 Assumptions, written before the run:
 
-1. A seed is an arbitrary label. Seeds 2-19 are as good a sample of "a blind three-industry
-   gated draw" as any other eighteen would be, and seed 1's recorded gated trial belongs in the
-   same population as the eighteen run here. The key is blake2b of the seed, the industry name
-   and the month; nothing gives any seed a privileged position.
-2. Using the *same* seeds as M0296 pairs the two populations draw for draw, so the comparison can
-   be read as nineteen matched pairs as well as two independent spreads. That is strictly more
-   information than independent seeds would have given, and it costs nothing.
-3. The family is ``stock-portfolio-construction``, as the reserved idea row set it, rather than
-   M0296's ``stock-industry-lead-lag``. Every arm here is a hash draw with no lead-lag opinion in
-   it, so what it varies is construction, not a signal. The kin rule reads behaviour rather than
-   the family string, so nothing in the hard gate turns on this choice.
+1. A seed is an arbitrary label. Seeds 8-19 are as good a sample of "a blind three-industry
+   gated draw" as any other twelve would be, and the seven gated trials already recorded by
+   M0295 and M0307 belong in the same population as the twelve run here. The key is blake2b of
+   the seed, the industry name and the month; nothing gives any seed a privileged position.
+2. Pooling across method ids is sound because the configurations are identical in every field
+   but the seed and were produced by the same imported allocator object at the same store
+   fingerprint. The lab's digest ignores the candidate id for exactly this reason.
+3. Using the *same* nineteen seeds as M0296 pairs the two populations draw for draw, so the
+   comparison can be read as nineteen matched pairs as well as two independent spreads. That is
+   strictly more information than independent seeds would have given, and it costs nothing.
+4. The family is ``stock-portfolio-construction``, as the reserved idea row set it, rather than
+   M0296's ``stock-industry-lead-lag`` or M0307's ``market-shape-yardstick``. Every arm here is a
+   hash draw with no lead-lag opinion in it, so what it varies is construction, not a signal. The
+   kin rule reads behaviour rather than the family string, so nothing in the hard gate turns on
+   this choice.
 """
 
 from __future__ import annotations
@@ -116,9 +133,9 @@ from seer_engine.sim.rules import MONTHLY_HOLD_FRAC_GOTRADE
 
 ADDED = date(2026, 10, 23)
 
-#: The seeds this block spends. 1 is not here: it is already recorded, as ``M0295-MATCHED-T3``,
-#: and re-running it would measure one configuration twice.
-SEEDS = (2, 3, 4, 5, 6, 7)
+#: The seeds this block spends. 1 is already recorded as ``M0295-MATCHED-T3`` and 2-7 as
+#: ``M0307-GDRAW-S2..S7``; re-running any of them would measure one configuration twice.
+SEEDS = (8, 9, 10, 11, 12, 13)
 
 
 def _draw(seed: int) -> Candidate:
@@ -140,41 +157,42 @@ def _draw(seed: int) -> Candidate:
     )
 
 
-# --------------------------------------------------------------------------- amendments
+# --------------------------------------------------------------------------- amendment
 
-#: Seeds 8-13 and 14-19 take the gated population from seven draws to nineteen, matching
-#: M0296's switch-off population exactly. Both blocks are pre-registered by the commit that adds
-#: them, **before** any of the three blocks is run, and all three are read by the one rule in
-#: this file's docstring. They are separate blocks only because a batch carries at most six
-#: variants.
-AMEND_1_SEEDS = (8, 9, 10, 11, 12, 13)
-AMEND_2_SEEDS = (14, 15, 16, 17, 18, 19)
+#: Seeds 14-19 take the gated population to nineteen, matching M0296's switch-off population
+#: seed for seed. Pre-registered by the commit that adds it, **before** either block is run, and
+#: read by the one rule in this file's docstring. It is a separate block only because a batch
+#: carries at most six variants.
+AMEND_1_SEEDS = (14, 15, 16, 17, 18, 19)
 
-_WHY = (
-    "The range of a sample grows with the size of the sample, and this method's whole purpose "
-    "is to compare a gated spread against the nineteen-draw switch-off spread M0296 published. "
-    "A seven-draw gated range read beside a nineteen-draw switch-off range would come out "
-    "narrower even if the two underlying distributions were identical, which is precisely the "
-    "conclusion the method is supposed to be able to refute. So the population is taken to "
-    "nineteen, the same nineteen seeds, and the comparison is matched draw for draw as well as "
-    "spread against spread.\n\n"
-    "This block is pre-registered in the same commit as the first six and before any arm has "
-    "run, so there is no result to have been tempted by. The reading rule admits no choices: "
-    "every seed is run, every seed is reported, the statistic is the plain range with the "
-    "standard deviation beside it, and the only windows read are the full dev window and the "
-    "2009-2015 slice."
-)
-
-_HYP = (
-    "The SPY 200-day switch narrows the spread of identical blind draws by more than its time "
-    "out of the market accounts for. M0295's gated arms hold exposure 0.694 against 0.964 for "
-    "its switch-off arms, so pure dilution by time invested predicts a gated-to-switch-off "
-    "spread ratio of 0.720. The hypothesis is that the measured ratio on the worst fall comes "
-    "in clearly below 0.720 — the switch clipping the tail that separates a lucky draw from an "
-    "unlucky one — while the ratio on money return sits near 0.720, because the switch has no "
-    "view on which names a draw picks while it is invested. If that holds, the lab may read a "
-    "fall difference between gated twins at a much finer resolution than M0296's ruler allows, "
-    "and must keep reading return differences at roughly M0296's resolution scaled by exposure."
+AMEND_1 = Amendment(
+    added=ADDED,
+    why=(
+        "The second half of one widening, pre-registered in the same commit as the first and "
+        "before either runs. The range of a sample grows with the size of the sample, so a "
+        "gated population smaller than M0296's nineteen switch-off draws cannot be compared "
+        "with them: it would read narrower even if the two distributions were identical. "
+        "Thirteen gated draws is not nineteen, and stopping at thirteen would leave the "
+        "comparison exactly as unreadable as stopping at seven did. Splitting the twelve into "
+        "two blocks is a batch-size limit and nothing else; the reading rule is unchanged and "
+        "admits no choices, because every seed from 8 to 19 is run and reported whatever it "
+        "does."
+    ),
+    hypothesis=(
+        "The gated spread measured on all nineteen draws is materially wider than the same "
+        "spread measured on the first seven, by enough that the seven-draw reading would have "
+        "misstated how much the switch narrows the coin. Under the exposure-dilution null the "
+        "nineteen-draw gated spread should sit near 0.720 of M0296's nineteen-draw switch-off "
+        "spread on the money return, and clearly below 0.720 on the worst fall."
+    ),
+    expected_failure=(
+        "Seeds 14-19 land inside the range the first thirteen already covered, the measured "
+        "spread stops widening, and the nineteen-draw gated bar turns out to be the "
+        "thirteen-draw bar — which would mean three industries drawn from roughly ten eligible "
+        "ones overlap so heavily that the draw population saturates, and that the honest gated "
+        "error bar is a lower bound no matter how many seeds are spent."
+    ),
+    candidates=tuple(_draw(s) for s in AMEND_1_SEEDS),
 )
 
 _EXP = (
@@ -186,38 +204,18 @@ _EXP = (
     "twins and may never read a return difference, and it would retire the worst fall as a "
     "discriminator between gated books. The second likely failure is the opposite and worse: "
     "the ratio lands near 0.720 on every meter at once, the switch turns out to be a pure "
-    "exposure dial with no effect on draw noise beyond arithmetic, and this method's nineteen "
-    "runs will have bought a multiplication the lab could have done from M0296 for nothing. The "
-    "third is that the gated draws inherit M0296's shape so completely that the ranks of the "
-    "gated idea arm and the switch-off idea arm inside their populations are identical, which "
-    "would say the switch changes no comparison the lab has ever made."
-)
-
-AMEND_1 = Amendment(
-    added=ADDED,
-    why=_WHY,
-    hypothesis=_HYP,
-    expected_failure=_EXP,
-    candidates=tuple(_draw(s) for s in AMEND_1_SEEDS),
-)
-
-AMEND_2 = Amendment(
-    added=ADDED,
-    why=(
-        "The second half of the same widening, pre-registered in the same commit and read by "
-        "the same rule. It is a separate block only because a batch carries at most six "
-        "variants. Seeds 14-19 take the gated population to nineteen, matching M0296's "
-        "switch-off population seed for seed."
-    ),
-    hypothesis=_HYP,
-    expected_failure=_EXP,
-    candidates=tuple(_draw(s) for s in AMEND_2_SEEDS),
+    "exposure dial with no effect on draw noise beyond arithmetic, and these twelve runs will "
+    "have bought a multiplication the lab could have done from M0296 for nothing. The third is "
+    "that seeds 8-19 land inside the range M0307's seven already covered, so the population "
+    "saturates and the gated bar is a lower bound however many seeds are spent — in which case "
+    "the only safe ruler for a gated comparison remains the switch-off one, and the lab must go "
+    "on treating every single-control claim as the one-in-two claim it is."
 )
 
 
 METHOD = Method(
     id="M0306",
-    name="The same error bar for the book that keeps its safety switch",
+    name="Finish the gated coin: the switch-on draw population from seven to nineteen",
     family="stock-portfolio-construction",
     source_kind="variation",
     source_ref="M0296",
@@ -230,24 +228,28 @@ METHOD = Method(
         "percent and turnover 4.1 percent. Every one of those nineteen was ALWAYS INVESTED, and "
         "that is not the chassis the lab uses. Every near miss on the leaderboard keeps the SPY "
         "200-day switch, and the switch is what flattens the fall: M0295's gated arms fall 27.6 "
-        "to 33.9 percent where its switch-off arms fall 58.1 and 59.9. So the published error "
-        "bar is being applied to books it was not measured on, and nobody knows whether it "
-        "overstates or understates them. This method registers the identical draw population on "
-        "the gated chassis — M0295's engine with inner=GATED, side=matched, leader=largest, "
-        "three industries, seeds 2 through 19 — read beside the recorded gated draw "
-        "M0295-MATCHED-T3 (seed 1) and the recorded gated idea arm M0295-FOLLOW-T3, giving "
-        "nineteen gated draws against M0296's nineteen switch-off draws, seed for seed. The "
-        "pre-registered null is dilution by time invested: the gated arms hold exposure 0.694 "
-        "against 0.964, so if the switch does nothing but keep the book out of the market the "
-        "spread ratio should be 0.720 on every meter. The hypothesis is that the worst-fall "
-        "ratio comes in clearly below 0.720 while the money-return ratio sits near it. Success "
-        "is not a strategy and no arm is expected to be eligible: the deliverable is the width "
-        "of the ruler the lab has used on every gated comparison in its record, and whether it "
-        "can be derived from the one it already has."
+        "to 33.9 percent where its switch-off arms fall 58.1 and 59.9. M0307 began the gated "
+        "half of this measurement and got seven draws into it. Seven is not enough to put "
+        "beside nineteen, because the range of a sample grows with the size of the sample: a "
+        "seven-draw gated range read against a nineteen-draw switch-off range comes out "
+        "narrower even when the two distributions are identical, which is the very conclusion "
+        "the measurement is supposed to be able to refute. This method runs the missing twelve "
+        "— M0295's engine with inner=GATED, side=matched, leader=largest, three industries, "
+        "seeds 8 through 19 — so the gated population reaches nineteen and can be read against "
+        "M0296's nineteen seed for seed. The pre-registered null is dilution by time invested: "
+        "the gated arms hold exposure 0.694 against 0.964, so if the switch does nothing but "
+        "keep the book out of the market the spread ratio should be 0.720 on every meter. The "
+        "hypothesis is that the worst-fall ratio comes in clearly below 0.720 while the "
+        "money-return ratio sits near it, and that the nineteen-draw gated spread is materially "
+        "wider than the seven-draw one. Success is not a strategy and no arm is expected to be "
+        "eligible: the deliverable is the width of the ruler the lab has used on every gated "
+        "comparison in its record, whether it can be derived from the one it already has, and "
+        "how badly a short draw population understates it."
     ),
     expected_failure=_EXP,
     candidates=tuple(_draw(s) for s in SEEDS),
-    amendments=(AMEND_1, AMEND_2),
-    seen_keys=("concept:gated-blind-draw-error-bar", "concept:draw-noise-on-a-gated-chassis",
+    amendments=(AMEND_1,),
+    seen_keys=("concept:gated-draw-population-completed-to-nineteen",
+               "concept:draw-population-size-correction",
                "concept:exposure-dilution-null-for-control-noise"),
 )

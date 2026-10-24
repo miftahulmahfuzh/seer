@@ -10,10 +10,11 @@ Every arm sits on the F4 chassis (F4's screen, top 20, equal weight, monthly, SP
 at Gotrade's real fees in fractional shares. Trading days stand in for months at 21 a month, so
 months 6-1 is ``c[-22]/c[-127]`` and months 12-7 is ``c[-127]/c[-253]``. The screen comes from
 ``factor_rows`` unchanged, so only the ranking differs between arms.
-Five variants, fixed before any result: acceleration, its mirror (deceleration), plain 12-1 as the
-control (the lab's own ``FACTOR``), the no-opinion arm (the same book ranked on dollar volume,
+Four variants, fixed before any result: acceleration, its mirror (deceleration), the no-opinion arm (the same book ranked on dollar volume,
 which carries no view on past returns, so the cost of holding 20 monthly-rebalanced liquid names
-behind the switch is priced), and acceleration with the switch off. A mirror proves the signal,
+behind the switch is priced), and acceleration with the switch off. The plain 12-1 control is
+M0332-M12-1, the identical configuration already recorded on the dev window (the lab refuses a
+second run of it), so the analysis compares against that trial. A mirror proves the signal,
 not what acting on it costs; the no-opinion arm is what prices that.
 Pure; reads only bars dated <= data_date.
 """
@@ -33,7 +34,6 @@ from seer_engine.sim.rules import MONTHLY_HOLD_FRAC_GOTRADE
 from seer_engine.strategies.allocator import target_from_close
 from seer_engine.strategies.base import History
 from seer_engine.strategies.f_factor import (
-    FACTOR,
     FactorParams,
     factor_lookback,
     factor_rows,
@@ -140,7 +140,7 @@ METHOD = Method(
         "6-1 back minus return over months 12-7 back. Top 20 equal weight, monthly, behind the SPY "
         "200-day switch, in fractional shares at Gotrade's real fees. Question: does a stock whose "
         "pace is speeding up beat one whose pace merely stayed high? Arms: acceleration, its "
-        "mirror (deceleration), plain 12-1 as the control, a no-opinion arm (same chassis ranked "
+        "mirror (deceleration), plain 12-1 as the control (M0332-M12-1, already recorded), a no-opinion arm (same chassis ranked "
         "on dollar volume) to price what acting on a ranking costs, and acceleration with the "
         "switch off. If the idea holds, acceleration beats the 12-1 control and deceleration "
         "trails the no-opinion arm. The literature is from the 2010s, so the dev window is "
@@ -154,11 +154,6 @@ METHOD = Method(
     candidates=(
         _v("ACC", "accel", "treatment: months 6-1 return minus months 12-7 return, behind the switch"),
         _v("DEC", "decel", "mirror: the lowest acceleration, behind the switch"),
-        Candidate(id="M0337-M12-1", family="M0337", rules=MONTHLY_HOLD_FRAC_GOTRADE,
-                  allocator=FACTOR,
-                  params=FactorParams(rank="momentum", top=20, mom_n=252, mom_skip=21, trend=SWITCH),
-                  rationale="control: plain 12-1 momentum, behind the switch", added=ADDED,
-                  owner_inputs=()),
         _v("DVOL", "dvol", "no opinion: same screen ranked on dollar volume, behind the switch"),
         _v("ACC-NOSW", "accel", "treatment with the switch off, always invested", trend=None),
     ),

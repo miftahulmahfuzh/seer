@@ -43,7 +43,6 @@ from seer_engine.strategies.allocator import target_from_close
 from seer_engine.strategies.base import History
 from seer_engine.strategies.f_factor import (
     EXCLUDED,
-    FACTOR,
     FactorParams,
     FactorRow,
     factor_lookback,
@@ -189,12 +188,13 @@ METHOD = Method(
         "show only the pre-crowd edge. Arms: DIP-RESID (the idea); DIP-RAW (does removing the "
         "market's move matter?); DIP-POOL40 (a gentler pool: 40 names, does the pool size "
         "matter?); MIRROR-RESID (the 20 with the BEST last month in the same pool, which would "
-        "reverse the idea if the dip is the signal); MOM20 (plain top-20 12-1 momentum behind the "
-        "same gate, no opinion about the last month, the always-acting control that prices the "
-        "habit so the dip and the mirror can be read against it). Success: DIP-RESID beats MOM20 "
-        "on worst fall at similar return, beats MIRROR-RESID on return, beats SPY in 2009-2015, "
+        "reverse the idea if the dip is the signal); the no-opinion control is the plain top-20 12-1 "
+        "momentum book behind the same gate, which the lab already holds as M0332-M12-1 (same "
+        "configuration, so the lab refuses to run it twice; it is read from that recorded trial, "
+        "not re-run, and prices the habit so the dip and the mirror can be read against it). "
+        "Success: DIP-RESID beats M0332-M12-1 on worst fall at similar return, beats MIRROR-RESID on return, beats SPY in 2009-2015, "
         "and wins a majority of walk-forward folds. If DIP-RESID and MIRROR-RESID land within the "
-        "gap that MOM20 explains, the month's move carries no information and the verdict is "
+        "gap that the plain momentum control explains, the month's move carries no information and the verdict is "
         "that the pool, not the dip, does the work."
     ),
     expected_failure=(
@@ -214,8 +214,6 @@ METHOD = Method(
            "Pool of 40 instead of 60: a stronger-momentum pool, a milder dip"),
         _v("MIRROR-RESID", PULLBACK, PullParams(N20, side="strength"),
            "Mirror control: the 20 BEST last-month residual returns inside the same pool"),
-        _v("MOM20", FACTOR, N20,
-           "No-opinion control: plain top-20 12-1 momentum behind the same gate, never looks at the month"),
     ),
     seen_keys=(
         "concept:momentum-pullback",

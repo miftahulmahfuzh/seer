@@ -203,7 +203,15 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    `ruff check src tests`. If the contract test fails, fix the method; never weaken the test.
    The commit is the pre-registration. Push it to `main`: child: `git fetch origin && git rebase
    origin/main && git push origin HEAD:main`; solo: `git push`.
-6. **Run** `lab run MNNNN`. It takes seconds to minutes. Use `run_in_background` and wait for it.
+6. **Run** `lab run MNNNN`. It takes seconds to minutes. Make `lab run` itself the Bash call
+   with `run_in_background: true`, redirected to a file (`> $S/run.txt 2>&1`), and **never add
+   `nohup`, `&` or `disown` to it**. The harness notifies when *that command* exits, so the
+   notification is the event that moves the run to step 7. With `&` the wrapper shell exits at
+   once, the "completed" notice fires while the run is still going, and the session sits idle
+   until the user prods it (20261025, M0145). Do not poll with `pgrep` or `sleep`. After the
+   notification, read the recorded trials, not the scroll, then continue. If a turn must end
+   while the run is in flight, say what the real trigger is; a turn that ends on "I'll wait"
+   with no live trigger is the failure.
 7. **Analyze honestly** in a scratch file, then `lab note MNNNN --file F --verdict "<one line>"`.
    Run **The gate** (below) before the `lab note`: the analysis only ever grows, so a number
    that goes in wrong stays on the owner's page with its correction underneath it.

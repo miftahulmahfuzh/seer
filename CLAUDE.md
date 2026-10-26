@@ -125,4 +125,4 @@ Other phases and agents may be working in this same checkout at the same time.
 
 > when user type in "c" : you must list leftover tasks in this session, then write a handover file, then run a new tmux analyze session using it. USE opus model for this task.
 
-> when user type in "a" : you must spawn calculate-assets 1-4-2018 tmux on each of the sera methods that have been explored. USE opus model for this task.
+> when user type in "a" : you must spawn calculate-assets 1-4-2018 tmux on each of the sera methods that have been explored. USE sonnet model for this task.

@@ -636,19 +636,28 @@ def test_parse_still_refuses_a_file_missing_any_of_the_original_fifteen():
             prereg.parse(text)
 
 
-def test_the_four_committed_pre_registrations_still_parse(conn):
+def test_the_five_committed_pre_registrations_still_parse(conn):
     """The reason this module exists: a committed record stays readable forever.
 
-    Not a fixture -- the real files in docs/lab/prereg/, which this phase must not edit. All four
-    predate the hard gate, so all four report both new fields as not recorded.
+    Not a fixture -- the real files in docs/lab/prereg/, which this phase must not edit. The
+    original four predate the hard gate, so all four report both new fields as not recorded.
+    M0377 (sera-20261026-0703, the lab's first method to clear the hard gate) was written after
+    the gate existed, so it carries real fold and family-state text instead of LEGACY.
     """
     files = sorted(prereg.PREREG_DIR.glob("M[0-9][0-9][0-9][0-9].md"))
-    assert [f.stem for f in files] == ["M0002", "M0021", "M0022", "M0029"]
+    assert [f.stem for f in files] == ["M0002", "M0021", "M0022", "M0029", "M0377"]
+    legacy = {"M0002", "M0021", "M0022", "M0029"}
     for path in files:
         p = prereg.parse(path.read_text(encoding="utf-8"))
         assert p.method == path.stem
-        assert p.folds == prereg.LEGACY
-        assert p.family_state == prereg.LEGACY
+        if path.stem in legacy:
+            assert p.folds == prereg.LEGACY
+            assert p.family_state == prereg.LEGACY
+        else:
+            assert p.folds != prereg.LEGACY
+            assert p.family_state != prereg.LEGACY
+            assert "4 of 4" in p.folds
+            assert "clean at promotion" in p.family_state
         assert prereg.parse(prereg.render(p, "n")) == p
 
 

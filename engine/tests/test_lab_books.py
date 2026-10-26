@@ -348,22 +348,26 @@ def test_only_dev_eligible_methods_are_evaluated_for_a_firing(conn):
 
 
 @pytest.mark.skipif(not store.COMMITTED_DB.is_file(), reason="no committed lab database here")
-def test_the_committed_lab_reads_four_looks_and_two_books(tmp_path):
-    """The measured fact, pinned: insight 529 and docs/backtests/2026-10-21-lab-book-clustering.md.
+def test_the_committed_lab_reads_five_looks_and_three_books(tmp_path):
+    """The measured fact, pinned: insight 529 and docs/backtests/2026-10-21-lab-book-clustering.md,
+    updated 2026-10-26 (sera-20261026-0703) when M0377 spent the lab's fifth test-window look --
+    its first promotion to clear the hard gate and the buy signal -- and test-failed.
 
-    Four test-window looks are spent and they bought two books -- M0021, M0022 and M0029 are one
-    (0.93 to 0.99; M0029 is M0021's child and both it and M0022 grew out of M0011) and M0002 is
-    genuinely separate at 0.73. The look count itself must not move: it is 4 before and after.
+    Five test-window looks are spent and they bought three books -- M0021, M0022 and M0029 are one
+    (0.93 to 0.99; M0029 is M0021's child and both it and M0022 grew out of M0011), M0002 is
+    genuinely separate at 0.73, and M0377 (family stock-updown-asymmetry, unrelated to the other
+    three) is a third, standalone book. The look count itself must not move: it is 5 before and
+    after.
     """
     db = tmp_path / "lab.sqlite"
     shutil.copyfile(store.COMMITTED_DB, db)
     c = store.connect(db)
     try:
-        assert store.test_looks(c) == 4
+        assert store.test_looks(c) == 5
         got = firings.test_look_books(c)
         assert [(b.lead, b.others) for b in got] == [
-            ("M0021", ("M0022", "M0029")), ("M0002", ())
+            ("M0021", ("M0022", "M0029")), ("M0002", ()), ("M0377", ())
         ]
-        assert store.test_looks(c) == 4
+        assert store.test_looks(c) == 5
     finally:
         c.close()

@@ -55,15 +55,21 @@ session's own date fires at the SAME measured session-level rate as its GATE twi
 fixed before any trial, never re-derived from a recorded result), and once fired stays in cash for
 a FIXED number of sessions equal to that tier's measured mean episode length (``BLIND_DURATION``) --
 never reading VVIX's value, only its freshness, so a blind arm also trades like the plain switch
-before 2008. ALWAYS is the third control the lab's dressing rule also wants: SPY held at full
-weight every session, no gate of any kind (F1's own ``TimingAllocator`` with ``rule="always"``, no
-new code) -- the "opinion removed" baseline a standalone arm needs, since M0370's own baseline
-(the 200-day switch alone) does not apply once the switch itself is gone.
+before 2008.
+
+No ALWAYS control is registered here. The "opinion removed, held every session" baseline a
+standalone arm needs -- SPY at full weight forever, same rules (``monthly-hold-frac-gotrade``), no
+gate of any kind -- is config-identical to M0251-HOLD, already recorded on this exact dev window
+(trial #814: funded +7.9%/yr against SPY TR's own +7.9%/yr, same deposits, worst fall 55%, 0
+trades; `lab run` refuses a second trial of an identical configuration, digests ignoring the id).
+GATE-90 and GATE-95 are compared against that recorded trial directly rather than against a
+duplicate arm.
 
 Success: GATE-90 or GATE-95 beats total-return SPY with worst fall <= 25%, PF >= 1.3, DSR >= 0.90,
-a positive 2009-2015 edge and a majority of walk-forward folds, beats ALWAYS by more than fees
-alone would predict, AND clears its BLIND twin by more than the two tiers would be expected to
-differ from each other -- otherwise the lead is the time spent in cash, not the recovery timing.
+a positive 2009-2015 edge and a majority of walk-forward folds, beats M0251-HOLD's recorded funded
+return by more than fees alone would predict, AND clears its BLIND twin by more than the two tiers
+would be expected to differ from each other -- otherwise the lead is the time spent in cash, not
+the recovery timing.
 """
 
 from __future__ import annotations
@@ -83,7 +89,6 @@ from seer_engine.sim.book import Target, equal_weight
 from seer_engine.sim.rules import MONTHLY_HOLD_FRAC_GOTRADE
 from seer_engine.strategies.allocator import last_close, target_from_close
 from seer_engine.strategies.base import History
-from seer_engine.strategies.f_index import TIMING, TimingParams
 
 ADDED = date(2026, 10, 26)
 
@@ -308,8 +313,6 @@ class RecoveryGateAllocator:
 
 GATE = RecoveryGateAllocator()
 
-ALWAYS_PARAMS = TimingParams(hold="SPY", signal="SPY", rule="always")
-
 
 def _v(suffix: str, allocator: Any, params: Any, rationale: str) -> Candidate:
     return Candidate(id=f"M0373-{suffix}", family="M0373", rules=MONTHLY_HOLD_FRAC_GOTRADE,
@@ -349,12 +352,14 @@ METHOD = Method(
         "monthly decision and resize cadence instead of weekly. BLIND-90 and BLIND-95 are the "
         "dressing twins: a hash fired at each tier's own measured rate, cash for that tier's fixed "
         "mean episode length, no VVIX value read at all -- pricing the habit of stepping aside this "
-        "often, separate from whether VVIX chose the moments. ALWAYS is the always-invested "
-        "baseline a standalone arm needs, since M0370's own baseline (the switch alone) no longer "
-        "applies once the switch is gone. Success: GATE-90 or GATE-95 beats total-return SPY with "
-        "worst fall <= 25%, PF >= 1.3, DSR >= 0.90, a positive 2009-2015 edge and a majority of "
-        "walk-forward folds, beats ALWAYS by more than fees alone would predict, AND clears its "
-        "BLIND twin by more than the two tiers would be expected to differ from each other."
+        "often, separate from whether VVIX chose the moments. No ALWAYS control is registered: the "
+        "always-invested baseline a standalone arm needs is config-identical to M0251-HOLD, already "
+        "recorded on this exact dev window (SPY at full weight forever, same rules), so GATE-90 and "
+        "GATE-95 are compared against that recorded trial directly. Success: GATE-90 or GATE-95 "
+        "beats total-return SPY with worst fall <= 25%, PF >= 1.3, DSR >= 0.90, a positive 2009-2015 "
+        "edge and a majority of walk-forward folds, beats M0251-HOLD's recorded funded return by "
+        "more than fees alone would predict, AND clears its BLIND twin by more than the two tiers "
+        "would be expected to differ from each other."
     ),
     expected_failure=(
         "VVIX and VIX spikes mostly co-occur because both react to the same equity sell-offs, so "
@@ -370,17 +375,15 @@ METHOD = Method(
         "but a single different threshold draw could change that. At 6.9-12.1% of eligible sessions "
         "firing, 'near the top of its own range' is still far more common than a true tail-risk "
         "warning, which is exactly what the BLIND twins exist to catch: expect them to capture most "
-        "of GATE-90/95's lead over ALWAYS, the same outcome M0370 found at a looser threshold and a "
-        "fixed exit. The gate is silent before 2008-01-03 (fewer than 252 prior VVIX rows), so every "
-        "variant trades exactly like ALWAYS over 1996-2007 and the whole comparison lives in "
+        "of GATE-90/95's lead over M0251-HOLD, the same outcome M0370 found at a looser threshold "
+        "and a fixed exit. The gate is silent before 2008-01-03 (fewer than 252 prior VVIX rows), so "
+        "every variant trades like M0251-HOLD over 1996-2007 and the whole comparison lives in "
         "2008-2015, the fuller-coverage half of the dev window -- any edge that does appear should "
         "be checked against `lab survivorship` before it is trusted. Published 2019, after the dev "
         "window and most of the test window, so a dev result says nothing about whether the "
         "mechanism has since been arbitraged away."
     ),
     candidates=(
-        _v("ALWAYS", TIMING, ALWAYS_PARAMS,
-           "Control: SPY held at full weight every session, no gate of any kind"),
         _v("GATE-90", GATE, Params(mode="gate", tier="top90"),
            "Cash while VVIX sits at or above the 90th percentile of its own trailing year, back "
            "once it has fallen to at or below that year's median"),

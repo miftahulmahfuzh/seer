@@ -80,6 +80,9 @@ def sample(store: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Re-derive M0356's frozen coefficients.")
     ap.add_argument("--store", type=Path, default=Path("engine/.research"))
+    ap.add_argument("--sweep", action="store_true",
+                    help="also print the honest-penalty sweep: which setting CV picks, and the "
+                         "band of cross-validated R-squared across every pipeline tried")
     args = ap.parse_args()
 
     x, y, g = sample(args.store)
@@ -102,6 +105,76 @@ def main() -> None:
     for i in range(0, 42, 6):
         print("    " + " ".join(f"{c:+.8f}," for c in coef[i : i + 6]))
     print(")")
+    if args.sweep:
+        sweep(x, y, g)
+
+
+def _xsec_z(x: np.ndarray, g: np.ndarray) -> np.ndarray:
+    """Each feature standardised inside its own month, the usual cross-sectional pipeline."""
+    out = np.empty_like(x)
+    for u in np.unique(g):
+        m = g == u
+        block = x[m]
+        s = np.where(block.std(0) > 0, block.std(0), 1.0)
+        out[m] = (block - block.mean(0)) / s
+    return out
+
+
+def _xsec_rank(y: np.ndarray, g: np.ndarray) -> np.ndarray:
+    """The target as a within-month percentile, centred: the heavy-tail-proof alternative."""
+    out = np.empty_like(y)
+    for u in np.unique(g):
+        m = g == u
+        v = y[m]
+        o = v.argsort(kind="stable")
+        r = np.empty(len(v))
+        r[o] = np.arange(len(v), dtype=float)
+        out[m] = r / max(len(v) - 1, 1) - 0.5
+    return out
+
+
+def sweep(x: np.ndarray, y: np.ndarray, g: np.ndarray) -> None:
+    """The honest answer to 'how hard should this be penalised', and the band it moves in.
+
+    This is the half of M0356's evidence that is not in COEF: choosing the penalty by
+    cross-validation rather than by hand picks the EMPTY model, and no pipeline in the grid
+    reaches a cross-validated R-squared worth having. The method file froze a band of
+    -0.0086..+0.0006, which was read off a narrower grid (one l1_ratio) than the one swept here;
+    the numbers this prints are the ones to quote.
+    """
+    cv = GroupKFold(n_splits=5)
+    alphas = [3e-4, 1e-3, 3e-3, 1e-2, 3e-2]
+    best: tuple[float, str, float, float, int] | None = None
+    lo: tuple[float, str, float, float] | None = None
+    hi: tuple[float, str, float, float] | None = None
+    for xname, xs in (("raw", x), ("xsec-z", _xsec_z(x, g))):
+        for yname, ys in (("demeaned", y), ("rank", _xsec_rank(y, g))):
+            sd = np.where(xs.std(0) > 0, xs.std(0), 1.0)
+            z = (xs - xs.mean(0)) / sd
+            null = float(np.mean(ys**2))
+            for l1 in (0.1, 0.5, 0.9):
+                for a in alphas:
+                    errs = []
+                    for tr, te in cv.split(z, ys, g):
+                        m = ElasticNet(alpha=a, l1_ratio=l1, max_iter=200_000).fit(z[tr], ys[tr])
+                        errs.append(float(np.mean((ys[te] - m.predict(z[te])) ** 2)))
+                    r2 = 1.0 - float(np.mean(errs)) / null
+                    tag = f"{xname}/{yname}"
+                    nz = int(np.sum(ElasticNet(alpha=a, l1_ratio=l1,
+                                               max_iter=200_000).fit(z, ys).coef_ != 0))
+                    if best is None or r2 > best[0]:
+                        best = (r2, tag, l1, a, nz)
+                    if lo is None or r2 < lo[0]:
+                        lo = (r2, tag, l1, a)
+                    if hi is None or r2 > hi[0]:
+                        hi = (r2, tag, l1, a)
+    assert best is not None and lo is not None and hi is not None
+    print()
+    print(f"sweep: {2 * 2 * 3 * len(alphas)} settings "
+          f"(raw|xsec-z inputs x demeaned|rank target x l1 0.1|0.5|0.9 x alpha 3e-4..3e-2)")
+    print(f"  worst CV R2 {lo[0]:+.6f}  at {lo[1]} l1={lo[2]} alpha={lo[3]:g}")
+    print(f"  best  CV R2 {hi[0]:+.6f}  at {hi[1]} l1={hi[2]} alpha={hi[3]:g}, "
+          f"{best[4]} of 42 coefficients non-zero there")
 
 
 if __name__ == "__main__":

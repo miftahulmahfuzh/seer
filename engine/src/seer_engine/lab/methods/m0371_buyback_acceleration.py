@@ -399,8 +399,8 @@ METHOD = Method(
            "Opposite: the 20 members whose buyback pace is decelerating fastest (or tipping into "
            "fresh issuance), no switch"),
         _vm("PLC20", AccelParams(20, side="random", seed=1, trend=None),
-            "Frame-matched blind draw: 20 names from the same scored pool, matched to ACC20's own "
-            "trade count and turnover, no switch"),
+            "Placebo, shape-matched: 20 names from ACC20's own scored pool, matched to its trade "
+            "count and turnover by a monthly hash order (lab.control_draw), no switch"),
     ),
     seen_keys=(
         "concept:buyback-acceleration",

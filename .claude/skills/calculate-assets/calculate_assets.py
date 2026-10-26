@@ -438,11 +438,20 @@ def main(argv: list[str] | None = None) -> int:
         print("  real-rupiah run done; now the fixed-rate one ...", file=sys.stderr)
         fixed_res, _fixed_row = run_once(market, dividends, spy_divs, candidate, window, real_fx=False)
         print("  done.\n", file=sys.stderr)
-        if real_row.stats.metrics.trades == 0:
+        ever_invested = any(
+            s.invested_usd > 0 for s in getattr(real_res, "snapshots", ())
+        )
+        if real_row.stats.metrics.trades == 0 and not ever_invested:
             # A book that never trades is almost always a book that could not see its data: a
             # gate allocator reads Market.series and targets nothing when market_series.csv is
             # absent, which a test store built without `market_series --refresh` is. The run
             # completes and reports the deposits sitting in cash as if that were the method.
+            #
+            # ``trades`` counts closed holding episodes (book_runner.BookResult.trades), so a
+            # true buy-and-hold arm that enters once and never exits -- M0389-ALWAYS, any other
+            # standing control -- reports 0 trades while fully invested. ``ever_invested`` tells
+            # the two apart: a book that was never fed a live target never shows a nonzero
+            # position, one that just never sold does.
             have = "present" if len(getattr(market, "series", ())) else "ABSENT"
             raise Refused(
                 f"{candidate.id} made no trade in {start}..{end}, so the deposits only sat in cash. "

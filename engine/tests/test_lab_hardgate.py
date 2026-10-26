@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -2449,12 +2450,31 @@ def test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways(
             if head.startswith("M") and head[1:].isdigit():
                 fired.add(head)
 
-    # The collapse itself, pinned: three method ids, ONE book, and the header says both numbers.
-    assert "*** BUY SIGNAL: 1 distinct book from 4 methods ***" in out
+    # The collapse itself: these four ids are ONE book, named once with its other names
+    # underneath, and the header counts books as well as methods.
+    #
+    # (2026-10-26) This used to pin the whole census, `1 distinct book from 4 methods`. A later
+    # batch added M0383, an unrelated book that fires on its own, and the line now reads `2
+    # distinct books from 5 methods` -- with nothing about this book changed. That is the same
+    # mistake the M0243 clause below was already repaired for: the lab's firing population is
+    # re-rolled by every batch, and pinning it here makes an unrelated success look like a
+    # regression. What this test guarantees is about ONE book and the hindsight-vs-promoted
+    # column, so it is asserted about that book alone. The collapse is still pinned exactly --
+    # four ids, one lead line, three names underneath it.
+    assert "*** BUY SIGNAL:" in out
+    assert BUY_SIGNAL_AFTER <= fired, (
+        f"the buy signal no longer names all of {sorted(BUY_SIGNAL_AFTER)}, only {sorted(fired)}"
+    )
+    lead = [ln for ln in block[1].splitlines() if ln.strip().startswith("M0072:")]
+    assert len(lead) == 1, "M0072's book is named once, as the lead of its own entry"
     assert out.count("the same book under another name") == 1
-
-    assert fired == set(BUY_SIGNAL_AFTER), (
-        f"the buy signal now names {sorted(fired)}, not {sorted(BUY_SIGNAL_AFTER)}"
+    collapsed = {
+        ln.strip().split(" ", 1)[0]
+        for ln in block[1].splitlines()
+        if "written as a version of M0072" in ln or "a later version of M0072" in ln
+    }
+    assert collapsed == BUY_SIGNAL_AFTER - {"M0072"}, (
+        f"M0072's book collapses {sorted(collapsed)}, not {sorted(BUY_SIGNAL_AFTER - {'M0072'})}"
     )
     # the two false alarms are gone...
     assert not (fired & (BUY_SIGNAL_BEFORE - BUY_SIGNAL_AFTER)), "a suppressed false alarm is back"
@@ -2466,7 +2486,19 @@ def test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways(
     # (2026-10-21) The own-arm fold majority, BUY_CONDITIONS[3]. The set above did NOT move when
     # it was added, and that is the assertion worth keeping: each of the three wins its folds on
     # the promoted arm ALONE, not merely on whatever variant each training slice happened to name.
-    reasons = [ln for ln in block[1].splitlines() if "cleared all 5" in ln]
+    # (2026-10-26) Scoped to this book's own entry, for the reason given above: another book
+    # firing brings its own `cleared all 5` line with its own fold record, and counting every
+    # such line in the output measured the batch, not the change this test is about.
+    # A book's entry runs from its own lead line to the next lead line -- a line at the same
+    # indent naming a different id. Found structurally, so no other book's id appears here.
+    lines = block[1].splitlines()
+    start = next(i for i, ln in enumerate(lines) if ln.strip().startswith("M0072:"))
+    lead_at = re.compile(r"^" + " " * (len(lines[start]) - len(lines[start].lstrip())) + r"M\d+: ")
+    end = next(
+        (i for i in range(start + 1, len(lines)) if lead_at.match(lines[i])),
+        len(lines),
+    )
+    reasons = [ln for ln in lines[start:end] if "cleared all 5" in ln]
     assert len(reasons) == len(BUY_SIGNAL_AFTER), "a collapsed name lost its own reason"
     for line in reasons:
         assert "promoted arm 3 of 4 folds" in line, line

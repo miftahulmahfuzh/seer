@@ -3,14 +3,14 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-10-20
-**Total Active Tasks**: 12
+**Total Active Tasks**: 14
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
-- P2 Medium: 9
+- P1 High: 2
+- P2 Medium: 10
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 2
@@ -23,6 +23,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [ ] **P1-ENG-BL71** Phase 2: The order-reservation repair, as a pinned-default lever
+  - **Difficulty**: HARD
+  - **Type**: Bug
+  - **Context**: Owns one appended `TradeRules` field (`reserve_basis`) with its `Literal`, `_RESERVE_BASES`, validation, docstring paragraph, `_V0_LEVERS` element, `LEVERS_SINCE_PINS` entry and conditional `describe_rules` line; the `step_book` buy-loop accounting at `sim/book.py:776`/`:795` and its step-4 docstring; the pinned lever table in `tests/test_sim_rules.py`; the pinned full `TradeRules(...)` literal in `tests/test_backtest_dev_report.py`; the regression and no-op proofs appended to `tests/test_sim_book.py`; a new `tests/test_reserve_basis_pins.py`; and the generated golden fixture `tests/fixtures/sim_book_reserve_order_golden.txt`. Exit: a test reproduces an unequal-weight book declining a pick it chose at the default and buying it under the lever; the `no_bar` and cash-clamp leaks each fail at "order" and pass at "fill"; the golden ledger was captured from the PRE-change engine and the default basis replays it while the fill basis demonstrably does not; `"reserve_basis"` appears in no `candidate_text`, no `config_text` and no `roster.rules_dict`; both §5 parity tests pass untouched; engine suite green with `PG_TEST_URL` exported.
+  - **Status**: in_progress
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/floor-reservation-yardstick/PLAN.md` (phase 2 of 3)
+  - **Satisfies**: R2 — Fix the order-reservation bug that silently makes an unequal-weight book skip its own picks
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-BL71.md`
 - [x] **P1-ENG-0L6E** Phase 1: Resize band relative to the holding's target (`resize_basis` lever)
   - **Difficulty**: NORMAL
   - **Type**: Feature
@@ -1554,6 +1563,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - `web/lib/sera/lab.test.ts:8` `expect(lab.version).toBe(5)` -> `6` (rung 2: the exit criterion is `npm test` green, and that assertion pins the exact number this phase's Interface Contract moves). The reconciliation log named only line 136 of this file; line 8 has the same cause and no other phase owns it.
     - `web/lib/sera/lab.test.ts:136` `summary.insights === insights.length` -> split into `summary.insightRows === insights.length` plus `summary.insights === heads.length` (rung 1: the reconciliation log assigns this line to phase 4 as the phase that changes the meaning).
     - The completed block is left in place under `### [P1] High` rather than moved to `## Completed Tasks` (rung 6: existing convention — phase 1 of this same plan set did the same, and peer phases are editing neighbouring blocks in this very file right now, so a move is pure diff churn in a file three sessions hold at once).
+- [ ] **P1-ENG-AMD0** Phase 1: The printed-price floor, landed where it legally can be
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns a new `engine/src/seer_engine/strategies/price_floor.py` holding the canonical printed close and the three-rung floor dial, a keyword-only basis argument (default = today's adjusted behaviour) threaded into `f_factor._eligible_mask`/`factor_rows` and `f_fundamental`'s `:403` comparison, a new `engine/tests/test_price_floor.py`, and one documentation note (`docs/lab/price-floor.md`) recording sites 3-6 as frozen with the legal route to repairing them; does not touch `lab/methods/` content, `FactorParams`/`FundamentalParams` field lists, `strategies/__init__.py`, `sim/`, `paper/` or `web/`. Exit: the printed basis is reachable and tested from both shared screens, the five real-world closes M0383 verified are pinned without reading any research store, every default-path call is byte-identical (`plain == explicit == with_market`) with every pinned candidate digest unchanged, the standalone re-digest reports `drifted: 0` with `lab/lab.sqlite`'s md5 unchanged, the three delegating modules are shown to need no change, `ruff check engine` is clean and the engine suite is green with `PG_TEST_URL` exported.
+  - **Status**: in_progress
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/floor-reservation-yardstick/PLAN.md` (phase 1 of 3)
+  - **Satisfies**: R1 — Land the printed-price floor repair at the six sites the handover names, and account for the three delegating modules
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-ENG-AMD0.md`
 
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"
@@ -1660,6 +1678,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R2 — Re-draw every mis-shaped control arm as an Amendment under the nine existing method ids — no new method id, no extra N, no moved config_digest, no test-window look; R3 — Report which of the nine standing verdicts survive their honest control, in trial_funding.mwr, including margins that worsen or reverse; R4 — lab promote must actually stop refusing the nine
   - **Depends on**: P1-ENG-K9WR
   - **Plan**: `.workflows/plan/P2-ENG-Y3BQ.md`
+- [ ] **P2-ENG-9UT4** Phase 3: M0396 — ten never-step-aside arms, pre-registered
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns exactly one appended `Amendment` block in each of `m0038`, `m0039`, `m0113`, `m0136`, `m0167`, `m0245`, `m0260`, `m0261`, `m0262`, `m0334`, plus the two lines the mechanism requires above it in each file (the `Amendment` import and one `amendments=(...)` line inside the `Method(...)` call); nine new per-method `*-ALWAYS` allocators with their own `AlwaysParams` (M0334 needs none); one runbook `docs/runbooks/2026-10-27-m0396-never-step-aside-retrofit.md`. Does not touch `m0173`, `m0336`, `m0338` (they already carry the arm), `lab/lab.sqlite`, `web/data/lab.json`, `strategies/`, `sim/`. Exit: ten pending amendments each declaring one arm of that method's own chassis that never steps aside, pinned to that method's own lookback; `test_a_method_that_ran_is_frozen_to_its_latest_recorded_sha`, `test_every_recorded_configuration_still_digests_to_its_recorded_digest` and `test_allocator_ids_are_unique_across_methods` green; `tests/test_lab_methods.py` smoke-runs all ten new candidates; runbook records why m0173/m0336/m0338 are absent; no lab run executed and no lab state written.
+  - **Status**: in_progress
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/floor-reservation-yardstick/PLAN.md` (phase 3 of 3)
+  - **Satisfies**: R3 — M0396, retrofit the never-step-aside arm by amendment to the timing methods lacking one (ten in fact, thirteen by the handover's exposure read)
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P2-ENG-9UT4.md`
 
 ### [P3] Low
 - [ ] **P3-ENG-V2KQ** Append a dated §7.3 revision recording the N policy move to the lab design doc

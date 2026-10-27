@@ -35,7 +35,19 @@ One session, in this exact order (all money ``Decimal``; ``q`` at every product;
    whose target has no limit price is bought exactly like "open_limit" (limit ``q(last × 1.02)``);
    a held target with no limit price is never added to; a fill cash cannot cover
    is shrunk to what cash affords. A new position is not checked against its stop or take on
-   its fill session;
+   its fill session.
+
+   Each buy also holds part of that one budget while the rest of the rank is sized, and
+   ``rules.reserve_basis`` says how much. "order" (every rule set before 2026-10-27) reserves
+   ``_buy_cash(limit, shares)`` the moment the order is sized, before any bar is read, and nothing
+   gives it back: a target rejected "no_bar" (an order never placed), one rejected "unfilled", the
+   part of one the cash clamp shrank away, and the difference between a limit and a fill below it
+   all keep their reservation against every later pick. "fill" reserves instead the cash the order
+   really spent, after the clamp, and reserves nothing for an order that never filled. Only an
+   unequal-weight book can tell: ``min(q(equity × weight), available − committed)`` is bound by its
+   first term under equal weights. Releasing a cancelled order is plain repair; handing the
+   limit/fill slack back down the list is hindsight the morning's order ticket does not have, which
+   is why both are behind the lever and the default is the engine every recorded trial ran on;
 5. intraday exits of positions held before S: ``low <= stop`` at the stop ("sl"), else
    ``high > take`` at the take ("tp");
 6. survivors: ``days_held + 1``, marked at the close when there is a bar;
@@ -773,7 +785,15 @@ def step_book(
                 if not is_idle:
                     slots_used += 1
                 fill_reason = "entry"
-            committed += _buy_cash(price, shares, rules)
+            # How much of the night's one budget this order holds while the rest of the rank is
+            # sized (rules.reserve_basis). "order": the whole order at its LIMIT, here, before any
+            # bar is read -- and every path below that buys less than that, or nothing at all,
+            # leaves the difference reserved for a night that never spends it. "fill": reserved
+            # once the fill is final, at the cash it really cost, so the picks below see what is
+            # left. slots_used is NOT part of this: a slot is counted as of the night before, which
+            # is the §5 parity contract (see the module docstring, step 4).
+            if rules.reserve_basis == "order":
+                committed += _buy_cash(price, shares, rules)
 
             b = day.get(symbol)
             if b is None:
@@ -793,6 +813,8 @@ def step_book(
                     rejected.append((symbol, "cash"))
                     continue
                 cost = _buy_cash(fill_price, shares, rules)
+            if rules.reserve_basis == "fill":
+                committed += cost
             cash -= cost
             fills_buy.append(
                 Fill(session, symbol, "buy", shares, fill_price, -cost, _fee(fill_price, shares, rules, "buy"), fill_reason)

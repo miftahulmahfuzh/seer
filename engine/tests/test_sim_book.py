@@ -937,3 +937,110 @@ def test_beyond_band_is_the_old_comparison_under_the_equity_basis():
     assert _beyond_band(W(0), W(100), W("0.02"), e, RESIZE_TARGET) is False
     assert _beyond_band(W(4), W(10), W("0.02"), e, RESIZE_TARGET) is True  # 40 >= 0.2 × 200
     assert _beyond_band(W("3.9999"), W(10), W("0.02"), e, RESIZE_TARGET) is False
+
+
+# ============================================================== reserve_basis: the night's budget
+
+# The shape the lab measured on 2026-10-26: an unequal-weight book, mid-rotation, with far more
+# equity than budget. 2,000 in cash plus an 8,000 holding it keeps makes equity 10,000 and the
+# night's budget 2,000, so `available - committed` -- not `q(equity x weight)` -- is what binds for
+# the tail of the rank. A and B are sized at their limit of 99.9 (= q(97.9412 x 1.02)) and fill 12%
+# lower at 88; C is the tail.
+RESERVE_FILL = replace(DAILY_SWITCH, id="daily-switch-fill", reserve_basis="fill")
+
+
+def _starved_tail():
+    b = book("2000", pos("Y", 800, "10"))  # equity = 2,000 cash + 8,000 held
+    bars = day(
+        bar("Y", TUE, "10", "10", "10", "10"),
+        bar("A", TUE, "88", "100", "87", "90"),
+        bar("B", TUE, "88", "100", "87", "90"),
+        bar("C", TUE, "190", "205", "189", "195"),
+    )
+    targets = (
+        T("Y", "0.795", "10"),  # held, rules.resize is False: never trimmed, never added to
+        T("A", "0.09", "97.9412"),
+        T("B", "0.09", "97.9412"),
+        T("C", "0.025", "200"),
+    )
+    return b, bars, targets
+
+
+def test_at_the_order_basis_an_unequal_book_declines_a_pick_it_can_afford():
+    """The bug, reproduced: C is refused "too_small" with 414.42 of cash against a 190.19 order."""
+    b, bars, targets = _starved_tail()
+    out = go(b, TUE, bars, targets, DAILY_SWITCH)
+    # A and B: budget q(10,000 x 0.09) = 900 each, 9 shares at a limit of 99.9. Reserved
+    # q(99.9 x 9 x 1.001) = 899.9991 each; spent q(88 x 9 x 1.001) = 792.7920 each.
+    assert [(f.symbol, f.shares, f.price, f.cash_usd) for f in out.fills] == [
+        ("A", W(9), P("88"), P("-792.792")),
+        ("B", W(9), P("88"), P("-792.792")),
+    ]
+    # 1,799.9982 of 2,000 is reserved though only 1,585.5840 was spent, so C's budget is
+    # min(q(10,000 x 0.025) = 250, 2,000 - 1,799.9982 = 0.0018) = 0.0018 -- not one share.
+    assert out.rejected == (("C", "too_small"),)
+    # And it was never affordability: C's one share would have cost q(190 x 1.001) = 190.19.
+    assert out.snapshot.cash_usd == P("414.416")
+
+
+def test_at_the_fill_basis_the_same_book_buys_the_tail():
+    b, bars, targets = _starved_tail()
+    out = go(b, TUE, bars, targets, RESERVE_FILL)
+    # Now 1,585.5840 is reserved, C's budget is its full 250, and one share at a limit of 204 fits.
+    assert [(f.symbol, f.shares, f.price, f.cash_usd) for f in out.fills] == [
+        ("A", W(9), P("88"), P("-792.792")),
+        ("B", W(9), P("88"), P("-792.792")),
+        ("C", W(1), P("190"), P("-190.19")),
+    ]
+    assert out.rejected == ()
+    assert out.snapshot.cash_usd == P("224.226")  # 414.416 - 190.19
+    assert out.snapshot.equity_usd == P("10039.226")
+
+
+def test_an_order_with_no_bar_holds_no_cash_against_the_picks_below_it():
+    """Leak (1) alone: P1 is sized, has no bar at all, and is never placed."""
+    b = book("2000", pos("Y", 800, "10"))  # equity 10,000, budget 2,000
+    bars = day(bar("Y", TUE, "10", "10", "10", "10"), bar("P2", TUE, "190", "205", "189", "195"))
+    targets = (T("Y", "0.785", "10"), T("P1", "0.19", "97.9412"), T("P2", "0.025", "200"))
+    # P1: budget min(1,900, 2,000) = 1,900 -> 19 shares reserved at q(99.9 x 19 x 1.001) = 1,899.9981.
+    out = go(b, TUE, bars, targets, DAILY_SWITCH)
+    assert out.fills == ()
+    assert out.rejected == (("P1", "no_bar"), ("P2", "too_small"))
+    assert out.snapshot.cash_usd == P("2000")  # the whole night traded nothing at all
+    out = go(b, TUE, bars, targets, RESERVE_FILL)
+    assert [(f.symbol, f.shares, f.price) for f in out.fills] == [("P2", W(1), P("190"))]
+    assert out.rejected == (("P1", "no_bar"),)
+    assert out.snapshot.cash_usd == P("1809.81")
+
+
+def test_the_cash_clamp_reserves_what_it_bought_not_what_it_ordered():
+    """Leak (1) in its third form, isolated from the limit/fill slack.
+
+    X is dropped and has no bar, so its 1,498.50 of planned proceeds sit in the night's budget and
+    never reach cash. P1's open (110) is above its limit (99.9) and its low (95) is below it, so it
+    fills exactly AT the limit: the only thing the lever can move here is the clamp, which cuts the
+    order from 19 shares to the 5 that 500 of cash affords.
+
+    P2 cannot buy under either basis, because a clamp by definition leaves less than one share's
+    worth of cash behind. What moves is the REASON it is refused, and that is the whole proof: at
+    "order" P2 is never sized at all (budget 98.5019, under one share); at "fill" it is sized, and
+    refused for the honest reason that the night has really spent its money. The budget moved; the
+    cash did not.
+    """
+    b = book("500", pos("Y", 800, "10"), pos("X", 150, "10"))  # equity 10,000
+    bars = day(
+        bar("Y", TUE, "10", "10", "10", "10"),
+        bar("P1", TUE, "110", "112", "95", "108"),
+        bar("P2", TUE, "190", "205", "189", "195"),
+    )
+    targets = (T("Y", "0.775", "10"), T("P1", "0.19", "97.9412"), T("P2", "0.035", "200"))
+    bought = [("P1", W(5), P("99.9"), P("-499.9995"))]
+    out = go(b, TUE, bars, targets, DAILY_SWITCH)
+    assert [(f.symbol, f.shares, f.price, f.cash_usd) for f in out.fills] == bought
+    assert out.rejected == (("P2", "too_small"),)
+    assert out.snapshot.cash_usd == P("0.0005")
+    assert out.book.position("X").exit_pending is True
+    out = go(b, TUE, bars, targets, RESERVE_FILL)
+    assert [(f.symbol, f.shares, f.price, f.cash_usd) for f in out.fills] == bought
+    assert out.rejected == (("P2", "cash"),)
+    assert out.snapshot.cash_usd == P("0.0005")

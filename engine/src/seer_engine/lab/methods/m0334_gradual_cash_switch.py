@@ -23,7 +23,7 @@ from decimal import Decimal
 from typing import Any
 
 from seer_engine.backtest.dev import Candidate
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.sim.book import Target, to_weight
 from seer_engine.sim.rules import MONTHLY_HOLD_FRAC_GOTRADE
 from seer_engine.strategies.base import History
@@ -121,6 +121,57 @@ def _g(suffix: str, params: Params, rationale: str) -> Candidate:
                      allocator=GRAD, params=params, rationale=rationale, added=ADDED, owner_inputs=())
 
 
+
+# --------------------------------------------------------------------------- amendment 1
+
+AMEND_ALWAYS = Amendment(
+    added=date(2026, 10, 27),
+    why=(
+        "M0334 registered a flat half-weight book as its no-opinion arm and never registered the "
+        "flat full-weight one, so the three ramps are priced against a book that is already "
+        "half out of the market. The full rung of the method's own dial is the missing zero."
+    ),
+    hypothesis=(
+        "M0334's hypothesis names M0332-M12-1-NOSW as the always-invested reference and reads it "
+        "from the lab rather than re-running it, which was correct under the no-re-rolls rule and "
+        "leaves the method's own run without a zero in it. M0389 then measured that a step-aside "
+        "habit priced against another step-aside arm -- and a half-weight book is one -- is "
+        "charged roughly half its standalone cost. This arm is the same picker, the same screen, "
+        "the same monthly fractional Gotrade chassis and the same lookback as UP, DOWN, MID and "
+        "HALF, at the one rung of the method's own exposure dial that never steps aside: "
+        "``Params(flat=100)``, invested fraction 1 on every decision session, no bar read to "
+        "decide it. It opens 1996-01-03 with the recorded four. The difference against it is what "
+        "each ramp's cash time costs; the difference between that and M0334-HALF's is how much of "
+        "the recorded safety was the ramp and how much was simply holding less. Success is those "
+        "two terms separated, plus a check that this arm reproduces M0332-M12-1-NOSW -- the same "
+        "book through a different allocator id -- which is the same reproduction check "
+        "M0113-SMA200 was built to make against M0084-MONTHLY."
+    ),
+    expected_failure=(
+        "The reproduction check may fail, and if it does the fault is almost certainly the "
+        "scaling path rather than the picker: ``_scale`` rebuilds every target through "
+        "``to_weight(t.weight * f)`` even at f = 1, and a rounding difference there would show up "
+        "as a small, persistent drift against M0332-M12-1-NOSW. A drift of that kind invalidates "
+        "every bill read off this arm and must be reported before any of them is quoted. Second, "
+        "M0334's expected_failure already predicted that a partial exit fails the fall bar, and "
+        "this arm will fail it by much more: M0332 recorded 61-67% worst falls for the unswitched "
+        "20-name momentum book against the recorded 22.32% to 35.29% here. That is the arm "
+        "working. Third, M0334-HALF is also an always-invested arm -- always invested at half "
+        "weight, 49.48% exposure, 1474 trades -- and a reader could take it for the zero; the "
+        "analysis must keep the two apart, because the whole point is that holding less is itself "
+        "a safety device with a price. Fourth, this arm runs later than the arms it prices, and "
+        "the fidelity evidence is the exact three-way reproduction of one configuration across "
+        "two run dates measured on 2026-10-27."
+    ),
+    candidates=(
+        _g("ALWAYS", Params(flat=100),
+           "Yardstick: the same 12-1 top-20 book held at full weight on every decision session, "
+           "no ramp and no opinion about the market, so what the ramps' cash time costs can be "
+           "read off directly instead of against a book that is already half out"),
+    ),
+)
+
+
 METHOD = Method(
     id="M0334",
     name="Gradual cash switch: scale the momentum book out as SPY nears its 200-day line",
@@ -158,5 +209,6 @@ METHOD = Method(
         _g("MID", Params(full=3, zero=3), "ramp: full 3% above, zero 3% below"),
         _g("HALF", Params(flat=50), "dressing: always half invested, no opinion about the market"),
     ),
+    amendments=(AMEND_ALWAYS,),
     seen_keys=("concept:graded-trend-exposure-ramp", "concept:spy-200d-gradual-cash-switch"),
 )

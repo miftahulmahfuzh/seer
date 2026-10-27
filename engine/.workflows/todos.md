@@ -23,15 +23,21 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ENG-BL71** Phase 2: The order-reservation repair, as a pinned-default lever
+- [x] **P1-ENG-BL71** Phase 2: The order-reservation repair, as a pinned-default lever
   - **Difficulty**: HARD
   - **Type**: Bug
   - **Context**: Owns one appended `TradeRules` field (`reserve_basis`) with its `Literal`, `_RESERVE_BASES`, validation, docstring paragraph, `_V0_LEVERS` element, `LEVERS_SINCE_PINS` entry and conditional `describe_rules` line; the `step_book` buy-loop accounting at `sim/book.py:776`/`:795` and its step-4 docstring; the pinned lever table in `tests/test_sim_rules.py`; the pinned full `TradeRules(...)` literal in `tests/test_backtest_dev_report.py`; the regression and no-op proofs appended to `tests/test_sim_book.py`; a new `tests/test_reserve_basis_pins.py`; and the generated golden fixture `tests/fixtures/sim_book_reserve_order_golden.txt`. Exit: a test reproduces an unequal-weight book declining a pick it chose at the default and buying it under the lever; the `no_bar` and cash-clamp leaks each fail at "order" and pass at "fill"; the golden ledger was captured from the PRE-change engine and the default basis replays it while the fill basis demonstrably does not; `"reserve_basis"` appears in no `candidate_text`, no `config_text` and no `roster.rules_dict`; both §5 parity tests pass untouched; engine suite green with `PG_TEST_URL` exported.
-  - **Status**: in_progress
+  - **Status**: completed
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/floor-reservation-yardstick/PLAN.md` (phase 2 of 3)
   - **Satisfies**: R2 — Fix the order-reservation bug that silently makes an unequal-weight book skip its own picks
   - **Depends on**: none
   - **Plan**: `.workflows/plan/P1-ENG-BL71.md`
+  - **Commit**: `2b03dd7`
+  - **Verified**: on the merged tree at d89c324, `PG_TEST_URL` exported and `seer-pg` Up — `ruff check engine` clean; full suite **7763 passed, 4 skipped, 0 failed** (the 4 skips are only the opt-in `*_LIVE` tests and the month-end sweep, so no DB test skipped). Golden fixture captured from the PRE-change engine (84 sessions, 17 `no_bar`) with `git diff -- engine/src/seer_engine/sim` empty at capture time; `test_the_default_basis_replays_the_engine_the_lab_recorded` green and `test_the_fill_basis_is_not_inert_on_the_same_tape` proves the pin is sensitive. Both §5 parity tests pass untouched. `lab/lab.sqlite` md5 9dbbf873209e82c8303f7f7117cb0682 and `web/data/lab.json` md5 9bf2b2e1740c4e27a0380056dd6649e0, both byte-identical to baseline.
+  - **Decided**: `engine/tests/test_cash_yield.py` is an EIGHTH file the plan's Files table did not list. Its `levers[-1] == "resize_band"` pin names whichever lever is newest, so appending one necessarily moves it — advanced to `"reserve_basis"` plus an explicit index assertion for the new pair. Rung 6, surrounding convention measured in git history: commit `057be94` made the byte-identical edit to this same line when it appended `resize_band`. The assertion stays an exact equality, so no guard was loosened. Same class as D11's two discoveries; coordinator recorded the write set as eight and confirmed no other phase writes that file.
+  - **Decided**: Step 3 says create every phase's task; created only phase 2's (P1-ENG-BL71). Phases 1 and 3 are spawned concurrently in this shared worktree and all three map to the engine package counter, so three sessions minting from it is a lost-update race. Rung 6: this file records the identical call at lines 359, 2138 and 2381. Validated in flight — phase 1 minted its own.
+  - **Decided**: committed directly through a private `GIT_INDEX_FILE` rather than dispatching `pusher`. Rung 3, the phase plan's own `## Committing` section; the shared index had gone stale when phase 1's d89c324 landed (it reported p1's three new files as staged deletions), and a subagent would not carry that context.
+  - **Note**: the red `test_lab_methods.py::test_a_method_that_ran_is_frozen_to_its_latest_recorded_sha` seen mid-run was phase 3 writing its ten amendment files, not a regression here. Re-run alone at 02:24:10Z: 2882 passed.
 - [x] **P1-ENG-0L6E** Phase 1: Resize band relative to the holding's target (`resize_basis` lever)
   - **Difficulty**: NORMAL
   - **Type**: Feature

@@ -43,6 +43,30 @@ by ``sim.book.step_book`` at each open, read point in time by ``backtest.book_ru
 It is a book-engine lever, it excludes ``idle_symbol`` (two answers to one question), and it raises
 the owner input ``cash-yield``: nobody has verified that Gotrade pays interest on idle dollars.
 
+``reserve_basis`` says how much of one night's buy budget an order holds while the rest of the rank
+is sized. "order" (every rule set before 2026-10-27) reserves the order at its LIMIT the moment it
+is sized, before any bar is read, and never gives any of it back: an order that found no bar, one
+the day's low never reached, the part of one the cash clamp shrank away, and the difference between
+a limit and a fill below it all keep their reservation against every pick ranked below. "fill"
+reserves instead the cash the order actually spent, after the clamp, and reserves nothing for an
+order that never filled.
+
+Only an unequal-weight book notices. ``sim.book`` sizes a new entry at
+``min(q(equity × weight), available − committed)``; under equal weights the first term binds and the
+drift in the second is invisible, which is why the equal-weight and shuffled arms never skipped a
+pick while the unequal-weight one did so six times in twenty years (lab journal, 2026-10-26) --
+once with $11,936 of cash against a $7,431 order.
+
+The two halves of "fill" are NOT equally defensible, and the lever exists because of that. Releasing
+an order that was never placed is pure accounting repair: there is no live book in which a cancelled
+order holds cash. Handing the limit/fill slack back DOWN the list inside one session is not: the
+owner places the whole night's orders in the morning and cannot know an early fill price before
+sizing a later one, so a book that opts in is buying picks it would not have been able to size live.
+They move together under one value because a book that opts in opts into one coherent rule -- a
+reservation is what the night actually commits -- and because measuring them apart would cost a
+second lever on a shared value that every config digest reads. The default is a pinned no-op
+(``LEVERS_SINCE_PINS``), so no recorded result, digest or live paper strategy moves.
+
 Pure: no clock, no I/O, no randomness.
 """
 
@@ -61,6 +85,7 @@ Engine = Literal["bracket_v0", "bracket", "book"]
 Cadence = Literal["daily", "weekly", "monthly"]
 Entry = Literal["limit", "open_limit", "open"]
 ResizeBasis = Literal["equity", "target"]
+ReserveBasis = Literal["order", "fill"]
 
 OPEN_LIMIT_BAND = Decimal("0.02")
 RESIZE_BAND = Decimal("0.01")
@@ -84,6 +109,7 @@ _CADENCES: tuple[str, ...] = ("daily", "weekly", "monthly")
 _CADENCE_ORDER: dict[str, int] = {"daily": 0, "weekly": 1, "monthly": 2}
 _ENTRIES: tuple[str, ...] = ("limit", "open_limit", "open")
 _RESIZE_BASES: tuple[str, ...] = ("equity", "target")
+_RESERVE_BASES: tuple[str, ...] = ("order", "fill")
 _ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 _DEFAULT_COST = Decimal("0.001")
 _MAX_COST = Decimal("0.05")
@@ -126,6 +152,7 @@ class TradeRules:
     resize_basis: ResizeBasis = "equity"
     cash_yield: str | None = None
     resize_band: Decimal | None = None
+    reserve_basis: ReserveBasis = "order"
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, str):
@@ -209,6 +236,16 @@ class TradeRules:
                 )
             if not self.resize:
                 raise ValueError("resize_band needs resize=True: a band with nothing to resize is a no-op")
+        if not isinstance(self.reserve_basis, str):
+            raise TypeError(f"reserve_basis must be a str, got {type(self.reserve_basis).__name__}")
+        if self.reserve_basis not in _RESERVE_BASES:
+            raise ValueError(f"unknown reserve_basis {self.reserve_basis!r}; expected one of {_RESERVE_BASES}")
+        if self.reserve_basis == "fill" and self.engine != "book":
+            raise ValueError(
+                f"reserve_basis 'fill' is a book-engine lever; the {self.engine} simulator sizes the "
+                "whole night before anything fills (sim.sizing.size_picks), so its limit already is "
+                "the most an order can pay"
+            )
         is_v0 = _lever_values(self) == _V0_LEVERS
         if self.engine == "bracket_v0" and not is_v0:
             raise ValueError("engine 'bracket_v0' is reserved for DESIGN_V0 (the unchanged §5 simulator)")
@@ -238,6 +275,7 @@ _V0_LEVERS: tuple[object, ...] = (
     "equity",
     None,
     None,
+    "order",
 )
 
 DESIGN_V0 = TradeRules(
@@ -383,6 +421,7 @@ LEVERS_SINCE_PINS: dict[str, object] = {
     "resize_basis": "equity",  # the band measured against the holding's own target, 2026-10-12
     "cash_yield": None,  # interest on idle cash at a T-bill yield, 2026-10-12
     "resize_band": None,  # the band's size, overriding the basis's constant, 2026-10-20
+    "reserve_basis": "order",  # the buy budget reconciled to the fill, not the order, 2026-10-27
 }
 
 
@@ -614,6 +653,14 @@ def describe_rules(rules: TradeRules) -> tuple[str, ...]:
         lines.append(_gotrade_costs_line())
     else:
         lines.append(f"Costs: {_pct(rules.cost_rate)} per side.")
+    if rules.reserve_basis == "fill":
+        lines.append(
+            "Buy budget: the night's orders are placed in rank order against one budget, and each "
+            "order holds only the cash it actually spends -- an order that does not fill holds "
+            "none, and one that fills below its limit leaves the difference to the picks ranked "
+            "below it. A live book cannot know an early fill price before sizing a later order, so "
+            "this reads the night with hindsight the morning does not have."
+        )
     return tuple(lines)
 
 

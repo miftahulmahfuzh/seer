@@ -50,7 +50,7 @@ import numpy as np
 
 from seer_engine.backtest.dev import Candidate
 from seer_engine.backtest.market import EMPTY_SERIES, MarketSeries
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0038_yield_curve_watch_gate import DIV_OPEN, inverted_dates
 from seer_engine.lab.methods.m0039_vix_term_structure_gate import DAILY_HOLD_FRAC_GOTRADE
 from seer_engine.lab.methods.m0076_dividend_raise_on_announcement import ANNOUNCED, AnnParams
@@ -252,6 +252,146 @@ def _v(suffix: str, allocator: Any, params: Any, rationale: str, rules: Any) -> 
                      params=params, rationale=rationale, added=ADDED, owner_inputs=())
 
 
+
+# --------------------------------------------------------------------------- amendment 1
+
+#: The yardstick's lookback, pinned to the expression ``EarlyExitAllocator.lookback`` returns
+#: for the SPY host (``own = HIGH_N + 1``). Both M0167-SPY-E200S and M0167-SPY-EHIGHL are
+#: recorded starting 1994-01-28, which is where this arm opens too. A bill read off an arm
+#: scored on a different window is not a bill.
+ALWAYS_LOOKBACK = HIGH_N + 1
+
+#: Full weight, once, so the target builder below allocates no new Decimal per session.
+ALWAYS_FULL = equal_weight(1)
+
+
+
+@dataclass(frozen=True, slots=True)
+class AlwaysParams:
+    """No dial at all: ``hold`` is held on every session and there is no gate to open.
+
+    A separate params type rather than an ``EarlyParams`` with the watch disabled, because
+    ``EarlyParams`` cannot express it: ``watch_days`` and ``min_days`` are both at least 1, so
+    the watch is always open on at least the inverted day itself, and a recorded row that named
+    a watch while none ran would be a lie.
+    """
+
+    hold: str = "SPY"
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.hold, str) or not self.hold or self.hold != self.hold.upper():
+            raise ValueError(f"hold must be a non-empty upper-case symbol, got {self.hold!r}")
+
+    def as_dict(self) -> dict[str, str]:
+        return {"hold": self.hold, "gate": "none"}
+
+
+def _always(params: object) -> AlwaysParams:
+    if not isinstance(params, AlwaysParams):
+        raise TypeError(f"params must be AlwaysParams, got {type(params).__name__}")
+    return params
+
+
+class AlwaysAllocator:
+    """M0167's SPY host with the curve watch taken out: held every session, never in cash.
+
+    Not market-aware: the watch arms return no target without ``Market.series`` because they read
+    the yield curve, and this arm reads nothing. ``EarlyParams`` cannot express it -- ``watch_days``
+    and ``min_days`` are both at least 1, so the watch is always open on at least the inverted day
+    itself. The lookback is the ``HIGH_N + 1`` that ``EarlyExitAllocator.lookback`` returns for
+    this host, which is what puts this arm on M0167-SPY-E200S's and M0167-SPY-EHIGHL's own first
+    session, 1994-01-28.
+    """
+
+    id = "M0167-ALWAYS"
+
+    def lookback(self, params: Any) -> int:
+        _always(params)
+        return ALWAYS_LOOKBACK
+
+    def symbols(self, params: Any) -> tuple[str, ...]:
+        return (_always(params).hold,)
+
+    def holds(self, params: Any) -> tuple[str, ...]:
+        return (_always(params).hold,)
+
+    def uses_members(self, params: Any) -> bool:
+        _always(params)
+        return False
+
+    def _run(self, history: Mapping[str, Any], data_date: date,
+             p: AlwaysParams) -> tuple[Target, ...]:
+        h = history.get(p.hold)
+        if h is None or h.index_of(data_date) is None:  # no bar dated d: never a new target
+            return ()
+        t = target_from_close(p.hold, last_close(h, data_date), ALWAYS_FULL)
+        return () if t is None else (t,)
+
+    def targets(self, history: Mapping[str, Any], members: AbstractSet[str], data_date: date,
+                held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        return self._run(history, data_date, _always(params))
+
+    def prepare(self, history: Mapping[str, Any]) -> Any:
+        return dict(history)  # one instrument: nothing to precompute
+
+    def targets_prepared(self, prepared: Any, members: AbstractSet[str], data_date: date,
+                         held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        if not isinstance(prepared, Mapping):
+            raise TypeError(f"prepared must be a Mapping, got {type(prepared).__name__}")
+        return self._run(prepared, data_date, _always(params))
+
+
+ALWAYS = AlwaysAllocator()
+
+AMEND_ALWAYS = Amendment(
+    added=date(2026, 10, 27),
+    why=(
+        "M0167's SPY arms made two and three trades in twenty-two years and are priced against "
+        "M0038's watch, which also steps aside. Nothing in this method holds SPY on every "
+        "session, so the early-exit rule's cost against never standing down has never been read."
+    ),
+    hypothesis=(
+        "M0167 keeps M0038's two-year curve watch and adds a way out of it early, and prices the "
+        "result against M0038's arms -- every one of which also sits in cash. M0389 measured that "
+        "this style of comparison charges a habit roughly half its standalone price. This arm is "
+        "SPY at full weight on every session, on M0167's own daily rule set at Gotrade's real "
+        "fees, at this method's own ``HIGH_N + 1`` lookback, so it opens 1994-01-28 with "
+        "M0167-SPY-E200S and M0167-SPY-EHIGHL and the paired difference is the watch-plus-exit "
+        "and nothing else. Its dividend arms are a separate question and already have their zero: "
+        "M0167's DIV host is ``AnnParams(replace(R25, inner=NOT20), 'ex')`` on "
+        "monthly-rank-weekly-resize-frac-gotrade, which is the configuration recorded as "
+        "M0038-DIV-OPEN, and the lab refuses a second registration of a configuration that has a "
+        "dev trial. Success is the bill for standing down on a curve inversion, read directly, "
+        "plus the difference between that and the figure M0167's analysis quoted against M0038. "
+        "A yardstick, not a candidate: it must not be promoted on any showing."
+    ),
+    expected_failure=(
+        "Two inversions in twenty-two years is two data points, and the yardstick does not add a "
+        "third: whatever bill this arm produces for M0167-SPY-E200S and M0167-SPY-EHIGHL, it is "
+        "the price of two decisions and must be reported that way. Both recorded SPY arms have an "
+        "infinite profit factor on two and three trades, which is the same statement in another "
+        "form. Second, this arm will hold through 2000-2002 and 2008 and post a far deeper fall "
+        "than M0167-SPY-EHIGHL's recorded 18.92%; that is the arm working. Third, the DIV half of "
+        "the method is untouched by this amendment and a reader may expect it to be covered; the "
+        "analysis must point at M0038-DIV-OPEN explicitly rather than leave the gap unexplained. "
+        "Fourth, the arm runs later than the arms it prices, and the fidelity evidence is the "
+        "three-way exact reproduction measured on 2026-10-27; if this arm's recorded numbers do "
+        "not sit where total-return SPY less Gotrade's fees says they should over 1994-2015, the "
+        "bill is unreadable and must not be quoted."
+    ),
+    candidates=(
+        Candidate(
+            id="M0167-ALWAYS", family="M0167", rules=DAILY_HOLD_FRAC_GOTRADE, allocator=ALWAYS,
+            params=AlwaysParams(),
+            rationale=("Yardstick: SPY held on every session with no curve watch and no early "
+                       "exit, so what standing down after an inversion costs can be read off "
+                       "directly rather than against another arm that also stands down."),
+            added=date(2026, 10, 27), owner_inputs=(),
+        ),
+    ),
+)
+
+
 METHOD = Method(
     id="M0167",
     name="The yield-curve watch with an early way out: buy back once the market proves it is not falling",
@@ -317,6 +457,7 @@ METHOD = Method(
         _v("SPY-EHIGHL", SPY_EARLY, EarlyParams("spy", "last", "high252"),
            "SPY under the DIV-EHIGHL watch and exit", DAILY_HOLD_FRAC_GOTRADE),
     ),
+    amendments=(AMEND_ALWAYS,),
     seen_keys=(
         "concept:yield-curve-gate",
         "concept:term-spread",

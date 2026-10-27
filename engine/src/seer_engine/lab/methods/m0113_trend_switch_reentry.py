@@ -60,7 +60,7 @@ from typing import Any, Literal
 import numpy as np
 
 from seer_engine.backtest.dev import Candidate
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0063_earnings_day_jump import WEEKLY_HOLD_FRAC_GOTRADE
 from seer_engine.lab.methods.m0084_trend_switch_price import FABER_MONTHS
 from seer_engine.sim.book import Target, equal_weight
@@ -214,6 +214,151 @@ def _v(suffix: str, params: ReentryParams, rules: Any, rationale: str) -> Candid
                      params=params, rationale=rationale, added=ADDED, owner_inputs=())
 
 
+
+# --------------------------------------------------------------------------- amendment 1
+
+#: The yardstick's lookback, pinned to M0113's own ``LOOKBACK`` (253, M0084's constant). That
+#: is what keeps this arm on exactly the sessions the six recorded arms ran on: all of them open
+#: 1994-01-28, and so does this one. A bill read off an arm scored on a different window is not
+#: a bill.
+#:
+#: ``LOOKBACK`` rather than a literal 253 on purpose: it says "the same sessions as every other
+#: arm here" to a reader, which a number cannot.
+ALWAYS_LOOKBACK = LOOKBACK
+
+#: Full weight, once, so the target builder below allocates no new Decimal per session.
+ALWAYS_FULL = equal_weight(1)
+
+
+
+@dataclass(frozen=True, slots=True)
+class AlwaysParams:
+    """No dial at all: ``hold`` is held on every session and there is no gate to open.
+
+    A separate params type rather than a ``ReentryParams`` with the exit disabled: the exit is
+    fixed in every variant by design -- it is the half of the switch M0113 was built to hold
+    still -- so "no exit at all" is a new allocator, not a new setting, and a recorded row that
+    claimed an exit while none ran would be a lie.
+    """
+
+    hold: str = BENCH
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.hold, str) or not self.hold or self.hold != self.hold.upper():
+            raise ValueError(f"hold must be a non-empty upper-case symbol, got {self.hold!r}")
+
+    def as_dict(self) -> dict[str, str]:
+        return {"hold": self.hold, "gate": "none"}
+
+
+def _always(params: object) -> AlwaysParams:
+    if not isinstance(params, AlwaysParams):
+        raise TypeError(f"params must be AlwaysParams, got {type(params).__name__}")
+    return params
+
+
+class AlwaysAllocator:
+    """M0113's frame with the exit taken out: SPY held every session, never in cash.
+
+    ``ReentryParams`` cannot express this. The exit is fixed in every variant by design -- it is
+    the half of the switch M0113 was built to hold still -- so "no exit at all" is a new
+    allocator, not a new setting. The lookback is M0113's own ``LOOKBACK`` (253, M0084's
+    constant), which is what keeps this arm on exactly the sessions the six recorded arms ran on:
+    all of them open 1994-01-28.
+    """
+
+    id = "M0113-ALWAYS"
+
+    def lookback(self, params: Any) -> int:
+        _always(params)
+        return ALWAYS_LOOKBACK
+
+    def symbols(self, params: Any) -> tuple[str, ...]:
+        return (_always(params).hold,)
+
+    def holds(self, params: Any) -> tuple[str, ...]:
+        return (_always(params).hold,)
+
+    def uses_members(self, params: Any) -> bool:
+        _always(params)
+        return False
+
+    def _run(self, history: Mapping[str, History], data_date: date,
+             p: AlwaysParams) -> tuple[Target, ...]:
+        h = history.get(p.hold)
+        if h is None or h.index_of(data_date) is None:  # no bar dated d: never a new target
+            return ()
+        t = target_from_close(p.hold, last_close(h, data_date), ALWAYS_FULL)
+        return () if t is None else (t,)
+
+    def targets(self, history: Mapping[str, History], members: AbstractSet[str], data_date: date,
+                held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        return self._run(history, data_date, _always(params))
+
+    def prepare(self, history: Mapping[str, History]) -> Any:
+        return dict(history)  # one instrument: nothing to precompute
+
+    def targets_prepared(self, prepared: Any, members: AbstractSet[str], data_date: date,
+                         held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        if not isinstance(prepared, Mapping):
+            raise TypeError(f"prepared must be a Mapping, got {type(prepared).__name__}")
+        return self._run(prepared, data_date, _always(params))
+
+
+ALWAYS = AlwaysAllocator()
+
+AMEND_ALWAYS = Amendment(
+    added=date(2026, 10, 27),
+    why=(
+        "Every M0113 arm carries the same 200-day exit, so the six paired differences price the "
+        "buy-back trigger and nothing prices the exit. This arm holds SPY on every session of the "
+        "same window, which is the only way to read what the exit itself costs."
+    ),
+    hypothesis=(
+        "M0113 holds one exit fixed and moves only the way back in, and that design means the "
+        "method cannot see its own largest term. M0084 reported the switch's whole advantage as "
+        "three falls sat out and a 6-to-11-point annual loss to holding SPY over 2009-2015, but "
+        "that was measured against SPY in a different run on a different allocator. M0389 then "
+        "showed that pricing a step-aside habit against another step-aside arm understates it by "
+        "roughly half. This arm is SPY at full weight on every session, on M0113's own monthly "
+        "rule set at Gotrade's real fees, at M0113's own 253-bar lookback, so it opens 1994-01-28 "
+        "with all six recorded arms and every difference against it is the exit plus that arm's "
+        "own re-entry. Subtracting the control arm M0113-SMA200 from it gives the exit's own "
+        "bill; subtracting each other arm from M0113-SMA200 gives the re-entry's, which is what "
+        "M0113 already reported. Success is the two terms separated, with a statement of how much "
+        "of M0113's recorded 2009-2015 gap was the exit rather than the trigger. This arm is a "
+        "yardstick and not a candidate: a 100%-SPY book paying Gotrade's fees cannot beat "
+        "total-return SPY, and it must not be promoted."
+    ),
+    expected_failure=(
+        "M0113's arms trade between 11 and 43 times in twenty-two years, so profit factor and the "
+        "luck score are close to meaningless on this method and the yardstick cannot repair that: "
+        "whatever the exit's bill turns out to be, it rests on three episodes. The likeliest "
+        "disappointing outcome is that the exit's bill comes out so large that it swamps every "
+        "re-entry difference M0113 measured, which would mean the method's whole published "
+        "ordering is a comparison between arms that all paid the same large bill -- true, useful, "
+        "and a flat answer rather than an interesting one. Second, this arm will record the "
+        "deepest fall in the method by a very wide margin: the six recorded arms sit between "
+        "18.89% and 35.61%, and an unswitched SPY book holds the whole of 2000-2002 and 2008. "
+        "Third, the arm runs later than the arms it prices; the evidence that this is survivable "
+        "is the exact three-way reproduction of one configuration across two run dates measured "
+        "on 2026-10-27 (M0038-DIV-OPEN, M0173-EXP100, M0336-NEVER), and if M0113-ALWAYS does not "
+        "reproduce total-return SPY less Gotrade's fees over 1994-2015 to a comparable fidelity, "
+        "the bill must be reported as unreadable rather than quoted."
+    ),
+    candidates=(
+        Candidate(
+            id="M0113-ALWAYS", family="M0113", rules=MONTHLY_HOLD_FRAC_GOTRADE, allocator=ALWAYS,
+            params=AlwaysParams(),
+            rationale=("Yardstick: SPY held on every session with no exit and no re-entry rule, "
+                       "so the 200-day exit's own cost can be separated from the buy-back "
+                       "trigger's instead of the two being quoted as one number."),
+            added=date(2026, 10, 27), owner_inputs=(),
+        ),
+    ),
+)
+
+
 METHOD = Method(
     id="M0113",
     name="Slow to leave, quick to return: keep the 200-day exit and vary only how fast the safety rule buys back",
@@ -291,6 +436,7 @@ METHOD = Method(
         _v("SMA50-W", ReentryParams("sma", 50, True), WEEKLY_HOLD_FRAC_GOTRADE,
            "The 50-day trigger read weekly while the exit stays one check a month"),
     ),
+    amendments=(AMEND_ALWAYS,),
     seen_keys=(
         "concept:asymmetric-trend-switch-reentry",
         "concept:fast-reentry-after-sma200-exit",

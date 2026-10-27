@@ -274,7 +274,7 @@ from typing import Any
 from seer_engine import dates
 from seer_engine.backtest.dev import Candidate
 from seer_engine.backtest.market import EMPTY_DIVIDENDS
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0070_dividend_raise_drift import RaisePrepared
 from seer_engine.lab.methods.m0088_calm_big_raisers import CALM, CalmParams, X, choose
 from seer_engine.sim.book import Target
@@ -524,6 +524,152 @@ def _v(suffix: str, gate_months: int | None, gate_phase: int | None, rationale: 
                      rationale=rationale, added=ADDED, owner_inputs=())
 
 
+
+# --------------------------------------------------------------------------- amendment 1
+
+
+@dataclass(frozen=True, slots=True)
+class AlwaysParams:
+    """M0088-C-LIVE-63's book with no gate read at all. ``book`` is the host, carried WHOLE.
+
+    Unmodified for the reason ``PhaseGateAllocator`` already gives: the recorded row must describe
+    the book M0088, M0101, M0107 and M0122 recorded, and the gate is removed in the allocator,
+    which is where this method removes it too. ``as_dict`` says ``gate: none`` outright.
+    """
+
+    book: CalmParams = BOOK
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.book, CalmParams):
+            raise TypeError(f"book must be CalmParams, got {type(self.book).__name__}")
+        if self.book.ann.base.inner.trend is None:
+            raise ValueError(
+                "book must carry a trend symbol and length: this arm reads no gate, but it must "
+                "declare the same symbols and the same lookback as the rungs it is the zero of"
+            )
+
+    def as_dict(self) -> dict[str, str]:
+        out = {"gate": "none"}
+        for k, v in self.book.as_dict().items():
+            out[f"book.{k}"] = v
+        return out
+
+
+def _always(params: object) -> AlwaysParams:
+    if not isinstance(params, AlwaysParams):
+        raise TypeError(f"params must be AlwaysParams, got {type(params).__name__}")
+    return params
+
+
+class AlwaysAllocator:
+    """M0088's calm-raisers book with its 200-day gate removed: this grid's zero.
+
+    ``PhaseParams`` cannot express it: its ``__post_init__`` requires the book to carry a trend,
+    because an anchored reading needs something to read, and there is no (k, phase) pair that means
+    "never". Everything except the gate test is ``PhaseGateAllocator``'s own code, the 454-bar lookback
+    included, which is what keeps this arm on the sessions the six recorded arms ran on (all of
+    them open 1996-01-03).
+    """
+
+    id = "M0261-ALWAYS"
+    market_fields = ("dividends",)
+
+    def lookback(self, params: Any) -> int:
+        return max(CALM.lookback(_always(params).book), TREND_N + MAX_ANCHOR_GAP)
+
+    def symbols(self, params: Any) -> tuple[str, ...]:
+        return CALM.symbols(_always(params).book)
+
+    def holds(self, params: Any) -> tuple[str, ...]:
+        return CALM.holds(_always(params).book)
+
+    def uses_members(self, params: Any) -> bool:
+        return CALM.uses_members(_always(params).book)
+
+    def _run(self, prepared: RaisePrepared, members: AbstractSet[str], data_date: date,
+             held: frozenset[str], p: AlwaysParams) -> tuple[Target, ...]:
+        """``PhaseGateAllocator._run``, with the gate test and nothing else removed."""
+        if len(prepared.calendar) == 0:  # no panel: target nothing (market-aware contract)
+            return ()
+        inner = p.book.ann.base.inner
+        if prepared.factor is None:
+            rows = factor_rows(prepared.history, members, data_date, inner)
+        else:
+            rows = prepared.factor.rows_on(members, data_date, inner)
+        return choose(prepared.history, rows, prepared.calendar, data_date, held, p.book)
+
+    def targets(self, history: Mapping[str, History], members: AbstractSet[str], data_date: date,
+                held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        """The history-only path: no calendar, so no event and no target."""
+        return self._run(RaisePrepared(history, None, EMPTY_DIVIDENDS), members, data_date, held,
+                         _always(params))
+
+    def prepare(self, history: Mapping[str, History]) -> RaisePrepared:
+        return CALM.prepare(history)
+
+    def prepare_market(self, market: Any) -> RaisePrepared:
+        return CALM.prepare_market(market)
+
+    def targets_prepared(self, prepared: Any, members: AbstractSet[str], data_date: date,
+                         held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        if not isinstance(prepared, RaisePrepared):
+            raise TypeError(f"prepared must be RaisePrepared, got {type(prepared).__name__}")
+        return self._run(prepared, members, data_date, held, _always(params))
+
+
+ALWAYS = AlwaysAllocator()
+
+AMEND_ALWAYS = Amendment(
+    added=date(2026, 10, 27),
+    why=(
+        "M0261 measured that two equally frequent readings of the same gate differ by 3.21 points "
+        "a year of the owner's money depending only on WHICH months they read. Nothing in the "
+        "method says what the gate is worth at all, because every arm reads it."
+    ),
+    hypothesis=(
+        "M0261's finding is that past monthly a gate's reading interval is a lottery over which "
+        "calendar months get read, and that the prize money in that lottery is larger than the "
+        "whole weekly-to-yearly interval ladder M0260 measured. Both of those are differences "
+        "between gated arms. M0389 measured that pricing a step-aside habit against another "
+        "step-aside arm understates it by roughly half, so the lottery's prize money has never "
+        "been put beside the thing it is a lottery over. This arm is M0088-C-LIVE-63's book "
+        "exactly as the six arms carry it, on M0261's own monthly rule set at Gotrade's real "
+        "fees, at M0261's own 454-bar lookback, with the gate test deleted and nothing else "
+        "changed, so it opens 1996-01-03 with every recorded arm. The difference against "
+        "M0261-NATIVE is the gate's own bill on this book, and the 3.21-point phase spread and "
+        "the 8.2-point fall spread become readable as fractions of it. Success is the bill, plus "
+        "a one-line answer to the question M0261 could not ask: is the choice of which months to "
+        "read worth more or less than the choice to read at all?"
+    ),
+    expected_failure=(
+        "The arm may make the method's finding less interesting rather than more: if the gate's "
+        "own bill is several times the 3.21-point phase spread, the honest summary becomes 'the "
+        "phase matters, but it is a second-order term inside a first-order decision', which is a "
+        "quieter sentence than the one M0261 wrote. Second, this arm is behaviourally identical "
+        "to M0262-ALWAYS, registered in the next amendment, because M0261 and M0262 share one "
+        "host book and one rule set; that duplication is deliberate and has the method's own "
+        "precedent -- M0261-NATIVE and M0262-NATIVE are already the same configuration under two "
+        "allocator ids and reproduce each other to the digit (0.1871 worst fall, 3.523 profit "
+        "factor, 528 trades, both) -- but a reader who meets both rows without that sentence will "
+        "think one of them is a mistake. Third, this arm will post the deepest fall in the method "
+        "against the recorded 18.71% to 27.41%, holding the book through 2000-2002 and 2008. "
+        "Fourth, it runs later than the arms it prices, and the three-way exact reproduction "
+        "measured on 2026-10-27 is the only evidence that this is survivable; anything worse and "
+        "the bill is reported as unreadable."
+    ),
+    candidates=(
+        Candidate(
+            id="M0261-ALWAYS", family="M0261", rules=MONTHLY_HOLD_FRAC_GOTRADE, allocator=ALWAYS,
+            params=AlwaysParams(),
+            rationale=("Yardstick: M0088's calm big-raisers book held on every decision session "
+                       "with the 200-day gate removed entirely, so what reading the gate at all "
+                       "is worth can be put beside what reading it on different months is worth."),
+            added=date(2026, 10, 27), owner_inputs=(),
+        ),
+    ),
+)
+
+
 METHOD = Method(
     id="M0261",
     name="Past monthly, is a safety gate's reading speed real or is it just which month you "
@@ -731,6 +877,7 @@ METHOD = Method(
            "June month end, six months from December, the furthest two once-a-year readings can "
            "sit from each other with the reading interval held identical"),
     ),
+    amendments=(AMEND_ALWAYS,),
     seen_keys=(
         "concept:gate-reading-phase-ladder",
         "concept:same-interval-different-calendar-dates",

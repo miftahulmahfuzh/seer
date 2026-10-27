@@ -59,11 +59,13 @@ def test_cash_yield_defaults_to_none_and_is_a_pinned_no_op():
     assert all(r.cash_yield is None for r in PRESETS[:16])
     assert DESIGN_V0.cash_yield is None and V0_BOOK.cash_yield is None
     assert LEVERS_SINCE_PINS["cash_yield"] is None
-    # Append-only, newest last. resize_band (2026-10-20) was appended after cash_yield; what this
-    # pins is the ORDER of the two, not that cash_yield is forever the newest lever.
+    # Append-only, newest last. resize_band (2026-10-20) and then reserve_basis (2026-10-27) were
+    # appended after cash_yield; what this pins is the ORDER, not that any one of them is forever
+    # the newest lever -- the last line moves on every append, exactly as it did at resize_band.
     levers = list(LEVERS_SINCE_PINS)
     assert levers.index("cash_yield") > levers.index("resize_basis")
-    assert levers[-1] == "resize_band"
+    assert levers.index("reserve_basis") > levers.index("resize_band")
+    assert levers[-1] == "reserve_basis"
     assert is_pinned_default("cash_yield", None) is True
     assert is_pinned_default("cash_yield", "T13W") is False
 

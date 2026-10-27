@@ -51,6 +51,7 @@ from seer_engine.strategies.indicators import (
     sma_window,
     stdev_return_window,
 )
+from seer_engine.strategies.price_floor import ADJUSTED, check_market, floor_closes
 
 DV_N = 20  # dollar-volume window, as Strategy A
 EXCLUDED: frozenset[str] = frozenset({"SPY"})  # never a factor target, even if listed as a member
@@ -177,9 +178,24 @@ class FactorRow:
 
 
 def _eligible_mask(
-    close: np.ndarray, mom: np.ndarray, vol: np.ndarray, dv: np.ndarray, params: FactorParams
+    close: np.ndarray,
+    mom: np.ndarray,
+    vol: np.ndarray,
+    dv: np.ndarray,
+    params: FactorParams,
+    *,
+    floor_close: np.ndarray | None = None,
 ) -> np.ndarray:
-    """The feature part of eligibility, shared verbatim by both paths."""
+    """The feature part of eligibility, shared verbatim by both paths.
+
+    ``floor_close`` is the price the five-dollar floor is compared against, one per symbol,
+    aligned with ``close``. None -- the default, and every caller that does not ask -- means the
+    floor reads ``close`` itself, the store's back-adjusted close, which is what this screen has
+    always done. ``strategies.price_floor.floor_closes`` builds the other two bases, and returns
+    ``close`` unchanged for the adjusted one, so the default path runs the identical expression
+    over the identical array.
+    """
+    floor = close if floor_close is None else floor_close
     return (
         np.isfinite(close)
         & np.isfinite(mom)
@@ -187,20 +203,45 @@ def _eligible_mask(
         & np.isfinite(dv)
         & (vol > 0.0)
         & (dv > params.min_dollar_volume)
-        & (close >= params.min_price)
+        & (floor >= params.min_price)
     )
 
 
 def factor_rows(
-    history: Mapping[str, History], members: Set[str], data_date: date, params: FactorParams
+    history: Mapping[str, History],
+    members: Set[str],
+    data_date: date,
+    params: FactorParams,
+    *,
+    price_basis: str = ADJUSTED,
+    market: Any = None,
 ) -> list[FactorRow]:
     """Eligible members' features on ``data_date``, sorted by symbol (the single-window path).
 
     Reads each member's last ``factor_lookback(params)`` bars ending at ``data_date``; later bars
     are never read.
+
+    ``price_basis`` chooses which close the ``min_price`` floor is compared against -- one of
+    ``price_floor.BASES``. It defaults to ``"adjusted"``, the store's back-adjusted close, which
+    is what this screen has always compared and what every recorded trial was scored on; at that
+    default the function is byte-for-byte the function it was before the argument existed. Ask
+    for ``"printed"`` and the floor reads the price that actually printed
+    (``close x Market.shares.raw_factor``), which needs ``market`` to carry splits and raises
+    ``price_floor.PrintedBasisUnavailable`` if it does not -- see that module for why this is a
+    refusal rather than a fallback. ``"none"`` asks nothing.
+
+    A keyword argument and not a ``FactorParams`` field, deliberately: ``registry._canon``
+    enumerates every ``compare=True`` dataclass field and drops pinned defaults for ``TradeRules``
+    only, so one new field here would move every recorded ``config_digest`` that embeds a
+    ``FactorParams``. An argument is invisible to the digest. A method that wants the repaired
+    basis as part of its pre-registration spells it in its own params, as M0387 does.
+
+    The basis moves the pool and nothing else. ``FactorRow.close`` stays the stored close: it is
+    what ``targets_from_rows`` prices a target at and what the book engine trades.
     """
     _check_params(params)
     as_day(data_date)
+    basis = check_market(market, price_basis)
     lb = factor_lookback(params)
     symbols: list[str] = []
     ends: list[int] = []
@@ -224,7 +265,9 @@ def factor_rows(
         vol = stdev_return_window(close, params.vol_n)
         dv = mean_dollar_volume_window(close, volume, DV_N)
     last = close[:, -1]
-    mask = _eligible_mask(last, mom, vol, dv, params)
+    mask = _eligible_mask(
+        last, mom, vol, dv, params, floor_close=floor_closes(last, market, symbols, data_date, basis)
+    )
     return [
         FactorRow(symbols[k], float(last[k]), float(mom[k]), float(vol[k]), float(dv[k]))
         for k in (int(j) for j in np.flatnonzero(mask))

@@ -53,7 +53,7 @@ from typing import Any, Literal
 
 from seer_engine.backtest.dev import Candidate
 from seer_engine.backtest.market import EMPTY_SERIES, MarketSeries
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0039_vix_term_structure_gate import DAILY_HOLD_FRAC_GOTRADE
 from seer_engine.lab.methods.m0070_dividend_raise_drift import NOT20
 from seer_engine.lab.methods.m0076_dividend_raise_on_announcement import ANNOUNCED, R25, AnnParams
@@ -214,6 +214,153 @@ def _v(suffix: str, allocator: Any, params: Any, rationale: str, rules: Any) -> 
                      params=params, rationale=rationale, added=ADDED, owner_inputs=())
 
 
+
+# --------------------------------------------------------------------------- amendment 1
+
+#: The yardstick's lookback, pinned to the SPY-WATCH arms' own. ``CurveGateAllocator.lookback``
+#: returns 1 for a ``watch`` gate on the SPY host, and ``dev.candidate_window`` opened both
+#: M0038-SPY-WATCH and this arm's window on 1993-02-01 for that reason. Pinning it is the whole
+#: point: a bill read off an arm that was scored on eleven extra months of 1993 is not a bill.
+#: M0038-SPY-2KEY reads a 200-bar average and already starts 1993-11-15; the gap between those two
+#: arms is M0038's own and is not introduced here.
+ALWAYS_LOOKBACK = 1
+
+#: Full weight, once, so the target builder below allocates no new Decimal per session.
+ALWAYS_FULL = equal_weight(1)
+
+
+
+@dataclass(frozen=True, slots=True)
+class AlwaysParams:
+    """No dial at all: ``hold`` is held on every session and there is no gate to open.
+
+    A separate params type rather than a ``CurveParams`` with the watch disabled, because
+    ``CurveParams`` cannot express "no watch" -- ``gate`` is ``watch`` or ``2key`` and
+    ``watch_days`` is at least 1 -- and because a recorded row that said ``gate=watch`` while no
+    watch ran would be a lie in the one place the lab cannot afford one.
+    """
+
+    hold: str = "SPY"
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.hold, str) or not self.hold or self.hold != self.hold.upper():
+            raise ValueError(f"hold must be a non-empty upper-case symbol, got {self.hold!r}")
+
+    def as_dict(self) -> dict[str, str]:
+        return {"hold": self.hold, "gate": "none"}
+
+
+def _always(params: object) -> AlwaysParams:
+    if not isinstance(params, AlwaysParams):
+        raise TypeError(f"params must be AlwaysParams, got {type(params).__name__}")
+    return params
+
+
+class AlwaysAllocator:
+    """M0038's SPY host with the curve watch taken out: held every session, never in cash.
+
+    Not market-aware. The gated arms return no target without ``Market.series`` because their
+    decision needs the yield curve; this arm has no decision to make, so it reads no series and
+    declares no market field. Everything else -- the instrument, the weight, the rule set, the
+    lookback -- is M0038's.
+    """
+
+    id = "M0038-ALWAYS"
+
+    def lookback(self, params: Any) -> int:
+        _always(params)
+        return ALWAYS_LOOKBACK
+
+    def symbols(self, params: Any) -> tuple[str, ...]:
+        return (_always(params).hold,)
+
+    def holds(self, params: Any) -> tuple[str, ...]:
+        return (_always(params).hold,)
+
+    def uses_members(self, params: Any) -> bool:
+        _always(params)
+        return False
+
+    def _run(self, history: Mapping[str, History], data_date: date,
+             p: AlwaysParams) -> tuple[Target, ...]:
+        h = history.get(p.hold)
+        if h is None or h.index_of(data_date) is None:  # no bar dated d: never a new target
+            return ()
+        t = target_from_close(p.hold, last_close(h, data_date), ALWAYS_FULL)
+        return () if t is None else (t,)
+
+    def targets(self, history: Mapping[str, History], members: AbstractSet[str], data_date: date,
+                held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        return self._run(history, data_date, _always(params))
+
+    def prepare(self, history: Mapping[str, History]) -> Any:
+        return dict(history)  # one instrument: nothing to precompute
+
+    def targets_prepared(self, prepared: Any, members: AbstractSet[str], data_date: date,
+                         held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        if not isinstance(prepared, Mapping):
+            raise TypeError(f"prepared must be a Mapping, got {type(prepared).__name__}")
+        return self._run(prepared, data_date, _always(params))
+
+
+ALWAYS = AlwaysAllocator()
+
+AMEND_ALWAYS = Amendment(
+    added=date(2026, 10, 27),
+    why=(
+        "M0038's SPY arms are priced against SPY itself and against M0039-SPY-200, both of them "
+        "arms that step aside; nothing in this method's run holds SPY on every session, so what "
+        "the curve watch COSTS has never been read off directly. This arm is that zero."
+    ),
+    hypothesis=(
+        "M0389 measured that the lab under-charges a step-aside habit by about half when it "
+        "prices the habit against another habit rather than against never stepping aside: on one "
+        "chassis the switch alone billed 2.90 points a year, the fear-spike brake 5.04 and the "
+        "term-structure brake 2.10, while the stacked pairs billed 5.66 and 3.75 rather than the "
+        "7.95 and 5.00 that adding them gives. The fix is an arm with no opinion in it, and M0038 "
+        "has one for its dividend host (M0038-DIV-OPEN) and none for its SPY host. This arm is "
+        "SPY at full weight on every session of the same window, on M0038's own daily rule set at "
+        "Gotrade's real fees, at the same one-bar lookback M0038-SPY-WATCH ran on, so the two "
+        "open on the same session (1993-02-01) and the difference between them is the watch and "
+        "nothing else. It is a measuring stick, not a candidate: SPY minus Gotrade's fees cannot "
+        "beat total-return SPY by construction, and it must not be promoted on any showing. "
+        "Success is a readable number -- the watch's own bill, in de-funded annual return against "
+        "this arm -- plus the difference between that number and the one M0038's analysis quoted "
+        "against M0039-SPY-200, which is the size of the error the lab has been making on this "
+        "method. Assumed: cash earns nothing in the gated arms, the store is the same dev store "
+        "M0038 ran on, and the comparison is de-funded, because trials.curve_json is the funded "
+        "curve and annualizing it directly reports deposits as return."
+    ),
+    expected_failure=(
+        "This arm is run in a LATER run than the arms it prices, which is the one structural "
+        "weakness of any retrofit and must be reported with the number. The evidence that it is "
+        "survivable was measured on 2026-10-27: M0038-DIV-OPEN (run 2026-10-16), M0173-EXP100 "
+        "and M0336-NEVER (both run 2026-10-24) are the same configuration through three allocator "
+        "ids and reproduce each other exactly -- 576 trades, 4.2962 turnover, 0.9746 exposure, "
+        "57.65% worst fall. If this arm's own re-run on a later store disagrees with that kind of "
+        "fidelity, the bill is not readable and the analysis must say so rather than quote it. "
+        "The second way this fails is that M0038-SPY-WATCH made two trades in twenty-two years "
+        "and sat out 24.5% of its sessions, so its bill is two events wearing a twenty-two-year "
+        "coat whatever the yardstick says; a one-number answer here would be false precision, and "
+        "the era split is the only honest reading. Third, this arm will post the deepest fall in "
+        "the method by a wide margin -- it holds SPY through 2000-2002 and 2008 where SPY-WATCH's "
+        "recorded worst fall is 18.88% -- and nothing about that makes the watch worth its price. "
+        "No arm of this amendment is expected to be eligible, and the one that is most likely to "
+        "clear a bar is the one that is a buy-and-hold index book and not a strategy."
+    ),
+    candidates=(
+        Candidate(
+            id="M0038-ALWAYS", family="M0038", rules=DAILY_HOLD_FRAC_GOTRADE, allocator=ALWAYS,
+            params=AlwaysParams(),
+            rationale=("Yardstick: SPY held on every session with no curve watch at all, so what "
+                       "standing down for two years after an inversion costs can be read off "
+                       "directly instead of inferred from another arm that also steps aside."),
+            added=date(2026, 10, 27), owner_inputs=(),
+        ),
+    ),
+)
+
+
 METHOD = Method(
     id="M0038",
     name="Regime gate on the yield curve, not on price: stand down for two years after it inverts",
@@ -289,6 +436,7 @@ METHOD = Method(
            "As DIV-2KEY, with the watch read on the 10-year minus 5-year curve",
            MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE),
     ),
+    amendments=(AMEND_ALWAYS,),
     seen_keys=(
         "concept:yield-curve-gate",
         "concept:term-spread",

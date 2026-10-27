@@ -101,7 +101,7 @@ from typing import Any, Literal
 import numpy as np
 
 from seer_engine.backtest.dev import Candidate
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.sim.book import Target, equal_weight
 from seer_engine.sim.rules import MONTHLY_HOLD_FRAC_GOTRADE
 from seer_engine.strategies.allocator import last_close, target_from_close
@@ -255,6 +255,141 @@ def _v(suffix: str, params: ConfirmParams, rationale: str) -> Candidate:
                      owner_inputs=())
 
 
+
+# --------------------------------------------------------------------------- amendment 1
+
+#: The yardstick's lookback, pinned to M0245's own ``LOOKBACK`` (``SMA_N + MAX_SLOPE_N + 1`` =
+#: 327), which the file already pins so that all six arms share one window. This arm joins them
+#: on 1994-05-17. A bill read off an arm scored on a different window is not a bill.
+ALWAYS_LOOKBACK = LOOKBACK
+
+
+
+@dataclass(frozen=True, slots=True)
+class AlwaysParams:
+    """No dial at all: ``hold`` is held on every session and there is no gate to open.
+
+    A separate params type rather than a ``ConfirmParams`` with the gate disabled: ``ConfirmParams``
+    chooses what must AGREE with a 200-day break before the book goes to cash and has no value
+    meaning "never go to cash" -- ``confirm='rise'`` with the longest slope window is still an
+    exit -- and a recorded row that named a gate while none ran would be a lie.
+    """
+
+    hold: str = BENCH
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.hold, str) or not self.hold or self.hold != self.hold.upper():
+            raise ValueError(f"hold must be a non-empty upper-case symbol, got {self.hold!r}")
+
+    def as_dict(self) -> dict[str, str]:
+        return {"hold": self.hold, "gate": "none"}
+
+
+def _always(params: object) -> AlwaysParams:
+    if not isinstance(params, AlwaysParams):
+        raise TypeError(f"params must be AlwaysParams, got {type(params).__name__}")
+    return params
+
+
+class AlwaysAllocator:
+    """M0245's frame with the gate taken out: SPY at full weight, every session, never in cash.
+
+    ``ConfirmParams`` chooses what must AGREE with a 200-day break before the book goes to cash;
+    it has no value that means "never go to cash", and ``confirm='rise'`` with the longest slope
+    window is still an exit. The lookback is M0245's own ``LOOKBACK`` (``SMA_N + MAX_SLOPE_N + 1``
+    = 327), which the file already pins so that all six arms share one window; this arm joins them
+    on 1994-05-17.
+    """
+
+    id = "M0245-ALWAYS"
+
+    def lookback(self, params: Any) -> int:
+        _always(params)
+        return ALWAYS_LOOKBACK
+
+    def symbols(self, params: Any) -> tuple[str, ...]:
+        return (_always(params).hold,)
+
+    def holds(self, params: Any) -> tuple[str, ...]:
+        return (_always(params).hold,)
+
+    def uses_members(self, params: Any) -> bool:
+        _always(params)
+        return False
+
+    def _run(self, history: Mapping[str, History], data_date: date,
+             p: AlwaysParams) -> tuple[Target, ...]:
+        h = history.get(p.hold)
+        if h is None or h.index_of(data_date) is None:  # no bar dated d: never a new target
+            return ()
+        t = target_from_close(p.hold, last_close(h, data_date), FULL)
+        return () if t is None else (t,)
+
+    def targets(self, history: Mapping[str, History], members: AbstractSet[str], data_date: date,
+                held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        return self._run(history, data_date, _always(params))
+
+    def prepare(self, history: Mapping[str, History]) -> Any:
+        return dict(history)  # one instrument: nothing to precompute
+
+    def targets_prepared(self, prepared: Any, members: AbstractSet[str], data_date: date,
+                         held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        if not isinstance(prepared, Mapping):
+            raise TypeError(f"prepared must be a Mapping, got {type(prepared).__name__}")
+        return self._run(prepared, data_date, _always(params))
+
+
+ALWAYS = AlwaysAllocator()
+
+AMEND_ALWAYS = Amendment(
+    added=date(2026, 10, 27),
+    why=(
+        "M0245's whole argument is that nine of the gate's eleven exits were premiums and two "
+        "were claims, and it prices every confirmation rule against M0245-GATE, which is the "
+        "insurance policy itself. The premium can only be read against not buying insurance."
+    ),
+    hypothesis=(
+        "M0245 reads the 200-day gate as insurance and measures each confirmation rule against "
+        "M0245-GATE, the unconfirmed policy. That answers 'does confirming the exit beat exiting "
+        "plainly' and never 'what is the policy worth at all', and M0389 measured that the second "
+        "question's answer is about twice what the first style of comparison implies. This arm is "
+        "SPY at full weight on every session, on M0245's own monthly rule set at Gotrade's real "
+        "fees, at M0245's own 327-bar lookback, so it opens 1994-05-17 with the recorded six. The "
+        "difference against it is the total premium paid over twenty-two years, and the "
+        "difference between that and each confirmation arm's is what the confirmation saved. "
+        "M0245's own episode ledger predicts the shape: nine premium spells costing 52 points of "
+        "missed market between them against two claims worth -45.8% and -53.0% of SPY while out, "
+        "so this arm should earn more than M0245-GATE and fall far deeper. Success is the premium "
+        "and the claims priced in the same run, on the same sessions, for the first time. A "
+        "yardstick, not a candidate: it must not be promoted."
+    ),
+    expected_failure=(
+        "The confirmation arms trade four to seven times in twenty-two years and M0245-FALL126 "
+        "records a profit factor of 5,985 on four trades; a yardstick does not make numbers like "
+        "those into evidence, and the premium this arm prices is still the premium of eleven "
+        "episodes, two of which carry the whole result. Second, M0245-RISE21 is the deliberate "
+        "disaster mirror (52.41% worst fall, 93.08% exposure) and sits closest to this arm on "
+        "exposure; a reader could mistake the two, and the analysis must keep them apart -- "
+        "RISE21 steps aside at the worst possible times, this arm never steps aside at all. "
+        "Third, this arm will post the deepest fall in the method by far against the recorded "
+        "18.85% to 52.41%, and that is the point rather than a failure. Fourth, it runs later "
+        "than the arms it prices; the fidelity evidence is the exact three-way reproduction of "
+        "one configuration across two run dates measured on 2026-10-27, and a worse reproduction "
+        "here means the bill is reported as unreadable rather than quoted."
+    ),
+    candidates=(
+        Candidate(
+            id="M0245-ALWAYS", family="M0245", rules=MONTHLY_HOLD_FRAC_GOTRADE, allocator=ALWAYS,
+            params=AlwaysParams(),
+            rationale=("Yardstick: SPY held on every session with no 200-day gate and no "
+                       "confirmation, so the total premium the insurance charged over the window "
+                       "can be read off directly instead of against the policy itself."),
+            added=date(2026, 10, 27), owner_inputs=(),
+        ),
+    ),
+)
+
+
 METHOD = Method(
     id="M0245",
     name="The 200-day gate is insurance: nine of its eleven exits were premiums, two were claims",
@@ -336,6 +471,7 @@ METHOD = Method(
         _v("CROSS", ConfirmParams("cross"),
            "Leave only once the 50-day average is under the 200-day one: the famous death cross"),
     ),
+    amendments=(AMEND_ALWAYS,),
     seen_keys=(
         "concept:sma200-slope-confirmed-exit",
         "concept:gate-exit-episode-ledger",

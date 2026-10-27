@@ -98,6 +98,7 @@ from seer_engine.sim.book import WEIGHT_QUANTUM, Target, equal_weight, to_weight
 from seer_engine.strategies.allocator import target_from_close
 from seer_engine.strategies.base import History, as_day
 from seer_engine.strategies.indicators import mean_dollar_volume_window, sma_window
+from seer_engine.strategies.price_floor import ADJUSTED, PRINTED, check_market, floor_value, raw_factor
 
 DV_N = 20  # dollar-volume window, as f_factor and Strategy A
 EXCLUDED: frozenset[str] = frozenset({"SPY"})  # never a factor target, even if listed as a member
@@ -377,15 +378,30 @@ def fundamental_rows(
     members: Set[str],
     data_date: date,
     params: FundamentalParams,
+    *,
+    price_basis: str = ADJUSTED,
+    market: Any = None,
 ) -> list[FundamentalRow]:
     """Eligible members' features on ``data_date``, sorted by symbol (see the module docstring).
 
     Reads each member's last ``fundamental_lookback(params)`` bars ending at ``data_date`` and
     exactly one phase-5 snapshot per symbol, which answers from facts with
     ``filed <= data_date``; later bars and later filings are never read.
+
+    ``price_basis`` chooses which close the ``min_price`` floor is compared against -- one of
+    ``price_floor.BASES``, defaulting to ``"adjusted"``, which is what this screen has always
+    compared. See ``f_factor.factor_rows`` and ``strategies.price_floor`` for why this is a
+    keyword argument and not a ``FundamentalParams`` field, and why ``"printed"`` refuses a
+    market without splits rather than falling back to the adjusted basis.
+
+    The basis moves the pool and nothing else: ``close`` is still the stored close everywhere
+    below, including in ``_row``, where it is one half of ``market_cap``. Repairing that figure
+    is a separate and much larger question (``Market.market_value`` is the repaired path) and
+    this argument deliberately does not touch it.
     """
     p = _check_params(params)
     as_day(data_date)
+    basis = check_market(market, price_basis)
     panel = _panel(panel)
     lb = fundamental_lookback(p)
     wanted = factors_read(p)
@@ -400,7 +416,10 @@ def fundamental_rows(
         if i is None or i + 1 < lb:
             continue
         close = float(h.close[i])
-        if not math.isfinite(close) or close < p.min_price:
+        if not math.isfinite(close):
+            continue
+        factor = raw_factor(market, symbol, data_date) if basis == PRINTED else 1.0
+        if floor_value(close, factor, basis) < p.min_price:
             continue
         dollar_volume = _dollar_volume(h, i)
         if not math.isfinite(dollar_volume) or not dollar_volume > p.min_dollar_volume:

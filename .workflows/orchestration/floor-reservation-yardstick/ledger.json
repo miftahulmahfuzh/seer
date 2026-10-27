@@ -23,19 +23,19 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "2b03dd7",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 2,
-      "note": "Write set grew to 8: phase 2 added engine/tests/test_cash_yield.py, which pins levers[-1]==\"resize_band\" and moves on any LEVERS_SINCE_PINS append. Decided by p2 on rung 6 with a measured precedent (commit 057be94 made the byte-identical edit when it appended resize_band); assertion strength unchanged, still an exact equality. Coordinator checked the collision: no other phase writes that file, so it stays a one-owner region. Same class as D11's two discoveries.",
+      "note": "Verified by coordinator from git and by re-running the guardrails, not from the report. Commit 2b03dd7 (+ todos bba4c7f) carries 10 files: the 7 declared, the accepted 8th (test_cash_yield.py), plus engine/.workflows/plan/P1-ENG-BL71.md and engine/.workflows/todos.md (task artifacts, no other phase writes them). No peer file, no lab state. Re-measured here: TradeRules 17 fields, reserve_basis default 'order' compare=True; LEVERS_SINCE_PINS['reserve_basis']='order' appended last after resize_band; is_pinned_default True at 'order' and False at 'fill'; len(PRESETS)==20 with all 20 at the pinned default (D5 held); describe_rules silent at the default. Focused suite on the combined tree: 238 passed, test_registry.py digest freeze included.",
       "package": "engine/src/seer_engine/sim",
       "plan": ".workflows/plan/floor-reservation-yardstick/phase-2.md",
-      "reported_at": "2026-10-27T02:29:05+00:00",
+      "reported_at": "2026-10-27T02:40:55+00:00",
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-BL71",
       "title": "The order-reservation repair, as a pinned-default lever"
     },
     {
@@ -59,7 +59,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/floor-reservation-yardstick/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "floor-reservation-yardstick",
-  "updated": "2026-10-27T02:31:42+00:00",
+  "updated": "2026-10-27T02:40:55+00:00",
   "verified_at": "2026-10-27T02:31:42+00:00",
   "worktree": "/home/miftah/.worktrees/seer/floor-reservation-yardstick"
 }

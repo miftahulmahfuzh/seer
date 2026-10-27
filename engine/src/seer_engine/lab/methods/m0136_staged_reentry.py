@@ -62,7 +62,7 @@ from typing import Any, Literal
 import numpy as np
 
 from seer_engine.backtest.dev import Candidate
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0084_trend_switch_price import FABER_MONTHS
 from seer_engine.lab.methods.m0113_trend_switch_reentry import entry_on
 from seer_engine.sim.book import Target, to_weight
@@ -252,6 +252,140 @@ def _v(suffix: str, params: StagedParams, rationale: str) -> Candidate:
                      owner_inputs=())
 
 
+
+# --------------------------------------------------------------------------- amendment 1
+
+#: The yardstick's lookback, pinned to M0136's own ``LOOKBACK`` -- the same 253 bars M0084 and
+#: M0113 use -- so this arm opens 1994-01-28 with all six recorded arms. A bill read off an arm
+#: scored on a different window is not a bill.
+ALWAYS_LOOKBACK = LOOKBACK
+
+
+
+@dataclass(frozen=True, slots=True)
+class AlwaysParams:
+    """No dial at all: ``hold`` is held on every session and there is no gate to open.
+
+    A separate params type rather than a ``StagedParams`` with the exit disabled: ``levels``
+    chooses how many steps there are on the way back in and never removes the exit, which is
+    fixed in every variant by design. A recorded row that named a ladder while none ran would be
+    a lie in the one place the lab cannot afford one.
+    """
+
+    hold: str = BENCH
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.hold, str) or not self.hold or self.hold != self.hold.upper():
+            raise ValueError(f"hold must be a non-empty upper-case symbol, got {self.hold!r}")
+
+    def as_dict(self) -> dict[str, str]:
+        return {"hold": self.hold, "gate": "none"}
+
+
+def _always(params: object) -> AlwaysParams:
+    if not isinstance(params, AlwaysParams):
+        raise TypeError(f"params must be AlwaysParams, got {type(params).__name__}")
+    return params
+
+
+class AlwaysAllocator:
+    """M0136's frame with the ladder and the exit taken out: SPY at full weight, every session.
+
+    The rung this arm sits on is the one ``StagedParams`` has no way to name. ``levels`` chooses
+    how many steps there are on the way back in; it never removes the exit, which is fixed in
+    every variant by design. The lookback is M0136's own ``LOOKBACK``, the same 253 bars M0084 and
+    M0113 use, so this arm opens 1994-01-28 with all six recorded arms.
+    """
+
+    id = "M0136-ALWAYS"
+
+    def lookback(self, params: Any) -> int:
+        _always(params)
+        return ALWAYS_LOOKBACK
+
+    def symbols(self, params: Any) -> tuple[str, ...]:
+        return (_always(params).hold,)
+
+    def holds(self, params: Any) -> tuple[str, ...]:
+        return (_always(params).hold,)
+
+    def uses_members(self, params: Any) -> bool:
+        _always(params)
+        return False
+
+    def _run(self, history: Mapping[str, History], data_date: date,
+             p: AlwaysParams) -> tuple[Target, ...]:
+        h = history.get(p.hold)
+        if h is None or h.index_of(data_date) is None:  # no bar dated d: never a new target
+            return ()
+        t = target_from_close(p.hold, last_close(h, data_date), _FULL)
+        return () if t is None else (t,)
+
+    def targets(self, history: Mapping[str, History], members: AbstractSet[str], data_date: date,
+                held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        return self._run(history, data_date, _always(params))
+
+    def prepare(self, history: Mapping[str, History]) -> Any:
+        return dict(history)  # one instrument: nothing to precompute
+
+    def targets_prepared(self, prepared: Any, members: AbstractSet[str], data_date: date,
+                         held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        if not isinstance(prepared, Mapping):
+            raise TypeError(f"prepared must be a Mapping, got {type(prepared).__name__}")
+        return self._run(prepared, data_date, _always(params))
+
+
+ALWAYS = AlwaysAllocator()
+
+AMEND_ALWAYS = Amendment(
+    added=date(2026, 10, 27),
+    why=(
+        "M0136's six arms share one fixed 200-day exit and differ only in how the position is "
+        "rebuilt, so the method prices the staging and never the exit. This arm holds SPY on "
+        "every session of the same window and is the zero the staging is worth measuring from."
+    ),
+    hypothesis=(
+        "M0136 asks whether coming back in halves beats coming back all at once, and answers it "
+        "with six arms that all pay the same exit. M0389 showed that an overlay priced against "
+        "another step-aside arm is charged roughly half its true standalone cost, which means "
+        "every one of M0136's paired differences is a marginal number sitting on an unmeasured "
+        "base. This arm is SPY at full weight on every session, on M0136's own monthly rule set "
+        "at Gotrade's real fees, at M0136's own 253-bar lookback, so it opens 1994-01-28 with the "
+        "recorded six and the difference against M0136-SMA200 is the exit's own bill on this "
+        "chassis. Because M0136-SMA200 and M0113-SMA200 are the same symmetric control and both "
+        "record 11 trades and an 18.89% worst fall, the exit bill this arm produces must agree "
+        "with the one M0113-ALWAYS produces; two independent arms reaching the same number is the "
+        "cheapest available check that the retrofit is measuring what it claims. Success is that "
+        "agreement plus a statement of how much of the half-step's recorded advantage survives "
+        "once the exit is priced. A yardstick, not a candidate: it must not be promoted."
+    ),
+    expected_failure=(
+        "The two bills may not agree, and the most likely reason would be the retrofit rather "
+        "than the method: M0113-ALWAYS and M0136-ALWAYS will be run as separate amendments, "
+        "possibly minutes apart but not in one run, so a disagreement larger than rounding points "
+        "at the store or the code moving between them and invalidates both numbers. That check "
+        "failing is itself the most useful thing this arm can do. Second, M0136's arms trade "
+        "between 11 and 19 times, so every number here rests on three episodes and no amount of "
+        "yardstick repairs that. Third, this arm will post the deepest fall in the method by a "
+        "wide margin -- five of the six recorded arms sit at 18.89% to 19.09% -- and that is the "
+        "arm doing its job, not evidence for the ladder. Fourth, this arm runs later than the "
+        "arms it prices; the fidelity evidence is the exact three-way reproduction of one "
+        "configuration across two run dates measured on 2026-10-27, and anything less than that "
+        "fidelity here means the bill is reported as unreadable."
+    ),
+    candidates=(
+        Candidate(
+            id="M0136-ALWAYS", family="M0136", rules=MONTHLY_HOLD_FRAC_GOTRADE, allocator=ALWAYS,
+            params=AlwaysParams(),
+            rationale=("Yardstick: SPY held at full weight on every session, with no exit and no "
+                       "ladder, so what the fixed 200-day exit costs can be separated from what "
+                       "the staged re-entry buys."),
+            added=date(2026, 10, 27), owner_inputs=(),
+        ),
+    ),
+)
+
+
 METHOD = Method(
     id="M0136",
     name="Come back halfway first: a staged re-entry that makes a false start cost half as much",
@@ -334,6 +468,7 @@ METHOD = Method(
         _v("HALF-UP63-HOLD", StagedParams("up", 63, 2, True),
            "The same half-step, but the half is kept unless a fresh 200-day break sells it"),
     ),
+    amendments=(AMEND_ALWAYS,),
     seen_keys=(
         "concept:staged-partial-reentry-after-sma200-exit",
         "concept:position-size-ramp-trend-switch",

@@ -51,7 +51,7 @@ from typing import Any, Literal
 
 from seer_engine.backtest.dev import Candidate
 from seer_engine.backtest.market import EMPTY_SERIES, MarketSeries
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0076_dividend_raise_on_announcement import ANNOUNCED, R25, AnnParams
 from seer_engine.sim.book import Target, equal_weight
 from seer_engine.sim.rules import MONTHLY_HOLD_FRAC_GOTRADE, MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE
@@ -215,6 +215,152 @@ def _v(suffix: str, allocator: Any, params: Any, rationale: str, rules: Any) -> 
                      params=params, rationale=rationale, added=ADDED, owner_inputs=())
 
 
+
+# --------------------------------------------------------------------------- amendment 1
+
+#: The yardstick's lookback, pinned to the gated SPY arms' own. ``GateAllocator.lookback``
+#: returns 1 for the SPY host, and M0039-SPY-TS and M0039-SPY-SPIKE are both recorded starting
+#: 1993-02-01 for that reason. Pinning it is the whole point: a bill read off an arm scored on a
+#: different window is not a bill. M0039-SPY-200 reads a 200-bar average and opens 1993-11-12;
+#: that gap is M0039's own and is not introduced here.
+ALWAYS_LOOKBACK = 1
+
+#: Full weight, once, so the target builder below allocates no new Decimal per session.
+ALWAYS_FULL = equal_weight(1)
+
+
+
+@dataclass(frozen=True, slots=True)
+class AlwaysParams:
+    """No dial at all: ``hold`` is held on every session and there is no gate to open.
+
+    A separate params type rather than a ``GateParams`` with the gate disabled, because
+    ``GateParams`` cannot express it: ``gate`` is ``ts`` or ``spike`` and ``threshold`` is a
+    level, not an off switch, and a recorded row reading ``threshold=1000000000.0`` would be a
+    dial abused rather than a gate removed.
+    """
+
+    hold: str = "SPY"
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.hold, str) or not self.hold or self.hold != self.hold.upper():
+            raise ValueError(f"hold must be a non-empty upper-case symbol, got {self.hold!r}")
+
+    def as_dict(self) -> dict[str, str]:
+        return {"hold": self.hold, "gate": "none"}
+
+
+def _always(params: object) -> AlwaysParams:
+    if not isinstance(params, AlwaysParams):
+        raise TypeError(f"params must be AlwaysParams, got {type(params).__name__}")
+    return params
+
+
+class AlwaysAllocator:
+    """M0039's SPY host with the fear gate taken out: held every session, never in cash.
+
+    Not market-aware. The gated arms return no target without ``Market.series`` because their
+    decision needs the fear index; this arm has no decision to make, so it reads no series and
+    declares no market field. ``GateParams`` could not express this: ``gate`` is ``ts`` or
+    ``spike`` and ``threshold`` is a level, not an off switch, and a row reading
+    ``threshold=1000000000.0`` would be a dial abused rather than a gate removed.
+    """
+
+    id = "M0039-ALWAYS"
+
+    def lookback(self, params: Any) -> int:
+        _always(params)
+        return ALWAYS_LOOKBACK
+
+    def symbols(self, params: Any) -> tuple[str, ...]:
+        return (_always(params).hold,)
+
+    def holds(self, params: Any) -> tuple[str, ...]:
+        return (_always(params).hold,)
+
+    def uses_members(self, params: Any) -> bool:
+        _always(params)
+        return False
+
+    def _run(self, history: Mapping[str, History], data_date: date,
+             p: AlwaysParams) -> tuple[Target, ...]:
+        h = history.get(p.hold)
+        if h is None or h.index_of(data_date) is None:  # no bar dated d: never a new target
+            return ()
+        t = target_from_close(p.hold, last_close(h, data_date), ALWAYS_FULL)
+        return () if t is None else (t,)
+
+    def targets(self, history: Mapping[str, History], members: AbstractSet[str], data_date: date,
+                held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        return self._run(history, data_date, _always(params))
+
+    def prepare(self, history: Mapping[str, History]) -> Any:
+        return dict(history)  # one instrument: nothing to precompute
+
+    def targets_prepared(self, prepared: Any, members: AbstractSet[str], data_date: date,
+                         held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        if not isinstance(prepared, Mapping):
+            raise TypeError(f"prepared must be a Mapping, got {type(prepared).__name__}")
+        return self._run(prepared, data_date, _always(params))
+
+
+ALWAYS = AlwaysAllocator()
+
+AMEND_ALWAYS = Amendment(
+    added=date(2026, 10, 27),
+    why=(
+        "M0039's two fear gates are priced against M0039-SPY-200, which is itself a step-aside "
+        "rule, so what either gate costs on its own has never been read. This arm is SPY held on "
+        "every session of the same window: the zero both gates and the 200-day switch are "
+        "measured from."
+    ),
+    hypothesis=(
+        "M0389 proved on this exact chassis -- SPY at full weight, decided every session, "
+        "fractional at Gotrade's real fees -- that two step-aside habits are strongly "
+        "sub-additive, and that the lab's habit of quoting stacked-minus-switch as an overlay's "
+        "price understates the overlay's own bill by about half: 55% for the fear spike and 40% "
+        "for the term structure. M0039 is the method both of those overlays were first registered "
+        "on, and it is the one that has never carried the zero. This arm is that zero: SPY at full "
+        "weight on every session, M0039's own daily rule set, the same one-bar lookback its "
+        "gated arms ran on, so M0039-SPY-TS, M0039-SPY-SPIKE and this arm all open on 1993-02-01 "
+        "and every paired difference is the gate alone. M0039-SPY-200 opens 1993-11-12 because it "
+        "reads a 200-bar average; that gap is M0039's own and is not introduced here, and the "
+        "switch's own bill must therefore be read on the common era rather than whole-window. "
+        "Success is three numbers the method could not produce before: the term structure's own "
+        "bill, the fear spike's own bill, and the difference between each and the figure M0039's "
+        "analysis quoted against the 200-day switch. It is a measuring stick and not a candidate; "
+        "it cannot beat total-return SPY because it pays Gotrade's fees to hold the same thing, "
+        "and it must not be promoted on any showing."
+    ),
+    expected_failure=(
+        "The first way this fails is coverage, and it is certain rather than likely: VIX3M begins "
+        "2006-07-17 in the dev store, so M0039-SPY-TS is this arm trade for trade over the "
+        "window's first thirteen years and its whole-window bill is diluted by roughly half. Only "
+        "the spike cell reads both bear markets. Any term-structure bill quoted off this arm "
+        "without the 2006-2015 split attached is a number wearing a coat that does not fit. "
+        "Second, this arm runs in a LATER run than the arms it prices. The fidelity evidence is "
+        "the three-way reproduction measured on 2026-10-27 -- M0038-DIV-OPEN, M0173-EXP100 and "
+        "M0336-NEVER, one configuration through three allocator ids on two dates eight days "
+        "apart, identical to four decimals -- but it is evidence about a different chassis, and "
+        "if this arm's numbers do not sit where SPY's own recorded total return says they should, "
+        "the bill is unreadable and the analysis must say so. Third, this arm will post by far "
+        "the deepest fall in the method: M0039-SPY-SPIKE already records 63.59% and this arm "
+        "holds through the whole of 2000-2002 and 2008 with nothing to cut it, so it will fail "
+        "the fall screen by a wide margin. That is the arm working, not failing."
+    ),
+    candidates=(
+        Candidate(
+            id="M0039-ALWAYS", family="M0039", rules=DAILY_HOLD_FRAC_GOTRADE, allocator=ALWAYS,
+            params=AlwaysParams(),
+            rationale=("Yardstick: SPY held on every session with no fear gate and no trend "
+                       "switch, so each gate's own cost can be read off directly instead of "
+                       "inferred from an arm that also steps aside."),
+            added=date(2026, 10, 27), owner_inputs=(),
+        ),
+    ),
+)
+
+
 METHOD = Method(
     id="M0039",
     name="Risk gate on the VIX term structure, which turns days before a 200-day average",
@@ -279,6 +425,7 @@ METHOD = Method(
            "The big-dividend-raise book behind the fear-spike gate, checked weekly",
            MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE),
     ),
+    amendments=(AMEND_ALWAYS,),
     seen_keys=(
         "concept:vix-term-structure",
         "concept:volatility-term-structure-gate",

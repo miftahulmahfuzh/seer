@@ -6,8 +6,8 @@
 **Worktree:** `/home/miftah/.worktrees/seer/floor-reservation-yardstick`
 **Branch:** `feature/floor-reservation-yardstick` (base: `origin/main` @ `35b41bd`)
 **Phases:** 3
-**Status:** planned
-**Coordinator:** —
+**Status:** landed (merged to main at d942857)
+**Coordinator:** orch-floor-reservation-yardstick
 
 ---
 
@@ -161,9 +161,9 @@ export PG_TEST_URL=postgresql://postgres:pg@localhost:55432/postgres
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | The printed-price floor, landed where it legally can be | R1 | `engine/src/seer_engine/strategies` | 5 | — | NORMAL | `.workflows/plan/floor-reservation-yardstick/phase-1.md` | — | — |
-| 2 | The order-reservation repair, as a pinned-default lever | R2 | `engine/src/seer_engine/sim` | 7 | — | HARD | `.workflows/plan/floor-reservation-yardstick/phase-2.md` | — | — |
-| 3 | M0396 — ten never-step-aside arms, pre-registered | R3 | `engine/src/seer_engine/lab/methods` | 11 | — | HARD | `.workflows/plan/floor-reservation-yardstick/phase-3.md` | — | — |
+| 1 | The printed-price floor, landed where it legally can be | R1 | `engine/src/seer_engine/strategies` | 5 | — | NORMAL | `.workflows/plan/floor-reservation-yardstick/phase-1.md` | P1-ENG-AMD0 | — |
+| 2 | The order-reservation repair, as a pinned-default lever | R2 | `engine/src/seer_engine/sim` | 7 | — | HARD | `.workflows/plan/floor-reservation-yardstick/phase-2.md` | P1-ENG-BL71 | — |
+| 3 | M0396 — ten never-step-aside arms, pre-registered | R3 | `engine/src/seer_engine/lab/methods` | 11 | — | HARD | `.workflows/plan/floor-reservation-yardstick/phase-3.md` | P2-ENG-9UT4 | — |
 
 The three phases share no file and no symbol. They may run concurrently. The only cross-phase
 coupling is a *non-change*: invariant 8, which phase 1 must not break and phase 3 relies on.

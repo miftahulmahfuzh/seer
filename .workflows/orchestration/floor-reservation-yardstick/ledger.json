@@ -3,6 +3,12 @@
   "coordinator": "orch-floor-reservation-yardstick",
   "coordinator_session_id": "ef31b3d3-61f0-415b-a35c-10c8669e0ccf",
   "created": "2026-10-27T02:13:00+00:00",
+  "landed": {
+    "at": "2026-10-27T02:51:05+00:00",
+    "base": "main",
+    "commit": "d9428570ad175912242cb24ee73ac09c7c49150e",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -40,26 +46,26 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "a13b833",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 3,
-      "note": null,
+      "note": "Verified by coordinator against a read-only lab DB, not from the report. Eleven commits 055b650..a13b833, pushed. Ten pending amendments resolve through runner.pending_amendment, one arm each: M0038/M0039/M0113/M0136/M0167/M0245/M0260/M0261/M0262/M0334-ALWAYS, all distinct. Lookbacks pinned to each method's own: 1,1,253,253,253,327,454,454,454,253 - max 454, inside the 473-bar smoke-fixture cap. D7 holds: m0173, m0336, m0338 all amendments == (). Allocator id uniqueness: 1318 candidate ids across every method, zero duplicates. Commit range touches exactly the eleven declared paths, no peer file, no lab state. Full suite on the settled tree 7763 passed / 4 skipped / 0 failed (skips are opt-in *_LIVE plus the month-end sweep), ruff clean, lab.sqlite and lab.json byte-identical to baseline. D6 held - no lab run, no lab stage.",
       "package": "engine/src/seer_engine/lab/methods",
       "plan": ".workflows/plan/floor-reservation-yardstick/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-10-27T02:48:52+00:00",
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P2-ENG-9UT4",
       "title": "M0396 \u2014 ten never-step-aside arms, pre-registered"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/floor-reservation-yardstick/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "floor-reservation-yardstick",
-  "updated": "2026-10-27T02:40:55+00:00",
+  "updated": "2026-10-27T02:51:05+00:00",
   "verified_at": "2026-10-27T02:31:42+00:00",
   "worktree": "/home/miftah/.worktrees/seer/floor-reservation-yardstick"
 }

@@ -334,7 +334,7 @@ from typing import Any
 
 from seer_engine import dates
 from seer_engine.backtest.dev import Candidate
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0063_earnings_day_jump import WEEKLY_HOLD_FRAC_GOTRADE
 from seer_engine.lab.methods.m0072_standardised_earnings_jump import (
     JUMP20,
@@ -547,6 +547,144 @@ def _v(suffix: str, gate_months: int | None, rules: Any, rationale: str) -> Cand
                      owner_inputs=())
 
 
+
+# --------------------------------------------------------------------------- amendment 1
+
+
+@dataclass(frozen=True, slots=True)
+class AlwaysParams:
+    """M0072-Z2-RAWRANK's book with no gate read at all. ``book`` is the host, carried WHOLE.
+
+    The book is M0260's ``BOOK``, unmodified, for the reason ``SlowGateAllocator.targets``
+    already gives: handing the host a gate-free twin of its params runs, but the recorded row
+    would then describe a book that is not the one M0258 and M0072 recorded. The gate is removed
+    in the ALLOCATOR, where M0260 removes it too, and ``as_dict`` says ``gate: none`` so no reader
+    has to infer it from the allocator id.
+    """
+
+    book: ZParams = BOOK
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.book, ZParams):
+            raise TypeError(f"book must be ZParams, got {type(self.book).__name__}")
+        if self.book.jump.inner.trend is None:
+            raise ValueError(
+                "book must carry a trend symbol and length: this arm reads no gate, but it must "
+                "declare the same symbols and the same lookback as the rungs it is the zero of"
+            )
+
+    def as_dict(self) -> dict[str, str]:
+        out = {"gate": "none"}
+        for k, v in self.book.as_dict().items():
+            out[f"book.{k}"] = v
+        return out
+
+
+def _always(params: object) -> AlwaysParams:
+    if not isinstance(params, AlwaysParams):
+        raise TypeError(f"params must be AlwaysParams, got {type(params).__name__}")
+    return params
+
+
+class AlwaysAllocator:
+    """M0072's book with its 200-day gate removed: the arm this ladder's rungs are measured from.
+
+    ``CadenceParams`` cannot express it -- its ``__post_init__`` requires the book to carry a
+    trend, because an anchored reading needs something to read, and ``gate_months`` runs from 1 to
+    12 with no "never" rung. So the zero is a separate allocator. Everything except the gate test
+    is ``SlowGateAllocator``'s own code, including the 454-bar lookback, which is what keeps this
+    arm on exactly the sessions the six recorded rungs ran on (all of them open 1996-01-03).
+    """
+
+    id = "M0260-ALWAYS"
+
+    def lookback(self, params: Any) -> int:
+        p = _always(params)
+        return max(ZJUMP.lookback(p.book), p.book.jump.inner.trend[1] + MAX_ANCHOR_GAP)
+
+    def symbols(self, params: Any) -> tuple[str, ...]:
+        return ZJUMP.symbols(_always(params).book)
+
+    def holds(self, params: Any) -> tuple[str, ...]:
+        return ZJUMP.holds(_always(params).book)
+
+    def uses_members(self, params: Any) -> bool:
+        return ZJUMP.uses_members(_always(params).book)
+
+    def targets(self, history: Mapping[str, History], members: AbstractSet[str], data_date: date,
+                held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        """``SlowGateAllocator.targets``, with the gate test and nothing else removed."""
+        p = _always(params)
+        rows = factor_rows(history, members, data_date, p.book.jump.inner)
+        return ZJUMP._targets(ZPrepared(history, None), rows, data_date, held, p.book)
+
+    def prepare(self, history: Mapping[str, History]) -> ZPrepared:
+        return ZJUMP.prepare(history)
+
+    def targets_prepared(self, prepared: Any, members: AbstractSet[str], data_date: date,
+                         held: frozenset[str], params: Any) -> tuple[Target, ...]:
+        if not isinstance(prepared, ZPrepared) or prepared.factor is None:
+            raise TypeError(f"prepared must be a prepared ZPrepared, got {type(prepared).__name__}")
+        p = _always(params)
+        rows = prepared.factor.rows_on(members, data_date, p.book.jump.inner)
+        return ZJUMP._targets(prepared, rows, data_date, held, p.book)
+
+
+ALWAYS = AlwaysAllocator()
+
+AMEND_ALWAYS = Amendment(
+    added=date(2026, 10, 27),
+    why=(
+        "M0260's ladder runs from a gate read weekly to a gate read yearly and stops there. The "
+        "end of the ladder -- a gate never read at all -- is the one rung that prices the gate "
+        "itself, and it was never registered."
+    ),
+    hypothesis=(
+        "M0260 measured that reading the SPY-200 gate monthly beat reading it weekly by 7.01 "
+        "points a year of the owner's money and 11.69 points of worst fall on M0072's book, and "
+        "that past monthly the axis stops behaving like a speed. Every one of those numbers is a "
+        "difference between two gated arms, so the ladder prices the READING and never the GATE. "
+        "M0389 then measured that a step-aside habit priced against another step-aside arm is "
+        "charged roughly half its standalone cost. This arm is the ladder's missing end: M0072's "
+        "book exactly as the six rungs carry it, on M0260's own monthly rule set at Gotrade's "
+        "real fees, at M0260's own 454-bar lookback, with the gate test deleted and nothing else "
+        "changed, so it opens 1996-01-03 with every recorded rung. The difference against "
+        "M0260-M-NATIVE is the gate's own bill on this book; the differences already published "
+        "between the rungs are then readable as fractions of it. Success is that bill plus a "
+        "statement of whether the 7.01-point cadence effect is large or small against it -- the "
+        "method's own headline claim is that the cadence is worth about twice the gate, and this "
+        "is the first arm that can check that sentence rather than assert it."
+    ),
+    expected_failure=(
+        "The headline the method rests on may simply be wrong once the gate is priced: if the "
+        "gate's own bill on this book turns out to be well above the 3.6 points a year the lab "
+        "has quoted elsewhere, then the 7.01-point cadence gap is a smaller fraction of the whole "
+        "than M0260 claimed, and the method's sentence 'the cadence is worth roughly twice the "
+        "gate itself' has to be withdrawn or restated. That is the most valuable outcome "
+        "available here and it is also the one that costs the method its headline. Second, this "
+        "arm covers only the monthly cadence; M0260-W-NATIVE and M0260-W-G1 run on "
+        "weekly-hold-frac-gotrade and their bills against a monthly yardstick carry a cadence "
+        "term as well as a gate term, so the two weekly rungs stay unpriced by this amendment and "
+        "the analysis must say so rather than quote a number for them. Third, this arm will post "
+        "by far the deepest fall in the method against the recorded 23.80% to 35.49%, holding "
+        "M0072's book through 2000-2002 and 2008 with nothing to cut it. Fourth, it runs later "
+        "than the rungs it prices; the fidelity evidence is the exact three-way reproduction of "
+        "one configuration across two run dates measured on 2026-10-27, and anything worse means "
+        "the bill is reported as unreadable."
+    ),
+    candidates=(
+        Candidate(
+            id="M0260-ALWAYS", family="M0260", rules=MONTHLY_HOLD_FRAC_GOTRADE, allocator=ALWAYS,
+            params=AlwaysParams(),
+            rationale=("Yardstick: M0072's book held on every decision session with the 200-day "
+                       "gate removed entirely, so the gate's own cost can be read off instead of "
+                       "inferred from the difference between two readings of it."),
+            added=date(2026, 10, 27), owner_inputs=(),
+        ),
+    ),
+)
+
+
 METHOD = Method(
     id="M0260",
     name="How often should a book read its safety gate? A dose-response ladder in the SPY-200 "
@@ -746,6 +884,7 @@ METHOD = Method(
            "the switch at the month end, reusing the monthly arm's own reading, so the measured "
            "weekly-monthly gap splits exactly into re-pick frequency and gate reading cadence"),
     ),
+    amendments=(AMEND_ALWAYS,),
     seen_keys=(
         "concept:gate-reading-cadence-ladder",
         "concept:anchored-gate-reading",

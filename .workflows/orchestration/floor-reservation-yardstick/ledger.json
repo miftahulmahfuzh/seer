@@ -1,0 +1,64 @@
+{
+  "branch": "feature/floor-reservation-yardstick",
+  "coordinator": "orch-floor-reservation-yardstick",
+  "coordinator_session_id": "ef31b3d3-61f0-415b-a35c-10c8669e0ccf",
+  "created": "2026-10-27T02:13:00+00:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 1,
+      "note": null,
+      "package": "engine/src/seer_engine/strategies",
+      "plan": ".workflows/plan/floor-reservation-yardstick/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The printed-price floor, landed where it legally can be"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "engine/src/seer_engine/sim",
+      "plan": ".workflows/plan/floor-reservation-yardstick/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The order-reservation repair, as a pinned-default lever"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 3,
+      "note": null,
+      "package": "engine/src/seer_engine/lab/methods",
+      "plan": ".workflows/plan/floor-reservation-yardstick/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "M0396 \u2014 ten never-step-aside arms, pre-registered"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/floor-reservation-yardstick/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "floor-reservation-yardstick",
+  "updated": "2026-10-27T02:13:00+00:00",
+  "worktree": "/home/miftah/.worktrees/seer/floor-reservation-yardstick"
+}

@@ -11,7 +11,8 @@ describe('paper provenance (lab.json `paper`)', () => {
     expect(methodHref('RAW35-FR-GT')).toBe('/sera/methods/M0139');
     // 2026-10-17: migration 022 put the coskewness book (COSK-FR-GT) in RMW-FR-GT's seat.
     expect(methodHref('COSK-FR-GT')).toBe('/sera/methods/M0179');
-    expect(methodHref('MOM-FR-GT')).toBe('/sera/methods/M0002');
+    // 2026-10-31: migration 024 put the momentum blend (MOM70-FR-GT) in MOM-FR-GT's seat.
+    expect(methodHref('MOM70-FR-GT')).toBe('/sera/methods/M0294');
     // 2026-10-23: migration 023 put the always-invested control (FULL50-FR-GT) in MVW-FR-GT's
     // seat, so MVW-FR-GT is retired and withheld like the other predecessors below.
     expect(methodHref('FULL50-FR-GT')).toBe('/sera/methods/M0287');
@@ -27,6 +28,8 @@ describe('paper provenance (lab.json `paper`)', () => {
     expect(paperOf('RAW-FR-GT')).toBeNull();
     // RMW-FR-GT, retired by 022 to make room for COSK-FR-GT.
     expect(methodHref('RMW-FR-GT')).toBeNull();
+    // MOM-FR-GT, retired by 024 to make room for MOM70-FR-GT.
+    expect(methodHref('MOM-FR-GT')).toBeNull();
   });
 
   it('has no answer for an entry the lab never produced', () => {

@@ -57,9 +57,9 @@ ROSTER_IDS = ("SPY", "A", "C", F4, F1, "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR")
 RETIRED_IDS = ("F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "FND")
 #: Every row the board shows, in `sort` order -- including the six 017 added and the ones 021 and
 #: 022 added, which are retired in this world and so are checked but never stepped.
-ALL_IDS = ("SPY-GT", "C-GT", "COSK-FR-GT", "RAW35-FR-GT", "MOM-FR-GT", "FULL50-FR-GT",
+ALL_IDS = ("SPY-GT", "C-GT", "COSK-FR-GT", "RAW35-FR-GT", "MOM70-FR-GT", "FULL50-FR-GT",
            "SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND", F4, F1, "RM-FR",
-           "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR", "RAW-FR-GT", "RMW-FR-GT", "MVW-FR-GT")
+           "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR", "RAW-FR-GT", "RMW-FR-GT", "MVW-FR-GT", "MOM-FR-GT")
 
 
 # ---- the synthetic world -----------------------------------------------------------------------

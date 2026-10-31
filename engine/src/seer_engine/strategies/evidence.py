@@ -828,6 +828,33 @@ def allinvested_evidence(
     return out
 
 
+def momblend_evidence(
+    market: Market, params: Any, data_date: date, symbols: Sequence[str]
+) -> dict[str, Facts]:
+    """``MOMBLEND70`` (lab M0294-M70-MOM30): SPY at a fixed share beside a momentum sleeve.
+
+    Each sleeve is explained by the evidence function of its own allocator -- ``TIMING`` for the
+    SPY core, ``FACTOR`` for the momentum names -- so a pick says here exactly what it says on any
+    other book that uses that allocator, and this module cannot drift from them. The one fact it
+    adds is the thing the blend changes: how much of the money that sleeve holds.
+    """
+    from seer_engine.strategies.allocator import BlendParams
+
+    p: BlendParams = _typed("MOMBLEND70", params, BlendParams)
+    out: dict[str, Facts] = {}
+    for part in p.parts:
+        fn = EVIDENCE.get(part.allocator.id)
+        if fn is None:
+            continue
+        share = f"{float(part.share) * 100:.0f}%"
+        for symbol, facts in fn(market, part.params, data_date, symbols).items():
+            if symbol in out:
+                continue
+            note = f"This book keeps {share} of its money in this part of the plan, and the rest beside it."
+            out[symbol] = (*facts[: MAX_FACTS - 1], note)
+    return out
+
+
 #: Keyed by ``paper.roster.RESOLVER`` keys; the benchmark key (``buy_and_hold``) has no entry.
 #: ``tests/test_evidence.py`` pins ``set(EVIDENCE) == set(RESOLVER) - {BENCHMARK_OBJECT}``, so a
 #: new resolver entry without evidence fails the suite, and ``promote`` refuses it (phase 4).
@@ -845,6 +872,7 @@ EVIDENCE: dict[str, EvidenceFn] = {
     "MINVAR": minvar_evidence,
     "COSKEW": coskew_evidence,  # 022: lab M0179-N20, COSK-FR-GT
     "ALLINVESTED": allinvested_evidence,  # 023: lab M0287-FULL, FULL50-FR-GT
+    "MOMBLEND70": momblend_evidence,  # 024: lab M0294-M70-MOM30, MOM70-FR-GT
 }
 
 

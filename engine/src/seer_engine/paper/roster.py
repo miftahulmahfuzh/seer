@@ -131,6 +131,7 @@ from seer_engine.lab.methods.m0139_names_on_an_invested_tape import METHOD as M0
 from seer_engine.lab.methods.m0179_coskewness import COSKEW
 from seer_engine.lab.methods.m0179_coskewness import METHOD as M0179
 from seer_engine.lab.methods.m0179_coskewness import SPAN as COSKEW_SPAN
+from seer_engine.lab.methods.m0294_smallest_sleeve_worth_trading import METHOD as M0294
 from seer_engine.lab.methods.m0287_graded_trend_vote import BOOK as ALLINVESTED
 from seer_engine.lab.methods.m0287_graded_trend_vote import METHOD as M0287
 from seer_engine.paper.capital import PAPER_INITIAL_IDR
@@ -138,7 +139,7 @@ from seer_engine.sim import COST_RATE
 from seer_engine.sim.costs import CostModel
 from seer_engine.sim.rules import PRESETS, TradeRules, is_pinned_default
 from seer_engine.strategies.a import STRATEGY_A, STRATEGY_A_PARAMS
-from seer_engine.strategies.allocator import Allocator
+from seer_engine.strategies.allocator import BLEND, Allocator
 from seer_engine.strategies.base import Strategy
 from seer_engine.strategies.c import STRATEGY_C, STRATEGY_C_PARAMS, NewsVeto
 from seer_engine.strategies.f_factor import FACTOR
@@ -206,6 +207,13 @@ COSK_GT_ID = "COSK-FR-GT"
 # other book entry carries a market switch or a brake; nothing on the roster has ever measured
 # their absence forward.
 ALLIN_GT_ID = "FULL50-FR-GT"
+
+# 024 (owner, 2026-10-31): lab M0294-M70-MOM30 joins -- 70% of the book in the thirty strongest
+# twelve-minus-one-month momentum names, 30% in SPY at all times, no market switch, no cash. MOM-FR-GT
+# is retired in the same migration to make room. The owner ranked four entries on the same
+# 2018-04-01 start, his real deposits and Gotrade's fees: COSK, this blend, FULL50 and MOM. MOM
+# came last by a wide margin and was the only one to lose to SPY.
+MOM70_GT_ID = "MOM70-FR-GT"
 
 #: The bracket rule set the daily control trades under: design section 5's shape, charging Gotrade's
 #: measured schedule instead of a flat 0.1% a side. Added by the bracket-path work; this module only
@@ -433,6 +441,11 @@ COSKEW_PARAMS = next(c.params for c in M0179.candidates if c.id == "M0179-N20")
 #: the trial it records.
 ALLIN_PARAMS = next(c.params for c in M0287.candidates if c.id == "M0287-FULL")
 
+#: MOM70's params: lab M0294's M70-MOM30 arm -- a two-part blend, 30% SPY held at all times and 70%
+#: the thirty strongest twelve-minus-one-month momentum names with no trend gate. Read from the
+#: frozen method file like the ones above, so the roster can never drift from the trial it records.
+MOM70_PARAMS = next(c.params for c in M0294.candidates if c.id == "M0294-M70-MOM30")
+
 
 #: Bars through a data date an object REALLY reads, where its own ``lookback(params)`` says less.
 #:
@@ -580,6 +593,10 @@ RESOLVER: dict[str, Binding] = {
     # second object: the same code path every graded arm runs, asked for no opinion. That is the
     # point of admitting it -- a control has to be the same machine with the opinion removed.
     "ALLINVESTED": Binding(obj=ALLINVESTED, params=ALLIN_PARAMS),
+    # 024: lab M0294's M70-MOM30 arm (owner, 2026-10-31; replaces MOM-FR-GT). The object is the
+    # generic core-and-satellite BLEND and the PARAMS carry which sleeves and what shares, so the
+    # key names this one blend and not the allocator: a different share is a new key and a new id.
+    "MOMBLEND70": Binding(obj=BLEND, params=MOM70_PARAMS),
 }
 
 
@@ -849,6 +866,23 @@ LAB_PROVENANCE: dict[str, LabProvenance] = {
             "beat the market -- while falling 33.3%. The dev verdict was earned in 1996-2002 and "
             "2008; his money has never lived through a fall of that kind, and this entry is how "
             "the roster finds out what happens when it does. MVW-FR-GT is retired to make room"
+        ),
+    ),
+    MOM70_GT_ID: LabProvenance(
+        method_id="M0294",
+        candidate_id="M0294-M70-MOM30",
+        lab_status="rejected",
+        basis="owner-override",
+        reason=(
+            "owner override, 2026-10-31, after his calculate-assets run of this arm. It is NOT a "
+            "lab pass: M0294 is REJECTED and this arm failed two dev conditions -- max DD 57.1% "
+            "against the screen's 50%, and a recorded DSR of 0.548 at its recorded N=255 against "
+            "the 0.90 bar -- while beating SPY TR (+295.1% against +257.2%) with PF 1.54 on 2,048 "
+            "trades. It has never had a test-window look. What put it here is the other window: "
+            "on 2018-04-02..2026-10-06, on his real deposits at Gotrade's real fees, it ended at "
+            "Rp 1,595,573,111, +25.1% a year against SPY's +20.5%, with a 34.6% fall, ahead of "
+            "MOM-FR-GT's +10.4% on the same terms. The fall is the risk of this admission and "
+            "momentum is a published edge expected to fade. MOM-FR-GT is retired to make room"
         ),
     ),
 }
@@ -1204,11 +1238,26 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "same picks without the brake"
         ),
     ),
+    # 024, the momentum blend (owner, 2026-10-31). The owner ranked four candidates on the same
+    # 2018-04-01 start with his real deposits at Gotrade's real fees -- COSK, this blend, FULL50
+    # and MOM -- and kept the first three. It takes MOM-FR-GT's slot and MOM-FR-GT is retired.
+    #
+    # WHAT IT IS. 30% of the book in SPY at all times and 70% in the thirty strongest
+    # twelve-minus-one-month momentum names, equal slices, monthly, no market switch and no cash.
+    # It is M0294's M70-MOM30 arm, on the roster's usual fractional Gotrade preset, so no new
+    # preset and no web lever is needed.
+    #
+    # WHAT IT FAILED, AND WHY IT IS HERE ANYWAY. On the dev window it fails two conditions: max DD
+    # 57.1% against the screen's 50% and a luck test of 0.548 against 0.90. M0294 is REJECTED. On
+    # 2018-2026 it ended at Rp 1,595,573,111, +25.1% a year against SPY's +20.5%, falling 34.6%.
+    # A book with no market switch gets that fall in any bear market, and momentum is a published
+    # edge the dev window can only show from before the crowd traded it. Watching it forward is how
+    # the roster finds out which kind of decade it is in.
     RosterRow(
-        id=MOM_GT_ID,
-        name="MOM · Regime momentum",
+        id=MOM70_GT_ID,
+        name="MOM70 · Momentum beside SPY",
         sub=(
-            "Top 20 by last year's rise, holds less when jumpy for itself, monthly, fractional "
+            "70% in the 30 strongest names by last year's rise, 30% in SPY, monthly, fractional "
             "shares, real Gotrade fees"
         ),
         icon="trending-up",
@@ -1217,15 +1266,20 @@ SEED_ROWS: tuple[RosterRow, ...] = (
         sort=5,
         engine="book",
         rules_id="monthly-hold-frac-gotrade",
-        object_name="REGIME",
+        object_name="MOMBLEND70",
         registry_id=None,
         gate_note=(
-            "Lab M0002 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
-            "0.1% a side: beats SPY TR (+940.1% vs +351.4%), max DD 18.4%, PF 2.33 and 1,148 "
-            "trades all pass; failed only the luck test, on a recorded DSR of 0.854 at its "
-            "recorded N=80. Re-measured at Gotrade's real fees (449fa34, report only) it "
-            "returns +763% against SPY's +350% at the same fees. Successor of MOM-FR, which paid "
-            "the assumed rate. On paper to test it forward"
+            "Owner override, 2026-10-31, after his calculate-assets run; NOT a lab pass, and the "
+            "method it comes from is REJECTED. Lab M0294 dev window only (1996-01-03..2015-10-16), "
+            "already in fractional shares at Gotrade's measured fees on the owner's funding plan "
+            "-- the rule set this entry runs: it beats SPY TR (+295.1% against +257.2%) with PF "
+            "1.54 on 2,048 trades, but its max DD is 57.1% -- outside the lab screen's 50% and "
+            "well past the owner's 25% real-money bar -- and its recorded DSR is 0.548 at its "
+            "recorded N=255 against the 0.90 bar. Never had a test-window look. What put it here "
+            "is the other window: over 2018-04-02..2026-10-06 on the owner's real deposits it "
+            "ended at Rp 1,595,573,111, +25.1% a year against SPY's +20.5%, and it fell 34.6% "
+            "doing it. Momentum is a published edge and is expected to fade. It replaces "
+            "MOM-FR-GT"
         ),
     ),
     # 023, the always-invested control (owner, 2026-10-23). The owner asked for M0287-FULL on the
@@ -1627,6 +1681,31 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "to test it forward"
         ),
         status="retired",  # 023: retired to make room for FULL50-FR-GT (owner, 2026-10-23)
+    ),
+    RosterRow(
+        id=MOM_GT_ID,
+        name="MOM · Regime momentum",
+        sub=(
+            "Top 20 by last year's rise, holds less when jumpy for itself, monthly, fractional "
+            "shares, real Gotrade fees"
+        ),
+        icon="trending-up",
+        is_champion=False,
+        is_benchmark=False,
+        sort=23,
+        engine="book",
+        rules_id="monthly-hold-frac-gotrade",
+        object_name="REGIME",
+        registry_id=None,
+        gate_note=(
+            "Lab M0002 dev window only (1996-01-03..2015-10-16), in whole shares at the assumed "
+            "0.1% a side: beats SPY TR (+940.1% vs +351.4%), max DD 18.4%, PF 2.33 and 1,148 "
+            "trades all pass; failed only the luck test, on a recorded DSR of 0.854 at its "
+            "recorded N=80. Re-measured at Gotrade's real fees (449fa34, report only) it "
+            "returns +763% against SPY's +350% at the same fees. Successor of MOM-FR, which paid "
+            "the assumed rate. On paper to test it forward"
+        ),
+        status="retired",  # 024: retired to make room for MOM70-FR-GT (owner, 2026-10-31)
     ),
 )
 

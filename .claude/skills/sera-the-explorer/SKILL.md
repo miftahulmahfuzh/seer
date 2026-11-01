@@ -42,7 +42,33 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
 
 1. **Name yourself.** Use `sera-<YYYYMMDD-HHMM>` as both run id and name:
    `python3 ~/.claude/skills/task/session.py rename sera-<stamp> --no-widen`. Never let that block.
-2. **Preflight** in `$REPO`: `git pull --rebase --autostash`. Lab tests green
+1b. **Peer sweep: is another Sera already out?** The owner may start a second batch while one is
+   running, and two batches that never talk reserve and explore the same ideas. Before preflight
+   and before choosing anything:
+   - Find the peers: `tmux list-sessions` and `tmux list-windows -a -F '#S #W'` for other
+     `sera-*` sessions and live `explore-M*` windows (skip your own), plus `git -C $REPO worktree list`
+     for `explore/MNNNN` branches. In Claude Code, `ListAgents` shows peer `sera-*` sessions too.
+   - Ask each live peer coordinator: `SendMessage` to `sera-<its stamp>` with "Sera <your stamp>
+     is starting a batch. Reply with every method id and idea you are exploring or have queued,
+     one line each (id, mechanism, family), and your remaining slot count." Wait a short while for
+     the reply (a few minutes at most), then go on. A peer that doesn't answer, or has no
+     `SendMessage` (a non-Claude coordinator), is read from its pane instead:
+     `tmux capture-pane -p -S - -t <session>`.
+   - **The database is the truth, the reply is a hint.** Cross-check against `lab status` and
+     `lab seen`, which show every id a peer has reserved or registered, since the lab database is
+     shared through `SEER_LAB_DB`. Build an **exclusion list** of all their ideas, families and
+     mechanisms, and keep it for the whole run: step 3's slate and every step-6 refill must avoid
+     it (same family or same mechanism counts as a repeat, not only the same id). Re-read
+     `lab status` at each refill, since the peer keeps reserving.
+   - **Share capacity.** The 4-at-a-time cap is across all Seras on this machine, not per Sera,
+     because eight children at once is the memory crash the cap exists to prevent. Count live
+     `explore-M*` windows and launch only `4 - live` children now; the rest wait for a slot in
+     step 6. If no peer exists, this step costs nothing: carry on.
+   - Never ask the owner about any of this, and never touch the peer's windows, worktrees or
+     reservations. Note the peer and the exclusion list in the batch report.
+2. **Preflight** in `$REPO`: `git pull --rebase --autostash` (**only if step 1b found no peer
+   batch running**: with children live, autostash rewrites `lab/lab.sqlite` under their open
+   connections, so use `git fetch` + `git merge --ff-only origin/main` instead, see Never). Lab tests green
    (`cd engine && .venv/bin/python -m pytest -q tests/test_lab_*.py`). The snapshot check in
    `test_lab_snapshot.py` fails whenever `lab/lab.sqlite` changed without `lab stage` (for example
    after an interrupted batch). If that is the only failure, run `lab stage`, commit both files,

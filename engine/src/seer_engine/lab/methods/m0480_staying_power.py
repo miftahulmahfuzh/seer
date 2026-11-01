@@ -8,7 +8,7 @@ stock has stayed in the top fifth of the 12-1 momentum ranking.
 
 The frame is M0480's: F4 screen, 20 equal slots, monthly, fractional shares at Gotrade's real
 fees, SPY 200-day switch on every arm but one. The pool is the names in the top fifth today.
-The key is the streak: month-ends are taken as every 21st SPY bar back from data_date, up to 12;
+The key is the streak: month-ends are taken as every 21st SPY bar back from data_date, up to 9;
 the streak counts back until the first one at which the name was outside the top fifth of the
 eligible names then (ranked on the same members as today: point-in-time membership for past
 dates is not read, a small known blur). Ties break on momentum, then symbol.
@@ -46,7 +46,7 @@ from seer_engine.strategies.f_factor import (
 
 ADDED = date(2026, 11, 1)
 STEP = 21  # SPY bars per month-end
-MAXK = 12  # month-ends read back
+MAXK = 9  # month-ends read back
 
 MODES = ("mom", "new", "vet", "blind")
 MARKET = "SPY"
@@ -224,7 +224,7 @@ METHOD = Method(
         "Grinblatt and Moskowitz (2004), published 2004: consistent past winners keep winning. "
         "Among F4-screened point-in-time index members, take the names in today's top fifth of "
         "12-1 momentum and rank them by how many consecutive month-ends (every 21st SPY bar, up "
-        "to 12) they have stayed in the top fifth. Hold 20 equal slots, monthly, fractional "
+        "to 9) they have stayed in the top fifth. Hold 20 equal slots, monthly, fractional "
         "shares at Gotrade's real fees, behind SPY's 200-day switch. Arms: MOM (plain top-20 "
         "momentum, control), VET (longest streaks), NEW (shortest streaks, the reversed arm), "
         "R1 and R2 (hash draws of 20 from the same top-fifth pool, the blind pair), VET-NOSW "

@@ -1254,35 +1254,6 @@ SEED_ROWS: tuple[RosterRow, ...] = (
     # edge the dev window can only show from before the crowd traded it. Watching it forward is how
     # the roster finds out which kind of decade it is in.
     RosterRow(
-        id=MOM70_GT_ID,
-        name="MOM70 · Momentum beside SPY",
-        sub=(
-            "70% in the 30 strongest names by last year's rise, 30% in SPY, monthly, fractional "
-            "shares, real Gotrade fees"
-        ),
-        icon="trending-up",
-        is_champion=False,
-        is_benchmark=False,
-        sort=5,
-        engine="book",
-        rules_id="monthly-hold-frac-gotrade",
-        object_name="MOMBLEND70",
-        registry_id=None,
-        gate_note=(
-            "Owner override, 2026-10-31, after his calculate-assets run; NOT a lab pass, and the "
-            "method it comes from is REJECTED. Lab M0294 dev window only (1996-01-03..2015-10-16), "
-            "already in fractional shares at Gotrade's measured fees on the owner's funding plan "
-            "-- the rule set this entry runs: it beats SPY TR (+295.1% against +257.2%) with PF "
-            "1.54 on 2,048 trades, but its max DD is 57.1% -- outside the lab screen's 50% and "
-            "well past the owner's 25% real-money bar -- and its recorded DSR is 0.548 at its "
-            "recorded N=255 against the 0.90 bar. Never had a test-window look. What put it here "
-            "is the other window: over 2018-04-02..2026-10-06 on the owner's real deposits it "
-            "ended at Rp 1,595,573,111, +25.1% a year against SPY's +20.5%, and it fell 34.6% "
-            "doing it. Momentum is a published edge and is expected to fade. It replaces "
-            "MOM-FR-GT"
-        ),
-    ),
-    RosterRow(
         id=BENCHMARK_ID,
         name="SPY",
         sub="S&P 500, buy and hold",
@@ -1707,6 +1678,37 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "market and loses the one with two in it. It replaces MVW-FR-GT"
         ),
         status="retired",  # 025: kicked off the roster by the owner, 2026-11-01; every row it wrote stays
+    ),
+    RosterRow(
+        id=MOM70_GT_ID,
+        name="MOM70 · Momentum beside SPY",
+        sub=(
+            "70% in the 30 strongest names by last year's rise, 30% in SPY, monthly, fractional "
+            "shares, real Gotrade fees"
+        ),
+        icon="trending-up",
+        is_champion=False,
+        is_benchmark=False,
+        sort=25,
+        engine="book",
+        rules_id="monthly-hold-frac-gotrade",
+        object_name="MOMBLEND70",
+        registry_id=None,
+        gate_note=(
+            "Owner override, 2026-10-31, after his calculate-assets run; NOT a lab pass, and the "
+            "method it comes from is REJECTED. Lab M0294 dev window only (1996-01-03..2015-10-16), "
+            "already in fractional shares at Gotrade's measured fees on the owner's funding plan "
+            "-- the rule set this entry runs: it beats SPY TR (+295.1% against +257.2%) with PF "
+            "1.54 on 2,048 trades, but its max DD is 57.1% -- outside the lab screen's 50% and "
+            "well past the owner's 25% real-money bar -- and its recorded DSR is 0.548 at its "
+            "recorded N=255 against the 0.90 bar. Never had a test-window look. What put it here "
+            "is the other window: over 2018-04-02..2026-10-06 on the owner's real deposits it "
+            "ended at Rp 1,595,573,111, +25.1% a year against SPY's +20.5%, and it fell 34.6% "
+            "doing it. Momentum is a published edge and is expected to fade. It replaces "
+            "MOM-FR-GT"
+        ),
+    
+        status="retired",  # 026: kicked off the roster by the owner, 2026-11-01; every row it wrote stays
     ),
 )
 

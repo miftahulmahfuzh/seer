@@ -14,12 +14,15 @@ market series). Nothing else moves, so the 2x2 is clean: habit (watch on or off)
 
 Variants:
 
-    * ``NEVER``: never steps aside, cash earns nothing. The control with no opinion in it.
     * ``NEVER-CASH``: never steps aside, the little idle cash it has is paid. Prices the
       interest on an almost fully invested book, so it isolates how much of any gain is the
       watch's cash and how much is just paying the residual.
-    * ``FIXED730``: M0336's clock, cash earns nothing. The parent's best arm, re-measured here.
     * ``FIXED730-CASH``: the clock, cash paid. The treatment.
+
+The two unpaid arms (NEVER, FIXED730) are not registered again: they are byte-identical to
+M0336-NEVER and M0336-FIXED730, which the runner refuses as already run (first run attempt,
+2026-11-01, recorded nothing). Their recorded trials, same store and fees, are the unpaid half
+of the 2x2.
 
 Cash yield raises the owner input "cash-yield" (nobody has verified Gotrade pays interest), so
 paper refuses it: this is a lab measurement of what the watch costs when its waiting money is
@@ -64,10 +67,10 @@ METHOD = Method(
         "stays the best rule, and its one real cost is the time spent in cash earning nothing. "
         "Pay the watch's cash the 13-week Treasury bill rate (series T13W, point in time) while the "
         "watch is open, on the same big-dividend-raise book (M0076-X-M's picks, own SPY-200 switch "
-        "removed, monthly re-pick, weekly resize) at fractional Gotrade fees. Registered as a 2x2 "
-        "so the habit and the cash are separated: NEVER and NEVER-CASH (never steps aside; the "
-        "no-opinion controls, the second prices the interest on the residual cash alone), FIXED730 "
-        "and FIXED730-CASH (M0336's clock, cash unpaid then paid; the treatment). The watch logic "
+        "removed, monthly re-pick, weekly resize) at fractional Gotrade fees. Two new arms "
+        "complete a 2x2 with M0336's recorded unpaid arms (same configuration, same store): "
+        "NEVER-CASH (never steps aside; the no-opinion control, it prices the interest on the "
+        "residual cash alone) and FIXED730-CASH (M0336's clock with cash paid; the treatment). The watch logic "
         "is M0336's allocator unchanged; only the rule set differs by cash_yield. Both the "
         "inverted-curve signal (1996) and bill interest are public and old, so no edge is claimed "
         "from being early. Assumed: Gotrade paying interest on idle dollars is unverified, so "
@@ -84,12 +87,8 @@ METHOD = Method(
         "luck bar by a wider margin than FIXED730 did."
     ),
     candidates=(
-        _v("NEVER", WatchParams("never"), MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE,
-           "Control: never steps aside, cash earns nothing"),
         _v("NEVER-CASH", WatchParams("never"), RESIZE_GOTRADE_CASH,
            "Control: never steps aside, residual cash paid the bill rate"),
-        _v("FIXED730", WatchParams("fixed"), MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE,
-           "Parent's clock, cash earns nothing"),
         _v("FIXED730-CASH", WatchParams("fixed"), RESIZE_GOTRADE_CASH,
            "Treatment: the clock with the watch's cash paid the bill rate"),
     ),

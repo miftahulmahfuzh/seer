@@ -140,7 +140,7 @@ class JanuaryTaxLossAllocator:
 
     def lookback(self, params: Any) -> int:
         _check(params)
-        return max(DV_N, SCREEN.vol_n + 1)
+        return max(DV_N, SCREEN.vol_n + 1, SCREEN.mom_n + 1)  # the formation return needs 253 bars
 
     def symbols(self, params: Any) -> tuple[str, ...]:
         _check(params)

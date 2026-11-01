@@ -19,10 +19,12 @@ Arms, all pre-registered here:
 * ``WIN``   the mirror: best-decile winners in January, SPY otherwise.
 * ``DRAW``  a decile picked by a fixed hash of (symbol, year), no opinion in it: same trades, same
   January-only habit, no ranking. It prices what *acting* costs, which cancels between LOSE and WIN.
-* ``SPY``   always invested in SPY: the control the habit is judged against.
+* SPY always invested is NOT a variant: it is configuration-identical to M0251-HOLD, which `lab run`
+  refuses to repeat, and every run already scores against total-return SPY (same fees). Read it from
+  the benchmark and from M0251-HOLD.
 
 LOSE against DRAW is the real test: does ranking on losses beat a random decile held for the same
-month. LOSE against SPY says whether the whole habit is worth its fees.
+month. LOSE against the SPY benchmark says whether the whole habit is worth its fees.
 
 Assumptions, written before the run: the idea row said "worst-decile"; the cap at 30 is mine. The
 formation window is the trailing 252 sessions through the last December close (calendar-year
@@ -54,7 +56,6 @@ from seer_engine.strategies.f_factor import (
     factor_rows,
     prepare_factor,
 )
-from seer_engine.strategies.f_index import TIMING, TimingParams
 
 ADDED = date(2026, 11, 1)
 
@@ -203,7 +204,7 @@ METHOD = Method(
         "252-session return (capped at 30 names) equal weight for January, SPY the other eleven "
         "months, in fractional shares at Gotrade's real fees on monthly-hold-frac-gotrade. Arms: "
         "LOSE (the idea), WIN (the mirror: best decile), DRAW (a hash-picked decile with the same "
-        "January-only habit and no ranking), SPY (always invested, the control). If LOSE beats "
+        "January-only habit and no ranking). The always-invested SPY control is the run's own SPY benchmark (a variant would repeat M0251-HOLD, which the lab refuses). If LOSE beats "
         "DRAW and WIN, ranking on losses carries the edge; if LOSE and WIN both beat DRAW the "
         "effect is January volatility, not tax selling. Success: LOSE beats total-return SPY with "
         "worst fall under the bar, LOSE > DRAW, and the gain holds in 2009-2015. Only one month "
@@ -226,10 +227,6 @@ METHOD = Method(
            "Mirror: best decile of 12-month winners held for January, SPY otherwise"),
         _v("DRAW", JanParams(side="draw"),
            "No-opinion arm: a hash-picked decile for January, SPY otherwise (prices the habit)"),
-        Candidate(id="M0458-SPY", family="M0458", rules=MONTHLY_HOLD_FRAC_GOTRADE,
-                  allocator=TIMING, params=TimingParams(hold="SPY", signal="SPY", rule="always"),
-                  rationale="Control: always invested in SPY, never switching", added=ADDED,
-                  owner_inputs=()),
     ),
     seen_keys=(
         "concept:tax-loss-selling-january-rebound",

@@ -111,8 +111,9 @@ MOM70_GT = "MOM70-FR-GT"
 #: every entry that ever traded under the assumed flat rate, plus the three 013 retired and the
 #: ones 021 and 022 retired; every one of them keeps every row it wrote.
 RETIRED = (F4, F1, FND, RM, "A", F4_FR, F1_FR, "SPY", "C", RMW, RAW, MOM, MVW, RAW_GT, RMW_GT,
-           MVW_GT, MOM_GT)
-ACTIVE_IDS = (SPY_GT, C_GT, COSK_GT, RAW35_GT, MOM70_GT, ALLIN_GT)
+           MVW_GT, MOM_GT, ALLIN_GT)
+# 025 (owner, 2026-11-01): FULL50-FR-GT retired with no replacement, so four books and the SPY yardstick.
+ACTIVE_IDS = (SPY_GT, C_GT, COSK_GT, RAW35_GT, MOM70_GT)
 
 # 2026-10-07: every digest moved once, on purpose, when the paper books' starting cash went from
 # 20,000,000 to 10,000,000 IDR (spec "initial_idr"; the owner's own Gotrade money). Production's
@@ -185,11 +186,12 @@ DISPLAY = ("id", "name", "sub", "icon", "is_champion", "is_benchmark", "sort", "
 
 def test_the_roster_is_the_handover_entries_in_sort_order():
     assert ROSTER_IDS == (
-        SPY_GT, C_GT, COSK_GT, RAW35_GT, MOM70_GT, ALLIN_GT,
+        SPY_GT, C_GT, COSK_GT, RAW35_GT, MOM70_GT,
         "SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW, RAW_GT, RMW_GT,
-        MVW_GT, MOM_GT,
+        MVW_GT, MOM_GT, ALLIN_GT,
     )
-    assert [e.sort for e in ROSTER] == list(range(1, 24))
+    # 025 retired FULL50 (sort 6) to the end at 24 and replaced nothing, so sort 6 is a gap.
+    assert [e.sort for e in ROSTER] == [1, 2, 3, 4, 5, *range(7, 25)]
     assert "B" not in ROSTER_IDS
 
 
@@ -574,7 +576,7 @@ def test_active_drops_retired_entries_and_keeps_order():
     )
     entries = from_rows(rows)
     assert [e.id for e in entries] == list(ROSTER_IDS)  # retired rows are never dropped from the roster
-    assert [e.id for e in active(entries)] == [SPY_GT, C_GT, COSK_GT, MOM70_GT, ALLIN_GT]
+    assert [e.id for e in active(entries)] == [SPY_GT, C_GT, COSK_GT, MOM70_GT]
     raw = next(e for e in entries if e.id == RAW35_GT)
     assert (raw.status, raw.paper_end) == ("retired", date(2026, 10, 2))
 
@@ -678,7 +680,7 @@ def test_read_roster_rows_reads_the_new_columns_and_defaults_them(pg):
     retired = {r.id: r for r in store.read_roster_rows(pg)}["A"]
     assert (retired.status, retired.paper_end) == ("retired", date(2026, 10, 2))
     # A is retired in SEED_ROWS since 013, so retiring it in the database changes nothing about
-    # who trades: the active set is still the five the owner chose plus the SPY yardstick.
+    # who trades: the active set is still the four books the owner kept plus the SPY yardstick.
     assert [e.id for e in active(from_rows(store.read_roster_rows(pg)))] == list(ACTIVE_IDS)
     pg.rollback()
 

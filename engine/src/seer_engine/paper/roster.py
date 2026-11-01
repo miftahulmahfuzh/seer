@@ -1282,63 +1282,6 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "MOM-FR-GT"
         ),
     ),
-    # 023, the always-invested control (owner, 2026-10-23). The owner asked for M0287-FULL on the
-    # roster after its calculate-assets run, naming C, COSK and RAW35 as the entries to keep. It
-    # replaces MVW-FR-GT.
-    #
-    # WHY THIS ENTRY IS NOT LIKE THE OTHERS. Every other book here expresses an opinion and then
-    # protects it -- a market switch, a volatility brake, a weighting scheme. This one has no
-    # opinion to protect: fifty liquid members, equal slices, rebalanced in full every month,
-    # never out of the market. It is on the roster for the same reason C is on it permanently:
-    # C measures what daily trading would have cost, and this measures what never stepping aside
-    # would have cost, or paid. Both are findings whether they win or lose, and neither is a
-    # candidate for the owner's money. The gate note says so in its first sentence.
-    #
-    # WHAT IT FAILED, AND WHY IT IS HERE ANYWAY. On the dev window it fails ALL FOUR conditions:
-    # it loses to a deposit-matched SPY TR, falls 59.5% against the screen's 50% and the owner's
-    # 25%, makes a profit factor of 1.25 against 1.30, and reads 0.414 on the luck test. M0287
-    # itself is REJECTED. On 2018-2026, the owner's own window, the same arm is the only thing in
-    # the batch that beat SPY. Those two facts are the entry: a book with no defence wins a decade
-    # with no long bear market in it and loses the one that has two. Watching it forward is how
-    # the roster finds out which kind of decade it is in.
-    #
-    # THE CHASSIS IS PART OF THE BOOK. It runs monthly-hold-frac-gotrade-tband00 -- the band shut,
-    # every holding traded back to its slot every month -- because that is what M0287 measured and
-    # what the +24.6% was earned on. Admitting it on the roster's usual preset would have been a
-    # different book wearing this one's number. 023 adds the preset to sim.rules rather than move
-    # the entry onto an approximation.
-    RosterRow(
-        id=ALLIN_GT_ID,
-        name="FULL50 · Never steps aside",
-        sub=(
-            "The 50 most-traded members at equal weight, fully rebalanced monthly, never in cash, "
-            "fractional shares, real Gotrade fees"
-        ),
-        icon="anchor",
-        is_champion=False,
-        is_benchmark=False,
-        sort=6,
-        engine="book",
-        rules_id="monthly-hold-frac-gotrade-tband00",
-        object_name="ALLINVESTED",
-        registry_id=None,
-        gate_note=(
-            "A CONTROL, not a candidate: the always-invested complement of C, here to measure what "
-            "never stepping aside costs or pays. Owner override, 2026-10-23, after his "
-            "calculate-assets run; NOT a lab pass, and the method it comes from is REJECTED. Lab "
-            "M0287 dev window only (1996-01-03..2015-10-16), already in fractional shares at "
-            "Gotrade's measured fees on the owner's funding plan -- the rule set this entry runs: "
-            "it FAILED every condition, losing to a deposit-matched SPY TR (+250.3% against "
-            "+257.2%, 6.9% a year against 7.2%), max DD 59.5% -- outside the lab screen's 50% and "
-            "well past the owner's 25% real-money bar -- PF 1.25 against the 1.30 bar, and a "
-            "recorded DSR of 0.414 at its recorded N=184, on 1,338 trades. Never had a "
-            "test-window look. What put it here is the other window: over 2018-04-02..2026-10-08 "
-            "on the owner's real deposits it ended at Rp 1,558,671,049, +24.6% a year against "
-            "SPY's +20.4%, the only arm of the four methods explored that beat the market -- and "
-            "it fell 33.3% doing it. A book with no defence wins a decade without a long bear "
-            "market and loses the one with two in it. It replaces MVW-FR-GT"
-        ),
-    ),
     RosterRow(
         id=BENCHMARK_ID,
         name="SPY",
@@ -1706,6 +1649,64 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "the assumed rate. On paper to test it forward"
         ),
         status="retired",  # 024: retired to make room for MOM70-FR-GT (owner, 2026-10-31)
+    ),
+    # 023, the always-invested control (owner, 2026-10-23). The owner asked for M0287-FULL on the
+    # roster after its calculate-assets run, naming C, COSK and RAW35 as the entries to keep. It
+    # replaces MVW-FR-GT.
+    #
+    # WHY THIS ENTRY IS NOT LIKE THE OTHERS. Every other book here expresses an opinion and then
+    # protects it -- a market switch, a volatility brake, a weighting scheme. This one has no
+    # opinion to protect: fifty liquid members, equal slices, rebalanced in full every month,
+    # never out of the market. It is on the roster for the same reason C is on it permanently:
+    # C measures what daily trading would have cost, and this measures what never stepping aside
+    # would have cost, or paid. Both are findings whether they win or lose, and neither is a
+    # candidate for the owner's money. The gate note says so in its first sentence.
+    #
+    # WHAT IT FAILED, AND WHY IT IS HERE ANYWAY. On the dev window it fails ALL FOUR conditions:
+    # it loses to a deposit-matched SPY TR, falls 59.5% against the screen's 50% and the owner's
+    # 25%, makes a profit factor of 1.25 against 1.30, and reads 0.414 on the luck test. M0287
+    # itself is REJECTED. On 2018-2026, the owner's own window, the same arm is the only thing in
+    # the batch that beat SPY. Those two facts are the entry: a book with no defence wins a decade
+    # with no long bear market in it and loses the one that has two. Watching it forward is how
+    # the roster finds out which kind of decade it is in.
+    #
+    # THE CHASSIS IS PART OF THE BOOK. It runs monthly-hold-frac-gotrade-tband00 -- the band shut,
+    # every holding traded back to its slot every month -- because that is what M0287 measured and
+    # what the +24.6% was earned on. Admitting it on the roster's usual preset would have been a
+    # different book wearing this one's number. 023 adds the preset to sim.rules rather than move
+    # the entry onto an approximation.
+    RosterRow(
+        id=ALLIN_GT_ID,
+        name="FULL50 · Never steps aside",
+        sub=(
+            "The 50 most-traded members at equal weight, fully rebalanced monthly, never in cash, "
+            "fractional shares, real Gotrade fees"
+        ),
+        icon="anchor",
+        is_champion=False,
+        is_benchmark=False,
+        sort=24,
+        engine="book",
+        rules_id="monthly-hold-frac-gotrade-tband00",
+        object_name="ALLINVESTED",
+        registry_id=None,
+        gate_note=(
+            "A CONTROL, not a candidate: the always-invested complement of C, here to measure what "
+            "never stepping aside costs or pays. Owner override, 2026-10-23, after his "
+            "calculate-assets run; NOT a lab pass, and the method it comes from is REJECTED. Lab "
+            "M0287 dev window only (1996-01-03..2015-10-16), already in fractional shares at "
+            "Gotrade's measured fees on the owner's funding plan -- the rule set this entry runs: "
+            "it FAILED every condition, losing to a deposit-matched SPY TR (+250.3% against "
+            "+257.2%, 6.9% a year against 7.2%), max DD 59.5% -- outside the lab screen's 50% and "
+            "well past the owner's 25% real-money bar -- PF 1.25 against the 1.30 bar, and a "
+            "recorded DSR of 0.414 at its recorded N=184, on 1,338 trades. Never had a "
+            "test-window look. What put it here is the other window: over 2018-04-02..2026-10-08 "
+            "on the owner's real deposits it ended at Rp 1,558,671,049, +24.6% a year against "
+            "SPY's +20.4%, the only arm of the four methods explored that beat the market -- and "
+            "it fell 33.3% doing it. A book with no defence wins a decade without a long bear "
+            "market and loses the one with two in it. It replaces MVW-FR-GT"
+        ),
+        status="retired",  # 025: kicked off the roster by the owner, 2026-11-01; every row it wrote stays
     ),
 )
 

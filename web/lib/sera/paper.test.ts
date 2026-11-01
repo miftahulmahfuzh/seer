@@ -13,9 +13,6 @@ describe('paper provenance (lab.json `paper`)', () => {
     expect(methodHref('COSK-FR-GT')).toBe('/sera/methods/M0179');
     // 2026-10-31: migration 024 put the momentum blend (MOM70-FR-GT) in MOM-FR-GT's seat.
     expect(methodHref('MOM70-FR-GT')).toBe('/sera/methods/M0294');
-    // 2026-10-23: migration 023 put the always-invested control (FULL50-FR-GT) in MVW-FR-GT's
-    // seat, so MVW-FR-GT is retired and withheld like the other predecessors below.
-    expect(methodHref('FULL50-FR-GT')).toBe('/sera/methods/M0287');
   });
 
   it('has no answer for a retired entry, even one the lab did produce', () => {
@@ -30,6 +27,9 @@ describe('paper provenance (lab.json `paper`)', () => {
     expect(methodHref('RMW-FR-GT')).toBeNull();
     // MOM-FR-GT, retired by 024 to make room for MOM70-FR-GT.
     expect(methodHref('MOM-FR-GT')).toBeNull();
+    // FULL50-FR-GT, the always-invested control 023 admitted, retired by 025 (owner, 2026-11-01)
+    // with no replacement.
+    expect(methodHref('FULL50-FR-GT')).toBeNull();
   });
 
   it('has no answer for an entry the lab never produced', () => {

@@ -63,9 +63,10 @@ METHOD = Method(
         "one-month losers, resized monthly, fractional at Gotrade's real fees on the owner's "
         "deposits. Variants: L1M (the idea), W1M (control: the one-month winners, same shape), "
         "L1M-SKIP (losers measured skipping the latest week, to avoid the bid-ask bounce), L1M-30 "
-        "(30% dose check) and SPY-ONLY (no opinion at all, the dressing arm that prices what "
-        "monthly turnover costs). Success: L1M beats SPY TR on dev, beats W1M and SPY-ONLY, and "
-        "leads SPY in 2009-2015."
+        "(30% dose check). The no-opinion arm (SPY always, same rules and fees) cannot be "
+        "registered again: its digest repeats M0251-HOLD, which already ran, so the dressing "
+        "comparison reads M0251-HOLD's recorded trial. Success: L1M beats SPY TR on dev, beats "
+        "W1M and M0251-HOLD, and leads SPY in 2009-2015."
     ),
     expected_failure=(
         "Monthly turnover of the slice at Gotrade's fees eats the edge (a 20-name slice at 20% of "
@@ -79,7 +80,6 @@ METHOD = Method(
         _v("W1M", BLEND, _blend("0.2", WINNERS), "Control: 20% the 20 one-month winners, same shape"),
         _v("L1M-SKIP", BLEND, _blend("0.2", LOSERS_SKIP), "Losers over sessions -26..-5, skipping the latest week"),
         _v("L1M-30", BLEND, _blend("0.3", LOSERS), "Dose check: 30% slice"),
-        _v("SPY-ONLY", TIMING, ALWAYS_SPY, "Dressing arm: SPY always, no opinion, same rules and fees"),
     ),
     seen_keys=(
         "concept:one-month-reversal-always-held-slice",

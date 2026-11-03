@@ -30,7 +30,7 @@ Each of these is the correct end state for its DB, not a failure of the harness.
 
 ## Gotchas
 
-- **`paper_check` crashes on demo data** (`UnknownObject: 'SPY': roster object name None is not in paper.roster.RESOLVER`). `web/scripts/seed-demo.mjs` writes strategy rows the engine's roster resolver cannot read. That is a product bug. Use `--empty` for roster commands.
+- On demo data (`up` without `--empty`) `paper_check` runs and reports `replay mismatch` for all five strategies (exit 1): the seeded history is hand-made, not simulated, so it cannot replay. That is the check working. Before 2026-11-03 it crashed instead (`UnknownObject: 'SPY': roster object name None`), because the seeder did not write migration 006's `object_name` column. A crash there now is a regression.
 - A full real nightly cannot be produced: it needs a 10-year `backfill` from yfinance first. Mark journeys that need one `inconclusive`.
 - `--net` reaches Massive with the owner's free-tier key, which the production nightly shares (06:17, 09:41, 12:41 UTC). Keep `--net` drives few and away from those times.
 - `veto` / `explain` with `--llm` spend the budget (default 3). On a DB with no candidates they make no call, which proves nothing. Seed state first.

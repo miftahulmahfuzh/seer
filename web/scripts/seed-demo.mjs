@@ -350,10 +350,16 @@ try {
   await c.query(`TRUNCATE action_dismissals, orders, equity_snapshots, bars, fx_rates, runs, paper_state, book_positions,
     book_targets, book_previews, book_fills, book_trades, dividends, news_vetoes, strategies RESTART IDENTITY CASCADE`);
 
+  // The definition columns migration 006 added are what paper.roster.from_row resolves a row
+  // through; without them every engine command that builds the roster (paper_check, paper) stops
+  // on "roster object name None". Same values 006 backfilled for these five ids.
   for (const s of strategies)
-    await c.query(`INSERT INTO strategies (id, name, sub, icon, is_champion, is_benchmark, sort, engine, rules_id, paper_start, params)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-    [s.id, s.name, s.sub, s.icon, s.champion, s.benchmark, s.sort, s.engine, s.rulesId, s.paperStart, JSON.stringify(s.params)]);
+    await c.query(`INSERT INTO strategies (id, name, sub, icon, is_champion, is_benchmark, sort, engine, rules_id, paper_start, params,
+        object_name, registry_id, gate_note, gate_applicable)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+    [s.id, s.name, s.sub, s.icon, s.champion, s.benchmark, s.sort, s.engine, s.rulesId, s.paperStart, JSON.stringify(s.params),
+      s.engine === 'benchmark' ? 'buy_and_hold' : s.params.spec.object, s.params.spec.registry_id ?? null, s.params.backtest_gate.note,
+      s.params.backtest_gate.applicable !== false]);
 
   await c.query(`INSERT INTO runs (started_at, finished_at, status, data_date, session_date, is_demo, paper_status, paper_finished_at)
     VALUES (now() - interval '5 minutes', now() - interval '2 minutes', 'success', $1, $2, true, 'success', now())`, [dataDate, session]);

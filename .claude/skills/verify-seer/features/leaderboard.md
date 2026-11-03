@@ -28,4 +28,4 @@ The page and `compare` must agree on the order: both rank by Sharpe, which is wh
 ## Gotchas
 
 - The checklist's drawdown bar (25%) is mirrored from the engine and pinned by a test. A change to it is a dated owner revision (CLAUDE.md), never something a verify run should "fix".
-- `compare` reads the run's DB, so it works on demo data. `paper_check` does not (see engine-night.md).
+- `compare` reads the run's DB, so it works on demo data. `paper_check` runs on demo data but cannot replay it (see engine-night.md).

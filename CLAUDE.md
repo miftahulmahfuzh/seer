@@ -59,6 +59,12 @@ npm run shoot -- --theme dark --width 390 /positions # headless signed-in screen
 
 Use the `run-the-web-app` skill to visually check any change to web/.
 
+To prove a change works (web, engine or lab), use the `verify-seer` skill
+(`.claude/skills/verify-seer/scripts/verify.sh`). It runs a throwaway copy against its own local
+Postgres, demo data and lab copy, and never reaches Neon, GitHub, Telegram or the test window. Its
+feature map is `.claude/skills/verify-seer/features/README.md`: a user-facing change updates its
+entry in the same commit.
+
 ## The lab: how methods get run
 
 - The method file must be **committed before** `lab run MNNNN`. That commit is the

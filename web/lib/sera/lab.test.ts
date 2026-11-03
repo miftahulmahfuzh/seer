@@ -22,13 +22,15 @@ describe('lab snapshot (web/data/lab.json)', () => {
   });
 
   it('collapses the spent looks and the buy signal to distinct strategies', () => {
-    // Insight 529, against the real snapshot rather than a fixture: four looks are spent and they
-    // bought two strategies, and the three firing method ids are one. Both numbers gate decisions
-    // the owner makes with real money, and the firing one is the direction that encourages
-    // spending — this is the test that notices if either collapse quietly stops happening.
+    // Insight 529, against the real snapshot rather than a fixture: five looks are spent and they
+    // bought three strategies (M0021/M0022/M0029 are one book; M0002 and M0377, the fifth look on
+    // 2026-10-26, are one each), and the five firing method ids are two. Both numbers gate
+    // decisions the owner makes with real money, and the firing one is the direction that
+    // encourages spending — this is the test that notices if either collapse quietly stops
+    // happening. The look count is a literal on purpose: spending a look should bring you here.
     const members = (bs: typeof lab.books.testLooks) => bs.flatMap((b) => [b.lead, ...b.others]);
 
-    expect(lab.summary.testLooks).toBe(4);
+    expect(lab.summary.testLooks).toBe(5);
     expect(lab.summary.testBooks).toBe(lab.books.testLooks.length);
     expect(members(lab.books.testLooks).length).toBe(lab.summary.testLooks);
 

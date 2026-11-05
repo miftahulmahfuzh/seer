@@ -135,7 +135,8 @@ def test_009_adds_a_nullable_jsonb_evidence_column_to_three_tables(pg):
         "SELECT table_name, data_type, is_nullable, column_default FROM information_schema.columns "
         "WHERE table_schema = current_schema() AND column_name = 'evidence' ORDER BY table_name"
     ).fetchall()
-    assert rows == [(t, "jsonb", "YES", None) for t in sorted(EVIDENCE_TABLES)]
+    # 027 (Seer Adversarial) gave strategy_candidates the same evidence column, with the same shape.
+    assert rows == [(t, "jsonb", "YES", None) for t in sorted((*EVIDENCE_TABLES, "strategy_candidates"))]
 
 
 def test_009_is_idempotent(pg):

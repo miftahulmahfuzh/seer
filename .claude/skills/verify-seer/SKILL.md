@@ -199,7 +199,7 @@ is wrong is a product bug: report it, do not edit the entry to match.
 - **`paper_check` on demo data reports replay mismatches** (for example `A: replay mismatch (178
   differences)`; exit 1). That is correct: `seed-demo.mjs` writes a hand-made story of snapshots,
   orders and trades, not one the simulator produced, so a replay cannot match it. Drive the
-  engine's roster commands on `up --empty`, where `paper_check` exits 0 over 23 roster strategies.
+  engine's roster commands on `up --empty`, where `paper_check` exits 0 over 24 roster strategies.
 - **A real `nightly` cannot run here.** `--net` gets through config and DB, then stops at "no SPY
   bars stored; run `backfill` first", and `backfill` is a 10-year yfinance crawl. Offline,
   `nightly` exits 2 on the blank `MASSIVE_API_KEY`. Treat both as end states, not failures.

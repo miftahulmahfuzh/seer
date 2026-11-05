@@ -355,7 +355,7 @@ exception.
 GitHub Actions  (cron, ~06:17 UTC Tue–Sat, Python)
    1  fetch EOD bars + dividends + USD/IDR        →  Neon
    2  settle every roster strategy's open orders
-   3  each strategy proposes next session's picks
+   3  each strategy proposes next session's picks, and lists its top ones for Claude's review
    4  news check: LLM may veto a candidate
    5  LLM writes a plain-language reason per pick
    6  mark the owner's real holdings to market
@@ -381,7 +381,7 @@ number the engine wrote.
 | Step | What it does | On failure |
 |---|---|---|
 | Bars | Grouped-daily for the whole market in one call, plus dividends and held-symbol bars | Retry, then mark the run failed; the UI shows do-not-trade |
-| Paper | Settle, then decide, for every roster strategy, in one transaction | Night is rolled back; no partial state |
+| Paper | Settle, then decide, for every roster strategy, in one transaction, and write down each method's ranked candidates for Claude's review | Night is rolled back; no partial state |
 | Paper check | Replay the night from stored bars and assert the database agrees | Loud failure in the run log |
 | Veto | Up to 20 headlines from the last 3 days plus earnings dates, under a frozen prompt | Any failure is a `failed` verdict, which means **no trade** |
 | Explain | A plain-language reason per pick | Explanation reads "unavailable"; the pick stands |
@@ -404,6 +404,23 @@ date arithmetic, not by care.
 
 `watch.yml` is deliberately a *separate* workflow: a step inside the nightly cannot report that the
 nightly never ran.
+
+### Seer Adversarial: what the night hands to Claude
+
+Claude reviews the roster's picks before they are bought (design brief in the mcp-notes repo,
+`docs/plans/2026-11-05-seer-adversarial-design.md`). Migration 027 adds what that needs:
+
+| Table | Written by | What it holds |
+|---|---|---|
+| `strategy_candidates` | `paper`, in the night's transaction | Each bracket method's own top 10 for the session it decides, before any news veto; each book's targets at a rank or kickoff decision |
+| `book_previews.next_decision_session` | `paper` | The next session a book ranks, so a monthly book can be reviewed days early |
+| `adversary_verdicts` | mcp-notes only | Agree, object or can't tell, with sources. Append-only: a trigger refuses deletes and edits; a re-review supersedes, and the old verdict stays |
+| `adversary_marks`, `adversary_leases` | mcp-notes only | "Paused" decisions (auto-reviews switched off), and which machine is reviewing |
+| `strategies.twin_of` | the roster | A Claude twin names its original |
+
+A verdict counts only if it was decided before 09:30 New York on its session
+(`seer_engine.dates.session_open_utc`). Missing, failed or late means the twin copies its original. The
+same migration brings plain A back as `A-GT`, at real Gotrade fees, as the baseline for C-GT and the twins.
 
 ---
 

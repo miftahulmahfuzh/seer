@@ -215,6 +215,12 @@ ALLIN_GT_ID = "FULL50-FR-GT"
 # came last by a wide margin and was the only one to lose to SPY.
 MOM70_GT_ID = "MOM70-FR-GT"
 
+# 027 (owner, 2026-11-05, Seer Adversarial): plain Strategy A back on paper at Gotrade's real fees, the
+# baseline that C-GT and the Claude twins are compared against. The object is STRATEGY_A, unchanged; the
+# rule set is the one C-GT trades (design-v0-gotrade). A NEW ID and not a revived A: A is frozen under
+# design-v0's flat 0.1% a side, and moving its fees would move its pinned digest.
+A_GT_ID = "A-GT"
+
 #: The bracket rule set the daily control trades under: design section 5's shape, charging Gotrade's
 #: measured schedule instead of a flat 0.1% a side. Added by the bracket-path work; this module only
 #: names it, and `rules_for` raises UnknownRules if it is not a `sim.rules` preset.
@@ -1236,6 +1242,30 @@ SEED_ROWS: tuple[RosterRow, ...] = (
             "against -0.2): the width case is a drawdown case, not a return case, and that is the "
             "risk of this admission. On paper as the controlled comparison against RMW-FR-GT: the "
             "same picks without the brake"
+        ),
+    ),
+    # 027 (owner, 2026-11-05): plain A, back as the baseline of the three-way comparison A / C / A with
+    # Claude's objections. It takes sort 5, which 026 vacated. Not a lab entry (A predates the lab), so
+    # it has no LAB_PROVENANCE line, and its gate applies and failed -- the row says so.
+    RosterRow(
+        id=A_GT_ID,
+        name="A · Dip buy",
+        sub="Buys a sharp short drop in a stock above its 200-day average, sells within 5 days, daily, real Gotrade fees",
+        icon="sigma",
+        is_champion=False,
+        is_benchmark=False,
+        sort=5,
+        engine="bracket",
+        rules_id=BRACKET_GOTRADE_RULES_ID,
+        object_name="STRATEGY_A",
+        registry_id=None,
+        gate_note=(
+            "Plain Strategy A, back on paper (owner, 2026-11-05) as the baseline that C-GT and the "
+            "Claude twins are compared against: the same rule, the same 4 slots and 5-day brackets, "
+            "and the same starting capital, monthly deposits and Gotrade fees as C-GT, with no news "
+            "check. It is not a candidate for real money: its backtest gate failed out of sample "
+            "(2022-01-03..2026-10-02), -15.0% vs SPY TR +71.9%, PF 0.92, max DD 33.3%, which is why "
+            "013 retired the whole-share A"
         ),
     ),
     # 024, the momentum blend (owner, 2026-10-31). The owner ranked four candidates on the same

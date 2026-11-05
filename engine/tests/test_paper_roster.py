@@ -108,13 +108,17 @@ ALLIN_GT = "FULL50-FR-GT"
 # 024 (owner, 2026-10-31): lab M0294-M70-MOM30, 70% momentum names beside 30% SPY, as an owner
 # override -- not a lab pass. It takes MOM-FR-GT's slot and MOM-FR-GT is retired beside it.
 MOM70_GT = "MOM70-FR-GT"
+# 027 (owner, 2026-11-05, Seer Adversarial): plain Strategy A back on paper under design-v0-gotrade, the
+# baseline that C-GT and the Claude twins are compared against. It takes sort 5, which 026 vacated.
+A_GT = "A-GT"
 #: every entry that ever traded under the assumed flat rate, plus the three 013 retired and the
 #: ones 021 and 022 retired; every one of them keeps every row it wrote.
 RETIRED = (F4, F1, FND, RM, "A", F4_FR, F1_FR, "SPY", "C", RMW, RAW, MOM, MVW, RAW_GT, RMW_GT,
            MVW_GT, MOM_GT, ALLIN_GT, MOM70_GT)
 # 025 (owner, 2026-11-01): FULL50-FR-GT retired with no replacement, so four books and the SPY yardstick.
 # 026 (owner, 2026-11-01): MOM70-FR-GT retired the same way, so three books and the SPY yardstick.
-ACTIVE_IDS = (SPY_GT, C_GT, COSK_GT, RAW35_GT)
+# 027 (owner, 2026-11-05): A-GT joins -- three books, the daily control, plain A and the SPY yardstick.
+ACTIVE_IDS = (SPY_GT, C_GT, COSK_GT, RAW35_GT, A_GT)
 
 # 2026-10-07: every digest moved once, on purpose, when the paper books' starting cash went from
 # 20,000,000 to 10,000,000 IDR (spec "initial_idr"; the owner's own Gotrade money). Production's
@@ -166,6 +170,9 @@ PINS = {
     # 024: the momentum blend. ONE new pin and not one moved: MOM-FR-GT's digest above is what 017
     # wrote, because retiring it touches only `status`, `sort` and `paper_end`.
     MOM70_GT: "663012bae5b61c98d4dba1f68d424e64830bf3dd72d3a7d1e146c3e6bed0c367",
+    # 027: plain A at Gotrade's fees. ONE new pin and not one moved: A's own digest above is what it
+    # always was, because A-GT is a new id under a new rule set and the retired A is not touched.
+    A_GT: "3db8862e29948b3cad007e404c0b1c59d79b1a9f7bdcc4d3a5eb043a42d4080d",
 }
 
 FACTOR_PARAMS_AS_DICT = {
@@ -187,12 +194,13 @@ DISPLAY = ("id", "name", "sub", "icon", "is_champion", "is_benchmark", "sort", "
 
 def test_the_roster_is_the_handover_entries_in_sort_order():
     assert ROSTER_IDS == (
-        SPY_GT, C_GT, COSK_GT, RAW35_GT,
+        SPY_GT, C_GT, COSK_GT, RAW35_GT, A_GT,
         "SPY", "A", F4, F1, "C", FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW, RAW_GT, RMW_GT,
         MVW_GT, MOM_GT, ALLIN_GT, MOM70_GT,
     )
-    # 025 retired FULL50 (sort 6) to the end at 24 and replaced nothing, so sort 6 is a gap; 026 did the same to MOM70 (sort 5, now 25), so 5 is one too.
-    assert [e.sort for e in ROSTER] == [1, 2, 3, 4, *range(7, 26)]
+    # 025 retired FULL50 (sort 6) to the end at 24 and replaced nothing, so sort 6 is a gap; 026 did the
+    # same to MOM70 (sort 5, now 25), and 027 put A-GT in sort 5.
+    assert [e.sort for e in ROSTER] == [1, 2, 3, 4, 5, *range(7, 26)]
     assert "B" not in ROSTER_IDS
 
 
@@ -354,7 +362,7 @@ def test_strategy_params_round_trip_through_jsonb(pg):
 
 def test_lookbacks():
     assert {e.id: e.lookback for e in ROSTER} == {
-        SPY_GT: 1, C_GT: 200, COSK_GT: 781, RAW35_GT: 401, MOM_GT: 379, MVW_GT: 253,
+        SPY_GT: 1, C_GT: 200, COSK_GT: 781, RAW35_GT: 401, A_GT: 200, MOM_GT: 379, MVW_GT: 253,
         ALLIN_GT: 275, MOM70_GT: 253,
         RAW_GT: 401, RMW_GT: 426,
         "SPY": 1, "A": 200, F4: 253, F1: 200, "C": 200, FND: 20, F4_FR: 253, F1_FR: 200,
@@ -577,7 +585,7 @@ def test_active_drops_retired_entries_and_keeps_order():
     )
     entries = from_rows(rows)
     assert [e.id for e in entries] == list(ROSTER_IDS)  # retired rows are never dropped from the roster
-    assert [e.id for e in active(entries)] == [SPY_GT, C_GT, COSK_GT]
+    assert [e.id for e in active(entries)] == [SPY_GT, C_GT, COSK_GT, A_GT]
     raw = next(e for e in entries if e.id == RAW35_GT)
     assert (raw.status, raw.paper_end) == ("retired", date(2026, 10, 2))
 
@@ -713,9 +721,9 @@ from seer_engine.paper.roster import (  # noqa: E402
 #: it, and that is the point -- forgetting is a failing test, not a silent gap.
 LAB_DERIVED = (F4, F1, FND, F4_FR, F1_FR, RM, RMW, RAW, MOM, MVW,
                RMW_GT, RAW_GT, MOM_GT, MVW_GT, RAW35_GT, COSK_GT, ALLIN_GT, MOM70_GT)
-#: And the five that are not: the two benchmark entries, C and its Gotrade successor (the LLM
-#: strategy the quant gate does not apply to), and A, which predates the lab.
-NOT_LAB_DERIVED = ("SPY", SPY_GT, "A", "C", C_GT)
+#: And the six that are not: the two benchmark entries, C and its Gotrade successor (the LLM
+#: strategy the quant gate does not apply to), and A and A-GT, which predate the lab.
+NOT_LAB_DERIVED = ("SPY", SPY_GT, "A", A_GT, "C", C_GT)
 
 
 def _lab_reachable(src: str) -> set[str]:
@@ -917,7 +925,7 @@ def test_every_active_entry_pays_gotrade_and_nothing_retired_changed():
     # retired, its digest is STILL the one that was pinned for it, and the successor's is not.
     for old, new in (("SPY", SPY_GT), ("C", C_GT), (RMW, RMW_GT), (RAW, RAW_GT),
                      (MOM, MOM_GT), (MVW, MVW_GT), (RAW_GT, RAW35_GT), (RMW_GT, COSK_GT),
-                     (MOM_GT, MOM70_GT)):
+                     (MOM_GT, MOM70_GT), ("A", A_GT)):
         assert entry(old).status == "retired", old
         assert spec_digest(spec(entry(old))) == PINS[old], old
         assert spec_digest(spec(entry(new))) != PINS[old], new
@@ -942,6 +950,26 @@ def test_the_daily_control_stays_and_is_funded_like_the_books():
     assert books, "the control needs books to be a control of"
     assert all(s["initial_idr"] == b["initial_idr"] for b in books)
     assert all(s["funding"] == b["funding"] for b in books)
+
+
+def test_plain_a_returns_as_a_gt_on_cs_money_and_fees():
+    """027: A-GT is A's own rule on C-GT's rule set, start, deposits and fees -- the three-way
+    comparison (A, C, A with Claude) is only fair if nothing but the news check and the objections
+    differs."""
+    a, a_gt, c_gt = entry("A"), entry(A_GT), entry(C_GT)
+    assert (a_gt.status, a_gt.engine, a_gt.object_name) == ("active", "bracket", "STRATEGY_A")
+    assert a_gt.obj is STRATEGY_A and a_gt.params is STRATEGY_A_PARAMS
+    assert a_gt.rules is c_gt.rules and a_gt.rules_id == "design-v0-gotrade" and a_gt.rules.cost_model == "gotrade"
+    assert a_gt.registry_id is None and a_gt.lab_provenance is None
+    assert a_gt.gate_applicable is True and backtest_gate(a_gt) == {"passed": False}
+    s, sc = spec(a_gt), spec(c_gt)
+    assert s["params"] == STRATEGY_A_PARAMS.as_dict() == spec(a)["params"]
+    assert {k[2:]: v for k, v in sc["params"].items() if k.startswith("a.")} == s["params"]
+    assert (s["rules"], s["initial_idr"], s["funding"]) == (sc["rules"], sc["initial_idr"], sc["funding"])
+    assert A_GT not in PRE_FUNDING_IDS and "funding" not in spec(a)
+    assert spec_digest(s) == PINS[A_GT] != PINS["A"]
+    assert a_gt.lookback == a.lookback == 200
+    assert news_veto() == c_gt  # A-GT is no news check: the one active NewsVeto is still C-GT
 
 
 def test_the_funding_plan_is_the_schedule_the_engine_actually_runs():

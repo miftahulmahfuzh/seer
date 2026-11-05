@@ -1,24 +1,32 @@
 """NYSE session arithmetic.
 
 Dates are ``datetime.date`` values (the ET calendar date of a session). The only
-timezone-aware datetimes here are UTC "now" and session closes from the NYSE calendar,
-whose ``market_close`` already accounts for half days and daylight saving time.
+timezone-aware datetimes here are UTC "now", session closes from the NYSE calendar,
+whose ``market_close`` already accounts for half days and daylight saving time, and
+session opens (09:30 New York wall-clock, as UTC).
 
 - ``data_date``: the last completed session, i.e. the latest session whose close plus a
   settle margin is not after now.
 - ``session_date``: the session after ``data_date``, which the next picks are for.
+- ``session_open_utc(d)``: the information cutoff for session ``d`` (Seer Adversarial, 027). A
+  reviewer's verdict on a pick for ``d`` counts only if it was decided before this instant.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from functools import lru_cache
+from zoneinfo import ZoneInfo
 
 import pandas_market_calendars as mcal
 
 CALENDAR = "NYSE"
 DEFAULT_SETTLE = timedelta(hours=1)
+
+#: Where and when every NYSE session opens, half days included.
+NEW_YORK = ZoneInfo("America/New_York")
+SESSION_OPEN_LOCAL = time(9, 30)
 
 # How many calendar years next_session/prev_session will scan before giving up.
 _MAX_YEAR_SCAN = 3
@@ -110,6 +118,25 @@ def session_close_utc(d: date) -> datetime:
         return _closes(d.year)[d]
     except KeyError:
         raise ValueError(f"{d} is not an NYSE session") from None
+
+
+def session_open_utc(d: date) -> datetime:
+    """09:30 America/New_York on session ``d``, in UTC: 14:30 UTC in US winter, 13:30 in summer.
+
+    The information cutoff of Seer Adversarial (migration 027): a verdict on a pick for ``d``
+    counts only if its ``decided_at`` is before this instant, so a twin's decision can never lean
+    on anything learned after the session it trades opened. Wall-clock New York time rather than
+    the calendar's ``market_open`` so mcp-notes can mirror it with a time-zone library alone; the
+    two are equal on every NYSE session (half days open at 09:30 too), and
+    ``tests/test_dates.py`` checks that across 2026-2027.
+
+    ValueError when ``d`` is not an NYSE session, TypeError for a datetime: a cutoff for a day
+    with no session would be a cutoff for a decision that cannot exist.
+    """
+    d = _as_date(d)
+    if not is_session(d):
+        raise ValueError(f"{d} is not an NYSE session")
+    return datetime.combine(d, SESSION_OPEN_LOCAL, tzinfo=NEW_YORK).astimezone(timezone.utc)
 
 
 def last_completed_session(now_utc: datetime, settle: timedelta = DEFAULT_SETTLE) -> date:

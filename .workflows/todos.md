@@ -2,19 +2,19 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-10-20
-**Total Active Tasks**: 8
+**Last Updated**: 2026-11-05
+**Total Active Tasks**: 10
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 7
+- P1 High: 9
 - P2 Medium: 0
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 4
-- Completed: 27
+- Completed: 28
 
 ---
 
@@ -105,6 +105,24 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Whether to update `engine/package_readme.md`, which no phase owns -> **yes, four exact-string insertions**, because its `control_shape.py` entry is an exhaustive public-surface list that three new public symbols made stale, and /implement Step 4 chains `readme-updater` by default. But the `**Last Updated**` header paragraph was deliberately left alone (Rung 1, invariant 9): six concurrent sessions each prepending to one line is the shared-file collision the invariant forbids, and phase 8 owns the set's written record.
     - Whether to commit `.workflows/todos.md` -> **no**. It already carries phase 8's entry (`P3-ROOT-D7MX`) alongside this one, and a pathspec commit of it would ship a peer's bookkeeping under this phase's message (Rung 3: phase 2's own commit block lists five source/test files and no `todos.md`). This entry is left in the working tree for whoever commits that file.
     - Whether this phase merges and lands -> **it does not**; the set is swarm-tracked and `/implement` Step 5a leaves the merge to `orch-honest-control-redraw`.
+- [ ] **P1-ROOT-O4FB** Phase 2: Seer twin machinery: roster twins, lag stepping, verdict filter, paper_check, promote
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `twin_of` on StrategyRow/Row/RosterRow/RosterEntry; twin resolution in `roster.from_row` (wrappers per C3) and twin checks in `from_rows`; pure `roster.plan_twins` + `store.ensure_twins` called from `paper` and `promote`; `paper._reviewable(e)` replacing phase 1's bridge (deletes `store.is_twin` and its test); one-session lag (D1) in `commands/paper.py`; `store.objected_between` verdict reader; `paper_check` replaying twins; roster invariant checks; `explain` skips twins; `ensure_twins=False` in pinned test worlds; tests; edits to `engine-night.md`, verify-seer `features/README.md` row, `features/steps/twin-world.py`; runbook and README sections. Does not touch migration 027, `dates.py`, candidate writers, `web/`, `SKILL.md`, mcp-notes. Exit: on a fresh test DB one paper night creates `A-GT-CX`, `RAW35-FR-GT-CX`, `COSK-FR-GT-CX` (none for C-GT, SPY-GT); twins step one session behind; injected verdicts change exactly the objected symbols; `paper_check` ok for every twin; full engine suite green.
+  - **Status**: open
+  - **Plan Set**: `/home/miftah/.worktrees/mcp-notes/seer-adversarial/.workflows/plan/SEER_ADVERSARIAL_PLAN.md` (phase 2 of 7)
+  - **Satisfies**: R1 — Seer engine: twin roster rows, verdict and mark tables, A-GT re-admission, candidate list for bracket strategies, decide-late twins; R2 — Confirm or reject decide-late twins against the real paper runner and paper_check
+  - **Depends on**: P1-ROOT-B10D
+  - **Plan**: `.workflows/plan/P1-ROOT-O4FB.md`
+- [ ] **P1-ROOT-BXVQ** Phase 3: Seer web: twins on Leaderboard as Paper, never Today, rule 5
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `web/lib/data.ts` (`twin_of`, `Strategy.twinOf`, `champion()` never a twin), leaderboard ordering (twin after original) and Paper chip, `looks()` shared colour with distinct dash, `gateItem` rule 5 "Can't be run", Today guard, demo seed twin rows, tests, verify-seer `features/leaderboard.md`, `today.md`, `positions-history.md`, `steps/leaderboard-twin.mjs`, one `SKILL.md` line. Does not touch engine, migrations, `engine-night.md`, `features/README.md`. Exit: `npx tsc --noEmit && npm test` green; verify-seer leaderboard shot shows a twin as Paper beside its original; Today never shows it.
+  - **Status**: open
+  - **Plan Set**: `/home/miftah/.worktrees/mcp-notes/seer-adversarial/.workflows/plan/SEER_ADVERSARIAL_PLAN.md` (phase 3 of 7)
+  - **Satisfies**: R3 — Seer web: twins on the Leaderboard as Paper next to originals, never on Today, rule 5 "can't be run"
+  - **Depends on**: P1-ROOT-B10D
+  - **Plan**: `.workflows/plan/P1-ROOT-BXVQ.md`
 
 ### [P2] Medium
 ### [P3] Low
@@ -134,6 +152,24 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ## Completed Tasks
 
+- [x] **P1-ROOT-B10D** Phase 1: Seer schema, A-GT, candidate list, session open time
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `db/migrations/027_adversary.sql` (C1 in full, incl. A-GT row and append-only trigger); `A-GT` in `paper/roster.py` (SEED_ROWS, RESOLVER, Gotrade bracket rules), PINS, EVIDENCE; `dates.session_open_utc`; `paper` writing `strategy_candidates` (bracket top 10, book rank/kickoff targets) and `book_previews.next_decision_session`; store functions plus `store.is_twin` as a phase-1-only bridge behind `paper._reviewable(conn, e)`; tests; README, paper-trading runbook, verify-seer `features/engine-night.md` (rewritten) and `SKILL.md:202` (23 -> 24). Does not touch twin rows/stepping, verdict reading, paper_check, promote, `web/`. Exit: migrations apply on an empty DB (`verify-seer up --no-web --empty` shows 27 migrations); a paper night writes candidates for A-GT and C-GT and rank-decision targets for books; A-GT starts and steps with Gotrade fees; full engine suite green.
+  - **Status**: completed (2026-11-05)
+  - **Plan Set**: `/home/miftah/.worktrees/mcp-notes/seer-adversarial/.workflows/plan/SEER_ADVERSARIAL_PLAN.md` (phase 1 of 7)
+  - **Satisfies**: R1 — Seer engine: twin roster rows, verdict and mark tables, A-GT re-admission, candidate list for bracket strategies, decide-late twins
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ROOT-B10D.md`
+  - **Completed**: 2026-11-05 10:20
+  - **Method**: /do
+  - **Files**: `db/migrations/027_adversary.sql`, `engine/src/seer_engine/dates.py`, `engine/src/seer_engine/paper/candidates.py`, `engine/src/seer_engine/paper/store.py`, `engine/src/seer_engine/paper/roster.py`, `engine/src/seer_engine/commands/paper.py`, `engine/tests/test_dates.py`, `engine/tests/test_paper_candidates.py`, `engine/tests/test_adversary_schema.py`, `engine/tests/test_paper_command.py`, `engine/tests/test_paper_roster.py`, `engine/tests/test_paper_store.py`, `engine/tests/test_paper_fnd.py`, `engine/tests/test_migrate.py`, `engine/tests/test_paper_check.py`, `engine/tests/test_paper_evidence.py`, `README.md`, `docs/runbooks/paper-trading.md`, `.claude/skills/verify-seer/features/engine-night.md`, `.claude/skills/verify-seer/SKILL.md`, `.workflows/todos.md`, `.workflows/plan/P1-ROOT-B10D.md`, `.workflows/plan/P1-ROOT-O4FB.md`, `.workflows/plan/P1-ROOT-BXVQ.md`
+  - **Drift**:
+    - Line numbers shifted slightly (store.py docstring/imports, runbook diagram line 154 not 162); code matched the plan's intent exactly, no structural drift.
+    - Pre-existing failure NOT caused by this phase: `engine/tests/test_lab_methods.py::test_allocator_contract[M0461-*]` (6 tests) fail identically on base `a6322d7` ('every probe returned no targets'). Left alone; worth a follow-up task.
+  - **Decided**:
+    - Plan's `strategy_candidates` CHECK `(kind='book' AND weight > 0 AND weight <= 1)` admitted a NULL book weight (CHECK is NULL -> passes) -> added `weight IS NOT NULL` in 027 (rung 2: exit criteria / its own test `test_a_candidate_row_is_a_bracket_rank_or_a_weighted_book_target`).
+    - `test_paper_evidence::test_009_adds_a_nullable_jsonb_evidence_column_to_three_tables` enumerates every `evidence` column; 027 adds `strategy_candidates.evidence` -> the expected list now includes `strategy_candidates` (rung 1: invariant 1, full suite green). Not a loosened check.
 - [x] **P1-ROOT-N7FS** Phase 6: Backfill the 5 byte-identical pairs, 500→499 first
   - **Difficulty**: NORMAL
   - **Type**: Update

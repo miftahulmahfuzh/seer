@@ -29,6 +29,11 @@ over values; this module turns those values into rows of the migration-003 table
   ``evidence`` mapping ``{symbol: facts}`` when they are written; each row stores its symbol's
   facts as a jsonb array of strings, or NULL. Nothing here reads it back: the replay never
   compares it, and ``explain`` / the site read it with their own SQL.
+- Seer Adversarial (migration 027): ``strategy_candidates``, the ranked list each reviewable
+  decision is written down with (``save_candidates`` / ``read_candidates``, rewritten only when it
+  changes); ``book_previews.next_decision_session``; and ``is_twin``, the one read of
+  ``strategies.twin_of`` the night needs. The three ``adversary_*`` tables are mcp-notes' to write;
+  nothing here writes them.
 
 Every money value, price and share count is written only when the column holds it exactly
 (4 dp; weights 6 dp), so a save followed by a load gives back equal values. Rows are returned
@@ -56,6 +61,7 @@ from seer_engine.backtest import io as bio
 from seer_engine.backtest.market import Market, Membership
 from seer_engine.paper import unavailable
 from seer_engine.paper.benchmark import BenchmarkState
+from seer_engine.paper.candidates import Candidate
 from seer_engine.sim.book import WEIGHT_QUANTUM, Book, BookSnapshot, Fill, Position, Target, Trade
 from seer_engine.sim.costs import CostModel
 from seer_engine.sim.model import Event, Order, Portfolio, Snapshot, initial_cash_usd
@@ -252,6 +258,18 @@ def read_strategy(conn: psycopg.Connection, strategy_id: str) -> StrategyRow | N
     """The ``strategies`` row ``strategy_id``, or None."""
     row = conn.execute(_STRATEGY_SQL + " WHERE id = %s", (strategy_id,)).fetchone()
     return None if row is None else _strategy(row)
+
+
+def is_twin(conn: psycopg.Connection, strategy_id: str) -> bool:
+    """True when ``strategy_id`` is a Claude twin (``strategies.twin_of`` set, migration 027).
+
+    A twin's decisions are its original's minus Claude's objections; reviewing them again would
+    review the review, so the night writes no candidate list for one. StoreError for no row.
+    """
+    row = conn.execute("SELECT twin_of FROM strategies WHERE id = %s", (strategy_id,)).fetchone()
+    if row is None:
+        raise StoreError(f"no strategies row {strategy_id!r}")
+    return row[0] is not None
 
 
 def freeze_spec(
@@ -732,14 +750,27 @@ def save_book_preview(
     targets: Sequence[Target] | None,
     *,
     evidence: Mapping[str, Sequence[str]] | None = None,
+    next_decision_session: date | None = None,
 ) -> None:
     """Replace the strategy's ``book_previews`` with ``targets``, what it would pick from the bars
     of ``data_date`` if it ranked tonight. Display only (008). None or empty leaves no rows.
 
     ``evidence``: ``{symbol: facts}`` (009); each row stores its symbol's facts, or NULL when the
     symbol is absent (the idle instrument, one the method could not explain) or ``evidence`` is
-    None."""
+    None.
+
+    ``next_decision_session`` (027): the next session on which the book will rank
+    (``paper.candidates.next_rank_session``), stored on every row so the reviewer can look early at
+    the decision this preview anticipates. None stores NULL. It must be a session after
+    ``data_date``."""
     _session("data_date", data_date)
+    if next_decision_session is not None:
+        _session("next_decision_session", next_decision_session)
+        if next_decision_session <= data_date:
+            raise ValueError(
+                f"{strategy_id}: next_decision_session {next_decision_session} is not after the "
+                f"preview's data_date {data_date}"
+            )
     conn.execute("DELETE FROM book_previews WHERE strategy_id = %s", (strategy_id,))
     rows: list[tuple[Any, ...]] = []
     for rank, t in enumerate(targets or (), start=1):
@@ -754,15 +785,112 @@ def save_book_preview(
                 _exact("weight", t.weight, WEIGHT_QUANTUM),
                 _exact("last", t.last),
                 _evidence_json(evidence, t.symbol),
+                next_decision_session,
             )
         )
     if rows:
         with conn.cursor() as cur:
             cur.executemany(
-                "INSERT INTO book_previews (strategy_id, data_date, rank, symbol, weight, last, evidence) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                "INSERT INTO book_previews "
+                "(strategy_id, data_date, rank, symbol, weight, last, evidence, next_decision_session) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
                 rows,
             )
+
+
+# --------------------------------------------------------------------------- candidates (027)
+
+#: ``strategy_candidates.kind``'s CHECK, as a Python value.
+CANDIDATE_KINDS: tuple[str, ...] = ("bracket", "book")
+
+
+def save_candidates(
+    conn: psycopg.Connection,
+    strategy_id: str,
+    session_date: date,
+    data_date: date,
+    kind: str,
+    items: Sequence[Candidate],
+    *,
+    evidence: Mapping[str, Sequence[str]] | None = None,
+) -> bool:
+    """Write ``items`` as the ranked list of ``strategy_id``'s decision for ``session_date``.
+
+    ``data_date`` is the night that decided it and must be ``prev_session(session_date)``.
+    ``kind`` is ``'bracket'`` (every weight None) or ``'book'`` (every weight a target weight,
+    exact at ``WEIGHT_QUANTUM``). Ranks must run 1..n in order and symbols must be unique.
+    ``evidence`` is stored per symbol as on ``orders`` (009).
+
+    Returns False and writes nothing when the stored list already equals this one (kind,
+    data_date, rank, symbol, weight and evidence), so a re-run night, a catch-up and a repick
+    that changes nothing leave the rows and their ``created_at`` alone; otherwise replaces the
+    whole list for ``(strategy_id, session_date)`` and returns True. Empty ``items`` clears it.
+    """
+    _session("session_date", session_date)
+    _session("data_date", data_date)
+    if dates.next_session(data_date) != session_date:
+        raise ValueError(
+            f"{strategy_id}: the decision for {session_date} is taken on the night of "
+            f"{dates.prev_session(session_date)}, not {data_date}"
+        )
+    if kind not in CANDIDATE_KINDS:
+        raise ValueError(f"{strategy_id}: candidate kind {kind!r} is not one of {CANDIDATE_KINDS}")
+    rows: list[tuple[Any, ...]] = []
+    wanted: list[tuple[Any, ...]] = []
+    seen: set[str] = set()
+    for position, c in enumerate(items, start=1):
+        if not isinstance(c, Candidate):
+            raise TypeError(f"items must hold Candidate values, got {type(c).__name__}")
+        if c.rank != position:
+            raise ValueError(
+                f"{strategy_id} {session_date}: candidate ranks must run 1..n in order; rank "
+                f"{c.rank} is at position {position}"
+            )
+        if c.symbol in seen:
+            raise ValueError(f"{strategy_id} {session_date}: {c.symbol} is listed twice")
+        seen.add(c.symbol)
+        if kind == "bracket":
+            if c.weight is not None:
+                raise ValueError(f"{strategy_id} {session_date}: a bracket candidate carries no weight")
+            weight = None
+        else:
+            if c.weight is None:
+                raise ValueError(f"{strategy_id} {session_date}: a book candidate needs its target weight")
+            weight = _exact("weight", c.weight, WEIGHT_QUANTUM)
+        facts = _evidence_json(evidence, c.symbol)
+        rows.append((strategy_id, session_date, data_date, kind, c.rank, c.symbol, weight, facts))
+        wanted.append((kind, data_date, c.rank, c.symbol, weight, None if facts is None else facts.obj))
+    stored = conn.execute(
+        "SELECT kind, data_date, rank, symbol, weight, evidence FROM strategy_candidates "
+        "WHERE strategy_id = %s AND session_date = %s ORDER BY rank",
+        (strategy_id, session_date),
+    ).fetchall()
+    if [tuple(r) for r in stored] == wanted:
+        return False
+    conn.execute(
+        "DELETE FROM strategy_candidates WHERE strategy_id = %s AND session_date = %s",
+        (strategy_id, session_date),
+    )
+    if rows:
+        with conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO strategy_candidates "
+                "(strategy_id, session_date, data_date, kind, rank, symbol, weight, evidence) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                rows,
+            )
+    return True
+
+
+def read_candidates(conn: psycopg.Connection, strategy_id: str, session_date: date) -> tuple[Candidate, ...]:
+    """The list stored for ``strategy_id``'s decision for ``session_date``, by rank (empty when none)."""
+    _date("session_date", session_date)
+    rows = conn.execute(
+        "SELECT rank, symbol, weight FROM strategy_candidates "
+        "WHERE strategy_id = %s AND session_date = %s ORDER BY rank",
+        (strategy_id, session_date),
+    ).fetchall()
+    return tuple(Candidate(rank=int(r[0]), symbol=r[1], weight=r[2]) for r in rows)
 
 
 # --------------------------------------------------------------------------- equity snapshots

@@ -205,6 +205,11 @@ CONTENT = {
     ),
     "equity_snapshots": ("*", "strategy_id, date"),
     "strategies": ("id, paper_start, params", "id"),
+    # 027: the list each reviewable decision is written down with (created_at left out: it is a clock).
+    "strategy_candidates": (
+        "strategy_id, session_date, data_date, kind, rank, symbol, weight, evidence",
+        "strategy_id, session_date, rank",
+    ),
 }
 
 # Whole rows (ids and timestamps included) of everything `paper` may write: "writes nothing".
@@ -218,6 +223,7 @@ EVERYTHING = {
     "equity_snapshots": "strategy_id, date",
     "strategies": "id",
     "runs": "id",
+    "strategy_candidates": "strategy_id, session_date, rank",
 }
 
 
@@ -235,8 +241,10 @@ def reset(conn) -> None:
         conn.execute(
             # paper_contributions too (017): the deposits belong to the clock being reset, so
             # leaving them would re-fund the next run from money the first one already spent.
+            # strategy_candidates too (027): the lists belong to the decisions being reset, and
+            # keeping them would let a catch-up that wrote nothing look identical to one that did.
             "TRUNCATE paper_state, book_positions, book_targets, book_fills, book_trades, "
-            "action_dismissals, orders, equity_snapshots, paper_contributions RESTART IDENTITY"
+            "action_dismissals, orders, equity_snapshots, paper_contributions, strategy_candidates RESTART IDENTITY"
         )
         conn.execute("UPDATE strategies SET paper_start = NULL, params = '{}'::jsonb")
         conn.execute("UPDATE runs SET paper_status = NULL, paper_error = NULL, paper_finished_at = NULL")
@@ -682,3 +690,164 @@ def test_repick_without_a_list_does_nothing(world):
     snapshot = everything(world)
     assert repick.execute(world) == 0
     assert everything(world) == snapshot
+
+
+# ---- 027: the list Claude reviews, and the preview's next rank session --------------------------
+
+import logging  # noqa: E402
+
+from seer_engine.paper import candidates as cand  # noqa: E402
+
+
+def stored_candidates(conn, strategy_id: str, session: date):
+    return q(
+        conn,
+        "SELECT kind, data_date, rank, symbol, weight FROM strategy_candidates "
+        "WHERE strategy_id = %s AND session_date = %s ORDER BY rank",
+        (strategy_id, session),
+    )
+
+
+def test_a_bracket_night_lists_its_own_ranking_before_any_veto(world, tmp_path):
+    assert night(world, N0) == 0
+    market, _ = bio.load_market(world, cache_dir=tmp_path)
+    a = ENTRIES["A"]
+    expected = cand.bracket_candidates(a.obj, a.params, market.history, market.membership.members_on(N0), N0)
+    assert expected, "the synthetic world gives A candidates on its first night (COST, NVDA measured)"
+    want = [("bracket", N0, c.rank, c.symbol, None) for c in expected]
+    assert stored_candidates(world, "A", PAPER_START) == want
+    assert q(world, "SELECT count(*) FROM strategy_candidates WHERE strategy_id = 'A' AND evidence IS NULL") == [(0,)]
+    # C has no stored verdict, so it buys nothing tonight -- and its list is still A's ranking:
+    # what the method ranked, not what the veto let through.
+    assert q(world, "SELECT count(*) FROM orders WHERE strategy_id = 'C'") == [(0,)]
+    assert stored_candidates(world, "C", PAPER_START) == want
+    # the benchmark decides nothing a reviewer could object to
+    assert q(world, "SELECT count(*) FROM strategy_candidates WHERE strategy_id = 'SPY'") == [(0,)]
+
+
+def test_a_book_lists_its_rank_and_kickoff_targets_and_never_a_resize(world):
+    for d in NIGHTS:
+        assert night(world, d) == 0
+    books = sorted(i for i in IDS if ENTRIES[i].engine == "book")
+    listed = 0
+    for sid in books:
+        idle = ENTRIES[sid].rules.idle_symbol
+        for session in (PAPER_START, OCT1):  # the kickoff, and October's rank session
+            targets = q(
+                world,
+                "SELECT symbol, weight FROM book_targets WHERE strategy_id = %s AND session_date = %s",
+                (sid, session),
+            )
+            want = sorted(((s, w) for s, w in targets if s != idle), key=lambda r: (-r[1], r[0]))
+            data = dates.prev_session(session)
+            assert stored_candidates(world, sid, session) == [
+                ("book", data, i, s, w) for i, (s, w) in enumerate(want, start=1)
+            ], (sid, session)
+            listed += len(want)
+    assert listed > 0
+    # RMW-FR re-scales its basket every Monday: 2026-09-28 is a resize-only decision, so no list.
+    monday = date(2026, 9, 28)
+    assert paper._resize_only(ENTRIES["RMW-FR"].rules, monday, False)
+    assert stored_candidates(world, "RMW-FR", monday) == []
+    # and a session that is no decision at all lists nothing either
+    assert stored_candidates(world, F1, date(2026, 9, 25)) == []
+
+
+def test_every_preview_names_the_next_session_its_book_ranks(world):
+    def nexts():
+        return {r[0] for r in q(world, "SELECT DISTINCT next_decision_session FROM book_previews")}
+
+    assert night(world, N0) == 0
+    assert nexts() == {PAPER_START}  # the first night's preview IS the kickoff decision
+    assert night(world, NIGHTS[1]) == 0
+    assert nexts() == {OCT1}  # RMW-FR's Monday resize is not a rank
+    for d in NIGHTS[2:]:
+        assert night(world, d) == 0
+    assert nexts() == {date(2026, 11, 2)}  # after October's rank, November's first session
+
+
+def test_a_twin_gets_no_list(world):
+    """A twin's decisions are its original's minus Claude's objections; listing them would review
+    the review. The row is written here by hand -- creating twins is not this change's job."""
+    with db.transaction(world, False):
+        world.execute(
+            "INSERT INTO strategies (id, name, sub, icon, is_champion, is_benchmark, sort, engine, rules_id, "
+            "object_name, gate_note, gate_applicable, twin_of) "
+            "SELECT 'A-CX', name, sub, icon, false, false, 90, engine, rules_id, object_name, gate_note, "
+            "false, id FROM strategies WHERE id = 'A'"
+        )
+    assert night(world, N0) == 0
+    assert stored_candidates(world, "A", PAPER_START)
+    assert stored_candidates(world, "A-CX", PAPER_START) == []
+
+
+def test_a_failing_list_fails_no_night_and_changes_no_decision(world, monkeypatch, caplog):
+    def decisions(conn):
+        return {k: v for k, v in content(conn).items() if k != "strategy_candidates"}
+
+    for d in NIGHTS[:2]:
+        assert night(world, d) == 0
+    expected = decisions(world)
+    reset(world)
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("boom in the list apiKey=sekret")
+
+    monkeypatch.setattr(cand, "bracket_candidates", boom)
+    monkeypatch.setattr(cand, "book_candidates", boom)
+    with caplog.at_level(logging.WARNING, logger="seer_engine.commands.paper"):
+        for d in NIGHTS[:2]:
+            assert night(world, d) == 0
+    assert decisions(world) == expected
+    assert q(world, "SELECT count(*) FROM strategy_candidates") == [(0,)]
+    assert "no candidate list stored tonight" in caplog.text
+    assert "sekret" not in caplog.text
+    for d in NIGHTS[:2]:
+        assert paper_run(world, d)[0][0] == "success"
+
+
+def test_repick_re_takes_the_list_with_the_decision(world):
+    from seer_engine.commands import repick
+
+    assert night(world, N0) == 0
+    listed = next(
+        sym
+        for (sym,) in q(
+            world,
+            "SELECT DISTINCT symbol FROM strategy_candidates WHERE session_date = %s ORDER BY symbol",
+            (PAPER_START,),
+        )
+        if sym in STOCKS
+    )
+    with db.transaction(world, False):
+        world.execute("INSERT INTO unavailable_symbols (symbol, since) VALUES (%s, %s)", (listed, N0))
+    assert repick.execute(world) == 0
+    assert q(
+        world,
+        "SELECT count(*) FROM strategy_candidates WHERE session_date = %s AND symbol = %s",
+        (PAPER_START, listed),
+    ) == [(0,)]
+    before = q(world, "SELECT strategy_id, rank, symbol, created_at FROM strategy_candidates ORDER BY 1, 2")
+    assert repick.execute(world) == 0  # a second pass changes nothing, so it writes nothing
+    assert q(world, "SELECT strategy_id, rank, symbol, created_at FROM strategy_candidates ORDER BY 1, 2") == before
+
+
+def test_a_gt_starts_steps_and_replays_beside_plain_a(world):
+    from seer_engine.commands import paper_check
+
+    with db.transaction(world, False):
+        world.execute("UPDATE strategies SET status = 'active' WHERE id = 'A-GT'")
+    for d in NIGHTS[:3]:
+        assert night(world, d) == 0
+    assert q(world, "SELECT paper_start, params->>'digest' FROM strategies WHERE id = 'A-GT'") == [
+        (PAPER_START, roster.strategy_params(ENTRIES["A-GT"])["digest"])
+    ]
+    assert q(world, "SELECT last_session, pending_session FROM paper_state WHERE strategy_id = 'A-GT'") == [
+        (NIGHTS[2], dates.next_session(NIGHTS[2]))
+    ]
+    # the owner's deposit of 2026-09-25 reached it exactly as it reached A
+    assert deposits(world, "A-GT") and deposits(world, "A-GT") == deposits(world, "A")
+    for d in NIGHTS[:3]:
+        s = dates.next_session(d)
+        assert [r[2:4] for r in stored_candidates(world, "A-GT", s)] == [r[2:4] for r in stored_candidates(world, "A", s)]
+    assert paper_check.execute(world) == 0

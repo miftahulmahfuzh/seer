@@ -47,6 +47,16 @@ symbol, the facts its method's formula read on that night's view (``_evidence``)
 instrument gets none. Evidence never changes a decision and never fails the night: an evidence
 function that raises leaves that strategy's evidence NULL for the night and logs a warning.
 
+Candidates (migration 027, Seer Adversarial): beside every decision a reviewable entry takes --
+active, not a benchmark, not a Claude twin (``store.is_twin``) -- the night writes the ranked list
+Claude reviews into ``strategy_candidates`` (``paper.candidates``). A bracket entry lists its own
+top 10 for the session it decides, before any news veto (C's list is A's ranking, what ``veto``
+checks). A book lists the targets of a rank or kickoff decision, never of a resize-only one. Every
+book preview also stores ``next_decision_session``, the next session it ranks. Like evidence, a
+list never changes a decision and never fails the night: one that cannot be computed logs a warning
+and leaves that decision's list as it was. A database error on the write fails the night like any
+other write. The list is rewritten only when it changes (``store.save_candidates``).
+
 Split-cadence rules (``rules.resize_cadence``, e.g. ``monthly-rank-weekly-resize-frac``): a book
 picks its basket on rank sessions (and its kickoff) and re-scales that frozen basket on
 resize-only sessions. The basket is never recomputed. The night reads it back from the
@@ -74,7 +84,7 @@ import psycopg
 from seer_engine import dates, db, demo, http, runs
 from seer_engine.backtest.market import Market
 from seer_engine.commands.nightly import _parse_now
-from seer_engine.paper import roster, store, unavailable
+from seer_engine.paper import candidates, roster, store, unavailable
 from seer_engine.paper.benchmark import SPY, step_benchmark
 from seer_engine.paper.book import (
     decide_book,
@@ -517,6 +527,9 @@ def repick(
 
     A resize-only decision is left alone: it re-scales the basket its last rank chose and cannot
     swap a stock, so a listed stock leaves that book at its next rank.
+
+    The candidate list of a re-taken decision (027) is re-taken with it, so Claude reviews the
+    list the decision now stands on; ``store.save_candidates`` writes it only when it changed.
     """
     windows = store.read_unavailable(conn)
     if not windows:
@@ -565,11 +578,20 @@ def repick(
                 continue
             facts = None if targets is None else _evidence(e, view, d, (t.symbol for t in targets))
             store.save_book_decision(conn, e.id, p, targets, evidence=facts)
+            if targets is not None and _reviewable(conn, e):
+                _save_book_candidates(conn, e, p, d, targets, facts)
             preview, preview_facts = targets, facts
             if preview is None:
                 preview, _ = decide_book(view, e.obj, e.params, rules, d, book.held(), force=True)
                 preview_facts = None if preview is None else _evidence(e, view, d, (t.symbol for t in preview))
-            store.save_book_preview(conn, e.id, d, preview, evidence=preview_facts)
+            store.save_book_preview(
+                conn,
+                e.id,
+                d,
+                preview,
+                evidence=preview_facts,
+                next_decision_session=candidates.next_rank_session(rules, d, kickoff=kickoff),
+            )
             before, after = [t.symbol for t in old], [t.symbol for t in targets or ()]
         else:
             pf = store.load_portfolio(conn, e.id)
@@ -584,6 +606,10 @@ def repick(
                 d,
                 rules=e.rules,
             )
+            # The list moves with the membership even when the orders do not (a listed stock
+            # ranked 7th changes no order but leaves the list); it is written only if it changed.
+            if _reviewable(conn, e):
+                _save_bracket_candidates(conn, e, view, d)
             if _order_key(sized.placed) == _order_key(waiting):
                 continue
             conn.execute(
@@ -676,6 +702,67 @@ def _evidence(e: RosterEntry, market: Market, data_date: date, symbols: Iterable
         return {}
 
 
+def _reviewable(conn: psycopg.Connection, e: RosterEntry) -> bool:
+    """True when the night writes ``e``'s decisions down for Claude's review (027).
+
+    Bracket and book entries that are not benchmarks and not Claude twins. Read from the row
+    (``strategies.twin_of``), never from a list of ids: Sera admits and retires methods, and the
+    one rule that holds for all of them is the column.
+    """
+    if e.is_benchmark or e.engine not in ("bracket", "book"):
+        return False
+    return not store.is_twin(conn, e.id)
+
+
+def _save_bracket_candidates(conn: psycopg.Connection, e: RosterEntry, view: Market, data_date: date) -> None:
+    """Write bracket entry ``e``'s ranked top 10 for ``next_session(data_date)`` on ``view``.
+
+    Computed beside the decision, never feeding it. A list that cannot be computed logs one
+    warning and leaves the stored list as it was; the night goes on (the evidence rule).
+    """
+    session = dates.next_session(data_date)
+    try:
+        found = candidates.bracket_candidates(
+            e.obj, e.params, view.history, view.membership.members_on(data_date), data_date
+        )
+    except Exception as exc:  # noqa: BLE001 - a candidate list must never fail the night
+        log.warning(
+            "%s %s: no candidate list stored tonight (%s); the decision is unchanged",
+            e.id,
+            session,
+            _error_text(exc),
+        )
+        return
+    facts = _evidence(e, view, data_date, (c.symbol for c in found))
+    store.save_candidates(conn, e.id, session, data_date, "bracket", found, evidence=facts)
+
+
+def _save_book_candidates(
+    conn: psycopg.Connection,
+    e: RosterEntry,
+    session: date,
+    data_date: date,
+    targets: Sequence[Target],
+    facts: Mapping[str, Facts] | None,
+) -> None:
+    """Write book entry ``e``'s rank or kickoff ``targets`` for ``session`` as its ranked list.
+
+    The caller decides that the decision is a rank or a kickoff (never resize-only). ``facts`` is
+    the evidence already computed for those targets. Same failure rule as the bracket list.
+    """
+    try:
+        found = candidates.book_candidates(targets, e.rules.idle_symbol)
+    except Exception as exc:  # noqa: BLE001 - a candidate list must never fail the night
+        log.warning(
+            "%s %s: no candidate list stored tonight (%s); the decision is unchanged",
+            e.id,
+            session,
+            _error_text(exc),
+        )
+        return
+    store.save_candidates(conn, e.id, session, data_date, "book", found, evidence=facts)
+
+
 def _resize_only(rules: TradeRules, session: date, kickoff: bool) -> bool:
     """True when the decision for ``session`` is a resize-only one: ``rules`` split their
     cadences, ``session`` re-scales the frozen basket (``sim.rules.is_resize_session``) and it is
@@ -729,6 +816,9 @@ def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight
     A split-cadence book (``e.rules.resize_cadence``) gets ``last_rank`` and ``marks`` from
     ``_split_inputs``: at the start there is no rank yet and nothing is held, so they are None and
     ``{}``, and the first decision is a rank (``paper_start`` is a rank session or the kickoff).
+
+    A reviewable entry (027) also writes the first decision's candidate list, and a book's preview
+    names its next rank session.
     """
     if _has_paper_rows(conn, e.id):
         raise PaperError(
@@ -742,6 +832,7 @@ def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight
         raise PaperError(f"no USD/IDR rate on or before {rd.data_date}; cannot start {e.id!r}") from exc
     cash0 = initial_cash_usd(PAPER_INITIAL_IDR, usd_idr)
     paper_start = rd.session_date
+    reviewable = _reviewable(conn, e)
 
     frozen = roster.strategy_params(e)
     store.freeze_spec(
@@ -767,6 +858,8 @@ def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight
         facts = _evidence(e, view, rd.data_date, (o.symbol for o in sized.placed))
         store.insert_pending_orders(conn, e.id, sized.placed, evidence=facts)
         store.write_pending(conn, e.id, paper_start, decision=False)
+        if reviewable:
+            _save_bracket_candidates(conn, e, view, rd.data_date)
     elif e.engine == "book":
         kickoff = needs_kickoff(e.rules, paper_start, paper_start, None)
         if e.rules.resize_cadence is None:
@@ -789,9 +882,18 @@ def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight
         else:
             facts = _evidence(e, view, rd.data_date, (t.symbol for t in targets))
         store.save_book_decision(conn, e.id, paper_start, targets, evidence=facts)
+        if reviewable and targets is not None and not _resize_only(e.rules, paper_start, kickoff):
+            _save_book_candidates(conn, e, paper_start, rd.data_date, targets, facts)
         if kickoff:
             store.write_kickoff(conn, e.id, paper_start)
-        store.save_book_preview(conn, e.id, rd.data_date, targets, evidence=facts)
+        store.save_book_preview(
+            conn,
+            e.id,
+            rd.data_date,
+            targets,
+            evidence=facts,
+            next_decision_session=candidates.next_rank_session(e.rules, rd.data_date, kickoff=kickoff),
+        )
     elif e.engine == "benchmark":
         store.write_pending(conn, e.id, paper_start, decision=False)
     else:
@@ -804,6 +906,7 @@ def _step_bracket(conn: psycopg.Connection, e: RosterEntry, sessions: Sequence[d
     if not sessions:
         return
     strategy = _bracket_strategy(conn, e, dates.next_session(sessions[0]), dates.next_session(sessions[-1]))
+    reviewable = _reviewable(conn, e)
     for s in sessions:
         view = tonight.view(s)
         # Cash AND equity: sizing reads the last snapshot's equity (sim/sizing.py), so a deposit
@@ -832,6 +935,9 @@ def _step_bracket(conn: psycopg.Connection, e: RosterEntry, sessions: Sequence[d
         facts = _evidence(e, view, s, (o.symbol for o in sized.placed))
         store.insert_pending_orders(conn, e.id, sized.placed, evidence=facts)
         store.write_pending(conn, e.id, dates.next_session(s), decision=False)
+        if reviewable:
+            # What it ranked for next_session(s), before any veto: what Claude reviews (027).
+            _save_bracket_candidates(conn, e, view, s)
         pf = sized.portfolio
         log.info("%s %s: equity %s, %d live order(s)", e.id, s, pf.equity, len(pf.orders))
 
@@ -848,6 +954,7 @@ def _step_book(
     loaded = store.load_book(conn, e.id, idle_symbol=rules.idle_symbol)
     book, targets, idle_added = loaded.book, loaded.targets, loaded.idle_added
     kicked = state.kickoff_session
+    reviewable = _reviewable(conn, e)
     for s in sessions:
         view = tonight.view(s)
         # deposit_book raises cash and equity together (phase 6): sim/book.py sizes from equity.
@@ -899,6 +1006,10 @@ def _step_book(
         else:
             facts = _evidence(e, view, s, (t.symbol for t in targets))
         store.save_book_decision(conn, e.id, nxt, targets, evidence=facts)
+        if reviewable and targets is not None and not _resize_only(rules, nxt, kickoff):
+            # A rank or kickoff decision: its targets are what Claude reviews (027). A resize-only
+            # one re-scales a basket already reviewed at its rank, so it is not listed (plan D3).
+            _save_book_candidates(conn, e, nxt, s, targets, facts)
         if kickoff:
             store.write_kickoff(conn, e.id, nxt)
             kicked = nxt
@@ -908,7 +1019,14 @@ def _step_book(
             if preview is None:
                 preview, _ = decide_book(view, e.obj, e.params, rules, s, book.held(), force=True)
                 preview_facts = None if preview is None else _evidence(e, view, s, (t.symbol for t in preview))
-            store.save_book_preview(conn, e.id, s, preview, evidence=preview_facts)
+            store.save_book_preview(
+                conn,
+                e.id,
+                s,
+                preview,
+                evidence=preview_facts,
+                next_decision_session=candidates.next_rank_session(rules, s, kickoff=kickoff),
+            )
         log.info(
             "%s %s: equity %s, %d position(s)%s",
             e.id,

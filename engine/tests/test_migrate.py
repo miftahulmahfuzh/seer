@@ -292,7 +292,7 @@ def test_004_on_a_fresh_schema_adds_c_last_and_the_news_vetoes_table(pg_empty):
     # in RAW-FR-GT's slot and sent RAW-FR-GT to the end of the retired block; 022 did the same with
     # COSK-FR-GT and RMW-FR-GT; 023 with FULL50-FR-GT and MVW-FR-GT; 024 with MOM70-FR-GT and MOM-FR-GT.
     assert [r[0] for r in rows] == [
-        "SPY-GT", "C-GT", "COSK-FR-GT", "RAW35-FR-GT",
+        "SPY-GT", "C-GT", "COSK-FR-GT", "RAW35-FR-GT", "A-GT",
         "SPY", "A", "F4-MOM12-N20-TREND", "F1-SPY-SMA200-M", "C", "FND",
         "F4-MOM12-N20-TREND-FR", "F1-SPY-SMA200-M-FR", "RM-FR", "RMW-FR",
         "RAW-FR", "MOM-FR", "MVW-FR", "RAW-FR-GT", "RMW-FR-GT", "MVW-FR-GT",

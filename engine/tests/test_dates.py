@@ -147,3 +147,38 @@ def test_run_dates_defaults_to_now():
     rd = run_dates()
     assert rd.session_date > rd.data_date
     assert dates.is_session(rd.data_date) and dates.is_session(rd.session_date)
+
+
+@pytest.mark.parametrize(
+    ("d", "expected"),
+    [
+        ("2026-11-04", datetime(2026, 11, 4, 14, 30, tzinfo=timezone.utc)),  # plan C3, US winter
+        ("2026-07-01", datetime(2026, 7, 1, 13, 30, tzinfo=timezone.utc)),  # plan C3, US summer
+        ("2026-10-30", datetime(2026, 10, 30, 13, 30, tzinfo=timezone.utc)),  # last session before DST ends (Nov 1)
+        ("2026-11-02", datetime(2026, 11, 2, 14, 30, tzinfo=timezone.utc)),  # first session after
+        ("2026-03-06", datetime(2026, 3, 6, 14, 30, tzinfo=timezone.utc)),  # last session before DST starts (Mar 8)
+        ("2026-03-09", datetime(2026, 3, 9, 13, 30, tzinfo=timezone.utc)),  # first session after
+        ("2026-11-27", datetime(2026, 11, 27, 14, 30, tzinfo=timezone.utc)),  # a half day opens at 09:30 too
+    ],
+)
+def test_session_open_utc(d, expected):
+    got = dates.session_open_utc(D(d))
+    assert got == expected
+    assert got.tzinfo == timezone.utc
+
+
+def test_session_open_utc_refuses_a_day_with_no_session():
+    with pytest.raises(ValueError, match="not an NYSE session"):
+        dates.session_open_utc(D("2026-11-07"))  # a Saturday
+    with pytest.raises(ValueError, match="not an NYSE session"):
+        dates.session_open_utc(D("2026-11-26"))  # Thanksgiving
+    with pytest.raises(TypeError):
+        dates.session_open_utc(datetime(2026, 11, 4, tzinfo=timezone.utc))
+
+
+def test_session_open_utc_is_the_calendars_open_on_every_session():
+    """The wall-clock rule mcp-notes mirrors (09:30 New York) is the NYSE calendar's own open."""
+    sched = dates._calendar().schedule(start_date="2026-01-01", end_date="2027-12-31")
+    assert len(sched) > 500
+    for idx, opened in zip(sched.index, sched["market_open"]):
+        assert dates.session_open_utc(idx.date()) == opened.to_pydatetime().astimezone(timezone.utc), idx.date()

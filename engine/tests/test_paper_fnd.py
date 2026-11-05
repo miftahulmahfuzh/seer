@@ -159,12 +159,12 @@ def test_fnd_is_the_sixth_roster_entry():
     # By id, not by index: 017 put the six Gotrade-fee successors at the head, so FND -- the sixth
     # entry ever added -- is now the twelfth row and carries sort 12.
     assert FND_ID == "FND" and FND_ID in ROSTER_IDS
-    assert ROSTER_IDS.index(FND_ID) == 9  # 025, 026: FULL50's and MOM70's slots closed up, no replacement
+    assert ROSTER_IDS.index(FND_ID) == 10  # 025, 026: FULL50's and MOM70's slots closed up; 027 put A-GT ahead of it
     # 010 adds fractional F4, F1 and RM; 011 RMW; 013 RAW/MOM/MVW; 017 six; 021 the 35-name book.
     # FND is still the twelfth row: 021 put RAW35-FR-GT in the slot RAW-FR-GT held and sent
     # RAW-FR-GT to the tuple's end, so nothing between the head and FND moved; 022 did the same
     # with COSK-FR-GT and RMW-FR-GT; 023 did the same with FULL50-FR-GT and MVW-FR-GT; 024 with MOM70-FR-GT and MOM-FR-GT; 025 retired FULL50-FR-GT with no swap; 026 did the same with MOM70-FR-GT.
-    assert len(ROSTER_IDS) == 23
+    assert len(ROSTER_IDS) == 24
     e = entry(FND_ID)
     assert (e.sort, e.engine, e.rules_id, e.is_champion, e.is_benchmark) == (12, "book", "monthly-hold", False, False)
     assert e.obj is FUNDAMENTAL

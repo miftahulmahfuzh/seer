@@ -46,6 +46,24 @@ reason to remove it. It is never retired on cost grounds, and it only answers th
 runs on the same starting capital, the same monthly deposits and the same fees as the books beside
 it.
 
+### 2026-11-05 — plain A comes back as A-GT; the night writes down what Claude reviews (migration 027)
+
+`A-GT` is Strategy A's own rule under `design-v0-gotrade`, the rule set `C-GT` trades. It has the same
+start, the same deposits and the same Gotrade fees, and no news check. It is the baseline for the
+three-way comparison A / C / A with Claude's objections. It is not a candidate for real money: A's gate
+failed out of sample (-15.0% vs SPY TR +71.9%, PF 0.92, max DD 33.3%). It is a new id because the
+retired `A` is frozen at a flat 0.1% a side. `paper_start` is written by its first night.
+
+From the same migration, every paper night writes `strategy_candidates` beside each decision of an
+active, non-benchmark, non-twin entry. A bracket method gets its own top 10 for the session it decides,
+before any veto (`C-GT`'s list is A's ranking, the list Veto checks). A book gets the targets of a rank or
+kickoff decision, never of a resize-only one. Each book preview also records `next_decision_session`.
+A list that cannot be computed logs `<id> <date>: no candidate list stored tonight (...)` and never
+changes a decision or fails the night. A list is rewritten only when it changes. Claude's verdicts,
+"paused" marks and leases (`adversary_*`) are written by mcp-notes, never by this repo.
+`adversary_verdicts` refuses deletes and edits. A re-review supersedes the old verdict, and the old one
+stays. No twin row is created by 027; the twins are a later change.
+
 ### 2026-10-14 — the roster went from twenty names to thirty-five
 
 The owner's instruction: *"let's change our seer roster to hold 35 stocks instead of 20"*. He
@@ -152,6 +170,10 @@ GitHub Actions nightly.yml   cron '17 6 * * 2-6' = 06:17 UTC Tue-Sat = 13:17 WIB
 │                                (orders / book_targets / book_previews .evidence, migration 009); the idle
 │                                symbol gets none; an evidence error logs "<id> <date>: no evidence stored
 │                                tonight (…)", stores NULL and never changes a decision or fails the night
+│                              → the decision's candidate list (027, strategy_candidates): a bracket
+│                                method's own top 10 before any veto, a book's rank/kickoff targets;
+│                                each book preview names its next rank session; a list error logs
+│                                "<id> <date>: no candidate list stored tonight (…)" and changes nothing
 ├─ Paper check               read-only replay: run_rules / buy_and_hold over [paper_start, last
 │                            session] on Neon's bars must equal what Paper stored (C from its stored
 │                            verdicts; the LLM is never re-asked). Red on mismatch.

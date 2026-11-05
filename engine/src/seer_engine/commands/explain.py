@@ -1,6 +1,8 @@
 """explain: a plain "why this pick" note for each newest paper entry, from its stored evidence (design §4, D9).
 
-For every roster strategy with a ``paper_state`` row whose ``pending_session`` is set:
+For every roster strategy with a ``paper_state`` row whose ``pending_session`` is set -- a Claude
+twin excepted: its picks are its original's, already explained, and its pending session has
+already traded (it runs one session behind):
   - bracket strategies: ``orders`` of that session with status 'pending' and no explanation;
   - book strategies: ``book_targets`` of that session with no explanation whose symbol the
     strategy does not already hold (``book_positions``): new entries only.
@@ -71,7 +73,7 @@ _STRATEGIES_SQL = """
 SELECT s.id, s.name, s.engine, ps.pending_session
 FROM strategies s
 JOIN paper_state ps ON ps.strategy_id = s.id
-WHERE s.engine IN ('bracket', 'book') AND ps.pending_session IS NOT NULL
+WHERE s.engine IN ('bracket', 'book') AND ps.pending_session IS NOT NULL AND s.twin_of IS NULL
 ORDER BY s.sort, s.id
 """
 

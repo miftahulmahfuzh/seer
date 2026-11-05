@@ -547,7 +547,7 @@ def test_paper_already_decided_the_session_writes_nothing(world, configured):
     with no verdicts. The 01:00 retry's Veto must not write verdicts now: C's replay would buy what
     Paper never did and paper_check would stay red."""
     bars_run(world)
-    assert paper.execute(world, now=NOW) == 0
+    assert paper.execute(world, now=NOW, ensure_twins=False) == 0
     assert q(world, "SELECT paper_status FROM runs WHERE session_date = %s AND NOT is_demo", (SESSION,)) == [
         ("success",)
     ]
@@ -565,7 +565,7 @@ def test_paper_already_decided_the_session_writes_nothing(world, configured):
 def test_paper_deciding_during_the_checks_writes_nothing(world, configured, monkeypatch):
     """H1, re-checked inside the write transaction: Paper finished between the first read and the write."""
     bars_run(world)
-    assert paper.execute(world, now=NOW) == 0
+    assert paper.execute(world, now=NOW, ensure_twins=False) == 0
     before = everything(world)
     real = runs.real_run
     seen = []

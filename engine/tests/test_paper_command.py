@@ -58,6 +58,7 @@ ENTRIES = {e.id: e for e in roster.ROSTER}
 # tests the NIGHT, not who is on the roster this month. 013 retired A, F4-FR and F1-FR, and 017
 # retired the other six in favour of their Gotrade-fee successors; the `world` fixture activates
 # exactly these nine. The production roster is pinned by tests/test_paper_roster.py.
+# Every night here runs with ensure_twins=False: this world pins its own entries, so the Claude twins (tests/test_paper_twins.py) are not part of it.
 IDS = tuple(sorted((
     "SPY", "A", "C", "F4-MOM12-N20-TREND-FR", "F1-SPY-SMA200-M-FR",
     "RMW-FR", "RAW-FR", "MOM-FR", "MVW-FR",
@@ -156,7 +157,7 @@ def bars_run(conn, d: date, status: str = "success") -> None:
 
 
 def go(conn, d: date, *, dry_run: bool = False) -> int:
-    return paper.execute(conn, now=night_of(d), dry_run=dry_run)
+    return paper.execute(conn, now=night_of(d), dry_run=dry_run, ensure_twins=False)
 
 
 def night(conn, d: date, *, dry_run: bool = False) -> int:
@@ -395,8 +396,8 @@ def test_weekend_run_is_a_no_op(world):
     for d in NIGHTS[:3]:  # through Friday 2026-09-25
         assert night(world, d) == 0
     before = everything(world)
-    assert paper.execute(world, now=datetime(2026, 9, 26, 23, tzinfo=UTC)) == 0  # Saturday
-    assert paper.execute(world, now=datetime(2026, 9, 27, 12, tzinfo=UTC)) == 0  # Sunday
+    assert paper.execute(world, now=datetime(2026, 9, 26, 23, tzinfo=UTC), ensure_twins=False) == 0  # Saturday
+    assert paper.execute(world, now=datetime(2026, 9, 27, 12, tzinfo=UTC), ensure_twins=False) == 0  # Sunday
     assert everything(world) == before
 
 

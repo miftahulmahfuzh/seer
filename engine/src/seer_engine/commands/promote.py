@@ -28,7 +28,9 @@ commits, so a row the paper night would refuse is never written. The
 next paper night starts it through ``paper.store.freeze_spec`` exactly as any new entry starts,
 which is what keeps the paper record honest: a promoted strategy's track record begins when it
 was promoted. With ``--retire`` the outgoing strategy's ``status`` becomes ``'retired'`` **in the
-same transaction**, so the board never shows five active horsemen or three.
+same transaction**, so the board never shows five active horsemen or three. In that same
+transaction the promoted entry's Claude twin is born (``paper.store.ensure_twins``) and a
+retired entry's twin retires with it.
 
 **What it never writes.** ``backtest.registry.REGISTRY`` (Decisions D1: it is the P7a dev-run
 candidate set, *fixed BEFORE the run*, capped at ``dev.MAX_CANDIDATES``, with ``candidate_digest``
@@ -559,7 +561,15 @@ def _run(args: argparse.Namespace) -> int:
                     retire_end = paper_store.retire(conn, p.retire_id)
                 if insert:
                     _insert(conn, p)
+                # Seer Adversarial (contract C2): the promoted entry's Claude twin is born in this
+                # same transaction, and a retired entry's twin retires with it, so the board never
+                # holds an original without its twin or a twin without its original.
+                twins = paper_store.ensure_twins(conn)
                 print(render_plan(p, retire_end=retire_end, lab_status=lab_status, lab_move=move))
+                for tid in twins.created:
+                    print(f"strategies INSERT  {tid}  (Claude twin: active, no paper_start)")
+                for tid, end in twins.retired:
+                    print(f"strategies RETIRE  {tid}  (Claude twin, paper_end {'-' if end is None else end})")
             if args.dry_run:
                 log.info("dry-run: the roster transaction was rolled back; nothing written")
         finally:

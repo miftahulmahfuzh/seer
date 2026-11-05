@@ -438,3 +438,51 @@ def test_fractional_twin_maps_a_whole_share_preset_to_its_fractional_preset():
         promote.fractional_twin(MONTHLY_RANK_WEEKLY_RESIZE_TBILL)
     with pytest.raises(promote.NotPromotable, match="no fractional preset matching 'design-v0'"):
         promote.fractional_twin(DESIGN_V0)
+
+
+# ---- Claude twins (Seer Adversarial, contract C2) ----------------------------------------------
+
+
+def _seed_resolvable_row(pg, sid: str, *, twin_of: str | None = None) -> None:
+    """A roster row the night can build (FUNDAMENTAL, named by this file's resolver fixture)."""
+    name = "OLD · old" if twin_of is None else "OLD+Claude · old"
+    pg.execute(
+        "INSERT INTO strategies (id, name, sub, icon, sort, engine, rules_id, object_name, gate_note, "
+        "gate_applicable, twin_of, params) "
+        "VALUES (%s, %s, 'old', 'x', 1, 'book', 'monthly-hold', 'FUNDAMENTAL', 'old note', %s, %s, '{}'::jsonb)",
+        (sid, name, twin_of is None, twin_of),
+    )
+    pg.commit()
+
+
+def test_promote_creates_the_claude_twin_in_the_same_transaction(pg, monkeypatch, lab, tmp_path):
+    _wire(monkeypatch, pg=pg, lab=lab)
+    assert promote.run(_args(lab_db=tmp_path / "lab.sqlite")) == 0
+    row = pg.execute(
+        "SELECT name, twin_of, status, paper_start, gate_applicable, gate_note, engine, rules_id, object_name "
+        "FROM strategies WHERE id = 'TEST-FND-CX'"
+    ).fetchone()
+    assert row == (
+        "T+Claude · Fundamentals", "TEST-FND", "active", None, False, roster.TWIN_GATE_NOTE,
+        "book", "monthly-hold", promote.object_name_of(FUNDAMENTAL),
+    )
+    assert "TEST-FND-CX" in {e.id for e in roster.from_rows(paper_store.read_roster_rows(pg))}
+
+
+def test_a_dry_run_promotion_creates_no_twin(pg, monkeypatch, lab, tmp_path):
+    _wire(monkeypatch, pg=pg, lab=lab)
+    assert promote.run(_args(dry_run=True, lab_db=tmp_path / "lab.sqlite")) == 0
+    assert pg.execute("SELECT count(*) FROM strategies WHERE id = 'TEST-FND-CX'").fetchone()[0] == 0
+
+
+def test_promote_retire_retires_the_retired_entrys_twin_too(pg, monkeypatch, lab, tmp_path):
+    _seed_resolvable_row(pg, "OLD")
+    _seed_resolvable_row(pg, "OLD-CX", twin_of="OLD")
+    _wire(monkeypatch, pg=pg, lab=lab)
+    assert promote.run(_args(retire="OLD", lab_db=tmp_path / "lab.sqlite")) == 0
+    rows = dict(
+        pg.execute(
+            "SELECT id, status FROM strategies WHERE id IN ('OLD', 'OLD-CX', 'TEST-FND', 'TEST-FND-CX')"
+        ).fetchall()
+    )
+    assert rows == {"OLD": "retired", "OLD-CX": "retired", "TEST-FND": "active", "TEST-FND-CX": "active"}

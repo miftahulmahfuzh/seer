@@ -48,7 +48,7 @@ instrument gets none. Evidence never changes a decision and never fails the nigh
 function that raises leaves that strategy's evidence NULL for the night and logs a warning.
 
 Candidates (migration 027, Seer Adversarial): beside every decision a reviewable entry takes --
-active, not a benchmark, not a Claude twin (``store.is_twin``) -- the night writes the ranked list
+active, not a benchmark, not a Claude twin (``e.twin_of``) -- the night writes the ranked list
 Claude reviews into ``strategy_candidates`` (``paper.candidates``). A bracket entry lists its own
 top 10 for the session it decides, before any news veto (C's list is A's ranking, what ``veto``
 checks). A book lists the targets of a rank or kickoff decision, never of a resize-only one. Every
@@ -65,6 +65,19 @@ resize-only sessions. The basket is never recomputed. The night reads it back fr
 earlier in a catch-up loop is seen. It hands that basket and the settled book's marks to
 ``decide_book``. A resize-only decision opens no position, so it stores no evidence. A rule
 set without ``resize_cadence`` takes none of these reads and calls ``decide_book`` exactly as before.
+
+Claude twins (Seer Adversarial, plan seer-adversarial phase 2, Decision D1): a roster row with
+``twin_of`` set runs its original's method minus the symbols Claude objected to before the session
+opened (``strategies.twin``, ``store.objected_between``). It is planned, started and stepped exactly
+like any entry, but on ``twin_dates(rd)`` -- as if tonight's data date were
+``prev_session(rd.data_date)``. So it decides session S on the night after S closed, from
+``view(prev_session(S))`` with every verdict decided before S's open, and settles S the next night.
+Fills come from stored bars, so that equals deciding on time; and because the cutoff is already in
+the past, ``paper_check`` reads the same verdicts on any later night. Nothing in the step loops,
+``store.write_pending`` or ``paper.replay`` knows about twins: a twin's record is an ordinary record
+that ends one session earlier. The night's transaction begins with ``store.ensure_twins``: every
+eligible active original gets its twin and a twin whose original retired is retired with it
+(contract C2), with no manual step (owner decision 5).
 
 Trade logic lives in ``paper.bracket``, ``paper.book`` and ``paper.benchmark`` (pure), and all
 persistence in ``paper.store``; this module only sequences them.
@@ -104,6 +117,7 @@ from seer_engine.sim.book import Position, Target
 from seer_engine.sim.model import Order
 from seer_engine.sim.rules import TradeRules, is_resize_session
 from seer_engine.strategies import evidence
+from seer_engine.strategies.allocator import Allocator
 from seer_engine.strategies.base import History, Strategy
 from seer_engine.strategies.c import NewsVeto
 
@@ -185,8 +199,16 @@ def _error_text(e: BaseException) -> str:
     return http.redact(f"{type(e).__name__}: {e}")[:MAX_ERROR_LEN]
 
 
-def execute(conn: psycopg.Connection, *, now: datetime, dry_run: bool = False) -> int:
-    """Run one paper night against ``conn``. Returns the exit code (0 ok or no-op, 1 failed)."""
+def execute(
+    conn: psycopg.Connection, *, now: datetime, dry_run: bool = False, ensure_twins: bool = True
+) -> int:
+    """Run one paper night against ``conn``. Returns the exit code (0 ok or no-op, 1 failed).
+
+    ``ensure_twins`` (default True; the CLI never changes it) makes the night's transaction begin
+    with ``store.ensure_twins`` (contract C2), and a night with nothing to step still runs when a
+    twin must be created or retired. False is for test worlds that pin their own set of entries:
+    they test the night, not the roster. Twins already in the database are stepped either way.
+    """
     demo.purge_demo_if_needed(conn, dry_run)
 
     rd = dates.run_dates(now)
@@ -208,20 +230,9 @@ def execute(conn: psycopg.Connection, *, now: datetime, dry_run: bool = False) -
 
     try:
         try:
-            strategy_rows = store.read_roster_rows(conn)
-            # The roster is data (phase 1). An entry whose object cannot be resolved raises here,
-            # by name, and the whole night stops (plan invariant 9) -- that is NOT the deliberate
-            # skip a retired entry gets below, and the two never share a code path or a log line.
-            entries = roster.from_rows(strategy_rows)
-            rows = {row.id: row for row in strategy_rows}
-            states: dict[str, PaperState] = {}
-            for e in entries:
-                state = store.read_paper_state(conn, e.id)
-                if state is not None:
-                    states[e.id] = state
+            plan, twins = _read_night(conn, rd, ensure_twins=ensure_twins)
         finally:
             conn.rollback()
-        plan = plan_night(entries, rows, states, rd)
         for r in plan.retired:
             log.info(
                 "%s: retired; no orders, no equity snapshot, no paper_state step. paper_end %s%s",
@@ -229,7 +240,7 @@ def execute(conn: psycopg.Connection, *, now: datetime, dry_run: bool = False) -
                 "-" if r.paper_end is None else r.paper_end,
                 " (stamped tonight)" if r.stamp else "",
             )
-        if plan.empty():
+        if plan.empty() and twins.empty():
             log.info(
                 "every active roster strategy is stepped through %s; nothing to do", rd.data_date
             )
@@ -238,7 +249,7 @@ def execute(conn: psycopg.Connection, *, now: datetime, dry_run: bool = False) -
         with db.transaction(conn, dry_run):
             runs.start_paper(conn, run_id)
         with db.transaction(conn, dry_run):
-            _night(conn, rd, plan, run_id)
+            _night(conn, rd, plan, run_id, ensure_twins=ensure_twins)
     except Exception as e:  # noqa: BLE001 - every failure must become a failed paper step
         message = _error_text(e)
         conn.rollback()
@@ -254,6 +265,54 @@ def execute(conn: psycopg.Connection, *, now: datetime, dry_run: bool = False) -
     return 0
 
 
+def twin_dates(rd: dates.RunDates) -> dates.RunDates:
+    """The run dates a Claude twin is stepped on tonight (Decision D1): one session behind.
+
+    ``data_date = prev_session(rd.data_date)`` and ``session_date = rd.data_date``: tonight the
+    twin settles through the session before the one that just closed and decides the one that just
+    closed, whose open -- the verdicts' cutoff -- has passed.
+    """
+    return dates.RunDates(data_date=dates.prev_session(rd.data_date), session_date=rd.data_date)
+
+
+def run_dates_for(e: RosterEntry, rd: dates.RunDates) -> dates.RunDates:
+    """``rd`` for an original, :func:`twin_dates` of it for a Claude twin."""
+    return rd if e.twin_of is None else twin_dates(rd)
+
+
+def _twin_may_start(original: StrategyRow | None, erd: dates.RunDates) -> bool:
+    """True when a twin with no paper state starts tonight (Decision D5): its original is active
+    and started, and the session the twin would decide first is on or after the original's
+    ``paper_start``. An original that starts tonight has no ``paper_start`` yet, so its twin starts
+    the next night, on the same ``paper_start``."""
+    return (
+        original is not None
+        and original.status == "active"
+        and original.paper_start is not None
+        and erd.session_date >= original.paper_start
+    )
+
+
+def _read_night(
+    conn: psycopg.Connection, rd: dates.RunDates, *, ensure_twins: bool
+) -> tuple[NightPlan, roster.TwinPlan]:
+    """Read the roster and its paper state on ``conn`` and plan tonight; also what the twins need
+    (an empty ``TwinPlan`` when ``ensure_twins`` is off). Writes nothing."""
+    strategy_rows = store.read_roster_rows(conn)
+    # The roster is data (phase 1). An entry whose object cannot be resolved raises here,
+    # by name, and the whole night stops (plan invariant 9) -- that is NOT the deliberate
+    # skip a retired entry gets below, and the two never share a code path or a log line.
+    entries = roster.from_rows(strategy_rows)
+    rows = {row.id: row for row in strategy_rows}
+    states: dict[str, PaperState] = {}
+    for e in entries:
+        state = store.read_paper_state(conn, e.id)
+        if state is not None:
+            states[e.id] = state
+    twins = roster.plan_twins(strategy_rows) if ensure_twins else roster.TwinPlan()
+    return plan_night(entries, rows, states, rd), twins
+
+
 def plan_night(
     entries: Sequence[RosterEntry],
     rows: Mapping[str, StrategyRow],
@@ -267,6 +326,11 @@ def plan_night(
     not the same thing as an entry whose object cannot be resolved -- that one never reaches this
     function, because ``roster.from_rows`` raises before the plan exists and the night stops
     (plan invariant 9).
+
+    A Claude twin (``e.twin_of``, Decision D1) is planned on ``twin_dates(rd)``: stepped through
+    ``prev_session(rd.data_date)`` and deciding ``rd.data_date``. A twin with no paper state starts
+    only when ``_twin_may_start`` (Decision D5); until then it waits, which is neither an error nor
+    a start.
 
     Raises ``store.SpecMismatch`` when an **active** entry's set ``paper_start`` holds a spec
     digest other than the code's (handover D4: a changed strategy needs a new id). Raises
@@ -299,17 +363,20 @@ def plan_night(
             )
             continue
         store.check_digest(row, roster.strategy_params(e)["digest"])
+        erd = run_dates_for(e, rd)
         if state is None:
             if row.paper_start is not None:
                 raise PaperError(
                     f"strategy {e.id!r} has paper_start {row.paper_start} but no paper_state; reset its "
                     f"paper clock (paper runbook) before it can start"
                 )
+            if e.twin_of is not None and not _twin_may_start(rows.get(e.twin_of), erd):
+                continue
             start.append(e)
             continue
         if row.paper_start is None:
             raise PaperError(f"strategy {e.id!r} has paper state but no paper_start")
-        if state.last_session >= rd.data_date:
+        if state.last_session >= erd.data_date:
             continue
         expected = dates.next_session(state.last_session)
         if state.pending_session != expected:
@@ -409,14 +476,28 @@ def _check_window(since: date, earliest: date, entries: Sequence[RosterEntry]) -
         )
 
 
-def _night(conn: psycopg.Connection, rd: dates.RunDates, plan: NightPlan, run_id: int) -> None:
+def _night(
+    conn: psycopg.Connection, rd: dates.RunDates, plan: NightPlan, run_id: int, *, ensure_twins: bool = True
+) -> None:
     """The single paper transaction's body (the caller's db.transaction commits or rolls back).
+
+    With ``ensure_twins`` it begins with ``store.ensure_twins`` (contract C2); when that created or
+    retired a twin, tonight is planned again from the rows as they now stand, in this transaction,
+    so a twin retired tonight takes no step and a twin created tonight starts if it may.
 
     Retirements are settled first and cost nothing: a retired strategy keeps every history row it
     ever wrote, and the only column tonight may write for it is ``paper_end`` (invariant 4). The
     market window is loaded only when something actually trades, so an all-retired roster is a
     cheap night, not a crash.
     """
+    if ensure_twins:
+        changes = store.ensure_twins(conn)
+        for tid in changes.created:
+            log.info("%s: Claude twin created; it starts once it can decide a session of its original's", tid)
+        for tid, end in changes.retired:
+            log.info("%s: Claude twin retired with its original; paper_end %s", tid, "-" if end is None else end)
+        if changes.changed:
+            plan, _ = _read_night(conn, rd, ensure_twins=False)
     for r in plan.retired:
         if not r.stamp or r.paper_end is None:
             continue
@@ -432,10 +513,14 @@ def _night(conn: psycopg.Connection, rd: dates.RunDates, plan: NightPlan, run_id
 
 
 def _trade(conn: psycopg.Connection, rd: dates.RunDates, plan: NightPlan) -> None:
-    """Start and step every active entry on tonight's bars window. Never called with nothing to do."""
+    """Start and step every active entry on tonight's bars window. Never called with nothing to do.
+
+    Each entry runs on its own run dates (``run_dates_for``): ``rd`` for an original,
+    ``twin_dates(rd)`` for a Claude twin, which therefore starts, settles and decides one session
+    behind (Decision D1). The window and tonight's splits/dividends cover both.
+    """
     lasts = [state.last_session for _, state in plan.step]
-    if plan.start:
-        lasts.append(rd.data_date)
+    lasts += [run_dates_for(e, rd).data_date for e in plan.start]
     earliest = min(lasts)
     since = store.market_window_since(earliest)  # earliest - store.MARKET_WINDOW_DAYS (1200) days
     _check_window(since, earliest, list(plan.start) + [e for e, _ in plan.step])
@@ -447,10 +532,11 @@ def _trade(conn: psycopg.Connection, rd: dates.RunDates, plan: NightPlan) -> Non
     repick(conn, [e for e, _ in plan.step], starts, tonight)
 
     for e in plan.start:
-        _start(conn, e, rd, tonight)
+        _start(conn, e, run_dates_for(e, rd), tonight)
     starts = {row.id: row.paper_start for row in store.read_strategies(conn)}
     for e, state in plan.step:
-        sessions = dates.sessions(dates.next_session(state.last_session), rd.data_date)
+        through = run_dates_for(e, rd).data_date
+        sessions = dates.sessions(dates.next_session(state.last_session), through)
         # The owner's deposits, recorded once per entry per night before anything steps: every
         # scheduled date (the 25th of each month) whose landing session has arrived by the last
         # session about to be stepped. store.accrue_contributions freezes each at the USD/IDR of
@@ -562,27 +648,28 @@ def repick(
                 raise PaperError(f"strategy {e.id!r} has a pending decision but no paper_start")
             rules = e.rules
             book = store.load_book(conn, e.id, idle_symbol=rules.idle_symbol).book
+            alloc = _book_allocator(conn, e, p, p)
             kicked = None if state.kickoff_session == p else state.kickoff_session
             kickoff = needs_kickoff(rules, paper_start, p, kicked)
             if _resize_only(rules, p, kickoff):
                 continue
             if rules.resize_cadence is None:
-                targets, _ = decide_book(view, e.obj, e.params, rules, d, book.held(), force=kickoff)
+                targets, _ = decide_book(view, alloc, e.params, rules, d, book.held(), force=kickoff)
             else:
                 last_rank, marks = _split_inputs(conn, e.id, rules, paper_start, kicked, p, book.positions)
                 targets, _ = decide_book(
-                    view, e.obj, e.params, rules, d, book.held(), force=kickoff, last_rank=last_rank, marks=marks
+                    view, alloc, e.params, rules, d, book.held(), force=kickoff, last_rank=last_rank, marks=marks
                 )
             old = store.read_book_targets(conn, e.id, p)
             if _book_key(targets) == _book_key(old):
                 continue
             facts = None if targets is None else _evidence(e, view, d, (t.symbol for t in targets))
             store.save_book_decision(conn, e.id, p, targets, evidence=facts)
-            if targets is not None and _reviewable(conn, e):
+            if targets is not None and _reviewable(e):
                 _save_book_candidates(conn, e, p, d, targets, facts)
             preview, preview_facts = targets, facts
             if preview is None:
-                preview, _ = decide_book(view, e.obj, e.params, rules, d, book.held(), force=True)
+                preview, _ = decide_book(view, alloc, e.params, rules, d, book.held(), force=True)
                 preview_facts = None if preview is None else _evidence(e, view, d, (t.symbol for t in preview))
             store.save_book_preview(
                 conn,
@@ -608,7 +695,7 @@ def repick(
             )
             # The list moves with the membership even when the orders do not (a listed stock
             # ranked 7th changes no order but leaves the list); it is written only if it changed.
-            if _reviewable(conn, e):
+            if _reviewable(e):
                 _save_bracket_candidates(conn, e, view, d)
             if _order_key(sized.placed) == _order_key(waiting):
                 continue
@@ -648,13 +735,30 @@ def _bracket_strategy(conn: psycopg.Connection, e: RosterEntry, first: date, las
     """The strategy object ``decide_bracket`` gets for ``e`` when it decides sessions ``first`` ..
     ``last`` (inclusive).
 
-    Every bracket entry but C: ``e.obj`` unchanged. C (a ``NewsVeto``): ``e.obj`` carrying the
-    ``allow`` verdicts stored for those sessions (``store.allowed_between``), so a candidate with
-    a ``veto`` or ``failed`` verdict, or with no verdict row, is not bought (handover D6, D8).
+    A Claude twin (``e.twin_of``): ``e.obj`` (a ``strategies.twin.TwinStrategy``) carrying its
+    ORIGINAL's standing objections for those sessions (``store.objected_between``), so an objected
+    pick is skipped and the next-ranked one takes its slot. C (a ``NewsVeto``): ``e.obj`` carrying
+    the ``allow`` verdicts stored for those sessions (``store.allowed_between``), so a candidate
+    with a ``veto`` or ``failed`` verdict, or with no verdict row, is not bought (handover D6, D8).
+    Every other bracket entry: ``e.obj`` unchanged.
     """
+    if e.twin_of is not None:
+        return e.obj.with_objected(store.objected_between(conn, e.twin_of, first, last))
     if not isinstance(e.obj, NewsVeto):
         return e.obj
     return e.obj.with_allowed(store.allowed_between(conn, e.id, first, last))
+
+
+def _book_allocator(conn: psycopg.Connection, e: RosterEntry, first: date, last: date) -> Allocator:
+    """The allocator ``decide_book`` gets for ``e`` when it decides sessions ``first`` .. ``last``.
+
+    ``e.obj`` for an original. For a Claude twin, ``e.obj`` (a ``strategies.twin.TwinBook``)
+    carrying its ORIGINAL's standing objections for those sessions: on a rank or kickoff session
+    the objected targets drop out and the rest are scaled up pro rata (contract C3).
+    """
+    if e.twin_of is None:
+        return e.obj
+    return e.obj.with_objected(store.objected_between(conn, e.twin_of, first, last))
 
 
 Facts = tuple[str, ...]
@@ -702,16 +806,17 @@ def _evidence(e: RosterEntry, market: Market, data_date: date, symbols: Iterable
         return {}
 
 
-def _reviewable(conn: psycopg.Connection, e: RosterEntry) -> bool:
+def _reviewable(e: RosterEntry) -> bool:
     """True when the night writes ``e``'s decisions down for Claude's review (027).
 
-    Bracket and book entries that are not benchmarks and not Claude twins. Read from the row
-    (``strategies.twin_of``), never from a list of ids: Sera admits and retires methods, and the
-    one rule that holds for all of them is the column.
+    Bracket and book entries that are not benchmarks and not Claude twins (``e.twin_of``: a twin's
+    decisions are its original's minus Claude's objections, so listing them would review the
+    review). Read from the entry, never from a list of ids: Sera admits and retires methods, and the
+    one rule that holds for all of them is the row.
     """
     if e.is_benchmark or e.engine not in ("bracket", "book"):
         return False
-    return not store.is_twin(conn, e.id)
+    return e.twin_of is None
 
 
 def _save_bracket_candidates(conn: psycopg.Connection, e: RosterEntry, view: Market, data_date: date) -> None:
@@ -832,7 +937,7 @@ def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight
         raise PaperError(f"no USD/IDR rate on or before {rd.data_date}; cannot start {e.id!r}") from exc
     cash0 = initial_cash_usd(PAPER_INITIAL_IDR, usd_idr)
     paper_start = rd.session_date
-    reviewable = _reviewable(conn, e)
+    reviewable = _reviewable(e)
 
     frozen = roster.strategy_params(e)
     store.freeze_spec(
@@ -862,13 +967,14 @@ def _start(conn: psycopg.Connection, e: RosterEntry, rd: dates.RunDates, tonight
             _save_bracket_candidates(conn, e, view, rd.data_date)
     elif e.engine == "book":
         kickoff = needs_kickoff(e.rules, paper_start, paper_start, None)
+        alloc = _book_allocator(conn, e, paper_start, paper_start)
         if e.rules.resize_cadence is None:
-            targets, _ = decide_book(view, e.obj, e.params, e.rules, rd.data_date, frozenset(), force=kickoff)
+            targets, _ = decide_book(view, alloc, e.params, e.rules, rd.data_date, frozenset(), force=kickoff)
         else:
             last_rank, marks = _split_inputs(conn, e.id, e.rules, paper_start, None, paper_start, ())
             targets, _ = decide_book(
                 view,
-                e.obj,
+                alloc,
                 e.params,
                 e.rules,
                 rd.data_date,
@@ -906,7 +1012,7 @@ def _step_bracket(conn: psycopg.Connection, e: RosterEntry, sessions: Sequence[d
     if not sessions:
         return
     strategy = _bracket_strategy(conn, e, dates.next_session(sessions[0]), dates.next_session(sessions[-1]))
-    reviewable = _reviewable(conn, e)
+    reviewable = _reviewable(e)
     for s in sessions:
         view = tonight.view(s)
         # Cash AND equity: sizing reads the last snapshot's equity (sim/sizing.py), so a deposit
@@ -954,7 +1060,12 @@ def _step_book(
     loaded = store.load_book(conn, e.id, idle_symbol=rules.idle_symbol)
     book, targets, idle_added = loaded.book, loaded.targets, loaded.idle_added
     kicked = state.kickoff_session
-    reviewable = _reviewable(conn, e)
+    alloc = (
+        _book_allocator(conn, e, dates.next_session(sessions[0]), dates.next_session(sessions[-1]))
+        if sessions
+        else e.obj
+    )
+    reviewable = _reviewable(e)
     for s in sessions:
         view = tonight.view(s)
         # deposit_book raises cash and equity together (phase 6): sim/book.py sizes from equity.
@@ -984,14 +1095,14 @@ def _step_book(
         # cadence (008, paper.book.needs_kickoff); the replay ranks on the stored kickoff too.
         kickoff = needs_kickoff(rules, paper_start, nxt, kicked)
         if rules.resize_cadence is None:
-            targets, idle_added = decide_book(view, e.obj, e.params, rules, s, book.held(), force=kickoff)
+            targets, idle_added = decide_book(view, alloc, e.params, rules, s, book.held(), force=kickoff)
         else:
             # Split cadences: a resize-only session re-scales the LAST RANK SESSION'S basket, read
             # back from book_targets in this transaction, at the settled book's marks.
             last_rank, marks = _split_inputs(conn, e.id, rules, paper_start, kicked, nxt, book.positions)
             targets, idle_added = decide_book(
                 view,
-                e.obj,
+                alloc,
                 e.params,
                 rules,
                 s,
@@ -1017,7 +1128,7 @@ def _step_book(
             # What it would pick if it ranked tonight: display only, never traded or replayed.
             preview, preview_facts = targets, facts
             if preview is None:
-                preview, _ = decide_book(view, e.obj, e.params, rules, s, book.held(), force=True)
+                preview, _ = decide_book(view, alloc, e.params, rules, s, book.held(), force=True)
                 preview_facts = None if preview is None else _evidence(e, view, s, (t.symbol for t in preview))
             store.save_book_preview(
                 conn,

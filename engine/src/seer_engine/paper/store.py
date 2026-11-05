@@ -23,6 +23,10 @@ over values; this module turns those values into rows of the migration-003 table
 - Every engine writes ``equity_snapshots``.
 - Strategy C's news check (migration 004): ``news_vetoes`` rows, written once per session by
   ``veto`` and read by ``paper`` / ``paper_check`` as the verdicts C decides and replays from.
+- Claude twins (Seer Adversarial, migration 027): ``ensure_twins`` writes the derived twin rows
+  of ``strategies`` (and retires a twin with its original); ``objected_between`` reads
+  ``adversary_verdicts`` -- written only by mcp-notes' reviewer -- as each twin's decisions read
+  them. Nothing here writes a verdict.
 - Inputs read at night: dividends by ex-date, splits applied on a session, and the windowed
   ``Market`` (bars since a date, membership, fx).
 - Evidence (migration 009): ``orders``, ``book_targets`` and ``book_previews`` take an optional
@@ -31,9 +35,8 @@ over values; this module turns those values into rows of the migration-003 table
   compares it, and ``explain`` / the site read it with their own SQL.
 - Seer Adversarial (migration 027): ``strategy_candidates``, the ranked list each reviewable
   decision is written down with (``save_candidates`` / ``read_candidates``, rewritten only when it
-  changes); ``book_previews.next_decision_session``; and ``is_twin``, the one read of
-  ``strategies.twin_of`` the night needs. The three ``adversary_*`` tables are mcp-notes' to write;
-  nothing here writes them.
+  changes) and ``book_previews.next_decision_session``. The three ``adversary_*`` tables are
+  mcp-notes' to write; nothing here writes them.
 
 Every money value, price and share count is written only when the column holds it exactly
 (4 dp; weights 6 dp), so a save followed by a load gives back equal values. Rows are returned
@@ -59,7 +62,7 @@ from psycopg.types.json import Jsonb
 from seer_engine import dates
 from seer_engine.backtest import io as bio
 from seer_engine.backtest.market import Market, Membership
-from seer_engine.paper import unavailable
+from seer_engine.paper import roster, unavailable
 from seer_engine.paper.benchmark import BenchmarkState
 from seer_engine.paper.candidates import Candidate
 from seer_engine.sim.book import WEIGHT_QUANTUM, Book, BookSnapshot, Fill, Position, Target, Trade
@@ -67,6 +70,7 @@ from seer_engine.sim.costs import CostModel
 from seer_engine.sim.model import Event, Order, Portfolio, Snapshot, initial_cash_usd
 from seer_engine.sim.rules import SHARE_QUANTUM
 from seer_engine.strategies.c import VERDICTS, allowed_map
+from seer_engine.strategies.twin import objected_map
 
 BENCHMARK_ID = "SPY"
 # Calendar days of bars loaded per night. 550 until RM (401-bar lookback, 2026-10-07), then 640; 1200
@@ -155,13 +159,15 @@ class StrategyRow:
     """One ``strategies`` row as the paper command needs it.
 
     Structurally a ``paper.roster.Row``: ``roster.from_rows(read_roster_rows(conn))`` is the
-    whole roster-from-data path, and neither module imports the other (``roster`` is pure;
-    ``tests/test_strategy_purity.py`` globs it).
+    whole roster-from-data path. ``roster`` imports nothing from this module (it is pure;
+    ``tests/test_strategy_purity.py`` globs it); this module imports ``roster`` only to plan the
+    Claude twins (:func:`ensure_twins`).
 
     ``status``, ``paper_end`` and ``promoted_from`` are migration 006's lifecycle columns;
     ``object_name``, ``registry_id``, ``gate_note`` and ``gate_applicable`` are its definition
     columns. They are nullable on rows that are not roster rows, and ``roster.from_row``
-    validates them with a named error rather than defaulting them.
+    validates them with a named error rather than defaulting them. ``twin_of`` (migration 027) is
+    the original's id on a Claude twin, else None.
     """
 
     id: str
@@ -182,12 +188,13 @@ class StrategyRow:
     registry_id: str | None = None
     gate_note: str | None = None
     gate_applicable: bool = True
+    twin_of: str | None = None
 
 
 _STRATEGY_SQL = (
     "SELECT id, name, sub, icon, engine, rules_id, is_champion, is_benchmark, sort, paper_start, "
-    "params, status, paper_end, promoted_from, object_name, registry_id, gate_note, gate_applicable "
-    "FROM strategies"
+    "params, status, paper_end, promoted_from, object_name, registry_id, gate_note, gate_applicable, "
+    "twin_of FROM strategies"
 )
 
 
@@ -211,6 +218,7 @@ def _strategy(row: tuple) -> StrategyRow:
         registry_id,
         gate_note,
         gate_applicable,
+        twin_of,
     ) = row
     return StrategyRow(
         id=sid,
@@ -231,6 +239,7 @@ def _strategy(row: tuple) -> StrategyRow:
         registry_id=registry_id,
         gate_note=gate_note,
         gate_applicable=bool(gate_applicable),
+        twin_of=twin_of,
     )
 
 
@@ -258,18 +267,6 @@ def read_strategy(conn: psycopg.Connection, strategy_id: str) -> StrategyRow | N
     """The ``strategies`` row ``strategy_id``, or None."""
     row = conn.execute(_STRATEGY_SQL + " WHERE id = %s", (strategy_id,)).fetchone()
     return None if row is None else _strategy(row)
-
-
-def is_twin(conn: psycopg.Connection, strategy_id: str) -> bool:
-    """True when ``strategy_id`` is a Claude twin (``strategies.twin_of`` set, migration 027).
-
-    A twin's decisions are its original's minus Claude's objections; reviewing them again would
-    review the review, so the night writes no candidate list for one. StoreError for no row.
-    """
-    row = conn.execute("SELECT twin_of FROM strategies WHERE id = %s", (strategy_id,)).fetchone()
-    if row is None:
-        raise StoreError(f"no strategies row {strategy_id!r}")
-    return row[0] is not None
 
 
 def freeze_spec(
@@ -371,6 +368,68 @@ def set_paper_end(conn: psycopg.Connection, strategy_id: str, paper_end: date) -
             (paper_end, strategy_id),
         )
         _one_row(cur, f"paper_end {strategy_id}")
+
+
+# --------------------------------------------------------------------------- Claude twins (C2)
+
+
+@dataclass(frozen=True)
+class TwinChanges:
+    """What :func:`ensure_twins` wrote: the twin ids it inserted, and ``(twin id, paper_end)`` for
+    every twin it retired (``paper_end`` None when the twin never started)."""
+
+    created: tuple[str, ...] = ()
+    retired: tuple[tuple[str, date | None], ...] = ()
+
+    @property
+    def changed(self) -> bool:
+        return bool(self.created or self.retired)
+
+
+_TWIN_INSERT_SQL = (
+    "INSERT INTO strategies (id, name, sub, icon, is_champion, is_benchmark, sort, engine, rules_id, "
+    "object_name, registry_id, gate_note, gate_applicable, status, promoted_from, twin_of, params) "
+    "VALUES (%s, %s, %s, %s, false, false, %s, %s, %s, %s, %s, %s, false, 'active', NULL, %s, '{}'::jsonb)"
+)
+
+
+def ensure_twins(conn: psycopg.Connection) -> TwinChanges:
+    """Give every eligible active original its Claude twin, and retire every twin that outlived its
+    original (contract C2, through ``roster.plan_twins``).
+
+    Retirements first, through :func:`retire` (``paper_end`` = the twin's own last stepped session,
+    history kept), then the inserts. Each inserted row is read back and built with
+    ``roster.from_row`` inside the same transaction, as ``promote`` does for its own row, so a twin
+    the night could not build is never committed. Raises ``roster.RosterError`` when a twin id is
+    taken (see ``plan_twins``). The caller's transaction decides: ``paper`` calls this first thing
+    in the night's transaction, ``promote`` in the promotion's.
+    """
+    plan = roster.plan_twins(read_roster_rows(conn))
+    retired = tuple((tid, retire(conn, tid)) for tid in plan.retire)
+    created: list[str] = []
+    for row in plan.create:
+        conn.execute(
+            _TWIN_INSERT_SQL,
+            (
+                row.id,
+                row.name,
+                row.sub,
+                row.icon,
+                row.sort,
+                row.engine,
+                row.rules_id,
+                row.object_name,
+                row.registry_id,
+                row.gate_note,
+                row.twin_of,
+            ),
+        )
+        written = read_strategy(conn, row.id)
+        if written is None:
+            raise StoreError(f"twin {row.id!r} was inserted but cannot be read back")
+        roster.from_row(written)
+        created.append(row.id)
+    return TwinChanges(created=tuple(created), retired=retired)
 
 
 # --------------------------------------------------------------------------- paper_state
@@ -1800,3 +1859,28 @@ def allowed_between(conn: psycopg.Connection, strategy_id: str, start: date, end
         (strategy_id, start, end),
     ).fetchall()
     return allowed_map((d, s, v) for d, s, v in rows)
+
+
+# --------------------------------------------------------------------------- Claude's verdicts (Seer Adversarial)
+
+
+def objected_between(
+    conn: psycopg.Connection, strategy_id: str, start: date, end: date
+) -> dict[date, frozenset[str]]:
+    """``{session: symbols Claude objected to in time}`` for the ORIGINAL ``strategy_id``'s
+    sessions ``start..end`` inclusive (contract C3), via ``strategies.twin.objected_map``.
+
+    Every ``adversary_verdicts`` row of those sessions is read and the cutoff is applied in
+    Python, per session, at ``dates.session_open_utc``: a row decided at or after its session's
+    open never counts, whatever ``superseded_by`` says. A session with no standing objection is
+    absent; callers look up with ``.get(session, frozenset())``. Empty when ``start > end``.
+    """
+    _date("start", start)
+    _date("end", end)
+    rows = conn.execute(
+        "SELECT session_date, symbol, verdict, decided_at, id FROM adversary_verdicts "
+        "WHERE strategy_id = %s AND session_date BETWEEN %s AND %s "
+        "ORDER BY session_date, symbol, decided_at, id",
+        (strategy_id, start, end),
+    ).fetchall()
+    return objected_map(rows)

@@ -3,7 +3,7 @@
 - ``paper.candidates`` (pure): a bracket method's own top 10 before any veto, a book's rank targets
   without the idle instrument, ranked by weight; the next session a book ranks.
 - ``paper.store``: ``save_candidates`` validates, replaces, and writes nothing when nothing changed;
-  ``read_candidates`` gives it back; ``is_twin`` reads ``strategies.twin_of``.
+  ``read_candidates`` gives it back.
 """
 
 from __future__ import annotations
@@ -204,20 +204,6 @@ def test_save_candidates_refuses_a_malformed_list_before_writing(pg):
     with pytest.raises(ValueError, match="decimals"):
         store.save_candidates(pg, "COSK-FR-GT", SESSION, NIGHT, "book", (Candidate(1, "X", Decimal("0.1234567")),))
     assert pg.execute("SELECT count(*) FROM strategy_candidates").fetchone()[0] == 0
-    pg.rollback()
-
-
-def test_is_twin_reads_the_column(pg):
-    assert store.is_twin(pg, "A-GT") is False
-    pg.execute(
-        "INSERT INTO strategies (id, name, sub, icon, is_champion, is_benchmark, sort, engine, rules_id, "
-        "object_name, gate_note, gate_applicable, twin_of) "
-        "SELECT 'A-GT-CX', name, sub, icon, false, false, 90, engine, rules_id, object_name, gate_note, "
-        "false, id FROM strategies WHERE id = 'A-GT'"
-    )
-    assert store.is_twin(pg, "A-GT-CX") is True
-    with pytest.raises(store.StoreError, match="no strategies row"):
-        store.is_twin(pg, "NOPE")
     pg.rollback()
 
 

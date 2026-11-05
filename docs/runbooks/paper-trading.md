@@ -62,7 +62,7 @@ A list that cannot be computed logs `<id> <date>: no candidate list stored tonig
 changes a decision or fails the night. A list is rewritten only when it changes. Claude's verdicts,
 "paused" marks and leases (`adversary_*`) are written by mcp-notes, never by this repo.
 `adversary_verdicts` refuses deletes and edits. A re-review supersedes the old verdict, and the old one
-stays. No twin row is created by 027; the twins are a later change.
+stays. No twin row is created by 027; the paper night creates the twins (see "Claude twins (Seer Adversarial)").
 
 ### 2026-10-14 — the roster went from twenty names to thirty-five
 
@@ -174,6 +174,9 @@ GitHub Actions nightly.yml   cron '17 6 * * 2-6' = 06:17 UTC Tue-Sat = 13:17 WIB
 │                                method's own top 10 before any veto, a book's rank/kickoff targets;
 │                                each book preview names its next rank session; a list error logs
 │                                "<id> <date>: no candidate list stored tonight (…)" and changes nothing
+│                              Claude twins (*-CX): the same, one session behind (they settle
+│                              prev_session(data_date) and decide data_date), dropping what Claude
+│                              objected to before that session's open; ensure_twins runs first
 ├─ Paper check               read-only replay: run_rules / buy_and_hold over [paper_start, last
 │                            session] on Neon's bars must equal what Paper stored (C from its stored
 │                            verdicts; the LLM is never re-asked). Red on mismatch.
@@ -285,6 +288,42 @@ For every strategy with a `paper_start`, `paper_check`:
 
 It is the proof that backtest and live share one code path (design §9, D7). It runs every night
 after Paper, and before the release with `--require-sessions 5`.
+
+## Claude twins (Seer Adversarial)
+
+Every active method on the roster that is not the benchmark and not C has a **Claude twin**: a
+row `<ID>-CX` (`twin_of = <ID>`, name `<HEAD>+Claude · <TAIL>`, `gate_applicable = false`) that
+runs the same method but does not buy what Claude objected to before the session opened. Claude's
+verdicts come from mcp-notes' reviewer, which writes `adversary_verdicts` (migration 027). Seer
+never asks Claude anything.
+
+- **Born and retired with no manual step.** The paper night's transaction begins with
+  `store.ensure_twins`: an eligible original without an active twin gets one, a twin whose
+  original retired is retired (`paper_end` = the twin's last stepped session, history kept).
+  `promote` does the same inside the promotion's transaction. No migration writes a twin row.
+- **One session behind.** A twin decides session S on the night after S closed, from the bars
+  through the session before S, then settles S the next night. So its equity, positions and
+  pending orders are always one session behind its original's, and its pending decision is for a
+  session that has already traded (twins are never on Today). It starts on the first night it can
+  decide a session on or after its original's `paper_start`, with 10,000,000 IDR and the owner's
+  deposits from its own `paper_start`.
+- **Which verdict counts.** For each (original, session, symbol), the latest verdict with
+  `decided_at` before 09:30 New York time on that session (`dates.session_open_utc`). Only
+  `object` drops a stock. `agree`, `unsure`, a late verdict and no verdict keep it: the twin copies
+  its original. `superseded_by` is history; the engine does not read it.
+- **Bracket twins** (A-GT-CX) skip an objected pick; the next-ranked pick takes the slot.
+  **Book twins** drop an objected target at a rank or kickoff session and spread its weight pro
+  rata over the rest; every target objected = the original's empty decision. An objected stock the
+  book holds is sold, and the fees count against Claude.
+- **Replay.** `paper_check` replays a twin with the same verdict reader over its own window; it
+  must be `ok` like any entry.
+- **No review of a twin's own picks.** A twin writes no `strategy_candidates`, and `explain`
+  skips it.
+
+**When the night fails with "`<ID>` is active and has no active Claude twin, but `<ID>-CX` already
+exists".** Someone retired a twin by hand while its original trades. A twin id is never reused.
+Either re-activate it (`UPDATE strategies SET status = 'active', paper_end = NULL WHERE id =
+'<ID>-CX'`; the next night catches it up session by session) or retire the original too.
 
 ## Strategy C: the news check
 

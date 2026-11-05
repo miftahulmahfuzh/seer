@@ -345,7 +345,7 @@ def night(conn, d: date) -> None:
             """,
             (rd.data_date, rd.session_date),
         )
-    assert paper.execute(conn, now=now) == 0, f"paper failed on the night of {d}"
+    assert paper.execute(conn, now=now, ensure_twins=False) == 0, f"paper failed on the night of {d}"
 
 
 def split_s01(conn) -> None:

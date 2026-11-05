@@ -387,6 +387,13 @@ number the engine wrote.
 | Explain | A plain-language reason per pick | Explanation reads "unavailable"; the pick stands |
 | Sean marks | Mark the owner's real holdings and rebuild his P&L series | Graph lags one night |
 
+**Claude twins.** Each method on the roster except the benchmark and C has a paper twin,
+`<ID>-CX`, that follows the same rule but drops the stocks Claude objected to before the session
+opened (the reviewer lives in mcp-notes and writes `adversary_verdicts`). Twins are created and
+retired by the paper night itself, trade one session behind their originals so every verdict they
+read was final before the market opened, and are replayed by `paper_check` like everything else.
+Details: `docs/runbooks/paper-trading.md`, "Claude twins".
+
 Decisions for session *S* read data only through `prev_session(S)`. Look-ahead is prevented by the
 date arithmetic, not by care.
 

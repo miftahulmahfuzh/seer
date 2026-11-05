@@ -97,6 +97,15 @@ method, so the two databases tell one story. The policy did not move; the silenc
 row it ever wrote and stays on the leaderboard: it only stops trading. :func:`active` is the
 filter the paper night uses.
 
+**Claude twins (Seer Adversarial, contract C2).** Every active original that is not the
+benchmark and not C has one active twin ``<ID>-CX`` (``twin_of = <ID>``): the same method,
+wrapped by ``strategies.twin`` so it drops what Claude objected to before the session opened.
+Twins are DERIVED rows: none is in :data:`SEED_ROWS` and no migration writes one.
+:func:`plan_twins` says which twin rows the roster lacks and which twins outlived their original;
+``paper.store.ensure_twins`` applies that inside the paper night's transaction and inside
+``promote``'s, so a twin appears and retires with its original and no manual step. This module
+stays pure: it plans, the store writes.
+
 :data:`MAX_LOOKBACK_BARS` is the most bars through a data date any object on the **seeded** roster
 reads (781 since 022: COSK's coskewness window, stated by :data:`HISTORY_FLOOR_BARS` because its
 object under-declares it); the paper store's windowed history load must cover it.
@@ -145,6 +154,8 @@ from seer_engine.strategies.c import STRATEGY_C, STRATEGY_C_PARAMS, NewsVeto
 from seer_engine.strategies.f_factor import FACTOR
 from seer_engine.strategies.f_fundamental import FUNDAMENTAL, FundamentalParams
 from seer_engine.strategies.f_index import TIMING
+from seer_engine.strategies.twin import FILTER_VERSION as TWIN_FILTER_VERSION
+from seer_engine.strategies.twin import TwinStrategy, twin_book
 
 Engine = Literal["bracket", "book", "benchmark"]
 Status = Literal["active", "retired"]
@@ -246,6 +257,30 @@ STATUSES: tuple[Status, ...] = ("active", "retired")
 #: on the lab's side of the bridge; ``tests/test_paper_roster.py`` checks they agree.
 BASES: tuple[Basis, ...] = ("test-passed", "owner-override")
 
+#: Seer Adversarial (contract C2): the Claude twin of roster entry ``X`` is the row ``X-CX``.
+TWIN_SUFFIX = "-CX"
+
+#: What a twin's display name adds to its original's head (the part before `` · ``).
+TWIN_NAME_MARK = "+Claude"
+
+#: Every twin row's ``gate_note`` (C2, verbatim). ``gate_applicable`` is false on every twin: a
+#: backtest of a method that asks Claude is impossible, because Claude knows how the past went.
+TWIN_GATE_NOTE = "Claude twin: no backtest is possible, Claude already knows how the past turned out."
+
+
+def twin_id(original_id: str) -> str:
+    """The roster id of ``original_id``'s Claude twin: ``RAW35-FR-GT`` -> ``RAW35-FR-GT-CX``."""
+    return f"{original_id}{TWIN_SUFFIX}"
+
+
+def twin_name(name: str) -> str:
+    """``name`` with ``+Claude`` on its head: ``RAW35 · Momentum`` -> ``RAW35+Claude · Momentum``.
+
+    A name without `` · `` gets the mark at its end: ``X`` -> ``X+Claude``.
+    """
+    head, sep, tail = name.partition(" · ")
+    return f"{head}{TWIN_NAME_MARK}{sep}{tail}"
+
 
 # --------------------------------------------------------------------------- errors
 
@@ -341,6 +376,12 @@ class RosterEntry:
     and ``A``, which predates the lab. It is not in :func:`spec` either, for the same reason
     ``gate_note`` is not: a recorded fact about *why* an entry was admitted must never move the
     digest of a strategy that is already running.
+
+    ``twin_of`` is the original's id when this entry is a Claude twin (Seer Adversarial, contract
+    C2), else ``None``. A twin's ``obj`` is ``strategies.twin.TwinStrategy`` / ``TwinBook`` around
+    its original's object, and everything else on the entry equals the original's except id, name,
+    the gate fields and lifecycle. It is in :func:`spec` (the ``twin`` key): a twin is a different
+    strategy from its original.
     """
 
     id: str
@@ -362,6 +403,7 @@ class RosterEntry:
     status: Status = "active"
     paper_end: date | None = None
     lab_provenance: LabProvenance | None = None
+    twin_of: str | None = None
 
     @property
     def rules_id(self) -> str | None:
@@ -960,6 +1002,7 @@ class Row(Protocol):
     gate_applicable: bool
     status: str
     paper_end: date | None
+    twin_of: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -981,6 +1024,7 @@ class RosterRow:
     gate_applicable: bool = True
     status: str = "active"
     paper_end: date | None = None
+    twin_of: str | None = None
 
 
 def _registered(registry_id: str, expected_obj: Allocator, rules: TradeRules) -> tuple[Allocator, Any]:
@@ -1006,6 +1050,12 @@ def from_row(row: Row) -> RosterEntry:
     Every failure is a :class:`RosterError` naming the row and what is wrong with it: there is
     no path through this function that returns a usable-looking entry for a row it did not fully
     understand, and no path that returns ``None``.
+
+    A Claude twin (``row.twin_of`` set, contract C2) resolves its ``object_name`` exactly as its
+    original does and then wraps the object (``strategies.twin``): ``TwinStrategy`` for a bracket
+    row, ``twin_book`` for a book row. A twin of a benchmark or of C (a ``NewsVeto``: itself an
+    LLM critic) cannot be built and is a :class:`BadRosterRow`. Whether the twin matches its
+    original is a cross-row fact, checked by :func:`from_rows`.
     """
     sid = row.id
     if not isinstance(sid, str) or not sid:
@@ -1059,6 +1109,21 @@ def from_row(row: Row) -> RosterEntry:
         # Strategy.lookback is an int attribute; Allocator.lookback is a method of its params.
         lookback = obj.lookback(params) if engine == "book" else obj.lookback
         lookback = history_need(object_name, lookback)
+    twin_of = row.twin_of
+    if twin_of is not None:
+        if not isinstance(twin_of, str) or not twin_of:
+            raise BadRosterRow(f"{sid!r}: twin_of must be a strategy id or NULL, got {twin_of!r}")
+        if obj is None:
+            raise BadRosterRow(
+                f"{sid!r}: a Claude twin of a benchmark cannot exist; the benchmark picks nothing "
+                f"Claude could object to (twin_of {twin_of!r})"
+            )
+        if isinstance(obj, NewsVeto):
+            raise BadRosterRow(
+                f"{sid!r}: C is itself an LLM critic and gets no Claude twin (object {object_name!r}, "
+                f"twin_of {twin_of!r})"
+            )
+        obj = TwinStrategy(inner=obj) if engine == "bracket" else twin_book(obj, rules)
     gate_note = row.gate_note
     if not isinstance(gate_note, str) or not gate_note:
         raise BadRosterRow(
@@ -1096,6 +1161,7 @@ def from_row(row: Row) -> RosterEntry:
         # ``None`` -- correct for SPY, C and A, and caught for anything else by
         # ``tests/test_paper_roster.py``, which pins the set of ids that must carry one.
         lab_provenance=LAB_PROVENANCE.get(sid),
+        twin_of=twin_of,
     )
 
 
@@ -1103,13 +1169,43 @@ def from_rows(rows: Iterable[Row]) -> tuple[RosterEntry, ...]:
     """Every row as an entry, by ``(sort, id)``. Raises on the FIRST row it cannot build.
 
     No row is ever dropped: either every row given becomes an entry, or nothing is returned.
+    Claude twins are checked against their originals (:func:`_check_twins`).
     """
     entries = tuple(sorted((from_row(r) for r in rows), key=lambda e: (e.sort, e.id)))
     ids = [e.id for e in entries]
     dupes = sorted({i for i in ids if ids.count(i) > 1})
     if dupes:
         raise BadRosterRow(f"the roster rows carry duplicate ids: {dupes}")
+    _check_twins(entries)
     return entries
+
+
+def _check_twins(entries: Sequence[RosterEntry]) -> None:
+    """BadRosterRow unless every twin names an original on the roster, is called ``twin_id`` of
+    it, and runs its method exactly: the same engine, rules_id, object_name and registry_id.
+
+    Lifecycle is NOT checked here: a twin whose original retired, or a twin of a twin, is still a
+    buildable entry, and ``store.ensure_twins`` retires it at the start of the night's transaction.
+    Refusing it here would stop the night before the repair could run.
+    """
+    by_id = {e.id: e for e in entries}
+    for e in entries:
+        if e.twin_of is None:
+            continue
+        original = by_id.get(e.twin_of)
+        if original is None:
+            raise BadRosterRow(f"{e.id!r}: twin_of {e.twin_of!r} is not a roster row")
+        if e.id != twin_id(original.id):
+            raise BadRosterRow(
+                f"{e.id!r}: the Claude twin of {original.id!r} must be called {twin_id(original.id)!r}"
+            )
+        mine = (e.engine, e.rules_id, e.object_name, e.registry_id)
+        theirs = (original.engine, original.rules_id, original.object_name, original.registry_id)
+        if mine != theirs:
+            raise BadRosterRow(
+                f"{e.id!r}: a Claude twin runs its original's method exactly; its (engine, rules_id, "
+                f"object_name, registry_id) is {mine}, {original.id!r}'s is {theirs}"
+            )
 
 
 # --------------------------------------------------------------------------- the seeded roster
@@ -1791,6 +1887,102 @@ def news_veto(entries: Sequence[RosterEntry] = ROSTER) -> RosterEntry:
     return found[0]
 
 
+# --------------------------------------------------------------------------- Claude twins (C2)
+
+
+def twin_eligible(row: Row) -> bool:
+    """True when ``row`` is an original that must have a Claude twin (contract C2).
+
+    Active, not itself a twin, not the benchmark, a bracket or book engine, and an object the
+    resolver knows that is not C's news check (C is already an LLM critic). An ``object_name`` the
+    resolver does not know is not eligible here: ``from_rows`` refuses that row by name on the
+    night, which is the right place for that error.
+    """
+    if row.status != "active" or row.twin_of is not None or row.is_benchmark:
+        return False
+    if row.engine not in ("bracket", "book"):
+        return False
+    binding = RESOLVER.get(row.object_name) if isinstance(row.object_name, str) else None
+    if binding is None or binding.obj is None:
+        return False
+    return not isinstance(binding.obj, NewsVeto)
+
+
+def twin_row(original: Row) -> RosterRow:
+    """The ``strategies`` row of ``original``'s Claude twin (C2): its method, a twin's display and
+    gate fields, active, no paper clock yet."""
+    return RosterRow(
+        id=twin_id(original.id),
+        name=twin_name(original.name),
+        sub=original.sub,
+        icon=original.icon,
+        is_champion=False,
+        is_benchmark=False,
+        sort=original.sort,
+        engine=original.engine,
+        rules_id=original.rules_id,
+        object_name=original.object_name,
+        registry_id=original.registry_id,
+        gate_note=TWIN_GATE_NOTE,
+        gate_applicable=False,
+        status="active",
+        paper_end=None,
+        twin_of=original.id,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class TwinPlan:
+    """What the roster needs so every eligible original has exactly one active twin and no twin
+    outlives its original: the twin rows to insert, and the active twin ids to retire."""
+
+    create: tuple[RosterRow, ...] = ()
+    retire: tuple[str, ...] = ()
+
+    def empty(self) -> bool:
+        return not self.create and not self.retire
+
+
+def plan_twins(rows: Iterable[Row]) -> TwinPlan:
+    """The twins to create and to retire for ``rows`` (every roster row; pure).
+
+    - every ACTIVE twin whose original is missing or no longer eligible (retired, or itself a
+      twin) is retired;
+    - every eligible original with no active twin gets ``twin_row(original)``, in ``(sort, id)``
+      order.
+
+    RosterError when an eligible original has no active twin but its twin id is already taken
+    (a twin retired by hand while its original trades on): a twin id is never reused, because its
+    history belongs to the clock that wrote it. The message says the two ways out.
+    """
+    by_id = {r.id: r for r in rows}
+    twinned: set[str] = set()
+    retire: list[str] = []
+    for r in by_id.values():
+        if r.twin_of is None or r.status != "active":
+            continue
+        original = by_id.get(r.twin_of)
+        if original is None or not twin_eligible(original):
+            retire.append(r.id)
+            continue
+        twinned.add(original.id)
+    create: list[RosterRow] = []
+    for r in sorted(by_id.values(), key=lambda x: (x.sort, x.id)):
+        if not twin_eligible(r) or r.id in twinned:
+            continue
+        tid = twin_id(r.id)
+        taken = by_id.get(tid)
+        if taken is not None:
+            raise RosterError(
+                f"{r.id!r} is active and has no active Claude twin, but {tid!r} already exists "
+                f"(status {taken.status!r}, twin_of {taken.twin_of!r}). A twin id is never reused: "
+                f"re-activate it (status 'active', paper_end NULL) and it catches up on the next "
+                f"night, or retire {r.id!r} too"
+            )
+        create.append(twin_row(r))
+    return TwinPlan(create=tuple(create), retire=tuple(sorted(retire)))
+
+
 # --------------------------------------------------------------------------- the frozen spec (D4)
 
 
@@ -1823,7 +2015,7 @@ def rules_dict(rules: TradeRules) -> dict[str, str | None]:
 def spec(e: RosterEntry) -> dict[str, Any]:
     """The frozen spec of ``e`` (contract C2 ``params.spec``): JSON-ready, strings and nulls only.
 
-    Two keys are conditional, and both are conditional for the same reason the levers in
+    Three keys are conditional, and all three are conditional for the same reason the levers in
     ``sim.rules.LEVERS_SINCE_PINS`` are: a fact added after an entry's digest was pinned must not
     move that digest, or ``store.check_digest`` refuses the entry's next paper night.
 
@@ -1835,6 +2027,11 @@ def spec(e: RosterEntry) -> dict[str, Any]:
       rate, ``cost_model`` once it is on Gotrade's measured schedule
       (:data:`BENCHMARK_COST_MODEL`). The retired ``SPY`` keeps ``cost_rate``, so its spec text is
       unchanged to the byte.
+    - ``twin`` (Seer Adversarial) is present on a Claude twin only: ``{"of": <original id>,
+      "filter": strategies.twin.FILTER_VERSION}``. Everything else in a twin's spec is its
+      original's (the object id is the wrapped object's), so ``spec(twin)`` is ``spec(original)``
+      with the twin's ``id`` and this key added -- and changing what a twin does with a verdict
+      moves its digest.
     """
     if e.engine == "benchmark":
         params: dict[str, str] = {
@@ -1869,6 +2066,8 @@ def spec(e: RosterEntry) -> dict[str, Any]:
     }
     if e.id not in PRE_FUNDING_IDS:
         out["funding"] = dict(OWNER_FUNDING)
+    if e.twin_of is not None:
+        out["twin"] = {"of": e.twin_of, "filter": TWIN_FILTER_VERSION}
     return out
 
 def spec_text(s: Mapping[str, Any]) -> str:

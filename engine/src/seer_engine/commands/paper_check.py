@@ -13,6 +13,11 @@ C is replayed from the verdicts ``veto`` stored (``news_vetoes``), read in the s
 the LLM is never asked again (handover D8): only ``allow`` verdicts can be bought, a ``veto``,
 ``failed`` or missing verdict is no trade, exactly as ``paper`` decided it.
 
+A Claude twin (``twin_of``) is replayed from its ORIGINAL's verdicts (``adversary_verdicts``),
+read in the same transaction through the same ``store.objected_between`` the night used, over the
+twin's own ``[paper_start, last_session]`` and pending decision. The cutoff of every session it
+decided is a market open already in the past, so the replay reads the verdict set the night read.
+
 Read-only: everything is read in one REPEATABLE READ, READ ONLY transaction that is rolled back,
 so ``--dry-run`` changes nothing. Exit 0 when every started strategy is ``ok`` or
 ``split-affected`` (and, with ``--require-sessions N``, every roster strategy has stepped at
@@ -35,7 +40,7 @@ from psycopg.pq import TransactionStatus
 from seer_engine import dates, db
 from seer_engine.backtest.book_runner import DividendMap
 from seer_engine.backtest.market import Market
-from seer_engine.commands.paper import _bracket_strategy
+from seer_engine.commands.paper import _book_allocator, _bracket_strategy
 from seer_engine.paper import replay, roster, store
 from seer_engine.paper.replay import CheckResult, Holding, PaperHead, Records
 from seer_engine.paper.roster import RosterEntry
@@ -256,7 +261,8 @@ def _expected(
 ) -> Records:
     if entry.engine == "bracket":
         # The replay decides paper_start .. next_session(last_session): C carries the verdicts
-        # stored for exactly those sessions (read in this read-only transaction).
+        # stored for exactly those sessions, a Claude twin its original's standing objections
+        # (both read in this read-only transaction).
         strategy = _bracket_strategy(conn, entry, head.paper_start, dates.next_session(head.last_session))
         # The entry's OWN rule set, not a module constant: C replays at DESIGN_V0 and C-GT at the
         # Gotrade bracket preset, so a Gotrade entry is not reconstructed at the flat rate.
@@ -264,8 +270,11 @@ def _expected(
             market, strategy, entry.params, head, rules=entry.rules, contributions=_deposits(conn, entry.id)
         )
     if entry.engine == "book":
+        # A Claude twin's allocator carries its original's standing objections for every session
+        # the replay decides; an original's is entry.obj unchanged.
+        allocator = _book_allocator(conn, entry, head.paper_start, dates.next_session(head.last_session))
         return replay.expected_book(
-            market, entry.obj, entry.params, entry.rules, head, dividends, contributions=_deposits(conn, entry.id)
+            market, allocator, entry.params, entry.rules, head, dividends, contributions=_deposits(conn, entry.id)
         )
     if entry.engine == "benchmark":
         # The entry's own cost model, for the same reason the bracket branch above passes its

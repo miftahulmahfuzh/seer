@@ -13,7 +13,7 @@ call) unless the table says so.
 | Leaderboard: equity vs SPY, go-live checklist, engine `compare` | [leaderboard.md](leaderboard.md) | web, engine | none |
 | Sera: the lab site (overview, methods, journal unread badges) | [sera.md](sera.md) | web, api, sql | none |
 | Sean: real-money P&L, trades, receipt upload, the plan's to-do list | [sean.md](sean.md) | web, ui, api, sql | none (the vision read is never enabled) |
-| The night: migrate, nightly, paper, paper_check | [engine-night.md](engine-night.md) | engine | `--net` opt-in (free tiers) |
+| The night: migrate, nightly, paper (Claude twins included), paper_check | [engine-night.md](engine-night.md) | engine | `--net` opt-in (free tiers) |
 | The lab CLI: status, show, next-id, idea, refusals | [lab-cli.md](lab-cli.md) | lab, labsql | none |
 
 Add an entry when a change ships a new user-facing feature; fix an entry when the app's behavior

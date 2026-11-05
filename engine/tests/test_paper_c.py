@@ -178,7 +178,7 @@ def veto(conn, d: date, choose: Choose) -> dict[str, str]:
 
 
 def go(conn, d: date, *, dry_run: bool = False) -> int:
-    return paper.execute(conn, now=night_of(d), dry_run=dry_run)
+    return paper.execute(conn, now=night_of(d), dry_run=dry_run, ensure_twins=False)
 
 
 def night(conn, d: date, choose: Choose | None = allow_all) -> dict[str, str]:

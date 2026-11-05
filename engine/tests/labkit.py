@@ -42,7 +42,9 @@ def smoke_history(symbol: str, k: int, days: list[date]) -> History:
     open_ = np.round(np.concatenate((close[:1], close[:-1])), 2)
     high = np.round(np.maximum(open_, close) * 1.01, 2)
     low = np.round(np.minimum(open_, close) * 0.99, 2)
-    volume = np.full(n, 2_000_000.0, dtype=np.float64)
+    # Varying, so a signal built on volume change has variance to read; still well above any screen.
+    volume = np.round(2_000_000.0 * (1.0 + 0.3 * np.sin(2.0 * np.pi * t / (7.0 + k) + 1.7 * k)
+                                      + 0.1 * np.where(t % 3 == 0, 1.0, -1.0)))
     return History(symbol, np.array(days, dtype="datetime64[D]"), open_, high, low, close, volume)
 
 

@@ -2,7 +2,7 @@ import { sql } from '@/lib/db';
 import { strategyMetrics, type Metrics, type Snapshot } from '@/lib/metrics';
 import { monthlyTable, type MonthlyTable } from '@/lib/monthly';
 import { isStale } from '@/lib/session';
-import { checksNews, engineOf, parseGate, shortLabel, type Engine, type Gate } from '@/lib/strategy';
+import { checksNews, engineOf, gateOf, orderTwins, shortLabel, twinOfRow, type Engine, type Gate } from '@/lib/strategy';
 import { parseVerdict, type Veto } from '@/lib/vetoes';
 import { parseEvidence } from '@/lib/why';
 
@@ -39,6 +39,7 @@ export type Strategy = {
   name: string;
   sub: string;
   icon: string;
+  /** Never true for a Claude twin, whatever the column says (see `toStrategy`). */
   isChampion: boolean;
   isBenchmark: boolean;
   /** 'bracket' (A, C), 'book' (F4, F1) or 'benchmark' (SPY). */
@@ -54,7 +55,10 @@ export type Strategy = {
   status: StrategyStatus;
   /** Last paper session a retired strategy traded (migration 006); null while it is active. */
   paperEnd: string | null;
-  /** params->'backtest_gate', verdict only; { passed: false, applicable: true } until `paper` writes the frozen spec. */
+  /**
+   * params->'backtest_gate', verdict only; { passed: false, applicable: true } until `paper` writes
+   * the frozen spec. `TWIN_GATE` for a Claude twin, always.
+   */
   gate: Gate;
   /** A research strategy: its orders and positions are paper only and never a buy recommendation. */
   isPaper: boolean;
@@ -62,11 +66,26 @@ export type Strategy = {
   short: string;
   /** Runs the nightly news check (C): Positions shows its verdicts under the paper orders. */
   checksNews: boolean;
+  /**
+   * The original's id when this row is a Claude twin (Seer Adversarial, migration 027, contract
+   * C2): the same method, minus the picks Claude objected to before the session opened. Null for
+   * every other row.
+   */
+  twinOf: string | null;
 };
 
+/**
+ * The one place a `strategies` row becomes a `Strategy`, so the one place the twin rules are
+ * enforced (owner decision 8: twins are Paper and never on Today). C2 already writes
+ * `is_champion = false` for a twin. `isChampion` refuses one anyway, because Today shows whatever
+ * `champion()` returns, and a hand edit or a bad promotion must not be able to put Claude's book in
+ * front of real money. Everything downstream (Today, the crown, the Paper labels) trusts these
+ * fields and checks nothing again.
+ */
 function toStrategy(r: Row): Strategy {
+  const twinOf = twinOfRow(r.twin_of);
   const isBenchmark = r.is_benchmark === true;
-  const isChampion = r.is_champion === true;
+  const isChampion = r.is_champion === true && twinOf === null;
   return {
     id: r.id,
     name: r.name,
@@ -79,10 +98,11 @@ function toStrategy(r: Row): Strategy {
     paperStart: ymdOrNull(r.paper_start),
     status: parseStatus(r.status),
     paperEnd: ymdOrNull(r.paper_end),
-    gate: parseGate(r.gate),
+    gate: gateOf(r.gate, twinOf),
     isPaper: !isBenchmark && !isChampion,
     short: shortLabel(r.name, r.id),
-    checksNews: checksNews(r.id, r.spec_object),
+    checksNews: checksNews(r.id, r.spec_object, twinOf),
+    twinOf,
   };
 }
 
@@ -90,11 +110,15 @@ export async function strategies(): Promise<Strategy[]> {
   // spec_object: the frozen spec wins where it exists, and `object_name` (migration 006) answers
   // for a strategy that has not been frozen yet — a just-promoted row has `params = '{}'` until
   // its first paper night, and without the COALESCE it would lose a display fact for a night.
+  // twin_of: read through `to_jsonb(s)` rather than named, so the app keeps working on a DB that
+  // has not applied migration 027. The key is then absent, the value is NULL and the row reads as
+  // no twin. Naming the column would fail every page until the migration ran.
   const rows = await sql`SELECT id, name, sub, icon, is_champion, is_benchmark, engine, rules_id,
       paper_start::text AS paper_start, paper_end::text AS paper_end, status,
       params->'backtest_gate' AS gate,
-      COALESCE(params->'spec'->>'object', object_name) AS spec_object
-    FROM strategies
+      COALESCE(params->'spec'->>'object', object_name) AS spec_object,
+      to_jsonb(s) ->> 'twin_of' AS twin_of
+    FROM strategies s
     -- A retired strategy is not part of the app. The old rule kept one that had a paper_start,
     -- on the reasoning that its paper record was the evidence -- but paper_start marks the night
     -- an entry was CREATED, not a night it traded. Six entries retired by 017 had a start date and
@@ -105,7 +129,9 @@ export async function strategies(): Promise<Strategy[]> {
     -- never put a stale card back on the board.
     WHERE status <> 'retired'
     ORDER BY sort, id`;
-  return rows.map(toStrategy);
+  // A twin sits right after its original in every list (owner decision 8: "next to their
+  // originals"), whatever `sort` the engine gave it.
+  return orderTwins(rows.map(toStrategy));
 }
 
 /**
@@ -118,6 +144,7 @@ export async function strategies(): Promise<Strategy[]> {
  * `paper_end` is the test of "traded": the paper night stamps it with the last session the entry
  * stepped, and leaves it NULL for one that never started -- the day-0-only rows 018 purged, whose
  * "+0.0% on 0 trades" read as a result and meant "never ran". So that lock still holds.
+ * Retiring an original retires its twin (C2), so on the shelf too a twin follows its original.
  */
 export async function boardStrategies(): Promise<Strategy[]> {
   const [live, retired] = await Promise.all([
@@ -125,14 +152,16 @@ export async function boardStrategies(): Promise<Strategy[]> {
     sql`SELECT id, name, sub, icon, is_champion, is_benchmark, engine, rules_id,
         paper_start::text AS paper_start, paper_end::text AS paper_end, status,
         params->'backtest_gate' AS gate,
-        COALESCE(params->'spec'->>'object', object_name) AS spec_object
-      FROM strategies
+        COALESCE(params->'spec'->>'object', object_name) AS spec_object,
+        to_jsonb(s) ->> 'twin_of' AS twin_of
+      FROM strategies s
       WHERE status = 'retired' AND paper_end IS NOT NULL
       ORDER BY sort, id`,
   ]);
-  return [...live, ...retired.map(toStrategy)];
+  return [...live, ...orderTwins(retired.map(toStrategy))];
 }
 
+/** The champion Today shows. Never a Claude twin: `toStrategy` makes a twin's `isChampion` false. */
 export async function champion(): Promise<Strategy | null> {
   return (await strategies()).find(s => s.isChampion) ?? null;
 }

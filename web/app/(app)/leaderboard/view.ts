@@ -16,9 +16,13 @@
 import { monthDay, monthName, pct, signedPct } from '../../../lib/format';
 import { CHECKLIST_RULES, type Snapshot } from '../../../lib/metrics';
 import type { MonthlyTable } from '../../../lib/monthly';
+import { attachedOriginal } from '../../../lib/strategy';
 
-/** The roster fields these helpers read (a structural subset of lib/data's Strategy). */
-export type RosterIn = { id: string; isChampion: boolean; isBenchmark: boolean };
+/**
+ * The roster fields these helpers read (a structural subset of lib/data's Strategy). `twinOf` is
+ * optional so a fixture without twins still type-checks; lib/data always sets it.
+ */
+export type RosterIn = { id: string; isChampion: boolean; isBenchmark: boolean; twinOf?: string | null };
 
 /**
  * What the ranking reads: the roster fields plus phase 1's lifecycle column. Structurally equal to
@@ -47,6 +51,13 @@ export const CARD_BGS = ['bg-lav', 'bg-sky', 'bg-sage', 'bg-rose', 'bg-plum', 'b
 /** Stroke patterns per lap of the palette: solid, then dashed. SPY's dotted '1 4' is not among them. */
 export const LAP_DASHES = [null, '7 5'] as const;
 
+/**
+ * A Claude twin's stroke, by its original's lap: short even dashes, then dash-dot. Neither is a
+ * lap dash or SPY's dotted '1 4', so a twin's line never equals any original's, and the pair
+ * "same colour, different dash" reads as "this one, with Claude".
+ */
+export const TWIN_DASHES = ['3 3', '10 3 2 3'] as const;
+
 /** Research strategies before any line repeats. */
 export const LOOK_PERIOD = CARD_BGS.length * LAP_DASHES.length;
 
@@ -64,24 +75,47 @@ export const LOOK_FALLBACK: Look = { bg: 'bg-sheet', tint: 'var(--sheet)', line:
 /** SPY's stroke: the benchmark is the dotted line on a plain sheet. */
 export const BENCHMARK_DASH = '1 4';
 
-/** Card sheet and chart line per strategy id, by roster order. */
+/**
+ * Card sheet and chart line per strategy id, by roster order.
+ *
+ * A Claude twin whose original is on the roster takes no palette slot. It wears its original's
+ * sheet, tint and line, with a `TWIN_DASHES` stroke and the ordinary width (a twin is never
+ * champion). Because it takes no slot, adding twins moves no other strategy's colour: the owner
+ * keeps reading F1 as sage and C as rose. The result does not depend on where the twin sits in
+ * `roster`. A twin whose original is absent is coloured like any other strategy.
+ */
 export function looks(roster: RosterIn[]): Map<string, Look> {
   const out = new Map<string, Look>();
+  const byId = new Map(roster.map(st => [st.id, st]));
+  const originalOf = (st: RosterIn): RosterIn | null => {
+    const o = attachedOriginal(st, byId);
+    return o && !o.isBenchmark ? o : null;
+  };
+  const lapOf = new Map<string, number>();
   let i = 0;
   for (const st of roster) {
     if (st.isBenchmark) {
       out.set(st.id, { bg: 'bg-sheet', tint: 'var(--sheet)', line: 'var(--ink-3)', width: 1.75, dash: BENCHMARK_DASH });
       continue;
     }
+    if (originalOf(st)) continue;
     const t = tokenOf(CARD_BGS[i % CARD_BGS.length]);
+    const lap = Math.floor(i / CARD_BGS.length) % LAP_DASHES.length;
     out.set(st.id, {
       bg: `bg-${t}`,
       tint: `var(--${t})`,
       line: `var(--${t}-line)`,
       width: st.isChampion ? 2.75 : 2,
-      dash: LAP_DASHES[Math.floor(i / CARD_BGS.length) % LAP_DASHES.length],
+      dash: LAP_DASHES[lap],
     });
+    lapOf.set(st.id, lap);
     i += 1;
+  }
+  for (const st of roster) {
+    const o = st.isBenchmark ? null : originalOf(st);
+    const base = o ? out.get(o.id) : undefined;
+    if (!o || !base) continue;
+    out.set(st.id, { ...base, width: 2, dash: TWIN_DASHES[lapOf.get(o.id) ?? 0] });
   }
   return out;
 }
@@ -397,16 +431,21 @@ const ALL_CAP = `${ALL[0].toUpperCase()}${ALL.slice(1)}`;
 
 export type Score = { passed: number; total: number; ready: boolean; lines: [string, string] };
 
-/** The gate fields the score reads (a structural subset of lib/strategy's Gate). */
-export type GateIn = { passed: boolean; applicable: boolean };
+/**
+ * The gate fields the score reads (a structural subset of lib/strategy's Gate). `twin?: true`,
+ * exactly as `Gate`, so a GateIn still passes where `checklist` wants a Gate.
+ */
+export type GateIn = { passed: boolean; applicable: boolean; twin?: true };
 
 /** A strategy with no checklist yet: not passed, applicable. */
 export const NO_GATE: GateIn = { passed: false, applicable: true };
 
 /**
  * The checklist score and its two-line verdict. Never "Ready for real money" unless every rule
- * passes, and never for a strategy whose backtest item is not applicable (C, handover D9): real
- * money for it would need an explicit owner decision even if the four forward rules pass.
+ * passes, and never for a strategy whose backtest item is not applicable (C, handover D9, or a
+ * Claude twin): real money for it would need an explicit owner decision even if the four forward
+ * rules pass. A twin's lines say why its backtest cannot run, in the owner's words (brief §4.1):
+ * Claude already knows how the past turned out.
  *
  * `items.length === CHECKS` is load-bearing and stays. `page.tsx` passes `items = []` for a
  * strategy with no gate row at all; a denominator of `items.length` would render that as 0/0 and
@@ -414,15 +453,27 @@ export const NO_GATE: GateIn = { passed: false, applicable: true };
  */
 export function scoreOf(items: { ok: boolean }[], gate: GateIn): Score {
   const passed = items.filter(i => i.ok).length;
-  const ready = gate.applicable && items.length === CHECKS && passed === CHECKS;
-  const lines: [string, string] = !gate.applicable
-    ? ['Paper only. No backtest gate.', 'Real money needs an owner decision']
-    : ready
-      ? [`${ALL_CAP} pass.`, 'Ready for real money']
-      : gate.passed
-        ? ['Paper trading until', `${ALL} pass`]
-        : ['Paper only.', 'Backtest gate not passed'];
+  const ready = !gate.twin && gate.applicable && items.length === CHECKS && passed === CHECKS;
+  const lines: [string, string] = gate.twin
+    ? ['Paper only. No backtest possible.', 'Claude knows how the past turned out']
+    : !gate.applicable
+      ? ['Paper only. No backtest gate.', 'Real money needs an owner decision']
+      : ready
+        ? [`${ALL_CAP} pass.`, 'Ready for real money']
+        : gate.passed
+          ? ['Paper trading until', `${ALL} pass`]
+          : ['Paper only.', 'Backtest gate not passed'];
   return { passed, total: CHECKS, ready, lines };
+}
+
+/**
+ * The Paper chip's tooltip on a twin's card: which method it shadows, and what it is, in plain
+ * words (CLAUDE.md: no ids or code in owner-facing text). `originalShort` is the original's short
+ * label, or null when the original is not on the board.
+ */
+export function twinChipTip(originalShort: string | null): string {
+  const of = originalShort ? `${originalShort}'s method` : 'the same method';
+  return `Claude twin: ${of}, minus the picks Claude objected to. Paper only, no real money.`;
 }
 
 export type Cell = { text: string; tone: '' | 'pos' | 'neg' };

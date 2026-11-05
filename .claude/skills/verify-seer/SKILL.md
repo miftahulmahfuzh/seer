@@ -34,8 +34,8 @@ What a run is:
 - **Postgres**: its own database `v_<run>` in the Docker container `seer-pg-verify`
   (127.0.0.1:55437, postgres:16, created on first use, left running). `up` applies every
   `db/migrations/*.sql` with the engine's own `migrate`, then (unless `--empty`) runs
-  `web/scripts/seed-demo.mjs` and `seed-demo-sean.mjs`: five paper strategies over 66 sessions,
-  24 Sean orders, a plan following F4. The champion is SPY unless `--champion=ID`.
+  `web/scripts/seed-demo.mjs` and `seed-demo-sean.mjs`: five paper strategies and F4's Claude
+  twin (F4-MOM12-N20-TREND-CX) over 66 sessions, 24 Sean orders, a plan following F4. The champion is SPY unless `--champion=ID`.
 - **Neon shim**: web/ only speaks Neon's HTTP and WebSocket protocols, never TCP, so
   `scripts/neon-shim.mjs` answers both on a loopback port in front of the run's database, and
   `scripts/preload.mjs` (loaded into every Node process via `NODE_OPTIONS`) routes the app's

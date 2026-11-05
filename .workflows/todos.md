@@ -3,18 +3,18 @@
 **Package Path**: `.`
 **Package Code**: ROOT
 **Last Updated**: 2026-11-05
-**Total Active Tasks**: 10
+**Total Active Tasks**: 9
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 9
+- P1 High: 8
 - P2 Medium: 0
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 4
-- Completed: 28
+- Completed: 29
 
 ---
 
@@ -114,16 +114,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R1 — Seer engine: twin roster rows, verdict and mark tables, A-GT re-admission, candidate list for bracket strategies, decide-late twins; R2 — Confirm or reject decide-late twins against the real paper runner and paper_check
   - **Depends on**: P1-ROOT-B10D
   - **Plan**: `.workflows/plan/P1-ROOT-O4FB.md`
-- [ ] **P1-ROOT-BXVQ** Phase 3: Seer web: twins on Leaderboard as Paper, never Today, rule 5
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `web/lib/data.ts` (`twin_of`, `Strategy.twinOf`, `champion()` never a twin), leaderboard ordering (twin after original) and Paper chip, `looks()` shared colour with distinct dash, `gateItem` rule 5 "Can't be run", Today guard, demo seed twin rows, tests, verify-seer `features/leaderboard.md`, `today.md`, `positions-history.md`, `steps/leaderboard-twin.mjs`, one `SKILL.md` line. Does not touch engine, migrations, `engine-night.md`, `features/README.md`. Exit: `npx tsc --noEmit && npm test` green; verify-seer leaderboard shot shows a twin as Paper beside its original; Today never shows it.
-  - **Status**: open
-  - **Plan Set**: `/home/miftah/.worktrees/mcp-notes/seer-adversarial/.workflows/plan/SEER_ADVERSARIAL_PLAN.md` (phase 3 of 7)
-  - **Satisfies**: R3 — Seer web: twins on the Leaderboard as Paper next to originals, never on Today, rule 5 "can't be run"
-  - **Depends on**: P1-ROOT-B10D
-  - **Plan**: `.workflows/plan/P1-ROOT-BXVQ.md`
-
 ### [P2] Medium
 ### [P3] Low
 - [x] **P3-ROOT-D7MX** Phase 8: Close-out: which verdicts survived their honest control
@@ -152,6 +142,24 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ## Completed Tasks
 
+- [x] **P1-ROOT-BXVQ** Phase 3: Seer web: twins on Leaderboard as Paper, never Today, rule 5
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `web/lib/data.ts` (`twin_of`, `Strategy.twinOf`, `champion()` never a twin), leaderboard ordering (twin after original) and Paper chip, `looks()` shared colour with distinct dash, `gateItem` rule 5 "Can't be run", Today guard, demo seed twin rows, tests, verify-seer `features/leaderboard.md`, `today.md`, `positions-history.md`, `steps/leaderboard-twin.mjs`, one `SKILL.md` line. Does not touch engine, migrations, `engine-night.md`, `features/README.md`. Exit: `npx tsc --noEmit && npm test` green; verify-seer leaderboard shot shows a twin as Paper beside its original; Today never shows it.
+  - **Status**: completed (2026-11-05)
+  - **Plan Set**: `/home/miftah/.worktrees/mcp-notes/seer-adversarial/.workflows/plan/SEER_ADVERSARIAL_PLAN.md` (phase 3 of 7)
+  - **Satisfies**: R3 — Seer web: twins on the Leaderboard as Paper next to originals, never on Today, rule 5 "can't be run"
+  - **Depends on**: P1-ROOT-B10D
+  - **Plan**: `.workflows/plan/P1-ROOT-BXVQ.md`
+  - **Completed**: 2026-11-05 10:40
+  - **Method**: /do
+  - **Files**: `web/lib/strategy.ts`, `web/lib/strategy.test.ts`, `web/lib/data.ts`, `web/lib/metrics.ts`, `web/lib/metrics.test.ts`, `web/app/(app)/leaderboard/view.ts`, `web/app/(app)/leaderboard/view.test.ts`, `web/app/(app)/leaderboard/page.tsx`, `web/app/(app)/leaderboard/leaderboard.module.css`, `web/components/PaperChip.tsx`, `web/components/PaperChip.test.tsx`, `web/scripts/seed-demo.mjs`, `.claude/skills/verify-seer/features/leaderboard.md`, `.claude/skills/verify-seer/features/today.md`, `.claude/skills/verify-seer/features/positions-history.md`, `.claude/skills/verify-seer/features/steps/leaderboard-twin.mjs`, `.claude/skills/verify-seer/SKILL.md`, `.workflows/todos.md`
+  - **Drift**:
+    - None in the code: every quoted block matched seer a6322d7/4cbbe68.
+  - **Decided**:
+    - Plan's attachedOriginal test literal failed tsc (inferred twinOf: null vs string) -> typed both rows as TwinIn (rung 1: invariant 1, suite green).
+    - Journey selector card() matched the StrategySwitch link before the card -> scoped to [data-status] like the plan's own order query (rung 2: exit criteria test the page, which was correct).
+    - Desktop card head let 'F4+Claude' run under the icon (column titleRow never width-bounds .name) -> max-width:100% on desktop .name so it ellipsises to 'F4+…'; leaderboard.module.css was outside the Files table but no other phase owns it (rung 2, narrowest fix); gotcha recorded in features/leaderboard.md.
 - [x] **P1-ROOT-B10D** Phase 1: Seer schema, A-GT, candidate list, session open time
   - **Difficulty**: HARD
   - **Type**: Feature

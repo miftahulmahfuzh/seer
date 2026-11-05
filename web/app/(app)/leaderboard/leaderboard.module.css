@@ -173,7 +173,9 @@
   /* Uniform heads: the code, then a chip line that keeps its height when it has no chip. */
   .titleRow { flex-direction: column; align-items: flex-start; gap: 8px; }
   .chips { min-height: 26px; }
-  .name { font-size: 30px; letter-spacing: -0.03em; }
+  /* In the column the name is not width-bound by default, so a long code (a Claude twin's
+     `F4+Claude`) would run under the icon; bound it so `.nameText` ellipsises instead. */
+  .name { font-size: 30px; letter-spacing: -0.03em; max-width: 100%; }
   .cardSub { display: none; }
   .cardLink { cursor: pointer; }
   .cardLink .icon { transition: background .15s, color .15s; }

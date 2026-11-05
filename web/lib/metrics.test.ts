@@ -7,6 +7,7 @@ const snaps = (vals: number[]) =>
 const FAILED = { passed: false, applicable: true };
 const PASSED = { passed: true, applicable: true };
 const NOT_APPLICABLE = { passed: false, applicable: false };
+const TWIN = { passed: false, applicable: false, twin: true as const };
 
 describe('strategyMetrics', () => {
   it('computes return, win rate, profit factor, drawdown and trade count', () => {
@@ -88,11 +89,21 @@ describe('checklist', () => {
     expect(gateItem({ passed: false, applicable: false })).toEqual({ label: 'Backtest gate', val: 'Not applicable', ok: false });
     expect(gateItem(PASSED)).toEqual({ label: 'Backtest gate passed', val: 'Passed', ok: true });
   });
+  it("reads \"Can't be run\" for a Claude twin and never counts it as passed", () => {
+    expect(gateItem(TWIN)).toEqual({ label: 'Backtest gate', val: "Can't be run", ok: false });
+    const items = checklist({ ...base, months: 18 }, 0.046, TWIN);
+    expect(items).toHaveLength(CHECKLIST_RULES);
+    expect(items[4]).toEqual({ label: 'Backtest gate', val: "Can't be run", ok: false });
+    expect(items.filter(i => i.ok)).toHaveLength(4);
+  });
+  it('even a twin gate that claims a pass is not a pass', () => {
+    expect(gateItem({ passed: true, applicable: true, twin: true }).ok).toBe(false);
+  });
 
   // A checklist item is a verdict and nothing else (owner, 2026-10-07). `gateItem` used to hang the
   // roster's prose off the failing row, which is how it reached the leaderboard sheet at all.
   it('carries no prose on any item: a failed gate explains itself on the Sera method page', () => {
-    for (const gate of [PASSED, FAILED, NOT_APPLICABLE]) {
+    for (const gate of [PASSED, FAILED, NOT_APPLICABLE, TWIN]) {
       for (const item of checklist({ ...base, months: 18 }, 0.046, gate)) {
         expect(Object.keys(item).sort()).toEqual(['label', 'ok', 'val']);
       }

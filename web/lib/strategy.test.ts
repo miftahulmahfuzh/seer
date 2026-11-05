@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checksNews, engineOf, parseGate, shortLabel } from './strategy';
+import { attachedOriginal, checksNews, engineOf, gateOf, orderTwins, parseGate, shortLabel, TWIN_GATE, twinOfRow, type TwinIn } from './strategy';
 
 describe('engineOf', () => {
   it('keeps a known engine', () => {
@@ -67,5 +67,70 @@ describe('checksNews', () => {
     expect(checksNews('A', 'STRATEGY_A')).toBe(false);
     expect(checksNews('SPY', null)).toBe(false);
     expect(checksNews('F4-MOM12-N20-TREND', 'FACTOR')).toBe(false);
+  });
+  it('is never true for a Claude twin, whatever its spec names', () => {
+    expect(checksNews('C-CX', 'STRATEGY_C', 'C')).toBe(false);
+    expect(checksNews('A-GT-CX', 'STRATEGY_A', 'A-GT')).toBe(false);
+    expect(checksNews('C', 'STRATEGY_C', null)).toBe(true);
+  });
+});
+
+describe('twinOfRow', () => {
+  it('reads the original id of a Claude twin', () => {
+    expect(twinOfRow('RAW35-FR-GT')).toBe('RAW35-FR-GT');
+  });
+  it('reads anything else as not a twin, including a DB without migration 027', () => {
+    expect(twinOfRow(null)).toBeNull();
+    expect(twinOfRow(undefined)).toBeNull();
+    expect(twinOfRow('')).toBeNull();
+    expect(twinOfRow(42)).toBeNull();
+  });
+});
+
+describe('gateOf', () => {
+  it("gives a twin the twin gate, even when params say it passed or params are still '{}'", () => {
+    expect(gateOf({ passed: true }, 'A-GT')).toEqual({ passed: false, applicable: false, twin: true });
+    expect(gateOf(null, 'A-GT')).toBe(TWIN_GATE);
+  });
+  it('reads every other row exactly as parseGate does', () => {
+    expect(gateOf({ passed: true }, null)).toEqual(parseGate({ passed: true }));
+    expect(gateOf({ passed: false, applicable: false }, null)).toEqual({ passed: false, applicable: false });
+    expect('twin' in gateOf({ passed: false }, null)).toBe(false);
+  });
+  it('cannot be edited by a caller', () => {
+    expect(Object.isFrozen(TWIN_GATE)).toBe(true);
+  });
+});
+
+describe('orderTwins', () => {
+  const row = (id: string, twinOf: string | null = null) => ({ id, twinOf });
+
+  it('puts each twin directly after its original, wherever the twin started', () => {
+    const rows = [row('SPY'), row('A-GT-CX', 'A-GT'), row('A-GT'), row('RAW35'), row('C'), row('RAW35-CX', 'RAW35')];
+    expect(orderTwins(rows).map(r => r.id)).toEqual(['SPY', 'A-GT', 'A-GT-CX', 'RAW35', 'RAW35-CX', 'C']);
+  });
+  it('leaves a list without twins exactly as it was', () => {
+    const rows = [row('SPY'), row('A'), row('F4'), row('C')];
+    expect(orderTwins(rows)).toEqual(rows);
+  });
+  it('keeps a twin whose original is not on the list where it was', () => {
+    const rows = [row('SPY'), row('X-CX', 'X'), row('C')];
+    expect(orderTwins(rows).map(r => r.id)).toEqual(['SPY', 'X-CX', 'C']);
+  });
+  it('never drops or duplicates a row, even for a twin of a twin', () => {
+    const rows = [row('B-CX-CX', 'B-CX'), row('B'), row('B-CX', 'B')];
+    const out = orderTwins(rows).map(r => r.id);
+    expect(out).toHaveLength(3);
+    expect(new Set(out)).toEqual(new Set(['B', 'B-CX', 'B-CX-CX']));
+    expect(out.indexOf('B-CX')).toBe(out.indexOf('B') + 1);
+  });
+});
+
+describe('attachedOriginal', () => {
+  it('finds the original on the list, and nothing for a plain row', () => {
+    const a: TwinIn = { id: 'A', twinOf: null }, t: TwinIn = { id: 'A-CX', twinOf: 'A' };
+    const byId = new Map([[a.id, a], [t.id, t]]);
+    expect(attachedOriginal(t, byId)).toBe(a);
+    expect(attachedOriginal(a, byId)).toBeNull();
   });
 });

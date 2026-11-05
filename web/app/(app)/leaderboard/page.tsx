@@ -4,6 +4,7 @@ import { Archive, Check, CircleDashed, Crown, X } from 'lucide-react';
 import { currentUser } from '@/auth';
 import { AppHeader } from '@/components/AppHeader';
 import { strategyIcon } from '@/components/roster';
+import { PaperChip } from '@/components/PaperChip';
 import { StrategySwitch } from '@/components/StrategySwitch';
 import { leaderboard, monthly, runStatus, type Board } from '@/lib/data';
 import { monthDay, monthName, shortDate, signedPct } from '@/lib/format';
@@ -15,7 +16,7 @@ import { PickName } from './PickName';
 import { RetiredShelf } from './RetiredShelf';
 import {
   BENCHMARK_DASH, compare, LOOK_FALLBACK, looks, MIN_COMMON_SESSIONS, monthLines, NO_GATE, pickResearch,
-  researchOf, retiredLabel, scoreOf, sinceStartLine, spyOverSpan, windowLine,
+  researchOf, retiredLabel, scoreOf, sinceStartLine, spyOverSpan, twinChipTip, windowLine,
   type CompareRow, type Look, type MonthLine,
 } from './view';
 import s from './leaderboard.module.css';
@@ -38,6 +39,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
   const roster = board.rows.map(r => r.strategy);
   const lookMap = looks(roster);
   const lookOf = (id: string): Look => lookMap.get(id) ?? LOOK_FALLBACK;
+  const shortOf = new Map(roster.map(st => [st.id, st.short]));
   const research = researchOf(roster);
   const champ = board.rows.find(r => r.strategy.isChampion);
   const spy = board.rows.find(r => r.strategy.isBenchmark);
@@ -71,7 +73,9 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
   // The picked strategy's name doubles as the way into Sera's method page — but only for the one
   // account /sera lets in. For anyone else `requireSera` is a 404, and the nav already hides the
   // section from them: a link here would dead-end and announce what the nav is keeping quiet.
-  const seeMethod = pick && isSeraUser(user?.email) ? methodHref(pick.id) : null;
+  // A Claude twin runs its original's method with Claude's objections taken out, so its name
+  // opens the original's method page; the twin has no lab method of its own.
+  const seeMethod = pick && isSeraUser(user?.email) ? methodHref(pick.twinOf ?? pick.id) : null;
   const since = table ? sinceStartLine(table) : null;
   const months = table ? monthLines(table) : [];
 
@@ -246,9 +250,10 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
                 <span className={`${s.nameText} desk-only`}>{st.short}</span>
                 {st.isChampion && <span data-tip="Champion" aria-label="Champion" role="img" className={`${s.crown} mobile-only`}><Crown size={20} /></span>}
               </span>
-              {/* Desktop: the status line under the code — champion, retired, not ranked. */}
+              {/* Desktop: the status line under the code — champion, Claude twin (Paper), retired, not ranked. */}
               <span className={s.chips}>
                 {st.isChampion && <span data-tip="Champion" aria-label="Champion" role="img" className={`${s.crown} desk-only`}><Crown size={20} /></span>}
+                {st.twinOf !== null && <PaperChip size="sm" tip={twinChipTip(shortOf.get(st.twinOf) ?? null)} />}
                 {retired && (
                   <span className={`chip ${s.retired}`}
                     data-tip="Retired: it stopped trading and keeps its whole record">

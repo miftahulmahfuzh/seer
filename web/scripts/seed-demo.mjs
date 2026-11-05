@@ -4,8 +4,9 @@
 // (monthly book strategies), C (bracket: A's picks minus the news check's vetoes, on its own
 // younger clock). 66 sessions ending at the last completed session: day 0 is the first, paper
 // start the second, so the demo spans at least three calendar months. C starts 28 sessions ago.
-// Needs migrations through 009 applied first (`npm run db:migrate`): 004 (news_vetoes, the C row's
-// columns), 008 (book_previews) and 009 (`evidence` on orders, book_targets and book_previews).
+// Needs every migration applied first (`npm run db:migrate`): 004 (news_vetoes, the C row's
+// columns), 008 (book_previews), 009 (`evidence` on orders, book_targets and book_previews) and
+// 027 (`strategies.twin_of`, for F4's Claude twin F4-MOM12-N20-TREND-CX, Seer Adversarial).
 // Pending orders, book targets and "would pick now" rows carry demo evidence: plain-English facts.
 // Refuses to run once the real engine has written a run, backfilled bars or started paper trading.
 // `--dry-run` builds every row and prints the counts without connecting.
@@ -323,6 +324,38 @@ const newsVetoes = VETO_CHECKS.map(([rank, sym, name, verdict, reason, k, earnin
   earnings, VETO_DECIDED.toISOString(),
 ]);
 
+// --- F4+Claude: F4's Claude twin (Seer Adversarial, contract C2) -----------------
+// Built last, after every other row has drawn from `rnd()`, so adding it moves no other strategy's
+// demo numbers. The same book as F4 minus the two names Claude objected to at the last decision
+// (BAC, CCL), the rest re-weighted pro rata (12 at 5% -> 10 at 6%), on F4's own clock. Paper only:
+// the web never makes a twin champion, so it never reaches Today.
+{
+  const id = 'F4-MOM12-N20-TREND-CX';
+  strategies.push({
+    id, twinOf: 'F4-MOM12-N20-TREND', name: 'F4+Claude · Momentum', sub: 'Top 20 by 12-1 momentum, monthly', icon: 'trending-up',
+    champion: false, benchmark: false, sort: 3, engine: 'book', rulesId: 'monthly-hold', paperStart: PAPER_START,
+    params: { demo: true, spec: { engine: 'book', object: 'FACTOR', registry_id: 'F4-MOM12-N20-TREND', rules_id: 'monthly-hold' }, digest: null,
+      backtest_gate: { passed: false, applicable: false, note: 'Claude twin: no backtest is possible, Claude already knows how the past turned out.' } },
+  });
+  const eq = curve(0.024, 3.1, FIRST_DECISION);
+  const E = eq[LAST];
+  // [symbol, mark, held since the first decision?]: F4's HELD without BAC and CCL.
+  const HELD = [['INTC', 36.42, true], ['PFE', 25.08, false], ['F', 11.31, true], ['T', 27.64, true],
+    ['WBD', 12.37, true], ['KMI', 27.93, false], ['HPE', 22.46, true], ['CMCSA', 32.81, false], ['CSX', 33.57, true],
+    ['HBAN', 16.72, true]];
+  let invested = 0;
+  for (const [sym, mark, early] of HELD) {
+    const from = early ? FIRST_DECISION : LAST_DECISION;
+    const entry = r2(mark / (1 + (rnd() - 0.4) * 0.15));
+    const shares = Math.max(1, Math.floor((0.06 * E) / mark));
+    invested += shares * mark;
+    bookPositions.push([id, sym, shares, mark, sessions[from], entry, LAST - from + 1, r4(shares * entry * (1 + FEE)), 0, null, null, false]);
+  }
+  const cashShare = Math.max(0, 1 - invested / E);
+  eq.forEach((e, i) => snapshots.push([id, sessions[i], i < FIRST_DECISION ? e : r4(e * cashShare), e]));
+  paperState.push([id, r4(E - invested), E, pendingDecision]);
+}
+
 const rows = { strategies, snapshots, paperState, bookPositions, bookTargets, bookPreviews, bookTrades, picks, open, closed,
   cPicks, cOpen, cClosed, newsVetoes };
 
@@ -355,11 +388,11 @@ try {
   // on "roster object name None". Same values 006 backfilled for these five ids.
   for (const s of strategies)
     await c.query(`INSERT INTO strategies (id, name, sub, icon, is_champion, is_benchmark, sort, engine, rules_id, paper_start, params,
-        object_name, registry_id, gate_note, gate_applicable)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+        object_name, registry_id, gate_note, gate_applicable, twin_of)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
     [s.id, s.name, s.sub, s.icon, s.champion, s.benchmark, s.sort, s.engine, s.rulesId, s.paperStart, JSON.stringify(s.params),
       s.engine === 'benchmark' ? 'buy_and_hold' : s.params.spec.object, s.params.spec.registry_id ?? null, s.params.backtest_gate.note,
-      s.params.backtest_gate.applicable !== false]);
+      s.params.backtest_gate.applicable !== false, s.twinOf ?? null]);
 
   await c.query(`INSERT INTO runs (started_at, finished_at, status, data_date, session_date, is_demo, paper_status, paper_finished_at)
     VALUES (now() - interval '5 minutes', now() - interval '2 minutes', 'success', $1, $2, true, 'success', now())`, [dataDate, session]);

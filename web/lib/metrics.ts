@@ -42,10 +42,14 @@ export function strategyMetrics(snaps: Snapshot[], pnls: number[]): Metrics {
 export type CheckItem = { label: string; val: string; ok: boolean };
 
 /**
- * The fifth rule: "Backtest gate passed", or "Not applicable" for C (design §1 item 5), which never
- * counts as passed. The verdict stands alone — why a gate failed is the method's Sera page to tell.
+ * The fifth rule: "Backtest gate passed", "Not applicable" for C (design §1 item 5), or "Can't be
+ * run" for a Claude twin (Seer Adversarial: Claude already knows how the past turned out, so no
+ * backtest of a twin is honest). Neither of the last two ever counts as passed. The verdict stands
+ * alone: why a gate failed is the method's Sera page to tell, and why a twin's cannot run is the
+ * score line's (`leaderboard/view.ts` `scoreOf`).
  */
 export function gateItem(gate: Gate): CheckItem {
+  if (gate.twin) return { label: 'Backtest gate', val: "Can't be run", ok: false };
   return gate.applicable
     ? { label: 'Backtest gate passed', val: gate.passed ? 'Passed' : 'Not passed', ok: gate.passed }
     : { label: 'Backtest gate', val: 'Not applicable', ok: false };

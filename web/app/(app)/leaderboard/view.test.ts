@@ -4,7 +4,7 @@ import type { MonthlyTable } from '../../../lib/monthly';
 import {
   CHECKS, compare, LOOK_PERIOD, looks, MIN_COMMON_SESSIONS, MIN_RANKED, monthLabel, monthLines,
   NO_GATE, pickResearch, researchOf, retiredLabel, scoreOf, sinceStartLine, spyOverSpan,
-  windowLine, type GateIn, type RankIn, type RosterIn,
+  TWIN_DASHES, twinChipTip, windowLine, type GateIn, type RankIn, type RosterIn,
 } from './view';
 
 const roster: RosterIn[] = [
@@ -65,6 +65,45 @@ describe('looks', () => {
   it('emphasises a non-benchmark champion', () => {
     const l = looks([{ ...roster[0], isChampion: false }, { ...roster[1], isChampion: true }]);
     expect(l.get('A')!.width).toBe(2.75);
+  });
+  // Seer Adversarial: a Claude twin wears its original's colour with its own dash, and takes no
+  // palette slot, so every card after it keeps the colour it had before twins existed.
+  const F4_TWIN: RosterIn = { id: 'F4-MOM12-N20-TREND-CX', isChampion: false, isBenchmark: false, twinOf: 'F4-MOM12-N20-TREND' };
+  const withTwin: RosterIn[] = [roster[0], roster[1], roster[2], F4_TWIN, roster[3], roster[4]];
+
+  it("gives a twin its original's sheet, tint and line, with a twin dash", () => {
+    const l = looks(withTwin);
+    const f4 = l.get('F4-MOM12-N20-TREND')!;
+    expect(l.get(F4_TWIN.id)).toEqual({ ...f4, dash: TWIN_DASHES[0] });
+    expect(f4.dash).toBeNull();
+  });
+  it('moves no other strategy: later cards keep their colours', () => {
+    const before = looks(roster), after = looks(withTwin);
+    for (const id of RESEARCH) expect(after.get(id)).toEqual(before.get(id));
+    expect(after.get('SPY')).toEqual(before.get('SPY'));
+  });
+  it('does not depend on where the twin sits in the roster', () => {
+    const first = looks([F4_TWIN, ...roster]);
+    expect(first.get(F4_TWIN.id)).toEqual(looks(withTwin).get(F4_TWIN.id));
+    expect(first.get('A')!.bg).toBe('bg-lav');
+  });
+  it('colours a twin whose original is not on the roster like any other strategy', () => {
+    const l = looks([roster[0], { id: 'X-CX', isChampion: false, isBenchmark: false, twinOf: 'X' }]);
+    expect(l.get('X-CX')).toEqual({ bg: 'bg-lav', tint: 'var(--lav)', line: 'var(--lav-line)', width: 2, dash: null });
+  });
+  it("never emphasises a twin, even when its original is champion", () => {
+    const l = looks([{ ...roster[1], isChampion: true }, { id: 'A-CX', isChampion: false, isBenchmark: false, twinOf: 'A' }]);
+    expect(l.get('A')!.width).toBe(2.75);
+    expect(l.get('A-CX')!.width).toBe(2);
+  });
+  it('never gives a twin the line of any original or of SPY, up to LOOK_PERIOD originals each with a twin', () => {
+    const originals: RosterIn[] = Array.from({ length: LOOK_PERIOD }, (_, i) => ({ id: `S${i}`, isChampion: false, isBenchmark: false }));
+    const twins: RosterIn[] = originals.map(o => ({ id: `${o.id}-CX`, isChampion: false, isBenchmark: false, twinOf: o.id }));
+    const l = looks([roster[0], ...originals, ...twins]);
+    const all = [...originals, ...twins].map(st => `${l.get(st.id)!.line}|${l.get(st.id)!.dash}`);
+    expect(new Set(all).size).toBe(LOOK_PERIOD * 2);
+    expect(l.get('S6-CX')!.dash).toBe(TWIN_DASHES[1]);
+    for (const t of twins) expect(l.get(t.id)!.dash).not.toBe('1 4');
   });
 });
 
@@ -338,6 +377,16 @@ describe('scoreOf', () => {
     expect(sc.ready).toBe(false);
     expect(sc.lines[1]).toBe('Real money needs an owner decision');
   });
+  it("says a twin's backtest cannot be run, and why, and is never ready", () => {
+    const TWIN = { passed: false, applicable: false, twin: true as const };
+    const sc = scoreOf(checks(STRONG, TWIN), TWIN);
+    expect(sc).toEqual({
+      passed: 4, total: CHECKS, ready: false,
+      lines: ['Paper only. No backtest possible.', 'Claude knows how the past turned out'],
+    });
+    // A malformed twin gate that claims a pass is still not ready.
+    expect(scoreOf(checks(STRONG, PASSED), { passed: true, applicable: true, twin: true }).ready).toBe(false);
+  });
 });
 
 describe('month rows', () => {
@@ -374,5 +423,14 @@ describe('month rows', () => {
   });
   it('has no since-start row before the first paper session', () => {
     expect(sinceStartLine({ months: [], sinceStart: null })).toBeNull();
+  });
+});
+
+describe('twinChipTip', () => {
+  it("names the original's method in plain words", () => {
+    expect(twinChipTip('F4')).toBe("Claude twin: F4's method, minus the picks Claude objected to. Paper only, no real money.");
+  });
+  it('still reads when the original is not on the board', () => {
+    expect(twinChipTip(null)).toBe('Claude twin: the same method, minus the picks Claude objected to. Paper only, no real money.');
   });
 });

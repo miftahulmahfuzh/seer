@@ -175,8 +175,11 @@ def run_backtest(
     ``contributions``: the owner's recurring deposit (``sim.contributions``), or None for a lump
     sum -- the default, so every existing caller and every closed record is unchanged. A
     contribution dated ``d`` is credited at the OPEN of the first session on or after ``d``,
-    before that session's sizing, so the money is deployable the moment it lands and sits as idle
-    cash until the strategy next buys. It raises cash AND equity (the slot budget is
+    AFTER that session's sizing: the session's orders were sized the night before, when paper
+    (``commands/paper._step_bracket``) had not yet credited it, and sizing them on the deposit is
+    what made C-GT's replay disagree with its record from 2026-10-26 on. The money is deployable
+    from the next decision and sits as idle cash until the strategy next buys. It raises cash
+    AND equity (the slot budget is
     ``q(equity / SLOTS)``: crediting cash alone would leave the deposit under-deployed for good).
     It is converted at this run's single ``usd_idr``, the rate the starting capital used.
 
@@ -214,11 +217,6 @@ def run_backtest(
     cashflows: list[tuple[date, Decimal]] = []
 
     for session in dates.sessions(start, end):
-        if contributions is not None:
-            credit = credit_for(contributions, data_date, session, usd_idr)
-            if credit > 0:
-                pf = replace(pf, cash=pf.cash + credit, equity=pf.equity + credit)
-                cashflows.append((session, credit))
         members = market.membership.members_on(data_date)
         session_params = params if schedule is None else schedule.at(session)
         if prepared is None:
@@ -231,6 +229,11 @@ def run_backtest(
         for r in sized.rejected:
             rejections[r.reason] += 1
         pf = sized.portfolio
+        if contributions is not None:
+            credit = credit_for(contributions, data_date, session, usd_idr)
+            if credit > 0:
+                pf = replace(pf, cash=pf.cash + credit, equity=pf.equity + credit)
+                cashflows.append((session, credit))
 
         result = step(pf, session, market.bars_on(session, pf.held_symbols()), rules=rules)
         pf = result.portfolio

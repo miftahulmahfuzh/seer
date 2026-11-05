@@ -174,6 +174,21 @@ def test_expected_bracket_first_night_is_day0_plus_the_first_decision():
     assert (got.cash, got.equity, got.pending_session) == (CASH0, CASH0, D("2025-03-04"))
 
 
+def test_a_deposit_does_not_size_the_bracket_order_placed_the_night_before_it_lands():
+    """Paper sizes S's bracket order on the night of ``prev_session(S)`` and credits S's deposit
+    only when it steps S, so the replay must not let that deposit into S's sizing.
+
+    C-GT, 2026-10-26: the first top-up landed on the session DXCM was bought for; paper had sized
+    1 share, the replay sized 2, and every night after read as a mismatch.
+    """
+    deposit = CASH0 * 10  # big enough that sizing with it could only buy more AAA
+    fed = replay.expected_bracket(market(), PICKS, None, BRACKET_HEAD, contributions=((D("2025-03-04"), deposit),))
+    plain = _bracket()
+    aaa = {o.session_date: o.shares for o in fed.orders if o.symbol == "AAA"}
+    assert aaa[D("2025-03-04")] == {o.session_date: o.shares for o in plain.orders if o.symbol == "AAA"}[D("2025-03-04")]
+    assert fed.snapshots[1].cash_usd - plain.snapshots[1].cash_usd == deposit  # it still lands on S
+
+
 def test_expected_book_is_run_book_with_every_decision():
     m = market()
     got = _book()

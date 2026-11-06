@@ -1,0 +1,70 @@
+{
+  "branch": "feature/lab-book-twins",
+  "coordinator": "orch-lab-book-twins",
+  "coordinator_session_id": "a6b5118b-e585-4675-aac1-590e1ebd5a5e",
+  "created": "2026-11-06T15:34:53+07:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "engine/lab`, `engine/commands",
+      "plan": ".workflows/plan/lab-book-twins/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1",
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Twin reader and lab CLI surfaces (run, twins, status, promote D19)"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "NORMAL",
+      "n": 2,
+      "note": null,
+      "package": ".claude/skills/calculate-assets",
+      "plan": ".workflows/plan/lab-book-twins/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "calculate-assets names controls and twins"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "EASY",
+      "n": 3,
+      "note": null,
+      "package": ".claude/skills",
+      "plan": ".workflows/plan/lab-book-twins/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2",
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Sera skills read the twin line"
+    }
+  ],
+  "plan": "/home/miftah/.worktrees/seer/lab-book-twins/.workflows/orchestration/lab-book-twins/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "lab-book-twins",
+  "updated": "2026-11-06T15:34:53+07:00",
+  "worktree": "/home/miftah/.worktrees/seer/lab-book-twins"
+}

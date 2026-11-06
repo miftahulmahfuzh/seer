@@ -6,20 +6,20 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "58dd774",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "lab/twins.py reader, lab twins, status tags, run Book twins block, promote D19 (stops M0173/M0258/M0284; promotable 6); 5 non-DB skips accepted vs '0 skips' per rung 2; proof: verified-first-pass /home/miftah/.local/state/seer-verify/1106-153838-700847/evidence",
       "package": "engine/lab`, `engine/commands",
       "plan": ".workflows/plan/lab-book-twins/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-11-06T15:47:29+07:00",
       "satisfies": [
         "R1",
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-K7QD",
       "title": "Twin reader and lab CLI surfaces (run, twins, status, promote D19)"
     },
     {
@@ -37,7 +37,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "calculate-assets names controls and twins"
     },
@@ -57,7 +57,7 @@
         "R2",
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Sera skills read the twin line"
     }
@@ -65,6 +65,6 @@
   "plan": "/home/miftah/.worktrees/seer/lab-book-twins/.workflows/orchestration/lab-book-twins/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-book-twins",
-  "updated": "2026-11-06T15:34:53+07:00",
+  "updated": "2026-11-06T15:48:05+07:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-book-twins"
 }

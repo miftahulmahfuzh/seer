@@ -2,19 +2,19 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-11-05
-**Total Active Tasks**: 8
+**Last Updated**: 2026-11-06
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 7
-- P2 Medium: 0
-- P3 Low: 1
+- P1 High: 1
+- P2 Medium: 2
+- P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 4
-- Completed: 30
+- Blocked: 0
+- Completed: 37
 
 ---
 
@@ -106,6 +106,24 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Whether to commit `.workflows/todos.md` -> **no**. It already carries phase 8's entry (`P3-ROOT-D7MX`) alongside this one, and a pathspec commit of it would ship a peer's bookkeeping under this phase's message (Rung 3: phase 2's own commit block lists five source/test files and no `todos.md`). This entry is left in the working tree for whoever commits that file.
     - Whether this phase merges and lands -> **it does not**; the set is swarm-tracked and `/implement` Step 5a leaves the merge to `orch-honest-control-redraw`.
 ### [P2] Medium
+- [ ] **P2-ROOT-M3ZV** Phase 2: calculate-assets names controls and twins
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `.claude/skills/calculate-assets/calculate_assets.py` (role via `control_shape.role_of`; twin via a `mode=ro` sqlite3 connection + `twins.first_recorded`; `TwinCheck` status `twin`/`first`/`none`/`not checked`; stdout block before the money and `role`/`twin_of` JSON keys) and `SKILL.md` (rule 4 allows the one read-only read; fifth rule on saying "control" and naming the first-recorded twin). Does not touch the money model, `build_page.py`, `build_audit.py` or the engine. Exit: `M0488-DVC10-NEVER` prints control-of-M0488 and `Same book as M0125-DV-C10 (M0125), first recorded 2026-10-16`; `M0179-N20` prints no twin and `Rp 1,783,094,603` with a byte-identical money section; `check_twin('M0125-DV-C10')` reads `first`; `lab/lab.sqlite` sha256 unchanged.
+  - **Status**: open
+  - **Plan Set**: `.workflows/plan/LAB_BOOK_TWINS_PLAN.md` (phase 2 of 3)
+  - **Satisfies**: R2 — Stop reporting surfaces (promote, calculate-assets, `lab status`, the Sera relay) presenting a control or an already-recorded book as a new candidate
+  - **Depends on**: P1-ENG-K7QD
+  - **Plan**: `.workflows/plan/P2-ROOT-M3ZV.md`
+- [ ] **P2-ROOT-R9XA** Phase 3: Sera skills read the twin line
+  - **Difficulty**: EASY
+  - **Type**: Feature
+  - **Context**: Owns `.claude/skills/sera-the-explorer/SKILL.md` (S1 slate rule, S2 relay check, S3 report table, S4 two Never rows) and `.claude/skills/explore-and-experiment-new-method/SKILL.md` (E1-E5: design note, read the `Book twins` block, gate trap, D19 at promote, quick reference). New prose says "book twin", never bare "twin". Does not touch engine code, `lab idea`, calculate-assets or any other skill. Exit: both skills name `lab twins` and state a control's or book twin's money is never a new book; the explore skill names "the treatment never acted", "the dial never moved" and D19; `lab twins M0488` / `M0447` on a verify-seer copy show the cases the text quotes.
+  - **Status**: open
+  - **Plan Set**: `.workflows/plan/LAB_BOOK_TWINS_PLAN.md` (phase 3 of 3)
+  - **Satisfies**: R2, R3 — R2 — Stop reporting surfaces (promote, calculate-assets, `lab status`, the Sera relay) presenting a control or an already-recorded book as a new candidate; R3 — Decide whether Sera's slate selection (skill or `lab idea`) warns about arms that re-measure a recorded book
+  - **Depends on**: P1-ENG-K7QD
+  - **Plan**: `.workflows/plan/P2-ROOT-R9XA.md`
 ### [P3] Low
 - [x] **P3-ROOT-D7MX** Phase 8: Close-out: which verdicts survived their honest control
   - **Difficulty**: NORMAL

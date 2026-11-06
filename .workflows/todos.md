@@ -3,18 +3,18 @@
 **Package Path**: `.`
 **Package Code**: ROOT
 **Last Updated**: 2026-11-06
-**Total Active Tasks**: 3
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
 - P1 High: 1
-- P2 Medium: 2
+- P2 Medium: 1
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 37
+- Completed: 38
 
 ---
 
@@ -115,15 +115,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R2 — Stop reporting surfaces (promote, calculate-assets, `lab status`, the Sera relay) presenting a control or an already-recorded book as a new candidate
   - **Depends on**: P1-ENG-K7QD
   - **Plan**: `.workflows/plan/P2-ROOT-M3ZV.md`
-- [ ] **P2-ROOT-R9XA** Phase 3: Sera skills read the twin line
-  - **Difficulty**: EASY
-  - **Type**: Feature
-  - **Context**: Owns `.claude/skills/sera-the-explorer/SKILL.md` (S1 slate rule, S2 relay check, S3 report table, S4 two Never rows) and `.claude/skills/explore-and-experiment-new-method/SKILL.md` (E1-E5: design note, read the `Book twins` block, gate trap, D19 at promote, quick reference). New prose says "book twin", never bare "twin". Does not touch engine code, `lab idea`, calculate-assets or any other skill. Exit: both skills name `lab twins` and state a control's or book twin's money is never a new book; the explore skill names "the treatment never acted", "the dial never moved" and D19; `lab twins M0488` / `M0447` on a verify-seer copy show the cases the text quotes.
-  - **Status**: open
-  - **Plan Set**: `.workflows/plan/LAB_BOOK_TWINS_PLAN.md` (phase 3 of 3)
-  - **Satisfies**: R2, R3 — R2 — Stop reporting surfaces (promote, calculate-assets, `lab status`, the Sera relay) presenting a control or an already-recorded book as a new candidate; R3 — Decide whether Sera's slate selection (skill or `lab idea`) warns about arms that re-measure a recorded book
-  - **Depends on**: P1-ENG-K7QD
-  - **Plan**: `.workflows/plan/P2-ROOT-R9XA.md`
 ### [P3] Low
 - [x] **P3-ROOT-D7MX** Phase 8: Close-out: which verdicts survived their honest control
   - **Difficulty**: NORMAL
@@ -151,6 +142,21 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ## Completed Tasks
 
+- [x] **P2-ROOT-R9XA** Phase 3: Sera skills read the twin line
+  - **Difficulty**: EASY
+  - **Type**: Feature
+  - **Context**: Owns `.claude/skills/sera-the-explorer/SKILL.md` (S1 slate rule, S2 relay check, S3 report table, S4 two Never rows) and `.claude/skills/explore-and-experiment-new-method/SKILL.md` (E1-E5: design note, read the `Book twins` block, gate trap, D19 at promote, quick reference). New prose says "book twin", never bare "twin". Does not touch engine code, `lab idea`, calculate-assets or any other skill. Exit: both skills name `lab twins` and state a control's or book twin's money is never a new book; the explore skill names "the treatment never acted", "the dial never moved" and D19; `lab twins M0488` / `M0447` on a verify-seer copy show the cases the text quotes.
+  - **Status**: completed (2026-11-06) — both skills name `lab twins`, say a control's or book twin's money is never a new book, and the explore skill names "the treatment never acted", "the dial never moved" and D19; journeys 1-4 pass on verify-seer run 1106-154850-753205 (`lab twins M0488` pairs NEVER with M0125-DV-C10 and FIXED730 with M0442; M0447 RECOVER arms print "the treatment never acted").
+  - **Plan Set**: `.workflows/plan/LAB_BOOK_TWINS_PLAN.md` (phase 3 of 3)
+  - **Satisfies**: R2, R3 — R2 — Stop reporting surfaces (promote, calculate-assets, `lab status`, the Sera relay) presenting a control or an already-recorded book as a new candidate; R3 — Decide whether Sera's slate selection (skill or `lab idea`) warns about arms that re-measure a recorded book
+  - **Depends on**: P1-ENG-K7QD
+  - **Plan**: `.workflows/plan/P2-ROOT-R9XA.md`
+  - **Completed**: 2026-11-06 15:55
+  - **Method**: /implement
+  - **Files**: `.claude/skills/sera-the-explorer/SKILL.md`, `.claude/skills/explore-and-experiment-new-method/SKILL.md`
+  - **Drift**: none — all nine exact old_strings matched uniquely at 58dd774
+  - **Decided**:
+    - Journey 1 bounds ('lab twins' >=4 in explore, 'never … new book' >=3 in sera) failed on the plan's own code blocks (S3 phrase wrapped across lines; E1 named only 'step 7') -> rewrapped S3 so 'never listed as a new book' is on one line and added '`lab twins MNNNN`' to E1's '(step 7)' (rung 2: exit criteria; tie-break: never relax a check).
 - [x] **P1-ROOT-O4FB** Phase 2: Seer twin machinery: roster twins, lag stepping, verdict filter, paper_check, promote
   - **Difficulty**: HARD
   - **Type**: Feature

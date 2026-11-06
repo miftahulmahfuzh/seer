@@ -1,9 +1,8 @@
 # Package: ROOT (seer)
 
 **Location**: `.` (repository root)
-**Last Updated**: 2026-10-08 (lab-realistic-gate, phase 3 (P1-ROOT-RDX2): a new
-`/redo-sera-experiments` skill that mints one pre-registered, realistically-costed "variation twin"
-per named lab method, as a batch)
+**Last Updated**: 2026-11-06 (lab-book-twins, P2-ROOT-M3ZV: `/calculate-assets` now prints the
+named arm's role and its book twin before the money, from one read-only `lab.sqlite` look)
 
 ## Overview
 
@@ -18,9 +17,9 @@ Its "API" is therefore not functions but **entry points a human or an agent invo
 command, a workflow dispatch, a migration file, a runbook step.
 
 **Key Responsibilities:**
-- The five lab skills under `.claude/skills/` — exploring new methods, redoing existing ones
-  honestly, fanning a batch out, moving the research store between machines, and repairing a stale
-  published method page
+- The lab skills under `.claude/skills/` — exploring new methods, redoing existing ones
+  honestly, fanning a batch out, moving the research store between machines, repairing a stale
+  published method page, and pricing one method on the owner's real money (`/calculate-assets`)
 - The scheduled and manual GitHub Actions under `.github/workflows/` — CI, nightly, universe,
   backfill, repick, sean, watch
 - The forward-only Neon schema under `db/migrations/`, plus one-off operational SQL in `db/ops/`
@@ -115,6 +114,25 @@ store is the train/eval input `lab run` reads; it never opens Neon.
 Purpose: repair a page on `seertrade.site/sera` that reads a number against a bar the lab no longer
 holds — after `DSR_MIN`, `MAX_DRAWDOWN`, `MIN_PROFIT_FACTOR` or the N policy moves. One rule: no
 number on the page may be read against a bar from a different day.
+
+#### `/calculate-assets`
+
+```
+/calculate-assets M0007-N20-RAW 16-4-2018
+```
+
+Purpose: run one lab method over any window inside the test-window store on the owner's real
+funding plan (fractional shares, Gotrade's real fees, the monthly top-up) and report the money,
+never the gate numbers. Script: `calculate_assets.py`; `build_page.py` turns its `--out` JSON into
+the artifact page.
+
+Before the money it prints the named arm's **role** (`control`, `dose`, `idea` or `treatment`) and
+a **book twin** line: whether an earlier trial already recorded the same book under another name,
+and when. That comes from the skill's only database read, a single `sqlite3` `mode=ro` connection
+(honours `SEER_LAB_DB`), never `lab.store.connect`, so `lab.sqlite` stays byte-identical. A missing
+or unreadable database prints `twin not checked (<reason>)` and leaves the money unaffected. The
+`--out` JSON carries the same facts as `role` and `twin_of`. Nothing is recorded in the lab.
+`SKILL.md` is the full spec.
 
 ### GitHub Actions (`.github/workflows/`)
 

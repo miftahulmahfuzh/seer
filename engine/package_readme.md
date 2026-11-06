@@ -178,6 +178,7 @@ engine/
       control_shape.py      is a placebo actually shaped like the book it controls (lab-shortfall-and-control-shape, P1-ENG-03W0): WINDOW = "dev", DECLARATION_ATTR = "controls", SUPERSEDES_ATTR = "supersedes", DOSE_MARKERS / DRAW_MARKERS / ABLATION_MARKERS / IDEA_MARKERS (measured phrase lists, each entry carrying its hit count over the lab's 770 candidates), KIND_PLACEBO / KIND_DOSE / KIND_ABLATION / KIND_NONE, OK / WARN / REFUSE / UNRESOLVED / UNRECORDED / NOT_CHECKED, RUNG_DECLARED / RUNG_STEM / RUNG_IDEA / RUNG_FIRST, WARN_BAND = (0.8, 1.25) and REFUSE_BAND = (0.5, 2.0); Arm (a Protocol), Shape, Finding (with `declares` / `superseded_by` / `superseded_by_target` and the `blocking` property), kind_of(), declared_target(), declared_supersessions(), resolve_target(), band_verdict(), worst(), superseding_arm(), findings(), for_method(), survey(), refusals(), flags(), describe(), band_sentence(), format_report(). From 2026-10-19 a `refuse` or `warn` finding is **superseded** -- reported with its verdict and both ratios, never dropped -- when the same method holds another placebo arm that is itself `ok` on both axes AND **names it** in its own pre-registered `Candidate.supersedes` declaration, read duck-typed through `SUPERSEDES_ATTR` exactly as `DECLARATION_ATTR` is; `refusals()` filters on `blocking` rather than `refused`, so the gate reads the honest draw, and a supersession is **declared and never inferred from the target** (a re-drawn arm is deliberately re-pointed at the book it actually controls, so target equality is wrong in both directions). A pure reader: one `window = 'dev'` SELECT, no insert, no status move, no file, no clock, no randomness, no research store and no printing — `format_report` returns a string and the caller prints it. It decides nothing and it is the single formatter for all three of its callers, so they cannot drift on one arm: `commands/lab.py` owns `lab control` (the standalone report) and the annotation inside `_run` that prints but never refuses (D15), and `lab/hardgate.py` owns the refusal at `lab promote` (D17, through `mis_shaped_controls`)
       shortfall.py          `lab shortfall <n|candidate_id>` (lab-shortfall-and-control-shape, P1-ENG-NVHT): where one trial's gap to SPY total return over an era went, with the residual left a residual. DEFAULT_ERA = "2009-2015", DEFAULT_NAMES = turnover.ROSTER_NAMES, SENSITIVITY_NAMES = (10, 20, 30, 50), ERA_BASIS / WHOLE_BASIS, MAX_GATE_FILL, RATE_Q, CASH_NOTE -- with the eras themselves (`ERAS`, `ERA_LABELS`, `WHOLE`) taken from `lab.exposure` and the gate's identity (`GATE_SYMBOL`, `GATE_N`, `GATE_RULE`) from `lab.gate_probe`, so no era boundary and no definition of "the shared gate" is restated here; resolve_trial(), benchmark(), era_bounds(), curve_of(), trial_window(), month_offset(), carries_shared_gate(), names_in(), GateShare, gate_history(), gate_shares(), gate_on_share(), Exposure, era_exposure(), round_trip_rate(), mean_round_trip_rate(), Fees, fee_model(), Split, Shortfall, check_against(), measure(), format_report(), csv_rows(), write_csv(). `gap = -(gate premium) -(fee drag) + residual`, where the two named terms are computed independently and the residual is whatever they do not explain -- it is **never** named after a cause, and `--against <sibling>` is the only split of it, a peer split rather than an identity. The era slice goes through `walkforward.measure` + `hardgate.trial_deposits` and nowhere else, so a deposit can never be read as a gain. Era exposure is era-resolved from SPY's own bars when `--store` is given and labelled whole-window when it is not, which is load-bearing: on trial 828 the residual is -0.87 era-resolved and flips sign to +0.65 on the recorded whole-window figure. Fees are MODELLED through `turnover.round_trip` at the era's own month offsets, not recovered (`RunStats.costs_usd` is not a `trials` column), and the name count is read from the configuration's shallowest `top=` with a 10/20/30/50 sensitivity band printed beside it so the guess is visibly bounded. Report only: no trial row, no moments, no journal entry, no status -- N and the looks do not move
       timing.py             `lab timing <n|candidate_id> [--against CID]` / `lab timing --all` (lab-edge-timing, feature-wish 517): WHEN in a window a lead was earned, era by era, beside the share of the owner's deposits that had arrived by then. PARTITION / NESTED (derived from `lab.exposure.ERAS` by dropping any era wholly inside another -- 2008 sits inside 2003-2008 -- so no era boundary is restated here), OUTSIDE, MIN_MONTHS, MIN_EDGE, MIN_LEAD, FLOORS, LADDER, BAR; pts(), share(), plain(), benchmark_row(), funding_lead(), steps(), paid_in(), EraShare, Timing, measure(), format_report(), Band, Skip, Sweep, sweep(), format_sweep(), csv_rows(), write_csv(). Each month's lead is the difference of the two de-funded curves' log returns over it and is assigned to the era it **ENDS** in, so the shares add to the whole by construction -- a per-era slice starts at the first curve point *inside* the era and drops the month that straddles each boundary, which on M0267 is worth 6.2 points of the 2009-2015 figure. The familiar per-era `lead a year` is printed beside each share and IS `walkforward.measure`'s own slice, so this reconciles with `lab exposure`, `lab gate` and `lab survivorship`. The lead the owner's money received is **not** reconstructed: it is `trial_funding.mwr` minus `spy_tr_mwr` (or minus a sibling arm's own `mwr`), two recorded columns and a subtraction. Report only, and stricter than `lab survivorship` and `lab costs`: **no journal entry on any path**, so running it twice leaves no append-only row to undo
+      twins.py              `lab twins` / `lab run`'s `Book twins:` block / hardgate (D19) (lab-book-twins phase 1, P1-ENG-K7QD): one book the lab recorded under more than one candidate id. Pure derived reader over `trials.curve_json` -- twins share window, trade count and byte-identical curve; first recorded = lowest `n`. Twin (frozen; earlier / same_method / same_store / provenance()), fingerprint(), twins_of(), first_recorded(), for_method(), report_lines(). Writes nothing, opens no database, reads rows by position so a bare read-only sqlite3 connection works
       universe_rank.py      point-in-time membership for a dollar-volume universe (2026-10-14): Sample, read_samples(), intervals() -> [(index_id, symbol, start, end)] with end EXCLUSIVE and None while still in, members_on(), DEFAULT_BAND = (1, 2000). There is no index to read for a liquidity band -- membership.py's vendored S&P 500 / Nasdaq-100 snapshots cover large caps and nothing else -- so membership is derived from what the market did: a symbol is a member on the sessions following a month-end at which its dollar volume ranked inside the band, and leaves at the first month-end it does not. Strictly point-in-time: a rank known on M governs membership only from M onward, a symbol that leaves and returns keeps TWO spells rather than one long one, and there is deliberately NO persistence filter -- requiring a year in the band would halve the store and look like prudence, but it would drop a name briefly liquid in 2001 from the 2001 cross-section because of what happened to it later, the same shape of error as a price history that quietly omits the companies that went bankrupt. Measured on the 214-sample sweep: 67,336 intervals over 9,977 symbols, exactly 2,000 members on every date, 7,816 symbols with more than one spell
       seed.py               one-time import of the pre-lab record (P7a's 54 candidates); since trial-reproducibility writes a source='backfill' trial_provenance row per seed trial
       methods/              one file per method, mNNNN_<slug>.py exporting METHOD
@@ -1849,6 +1850,38 @@ correct arm is how a rule gets switched off.
   among them. `M0244-PLACEBO30` passes clean at 1.01x / 0.98x, which is why its own gap to M0244
   still stands.
 
+### `lab twins` (lab-book-twins phase 1, P1-ENG-K7QD)
+
+```
+python -m seer_engine lab twins M0488 [M0447-DVC10-NEVER ...] [--window dev|test]
+```
+
+Report only, in the sense `lab kin` and `lab control` are reports. A trial's identity is its
+config digest, and a follow-up method that wraps a host book in its own allocator and params gives
+the same book a new digest, so `runner.preflight`'s "repeats" refusal and
+`UNIQUE(config_digest, window)` never fire and one book collects several names (the 2026-11-06
+handover: `M0125-DV-C10` relayed again as `M0442-` / `M0447-` / `M0488-DVC10-NEVER`). For every
+recorded arm of a named method (or a named candidate) it lists every other trial on the same window
+with the same trade count and a byte-identical `curve_json`, earliest first, with trial number,
+method, run date and both store fingerprints (a twin across fingerprints is still a twin). An arm
+whose earliest twin came first prints `= <that id>`; an arm that is itself the first recording
+says so and lists its later copies; a **treatment identical to its own method's control** is
+flagged as never having acted. Roles come from the method files (`_roles` /
+`control_shape.role_of`).
+
+- **Three bindings, one formatter.** `lab twins` reports; `lab run` prints a `Book twins:` block
+  after every run (always, `none` included, because the Sera skills read it) and **refuses
+  nothing** (hardgate D15); `lab promote` refuses through hardgate **(D19)**. Both printers go
+  through `twins.report_lines`, so they cannot disagree on one arm.
+- Nothing is written, no research store is opened, no method id is minted; recorded dev trials and
+  test-window looks are printed before and after.
+- Refusals (`store.LabError`, exit 2): an id that is neither a method nor a recorded trial on the
+  window -- "no twins" for a typo would be a false all-clear.
+- `lab status`: every row in `Near misses` and `Closest to eligible` now ends in a tag from
+  `_book_tags`, e.g. `[control; = M0125-DV-C10]` or `[treatment; first of 4]`: the arm's role and
+  whose book it is. Never raises; a row with neither gets no tag.
+- Tests: `tests/test_lab_twins.py` (20).
+
 ## Exported API
 
 ### config
@@ -3510,6 +3543,17 @@ arithmetic on curves already in `trials.curve_json`. Measured 2026-10-09 on the 
     `walkforward.buy_signal` (D9), so the signal's kin condition widens with D12;
     `walkforward.py` is untouched. Its `BUY_CONDITIONS` text still says "family union ancestors",
     and the signal does not apply D11 — both left for the owner.
+  - **(D19) whose book it is** — `hardgate.book_twin_refusal(conn, method_id, candidate_id) -> str | None`,
+    called in `check` right after (D18) and before (D16). It refuses when the variant `lab promote`
+    would pre-register is a book the lab already recorded (`lab/twins.py`'s definition: same window,
+    same trade count, byte-identical curve, earliest = lowest `n`): either its earliest twin is a
+    trial of **another method** recorded first (the refusal names `lab promote <that method>` as the
+    way to spend a look on this book), or a same-method twin reads as this method's own **control**
+    via `promoted_arm_role` (the treatment never acted; the way back is an amendment, no method id).
+    A later copy never refuses the first recording; two non-control arms of one method that are one
+    book are a finding for `lab twins`, not a refusal; a twin whose role cannot be read refuses
+    nothing. The measured reach is argued in the module docstring's (D19). Does not reach
+    `walkforward.buy_signal`. Tests: `tests/test_lab_hardgate.py` (10 new).
 - **Where it is enforced, and where it is not.** `commands/lab.py:_promote` calls it **before**
   `prereg.promote_method`, so a refusal leaves the repository and the database byte-identical: no
   file, no status move, no insight, no analysis row. `lab test` does **not** re-check (K): a
@@ -3899,6 +3943,25 @@ times the fees, so the gap is quoted against an opponent running with weights on
   wider set than promotable-now. The nine are the rule working rather than collateral, and
   each has the same way back for no method id. M0222, M0226, M0230 and M0248 hold refuse-band
   arms too and are already `rejected`; M0241 is dev-eligible and warn-only (1.37x / 1.13x).
+
+### lab: book twins (lab-book-twins phase 1, P1-ENG-K7QD)
+
+`lab/twins.py`, derived on read from `trials.curve_json`: no schema change, no new column, no
+backfill, so every duplicate already in the lab is covered retroactively. Store fingerprints are
+reported, never compared. A trial with no curve (`""` / `"[]"`) has no twins.
+
+- `Twin` (frozen, slots): `candidate_id`, `method_id`, `n`, `store_fingerprint`, `run_at`,
+  `window`, `trades`, `book` (first 12 hex of the curve hash), and the asked-about trial's
+  `of_candidate_id`, `of_method_id`, `of_n`, `of_store_fingerprint`. Properties `earlier`
+  (`n < of_n`), `same_method`, `same_store`; `provenance() -> str`.
+- `fingerprint(curve_json) -> str` — sha256 hex, the same hash `lab walkforward`'s buy-signal block
+  prints.
+- `twins_of(conn, candidate_id, window="dev") -> tuple[Twin, ...]` — earliest first; `()` on a
+  missing row or empty curve. Never raises, never writes.
+- `first_recorded(conn, candidate_id, window="dev") -> Twin | None` — the stable entry point for
+  callers outside `lab` (calculate-assets). Read `.earlier` before saying "first recorded as".
+- `for_method(conn, method_id, window="dev") -> dict[str, tuple[Twin, ...]]` — only arms with twins.
+- `report_lines(found, roles, *, limit=3) -> list[str]` — the lines `lab run` and `lab twins` print.
 
 ### lab: the web snapshot and the journal's version chain (journal-versioning phase 4, P1-ENG-Q9XB)
 
@@ -4414,6 +4477,7 @@ re-reads the orders and replaces `sean_equity` whole. In `nightly.yml` it is the
 - `lab.turnover` (fold-verdict-and-fall-label phase 4) imports almost nothing: `csv`, `collections.abc`, `dataclasses`, `datetime`, `decimal` and `pathlib` from the standard library, plus `lab.store` (for `LabError` alone), `sim.costs`, `sim.contributions` (`OWNER_MONTHLY`), `sim.model` (`q`), `paper.capital` (`PAPER_INITIAL_IDR`) and `paper.compare` (`SESSIONS_PER_YEAR`). `paper.capital` rather than `backtest.runner` deliberately: the two hold the same opening capital and a test asserts they still agree, but `paper.capital` is stdlib-only, so the module pulls in no numpy, no `research`, no `backtest` and no psycopg. It imports no `research` module because it opens no store, and nothing imports it: `commands.lab`'s `turnover` handler imports it inside the function, the way `costs` and `exposure` do.
 - `lab.control_shape` (lab-shortfall-and-control-shape, P1-ENG-03W0) imports `sqlite3`, `collections.abc`, `dataclasses` and `typing.Protocol` from the standard library, plus exactly one package name at module scope: `backtest.metrics.DASH`. It does not import `lab.store` — it is handed a connection and issues one `SELECT` — and it does not import `backtest.dev`: the candidates it reads are described by a local `Arm` Protocol (`id`, `rationale`), so a duck-typed arm is enough and the `controls` declaration is reached with `getattr` rather than a field. `lab.method.discover` is imported *inside* `for_method` and `survey`, because at module scope it would import all 271 method modules on any import of this one. Two things import `lab.control_shape`, both *inside* a function body rather than at module scope so no cycle can form in either direction: `commands.lab` (the `control` handler and the annotation block in `_run`, the way `costs`, `exposure` and `turnover` are imported) and `lab.hardgate.mis_shaped_controls`, which is D17's reader. `control_shape` imports neither of them.
 - `lab.shortfall` (lab-shortfall-and-control-shape, P1-ENG-NVHT) imports `csv`, `json`, `logging`, `re`, `sqlite3`, `collections.abc`, `dataclasses`, `datetime`, `decimal` and `pathlib` from the standard library, plus numpy and, from the package: `lab.store` (for `LabError`), `lab.walkforward` (the one era `measure`), `lab.hardgate` (`trial_deposits`, so there is exactly one de-funding path), `lab.turnover` (`round_trip` and `ROSTER_NAMES`, and through it `sim.costs.fee_parts`, so no fee arithmetic is re-derived), `lab.exposure` (`ERAS` / `ERA_LABELS` / `WHOLE` — the era boundaries are not restated), `lab.gate_probe` (`GATE_SYMBOL` / `GATE_N` / `GATE_RULE` — neither is "the shared gate"), `backtest.regime`, `backtest.metrics` (formatters), `strategies.base.History`, `strategies.f_factor` (`FactorParams`, `trend_on` — the lab's own trend reader, so the era gate share is measured by the same code the books use) and `research`, whose store is opened only when `--store` is given. Nothing imports `lab.shortfall`: `commands.lab`'s `shortfall` handler imports it inside the function, the way `costs`, `exposure` and `turnover` do.
+- `lab.twins` (lab-book-twins phase 1, P1-ENG-K7QD) imports `hashlib`, `sqlite3`, `collections.abc` and `dataclasses` from the standard library plus one package name, `lab.control_shape` (`ROLE_CONTROL`); nothing that opens a database. `lab.hardgate` imports it inside `book_twin_refusal`; `commands.lab` imports it inside `_run`, `_twins`, `_twin_lines` and `_book_tags`.
 ### Standard library
 `argparse`, `importlib`/`pkgutil` (command discovery), `logging`, `contextlib`, `dataclasses`, `decimal`, `functools.lru_cache`, `re`, `time`.
 

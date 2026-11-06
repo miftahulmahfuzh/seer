@@ -2689,3 +2689,167 @@ def test_the_era_edge_carries_the_noise_scale_the_margin_study_measured(tmp_path
     finally:
         conn.close()
     assert hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest() == before
+
+
+# --- (D19): the arm that takes the look may not be a book the lab already holds -------------------
+#
+# `_method` and `_arm_row` record `_curve(...)`, which is deterministic, so two arms with the same
+# `annual` and the same trade count carry byte-identical curves: that is how a twin is built here.
+# `_method` records 250 trades, `_arm_row` 252 by default, so the existing (D18) fixtures are not
+# twins of their own book by accident.
+
+R_STEP = "Step aside when the book falls 10 pct and come back when it recovers"
+
+
+def test_the_module_records_the_book_twin_decision():
+    """(D19) is argued where the other eighteen are, with its live case and its measurement."""
+    doc = hardgate.__doc__ or ""
+    assert "(D19)" in doc
+    assert "M0442-DVC10-FIXED730" in doc and "M0125-DV-C10" in doc   # the live case
+    assert "byte-identical" in doc
+    assert "absence is not evidence" in doc.lower()
+    assert "lab promote" in doc and "costs no method id" in doc
+
+
+def test_an_arm_another_method_recorded_first_is_refused_and_both_are_named(conn, monkeypatch):
+    """M0447's and M0488's shape: their promoted arm is M0442's curve, to the byte."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)                    # the first recording
+    _method(conn, "M0002", annual=0.15)                    # the same book, recorded second
+    _promote_the_book(conn, monkeypatch, "M0002")
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA)], M0002=[_Arm("M0002-A", R_IDEA)])
+
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0002")
+    said = str(e.value)
+    assert "(D19)" in said
+    assert "M0002-A" in said and "M0001-A, which M0001 recorded first" in said
+    assert "lab promote M0001" in said
+    assert "byte-identical" in said
+    assert "Nothing was written and no status moved" in said
+    assert "There is no override" in said
+
+
+def test_the_first_recording_is_never_refused_by_a_later_copy(conn, monkeypatch):
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _method(conn, "M0002", annual=0.15)
+    _promote_the_book(conn, monkeypatch, "M0001")
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA)], M0002=[_Arm("M0002-A", R_IDEA)])
+
+    assert hardgate.book_twin_refusal(conn, "M0001", "M0001-A") is None
+    hardgate.check(conn, "M0001")                          # returns: no refusal
+
+
+def test_a_treatment_identical_to_its_own_control_never_acted_and_is_refused(conn, monkeypatch):
+    """M0447-DVC10-RECOVER's shape: a treatment whose curve is its own method's control."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _arm_row(conn, monkeypatch, "M0001", "NEVER", mar=0.90, annual=0.12)
+    _arm_row(conn, monkeypatch, "M0001", "RECOVER", mar=0.95, annual=0.12)   # named; == NEVER
+    _declare(monkeypatch, M0001=[
+        _Arm("M0001-A", R_IDEA), _Arm("M0001-NEVER", R_CONTROL), _Arm("M0001-RECOVER", R_STEP),
+    ])
+
+    assert hardgate.promoted_variant(conn, "M0001") == "M0001-RECOVER"
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0001")
+    said = str(e.value)
+    assert "(D19)" in said and "M0001-NEVER" in said
+    assert "this method's own control arm" in said and "never acted" in said
+    assert "amendment" in said and "costs no method id" in said
+
+
+def test_a_control_twin_whose_role_cannot_be_read_refuses_nothing(conn, monkeypatch):
+    """Absence is not evidence: the file does not declare M0001-NEVER, so nothing is refused."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _arm_row(conn, monkeypatch, "M0001", "NEVER", mar=0.90, annual=0.12)
+    _arm_row(conn, monkeypatch, "M0001", "RECOVER", mar=0.95, annual=0.12)
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA), _Arm("M0001-RECOVER", R_STEP)])
+
+    assert hardgate.book_twin_refusal(conn, "M0001", "M0001-RECOVER") is None
+    hardgate.check(conn, "M0001")
+
+
+def test_rungs_of_one_method_that_are_one_book_are_not_refused(conn, monkeypatch):
+    """M0488's DEEP10/15/20: the dial never moved. A finding for `lab twins`, not a refusal."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)
+    _arm_row(conn, monkeypatch, "M0001", "DEEP10", mar=0.90, annual=0.12)
+    _arm_row(conn, monkeypatch, "M0001", "DEEP20", mar=0.95, annual=0.12)
+    _declare(monkeypatch, M0001=[
+        _Arm("M0001-A", R_IDEA), _Arm("M0001-DEEP10", R_STEP), _Arm("M0001-DEEP20", R_STEP),
+    ])
+
+    hardgate.check(conn, "M0001")
+
+
+def test_one_more_trade_is_another_book(conn, monkeypatch):
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)                    # 250 trades
+    _method(conn, "M0002", annual=0.20)
+    _arm_row(conn, monkeypatch, "M0002", "B", mar=0.95, trades=251, annual=0.15)
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA)],
+             M0002=[_Arm("M0002-A", R_IDEA), _Arm("M0002-B", R_STEP)])
+
+    hardgate.check(conn, "M0002")
+
+
+def test_d18_speaks_before_d19_when_the_arm_is_both(conn, monkeypatch):
+    """Order inside `check`: what the arm is, then whose book it is."""
+    _benchmark(conn)
+    _method(conn, "M0001", annual=0.15)                    # M0001-A, 250 trades
+    _method(conn, "M0002", annual=0.20)
+    _arm_row(conn, monkeypatch, "M0002", "PLC1", mar=0.95, trades=250, annual=0.15)  # == M0001-A
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA)],
+             M0002=[_Arm("M0002-A", R_IDEA), _Arm("M0002-PLC1", R_DRAW)])
+
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0002")
+    said = str(e.value)
+    assert "D18" in said and "(D19)" not in said
+
+
+def test_lab_promote_exits_2_and_writes_nothing_when_the_book_is_another_methods(
+    tmp_path, monkeypatch
+):
+    db, prereg_dir = tmp_path / "lab.sqlite", tmp_path / "prereg"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0001", annual=0.15)
+    _method(c, "M0002", annual=0.15)
+    row = c.execute("SELECT * FROM trials WHERE candidate_id = 'M0002-A'").fetchone()
+    before = db.read_bytes()
+    c.close()
+    monkeypatch.setattr(store, "best_dev_eligible", lambda _c, _m, **_k: row)
+    _declare(monkeypatch, M0001=[_Arm("M0001-A", R_IDEA)], M0002=[_Arm("M0002-A", R_IDEA)])
+
+    assert _cli(tmp_path, db, prereg_dir, method="M0002") == 2
+    assert not prereg_dir.exists()
+    assert db.read_bytes() == before
+
+
+def test_m0488s_promoted_book_is_m0442s_on_the_committed_lab():
+    """The live case, on frozen rows: trials are append-only, so who recorded a book first never
+    moves. `mode=ro`, never `store.connect`, bytes hashed either side."""
+    if not store.COMMITTED_DB.exists():
+        pytest.skip("no lab database")
+    before = hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest()
+    conn = sqlite3.connect(f"file:{store.COMMITTED_DB}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        if conn.execute(
+            "SELECT 1 FROM trials WHERE candidate_id = 'M0488-DVC10-FIXED730' AND window = 'dev'"
+        ).fetchone() is None:
+            pytest.skip("M0488 is not in this tree's lab")
+        said = hardgate.book_twin_refusal(conn, "M0488", "M0488-DVC10-FIXED730")
+        assert said is not None
+        assert "M0442-DVC10-FIXED730, which M0442 recorded first" in said
+        assert "lab promote M0442" in said
+        # M0447's inert treatment: the cross-method case speaks first, naming trial 519.
+        said = hardgate.book_twin_refusal(conn, "M0447", "M0447-DVC10-RECOVER")
+        assert said is not None and "M0125-DV-C10, which M0125 recorded first" in said
+    finally:
+        conn.close()
+    assert hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest() == before

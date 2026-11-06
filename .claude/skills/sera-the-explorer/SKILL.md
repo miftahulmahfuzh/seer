@@ -90,6 +90,16 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
    - **Survives real fees?** Before reserving a variation of a near miss from M0030 or earlier,
      run `lab costs <near miss>` (a minute or less, report only, N unchanged). A near miss whose
      edge the real fees erase is not worth a variation; journal that and pick another.
+   - **A wrapped host is not a new book.** A follow-up whose arms wrap a book the lab already
+     ran (a never-aside or no-opinion control, or a host book under a new allocator id) gives
+     that book a new digest, so `lab run` cannot refuse it, and the arm records as a *book twin*:
+     the same curve and trades as a trial already in the lab. Reserve it anyway when the idea
+     needs it: controls run beside the treatment, and N counts methods, so a book twin costs
+     compute and no look. But the slate never counts that arm as a new book, and the hypothesis
+     names the recorded host it repeats (M0488's never-aside arm is M0125-DV-C10's book, first
+     recorded as trial 519). `lab idea` cannot warn, because an idea row has no arms yet. The
+     check comes after the run: `lab run` prints a `Book twins` block, and `lab twins MNNNN`
+     prints it again at any time.
    - **Reserve** each new idea with `lab idea …`, which prints its id. A backlog row keeps its id.
      The hypothesis can be a draft; the child sharpens it before its pre-registration commit.
    - Then `lab stage` + commit (`lab/lab.sqlite` and `web/data/lab.json`) + push ("lab: sera <stamp> reserves M00xx, M00yy").
@@ -125,6 +135,16 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
        dressing MNNNN` says what is recoverable and journals nothing. Report it in the
        synthesis either way — a batch that measured its signals and not their price is a finding
        about the batch.
+     - **Which arms are book twins?** `lab twins MNNNN` (the `Book twins` block `lab run`
+       printed) names each arm's role and the first-recorded trial with the same curve. Read it
+       before relaying any arm's money or metrics, wherever the figure came from: a child's
+       `DONE` line, `lab show`, or `/calculate-assets`. A control's or a book twin's money is
+       never reported as a new book; name it by its first-recorded candidate. The case that
+       made this rule: M0488-DVC10-NEVER was relayed as a new book, and it is M0125-DV-C10
+       (trial 519), the book the owner already holds as DEEPTAPE. A treatment arm that shares
+       its own control's curve means the treatment never acted, and a dose ladder whose rungs
+       are one curve means the dial never moved. Both go in the synthesis as findings, not as
+       books.
 
      Whatever is missing, finish it yourself from the scrollback and the data. If the method
      never ran, relaunch it once; if it fails again, `lab drop MNNNN --why "<reason>"` plus a `risk` insight.
@@ -193,7 +213,9 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
 
    Then `lab stage`, commit (`lab/lab.sqlite` and `web/data/lab.json`), push. The site picks the
    synthesis up from that push with no other step. End with a short report:
-   - a table of method, verdict, CAGR vs SPY, max DD, PF, trades, DSR
+   - a table of method, verdict, CAGR vs SPY, max DD, PF, trades, DSR. A row for a control or a
+     book twin says so and names its first-recorded candidate (`lab twins MNNNN`); it is
+     never listed as a new book
    - the synthesis
    - N and test looks used
 
@@ -218,3 +240,5 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
 | "Its fold record is 2 of 4 but the twenty-year numbers are great" | That is the gate's entire point, and the 0-for-5 roster is what the twenty-year numbers bought. `lab promote` exits 2. |
 | "That older method sits in the Promotable-now list, so promote it" | The list is the gate's letter, not the durability check. Run `lab walkforward` first; a negative 2009-2015 edge means no look. A batch promotes its own children's results, not an earlier batch's leftovers. |
 | "Its sibling test-failed, but this variant is genuinely different" | Kin is `family` plus every ancestor through `parent_id`. A disproven family does not get a retry under a new id — that is the mechanism the gate exists to close. |
+| "The control made the most money, report it as a find" | A control, or a book twin of a recorded trial, is never a new book. Run `lab twins MNNNN` and name it by its first-recorded candidate (M0488-DVC10-NEVER is M0125-DV-C10). |
+| "This follow-up wraps a recorded host, so skip it" or "so count it as a new book" | Neither. It re-measures the host, which is fine: the control runs beside the treatment and N counts methods. Name the host in the hypothesis and don't count the arm as a new book. |

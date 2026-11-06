@@ -198,6 +198,10 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
      "habit" is a gate or its churn needs the 2×2 instead — the pair with the habit on and off.
      Check your own method with `lab dressing MNNNN` after it runs; it journals nothing and can
      be re-run freely.
+     That no-opinion arm usually repeats a book the lab already ran. Wrapping the host's params
+     in your own allocator id gives it a new digest, so `lab run` cannot refuse it, and it
+     records as a *book twin* of the host (step 7; `lab twins MNNNN`). That is expected and costs no look. Name the
+     recorded host in the hypothesis, and never count the arm as a new book.
    - Pure. Reads only bars dated ≤ `data_date`. Set `seen_keys`.
 5. **Test, then commit** only the method file. Run `pytest -q tests/test_lab_methods.py` and
    `ruff check src tests`. If the contract test fails, fix the method; never weaken the test.
@@ -242,6 +246,16 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    - comparison with the parent or near misses. A method from M0030 or earlier was measured at
      the flat 0.1%; compare against its numbers from `lab costs <id>` (both fees side by side),
      never against its recorded trial, or the fees decide the comparison instead of the idea
+   - **book twins**, from the `Book twins` block `lab run` printed (`lab twins MNNNN` prints it
+     again; `Book twins: none.` means no arm repeats a recorded book). It names each arm's role and the first-recorded trial with the same curve and the
+     same trade count. Three readings, each a finding for the analysis and the journal. A
+     control, or a host that repeats an earlier method's book, *is* that book: name it by its
+     first-recorded candidate and never report it as a new result. **A treatment arm that shares
+     its own control's curve means the treatment never acted**: M0447-DVC10-RECOVER and
+     M0447-DVC10-RECOVER-CAP730 have M0447-DVC10-NEVER's curve. **A dose ladder whose rungs are
+     one curve means the dial never moved**: M0488-DVC10-DEEP10, -DEEP15, -DEEP20 and
+     -DEEP15-NOFALL730 are one curve. Say which in plain words, and never write up the rungs as a
+     ladder that was measured.
    - end with a paragraph that starts **`My opinion:`**. Say plainly whether this direction is
      worth more trials, what you would try next, and why. Commit to a view; no hedging.
    The verdict is one plain line the site shows next to the method's name.
@@ -327,6 +341,10 @@ run leans on figures it did not produce. The traps that catch this run in partic
 - **A pre-M0031 parent** was measured at the flat 0.1%. Compare with `lab costs <id>`, never with
   the parent's recorded trial.
 - **N comes from `lab status`**, not from counting trial rows: a method's variants are one look.
+- **A control or a book twin is not a new book.** Its money and metrics belong to the
+  first-recorded trial, already in the lab. In the analysis, the insight and the `DONE` line,
+  name it by its first-recorded candidate from `lab twins MNNNN`. M0488-DVC10-NEVER reached the
+  owner as a new book; it is M0125-DV-C10, first recorded as trial 519.
 
 ## Promotion (dev-eligible): autonomous, one counted look
 
@@ -338,7 +356,11 @@ Nobody approves this; you do it. Both commands exist — do not build them:
   passed — the five conditions, the DSR threshold in force and the N the multiple-testing policy
   resolved to that day — so the rule is pinned in git before any test number exists. It is written
   once and never rewritten: a re-run with a better-looking variant available is a refusal, not an
-  update. It loads no store, runs no backtest and spends no look.
+  update. It loads no store, runs no backtest and spends no look. It also refuses (hardgate D19)
+  when that arm is a book twin: of an earlier method's trial (promote that method, or nothing),
+  or of one of its own method's controls (the treatment never acted). M0447 and M0488 are both
+  dev-eligible on an arm whose curve is M0442-DVC10-FIXED730's. Like the fold and kin refusals,
+  D19 has no override.
 - **`lab test <candidate>`:** takes the *variant* id (`M0007-RESID`), not the method id. It
   refuses a method that is not `promoted`, refuses a pre-registration that is missing,
   uncommitted, modified or names another configuration, refuses a configuration with no dev
@@ -535,6 +557,7 @@ Then:
 ```
 lab status | lab show M0007 | lab next-id | lab seen --find momentum
 lab run M0007                     # needs a committed method file
+lab twins M0488                   # report only: each arm's role and its first-recorded book twin (same curve); journals nothing
 lab costs M0007                   # report only: best variant at the flat 0.1% vs Gotrade's real fees; journals it, N unchanged
 lab survivorship M0069            # report only: every recorded variant on the dev store vs the survivorship-check store; journals it, N unchanged
 lab note M0007 --file /tmp/a.md --verdict "..."

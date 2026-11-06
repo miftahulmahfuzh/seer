@@ -817,6 +817,74 @@ promotion that would happen today stops happening** and ``lab status``'s ``Promo
 does not move. As with (D12), (D14) and (D17), the point is forward: the next method whose placebo
 out-MARs its idea is stopped before the look is spent, rather than after the owner is holding the
 book.
+
+**(D19) Does the gate check WHOSE book the variant is? -- Yes, and from 2026-11-06 ``check``
+REFUSES a promotion whose pre-registered variant is a book the lab already recorded: first under
+another method, or as this method's own control.**
+
+(D18) asks what the arm *is*. It never asks whether the lab has already measured it. A trial's
+identity is ``method.config_digest``, and a follow-up method that wraps a host book in its own
+allocator and params dataclass hands the same book a new digest, so neither ``runner.preflight``'s
+"repeats" refusal nor ``UNIQUE(config_digest, window)`` ever fires. The 2026-11-06 handover met it
+as one book relayed under four names: ``M0125-DV-C10`` (trial 519, store ``77c37d55``) recorded it
+first, and ``M0442-DVC10-NEVER``, ``M0447-DVC10-NEVER`` and ``M0488-DVC10-NEVER`` recorded it again
+on store ``640fc25e``. Worse for this gate: M0447 and M0488 are both ``dev-eligible``, and the arm
+``best_dev_eligible`` names for each is ``DVC10-FIXED730`` -- the curve of
+``M0442-DVC10-FIXED730``, to the byte. Three dev-eligible methods, one book.
+
+**What a twin is** is ``lab/twins.py``'s definition and nothing else: the same window, the same
+trade count, a byte-identical ``curve_json``; the earliest recording is the lowest ``n``. It is read
+from curves every trial already carries, so it covers every duplicate retroactively and writes
+nothing. Measured on the committed lab at ``3b87070``: 1,739 trials, 80 groups of twins, 260 rows,
+180 of them copies; 76 groups span two or more methods and 44 span two store fingerprints.
+
+**Two refusals, one question.**
+
+- **Another method recorded it first.** The arm's earliest twin is a trial of a different method
+  with a lower ``n``. A counted look spent here is that method's measurement taken again under a
+  new name, so the refusal names the first recording and says ``lab promote <that method>`` is the
+  way to spend a look on this book -- where it answers to this same gate. A later copy elsewhere
+  never refuses the arm that recorded the book first.
+- **It is this method's own control.** A twin inside the same method whose role
+  (``control_shape.role_of``, via ``promoted_arm_role``) is ``control``. The treatment never acted:
+  whatever it was registered to change did not change one decision on the dev window, so its
+  margin over that control is zero by construction. ``M0447-DVC10-RECOVER`` and
+  ``-RECOVER-CAP730`` are the live shape -- treatments, each the curve of ``M0447-DVC10-NEVER``.
+  The way back is (D18)'s: register an arm that acts and run it as an amendment, which costs no
+  method id.
+
+Two arms of one method that are one book, neither of them a control -- M0488's ``DEEP10``,
+``DEEP15`` and ``DEEP20`` rungs, one curve -- are a finding for ``lab twins`` and ``lab run`` to
+print, not a refusal: the dial never moved, and the arm is still this method's own measurement.
+
+**Who it stops today, measured.** Of 152 dev-eligible methods, 42 would pre-register an arm whose
+book another method recorded first; none is caught by the control rule alone. Of the nine the gate
+passed before this clause, three stop here: M0173 (``M0173-EXP00`` is ``M0038-DIV-WATCH``), M0258
+(``M0258-M-B0`` is ``M0072-Z2-RAWRANK``) and M0284 (``M0284-VOL30`` is ``M0072-Z2-RAWRANK``). M0072
+itself stays promotable. M0258's zero rung equals M0072 by construction -- its own test says so --
+which is the clause working: the look would have been M0072's look, under M0258's name.
+
+**Absence is not evidence.** A trial with no curve has no twins. A same-method twin whose role
+cannot be read refuses nothing, for (D18)'s reason. A twin across store fingerprints is still a
+twin -- trial 519 is -- and both fingerprints are printed so the crossing is visible.
+
+**Why not at ``lab run``, and why not a new digest.** (D15)'s reason: the protocol runs a method's
+controls beside its treatment and N counts methods, so a twin at run time costs compute and
+nothing else; ``lab run`` prints a ``Book twins`` block and refuses nothing. An "effective config"
+digest that ignored inert wrapper fields would move recorded digests and need every frozen method
+file to declare which of its fields are inert; the recorded curve already knows.
+
+**Why in ``check`` and not in ``best_dev_eligible``.** (D18)'s reason exactly: a filter in the
+ranking would silently move what every recorded sentence means by "its best version". A clause
+refuses by name and is argued here.
+
+**What it does not reach.** ``walkforward.buy_signal`` -- (D13)'s reason; the buy-signal block in
+``lab walkforward`` already prints "the same book under another name" for a fired curve. Whether
+the signal should follow this clause is another edit and the owner's call. It moves no recorded
+row, no digest and no closed verdict.
+
+**Where it sits in ``check``.** Right after (D18) and before (D16): "what is this arm" and "whose
+book is it" are both about the arm's identity, and read in front of "is its fall honest".
 """
 
 from __future__ import annotations
@@ -1111,6 +1179,59 @@ def promoted_arm_role(method_id: str, candidate_id: str) -> tuple[str, str] | No
     for arm in method.all_candidates():
         if str(arm.id) == candidate_id:
             return control_shape.role_of(arm), str(arm.rationale)
+    return None
+
+
+def book_twin_refusal(
+    conn: sqlite3.Connection, method_id: str, candidate_id: str
+) -> str | None:
+    """Why (D19) will not pre-register ``candidate_id`` for ``method_id``; None when it will.
+
+    The sentence, without the "Nothing was written" tail ``check`` adds. Two cases, in this order:
+    the arm's earliest twin is a trial of ANOTHER method recorded before it (the book is that
+    method's measurement); or a twin inside this method reads as a control in the method file (the
+    treatment never acted). A same-method twin whose role cannot be read refuses nothing --
+    absence is not evidence (D16) -- and two non-control arms of one method that are one book are a
+    finding for ``lab twins``, not a refusal.
+
+    Reads ``trials`` and, for the second case only, the method file through ``promoted_arm_role``.
+    Writes nothing; takes any connection, read-only included.
+    """
+    from seer_engine.lab import control_shape
+    from seer_engine.lab import twins as book_twins
+
+    found = book_twins.twins_of(conn, candidate_id, "dev")
+    if not found:
+        return None
+    first = found[0]
+    if first.earlier and not first.same_method:
+        return (
+            f"{candidate_id} -- the variant `lab promote` would pre-register -- is the same book "
+            f"as {first.candidate_id}, which {first.method_id} recorded first "
+            f"({first.provenance()}): the same window, the same {first.trades} trades and a "
+            f"byte-identical equity curve, so the same targets on every decision date. A new "
+            f"method id wrapped around a recorded book does not make it a new candidate, and a "
+            f"counted look spent here would be {first.method_id}'s measurement taken again under "
+            f"{method_id}'s name. The evidence belongs to the method that recorded it: "
+            f"`lab promote {first.method_id}` is the way to spend a look on this book, and it "
+            f"answers to this same gate. `lab twins {method_id}` lists every arm of this method "
+            f"the lab already holds"
+        )
+    for twin in found:
+        if not twin.same_method:
+            continue
+        arm_role = promoted_arm_role(method_id, twin.candidate_id)
+        if arm_role is not None and arm_role[0] == control_shape.ROLE_CONTROL:
+            return (
+                f"{candidate_id} -- the variant `lab promote` would pre-register -- is the same "
+                f"book as {twin.candidate_id}, this method's own control arm "
+                f"({twin.provenance()}): the same window, the same {twin.trades} trades and a "
+                f"byte-identical equity curve. The treatment never acted -- whatever it was "
+                f"registered to change did not change one decision on the dev window -- so its "
+                f"record is the control's record and its margin over that control is zero by "
+                f"construction. The way back is (D18)'s: register an arm that actually acts and "
+                f"run it as an amendment, which costs no method id"
+            )
     return None
 
 
@@ -1957,9 +2078,10 @@ def check(conn: sqlite3.Connection, method_id: str) -> None:
     second. Within (F) the picks' record comes first and the promoted variant's own record second
     (D11): the first says whether the lab's way of choosing works out of sample, the second
     whether the variant actually chosen won its folds itself. (D18) then asks what that variant
-    *is* and refuses a control arm, before (D16) and (D17) ask whether its fall is honest and its
-    own control is shaped right -- all three are statements about the same one arm, and "what is
-    it" reads in front of the other two. All of it is cheap -- SQL, arithmetic on recorded curves
+    *is* and refuses a control arm, and (D19) asks whose book it is -- one another method recorded
+    first, or this method's own control's -- before (D16) and (D17) ask whether its fall is honest
+    and its own control is shaped right. All four are statements about the same one arm, and "what
+    is it" and "whose is it" read in front of the other two. All of it is cheap -- SQL, arithmetic on recorded curves
     and one read of the method file -- so the order is about the message, not the cost.
     """
     row = store.get_method(conn, method_id)
@@ -2050,6 +2172,18 @@ def check(conn: sqlite3.Connection, method_id: str) -> None:
                     f"no override -- if the rule is wrong, change it in "
                     f"seer_engine/lab/hardgate.py and argue for it in the commit"
                 )
+        # (D19) The arm that takes the look may not be a book the lab already holds: one another
+        # method recorded first (promote that method instead), or this method's own control (the
+        # treatment never acted). Read from recorded curves by `lab/twins.py`; a twin across store
+        # fingerprints is still a twin, and a same-method twin whose role cannot be read refuses
+        # nothing. `lab run` prints the same twins and refuses nothing (D15).
+        twin_said = book_twin_refusal(conn, method_id, candidate)
+        if twin_said is not None:
+            raise store.LabError(
+                f"{method_id} is not promoted: {twin_said} (D19). Nothing was written and no "
+                f"status moved. There is no override -- if the rule is wrong, change it in "
+                f"seer_engine/lab/hardgate.py and argue for it in the commit"
+            )
         sv_dd = survivorship_record.over_bar(method_id, candidate, tuning.MAX_DRAWDOWN)
         if sv_dd is not None:
             raise store.LabError(

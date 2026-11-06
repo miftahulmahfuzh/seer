@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-10-20
-**Total Active Tasks**: 14
+**Last Updated**: 2026-11-06
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
-- P2 Medium: 10
+- P1 High: 0
+- P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 2
-- Completed: 152
+- Blocked: 0
+- Completed: 165
 
 ---
 
@@ -23,6 +23,27 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [x] **P1-ENG-K7QD** Phase 1: Twin reader and lab CLI surfaces (run, twins, status, promote D19)
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns new `engine/src/seer_engine/lab/twins.py` (pure derived reader over `trials.curve_json`: `Twin`, `fingerprint`, `twins_of`, `first_recorded`, `for_method`, `report_lines`), `hardgate.book_twin_refusal` and D19 in `hardgate.check`, `commands/lab.py` (`Book twins:` block in `lab run`, `lab twins` subcommand, role/twin tags on `lab status`), `engine/tests/test_lab_twins.py`, D19 tests, and `verify-seer/features/lab-cli.md`. Does not touch `store.best_dev_eligible`, `config_digest`, `runner.preflight`, schema, method files or `web/`. Exit: `lab twins M0488` names M0125-DV-C10 and M0442-DVC10-FIXED730 as first recordings; `lab status` refuses M0258 with `(D19)` naming M0072-Z2-RAWRANK; `book_twin_refusal` names M0442 for M0488's FIXED730 arm and returns None for M0442's own; ruff and full engine suite green with 0 skips; `lab/lab.sqlite` hash unchanged.
+  - **Status**: completed
+  - **Plan Set**: `.workflows/plan/LAB_BOOK_TWINS_PLAN.md` (phase 1 of 3)
+  - **Satisfies**: R1, R2 — R1 — Detect that a candidate is behaviourally a book the lab already recorded, and decide what happens on a match, without touching frozen records; R2 — Stop reporting surfaces (promote, calculate-assets, `lab status`, the Sera relay) presenting a control or an already-recorded book as a new candidate
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-K7QD.md`
+  - **Completed**: 2026-11-06 15:44
+  - **Method**: /do
+  - **Files**: engine/src/seer_engine/lab/twins.py (new), engine/tests/test_lab_twins.py (new), engine/src/seer_engine/lab/hardgate.py, engine/tests/test_lab_hardgate.py, engine/src/seer_engine/commands/lab.py, .claude/skills/verify-seer/features/lab-cli.md, engine/.workflows/todos.md, .workflows/todos.md, .workflows/plan/LAB_BOOK_TWINS_PLAN.md, engine/.workflows/plan/P1-ENG-K7QD.md (new), .workflows/plan/P2-ROOT-M3ZV.md (new), .workflows/plan/P2-ROOT-R9XA.md (new)
+  - **Verified**: ruff clean; focused 286 passed / 1 skipped; full engine suite 8689 passed, 5 skipped (non-DB); `lab/lab.sqlite` sha1 08752853... unchanged. Proof verified-first-pass (J1, J2, J3, J5, J6, write-nothing, walkforward neighbour), J4 tag sub-claim proven by direct call; evidence `/home/miftah/.local/state/seer-verify/1106-153838-700847/evidence`.
+  - **Drift**:
+    - No code drift: every anchor in hardgate.py and commands/lab.py matched the plan's quoted lines.
+    - Proof J4: on today's lab none of the 12 distinct near-miss/closest rows of `lab status` has a book twin, so every tag reads `[treatment]`; the `[role; = X]` path was proven by calling `_book_tags` directly on M0488-DVC10-NEVER -> `[control; = M0125-DV-C10]`, M0258-M-B0 -> `[dose; = M0072-Z2-RAWRANK]`, plus the unit test.
+    - J6 re-measured on committed lab: trials 1739, 80 groups / 260 rows / 180 copies, 76 cross-method, 44 cross-store; 152 dev-eligible, 42 D19 twins, 0 control-only; promotable M0072 M0092 M0197 M0243 M0363 M0383; D19 newly stops M0173, M0258, M0284 (and is now the first refusal for M0003/M0285/M0344, which other clauses already refused). All match the D19 docstring.
+  - **Decided**:
+    - Exit criterion '0 skips' vs 5 skips in full suite (4 opt-in live sweeps + data-conditional M0044, all pre-existing, none Postgres) -> accepted (rung 2: plan defines skips as the Postgres-down signal; Postgres was up).
+    - Completion: the `[x]` block is left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats are recounted from the file rather than blind-decremented (rung 6: this file's own precedent for every swarm-tracked set; phases 2 and 3 share this worktree). Plan index: phase 1's TaskID cell ticked `(done 2026-11-06)`. P2-ROOT-M3ZV and P2-ROOT-R9XA both unblocked (each depends only on phase 1).
+    - Landing not attempted: swarm coordinator `orch-lab-book-twins` owns the merge of `feature/lab-book-twins` into `main`.
 - [x] **P1-ENG-BL71** Phase 2: The order-reservation repair, as a pinned-default lever
   - **Difficulty**: HARD
   - **Type**: Bug

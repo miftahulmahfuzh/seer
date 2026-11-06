@@ -151,6 +151,15 @@
                                     (lab/hardgate.py, D17); `lab run` prints the same reading and
                                     refuses nothing (D15). No trial row, no moments, no status
                                     change: N and the looks do not move
+    lab twins M0488 [M0447-DVC10-NEVER ...] [--window dev|test]
+                                    report only: every arm that is a book the lab already holds
+                                    under another id -- same window, same trade count,
+                                    byte-identical equity curve -- with the first recording named
+                                    and its store fingerprint beside this arm's, and a treatment
+                                    identical to its own control flagged as never having acted.
+                                    `lab promote` refuses on both (lab/hardgate.py, D19); `lab
+                                    run` prints the same lines. No trial row, no status change: N
+                                    and the looks do not move
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
@@ -888,6 +897,29 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s.add_argument("method", nargs="*", metavar="M0248",
                    help="methods to report (default: every method that has a control arm)")
 
+    s = sub.add_parser(
+        "twins",
+        # No literal `%` in any `help=` string below: argparse %-interpolates every `help=`.
+        help="report only: which arms are a book the lab already recorded under another id",
+        description=(
+            "A trial's identity is its config digest, and a follow-up method that wraps a host "
+            "book in its own allocator and params gives the same book a new digest, so the "
+            "re-run guards never fire and one book collects several names. This lists, for every "
+            "recorded arm of each named method (or each named candidate), every other trial on "
+            "the same window with the same trade count and a byte-identical equity curve -- the "
+            "same targets on every decision date -- with the earliest recording first, and its "
+            "trial number, method, run date and store fingerprint beside this arm's. A treatment "
+            "identical to its own method's control is flagged: the treatment never acted. "
+            "lab promote refuses both cases (lab/hardgate.py, D19). Derived on read from the "
+            "recorded curves: nothing is written, no research store is opened and no method id "
+            "is minted, so the lab's N and the test-window looks cannot move."
+        ),
+    )
+    s.add_argument("ids", nargs="+", metavar="ID",
+                   help="methods (every recorded arm) or candidate ids to report")
+    s.add_argument("--window", choices=store.WINDOWS, default="dev",
+                   help="which window's recordings to compare (default: dev)")
+
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
     s.add_argument("--family", required=True)
@@ -1000,25 +1032,32 @@ def _status(conn, args) -> int:
         out.append(f"  {r['family']:<28} trials {r['trials']:>3}  best MAR {fmt_num(r['best'])}  ({r['ids']})")
     out.append("")
     out.append("Near misses (beat SPY TR on dev, by MAR):")
-    for r in conn.execute(
+    near = conn.execute(
         "SELECT * FROM trials WHERE window = 'dev' AND total_return > spy_tr_return AND mar IS NOT NULL "
         "ORDER BY mar DESC LIMIT 12"
-    ):
+    ).fetchall()
+    rows = conn.execute("SELECT * FROM trials WHERE window = 'dev' AND mar IS NOT NULL").fetchall()
+    closest = sorted(rows, key=lambda r: (len(_owner_misses(r)), -r["mar"], r["n"]))[:8]
+    # Both lists rank raw trial rows, so a control arm and a book the lab already recorded under
+    # another id used to read here as fresh candidates (handover 2026-11-06: one book, four ids).
+    # Each row now ends in its role and its first-recorded twin; see `_book_tags`.
+    tags = _book_tags(conn, [*near, *closest])
+    for r in near:
         out.append(
             f"  {r['candidate_id']:<28} MAR {fmt_num(r['mar'])}  CAGR {fmt_signed_pct(r['cagr'])} vs "
             f"{fmt_signed_pct(r['spy_tr_cagr'])}  maxDD {fmt_pct(r['max_drawdown'])}  PF {fmt_pf(r['profit_factor'])}  "
             f"trades {r['trades']}  DSR {fmt_num(r['dsr'], 3)}  failed: {r['failed'] or '-'}"
+            f"{tags.get(str(r['candidate_id']), '')}"
         )
     out.append("")
     out.append("Closest to eligible (fewest failed go-live conditions, DSR aside, then MAR):")
-    rows = conn.execute("SELECT * FROM trials WHERE window = 'dev' AND mar IS NOT NULL").fetchall()
-
-    for r in sorted(rows, key=lambda r: (len(_owner_misses(r)), -r["mar"], r["n"]))[:8]:
+    for r in closest:
         out.append(
             f"  {r['candidate_id']:<28} misses {len(_owner_misses(r))}: "
             f"{'; '.join(_owner_misses(r)) or '-'}  "
             f"CAGR {fmt_signed_pct(r['cagr'])} vs {fmt_signed_pct(r['spy_tr_cagr'])}  maxDD "
             f"{fmt_pct(r['max_drawdown'])}  PF {fmt_pf(r['profit_factor'])}  trades {r['trades']}  DSR {fmt_num(r['dsr'], 3)}"
+            f"{tags.get(str(r['candidate_id']), '')}"
         )
     for title, status in (("Backlog (idea)", "idea"), ("Blocked on data", "blocked-data")):
         rows = conn.execute("SELECT * FROM methods WHERE status = ? ORDER BY id", (status,)).fetchall()
@@ -2078,6 +2117,42 @@ def _run(conn, args) -> int:
                 print(f"  Every pair is priced against an always-invested arm. "
                       f"`lab dressing {method.id}` splits what the")
                 print("      opinion knows from what the habits cost.")
+    # The run's book-twin reading, from the rows that were just recorded (lab/twins.py). A method
+    # that wraps a host book in its own allocator and params gives that book a new digest, so the
+    # re-run guard never fires and the same book is recorded again under a new id -- four times,
+    # for the 2026-11-06 handover's book -- and relayed as if it were new. This names, per arm, the
+    # earliest other recording of the same curve, and flags a treatment identical to this method's
+    # own control: the treatment never acted.
+    #
+    # It ANNOTATES; it does not gate (hardgate D15). The protocol runs controls beside the
+    # treatment and N counts methods, so a twin costs compute and nothing else; `lab promote`
+    # refuses on the two cases that matter (D19). Always printed, `none` included, because the
+    # Sera skills read this line. A FORWARDER like the blocks above: the same `report_lines`
+    # `lab twins` prints, so the two can never disagree about one arm.
+    from seer_engine.lab import twins
+
+    try:
+        twin_found = twins.for_method(conn, method.id)
+        twin_lines = _twin_lines(twin_found) if twin_found else []
+    except Exception as e:  # pragma: no cover - a reader must never fail a recorded run
+        print(f"\nBook twins: not read ({e}). The trials above are recorded either way.")
+    else:
+        if not twin_found:
+            print(f"\nBook twins: none. No arm of {method.id} repeats a book the lab already "
+                  f"holds.")
+        else:
+            print(f"\nBook twins: {len(twin_found)} arm(s) of {method.id} are a book the lab "
+                  f"already holds under another id --")
+            print("      same window, same trade count, byte-identical equity curve, so the same "
+                  "targets on every decision date.")
+            for line in twin_lines:
+                print(line)
+            print("  A twin is the same measurement taken again, not new evidence: quote it by "
+                  "the id that recorded it first.")
+            print("  `lab promote` refuses an arm another method recorded first, or one identical "
+                  "to this method's own control")
+            print(f"  (lab/hardgate.py, D19); these trials are recorded either way (D15). "
+                  f"`lab twins {method.id}` reprints this.")
     if amendment is not None:
         g = store.gate(conn)
         seq = len(store.amendments_of(conn, method.id))
@@ -2805,6 +2880,35 @@ def _regime(conn, args) -> int:
 HIGH_COVERAGE = _firings.HIGH_COVERAGE
 
 
+def _roles(method_ids: Sequence[str]) -> dict[tuple[str, str], str]:
+    """``(method, candidate) -> role`` (a ``control_shape.ROLE_*`` value) for every arm of ``method_ids``.
+
+    The raw half of ``_arm_roles``, split out so ``lab run``, ``lab twins`` and ``lab status`` ask
+    "is this arm a control" by value instead of parsing the label ``_arm_roles`` prints. Same
+    reader and the same failure rule: it swallows everything, and an arm it cannot read is absent.
+    See ``_arm_roles``.
+    """
+    try:
+        from seer_engine.lab import control_shape
+        from seer_engine.lab.method import discover
+
+        found = discover()
+    except Exception:  # noqa: BLE001 -- a reader, deliberately: see `_arm_roles`
+        return {}
+    out: dict[tuple[str, str], str] = {}
+    for mid in method_ids:
+        entry = found.get(mid)
+        if entry is None:
+            continue
+        method, _path = entry
+        for arm in method.all_candidates():
+            try:
+                out[(mid, arm.id)] = control_shape.role_of(arm)
+            except Exception:  # noqa: BLE001
+                continue
+    return out
+
+
 def _arm_roles(method_ids: Sequence[str]) -> dict[tuple[str, str], str]:
     """``(method, candidate) -> " (control)"`` for every arm of ``method_ids``; ``{}`` when unreadable.
 
@@ -2821,24 +2925,57 @@ def _arm_roles(method_ids: Sequence[str]) -> dict[tuple[str, str], str]:
     is the adjective on a line that is already complete without it, and a report that crashed
     while annotating a footnote would be a worse answer than a report with a plainer footnote.
     """
-    try:
-        from seer_engine.lab import control_shape
-        from seer_engine.lab.method import discover
+    return {key: f" ({role})" for key, role in _roles(method_ids).items()}
 
-        found = discover()
+
+def _roles_by_candidate(method_ids: Sequence[str]) -> dict[str, str]:
+    """``candidate -> role`` over ``method_ids``. A candidate id is unique across the lab -- every
+    arm's id carries its method's -- so the method half of ``_roles``' key can be dropped."""
+    return {cid: role for (_mid, cid), role in _roles(sorted(set(method_ids))).items()}
+
+
+def _twin_lines(found) -> list[str]:
+    """``twins.report_lines`` for ``found``, with every arm's role read from its method's file:
+    the arms asked about and every twin, so "the treatment never acted" can be said."""
+    from seer_engine.lab import twins
+
+    mids = {t.method_id for ts in found.values() for t in ts}
+    mids |= {t.of_method_id for ts in found.values() for t in ts}
+    return twins.report_lines(found, _roles_by_candidate(sorted(mids)))
+
+
+def _book_tags(conn, rows) -> dict[str, str]:
+    """``candidate -> "  [control; = M0125-DV-C10]"`` for the trial rows ``lab status`` lists.
+
+    The tag says what the arm IS -- its role, from the method file's own prose
+    (``control_shape.role_of``) -- and whose book it is: ``= X`` names the earliest other recording
+    when X came first, and ``first of k`` says this row is the first of k recordings of one book.
+    A row with neither gets no tag.
+
+    It never raises: ``lab status`` runs on every lab there is, and a tag is an adjective on a line
+    that is complete without it -- ``_arm_roles``' rule.
+    """
+    try:
+        from seer_engine.lab import twins
+
+        found = {
+            str(r["candidate_id"]): twins.twins_of(conn, str(r["candidate_id"]), "dev")
+            for r in rows
+        }
+        roles = _roles_by_candidate([str(r["method_id"]) for r in rows])
     except Exception:  # noqa: BLE001 -- a reader, deliberately: see the docstring
         return {}
-    out: dict[tuple[str, str], str] = {}
-    for mid in method_ids:
-        entry = found.get(mid)
-        if entry is None:
-            continue
-        method, _path = entry
-        for arm in method.all_candidates():
-            try:
-                out[(mid, arm.id)] = f" ({control_shape.role_of(arm)})"
-            except Exception:  # noqa: BLE001
-                continue
+    out: dict[str, str] = {}
+    for cid, those in found.items():
+        bits: list[str] = []
+        role = roles.get(cid)
+        if role:
+            bits.append(role)
+        if those:
+            first = those[0]
+            bits.append(f"= {first.candidate_id}" if first.earlier else f"first of {len(those) + 1}")
+        if bits:
+            out[cid] = f"  [{'; '.join(bits)}]"
     return out
 
 
@@ -3454,6 +3591,61 @@ def _control(conn, args) -> int:
     return 0
 
 
+def _twins(conn, args) -> int:
+    """``lab twins M0488 [M0447-DVC10-NEVER ...]``: which arms are a book the lab already holds.
+
+    Report only, in the sense ``lab kin`` and ``lab control`` are reports: SQL over recorded trial
+    rows (``lab/twins.py``) and one read of the method files for each arm's role. No research
+    store, no backtest, no trial, no status and no journal entry; N and the looks are printed
+    either side, so the invariant is on the terminal rather than merely asserted. ``lab run``
+    prints the same lines through the same ``twins.report_lines`` after every run, and ``lab
+    promote`` refuses on the two cases they flag (hardgate D19), so the three cannot disagree.
+
+    An id that names a method reports every recorded arm of it; any other id is read as a
+    candidate. An id that is neither is refused (exit 2): "no twins" for a typo would be a false
+    all-clear, the failure ``lab control`` was once caught in.
+    """
+    from seer_engine.lab import twins
+
+    window = args.window
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+    for ident in args.ids:
+        print()
+        if store.get_method(conn, ident) is not None:
+            arms = conn.execute(
+                "SELECT count(*) FROM trials WHERE method_id = ? AND window = ?", (ident, window)
+            ).fetchone()[0]
+            found = twins.for_method(conn, ident, window)
+            head = f"{ident} ({arms} {window} arm{'' if arms == 1 else 's'})"
+        elif conn.execute(
+            "SELECT 1 FROM trials WHERE candidate_id = ? AND window = ?", (ident, window)
+        ).fetchone() is not None:
+            those = twins.twins_of(conn, ident, window)
+            found = {ident: those} if those else {}
+            head = ident
+        else:
+            raise store.LabError(
+                f"no method and no recorded {window} trial called {ident}: nothing to compare, "
+                f"and reading that as 'no twins' would be a false all-clear"
+            )
+        if not found:
+            print(f"{head}: no other {window} trial holds the same book.")
+            continue
+        print(f"{head}: {len(found)} arm(s) are a book the lab already holds under another id "
+              f"(same window, same trade count, byte-identical equity curve)")
+        for line in _twin_lines(found):
+            print(line)
+    print()
+    print("A twin is the same measurement taken again, not new evidence: quote it by the id that "
+          "recorded it first. `lab promote` refuses an arm another method recorded first, or one "
+          "identical to its own method's control (lab/hardgate.py, D19).")
+    print(f"recorded dev trials {n_before} -> {store.dev_trial_count(conn)}; "
+          f"test-window looks {looks_before} -> {store.test_looks(conn)}. "
+          f"Nothing was written, no research store was opened and no method id was minted.")
+    return 0
+
+
 def _exposure(conn, args) -> int:
     """``lab exposure M0030 [M0024 ...]``: a method's own picks, apart from what it parks.
 
@@ -3836,6 +4028,7 @@ _HANDLERS = {
     "kin": _kin,
     "gate": _gate,
     "control": _control,
+    "twins": _twins,
     "idea": _idea,
     "note": _note,
     "block": _block,

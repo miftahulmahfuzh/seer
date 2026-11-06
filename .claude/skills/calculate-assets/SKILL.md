@@ -28,7 +28,7 @@ owner's plan as a frozen value, including the detail that a deposit on the 25th 
 until the next month-start rotation, so the result does not quietly overstate returns by
 investing money the instant it lands.
 
-## Four rules this skill does not bend
+## Five rules this skill does not bend
 
 **1. The id you give is not what runs.** `M0007-N20-RAW` is the lab's record of a flat-fee,
 whole-share, lump-sum run. The question is about real money, so the skill swaps in fractional
@@ -46,10 +46,23 @@ chose to see the outcome without the diagnostics — DSR, eligibility, the owner
 failure labels — that would let a method be tuned against data it was supposed to be judged on
 once. Do not add them back, and do not go looking them up afterwards to "complete" the report.
 
-**4. It never connects to the lab database.** `lab` commands migrate `lab.sqlite` on connect, so
-even a read dirties the file. Methods come from `lab.method.discover()`, reading committed method
-files on disk. Nothing is recorded: no trial, no observation, no status move. It is a report, in
-the sense `lab costs` is a report.
+**4. It never connects to the lab database the way `lab` commands do.** `lab` commands migrate
+`lab.sqlite` on connect, so even a read through them dirties the file. Methods come from
+`lab.method.discover()`, reading committed method files on disk. The one database read allowed is
+a single `sqlite3` connection opened with `mode=ro` (it honours `SEER_LAB_DB`), used only to ask
+whether the book that ran was first recorded under another name. A read-only handle cannot write,
+so the file stays byte-identical; never replace it with `lab.store.connect`. If the database is
+missing or unreadable the output says `twin not checked (<reason>)` and the money is unaffected.
+Nothing is recorded: no trial, no observation, no status move. It is a report, in the sense
+`lab costs` is a report.
+
+**5. A control is a control, and a recorded book keeps its first name.** Before the money the
+output says whether the arm you named is a control arm (the yardstick its method was registered
+to beat) and whether its book is the same book as one the lab recorded earlier ("Same book as
+M0125-DV-C10, first recorded 2026-10-16"). When you relay the answer, call a control a control,
+and name the first-recorded twin instead of presenting the arm as a new book: its money is that
+book's money. To see every arm of a method that repeats a recorded book, run
+`python -m seer_engine lab twins MNNNN`.
 
 ## Running it without wasting the owner's time
 
@@ -134,7 +147,12 @@ which every method here was built on, and a result there is the method marking i
 ## The chart
 
 `--out FILE` writes the series as JSON: `book_real`, `book_fixed`, `spy`, `deposited`, monthly
-points in rupiah. `build_page.py` turns that JSON into the artifact page:
+points in rupiah, plus `role` (the named arm's role: `control`, `dose`, `idea` or `treatment`) and
+`twin_of` (`{"status": "twin", "candidate", "method", "trial", "first_recorded",
+"store_fingerprint"}` when an earlier trial holds this book, `{"status": "first", "later_copy",
+"method", "trial"}` when this arm is itself the first recording, `{"status": "none"}` or
+`{"status": "not checked", "reason"}`).
+`build_page.py` turns that JSON into the artifact page:
 
 ```bash
 python3 .claude/skills/calculate-assets/build_page.py /tmp/assets.json /tmp/assets.html

@@ -3,6 +3,12 @@
   "coordinator": "orch-lab-book-twins",
   "coordinator_session_id": "a6b5118b-e585-4675-aac1-590e1ebd5a5e",
   "created": "2026-11-06T15:34:53+07:00",
+  "landed": {
+    "at": "2026-11-06T16:13:55+07:00",
+    "base": "main",
+    "commit": "d74ee1199a6812a5f2c4c3612f47e097af7e2f1b",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -10,10 +16,10 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": "lab/twins.py reader, lab twins, status tags, run Book twins block, promote D19 (stops M0173/M0258/M0284; promotable 6); 5 non-DB skips accepted vs '0 skips' per rung 2; proof: verified-first-pass /home/miftah/.local/state/seer-verify/1106-153838-700847/evidence",
+      "note": "verifier: 5/6 claims proved; 'promotable-now 6 incl M0243' is stale plan text (M0243 DSR <0.90 at N=322, absent on base too) -> correct figure 5; skip test_lab_hardgate.py:2149 pre-exists at 4c29bbd (M0044 lost eligibility), not new",
       "package": "engine/lab`, `engine/commands",
       "plan": ".workflows/plan/lab-book-twins/phase-1.md",
-      "reported_at": "2026-11-06T15:47:29+07:00",
+      "reported_at": "2026-11-06T16:13:30+07:00",
       "satisfies": [
         "R1",
         "R2"
@@ -24,47 +30,48 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "d181f2a",
       "depends_on": [
         1
       ],
       "difficulty": "NORMAL",
       "n": 2,
-      "note": null,
+      "note": "verifier: all claims verified",
       "package": ".claude/skills/calculate-assets",
       "plan": ".workflows/plan/lab-book-twins/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-11-06T16:13:30+07:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P2-ROOT-M3ZV",
       "title": "calculate-assets names controls and twins"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "c2c7f42",
       "depends_on": [
         1
       ],
       "difficulty": "EASY",
       "n": 3,
-      "note": null,
+      "note": "verifier: verified; 'the dial never moved' is docstring prose not CLI output",
       "package": ".claude/skills",
       "plan": ".workflows/plan/lab-book-twins/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-11-06T16:13:30+07:00",
       "satisfies": [
         "R2",
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P2-ROOT-R9XA",
       "title": "Sera skills read the twin line"
     }
   ],
   "plan": "/home/miftah/.worktrees/seer/lab-book-twins/.workflows/orchestration/lab-book-twins/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "lab-book-twins",
-  "updated": "2026-11-06T15:48:05+07:00",
+  "updated": "2026-11-06T16:13:55+07:00",
+  "verified_at": "2026-11-06T15:51:18+07:00",
   "worktree": "/home/miftah/.worktrees/seer/lab-book-twins"
 }

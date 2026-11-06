@@ -3,18 +3,18 @@
 **Package Path**: `.`
 **Package Code**: ROOT
 **Last Updated**: 2026-11-06
-**Total Active Tasks**: 2
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
 - P1 High: 1
-- P2 Medium: 1
+- P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 38
+- Completed: 39
 
 ---
 
@@ -106,15 +106,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Whether to commit `.workflows/todos.md` -> **no**. It already carries phase 8's entry (`P3-ROOT-D7MX`) alongside this one, and a pathspec commit of it would ship a peer's bookkeeping under this phase's message (Rung 3: phase 2's own commit block lists five source/test files and no `todos.md`). This entry is left in the working tree for whoever commits that file.
     - Whether this phase merges and lands -> **it does not**; the set is swarm-tracked and `/implement` Step 5a leaves the merge to `orch-honest-control-redraw`.
 ### [P2] Medium
-- [ ] **P2-ROOT-M3ZV** Phase 2: calculate-assets names controls and twins
-  - **Difficulty**: NORMAL
-  - **Type**: Feature
-  - **Context**: Owns `.claude/skills/calculate-assets/calculate_assets.py` (role via `control_shape.role_of`; twin via a `mode=ro` sqlite3 connection + `twins.first_recorded`; `TwinCheck` status `twin`/`first`/`none`/`not checked`; stdout block before the money and `role`/`twin_of` JSON keys) and `SKILL.md` (rule 4 allows the one read-only read; fifth rule on saying "control" and naming the first-recorded twin). Does not touch the money model, `build_page.py`, `build_audit.py` or the engine. Exit: `M0488-DVC10-NEVER` prints control-of-M0488 and `Same book as M0125-DV-C10 (M0125), first recorded 2026-10-16`; `M0179-N20` prints no twin and `Rp 1,783,094,603` with a byte-identical money section; `check_twin('M0125-DV-C10')` reads `first`; `lab/lab.sqlite` sha256 unchanged.
-  - **Status**: open
-  - **Plan Set**: `.workflows/plan/LAB_BOOK_TWINS_PLAN.md` (phase 2 of 3)
-  - **Satisfies**: R2 — Stop reporting surfaces (promote, calculate-assets, `lab status`, the Sera relay) presenting a control or an already-recorded book as a new candidate
-  - **Depends on**: P1-ENG-K7QD
-  - **Plan**: `.workflows/plan/P2-ROOT-M3ZV.md`
 ### [P3] Low
 - [x] **P3-ROOT-D7MX** Phase 8: Close-out: which verdicts survived their honest control
   - **Difficulty**: NORMAL
@@ -142,6 +133,19 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ## Completed Tasks
 
+- [x] **P2-ROOT-M3ZV** Phase 2: calculate-assets names controls and twins
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `.claude/skills/calculate-assets/calculate_assets.py` (role via `control_shape.role_of`; twin via a `mode=ro` sqlite3 connection + `twins.first_recorded`; `TwinCheck` status `twin`/`first`/`none`/`not checked`; stdout block before the money and `role`/`twin_of` JSON keys) and `SKILL.md` (rule 4 allows the one read-only read; fifth rule on saying "control" and naming the first-recorded twin). Does not touch the money model, `build_page.py`, `build_audit.py` or the engine. Exit: `M0488-DVC10-NEVER` prints control-of-M0488 and `Same book as M0125-DV-C10 (M0125), first recorded 2026-10-16`; `M0179-N20` prints no twin and `Rp 1,783,094,603` with a byte-identical money section; `check_twin('M0125-DV-C10')` reads `first`; `lab/lab.sqlite` sha256 unchanged.
+  - **Status**: completed (2026-11-06) — calculate-assets prints the role and a book-twin line before the money from one read-only DB look; verified first pass, 4 journeys (M0179-N20 money unchanged at Rp 1,783,094,603; M0488-DVC10-NEVER control of M0488 and same book as M0125-DV-C10; M0125-DV-C10 reads `first`; lab.sqlite sha256 unchanged).
+  - **Plan Set**: `.workflows/plan/LAB_BOOK_TWINS_PLAN.md` (phase 2 of 3)
+  - **Satisfies**: R2 — Stop reporting surfaces (promote, calculate-assets, `lab status`, the Sera relay) presenting a control or an already-recorded book as a new candidate
+  - **Depends on**: P1-ENG-K7QD
+  - **Plan**: `.workflows/plan/P2-ROOT-M3ZV.md`
+  - **Completed**: 2026-11-06 15:52
+  - **Method**: /do
+  - **Files**: `.claude/skills/calculate-assets/calculate_assets.py`, `.claude/skills/calculate-assets/SKILL.md`
+  - **Drift**: none: code matched the plan's quoted lines; phase 3 (c2c7f42) landed during the run and does not touch these files
 - [x] **P2-ROOT-R9XA** Phase 3: Sera skills read the twin line
   - **Difficulty**: EASY
   - **Type**: Feature

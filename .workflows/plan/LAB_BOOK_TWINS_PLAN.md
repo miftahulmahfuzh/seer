@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/lab-book-twins`
 **Branch:** `feature/lab-book-twins` (base: `origin/main` @ `3b87070`)
 **Phases:** 3
-**Status:** phases 1/3 and 3/3 complete (phase 2 running)
+**Status:** complete
 **Coordinator:** —
 
 ---
@@ -72,7 +72,7 @@ refusal or digest change (would move every recorded digest — memory
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
 | 1 | Twin reader and lab CLI surfaces (run, twins, status, promote D19) | R1, R2 | `engine/lab`, `engine/commands` | 6 | — | HARD | `.workflows/plan/lab-book-twins/phase-1.md` | P1-ENG-K7QD (done 2026-11-06) | — |
-| 2 | calculate-assets names controls and twins | R2 | `.claude/skills/calculate-assets` | 2 | 1 | NORMAL | `.workflows/plan/lab-book-twins/phase-2.md` | P2-ROOT-M3ZV | — |
+| 2 | calculate-assets names controls and twins | R2 | `.claude/skills/calculate-assets` | 2 | 1 | NORMAL | `.workflows/plan/lab-book-twins/phase-2.md` | P2-ROOT-M3ZV (done 2026-11-06) | — |
 | 3 | Sera skills read the twin line | R2, R3 | `.claude/skills` | 2 | 1 | EASY | `.workflows/plan/lab-book-twins/phase-3.md` | P2-ROOT-R9XA (done 2026-11-06) | — |
 
 ### Phase 1 — Twin reader and lab CLI surfaces

@@ -9,9 +9,12 @@ arbitrary window inside the test-window research store, and reports what the mon
 
 Three things this deliberately does NOT do:
 
-1. **It never connects to the lab database.** ``lab`` commands migrate ``lab.sqlite`` on connect,
-   so even a read dirties the file. Methods and candidates come from ``lab.method.discover()``,
-   which reads the committed method files on disk, and nothing here opens the database at all.
+1. **It never connects to the lab database the way ``lab`` commands do.** ``lab.store.connect``
+   migrates ``lab.sqlite`` on connect, so even a read through it dirties the file. Methods and
+   candidates come from ``lab.method.discover()``, which reads the committed method files on
+   disk. The one exception is a single read-only look (``sqlite3`` with ``mode=ro``, which cannot
+   write) to ask whether the book that ran was already recorded under another name -- see
+   ``check_twin``. A missing or unreadable database only means that line says "not checked".
 2. **It records nothing.** No trial, no observation, no status move, no pre-registration. This is
    a report, in the sense ``lab costs`` is a report.
 3. **It prints no gate numbers.** No DSR, no eligibility, no owner conditions, no failure labels.
@@ -28,8 +31,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -44,6 +48,7 @@ from seer_engine.backtest.market import Market
 from seer_engine.backtest.metrics import money_weighted_return
 from seer_engine.lab import runner
 from seer_engine.lab import store as lab_store
+from seer_engine.lab.control_shape import ROLE_CONTROL, role_of
 from seer_engine.lab.method import discover
 from seer_engine.lab.methods.m0039_vix_term_structure_gate import DAILY_HOLD_FRAC_GOTRADE
 from seer_engine.lab.methods.m0063_earnings_day_jump import WEEKLY_HOLD_FRAC_GOTRADE
@@ -398,6 +403,127 @@ def monthly(points):
     return out
 
 
+# --------------------------------------------------------------------------- what the book is
+
+TWIN_FOUND = "twin"
+TWIN_FIRST = "first"
+TWIN_NONE = "none"
+TWIN_UNCHECKED = "not checked"
+
+
+@dataclass(frozen=True)
+class TwinCheck:
+    """Whether the book that ran was first recorded under another candidate id.
+
+    ``status`` is one of ``TWIN_FOUND`` (``twin`` holds phase 1's ``Twin``, recorded EARLIER under
+    another id), ``TWIN_FIRST`` (``twin`` holds a LATER copy: this arm is itself the first
+    recording), ``TWIN_NONE`` (looked, no other trial holds this book), or ``TWIN_UNCHECKED``
+    (``reason`` says why the look did not happen). Built only through ``check_twin``, which sets
+    ``twin`` only with ``TWIN_FOUND``/``TWIN_FIRST`` and ``reason`` only with ``TWIN_UNCHECKED``.
+    """
+
+    status: str
+    reason: str | None = None
+    twin: object | None = None
+
+
+def check_twin(candidate_id: str, db_path: Path) -> TwinCheck:
+    """The first-recorded dev-window book with ``candidate_id``'s exact curve, read-only.
+
+    ``mode=ro`` is the point: ``lab.store.connect`` migrates the file on connect, so this never goes
+    through it, and a read-only SQLite handle cannot write even if something downstream tried.
+    Everything that can go wrong -- no file, no twin reader in this engine, a locked or foreign
+    file, a candidate the lab never ran -- comes back as ``TWIN_UNCHECKED`` with a reason. The
+    money is the answer the owner asked for; this line is context, so it may never cost him the
+    answer.
+    """
+    if not db_path.is_file():
+        return TwinCheck(TWIN_UNCHECKED, reason=f"no lab database at {db_path}")
+    try:
+        from seer_engine.lab import twins
+    except ImportError:
+        return TwinCheck(TWIN_UNCHECKED, reason="this engine has no twin reader")
+    try:
+        conn = sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True)
+    except sqlite3.Error as e:
+        return TwinCheck(TWIN_UNCHECKED, reason=f"could not open {db_path} read-only: {e}")
+    try:
+        ran = conn.execute(
+            "SELECT 1 FROM trials WHERE candidate_id = ? AND window = 'dev' LIMIT 1",
+            (candidate_id,),
+        ).fetchone()
+        if ran is None:
+            return TwinCheck(
+                TWIN_UNCHECKED,
+                reason=f"{candidate_id} has no dev-window trial, so no recorded book to compare",
+            )
+        found = twins.first_recorded(conn, candidate_id, "dev")
+    except Exception as e:  # context only: a failed look must never fail the money
+        return TwinCheck(TWIN_UNCHECKED, reason=f"the lab database could not be read: {e}")
+    finally:
+        conn.close()
+    # `first_recorded` returns the earliest OTHER trial of this book (phase 1). It came first
+    # only when `earlier`; otherwise the arm asked about is itself the first recording.
+    if found is None:
+        return TwinCheck(TWIN_NONE)
+    if found.earlier:
+        return TwinCheck(TWIN_FOUND, twin=found)
+    return TwinCheck(TWIN_FIRST, twin=found)
+
+
+def identity_lines(method_id: str, recorded: Candidate, check: TwinCheck) -> list[str]:
+    """The plain-language block printed before the money: is it a control, is it a known book.
+
+    A control arm's money is real money, but it is the yardstick the method was registered to be
+    beaten against, and relaying it as "a new book" is exactly how one book got reported under
+    three names. A twin's money is the first-recorded book's money, so it is named by that book.
+    """
+    lines: list[str] = []
+    if role_of(recorded) == ROLE_CONTROL:
+        lines.append(
+            f"  {recorded.id} is a control arm of {method_id}: it is the yardstick that method's "
+            f"idea was registered\n  to beat, not a new book to trade."
+        )
+    if check.status == TWIN_FOUND:
+        t = check.twin
+        lines.append(
+            f"  Same book as {t.candidate_id} ({t.method_id}), first recorded "
+            f"{str(t.run_at)[:10]}: its money is that\n  book's money, not a new book."
+        )
+    elif check.status == TWIN_FIRST:
+        t = check.twin
+        lines.append(
+            f"  The first recording of this book; the lab recorded it again later as "
+            f"{t.candidate_id} ({t.method_id})."
+        )
+    elif check.status == TWIN_NONE:
+        lines.append("  Not a book the lab recorded earlier under another name.")
+    else:
+        lines.append(f"  twin not checked ({check.reason})")
+    return lines
+
+
+def twin_json(check: TwinCheck) -> dict:
+    """``check`` for the ``--out`` file: one shape per status, keyed by ``status``."""
+    if check.status == TWIN_FOUND:
+        t = check.twin
+        return {
+            "status": TWIN_FOUND,
+            "candidate": t.candidate_id,
+            "method": t.method_id,
+            "trial": t.n,
+            "first_recorded": str(t.run_at),
+            "store_fingerprint": t.store_fingerprint,
+        }
+    if check.status == TWIN_FIRST:
+        t = check.twin
+        return {"status": TWIN_FIRST, "later_copy": t.candidate_id, "method": t.method_id,
+                "trial": t.n}
+    if check.status == TWIN_NONE:
+        return {"status": TWIN_NONE}
+    return {"status": TWIN_UNCHECKED, "reason": check.reason}
+
+
 # --------------------------------------------------------------------------- the report
 
 
@@ -471,6 +597,8 @@ def main(argv: list[str] | None = None) -> int:
     n_deposits, total_in = deposits_idr(ran_from, ran_to)
     open_rate = real_res.usd_idr
     end_rate = market.usd_idr_on(ran_to)
+    role = role_of(recorded)
+    twin = check_twin(candidate.id, lab_store.DB_PATH)
 
     # The book, in rupiah, two ways; and the SPY fed the identical dollars on the identical days.
     real_curve = [(s.date, float(s.equity_usd)) for s in real_res.snapshots]
@@ -501,6 +629,9 @@ def main(argv: list[str] | None = None) -> int:
     r_book_fixed = rupiah_return(book_fixed, flows)
     r_spy = rupiah_return(spy_real, flows)
 
+    for line in identity_lines(method_id, recorded, twin):
+        print(line)
+    print()
     print(f"  {candidate.id}   {ran_from} to {ran_to}   ({years:.1f} years)")
     print(f"  10,000,000 to open, then 5,000,000 on the 25th: {n_deposits} deposits\n")
     print(f"  {'you paid in':<34}{rupiah(total_in):>22}")
@@ -527,6 +658,8 @@ def main(argv: list[str] | None = None) -> int:
             "candidate": candidate.id,
             "method": method_id,
             "swap": swap,
+            "role": role,
+            "twin_of": twin_json(twin),
             "start": ran_from.isoformat(),
             "end": ran_to.isoformat(),
             "years": years,

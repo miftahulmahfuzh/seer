@@ -188,7 +188,7 @@ def test_reserve_basis_is_a_lever_since_the_pins():
     assert is_pinned_default("reserve_basis", "order") is True
     assert is_pinned_default("reserve_basis", "fill") is False
     # Append only: an insertion would re-order nothing, but the habit is the point.
-    assert list(LEVERS_SINCE_PINS)[-1] == "reserve_basis"
+    assert "reserve_basis" in LEVERS_SINCE_PINS  # append-only; later levers follow it
 
 
 def _all_candidates():

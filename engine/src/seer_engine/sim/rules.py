@@ -43,6 +43,12 @@ by ``sim.book.step_book`` at each open, read point in time by ``backtest.book_ru
 It is a book-engine lever, it excludes ``idle_symbol`` (two answers to one question), and it raises
 the owner input ``cash-yield``: nobody has verified that Gotrade pays interest on idle dollars.
 
+``resize_adds`` (2026-11-08) splits resizing in two. True (every rule set before it) trims a holding
+that has outgrown its slot and tops up one that has fallen below it. False only trims: a held
+target below its band is left alone, so the trim's proceeds stay in cash. Entries of names not yet
+held are untouched. A book-engine lever, a ``LEVERS_SINCE_PINS`` no-op at True; it needs
+``resize=True``.
+
 ``reserve_basis`` says how much of one night's buy budget an order holds while the rest of the rank
 is sized. "order" (every rule set before 2026-10-27) reserves the order at its LIMIT the moment it
 is sized, before any bar is read, and never gives any of it back: an order that found no bar, one
@@ -153,6 +159,7 @@ class TradeRules:
     cash_yield: str | None = None
     resize_band: Decimal | None = None
     reserve_basis: ReserveBasis = "order"
+    resize_adds: bool = True
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, str):
@@ -246,6 +253,13 @@ class TradeRules:
                 "whole night before anything fills (sim.sizing.size_picks), so its limit already is "
                 "the most an order can pay"
             )
+        if not isinstance(self.resize_adds, bool):
+            raise TypeError(f"resize_adds must be a bool, got {type(self.resize_adds).__name__}")
+        if not self.resize_adds:
+            if self.engine != "book":
+                raise ValueError(f"resize_adds is a book-engine lever; the {self.engine} simulator never resizes")
+            if not self.resize:
+                raise ValueError("resize_adds=False needs resize=True: with nothing to resize it is a no-op")
         is_v0 = _lever_values(self) == _V0_LEVERS
         if self.engine == "bracket_v0" and not is_v0:
             raise ValueError("engine 'bracket_v0' is reserved for DESIGN_V0 (the unchanged §5 simulator)")
@@ -276,6 +290,7 @@ _V0_LEVERS: tuple[object, ...] = (
     None,
     None,
     "order",
+    True,
 )
 
 DESIGN_V0 = TradeRules(
@@ -422,6 +437,7 @@ LEVERS_SINCE_PINS: dict[str, object] = {
     "cash_yield": None,  # interest on idle cash at a T-bill yield, 2026-10-12
     "resize_band": None,  # the band's size, overriding the basis's constant, 2026-10-20
     "reserve_basis": "order",  # the buy budget reconciled to the fill, not the order, 2026-10-27
+    "resize_adds": True,  # False: resizing only trims, a holding below its band is left alone, 2026-11-08
 }
 
 
@@ -653,6 +669,11 @@ def describe_rules(rules: TradeRules) -> tuple[str, ...]:
         lines.append(_gotrade_costs_line())
     else:
         lines.append(f"Costs: {_pct(rules.cost_rate)} per side.")
+    if not rules.resize_adds:
+        lines.append(
+            "Resizing is sell-only: a holding that has outgrown its slot is trimmed back, a holding "
+            "that has fallen below it is left alone and the proceeds stay in cash."
+        )
     if rules.reserve_basis == "fill":
         lines.append(
             "Buy budget: the night's orders are placed in rank order against one budget, and each "

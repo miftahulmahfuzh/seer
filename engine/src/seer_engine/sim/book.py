@@ -760,6 +760,8 @@ def step_book(
             if p is not None:
                 if p.exit_pending or not (rules.resize or is_idle):
                     continue
+                if not rules.resize_adds and not is_idle:
+                    continue  # sell-only resizing: a holding below its slot is left alone
                 if rules.entry == "limit" and t.limit is None:
                     continue
                 desired = _desired_shares(equity, t.weight, t.last, rules)

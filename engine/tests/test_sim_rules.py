@@ -435,6 +435,7 @@ def test_a_lever_added_after_the_pins_is_left_out_of_canonical_text_at_its_defau
         "cash_yield": None,
         "resize_band": None,
         "reserve_basis": "order",
+        "resize_adds": True,
     }
 
 

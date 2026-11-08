@@ -319,6 +319,22 @@ def test_rebalance_trims_and_adds_at_the_open():
     assert out.snapshot.equity_usd == P("10042.498")
 
 
+def test_sell_only_resizing_trims_the_winner_and_leaves_the_faller_alone():
+    """``resize_adds=False``: the trim still happens, the add does not, the proceeds stay cash."""
+    from dataclasses import replace
+
+    b = _two_held()
+    bars = day(
+        bar("AAA", TUE, "101", "102", "100", "101"),
+        bar("BBB", TUE, "99", "100", "98.5", "99.5"),
+    )
+    out = go(b, TUE, bars, (T("AAA", "0.5", "100"), T("BBB", "0.5", "100")),
+             replace(RESIZE, resize_adds=False))
+    assert [(f.symbol, f.side, f.shares, f.reason) for f in out.fills] == [("AAA", "sell", W(11), "trim")]
+    assert out.book.position("BBB").shares == W(40)
+    assert out.snapshot.cash_usd == P("1109.889")
+
+
 def test_rebalance_inside_the_band_does_nothing():
     # equity 10,000: desired = floor(5000 / 99.099) = 50; AAA is 1 share × 99 = 99 < 100 over.
     b = book("100", pos("AAA", 51, "99"), pos("BBB", 49, "99"))

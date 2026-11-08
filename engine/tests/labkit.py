@@ -23,6 +23,8 @@ BASE_ETFS: tuple[str, ...] = ("BIL", "EFA", "IEF", "QQQ", "SPY", "TLT", "GLD",
                               "XLB", "XLE", "XLF", "XLI", "XLK", "XLP", "XLU", "XLV", "XLY")
 SPY_EX_DATE = date(2015, 6, 19)
 SMOKE_T13W = MarketSeries({"T13W": [(date(1993, 1, 29), 4.0)]})
+SMOKE_VIX = MarketSeries({"T13W": [(date(1993, 1, 29), 4.0)], "VIX": [(date(1993, 1, 29), 30.0)]})
+"""A flat VIX of 30 (and the T-bill), for a candidate whose rules gate top-ups on the VIX."""
 """A flat 4% 13-week T-bill, dated before both smoke windows, so ``value_on`` answers 4.0 on any
 dev or test session. Opt-in: a candidate whose rules credit idle cash (``rules.cash_yield``) runs
 on ``smoke_market(...).with_series(SMOKE_T13W)``; the smoke markets themselves keep

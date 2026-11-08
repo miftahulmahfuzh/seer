@@ -1060,3 +1060,38 @@ def test_the_cash_clamp_reserves_what_it_bought_not_what_it_ordered():
     assert [(f.symbol, f.shares, f.price, f.cash_usd) for f in out.fills] == bought
     assert out.rejected == (("P2", "cash"),)
     assert out.snapshot.cash_usd == P("0.0005")
+
+
+def test_adds_only_resizing_leaves_the_winner_alone_and_tops_up_the_faller():
+    """``resize_trims=False``: no sale, the add still happens when the gate is open."""
+    from dataclasses import replace
+
+    b = _two_held()
+    bars = day(
+        bar("AAA", TUE, "101", "102", "100", "101"),
+        bar("BBB", TUE, "99", "100", "98.5", "99.5"),
+    )
+    out = go(b, TUE, bars, (T("AAA", "0.5", "100"), T("BBB", "0.5", "100")),
+             replace(RESIZE, resize_trims=False))
+    assert all(f.side != "sell" for f in out.fills)
+
+
+def test_gated_topups_need_the_caller_and_close_when_the_gate_is_shut():
+    from dataclasses import replace
+    from decimal import Decimal
+
+    import pytest
+
+    rules = replace(RESIZE, resize_trims=False, add_gate_vix=Decimal("25"))
+    bars = day(
+        bar("AAA", TUE, "101", "102", "100", "101"),
+        bar("BBB", TUE, "99", "100", "98.5", "99.5"),
+    )
+    tg = (T("AAA", "0.5", "100"), T("BBB", "0.5", "100"))
+    with pytest.raises(ValueError, match="adds_ok"):
+        go(_two_held(), TUE, bars, tg, rules)
+    funded = replace(_two_held(), cash=Decimal("2000"))
+    shut = go(funded, TUE, bars, tg, rules, adds_ok=False)
+    assert shut.fills == ()
+    opened = go(funded, TUE, bars, tg, rules, adds_ok=True)
+    assert [f.side for f in opened.fills] == ["buy"]

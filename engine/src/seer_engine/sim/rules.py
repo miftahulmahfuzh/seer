@@ -160,6 +160,8 @@ class TradeRules:
     resize_band: Decimal | None = None
     reserve_basis: ReserveBasis = "order"
     resize_adds: bool = True
+    resize_trims: bool = True
+    add_gate_vix: Decimal | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, str):
@@ -260,6 +262,14 @@ class TradeRules:
                 raise ValueError(f"resize_adds is a book-engine lever; the {self.engine} simulator never resizes")
             if not self.resize:
                 raise ValueError("resize_adds=False needs resize=True: with nothing to resize it is a no-op")
+        if not isinstance(self.resize_trims, bool):
+            raise TypeError(f"resize_trims must be a bool, got {type(self.resize_trims).__name__}")
+        if self.add_gate_vix is not None:
+            if not isinstance(self.add_gate_vix, Decimal) or not self.add_gate_vix > 0:
+                raise TypeError("add_gate_vix must be a positive Decimal or None")
+        if not self.resize_trims or self.add_gate_vix is not None:
+            if self.engine != "book" or not self.resize:
+                raise ValueError("resize_trims=False and add_gate_vix are book-engine levers and need resize=True")
         is_v0 = _lever_values(self) == _V0_LEVERS
         if self.engine == "bracket_v0" and not is_v0:
             raise ValueError("engine 'bracket_v0' is reserved for DESIGN_V0 (the unchanged §5 simulator)")
@@ -291,6 +301,8 @@ _V0_LEVERS: tuple[object, ...] = (
     None,
     "order",
     True,
+    True,
+    None,
 )
 
 DESIGN_V0 = TradeRules(
@@ -438,6 +450,8 @@ LEVERS_SINCE_PINS: dict[str, object] = {
     "resize_band": None,  # the band's size, overriding the basis's constant, 2026-10-20
     "reserve_basis": "order",  # the buy budget reconciled to the fill, not the order, 2026-10-27
     "resize_adds": True,  # False: resizing only trims, a holding below its band is left alone, 2026-11-08
+    "resize_trims": True,  # False: never sell a winner back to its slot, 2026-11-08
+    "add_gate_vix": None,  # adds only while the VIX is at or above this, 2026-11-08
 }
 
 
@@ -673,6 +687,13 @@ def describe_rules(rules: TradeRules) -> tuple[str, ...]:
         lines.append(
             "Resizing is sell-only: a holding that has outgrown its slot is trimmed back, a holding "
             "that has fallen below it is left alone and the proceeds stay in cash."
+        )
+    if not rules.resize_trims:
+        lines.append("Resizing never sells: a holding that has outgrown its slot is left to run.")
+    if rules.add_gate_vix is not None:
+        lines.append(
+            f"Top-ups are gated: a holding below its slot is bought up only while the VIX, at the "
+            f"previous close, is {rules.add_gate_vix} or higher."
         )
     if rules.reserve_basis == "fill":
         lines.append(

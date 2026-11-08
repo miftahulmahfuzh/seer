@@ -436,6 +436,8 @@ def test_a_lever_added_after_the_pins_is_left_out_of_canonical_text_at_its_defau
         "resize_band": None,
         "reserve_basis": "order",
         "resize_adds": True,
+        "resize_trims": True,
+        "add_gate_vix": None,
     }
 
 

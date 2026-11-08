@@ -357,6 +357,8 @@ def run_book(
             f"carries no {rules.cash_yield} series (the research store's market_series.csv); write "
             "it with `python -m seer_engine market_series --refresh --store <store>`"
         )
+    if rules.add_gate_vix is not None and "VIX" not in market.series.names():
+        raise ValueError(f"rules {rules.id!r} gate top-ups on the VIX, and this market carries no VIX series")
     _session("start", start)
     _session("end", end)
     if end < start:
@@ -415,8 +417,12 @@ def run_book(
         bars = market.bars_on(session, sorted(symbols))
         divs = _dividends_on(dividends, held, session) if rules.dividends else {}
 
+        gate = {}
+        if rules.add_gate_vix is not None:
+            vix = market.series.value_on("VIX", data_date)
+            gate = {"adds_ok": vix is not None and Decimal(str(vix)) >= rules.add_gate_vix}
         if rules.cash_yield is None:
-            stepped = step_book(book, session, bars, targets, rules, divs, idle_symbol_ok=idle_added)
+            stepped = step_book(book, session, bars, targets, rules, divs, idle_symbol_ok=idle_added, **gate)
         else:
             stepped = step_book(
                 book,
@@ -428,6 +434,7 @@ def run_book(
                 idle_symbol_ok=idle_added,
                 cash_rate=cash_rate_on(market, rules.cash_yield, data_date),
                 deposited=deposited,
+                **gate,
             )
             interest_usd += stepped.interest
         book = stepped.book

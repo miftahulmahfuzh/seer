@@ -591,6 +591,7 @@ def step_book(
     *,
     cash_rate: Decimal | None = None,
     deposited: Decimal = _ZERO,
+    adds_ok: bool | None = None,
 ) -> BookStep:
     """Advance ``book`` through the NYSE session ``session`` (see the module docstring).
 
@@ -628,6 +629,9 @@ def step_book(
         raise TypeError(f"dividends must be a Mapping, got {type(dividends).__name__}")
     if not isinstance(idle_symbol_ok, bool):
         raise TypeError("idle_symbol_ok must be a bool")
+    if rules.add_gate_vix is not None and adds_ok is None:
+        raise ValueError(f"rules {rules.id!r} gate their top-ups on the VIX; the caller must pass adds_ok")
+    adds_open = True if adds_ok is None else bool(adds_ok)
     rate, fresh = _check_cash_rate(book, rules, cash_rate, deposited)
     held_at_night = book.held()
     checked = _check_targets(targets, rules, idle_symbol_ok)
@@ -662,6 +666,8 @@ def step_book(
         for p in book.positions:
             t = wanted.get(p.symbol)
             if t is None or p.symbol in night_exits or not (rules.resize or p.symbol == idle):
+                continue
+            if not rules.resize_trims and p.symbol != idle:
                 continue
             desired = _desired_shares(equity, t.weight, t.last, rules)
             excess = p.shares - desired
@@ -725,6 +731,8 @@ def step_book(
             b = day.get(symbol)
             if t is None or b is None or p.exit_pending or not (rules.resize or symbol == idle):
                 continue
+            if not rules.resize_trims and symbol != idle:
+                continue  # adds-only resizing: a winner is left to run
             desired = _desired_shares(equity, t.weight, t.last, rules)
             excess = p.shares - desired
             if not _beyond_band(excess, t.last, t.weight, equity, rules):
@@ -762,6 +770,8 @@ def step_book(
                     continue
                 if not rules.resize_adds and not is_idle:
                     continue  # sell-only resizing: a holding below its slot is left alone
+                if not adds_open and not is_idle:
+                    continue  # gated top-ups: the VIX is below the gate tonight
                 if rules.entry == "limit" and t.limit is None:
                     continue
                 desired = _desired_shares(equity, t.weight, t.last, rules)

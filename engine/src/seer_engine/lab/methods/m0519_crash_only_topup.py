@@ -16,7 +16,7 @@ gated rule set whose caller did not.
 
 FOUR ARMS on M0266's chassis (M0109's 50 most-traded index members, equal weight, fractional shares,
 Gotrade's real fees, the owner's monthly funding). The hosting book is M0127's never-resize control
-(M0269-NEVER at scale 1 is this same book: its book twin). The "no opinion" arm is ALWAYS, the same
+(M0266-L is this same book; NEVER repeats it under this method's own allocator id and so records as its book twin). The "no opinion" arm is ALWAYS, the same
 adds-only book that tops up every month whatever the VIX says, so the gate's worth can be read apart
 from the habit of topping up. THE CALIBRATION WAS MEASURED BEFORE ANY RETURN WAS READ: exposure only,
 from a scratch run of ``dev.run_registry`` on the dev store, printing no return. At scale 1 the
@@ -45,10 +45,22 @@ from decimal import Decimal
 from seer_engine.backtest.dev import Candidate
 from seer_engine.lab.method import Method
 from seer_engine.lab.methods.m0127_slot_relative_resize_band import E1, T20
-from seer_engine.lab.methods.m0266_exposure_matched_rebalance import BOOK, ScaledBandParams
+from seer_engine.lab.methods.m0266_exposure_matched_rebalance import ScaledBandParams, ScaledMostTradedEqualWeight
 from seer_engine.sim.rules import TradeRules
 
 ADDED = date(2026, 11, 8)
+
+
+class _HostBook(ScaledMostTradedEqualWeight):
+    """M0266's book under this method's own allocator id. The NEVER arm is exactly M0266-L (same
+    rules, same scale 1, same params), and ``lab run`` refuses a configuration already run on the
+    dev window (the first attempt did, with nothing recorded). A new id gives the arm a new digest;
+    it records as a book twin of M0266-L, which is expected, costs no look, and is named as such."""
+
+    id = "M0519"
+
+
+BOOK = _HostBook()
 
 #: M0127's 20%-of-target band, adds only: the same resize rung as the sell-only arms of M0269, with
 #: the selling switched off instead of the buying.
@@ -89,7 +101,7 @@ METHOD = Method(
         "cost. Four arms on M0266's chassis (50 most-traded index members, equal weight, fractional "
         "shares, Gotrade real fees, owner funding), all at the never-resize control's measured "
         "exposure (0.8865 on dev, calibrated before any return was read, see the module docstring): "
-        "NEVER (host: the book that never resizes, a book twin of M0269-NEVER's host), ALWAYS (the "
+        "NEVER (host: the book that never resizes, M0266-L's book twin under this method's own allocator id), ALWAYS (the "
         "no-opinion arm: adds-only, tops up every month whatever the market does), VIX25 and VIX30 "
         "(adds-only, topping up only while the VIX at the previous close is at least 25 or 30). "
         "Published-anomaly note: buying the dip when the VIX spikes has been public for decades, so "

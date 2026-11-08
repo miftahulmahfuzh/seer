@@ -134,6 +134,9 @@ class SameMonthMemoryAllocator:
     """The lab's index-member book ranked on its multi-year same-calendar-month average."""
 
     id = "M0515"
+    # Prices only: market-aware just to read the uncut bars. Declared so the runner does not take
+    # it for a fundamentals ranker and refuse the run on that panel's coverage (nothing was spent).
+    market_fields = ("bars",)
 
     def lookback(self, params: Any) -> int:
         return factor_lookback(_check(params).inner)

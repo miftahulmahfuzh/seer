@@ -2388,7 +2388,15 @@ def test_a_method_with_no_promotable_variant_shows_a_dash_and_cannot_fire(
 # A test that only pinned the suppressions would let a later edit quietly re-break M0072 while
 # still reading green.
 BUY_SIGNAL_BEFORE: frozenset[str] = frozenset({"M0092", "M0197", "M0243", "M0258"})
-BUY_SIGNAL_AFTER: frozenset[str] = frozenset({"M0072", "M0092", "M0258", "M0284"})
+BUY_SIGNAL_AFTER: frozenset[str] = frozenset({"M0072", "M0258", "M0284"})
+# (2026-11-08) M0092 left this set, and nothing about its book changed. Its best arm recorded DSR
+# 0.911 at N=64; the luck bar is judged at the lab's current N (344 on this date), where that arm
+# no longer clears it, so `lab walkforward` reads "no variant would be promoted" for M0092 and
+# never reaches the fold conditions. That is the luck gate doing its job as N grows, and it is the
+# same lesson as the M0383 note below: the lab's firing population is re-rolled by every batch, so
+# the set is pinned to the book this test is about (M0072's, with the names that share its curve),
+# not to every id that happened to fire on the day it was written. M0092 stays in BUY_SIGNAL_BEFORE
+# because it was one of the false alarms in the first reading, and it is still not firing.
 # (2026-10-23) M0284 joined, and it is the cleanest possible instance of what this block exists
 # to collapse: its promoted arm's curve is byte-identical to M0072's -- trials 283, 914, 934 and
 # 952 share one total return to fourteen digits, 1208 trades, the same fall and the same curve

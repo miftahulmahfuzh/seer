@@ -11,7 +11,7 @@
 
 ## How to get to it (user POV)
 
-Third icon (trophy). The checklist switches strategy with its own icon row. A twin is the card named `<original>+Claude`, e.g. `F4+Claude`.
+Third icon (trophy). The checklist switches strategy with its own icon row: on desktop always one row, its round buttons shrinking together once the strategies outnumber the 46px circles the sheet can hold (about 41px at 7 strategies, about 23px at 12); on a phone it wraps as before. A twin is the card named `<original>+Claude`, e.g. `F4+Claude`.
 
 ## Driving it with verify.sh
 
@@ -25,6 +25,7 @@ $V api RUN GET '/leaderboard?s=F4-MOM12-N20-TREND-CX'
                                 # "Go-live checklist · F4+Claude · Momentum", "Paper only. No backtest possible.",
                                 # "Claude knows how the past turned out", "[Not yet] Backtest gate Can't be run"
 $V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-twin.mjs   # order, partner colour, own icon, unique sheets and icons, dash, chip, rule 5; result: PASS
+$V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-switch-row.mjs --width 1280   # one row at the real count, at 7 and at 12; positions unchanged
 $V sql RUN "select id, twin_of, is_champion from strategies where twin_of is not null"
                                 # F4-MOM12-N20-TREND-CX | F4-MOM12-N20-TREND | f
 $V engine RUN compare           # common window 2026-08-03..2026-11-02, 66 sessions; ranks by Sharpe, the twin among them;

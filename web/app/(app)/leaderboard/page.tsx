@@ -160,7 +160,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
       {pick && switchable.length > 1 && (
         <div className={s.switch}>
           <StrategySwitch strategies={switchable} current={pick.id}
-            href={id => `/leaderboard?s=${encodeURIComponent(id)}`} label="Strategy" />
+            href={id => `/leaderboard?s=${encodeURIComponent(id)}`} label="Strategy" fit />
         </div>
       )}
       <span className="eyebrow">Go-live checklist · <PickName name={pick?.name} href={seeMethod} /></span>

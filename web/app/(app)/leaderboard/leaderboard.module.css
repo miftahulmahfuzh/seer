@@ -42,7 +42,7 @@
 .methodLink svg { margin-left: 4px; vertical-align: -1px; }
 
 .check { padding-bottom: 64px; gap: 8px; background: var(--butter); }
-.switch { display: flex; gap: 6px; padding-bottom: 8px; }
+.switch { padding-bottom: 8px; }
 .score { display: flex; align-items: center; gap: 12px; padding-bottom: 8px; }
 .scoreNum { font-size: 52px; line-height: 1; letter-spacing: -0.04em; }
 .scoreText { font-size: 16px; line-height: 1.3; color: var(--ink-2); }

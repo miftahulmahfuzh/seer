@@ -3,18 +3,18 @@
 **Package Path**: `web`
 **Package Code**: WEB
 **Last Updated**: 2026-11-10
-**Total Active Tasks**: 2
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 27
+- Blocked: 0
+- Completed: 28
 
 ---
 
@@ -24,15 +24,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ### [P1] High
 
-- [ ] **P1-WEB-1PLT** Phase 2: One-row checklist switcher
-  - **Difficulty**: EASY
+- [ ] **P1-WEB-B6MG** Phase 3: Desktop card stacks
+  - **Difficulty**: HARD
   - **Type**: Feature
-  - **Context**: Owns an opt-in `fit` prop on `StrategySwitch` (one-row grid at >= 1024 px, no floor, never wraps; loose row below), its use on the leaderboard checklist, `.switch` padding, new `StrategySwitch.test.tsx` and verify step `leaderboard-switch-row.mjs`. Exit: `tsc` + `npm test` green; at 1024/1280/1440 the switcher is one row with the real count, 7 and 12 strategies; 390, `/positions` and `/history` shots unchanged.
+  - **Context**: Owns `stacks()` in `view.ts` and the desktop (>= 1024 px) live-card decks in `page.tsx` (original on top, twin tucked behind, deck holding the pick opens and pops forward in place, `prefers-reduced-motion` respected), `RetiredShelf` `cols={rowCols}`, new verify step `leaderboard-stack.mjs`. Exit: `tsc` + `npm test` green; `leaderboard-stack.mjs` PASS at 1280 light and 1440 dark; no horizontal scroll at 1280/1440; "No common window yet" printed once on the empty board; 390 px fingerprint identical before and after.
   - **Status**: open
-  - **Plan Set**: `.workflows/plan/LEADERBOARD_DESKTOP_REVAMP_PLAN.md` (phase 2 of 3)
-  - **Satisfies**: R2 — Checklist icon switcher fits one row
-  - **Depends on**: P1-WEB-A59X
-  - **Plan**: `.workflows/plan/P1-WEB-1PLT.md`
+  - **Plan Set**: `.workflows/plan/LEADERBOARD_DESKTOP_REVAMP_PLAN.md` (phase 3 of 3)
+  - **Satisfies**: R3 — Stacked cards; clicking pops the active stack forward in place (desktop revamp)
+  - **Depends on**: P1-WEB-A59X, P1-WEB-1PLT
+  - **Plan**: `.workflows/plan/P1-WEB-B6MG.md`
 
 ### [P2] Medium
 
@@ -42,19 +42,26 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ### 🚫 Blocked
 
-- [ ] **P1-WEB-B6MG** Phase 3: Desktop card stacks
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `stacks()` in `view.ts` and the desktop (>= 1024 px) live-card decks in `page.tsx` (original on top, twin tucked behind, deck holding the pick opens and pops forward in place, `prefers-reduced-motion` respected), `RetiredShelf` `cols={rowCols}`, new verify step `leaderboard-stack.mjs`. Exit: `tsc` + `npm test` green; `leaderboard-stack.mjs` PASS at 1280 light and 1440 dark; no horizontal scroll at 1280/1440; "No common window yet" printed once on the empty board; 390 px fingerprint identical before and after.
-  - **Status**: blocked
-  - **Plan Set**: `.workflows/plan/LEADERBOARD_DESKTOP_REVAMP_PLAN.md` (phase 3 of 3)
-  - **Satisfies**: R3 — Stacked cards; clicking pops the active stack forward in place (desktop revamp)
-  - **Depends on**: P1-WEB-A59X, P1-WEB-1PLT
-  - **Plan**: `.workflows/plan/P1-WEB-B6MG.md`
-
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-1PLT** Phase 2: One-row checklist switcher
+  - **Difficulty**: EASY
+  - **Type**: Feature
+  - **Context**: Owns an opt-in `fit` prop on `StrategySwitch` (one-row grid at >= 1024 px, no floor, never wraps; loose row below), its use on the leaderboard checklist, `.switch` padding, new `StrategySwitch.test.tsx` and verify step `leaderboard-switch-row.mjs`. Exit: `tsc` + `npm test` green; at 1024/1280/1440 the switcher is one row with the real count, 7 and 12 strategies; 390, `/positions` and `/history` shots unchanged.
+  - **Status**: completed
+  - **Plan Set**: `.workflows/plan/LEADERBOARD_DESKTOP_REVAMP_PLAN.md` (phase 2 of 3)
+  - **Satisfies**: R2 — Checklist icon switcher fits one row
+  - **Depends on**: P1-WEB-A59X
+  - **Plan**: `.workflows/plan/P1-WEB-1PLT.md`
+  - **Completed**: 2026-11-10 09:37
+  - **Method**: /do
+  - **Files**: web/components/StrategySwitch.tsx, web/components/StrategySwitch.module.css, web/components/StrategySwitch.test.tsx, web/app/(app)/leaderboard/leaderboard.module.css, web/app/(app)/leaderboard/page.tsx, .claude/skills/verify-seer/features/steps/leaderboard-switch-row.mjs, .claude/skills/verify-seer/features/leaderboard.md
+  - **Drift**:
+    - none — tree matched the plan exactly (page.tsx:163, css:45, leaderboard.md lines 14/27)
+  - **Decided**:
+    - Step 5 CSS-module fallback assertion → not needed; vitest resolves s.group/s.fit, test passed as written (rung 3: code block)
 
 - [x] **P1-WEB-A59X** Phase 1: Unique colour and icon per method
   - **Difficulty**: NORMAL
@@ -95,7 +102,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - temporary hand-edit of `web/data/lab.json` for screenshots → skipped, shot against the real chains (rung 1: the index added the `6 → 5` edge for exactly this)
     - tests for `layout.tsx` and `how/page.tsx` one-line fixes → covered by `isHead`'s own suite in `view.test.ts`; no RSC render harness exists anywhere in `web/` (tie-break: never widen scope to settle an ambiguity). `overview.ts` got three real cases in `overview.test.ts`, which has a harness.
     - engine `test_lab_gate_wording.py` mirror broken by the head filter → fixed the mirror on both sides, never relaxed the check (tie-break: a failing verification is never settled by relaxing the check)
-
 
 - [x] **P1-WEB-V4CD** Phase 4: /sera/methods/[id]: the variants table, same treatment
   - **Difficulty**: HARD

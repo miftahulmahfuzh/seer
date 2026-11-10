@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/leaderboard-desktop-revamp`
 **Branch:** `feature/leaderboard-desktop-revamp` (base: `HEAD` @ `22d1051`, equal to origin/main)
 **Phases:** 3
-**Status:** phase 1/3 complete
+**Status:** phase 2/3 complete
 **Coordinator:** —
 
 ---
@@ -55,7 +55,7 @@ icon), the `RetiredShelf` layout (beyond the new colours/icons), the mobile (< 1
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
 | 1 ✓ | Unique colour and icon per method | R1 | `web` | 13 | — | NORMAL | `.workflows/plan/leaderboard-desktop-revamp/phase-1.md` | P1-WEB-A59X | — |
-| 2 | One-row checklist switcher | R2 | `web` | 7 | 1 | EASY | `.workflows/plan/leaderboard-desktop-revamp/phase-2.md` | P1-WEB-1PLT | — |
+| 2 ✓ | One-row checklist switcher | R2 | `web` | 7 | 1 | EASY | `.workflows/plan/leaderboard-desktop-revamp/phase-2.md` | P1-WEB-1PLT | — |
 | 3 | Desktop card stacks | R3 | `web` | 7 | 1, 2 | HARD | `.workflows/plan/leaderboard-desktop-revamp/phase-3.md` | P1-WEB-B6MG | — |
 
 Sequential on purpose: all three edit `leaderboard/page.tsx` and/or `leaderboard.module.css`, and

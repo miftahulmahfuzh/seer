@@ -1,1 +1,31 @@
 .group { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Phone: the loose row, exactly as .group (the leaderboard's mobile layout is not part of the
+   desktop revamp). */
+.fit { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Desktop: one row whatever the count. Each column is at most the usual 46px button, so a row that
+   fits looks exactly like .group. When it does not fit, every column gives up the same width
+   (minmax(0, ...) has no floor) rather than one button wrapping onto a line of its own. The gap
+   tightens from 6px to 4px as the row fills: 48px / n is 6 or more up to eight buttons and 4px
+   at twelve. --n is the button count, set inline by StrategySwitch. */
+@media (min-width: 1024px) {
+  .fit {
+    display: grid;
+    grid-template-columns: repeat(var(--n, 1), minmax(0, 46px));
+    gap: min(6px, calc(48px / var(--n, 1)));
+    align-items: start;
+  }
+  .fit > :global(.icon-btn.md) {
+    width: 100%;
+    height: auto;
+    min-width: 0;
+    aspect-ratio: 1;
+  }
+  /* The 19px icon stays 19px until the button is under ~38px, then it takes half the button. */
+  .fit > :global(.icon-btn.md) svg {
+    width: min(19px, 50%);
+    height: auto;
+    aspect-ratio: 1;
+  }
+}

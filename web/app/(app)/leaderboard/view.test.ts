@@ -1,10 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { checklist, type Metrics, type Snapshot } from '../../../lib/metrics';
 import type { MonthlyTable } from '../../../lib/monthly';
 import {
-  CHECKS, compare, LOOK_PERIOD, looks, MIN_COMMON_SESSIONS, MIN_RANKED, monthLabel, monthLines,
-  NO_GATE, pickResearch, researchOf, retiredLabel, scoreOf, sinceStartLine, spyOverSpan,
-  TWIN_DASHES, twinChipTip, windowLine, type GateIn, type RankIn, type RosterIn,
+  CARD_BGS, CHECKS, compare, LOOK_PERIOD, looks, MIN_COMMON_SESSIONS, MIN_RANKED, monthLabel, monthLines,
+  NO_GATE, PALETTE_SIZE, PARTNER_BGS, pickResearch, researchOf, retiredLabel, scoreOf, sinceStartLine,
+  SLOT_BGS, spyOverSpan, TWIN_DASHES, twinChipTip, windowLine, type GateIn, type RankIn, type RosterIn,
 } from './view';
 
 const roster: RosterIn[] = [
@@ -15,6 +17,10 @@ const roster: RosterIn[] = [
   { id: 'C', isChampion: false, isBenchmark: false },
 ];
 const RESEARCH = ['A', 'F4-MOM12-N20-TREND', 'F1-SPY-SMA200-M', 'C'];
+
+const research = (n: number, prefix = 'S'): RosterIn[] =>
+  Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, isChampion: false, isBenchmark: false }));
+const twinOf = (o: RosterIn): RosterIn => ({ id: `${o.id}-CX`, isChampion: false, isBenchmark: false, twinOf: o.id });
 
 describe('looks', () => {
   it('gives the benchmark the dotted line on a plain sheet', () => {
@@ -48,39 +54,80 @@ describe('looks', () => {
     expect(l.get('X9')).toEqual({ bg: 'bg-plum', tint: 'var(--plum)', line: 'var(--plum-line)', width: 2, dash: null });
     expect(l.get('X10')).toEqual({ bg: 'bg-stone', tint: 'var(--stone)', line: 'var(--stone-line)', width: 2, dash: null });
   });
-  it('dashes the second lap of the palette', () => {
-    const many: RosterIn[] = Array.from({ length: 7 }, (_, i) => ({ id: `S${i}`, isChampion: false, isBenchmark: false }));
-    const l = looks(many);
-    expect(l.get('S6')).toEqual({ bg: 'bg-lav', tint: 'var(--lav)', line: 'var(--lav-line)', width: 2, dash: '7 5' });
+  it('lends the seventh to twelfth originals the partners, last family first, before any dashed lap', () => {
+    const l = looks(research(13));
+    expect(l.get('S6')).toEqual({ bg: 'bg-amber', tint: 'var(--amber)', line: 'var(--amber-line)', width: 2, dash: null });
+    expect(['S6', 'S7', 'S8', 'S9', 'S10', 'S11'].map(id => l.get(id)!.bg))
+      .toEqual(['bg-amber', 'bg-orchid', 'bg-berry', 'bg-moss', 'bg-teal', 'bg-iris']);
+    expect(l.get('S12')).toEqual({ bg: 'bg-lav', tint: 'var(--lav)', line: 'var(--lav-line)', width: 2, dash: '7 5' });
   });
-  it('never gives two research strategies the same line, up to LOOK_PERIOD', () => {
-    expect(LOOK_PERIOD).toBe(12);
-    const many: RosterIn[] = Array.from({ length: LOOK_PERIOD }, (_, i) => ({
-      id: `S${i}`, isChampion: false, isBenchmark: false,
-    }));
+  it('never gives two research strategies the same sheet up to PALETTE_SIZE, or the same line up to LOOK_PERIOD', () => {
+    expect(PALETTE_SIZE).toBe(12);
+    expect(LOOK_PERIOD).toBe(24);
+    const many = research(LOOK_PERIOD);
     const l = looks(many);
-    const seen = many.map(st => `${l.get(st.id)!.line}|${l.get(st.id)!.dash}`);
-    expect(new Set(seen).size).toBe(LOOK_PERIOD);
+    expect(new Set(many.slice(0, PALETTE_SIZE).map(st => l.get(st.id)!.bg)).size).toBe(PALETTE_SIZE);
+    expect(new Set(many.map(st => `${l.get(st.id)!.line}|${l.get(st.id)!.dash}`)).size).toBe(LOOK_PERIOD);
   });
   it('emphasises a non-benchmark champion', () => {
     const l = looks([{ ...roster[0], isChampion: false }, { ...roster[1], isChampion: true }]);
     expect(l.get('A')!.width).toBe(2.75);
   });
-  // Seer Adversarial: a Claude twin wears its original's colour with its own dash, and takes no
-  // palette slot, so every card after it keeps the colour it had before twins existed.
+
+  // Seer Adversarial + R1: a Claude twin wears its original's PARTNER colour with a twin dash. It
+  // takes no original's slot, so every original keeps the colour it had before twins existed.
   const F4_TWIN: RosterIn = { id: 'F4-MOM12-N20-TREND-CX', isChampion: false, isBenchmark: false, twinOf: 'F4-MOM12-N20-TREND' };
   const withTwin: RosterIn[] = [roster[0], roster[1], roster[2], F4_TWIN, roster[3], roster[4]];
 
-  it("gives a twin its original's sheet, tint and line, with a twin dash", () => {
+  it("gives a twin its original's partner sheet, tint and line, with a twin dash", () => {
     const l = looks(withTwin);
-    const f4 = l.get('F4-MOM12-N20-TREND')!;
-    expect(l.get(F4_TWIN.id)).toEqual({ ...f4, dash: TWIN_DASHES[0] });
-    expect(f4.dash).toBeNull();
+    expect(l.get('F4-MOM12-N20-TREND')).toEqual({ bg: 'bg-sky', tint: 'var(--sky)', line: 'var(--sky-line)', width: 2, dash: null });
+    expect(l.get(F4_TWIN.id)).toEqual({ bg: 'bg-teal', tint: 'var(--teal)', line: 'var(--teal-line)', width: 2, dash: TWIN_DASHES[0] });
   });
-  it('moves no other strategy: later cards keep their colours', () => {
+  it('pairs every family with its own partner', () => {
+    const originals = research(6);
+    const twins = originals.map(twinOf);
+    const l = looks([roster[0], ...originals, ...twins]);
+    expect(originals.map(o => l.get(o.id)!.bg)).toEqual([...CARD_BGS]);
+    expect(twins.map(t => l.get(t.id)!.bg)).toEqual([...PARTNER_BGS]);
+  });
+  it('moves no other strategy: originals keep their looks', () => {
     const before = looks(roster), after = looks(withTwin);
     for (const id of RESEARCH) expect(after.get(id)).toEqual(before.get(id));
     expect(after.get('SPY')).toEqual(before.get('SPY'));
+  });
+  it('moves no original, whichever original gains a twin, up to a full palette', () => {
+    for (let n = 1; n <= PALETTE_SIZE; n++) {
+      const originals = research(n);
+      const before = looks([roster[0], ...originals]);
+      for (const o of originals) {
+        const after = looks([roster[0], ...originals, twinOf(o)]);
+        for (const p of originals) expect(after.get(p.id)).toEqual(before.get(p.id));
+      }
+    }
+  });
+  it('gives every research strategy its own sheet and line colour, twins included, up to PALETTE_SIZE', () => {
+    for (let n = 1; n <= PALETTE_SIZE; n++) {
+      const originals = research(n);
+      const t = Math.min(n, PALETTE_SIZE - n);
+      // Twins of the first originals (natural partners), then of the last (the most displaced).
+      for (const paired of [originals.slice(0, t), originals.slice(n - t)]) {
+        const all = [...originals, ...paired.map(twinOf)];
+        const l = looks([roster[0], ...all]);
+        const bgs = all.map(st => l.get(st.id)!.bg);
+        expect(new Set(bgs).size).toBe(all.length);
+        expect(new Set(all.map(st => l.get(st.id)!.line)).size).toBe(all.length);
+        expect(bgs).not.toContain('bg-butter');
+        expect(bgs).not.toContain('bg-sheet');
+      }
+    }
+  });
+  it('lends a displaced twin the first free sheet', () => {
+    // Seven originals: S6 borrows stone's partner (amber), so stone's twin takes the next free one.
+    const originals = research(7);
+    const l = looks([...originals, twinOf(originals[5])]);
+    expect(l.get('S6')!.bg).toBe('bg-amber');
+    expect(l.get('S5-CX')).toEqual({ bg: 'bg-orchid', tint: 'var(--orchid)', line: 'var(--orchid-line)', width: 2, dash: TWIN_DASHES[0] });
   });
   it('does not depend on where the twin sits in the roster', () => {
     const first = looks([F4_TWIN, ...roster]);
@@ -96,14 +143,84 @@ describe('looks', () => {
     expect(l.get('A')!.width).toBe(2.75);
     expect(l.get('A-CX')!.width).toBe(2);
   });
-  it('never gives a twin the line of any original or of SPY, up to LOOK_PERIOD originals each with a twin', () => {
-    const originals: RosterIn[] = Array.from({ length: LOOK_PERIOD }, (_, i) => ({ id: `S${i}`, isChampion: false, isBenchmark: false }));
-    const twins: RosterIn[] = originals.map(o => ({ id: `${o.id}-CX`, isChampion: false, isBenchmark: false, twinOf: o.id }));
+  it('never gives a twin the line of any original or of SPY, up to PALETTE_SIZE originals each with a twin', () => {
+    const originals = research(PALETTE_SIZE);
+    const twins = originals.map(twinOf);
     const l = looks([roster[0], ...originals, ...twins]);
     const all = [...originals, ...twins].map(st => `${l.get(st.id)!.line}|${l.get(st.id)!.dash}`);
-    expect(new Set(all).size).toBe(LOOK_PERIOD * 2);
-    expect(l.get('S6-CX')!.dash).toBe(TWIN_DASHES[1]);
-    for (const t of twins) expect(l.get(t.id)!.dash).not.toBe('1 4');
+    expect(new Set(all).size).toBe(LOOK_PERIOD);
+    // Twelve originals hold every first-lap sheet, so every twin is lent one on the second lap.
+    expect(l.get('S0-CX')!.dash).toBe(TWIN_DASHES[1]);
+    for (const t of twins) expect(TWIN_DASHES as readonly string[]).toContain(l.get(t.id)!.dash);
+  });
+  it('gives every live card its own sheet before the retired shelf claims any, past PALETTE_SIZE', () => {
+    // The real board on 2026-11-10: four live originals, three twins, six retired originals (13).
+    const live = ['C', 'COSK', 'RAW35', 'A'].map(id => ({ id, isChampion: false, isBenchmark: false, status: 'active' }));
+    const liveTwins = ['COSK', 'RAW35', 'A'].map(id => ({ ...twinOf({ id, isChampion: false, isBenchmark: false }), status: 'active' }));
+    const shelf = ['RAW', 'MOM', 'MVW', 'RMW', 'FULL50', 'MOM70'].map(id => ({ id, isChampion: false, isBenchmark: false, status: 'retired' }));
+    const board = [{ ...roster[0], status: 'active' }, live[0], live[1], liveTwins[0], live[2], liveTwins[1], live[3], liveTwins[2], ...shelf];
+    const l = looks(board);
+    expect(['C', 'COSK', 'COSK-CX', 'RAW35', 'RAW35-CX', 'A', 'A-CX'].map(id => l.get(id)!.bg))
+      .toEqual(['bg-lav', 'bg-sky', 'bg-teal', 'bg-sage', 'bg-moss', 'bg-rose', 'bg-berry']);
+    // Only the thirteenth claim repeats a sheet, and it is a folded shelf card on a dashed lap.
+    expect(shelf.map(st => l.get(st.id)!.bg)).toEqual(['bg-plum', 'bg-stone', 'bg-amber', 'bg-orchid', 'bg-iris', 'bg-lav']);
+    expect(l.get('MOM70')!.dash).toBe('7 5');
+    // With no status the order is the plain roster-order rule, unchanged.
+    expect(looks(board.map(({ status: _, ...st }) => st)).get('A-CX')!.bg).toBe('bg-lav');
+  });
+  it('keeps a retired twin in its retired original\'s pass', () => {
+    const l = looks([
+      { id: 'X', isChampion: false, isBenchmark: false, status: 'active' },
+      { id: 'OLD', isChampion: false, isBenchmark: false, status: 'retired' },
+      { id: 'OLD-CX', isChampion: false, isBenchmark: false, twinOf: 'OLD', status: 'active' },
+    ]);
+    expect([l.get('X')!.bg, l.get('OLD')!.bg, l.get('OLD-CX')!.bg]).toEqual(['bg-lav', 'bg-sky', 'bg-teal']);
+  });
+});
+
+describe('palette tokens in globals.css', () => {
+  const css = readFileSync(join(import.meta.dirname, '../../globals.css'), 'utf8');
+  const light = css.match(/^:root \{([^}]*)\}/m)?.[1] ?? '';
+  const dark = css.match(/@media \(prefers-color-scheme: dark\) \{\s*:root \{([^}]*)\}/)?.[1] ?? '';
+  const token = (block: string, name: string): string | null =>
+    block.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6});`))?.[1] ?? null;
+  const luminance = (hex: string): number => {
+    const [r, g, b] = [1, 3, 5]
+      .map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map(c => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contrast = (a: string, b: string): number => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  it('finds both theme blocks', () => {
+    expect(token(light, 'sheet')).toBe('#ffffff');
+    expect(token(dark, 'sheet')).toBe('#211f1c');
+  });
+  it('defines every palette sheet and line for light and dark, with a sheet class', () => {
+    for (const bg of SLOT_BGS) {
+      const t = bg.slice(3);
+      for (const block of [light, dark]) {
+        expect(token(block, t), `--${t}`).not.toBeNull();
+        expect(token(block, `${t}-line`), `--${t}-line`).not.toBeNull();
+      }
+      expect(css).toContain(`.${bg} { background: var(--${t}); }`);
+    }
+  });
+  it('keeps every chart line at 3:1 or better against the plain chart sheet, in both themes', () => {
+    for (const block of [light, dark]) {
+      const sheet = token(block, 'sheet')!;
+      for (const bg of SLOT_BGS) {
+        const line = token(block, `${bg.slice(3)}-line`)!;
+        expect(contrast(line, sheet), `${bg} line ${line} on ${sheet}`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+  it('keeps butter out of a palette of twelve different sheets', () => {
+    expect(SLOT_BGS as readonly string[]).not.toContain('bg-butter');
+    expect(new Set(SLOT_BGS).size).toBe(12);
   });
 });
 

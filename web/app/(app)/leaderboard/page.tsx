@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Archive, Check, CircleDashed, Crown, X } from 'lucide-react';
 import { currentUser } from '@/auth';
 import { AppHeader } from '@/components/AppHeader';
-import { strategyIcon } from '@/components/roster';
+import { displayIcons, strategyIcon } from '@/components/roster';
 import { PaperChip } from '@/components/PaperChip';
 import { StrategySwitch } from '@/components/StrategySwitch';
 import { leaderboard, monthly, runStatus, type Board } from '@/lib/data';
@@ -30,7 +30,15 @@ type Search = { s?: string };
 export default async function Leaderboard({ searchParams }: { searchParams: Promise<Search> }) {
   const now = new Date();
   const q = await searchParams;
-  const [board, run, user] = await Promise.all([leaderboard(), runStatus(now), currentUser()]);
+  const [stored, run, user] = await Promise.all([leaderboard(), runStatus(now), currentUser()]);
+  // R1: every card and switch button draws its own icon. A Claude twin's row stores its original's
+  // icon (the engine copies it), so the unique one is resolved here from the whole board, once, and
+  // everything below keeps reading `st.icon`.
+  const icons = displayIcons(stored.rows.map(r => r.strategy));
+  const board: Board = {
+    ...stored,
+    rows: stored.rows.map(r => ({ ...r, strategy: { ...r.strategy, icon: icons.get(r.strategy.id) ?? r.strategy.icon } })),
+  };
 
   // The live strategies hold the board -- chart, legend, switch and the row of cards. A retired one
   // that traded keeps its card and its record on the folded shelf under them (`RetiredShelf`).

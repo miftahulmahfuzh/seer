@@ -1,6 +1,7 @@
 import { Check, CircleMinus, CirclePlus, HandCoins, Link2Off, RotateCcw } from 'lucide-react';
 import type { Metadata } from 'next';
-import { sharesLabel, strategyIcon } from '@/components/roster';
+import { displayIcons, sharesLabel, strategyIcon } from '@/components/roster';
+import { strategies } from '@/lib/data';
 import { PageHeader } from '@/components/sera/PageHeader';
 import { Section } from '@/components/sera/Section';
 import { Stat } from '@/components/sera/Stat';
@@ -27,8 +28,16 @@ type Loaded = { ok: true; state: PlanState | null; methods: LinkableMethod[] } |
 
 async function load(): Promise<Loaded> {
   try {
-    const [state, methods] = await Promise.all([planState(), linkableMethods()]);
-    return { ok: true, state, methods };
+    const [state, methods, roster] = await Promise.all([planState(), linkableMethods(), strategies()]);
+    // R1: a Claude twin's row stores its original's icon. Draw the roster's unique one instead, the
+    // same one the Leaderboard and Positions show. A method that has left the roster keeps its own.
+    const icons = displayIcons(roster);
+    const iconOf = (id: string, stored: string): string => icons.get(id) ?? stored;
+    return {
+      ok: true,
+      state: state && { ...state, link: { ...state.link, icon: iconOf(state.link.strategyId, state.link.icon) } },
+      methods: methods.map(m => ({ ...m, icon: iconOf(m.id, m.icon) })),
+    };
   } catch (e) {
     console.error('sean plan read failed', e);
     return { ok: false };

@@ -23,7 +23,7 @@ export type LinkableMethod = {
   /** 'RAW · Unbraked momentum'. */
   name: string;
   sub: string;
-  /** strategies.icon (a Lucide name; components/roster.ts strategyIcon). */
+  /** strategies.icon as stored (a Lucide name). The plan page swaps in components/roster.ts displayIcons. */
   icon: string;
   rulesId: string | null;
   /** Its newest decision's session (book_targets), YYYY-MM-DD; null before its first pick. */

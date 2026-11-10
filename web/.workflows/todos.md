@@ -2,19 +2,19 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-10-20
-**Total Active Tasks**: 0
+**Last Updated**: 2026-11-10
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 0
-- Completed: 26
+- Blocked: 1
+- Completed: 27
 
 ---
 
@@ -24,6 +24,16 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ### [P1] High
 
+- [ ] **P1-WEB-1PLT** Phase 2: One-row checklist switcher
+  - **Difficulty**: EASY
+  - **Type**: Feature
+  - **Context**: Owns an opt-in `fit` prop on `StrategySwitch` (one-row grid at >= 1024 px, no floor, never wraps; loose row below), its use on the leaderboard checklist, `.switch` padding, new `StrategySwitch.test.tsx` and verify step `leaderboard-switch-row.mjs`. Exit: `tsc` + `npm test` green; at 1024/1280/1440 the switcher is one row with the real count, 7 and 12 strategies; 390, `/positions` and `/history` shots unchanged.
+  - **Status**: open
+  - **Plan Set**: `.workflows/plan/LEADERBOARD_DESKTOP_REVAMP_PLAN.md` (phase 2 of 3)
+  - **Satisfies**: R2 — Checklist icon switcher fits one row
+  - **Depends on**: P1-WEB-A59X
+  - **Plan**: `.workflows/plan/P1-WEB-1PLT.md`
+
 ### [P2] Medium
 
 ### [P3] Low
@@ -32,9 +42,37 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 
 ### 🚫 Blocked
 
+- [ ] **P1-WEB-B6MG** Phase 3: Desktop card stacks
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `stacks()` in `view.ts` and the desktop (>= 1024 px) live-card decks in `page.tsx` (original on top, twin tucked behind, deck holding the pick opens and pops forward in place, `prefers-reduced-motion` respected), `RetiredShelf` `cols={rowCols}`, new verify step `leaderboard-stack.mjs`. Exit: `tsc` + `npm test` green; `leaderboard-stack.mjs` PASS at 1280 light and 1440 dark; no horizontal scroll at 1280/1440; "No common window yet" printed once on the empty board; 390 px fingerprint identical before and after.
+  - **Status**: blocked
+  - **Plan Set**: `.workflows/plan/LEADERBOARD_DESKTOP_REVAMP_PLAN.md` (phase 3 of 3)
+  - **Satisfies**: R3 — Stacked cards; clicking pops the active stack forward in place (desktop revamp)
+  - **Depends on**: P1-WEB-A59X, P1-WEB-1PLT
+  - **Plan**: `.workflows/plan/P1-WEB-B6MG.md`
+
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-A59X** Phase 1: Unique colour and icon per method
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns six new partner tints in `globals.css` (light and dark), `looks()` rewritten so tint/line are unique up to 12 research strategies (twin takes its original's partner tint), `displayIcons`/`withDisplayIcons` in `components/roster.ts` applied in leaderboard, positions, history and `sean/plan`, plus verify-seer docs and a rewritten `leaderboard-twin.mjs` step. Exit: `tsc` + `npm test` green; tests prove tint/line/icon uniqueness over a 12-strategy roster with twins; twin step fails on base and passes after; real board's 1440 screenshots show every live card with its own sheet and icon.
+  - **Status**: completed
+  - **Plan Set**: `.workflows/plan/LEADERBOARD_DESKTOP_REVAMP_PLAN.md` (phase 1 of 3)
+  - **Satisfies**: R1 — Every method unique in colour and in icon
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P1-WEB-A59X.md`
+  - **Completed**: 2026-11-10 09:40
+  - **Method**: /do
+  - **Files**: web/app/globals.css, web/app/(app)/leaderboard/view.ts, web/app/(app)/leaderboard/view.test.ts, web/components/roster.ts, web/components/roster.test.ts, web/app/(app)/leaderboard/page.tsx, web/app/(app)/positions/page.tsx, web/app/(app)/history/page.tsx, web/app/sean/plan/page.tsx, web/lib/sean/planData.ts, .claude/skills/verify-seer/features/leaderboard.md, .claude/skills/verify-seer/features/positions-history.md, .claude/skills/verify-seer/features/steps/leaderboard-twin.mjs, web/.workflows/todos.md, .workflows/plan/LEADERBOARD_DESKTOP_REVAMP_PLAN.md, web/.workflows/plan/P1-WEB-A59X.md, web/.workflows/plan/P1-WEB-1PLT.md, web/.workflows/plan/P1-WEB-B6MG.md
+  - **Drift**:
+    - Main moved to eb5c689 since the plan's base 22d1051; plan-quoted anchors in all phase-1 files still matched exactly.
+    - view.test.ts: plan said replace lines 19-110, but line 110 is `describe('researchOf'`; replaced 19-108 to keep that block intact (plan intent: 'everything after line 110 unchanged').
+  - **Decided**:
+    - Real board has 13 research strategies (4 live originals, 3 twins, 6 retired originals — measured from the DB 2026-11-10); the plan's single roster-order looks() let retired originals take moss/berry, so A+Claude fell to C's lav and RAW35+Claude to iris, failing the exit criterion 'every live card with its own sheet' → looks() now runs its three passes for live families first, then retired families (a twin follows its original's status); retired rows take the first free slot, so any repeat past 12 lands on a folded shelf card. Two regression tests added; leaderboard.md uniqueness bullet notes it (rung 2: exit criteria).
 
 - [x] **P1-WEB-K6DR** Phase 5: Reader: heads-only, version chip, history disclosure, "Revised"
   - **Difficulty**: HARD

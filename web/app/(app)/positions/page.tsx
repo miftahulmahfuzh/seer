@@ -1,7 +1,7 @@
 import { Clock, Crown, Gavel, Landmark, Pause, TriangleAlert } from 'lucide-react';
 import { AppHeader } from '@/components/AppHeader';
 import { PaperChip } from '@/components/PaperChip';
-import { selectStrategy, sharesLabel, strategyIcon } from '@/components/roster';
+import { selectStrategy, sharesLabel, strategyIcon, withDisplayIcons } from '@/components/roster';
 import { StrategySwitch } from '@/components/StrategySwitch';
 import { WhyToggle } from '@/components/WhyToggle';
 import { heldUsd, orderSizeChange, picksMonthlySizesWeekly, sizeLabel, sizeTip, type SizeChange } from '@/lib/cadence';
@@ -29,7 +29,9 @@ const NO_PREVIEW: Preview = { dataDate: null, picks: [] };
 export default async function Positions({ searchParams }: { searchParams: Promise<Search> }) {
   const now = new Date();
   const q = await searchParams;
-  const [roster, run] = await Promise.all([strategies(), runStatus(now)]);
+  const [stored, run] = await Promise.all([strategies(), runStatus(now)]);
+  // R1: the switcher and the header pill draw the roster's unique icon, not the twin's copied one.
+  const roster = withDisplayIcons(stored);
   const strat = selectStrategy(roster, q.s);
   // Paper orders exist for research strategies only. They are now fetched whatever session they are
   // for: an expired decision is shown as a spent record (handover Q5), never left as a blank panel.

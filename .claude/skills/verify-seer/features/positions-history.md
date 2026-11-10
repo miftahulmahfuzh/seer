@@ -2,7 +2,7 @@
 
 ## Sub-features
 
-- Positions: one strategy's open book at a time (unrealized P/L in USD and rupiah, open count, exits today, the `Paper` label), plus a strategy switcher (`SPY`, `A · Quant`, `F4 · Momentum`, `F4+Claude · Momentum`, `F1 · Trend`, `C · News veto` on demo data; a Claude twin sits right after its original and carries the `Paper` label). Bracket strategies show slot cards with a stop/target rail; basket strategies show the whole book.
+- Positions: one strategy's open book at a time (unrealized P/L in USD and rupiah, open count, exits today, the `Paper` label), plus a strategy switcher (`SPY`, `A · Quant`, `F4 · Momentum`, `F4+Claude · Momentum`, `F1 · Trend`, `C · News veto` on demo data; a Claude twin sits right after its original, carries the `Paper` label and draws its own icon, e.g. F4's gauge and F4+Claude's rocket, the same icons the Leaderboard shows). Bracket strategies show slot cards with a stop/target rail; basket strategies show the whole book.
 - History, Trades tab: closed trades with strategy and outcome filters and the net result.
 - History, Activity tab (`?v=activity`): every buy and sell the paper books made, with fees.
 

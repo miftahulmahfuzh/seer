@@ -7,7 +7,7 @@ import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { AppHeader } from '@/components/AppHeader';
 import { PaperChip } from '@/components/PaperChip';
-import { sharesLabel, strategyIcon } from '@/components/roster';
+import { sharesLabel, strategyIcon, withDisplayIcons } from '@/components/roster';
 import { ALL, StrategySwitch } from '@/components/StrategySwitch';
 import { closedTrades, fills, runStatus, strategies } from '@/lib/data';
 import { monthDay, money, shortDate, signedPct, signedUsd, usd } from '@/lib/format';
@@ -39,7 +39,8 @@ type Search = { s?: string; o?: string; v?: string };
 export default async function History({ searchParams }: { searchParams: Promise<Search> }) {
   const now = new Date();
   const q = await searchParams;
-  const roster = await strategies();
+  // R1: the filter row and each trade's strategy tag draw the roster's unique icon.
+  const roster = withDisplayIcons(await strategies());
   const research = roster.filter(r => !r.isBenchmark);
   const strat = q.s && research.some(r => r.id === q.s) ? q.s : ALL;
   const view: View = q.v === 'activity' ? 'activity' : 'trades';

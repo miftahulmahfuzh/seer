@@ -90,16 +90,22 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
    - **Survives real fees?** Before reserving a variation of a near miss from M0030 or earlier,
      run `lab costs <near miss>` (a minute or less, report only, N unchanged). A near miss whose
      edge the real fees erase is not worth a variation; journal that and pick another.
-   - **A wrapped host is not a new book.** A follow-up whose arms wrap a book the lab already
-     ran (a never-aside or no-opinion control, or a host book under a new allocator id) gives
-     that book a new digest, so `lab run` cannot refuse it, and the arm records as a *book twin*:
-     the same curve and trades as a trial already in the lab. Reserve it anyway when the idea
-     needs it: controls run beside the treatment, and N counts methods, so a book twin costs
-     compute and no look. But the slate never counts that arm as a new book, and the hypothesis
-     names the recorded host it repeats (M0488's never-aside arm is M0125-DV-C10's book, first
-     recorded as trial 519). `lab idea` cannot warn, because an idea row has no arms yet. The
-     check comes after the run: `lab run` prints a `Book twins` block, and `lab twins MNNNN`
-     prints it again at any time.
+   - **A repeated book is refused, not recorded.** `lab run` compares every arm's finished
+     equity curve and trade count with the record *before* it writes anything. If an arm's book
+     was first recorded by **another** method and the arm does not say so, the run exits 2 and
+     names the arm and the first recording (`M0246-SPY200 = M0205-SPY200, first recorded (trial
+     690, …)`). Nothing is recorded, no arm's result is printed and no N is spent. An arm says
+     so in one of two ways, both in its committed rationale: it is a control ("Control: …"), or
+     it names the method it repeats (M0488's never-aside arm names M0125). A batch whose **every**
+     arm repeats a recorded book is refused even when all are declared, because it would measure
+     nothing new (every arm of M0447 did). A wrapper allocator or params class that gives a host a
+     new digest no longer slips past. The refusal reads the curve, not the digest.
+   - **Read the neighbour list before you settle a slate.** `lab idea …` prints the new id on
+     stdout and, on stderr, up to five methods already in the lab whose name, family and
+     hypothesis share the most words with it. It is a hint and never refuses. If one is the same
+     idea, `lab drop MNNNN --why "same idea as M00xx"` (an idea with no trial costs no N) and
+     choose another. Otherwise write the closest one into the hypothesis ("closest recorded:
+     M00xx, which …") so the child designs against it.
    - **Reserve** each new idea with `lab idea …`, which prints its id. A backlog row keeps its id.
      The hypothesis can be a draft; the child sharpens it before its pre-registration commit.
    - Then `lab stage` + commit (`lab/lab.sqlite` and `web/data/lab.json`) + push ("lab: sera <stamp> reserves M00xx, M00yy").
@@ -241,4 +247,5 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
 | "That older method sits in the Promotable-now list, so promote it" | The list is the gate's letter, not the durability check. Run `lab walkforward` first; a negative 2009-2015 edge means no look. A batch promotes its own children's results, not an earlier batch's leftovers. |
 | "Its sibling test-failed, but this variant is genuinely different" | Kin is `family` plus every ancestor through `parent_id`. A disproven family does not get a retry under a new id — that is the mechanism the gate exists to close. |
 | "The control made the most money, report it as a find" | A control, or a book twin of a recorded trial, is never a new book. Run `lab twins MNNNN` and name it by its first-recorded candidate (M0488-DVC10-NEVER is M0125-DV-C10). |
-| "This follow-up wraps a recorded host, so skip it" or "so count it as a new book" | Neither. It re-measures the host, which is fine: the control runs beside the treatment and N counts methods. Name the host in the hypothesis and don't count the arm as a new book. |
+| "This follow-up wraps a recorded host, so skip it" or "so count it as a new book" | Neither. Re-measuring the host is fine as a *declared* control, which runs beside the treatment. Undeclared, `lab run` refuses it. Name the host in the hypothesis and the arm's rationale, and never count the arm as a new book. |
+| "`lab run` refused a repeated book, ask the owner" or "mark the treatment as a control to get it through" | Neither. The child changes the arm so it holds a new book, or declares it truthfully if re-measuring is the point, re-commits the method file (the new pre-registration) and re-runs. No owner step, and nothing was spent. Relabelling a treatment as a control to pass the check falsifies the pre-registration. |

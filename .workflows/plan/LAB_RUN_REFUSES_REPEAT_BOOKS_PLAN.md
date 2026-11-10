@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/lab-run-refuses-repeat-books`
 **Branch:** `feature/lab-run-refuses-repeat-books` (base: `origin/main` @ `22d1051`)
 **Phases:** 1
-**Status:** planned
+**Status:** complete
 **Coordinator:** —
 
 ---
@@ -68,7 +68,7 @@ costs no N and needs no extra simulation.
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Refuse repeat books in `lab run`; neighbours in `lab idea`; skills | R1, R2, R3, R4 | `engine/src/seer_engine/lab`, `commands`, `.claude/skills` | 7 | — | NORMAL | `.workflows/plan/lab-run-refuses-repeat-books/phase-1.md` | — | — |
+| 1 | Refuse repeat books in `lab run`; neighbours in `lab idea`; skills | R1, R2, R3, R4 | `engine/src/seer_engine/lab`, `commands`, `.claude/skills` | 7 | — | NORMAL | `.workflows/plan/lab-run-refuses-repeat-books/phase-1.md` | P2-ENG-LNQM (done 2026-11-10) | — |
 
 ### Phase 1 — Refuse repeat books in `lab run`; neighbours in `lab idea`; skills
 **Satisfies:** R1, R2, R3, R4 (one phase: the four are properties of one mechanism, not separable deliverables)

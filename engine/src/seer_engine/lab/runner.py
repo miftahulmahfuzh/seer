@@ -4,7 +4,10 @@
 
 1. Refuse when the method file is not committed (its commit is the pre-registration), when the
    method has already run **and ``--amend`` was not given**, or when any variant this run is about
-   to execute already has a dev trial.
+   to execute already has a dev trial. After the simulation and before anything is written,
+   refuse a batch with an arm whose book another method recorded first and that does not declare
+   it, or a batch in which every arm repeats a recorded book (``lab/twins.py``,
+   ``twins.refused``). No arm's metrics are logged until that check passes.
 2. Run the variants through ``dev.run_registry`` on the research store (every D9 guard), funded on
    ``sim.contributions.OWNER_MONTHLY`` -- 10,000,000 IDR to start and +5,000,000 IDR on the 25th of
    every month, the owner's real plan. The dollar-cost-averaged SPY TR curve receives the identical
@@ -84,7 +87,7 @@ from seer_engine.backtest.market import Market
 from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.commands.backtest_dev import daily_moments, month_end_curve, registry_problem
 from seer_engine.fundamentals import coverage
-from seer_engine.lab import store
+from seer_engine.lab import store, twins
 from seer_engine.lab.method import METHOD_ID, Amendment, Method, config_digest, config_text, source_sha
 from seer_engine.lab.real_costs import real_cost_problem
 from seer_engine.sim.contributions import OWNER_MONTHLY, ContributionSchedule
@@ -708,17 +711,12 @@ def run_method(
     deposits: list[Sequence[tuple[date, float]]] = []
 
     def on_result(i: int, result: Any, row: DevRow) -> None:
+        # Progress only. An arm's metrics are logged after the repeat check below (`_log_arm`),
+        # because a refused batch is edited and re-run, and that edit must not be made after
+        # seeing the result.
         results.append((row, month_end_curve(result.snapshots)))
-        cash = external_cashflows(result)
-        deposits.append(cash)
-        m = row.stats.metrics
-        log.info(
-            "[%d/%d] %s %s..%s: money-weighted %s vs DCA SPY TR %s (%d deposits, %.2f USD), "
-            "max DD %s, PF %s, trades %d",
-            i + 1, len(candidates), row.candidate.id, row.start, row.end,
-            m.mwr, row.spy_tr.mwr, len(cash), float(sum(a for _, a in cash)),
-            m.max_drawdown, m.profit_factor, m.trades,
-        )
+        deposits.append(external_cashflows(result))
+        log.info("[%d/%d] %s simulated", i + 1, len(candidates), row.candidate.id)
 
     dev.run_registry(
         data.market, data.dividends, data.spy_dividends, candidates,
@@ -738,6 +736,19 @@ def run_method(
         ran = trial_rows(
             conn, method, results, fingerprint=data.fingerprint, git_sha=git_sha, deposits=deposits
         )
+        # The repeat check (lab/twins.py). It reads the exact `curve_json` and `trades` these rows
+        # would write, and it runs under the write lock for the same reason the preflight above is
+        # repeated here: two Sera children running the same book in parallel must not both pass.
+        # Raising inside `with conn` rolls back the IMMEDIATE transaction, which has written
+        # nothing yet, so a refused batch leaves no method row, no trial and no N behind.
+        batch = [(r.row.candidate, r.trial.curve_json, r.trial.trades) for r in ran]
+        blocked = twins.refused(twins.repeats(conn, method.id, batch), len(batch))
+        if blocked:
+            raise store.LabError(
+                twins.refusal(method.id, blocked, len(batch), amend=amendment is not None)
+            )
+        for i, (r, cash) in enumerate(zip(ran, deposits, strict=True)):
+            _log_arm(i, len(ran), r.row, cash)
         status = "dev-eligible" if any(r.trial.eligible for r in ran) else "rejected"
         if store.get_method(conn, method.id) is None:
             store.add_method(
@@ -860,6 +871,22 @@ def run_method(
 
 def _hypothesis(method: Method) -> str:
     return f"{method.hypothesis.strip()}\n\nExpected failure: {method.expected_failure.strip()}"
+
+
+def _log_arm(i: int, total: int, row: DevRow, cash: Sequence[tuple[date, float]]) -> None:
+    """One recorded arm's result at INFO: the line ``on_result`` used to log as each arm finished.
+
+    It moved here so it fires only after ``run_method``'s repeat check has passed. A refused batch
+    prints no metric of any arm, so the redesign is made blind to the result.
+    """
+    m = row.stats.metrics
+    log.info(
+        "[%d/%d] %s %s..%s: money-weighted %s vs DCA SPY TR %s (%d deposits, %.2f USD), "
+        "max DD %s, PF %s, trades %d",
+        i + 1, total, row.candidate.id, row.start, row.end,
+        m.mwr, row.spy_tr.mwr, len(cash), float(sum(a for _, a in cash)),
+        m.max_drawdown, m.profit_factor, m.trades,
+    )
 
 
 # --------------------------------------------------------------------------- the test window

@@ -23,21 +23,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "e09e63e",
       "depends_on": [
         1
       ],
       "difficulty": "EASY",
       "n": 2,
-      "note": null,
+      "note": "StrategySwitch fit prop, desktop-only one-row grid; 7\u219241.1px, 12\u219223.3px; 390 pixel-identical; no ladder decisions needed; proof: verified-first-pass /home/miftah/.local/state/seer-verify/1110-093602-1503791/evidence",
       "package": "web",
       "plan": ".workflows/plan/leaderboard-desktop-revamp/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-11-10T09:38:46+07:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-1PLT",
       "title": "One-row checklist switcher"
     },
     {
@@ -56,7 +56,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Desktop card stacks"
     }
@@ -64,6 +64,6 @@
   "plan": "/home/miftah/.worktrees/seer/leaderboard-desktop-revamp/.workflows/orchestration/leaderboard-desktop-revamp/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "leaderboard-desktop-revamp",
-  "updated": "2026-11-10T09:34:52+07:00",
+  "updated": "2026-11-10T09:39:09+07:00",
   "worktree": "/home/miftah/.worktrees/seer/leaderboard-desktop-revamp"
 }

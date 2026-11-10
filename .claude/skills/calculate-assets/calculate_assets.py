@@ -54,6 +54,7 @@ from seer_engine.lab.methods.m0039_vix_term_structure_gate import DAILY_HOLD_FRA
 from seer_engine.lab.methods.m0063_earnings_day_jump import WEEKLY_HOLD_FRAC_GOTRADE
 from seer_engine.lab.methods.m0065_rebalance_day_residual import DAILY_RESIZE_FRAC_GOTRADE
 from seer_engine.lab.methods.m0127_slot_relative_resize_band import T00
+from seer_engine.lab.methods.m0533_sell_side_or_cash_side import BAND0_NOTRIM, BAND0_TRIM, BAND1_NOTRIM
 from seer_engine.sim.contributions import OWNER_MONTHLY
 from seer_engine.sim.rules import (
     MONTHLY_HOLD_FRAC_GOTRADE,
@@ -96,6 +97,13 @@ REALISTIC: dict[str, object] = {
     # M0065's daily tape is DAILY_SWITCH resized, fractional, at Gotrade's real fees, so it maps
     # to itself. M0052 ran on the same preset.
     "daily-resize-frac-gotrade": DAILY_RESIZE_FRAC_GOTRADE,
+    # M0533's three new cells of the band-by-trims square are E1 (the owner's monthly fractional
+    # Gotrade book) with only the resize band and/or trims changed, so each is already the money
+    # model and maps to itself. The band and the trims are the question M0533 asks, not part of
+    # the money model, so neither is swapped back to E1's. M0532's add-only arm shares the last id.
+    "monthly-hold-frac-gotrade-band0-trim": BAND0_TRIM,
+    "monthly-hold-frac-gotrade-band1-notrim": BAND1_NOTRIM,
+    "monthly-hold-frac-gotrade-add-only": BAND0_NOTRIM,
 }
 
 # Tapes that credit idle cash with the 13-week T-bill yield. They stay out of REALISTIC on

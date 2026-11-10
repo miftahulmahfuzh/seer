@@ -53,7 +53,7 @@ import numpy as np
 
 from seer_engine.backtest.dev import Candidate
 from seer_engine.lab import control_draw
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0007_residual_momentum import ResidPrepared
 from seer_engine.sim.book import Target
 from seer_engine.sim.rules import MONTHLY_HOLD_FRAC_GOTRADE
@@ -284,4 +284,33 @@ METHOD = Method(
            "Control: blind draw seed 2 matched on SMAD's book size and entry count, same switch"),
     ),
     seen_keys=("concept:short-term-ma-distance", "concept:smad-10-day"),
+    amendments=(
+        Amendment(
+            added=ADDED,
+            why=("The noise band and the mirror's price: three more matched draws and an "
+                 "always-invested blind draw"),
+            hypothesis=(
+                "DRAW-3..5 are seeds 3-5 of the gated matched draw, so with DRAW-1/2 there are five "
+                "and SMAD's lead over them reads at p = 1/6 by chance if it clears all five. "
+                "DRAW-OPEN is seed 1 matched on SMAD-OPEN's book with no switch, always invested: "
+                "the opinion-free, never-stepping-aside arm the SMAD / SMAD-HIGH mirror pair needs "
+                "to be priced, and SMAD-OPEN minus DRAW-OPEN is the 10-day-distance ranking's worth "
+                "with the switch priced out."
+            ),
+            expected_failure=(
+                "SMAD already sits between DRAW-1 and DRAW-2; the extra draws widen the band and "
+                "SMAD lands in its middle. SMAD-OPEN and DRAW-OPEN differ by less than the draw "
+                "noise, so the ranking added nothing over a hash pick at the same churn."
+            ),
+            candidates=(
+                *(_v(f"DRAW-{s}", SmadParams(GATED, "draw", seed=s),
+                     f"Control: blind draw seed {s} matched on SMAD's book size and entry count, "
+                     "same switch")
+                  for s in (3, 4, 5)),
+                _v("DRAW-OPEN", SmadParams(OPEN, "draw", seed=1),
+                   "Control: blind draw seed 1 matched on SMAD-OPEN's book, no switch, always "
+                   "invested: prices the mirror pair"),
+            ),
+        ),
+    ),
 )

@@ -16,7 +16,7 @@ import { PickName } from './PickName';
 import { RetiredShelf } from './RetiredShelf';
 import {
   BENCHMARK_DASH, compare, LOOK_FALLBACK, looks, MIN_COMMON_SESSIONS, monthLines, NO_GATE, pickResearch,
-  researchOf, retiredLabel, scoreOf, sinceStartLine, spyOverSpan, twinChipTip, windowLine,
+  researchOf, retiredLabel, scoreOf, sinceStartLine, spyOverSpan, stacks, twinChipTip, windowLine,
   type CompareRow, type Look, type MonthLine,
 } from './view';
 import s from './leaderboard.module.css';
@@ -103,7 +103,9 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
     ? {
         value: best ? ret(best.totalReturn) : '—',
         mobile: best ? `Best · ${best.strategy.short}` : 'Not ranked',
-        desk: best ? `${best.strategy.name}, best over the common window` : wline.label,
+        // With nothing ranked, the window row right under the headline already says "No common
+        // window yet" and how far off one is; repeating it here printed it twice on desktop.
+        desk: best ? `${best.strategy.name}, best over the common window` : 'Not ranked',
       }
     : { value: ret(spyRet), mobile: 'SPY', desk: 'SPY' };
 
@@ -180,10 +182,20 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
     </section>
   );
 
-  // Desktop: the picked card drops into this sheet as a tab. At either end of the row the tab meets
-  // the sheet's own rounded corner, which has to square off for the two to read as one surface.
-  const ids = live.map(r => r.strategy.id);
+  // Desktop: the live row is one deck per family (`stacks`), an original with its Claude twin
+  // tucked behind it. The picked card drops into this sheet as a tab, and at either end of the row
+  // the tab meets the sheet's own rounded corner, which has to square off for the two to read as
+  // one surface. The row's leftmost card is always the first deck's top card. The deck holding the
+  // pick is always open (its cards side by side), so when the pick sits in the last deck,
+  // `decks.flat().at(-1)` is the rightmost card on screen.
+  const decks = stacks(live);
+  const ids = decks.flat().map(r => r.strategy.id);
   const tabEdge = !pick ? undefined : ids[0] === pick.id ? 'first' : ids.at(-1) === pick.id ? 'last' : undefined;
+  // A deck is open when it holds the pick, so "open" can never be stored apart from the pick.
+  const isOpen = (rows: Board['rows']) => rows.some(r => r.strategy.id === pick?.id);
+  // The retired shelf keeps the live row's column width (`RetiredShelf`'s `cols`). The row is no
+  // longer one column per card: it is one per deck, and the open deck spans one per card.
+  const rowCols = decks.reduce((n, d) => n + (isOpen(d) ? d.length : 1), 0);
   const monthsSheet = (
     <section className={`sheet over ${pick ? lookOf(pick.id).bg : 'bg-sheet'} ${s.months}`} data-tab={tabEdge}
       aria-labelledby="months-title">
@@ -221,9 +233,9 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
       <div className="stack">
         <div className={s.top}>{chartSheet}{checklistSheet}</div>
         {monthsSheet}
-        <div className={s.cards}>{live.map(r => card(r, true))}</div>
+        <div className={s.cards}>{decks.map(d => deck(d))}</div>
         {retiredRows.length > 0 && (
-          <RetiredShelf count={retiredRows.length} cols={live.length} open={pick?.status === 'retired'}>
+          <RetiredShelf count={retiredRows.length} cols={rowCols} open={pick?.status === 'retired'}>
             {retiredRows.map(r => card(r, false))}
           </RetiredShelf>
         )}
@@ -233,29 +245,56 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
   );
 
   /**
+   * One family on the desktop row: the original on top, its Claude twin tucked behind it with its
+   * edge and colour peeking out above and to the right. The deck holding the pick is open. It takes
+   * one column per card, fans the twin out beside the original and pops forward in its own slot,
+   * so every other deck keeps its place. "Open" is derived from the pick and never stored, so a deck
+   * cannot be open without holding it. Below 1024px the deck is `display: contents` and its cards
+   * fall back into the mobile column exactly as before. CSS alone moves the cards: the deck and
+   * card keys are stable ids, so React keeps the same elements across a pick and their transform
+   * transitions run with no client component.
+   */
+  function deck(rows: Board['rows']) {
+    const open = isOpen(rows);
+    return (
+      <div key={rows[0].strategy.id} className={s.deck} data-deck={rows[0].strategy.id}
+        data-open={open ? '' : undefined} style={{ '--n': rows.length } as CSSProperties}>
+        {rows.map((r, depth) => card(r, true, { depth, open }))}
+      </div>
+    );
+  }
+
+  /**
    * One strategy's card. `tab`: the picked live card becomes the tab into the month-by-month sheet
    * right under the live row (desktop); a retired card sits on the shelf below that sheet, so when
    * it is the pick it is marked as picked instead of pretending to be attached to it.
+   * `place`: a live card's position in its deck. A twin behind a closed deck shows only its edge on
+   * desktop, so it carries its name as its accessible name, and as the tooltip of the edge.
    */
-  function card({ strategy: st, metrics: m }: Board['rows'][number], tab: boolean) {
-    const Icon = strategyIcon(st.icon);
+  function card({ strategy: st, metrics: m }: Board['rows'][number], tab: boolean, place?: { depth: number; open: boolean }) {
+    const Icon = strategyIcon(st.icon); // st.icon is already the unique display icon (`board` above).
     const look = lookOf(st.id);
     const dash = (v: string) => (st.isBenchmark ? '—' : v);
     const cr = cmpOf(st.id);
     const retired = st.status === 'retired';
     const active = st.id === pick?.id;
-    // Desktop shows the code only; the full name and the one-line description live in this tip.
+    const tucked = place !== undefined && place.depth > 0 && !place.open;
+    // Desktop shows the code; the full name and the one-line description live in this tip.
     const tip = `${st.name}\n${st.sub}`;
     const body = (
       <>
+        {/* Desktop, a tucked twin: the strip that peeks out from behind the deck is its whole
+            clickable face, so the strip carries the name. Never rendered on an open deck. */}
+        {tucked && <span className={s.peek} data-tip={st.name} aria-hidden="true" />}
         <div className={s.cardHead}>
           <div className={s.cardName}>
             <div className={s.titleRow}>
               {/* Mobile: one row, the name gives way (ellipsis) before the chips wrap under it.
-                  Desktop: the code, with the chips on their own fixed-height line below. */}
+                  Desktop: the whole code (a twin's breaks after its '+'), with the chips on their
+                  own line below. */}
               <span className={s.name} data-tip={tip}>
                 <span className={`${s.nameText} mobile-only`}>{st.name}</span>
-                <span className={`${s.nameText} desk-only`}>{st.short}</span>
+                <span className={`${s.nameText} desk-only`}>{breakable(st.short)}</span>
                 {st.isChampion && <span data-tip="Champion" aria-label="Champion" role="img" className={`${s.crown} mobile-only`}><Crown size={20} /></span>}
               </span>
               {/* Desktop: the status line under the code — champion, Claude twin (Paper), retired, not ranked. */}
@@ -292,16 +331,26 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
     );
     const picked = active ? ` ${tab ? s.cardActive : s.cardPicked}` : '';
     const cls = `sheet ${tab ? 'over ' : ''}${look.bg} ${s.card}${picked}`;
-    const style = { '--tint': look.tint } as CSSProperties;
+    const style = { '--tint': look.tint, ...(place && { '--depth': place.depth }) } as CSSProperties;
+    // Which end of the row the tab sits at, if any: there the sheet's corner squares off instead
+    // of the tab drawing a fillet past the row's edge.
+    const edge = active && tab ? tabEdge : undefined;
     // SPY is in every month row already, so only research cards pick the month-by-month sheet.
     return st.isBenchmark ? (
       <article key={st.id} data-status={cr?.status ?? 'benchmark'} className={cls} style={style}>{body}</article>
     ) : (
       <Link key={st.id} href={`/leaderboard?s=${encodeURIComponent(st.id)}`} scroll={false}
-        data-status={cr?.status ?? 'benchmark'} aria-current={active ? 'true' : undefined}
+        data-status={cr?.status ?? 'benchmark'} data-edge={edge} aria-current={active ? 'true' : undefined}
+        aria-label={tucked ? st.name : undefined}
         className={`${cls} ${s.cardLink}`} style={style}>{body}</Link>
     );
   }
+}
+
+/** A twin's code may break after its '+' ('RAW35+' / 'Claude') rather than mid-word in a narrow card. */
+function breakable(code: string) {
+  const at = code.indexOf('+');
+  return at < 0 ? code : <>{code.slice(0, at + 1)}<wbr />{code.slice(at + 1)}</>;
 }
 
 function MonthRow({ line, total }: { line: MonthLine; total?: boolean }) {
@@ -325,7 +374,12 @@ function MonthRow({ line, total }: { line: MonthLine; total?: boolean }) {
   );
 }
 
-/** One swatch + short label per strategy (full name as its tooltip), so the legend stays on one row. */
+/**
+ * One swatch + short label per strategy (full name as its tooltip). On desktop it is one row: it
+ * sits beside the headline figures when it fits and drops under them when it does not. Past about
+ * a dozen strategies its codes ellipsise rather than wrap (`.legendLabel`). On mobile it is the
+ * wrapping row under the axis.
+ */
 function Legend({ rows, lookOf, className }: {
   rows: Board['rows']; lookOf: (id: string) => Look; className: string;
 }) {
@@ -341,7 +395,7 @@ function Legend({ rows, lookOf, className }: {
             {look.dash
               ? <span className={s.swatchDash} style={{ borderTopColor: look.line, borderTopStyle: look.dash === BENCHMARK_DASH ? 'dotted' : 'dashed' }} />
               : <span className={s.swatch} style={{ background: look.line }} />}
-            {st.short}
+            <span className={s.legendLabel}>{st.short}</span>
           </span>
         );
       })}

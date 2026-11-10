@@ -76,6 +76,11 @@
 .key span { display: flex; align-items: center; gap: 5px; }
 
 .cards { display: contents; }
+/* The desktop row is decks (`deck()` in page.tsx). Below 1024px a deck is `display: contents`, so
+   its cards are the mobile column's own stacked sheets exactly as before, and the peek strip of a
+   tucked twin does not exist. */
+.deck { display: contents; }
+.peek { display: none; }
 .card { gap: 18px; }
 .cardHead { display: flex; align-items: center; gap: 14px; }
 .cardName { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -203,7 +208,10 @@
     right: calc(var(--card-r) * -1);
     background: radial-gradient(circle at 100% 0, transparent calc(var(--card-r) - 0.5px), var(--tint) var(--card-r));
   }
-  .cardActive:first-child::before, .cardActive:last-child::after { display: none; }
+  /* At either end of the row (`data-edge`, from the page's `tabEdge`) the fillet would reach past
+     the row; the sheet's corner squares off there instead. Inside a deck, :first-child would mean
+     "first in its deck", which is not the row's edge. */
+  .cardActive[data-edge='first']::before, .cardActive[data-edge='last']::after { display: none; }
   .months[data-tab='first'] { border-top-left-radius: 0; }
   .months[data-tab='last'] { border-top-right-radius: 0; }
   .icon { width: 46px; height: 46px; }
@@ -218,6 +226,79 @@
   .mLabel { font-size: 13px; color: var(--ink-2); }
 }
 
+@media (min-width: 1024px) {
+  /* The legend is one row. It sits beside the headline figures when it fits and drops under them,
+     still one row, when it does not. Only past a dozen strategies do its codes ellipsise (each
+     keeps its full name as its tooltip), never a second row. */
+  .headline { flex-wrap: wrap; row-gap: 14px; }
+  .headline > .legend {
+    flex: 0 1 auto; min-width: 0; margin-left: auto;
+    flex-wrap: nowrap; gap: 6px 14px; font-size: 13px;
+  }
+  .headline > .legend .legendItem { min-width: 0; gap: 6px; }
+  .headline > .legend .swatch, .headline > .legend .swatchDash { flex: none; }
+  .headline > .legend .legendLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+  /* A deck: one column of the row, every card in the same grid cell. The original (depth 0) is on
+     top; each twin sits a step behind it, offset up and right by --peek, so its edge and its own
+     colour show in the 12px gaps. Hovering a deck slides the edge a little further out. The deck is
+     its own stacking context, so a twin's z-index never competes with a neighbouring deck. */
+  .deck {
+    --peek: 7px; --lift: 10px;
+    position: relative; z-index: 0;
+    display: grid; grid-template-columns: minmax(0, 1fr);
+  }
+  .deck > .card {
+    grid-area: 1 / 1;
+    z-index: calc(4 - var(--depth, 0));
+    transform: translate(calc(var(--depth, 0) * var(--peek)), calc(var(--depth, 0) * var(--peek) * -1));
+    transform-origin: 50% 100%;
+    transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.32s ease;
+  }
+  .deck:not([data-open]):hover { --peek: 10px; }
+  /* A keyboard user tabbing onto a tucked twin sees it come to the front with its focus ring. */
+  .deck:not([data-open]) > .card:focus-visible { z-index: 5; }
+  /* Only rendered on a tucked twin: covers its face so the peeking strip is the hover target. */
+  .peek { display: block; position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+
+  /* The open deck holds the pick. It takes one column per card, so the twin fans out beside the
+     original at full card width. It pops forward in its own slot: raised by --lift, 2% larger from
+     its bottom edge, shadowed, above its neighbours. The other decks keep their order. */
+  .deck[data-open] {
+    z-index: 1;
+    grid-column: span var(--n);
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    gap: 12px;
+  }
+  .deck[data-open] > .card {
+    grid-area: auto; z-index: 1;
+    transform: translateY(calc(var(--lift) * -1)) scale(1.02);
+    box-shadow: 0 22px 34px -22px rgba(0, 0, 0, 0.45);
+  }
+  /* The picked card is the front one and still the tab. It reaches --lift further down so that,
+     once raised, its square bottom lands on the month-by-month sheet exactly as before. Its shadow
+     would fall on that sheet, so it has none. */
+  .deck[data-open] > .cardActive {
+    z-index: 2;
+    margin-bottom: calc(-12px - var(--lift));
+    box-shadow: none;
+  }
+
+  /* Codes show whole: a twin's breaks after its '+' (`breakable`), anything longer breaks
+     anywhere rather than spill, and the chips wrap inside the card. */
+  .deck .name { font-size: 26px; }
+  .deck .nameText {
+    white-space: normal; overflow: visible; text-overflow: clip;
+    overflow-wrap: anywhere; line-height: 1.05;
+  }
+  .deck .chips { max-width: 100%; flex-wrap: wrap; row-gap: 6px; }
+}
+
+/* The pop and the peek are motion; with reduced motion the deck snaps to the same places. */
+@media (min-width: 1024px) and (prefers-reduced-motion: reduce) {
+  .deck > .card { transition: none; }
+}
+
 /* A narrow row (six strategies at 1024px): tighter cards so the code never runs into the icon. */
 @container cards (max-width: 1000px) {
   .card { padding: 18px 16px; }
@@ -228,4 +309,9 @@
 }
 @container card (max-width: 150px) {
   .metrics { grid-template-columns: 1fr; }
+}
+/* A deck card in a six-column row at 1280 (an open pair) is ~180px wide: a smaller code keeps
+   'RAW35+' and 'Claude' to two clean lines beside the icon. */
+@container card (max-width: 200px) {
+  .deck .name { font-size: 22px; }
 }

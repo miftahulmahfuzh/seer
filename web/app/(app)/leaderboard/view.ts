@@ -197,6 +197,41 @@ export function looks(roster: (RosterIn & { status?: string })[]): Map<string, L
 export const researchOf = <T extends RosterIn>(roster: T[]): T[] => roster.filter(st => !st.isBenchmark);
 
 /**
+ * The desktop card row as decks (owner, 2026-11-10: "a stack of cards ... active card will make
+ * the cards pop forward, but still stay in place"). Each deck is one family: a strategy, then every
+ * Claude twin attached to it (`attachedOriginal`), twins in the order `rows` gives them. A deck
+ * sits where its original sits in `rows`, so the row keeps the board's order whatever order the
+ * twins arrive in. The benchmark always stands alone, and so does a twin whose original is not in
+ * `rows` (retired, so off the live row) or is the benchmark: the same two cases `looks` colours as
+ * a plain strategy. Every row lands in exactly one deck.
+ *
+ * Pure grouping: which deck is open is not decided here. Open means "holds the pick", and the page
+ * derives it from the pick, so a deck can never be open without holding it.
+ */
+export function stacks<R extends { strategy: RosterIn }>(rows: R[]): R[][] {
+  const byId = new Map(rows.map(r => [r.strategy.id, r.strategy]));
+  const originalOf = (st: RosterIn): RosterIn | null => {
+    const o = attachedOriginal(st, byId);
+    return o && !o.isBenchmark ? o : null;
+  };
+  const decks: R[][] = [];
+  const deckOf = new Map<string, R[]>();
+  for (const r of rows) {
+    if (originalOf(r.strategy)) continue;
+    const deck = [r];
+    decks.push(deck);
+    deckOf.set(r.strategy.id, deck);
+  }
+  // `originalOf` only returns a row of `rows` that is neither a twin nor the benchmark, and every
+  // such row opened a deck in the loop above, so the lookup cannot miss.
+  for (const r of rows) {
+    const o = originalOf(r.strategy);
+    if (o) deckOf.get(o.id)!.push(r);
+  }
+  return decks;
+}
+
+/**
  * Sessions a strategy must share with the others before it can be ranked. **This is
  * `compare.py`'s `MIN_COMMON_SESSIONS` and must stay equal to it** — 63, one quarter of a
  * 252-session year, which is three full rebalances for a monthly-hold book strategy, so a ranked

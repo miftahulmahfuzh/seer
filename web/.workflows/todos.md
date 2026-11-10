@@ -3,18 +3,18 @@
 **Package Path**: `web`
 **Package Code**: WEB
 **Last Updated**: 2026-11-10
-**Total Active Tasks**: 1
+**Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 28
+- Completed: 29
 
 ---
 
@@ -23,16 +23,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-
-- [ ] **P1-WEB-B6MG** Phase 3: Desktop card stacks
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `stacks()` in `view.ts` and the desktop (>= 1024 px) live-card decks in `page.tsx` (original on top, twin tucked behind, deck holding the pick opens and pops forward in place, `prefers-reduced-motion` respected), `RetiredShelf` `cols={rowCols}`, new verify step `leaderboard-stack.mjs`. Exit: `tsc` + `npm test` green; `leaderboard-stack.mjs` PASS at 1280 light and 1440 dark; no horizontal scroll at 1280/1440; "No common window yet" printed once on the empty board; 390 px fingerprint identical before and after.
-  - **Status**: open
-  - **Plan Set**: `.workflows/plan/LEADERBOARD_DESKTOP_REVAMP_PLAN.md` (phase 3 of 3)
-  - **Satisfies**: R3 — Stacked cards; clicking pops the active stack forward in place (desktop revamp)
-  - **Depends on**: P1-WEB-A59X, P1-WEB-1PLT
-  - **Plan**: `.workflows/plan/P1-WEB-B6MG.md`
 
 ### [P2] Medium
 
@@ -45,6 +35,27 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-B6MG** Phase 3: Desktop card stacks
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `stacks()` in `view.ts` and the desktop (>= 1024 px) live-card decks in `page.tsx` (original on top, twin tucked behind, deck holding the pick opens and pops forward in place, `prefers-reduced-motion` respected), `RetiredShelf` `cols={rowCols}`, new verify step `leaderboard-stack.mjs`. Exit: `tsc` + `npm test` green; `leaderboard-stack.mjs` PASS at 1280 light and 1440 dark; no horizontal scroll at 1280/1440; "No common window yet" printed once on the empty board; 390 px fingerprint identical before and after.
+  - **Status**: completed
+  - **Plan Set**: `.workflows/plan/LEADERBOARD_DESKTOP_REVAMP_PLAN.md` (phase 3 of 3)
+  - **Satisfies**: R3 — Stacked cards; clicking pops the active stack forward in place (desktop revamp)
+  - **Depends on**: P1-WEB-A59X, P1-WEB-1PLT
+  - **Plan**: `.workflows/plan/P1-WEB-B6MG.md`
+  - **Completed**: 2026-11-10 09:45
+  - **Method**: /do
+  - **Files**: web/app/(app)/leaderboard/view.ts, web/app/(app)/leaderboard/view.test.ts, web/app/(app)/leaderboard/page.tsx, web/app/(app)/leaderboard/leaderboard.module.css, .claude/skills/verify-seer/features/steps/leaderboard-stack.mjs, .claude/skills/verify-seer/features/steps/leaderboard-twin.mjs, .claude/skills/verify-seer/features/leaderboard.md
+  - **Evidence**:
+    - Step 0, real roster before: overflow 8 px at 1440 and 28 px at 1280 (last card's chips); legend 2 rows at 1440, 3 at 1280; "No common window yet" printed twice.
+    - After, real roster: overflow 0 at 1440 and 1280, legend 1 row, "No common window yet" once; shoot both themes 1280/1440 exit 0, no horizontal scroll.
+    - tsc clean; npm test 52 files / 795 tests pass.
+    - verify-seer demo: leaderboard-stack.mjs PASS at 1280 light and 1440 dark (FAILs on parent e09e63e, as expected); leaderboard-twin.mjs PASS at 1280 dark and 390; leaderboard-switch-row.mjs PASS at 1280.
+    - Empty board: "No common window yet" count 2 on parent, 1 after. 390 px fingerprint identical before and after.
+  - **Drift**:
+    - page.tsx card() style: the plan's `(place ? {...} : {...}) as CSSProperties` fails tsc (TS2352 on a union of literals); written as one literal `{ '--tint': look.tint, ...(place && { '--depth': place.depth }) } as CSSProperties`. Same behaviour.
 
 - [x] **P1-WEB-1PLT** Phase 2: One-row checklist switcher
   - **Difficulty**: EASY

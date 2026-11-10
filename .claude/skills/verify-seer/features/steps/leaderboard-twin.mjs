@@ -60,7 +60,10 @@ export default async ({ page, base, shot, log }) => {
   log('Paper chip on the twin card only');
   await shot('board');
 
-  await page.locator(card(TWIN)).first().click();
+  // At desktop width the twin is tucked behind F4 and only its top edge shows: click that strip.
+  const twinCard = page.locator(card(TWIN)).first();
+  const twinBox = await twinCard.boundingBox();
+  await twinCard.click((page.viewportSize()?.width ?? 0) >= 1024 && twinBox ? { position: { x: twinBox.width / 2, y: 3 } } : {});
   await page.waitForURL(u => u.searchParams.get('s') === TWIN);
   await page.getByText("Can't be run").first().waitFor();
   await page.getByText('Paper only. No backtest possible.').first().waitFor();

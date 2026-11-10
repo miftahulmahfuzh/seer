@@ -1,0 +1,69 @@
+{
+  "branch": "feature/leaderboard-desktop-revamp",
+  "coordinator": "orch-leaderboard-desktop-revamp",
+  "coordinator_session_id": "0e7a72c3-159b-4130-abe4-44c9516363fa",
+  "created": "2026-11-10T09:25:13+07:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "NORMAL",
+      "n": 1,
+      "note": null,
+      "package": "web",
+      "plan": ".workflows/plan/leaderboard-desktop-revamp/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Unique colour and icon per method"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1
+      ],
+      "difficulty": "EASY",
+      "n": 2,
+      "note": null,
+      "package": "web",
+      "plan": ".workflows/plan/leaderboard-desktop-revamp/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "One-row checklist switcher"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2
+      ],
+      "difficulty": "HARD",
+      "n": 3,
+      "note": null,
+      "package": "web",
+      "plan": ".workflows/plan/leaderboard-desktop-revamp/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Desktop card stacks"
+    }
+  ],
+  "plan": "/home/miftah/.worktrees/seer/leaderboard-desktop-revamp/.workflows/orchestration/leaderboard-desktop-revamp/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "leaderboard-desktop-revamp",
+  "updated": "2026-11-10T09:25:13+07:00",
+  "worktree": "/home/miftah/.worktrees/seer/leaderboard-desktop-revamp"
+}

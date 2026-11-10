@@ -46,7 +46,7 @@ from typing import Any
 import numpy as np
 
 from seer_engine.backtest.dev import Candidate
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.lab.methods.m0007_residual_momentum import ResidPrepared, ReturnGrid, build_grid
 from seer_engine.sim.book import Target
 from seer_engine.sim.rules import MONTHLY_HOLD_FRAC_GOTRADE
@@ -314,4 +314,29 @@ METHOD = Method(
            "No opinion: hash draw seed 1, same gate and monthly churn"),
     ),
     seen_keys=("concept:hurst-exponent-persistence", "concept:random-draw-error-bar"),
+    amendments=(
+        Amendment(
+            added=ADDED,
+            why="The noise band and the gate's price: four more blind draws and a random book with no switch",
+            hypothesis=(
+                "RAND-B..E are seeds 2-5 of the gated hash draw, so with RAND-A there are five. "
+                "RAND-OPEN is seed 1 with no switch, always invested: HIGH-OPEN minus RAND-OPEN is "
+                "the Hurst sort's worth with the gate priced out. HIGH's funded lead over SPY "
+                "counts only if it clears all five draws (p = 1/6 by chance) and HIGH-OPEN "
+                "clears RAND-OPEN."
+            ),
+            expected_failure=(
+                "The five draws span several points a year and HIGH's 3.9-point lead over RAND-A "
+                "sits inside them; HIGH-OPEN and RAND-OPEN differ by less than the draw noise, so "
+                "the whole edge was the gate."
+            ),
+            candidates=(
+                *(_v(f"RAND-{c}", HurstParams(GATED, "rand", seed=s),
+                     f"No opinion: hash draw seed {s}, same gate and monthly churn")
+                  for s, c in enumerate("BCDE", start=2)),
+                _v("RAND-OPEN", HurstParams(OPEN, "rand", seed=1),
+                   "No opinion and no switch: always invested, prices the gate"),
+            ),
+        ),
+    ),
 )

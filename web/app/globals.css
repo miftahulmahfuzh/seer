@@ -20,6 +20,13 @@
   --sage: #dcebd8;
   --rose: #f8e0d9;
   --plum: #ebe0ee;
+  /* Each family's partner sheet: a Claude twin wears its original's partner (view.ts looks()). */
+  --iris: #cbdff4;
+  --teal: #c3e5e1;
+  --moss: #dbe0c5;
+  --berry: #f2cfd4;
+  --orchid: #ebd4e8;
+  --amber: #f0d7c6;
   /* Chart lines, one per sheet tint, dark enough to read on the white chart sheet. */
   --lav-line: #6b72d6;
   --sky-line: #2a8aa3;
@@ -27,6 +34,12 @@
   --rose-line: #e2604a;
   --plum-line: #9a5bb4;
   --stone-line: #9a7a52;
+  --iris-line: #005fad;
+  --teal-line: #00756e;
+  --moss-line: #677000;
+  --berry-line: #ad2751;
+  --orchid-line: #903182;
+  --amber-line: #a1551e;
   --chip-plain: #efe8dd;
   --pos: #2b7d38;
   --neg: #b8321f;
@@ -65,12 +78,24 @@
     --sage: #1f3226;
     --rose: #3b2623;
     --plum: #33263a;
+    --iris: #26384c;
+    --teal: #1a3e3b;
+    --moss: #2e3b26;
+    --berry: #4a2d32;
+    --orchid: #432f41;
+    --amber: #493024;
     --lav-line: #a3a8f5;
     --sky-line: #6cc6da;
     --sage-line: #86d08f;
     --rose-line: #ff8f7a;
     --plum-line: #cf9de6;
     --stone-line: #cfae84;
+    --iris-line: #a4d6ff;
+    --teal-line: #8be8df;
+    --moss-line: #d5e279;
+    --berry-line: #ffb9c8;
+    --orchid-line: #ffb6f5;
+    --amber-line: #ffbf94;
     --chip-plain: rgba(255, 255, 255, 0.14);
     --pos: #86d483;
     --neg: #ff9180;
@@ -241,6 +266,12 @@ h1, h2 { margin: 0; font-weight: 400; }
 .bg-sage { background: var(--sage); }
 .bg-rose { background: var(--rose); }
 .bg-plum { background: var(--plum); }
+.bg-iris { background: var(--iris); }
+.bg-teal { background: var(--teal); }
+.bg-moss { background: var(--moss); }
+.bg-berry { background: var(--berry); }
+.bg-orchid { background: var(--orchid); }
+.bg-amber { background: var(--amber); }
 .bg-coral { background: var(--coral); color: var(--on-coral); }
 
 @media (max-width: 1023.98px) {

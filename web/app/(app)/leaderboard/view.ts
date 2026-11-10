@@ -1,8 +1,9 @@
 // Pure helpers for the Leaderboard: roster-driven looks, the common-window comparison that ranks
 // research strategies honestly, the honest checklist line and the month-by-month rows. No data
 // access; page.tsx feeds it.
-// Selection (`selectStrategy`) and icons (`strategyIcon`) are phase 11's `components/roster.ts`;
-// short labels are phase 10's `Strategy.short`; the month math is phase 10's `lib/monthly.ts`.
+// Selection (`selectStrategy`) and icons (`strategyIcon`, and `displayIcons` that makes them unique
+// per roster) are `components/roster.ts`; short labels are phase 10's `Strategy.short`; the month
+// math is phase 10's `lib/monthly.ts`.
 //
 // `compare` is a TypeScript port of the engine's `seer_engine/paper/compare.py`
 // (roster-promotion-pipeline phase 3): the same window rule, the same selection, the same metrics,
@@ -32,34 +33,59 @@ export type RosterIn = { id: string; isChampion: boolean; isBenchmark: boolean; 
 export type RankIn = RosterIn & { status: 'active' | 'retired' };
 
 /**
- * Every research strategy gets a sheet of its own: the design's lav/sky/stone tints plus sage, rose
- * and plum, so today's five never share a colour with each other or with SPY's plain sheet. Butter
- * is not in the rotation: it is the checklist's own sheet on mobile, and the month-by-month sheet
- * stacked right under it takes the picked strategy's tint, so a butter strategy would merge them.
- * Stone, the closest tint to the plain sheet in dark mode, is last.
+ * Every research strategy gets a sheet of its own, and a Claude twin gets the sheet next to its
+ * original's. The palette is six families, each a base tint and a partner tint one step round the
+ * colour wheel: lav/iris, sky/teal, sage/moss, rose/berry, plum/orchid, stone/amber. An original
+ * takes the next slot of `SLOT_BGS` in roster order: the six bases first (the design's lav, sky and
+ * stone plus sage, rose and plum, so the first six keep the colours they always had), then the
+ * partners. A twin takes its original's partner. So a pair still reads as a pair (F4 sky,
+ * F4+Claude teal) and never shares a card, a tab or a line with anything else on the board.
  *
- * Each sheet has its chart line in the same colour family (`--<tint>-line`, saturated enough to
- * read on the plain chart sheet), so a card, its tab and its curve all say the same colour.
+ * Partners are lent to originals from the last family backwards. A seventh original has to borrow
+ * one, and the families at the top of the roster are the ones the owner has read longest, so they
+ * keep their natural pair the longest. A twin whose partner an original already holds takes the
+ * first free slot instead (see `looks`).
  *
- * The roster is variable length — a promotion adds a horseman and a retirement keeps one on the
- * board — so the palette may not be assumed to cover it. A seventh research strategy starts a
- * second lap that reuses the colours with a dashed line, so the line stays unique for the first
- * `LOOK_PERIOD`; past that both repeat. Every token is defined for light and dark in `globals.css`.
+ * Butter is not in the palette: it is the checklist's own sheet on mobile, and the month-by-month
+ * sheet stacked right under it takes the picked strategy's tint, so a butter strategy would merge
+ * them. Stone, the closest tint to the plain sheet in dark mode, is the last base. The partners were
+ * picked in OKLab so that no two of the twelve sit closer than the two closest original tints
+ * already did, and each is a step darker (light theme) or lighter (dark theme) than its base, so a
+ * pair differs in lightness as well as in hue.
+ *
+ * Each sheet has its chart line in the same colour family (`--<tint>-line`, at least 3:1 against
+ * the plain chart sheet in both themes; view.test.ts reads globals.css and holds that), so a card,
+ * its tab and its curve all say the same colour.
+ *
+ * The roster is variable length, so the palette may not be assumed to cover it. Twelve research
+ * strategies fill it. The thirteenth starts a second lap that reuses the sheets with a dashed line,
+ * so lines stay unique for `LOOK_PERIOD` claims; past that both repeat. Every token is defined for
+ * light and dark in `globals.css`.
  */
 export const CARD_BGS = ['bg-lav', 'bg-sky', 'bg-sage', 'bg-rose', 'bg-plum', 'bg-stone'] as const;
+
+/** Each family's partner sheet, at the same index as its base in `CARD_BGS`. */
+export const PARTNER_BGS = ['bg-iris', 'bg-teal', 'bg-moss', 'bg-berry', 'bg-orchid', 'bg-amber'] as const;
+
+/** The order originals take sheets in: the six bases, then the partners, last family first. */
+export const SLOT_BGS = [...CARD_BGS, 'bg-amber', 'bg-orchid', 'bg-berry', 'bg-moss', 'bg-teal', 'bg-iris'] as const;
+
+/** Research strategies before any sheet repeats. */
+export const PALETTE_SIZE = SLOT_BGS.length;
 
 /** Stroke patterns per lap of the palette: solid, then dashed. SPY's dotted '1 4' is not among them. */
 export const LAP_DASHES = [null, '7 5'] as const;
 
 /**
- * A Claude twin's stroke, by its original's lap: short even dashes, then dash-dot. Neither is a
- * lap dash or SPY's dotted '1 4', so a twin's line never equals any original's, and the pair
- * "same colour, different dash" reads as "this one, with Claude".
+ * A Claude twin's stroke, by the lap of the sheet it holds: short even dashes, then dash-dot.
+ * Neither is a lap dash or SPY's dotted '1 4', so a twin's line never equals an original's even
+ * where a later lap reuses its colour. With the partner colour, the pair reads as "this one's pair,
+ * with Claude" even on a glance at the legend.
  */
 export const TWIN_DASHES = ['3 3', '10 3 2 3'] as const;
 
-/** Research strategies before any line repeats. */
-export const LOOK_PERIOD = CARD_BGS.length * LAP_DASHES.length;
+/** Sheet claims, originals and twins together, before any line repeats. */
+export const LOOK_PERIOD = PALETTE_SIZE * LAP_DASHES.length;
 
 /**
  * `bg` is the sheet class; `tint` is the same colour as a CSS value, for surfaces that borrow it;
@@ -70,57 +96,140 @@ export type Look = { bg: string; tint: string; line: string; width: number; dash
 /** 'bg-lav' -> 'lav': every sheet class in globals.css is a one-token background. */
 const tokenOf = (bg: string): string => bg.slice(3);
 
+/** One claim on the palette: which tint, on which lap of it. */
+type Slot = { token: string; lap: number };
+
+/** The n-th claim in `SLOT_BGS` order, laps included. */
+const slotAt = (n: number): Slot => ({ token: tokenOf(SLOT_BGS[n % PALETTE_SIZE]), lap: Math.floor(n / PALETTE_SIZE) });
+
+/** 'sky' -> 'teal' and 'teal' -> 'sky': a pair is a pair from either side. */
+const PARTNER = new Map<string, string>(
+  CARD_BGS.flatMap((bg, i): [string, string][] => [
+    [tokenOf(bg), tokenOf(PARTNER_BGS[i])],
+    [tokenOf(PARTNER_BGS[i]), tokenOf(bg)],
+  ]),
+);
+
 export const LOOK_FALLBACK: Look = { bg: 'bg-sheet', tint: 'var(--sheet)', line: 'var(--ink-2)', width: 2, dash: null };
 
 /** SPY's stroke: the benchmark is the dotted line on a plain sheet. */
 export const BENCHMARK_DASH = '1 4';
 
 /**
- * Card sheet and chart line per strategy id, by roster order.
+ * Card sheet and chart line per strategy id, by roster order, in three passes so that no
+ * original's look can depend on a twin:
  *
- * A Claude twin whose original is on the roster takes no palette slot. It wears its original's
- * sheet, tint and line, with a `TWIN_DASHES` stroke and the ordinary width (a twin is never
- * champion). Because it takes no slot, adding twins moves no other strategy's colour: the owner
- * keeps reading F1 as sage and C as rose. The result does not depend on where the twin sits in
- * `roster`. A twin whose original is absent is coloured like any other strategy.
+ * 1. SPY gets the plain sheet and the dotted line. Each original (every row that is not an
+ *    attached twin, a twin whose original is absent included) takes the first free slot of
+ *    `SLOT_BGS` with its lap's dash, which on the live board is `SLOT_BGS[i]` for the i-th. Twins
+ *    are not counted, so adding one moves no original: the owner keeps reading F1 as sage and C as
+ *    rose.
+ * 2. Each attached twin takes its original's partner, on its original's lap, when nothing holds it
+ *    yet, with a `TWIN_DASHES` stroke and the ordinary width (a twin is never champion). That
+ *    depends only on the original, so it does not depend on where the twin sits in `roster`.
+ * 3. A twin whose partner is held (an original borrowed it, or the original has a second twin)
+ *    takes the first free slot from its original's lap on. Up to `PALETTE_SIZE` research
+ *    strategies there is always one on the first lap, so no two of them share a sheet, a tint or a
+ *    line colour.
+ *
+ * The live board runs all three passes before any retired family (a retired original and its
+ * twins) claims anything. The board carries its retired shelf, and past `PALETTE_SIZE` something
+ * has to repeat; it must be a folded shelf card, never two live cards. MEASURED 2026-11-10 on the
+ * real board: four live originals, three twins and six retired originals are 13 claims, and in
+ * one roster-order pass the retired originals took moss and berry, so A+Claude fell to C's lav.
  */
-export function looks(roster: RosterIn[]): Map<string, Look> {
+export function looks(roster: (RosterIn & { status?: string })[]): Map<string, Look> {
   const out = new Map<string, Look>();
   const byId = new Map(roster.map(st => [st.id, st]));
   const originalOf = (st: RosterIn): RosterIn | null => {
+    if (st.isBenchmark) return null;
     const o = attachedOriginal(st, byId);
     return o && !o.isBenchmark ? o : null;
   };
-  const lapOf = new Map<string, number>();
-  let i = 0;
-  for (const st of roster) {
-    if (st.isBenchmark) {
-      out.set(st.id, { bg: 'bg-sheet', tint: 'var(--sheet)', line: 'var(--ink-3)', width: 1.75, dash: BENCHMARK_DASH });
-      continue;
+  const held = new Set<string>();
+  const slotOf = new Map<string, Slot>();
+  const keyOf = (s: Slot): string => `${s.token}|${s.lap}`;
+  const freeFrom = (n: number): Slot => {
+    while (held.has(keyOf(slotAt(n)))) n += 1;
+    return slotAt(n);
+  };
+  const claim = (st: RosterIn, s: Slot, dash: string | null, width: number): void => {
+    held.add(keyOf(s));
+    slotOf.set(st.id, s);
+    out.set(st.id, { bg: `bg-${s.token}`, tint: `var(--${s.token})`, line: `var(--${s.token}-line)`, width, dash });
+  };
+
+  const run = (rows: RosterIn[]): void => {
+    for (const st of rows) {
+      if (st.isBenchmark) {
+        out.set(st.id, { bg: 'bg-sheet', tint: 'var(--sheet)', line: 'var(--ink-3)', width: 1.75, dash: BENCHMARK_DASH });
+        continue;
+      }
+      if (originalOf(st)) continue;
+      const s = freeFrom(0);
+      claim(st, s, LAP_DASHES[s.lap % LAP_DASHES.length], st.isChampion ? 2.75 : 2);
     }
-    if (originalOf(st)) continue;
-    const t = tokenOf(CARD_BGS[i % CARD_BGS.length]);
-    const lap = Math.floor(i / CARD_BGS.length) % LAP_DASHES.length;
-    out.set(st.id, {
-      bg: `bg-${t}`,
-      tint: `var(--${t})`,
-      line: `var(--${t}-line)`,
-      width: st.isChampion ? 2.75 : 2,
-      dash: LAP_DASHES[lap],
+
+    const twins = rows.flatMap(st => {
+      const o = originalOf(st);
+      const at = o ? slotOf.get(o.id) : undefined;
+      return at ? [{ st, at }] : [];
     });
-    lapOf.set(st.id, lap);
-    i += 1;
-  }
-  for (const st of roster) {
-    const o = st.isBenchmark ? null : originalOf(st);
-    const base = o ? out.get(o.id) : undefined;
-    if (!o || !base) continue;
-    out.set(st.id, { ...base, width: 2, dash: TWIN_DASHES[lapOf.get(o.id) ?? 0] });
-  }
+    const displaced: typeof twins = [];
+    for (const t of twins) {
+      const want: Slot = { token: PARTNER.get(t.at.token) ?? t.at.token, lap: t.at.lap };
+      if (held.has(keyOf(want))) displaced.push(t);
+      else claim(t.st, want, TWIN_DASHES[want.lap % TWIN_DASHES.length], 2);
+    }
+    for (const t of displaced) {
+      const s = freeFrom(t.at.lap * PALETTE_SIZE);
+      claim(t.st, s, TWIN_DASHES[s.lap % TWIN_DASHES.length], 2);
+    }
+  };
+  // A family is retired when its original is: a twin always claims in its original's pass.
+  const retired = (st: RosterIn & { status?: string }): boolean =>
+    ((originalOf(st) ?? st) as { status?: string }).status === 'retired';
+  run(roster.filter(st => !retired(st)));
+  run(roster.filter(retired));
   return out;
 }
 
 export const researchOf = <T extends RosterIn>(roster: T[]): T[] => roster.filter(st => !st.isBenchmark);
+
+/**
+ * The desktop card row as decks (owner, 2026-11-10: "a stack of cards ... active card will make
+ * the cards pop forward, but still stay in place"). Each deck is one family: a strategy, then every
+ * Claude twin attached to it (`attachedOriginal`), twins in the order `rows` gives them. A deck
+ * sits where its original sits in `rows`, so the row keeps the board's order whatever order the
+ * twins arrive in. The benchmark always stands alone, and so does a twin whose original is not in
+ * `rows` (retired, so off the live row) or is the benchmark: the same two cases `looks` colours as
+ * a plain strategy. Every row lands in exactly one deck.
+ *
+ * Pure grouping: which deck is open is not decided here. Open means "holds the pick", and the page
+ * derives it from the pick, so a deck can never be open without holding it.
+ */
+export function stacks<R extends { strategy: RosterIn }>(rows: R[]): R[][] {
+  const byId = new Map(rows.map(r => [r.strategy.id, r.strategy]));
+  const originalOf = (st: RosterIn): RosterIn | null => {
+    const o = attachedOriginal(st, byId);
+    return o && !o.isBenchmark ? o : null;
+  };
+  const decks: R[][] = [];
+  const deckOf = new Map<string, R[]>();
+  for (const r of rows) {
+    if (originalOf(r.strategy)) continue;
+    const deck = [r];
+    decks.push(deck);
+    deckOf.set(r.strategy.id, deck);
+  }
+  // `originalOf` only returns a row of `rows` that is neither a twin nor the benchmark, and every
+  // such row opened a deck in the loop above, so the lookup cannot miss.
+  for (const r of rows) {
+    const o = originalOf(r.strategy);
+    if (o) deckOf.get(o.id)!.push(r);
+  }
+  return decks;
+}
 
 /**
  * Sessions a strategy must share with the others before it can be ranked. **This is

@@ -3,6 +3,12 @@
   "coordinator": "orch-leaderboard-desktop-revamp",
   "coordinator_session_id": "0e7a72c3-159b-4130-abe4-44c9516363fa",
   "created": "2026-11-10T09:25:13+07:00",
+  "landed": {
+    "at": "2026-11-10T09:52:01+07:00",
+    "base": "main",
+    "commit": "08e5181bcaf9b398afa18dedac216b68ea230342",
+    "machine": "pc"
+  },
   "phases": [
     {
       "card": null,
@@ -42,28 +48,28 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "de76d84",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "HARD",
       "n": 3,
-      "note": null,
+      "note": "desktop decks (twin tucked behind original, open deck pops forward), 8px/28px scroll removed (culprit: last card's chips), legend 1 row, 'No common window yet' once; drift: style literal reshaped for tsc; proof: verified-first-pass ~/.local/state/seer-verify/1110-094232-1532092/evidence",
       "package": "web",
       "plan": ".workflows/plan/leaderboard-desktop-revamp/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-11-10T09:47:19+07:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-B6MG",
       "title": "Desktop card stacks"
     }
   ],
   "plan": "/home/miftah/.worktrees/seer/leaderboard-desktop-revamp/.workflows/orchestration/leaderboard-desktop-revamp/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "leaderboard-desktop-revamp",
-  "updated": "2026-11-10T09:39:09+07:00",
+  "updated": "2026-11-10T09:52:01+07:00",
   "worktree": "/home/miftah/.worktrees/seer/leaderboard-desktop-revamp"
 }

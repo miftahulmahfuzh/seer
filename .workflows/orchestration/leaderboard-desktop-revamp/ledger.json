@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "3d29adf",
       "depends_on": [],
       "difficulty": "NORMAL",
       "n": 1,
-      "note": null,
+      "note": "partner tints + unique display icons; looks() live families claim before retired (real board has 13 strategies, plan's order put A+Claude on C's lav) per exit criterion rung 2; proof: verified-after-fix ~/.local/state/seer-verify/1110-093122-1485413/evidence",
       "package": "web",
       "plan": ".workflows/plan/leaderboard-desktop-revamp/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-11-10T09:34:21+07:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-A59X",
       "title": "Unique colour and icon per method"
     },
     {
@@ -36,7 +36,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "One-row checklist switcher"
     },
@@ -64,6 +64,6 @@
   "plan": "/home/miftah/.worktrees/seer/leaderboard-desktop-revamp/.workflows/orchestration/leaderboard-desktop-revamp/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "leaderboard-desktop-revamp",
-  "updated": "2026-11-10T09:25:13+07:00",
+  "updated": "2026-11-10T09:34:52+07:00",
   "worktree": "/home/miftah/.worktrees/seer/leaderboard-desktop-revamp"
 }

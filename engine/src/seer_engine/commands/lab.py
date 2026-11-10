@@ -196,11 +196,15 @@ import hashlib
 import logging
 import math
 import os
+import re
 import statistics
+import sys
 import time
+from collections import Counter
 from datetime import date
 from collections.abc import Sequence
 from pathlib import Path
+from typing import NamedTuple
 
 from seer_engine import config, research
 from seer_engine.backtest import dev, tuning
@@ -2124,11 +2128,14 @@ def _run(conn, args) -> int:
     # earliest other recording of the same curve, and flags a treatment identical to this method's
     # own control: the treatment never acted.
     #
-    # It ANNOTATES; it does not gate (hardgate D15). The protocol runs controls beside the
-    # treatment and N counts methods, so a twin costs compute and nothing else; `lab promote`
-    # refuses on the two cases that matter (D19). Always printed, `none` included, because the
-    # Sera skills read this line. A FORWARDER like the blocks above: the same `report_lines`
-    # `lab twins` prints, so the two can never disagree about one arm.
+    # What reaches this block is what `runner.run_method` let through: twins of this method's own
+    # earlier arms, and repeats of another method's book that the arm declared (a control, or a
+    # rationale naming that method). An undeclared cross-method repeat, or a batch of nothing but
+    # repeats, was refused before the write and never gets here (lab/twins.py). So this block
+    # still ANNOTATES (hardgate D15) and `lab promote` still refuses the two cases that matter
+    # (D19). Always printed, `none` included, because the Sera skills read this line. A FORWARDER
+    # like the blocks above: the same `report_lines` `lab twins` prints, so the two can never
+    # disagree about one arm.
     from seer_engine.lab import twins
 
     try:
@@ -3807,6 +3814,103 @@ def _gate(conn, args) -> int:
     return 0
 
 
+#: Words too common in the lab's prose to say two ideas are alike.
+_IDEA_STOPWORDS = frozenset("""
+a about after all also an and any are as at be been before beside both but by can each every for
+from has have how if in into is it its last more most no not of on one only or over same so than
+that the their them then there these they this those to under up very was were what when where
+which while will with without would
+""".split())
+_IDEA_WORD = re.compile(r"[a-z][a-z0-9]+")
+_IDEA_NEIGHBOURS = 5
+
+
+class _Neighbour(NamedTuple):
+    score: float
+    id: str
+    name: str
+    status: str
+    shared: tuple[str, ...]
+
+
+def _idea_words(text: str) -> frozenset[str]:
+    """The words an idea is compared on: lower-case, three letters or more, stopwords out."""
+    return frozenset(
+        w for w in _IDEA_WORD.findall(text.lower()) if len(w) > 2 and w not in _IDEA_STOPWORDS
+    )
+
+
+def _nearest_methods(
+    rows: Sequence[tuple[str, str, str, str, str]], text: str, *, limit: int = _IDEA_NEIGHBOURS
+) -> list[_Neighbour]:
+    """The ``limit`` methods in ``rows`` (``(id, name, family, hypothesis, status)``) whose words
+    are closest to ``text``'s, best first. A method sharing no word is left out.
+
+    Cosine similarity over word sets, each word weighted by its inverse document frequency across
+    ``rows``. A word every method uses ("book", "spy") says little, and a word two methods share
+    ("hurst", "m0125") says a lot. The norm divides out a long hypothesis, so an essay does not
+    outrank a short exact match. Stdlib and deterministic: no embeddings, no network, no model.
+    The owner asked for something realistic on a free tier (R4). This is a hint for the agent
+    reserving an id, and ``lab run``'s repeat check (lab/twins.py) is the guarantee. Measured
+    2026-11-10 on the committed lab: an idea worded like M0115's dead-zone brake lists M0115 and
+    M0109, and M0115's own text puts M0109 first.
+    """
+    docs = [
+        (str(mid), str(name), str(status), _idea_words(f"{name} {family} {hypothesis}"))
+        for mid, name, family, hypothesis, status in rows
+    ]
+    df = Counter(w for *_, words in docs for w in words)
+    n = len(docs)
+
+    def idf(w: str) -> float:
+        return math.log((1 + n) / (1 + df.get(w, 0))) + 1.0
+
+    query = _idea_words(text)
+    qnorm = math.sqrt(sum(idf(w) ** 2 for w in query)) or 1.0
+    out: list[_Neighbour] = []
+    for mid, name, status, words in docs:
+        shared = query & words
+        if not shared:
+            continue
+        dnorm = math.sqrt(sum(idf(w) ** 2 for w in words)) or 1.0
+        score = sum(idf(w) ** 2 for w in shared) / (qnorm * dnorm)
+        top = tuple(sorted(shared, key=lambda w: (-idf(w), w))[:4])
+        out.append(_Neighbour(score, mid, name, status, top))
+    out.sort(key=lambda x: (-x.score, x.id))
+    return out[:limit]
+
+
+def _print_idea_neighbours(conn, mid: str, text: str) -> None:
+    """Print, on stderr, the methods already in the lab closest in wording to ``mid``'s idea.
+
+    On stderr so stdout stays the bare id that scripts capture with ``$(lab idea ...)``. It never
+    refuses and never fails the command, because the id is already committed by the time this
+    runs, and a hint that crashed would turn a good reservation into an error.
+    """
+    try:
+        rows = [
+            (str(r[0]), str(r[1]), str(r[2]), str(r[3] or ""), str(r[4]))
+            for r in conn.execute(
+                "SELECT id, name, family, hypothesis, status FROM methods WHERE id <> ?", (mid,)
+            ).fetchall()
+        ]
+        near = _nearest_methods(rows, text)
+    except Exception as e:  # noqa: BLE001 -- a hint must never fail a reservation already made
+        print(f"Closest methods: not read ({e}). {mid} is reserved either way.", file=sys.stderr)
+        return
+    if not near:
+        print(f"Closest methods: none share a word with {mid}'s name, family or hypothesis.",
+              file=sys.stderr)
+        return
+    print(f"Closest methods already in the lab, by shared words. A hint, not a check: "
+          f"`lab run` refuses a repeated book. If one is the same idea, `lab drop {mid}`; "
+          f"otherwise name the closest in the hypothesis:", file=sys.stderr)
+    for x in near:
+        name = x.name if len(x.name) <= 90 else x.name[:87] + "..."
+        print(f"  {x.id}  {x.score:.2f}  [{x.status}]  {name}", file=sys.stderr)
+        print(f"         shares: {', '.join(x.shared)}", file=sys.stderr)
+
+
 def _idea(conn, args) -> int:
     store.begin_immediate(conn)  # the next id and its insert, atomic against parallel sessions
     with conn:
@@ -3816,6 +3920,7 @@ def _idea(conn, args) -> int:
             source_ref=args.source_ref, hypothesis=args.hypothesis, parent_id=args.parent,
         )
     print(mid)
+    _print_idea_neighbours(conn, mid, f"{args.name} {args.family} {args.hypothesis}")
     return 0
 
 

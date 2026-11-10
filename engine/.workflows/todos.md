@@ -2,7 +2,7 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-11-06
+**Last Updated**: 2026-11-10
 **Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 165
+- Completed: 166
 
 ---
 
@@ -1740,6 +1740,26 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P2-ENG-LNQM** Phase 1: Refuse repeat books in `lab run`; neighbours in `lab idea`; skills
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns lab/twins.py (lookup by unrecorded curve + refusal rule), lab/runner.py (check before insert_trials, log after), commands/lab.py (_idea neighbours), tests, the sera-the-explorer and explore-and-experiment-new-method skills, verify-seer/features/lab-cli.md. Exit: a test proves a cross-method treatment repeat is refused with exit-2 semantics and writes nothing; a declared repeat and a same-method twin still record; an all-repeat batch is refused; `lab idea` prints neighbours; full engine suite and ruff green.
+  - **Status**: completed
+  - **Plan Set**: `.workflows/plan/LAB_RUN_REFUSES_REPEAT_BOOKS_PLAN.md` (phase 1 of 1)
+  - **Satisfies**: R1, R2, R3, R4 — make sure a new method Sera explores is unique and never explored before; no human in the loop; robust; realistic for free tier (no semantic search/embeddings/paid APIs)
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P2-ENG-LNQM.md`
+  - **Completed**: 2026-11-10 09:51
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/lab/twins.py, engine/src/seer_engine/lab/runner.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_repeat_refusal.py, .claude/skills/sera-the-explorer/SKILL.md, .claude/skills/explore-and-experiment-new-method/SKILL.md, .claude/skills/verify-seer/features/lab-cli.md, engine/.workflows/todos.md, engine/.workflows/plan/P2-ENG-LNQM.md, .workflows/plan/LAB_RUN_REFUSES_REPEAT_BOOKS_PLAN.md
+  - **Drift**:
+    - No code drift: every plan anchor matched. explore-and-experiment-new-method SKILL.md step-4 paragraph wording differed slightly from the plan's quoted start/end; replaced the same paragraph.
+    - Proof drive script in the plan was flawed: copying M0205-SPY200 unchanged is refused earlier by the existing config-digest guard, and its 'fresh' arm (sma=187 under rule 'spy') is the same book because the spy rule ignores sma. Adapted the drive: treat/control get exit_below=0.99 (inert under 'spy': new digest, same book), fresh = rule breadth sma 187. Recorded as a gotcha in verify-seer/features/lab-cli.md.
+    - Full engine suite: 9188 passed, 2 failed, 6 skipped. Both failures (test_cash_yield::test_cash_yield_defaults_to_none_and_is_a_pinned_no_op, test_backtest_dev_report::test_preregistration_names_each_finalist_exactly) are pre-existing on HEAD from the add_gate_vix lever in commit 998aed9 (M0519); this diff touches neither file.
+  - **Decided**:
+    - Proof J1-J3 arm construction → inert exit_below for a new digest on M0205-SPY200's book, breadth-187 as the fresh arm (rung 2: exit criteria demand the refusal be exercised; the plan's arms never reached it).
+    - Small-set verifier skip → not applied; independent verifier dispatched (Proof not single-pass).
+    - Completion: the `[x]` block moved into `## Completed Tasks` (single-phase set, no peers in this worktree, so the in-place exception's reason is absent; the same reasoning recorded for the earlier single-phase set further down this section). Quick Stats recounted: the task was added in_progress without incrementing P2, so P2 stays 1 (P2-ENG-N3LB) and Completed 165 → 166.
 - [x] **P1-ENG-H4ZQ** Phase 2: Writer CLI: `lab insight --supersedes`, `lab link`
   - **Difficulty**: NORMAL
   - **Type**: Feature

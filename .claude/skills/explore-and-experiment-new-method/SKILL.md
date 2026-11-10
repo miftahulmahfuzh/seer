@@ -198,10 +198,12 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
      "habit" is a gate or its churn needs the 2×2 instead — the pair with the habit on and off.
      Check your own method with `lab dressing MNNNN` after it runs; it journals nothing and can
      be re-run freely.
-     That no-opinion arm usually repeats a book the lab already ran. Wrapping the host's params
-     in your own allocator id gives it a new digest, so `lab run` cannot refuse it, and it
-     records as a *book twin* of the host (step 7; `lab twins MNNNN`). That is expected and costs no look. Name the
-     recorded host in the hypothesis, and never count the arm as a new book.
+     That no-opinion arm usually repeats a book the lab already ran. `lab run` checks each arm's
+     finished curve against the record before writing (step 6). A copy of another method's book
+     is recorded only when the arm says so in its rationale: it opens "Control: …", or it names
+     the method it repeats ("M0125-DV-C10's book, never stepping aside"). Write that now, in the
+     pre-registration. Name the recorded host in the hypothesis too, and never count the arm as a
+     new book. A method whose every arm repeats a recorded book is refused however it is labelled.
    - Pure. Reads only bars dated ≤ `data_date`. Set `seen_keys`.
 5. **Test, then commit** only the method file. Run `pytest -q tests/test_lab_methods.py` and
    `ruff check src tests`. If the contract test fails, fix the method; never weaken the test.
@@ -216,6 +218,18 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    notification, read the recorded trials, not the scroll, then continue. If a turn must end
    while the run is in flight, say what the real trigger is; a turn that ends on "I'll wait"
    with no live trigger is the failure.
+   **Exit 2 naming a repeated book** (`MNNNN-X = M00yy-Z, first recorded (trial …)`) means
+   `lab run` found an arm whose book another method recorded first, and the arm did not declare
+   it, or found that every arm repeats a recorded book. Nothing was recorded, no result was
+   printed, no N was spent, and the method is still `idea`/`registered`. Fix it without asking
+   anyone. (a) Change the arm so it holds a different book: another dial, another pool, or drop
+   the arm. (b) If re-measuring that book is the point (a paired control), say so truthfully: a
+   control's rationale opens "Control: …", and any other arm names the method it repeats.
+   (c) If every arm was a repeat, the idea measures nothing new: add an arm that does, or
+   `lab drop MNNNN --why "repeats M00yy"` and report it. Then commit the method file again (that
+   commit is the new pre-registration, so say in its message what changed and why) and run
+   `lab run MNNNN` again (`--amend` for an amendment). Never relabel a treatment as a control to
+   get past the check.
 7. **Analyze honestly** in a scratch file, then `lab note MNNNN --file F --verdict "<one line>"`.
    Run **The gate** (below) before the `lab note`: the analysis only ever grows, so a number
    that goes in wrong stays on the owner's page with its correction underneath it.
@@ -273,7 +287,10 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    Ids, digests and mechanics belong in the method's analysis (step 7), which is the audit record.
    (`synthesis` is Sera's batch summary; a single run never uses it.)
 9. **Queue at least one next idea**: `lab idea --name … --family … --source-kind … --hypothesis …`
-   (plus `--parent`), drawn from what this result taught.
+   (plus `--parent`), drawn from what this result taught. It prints the new id on stdout and, on
+   stderr, the five methods already in the lab whose wording is closest. Read them. If one is
+   the same idea, `lab drop` the new id with the reason. Otherwise name the closest recorded
+   method in the hypothesis so the next session designs against it.
 10. **Promotion** if `lab run` printed an ELIGIBLE trial: solo, see **Promotion** below; child, report it.
 11. **Finish.**
     - Solo: run `lab stage`. It takes the database's write lock, regenerates `web/data/lab.json`
@@ -544,6 +561,8 @@ Then:
 | "It's eligible on dev, promote it as is" | Not in whole shares. Promote only the fractional configuration paper would trade (Promotion step 0). |
 | "My new method looks better at the flat 0.1%" | From M0031 `lab run` refuses it. The owner pays real fees; a method that only wins at the old assumption does not win. |
 | "Compare my numbers with that old trial's" | An old trial paid 0.1% a trade. Use `lab costs <old id>` and compare real fees with real fees. |
+| "`lab run` refused a repeated book, ask the owner" | Never. Change the arm, or declare it truthfully, re-commit (the new pre-registration) and re-run (step 6). Nothing was spent. |
+| "Label the treatment a control so the repeat check passes" | Never. The rationale is the pre-registration. A treatment that is another method's book has measured nothing new. |
 | "`lab costs` showed it survives, call it eligible" | Never. `lab costs` is a report, not a trial. Only a new variation method on the `-gotrade` preset can be judged at real fees. |
 | "Max DD 21% is basically 20%" | The bar is 20% since 2026-10-07 (design §1 item 4, the owner's call) and "basically" is not a comparison. Never edit §1/§5, `tuning` thresholds or the P7a registry — they are the owner's dials, not yours. |
 | "The luck bar is still too high; nudge it" | Never. `DSR_MIN` is the owner's risk appetite and `DSR_POLICY` is the owner's call on what counts as an independent look (design §7). Run `lab luck` to see the sensitivity, journal what you found, and leave both alone. |
@@ -556,13 +575,13 @@ Then:
 
 ```
 lab status | lab show M0007 | lab next-id | lab seen --find momentum
-lab run M0007                     # needs a committed method file
+lab run M0007                     # needs a committed method file; exit 2 if an undeclared arm repeats another method's book
 lab twins M0488                   # report only: each arm's role and its first-recorded book twin (same curve); journals nothing
 lab costs M0007                   # report only: best variant at the flat 0.1% vs Gotrade's real fees; journals it, N unchanged
 lab survivorship M0069            # report only: every recorded variant on the dev store vs the survivorship-check store; journals it, N unchanged
 lab note M0007 --file /tmp/a.md --verdict "..."
 lab insight --kind data-wish --title "Quarterly fundamentals" --body "..." --method M0007
-lab idea --name "..." --family ... --source-kind variation --parent M0007 --hypothesis "..."
+lab idea --name "..." --family ... --source-kind variation --parent M0007 --hypothesis "..."   # id on stdout; 5 closest methods on stderr
 lab block M0012 --on "quarterly fundamentals"   lab drop M0013 --why "duplicate of M0004"
 lab unblock M0012 --note "what arrived, how much of the window it covers"   # blocked-data -> idea
 lab stage                         # solo only: writes web/data/lab.json, git-adds it and lab/lab.sqlite

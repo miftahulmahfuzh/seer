@@ -629,8 +629,10 @@ def step_book(
         raise TypeError(f"dividends must be a Mapping, got {type(dividends).__name__}")
     if not isinstance(idle_symbol_ok, bool):
         raise TypeError("idle_symbol_ok must be a bool")
-    if rules.add_gate_vix is not None and adds_ok is None:
-        raise ValueError(f"rules {rules.id!r} gate their top-ups on the VIX; the caller must pass adds_ok")
+    if (
+        rules.add_gate_vix is not None or rules.add_gate_spy_sma is not None or rules.add_gate_max_wait is not None
+    ) and adds_ok is None:
+        raise ValueError(f"rules {rules.id!r} gate their top-ups; the caller must pass adds_ok")
     adds_open = True if adds_ok is None else bool(adds_ok)
     rate, fresh = _check_cash_rate(book, rules, cash_rate, deposited)
     held_at_night = book.held()

@@ -162,6 +162,9 @@ class TradeRules:
     resize_adds: bool = True
     resize_trims: bool = True
     add_gate_vix: Decimal | None = None
+    add_gate_spy_sma: int | None = None
+    add_gate_spy_sma_above: bool = False
+    add_gate_max_wait: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, str):
@@ -267,9 +270,31 @@ class TradeRules:
         if self.add_gate_vix is not None:
             if not isinstance(self.add_gate_vix, Decimal) or not self.add_gate_vix > 0:
                 raise TypeError("add_gate_vix must be a positive Decimal or None")
-        if not self.resize_trims or self.add_gate_vix is not None:
+        if self.add_gate_spy_sma is not None:
+            if isinstance(self.add_gate_spy_sma, bool) or not isinstance(self.add_gate_spy_sma, int):
+                raise TypeError(f"add_gate_spy_sma must be an int or None, got {type(self.add_gate_spy_sma).__name__}")
+            if not 2 <= self.add_gate_spy_sma <= 252:
+                raise ValueError(f"add_gate_spy_sma must be in 2..252, got {self.add_gate_spy_sma}")
+        if not isinstance(self.add_gate_spy_sma_above, bool):
+            raise TypeError(f"add_gate_spy_sma_above must be a bool, got {type(self.add_gate_spy_sma_above).__name__}")
+        if self.add_gate_spy_sma_above and self.add_gate_spy_sma is None:
+            raise ValueError("add_gate_spy_sma_above needs add_gate_spy_sma set: there is no condition to flip")
+        if self.add_gate_max_wait is not None:
+            if isinstance(self.add_gate_max_wait, bool) or not isinstance(self.add_gate_max_wait, int):
+                raise TypeError(f"add_gate_max_wait must be an int or None, got {type(self.add_gate_max_wait).__name__}")
+            if not 1 <= self.add_gate_max_wait <= 252:
+                raise ValueError(f"add_gate_max_wait must be in 1..252, got {self.add_gate_max_wait}")
+        if (
+            not self.resize_trims
+            or self.add_gate_vix is not None
+            or self.add_gate_spy_sma is not None
+            or self.add_gate_max_wait is not None
+        ):
             if self.engine != "book" or not self.resize:
-                raise ValueError("resize_trims=False and add_gate_vix are book-engine levers and need resize=True")
+                raise ValueError(
+                    "resize_trims=False, add_gate_vix, add_gate_spy_sma and add_gate_max_wait are "
+                    "book-engine levers and need resize=True"
+                )
         is_v0 = _lever_values(self) == _V0_LEVERS
         if self.engine == "bracket_v0" and not is_v0:
             raise ValueError("engine 'bracket_v0' is reserved for DESIGN_V0 (the unchanged §5 simulator)")
@@ -302,6 +327,9 @@ _V0_LEVERS: tuple[object, ...] = (
     "order",
     True,
     True,
+    None,
+    None,
+    False,
     None,
 )
 
@@ -452,6 +480,11 @@ LEVERS_SINCE_PINS: dict[str, object] = {
     "resize_adds": True,  # False: resizing only trims, a holding below its band is left alone, 2026-11-08
     "resize_trims": True,  # False: never sell a winner back to its slot, 2026-11-08
     "add_gate_vix": None,  # adds only while the VIX is at or above this, 2026-11-08
+    "add_gate_spy_sma": None,  # adds only while SPY's own close is below (or, inverted, above) its
+    # N-session average, 2026-11-12
+    "add_gate_spy_sma_above": False,  # flips add_gate_spy_sma's condition to "above", 2026-11-12
+    "add_gate_max_wait": None,  # forces an add after this many sessions of no deposit, whatever the
+    # other gates say, 2026-11-12
 }
 
 
@@ -694,6 +727,17 @@ def describe_rules(rules: TradeRules) -> tuple[str, ...]:
         lines.append(
             f"Top-ups are gated: a holding below its slot is bought up only while the VIX, at the "
             f"previous close, is {rules.add_gate_vix} or higher."
+        )
+    if rules.add_gate_spy_sma is not None:
+        side = "above" if rules.add_gate_spy_sma_above else "below"
+        lines.append(
+            f"Top-ups are gated: a holding below its slot is bought up only on a session whose "
+            f"previous close had SPY {side} its own {rules.add_gate_spy_sma}-session average."
+        )
+    if rules.add_gate_max_wait is not None:
+        lines.append(
+            f"Top-up gate override: a held position is topped up regardless of any other gate once "
+            f"{rules.add_gate_max_wait} sessions have passed since the last deposit."
         )
     if rules.reserve_basis == "fill":
         lines.append(

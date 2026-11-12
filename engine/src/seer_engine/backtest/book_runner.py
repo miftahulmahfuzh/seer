@@ -223,6 +223,22 @@ def _with_idle(
     return targets + (Target(symbol=idle, weight=to_weight(residual), last=q(idle_bar.close)),), True
 
 
+def _spy_sma_gate_open(market: Market, data_date: date, window: int, above: bool) -> bool:
+    """True when SPY's close on ``data_date`` is below (or, ``above``, above) its own
+    ``window``-session average through ``data_date``. False with too little history, never a
+    look past ``data_date``."""
+    h = market.history.get("SPY")
+    if h is None:
+        return False
+    i = h.index_of(data_date)
+    if i is None or i < window - 1:
+        return False
+    closes = [float(c) for c in h.close[i - window + 1 : i + 1]]
+    sma = sum(closes) / window
+    last = closes[-1]
+    return last > sma if above else last < sma
+
+
 def _dividends_on(dividends: DividendMap, held: Iterable[str], session: date) -> dict[str, Decimal]:
     """``{symbol: amount per share}`` for the ``held`` symbols whose ex-date is ``session``, by symbol."""
     out: dict[str, Decimal] = {}
@@ -359,6 +375,8 @@ def run_book(
         )
     if rules.add_gate_vix is not None and "VIX" not in market.series.names():
         raise ValueError(f"rules {rules.id!r} gate top-ups on the VIX, and this market carries no VIX series")
+    if rules.add_gate_spy_sma is not None and "SPY" not in market.history:
+        raise ValueError(f"rules {rules.id!r} gate top-ups on SPY's own average, and this market carries no SPY")
     _session("start", start)
     _session("end", end)
     if end < start:
@@ -369,6 +387,10 @@ def run_book(
     book = new_book(cash0)
     data_date = dates.prev_session(start)
     last_rank: tuple[Target, ...] | None = None  # the last rank session's targets, pre-idle; None = none yet
+    # Sessions since the most recent deposit was credited (0 on that session itself), for
+    # ``add_gate_max_wait``. Reset on every credited deposit; the run's starting capital counts as
+    # session 0's "deposit", so a max-wait gate can force the opening buy too.
+    sessions_since_deposit = 0
     snapshots: list[BookSnapshot] = [
         BookSnapshot(date=data_date, cash_usd=book.cash, equity_usd=book.equity, invested_usd=_ZERO)
     ]
@@ -389,6 +411,7 @@ def run_book(
                 book = replace(book, cash=book.cash + credit, equity=book.equity + credit)
                 cashflows.append((session, credit))
                 deposited = credit
+                sessions_since_deposit = 0
         held = book.held()
         targets: tuple[Target, ...] | None = None
         idle_added = False
@@ -418,9 +441,17 @@ def run_book(
         divs = _dividends_on(dividends, held, session) if rules.dividends else {}
 
         gate = {}
-        if rules.add_gate_vix is not None:
-            vix = market.series.value_on("VIX", data_date)
-            gate = {"adds_ok": vix is not None and Decimal(str(vix)) >= rules.add_gate_vix}
+        if rules.add_gate_vix is not None or rules.add_gate_spy_sma is not None or rules.add_gate_max_wait is not None:
+            raw = False
+            if rules.add_gate_vix is not None:
+                vix = market.series.value_on("VIX", data_date)
+                raw = raw or (vix is not None and Decimal(str(vix)) >= rules.add_gate_vix)
+            if rules.add_gate_spy_sma is not None:
+                raw = raw or _spy_sma_gate_open(
+                    market, data_date, rules.add_gate_spy_sma, rules.add_gate_spy_sma_above
+                )
+            forced = rules.add_gate_max_wait is not None and sessions_since_deposit >= rules.add_gate_max_wait
+            gate = {"adds_ok": raw or forced}
         if rules.cash_yield is None:
             stepped = step_book(book, session, bars, targets, rules, divs, idle_symbol_ok=idle_added, **gate)
         else:
@@ -459,6 +490,7 @@ def run_book(
             )
         snapshots.append(snapshot)
         data_date = session
+        sessions_since_deposit += 1
 
     for f in fills:
         costs_usd += f.cost_usd

@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/leaderboard-legend-toggles`
 **Branch:** `feature/leaderboard-legend-toggles` (base: `origin/main` @ `ac5a46b`)
 **Phases:** 1
-**Status:** planned
+**Status:** complete
 **Coordinator:** —
 
 ---
@@ -62,7 +62,7 @@ Accepted highlight proposal: with ≥1 active, active lines keep their colour, ~
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | ChartPanel: left legend row, toggle highlight, pick seeds it | R1, R2, R3 | `web/app/(app)/leaderboard` | 6 | — | NORMAL | `.workflows/plan/leaderboard-legend-toggles/phase-1.md` | — | — |
+| 1 | ChartPanel: left legend row, toggle highlight, pick seeds it | R1, R2, R3 | `web/app/(app)/leaderboard` | 6 | — | NORMAL | `.workflows/plan/leaderboard-legend-toggles/phase-1.md` | P2-WEB-SF4E ✓ | — |
 
 ### Phase 1 — ChartPanel: left legend row, toggle highlight, pick seeds it
 **Satisfies:** R1, R2, R3 (one component holds all three; splitting would leave a toggle with no state or a state with no toggle — the coupling is real)

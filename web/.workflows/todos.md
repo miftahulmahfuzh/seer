@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 30
+- Completed: 31
 
 ---
 
@@ -35,6 +35,23 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P2-WEB-SF4E** Phase 1: ChartPanel: left legend row, toggle highlight, pick seeds it
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns ChartPanel.tsx (new), ChartPanel.test.tsx (new), page.tsx chartSheet + Legend removal, leaderboard.module.css, .claude/skills/verify-seer/features/leaderboard.md, .claude/skills/verify-seer/features/steps/leaderboard-legend.mjs (new). Exit: every criterion passes its journey; tsc + vitest green; screenshots at 1440 and 390, light and dark.
+  - **Status**: completed
+  - **Plan Set**: `.workflows/plan/LEADERBOARD_LEGEND_TOGGLES_PLAN.md` (phase 1 of 1)
+  - **Satisfies**: R1, R2, R3 — left-aligned legend row; legend items as highlight toggles; card pick adds its line to the highlighted set · criteria: R1.1, R1.2, R2.1, R2.2, R2.3, R2.4, R3.1, R3.2, R3.3
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P2-WEB-SF4E.md`
+  - **Completed**: 2026-11-12 10:01
+  - **Method**: /do
+  - **Files**: web/app/(app)/leaderboard/ChartPanel.tsx, web/app/(app)/leaderboard/ChartPanel.test.tsx, web/app/(app)/leaderboard/page.tsx, web/app/(app)/leaderboard/leaderboard.module.css, .claude/skills/verify-seer/features/leaderboard.md, .claude/skills/verify-seer/features/steps/leaderboard-legend.mjs, web/.workflows/todos.md, web/.workflows/plan/P2-WEB-SF4E.md, .workflows/plan/LEADERBOARD_LEGEND_TOGGLES_PLAN.md
+  - **Drift**: Task lives in web/.workflows/todos.md (no todos under web/app/(app)/leaderboard).
+  - **Decided**:
+    - axis passed as a server-rendered element (plan Step 1/3) → ChartPanel takes `labels: string[]` and renders the axis row itself (rung 2: exit criteria — the server-built axis list crossing the client boundary raised React's missing-key console error, which failed every verify-seer journey; bisected in the run snapshot: head alone is clean, axis alone triggers it)
+  - **Verification**: npx tsc --noEmit clean; npm test 794/794 passed (6 new ChartPanel tests); verify-seer run 1112-095955-745781 leaderboard-legend.mjs PASS at 1440 light, 1024, 390 (J1-J9); leaderboard-spread.mjs and leaderboard-twin.mjs PASS; shoot both themes 1440/390 clean; proof verified-after-fix
 
 - [x] **P2-WEB-A129** Phase 1: Flat overlapping card spread
   - **Difficulty**: NORMAL

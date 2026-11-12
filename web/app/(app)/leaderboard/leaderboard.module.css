@@ -93,11 +93,6 @@
 .retired { height: 28px; padding: 0 11px; gap: 5px; font-size: 13px; color: var(--ink-2); }
 .card[data-status='retired'] { opacity: 0.74; }
 .legendRetired { opacity: 0.6; }
-/* Dashed, like PaperChip: a state, not a holding. "Not ranked" is a fact about the window, not a loss. */
-.unranked {
-  height: 26px; padding: 0 10px; font-size: 12px; white-space: nowrap; color: var(--ink-2);
-  background: transparent; border: 1.5px dashed var(--ink-3);
-}
 .icon {
   flex: none; width: 52px; height: 52px; border-radius: 999px; background: var(--chip-solid);
   display: flex; align-items: center; justify-content: center;

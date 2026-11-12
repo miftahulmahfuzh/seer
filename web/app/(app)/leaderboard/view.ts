@@ -540,16 +540,6 @@ export function scoreOf(items: { ok: boolean }[], gate: GateIn): Score {
   return { passed, total: CHECKS, ready, lines };
 }
 
-/**
- * The Paper chip's tooltip on a twin's card: which method it shadows, and what it is, in plain
- * words (CLAUDE.md: no ids or code in owner-facing text). `originalShort` is the original's short
- * label, or null when the original is not on the board.
- */
-export function twinChipTip(originalShort: string | null): string {
-  const of = originalShort ? `${originalShort}'s method` : 'the same method';
-  return `Claude twin: ${of}, minus the picks Claude objected to. Paper only, no real money.`;
-}
-
 export type Cell = { text: string; tone: '' | 'pos' | 'neg' };
 
 export type MonthLine = {

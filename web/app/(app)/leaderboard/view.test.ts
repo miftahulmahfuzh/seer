@@ -6,7 +6,7 @@ import type { MonthlyTable } from '../../../lib/monthly';
 import {
   CARD_BGS, CHECKS, compare, LOOK_PERIOD, looks, MIN_COMMON_SESSIONS, MIN_RANKED, monthLabel, monthLines,
   NO_GATE, PALETTE_SIZE, PARTNER_BGS, pickResearch, researchOf, retiredLabel, scoreOf, sinceStartLine,
-  SLOT_BGS, spyOverSpan, TWIN_DASHES, twinChipTip, windowLine, type GateIn, type RankIn, type RosterIn,
+  SLOT_BGS, spyOverSpan, TWIN_DASHES, windowLine, type GateIn, type RankIn, type RosterIn,
 } from './view';
 
 const roster: RosterIn[] = [
@@ -543,11 +543,3 @@ describe('month rows', () => {
   });
 });
 
-describe('twinChipTip', () => {
-  it("names the original's method in plain words", () => {
-    expect(twinChipTip('F4')).toBe("Claude twin: F4's method, minus the picks Claude objected to. Paper only, no real money.");
-  });
-  it('still reads when the original is not on the board', () => {
-    expect(twinChipTip(null)).toBe('Claude twin: the same method, minus the picks Claude objected to. Paper only, no real money.');
-  });
-});

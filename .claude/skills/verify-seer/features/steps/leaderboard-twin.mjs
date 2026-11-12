@@ -1,6 +1,6 @@
 // Seer Adversarial + R1 (leaderboard-desktop-revamp phase 1): F4's Claude twin sits right after F4
 // in F4's PARTNER colour (sky -> teal) with the twin dash and an icon of its own (F4 gauge, the twin
-// rocket), labelled Paper; A, F1 and C keep their colours; no two cards share a sheet and no two
+// rocket), with no Paper pill on any card (owner, 2026-11-12); A, F1 and C keep their colours; no two cards share a sheet and no two
 // switch buttons share an icon; the twin's checklist says its backtest can't be run.
 // Run on `up` demo data: `$V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-twin.mjs`.
 const F4 = 'F4-MOM12-N20-TREND';
@@ -53,11 +53,10 @@ export default async ({ page, base, shot, log }) => {
     throw new Error('the twin switch button does not draw a rocket');
   log(`switch: every button its own icon: ${switchIcons.join(', ')}`);
 
-  const chip = page.locator(card(TWIN)).getByText('Paper', { exact: true });
-  await chip.first().waitFor();
-  if ((await page.locator(card(F4)).getByText('Paper', { exact: true }).count()) !== 0)
-    throw new Error('the original carries a Paper chip; only twins do');
-  log('Paper chip on the twin card only');
+  // No card carries a Paper or Not ranked pill: the checklist already says "Paper only".
+  const pills = await page.locator('[data-status]').getByText(/^(Paper|Not ranked)$/).count();
+  if (pills !== 0) throw new Error(`${pills} Paper / Not ranked pills on the cards`);
+  log('no Paper or Not ranked pill on any card');
   await shot('board');
 
   // At desktop width F4 covers the twin's left 40% (the card spread), so click inside its uncovered

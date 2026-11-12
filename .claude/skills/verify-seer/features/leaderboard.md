@@ -7,7 +7,7 @@
 - Per-strategy cards and the month-by-month table.
 - Claude twins (Seer Adversarial): a twin's card sits right after its original's, in its original's **partner** colour (F4 sky, F4+Claude teal), with an icon of its own (F4 gauge, F4+Claude rocket) and a `Paper` chip; its chart line is the partner colour with the twin dash (`3 3`). Every original keeps the colour it had before twins existed. The twin's checklist reads rule 5 as `Backtest gate · Can't be run`, with "Paper only. No backtest possible. Claude knows how the past turned out". Its name links to the original's Sera method page.
 - Every strategy is unique on the board (R1): no two cards share a sheet, a chart line colour or an icon while there are at most twelve research strategies. Originals take lav, sky, sage, rose, plum, stone in roster order, then amber, orchid, berry, moss, teal, iris; a twin takes its original's partner (lav/iris, sky/teal, sage/moss, rose/berry, plum/orchid, stone/amber), or the first free sheet when an original holds it. The live board claims before the retired shelf, so past twelve a repeat lands on a folded shelf card, never on two live cards (the real board on 2026-11-10 had 13). Icons come from `displayIcons` in `web/components/roster.ts`: a twin draws its original's partner icon, a collision draws the next spare, and the same icon shows on Positions, History and Sean's plan.
-- Desktop (≥ 1024 px) card row as decks: one deck per family, SPY and plain strategies alone, each original on top with its Claude twin tucked behind it so the twin's edge and colour peek out above and to the right. Clicking a card (the peeking edge, for a tucked twin) picks it. The deck holding the pick pops forward in its own slot (raised, 2% larger, shadowed) and fans the twin out beside the original. The picked card is the tab into the month-by-month sheet. Other decks stay closed and in order. Codes show whole, chips stay inside the card, the chart legend is one row. Motion is CSS only and off under `prefers-reduced-motion`. Below 1024 px the cards are the same flat column as before.
+- Desktop (≥ 1024 px) card row as one spread (owner, 2026-11-12): every live card in board order, all the same width, each laid over the left 40% of the card to its right ("left covers right"), the row filling its width exactly with no scroll. SPY, the baseline, is always on top and nothing ever covers it. A card's code, chips, total return and metrics sit right-aligned in its uncovered right 60%, with its icon top-left. Clicking a card picks it: it rises above every card but SPY in its own place, with the front card's shadow (cast up and sideways, never onto the month sheet), and no card moves or resizes except that the pick is the tab into the month-by-month sheet. A Claude twin is an ordinary card: picking it leaves its original exactly as it was. A keyboard-focused card rises just under the pick so its focus ring shows. The shadow fade is CSS only and off under `prefers-reduced-motion`. Codes show whole, chips stay inside the card, the chart legend is one row. Below 1024 px the cards are the same column as before.
 - The same ranking from the engine: `compare`.
 
 ## How to get to it (user POV)
@@ -27,9 +27,13 @@ $V api RUN GET '/leaderboard?s=F4-MOM12-N20-TREND-CX'
                                 # "Claude knows how the past turned out", "[Not yet] Backtest gate Can't be run"
 $V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-twin.mjs   # order, partner colour, own icon, unique sheets and icons, dash, chip, rule 5; result: PASS
 $V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-switch-row.mjs --width 1280   # one row at the real count, at 7 and at 12; positions unchanged
-$V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-stack.mjs --width 1440 --theme light
-                                # decks SPY | A | F4 + F4+Claude | F1 | C; twin peeks ~7px up/right; legend one row;
-                                # clicking the twin's edge opens F4's deck side by side, raised; ?s=C gives data-tab=last; result: PASS
+$V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-spread.mjs --width 1440 --theme light
+                                # SPY | A | F4 | F4+Claude | F1 | C one flat row, 40% overlap, filling the row; left covers right,
+                                # SPY whole; codes and returns in each card's right 60%; Tab raises a focused card; picking the
+                                # twin raises it in place (front shadow, F4 untouched, nothing moves); ?s=C gives data-tab=last; result: PASS
+$V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-spread.mjs --width 1280
+$V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-spread.mjs --width 390
+                                # phone: the unchanged column, each sheet tucked 40px under the next; result: PASS
 $V shoot RUN --theme both --width 1280 --width 1440 /leaderboard '/leaderboard?s=F4-MOM12-N20-TREND-CX'
 $V sql RUN "select id, twin_of, is_champion from strategies where twin_of is not null"
                                 # F4-MOM12-N20-TREND-CX | F4-MOM12-N20-TREND | f
@@ -48,6 +52,7 @@ The page and `compare` must agree on the order: both rank by Sharpe, which is wh
 - A twin is ranked like any paper strategy once it shares enough sessions; it is never crowned (the web refuses `is_champion` on a row with `twin_of`).
 - The demo twin is built after every other demo row, so it moves none of the numbers above. Read the PNGs: A lav, F4 sky with a gauge, F4+Claude teal with a rocket, F1 sage and C rose. The originals look as they did before twins.
 - A twin's legend swatch is dashed (the twin dash) and in its own partner colour, so neither its colour nor its dash matches any original's line.
-- At desktop width a card shows its code whole: `F4+Claude` breaks after the `+` onto two lines when the column is narrow, never `F4+…`. The full name and description are the tooltip.
-- A tucked twin's face is covered by its original, so a desktop Playwright click on it must hit the peeking strip (`click({ position: { x: width / 2, y: 3 } })`); a centre click times out on "intercepts pointer events".
-- Picking a twin's deck adds a column (the open deck spans one column per card), so the other decks narrow slightly on that pick. Their order never changes.
+- At desktop width a card shows its code whole in its uncovered right 60%: `F4+Claude` breaks after the `+` onto two lines, never `F4+…`. The full name and description are the tooltip.
+- Where cards overlap only the top one takes a click, so a desktop Playwright click on a card must land in its right 60% (`click({ position: { x: width * 0.7, y: height / 2 } })`): its left 40% belongs to the card on its left unless it is the pick.
+- When the pick is not the card right after SPY, it covers its left neighbour's right 40%, code and return included; only that neighbour's middle 20% shows while the pick is in front. That is the agreed cost of raising a card in place; the neighbour keeps its name as a tooltip.
+- The picked card is 12px taller than the rest (its tab reaches over the gap onto the month sheet); every other card keeps its exact place and size on a pick. Measure card positions relative to the row: the checklist above can change height with the pick and move the whole row.

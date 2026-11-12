@@ -283,7 +283,9 @@ METHOD = Method(
         _v("REL-LO-NOTREND", RelBetaParams(N20_NOTREND, "low", "relative"),
            "Always invested, no switch: prices the switch and its churn"),
         _v("REL-RAND", RelBetaParams(N20, "low", "relative", True),
-           "Pseudo-random 20 on the same chassis: draw-noise yardstick"),
+           "Control: the shuffle score ignores side and mode, so on N20's chassis this is the "
+           "same pseudo-random 20 as M0353-RAND-N20-T's book, first recorded there; read as the "
+           "draw-noise yardstick for this run rather than a new book"),
     ),
     seen_keys=(
         "concept:relative-downside-beta",

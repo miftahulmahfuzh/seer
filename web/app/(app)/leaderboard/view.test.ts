@@ -6,7 +6,7 @@ import type { MonthlyTable } from '../../../lib/monthly';
 import {
   CARD_BGS, CHECKS, compare, LOOK_PERIOD, looks, MIN_COMMON_SESSIONS, MIN_RANKED, monthLabel, monthLines,
   NO_GATE, PALETTE_SIZE, PARTNER_BGS, pickResearch, researchOf, retiredLabel, scoreOf, sinceStartLine,
-  SLOT_BGS, spyOverSpan, stacks, TWIN_DASHES, twinChipTip, windowLine, type GateIn, type RankIn, type RosterIn,
+  SLOT_BGS, spyOverSpan, TWIN_DASHES, twinChipTip, windowLine, type GateIn, type RankIn, type RosterIn,
 } from './view';
 
 const roster: RosterIn[] = [
@@ -227,49 +227,6 @@ describe('palette tokens in globals.css', () => {
 describe('researchOf', () => {
   it('lists research strategies only', () => {
     expect(researchOf(roster).map(s => s.id)).toEqual(RESEARCH);
-  });
-});
-
-describe('stacks', () => {
-  const row = (id: string, of: string | null = null, isBenchmark = false) =>
-    ({ strategy: { id, isChampion: isBenchmark, isBenchmark, twinOf: of } satisfies RosterIn });
-  const ids = (decks: { strategy: RosterIn }[][]) => decks.map(d => d.map(r => r.strategy.id));
-
-  it('puts each twin behind its original and leaves SPY and plain strategies alone, in board order', () => {
-    const rows = [
-      row('SPY', null, true), row('C'), row('COSK'), row('COSK-CX', 'COSK'),
-      row('RAW35'), row('RAW35-CX', 'RAW35'), row('A'), row('A-CX', 'A'),
-    ];
-    expect(ids(stacks(rows))).toEqual([['SPY'], ['C'], ['COSK', 'COSK-CX'], ['RAW35', 'RAW35-CX'], ['A', 'A-CX']]);
-  });
-
-  it("files a twin listed before its original into the original's deck, at the original's place", () => {
-    expect(ids(stacks([row('SPY', null, true), row('A-CX', 'A'), row('C'), row('A')])))
-      .toEqual([['SPY'], ['C'], ['A', 'A-CX']]);
-  });
-
-  it('lets a twin whose original is off the row stand alone where it is', () => {
-    expect(ids(stacks([row('SPY', null, true), row('A-CX', 'A'), row('C')])))
-      .toEqual([['SPY'], ['A-CX'], ['C']]);
-  });
-
-  it('never tucks anything behind the benchmark', () => {
-    expect(ids(stacks([row('SPY', null, true), row('SPY-CX', 'SPY')]))).toEqual([['SPY'], ['SPY-CX']]);
-  });
-
-  it("keeps two twins of one original in the board's order", () => {
-    expect(ids(stacks([row('A'), row('A-CX2', 'A'), row('A-CX1', 'A')]))).toEqual([['A', 'A-CX2', 'A-CX1']]);
-  });
-
-  it('places every row in exactly one deck and returns the rows themselves', () => {
-    const rows = [row('SPY', null, true), row('F4'), row('F4-CX', 'F4'), row('F1'), row('C'), row('X-CX', 'X')];
-    const decks = stacks(rows);
-    expect(decks.flat()).toHaveLength(rows.length);
-    expect(new Set(decks.flat())).toEqual(new Set(rows));
-  });
-
-  it('returns no decks for an empty row', () => {
-    expect(stacks([])).toEqual([]);
   });
 });
 

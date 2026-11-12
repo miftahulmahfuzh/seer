@@ -2,7 +2,7 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-11-10
+**Last Updated**: 2026-11-12
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 29
+- Completed: 30
 
 ---
 
@@ -35,6 +35,24 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P2-WEB-A129** Phase 1: Flat overlapping card spread
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns page.tsx, leaderboard.module.css, view.ts (stacks removal), view.test.ts, verify-seer features/leaderboard.md, steps/leaderboard-stack.mjs → leaderboard-spread.mjs. Exit: every criterion R1.1–R4.2 traced and passing; tsc and vitest green; spread step PASSes at 1280 and 1440 and 390; screenshots look like the approved prototype.
+  - **Status**: completed
+  - **Plan Set**: `.workflows/plan/LEADERBOARD_CARD_SPREAD_PLAN.md` (phase 1 of 1)
+  - **Satisfies**: R1, R2, R3, R4 — desktop live cards as one flat left-covers-right spread; click raises in place; no twin pairing · criteria: R1.1, R1.2, R1.3, R2.1, R2.2, R3.1, R3.2, R3.3, R4.1, R4.2
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P2-WEB-A129.md`
+  - **Completed**: 2026-11-12 08:16
+  - **Method**: /do
+  - **Files**: web/app/(app)/leaderboard/page.tsx, web/app/(app)/leaderboard/view.ts, web/app/(app)/leaderboard/view.test.ts, web/app/(app)/leaderboard/leaderboard.module.css, .claude/skills/verify-seer/features/leaderboard.md, .claude/skills/verify-seer/features/steps/leaderboard-spread.mjs, .claude/skills/verify-seer/features/steps/leaderboard-stack.mjs (deleted), web/.workflows/todos.md, web/.workflows/plan/P2-WEB-A129.md, .workflows/plan/LEADERBOARD_CARD_SPREAD_PLAN.md, .workflows/plan/leaderboard-card-spread/phase-1.md, .workflows/analyze/20261112-075853-LCS1_code_analyzer.md, web/package_readme.md
+  - **Drift**: none — code matched the plan's quotes exactly
+  - **Decided**:
+    - Phase package `web/app/(app)/leaderboard` → task tracked in web/.workflows/todos.md (rung 6: existing package convention)
+    - Exit-criterion grep still prints the new step's own negative assertion `[data-deck]` and historical closed records (old P1-WEB-B6MG plan, todos history) plus web/package_readme.md (handoff) → accepted; no live code or CSS references remain (rung 3: the plan's own code block contains that assertion)
+  - **Verification**: tsc + vitest 52 files / 788 tests passed; verify-seer run 1112-081451-480464 leaderboard-spread.mjs PASS at 1440 light, 1280 dark, 390; leaderboard-twin.mjs and leaderboard-switch-row.mjs PASS; proof verified-first-pass
 
 - [x] **P1-WEB-B6MG** Phase 3: Desktop card stacks
   - **Difficulty**: HARD

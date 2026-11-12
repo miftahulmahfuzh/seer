@@ -1,6 +1,5 @@
 import { Clock, Crown, Gavel, Landmark, Pause, TriangleAlert } from 'lucide-react';
 import { AppHeader } from '@/components/AppHeader';
-import { PaperChip } from '@/components/PaperChip';
 import { selectStrategy, sharesLabel, strategyIcon, withDisplayIcons } from '@/components/roster';
 import { StrategySwitch } from '@/components/StrategySwitch';
 import { WhyToggle } from '@/components/WhyToggle';
@@ -104,7 +103,7 @@ export default async function Positions({ searchParams }: { searchParams: Promis
             )}
           </div>
           {paper && strat && (
-            <div className={s.paperLine}><PaperChip /><span>{paperNote(strat)}</span></div>
+            <div className={s.paperLine}><span>{paperNote(strat)}</span></div>
           )}
         </section>
 
@@ -138,7 +137,6 @@ export default async function Positions({ searchParams }: { searchParams: Promis
           <section className={`sheet over bg-sheet ${s.orders}`}>
             <div className={s.between}>
               <span className="eyebrow">Paper orders for {shortDate(orderSession)}</span>
-              {paper && <PaperChip />}
             </div>
             {pending.orders.some(o => o.kind === 'book') && <span className={s.ordersSub}>Target portfolio after the open, by rank</span>}
             {pending.orders.length === 0 ? (

@@ -6,7 +6,6 @@ import {
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { AppHeader } from '@/components/AppHeader';
-import { PaperChip } from '@/components/PaperChip';
 import { sharesLabel, strategyIcon, withDisplayIcons } from '@/components/roster';
 import { ALL, StrategySwitch } from '@/components/StrategySwitch';
 import { closedTrades, fills, runStatus, strategies } from '@/lib/data';
@@ -139,7 +138,6 @@ export default async function History({ searchParams }: { searchParams: Promise<
                   <span className={s.line1}>
                     <span className={s.sym}>{r.symbol}</span>
                     <span className={s.tag} data-tip={st?.name ?? r.strategyId}><SIcon size={12} />{r.strategyShort}</span>
-                    {(!st || st.isPaper) && <PaperChip size="sm" />}
                   </span>
                   <span className={`num ${s.line2}`}>{money(r.entry)} → {money(r.exit)} · {monthDay(r.exitDate)}</span>
                 </div>
@@ -164,7 +162,6 @@ export default async function History({ searchParams }: { searchParams: Promise<
                   <span className={s.line1}>
                     <span className={s.sym}>{f.symbol}</span>
                     <span className={s.tag} data-tip={st?.name ?? f.strategyId}><SIcon size={12} />{f.strategyShort}</span>
-                    {(!st || st.isPaper) && <PaperChip size="sm" />}
                   </span>
                   <span className={`num ${s.line2} ${s.line2wrap}`}>{verb} {sharesLabel(f.shares)} at {money(f.price)} · {monthDay(f.date)}</span>
                 </div>

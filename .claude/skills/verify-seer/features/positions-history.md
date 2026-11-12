@@ -2,7 +2,7 @@
 
 ## Sub-features
 
-- Positions: one strategy's open book at a time (unrealized P/L in USD and rupiah, open count, exits today, the `Paper` label), plus a strategy switcher (`SPY`, `A · Quant`, `F4 · Momentum`, `F4+Claude · Momentum`, `F1 · Trend`, `C · News veto` on demo data; a Claude twin sits right after its original, carries the `Paper` label and draws its own icon, e.g. F4's gauge and F4+Claude's rocket, the same icons the Leaderboard shows). Bracket strategies show slot cards with a stop/target rail; basket strategies show the whole book.
+- Positions: one strategy's open book at a time (unrealized P/L in USD and rupiah, open count, exits today, the on-paper note; no `Paper` chip on Positions or History since 2026-11-12), plus a strategy switcher (`SPY`, `A · Quant`, `F4 · Momentum`, `F4+Claude · Momentum`, `F1 · Trend`, `C · News veto` on demo data; a Claude twin sits right after its original, draws its own icon, e.g. F4's gauge and F4+Claude's rocket, the same icons the Leaderboard shows). Bracket strategies show slot cards with a stop/target rail; basket strategies show the whole book.
 - History, Trades tab: closed trades with strategy and outcome filters and the net result.
 - History, Activity tab (`?v=activity`): every buy and sell the paper books made, with fees.
 
@@ -15,9 +15,9 @@ Second icon (Positions) and fourth icon (History) of the bar. The strategy switc
 ```sh
 $V up
 $V api RUN GET /positions                             # "Unrealized P/L A · Quant", "−$2.10 −Rp 35.000", "3 Open", "1 Exits today",
-                                                      # "Paper On paper since Tue, Aug 4.", first card "NVDA Nvidia · 1 share"
+                                                      # "On paper since Tue, Aug 4.", first card "NVDA Nvidia · 1 share"
 $V api RUN GET '/positions?s=F4-MOM12-N20-TREND'      # "Unrealized P/L F4 · Momentum", "+$11.44 +Rp 189.000", "12 Open"
-$V api RUN GET '/positions?s=F4-MOM12-N20-TREND-CX'   # "Unrealized P/L F4+Claude · Momentum", "10 Open", "Paper"
+$V api RUN GET '/positions?s=F4-MOM12-N20-TREND-CX'   # "Unrealized P/L F4+Claude · Momentum", "10 Open"
 $V api RUN GET /history                               # "[Strategy filter]", "[Outcome filter]", "−$45.04 Net result", "24 Won"
 $V api RUN GET '/history?v=activity'                  # "[Side filter]", "[Buys and sells]"
 $V shoot RUN --theme both --width 390 --width 1280 /positions /history   # exit 0, "no HTTP error, console error or horizontal scroll"

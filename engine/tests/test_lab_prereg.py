@@ -641,11 +641,12 @@ def test_the_five_committed_pre_registrations_still_parse(conn):
 
     Not a fixture -- the real files in docs/lab/prereg/, which this phase must not edit. The
     original four predate the hard gate, so all four report both new fields as not recorded.
-    M0377 (sera-20261026-0703, the lab's first method to clear the hard gate) was written after
-    the gate existed, so it carries real fold and family-state text instead of LEGACY.
+    M0377 (sera-20261026-0703, the lab's first method to clear the hard gate) and M0497
+    (sera-20261112-1645) were written after the gate existed, so they carry real fold and
+    family-state text instead of LEGACY.
     """
     files = sorted(prereg.PREREG_DIR.glob("M[0-9][0-9][0-9][0-9].md"))
-    assert [f.stem for f in files] == ["M0002", "M0021", "M0022", "M0029", "M0377"]
+    assert [f.stem for f in files] == ["M0002", "M0021", "M0022", "M0029", "M0377", "M0497"]
     legacy = {"M0002", "M0021", "M0022", "M0029"}
     for path in files:
         p = prereg.parse(path.read_text(encoding="utf-8"))

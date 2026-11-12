@@ -55,6 +55,8 @@ from seer_engine.lab.methods.m0063_earnings_day_jump import WEEKLY_HOLD_FRAC_GOT
 from seer_engine.lab.methods.m0065_rebalance_day_residual import DAILY_RESIZE_FRAC_GOTRADE
 from seer_engine.lab.methods.m0127_slot_relative_resize_band import T00
 from seer_engine.lab.methods.m0533_sell_side_or_cash_side import BAND0_NOTRIM, BAND0_TRIM, BAND1_NOTRIM
+from seer_engine.lab.methods.m0555_dip_timed_deposits import BASE as DEPOSIT_BASE
+from seer_engine.lab.methods.m0555_dip_timed_deposits import DELAY3, DIP, MIRROR
 from seer_engine.sim.contributions import OWNER_MONTHLY
 from seer_engine.sim.rules import (
     MONTHLY_HOLD_FRAC_GOTRADE,
@@ -104,6 +106,14 @@ REALISTIC: dict[str, object] = {
     "monthly-hold-frac-gotrade-band0-trim": BAND0_TRIM,
     "monthly-hold-frac-gotrade-band1-notrim": BAND1_NOTRIM,
     "monthly-hold-frac-gotrade-add-only": BAND0_NOTRIM,
+    # M0555's SPY deposit-timing book is the owner's monthly fractional Gotrade book checked daily,
+    # add-only, with a gate on WHEN a deposit converts into SPY. The gate is the question it asks,
+    # not part of the money model, so all four arms (IMMEDIATE, DIP, DELAY3, MIRROR) map to
+    # themselves instead of being swapped back to an un-gated preset.
+    DEPOSIT_BASE.id: DEPOSIT_BASE,
+    DIP.id: DIP,
+    DELAY3.id: DELAY3,
+    MIRROR.id: MIRROR,
 }
 
 # Tapes that credit idle cash with the 13-week T-bill yield. They stay out of REALISTIC on

@@ -129,9 +129,15 @@
   .shelf { order: 3; margin-top: 12px; border-radius: 40px; padding: 22px 30px 24px; }
   .shelfIcon { width: 46px; height: 46px; }
   .shelfSub { font-size: 14px; }
+  /* The shelf's cards line up under the live row (owner, 2026-11-12): the same spread, `--n` (the
+     live count) cards to a line, each exactly the width and place of the live card above it. So the
+     cards span the sheet's whole width, past its padding, as the live row spans the stack. Each
+     track is one 0.6-card step; a card is a whole card wide, so it lies over the next track the way
+     a live card lies over its neighbour, and the last one in a line ends at the sheet's edge. */
   .shelfCards {
-    display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr));
-    gap: 12px; margin-top: 18px; container: cards / inline-size; --card-r: 32px;
+    display: grid; grid-template-columns: repeat(var(--n, 1), calc(var(--w) * 0.6));
+    gap: 12px 0; margin: 18px -30px 0; container: cards / inline-size; --card-r: 32px;
+    --w: calc(100% / (1 + (var(--n, 1) - 1) * 0.6));
   }
   .shelfCards .card { border-radius: var(--card-r); padding: 22px; }
   .shelfCards .cardPicked { outline: 2px solid var(--ink); outline-offset: -2px; }
@@ -172,6 +178,9 @@
   .cards {
     order: 1; display: flex; margin-top: 12px; container: cards / inline-size; --card-r: 32px;
     --w: calc(100% / (1 + (var(--n, 1) - 1) * 0.6));
+  }
+  /* The spread's shadows, shared by the live row and the retired shelf. */
+  .cards, .shelfCards {
     --spread-edge: rgba(29, 28, 26, 0.12);
     --front-shadow: -18px -6px 30px -16px rgba(29, 28, 26, 0.38), 18px -6px 30px -16px rgba(29, 28, 26, 0.38);
   }
@@ -245,51 +254,62 @@
      every card to its right, so SPY, the baseline, is never covered, and each card's edge casts a
      soft shadow onto the card it lies over. The pick rises above every card but SPY in its own
      place: no transform and no extra column, so nothing in the row moves on a click. */
-  .cards > .card {
+  .cards > .card, .shelfCards > .card {
     flex: none; width: var(--w); z-index: var(--z);
     padding-left: calc(var(--w) * 0.4 + 16px);
     box-shadow: 10px 0 22px -14px var(--spread-edge);
     transition: box-shadow 0.18s ease;
   }
   .cards > .card + .card { margin-left: calc(var(--w) * -0.4); }
+  /* In the shelf a card's percentages resolve against its grid track, one 0.6-card step. */
+  .shelfCards > .card { --w: calc(100% / 0.6); }
+  /* A see-through card would show its neighbour through the overlap, so here a retired card is
+     opaque: its sheet is washed 26% toward the shelf's own ground and only its contents fade, which
+     reads as the 0.74 opacity it has in the phone column. */
+  .shelfCards > .card[data-status='retired'] {
+    opacity: 1;
+    background-image: linear-gradient(color-mix(in srgb, var(--sheet) 26%, transparent) 0 0);
+  }
+  .shelfCards > .card[data-status='retired'] > * { opacity: 0.74; }
   /* The front card's shadow is cast up and to the sides only: its foot is the tab, and a shadow
      there would fall on the month-by-month sheet. */
-  .cards > .cardActive { box-shadow: var(--front-shadow); }
+  .cards > .cardActive, .shelfCards > .cardPicked { box-shadow: var(--front-shadow); }
   /* A keyboard user's focused card rises just under the pick (`spreadZ` leaves n + 1 free), so its
      focus ring shows whole. */
-  .cards > .card:focus-visible:not(.cardActive) { z-index: calc(var(--n) + 1); }
+  .cards > .card:focus-visible:not(.cardActive),
+  .shelfCards > .card:focus-visible:not(.cardPicked) { z-index: calc(var(--n) + 1); }
 
   /* Mirrored contents. The card on the left covers this card's left 40%, so everything the owner
      reads (code, chips, total return, metrics) sits right-aligned in the right 60%, past the
      padding above, and the icon, which only decorates, takes the top-left corner. Codes show
      whole: a twin's breaks after its '+' (`breakable`), anything longer breaks anywhere rather
      than spill, and the chips wrap inside the card. */
-  .cards .icon { position: absolute; top: 22px; left: 22px; }
-  .cards .cardName { align-items: flex-end; text-align: right; }
-  .cards .titleRow { align-items: flex-end; }
-  .cards .name { font-size: 26px; }
-  .cards .nameText {
+  :is(.cards, .shelfCards) .icon { position: absolute; top: 22px; left: 22px; }
+  :is(.cards, .shelfCards) .cardName { align-items: flex-end; text-align: right; }
+  :is(.cards, .shelfCards) .titleRow { align-items: flex-end; }
+  :is(.cards, .shelfCards) .name { font-size: 26px; }
+  :is(.cards, .shelfCards) .nameText {
     white-space: normal; overflow: visible; text-overflow: clip;
     overflow-wrap: anywhere; line-height: 1.05;
   }
-  .cards .chips { max-width: 100%; flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
-  .cards .metric { align-items: flex-end; text-align: right; }
+  :is(.cards, .shelfCards) .chips { max-width: 100%; flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
+  :is(.cards, .shelfCards) .metric { align-items: flex-end; text-align: right; }
 
   /* A narrow row (`.card`'s tighter padding in the container query below): the icon follows it. */
   @container cards (max-width: 1000px) {
-    .cards .icon { top: 18px; left: 16px; }
+    :is(.cards, .shelfCards) .icon { top: 18px; left: 16px; }
   }
   /* A spread card's readable part is about 135px wide at 1280 and 160px at 1440: a smaller code
      keeps 'COSK+' and 'Claude' to two clean lines, and a smaller total return stays on its line. */
   @container card (max-width: 200px) {
-    .cards .name { font-size: 22px; }
-    .cards .ret { font-size: 30px; }
+    :is(.cards, .shelfCards) .name { font-size: 22px; }
+    :is(.cards, .shelfCards) .ret { font-size: 30px; }
   }
 }
 
 /* The edge and front shadows need more weight to read on the dark ground. */
 @media (min-width: 1024px) and (prefers-color-scheme: dark) {
-  .cards {
+  .cards, .shelfCards {
     --spread-edge: rgba(0, 0, 0, 0.45);
     --front-shadow: -18px -6px 30px -16px rgba(0, 0, 0, 0.7), 18px -6px 30px -16px rgba(0, 0, 0, 0.7);
   }
@@ -297,7 +317,7 @@
 
 /* The front shadow fading in is motion; with reduced motion it snaps. */
 @media (min-width: 1024px) and (prefers-reduced-motion: reduce) {
-  .cards > .card { transition: none; }
+  .cards > .card, .shelfCards > .card { transition: none; }
 }
 
 /* A narrow row (six strategies at 1024px): tighter cards so the code never runs into the icon. */

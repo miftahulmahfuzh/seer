@@ -15,7 +15,8 @@ import s from './leaderboard.module.css';
  */
 export function RetiredShelf({ count, cols, open: startOpen, children }: {
   count: number;
-  /** How many live cards share the row above: the shelf's desktop grid keeps their column width. */
+  /** How many live cards share the row above. On desktop the shelf is the same spread, that many cards
+   *  to a line, so each retired card sits exactly under a live one: same width, place and overlap. */
   cols: number;
   open: boolean;
   children: ReactNode;
@@ -36,7 +37,7 @@ export function RetiredShelf({ count, cols, open: startOpen, children }: {
         </button>
       </div>
       <div id="retired-cards" className={s.shelfCards} hidden={!open}
-        style={{ '--cols': Math.max(cols, count) } as CSSProperties}>{children}</div>
+        style={{ '--n': cols } as CSSProperties}>{children}</div>
     </section>
   );
 }

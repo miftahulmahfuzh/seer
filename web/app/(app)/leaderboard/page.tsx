@@ -231,7 +231,7 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
         </div>
         {retiredRows.length > 0 && (
           <RetiredShelf count={retiredRows.length} cols={live.length} open={pick?.status === 'retired'}>
-            {retiredRows.map(r => card(r, false))}
+            {retiredRows.map((r, i) => card(r, false, i % live.length))}
           </RetiredShelf>
         )}
         <div className="nav-clear" />
@@ -257,8 +257,9 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
    * One strategy's card. `tab`: the picked live card becomes the tab into the month-by-month sheet
    * right under the live row (desktop); a retired card sits on the shelf below that sheet, so when
    * it is the pick it is marked as picked instead of pretending to be attached to it.
-   * `at`: a live card's index in the row, which sets its place in the spread's stacking order
-   * (`spreadZ`). A Claude twin is an ordinary card here: picking it raises it alone.
+   * `at`: the card's index in its line of the spread (the live row, or a line of the retired shelf,
+   * which wraps every `live.length` cards), which sets its stacking order (`spreadZ`). A Claude twin
+   * is an ordinary card here: picking it raises it alone.
    */
   function card({ strategy: st, metrics: m }: Board['rows'][number], tab: boolean, at?: number) {
     const Icon = strategyIcon(st.icon); // st.icon is already the unique display icon (`board` above).

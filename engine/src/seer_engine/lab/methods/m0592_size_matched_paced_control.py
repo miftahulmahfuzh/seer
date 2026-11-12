@@ -18,19 +18,20 @@ previous decision (both re-derived under TODAY's membership, so the comparison s
 correct without needing historical membership), keeps all but ``e`` of its own names in a
 date-free order, and draws ``e`` fresh ones in a month-keyed order, where ``e`` is the real arm's
 own entry count. On an equal-weight chassis (this one: 20 equal slots) matching the trade count
-matches the turnover too, because every slot moves the same fraction of the book per name
-([[seer-matched-draw-cannot-match-turnover-on-weight-varying-chassis]] is about cap/size-WEIGHTED
-books and does not apply here). This method applies that construction independently inside each of
-the five market-value quintiles M0590-SM-WIDE already used -- so the size profile is unchanged --
-with WIDE's own top-20 (re-scored at this decision and the previous one) as the arm each quintile's
+matches the turnover too, because every slot moves the same fraction of the book per name (a
+cap- or size-WEIGHTED chassis is a different, harder case the lab has measured separately and
+this one is not). This method applies that construction independently inside each of the five
+market-value quintiles M0590-SM-WIDE already used -- so the size profile is unchanged -- with
+WIDE's own top-20 (re-scored at this decision and the previous one) as the arm each quintile's
 slice is matched to. ``held`` is the book's own real previous holdings, read from the book runner
 exactly as the module expects.
 
 Frame: identical to M0590 (point-in-time members, F4's screen, 20 equal slots, monthly, fractional
-shares at Gotrade's real fees, SPY's 200-day switch, market-aware on ``shares``). Two arms: PACED
-(the re-drawn control, the new book this method records) and WIDE (M0590-WIDE's own book, repeated
-under a new digest so the comparison runs in the same trial set instead of being read off a
-different method's row).
+shares at Gotrade's real fees, SPY's 200-day switch, market-aware on ``shares``). One arm, PACED:
+the re-drawn control. WIDE's own book is not re-registered here (its exact config digest already
+ran under M0590, and the lab refuses a second recording of the same configuration on any window
+regardless of label); the comparison this method exists to make reads PACED's recorded trial
+against M0590-WIDE's trial #2099 directly.
 """
 
 from __future__ import annotations
@@ -48,7 +49,7 @@ from seer_engine.lab import control_draw
 from seer_engine.lab.method import Method
 from seer_engine.lab.methods.m0007_residual_momentum import N20
 from seer_engine.lab.methods.m0091_lottery_avoidance import targets_from_rows
-from seer_engine.lab.methods.m0590_corwin_schultz_spread import CORWINSCHULTZ, SpreadParams, scored_names
+from seer_engine.lab.methods.m0590_corwin_schultz_spread import scored_names
 from seer_engine.sim.book import Target
 from seer_engine.sim.rules import MONTHLY_HOLD_FRAC_GOTRADE
 from seer_engine.strategies.base import History
@@ -235,12 +236,6 @@ def _v_paced(suffix: str, params: PacedParams, rationale: str) -> Candidate:
                      owner_inputs=())
 
 
-def _v_wide(suffix: str, params: SpreadParams, rationale: str) -> Candidate:
-    return Candidate(id=f"M0592-{suffix}", family="M0592", rules=MONTHLY_HOLD_FRAC_GOTRADE,
-                     allocator=CORWINSCHULTZ, params=params, rationale=rationale, added=ADDED,
-                     owner_inputs=())
-
-
 METHOD = Method(
     id="M0592",
     name="Re-draw M0590's size-matched control at WIDE's own trading pace",
@@ -261,10 +256,11 @@ METHOD = Method(
         "previous decision, both under today's point-in-time membership, which is the module's "
         "documented contract for a chassis with no keep-band). On an equal-weight book, matching "
         "the entry count matches the turnover too, because every slot moves the same fraction of "
-        "the book per name regardless of which name it is. WIDE's own book is repeated under this "
-        "method's own digest (candidate WIDE, reusing M0590's `CorwinSchultzAllocator` and its "
-        "`SpreadParams(N20, 'wide')`) so the comparison runs inside one trial set rather than "
-        "being read off a different method's row. Predictions, written now: PACED's trade count "
+        "the book per name regardless of which name it is. WIDE's own book is not re-registered "
+        "here -- its exact configuration already has a recorded dev trial under M0590 (trial "
+        "#2099), and the lab refuses a second recording of the same configuration on any window "
+        "whatever it is labelled -- so this method's PACED is read against that trial directly. "
+        "Predictions, written now: PACED's trade count "
         "and turnover land inside the 0.80-1.25 band against WIDE's own recorded figures, closing "
         "the fairness gap the old control failed on. Because the old, under-traded SM-WIDE "
         "already beat WIDE on the raw 20-year number (CAGR 35.3% vs 34.9%, maxDD 23.9% vs 34.7%, "
@@ -294,10 +290,7 @@ METHOD = Method(
         _v_paced("PACED", PacedParams(N20, seed=592),
                  "The size-matched control re-drawn with control_draw.matched_names, keyed to "
                  "WIDE's own entry count per quintile: the fairly-paced comparison this method "
-                 "exists to make"),
-        _v_wide("WIDE", SpreadParams(N20, "wide"),
-                "Host: repeats M0590-WIDE's book (trial #2099), run again under this method's own "
-                "digest so PACED is compared against it inside one trial set"),
+                 "exists to make, read against M0590-WIDE's recorded trial #2099"),
     ),
     seen_keys=(
         "concept:size-matched-control-redrawn-at-own-pace",

@@ -572,7 +572,7 @@ def test_preregistration_names_each_finalist_exactly():
         "entry='open_limit', max_positions=None, "
         "time_stop=None, resize=True, fractional=False, dividends=True, idle_symbol=None, cost_rate=Decimal('0.001'), "
         "cost_model='flat', resize_basis='equity', cash_yield=None, resize_band=None, "
-        "reserve_basis='order')"
+        "reserve_basis='order', resize_adds=True, resize_trims=True, add_gate_vix=None)"
     ) in text
     assert "| cost_rate | 0.001 |" in text and "| idle_symbol | none |" in text
     assert "- Instruments held: SPY" in text

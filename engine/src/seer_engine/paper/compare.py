@@ -52,7 +52,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from typing import Any, Literal
 
@@ -94,12 +94,10 @@ class Performance:
     ``sessions - 1`` returns.
 
     ``deposited`` is the dollars the owner added over the span -- money arriving, not performance.
-    It is 0.0 for every strategy that received nothing, which is every strategy on the roster
-    today. When it is non-zero ``cagr`` is ``None``: compound growth over a book that was fed
-    cannot be read off the endpoints, and the honest figure is a money-weighted return, which
-    lives in ``backtest.metrics`` and is deliberately not imported into this pure module.
-    ``total_return`` and ``max_drawdown`` still read the raw curve and so still carry the
-    deposit; ``render`` says so in a line beneath the table rather than quoting them as clean.
+    It is 0.0 for a strategy that received nothing. Every other figure is measured on the curve
+    with that money taken out (``_without_deposits``), so a deposit never reads as a return, a
+    CAGR or a recovered drawdown (owner, 2026-11-12: the 2026-10-26 top-up had every book reading
+    about +40% in a month each lost money). ``render`` names the money added beneath the table.
     """
 
     start: date
@@ -219,6 +217,23 @@ def _returns(points: Sequence[Point], deposits: Mapping[date, float] = {}) -> tu
     return tuple(out)
 
 
+def _without_deposits(points: Sequence[Point], deposits: Mapping[date, float] = {}) -> tuple[Point, ...]:
+    """The curve with the owner's deposits taken out: what the money already there grew into.
+
+    Chained from the opening equity with ``_returns``' own rule, so its session returns are
+    exactly ``_returns(points, deposits)`` and its endpoints, drawdown and CAGR count no deposit.
+    It keeps the first value, and only its ratios mean anything. The Seer web app's
+    ``metrics.withoutDeposits`` is the same function; keep the two equal. Empty ``deposits``
+    returns ``points`` unchanged.
+    """
+    if not deposits or len(points) < 2:
+        return tuple(points)
+    out: list[Point] = [points[0]]
+    for r, (day, _) in zip(_returns(points, deposits), points[1:]):
+        out.append((day, out[-1][1] * (1.0 + r)))
+    return tuple(out)
+
+
 def _deposited(points: Sequence[Point], deposits: Mapping[date, float] = {}) -> float:
     """The dollars added over ``points``, counting the same sessions ``_returns`` corrects.
 
@@ -272,22 +287,21 @@ def performance(points: Sequence[Point], deposits: Mapping[date, float] = {}) ->
     """Every figure over ``points``; ``None`` when there are fewer than two (no return exists).
 
     ``deposits`` is this strategy's session-dated dollars (see ``_returns``). With none -- the
-    default -- every field is bit-for-bit what it was before deposits existed. With some, the
-    session returns and therefore ``sharpe`` have the money taken out, and ``cagr`` is ``None``
-    because an endpoint ratio counts the owner's own money as growth.
+    default -- every field is bit-for-bit what it was before deposits existed. With some, every
+    figure is read off ``_without_deposits``: the money is in ``deposited`` and nowhere else.
     """
     if len(points) < 2:
         return None
-    deposited = _deposited(points, deposits)
+    clean = _without_deposits(points, deposits)
     return Performance(
         start=points[0][0],
         end=points[-1][0],
         sessions=len(points),
-        total_return=points[-1][1] / points[0][1] - 1.0,
-        cagr=None if deposited else _cagr(points),
-        max_drawdown=_max_drawdown(points),
-        sharpe=_sharpe(_returns(points, deposits)),
-        deposited=deposited,
+        total_return=clean[-1][1] / clean[0][1] - 1.0,
+        cagr=_cagr(clean),
+        max_drawdown=_max_drawdown(clean),
+        sharpe=_sharpe(_returns(clean)),
+        deposited=_deposited(points, deposits),
     )
 
 
@@ -380,9 +394,9 @@ def compare(
 
     ``deposits`` maps a strategy id to the dollars the owner added, by the session they were
     credited on (``paper.store.read_contributions``' ``session_date`` -> ``amount_usd``, applied
-    rows only). A strategy absent from it received nothing, which is every strategy on the roster
-    today and is the default; money arriving is not a return, so for one that is present the
-    session returns have it removed and its ``cagr`` is suppressed. See ``_returns``.
+    rows only). A strategy absent from it received nothing, and is the default; money arriving is
+    not a return, so for one that is present every figure is measured with it taken out. See
+    ``performance``.
 
     Every id handed in comes back as exactly one :class:`Row`. A strategy that cannot be ranked --
     too short on its own, too little overlap, or an unusable curve -- comes back
@@ -405,15 +419,22 @@ def compare(
     ranked: list[Row] = []
     for strategy_id in ranked_ids:
         points = points_by_id[strategy_id]
-        in_window = tuple(p for p in points if p[0] in common_set)
+        own = deposits.get(strategy_id, {})
+        # Deposits come out of the whole curve before the window is cut, as the web app does:
+        # a deposit on a session some other strategy missed is still taken out.
+        clean = _without_deposits(points, own)
+        window = performance(tuple(p for p in clean if p[0] in common_set))
+        if window is not None:
+            window = replace(window, deposited=_sum(
+                v for d, v in own.items() if window.start < d <= window.end))
         ranked.append(
             Row(
                 strategy_id=strategy_id,
                 status="ranked",
                 rank=None,
                 reason=None,
-                window=performance(in_window, deposits.get(strategy_id, {})),
-                inception=performance(points, deposits.get(strategy_id, {})),
+                window=window,
+                inception=performance(points, own),
             )
         )
     ranked.sort(key=_rank_key)
@@ -497,12 +518,8 @@ def render(c: Comparison) -> tuple[str, ...]:
     fed = [r for r in ranked if r.window is not None and r.window.deposited]
     if fed:
         lines.append(
-            "money added during the window, so CAGR is not shown for "
+            "money added during the window, taken out of every figure above: "
             + ", ".join(f"{r.strategy_id} (+{r.window.deposited:,.2f} USD)" for r in fed)
-        )
-        lines.append(
-            "    total and max DD still count that money; the figure that does not is the "
-            "money-weighted return"
         )
 
     lines.append("inception to date (its own window; never ranked)")

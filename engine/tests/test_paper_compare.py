@@ -544,22 +544,25 @@ def test_a_deposit_on_the_opening_session_is_the_baseline_not_a_return():
     assert cmp.performance(points, opening).cagr is not None
 
 
-def test_performance_suppresses_cagr_for_a_window_that_was_fed():
-    points = tuple(curve(D, [1000.0, 1312.50, 1325.0, 1330.0]))
+def test_performance_takes_a_deposit_out_of_every_figure():
+    # 1000 -> 990, then 312.50 lands and is invested: every later balance is scaled by
+    # 1 + 312.50 / 990. The book itself went 1000 -> 990 -> 1000 -> 1010.
+    book = [1000.0, 990.0, 1000.0, 1010.0]
+    lift = 1 + 312.50 / 990.0
+    points = tuple(curve(D, [v * (lift if i >= 1 else 1.0) for i, v in enumerate(book)]))
     deposits = {points[1][0]: 312.50}
 
-    clean = cmp.performance(points)
-    assert clean.deposited == 0.0
-    assert clean.cagr is not None
-
     fed = cmp.performance(points, deposits)
+    unfunded = cmp.performance(tuple(curve(D, book)))
     assert fed.deposited == 312.50
-    # Compound growth off the endpoints would count the owner's own money as growth.
-    assert fed.cagr is None
-    # The session returns -- and so Sharpe -- have it removed; the raw curve figures do not.
-    assert fed.sharpe != clean.sharpe
-    assert fed.total_return == clean.total_return
-    assert fed.max_drawdown == clean.max_drawdown
+    assert unfunded.deposited == 0.0
+    # Every figure is what the book earned, exactly as if no money had arrived.
+    assert fed.total_return == pytest.approx(unfunded.total_return)
+    assert fed.cagr == pytest.approx(unfunded.cagr)
+    assert fed.max_drawdown == pytest.approx(unfunded.max_drawdown)
+    assert fed.sharpe == pytest.approx(unfunded.sharpe)
+    # The raw curve would have read the deposit as a +31% gain.
+    assert cmp.performance(points).total_return > 0.3
 
 
 def test_compare_threads_deposits_per_strategy_and_leaves_the_others_alone():
@@ -573,7 +576,11 @@ def test_compare_threads_deposits_per_strategy_and_leaves_the_others_alone():
 
     rows = {r.strategy_id: r for r in with_deposit.rows}
     assert rows["A"].window.deposited == 50.0
-    assert rows["A"].window.cagr is None
+    # A flat $50 added to every later balance is money the book did not earn: with it out, A's
+    # window return is below the raw one, which reads it as growth.
+    raw_a = {r.strategy_id: r for r in plain.rows}["A"].window
+    assert rows["A"].window.total_return < raw_a.total_return
+    assert rows["A"].window.cagr is not None
     # B received nothing, so every one of its figures is bit-identical to the no-deposit run.
     before = {r.strategy_id: r for r in plain.rows}["B"]
     assert rows["B"].window == before.window
@@ -593,8 +600,7 @@ def test_render_says_when_a_figure_carries_money_the_owner_added():
     fed_day = series["A"][40][0]
     lines = cmp.render(cmp.compare(series, deposits={"A": {fed_day: 50.0}}))
     note = [ln for ln in lines if "money added during the window" in ln]
-    assert len(note) == 1 and "A (+50.00 USD)" in note[0]
-    assert any("money-weighted return" in ln for ln in lines)
+    assert len(note) == 1 and "A (+50.00 USD)" in note[0] and "taken out of every figure" in note[0]
     # Nothing is said when nobody was fed.
     assert not [ln for ln in cmp.render(cmp.compare(series)) if "money added" in ln]
 

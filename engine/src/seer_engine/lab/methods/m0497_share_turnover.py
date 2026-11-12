@@ -61,7 +61,7 @@ import numpy as np
 
 from seer_engine.backtest.dev import Candidate
 from seer_engine.lab import control_draw
-from seer_engine.lab.method import Method
+from seer_engine.lab.method import Amendment, Method
 from seer_engine.sim.book import Target, equal_weight
 from seer_engine.sim.rules import MONTHLY_HOLD_FRAC_GOTRADE
 from seer_engine.strategies.allocator import last_close, target_from_close
@@ -300,5 +300,35 @@ METHOD = Method(
     seen_keys=(
         "concept:share-turnover-rank-behind-switch",
         "concept:glamour-vs-value-turnover-mirror",
+    ),
+    amendments=(
+        Amendment(
+            added=date(2026, 11, 12),
+            why=(
+                "The run reversed the hypothesis: HIGH-SW (most turned-over) cleared DSR and beat "
+                "every draw and SPY-SW, LOW-SW (least turned-over, the predicted winner) failed "
+                "both bars, and `lab dressing M0497` confirms it structurally (BACKWARDS, -7.25 "
+                "pts on the prices whole-window). No always-invested arm was recorded for this "
+                "ranking, so what the 200-day switch costs on top of the ranking that actually won "
+                "could not be priced. This arm answers that for HIGH-SW specifically, since it is "
+                "the arm a promotion would be about."
+            ),
+            hypothesis=(
+                "HIGH-SW's edge is mostly the ranking, not the switch: an always-invested twin of "
+                "HIGH-SW (same screen, same most-turned-over ranking, trend=None) still beats "
+                "SPY TR and the draws, even without the 2008 exit the switch would have given it."
+            ),
+            expected_failure=(
+                "The edge was the switch wearing the ranking's name: HIGH-ALWAYS gives back most "
+                "of HIGH-SW's lead once it rides 2008 and 2015-2016 uncushioned, the same way "
+                "M0491's most-traded ranking turned out to be the switch's record and not the "
+                "stocks'."
+            ),
+            candidates=(
+                _v("HIGH-ALWAYS", TurnoverParams("high", trend=None),
+                   "HIGH-SW's own always-invested twin: same ranking, never stepping aside, "
+                   "to separate the ranking from the switch for the arm that cleared DSR"),
+            ),
+        ),
     ),
 )

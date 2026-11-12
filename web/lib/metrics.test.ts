@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checklist, CHECKLIST_RULES, gateItem, strategyMetrics } from './metrics';
+import { checklist, CHECKLIST_RULES, gateItem, strategyMetrics, withoutDeposits } from './metrics';
 
 const snaps = (vals: number[]) =>
   vals.map((equity, i) => ({ date: new Date(Date.UTC(2026, 6, 1 + i)).toISOString().slice(0, 10), equity }));
@@ -32,6 +32,35 @@ describe('strategyMetrics', () => {
   it('measures months of forward testing', () => {
     const m = strategyMetrics([{ date: '2026-07-06', equity: 1 }, { date: '2026-10-05', equity: 1 }], []);
     expect(m.months).toBeCloseTo(3.0, 1);
+  });
+});
+
+describe('withoutDeposits', () => {
+  it("takes a deposit out of the session it landed in, so it is never a return", () => {
+    // 1000 -> 990 (-1%), then 275 lands and the book also gains 1%: 990 * 1.01 + 275 = 1274.9.
+    const raw = snaps([1000, 990, 1274.9, 1287.649]);
+    const clean = withoutDeposits(raw, new Map([[raw[2].date, 275]]));
+    expect(clean.map(s => s.date)).toEqual(raw.map(s => s.date));
+    expect(clean[0].equity).toBe(1000);
+    expect(clean[2].equity).toBeCloseTo(999.9);   // 1000 * 0.99 * 1.01
+    expect(clean[3].equity).toBeCloseTo(1009.899); // then +1% more
+    expect(strategyMetrics(clean, []).totalReturn).toBeCloseTo(0.009899);
+    expect(strategyMetrics(raw, []).totalReturn).toBeCloseTo(0.287649); // what the card used to say
+  });
+  it('counts a deposit on the opening snapshot as opening money', () => {
+    const raw = snaps([1275, 1287.75]);
+    expect(withoutDeposits(raw, new Map([[raw[0].date, 275]]))[1].equity).toBeCloseTo(1287.75);
+  });
+  it('returns the curve unchanged with no deposits', () => {
+    const raw = snaps([1, 2, 3]);
+    expect(withoutDeposits(raw, new Map())).toBe(raw);
+  });
+  it('keeps a deposit from hiding a drawdown', () => {
+    // -10%, then a deposit lifts the balance past its old peak while the book gains nothing.
+    const raw = snaps([1000, 900, 1175]);
+    const clean = withoutDeposits(raw, new Map([[raw[2].date, 275]]));
+    expect(strategyMetrics(clean, []).maxDrawdown).toBeCloseTo(0.1);
+    expect(strategyMetrics(clean, []).totalReturn).toBeCloseTo(-0.1);
   });
 });
 

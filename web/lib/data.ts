@@ -1,5 +1,5 @@
 import { sql } from '@/lib/db';
-import { strategyMetrics, type Metrics, type Snapshot } from '@/lib/metrics';
+import { strategyMetrics, withoutDeposits, type Metrics, type Snapshot } from '@/lib/metrics';
 import { monthlyTable, type MonthlyTable } from '@/lib/monthly';
 import { isStale } from '@/lib/session';
 import { checksNews, engineOf, gateOf, orderTwins, shortLabel, twinOfRow, type Engine, type Gate } from '@/lib/strategy';
@@ -539,6 +539,25 @@ export async function fills(strategyId: string | null, side: 'buy' | 'sell' | nu
   }));
 }
 
+/**
+ * Each strategy's credited deposits as `session date -> dollars`, the monthly top-up the paper
+ * night adds (`paper_contributions`). Applied rows only, as the engine's `compare` reads them: an
+ * accrued deposit not yet credited is in no snapshot, so subtracting it would invent a loss.
+ */
+async function deposits(): Promise<Map<string, Map<string, number>>> {
+  const rows = await sql`SELECT strategy_id, session_date::text AS date, amount_usd FROM paper_contributions
+    WHERE applied_at IS NOT NULL`;
+  const out = new Map<string, Map<string, number>>();
+  for (const r of rows) {
+    const byDate = out.get(r.strategy_id) ?? new Map<string, number>();
+    byDate.set(ymd(r.date), (byDate.get(ymd(r.date)) ?? 0) + n(r.amount_usd));
+    out.set(r.strategy_id, byDate);
+  }
+  return out;
+}
+
+const NO_DEPOSITS: ReadonlyMap<string, number> = new Map();
+
 /** Which closed-trade rows count for a strategy: closed orders (bracket), non-idle book trades (book), none (benchmark). */
 const countsFor = (engine: Engine, src: unknown) => engine !== 'benchmark' && src === engine;
 
@@ -551,16 +570,21 @@ export type Board = {
 /**
  * Every board strategy's metrics over all its snapshots (day 0 included) and its own engine's
  * closed trades: the live ones first, then the retired ones that traded (`boardStrategies`).
+ * Each `curve` has the owner's deposits taken out (`withoutDeposits`), so every figure the
+ * Leaderboard draws from it (total return, drawdown, the chart, "Beats SPY", the ranking) is what
+ * the strategy earned. Its values are no longer the dollar balance, only its ratios are meaningful.
  */
 export async function leaderboard(): Promise<Board> {
-  const [strats, snaps, pnls] = await Promise.all([
+  const [strats, snaps, pnls, deps] = await Promise.all([
     boardStrategies(),
     sql`SELECT strategy_id, date::text AS date, equity_usd FROM equity_snapshots ORDER BY date`,
     sql`SELECT 'bracket' AS src, strategy_id, pnl_usd FROM orders WHERE status = 'closed'
       UNION ALL SELECT 'book' AS src, strategy_id, pnl_usd FROM book_trades WHERE NOT idle`,
+    deposits(),
   ]);
   const rows = strats.map(strategy => {
-    const curve = snaps.filter(s => s.strategy_id === strategy.id).map(s => ({ date: ymd(s.date), equity: n(s.equity_usd) }));
+    const raw = snaps.filter(s => s.strategy_id === strategy.id).map(s => ({ date: ymd(s.date), equity: n(s.equity_usd) }));
+    const curve = withoutDeposits(raw, deps.get(strategy.id) ?? NO_DEPOSITS);
     const p = pnls.filter(t => t.strategy_id === strategy.id && countsFor(strategy.engine, t.src)).map(t => n(t.pnl_usd));
     return { strategy, metrics: strategyMetrics(curve, p), curve };
   });
@@ -579,7 +603,7 @@ export async function monthly(strategyId: string, sessionDate: string | null): P
   if (!st) return { months: [], sinceStart: null };
   const bench = strats.find(x => x.isBenchmark) ?? null;
   const none = Promise.resolve([] as Row[]);
-  const [snaps, spy, exits] = await Promise.all([
+  const [snaps, spy, exits, deps] = await Promise.all([
     sql`SELECT date::text AS date, equity_usd FROM equity_snapshots WHERE strategy_id = ${st.id} ORDER BY date`,
     bench ? sql`SELECT date::text AS date, equity_usd FROM equity_snapshots WHERE strategy_id = ${bench.id} ORDER BY date` : none,
     st.engine === 'bracket'
@@ -587,11 +611,14 @@ export async function monthly(strategyId: string, sessionDate: string | null): P
       : st.engine === 'book'
         ? sql`SELECT exit_date::text AS exit_date FROM book_trades WHERE strategy_id = ${st.id} AND NOT idle`
         : none,
+    deposits(),
   ]);
+  // Deposits out, as on the board (`leaderboard`): a top-up month is not a winning month.
   const toSnap = (r: Row): Snapshot => ({ date: ymd(r.date), equity: n(r.equity_usd) });
+  const clean = (rows: Row[], id: string) => withoutDeposits(rows.map(toSnap), deps.get(id) ?? NO_DEPOSITS);
   return monthlyTable({
-    snaps: snaps.map(toSnap),
-    spy: bench ? spy.map(toSnap) : null,
+    snaps: clean(snaps, st.id),
+    spy: bench ? clean(spy, bench.id) : null,
     exitDates: exits.map(r => ymd(r.exit_date)),
     sessionDate,
   });

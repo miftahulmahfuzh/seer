@@ -14,6 +14,28 @@ export type Metrics = {
 
 const DAY = 86_400_000;
 
+/**
+ * The curve with the owner's deposits taken out, so it grows only by what the strategy earned
+ * (owner, 2026-11-12). Every paper strategy is handed the monthly top-up, and a raw curve counts
+ * it as performance: on 2026-10-26 Rp 5,000,000 ($275.30) landed in each book and every card read
+ * about +40% on a month in which they all lost money. This is the engine's own rule
+ * (`paper/compare.py` `_returns`): a session that received a deposit returns
+ * `(equity - deposit) / previous - 1`, and the series is chained from the opening equity, so it
+ * keeps that first value and only its ratios mean anything. `deposits` maps a session date to the
+ * dollars credited at that session's open (`paper_contributions`, applied rows only). A deposit
+ * dated on the first snapshot is part of the opening money, not a step. `snaps` in date order.
+ */
+export function withoutDeposits(snaps: Snapshot[], deposits: ReadonlyMap<string, number>): Snapshot[] {
+  if (deposits.size === 0 || snaps.length < 2) return snaps;
+  const out = [snaps[0]];
+  for (let i = 1; i < snaps.length; i++) {
+    const prev = snaps[i - 1].equity;
+    const growth = prev > 0 ? (snaps[i].equity - (deposits.get(snaps[i].date) ?? 0)) / prev : 1;
+    out.push({ date: snaps[i].date, equity: out[i - 1].equity * growth });
+  }
+  return out;
+}
+
 /** Metrics over a strategy's equity curve and its closed trades' P/L (USD). */
 export function strategyMetrics(snaps: Snapshot[], pnls: number[]): Metrics {
   const wins = pnls.filter(p => p > 0);

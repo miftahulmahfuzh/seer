@@ -60,7 +60,8 @@ export default async ({ page, base, shot, log }) => {
   log('Paper chip on the twin card only');
   await shot('board');
 
-  // At desktop width the twin is tucked behind F4 and only its top edge shows: click that strip.
+  // At desktop width F4 covers the twin's left 40% (the card spread), so click inside its uncovered
+  // right part: its horizontal middle, near the top edge.
   const twinCard = page.locator(card(TWIN)).first();
   const twinBox = await twinCard.boundingBox();
   await twinCard.click((page.viewportSize()?.width ?? 0) >= 1024 && twinBox ? { position: { x: twinBox.width / 2, y: 3 } } : {});

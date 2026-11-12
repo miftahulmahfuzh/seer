@@ -3,6 +3,7 @@
 ## Sub-features
 
 - Equity curves of every active strategy against SPY over the window they share, with the champion crowned.
+- Chart legend toggles (owner, 2026-11-12): the legend is a row of its own under the headline figures and the window line, left-aligned so its first swatch starts exactly where the champion label ("SPY, champion") starts; on desktop it is one row, on a phone it wraps under the axis. Every item is a toggle button (`aria-pressed`, the full name as its tooltip). While one or more are pressed, each pressed strategy's line keeps its colour, is 1px thicker and is drawn above the rest, every other line fades to 20%, the pressed items wear their sheet tint as a pill (SPY: the page ground) and the others fade. Nothing pressed is the chart exactly as before. Any number can be pressed, SPY included. Picking a card adds it to the pressed set and never clears the others; pressing the pick's item again un-highlights its line while the card stays picked. Highlights live in page memory only: a reload starts from the pick alone.
 - The go-live checklist (design §1): 18 months forward, beats SPY, profit factor ≥ 1.3, max drawdown ≤ 25%, backtest gate. Each row shows Passed / Not yet with the measured number.
 - Per-strategy cards and the month-by-month table.
 - Claude twins (Seer Adversarial): a twin's card sits right after its original's, in its original's **partner** colour (F4 sky, F4+Claude teal), with an icon of its own (F4 gauge, F4+Claude rocket) and no pill on its card (no card carries a `Paper` or `Not ranked` pill: the checklist says "Paper only"); its chart line is the partner colour with the twin dash (`3 3`). Every original keeps the colour it had before twins existed. The twin's checklist reads rule 5 as `Backtest gate · Can't be run`, with "Paper only. No backtest possible. Claude knows how the past turned out". Its name links to the original's Sera method page.
@@ -36,6 +37,12 @@ $V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-spread.mjs --wid
 $V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-spread.mjs --width 1280
 $V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-spread.mjs --width 390
                                 # phone: the unchanged column, each sheet tucked 40px under the next; result: PASS
+$V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-legend.mjs --width 1440 --theme light
+$V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-legend.mjs --width 1024
+                                # J1 one row, first swatch on "SPY, champion"; J2-J5 toggles, highlight, all, none;
+                                # J6 card C adds to A+F1; J7 un-press C, card stays picked; J8 reload -> C only; result: PASS
+$V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-legend.mjs --width 390
+                                # phone: the wrapping row under the axis, same toggles; result: PASS
 # Retired shelf: demo retires nothing, so retire two in the run's own DB first (`sql` is read-only):
 docker exec seer-pg-verify psql -U postgres -d v_${RUN//-/_} -c "update strategies set status='retired', paper_end='2026-10-30' where id in ('F1-SPY-SMA200-M','C')"
 $V ui RUN .claude/skills/verify-seer/features/steps/leaderboard-shelf.mjs --width 1440 --theme light
@@ -58,6 +65,8 @@ The page and `compare` must agree on the order: both rank by Sharpe, which is wh
 - A twin is ranked like any paper strategy once it shares enough sessions; it is never crowned (the web refuses `is_champion` on a row with `twin_of`).
 - The demo twin is built after every other demo row, so it moves none of the numbers above. Read the PNGs: A lav, F4 sky with a gauge, F4+Claude teal with a rocket, F1 sage and C rose. The originals look as they did before twins.
 - A twin's legend swatch is dashed (the twin dash) and in its own partner colour, so neither its colour nor its dash matches any original's line.
+- With no `?s=` the demo pick is A, so `/leaderboard` opens with A's line highlighted and every other line at 20%. That is the pick seeding the legend, not a bug.
+- Both legends are in the DOM (desktop row and phone row, one hidden by `desk-only` / `mobile-only`). Query the visible one (`button[data-id]:visible`); `data-id` is the strategy id, the accessible name is its full name.
 - At desktop width a card shows its code whole in its uncovered right 60%: `F4+Claude` breaks after the `+` onto two lines, never `F4+…`. The full name and description are the tooltip.
 - Where cards overlap only the top one takes a click, so a desktop Playwright click on a card must land in its right 60% (`click({ position: { x: width * 0.7, y: height / 2 } })`): its left 40% belongs to the card on its left unless it is the pick.
 - When the pick is not the card right after SPY, it covers its left neighbour's right 40%, code and return included; only that neighbour's middle 20% shows while the pick is in front. That is the agreed cost of raising a card in place; the neighbour keeps its name as a tooltip.

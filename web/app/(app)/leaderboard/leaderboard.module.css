@@ -16,14 +16,48 @@
 .window { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 14px; }
 .windowLabel { color: var(--ink); }
 .windowDetail { color: var(--ink-2); }
-.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; }
-.legendItem { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
-/* Mobile: spread under the axis labels, wrapping onto a second line rather than off the edge: six
-   live codes plus a picked retired one do not fit 390px on one line. */
-.legendRow { flex-wrap: wrap; justify-content: flex-start; gap: 6px 14px; }
+/* The chart legend: one toggle per line (owner, 2026-11-12). Every item is always a pill, padded
+   `--pill-x` each side whether or not it is pressed, and the row is pulled out by the same amount
+   into the `.pad` around it, so the first swatch sits exactly on the sheet's text edge (where the
+   champion label starts) and pressing an item moves nothing. The two paddings are the spacing
+   between items (14px, as before). The pull stays inside the `.pad` padding, so nothing reaches
+   past the sheet. */
+.legend {
+  --pill-x: 7px;
+  display: flex; flex-wrap: wrap; gap: 0; font-size: 14px;
+  margin-inline: calc(var(--pill-x) * -1);
+}
+.legendItem {
+  display: flex; align-items: center; gap: 7px; white-space: nowrap;
+  margin: 0; border: 0; padding: 3px var(--pill-x); border-radius: 999px;
+  background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+/* Pressed: the strategy's own sheet tint (`--pill`, from the page; SPY's is the page ground). */
+.legendItem[aria-pressed='true'] { background: var(--pill); }
+.legendItem:focus-visible { outline: 2px solid var(--coral); outline-offset: 1px; }
+@media (hover: hover) {
+  .legendItem[aria-pressed='false']:hover { background: var(--chip-plain); }
+}
+/* While anything is highlighted, the items that are not step back with their lines. */
+.legend[data-focus] .legendItem[aria-pressed='false'] { opacity: 0.45; }
+.legend[data-focus] .legendRetired[aria-pressed='false'] { opacity: 0.3; }
+/* Mobile: under the axis labels, wrapping onto a second line rather than off the edge: six live
+   codes plus a picked retired one do not fit 390px on one line. */
+.legendRow { flex-wrap: wrap; justify-content: flex-start; }
 
 .swatch { width: 18px; height: 3px; border-radius: 9px; }
 .swatchDash { width: 18px; height: 0; border-top-width: 2.5px; }
+
+/* Highlighted lines (`ChartPanel`): with anything pressed, every other line fades to 20%. The
+   pressed lines' extra pixel and their place on top are set on the paths themselves. With nothing
+   pressed no rule here matches and the lines are exactly as `buildChart` drew them. */
+.chart path[data-line] { transition: opacity 0.15s ease; }
+.chart[data-focus] path[data-line]:not([data-on]) { opacity: 0.2; }
+/* The fades are motion; with reduced motion they snap. */
+@media (prefers-reduced-motion: reduce) {
+  .chart path[data-line], .legendItem { transition: none; }
+}
 
 /* The picked strategy's name as the way into its Sera method page. `a` is undecorated globally,
    and inside an uppercase, letter-spaced eyebrow a colour shift alone would not read as a link,
@@ -233,17 +267,13 @@
 }
 
 @media (min-width: 1024px) {
-  /* The legend is one row. It sits beside the headline figures when it fits and drops under them,
-     still one row, when it does not. Only past a dozen strategies do its codes ellipsise (each
-     keeps its full name as its tooltip), never a second row. */
-  .headline { flex-wrap: wrap; row-gap: 14px; }
-  .headline > .legend {
-    flex: 0 1 auto; min-width: 0; margin-left: auto;
-    flex-wrap: nowrap; gap: 6px 14px; font-size: 13px;
-  }
-  .headline > .legend .legendItem { min-width: 0; gap: 6px; }
-  .headline > .legend .swatch, .headline > .legend .swatchDash { flex: none; }
-  .headline > .legend .legendLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* The legend is one row of its own, under the headline figures and the window line, starting on
+     the sheet's text edge (owner, 2026-11-12). Only past a dozen strategies do its codes ellipsise
+     (each keeps its full name as its tooltip), never a second row. */
+  .legendDesk { flex-wrap: nowrap; font-size: 13px; }
+  .legendDesk .legendItem { min-width: 0; gap: 6px; }
+  .legendDesk .swatch, .legendDesk .swatchDash { flex: none; }
+  .legendDesk .legendLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
   /* Left covers right: each card's stacking order (`--z`, from the page's `spreadZ`) puts it above
      every card to its right, so SPY, the baseline, is never covered, and each card's edge casts a

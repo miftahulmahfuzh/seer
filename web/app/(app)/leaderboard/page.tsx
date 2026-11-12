@@ -11,6 +11,7 @@ import { checklist } from '@/lib/metrics';
 import { isSeraUser } from '@/lib/sera/access';
 import { methodHref } from '@/lib/sera/paper';
 import { wibDate } from '@/lib/session';
+import { ChartPanel, type LegendEntry } from './ChartPanel';
 import { PickName } from './PickName';
 import { RetiredShelf } from './RetiredShelf';
 import {
@@ -107,51 +108,47 @@ export default async function Leaderboard({ searchParams }: { searchParams: Prom
       }
     : { value: ret(spyRet), mobile: 'SPY', desk: 'SPY' };
 
+  // The chart sheet is a client component (`ChartPanel`): its legend toggles which lines are
+  // highlighted, and the pick seeds that. The figures above the chart and the axis under it are
+  // rendered here and handed in (the axis as its labels). The legend is no longer in the headline: it is a row of its own
+  // under the window line, left-aligned on the champion label (owner, 2026-11-12).
   const chartSheet = (
-    <section className={`sheet bg-sheet ${s.chartSheet}`}>
-      <div className={`${s.between} ${s.pad} mobile-only`}>
-        <span className="eyebrow">Forward test</span>
-        <span className="pill-outline">{period}</span>
-      </div>
-      <div className={`${s.headline} ${s.pad}`}>
-        <div className={s.stats}>
-          <div className={s.stat}>
-            <span className={`num ${s.big} ${tone(champRet)}`}>{ret(champRet)}</span>
-            <span className={s.statLabel}>
-              <Crown size={14} />
-              <span>{champ?.strategy.name ?? 'No champion'}<span className="desk-only">, champion</span></span>
-            </span>
+    <ChartPanel pickId={pick?.id ?? null} lines={chart.lines} grid={chart.grid} zero={chart.zero} labels={chart.labels} w={W} h={H}
+      entries={shown.map(r => legendEntry(r.strategy, lookOf(r.strategy.id)))}
+      head={
+        <>
+          <div className={`${s.between} ${s.pad} mobile-only`}>
+            <span className="eyebrow">Forward test</span>
+            <span className="pill-outline">{period}</span>
           </div>
-          <div className={s.stat}>
-            <span className={`num ${s.mid}`}>{second.value}</span>
-            <span className={s.statLabel}>
-              <span className="mobile-only">{second.mobile}</span>
-              <span className="desk-only">{second.desk}</span>
-            </span>
+          <div className={`${s.headline} ${s.pad}`}>
+            <div className={s.stats}>
+              <div className={s.stat}>
+                <span className={`num ${s.big} ${tone(champRet)}`}>{ret(champRet)}</span>
+                <span className={s.statLabel}>
+                  <Crown size={14} />
+                  <span>{champ?.strategy.name ?? 'No champion'}<span className="desk-only">, champion</span></span>
+                </span>
+              </div>
+              <div className={s.stat}>
+                <span className={`num ${s.mid}`}>{second.value}</span>
+                <span className={s.statLabel}>
+                  <span className="mobile-only">{second.mobile}</span>
+                  <span className="desk-only">{second.desk}</span>
+                </span>
+              </div>
+              <div className={`${s.stat} mobile-only`}>
+                <span className={`num ${s.mid}`}>{champ?.curve.length ?? 0}</span>
+                <span className={s.statLabel}>Sessions</span>
+              </div>
+            </div>
           </div>
-          <div className={`${s.stat} mobile-only`}>
-            <span className={`num ${s.mid}`}>{champ?.curve.length ?? 0}</span>
-            <span className={s.statLabel}>Sessions</span>
+          <div className={`${s.window} ${s.pad}`}>
+            <span className={s.windowLabel}>{wline.label}</span>
+            <span className={s.windowDetail}>{wline.detail}</span>
           </div>
-        </div>
-        <Legend rows={shown} lookOf={lookOf} className="desk-only" />
-      </div>
-      <div className={`${s.window} ${s.pad}`}>
-        <span className={s.windowLabel}>{wline.label}</span>
-        <span className={s.windowDetail}>{wline.detail}</span>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={s.chart} role="img"
-        aria-label="Equity curves of each strategy against SPY">
-        {chart.grid.map((y, i) => <line key={i} x1="0" x2={W} y1={y} y2={y} vectorEffect="non-scaling-stroke" stroke="var(--hair)" />)}
-        <line x1="0" x2={W} y1={chart.zero} y2={chart.zero} vectorEffect="non-scaling-stroke" stroke="var(--outline)" strokeDasharray="3 3" />
-        {chart.lines.map(l => (
-          <path key={l.id} d={l.d} vectorEffect="non-scaling-stroke" fill="none" stroke={l.color} strokeWidth={l.width}
-            strokeDasharray={l.dash ?? undefined} strokeLinecap="round" strokeLinejoin="round" />
-        ))}
-      </svg>
-      <div className={`${s.axis} ${s.pad}`}>{chart.labels.map((l, i) => <span key={i}>{l}</span>)}</div>
-      <Legend rows={shown} lookOf={lookOf} className={`${s.pad} ${s.legendRow} mobile-only`} />
-    </section>
+        </>
+      } />
   );
 
   const checklistSheet = (
@@ -353,32 +350,22 @@ function MonthRow({ line, total }: { line: MonthLine; total?: boolean }) {
 }
 
 /**
- * One swatch + short label per strategy (full name as its tooltip). On desktop it is one row: it
- * sits beside the headline figures when it fits and drops under them when it does not. Past about
- * a dozen strategies its codes ellipsise rather than wrap (`.legendLabel`). On mobile it is the
- * wrapping row under the axis.
+ * One legend toggle per strategy on the chart (`ChartPanel`): its code, its full name as the
+ * tooltip (a retired one says when it stopped), its line's colour and stroke for the swatch, and
+ * the tint its pill takes while its line is highlighted. SPY's sheet is the chart's own white, so
+ * its pill takes the page ground instead, as SPY's card icon does (`.card:global(.bg-sheet) .icon`).
  */
-function Legend({ rows, lookOf, className }: {
-  rows: Board['rows']; lookOf: (id: string) => Look; className: string;
-}) {
-  return (
-    <div className={`${s.legend} ${className}`}>
-      {rows.map(({ strategy: st }) => {
-        const look = lookOf(st.id);
-        const retired = st.status === 'retired';
-        const tip = retired ? `${st.name} · ${retiredLabel(st.paperEnd).toLowerCase()}` : st.name;
-        return (
-          <span key={st.id} data-tip={tip} aria-label={tip}
-            className={retired ? `${s.legendItem} ${s.legendRetired}` : s.legendItem}>
-            {look.dash
-              ? <span className={s.swatchDash} style={{ borderTopColor: look.line, borderTopStyle: look.dash === BENCHMARK_DASH ? 'dotted' : 'dashed' }} />
-              : <span className={s.swatch} style={{ background: look.line }} />}
-            <span className={s.legendLabel}>{st.short}</span>
-          </span>
-        );
-      })}
-    </div>
-  );
+function legendEntry(st: Board['rows'][number]['strategy'], look: Look): LegendEntry {
+  const retired = st.status === 'retired';
+  return {
+    id: st.id,
+    code: st.short,
+    tip: retired ? `${st.name} · ${retiredLabel(st.paperEnd).toLowerCase()}` : st.name,
+    retired,
+    line: look.line,
+    stroke: look.dash === null ? 'solid' : look.dash === BENCHMARK_DASH ? 'dotted' : 'dashed',
+    pill: look.bg === 'bg-sheet' ? 'var(--chip-plain)' : look.tint,
+  };
 }
 
 function buildChart(board: Board, lookOf: (id: string) => Look) {

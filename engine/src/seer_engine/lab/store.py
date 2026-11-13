@@ -251,6 +251,26 @@ YARDSTICK_MIN_PERCENTILE = 0.90
 # that reads the yardstick writes this string, and ``yardstick_due`` recognises it.
 YARDSTICK_LABEL = f"beats {YARDSTICK_MIN_PERCENTILE:.0%} of random twins"
 
+# The day the random-twin yardstick became a condition of the dev screen
+# (RANDOM_TWIN_YARDSTICK_PLAN.md Decision D5), compared with ``trials.run_at`` as text. ISO-8601
+# strings sort as dates, and "2026-11-14" sorts before every timestamp of that day, so "recorded
+# on or after it" is ``str(run_at) >= YARDSTICK_SINCE``.
+#
+# **Why a date at all.** On 2026-11-13 the committed lab held 256 dev arms that read eligible at
+# today's bars and not one yardstick reading. Failing every unmeasured arm at once would flip all
+# of them on the day the code lands, before ``lab yardstick --pending`` has measured one, and the
+# shared lab and the site would read "nothing is eligible" for the hours the backfill takes, for a
+# reason that is a queue and not a result. So the condition is staged:
+#
+# - an arm recorded BEFORE this date is judged by its reading once it has one, and by the six
+#   other conditions alone until then;
+# - an arm recorded ON OR AFTER it was measured by ``lab run`` itself, so an unmeasured one is a
+#   hole in the record and fails closed.
+#
+# ``lab promote`` (hardgate D20) is not staged: the look and the owner's money are never spent on
+# an arm nobody measured, whatever its age.
+YARDSTICK_SINCE = "2026-11-14"
+
 
 # The N the luck test deflates by, resolved through ``npolicy.effective_n``. ONE constant: the
 # only place in the lab where the multiple-testing count is decided, read at call time by
@@ -1615,8 +1635,8 @@ class Verdict:
 
     ``failed`` is the ordered tuple of failure labels (``trials.failed`` is the same list,
     "; "-joined): owner conditions first in ``dev.FAILURE_LABELS`` order, then the luck label,
-    then ``CONTROL_LABEL`` for a trial recorded as a control arm. ``eligible`` is
-    ``failed == ()``, always.
+    then ``CONTROL_LABEL`` for a trial recorded as a control arm, and ``YARDSTICK_LABEL`` last.
+    ``eligible`` is ``failed == ()``, always.
 
     ``derived`` is True when the DSR in this verdict was **evaluated at ``n``**, and False when
     it could not be -- in which case ``dsr`` is None and the luck label is among ``failed``. It
@@ -1988,6 +2008,35 @@ def dsr_at(
     )
 
 
+def _yardstick_binds(
+    conn: sqlite3.Connection,
+    trial: Mapping[str, Any] | sqlite3.Row,
+    failed: tuple[str, ...],
+) -> bool:
+    """Does the random-twin yardstick fail ``trial`` today? ``failed`` is every other label
+    ``verdict`` has already decided for it, the control label included.
+
+    - **A control arm is never judged on it.** ``CONTROL_LABEL`` already fails a control, and a
+      control is the arm the method registered in order to be beaten. Adding a second label to
+      it would describe the control, not the idea.
+    - **A reading decides when there is one** (``yardstick_clears``): below the bar or
+      ``unmatched`` fails; at or above the bar, or ``not-applicable``, passes. This binds every
+      arm whatever its run date, which is how an old arm is re-judged once the backfill has
+      measured it.
+    - **No reading fails only an arm that would otherwise pass and was recorded on or after
+      ``YARDSTICK_SINCE``.** Such an arm went through a ``lab run`` that measures, so a missing
+      reading is a hole in the record. An older arm is left to its other conditions until it is
+      measured (Decision D5). An arm that already fails something else gains nothing from a
+      second label for a measurement nobody took.
+    """
+    if CONTROL_LABEL in failed:
+        return False
+    clears = yardstick_clears(yardstick_of(conn, int(trial["n"])))
+    if clears is None:
+        return not failed and str(trial["run_at"]) >= YARDSTICK_SINCE
+    return not clears
+
+
 def verdict(
     conn: sqlite3.Connection,
     trial: Mapping[str, Any] | sqlite3.Row,
@@ -2008,7 +2057,7 @@ def verdict(
     today, rather than by the bars in force on its run date. That is R2's comparability, obtained
     without rewriting anything.
 
-    **Nothing is ever returned verbatim.** Every one of the six conditions is decided here:
+    **Nothing is ever returned verbatim.** Every condition is decided here:
 
     - the four **threshold** owner conditions are re-derived from this row's recorded columns by
       ``owner_failures``, against the live ``tuning.DEV_MAX_DRAWDOWN`` /
@@ -2020,6 +2069,12 @@ def verdict(
       constant re-decides it;
     - the **luck** test is decided on ``dsr_at(conn, trial, g.n)`` -- this trial's DSR **at the
       gate's current N**, never at the N it happened to be run under.
+    - the **random-twin yardstick** is decided on the trial's latest ``trial_yardstick`` reading
+      (``yardstick_of``): below ``YARDSTICK_MIN_PERCENTILE`` or ``unmatched`` fails, and its label
+      goes last. An arm with no reading fails only when every other condition passes and it was
+      recorded on or after ``YARDSTICK_SINCE`` (Decision D5). A control arm is never judged on
+      it. On a lab with no reading and no trial on or after that date, this function returns
+      exactly what it returned before the yardstick existed (plan invariant 5).
 
     **The luck test is always evaluated at the current N, and that is the whole of R2.** An
     earlier draft re-thresholded the recorded ``dsr`` only when ``n_trials_at_run`` already
@@ -2066,6 +2121,12 @@ def verdict(
     # no role row (or a database without the table) is judged exactly as before.
     if role_of_trial(conn, trial["n"]) == CONTROL_ROLE:
         failed = failed + (CONTROL_LABEL,)
+    # The seventh condition (RANDOM_TWIN_YARDSTICK_PLAN.md, phase 4): did this arm out-earn the
+    # random twins that repeat its every decision with the picked stocks swapped? Last, after the
+    # control label, and never on a control. Staged by run date for an arm with no reading; see
+    # `_yardstick_binds` and `YARDSTICK_SINCE`.
+    if _yardstick_binds(conn, trial, failed):
+        failed = failed + (YARDSTICK_LABEL,)
     return Verdict(
         dsr=dsr, failed=failed, eligible=not failed, n=g.n, policy=g.policy,
         derived=dsr is not None,
@@ -2153,6 +2214,7 @@ class Reevaluation:
 def _blocking(
     trial: Mapping[str, Any] | sqlite3.Row,
     funding: Mapping[str, Any] | sqlite3.Row | None = None,
+    reading: Mapping[str, Any] | sqlite3.Row | None = None,
 ) -> tuple[str, ...]:
     """The second, independent no: why this trial may **not** take the ``rejected`` edge.
 
@@ -2174,6 +2236,15 @@ def _blocking(
     ``rejected``, and ``lab reevaluate`` with no argument sweeps exactly those. The point of the
     repetition is that the comparison is written twice in two places, not that it is written
     against two different bars.
+
+    **The random-twin yardstick is said here a second time too** (RANDOM_TWIN_YARDSTICK_PLAN.md
+    phase 4). ``reading`` is ``yardstick_of(conn, trial["n"])``, or None. The rule is
+    ``_yardstick_binds``'s, the one ``verdict`` applies, written out again without calling it or
+    ``yardstick_clears``: a ``measured`` reading below ``YARDSTICK_MIN_PERCENTILE`` says no, any
+    status other than ``measured`` or ``not-applicable`` says no (``unmatched`` is the one there
+    is), and no reading says no only for an arm recorded on or after ``YARDSTICK_SINCE``. Control
+    arms never reach this function: ``verdict`` fails them first, and only an arm ``verdict``
+    calls eligible is checked here.
     """
     from seer_engine.backtest import dev, tuning
 
@@ -2203,6 +2274,26 @@ def _blocking(
         out.append(
             f"it recorded {OWNER_INPUTS_LABEL!r}, which is a property of the candidate and which "
             f"no threshold re-decides"
+        )
+    if reading is not None:
+        status = str(reading["status"])
+        pct = reading["percentile"]
+        if status == "measured":
+            if pct is None or float(pct) < YARDSTICK_MIN_PERCENTILE:
+                out.append(
+                    f"it out-earned {reading['beaten']!r} of {reading['draws']!r} random twins "
+                    f"(share {pct!r}), under the {YARDSTICK_MIN_PERCENTILE:.0%} bar"
+                )
+        elif status != "not-applicable":
+            out.append(
+                f"its random-twin yardstick reads {status!r}, and only a measured share at or "
+                f"above {YARDSTICK_MIN_PERCENTILE:.0%}, or a book with no picked stock, clears it"
+            )
+    elif str(trial["run_at"]) >= YARDSTICK_SINCE:
+        out.append(
+            f"it was recorded at {trial['run_at']}, on or after {YARDSTICK_SINCE} when the "
+            f"random-twin yardstick became a condition, and it has never been measured against "
+            f"its twins"
         )
     return tuple(out)
 
@@ -2270,14 +2361,13 @@ def reevaluate_method(conn: sqlite3.Connection, method_id: str) -> Reevaluation:
         derived += 1 if v.derived else 0
         if not v.eligible:
             continue
-        blocking = _blocking(t, funding_of(conn, t["n"]))
+        blocking = _blocking(t, funding_of(conn, t["n"]), yardstick_of(conn, int(t["n"])))
         if blocking:
             raise LabError(
                 f"{t['candidate_id']} reads eligible at {DSR_LABEL} under the {g.policy} policy "
                 f"(N={g.n}), but a second, independent check of its recorded numbers says "
                 f"otherwise: {'; '.join(blocking)}. Refusing to move {method_id} -- a method may "
-                f"only cross this edge when every one of the five conditions clears the bar in "
-                f"force today."
+                f"only cross this edge when every condition clears the bar in force today."
             )
         if demoted or not bool(t["eligible"]):
             unblocked.append(str(t["candidate_id"]))

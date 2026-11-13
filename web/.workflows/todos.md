@@ -13,7 +13,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 1
+- Blocked: 0
 - Completed: 31
 
 ---
@@ -27,11 +27,14 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns: the snapshot fields and `SNAPSHOT_VERSION`; `web/lib/sera` types, derive, glossary, fixture and tests; the method page's seventh condition and the comparison-book treatment of control arms; the how page's wording; the redone panel's plain words for the two new labels; the regenerated `web/data/lab.json`; `sera.md` in the feature map. Exit criteria: the snapshot test and the JSON sync test pass; the method page shows the yardstick row in plain words in both themes at phone and desktop widths; a row with no reading says so and is never drawn as a pass; no owner-facing text prints either new engine label raw.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md` (phase 5 of 5)
   - **Satisfies**: R2 — "you idea so we can implement them robustly" — part 2: "Judge ideas against it. An arm passes only if it beats roughly the top tenth of random books on its own setup, in place of today's 'beats SPY and clears the luck score'." · criteria: R2.4
   - **Depends on**: P1-ENG-VZXN
   - **Plan**: `.workflows/plan/P1-WEB-59NH.md`
+  - **Handoff from phase 4** (P1-ENG-VZXN, 2026-11-13):
+    - The snapshot's `failedNow` can now carry the engine label `beats 90% of random twins` (the yardstick condition); it must be shown in plain words, never raw.
+    - Any P5 proof command that quotes `lab yardstick M… --arm …` must use `lab yardstick --arm …` alone: phase 3's CLI takes method ids, one `--arm`, or `--pending`, exactly one.
 
 ### [P2] Medium
 

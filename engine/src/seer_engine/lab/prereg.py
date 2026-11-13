@@ -203,6 +203,10 @@ def gate_text(conn: sqlite3.Connection | None = None) -> str:
     retyped, so a file written next year cannot claim a condition the code stopped applying, a
     bar the owner has moved, or an N the gate stopped deflating by.
 
+    Since 2026-11-14 it also names the random-twin yardstick (``store.YARDSTICK_LABEL``, built from
+    ``store.YARDSTICK_MIN_PERCENTILE``), because ``lab promote`` refuses a variant without a reading
+    that clears it (hardgate D20). Files written before then keep the text of their own day.
+
     Two numbers, both of which decide the verdict and neither of which can be recovered from the
     other. The **threshold** moved on 2026-10-07 (design §7.1: the owner set ``DSR_MIN`` to 0.90),
     and a pre-registration written at 0.90 records a different claim from one written at 0.95, so
@@ -233,9 +237,11 @@ def gate_text(conn: sqlite3.Connection | None = None) -> str:
 
     conditions = "; ".join(dev.FAILURE_LABELS[:-1])
     head = (
-        f"dev-eligible = the five P7a D8 conditions ({conditions}; no {dev.FAILURE_LABELS[-1]}) "
-        f"and DSR >= {store.DSR_MIN:.2f}, deflated by the multiple-testing N that the "
-        f"'{store.DSR_POLICY}' policy resolves to"
+        f"dev-eligible = the five P7a D8 conditions ({conditions}; no {dev.FAILURE_LABELS[-1]}), "
+        f"{store.YARDSTICK_LABEL} (out-earned at least {store.YARDSTICK_MIN_PERCENTILE:.0%} of the "
+        f"books that replay its decisions with the picked stocks drawn at random, or held no "
+        f"picked stock) and DSR >= {store.DSR_MIN:.2f}, deflated by the multiple-testing N that "
+        f"the '{store.DSR_POLICY}' policy resolves to"
     )
     if conn is None:
         return head

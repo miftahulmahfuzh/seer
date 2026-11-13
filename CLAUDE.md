@@ -84,9 +84,10 @@ entry in the same commit.
 Every method experiment runs in the same order: verify the data store is the one you mean →
 pre-register the hypothesis and every arm in a committed method file → run the control arms beside
 the treatment (cite a recorded control by trial instead when it is the same book on the current
-store) → survivorship and sanity check → record the verdict (accept or reject) in the
-journal → queue the follow-up ideas → report to the coordinator. Pre-registration is not skippable,
-least of all when the result looks obvious.
+store; `lab run` itself measures every otherwise-eligible arm against its random twins, so a
+hand-written random arm is a control, not the luck test) → survivorship and sanity check → record
+the verdict (accept or reject) in the journal → queue the follow-up ideas → report to the
+coordinator. Pre-registration is not skippable, least of all when the result looks obvious.
 
 ## Invariants that are easy to break
 

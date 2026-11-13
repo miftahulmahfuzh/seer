@@ -345,6 +345,18 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
             "reevaluate` if an amendment's trial clears every condition"
         ),
     )
+    s.add_argument(
+        "--jobs",
+        type=_positive_count,
+        default=2,
+        metavar="J",
+        help=(
+            "worker processes for the random-twin yardstick each arm that clears every other "
+            "condition is measured against before it is recorded (default 2: every worker holds "
+            "a full simulation in memory, and the lab machine has 11 GiB). The reading is the "
+            "same at any J"
+        ),
+    )
 
     s = sub.add_parser(
         "promote", help="pre-register a dev-eligible method's best variant for the test window"
@@ -1788,8 +1800,8 @@ def _promotable_now(
         out.append(
             "  Refused by the hard gate (dev-eligible, but `lab promote` exits 2 on these -- it "
             "wants a majority of walk-forward folds, won by the picks and by the variant it would "
-            "pre-register, and no kin -- family, ancestry, blend ingredient or behaviour -- that "
-            "has test-failed; there is no override):"
+            "pre-register, a variant that out-earned its random twins, and no kin -- family, "
+            "ancestry, blend ingredient or behaviour -- that has test-failed; there is no override):"
         )
         out += refused
     if held:
@@ -2093,12 +2105,20 @@ def _run(conn, args) -> int:
                 f"{coverage.MIN_DEV_COVERAGE:.0%} floor. These trials measure the panel, not the "
                 "hypothesis, and the method id is spent either way."
             )
+    # getattr for the same reason as `amend` above: hand-built Namespaces in the tests.
+    jobs = int(getattr(args, "jobs", 2))
     done = runner.run_method(
-        conn, method, path, data, git_sha=runner.git_head(config.REPO_ROOT), amend=amend
+        conn, method, path, data, git_sha=runner.git_head(config.REPO_ROOT), amend=amend,
+        yardstick_jobs=jobs,
     )
     ran = done.ran
     status = store.get_method(conn, method.id)["status"]
     log.info("%s: %d trial(s) recorded, status %s (%.1fs)", method.id, len(ran), status, time.perf_counter() - t0)
+    # One line per reading, printed by phase 3's `_yardstick_line` -- the same row `lab yardstick`
+    # prints -- so a reading reads the same wherever it was taken.
+    for r in ran:
+        if r.yardstick is not None:
+            log.info("random-twin yardstick: %s", _yardstick_line(r.trial.candidate_id, r.yardstick, ""))
     _show(conn, argparse.Namespace(method=method.id))
     print(f"\nLab N (dev trials) is now {store.dev_trial_count(conn)}; test-window looks used: {store.test_looks(conn)}")
     # The run's walk-forward verdict, printed from the value that was just recorded (R1). This is

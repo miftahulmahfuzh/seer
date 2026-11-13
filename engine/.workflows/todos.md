@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-11-13
-**Total Active Tasks**: 3
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 170
+- Completed: 171
 
 ---
 
@@ -78,15 +78,31 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - The plan's test `test_insert_refuses_what_the_record_cannot_mean` passed trial_n twice for two parametrised cases (TypeError before any assertion) → the row is built from merged keywords so the case's own trial_n wins; assertions and match strings unchanged (rung 3: the code block's evident intent)
     - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats adjusted for this task only (rung 6: this file's precedent for every swarm-tracked set, incl. phases 1 and 2 of this set). Plan index: phase 3's TaskID cell ticked `(done 2026-11-13)` in the coordinator's copy and the worktree copy (phase 2's missing tick in the worktree copy added too); coordinator's `**Status:**` set to `phase 3/5 complete`. P1-ENG-VZXN unblocked: its one dependency (P1-ENG-M170) is complete.
     - Landing not attempted: swarm coordinator `orch-random-twin-yardstick` owns the merge of `feature/random-twin-yardstick`.
-- [ ] **P1-ENG-VZXN** Phase 4: The yardstick as a screen condition
+- [x] **P1-ENG-VZXN** Phase 4: The yardstick as a screen condition
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns: the yardstick condition in `store.verdict` and `YARDSTICK_SINCE`; measurement inside `runner.run_method` before the write lock and the label in `trial_rows`; the clause in `hardgate.check`; the yardstick clause in `prereg.gate_text`; the `lab run` wiring; design §10; the backfill runbook; every skill and `CLAUDE.md` line that lists the dev screen (grep-based: explore, Sera, stale-page skills); `labkit.stamp_yardstick` and the clearing readings in every fixture that promotes; their tests and the `lab-cli.md` entry. Exit criteria: a fixture arm that clears the other six conditions and loses to its twins records not eligible and its method `rejected`; an old arm flips in `verdict` once a failing row exists; `lab promote` refuses an unmeasured arm; a newly written pre-registration names the yardstick; invariant 5 holds.
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md` (phase 4 of 5)
   - **Satisfies**: R2 — "you idea so we can implement them robustly" — part 2: "Judge ideas against it. An arm passes only if it beats roughly the top tenth of random books on its own setup, in place of today's 'beats SPY and clears the luck score'." · criteria: R2.1, R2.2, R2.3
   - **Depends on**: P1-ENG-M170
   - **Plan**: `.workflows/plan/P1-ENG-VZXN.md`
+  - **Completed**: 2026-11-13 16:05
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/lab/store.py, engine/src/seer_engine/lab/runner.py, engine/src/seer_engine/lab/hardgate.py, engine/src/seer_engine/lab/prereg.py, engine/src/seer_engine/commands/lab.py, engine/tests/labkit.py, engine/tests/test_lab_yardstick_gate.py, engine/tests/test_lab_hardgate.py, engine/tests/test_lab_prereg.py, engine/tests/test_lab_status.py, engine/tests/test_lab_gate_wording.py, docs/plans/2026-10-04-method-lab-design.md, docs/runbooks/yardstick-backfill.md, .claude/skills/explore-and-experiment-new-method/SKILL.md, .claude/skills/sera-the-explorer/SKILL.md, .claude/skills/update-stale-sera-methods-page/SKILL.md, .claude/skills/verify-seer/features/lab-cli.md, CLAUDE.md, engine/.workflows/todos.md, web/.workflows/todos.md, .workflows/plan/RANDOM_TWIN_YARDSTICK_PLAN.md
+  - **Proof**: verified-after-fix — 6 journeys, evidence /home/miftah/.local/state/seer-verify/1113-145908-323529/evidence
+  - **Drift**:
+    - Design §10 figures re-measured this session on the committed lab/lab.sqlite (read-only) with the plan's script: 45/42/14; 2,051/362; N=415; 256 eligible arms in 125 methods (185 treatment, 64 control, 7 dose); 182 dev-eligible methods, 94 with an eligible non-control arm; 192 non-control arms in 97 methods — all as the plan wrote them. The M0562 replay figures in §10.2 and the runbook's timing estimates are the analysis file's and were not re-measured.
+    - lab-cli.md: removed a stray unmatched fence (present before this set) that left phase 1's and phase 3's gotcha bullets outside the Gotchas list, as the coordinator asked.
+    - pytest runs used -n 4 instead of the plan's default, per the coordinator's memory note.
+    - Whole engine suite (-n 4, PG_TEST_URL set): 9948 passed, 1 failed, 6 skipped; the one failure is the known-red test_lab_hardgate.py::test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways (red on the base commit, see P1-ENG-3B9A).
+  - **Decided**:
+    - Plan's D20 tests `never_measured` (in-process and CLI), `not_applicable_reading` and the `twins_out_earned` CLI test never named a promoted variant, so `check` skipped the per-arm clauses → they patch `hardgate.promoted_variant` as every other clause test in that module does, and the CLI tests also assert `yardstick_refusal`'s sentence (rung 2)
+    - Plan's `_clear_every_other_condition` built a DevRow whose `beats_spy` disagreed with `failed` → the helper sets `beats_spy=True` with the labels (rung 3: fixture bug, code under test unchanged)
+    - Two `store.verdict` assertions in the lab-run tests assumed the relabelled smoke arm re-derives clean; `verdict` correctly re-derives the smoke market's real owner failures → they assert the yardstick label's presence/absence instead; the whole-tuple behaviour stays pinned by the R2.2 tests (rung 2)
+    - Way-back command `lab yardstick MNNNN --arm C` (plan prose, runner log line, test, explore skill) is refused by phase 3's landed CLI (method ids, one --arm, or --pending, exactly one) → the log line, its test and the skill say `lab yardstick --arm C` (rung 3/6: the landed CLI is the code that runs)
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats adjusted for this task only (rung 6: this file's precedent for every swarm-tracked set, incl. phases 1-3 of this set). Plan index: phase 4's TaskID cell ticked `(done 2026-11-13)` in the coordinator's copy and the worktree copy; coordinator's `**Status:**` set to `phase 4/5 complete`. P1-WEB-59NH unblocked: its one dependency (P1-ENG-VZXN) is complete.
+    - Landing not attempted: swarm coordinator `orch-random-twin-yardstick` owns the merge of `feature/random-twin-yardstick`.
 - [x] **P1-ENG-K7QD** Phase 1: Twin reader and lab CLI surfaces (run, twins, status, promote D19)
   - **Difficulty**: HARD
   - **Type**: Feature

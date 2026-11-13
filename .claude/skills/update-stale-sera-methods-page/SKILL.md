@@ -34,8 +34,11 @@ lab/lab.sqlite  --(lab export-json)-->  web/data/lab.json  --(next build)-->  th
 ```
 
 - `gate` in the snapshot is **resolved at export time** from `tuning.MAX_DRAWDOWN`,
-  `tuning.MIN_PROFIT_FACTOR`, `dev._MIN_TRADES`, `store.DSR_MIN` and `store.DSR_POLICY`. Move a
-  constant, re-export, and the published bars move with no data change.
+  `tuning.MIN_PROFIT_FACTOR`, `dev._MIN_TRADES`, `store.DSR_MIN`, `store.DSR_POLICY` and
+  `store.YARDSTICK_MIN_PERCENTILE` (published as `gate.yardstickMin` since snapshot 8). Move a
+  constant, re-export, and the published bars move with no data change. Each trial also carries
+  its random-twin reading (`yardstick`) and role (`role`); a method page's seventh condition,
+  "Beats look-alikes", reads them with `failedNow`.
 - Each trial is published **twice**: the record (`failed` / `eligible` / `dsr` / `nTrialsAtRun`,
   the run date's bars, append-only, never changes) and the verdict (`failedNow` / `eligibleNow` /
   `dsrNow`, from `store.published_verdict` against that same gate). Snapshot v2.

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from labkit import stamp_provenance
+from labkit import stamp_provenance, stamp_yardstick
 from seer_engine import dates
 from seer_engine.backtest import dev
 from seer_engine.lab import prereg, store
@@ -179,6 +179,7 @@ def _benchmark(conn) -> None:
         curve_json=_curve(_months(date(1993, 2, 1), date(2015, 10, 16)), 0.08),
     )])
     stamp_provenance(conn, ns)
+    stamp_yardstick(conn, ns)
 
 
 def _real_method(conn, mid: str = "M0001"):
@@ -192,7 +193,9 @@ def _real_method(conn, mid: str = "M0001"):
     fold and is refused. The curve compounds at 15% a year against the benchmark's 8%, so the
     method wins all four folds -- which is what the brief means by "a method winning a majority
     with a clean family promotes". Both trials are stamped with provenance on the benchmark's
-    prices, as `lab run` stamps a real one, because the gate refuses an unstamped trial (D10).
+    prices, as `lab run` stamps a real one, because the gate refuses an unstamped trial (D10). Both
+    trials also carry a random-twin reading that clears, as `lab run` now records one, because the
+    gate refuses an unmeasured variant (D20).
     """
     method, path = discover()[mid]
     c = method.candidates[0]
@@ -208,6 +211,7 @@ def _real_method(conn, mid: str = "M0001"):
             _ballast(mid),
         ])
         stamp_provenance(conn, ns)
+        stamp_yardstick(conn, ns)
         store.update_method(conn, mid, source_sha=source_sha(path), status="dev-eligible")
     return c, path
 
@@ -537,6 +541,20 @@ def test_the_recorded_gate_names_every_condition_the_lab_applies(tmp_path):
     assert resolved.startswith(text)  # the conn form only appends
     assert "N = " in resolved
     assert "\n" not in resolved  # one `key: value` line in the committed file
+
+
+def test_the_recorded_gate_names_the_random_twin_yardstick(tmp_path):
+    """Since 2026-11-14 a promoted variant has cleared its random twins (hardgate D20), so the
+    file says so, with the bar built from the constant, and the conn form still only appends."""
+    text = prereg.gate_text()
+    assert store.YARDSTICK_LABEL in text
+    assert f"{store.YARDSTICK_MIN_PERCENTILE:.0%}" in text
+    conn = store.connect(tmp_path / "lab.sqlite")
+    try:
+        resolved = prereg.gate_text(conn)
+    finally:
+        conn.close()
+    assert resolved.startswith(text) and "\n" not in resolved
 
 
 def test_the_recorded_test_window_starts_the_session_after_dev_end():

@@ -179,6 +179,9 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
      round -- the iron rules hold here exactly as everywhere else. `lab status` shows every
      dev-eligible method's fold record and, under "Refused by the hard gate", the reason, so check
      it *before* you plan a promotion.
+     `lab promote` also refuses an arm with no random-twin reading that clears (hardgate D20): an
+     arm must have out-earned at least 90% of its random twins. An arm recorded before 2026-11-14
+     may not be measured yet; `lab yardstick MNNNN` measures it, then promote again.
      Step 0b also carries the buy signal, which you report and never block on. If the eligible
      variant trades whole shares, or is a method from M0030 or earlier measured at the flat 0.1%,
      first run `lab costs` on it and then its fractional, real-fee twin as a one-variant variation
@@ -194,6 +197,11 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
 6. **Refill.** While launched < num-methods, pick the next idea for the free slot from the
    **current** lab, so later ideas learn from earlier results (the children's queued ideas
    included), then reserve and launch. Never let a slot sit idle while ideas remain.
+   **Between batches**, when no child is running, the coordinator may work down the yardstick
+   backfill: `lab yardstick --pending --limit N --jobs 2` (docs/runbooks/yardstick-backfill.md),
+   then `lab stage` + commit + push ("lab: yardstick backfill, batch k"). Never while children
+   run: each measurement holds two workers, and so does each child's `lab run`. A child never
+   demotes, promotes or runs the backfill.
 7. **Synthesize** when num-methods children are closed out. **Gate it before you write it.**
    Every figure in a synthesis arrived in a child's `DONE` line or its pane, so all of them are
    someone else's measurement, and the synthesis itself is append-only: it cannot be edited once

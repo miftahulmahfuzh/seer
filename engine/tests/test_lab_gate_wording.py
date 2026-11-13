@@ -513,3 +513,32 @@ def test_the_site_still_headlines_the_newest_synthesis() -> None:
         "web/app/sera/overview.ts no longer resolves `newest()` by `added` then `id`; the sweep's "
         "`ORDER BY added DESC, id DESC` would pick a different insight than the page renders"
     )
+
+
+# ------------------------------------------------------------------ the random-twin yardstick's bar
+
+#: The shipped documents that state the yardstick bar to an unattended session or to the person
+#: running the backfill. The design document is left out for ``SCANNED``'s reason: it records by
+#: dated revision, and a future §11 that moves the bar must not rewrite §10's number.
+YARDSTICK_DOCS: tuple[str, ...] = (
+    "docs/runbooks/yardstick-backfill.md",
+    ".claude/skills/explore-and-experiment-new-method/SKILL.md",
+    ".claude/skills/sera-the-explorer/SKILL.md",
+)
+
+#: "90% of its random twins", "90% of their twins": the bar as a document writes it.
+TWIN_BAR = re.compile(r"(\d{1,3}(?:\.\d+)?)% of (?:its |their )?(?:random )?twins", re.I)
+
+
+@pytest.mark.parametrize("rel", YARDSTICK_DOCS)
+def test_no_shipped_document_states_a_yardstick_bar_the_lab_does_not_apply(rel: str) -> None:
+    """The DSR bar went stale in six shipped files at once when the owner moved it (this module's
+    docstring). The yardstick's bar is written into three, so the same guard is built for it on
+    the day it ships rather than after the first move."""
+    path = config.REPO_ROOT / rel
+    assert path.is_file(), f"{rel} is gone; update YARDSTICK_DOCS or restore the file"
+    stated = [float(m.group(1)) for m in TWIN_BAR.finditer(path.read_text(encoding="utf-8"))]
+    assert stated, f"{rel} no longer states the yardstick bar; it is what a session acts on"
+    live = store.YARDSTICK_MIN_PERCENTILE * 100
+    wrong = [s for s in stated if abs(s - live) > 1e-9]
+    assert not wrong, f"{rel} states {wrong}% of twins; the lab applies {live:.0f}%"

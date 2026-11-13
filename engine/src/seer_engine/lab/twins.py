@@ -53,6 +53,17 @@ is recorded too, and ``lab run``'s Book twins block still names it. ``lab promot
 both cases that matter (hardgate D19). A near-twin (one trade apart) is a different book here, as
 it is everywhere in this module.
 
+**A recorded control is cited, not copied (2026-11-13).** Sera batch 20261113-0721 re-ran eight arms
+(M0545's SMA200 and ALWAYS, M0561's D3 and D6, four of M0606's) whose books M0084, M0558, M0108,
+M0232, M0313 and M0337 had recorded first. Each was a declared control, so ``lab run`` accepted it, and
+each cost a simulation and a dev trial row that said nothing new. The recorded trial already holds what
+the re-run recomputes, byte for byte, so the next method cites it by first-recorded trial (``lab idea``
+lists them) and runs only arms that hold a book the lab has not recorded. Nothing is written for a
+citation, so the append-only rows, N (methods with a dev trial), DSR (stamped moments of recorded rows)
+and D17/D19 (no twin arm exists) are all untouched. Citing is valid only when the control would be the
+same rules, allocator and params on the same window and the book is on the current store; otherwise it
+is re-run as a declared control, exactly as before. This refusal logic is unchanged.
+
 **Connection-agnostic on purpose.** Rows are read by position, never by name, so a bare
 ``sqlite3.connect("file:...?mode=ro", uri=True)`` -- which is how the calculate-assets skill opens
 the lab, because ``store.connect`` migrates and so dirties the file on a read -- gets the same

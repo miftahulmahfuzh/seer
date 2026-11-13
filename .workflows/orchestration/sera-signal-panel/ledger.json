@@ -10,10 +10,10 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": "signal registry + pure panel evaluator, 8 files verbatim from the plan, no decisions; S0001 reads weak on the real dev store (ic t +1.04) so do not assume it clears; proof: verified-first-pass /tmp/claude-1000/-home-miftah--worktrees-seer-sera-signal-panel/25196239-3ae1-4a7e-b9e1-34217419f431/scratchpad/p1-evidence",
+      "note": "verifier (wave 0): verified, R1.1 and R2.1 evaluator half; S0001 reads weak on the real dev store (ic t +1.04), do not assume it clears; observation: on the survivorship store mean_scored slightly exceeds mean_pool",
       "package": "engine/lab",
       "plan": ".workflows/plan/sera-signal-panel/phase-1.md",
-      "reported_at": "2026-11-14T05:51:54+07:00",
+      "reported_at": "2026-11-14T06:14:39+07:00",
       "satisfies": [
         "R1",
         "R2"
@@ -28,10 +28,10 @@
       "depends_on": [],
       "difficulty": "HARD",
       "n": 2,
-      "note": "panel tables + panel_verdict + snapshot 9 panel key; lab.sqlite untouched; baseline red left unfixed per invariant 11: web lab.test.ts testLooks pins 5, snapshot holds 6 (red on origin/main too); phase 6 task P1-WEB-4JM6 still marked blocked in web todos; proof: verified-first-pass /tmp/claude-1000/-home-miftah--worktrees-seer-sera-signal-panel/0199a25a-c6c3-47eb-99f4-e4cffcdc903c/scratchpad/evidence",
+      "note": "verifier (wave 0): verified, R2.3/R3.2 record half, R6.1, R6.3 engine half; lab.sqlite untouched; both baseline reds confirmed pre-existing (hardgate buy-signal test; web lab.test.ts testLooks 5 vs 6)",
       "package": "engine/lab`, `web/lib/sera",
       "plan": ".workflows/plan/sera-signal-panel/phase-2.md",
-      "reported_at": "2026-11-14T05:59:23+07:00",
+      "reported_at": "2026-11-14T06:14:39+07:00",
       "satisfies": [
         "R2",
         "R3",
@@ -111,10 +111,10 @@
       ],
       "difficulty": "NORMAL",
       "n": 6,
-      "note": null,
+      "note": "spawned by mistake as a third concurrent session (invariant 6 caps at two); closed before it wrote anything; respawn when 4 or 5 lands",
       "package": "web",
       "plan": ".workflows/plan/sera-signal-panel/phase-6.md",
-      "reported_at": null,
+      "reported_at": "2026-11-14T06:14:39+07:00",
       "satisfies": [
         "R6"
       ],
@@ -147,6 +147,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-signal-panel",
-  "updated": "2026-11-14T06:11:27+07:00",
+  "updated": "2026-11-14T06:55:56+07:00",
+  "verified_at": "2026-11-14T06:48:11+07:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-signal-panel"
 }

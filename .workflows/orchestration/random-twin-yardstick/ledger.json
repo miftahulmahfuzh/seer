@@ -6,19 +6,19 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "794b882c",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "roles recorded per trial, control arms never eligible, lab roles --backfill and lab reevaluate --demote added; on the lab copy backfill wrote 2182 roles (54 seed arms skipped) and --demote moved 88 of 182 methods; 1 pre-existing red pin (test_lab_hardgate buy-signal) fails on base too; decided: tasks filed under package engine since engine/lab has no todos (rung 6); proof: verified-first-pass /home/miftah/.local/state/seer-verify/1113-135053-184864/evidence",
       "package": "engine/lab",
       "plan": ".workflows/plan/random-twin-yardstick/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-11-13T14:18:05+07:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-NI1B",
       "title": "Roles in the record, role-aware status and the demotion door"
     },
     {
@@ -54,7 +54,7 @@
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The yardstick record and `lab yardstick"
     },
@@ -100,6 +100,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "random-twin-yardstick",
-  "updated": "2026-11-13T14:00:53+07:00",
+  "updated": "2026-11-13T14:19:18+07:00",
   "worktree": "/home/miftah/.worktrees/seer/random-twin-yardstick"
 }

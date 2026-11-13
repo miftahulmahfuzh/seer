@@ -11,7 +11,7 @@ import { pct } from '../../../lib/format';
 import {
   bestVariant, CONDITION_KEYS, CONDITION_LABEL, CONTROL_LABEL, conditionOk, conditionsPassed, excessCagr,
   isComparisonBook, isYardstickLabel, misses, moneyWeighted, shareInWords, trialsByMethod, twinsState,
-  twinsValue, type ConditionKey,
+  twinsValue, YARDSTICK_FAILURE_PREFIX, YARDSTICK_FAILURE_SUFFIX, type ConditionKey,
 } from '../../../lib/sera/derive';
 import type { ArmRole, Gate, LabMethod, LabTrial, Point } from '../../../lib/sera/types';
 
@@ -501,12 +501,30 @@ export function missInWords(label: string, gate: Gate): string {
 }
 
 /**
+ * One *recorded* `failed` label as the owner reads it ("Missed when run" in the technical record).
+ *
+ * The record names the bars of its own run date, so the bar is read out of the recorded label and
+ * never taken from today's gate: a label written at one bar and restated at another would put
+ * words in the record's mouth. The same two labels as `missInWords`, and every older label is
+ * returned exactly as it was recorded.
+ */
+export function recordedMissInWords(label: string): string {
+  if (isYardstickLabel(label)) {
+    const bar = Number(label.slice(YARDSTICK_FAILURE_PREFIX.length, label.length - YARDSTICK_FAILURE_SUFFIX.length));
+    return `beating ${shareInWords(bar / 100)} random look-alike books`;
+  }
+  if (label === CONTROL_LABEL) return 'it is a comparison book, built to be beaten';
+  return label;
+}
+
+/**
  * The full technical record of one trial, as label/value rows.
  *
  * `gate` is here for one row: "Missed by today's bars" goes through `missInWords`, because the
  * record sits on the page the owner reads and the two labels the lab grew on 2026-11-14 are
  * engine text, not words (plan invariant 8, and phase 5's exit criterion that no owner-facing
- * text prints either raw). Every older label prints as it always did.
+ * text prints either raw). "Missed when run" does the same from the recorded label alone
+ * (`recordedMissInWords`). Every older label prints as it always did.
  */
 export function techRows(t: LabTrial, gate: Gate): [string, string][] {
   return [
@@ -528,7 +546,7 @@ export function techRows(t: LabTrial, gate: Gate): [string, string][] {
     // a development try, which is one of many results selected among, and not to a test run,
     // which is a single try booked in advance.
     ['Luck bar applies', t.luckGated ? 'yes' : 'no — a test run has nothing to discount for luck'],
-    ['Missed when run', t.failed.length ? t.failed.join('; ') : 'nothing: eligible'],
+    ['Missed when run', t.failed.length ? t.failed.map(recordedMissInWords).join('; ') : 'nothing: eligible'],
     ['Missed by today’s bars', t.failedNow.length ? t.failedNow.map(f => missInWords(f, gate)).join('; ') : 'nothing: eligible'],
     // Snapshot 8. What the arm was registered as, and how it did against its random look-alikes.
     ['Kind of variant', roleText(t.role)],

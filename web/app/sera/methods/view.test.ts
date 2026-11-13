@@ -10,7 +10,7 @@ import {
   SPY_COLOR, SPY_DASH, techRows, untestedNote, windowText, workedSummary, yearPairs,
   redoneOf,
   nAtLastRun,
-  missInWords, roleText, techStatus, twinsRecord,
+  missInWords, recordedMissInWords, roleText, techStatus, twinsRecord,
 } from './view';
 
 const method = (over: Partial<LabMethod> = {}): LabMethod => ({
@@ -302,6 +302,23 @@ describe('marks / workedSummary', () => {
       'beats SPY TR; beating 9 in 10 random look-alike books',
     );
     for (const t of Object.values(s)) expect(now(t)).not.toMatch(/random twins|not a control arm/);
+  });
+
+  it('restates a recorded label at the bar it was recorded with, never today’s', () => {
+    const then = (failed: string[]) =>
+      Object.fromEntries(techRows(trial({ failed, failedNow: [] }), { ...GATE, yardstickMin: 0.5 }))['Missed when run'];
+    expect(then(['beats 90% of random twins'])).toBe('beating 9 in 10 random look-alike books');
+    expect(then(['beats 95% of random twins'])).toBe('beating 19 in 20 random look-alike books');
+    expect(then([CONTROL_LABEL])).toBe('it is a comparison book, built to be beaten');
+    // Older labels are the record as written, a retired bar included.
+    expect(then(['beats SPY TR', 'DSR >= 0.95', 'beats 90% of random twins'])).toBe(
+      'beats SPY TR; DSR >= 0.95; beating 9 in 10 random look-alike books',
+    );
+    expect(recordedMissInWords('PF >= 1.3')).toBe('PF >= 1.3');
+    for (const f of ['beats 90% of random twins', 'beats 95% of random twins', CONTROL_LABEL]) {
+      expect(then([f])).not.toMatch(/random twins|not a control arm|%/);
+    }
+    expect(Object.fromEntries(techRows(armStates().control, GATE))['Missed when run']).not.toMatch(/not a control arm/);
   });
 
   it('puts the two new engine labels into plain words for the redone panel, and leaves the rest', () => {

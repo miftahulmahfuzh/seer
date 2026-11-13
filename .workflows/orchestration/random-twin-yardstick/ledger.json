@@ -79,27 +79,27 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "2d57216455512d20c67fd842d7322b5851a60b68",
       "depends_on": [
         4
       ],
       "difficulty": "NORMAL",
       "n": 5,
-      "note": null,
+      "note": "snapshot 8 (role + yardstick per trial, gate bar/draws), seventh condition and comparison books on Sera pages; decided: test_lab_books.py version pin 7->8 per invariant 1 (file not in plan table); technical record 'Missed by today's bars' still prints raw labels as the plan's techRows block has it; web lab.test.ts testLooks 5-vs-6 red on base, hardgate buy-signal test red (not re-checked on base); ran npm ci in web/ (playwright missing); proof: verified-first-pass /home/miftah/.local/state/seer-verify/1113-155052-445583/evidence",
       "package": "web",
       "plan": ".workflows/plan/random-twin-yardstick/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-11-13T15:57:08+07:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-WEB-59NH",
       "title": "Snapshot and Sera pages"
     }
   ],
   "plan": "/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "random-twin-yardstick",
-  "updated": "2026-11-13T15:27:32+07:00",
+  "updated": "2026-11-13T15:57:08+07:00",
   "worktree": "/home/miftah/.worktrees/seer/random-twin-yardstick"
 }

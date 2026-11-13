@@ -17,25 +17,25 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Roles in the record, role-aware status and the demotion door"
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "7502e081",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "lab/yardstick.py + tests, plan code verbatim, no decisions; proof: verified-first-pass engine/tests/test_lab_yardstick.py (15 passed -n0 and -n 4); pre-existing red on base: test_lab_hardgate buy-signal pin (not this phase)",
       "package": "engine/lab",
       "plan": ".workflows/plan/random-twin-yardstick/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-11-13T14:00:53+07:00",
       "satisfies": [
         "R1"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-3B9A",
       "title": "The random-twin engine"
     },
     {
@@ -100,6 +100,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "random-twin-yardstick",
-  "updated": "2026-11-13T13:47:53+07:00",
+  "updated": "2026-11-13T14:00:53+07:00",
   "worktree": "/home/miftah/.worktrees/seer/random-twin-yardstick"
 }

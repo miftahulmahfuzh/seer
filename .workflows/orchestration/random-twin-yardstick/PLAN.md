@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/random-twin-yardstick`
 **Branch:** `feature/random-twin-yardstick` (base: `origin/main` @ `f83fb237`)
 **Phases:** 5
-**Status:** planned
+**Status:** phase 2/5 complete
 **Coordinator:** —
 
 ---
@@ -210,11 +210,11 @@ Names every phase plans against. A planner may add private helpers; it may not r
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Roles in the record, role-aware status and the demotion door | R3 | `engine/lab` | 5 | — | HARD | `.workflows/plan/random-twin-yardstick/phase-1.md` | — | — |
-| 2 | The random-twin engine | R1 | `engine/lab` | 2 | — | HARD | `.workflows/plan/random-twin-yardstick/phase-2.md` | — | — |
-| 3 | The yardstick record and `lab yardstick` | R1 | `engine/lab` | 4 | 1, 2 | NORMAL | `.workflows/plan/random-twin-yardstick/phase-3.md` | — | — |
-| 4 | The yardstick as a screen condition | R2 | `engine/lab` | 18 | 3 | HARD | `.workflows/plan/random-twin-yardstick/phase-4.md` | — | — |
-| 5 | Snapshot and Sera pages | R2 | `web` | 24 | 4 | NORMAL | `.workflows/plan/random-twin-yardstick/phase-5.md` | — | — |
+| 1 | Roles in the record, role-aware status and the demotion door | R3 | `engine/lab` | 5 | — | HARD | `.workflows/plan/random-twin-yardstick/phase-1.md` | P1-ENG-NI1B | — |
+| 2 | The random-twin engine | R1 | `engine/lab` | 2 | — | HARD | `.workflows/plan/random-twin-yardstick/phase-2.md` | P1-ENG-3B9A (done 2026-11-13) | — |
+| 3 | The yardstick record and `lab yardstick` | R1 | `engine/lab` | 4 | 1, 2 | NORMAL | `.workflows/plan/random-twin-yardstick/phase-3.md` | P1-ENG-M170 | — |
+| 4 | The yardstick as a screen condition | R2 | `engine/lab` | 18 | 3 | HARD | `.workflows/plan/random-twin-yardstick/phase-4.md` | P1-ENG-VZXN | — |
+| 5 | Snapshot and Sera pages | R2 | `web` | 24 | 4 | NORMAL | `.workflows/plan/random-twin-yardstick/phase-5.md` | P1-WEB-59NH | — |
 
 Phases 1 and 2 share no file and may run concurrently. Phases 3, 4 and 5 are strictly sequential:
 each edits files the one before it edited (`store.py`, `runner.py`, `commands/lab.py`, `lab-cli.md`),

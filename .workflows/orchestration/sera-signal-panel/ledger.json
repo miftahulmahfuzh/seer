@@ -24,21 +24,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "a36757e",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 2,
-      "note": null,
+      "note": "panel tables + panel_verdict + snapshot 9 panel key; lab.sqlite untouched; baseline red left unfixed per invariant 11: web lab.test.ts testLooks pins 5, snapshot holds 6 (red on origin/main too); phase 6 task P1-WEB-4JM6 still marked blocked in web todos; proof: verified-first-pass /tmp/claude-1000/-home-miftah--worktrees-seer-sera-signal-panel/0199a25a-c6c3-47eb-99f4-e4cffcdc903c/scratchpad/evidence",
       "package": "engine/lab`, `web/lib/sera",
       "plan": ".workflows/plan/sera-signal-panel/phase-2.md",
-      "reported_at": null,
+      "reported_at": "2026-11-14T05:59:23+07:00",
       "satisfies": [
         "R2",
         "R3",
         "R6"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-1MOB",
       "title": "Panel record: tables, published verdict, snapshot key"
     },
     {
@@ -60,7 +60,7 @@
         "R3",
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "lab panel`, `lab panel-map`, `lab next-signal-id"
     },
@@ -147,6 +147,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-signal-panel",
-  "updated": "2026-11-14T05:51:54+07:00",
+  "updated": "2026-11-14T05:59:48+07:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-signal-panel"
 }

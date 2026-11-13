@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/sera-signal-panel`
 **Branch:** `feature/sera-signal-panel` (base: `origin/main` @ `b0652d2`)
 **Phases:** 7
-**Status:** planned
+**Status:** phase 2/7 complete
 **Coordinator:** —
 
 ---
@@ -221,13 +221,13 @@ where era `2009-2015` is published under `recent` and each era object is `{"mont
 
 | # | Title | Satisfies | Package | Files | Depends on | Difficulty | Plan | TaskID | Card |
 |---|-------|-----------|---------|-------|-----------|------------|------|--------|------|
-| 1 | Signal registry and the pure panel evaluator | R1, R2 | `engine/lab` | 8 | — | HARD | `.workflows/plan/sera-signal-panel/phase-1.md` | — | — |
-| 2 | Panel record: tables, published verdict, snapshot key | R2, R3, R6 | `engine/lab`, `web/lib/sera` | 11 | — | HARD | `.workflows/plan/sera-signal-panel/phase-2.md` | — | — |
-| 3 | `lab panel`, `lab panel-map`, `lab next-signal-id` | R1, R2, R3, R4 | `engine/commands`, `engine/lab` | 5 | 1, 2 | NORMAL | `.workflows/plan/sera-signal-panel/phase-3.md` | — | — |
-| 4 | Replay the recorded stock-signal methods | R3 | `engine/lab`, `engine/commands` | 5 | 3 | HARD | `.workflows/plan/sera-signal-panel/phase-4.md` | — | — |
-| 5 | The panel gate in `lab run` and the one-chassis signal book | R4 | `engine/lab` | 12 | 1, 2 | HARD | `.workflows/plan/sera-signal-panel/phase-5.md` | — | — |
-| 6 | The signal map on `/sera/signals` | R6 | `web` | 8 | 2 | NORMAL | `.workflows/plan/sera-signal-panel/phase-6.md` | — | — |
-| 7 | Skills, runbook and docs for the two-stage flow | R5 | `.claude/skills`, `docs` | 6 | 3, 4, 5 | NORMAL | `.workflows/plan/sera-signal-panel/phase-7.md` | — | — |
+| 1 | Signal registry and the pure panel evaluator | R1, R2 | `engine/lab` | 8 | — | HARD | `.workflows/plan/sera-signal-panel/phase-1.md` | `P1-ENG-6CGV` | — |
+| 2 | Panel record: tables, published verdict, snapshot key | R2, R3, R6 | `engine/lab`, `web/lib/sera` | 11 | — | HARD | `.workflows/plan/sera-signal-panel/phase-2.md` | `P1-ENG-1MOB` | — |
+| 3 | `lab panel`, `lab panel-map`, `lab next-signal-id` | R1, R2, R3, R4 | `engine/commands`, `engine/lab` | 5 | 1, 2 | NORMAL | `.workflows/plan/sera-signal-panel/phase-3.md` | `P1-ENG-7F8X` | — |
+| 4 | Replay the recorded stock-signal methods | R3 | `engine/lab`, `engine/commands` | 5 | 3 | HARD | `.workflows/plan/sera-signal-panel/phase-4.md` | `P1-ENG-3AY5` | — |
+| 5 | The panel gate in `lab run` and the one-chassis signal book | R4 | `engine/lab` | 12 | 1, 2 | HARD | `.workflows/plan/sera-signal-panel/phase-5.md` | `P1-ENG-KGFN` | — |
+| 6 | The signal map on `/sera/signals` | R6 | `web` | 8 | 2 | NORMAL | `.workflows/plan/sera-signal-panel/phase-6.md` | `P1-WEB-4JM6` | — |
+| 7 | Skills, runbook and docs for the two-stage flow | R5 | `.claude/skills`, `docs` | 6 | 3, 4, 5 | NORMAL | `.workflows/plan/sera-signal-panel/phase-7.md` | `P1-ROOT-F485` | — |
 
 Phase 2 spans three Rs and cannot be split: the tables (R2), the twin rule inside the published verdict (R3.2) and the snapshot key (R6.1, R6.3) are one record with one byte-compared export, and a tree holding half of it fails the snapshot test. Phase 3 serves R3 through the printing half of R3.2 (`lab panel-map`'s twin column), which phase 2's handoff assigned to it.
 

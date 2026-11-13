@@ -1,0 +1,105 @@
+{
+  "branch": "feature/random-twin-yardstick",
+  "coordinator": "orch-random-twin-yardstick",
+  "coordinator_session_id": "65d86556-13e0-4ce6-8cbb-b7e1a2ace53c",
+  "created": "2026-11-13T13:47:53+07:00",
+  "phases": [
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 1,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/random-twin-yardstick/phase-1.md",
+      "reported_at": null,
+      "satisfies": [
+        "R3"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Roles in the record, role-aware status and the demotion door"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [],
+      "difficulty": "HARD",
+      "n": 2,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/random-twin-yardstick/phase-2.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The random-twin engine"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        1,
+        2
+      ],
+      "difficulty": "NORMAL",
+      "n": 3,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/random-twin-yardstick/phase-3.md",
+      "reported_at": null,
+      "satisfies": [
+        "R1"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The yardstick record and `lab yardstick"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        3
+      ],
+      "difficulty": "HARD",
+      "n": 4,
+      "note": null,
+      "package": "engine/lab",
+      "plan": ".workflows/plan/random-twin-yardstick/phase-4.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "The yardstick as a screen condition"
+    },
+    {
+      "card": null,
+      "commit": null,
+      "depends_on": [
+        4
+      ],
+      "difficulty": "NORMAL",
+      "n": 5,
+      "note": null,
+      "package": "web",
+      "plan": ".workflows/plan/random-twin-yardstick/phase-5.md",
+      "reported_at": null,
+      "satisfies": [
+        "R2"
+      ],
+      "status": "pending",
+      "task_id": null,
+      "title": "Snapshot and Sera pages"
+    }
+  ],
+  "plan": "/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md",
+  "repo": "/home/miftah/seer",
+  "slug": "random-twin-yardstick",
+  "updated": "2026-11-13T13:47:53+07:00",
+  "worktree": "/home/miftah/.worktrees/seer/random-twin-yardstick"
+}

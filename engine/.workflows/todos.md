@@ -2,19 +2,19 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-11-13
-**Total Active Tasks**: 2
+**Last Updated**: 2026-11-14
+**Total Active Tasks**: 5
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 3
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 171
+- Completed: 172
 
 ---
 
@@ -1682,6 +1682,33 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Commit**: `d89c324`
   - **Verified**: by the swarm coordinator from git, not from the phase's report — `d89c324` is an ancestor of the branch and carries exactly the five declared paths, no peer file and no lab state. Guardrails re-measured independently: `factor_rows` and `fundamental_rows` both report `price_basis='adjusted'`, `KEYWORD_ONLY`, read back from `inspect.signature`; `FactorParams` still 10 fields and `FundamentalParams` still 8, neither gained one; `lab/lab.sqlite` md5 9dbbf873209e82c8303f7f7117cb0682, `web/data/lab.json` md5 9bf2b2e1740c4e27a0380056dd6649e0 and `engine/tests/test_registry.py` md5 73ceb3ca56220477d1eeee901eee84fa all byte-identical to the pre-wave baseline. Full suite **7763 passed, 4 skipped, 0 failed**; `ruff check engine` clean.
   - **Note**: invariant 8 — the unmoved `price_basis="adjusted"` default — is the guarantee phase 3's four `factor_rows` arms (M0260, M0261, M0262, M0334) depend on. It held, so the retrofit prices against the same pool as the arms it is subtracted from.
+- [ ] **P1-ENG-7F8X** Phase 3: `lab panel`, `lab panel-map`, `lab next-signal-id`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns the three subcommands in `commands/lab.py` (parser, handler, `_HANDLERS`, module docstring); `lab/panel_run.py` (incl. `open_store`, shared with phase 4); `tests/test_lab_panel_cli.py` (incl. the `RULE_ID`/`ERAS` equality pin between phases 1 and 2); `.claude/skills/verify-seer/features/signal-panel.md` and its README row. Does not touch `panel.py` and `store.py` beyond calling them; `runner.py`; `hardgate.py` beyond calling `pin_dev_store`. Exit: on a scratch DB and the real stores, `lab panel S0001 S0002` records 2 signals x 2 stores x up to 3 eras, a second run records nothing new, an uncommitted signal and a non-dev store each exit 2, `panel-map` shows a twin in its twin-of column, and `lab status`'s N is the same before and after.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 3 of 7)
+  - **Satisfies**: R1 — a signal registry of pure, look-ahead-safe score functions, one per file, pre-registered by commit; R2 — a `lab panel` command reporting top-minus-pool spread and rank correlation with error bars by era, raw and controlled, false-discovery corrected, on both the dev and survivorship stores; R3 — replay the already-run stock-signal methods through the panel in one pass without changing any config digest or frozen record; R4 — the book lab runs only signals that clear the panel, on one fixed chassis, with the bar enforced as an exit-2 refusal · criteria: R1.2, R2.1, R2.2, R2.3, R3.2, R4.3
+  - **Depends on**: P1-ENG-6CGV, P1-ENG-1MOB
+  - **Plan**: `engine/.workflows/plan/P1-ENG-7F8X.md`
+- [ ] **P1-ENG-3AY5** Phase 4: Replay the recorded stock-signal methods
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `lab/panel_replay.py` (candidate -> picks scorer through `prepare_for` and `targets_prepared` with `held=frozenset()`; stores loaded through `panel_run.open_store`; row name = the method's own name); `lab panel-replay` in `commands/lab.py`; `tests/test_lab_panel_replay.py`; `docs/runbooks/signal-panel.md` (operator half); an appended `## Replay` section in `features/signal-panel.md`. Does not touch any file under `lab/methods/`; `trials`; phase 3's three subcommands except to sit beside them; `panel_run.py`. Exit: on a scratch copy of the lab DB and the real stores, `lab panel-replay` over every `stock-%` method completes, `lab panel-map` prints the ranked map with twins collapsed, and the sha256 of every `trials` row and of `methods.source_sha` is unchanged.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 4 of 7)
+  - **Satisfies**: R3 — replay the already-run stock-signal methods through the panel in one pass without changing any config digest or frozen record · criteria: R3.1
+  - **Depends on**: P1-ENG-7F8X
+  - **Plan**: `engine/.workflows/plan/P1-ENG-3AY5.md`
+- [ ] **P1-ENG-KGFN** Phase 5: The panel gate in `lab run` and the one-chassis signal book
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `Method.signal`, `Method.panel_exempt`, `method.SIGNAL_ID`, `method.PANEL_EXEMPT_KINDS` in `lab/method.py`; `lab/signal_book.py` (scores through `Signal.scores`); the D21 rule in `hardgate.py` and its call in `runner.preflight`; `method_template.py`; `tests/test_lab_panel_gate.py`, `tests/test_lab_signal_book.py`; the `panel_exempt` fixture edits in `tests/test_lab_exposure.py`, `tests/test_lab_gate_probe.py`, `tests/test_lab_survivorship.py`, `tests/test_lab_yardstick_gate.py`; the refusal line and gotcha in `features/lab-cli.md`. Does not touch `commands/lab.py`; `store.py`; any recorded method file. Exit: `lab run` on a scratch DB refuses an unpanelled member-picking method with exit 2 and an unchanged trial count, refuses a signal method with a hand-written treatment arm, accepts a signal method built from `standard_candidates` whose signal clears, and accepts an exempt chassis method; the full engine suite is green apart from invariant 11's baseline.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 5 of 7)
+  - **Satisfies**: R4 — the book lab runs only signals that clear the panel, on one fixed chassis, with the bar enforced as an exit-2 refusal · criteria: R4.1, R4.2
+  - **Depends on**: P1-ENG-6CGV, P1-ENG-1MOB
+  - **Plan**: `engine/.workflows/plan/P1-ENG-KGFN.md`
 
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"
@@ -1820,6 +1847,23 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-6CGV** Phase 1: Signal registry and the pure panel evaluator
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `lab/signal.py`, `lab/signals/__init__.py`, two seed signals (`s0001` twelve-minus-one momentum as the known-positive check, `s0002` a hash-order draw as the known-null check), `lab/panel.py`, `.claude/skills/explore-and-experiment-new-method/signal_template.py`, `tests/test_lab_signals.py`, `tests/test_lab_panel.py`. Does not touch `store.py`, `commands/lab.py`, `method.py`, `runner.py`, anything under `web/`. Exit: `discover()` returns both seed signals; `measure` recovers a planted signal and reads a null one as null on a synthetic market; both test files pass; J4/J5 print three finite era lines per seed signal on both real stores.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 1 of 7)
+  - **Satisfies**: R1 — a signal registry of pure, look-ahead-safe score functions, one per file, pre-registered by commit; R2 — a `lab panel` command reporting top-minus-pool spread and rank correlation with error bars by era, raw and controlled, false-discovery corrected, on both the dev and survivorship stores · criteria: R1.1, R2.1
+  - **Depends on**: none
+  - **Plan**: `engine/.workflows/plan/P1-ENG-6CGV.md`
+  - **Completed**: 2026-11-14 05:48
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/lab/signal.py, engine/src/seer_engine/lab/signals/__init__.py, engine/src/seer_engine/lab/signals/s0001_twelve_minus_one_momentum.py, engine/src/seer_engine/lab/signals/s0002_hash_draw.py, engine/src/seer_engine/lab/panel.py, engine/tests/test_lab_signals.py, engine/tests/test_lab_panel.py, .claude/skills/explore-and-experiment-new-method/signal_template.py
+  - **Proof**: verified-first-pass — 5 journeys, evidence /tmp/claude-1000/-home-miftah--worktrees-seer-sera-signal-panel/25196239-3ae1-4a7e-b9e1-34217419f431/scratchpad/p1-evidence
+  - **Drift**:
+    - No code drift: all eight files written byte-for-byte from the plan's code blocks.
+    - Observation, not a failure: the known-positive seed S0001 reads weak on the real dev store (whole-window rank correlation +0.0147, t +1.04; 2009-2015 spread −0.0202/yr). Exit criteria ask only for finite figures; later phases should not assume S0001 clears.
+    - The index's TaskID column and the phase 2 task entry were partly written by the concurrent phase 2 session; the Step 3 subagent reused P1-ENG-1MOB rather than duplicating it.
 - [x] **P2-ENG-3UGL** Phase 1: idea lists recorded controls; skills say cite
   - **Difficulty**: NORMAL
   - **Type**: Feature

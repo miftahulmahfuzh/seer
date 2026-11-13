@@ -182,6 +182,9 @@ engine/
       yardstick.py          the random-twin yardstick (random-twin-yardstick phase 2, P1-ENG-3B9A): what a no-skill book of exactly this arm's shape would have earned. Not `lab.twins` (that finds repeated recorded books; this builds random ones). Records the arm's allocator decisions, then replays them with every picked name swapped for a random index member of similar trading size, so dates, weights, cash and the safety switch are copied rather than described. Pure: no database, no `lab.store`, no clock, no network. See `### lab: the random-twin yardstick`
       universe_rank.py      point-in-time membership for a dollar-volume universe (2026-10-14): Sample, read_samples(), intervals() -> [(index_id, symbol, start, end)] with end EXCLUSIVE and None while still in, members_on(), DEFAULT_BAND = (1, 2000). There is no index to read for a liquidity band -- membership.py's vendored S&P 500 / Nasdaq-100 snapshots cover large caps and nothing else -- so membership is derived from what the market did: a symbol is a member on the sessions following a month-end at which its dollar volume ranked inside the band, and leaves at the first month-end it does not. Strictly point-in-time: a rank known on M governs membership only from M onward, a symbol that leaves and returns keeps TWO spells rather than one long one, and there is deliberately NO persistence filter -- requiring a year in the band would halve the store and look like prudence, but it would drop a name briefly liquid in 2001 from the 2001 cross-section because of what happened to it later, the same shape of error as a price history that quietly omits the companies that went bankrupt. Measured on the 214-sample sweep: 67,336 intervals over 9,977 symbols, exactly 2,000 members on every date, 7,816 symbols with more than one spell
       seed.py               one-time import of the pre-lab record (P7a's 54 candidates); since trial-reproducibility writes a source='backfill' trial_provenance row per seed trial
+      signal.py             a lab signal, stage one of the lab (sera-signal-panel phase 1, P1-ENG-6CGV): one stock-ranking idea as a pure month-end score function, with no width, weights, switch or cadence. Signal, discover(), visible(), SIGNAL_ID, MAX_LOOKBACK = 473, MARKET_FIELDS; source_sha is method.source_sha re-exported. See `### lab: signals and the signal panel`
+      panel.py              the signal panel (sera-signal-panel phase 1, P1-ENG-6CGV): does a ranking order next month's returns across the whole screened pool, beyond momentum, beta, size and volatility? build_frame() once per dev store, measure() per scorer -> PanelReading of EraStats. Pure, no verdict, no N. See `### lab: signals and the signal panel`
+      signals/              one file per signal, sNNNN_<slug>.py exporting SIGNAL (S0001 twelve-minus-one momentum, the known-positive check; S0002 a monthly hash draw, the known-null check)
       methods/              one file per method, mNNNN_<slug>.py exporting METHOD
     sean/                   Sean: the owner's real Gotrade orders, marked to market (Sean phases 1 and 4) and replayed against the fee schedule (phase 7)
       __init__.py           docstring only
@@ -4143,6 +4146,62 @@ It is now recorded beside the trial, so `verdict` can refuse a control without o
   run_at`) after `insert_provenance`, on both the first-run and `--amend` paths. The status rule
   is unchanged and is role-aware through `trial.eligible`: a method whose only eligible arm is a
   control records `rejected`. Hardgate D18 stays as an independent refusal at `lab promote`.
+
+### lab: signals and the signal panel (sera-signal-panel phase 1, P1-ENG-6CGV)
+
+Random twins of a book spread wider than a typical signal's effect, so a book cannot say whether
+its ranking ordered anything. A signal is only the ranking, measured across every pool member and
+every month at once; only a signal that clears there goes on to a book. Both modules are pure:
+no database, clock, files or network. Nothing here records a row or moves the luck gate's N.
+
+`lab/signal.py`:
+
+- `Signal` (frozen): `id` (`S\d{4}`), `name`, `family`, `source_kind` (method's `SOURCE_KINDS`),
+  `source_ref` (required unless `knowledge`), `hypothesis`, `expected_failure`, `lookback`
+  (1..`MAX_LOOKBACK` = 473, the smoke fixture's size), `score`, `market_fields` (subset of
+  `MARKET_FIELDS`, `runner.market_fields`' vocabulary), `idea_id` (a queued `MNNNN` idea),
+  `seen_keys` (`kind:value`). `__post_init__` raises on every malformed field.
+- `ScoreFn = (history, market, pool, data_date) -> Mapping[str, float]`; higher is better, a
+  left-out or NaN name has no opinion. `pool` is the names passing `tree_rank.SCREEN` on the date.
+- `Signal.scores(market, pool, data_date) -> dict` is the one call path (the panel and the later
+  signal book use it, never `score` directly): it applies `visible()` first, so the look-ahead
+  rule holds by construction. TypeError when `score` returns a non-Mapping.
+- `visible(market, data_date, lookback) -> (history, market)`: each symbol's last `lookback` bars
+  dated on or before `data_date` (views, not copies), and the market rebuilt with only those.
+- `discover(package=None) -> {id: (Signal, Path)}`, sorted; finds `signals/sNNNN_*.py` the way
+  `method.discover` finds methods. TypeError on a module without `SIGNAL`, ValueError on a file
+  number that disagrees with `SIGNAL.id` or two files claiming one id. The commit that adds the
+  file is the pre-registration.
+- Registered: `S0001` twelve-minus-one momentum (Jegadeesh-Titman; lookback 253; its controlled
+  slope is near zero by construction since momentum is a control, so it is checked on its rank
+  correlation and spread) and `S0002` a coin toss re-drawn every month from a sha256 of symbol and
+  month (lookback 1; any non-null reading means the panel leaks).
+- The authoring template is `.claude/skills/explore-and-experiment-new-method/signal_template.py`.
+
+`lab/panel.py` (the module docstring is the spec):
+
+- `build_frame(data: ResearchData) -> PanelFrame` (`market`, `months` of `PanelMonth`), built once
+  per store and shared by every signal. Decision dates are `tree_rank.month_ends`; the universe is
+  point-in-time membership minus SPY; the pool passes `tree_rank.SCREEN` (via
+  `f_factor.factor_rows`); the forward return is total return to the session after the next
+  decision date, dividends included, and a name with no bar after d by the exit is dropped and
+  counted. Controls `CONTROLS = (momentum, beta, volatility, size)`, from bars dated <= d.
+  ValueError when the store ends after `DEV_END` (never reads the test window) or SPY has
+  `BETA_N` (252) or fewer bars.
+- `measure(frame, scorer, *, mode="score"|"picks") -> PanelReading`. Score mode: per month
+  (needs `MIN_SCORED` = 30 scored pool names) the Spearman rank correlation, the top-bucket
+  (`top_size()` = max(`TOP_MIN` 10, ceil(`TOP_FRACTION` 0.10 x scored))) minus pool spread, and a
+  Fama-MacBeth controlled slope per one sd of score rank, controls clipped at the 1st/99th
+  percentile. Picks mode (for phase 4's replay): any finite value is a pick, `MIN_PICKS` = 5, a
+  0/1 pick dummy, no rank correlation. A scorer with no measurable month returns empty `stats`
+  and never raises.
+- `signal_scorer(signal)` -> `signal.scores`. `Scorer = (market, pool, d) -> Mapping`.
+- `PanelReading`: `stats` (one `EraStats` per era in `ERAS = (all, pre2009, 2009-2015)` with at
+  least `MIN_ERA_MONTHS` = 12 measured months; split at `ERA_SPLIT` 2009-01-01), `picks_hash`
+  (sha256 over each month's top bucket), `dropped_exits`; `era(name)`. `EraStats`: `months`,
+  `mean_pool`, `mean_scored`, `ic_mean`/`ic_t` (None in picks mode), `spread_top` (annualised),
+  `spread_t`, `fm_slope` (monthly), `fm_t`, `top_turnover`.
+- `RULE_ID = "panel-v1"`. No false-discovery correction and no verdict here.
 
 ### lab: the web snapshot and the journal's version chain (journal-versioning phase 4, P1-ENG-Q9XB)
 

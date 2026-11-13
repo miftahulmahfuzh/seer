@@ -2,14 +2,14 @@
 
 **Package Path**: `.`
 **Package Code**: ROOT
-**Last Updated**: 2026-11-06
-**Total Active Tasks**: 1
+**Last Updated**: 2026-11-14
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 2
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
@@ -105,6 +105,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - Whether to update `engine/package_readme.md`, which no phase owns -> **yes, four exact-string insertions**, because its `control_shape.py` entry is an exhaustive public-surface list that three new public symbols made stale, and /implement Step 4 chains `readme-updater` by default. But the `**Last Updated**` header paragraph was deliberately left alone (Rung 1, invariant 9): six concurrent sessions each prepending to one line is the shared-file collision the invariant forbids, and phase 8 owns the set's written record.
     - Whether to commit `.workflows/todos.md` -> **no**. It already carries phase 8's entry (`P3-ROOT-D7MX`) alongside this one, and a pathspec commit of it would ship a peer's bookkeeping under this phase's message (Rung 3: phase 2's own commit block lists five source/test files and no `todos.md`). This entry is left in the working tree for whoever commits that file.
     - Whether this phase merges and lands -> **it does not**; the set is swarm-tracked and `/implement` Step 5a leaves the merge to `orch-honest-control-redraw`.
+- [ ] **P1-ROOT-F485** Phase 7: Skills, runbook and docs for the two-stage flow
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `.claude/skills/sera-the-explorer/SKILL.md`, `.claude/skills/explore-and-experiment-new-method/SKILL.md`, the one paragraph in `.claude/skills/redo-sera-experiments/SKILL.md` that mints a twin (it now carries `panel_exempt`), `CLAUDE.md` (Layout, The lab, Experiment protocol), `README.md`, and the two Sera-facing sections appended to `docs/runbooks/signal-panel.md` ("A sweep, step by step", "The first replay"). Does not touch any code; `signal_template.py`; `method_template.py`; any feature-map file. Exit: both skills describe the sweep, the stage-two launch for a cleared signal, the unchanged path for non-signal ideas, the routing of queued stock-signal idea rows, the first replay run without `--limit`, and the `feature-wish` step for a promotable signal book; every command they name exists with those flags (J3).
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 7 of 7)
+  - **Satisfies**: R5 — the Sera and explore skills send signal ideas through the panel, with one synthesis per sweep and the queued stock-signal ideas routed through it · criteria: R5.1, R5.2
+  - **Depends on**: P1-ENG-7F8X, P1-ENG-3AY5, P1-ENG-KGFN
+  - **Plan**: `.workflows/plan/P1-ROOT-F485.md`
 ### [P2] Medium
 ### [P3] Low
 - [x] **P3-ROOT-D7MX** Phase 8: Close-out: which verdicts survived their honest control

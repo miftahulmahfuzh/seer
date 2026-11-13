@@ -2,14 +2,14 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-11-13
-**Total Active Tasks**: 0
+**Last Updated**: 2026-11-14
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
@@ -49,6 +49,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Handoff from phase 4** (P1-ENG-VZXN, 2026-11-13):
     - The snapshot's `failedNow` can now carry the engine label `beats 90% of random twins` (the yardstick condition); it must be shown in plain words, never raw.
     - Any P5 proof command that quotes `lab yardstick M… --arm …` must use `lab yardstick --arm …` alone: phase 3's CLI takes method ids, one `--arm`, or `--pending`, exactly one.
+- [ ] **P1-WEB-4JM6** Phase 6: The signal map on `/sera/signals`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `web/app/sera/signals/page.tsx`, `view.ts`, `view.test.ts`, `signals.module.css`; the seventh tab in `web/components/sera/SeraNav.tsx` and `SeraNav.module.css`; the "six-tab bar" comment in `web/components/sera/PageHeader.tsx`; `.claude/skills/verify-seer/features/sera.md`. Does not touch `types.ts` beyond importing the phase-2 types; `fixture.ts`; `features/README.md`; the engine. Exit: the page renders an empty state on the committed snapshot and a ranked map on a fixture snapshot, at 390 and 1280 wide in both themes, with no id, digest or code in the owner-visible text; a measured store with a missing era reads "not enough months to say".
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 6 of 7)
+  - **Satisfies**: R6 — panel results persisted in lab.sqlite with a snapshot key and shown on /sera in plain language · criteria: R6.2, R6.3
+  - **Depends on**: P1-ENG-1MOB
+  - **Plan**: `web/.workflows/plan/P1-WEB-4JM6.md`
 
 ### [P2] Medium
 

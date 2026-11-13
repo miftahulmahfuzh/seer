@@ -189,6 +189,7 @@ METHOD = Method(
         "windows of 3, 6 and 12 months); arms U3, U6, U12 are their Controls: the same count of names "
         "on exactly the same days, drawn from all liquid current members in a date-seeded hash order "
         "with no ranking (M0558 pool and screen, so U6 is not M0558-W6's book: it ranks on nothing). "
+        "D3 and D6 repeat M0558-A3 and M0558-A6 books on purpose (the admission side is unchanged; only the control is new); D12 is a new book. "
         "The gap D minus U is the admission's forward return against the average liquid member. "
         "Decay predicts D < U in the later, best-covered years (2009-2015). Published 2022-2023, the "
         "decay itself is recent, so the dev window sees mostly the older era in which admissions "
@@ -208,13 +209,13 @@ METHOD = Method(
         "anomaly, so any edge is likely pre-2009 and gone in 2009-2015."
     ),
     candidates=(
-        _v("D3", DecayParams(window_months=3), "admissions in the last 3 months, 10% each, rest SPY"),
+        _v("D3", DecayParams(window_months=3), "M0558-A3's book, repeated on purpose: admissions in the last 3 months, 10% each, rest SPY"),
         _v(
             "U3",
             DecayParams(window_months=3, arm="universe"),
             "Control: as many names as D3, drawn unranked from all liquid members, same days",
         ),
-        _v("D6", DecayParams(window_months=6), "admissions in the last 6 months, 10% each, rest SPY"),
+        _v("D6", DecayParams(window_months=6), "M0558-A6's book, repeated on purpose: admissions in the last 6 months, 10% each, rest SPY"),
         _v(
             "U6",
             DecayParams(window_months=6, arm="universe"),

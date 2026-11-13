@@ -184,6 +184,25 @@
                                     An arm recorded on the loaded store that no longer reproduces
                                     its trade count and return is refused (exit 2) and nothing is
                                     written for it
+    lab panel S0001 [S0002 ...] | --pending [--store DIR] [--sv-store DIR] [--jobs J]
+                                    stage one: measure committed signal files (lab/signals/) on a
+                                    stock-by-month panel of the dev window, first on the dev store
+                                    and then on the survivorship-check store, never both in
+                                    memory, and record each signal's three eras on both stores in
+                                    one transaction (panel_signals, panel_results). Refused before
+                                    any store loads, exit 2: an unknown id, a named signal file
+                                    that is not committed as it stands, a file changed since its
+                                    panel, a dev store declaring any window but dev, a missing or
+                                    unmarked survivorship-check store. A signal already panelled on
+                                    the dev store is not measured again. Never a trial: N, the luck
+                                    gate's N and the looks do not move
+    lab panel-map [--top K] [--kind signal|replay|all]
+                                    report only: every recorded panel ranked by its controlled
+                                    slope, with the published verdict (Benjamini-Hochberg across
+                                    every distinct pick set), its q, the panel it is a twin of and
+                                    the three eras' spread. Writes nothing
+    lab next-signal-id              the next free signal id: one past both the record and the
+                                    committed signal files
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
@@ -205,9 +224,9 @@
     lab seed                        one-time import of the pre-lab record
 
 Parallel sessions (sera-the-explorer) share one database: SEER_LAB_DB sets --db,
-SEER_RESEARCH_STORE sets --store, and SEER_SV_STORE sets lab survivorship's --sv-store. A
-worktree has none of the three stores of its own, so a child exports all three to the main
-checkout's.
+SEER_RESEARCH_STORE sets --store, and SEER_SV_STORE sets the --sv-store of lab survivorship and
+lab panel. A worktree has none of the three stores of its own, so a child exports all three to
+the main checkout's.
 
 Exit 0 on success; 2 when the lab's rules refuse the request; 1 on any other error.
 """
@@ -1058,6 +1077,73 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s.add_argument("--dry-run", action="store_true", default=argparse.SUPPRESS,
                    help="measure and print, and write nothing (the global --dry-run does the "
                         "same)")
+
+    s = sub.add_parser(
+        "panel",
+        # No literal `%` in any `help=` string below: argparse %-interpolates every `help=`.
+        help="screen committed signals on a stock-by-month panel, on both stores; no trial, no N",
+        description=(
+            "Stage one of the lab. For every index member and month-end of the dev window, score "
+            "each named signal file (seer_engine/lab/signals/sNNNN_<slug>.py) and set it against "
+            "the next month's total return: rank correlation, the top bucket's spread over the "
+            "pool and the slope after momentum, beta, size and volatility, each with its "
+            "t-statistic, for the whole window, before 2009 and 2009-2015. Measured on the dev "
+            "store and then on the survivorship-check store (never both in memory), and recorded "
+            "once per signal in one transaction only after both are measured. Refused before any "
+            "store loads (exit 2, nothing recorded): an unknown id, a named signal file that is "
+            "not committed exactly as it stands, a file changed since its panel, a dev store that "
+            "declares any window but dev or carries a purpose marker, a missing or unmarked "
+            "survivorship-check store. The dev store must carry the benchmark's prices (D10). A "
+            "signal already panelled on this dev store is not measured again. Nothing here is a "
+            "trial: the lab's N, the luck gate's N and the test-window looks do not move."
+        ),
+    )
+    s.add_argument("signal", nargs="*", metavar="S0001",
+                   help="signal ids to measure; each must be a committed file under "
+                        "seer_engine/lab/signals/")
+    s.add_argument("--pending", action="store_true",
+                   help="every committed signal file with no panel on this dev store yet; an "
+                        "uncommitted file is listed and skipped, not refused")
+    s.add_argument(
+        "--store",
+        type=Path,
+        default=Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR),
+        help=f"dev-window research store (default: {research.STORE_DIR}, or "
+             "$SEER_RESEARCH_STORE); a store declaring another window, or carrying a purpose "
+             "marker, is refused from its manifest",
+    )
+    s.add_argument(
+        "--sv-store",
+        type=Path,
+        default=Path(os.environ.get("SEER_SV_STORE") or research.SV_STORE_DIR),
+        help=f"the survivorship-check store (default: {research.SV_STORE_DIR}, or "
+             "$SEER_SV_STORE); required, and refused unless its manifest says purpose "
+             "survivorship-check. From a worktree, export SEER_SV_STORE to the main checkout's "
+             "engine/.research-sv",
+    )
+    s.add_argument("--jobs", type=_positive_count, default=1, metavar="J",
+                   help="worker processes across signals (default 1). The readings are identical "
+                        "for any J; only the time changes")
+
+    s = sub.add_parser(
+        "panel-map",
+        help="report only: every recorded signal panel ranked by its controlled slope, with its verdict",
+        description=(
+            "Read the recorded panels and print one row per panel, ranked by the dev store's "
+            "whole-window slope after momentum, beta, size and volatility, with the published "
+            "verdict (a Benjamini-Hochberg correction across every distinct pick set recorded on "
+            "that dev store, computed on read), its q, the earlier panel it is a twin of, and the "
+            "top bucket's spread over the pool in each era. Loads no research store and writes "
+            "nothing: the lab's N, the luck gate's N and the looks do not move."
+        ),
+    )
+    s.add_argument("--top", type=_positive_count, default=None, metavar="K",
+                   help="print only the K highest-ranked panels (default: all of them)")
+    s.add_argument("--kind", choices=("signal", "replay", "all"), default="all",
+                   help="registered signals, replays of recorded methods, or both (default: all)")
+
+    sub.add_parser("next-signal-id",
+                   help="the next free signal id: one past the record and the committed signal files")
 
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
@@ -4777,6 +4863,107 @@ def _seed(conn, args) -> int:
     return 0
 
 
+def _panel(conn, args) -> int:
+    """``lab panel S0001 [S0002 ...] | --pending``: stage one, the signal panel (lab/panel_run.py).
+
+    Order is the contract: ids and git first (``select_signals``), then the two manifests
+    (``check_stores``), then what is already recorded on the dev store (``split_recorded``). All
+    of that runs before a bar is read. Only then is each store loaded in turn
+    (``measure_stores``), and each signal recorded once both stores have measured it
+    (``record``). A repeat loads nothing. N, the luck gate's N and the looks are printed before
+    and after.
+    """
+    from seer_engine.lab import panel, panel_run, runner
+
+    command = "lab panel"
+    if research.DEV_END != dev.DEV_END:
+        raise store.LabError("research.DEV_END differs from dev.DEV_END; refusing to run")
+    if bool(args.signal) == bool(args.pending):
+        raise store.LabError(
+            "lab panel: name the signals to measure (lab panel S0001 S0002) or pass --pending, "
+            "not both and not neither"
+        )
+    selection = panel_run.select_signals(conn, args.signal, pending=args.pending, command=command)
+    pair = panel_run.check_stores(Path(args.store), Path(args.sv_store), command=command)
+    todo, already = panel_run.split_recorded(conn, selection.subjects, pair.dev_fingerprint)
+    before = panel_run.Counts.read(conn)
+    for sid, why in selection.skipped:
+        print(f"skipped {sid}: {why} (--pending measures committed signal files only)")
+    for sid in already:
+        print(f"{sid}: already panelled on dev store {pair.dev_fingerprint[:12]} under "
+              f"{panel.RULE_ID}; not measured again")
+    if not todo:
+        print("\nnothing to measure.")
+        print(panel_run.footer(conn, before, lead="Nothing was recorded."))
+        return 0
+
+    t0 = time.perf_counter()
+    jobs = int(getattr(args, "jobs", 1) or 1)
+    dev_run, sv_run = panel_run.measure_stores(conn, todo, pair, command=command, jobs=jobs)
+    git_sha = runner.git_head(config.REPO_ROOT)
+    measured = store.now_iso()
+    recorded, lost, unmeasurable = 0, 0, []
+    for s in todo:
+        print()
+        print(panel_run.format_reading(s, dev_run, sv_run))
+        empty = [
+            run.role for run in (dev_run, sv_run)
+            if not panel_run.has_whole_window(run.readings[s.id])
+        ]
+        if empty:
+            unmeasurable.append(
+                f"{s.id}: no month could be measured on the {' and '.join(empty)} store(s), so "
+                f"there is no whole-window reading to record; check its lookback and what it "
+                f"scores. Nothing was recorded for it"
+            )
+            print("  not recorded: no whole-window reading on " + " and ".join(empty))
+            continue
+        if panel_run.record(conn, s, dev_run, sv_run, git_sha=git_sha, measured=measured):
+            recorded += 1
+            print(f"  recorded on dev store {dev_run.fingerprint[:12]} and survivorship-check "
+                  f"store {sv_run.fingerprint[:12]}")
+        else:
+            lost += 1
+            print("  already recorded by a parallel session; kept theirs")
+    print()
+    print(
+        f"{recorded} signal(s) recorded, {len(already)} already panelled, "
+        f"{len(selection.skipped)} skipped, {lost} recorded first by a parallel session, "
+        f"{len(unmeasurable)} not measurable"
+    )
+    stage = (" Solo: `python -m seer_engine lab stage` so seertrade.site/sera shows it."
+             if recorded else "")
+    print(panel_run.footer(conn, before, lead="No trial was recorded.") + stage)
+    log.info("lab panel: %d signal(s) measured (%.1fs)", len(todo), time.perf_counter() - t0)
+    if unmeasurable:
+        for msg in unmeasurable:
+            log.error("%s", msg)
+        return 2
+    return 0
+
+
+def _panel_map(conn, args) -> int:
+    """``lab panel-map``: the recorded panels, ranked, with the published verdict. Writes nothing."""
+    from seer_engine.lab import panel_run
+
+    before = panel_run.Counts.read(conn)
+    fingerprint, rows, elsewhere = panel_run.panel_map(conn, kind=args.kind)
+    print(panel_run.format_map(fingerprint, rows, elsewhere, top=args.top, kind=args.kind))
+    print()
+    print(panel_run.footer(conn, before, lead="Nothing was recorded."))
+    return 0
+
+
+def _next_signal_id(conn, args) -> int:
+    """``lab next-signal-id``: the id alone on stdout; the N line on stderr."""
+    from seer_engine.lab import panel_run
+
+    before = panel_run.Counts.read(conn)
+    print(panel_run.next_signal_id(conn))
+    print(panel_run.footer(conn, before, lead="Nothing was recorded."), file=sys.stderr)
+    return 0
+
+
 _HANDLERS = {
     "status": _status,
     "regime": _regime,
@@ -4812,6 +4999,9 @@ _HANDLERS = {
     "link": _link,
     "stage": _stage,
     "next-id": _next_id,
+    "panel": _panel,
+    "panel-map": _panel_map,
+    "next-signal-id": _next_signal_id,
     "export": _export,
     "export-json": _export_json,
     "seed": _seed,

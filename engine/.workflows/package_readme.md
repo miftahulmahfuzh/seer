@@ -47,7 +47,8 @@ ones: `migrate`, `nightly`, `backfill`, `universe`, `fundamentals`, `shares`, `p
 ### The method lab (`seer_engine.lab`)
 
 `lab` subcommands that matter for this document: `next-id`, `run MNNNN`, `show`, `status`,
-`reevaluate`, `demote`, `promote`, `test`, `stage`, and `yardstick`.
+`reevaluate`, `demote`, `promote`, `test`, `stage`, `yardstick`, and the signal panel's `panel`,
+`panel-map` and `next-signal-id`.
 
 #### `lab run MNNNN [--amend] [--jobs J]`
 Runs a committed method on the dev window and records every arm. `--jobs` (default 2) is the
@@ -63,6 +64,27 @@ Default `--jobs` here is 1.
 
 #### `lab promote MNNNN`
 Pre-registers a dev-eligible method's best variant for the test window, behind the hard gate.
+
+#### `lab panel (S0001 ... | --pending) [--store DIR] [--sv-store DIR] [--jobs J]`
+Stage one of the lab: measures committed signal files (`lab/signals/sNNNN_<slug>.py`) on the
+stock-by-month panel of the dev window, first on the dev store, then on the survivorship-check
+store, and records each signal once both are measured. Exactly one of ids or `--pending` (every
+committed signal with no panel on this dev store; an uncommitted file is listed and skipped).
+`--store` defaults to `$SEER_RESEARCH_STORE` or `research.STORE_DIR`; `--sv-store` to
+`$SEER_SV_STORE` or `research.SV_STORE_DIR` (from a worktree, export it to the main checkout's
+`engine/.research-sv`). `--jobs` (default 1) fans scorers out to worker processes; readings do not
+depend on it. A signal already panelled on this dev store is not re-measured. Exit 2 when any
+signal has no whole-window reading on either store (it is not recorded). Prints N, the luck gate's
+N and the looks before and after: none of them move.
+
+#### `lab panel-map [--top K] [--kind signal|replay|all]`
+Report only. Every recorded panel ranked by its dev whole-window controlled slope, with the
+published verdict, its q, the panel it is a twin of and the top bucket's spread per era. Loads no
+research store and writes nothing.
+
+#### `lab next-signal-id`
+The next free signal id alone on stdout (the N footer goes to stderr): one past both the record
+and the committed signal files.
 
 ### Key Python entry points
 
@@ -107,6 +129,21 @@ def current_dev_fingerprint(conn) -> str | None
 def readings(conn, *, dev_fingerprint=None) -> dict[str, Readings]
 def published(conn, *, dev_fingerprint=None) -> dict[str, Verdict]  # computed on read, never stored
 def one_sided_p(t, months) -> float; def bh_qvalues(pvalues) -> list[float]
+
+# lab/panel_run.py (phase 3: what `lab panel`, `panel-map`, `next-signal-id` call)
+DEV, SURVIVORSHIP = "dev", "survivorship"
+class Subject; class StorePair; class StoreRun; class Selection; class Counts; class MapRow
+def check_stores(dev_dir, sv_dir, *, command) -> StorePair      # manifests only; LabError on a bad pair
+def load(store_dir, *, role, command) -> research.ResearchData  # dev window + purpose checked
+def open_store(conn, pair, role, *, command) -> research.ResearchData  # dev: D10 pin + fingerprint
+def select_signals(conn, ids, *, pending, command) -> Selection # ids + git, before any store loads
+def split_recorded(conn, subjects, dev_fingerprint) -> tuple[tuple[Subject, ...], tuple[str, ...]]
+def measure_stores(conn, subjects, pair, *, command, jobs=1) -> tuple[StoreRun, StoreRun]
+def has_whole_window(reading) -> bool
+def record(conn, subject, dev_run, sv_run, *, git_sha, measured) -> bool  # False: a peer got there first
+def panel_map(conn, *, kind="all") -> tuple[str | None, list[MapRow], int]
+def format_map(...) -> str; def format_reading(...) -> str; def footer(conn, before, *, lead) -> str
+def next_signal_id(conn) -> str     # store.next_signal_id(conn, taken=signal.discover())
 
 # lab/hardgate.py
 def check(conn, method_id) -> None                 # raises LabError on any refusal
@@ -201,6 +238,27 @@ for `/sera/signals`.
 One dev fingerprint is resolved once and used for both readings and verdicts; signals are ranked
 by dev whole-window slope, unmeasured last, ties by id. `web/lib/sera/types.ts` mirrors the shape.
 
+**Data flow of `lab panel` (`lab/panel_run.py`, phase 3)**. Order is the contract:
+1. `select_signals`: unknown ids, a signal file not committed exactly as it stands (the commit is
+   the pre-registration) and a file changed since its panel are refused from git alone.
+2. `check_stores`: both manifests, before either store loads. The dev side must declare the dev
+   window with no purpose marker; the survivorship side must exist, be marked survivorship-check
+   and cover the dev window. A test-window store is refused by its manifest and never read.
+3. `split_recorded`: what `store.has_panel` already holds on the dev fingerprint is skipped, so a
+   repeat loads nothing.
+4. `measure_stores`: load the dev store through `open_store` (which applies `hardgate.pin_dev_store`,
+   D10, and checks the loaded fingerprint still matches the manifest), build the frame once,
+   measure every subject, drop it, then do the same on the survivorship-check store. The two
+   stores (about 1 GB each) are never in memory together.
+5. `record`: per subject, the `panel_signals` row and every `panel_results` row for both stores in
+   one `BEGIN IMMEDIATE` transaction, re-asking `has_panel` under the lock. No half record, no
+   trial, no journal entry.
+
+Phase 4's replay reuses `Subject` (`mode="picks"`), `check_stores`, `open_store`, `record`,
+`Counts` and `footer` with its own store loop, so the D10 pin and fingerprint check live once.
+`panel_map` ranks on the dev store of the most recent dev panel; panels measured only on older dev
+stores are counted, not ranked.
+
 ### Pre-registration text
 
 `prereg.gate_text` writes the gate into every pre-registration file from live constants, so it now
@@ -234,7 +292,9 @@ The pipeline is single-process per command. Parallel sessions share the lab thro
 SQLite `BEGIN IMMEDIATE` (`store.begin_immediate`); `lab run` keeps the slow yardstick measurement
 outside that lock and re-decides eligibility under it. `yardstick.measure` fans twins out to `jobs`
 worker processes, each holding a full simulation in memory (hence the default of 2 in `lab run`);
-the result is identical at any `jobs`.
+the result is identical at any `jobs`. `lab panel` loads its two stores one after the other, never
+together, and its `record` re-checks `has_panel` under the write lock so a parallel session that
+recorded the same signal first wins and nothing is written twice.
 
 ## Error Handling
 
@@ -256,6 +316,10 @@ engine/.venv/bin/python -m seer_engine lab run M0700            # method file co
 engine/.venv/bin/python -m seer_engine lab yardstick --arm M0700-W60-B100
 engine/.venv/bin/python -m seer_engine lab yardstick --pending --limit 20 --jobs 2
 engine/.venv/bin/python -m seer_engine lab promote M0700
+engine/.venv/bin/python -m seer_engine lab next-signal-id
+SEER_SV_STORE=/home/miftah/seer/engine/.research-sv \
+  engine/.venv/bin/python -m seer_engine lab panel S0001        # signal file committed first
+engine/.venv/bin/python -m seer_engine lab panel-map --top 20
 ```
 
 ### Gotchas
@@ -264,6 +328,7 @@ engine/.venv/bin/python -m seer_engine lab promote M0700
 - `unmatched` never clears: the fix is a new arm (an amendment), not a remeasure.
 - argparse `help=` strings are %-interpolated; escape `%` as `%%`.
 - Closed records (`backtest/registry.py`, past reports, existing lab rows) are frozen.
+- `lab panel` needs a survivorship-check store; a worktree has none, so export `SEER_SV_STORE` (and `SEER_RESEARCH_STORE`) to the main checkout's stores.
 
 ## Notes
 
@@ -276,7 +341,9 @@ clause D20.
 
 The signal panel is the sera-signal-panel plan set (`.workflows/plan/sera-signal-panel/`): phase 1
 the signal registry and pure evaluator, phase 2 (task P1-ENG-1MOB) the append-only panel tables,
-`panel_verdict.published` and the `panel` key in `web/data/lab.json`. The `lab panel` and
-`lab panel-map` commands that write and print it come in later phases.
+`panel_verdict.published` and the `panel` key in `web/data/lab.json`, phase 3 (task P1-ENG-7F8X)
+`lab/panel_run.py` and the `lab panel`, `lab panel-map` and `lab next-signal-id` commands
+(feature-map entry `.claude/skills/verify-seer/features/signal-panel.md`). Phase 4 adds the replay
+of recorded methods.
 
 Documentation Created: 2026-11-13

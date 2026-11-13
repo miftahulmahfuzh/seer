@@ -15,6 +15,7 @@ call) unless the table says so.
 | Sean: real-money P&L, trades, receipt upload, the plan's to-do list | [sean.md](sean.md) | web, ui, api, sql | none (the vision read is never enabled) |
 | The night: migrate, nightly, paper (Claude twins included), paper_check | [engine-night.md](engine-night.md) | engine | `--net` opt-in (free tiers) |
 | The lab CLI: status, show, next-id, idea, refusals | [lab-cli.md](lab-cli.md) | lab, labsql | none |
+| The signal panel: `lab panel`, `lab panel-map`, `lab next-signal-id` | [signal-panel.md](signal-panel.md) | lab, labsql | none |
 
 Add an entry when a change ships a new user-facing feature; fix an entry when the app's behavior
 changed on purpose. A journey that fails because the app is broken is a product bug: report it,

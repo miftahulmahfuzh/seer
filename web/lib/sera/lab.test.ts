@@ -3,14 +3,14 @@ import {
   CONTROL_LABEL, DRAWDOWN_FAILURE_PREFIX, DSR_FAILURE_PREFIX, FAILURE_LABEL, isYardstickLabel,
 } from './derive';
 import { childrenOf, insightsOf, lab, methodById, trialsOf } from './lab';
-import { ARM_ROLES, DSR_POLICIES, INSIGHT_KINDS, METHOD_STATUSES, SOURCE_KINDS, YARDSTICK_STATUSES } from './types';
+import { ARM_ROLES, DSR_POLICIES, INSIGHT_KINDS, METHOD_STATUSES, PANEL_KINDS, SOURCE_KINDS, YARDSTICK_STATUSES } from './types';
 
 describe('lab snapshot (web/data/lab.json)', () => {
   it('has exactly the contract keys', () => {
-    expect(lab.version).toBe(8);
+    expect(lab.version).toBe(9);
     expect(Object.keys(lab).sort()).toEqual(
-      ['asOf', 'benchmark', 'books', 'data', 'gate', 'ideasSeen', 'insights', 'methods', 'paper',
-        'summary', 'trials', 'version'].sort(),
+      ['asOf', 'benchmark', 'books', 'data', 'gate', 'ideasSeen', 'insights', 'methods', 'panel',
+        'paper', 'summary', 'trials', 'version'].sort(),
     );
     expect(typeof lab.asOf).toBe('string');
     for (const k of ['maxDrawdown', 'minProfitFactor', 'minTrades', 'dsrMin', 'dsrN'] as const) {
@@ -24,6 +24,18 @@ describe('lab snapshot (web/data/lab.json)', () => {
     // Snapshot 8: the random-twin bar and draw count, published from the engine's constants.
     expect(lab.gate.yardstickMin > 0 && lab.gate.yardstickMin < 1).toBe(true);
     expect(Number.isInteger(lab.gate.yardstickDraws) && lab.gate.yardstickDraws > 0).toBe(true);
+  });
+
+  it('publishes the panel block in its contract shape, empty or not', () => {
+    // Snapshot 9. The committed lab may hold no panel yet, so this reads the shape, never a count.
+    expect(lab.panel.rule.length).toBeGreaterThan(0);
+    expect(lab.panel.fdr > 0 && lab.panel.fdr < 1).toBe(true);
+    expect(Array.isArray(lab.panel.signals)).toBe(true);
+    for (const s of lab.panel.signals) {
+      expect(PANEL_KINDS).toContain(s.kind);
+      expect(s.clears && s.twinOf !== null).toBe(false);
+      expect(s.clears).toBe(s.reasons.length === 0);
+    }
   });
 
   it('collapses the spent looks and the buy signal to distinct strategies', () => {

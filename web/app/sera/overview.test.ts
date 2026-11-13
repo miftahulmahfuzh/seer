@@ -101,7 +101,7 @@ const insight = (
 });
 
 const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
-  version: 8,
+  version: 9,
   asOf: '2026-10-04T14:12:24+00:00',
   gate: {
     maxDrawdown: 0.2,
@@ -150,6 +150,7 @@ const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
   ideasSeen: [],
   paper: [],
   books: { firing: [], testLooks: [] },
+  panel: { rule: 'panel-v1', fdr: 0.1, signals: [] },
   ...over,
 });
 

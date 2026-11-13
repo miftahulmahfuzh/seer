@@ -1,7 +1,7 @@
 # Package: seer_engine
 
 **Location**: `engine` (Python 3.11 package `seer_engine`, source in `engine/src/seer_engine/`)
-**Last Updated**: 2026-11-13
+**Last Updated**: 2026-11-14
 
 ## Overview
 
@@ -89,6 +89,24 @@ def yardstick_due(conn, trial, *, at=None) -> bool
 def insert_yardstick(conn, row: YardstickRow) -> bool
 def reevaluate_method(conn, method_id) -> Reevaluation
 class LabError(RuntimeError)                      # -> exit code 2
+# signal panel record (phase 2 of the sera-signal-panel set)
+PANEL_KINDS = ("signal", "replay"); PANEL_STORE_ROLES = ("dev", "survivorship")
+PANEL_ERAS = ("all", "pre2009", "2009-2015")
+class PanelSignalRow; class PanelResultRow       # PanelResultRow.from_era(...)
+def panel_signals(conn) -> list[dict]            # [] when the tables are absent
+def panel_results(conn, signal_id=None) -> list[dict]   # oldest first
+def has_panel(conn, signal_id, rule_id, store_fingerprint) -> bool
+def next_signal_id(conn, taken=()) -> str        # "S0001"-style; replays never consume one
+def insert_panel_signal(conn, row) -> bool       # False on a repeat; LabError on a changed file
+def insert_panel_results(conn, rows) -> int      # new rows; whole batch checked before any write
+SNAPSHOT_VERSION = 9                             # lab.json gains a trailing "panel" key
+
+# lab/panel_verdict.py
+RULE_ID = "panel-v1"; FDR = 0.10                 # RULE_ID must equal panel.RULE_ID
+def current_dev_fingerprint(conn) -> str | None
+def readings(conn, *, dev_fingerprint=None) -> dict[str, Readings]
+def published(conn, *, dev_fingerprint=None) -> dict[str, Verdict]  # computed on read, never stored
+def one_sided_p(t, months) -> float; def bh_qvalues(pvalues) -> list[float]
 
 # lab/hardgate.py
 def check(conn, method_id) -> None                 # raises LabError on any refusal
@@ -152,6 +170,36 @@ deflated Sharpe and does not touch the §1 real-money bar.
 3. `_measure_yardsticks`, **before the write lock**: provisional DSRs (`_provisional_dsrs`) pick the arms still worth measuring (`_due_for_yardstick`: not a control, clear of the five D8 conditions and the provisional luck test); each is measured at its own capital and funding. This is the slowest step and the lab-wide write lock is not held during it.
 4. `store.begin_immediate`, then `trial_rows` decides again under the lock. An arm that clears everything but has no reading (luck moved between reads, or `Unreproducible`) is labelled with `YARDSTICK_LABEL`: the record fails closed, and `lab yardstick` + `lab reevaluate` is the way back.
 5. Trials, roles, moments, funding, provenance and yardstick readings are inserted in one transaction; method status becomes `dev-eligible` or `rejected`.
+
+### The signal panel record (stage one of the lab)
+
+A stock-picking idea is measured on a stock-by-month panel (does its ranking order next month's
+returns?) before it is ever simulated as a book. Phase 1 added the pure evaluator (`lab/panel.py`);
+phase 2 adds its record and verdict. Neither table is a trial: no N, no test look.
+
+- `panel_signals`: one row per thing measured, either a committed signal file (`S0001`, kind
+  `signal`) or a replay of a recorded dev arm (its candidate id, kind `replay`, `method_id` set).
+  A panelled signal is frozen: the same id from a different `source_sha` is refused.
+- `panel_results`: one row per (signal, panel rule, research store, era) holding months, rank
+  correlation, top-minus-pool spread and the controlled slope, each with its t-statistic.
+- Both are `CREATE TABLE IF NOT EXISTS` on connect with no schema version (older checkouts sharing
+  `SEER_LAB_DB` open the DB unchanged), every reader answers empty when they are absent, and
+  triggers refuse every UPDATE and DELETE.
+
+**Published verdict (`panel_verdict.published`)**: never stored, because the false-discovery
+correction moves with every panel recorded. A panel clears when (1) its whole-window controlled
+slope on the current dev store is positive and its one-sided p-value (Student's t on `months - 1`
+df, computed without scipy) survives Benjamini-Hochberg at `FDR` across every distinct pick set on
+that store; (2) its top bucket beat the pool in 2009-2015; (3) its whole-window slope stays
+positive on the survivorship store. **Replay twins collapse**: panels with the same `picks_hash`
+count once, carried by the earliest recorded (`created`, then id); later ones report `twin_of`,
+show the first's q-value and never clear in their own name. `Verdict.reasons` are plain sentences
+for `/sera/signals`.
+
+**Snapshot**: `store.snapshot` (now `SNAPSHOT_VERSION = 9`) appends a `panel` block,
+`{rule, fdr, signals: [...]}`, with each signal's verdict and its dev and survivorship readings.
+One dev fingerprint is resolved once and used for both readings and verdicts; signals are ranked
+by dev whole-window slope, unmeasured last, ties by id. `web/lib/sera/types.ts` mirrors the shape.
 
 ### Pre-registration text
 
@@ -225,5 +273,10 @@ was built in the random-twin-yardstick plan set (`.workflows/plan/RANDOM_TWIN_YA
 phase 1 arm roles, phase 2 the twin engine, phase 3 the `trial_yardstick` record and
 `lab yardstick`, phase 4 (task P1-ENG-VZXN) the yardstick as a dev-screen condition and hard-gate
 clause D20.
+
+The signal panel is the sera-signal-panel plan set (`.workflows/plan/sera-signal-panel/`): phase 1
+the signal registry and pure evaluator, phase 2 (task P1-ENG-1MOB) the append-only panel tables,
+`panel_verdict.published` and the `panel` key in `web/data/lab.json`. The `lab panel` and
+`lab panel-map` commands that write and print it come in later phases.
 
 Documentation Created: 2026-11-13

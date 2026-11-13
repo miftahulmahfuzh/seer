@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 172
+- Completed: 173
 
 ---
 
@@ -1686,7 +1686,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns the three subcommands in `commands/lab.py` (parser, handler, `_HANDLERS`, module docstring); `lab/panel_run.py` (incl. `open_store`, shared with phase 4); `tests/test_lab_panel_cli.py` (incl. the `RULE_ID`/`ERAS` equality pin between phases 1 and 2); `.claude/skills/verify-seer/features/signal-panel.md` and its README row. Does not touch `panel.py` and `store.py` beyond calling them; `runner.py`; `hardgate.py` beyond calling `pin_dev_store`. Exit: on a scratch DB and the real stores, `lab panel S0001 S0002` records 2 signals x 2 stores x up to 3 eras, a second run records nothing new, an uncommitted signal and a non-dev store each exit 2, `panel-map` shows a twin in its twin-of column, and `lab status`'s N is the same before and after.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 3 of 7)
   - **Satisfies**: R1 — a signal registry of pure, look-ahead-safe score functions, one per file, pre-registered by commit; R2 — a `lab panel` command reporting top-minus-pool spread and rank correlation with error bars by era, raw and controlled, false-discovery corrected, on both the dev and survivorship stores; R3 — replay the already-run stock-signal methods through the panel in one pass without changing any config digest or frozen record; R4 — the book lab runs only signals that clear the panel, on one fixed chassis, with the bar enforced as an exit-2 refusal · criteria: R1.2, R2.1, R2.2, R2.3, R3.2, R4.3
   - **Depends on**: P1-ENG-6CGV, P1-ENG-1MOB
@@ -1704,7 +1704,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns `Method.signal`, `Method.panel_exempt`, `method.SIGNAL_ID`, `method.PANEL_EXEMPT_KINDS` in `lab/method.py`; `lab/signal_book.py` (scores through `Signal.scores`); the D21 rule in `hardgate.py` and its call in `runner.preflight`; `method_template.py`; `tests/test_lab_panel_gate.py`, `tests/test_lab_signal_book.py`; the `panel_exempt` fixture edits in `tests/test_lab_exposure.py`, `tests/test_lab_gate_probe.py`, `tests/test_lab_survivorship.py`, `tests/test_lab_yardstick_gate.py`; the refusal line and gotcha in `features/lab-cli.md`. Does not touch `commands/lab.py`; `store.py`; any recorded method file. Exit: `lab run` on a scratch DB refuses an unpanelled member-picking method with exit 2 and an unchanged trial count, refuses a signal method with a hand-written treatment arm, accepts a signal method built from `standard_candidates` whose signal clears, and accepts an exempt chassis method; the full engine suite is green apart from invariant 11's baseline.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 5 of 7)
   - **Satisfies**: R4 — the book lab runs only signals that clear the panel, on one fixed chassis, with the bar enforced as an exit-2 refusal · criteria: R4.1, R4.2
   - **Depends on**: P1-ENG-6CGV, P1-ENG-1MOB
@@ -1847,6 +1847,25 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-1MOB** Phase 2: Panel record: tables, published verdict, snapshot key
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns the two panel tables and their API in store.py; lab/panel_verdict.py; the `panel` snapshot key and SNAPSHOT_VERSION = 9; tests/test_lab_panel_record.py; version/key asserts in test_lab_snapshot.py and test_lab_books.py; the PANEL_KINDS pin in test_lab_gate_wording.py; web/lib/sera/types.ts, lab.test.ts, web/app/sera/overview.test.ts; regenerated web/data/lab.json; proof script phase-2-drive.py. Exit: rows insert once and never update; `published` returns the contract's verdicts with twins collapsed; snapshot test, tsc and vitest green with an empty panel.signals; lab/lab.sqlite byte-identical to the base.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 2 of 7)
+  - **Satisfies**: R2, R3, R6 — signal panel record, replay twin rule, persistence and site snapshot · criteria: R2.3, R3.2, R6.1, R6.3
+  - **Depends on**: none
+  - **Plan**: `.workflows/plan/P1-ENG-1MOB.md`
+  - **Completed**: 2026-11-14 05:57
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/lab/store.py, engine/src/seer_engine/lab/panel_verdict.py, engine/tests/test_lab_panel_record.py, engine/tests/test_lab_snapshot.py, engine/tests/test_lab_books.py, engine/tests/test_lab_gate_wording.py, web/lib/sera/types.ts, web/lib/sera/lab.test.ts, web/app/sera/overview.test.ts, web/data/lab.json, .workflows/plan/sera-signal-panel/phase-2-drive.py, engine/.workflows/todos.md, engine/.workflows/plan/P1-ENG-1MOB.md
+  - **Proof**: verified-first-pass — 5 journeys, evidence /tmp/claude-1000/-home-miftah--worktrees-seer-sera-signal-panel/0199a25a-c6c3-47eb-99f4-e4cffcdc903c/scratchpad/evidence
+  - **Drift**:
+    - Baseline red, not caused by this phase and left unfixed: web/lib/sera/lab.test.ts 'collapses the spent looks and the buy signal to distinct strategies' asserts summary.testLooks toBe(5) while the committed snapshot holds 6. Same literal (5) and same data (6) on base 0cedd79 and on origin/main, so it is red there too. The literal is deliberate ('spending a look should bring you here'); someone who owns the sixth look should update it.
+    - No code drift: every plan anchor in store.py matched its quoted line number.
+  - **Decided**:
+    - Step 3 task creation while phase 1 ran the same step in this worktree -> created only phase 2's task (tie-break: narrower blast radius)
+    - Stale testLooks literal in lab.test.ts -> left red and reported, not fixed (Decision 14 / invariant 11: a red test on the untouched base is never fixed by the phase)
 - [x] **P1-ENG-6CGV** Phase 1: Signal registry and the pure panel evaluator
   - **Difficulty**: HARD
   - **Type**: Feature

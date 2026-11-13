@@ -11,9 +11,11 @@ export type LabSnapshot = {
    * 7 added `books` and `summary.testBooks` — the buy signal and the spent looks collapsed from
    *   method ids to distinct strategies, because a method id is not a strategy;
    * 8 added each trial's `role` and `yardstick` (its random-twin reading) and the gate's
-   *   `yardstickMin` / `yardstickDraws` — the seventh condition, and which arms are comparison books.
+   *   `yardstickMin` / `yardstickDraws` — the seventh condition, and which arms are comparison books;
+   * 9 added `panel` — stage one of the lab: every signal measured on the stock-by-month panel,
+   *   with its verdict worked out at export time.
    */
-  version: 8;
+  version: 9;
   asOf: string;
   gate: {
     maxDrawdown: number;
@@ -81,6 +83,11 @@ export type LabSnapshot = {
    * the declared parent of each method and confirms it against the recorded curves.
    */
   books: { firing: LabBook[]; testLooks: LabBook[] };
+  /**
+   * Stage one of the lab (snapshot 9): every stock-picking idea measured on the stock-by-month
+   * panel, best controlled slope first, each with its verdict. Empty until a panel is recorded.
+   */
+  panel: LabPanel;
 };
 
 /**
@@ -377,3 +384,67 @@ export const ARM_ROLES = ['control', 'dose', 'idea', 'treatment'] as const satis
 
 /** Mirrors `lab.yardstick.STATUS_*`; pinned by the same engine test. */
 export const YARDSTICK_STATUSES = ['measured', 'not-applicable', 'unmatched'] as const satisfies readonly YardstickStatus[];
+
+/** What a panel row is (`lab.store.PANEL_KINDS`): a registered signal, or a replay of an arm the lab already ran. */
+export type PanelKind = 'signal' | 'replay';
+
+/** Mirrors `lab.store.PANEL_KINDS`; pinned by `engine/tests/test_lab_gate_wording.py`. */
+export const PANEL_KINDS = ['signal', 'replay'] as const satisfies readonly PanelKind[];
+
+/**
+ * One era of one panel reading (`store._snapshot_panel_era`). Every rate is a fraction, not a
+ * percentage. `ic` / `icT` are null for a replay: an arm's picks are a set with no score to rank.
+ */
+export type LabPanelEra = {
+  /** Months measured. */
+  months: number;
+  /** Mean monthly rank correlation between the score and next month's return. */
+  ic: number | null;
+  icT: number | null;
+  /** The top bucket's return over the whole pool's, annualised. */
+  spread: number;
+  spreadT: number;
+  /**
+   * Next month's return per 1 sd of score (or per pick, for a replay) once momentum, beta, size and
+   * volatility are allowed for. MONTHLY, unlike `spread`: a yearly figure is `slope * 12`, and the
+   * two are never shown as one unit.
+   */
+  slope: number;
+  slopeT: number;
+  /** Mean share of the top bucket replaced each month. */
+  turnover: number;
+};
+
+/** One store's readings by era; an era with no months is null. `recent` is 2009 to 2015. */
+export type LabPanelStore = {
+  all: LabPanelEra | null;
+  pre2009: LabPanelEra | null;
+  recent: LabPanelEra | null;
+};
+
+/** One recorded panel and its verdict (`store._snapshot_panel`, `lab.panel_verdict.published`). */
+export type LabPanelSignal = {
+  /** `S0001` for a signal; the arm's own id for a replay. Never shown to the owner. */
+  id: string;
+  kind: PanelKind;
+  /** What it ranks on, in plain words. */
+  name: string;
+  family: string;
+  /** The method a replay re-reads; null for a signal. */
+  methodId: string | null;
+  /** Whether it clears stage one. Never true for a twin. */
+  clears: boolean;
+  /** Its false-discovery q-value across every distinct pick set; null when not measured on the current history. */
+  q: number | null;
+  /** Each condition it missed, as a plain sentence written by the engine; empty exactly when it clears. */
+  reasons: string[];
+  /** The earlier panel that picks exactly the same stocks every month, or null. */
+  twinOf: string | null;
+  /** On the current dev price history; null when not measured there. */
+  dev: LabPanelStore | null;
+  /** With the companies that later disappeared put back; null when not measured that way. */
+  survivorship: LabPanelStore | null;
+};
+
+/** The panel block: the rule, the false-discovery rate it is judged at, and every recorded panel. */
+export type LabPanel = { rule: string; fdr: number; signals: LabPanelSignal[] };

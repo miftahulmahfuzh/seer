@@ -669,8 +669,9 @@ def test_the_v6_to_v7_migration_moves_not_one_byte_of_the_web_snapshot(tmp_path)
     finally:
         ro.close()
     # 7 when this was written; 8 since the random-twin fields (an additive change to the trials,
-    # not to this migration). The claim above is about the migration, and still holds.
-    assert store.SNAPSHOT_VERSION == 8
+    # not to this migration); 9 since the signal panel's ``panel`` key, another additive change.
+    # The claim above is about the migration, and still holds.
+    assert store.SNAPSHOT_VERSION == 9
 
 
 def _v7_db(path):
@@ -943,8 +944,8 @@ def lab(tmp_path):
 def test_the_snapshot_follows_the_contract(lab):
     s = store.snapshot(lab)
     assert list(s) == ["version", "asOf", "gate", "data", "summary", "benchmark", "books",
-                       "methods", "trials", "insights", "ideasSeen", "paper"]
-    assert s["version"] == 8
+                       "methods", "trials", "insights", "ideasSeen", "paper", "panel"]
+    assert s["version"] == 9
     gate = s["gate"]
     assert list(gate) == [
         "maxDrawdown", "minProfitFactor", "minTrades", "dsrMin",

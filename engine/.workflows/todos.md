@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-11-13
-**Total Active Tasks**: 2
+**Total Active Tasks**: 5
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 3
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 0
-- Completed: 167
+- Blocked: 2
+- Completed: 168
 
 ---
 
@@ -23,6 +23,49 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [ ] **P1-ENG-NI1B** Phase 1: Roles in the record, role-aware status and the demotion door
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns: the `trial_roles` table and its helpers; `CONTROL_LABEL` in `store.verdict` and in `runner.trial_rows`; role rows written by `run_method`; the `dev-eligible → rejected` transition and `store.demote_method`; the way back for a demoted method in `reevaluate_method` (D10); `lab roles` and `lab reevaluate --demote`; their tests and the `lab-cli.md` feature-map entry. Exit criteria: a method whose only eligible arm is a control records `rejected`; a recorded control reads not eligible and is never chosen by `best_dev_eligible`; `--demote` moves a stale method and appends a dated note, and plain `lab reevaluate` takes it back once an arm clears again; `--backfill` is idempotent; invariant 5 holds.
+  - **Status**: in_progress
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md` (phase 1 of 5)
+  - **Satisfies**: R3 — "you idea so we can implement them robustly" — part 3: "Derive status from treatment arms only. Arm roles already exist (the hard gate reads them to refuse promoting a control); the status line just ignores them." · criteria: R3.1, R3.2, R3.3, R3.4
+  - **Plan**: `.workflows/plan/P1-ENG-NI1B.md`
+- [x] **P1-ENG-3B9A** Phase 2: The random-twin engine
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns: the new module `lab/yardstick.py` and `tests/test_lab_yardstick.py`. Pure: a market, a candidate and a seed in, a `Measurement` out. Exit criteria: on a synthetic market, a recorded-and-replayed arm reproduces itself exactly; a twin has the arm's decision dates and weights and none of its picked names by construction; the result is identical at `jobs=1` and `jobs=2`; an ETF-only arm is `not-applicable`; a forced shape mismatch is `unmatched`.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md` (phase 2 of 5)
+  - **Satisfies**: R1 — "you idea so we can implement them robustly" — part 1: "A random-book yardstick per setup. For each combination of pool, book size, cadence, weighting and safety switch, run a few hundred random books once and cache the distribution. These count against nothing." · criteria: R1.1, R1.3, R1.4, R1.5
+  - **Plan**: `.workflows/plan/P1-ENG-3B9A.md`
+  - **Completed**: 2026-11-13 13:59
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/lab/yardstick.py, engine/tests/test_lab_yardstick.py
+  - **Proof**: verified-first-pass — 6 journeys, evidence engine/tests/test_lab_yardstick.py (15 passed, -n0 and under xdist -n 4)
+  - **Drift**:
+    - No code drift: both files are the plan's code blocks verbatim.
+    - test_lab_hardgate.py::test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways is red on the untouched base source (HEAD 34266dec exported to a scratch dir, run against a copy of lab.sqlite): the committed lab's buy-signal set is now M0284/M0383/M0562, the test pins M0072/M0258/M0284. Pre-existing red pin, out of scope per the index; not fixed.
+    - test_lab_luck.py::test_owner_misses_is_a_one_line_delegation_and_reads_the_row_not_the_string failed once in the full run while phase 1 was mid-edit on store.py and passed when re-run alone; not from this phase.
+    - Step 3 tasks were created by the peer phase-1 session first; this session created none.
+- [ ] **P1-ENG-M170** Phase 3: The yardstick record and `lab yardstick`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns: the `trial_yardstick` table and its helpers (`YardstickRow.from_measurement`, `has_yardstick`, `insert_yardstick`, `yardstick_of`); `YARDSTICK_MIN_PERCENTILE`, `YARDSTICK_LABEL`, `yardstick_clears`, `yardstick_due`; the `lab yardstick` command with `_positive_count` and `_yardstick_line`, which phase 4 reuses; their tests and the `lab-cli.md` entry. Exit criteria: `lab yardstick M…` on a fixture lab writes one row per due arm and none on a second run; the trial count and `gate(conn).n` do not move; a non-reproducing arm exits 2 with nothing written; a not-applicable (bracket) reading is recorded with `reproduced` NULL; every shape phase 2's `Measurement` admits is a row `insert_yardstick` accepts.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md` (phase 3 of 5)
+  - **Satisfies**: R1 — "you idea so we can implement them robustly" — part 1: "A random-book yardstick per setup. For each combination of pool, book size, cadence, weighting and safety switch, run a few hundred random books once and cache the distribution. These count against nothing." · criteria: R1.1, R1.2, R1.5, R1.6
+  - **Depends on**: P1-ENG-NI1B, P1-ENG-3B9A
+  - **Plan**: `.workflows/plan/P1-ENG-M170.md`
+- [ ] **P1-ENG-VZXN** Phase 4: The yardstick as a screen condition
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns: the yardstick condition in `store.verdict` and `YARDSTICK_SINCE`; measurement inside `runner.run_method` before the write lock and the label in `trial_rows`; the clause in `hardgate.check`; the yardstick clause in `prereg.gate_text`; the `lab run` wiring; design §10; the backfill runbook; every skill and `CLAUDE.md` line that lists the dev screen (grep-based: explore, Sera, stale-page skills); `labkit.stamp_yardstick` and the clearing readings in every fixture that promotes; their tests and the `lab-cli.md` entry. Exit criteria: a fixture arm that clears the other six conditions and loses to its twins records not eligible and its method `rejected`; an old arm flips in `verdict` once a failing row exists; `lab promote` refuses an unmeasured arm; a newly written pre-registration names the yardstick; invariant 5 holds.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md` (phase 4 of 5)
+  - **Satisfies**: R2 — "you idea so we can implement them robustly" — part 2: "Judge ideas against it. An arm passes only if it beats roughly the top tenth of random books on its own setup, in place of today's 'beats SPY and clears the luck score'." · criteria: R2.1, R2.2, R2.3
+  - **Depends on**: P1-ENG-M170
+  - **Plan**: `.workflows/plan/P1-ENG-VZXN.md`
 - [x] **P1-ENG-K7QD** Phase 1: Twin reader and lab CLI surfaces (run, twins, status, promote D19)
   - **Difficulty**: HARD
   - **Type**: Feature

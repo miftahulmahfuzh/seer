@@ -60,21 +60,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "b080d87c",
       "depends_on": [
         3
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "yardstick is the seventh screen condition in verdict, lab run and lab promote (D20); decisions: D20 tests patch promoted_variant like the module's other clause tests; way-back command is 'lab yardstick --arm C' alone (phase 3's CLI refuses 'MNNNN --arm C' \u2014 phase 5 proofs must use it); proof: verified-after-fix /home/miftah/.local/state/seer-verify/1113-145908-323529/evidence",
       "package": "engine/lab",
       "plan": ".workflows/plan/random-twin-yardstick/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-11-13T15:24:17+07:00",
       "satisfies": [
         "R2"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-VZXN",
       "title": "The yardstick as a screen condition"
     },
     {
@@ -92,7 +92,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Snapshot and Sera pages"
     }
@@ -100,6 +100,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "random-twin-yardstick",
-  "updated": "2026-11-13T14:48:11+07:00",
+  "updated": "2026-11-13T15:27:32+07:00",
   "worktree": "/home/miftah/.worktrees/seer/random-twin-yardstick"
 }

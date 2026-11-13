@@ -63,8 +63,9 @@ describe('pipelineStages', () => {
   it('reads the windows and thresholds from the gate', () => {
     expect(st[2].title).toEqual(['Tested on', '1993–2015']);
     expect(st[4].title).toEqual(['One look at', '2015–today']);
+    expect(st[3].title).toEqual(['Seven hurdles']);
     expect(st[3].detail.join(' | ')).toBe(
-      'Beat SPY + dividends | Worst fall ≤ 25% | PF ≥ 1.3 · 100+ trades | No owner inputs | Luck check ≥ 0.9',
+      'Beat SPY + dividends | Worst fall ≤ 25% | PF ≥ 1.3 · 100+ trades | No owner inputs | Luck check ≥ 0.9 | Beat 9 in 10 look-alikes',
     );
     // 0.3 / 0.8, not 0.2 / 0.9: once the defaults ARE 0.2 and 0.9 an override to those values is
     // a no-op and the case passes while proving nothing. The override has to differ from the
@@ -72,12 +73,14 @@ describe('pipelineStages', () => {
     const loose = pipelineStages(snap({ gate: { ...GATE, maxDrawdown: 0.3, dsrMin: 0.8 } }));
     expect(loose[3].detail).toContain('Worst fall ≤ 30%');
     expect(loose[3].detail).toContain('Luck check ≥ 0.8');
+    expect(pipelineStages(snap({ gate: { ...GATE, yardstickMin: 0.95 } }))[3].detail).toContain('Beat 19 in 20 look-alikes');
   });
   it('shows current counts', () => {
     expect(st.map(x => x.count)).toEqual(['2 waiting', '2 methods', '58 tries', '1 pass', '0 looks used', '1 on paper', 'None yet']);
   });
   it('keeps every line short enough for its box', () => {
     for (const x of st) {
+      expect(x.detail.length).toBeLessThanOrEqual(x.title.length === 1 ? 6 : 5);
       const max = x.weight && x.weight > 1 ? 26 : 18;
       for (const l of x.title) expect(l.length).toBeLessThanOrEqual(14);
       for (const l of x.detail) expect(l.length).toBeLessThanOrEqual(max);
@@ -109,16 +112,18 @@ describe('windowsModel', () => {
 });
 
 describe('hurdles', () => {
-  it('lists the six conditions in gate order with thresholds from the gate', () => {
+  it('lists the seven conditions in gate order with thresholds from the gate', () => {
     const h = hurdles(GATE, 58);
-    expect(h.map(x => x.key)).toEqual(['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr']);
+    expect(h.map(x => x.key)).toEqual(['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr', 'yardstick']);
     expect(h.map(x => x.target)).toEqual([
       'More than SPY total return', 'Max drawdown ≤ 25%', 'Profit factor ≥ 1.3', 'At least 100 trades',
-      'Nothing left for the owner to decide', 'Luck check ≥ 0.9',
+      'Nothing left for the owner to decide', 'Luck check ≥ 0.9', 'Beats 9 in 10 random look-alikes',
     ]);
-    expect(h.map(x => x.term)).toEqual(['spyTr', 'maxDrawdown', 'profitFactor', 'trades', 'ownerInputs', 'dsr']);
+    expect(h.map(x => x.term)).toEqual(['spyTr', 'maxDrawdown', 'profitFactor', 'trades', 'ownerInputs', 'dsr', 'twinsBeaten']);
     expect(h[5].plain).toContain('N = 110'); // the gate's N, from GATE.dsrN
     expect(h[5].plain).toContain('58'); // the tries argument, still quoted
+    expect(h[6].plain).toContain('200 times'); // GATE.yardstickDraws
+    expect(h[6].plain).toContain('only holds funds');
   });
 });
 

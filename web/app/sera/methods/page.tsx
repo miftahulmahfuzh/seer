@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { PageHeader } from '@/components/sera/PageHeader';
 import { Section } from '@/components/sera/Section';
 import { Term } from '@/components/sera/Term';
-import { excessCagr } from '@/lib/sera/derive';
+import { CONDITION_KEYS, excessCagr } from '@/lib/sera/derive';
 import { requireSera } from '@/lib/sera/gate';
 import { GLOSSARY, type GlossaryKey, SOURCE_KIND_LABEL, STATUS_LABEL } from '@/lib/sera/glossary';
 import { lab } from '@/lib/sera/lab';
@@ -58,7 +58,7 @@ export default async function Methods({ searchParams }: { searchParams: Promise<
       />
       <Section
         title="The methods"
-        caption="The six dots on each row are the six hurdles a method must clear before it may trade. A filled dot means cleared."
+        caption="The seven dots on each row are the seven hurdles a method must clear before it may trade. A filled dot means cleared; a dashed one means it does not apply or has not been measured yet."
         className={s.sheet}
       >
         <div className={s.toolbar}>
@@ -192,7 +192,7 @@ function Row({ r }: { r: MethodRow }) {
  * which the whole card links to.
  *
  * Dropped on purpose, each reachable one tap away:
- *   - Trades: a sample-size check, not a result; its hurdle is still one of the six dots.
+ *   - Trades: a sample-size check, not a result; its hurdle is still one of the seven dots.
  *   - Source: provenance, not performance, and a second tap target inside a card that is itself
  *     one big link is a mis-tap waiting to happen on a phone.
  *   - The verdict: the longest in the lab runs to 434 characters, and two lines of it at this
@@ -261,12 +261,13 @@ function Dots({ best, passed }: { best: LabTrial; passed: number }) {
   // listing it under "missed" is the same wrong answer as ticking it, one column over.
   const missed = ms.filter(x => x.ok === false).map(markLabel);
   const tip = missed.length ? missed.join(' · ') : 'Cleared every hurdle';
+  const total = CONDITION_KEYS.length;
   return (
-    <span className={s.dots} role="img" aria-label={`Cleared ${passed} of 6 hurdles. ${tip}`} data-tip={tip}>
+    <span className={s.dots} role="img" aria-label={`Cleared ${passed} of ${total} hurdles. ${tip}`} data-tip={tip}>
       {ms.map(x => (
         <span key={x.key} className={x.ok === true ? s.dotOn : x.ok === null ? s.dotNa : s.dotOff} />
       ))}
-      <span className={`num ${s.dotsN}`}>{passed}/6</span>
+      <span className={`num ${s.dotsN}`}>{passed}/{total}</span>
     </span>
   );
 }

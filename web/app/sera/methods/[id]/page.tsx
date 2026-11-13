@@ -11,7 +11,7 @@ import { ScatterChart, type ScatterPoint } from '@/components/sera/charts/Scatte
 import { PageHeader } from '@/components/sera/PageHeader';
 import { Section } from '@/components/sera/Section';
 import { Term } from '@/components/sera/Term';
-import { bestVariant, CONDITION_KEYS, CONDITION_LABEL, drawdownSeries, moneyWeighted, spyForWindow, yearlyReturns } from '@/lib/sera/derive';
+import { bestVariant, CONDITION_KEYS, CONDITION_LABEL, drawdownSeries, isComparisonBook, moneyWeighted, spyForWindow, yearlyReturns } from '@/lib/sera/derive';
 import { requireSera } from '@/lib/sera/gate';
 import { GLOSSARY, type GlossaryKey, INSIGHT_KIND_LABEL, SOURCE_KIND_LABEL, STATUS_LABEL } from '@/lib/sera/glossary';
 import { childrenOf, insightsOf, lab, methodById, trialsOf } from '@/lib/sera/lab';
@@ -21,7 +21,7 @@ import {
   anyMoneyWeighted, BEST_COLOR, conditionTip, count, DEPOSITS_TIP, dsrNote, earned, earnedVs, fixed, growthFmt, nAtLastRun,
   redoneOf, type Redone,
   growthLines, hurdlePoints, longDate, markLabel, marks, pct1, pfText, signed1, SOURCE_ICON, sourceHref, SPY_COLOR,
-  SPY_DASH, techRows, untestedNote, windowText, workedSummary, yearPairs, type Mark,
+  SPY_DASH, techRows, techStatus, missInWords, untestedNote, windowText, workedSummary, yearPairs, type Mark,
 } from '../view';
 import s from './method.module.css';
 
@@ -177,7 +177,9 @@ export default async function MethodPage({ params }: { params: Promise<Params> }
 }
 
 /**
- * A condition mark: tick, cross, or a dashed circle for a hurdle that does not apply.
+ * A condition mark: tick, cross, or a dashed circle for a hurdle with nothing to score — one that
+ * does not apply, or a random-twin check nobody has run yet. The label says which; the circle
+ * never reads as a pass.
  *
  * `decorative` is for the places that print the mark's label as visible text right beside it —
  * the narrow-width variant cards. There the icon is a picture of a sentence the reader can
@@ -253,7 +255,9 @@ function RedonePanel(
               )}
             </span>
             {!trial.eligibleNow && (
-              <span className={s.redoneNote}>Still misses: {trial.failedNow.join(', ')}.</span>
+              <span className={s.redoneNote}>
+                Still misses: {trial.failedNow.map(f => missInWords(f, lab.gate)).join(', ')}.
+              </span>
             )}
           </div>
         ))}
@@ -269,6 +273,17 @@ function RedonePanel(
   );
 }
 
+/**
+ * A control arm, named for what it is to the owner: a book registered to be beaten, so the idea
+ * has something fair to beat. The engine refuses it as a candidate with a label that is not a
+ * condition ("not a control arm"); drawing that as a crossed seventh hurdle would read as the idea
+ * failing, which is not what happened. Dashed like a waiting status chip, never filled like a result.
+ */
+function ComparisonChip() {
+  return (
+    <span className={s.compare} data-tip={GLOSSARY.comparisonBook.plain}>comparison book</span>
+  );
+}
 
 function Tested({ m, trials, best }: { m: LabMethod; trials: LabTrial[]; best: LabTrial }) {
   const gate = lab.gate;
@@ -308,7 +323,7 @@ function Tested({ m, trials, best }: { m: LabMethod; trials: LabTrial[]; best: L
         <ul className={s.worked}>
           {worked.lines.map(l => (
             <li key={l.key} className={s.workedItem}>
-              <MarkIcon mark={{ key: l.key, label: CONDITION_LABEL[l.key], ok: l.ok }} size={16} />
+              <MarkIcon mark={l} size={16} />
               <span>{l.text}</span>
             </li>
           ))}
@@ -382,7 +397,7 @@ function Tested({ m, trials, best }: { m: LabMethod; trials: LabTrial[]; best: L
       </Section>
 
       <Section eyebrow="Variants" title="Every variant"
-        caption={`One row per test run. A tick means the hurdle was cleared. The best variant is highlighted.${
+        caption={`One row per test run. A tick means the hurdle was cleared; a dashed circle means it does not apply, or has not been measured yet. A row marked comparison book was built to be beaten, so the idea can be judged against it. The best variant is highlighted.${
           funded ? ' Some runs here had money added every month, so their return and growth-a-year cells are left blank: with deposits arriving, neither is a return. What that money actually earned has a column of its own.' : ''}`}
         className={s.chartSheet}>
         {/* One list, two presentations, switched at 1024px by globals' .desk-only / .mobile-only
@@ -427,7 +442,10 @@ function Tested({ m, trials, best }: { m: LabMethod; trials: LabTrial[]; best: L
                 const money = moneyWeighted(t);
                 return (
                   <tr key={t.n} className={t.n === best.n ? s.bestRow : undefined}>
-                    <th scope="row" className={s.variant}>{t.candidateId}</th>
+                    <th scope="row" className={s.variant}>
+                      {t.candidateId}
+                      {isComparisonBook(t) && <ComparisonChip />}
+                    </th>
                     <td><span className={s.window} data-window={t.window}>{t.window === 'dev' ? 'Dev' : 'Test'}</span> {windowText(t)}</td>
                     <td className={s.r}>
                       {money ? (
@@ -510,6 +528,7 @@ function VariantCard({ t, gate, isBest }: { t: LabTrial; gate: Gate; isBest: boo
     <li className={s.card} data-best={isBest ? 'true' : undefined}>
       <div className={s.cardHead}>
         <span className={s.vName}>{t.candidateId}</span>
+        {isComparisonBook(t) && <ComparisonChip />}
         {isBest && (
           <span className={`chip ${s.vBest}`}
             data-tip="Of this method's development runs, the one that missed the fewest hurdles. It is the run the verdict above is written about.">
@@ -596,7 +615,7 @@ function Tech({ t }: { t: LabTrial }) {
       <summary className={s.techSummary} data-tip="Show the technical record">
         <span className={s.techChevron} aria-hidden="true"><ChevronRight size={16} /></span>
         <span className={s.techName}>{t.candidateId}</span>
-        <span className={s.techSub}>#{t.n} · {t.window === 'dev' ? 'development' : 'test'} {windowText(t)} · {t.failedNow.length ? `missed ${t.failedNow.length}` : 'eligible'}</span>
+        <span className={s.techSub}>#{t.n} · {t.window === 'dev' ? 'development' : 'test'} {windowText(t)} · {techStatus(t)}</span>
       </summary>
       <div className={s.techBody}>
         <dl className={s.techGrid}>

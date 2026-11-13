@@ -7,7 +7,7 @@ export type PipelineStage = {
   key: string;
   /** 1–2 short lines (≤ 14 characters each). */
   title: string[];
-  /** 1–5 short lines (≤ 18 characters, ≤ 26 on a weight-1.35 box). */
+  /** 1–5 short lines under a two-line title, 1–6 under a one-line title (≤ 18 characters, ≤ 26 on a weight-1.35 box). */
   detail: string[];
   /** The pill at the bottom, e.g. '58 tries' (≤ 18 characters: the pill is ~123px wide). */
   count: string;

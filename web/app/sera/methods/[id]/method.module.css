@@ -54,6 +54,13 @@
   font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; background: var(--stone); color: var(--ink-2);
 }
 .window[data-window='test'] { background: var(--ink); color: var(--sheet); }
+/* A comparison book (a control arm): built to be beaten, so it carries the dashed outline the
+   status chip uses for "waiting", never the filled ink of a result. Same pill as .window. */
+.compare {
+  display: inline-flex; flex: none; align-items: center; height: 22px; margin-left: 8px; padding: 0 8px;
+  border-radius: 999px; border: 1.5px dashed var(--outline); color: var(--ink-2); vertical-align: middle;
+  font-size: 11px; font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase;
+}
 
 /* Markdown prose (escape-first HTML from lib/sera/markdown; headings arrive as h3/h4/h5) */
 .proseSheet { gap: 16px; }

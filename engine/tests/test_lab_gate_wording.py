@@ -257,6 +257,72 @@ def test_the_web_mirrors_the_engines_luck_label_prefix() -> None:
     )
 
 
+_WEB_TWINS_PREFIX = re.compile(r"YARDSTICK_FAILURE_PREFIX\s*=\s*'([^']*)'")
+_WEB_TWINS_SUFFIX = re.compile(r"YARDSTICK_FAILURE_SUFFIX\s*=\s*'([^']*)'")
+_WEB_CONTROL = re.compile(r"CONTROL_LABEL\s*=\s*'([^']*)'")
+
+
+def _derive_ts() -> str:
+    return (config.REPO_ROOT / "web" / "lib" / "sera" / "derive.ts").read_text(encoding="utf-8")
+
+
+def _ts_string_list(src: str, name: str, rel: str) -> set[str]:
+    m = re.search(rf"export const {name}\s*=\s*\[([^\]]*)\]", src)
+    assert m is not None, f"{rel}: could not find `export const {name} = [...]`; fix this parse"
+    items = set(re.findall(r"'([^']+)'", m.group(1)))
+    assert items, f"{rel}: `{name}` parsed empty; fix this parse"
+    return items
+
+
+def test_the_web_mirrors_the_engines_random_twin_label() -> None:
+    """The random-twin label carries its bar in the middle, so the site matches both ends.
+
+    ``beats `` alone would also match ``beats SPY TR``, so ``derive.ts`` requires the fixed start,
+    the fixed end and a number between them. This pins both ends to ``store.YARDSTICK_LABEL`` and
+    the number to ``YARDSTICK_MIN_PERCENTILE``: if either drifts, a missed random-twin check renders
+    as a tick on the owner's page.
+    """
+    src = _derive_ts()
+    p, s = _WEB_TWINS_PREFIX.search(src), _WEB_TWINS_SUFFIX.search(src)
+    assert p is not None and s is not None, (
+        "web/lib/sera/derive.ts no longer defines YARDSTICK_FAILURE_PREFIX and "
+        "YARDSTICK_FAILURE_SUFFIX as single-quoted literals; say how the site reads the label now"
+    )
+    prefix, suffix = p.group(1), s.group(1)
+    label = store.YARDSTICK_LABEL
+    assert prefix and suffix
+    assert label.startswith(prefix) and label.endswith(suffix), (
+        f"the engine writes {label!r}, but the site looks for {prefix!r}...{suffix!r}"
+    )
+    bar = label[len(prefix):len(label) - len(suffix)]
+    assert re.fullmatch(r"\d+(?:\.\d+)?", bar), f"the bar inside {label!r} is not a number"
+    assert float(bar) == pytest.approx(store.YARDSTICK_MIN_PERCENTILE * 100)
+    # The SPY label shares the start and must not be read as a random-twin miss.
+    assert not "beats SPY TR".endswith(suffix)
+
+
+def test_the_web_mirrors_the_engines_control_label() -> None:
+    """``derive.ts`` recognises a control arm by the label phase 1 writes into its verdict."""
+    m = _WEB_CONTROL.search(_derive_ts())
+    assert m is not None, "web/lib/sera/derive.ts no longer defines CONTROL_LABEL as a literal"
+    assert m.group(1) == store.CONTROL_LABEL, (
+        f"the engine writes {store.CONTROL_LABEL!r} for a control arm, but the site looks for "
+        f"{m.group(1)!r}: every control would read as an unknown failure"
+    )
+
+
+def test_the_web_mirrors_the_engines_arm_roles_and_reading_statuses() -> None:
+    """The two closed vocabularies snapshot 8 publishes, as typed in ``web/lib/sera/types.ts``."""
+    from seer_engine.lab import control_shape, yardstick
+
+    rel = "web/lib/sera/types.ts"
+    src = (config.REPO_ROOT / rel).read_text(encoding="utf-8")
+    assert _ts_string_list(src, "ARM_ROLES", rel) == set(control_shape.ROLES)
+    assert _ts_string_list(src, "YARDSTICK_STATUSES", rel) == {
+        yardstick.STATUS_MEASURED, yardstick.STATUS_NOT_APPLICABLE, yardstick.STATUS_UNMATCHED,
+    }
+
+
 # ------------------------------------------------------------------- the lab journal's newest note
 
 #: The drawdown bar a journal note may state without being stale, because the note that states it

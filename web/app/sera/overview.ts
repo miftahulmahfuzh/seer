@@ -4,6 +4,7 @@ import type { ScatterPoint, ScatterRegion } from '../../components/sera/charts/S
 import { type Domain, type RefLine, type Tick, niceDomain } from '../../components/sera/charts/scale';
 import {
   type Book,
+  CONDITION_KEYS,
   CONDITION_LABEL,
   books,
   closest,
@@ -16,8 +17,8 @@ import {
 } from '../../lib/sera/derive';
 import type { DsrPolicy, LabInsight, LabMethod, LabSnapshot, LabTrial } from '../../lib/sera/types';
 
-/** The six conditions every dev try is judged on (the contract's failure labels). A count, not a threshold. */
-export const HURDLES = 6;
+/** The conditions every dev try is judged on (the contract's failure labels). A count, not a threshold. */
+export const HURDLES = CONDITION_KEYS.length;
 
 const MINUS = '−';
 
@@ -273,7 +274,7 @@ export function hurdles(snap: LabSnapshot): Hurdles {
         valueText: String(r.passing),
         tip:
           r.measured < r.total
-            ? `${r.passing} of the ${r.measured} tries it was checked on pass “${r.label}” (${r.total - r.measured} older tries predate it)`
+            ? `${r.passing} of the ${r.measured} tries it was checked on pass “${r.label}” (${r.total - r.measured} ${r.key === 'yardstick' ? 'not compared with random look-alikes yet' : 'older tries predate it'})`
             : `${r.passing} of ${r.total} tries pass “${r.label}”`,
       },
     ],

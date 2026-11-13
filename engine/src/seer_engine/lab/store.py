@@ -3885,7 +3885,17 @@ def as_mapping(row: sqlite3.Row) -> Mapping[str, Any]:
 # page was overstating the first and the lab was overstating the second. Derived at export time
 # like the version chain above, and for the same reason: it cuts walk-forward folds and runs the
 # kin rule, which is not work a React component may do. See ``lab/books.py`` and ``lab/firings.py``.
-SNAPSHOT_VERSION = 7
+#
+# 8 adds each trial's ``role`` and ``yardstick``, and ``gate.yardstickMin`` / ``gate.yardstickDraws``.
+# On 2026-11-14 the lab grew a seventh screen condition: a dev arm must out-earn
+# ``YARDSTICK_MIN_PERCENTILE`` of its random twins, books that replay its own decisions with every
+# picked name swapped for a random index member of similar trading size. It also started recording
+# which arms are controls. ``failedNow`` already carries both answers as labels (``verdict``), but a
+# label is a verdict and not a reading: from it alone the page could say "missed" and not "beat 150
+# of 200", and it could not tell an arm nobody has measured from one that cleared -- the one
+# confusion the method page must never make. Both fields are null when their table is absent or
+# holds no row for the trial, which was every trial the committed lab held when this version shipped.
+SNAPSHOT_VERSION = 8
 EXPECTED_FAILURE_SEP = "\n\nExpected failure: "  # how lab ideas write their hypothesis
 
 
@@ -3994,8 +4004,49 @@ def _snapshot_curve(text: str) -> list[list[Any]]:
     return out
 
 
+def _snapshot_yardstick(y: Mapping[str, Any] | sqlite3.Row | None) -> dict[str, Any] | None:
+    """One ``trial_yardstick`` row as the web reads it, or None when the trial has none.
+
+    A reading, not a verdict. Whether the arm clears is decided once, by ``verdict``, and reaches
+    the web as the label in ``failedNow``; this is the measurement that sentence is about, so the
+    page can say *how* it went ("beat 187 of 200") and not only *that* it went. ``medianRate`` is
+    the middle twin's rate, worked out here from ``rates_json`` so the web never parses a list it
+    only wants one number from. ``rates_json`` itself stays out: 200 floats per arm across the
+    whole lab is weight the page has no use for.
+
+    ``_num`` and ``_opt_int`` keep the published shape strict JSON: a not-applicable reading has
+    no draws to rank against, and its null ``percentile`` must stay null rather than become NaN,
+    which ``snapshot_json`` refuses. Its ``beaten`` is stored as 0 (the table mirrors
+    ``yardstick.Measurement``, plan Decision D11) and is **published as null**: "beat 0 of 0" is
+    not a reading, and the page tells "does not apply" from a result by ``status`` and a null.
+    """
+    if y is None:
+        return None
+    from statistics import median
+
+    status = str(y["status"])
+    raw = y["rates_json"]
+    rates = [
+        float(r) for r in (json.loads(raw) if raw else [])
+        if r is not None and math.isfinite(float(r))
+    ]
+    return {
+        "status": status,
+        "percentile": _num(y["percentile"]),
+        "draws": _opt_int(y["draws"]),
+        "beaten": None if status == "not-applicable" else _opt_int(y["beaten"]),
+        "armRate": _num(y["arm_rate"]),
+        "medianRate": _num(median(rates)) if rates else None,
+        "tradeRatio": _num(y["trade_ratio"]),
+    }
+
+
 def _snapshot_trial(
-    t: Mapping[str, Any], v: Verdict, f: Mapping[str, Any] | sqlite3.Row | None = None
+    t: Mapping[str, Any],
+    v: Verdict,
+    f: Mapping[str, Any] | sqlite3.Row | None = None,
+    role: str | None = None,
+    y: Mapping[str, Any] | sqlite3.Row | None = None,
 ) -> dict[str, Any]:
     """One ``trials`` row as the web reads it: the record, **and** the verdict it reads as now.
 
@@ -4025,6 +4076,13 @@ def _snapshot_trial(
     cannot tell that from a hurdle that was cleared. It published a tick on 0.513013 against a
     bar of 0.90. **Three states, not two**: gated and cleared, gated and missed (``dsrNow`` may be
     null -- nothing is admitted for being unmeasurable), and not gated at all.
+
+    ``role`` is :func:`role_of_trial` and ``y`` is :func:`yardstick_of` (snapshot 8). The random-
+    twin condition has the same trap ``luckGated`` closed, one condition over: an arm nobody has
+    measured has no label in ``failedNow``, and neither has one that cleared. ``yardstick`` is what
+    tells them apart, so it is published whole or as null, and null means "not measured" -- never
+    a pass. ``role`` lets the page show a control arm as the comparison book it was registered as,
+    instead of an idea that failed a seventh hurdle.
     """
     pf = t["profit_factor"]
     return {
@@ -4069,6 +4127,9 @@ def _snapshot_trial(
         "failedNow": list(v.failed),
         "eligibleNow": v.eligible,
         "dsrNow": _num(v.dsr),
+        # Snapshot 8: the arm's registered role and its latest random-twin reading, or null.
+        "role": role,
+        "yardstick": _snapshot_yardstick(y),
         "curve": _snapshot_curve(t["curve_json"]),
     }
 
@@ -4108,8 +4169,10 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
     Deterministic: the same database gives the same value; there is no wall-clock time in it
     (``asOf`` is the latest timestamp found in the data, "" for an empty lab). Reads only what
     schema v1 and v2 share and never touches ``meta``, so it works on a read-only connection to
-    a database that has not been migrated -- the one table added since, ``trial_funding``, is
-    reached only through ``funding_of``, which answers None when it does not exist. Gate and data
+    a database that has not been migrated -- the tables added since, ``trial_funding``,
+    ``trial_roles`` and ``trial_yardstick``, are reached only through ``funding_of``,
+    ``role_of_trial`` and ``yardstick_of``, each of which answers None when its table does not
+    exist. Gate and data
     facts come from the engine's constants;
     the gate's ``dsrPolicy`` / ``dsrN`` / ``dsrNBasis`` are resolved from ``DSR_POLICY`` against
     ``trials`` at export time rather than stored, so the published gate follows the constant
@@ -4131,6 +4194,7 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
     from seer_engine import dates, research
     from seer_engine.backtest import dev, tuning
     from seer_engine.lab import seed
+    from seer_engine.lab import yardstick as _yardstick
     from seer_engine.paper import roster
 
     def count(sql: str) -> int:
@@ -4165,6 +4229,10 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
             "minTrades": dev._MIN_TRADES,
             "dsrMin": DSR_MIN,
             **gate_block,
+            # Snapshot 8: the random-twin bar and how many twins it is read against. Published, not
+            # retyped in the web, for the reason ``dsrMin`` is: the owner moves bars.
+            "yardstickMin": YARDSTICK_MIN_PERCENTILE,
+            "yardstickDraws": _yardstick.DRAWS,
             "devStart": research.STORE_START.isoformat(),
             "devEnd": dev.DEV_END.isoformat(),
             "testStart": dates.next_session(dev.DEV_END).isoformat(),
@@ -4215,7 +4283,13 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
         # One gate, resolved once and passed down: `published_verdict` judges every row against
         # the same N, which is also the `gate.dsrN` published above.
         "trials": [
-            _snapshot_trial(t, published_verdict(conn, t, at=g), funding_of(conn, t["n"]))
+            _snapshot_trial(
+                t,
+                published_verdict(conn, t, at=g),
+                funding_of(conn, t["n"]),
+                role_of_trial(conn, t["n"]),
+                yardstick_of(conn, t["n"]),
+            )
             for t in _dicts(conn, "SELECT * FROM trials ORDER BY n")
         ],
         # ``supersedes`` and ``docKey`` as the writer recorded them; ``version`` and

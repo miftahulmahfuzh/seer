@@ -9,10 +9,11 @@ import {
 } from 'lucide-react';
 import { pct } from '../../../lib/format';
 import {
-  bestVariant, CONDITION_KEYS, CONDITION_LABEL, conditionOk, conditionsPassed, excessCagr, misses, moneyWeighted,
-  trialsByMethod, type ConditionKey,
+  bestVariant, CONDITION_KEYS, CONDITION_LABEL, CONTROL_LABEL, conditionOk, conditionsPassed, excessCagr,
+  isComparisonBook, isYardstickLabel, misses, moneyWeighted, shareInWords, trialsByMethod, twinsState,
+  twinsValue, type ConditionKey,
 } from '../../../lib/sera/derive';
-import type { Gate, LabMethod, LabTrial, Point } from '../../../lib/sera/types';
+import type { ArmRole, Gate, LabMethod, LabTrial, Point } from '../../../lib/sera/types';
 
 /* ---- List filter --------------------------------------------------------------------------- */
 
@@ -49,7 +50,7 @@ export type MethodRow = {
   best: LabTrial | null;
   /** Number of trials recorded for this method (all windows). */
   tries: number;
-  /** Hurdles the best variant cleared (0..6), or null when it was never run. */
+  /** Hurdles the best variant cleared (0..7), or null when it was never run. */
   passed: number | null;
   alive: boolean;
 };
@@ -204,25 +205,36 @@ export function redoneOf(children: LabMethod[], trialsOf: (id: string) => LabTri
 /** A child method that is this one redone on real money, with the trial that says so. */
 export type Redone = { method: LabMethod; trial: LabTrial };
 
-/* ---- The six hurdles ----------------------------------------------------------------------- */
+/* ---- The seven hurdles --------------------------------------------------------------------- */
 
 /**
- * true = cleared, false = missed, null = the hurdle does not apply to this row
- * (derive.conditionOk, which reads the engine's `failedNow` and `luckGated`).
+ * true = cleared, false = missed, null = nothing to score here
+ * (derive.conditionOk, which reads the engine's `failedNow`, `luckGated` and `yardstick`).
  *
- * `null` is the luck check on a test-window look and nothing else. A luck test that *could not be
- * scored* is still a miss — the engine lists it in `failedNow` — so a dashed mark always means
- * "no such hurdle here", never "we did not look".
+ * `null` is the luck check on a test-window look, the random-twin check on a test look or on a
+ * book that only holds funds, and the random-twin check on an arm nobody has measured yet. The
+ * last one says so in `naText` ("not measured yet"), so a dashed mark is never read as an excused
+ * hurdle when it is really a pending one. `detail` is the reading behind a random-twin mark
+ * ("beat 187 of 200"), printed after the state wherever the mark is spelled out.
  */
-export type Mark = { key: ConditionKey; label: string; ok: boolean | null };
+export type Mark = { key: ConditionKey; label: string; ok: boolean | null; naText?: string; detail?: string };
 
-/** The six hurdles of one trial, in display order. */
+/** The seven hurdles of one trial, in display order. */
 export const marks = (t: LabTrial): Mark[] =>
-  CONDITION_KEYS.map(key => ({ key, label: CONDITION_LABEL[key], ok: conditionOk(t, key) }));
+  CONDITION_KEYS.map(key => {
+    const mark: Mark = { key, label: CONDITION_LABEL[key], ok: conditionOk(t, key) };
+    if (key !== 'yardstick') return mark;
+    const state = twinsState(t);
+    if (state === 'not-measured') return { ...mark, naText: 'not measured yet' };
+    if (state === 'cleared' || state === 'missed' || state === 'unmatched') return { ...mark, detail: twinsValue(t) };
+    return mark;
+  });
 
-/** 'Beats SPY: cleared' / 'missed' / 'not applicable'. */
-export const markLabel = (m: Mark): string =>
-  `${m.label}: ${m.ok === null ? 'not applicable' : m.ok ? 'cleared' : 'missed'}`;
+/** 'Beats SPY: cleared' / 'missed' / 'not applicable' / 'not measured yet', plus any reading. */
+export const markLabel = (m: Mark): string => {
+  const state = m.ok === null ? (m.naText ?? 'not applicable') : m.ok ? 'cleared' : 'missed';
+  return m.detail ? `${m.label}: ${state} (${m.detail})` : `${m.label}: ${state}`;
+};
 
 /** One plain sentence per hurdle, with its threshold read from the gate. */
 export function conditionTip(key: ConditionKey, gate: Gate): string {
@@ -233,11 +245,45 @@ export function conditionTip(key: ConditionKey, gate: Gate): string {
     case 'trades': return `At least ${count(gate.minTrades)} trades, so the result is not a handful of lucky bets`;
     case 'owner': return 'Needs no setting that only the owner can decide';
     case 'dsr': return `A luck-adjusted score of at least ${fixed(gate.dsrMin, 2)}, discounted by all ${count(gate.dsrN)} tries counted so far (${gate.dsrNBasis})`;
+    case 'yardstick': return `Earned more than at least ${shareInWords(gate.yardstickMin)} of ${count(gate.yardstickDraws)} random look-alike books: the same trading days and amounts, with every picked stock swapped for a random one of similar size`;
+  }
+}
+
+/**
+ * The random-twin sentence. Its own function because it has six things to say, not three, and
+ * which one is decided by `twinsState` — the engine's verdict and its reading together — rather
+ * than by the tick alone.
+ */
+export function twinsSentence(t: LabTrial, gate: Gate): string {
+  const label = CONDITION_LABEL.yardstick;
+  const bar = shareInWords(gate.yardstickMin);
+  const y = t.yardstick;
+  const beat = y !== null && y.beaten !== null && y.draws !== null
+    ? `${count(y.beaten)} of ${count(y.draws)}`
+    : null;
+  switch (twinsState(t)) {
+    case 'cleared':
+      return beat === null
+        ? `${label}: yes.`
+        : `${label}: yes (it earned more than ${beat} random look-alike books, and the bar is ${bar}).`;
+    case 'missed':
+      return beat === null
+        ? `${label}: no (not measured — a variant this recent cannot pass until it has been compared with random look-alike books).`
+        : `${label}: no (it earned more than only ${beat} random look-alike books, short of ${bar}).`;
+    case 'unmatched':
+      return `${label}: no (its random look-alikes ended up trading too differently from it to be a fair comparison, and that never counts as a pass).`;
+    case 'not-applicable':
+      return `${label}: does not apply. It only holds funds, so there are no picked stocks to swap for random ones.`;
+    case 'not-measured':
+      return `${label}: not measured yet. It has not been compared with random look-alike books, so this is neither a pass nor a miss.`;
+    case 'test-look':
+      return `${label}: does not apply to a test run.`;
   }
 }
 
 /** 'Beats SPY: no (7.6% vs 7.9% a year).' and so on, one per hurdle. */
 export function conditionSentence(key: ConditionKey, ok: boolean | null, t: LabTrial, gate: Gate): string {
+  if (key === 'yardstick') return twinsSentence(t, gate);
   const label = CONDITION_LABEL[key];
   if (ok === null) {
     // Only the luck check reaches here, and only on a test look. Say which hurdle it is, say it
@@ -287,21 +333,30 @@ export const dsrNote = (t: LabTrial, gate: Gate): string | null =>
 
 export type Worked = {
   headline: string;
-  lines: { key: ConditionKey; ok: boolean | null; text: string }[];
+  /** One per hurdle: its mark, and the sentence printed beside it. */
+  lines: (Mark & { text: string })[];
   /** Every line joined: the one-paragraph summary. */
   sentence: string;
 };
 
-/** The plain 'Did it work?' answer for a method's best variant. */
+const NUMBER_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'];
+
+/**
+ * The plain 'Did it work?' answer for a method's best variant.
+ *
+ * Hurdles with nothing to score are not hurdles it failed to clear, so they leave the count: a
+ * test look is counted out of five, and an arm nobody has compared with its random look-alikes
+ * out of six. That second case is a hurdle still ahead of it, not one behind it, so a "Yes" says
+ * so in the same sentence rather than reading as "cleared everything".
+ */
 export function workedSummary(best: LabTrial, gate: Gate): Worked {
-  const lines = marks(best).map(m => ({ key: m.key, ok: m.ok, text: conditionSentence(m.key, m.ok, best, gate) }));
+  const lines = marks(best).map(m => ({ ...m, text: conditionSentence(m.key, m.ok, best, gate) }));
   const passed = conditionsPassed(best);
-  // Hurdles that do not apply to this row are not hurdles it failed to clear. Every dev row has
-  // all six, so this reads "all six" exactly as before; a test look is counted out of five.
   const applicable = lines.filter(l => l.ok !== null).length;
   const span = windowText(best);
+  const pending = twinsState(best) === 'not-measured' ? '; it has not been compared with random look-alike books yet' : '';
   const headline = passed === applicable
-    ? `Yes. Its best variant, ${best.candidateId}, cleared all ${applicable === CONDITION_KEYS.length ? 'six' : count(applicable)} hurdles on ${span} data.`
+    ? `Yes. Its best variant, ${best.candidateId}, cleared all ${NUMBER_WORDS[applicable] ?? count(applicable)} hurdles on ${span} data${pending}.`
     : `Not yet. Its best variant, ${best.candidateId}, cleared ${passed} of ${count(applicable)} hurdles on ${span} data.`;
   return { headline, lines, sentence: lines.map(l => l.text).join(' ') };
 }
@@ -397,6 +452,54 @@ export function untestedNote(m: LabMethod): string {
   }
 }
 
+const ROLE_TEXT: Record<ArmRole, string> = {
+  idea: 'the idea itself',
+  treatment: 'the idea itself',
+  dose: 'the idea at a stronger or weaker setting',
+  control: 'a comparison book, built to be beaten',
+};
+
+/** An arm's registered role in words, or 'not recorded'. */
+export const roleText = (role: ArmRole | null): string => (role === null ? 'not recorded' : ROLE_TEXT[role]);
+
+/** The random-twin reading for the technical record: the count, the arm's rate and the middle look-alike's. */
+export function twinsRecord(t: LabTrial): string {
+  const y = t.yardstick;
+  switch (twinsState(t)) {
+    case 'cleared':
+    case 'missed':
+      return y === null || y.beaten === null || y.draws === null
+        ? 'not measured, and a variant this recent cannot pass without it'
+        : `${twinsValue(t)}; it earned ${pct1(y.armRate)} a year, the middle look-alike ${pct1(y.medianRate)}`;
+    case 'unmatched':
+      return 'not comparable: its look-alikes traded too differently from it';
+    case 'not-applicable':
+      return 'does not apply: it only holds funds';
+    case 'test-look':
+      return 'does not apply to a test run';
+    case 'not-measured':
+      return 'not measured yet';
+  }
+}
+
+/** The one-line state on a technical-record summary. A comparison book is not a missed idea. */
+export const techStatus = (t: LabTrial): string =>
+  isComparisonBook(t) ? 'comparison book' : t.failedNow.length ? `missed ${t.failedNow.length}` : 'eligible';
+
+/**
+ * One `failedNow` label as the owner reads it in a sentence ("Still misses: …" on the redone panel).
+ *
+ * Only the two labels this lab grew on 2026-11-14 are translated: the random-twin miss and the
+ * control arm's label, which would otherwise print engine text ("beats 90% of random twins",
+ * "not a control arm") on a page with no ids or code. Every older label is returned as it was;
+ * rewording those is a separate change.
+ */
+export function missInWords(label: string, gate: Gate): string {
+  if (isYardstickLabel(label)) return `beating ${shareInWords(gate.yardstickMin)} random look-alike books`;
+  if (label === CONTROL_LABEL) return 'it is a comparison book, built to be beaten';
+  return label;
+}
+
 /** The full technical record of one trial, as label/value rows. */
 export function techRows(t: LabTrial): [string, string][] {
   return [
@@ -420,6 +523,9 @@ export function techRows(t: LabTrial): [string, string][] {
     ['Luck bar applies', t.luckGated ? 'yes' : 'no — a test run has nothing to discount for luck'],
     ['Missed when run', t.failed.length ? t.failed.join('; ') : 'nothing: eligible'],
     ['Missed by today’s bars', t.failedNow.length ? t.failedNow.join('; ') : 'nothing: eligible'],
+    // Snapshot 8. What the arm was registered as, and how it did against its random look-alikes.
+    ['Kind of variant', roleText(t.role)],
+    ['Random look-alikes', twinsRecord(t)],
     // Only for a run that was fed. An unfunded trial has nothing to say here and says nothing,
     // which is why these are appended rather than dashed: every recorded trial is unfunded, and a
     // row of em-dashes on all 128 of them would be noise standing in for a definite answer.

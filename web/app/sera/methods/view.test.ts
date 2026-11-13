@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { GATE, withVerdict } from '../../../lib/sera/fixture';
+import { CONTROL_LABEL, isYardstickLabel } from '../../../lib/sera/derive';
+import { armStates, GATE, withVerdict } from '../../../lib/sera/fixture';
 import type { LabMethod, LabTrial } from '../../../lib/sera/types';
 import {
   anyMoneyWeighted, BEST_COLOR, conditionSentence, count, dsrNote, earned, earnedVs, filterRows, fixed, growthFmt,
@@ -9,6 +10,7 @@ import {
   SPY_COLOR, SPY_DASH, techRows, untestedNote, windowText, workedSummary, yearPairs,
   redoneOf,
   nAtLastRun,
+  missInWords, roleText, techStatus, twinsRecord,
 } from './view';
 
 const method = (over: Partial<LabMethod> = {}): LabMethod => ({
@@ -28,7 +30,7 @@ const trial = (over: Partial<LabTrial> = {}): LabTrial => {
     pfInfinite: false, trades: 1130, sharpe: 0.71, exposure: 0.48, turnover: 3.1, worstYear: 2015,
     worstYearReturn: -0.023, spyTrReturn: 3.514, spyTrCagr: 0.079, mar: 0.59, mwr: null, spyTrMwr: null,
     failed: ['beats SPY TR', 'DSR >= 0.95'], eligible: false, dsr: 0.899, nTrialsAtRun: 58,
-    luckGated: true, failedNow: [], eligibleNow: false, dsrNow: null,
+    luckGated: true, failedNow: [], eligibleNow: false, dsrNow: null, role: null, yardstick: null,
     curve: [['1996-01-31', 1], ['1996-02-29', 1.02], ['1997-01-31', 1.1]],
     ...over,
   };
@@ -136,7 +138,7 @@ describe('formatting', () => {
 describe('marks / workedSummary', () => {
   it('marks the failed hurdles from the engine list', () => {
     const m = Object.fromEntries(marks(trial()).map(x => [x.key, x.ok]));
-    expect(m).toEqual({ spy: false, drawdown: true, pf: true, trades: true, owner: true, dsr: false });
+    expect(m).toEqual({ spy: false, drawdown: true, pf: true, trades: true, owner: true, dsr: false, yardstick: null });
     expect(markLabel(marks(trial())[0])).toBe('Beats SPY: missed');
   });
   it('treats a missing luck score as a miss, and says why', () => {
@@ -232,12 +234,70 @@ describe('marks / workedSummary', () => {
       'Beats SPY: no (7.6% vs 7.9% a year). Max drawdown: yes (12.9% ≤ 25%). ' +
       'Profit factor: yes (2.27 ≥ 1.3). Trade count: yes (1,130 ≥ 100). ' +
       'Owner inputs: yes (none needed). ' +
-      'Luck check: no (0.899 < 0.90, scored at N = 110).',
+      'Luck check: no (0.899 < 0.90, scored at N = 110).' +
+      ' Beats look-alikes: not measured yet. It has not been compared with random look-alike books, so this is neither a pass nor a miss.',
     );
   });
   it('says yes when every hurdle clears', () => {
     const t = trial({ failed: [], failedNow: [], eligible: true, cagr: 0.09, dsr: 0.97, dsrNow: 0.97 });
-    expect(workedSummary(t, GATE).headline).toBe('Yes. Its best variant, M0001-TV12, cleared all six hurdles on 1996–2015 data.');
+    expect(workedSummary(t, GATE).headline).toBe(
+      'Yes. Its best variant, M0001-TV12, cleared all six hurdles on 1996–2015 data; it has not been compared with random look-alike books yet.',
+    );
+  });
+  it('draws every random-twin state in words, and never a missing reading as a pass', () => {
+    const s = armStates();
+    const twins = (t: LabTrial) => marks(t).find(x => x.key === 'yardstick')!;
+    expect(markLabel(twins(s.measuredPass))).toBe('Beats look-alikes: cleared (beat 187 of 200)');
+    expect(markLabel(twins(s.measuredFail))).toBe('Beats look-alikes: missed (beat 150 of 200)');
+    expect(markLabel(twins(s.unmatched))).toBe('Beats look-alikes: missed (look-alikes traded too differently to compare)');
+    expect(markLabel(twins(s.recentUnmeasured))).toBe('Beats look-alikes: missed (not measured)');
+    expect(markLabel(twins(s.notApplicable))).toBe('Beats look-alikes: not applicable');
+    expect(markLabel(twins(s.notMeasured))).toBe('Beats look-alikes: not measured yet');
+    expect(twins(s.notMeasured).ok).toBe(null);
+
+    expect(conditionSentence('yardstick', true, s.measuredPass, GATE)).toBe(
+      'Beats look-alikes: yes (it earned more than 187 of 200 random look-alike books, and the bar is 9 in 10).',
+    );
+    expect(conditionSentence('yardstick', false, s.measuredFail, GATE)).toBe(
+      'Beats look-alikes: no (it earned more than only 150 of 200 random look-alike books, short of 9 in 10).',
+    );
+    expect(conditionSentence('yardstick', null, s.notApplicable, GATE)).toBe(
+      'Beats look-alikes: does not apply. It only holds funds, so there are no picked stocks to swap for random ones.',
+    );
+    expect(workedSummary(s.measuredPass, GATE).headline).toBe(
+      'Yes. Its best variant, M0001-PASS, cleared all seven hurdles on 1996–2015 data.',
+    );
+    expect(workedSummary(s.measuredFail, GATE).headline).toBe(
+      'Not yet. Its best variant, M0001-FAIL, cleared 6 of 7 hurdles on 1996–2015 data.',
+    );
+    // Owner-facing words carry no code: no status token, no engine label, no id.
+    for (const t of Object.values(s)) {
+      for (const m of marks(t)) expect(markLabel(m)).not.toMatch(/yardstick|not-applicable|unmatched|random twins/);
+      expect(workedSummary(t, GATE).sentence).not.toMatch(/yardstick|not-applicable|unmatched|random twins/);
+    }
+  });
+
+  it('records the role and the reading in the technical record, and names a comparison book', () => {
+    const s = armStates();
+    const pass = Object.fromEntries(techRows(s.measuredPass));
+    expect(pass['Kind of variant']).toBe('the idea itself');
+    expect(pass['Random look-alikes']).toBe('beat 187 of 200; it earned 11.2% a year, the middle look-alike 8.1%');
+    expect(Object.fromEntries(techRows(s.notMeasured))['Random look-alikes']).toBe('not measured yet');
+    expect(Object.fromEntries(techRows(s.notApplicable))['Random look-alikes']).toBe('does not apply: it only holds funds');
+    expect(roleText('control')).toBe('a comparison book, built to be beaten');
+    expect(roleText(null)).toBe('not recorded');
+    expect(twinsRecord(s.unmatched)).toBe('not comparable: its look-alikes traded too differently from it');
+    expect(techStatus(s.control)).toBe('comparison book');
+    expect(techStatus(s.measuredFail)).toBe('missed 1');
+    expect(techStatus(s.measuredPass)).toBe('eligible');
+  });
+
+  it('puts the two new engine labels into plain words for the redone panel, and leaves the rest', () => {
+    const twinsMiss = armStates().measuredFail.failedNow.find(isYardstickLabel)!;
+    expect(missInWords(twinsMiss, GATE)).toBe('beating 9 in 10 random look-alike books');
+    expect(missInWords(CONTROL_LABEL, GATE)).toBe('it is a comparison book, built to be beaten');
+    expect(missInWords('PF >= 1.3', GATE)).toBe('PF >= 1.3');   // older labels: unchanged
+    expect(missInWords(twinsMiss, GATE)).not.toMatch(/random twins|%/);
   });
   it('flips the comparison sign on a miss', () => {
     // 0.28 rather than 0.18: the sentence says "> 25%", so the value must actually exceed 25%

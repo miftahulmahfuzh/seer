@@ -19,7 +19,10 @@ export type GlossaryKey =
   | 'testWindow'
   | 'paperTrading'
   | 'spyTr'
-  | 'ownerInputs';
+  | 'ownerInputs'
+  | 'randomTwin'
+  | 'twinsBeaten'
+  | 'comparisonBook';
 
 export type GlossaryEntry = { term: string; plain: string };
 
@@ -102,6 +105,26 @@ export const GLOSSARY: Record<GlossaryKey, GlossaryEntry> = {
     term: 'Owner inputs',
     plain: 'Settings only the owner can decide, such as how much to risk, so a method that still needs them cannot go live as it is.',
   },
+  randomTwin: {
+    term: 'Random look-alike',
+    plain:
+      'A made-up book that trades on exactly the same days and in the same amounts as the variant ' +
+      'being judged but swaps every stock that variant picked for a randomly drawn index stock of ' +
+      'similar trading size, so it has the variant’s shape and none of its judgement.',
+  },
+  twinsBeaten: {
+    term: 'Look-alikes beaten',
+    plain:
+      'Out of a few hundred random look-alike books, how many the variant earned more than, where ' +
+      'an idea that really picks well should beat nearly all of them and one that only has a good ' +
+      'shape lands near the middle.',
+  },
+  comparisonBook: {
+    term: 'Comparison book',
+    plain:
+      'A variant built on purpose to be beaten, such as one that picks at random or leaves the idea ' +
+      'out, so the idea can be judged by how far ahead of it it lands, and never a candidate itself.',
+  },
 };
 
 /** Display order for the glossary on the How it works page. */
@@ -116,6 +139,9 @@ export const GLOSSARY_ORDER: GlossaryKey[] = [
   'ownerInputs',
   'dsr',
   'tries',
+  'twinsBeaten',
+  'randomTwin',
+  'comparisonBook',
   'mar',
   'sharpe',
   'exposure',
@@ -133,6 +159,7 @@ export const CONDITION_TERM: Record<ConditionKey, GlossaryKey> = {
   trades: 'trades',
   owner: 'ownerInputs',
   dsr: 'dsr',
+  yardstick: 'twinsBeaten',
 };
 
 export type Tone = 'good' | 'bad' | 'wait' | 'neutral';

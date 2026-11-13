@@ -19,22 +19,29 @@
  * apply to every row — the luck check, which a pre-registered test look has no selection to
  * deflate — is read off the engine's own marker, `trial.luckGated`, and never inferred from the
  * shape of `failedNow`.
+ *
+ * The seventh hurdle, the random-twin check, has the same trap one condition over: an arm nobody
+ * has measured carries no label in `failedNow`, and neither does one that cleared. So it is read
+ * off the engine's published reading, `trial.yardstick`, through `twinsState`, and an arm with no
+ * reading is "not measured yet" — never a tick. A control arm is a third kind of thing again: the
+ * engine refuses it with a label that is not a condition, and the page shows it as a comparison
+ * book rather than as an idea that failed.
  */
 import { pct, signedPct } from '../format';
 import type { Benchmark, Gate, LabBook, LabMethod, LabTrial, Point } from './types';
 
-export const CONDITION_KEYS = ['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr'] as const;
+export const CONDITION_KEYS = ['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr', 'yardstick'] as const;
 export type ConditionKey = (typeof CONDITION_KEYS)[number];
 
 /**
  * The engine's label for each condition, exactly as it appears in a failure list.
  *
- * The luck check is the exception and is matched by prefix instead (`DSR_FAILURE_PREFIX`),
- * because the label carries the bar inside its own text. `failedNow` always names today's bar,
- * so an exact match would work there — but `failed` does not, the two lists are read by the
- * same helpers, and a prefix match cannot go stale the next time the owner moves a bar.
+ * Three are matched by shape instead (`DSR_FAILURE_PREFIX`, `DRAWDOWN_FAILURE_PREFIX`,
+ * `isYardstickLabel`), because each carries its bar inside its own text. `failedNow` always names
+ * today's bar, so an exact match would work there — but `failed` does not, the two lists are read
+ * by the same helpers, and a shape match cannot go stale the next time the owner moves a bar.
  */
-export const FAILURE_LABEL: Record<Exclude<ConditionKey, 'dsr' | 'drawdown'>, string> = {
+export const FAILURE_LABEL: Record<Exclude<ConditionKey, 'dsr' | 'drawdown' | 'yardstick'>, string> = {
   spy: 'beats SPY TR',
   pf: 'PF >= 1.3',
   trades: '>= 100 trades',
@@ -55,6 +62,39 @@ export const FAILURE_LABEL: Record<Exclude<ConditionKey, 'dsr' | 'drawdown'>, st
 export const DSR_FAILURE_PREFIX = 'DSR >= ';
 export const DRAWDOWN_FAILURE_PREFIX = 'max DD <= ';
 
+/**
+ * The random-twin label (`store.YARDSTICK_LABEL`, "beats 90% of random twins"), matched by its two
+ * fixed ends with a number between them.
+ *
+ * Its bar sits in the middle of the text, so a prefix alone cannot do what it does for the luck
+ * and drawdown labels: `beats ` is also how `beats SPY TR` begins. Both ends plus a number is the
+ * narrowest shape that still reads the label after the owner moves the bar.
+ * `engine/tests/test_lab_gate_wording.py` pins both ends, and the number, to the engine.
+ */
+export const YARDSTICK_FAILURE_PREFIX = 'beats ';
+export const YARDSTICK_FAILURE_SUFFIX = '% of random twins';
+
+export function isYardstickLabel(label: string): boolean {
+  if (!label.startsWith(YARDSTICK_FAILURE_PREFIX) || !label.endsWith(YARDSTICK_FAILURE_SUFFIX)) return false;
+  const bar = label.slice(YARDSTICK_FAILURE_PREFIX.length, label.length - YARDSTICK_FAILURE_SUFFIX.length);
+  return /^\d+(\.\d+)?$/.test(bar);
+}
+
+/**
+ * What the engine adds to a control arm's verdict (`store.CONTROL_LABEL`).
+ *
+ * It is not a condition and is never drawn as a seventh crossed hurdle. A control arm is a book
+ * the lab built to be beaten, so the idea beside it has something fair to be measured against;
+ * its not becoming a candidate is the design working, not an idea failing. The page presents it
+ * as a comparison book instead (`isComparisonBook`). Pinned by `engine/tests/test_lab_gate_wording.py`.
+ */
+export const CONTROL_LABEL = 'not a control arm';
+
+/** Is this arm a comparison book rather than a candidate? Its recorded role, or the engine's own label. */
+export function isComparisonBook(trial: LabTrial): boolean {
+  return trial.role === 'control' || trial.failedNow.includes(CONTROL_LABEL);
+}
+
 /** Plain-language name of each condition. */
 export const CONDITION_LABEL: Record<ConditionKey, string> = {
   spy: 'Beats SPY',
@@ -63,6 +103,7 @@ export const CONDITION_LABEL: Record<ConditionKey, string> = {
   trades: 'Trade count',
   owner: 'Owner inputs',
   dsr: 'Luck check',
+  yardstick: 'Beats look-alikes',
 };
 
 /**
@@ -119,19 +160,95 @@ export function moneyWeighted(trial: LabTrial): { mwr: number; spyTrMwr: number 
 }
 
 /**
+ * Where an arm stands on the random-twin check, read off the engine and never re-judged.
+ *
+ * - `cleared`: a measured reading, and the engine lists no random-twin miss.
+ * - `missed`: the engine lists the miss. With a reading, the arm was below the bar; without one,
+ *   it was run after the check began and nobody measured it, which the engine fails closed.
+ * - `unmatched`: the look-alikes ended up trading too differently to be a fair comparison. Never
+ *   a pass, whatever the engine's list says.
+ * - `not-applicable`: the book only holds funds, so there are no picked stocks to swap.
+ * - `not-measured`: no reading and no miss — every arm the lab held when the check began.
+ *   Neither a pass nor a miss, and never drawn as either.
+ * - `test-look`: a test-window run. The check is a development-stage hurdle.
+ */
+export type TwinsState = 'cleared' | 'missed' | 'unmatched' | 'not-applicable' | 'not-measured' | 'test-look';
+
+export function twinsState(trial: LabTrial): TwinsState {
+  const y = trial.yardstick;
+  if (trial.failedNow.some(isYardstickLabel)) return y?.status === 'unmatched' ? 'unmatched' : 'missed';
+  if (trial.window !== 'dev') return 'test-look';
+  if (y === null) return 'not-measured';
+  if (y.status === 'not-applicable') return 'not-applicable';
+  if (y.status === 'unmatched') return 'unmatched';
+  return 'cleared';
+}
+
+/**
+ * A share in words, as "N in D" with the smallest of 10, 20, 100 or 1000 that makes N whole:
+ * 0.9 -> "9 in 10", 0.95 -> "19 in 20". The owner reads "9 in 10" without a percent sign to parse.
+ */
+export function shareInWords(share: number): string {
+  for (const d of [10, 20, 100, 1000]) {
+    const k = share * d;
+    if (Math.abs(k - Math.round(k)) < 1e-9) return `${Math.round(k)} in ${d}`;
+  }
+  return `${Math.round(share * 1000)} in 1000`;
+}
+
+/** The reading as printed beside its mark: "beat 187 of 200", or why there is none. */
+export function twinsValue(trial: LabTrial): string {
+  const y = trial.yardstick;
+  const beat = y !== null && y.beaten !== null && y.draws !== null ? `beat ${y.beaten} of ${y.draws}` : null;
+  switch (twinsState(trial)) {
+    case 'cleared':
+      return beat ?? 'cleared';
+    case 'missed':
+      return beat ?? 'not measured';
+    case 'unmatched':
+      return 'look-alikes traded too differently to compare';
+    case 'not-applicable':
+    case 'test-look':
+      return 'does not apply';
+    case 'not-measured':
+      return 'not measured yet';
+  }
+}
+
+/** What the arm had to do, in words, with the bar read from the snapshot's gate. */
+export function twinsTarget(trial: LabTrial, gate: Gate): string {
+  switch (twinsState(trial)) {
+    case 'test-look':
+      return 'does not apply to a test look';
+    case 'not-applicable':
+      return 'does not apply to a book that only holds funds';
+    default:
+      return `beats at least ${shareInWords(gate.yardstickMin)} random look-alike books`;
+  }
+}
+
+/**
  * Does this trial clear `key` **as the bars read now**? true = cleared, false = missed,
- * null = the hurdle does not apply to this row.
+ * null = there is no hurdle to score here.
  *
- * Reads `failedNow` and `luckGated`, never `failed`. The engine decided all six there
- * (`store.published_verdict`) against the same gate the snapshot publishes, and said which rows
- * the luck hurdle applies to (`store.luck_gated`), so this is a lookup, not a judgement — which
- * is what keeps a tick and the target printed beside it from describing two different days.
+ * Reads `failedNow`, `luckGated` and `yardstick`, never `failed`. The engine decided all seven
+ * there (`store.published_verdict`) against the same gate the snapshot publishes, and said which
+ * rows the luck hurdle applies to (`store.luck_gated`), so this is a lookup, not a judgement —
+ * which is what keeps a tick and the target printed beside it from describing two different days.
  *
- * `null` means **not applicable**, never "not measured". A gated row whose DSR could not be
- * scored still comes back `false`: the engine puts the luck label in `failedNow` for exactly
- * those rows, because nothing is admitted for being unmeasurable (its D11).
+ * `null` is "not applicable" for the luck check (a test look) and for the random-twin check (a
+ * test look, or a book that only holds funds), and — for the random-twin check only — "not
+ * measured yet". It is never a pass: every count here counts only `true`. A gated row whose DSR
+ * could not be scored still comes back `false`: the engine puts the luck label in `failedNow` for
+ * exactly those rows, because nothing is admitted for being unmeasurable (its D11).
  */
 export function conditionOk(trial: LabTrial, key: ConditionKey): boolean | null {
+  if (key === 'yardstick') {
+    const state = twinsState(trial);
+    if (state === 'cleared') return true;
+    if (state === 'missed' || state === 'unmatched') return false;
+    return null;
+  }
   if (key === 'dsr') {
     if (!trial.luckGated) return null;
     return !trial.failedNow.some((f) => f.startsWith(DSR_FAILURE_PREFIX));
@@ -140,7 +257,7 @@ export function conditionOk(trial: LabTrial, key: ConditionKey): boolean | null 
   return !trial.failedNow.includes(FAILURE_LABEL[key]);
 }
 
-/** The six hurdles for one trial, in display order, with plain labels and display strings. */
+/** The seven hurdles for one trial, in display order, with plain labels and display strings. */
 export function gateChecks(trial: LabTrial, gate: Gate): GateCheck[] {
   const pf = trial.pfInfinite
     ? '∞ (no losing trades)'
@@ -204,13 +321,20 @@ export function gateChecks(trial: LabTrial, gate: Gate): GateCheck[] {
       target: trial.luckGated ? `${num(gate.dsrMin)} or more` : 'does not apply to a test look',
       ok: conditionOk(trial, 'dsr'),
     },
+    {
+      key: 'yardstick',
+      label: CONDITION_LABEL.yardstick,
+      value: twinsValue(trial),
+      target: twinsTarget(trial, gate),
+      ok: conditionOk(trial, 'yardstick'),
+    },
   ];
 }
 
 /**
- * How many of the six hurdles the trial cleared. Not-measured counts as not cleared (the engine
- * already listed it as a failure); a hurdle that does not apply counts as neither cleared nor
- * missed, so a test look reads 5 of 5 rather than 5 of 6.
+ * How many of the seven hurdles the trial cleared. Not-measured luck counts as not cleared (the
+ * engine already listed it as a failure); a hurdle that does not apply, or a random-twin check
+ * nobody has run yet, counts as neither cleared nor missed, so a test look reads 4 of 5.
  */
 export function conditionsPassed(trial: LabTrial): number {
   return CONDITION_KEYS.filter((k) => conditionOk(trial, k) === true).length;
@@ -227,34 +351,54 @@ export function excessCagr(trial: LabTrial): number | null {
   return trial.cagr - trial.spyTrCagr;
 }
 
-/** The k dev trials nearest to eligible: most hurdles cleared, then best MAR, then earliest. */
+/**
+ * The k dev trials nearest to eligible: most hurdles cleared, then best MAR, then earliest.
+ * Comparison books are left out: they are built to be beaten and are never "nearly there".
+ */
 export function closest(trials: LabTrial[], k: number): LabTrial[] {
   return devTrials(trials)
+    .filter((t) => !isComparisonBook(t))
     .sort((a, b) => conditionsPassed(b) - conditionsPassed(a) || marDesc(a, b) || byN(a, b))
     .slice(0, k);
 }
 
-/** A method's best variant: fewest missed hurdles, then best MAR, then earliest. Dev trials first. */
+/**
+ * A method's best variant: fewest missed hurdles, then best MAR, then earliest. Dev trials first,
+ * and among them the candidates: a comparison book clears the six classic hurdles as easily as an
+ * idea does (that is what makes it a fair comparison), so letting it win here would headline the
+ * method with the arm registered to lose. It is chosen only when the method has nothing else.
+ */
 export function bestVariant(trials: LabTrial[]): LabTrial | null {
   const dev = devTrials(trials);
-  const pool = dev.length > 0 ? dev : [...trials];
+  const candidates = dev.filter((t) => !isComparisonBook(t));
+  const pool = candidates.length > 0 ? candidates : dev.length > 0 ? dev : [...trials];
   if (pool.length === 0) return null;
   return pool.sort((a, b) => misses(a).length - misses(b).length || marDesc(a, b) || byN(a, b))[0];
+}
+
+/** Could this hurdle be scored on this row at all? The denominator `funnel` quotes. */
+function scored(t: LabTrial, key: ConditionKey): boolean {
+  if (key === 'dsr') return t.luckGated && t.dsrNow !== null;
+  if (key === 'yardstick') {
+    const state = twinsState(t);
+    return state === 'cleared' || state === 'missed' || state === 'unmatched';
+  }
+  return true;
 }
 
 /**
  * Per hurdle, how many dev trials cleared it.
  *
- * `measured` is how many rows the hurdle could be *scored* on, which is every row except for the
- * luck check: the P7a seed rows have no DSR to re-evaluate at any N. Those rows still **miss**
- * the luck check — nothing is admitted for being unmeasurable, and `passing` counts them as
- * misses — but saying "1 of the 56 it was checked on" rather than "1 of 110" is the honest
- * denominator, and the page's tip names the gap.
+ * `measured` is how many rows the hurdle could be *scored* on. For most hurdles that is every
+ * row. The luck check leaves out the P7a seed rows, which have no DSR to re-evaluate at any N;
+ * those rows still **miss** it — nothing is admitted for being unmeasurable, and `passing` counts
+ * them as misses — but "1 of the 56 it was checked on" rather than "1 of 110" is the honest
+ * denominator. The random-twin check counts only rows that have been judged on it (a reading, or
+ * the engine's miss): an arm nobody has measured was not checked, and one that only holds funds
+ * has nothing to check.
  *
  * `luckGated` is checked alongside the score for the same reason the denominator exists at all:
- * a row the hurdle does not apply to was not "checked and unscorable", it was not checked. Every
- * dev row is gated today, so this changes no published number — it stops the count being wrong
- * if that ever stops being true.
+ * a row the hurdle does not apply to was not "checked and unscorable", it was not checked.
  */
 export function funnel(trials: LabTrial[]): FunnelRow[] {
   const dev = devTrials(trials);
@@ -262,7 +406,7 @@ export function funnel(trials: LabTrial[]): FunnelRow[] {
     key,
     label: CONDITION_LABEL[key],
     passing: dev.filter((t) => conditionOk(t, key) === true).length,
-    measured: key === 'dsr' ? dev.filter((t) => t.luckGated && t.dsrNow !== null).length : dev.length,
+    measured: dev.filter((t) => scored(t, key)).length,
     total: dev.length,
   }));
 }

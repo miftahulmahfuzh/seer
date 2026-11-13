@@ -3,6 +3,12 @@
   "coordinator": "orch-random-twin-yardstick",
   "coordinator_session_id": "65d86556-13e0-4ce6-8cbb-b7e1a2ace53c",
   "created": "2026-11-13T13:47:53+07:00",
+  "landed": {
+    "at": "2026-11-13T16:11:41+07:00",
+    "base": "main",
+    "commit": "11acdad5a57f7aa3f06e0242deb1841527e74a90",
+    "machine": "GPD"
+  },
   "phases": [
     {
       "card": null,
@@ -79,16 +85,16 @@
     },
     {
       "card": null,
-      "commit": "2d57216455512d20c67fd842d7322b5851a60b68",
+      "commit": "adb55f99634a2ab540beb2ba8c89f11966f5bf91",
       "depends_on": [
         4
       ],
       "difficulty": "NORMAL",
       "n": 5,
-      "note": "snapshot 8 (role + yardstick per trial, gate bar/draws), seventh condition and comparison books on Sera pages; decided: test_lab_books.py version pin 7->8 per invariant 1 (file not in plan table); technical record 'Missed by today's bars' still prints raw labels as the plan's techRows block has it; web lab.test.ts testLooks 5-vs-6 red on base, hardgate buy-signal test red (not re-checked on base); ran npm ci in web/ (playwright missing); proof: verified-first-pass /home/miftah/.local/state/seer-verify/1113-155052-445583/evidence",
+      "note": "second follow-up at coordinator's request: 'Missed when run' row via view.recordedMissInWords, bar read from the recorded label not today's gate; phase 5 is now 2d572164 + 6801daad + adb55f99; web 808 passed, lab.test.ts testLooks pin still red from base; proof: verified-first-pass /home/miftah/.local/state/seer-verify/1113-160016-476538/evidence",
       "package": "web",
       "plan": ".workflows/plan/random-twin-yardstick/phase-5.md",
-      "reported_at": "2026-11-13T15:57:08+07:00",
+      "reported_at": "2026-11-13T16:01:27+07:00",
       "satisfies": [
         "R2"
       ],
@@ -100,6 +106,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "random-twin-yardstick",
-  "updated": "2026-11-13T15:57:08+07:00",
+  "updated": "2026-11-13T16:11:41+07:00",
   "worktree": "/home/miftah/.worktrees/seer/random-twin-yardstick"
 }

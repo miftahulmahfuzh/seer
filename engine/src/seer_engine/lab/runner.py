@@ -20,10 +20,12 @@
    the variance of the daily Sharpe across those trials. *What* N counts is the policy's business
    and need not be a row count; this module never reads the policy's value, only the N it yields.
 4. Eligible = the five P7a D8 conditions and ``store.DSR_LABEL`` (DSR >= 0.90 since 2026-10-07;
-   LAB_LUCK_GATE_PLAN.md Decision D1). Insert the trials, set the method's ``source_sha`` and
-   status (``dev-eligible`` when any trial is eligible, else ``rejected``), all in one
-   transaction. ``store.verdict`` re-reads a recorded trial against the same threshold and N, so
-   a verdict is comparable across time rather than frozen at its run date.
+   LAB_LUCK_GATE_PLAN.md Decision D1), and never for an arm whose rationale reads as a control
+   (``store.CONTROL_LABEL``; random-twin-yardstick R3). Insert the trials and each arm's role
+   (``store.trial_roles``), set the method's ``source_sha`` and status (``dev-eligible`` when any
+   trial is eligible -- so only a non-control arm can make it -- else ``rejected``), all in one
+   transaction. ``store.verdict`` re-reads a recorded trial against the same threshold, N and
+   role, so a verdict is comparable across time rather than frozen at its run date.
 5. Score the method's whole walk-forward record against the lab's shared geometry and record it
    (``hardgate.fold_verdict`` -> ``store.method_folds``), **in that same transaction**, so the
    curves this batch just produced are inside the record it keeps and a rolled-back run leaves
@@ -87,7 +89,7 @@ from seer_engine.backtest.market import Market
 from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.commands.backtest_dev import daily_moments, month_end_curve, registry_problem
 from seer_engine.fundamentals import coverage
-from seer_engine.lab import store, twins
+from seer_engine.lab import control_shape, store, twins
 from seer_engine.lab.method import METHOD_ID, Amendment, Method, config_digest, config_text, source_sha
 from seer_engine.lab.real_costs import real_cost_problem
 from seer_engine.sim.contributions import OWNER_MONTHLY, ContributionSchedule
@@ -114,12 +116,17 @@ class Ran:
     deposit. **The existence of the row is the funded flag** (``store.FundingRow``), so None here
     must produce no row at all rather than a row of zeroes -- ``trial_funding`` CHECKs
     ``deposits_usd > 0`` and ``deposits_n >= 1`` and would refuse one.
+
+    ``role`` is ``control_shape.role_of`` on the candidate, set by ``trial_rows`` and recorded by
+    ``run_method`` as the trial's ``trial_roles`` row. None only for a ``Ran`` built by hand,
+    which records no role.
     """
 
     trial: store.TrialRow
     row: DevRow
     moments: store.MomentsRow | None = None
     funding: store.FundingRow | None = None
+    role: str | None = None
 
 
 @dataclass(frozen=True)
@@ -575,6 +582,15 @@ def trial_rows(
     reader of the row never reconstructs the plan from the dates. It travels with ``deposits``
     because the two describe one run: funding a batch on some other schedule and leaving this at
     its default would record a sentence the run never obeyed.
+
+    **A control arm is never eligible** (random-twin-yardstick R3). ``control_shape.role_of``
+    reads each candidate's role from its rationale -- the reader the hard gate's D18 uses at
+    ``lab promote`` -- and an arm registered to be beaten gets ``store.CONTROL_LABEL`` after the
+    luck label, so its ``eligible`` is False whatever its numbers. That one line is the whole of
+    the role-aware status: ``run_method``'s ``dev-eligible``/``rejected`` rule reads
+    ``trial.eligible`` and needs no second rule. The role travels on ``Ran.role`` so
+    ``run_method`` records it beside the trial (``store.RoleRow``), which is what lets
+    ``store.verdict`` say the same thing later without opening the method file.
     """
     prior = store.dev_daily_sharpes(conn)
     moments = [daily_moments(r.stats.daily_returns) for r, _ in results]
@@ -610,6 +626,11 @@ def trial_rows(
         failed = list(row.failed)
         if dsr is None or dsr < store.DSR_MIN:
             failed.append(store.DSR_LABEL)
+        # R3: an arm registered to be beaten never makes its method eligible, whatever its
+        # numbers. After the luck label, the order `store.verdict` reads it back in.
+        role = control_shape.role_of(c)
+        if role == control_shape.ROLE_CONTROL:
+            failed.append(store.CONTROL_LABEL)
         worst = row.stats.worst_year
         trial = store.TrialRow(
             method_id=method.id,
@@ -652,7 +673,7 @@ def trial_rows(
             schedule=schedule,
             measured=run_at,
         )
-        out.append(Ran(trial=trial, row=row, moments=mom, funding=fund))
+        out.append(Ran(trial=trial, row=row, moments=mom, funding=fund, role=role))
     return out
 
 
@@ -749,6 +770,8 @@ def run_method(
             )
         for i, (r, cash) in enumerate(zip(ran, deposits, strict=True)):
             _log_arm(i, len(ran), r.row, cash)
+        # Role-aware without a rule of its own: `trial_rows` already failed every control arm with
+        # `store.CONTROL_LABEL`, so only a non-control arm can make this method dev-eligible.
         status = "dev-eligible" if any(r.trial.eligible for r in ran) else "rejected"
         if store.get_method(conn, method.id) is None:
             store.add_method(
@@ -804,6 +827,15 @@ def run_method(
                 measured=r.trial.run_at,
             )
             for n, r in zip(ns, ran, strict=True)
+        ])
+        # Each arm's role, read from the candidate this run just simulated, in this same
+        # transaction (random-twin-yardstick R3). `store.verdict` reads it to refuse a control arm
+        # without importing the method file. Both paths record it -- a first run and `--amend` --
+        # and a batch refused above leaves none, because nothing has been written yet.
+        store.insert_roles(conn, [
+            store.RoleRow(trial_n=n, role=r.role, source="recorded", measured=r.trial.run_at)
+            for n, r in zip(ns, ran, strict=True)
+            if r.role is not None
         ])
         # The fold verdict of this batch, computed HERE: after the trials, their moments, their
         # funding and their provenance are all in, and inside this same transaction. Three things

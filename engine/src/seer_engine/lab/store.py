@@ -55,6 +55,15 @@ Tables:
   annotates; it does not gate**: the fold majority is a refusal at ``lab promote``
   (``hardgate.check``) and nowhere else, and no ``trials`` column changed meaning when this table
   arrived. Triggers refuse every UPDATE and DELETE.
+- ``trial_roles``: the part one dev trial's arm plays in its method's experiment -- ``control``,
+  ``dose``, ``idea`` or ``treatment``, read by ``control_shape.role_of`` from the arm's one-line
+  rationale -- recorded so that ``verdict`` can refuse a control arm without opening a method
+  file. ``lab run`` writes one row per trial in its own transaction (``source='recorded'``);
+  ``lab roles --backfill`` adds the rows for trials recorded before the table existed whose
+  method file can still be read (``source='backfill'``). At most one row per trial, keyed by
+  ``trials.n``. Triggers refuse every UPDATE and DELETE. **No schema version came with it**: the
+  table is created by ``CREATE TABLE IF NOT EXISTS`` inside ``_SCHEMA`` on every connect, and
+  ``role_of_trial`` answers None when it is absent.
 
 Schema versions (``meta.schema_version``): 1 is the first lab; 2 adds the ``synthesis`` insight
 kind; 3 adds the ``trial_moments`` side table; 4 adds the ``trial_funding`` side table (the
@@ -138,6 +147,13 @@ TRANSITIONS: tuple[tuple[str, str], ...] = (
     # ``has_trial`` refuses outright.
     ("rejected", "dev-eligible"),
     ("dev-eligible", "promoted"),
+    # The one edge back out of ``dev-eligible`` (random-twin-yardstick R3, 2026-11-13). Admitted
+    # only by ``demote_method``, and only for a method none of whose dev trials reads eligible
+    # under ``verdict`` today -- most often because the only arms that ever cleared the screen
+    # were control arms, which ``verdict`` refuses once their role is recorded. Like the
+    # ``rejected -> dev-eligible`` edge above, it erases no verdict: the trials stay in the
+    # append-only ``trials`` table, untouched, and the demotion is *appended* to the analysis.
+    ("dev-eligible", "rejected"),
     ("promoted", "test-passed"),
     ("promoted", "test-failed"),
     ("test-passed", "paper"),
@@ -187,6 +203,31 @@ def is_luck_label(label: str) -> bool:
     never of this shape, so the prefix is an exact discriminator.
     """
     return str(label).startswith(LUCK_LABEL_PREFIX)
+
+
+#: The roles ``control_shape.role_of`` can answer, spelled here as literals because this module
+#: imports nothing from the lab at module scope (see ``OWNER_INPUTS_LABEL``) and the
+#: ``trial_roles`` CHECK needs them when ``_SCHEMA`` is built. ``test_lab_roles`` pins this tuple
+#: to ``control_shape.ROLES``, so the two cannot drift apart.
+TRIAL_ROLES: tuple[str, ...] = ("control", "dose", "idea", "treatment")
+
+#: The one role anything refuses on: an arm registered to be beaten.
+CONTROL_ROLE = "control"
+
+#: How a ``trial_roles`` row came to be: written by the run that recorded the trial
+#: (``recorded``), or added after the fact by ``lab roles --backfill`` from the method file as it
+#: reads now (``backfill``).
+ROLE_SOURCES: tuple[str, ...] = ("recorded", "backfill")
+
+# The failure label of an arm registered to be beaten (random-twin-yardstick R3, 2026-11-13). It
+# is not a seventh screen condition and no threshold sits behind it: it says the arm's *role*
+# forbids eligibility whatever its numbers, so a method is never ``dev-eligible`` on the strength
+# of its own placebo, paired baseline or mirror. ``runner.trial_rows`` writes it into a new
+# control's ``trials.failed`` and ``verdict`` appends it for every trial whose ``trial_roles`` row
+# says ``control`` -- after the luck label, so the conditions keep their order -- and the record
+# and the verdict therefore agree on the run date. Worded as the condition the arm misses, the
+# way every other label is ("beats SPY TR", "PF >= 1.3").
+CONTROL_LABEL = "not a control arm"
 
 
 # The N the luck test deflates by, resolved through ``npolicy.effective_n``. ONE constant: the
@@ -511,6 +552,38 @@ BEGIN SELECT RAISE(ABORT, 'method_folds are append-only: a recorded fold verdict
 BEGIN SELECT RAISE(ABORT, 'method_folds are append-only: a recorded fold verdict is never deleted'); END""",
 )
 
+# The trial_roles side table and its two triggers (random-twin-yardstick R3, 2026-11-13).
+#
+# **What it records and why.** An arm's role is its author's one-line rationale, read by
+# ``control_shape.role_of``; it lives in the method file and nowhere in ``trials``. The hard gate
+# reads it at ``lab promote`` (hardgate D18), but ``verdict``, ``best_dev_eligible`` and the
+# ``lab run`` status line did not, so a method whose only eligible arm was its own placebo read
+# ``dev-eligible``. Recording the role beside the trial lets ``verdict`` refuse a control from the
+# database alone -- no method import on every read, and the same answer on a read-only snapshot
+# connection.
+#
+# A side table, not a column on ``trials``, for the reason every side table above is one:
+# ``ALTER TABLE trials ADD COLUMN`` would move every recorded row's bytes. ``trial_n`` is the
+# primary key, so a trial has at most one role and INSERT is the whole lifecycle; the two CHECKs
+# refuse a role ``role_of`` cannot answer and a source nobody writes.
+#
+# **No schema version.** Unlike every table above, this one arrived without a migration step:
+# ``_SCHEMA`` runs on every ``connect`` and ``CREATE TABLE IF NOT EXISTS`` adds it to an existing
+# v8 database in place. A version bump is a one-way door for every parallel checkout
+# (``_migrate``); an additive table whose reader answers None when it is absent is not.
+_ROLES_TABLE = f"""CREATE TABLE IF NOT EXISTS trial_roles (
+    trial_n  INTEGER PRIMARY KEY REFERENCES trials(n),
+    role     TEXT NOT NULL CHECK (role IN ({_quoted(TRIAL_ROLES)})),
+    source   TEXT NOT NULL CHECK (source IN ({_quoted(ROLE_SOURCES)})),
+    measured TEXT NOT NULL CHECK (length(trim(measured)) > 0)
+)"""
+_ROLES_TRIGGERS: tuple[str, ...] = (
+    """CREATE TRIGGER IF NOT EXISTS trial_roles_no_update BEFORE UPDATE ON trial_roles
+BEGIN SELECT RAISE(ABORT, 'trial_roles are append-only: a role row is never updated'); END""",
+    """CREATE TRIGGER IF NOT EXISTS trial_roles_no_delete BEFORE DELETE ON trial_roles
+BEGIN SELECT RAISE(ABORT, 'trial_roles are append-only: a role row is never deleted'); END""",
+)
+
 #: The backfill's capital rule, exact on every trial recorded before schema v5 (analysis M3).
 #: Cross-checked with ``git merge-base --is-ancestor d79fc83 <trials.git_sha>`` over all 26
 #: distinct ``git_sha`` values: the 20 shas behind trials #1..#128 predate ``d79fc83`` and none of
@@ -664,6 +737,12 @@ CREATE TABLE IF NOT EXISTS ideas_seen (
 {_FOLDS_TRIGGERS[0]};
 
 {_FOLDS_TRIGGERS[1]};
+
+{_ROLES_TABLE};
+
+{_ROLES_TRIGGERS[0]};
+
+{_ROLES_TRIGGERS[1]};
 
 CREATE TRIGGER IF NOT EXISTS trials_no_update BEFORE UPDATE ON trials
 BEGIN SELECT RAISE(ABORT, 'trials are append-only: a trial row is never updated'); END;
@@ -1390,6 +1469,13 @@ def best_dev_eligible(
     does not outrank a higher-MAR one, which is why ``M0022-W-TV14`` (MAR 0.857, DSR 0.912) is
     the answer for M0022 and ``M0022-W-TV16`` (MAR 0.816, DSR 0.916) is not.
 
+    **A recorded control arm is never the answer** (random-twin-yardstick R3), and this function
+    has no rule of its own for it: ``verdict`` appends ``CONTROL_LABEL`` to every trial whose
+    ``trial_roles`` row says ``control``, so such a row is simply not eligible here. A trial with
+    no role row is judged exactly as before -- which is why ``lab roles --backfill`` exists, and
+    why hardgate D18 still reads the method file at ``lab promote`` as a second, independent
+    refusal.
+
     The gate is resolved once, after the rows are fetched, so a method with no comparable dev
     trial costs no estimator read at all.
 
@@ -1434,8 +1520,9 @@ class Verdict:
     """One dev trial's eligibility as it reads *now*.
 
     ``failed`` is the ordered tuple of failure labels (``trials.failed`` is the same list,
-    "; "-joined), owner conditions first in ``dev.FAILURE_LABELS`` order and the luck label last.
-    ``eligible`` is ``failed == ()``, always.
+    "; "-joined): owner conditions first in ``dev.FAILURE_LABELS`` order, then the luck label,
+    then ``CONTROL_LABEL`` for a trial recorded as a control arm. ``eligible`` is
+    ``failed == ()``, always.
 
     ``derived`` is True when the DSR in this verdict was **evaluated at ``n``**, and False when
     it could not be -- in which case ``dsr`` is None and the luck label is among ``failed``. It
@@ -1857,6 +1944,14 @@ def verdict(
     strength of a luck test nobody ever ran. ``derived`` is False exactly in this case, and
     ``dsr`` is None with it.
 
+    **A recorded control arm is never eligible** (random-twin-yardstick R3). When this trial's
+    ``trial_roles`` row says ``control`` -- an arm registered to be beaten -- ``CONTROL_LABEL`` is
+    appended after the luck label, whatever its numbers. It is the label ``runner.trial_rows``
+    writes into a new control's ``failed``, so the record and this read agree on the run date,
+    and ``best_dev_eligible`` stops choosing controls with no rule of its own. A trial with no
+    role row, and every trial on a database without the table, reads exactly as it did before
+    the table existed.
+
     ``at`` resolves the gate once for a caller judging many trials. ``policy`` names a different
     policy for a read-only comparison (phase 5's ``lab luck``); the write paths never pass it.
     """
@@ -1872,6 +1967,11 @@ def verdict(
     # that was not passed. Nothing is admitted for being unmeasurable.
     if dsr is None or dsr < DSR_MIN:
         failed = failed + (DSR_LABEL,)
+    # An arm registered to be beaten never makes its method eligible, whatever its numbers. Read
+    # from the recorded role, never from the method file, so this read opens nothing; a trial with
+    # no role row (or a database without the table) is judged exactly as before.
+    if role_of_trial(conn, trial["n"]) == CONTROL_ROLE:
+        failed = failed + (CONTROL_LABEL,)
     return Verdict(
         dsr=dsr, failed=failed, eligible=not failed, n=g.n, policy=g.policy,
         derived=dsr is not None,
@@ -1941,7 +2041,7 @@ REEVALUATION_MARKER = "Re-evaluated under the "
 
 @dataclass(frozen=True)
 class Reevaluation:
-    """What ``reevaluate_method`` found, and whether it moved the method."""
+    """What ``reevaluate_method`` or ``demote_method`` found, and whether it moved the method."""
 
     method_id: str
     status_before: str
@@ -1952,6 +2052,8 @@ class Reevaluation:
     derived: int                # dev trials whose DSR was evaluated at the gate's N
     unjudgeable: int            # dev trials with no evaluable DSR -- they fail the luck test
     dev_trials: int
+    eligible_now: tuple[str, ...] = ()  # candidate ids eligible under ``verdict`` now (demotion)
+    controls: int = 0                   # dev trials recorded as control arms (demotion)
 
 
 def _blocking(
@@ -2022,7 +2124,10 @@ def reevaluate_method(conn: sqlite3.Connection, method_id: str) -> Reevaluation:
       False; there is no other edge into ``dev-eligible`` from here, so a method already moved
       is not moved twice.
     - at least one of its dev trials must be eligible under the derived verdict and not already
-      recorded eligible.
+      recorded eligible -- or, for a method ``demote_method`` moved here (its analysis carries
+      ``DEMOTION_MARKER``), eligible under the derived verdict whatever it recorded, because a
+      demotion is the one way a method reaches ``rejected`` while holding a recorded-eligible arm,
+      and the way back must be open to that same arm (random-twin-yardstick, Decision D10).
     - **every trial it relies on must clear all five conditions on a second, independently
       written check.** ``verdict`` already derives them; ``_blocking`` repeats the four
       comparisons against the same live constants in its own code, and refuses outright if the
@@ -2056,6 +2161,9 @@ def reevaluate_method(conn: sqlite3.Connection, method_id: str) -> Reevaluation:
     if row is None:
         raise LabError(f"no method {method_id}")
     status = str(row["status"])
+    # A method demote_method moved here may hold arms recorded eligible (1) that read eligible
+    # again today. They unblock it too; any other rejected method keeps the narrow rule.
+    demoted = DEMOTION_MARKER in str(row["analysis"] or "")
     trials = conn.execute(
         "SELECT * FROM trials WHERE method_id = ? AND window = 'dev' ORDER BY n", (method_id,)
     ).fetchall()
@@ -2077,7 +2185,7 @@ def reevaluate_method(conn: sqlite3.Connection, method_id: str) -> Reevaluation:
                 f"only cross this edge when every one of the five conditions clears the bar in "
                 f"force today."
             )
-        if not bool(t["eligible"]):
+        if demoted or not bool(t["eligible"]):
             unblocked.append(str(t["candidate_id"]))
             verdicts[str(t["candidate_id"])] = v
     found = Reevaluation(
@@ -2151,6 +2259,150 @@ def reevaluate(
             for r in conn.execute("SELECT id FROM methods WHERE status = 'rejected' ORDER BY id")
         ]
     return [reevaluate_method(conn, m) for m in method_ids]
+
+
+# The first words of the analysis section ``demote_method`` appends. Like ``REEVALUATION_MARKER``
+# it is not an idempotence key: the edge it guards leads out of the only status it may be taken
+# from, so a method is demoted at most once per stay in ``dev-eligible``.
+DEMOTION_MARKER = "Demoted under the "
+
+
+def demote_method(conn: sqlite3.Connection, method_id: str) -> Reevaluation:
+    """Move a ``dev-eligible`` method none of whose dev trials reads eligible today to ``rejected``.
+
+    The mirror of ``reevaluate_method``, and **as narrow**. It may take exactly one edge, from
+    exactly one status, for exactly one reason:
+
+    - the method must read ``dev-eligible`` now. Any other status is left alone and ``moved`` is
+      False -- a ``promoted`` method in particular is a pre-registration, a promise this function
+      never unpicks.
+    - it must have at least one dev trial. A method with none has nothing to be judged on and is
+      left where it is rather than demoted on an absence.
+    - **no** dev trial of it may be eligible under ``verdict`` at the gate in force now. That one
+      rule covers both ways a status goes stale: a method whose only eligible arms were control
+      arms, which ``verdict`` refuses once their ``trial_roles`` row exists, and a method whose
+      arms have since sunk under the luck bar as N grew.
+
+    It is deliberately **not** run by plain ``lab reevaluate``. Demotion is an explicit act
+    (``lab reevaluate --demote``, plan Decision D6), for the reason ``reevaluate_method`` is
+    narrow: a sweep that could move a method either way on every call would let a status flicker
+    with every Sera batch.
+
+    It reads roles from ``trial_roles`` only. A control arm with no role row still counts as an
+    eligible arm here, so a sweep run before ``lab roles --backfill`` can only demote too little,
+    never too much; ``lab reevaluate --demote`` says so when it sees one.
+
+    Nothing in ``trials`` is written: no row is inserted, updated or deleted, so the lab's N does
+    not move and ``test_looks`` is untouched. What is written is one dated section appended to
+    ``analysis`` (append-only by trigger), in the owner's plain words because the method page
+    shows it, and the ``status`` column. Both happen in the caller's transaction, so a crash
+    leaves neither.
+
+    The caller holds the transaction (``begin_immediate`` / ``with conn``), as every other writer
+    in this module does.
+    """
+    from seer_engine.backtest import tuning  # for the drawdown screen named in the analysis text
+
+    row = get_method(conn, method_id)
+    if row is None:
+        raise LabError(f"no method {method_id}")
+    status = str(row["status"])
+    trials = conn.execute(
+        "SELECT * FROM trials WHERE method_id = ? AND window = 'dev' ORDER BY n", (method_id,)
+    ).fetchall()
+    g = gate(conn)
+    eligible_now: list[str] = []
+    derived = 0
+    controls = 0
+    for t in trials:
+        v = verdict(conn, t, at=g)
+        derived += 1 if v.derived else 0
+        if role_of_trial(conn, t["n"]) == CONTROL_ROLE:
+            controls += 1
+        if v.eligible:
+            eligible_now.append(str(t["candidate_id"]))
+    found = Reevaluation(
+        method_id=method_id,
+        status_before=status,
+        status_after=status,
+        moved=False,
+        gate=g,
+        unblocked=(),
+        derived=derived,
+        unjudgeable=len(trials) - derived,
+        dev_trials=len(trials),
+        eligible_now=tuple(eligible_now),
+        controls=controls,
+    )
+    if status != "dev-eligible" or not trials or eligible_now:
+        return found
+
+    k = len(trials)
+    runs = "1 run" if k == 1 else f"{k} runs"
+    if controls == 0:
+        why = (
+            "None of them is a comparison arm: each misses at least one condition at today's bars."
+        )
+    elif controls == k:
+        why = (
+            "Every one of them is a comparison arm, registered in advance to be beaten, and a "
+            "comparison arm never counts."
+        )
+    else:
+        arms = (
+            "1 of them is a comparison arm" if controls == 1
+            else f"{controls} of them are comparison arms"
+        )
+        why = (
+            f"{arms}, registered in advance to be beaten, which never count; each of the others "
+            f"misses at least one condition at today's bars."
+        )
+    lines = [
+        "# Re-evaluation",
+        "",
+        f"{DEMOTION_MARKER}bars in force on {date.today().isoformat()}: the luck test (a "
+        f"deflated Sharpe of at least {DSR_MIN:.2f}, with the lab's count of tries at {g.n}), "
+        f"the {tuning.DEV_MAX_DRAWDOWN:.0%} drawdown screen, and the rule that a comparison arm "
+        f"never makes a method worth studying.",
+        "",
+        f"None of this method's {runs} on the study window clears every condition today. {why}",
+        "",
+        "Nothing recorded changed: every run keeps the numbers and the verdict it was given on "
+        "its own day. Status moves from dev-eligible back to rejected.",
+    ]
+    append_analysis(conn, method_id, "\n".join(lines))
+    update_method(conn, method_id, status="rejected")
+    return Reevaluation(
+        method_id=method_id,
+        status_before=status,
+        status_after="rejected",
+        moved=True,
+        gate=g,
+        unblocked=(),
+        derived=derived,
+        unjudgeable=len(trials) - derived,
+        dev_trials=len(trials),
+        eligible_now=(),
+        controls=controls,
+    )
+
+
+def demote(
+    conn: sqlite3.Connection, method_ids: Sequence[str] | None = None
+) -> list[Reevaluation]:
+    """``demote_method`` over ``method_ids``, or over every ``dev-eligible`` method when None.
+
+    The caller holds the transaction, so the whole sweep is one atomic unit: either every method
+    it demotes moves, or none does.
+    """
+    if method_ids is None:
+        method_ids = [
+            str(r[0])
+            for r in conn.execute(
+                "SELECT id FROM methods WHERE status = 'dev-eligible' ORDER BY id"
+            )
+        ]
+    return [demote_method(conn, m) for m in method_ids]
 
 
 # --------------------------------------------------------------------------- trial moments
@@ -2728,6 +2980,119 @@ def insert_folds(conn: sqlite3.Connection, row: FoldRow) -> None:
             row.picks_json, row.summary, row.reason, row.recorded,
         ],
     )
+
+
+# --------------------------------------------------------------------------- trial roles
+
+
+@dataclass(frozen=True)
+class RoleRow:
+    """The part one dev trial's arm plays in its method's experiment (``_ROLES_TABLE``).
+
+    - ``trial_n``  the ``trials.n`` this describes. ``insert_trials`` assigns it, so
+                   ``run_method`` builds the row after the insert; ``insert_roles`` refuses the
+                   pre-insert sentinel ``0``.
+    - ``role``     one of ``TRIAL_ROLES``: ``control_shape.role_of`` on the arm's rationale.
+    - ``source``   ``"recorded"`` when the run that recorded the trial wrote it, from the
+                   candidate it had just simulated; ``"backfill"`` when ``lab roles --backfill``
+                   added it later from the method file as it reads now.
+    - ``measured`` an ISO timestamp: the trial's own ``run_at`` for a recorded row, the moment
+                   of the backfill for a backfilled one.
+    """
+
+    trial_n: int
+    role: str
+    source: str
+    measured: str
+
+
+ROLE_COLUMNS: tuple[str, ...] = tuple(f.name for f in fields(RoleRow))
+
+
+def role_of_trial(conn: sqlite3.Connection, trial_n: int) -> str | None:
+    """The recorded role of one trial's arm (one of ``TRIAL_ROLES``), or None when it has none.
+
+    None is the normal answer for every trial recorded before the table existed whose role has
+    not been backfilled -- the P7a seed rows never will be, having no method file -- and for every
+    test-window look, which ``lab run`` does not record. It means "not known", never "not a
+    control": ``verdict`` then judges the trial exactly as it did before roles were recorded.
+
+    A database opened read-only by a checkout that never created the table has no
+    ``trial_roles`` at all, and is answered the same way, exactly as ``funding_of`` answers for
+    ``trial_funding`` -- ``snapshot`` runs on ``connect_readonly`` and must keep working there.
+    """
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'trial_roles'"
+    ).fetchone() is None:
+        return None
+    row = conn.execute(
+        "SELECT role FROM trial_roles WHERE trial_n = ?", (int(trial_n),)
+    ).fetchone()
+    return None if row is None else str(row[0])
+
+
+def insert_roles(conn: sqlite3.Connection, rows: Sequence[RoleRow]) -> None:
+    """Record the role of trials that already exist (the caller holds the transaction).
+
+    Append-only and one row per trial: a trial that already has a role is refused rather than
+    overwritten, so ``lab roles --backfill`` is made idempotent by asking ``unroled_dev_trials``
+    for what is still missing instead of racing the triggers. The role and the source are checked
+    here, once, with a sentence a reader can act on; the table's CHECKs are the floor under it.
+    ``trial_n`` must be a real trial number -- the foreign key enforces that the trial exists, and
+    the explicit check turns the pre-insert sentinel ``0`` into a readable refusal.
+    """
+    cols = ", ".join(f'"{c}"' for c in ROLE_COLUMNS)
+    marks = ", ".join("?" for _ in ROLE_COLUMNS)
+    for r in rows:
+        if r.trial_n <= 0:
+            raise LabError(
+                f"roles need the trial number insert_trials assigned, got {r.trial_n!r}: insert "
+                "the trial first, then record its role"
+            )
+        if r.role not in TRIAL_ROLES:
+            raise LabError(
+                f"trial {r.trial_n}: {r.role!r} is not a role control_shape.role_of can answer "
+                f"({', '.join(TRIAL_ROLES)})"
+            )
+        if r.source not in ROLE_SOURCES:
+            raise LabError(
+                f"trial {r.trial_n}: source {r.source!r} is not one of {', '.join(ROLE_SOURCES)}"
+            )
+        if role_of_trial(conn, r.trial_n) is not None:
+            raise LabError(
+                f"trial {r.trial_n} already has a recorded role: trial_roles is append-only, and "
+                "a second role for one arm would be two answers to one question"
+            )
+        conn.execute(
+            f"INSERT INTO trial_roles ({cols}) VALUES ({marks})",
+            [getattr(r, c) for c in ROLE_COLUMNS],
+        )
+
+
+def unroled_dev_trials(
+    conn: sqlite3.Connection, method_ids: Sequence[str] | None = None
+) -> list[sqlite3.Row]:
+    """Every dev trial with no ``trial_roles`` row, in trial order; only ``method_ids``' when given.
+
+    What ``lab roles --backfill`` still has to read, and what ``lab reevaluate --demote`` warns
+    about: a control arm in this list still counts as eligible, because ``verdict`` refuses only a
+    role it can read from the record. On a database without the table every dev trial is listed.
+    An empty ``method_ids`` lists nothing.
+    """
+    have_table = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'trial_roles'"
+    ).fetchone() is not None
+    sql = "SELECT t.* FROM trials t WHERE t.window = 'dev'"
+    params: list[Any] = []
+    if have_table:
+        sql += " AND NOT EXISTS (SELECT 1 FROM trial_roles r WHERE r.trial_n = t.n)"
+    if method_ids is not None:
+        ids = [str(m) for m in method_ids]
+        if not ids:
+            return []
+        sql += f" AND t.method_id IN ({', '.join('?' for _ in ids)})"
+        params.extend(ids)
+    return conn.execute(sql + " ORDER BY t.n", params).fetchall()
 
 
 # --------------------------------------------------------------------------- ideas_seen

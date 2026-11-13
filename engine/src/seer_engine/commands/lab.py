@@ -33,6 +33,17 @@
                                     Reads only: no store, no backtest, no trial row, no look. A
                                     trial whose DSR cannot be evaluated at the gate's N fails the
                                     luck test and is reported as such
+    lab reevaluate --demote [M0022 ...]
+                                    the way back: move a dev-eligible method none of whose dev
+                                    trials reads eligible today -- a recorded control arm never
+                                    does -- to rejected, with a dated note in its analysis. No
+                                    trial row is touched. Default: every dev-eligible method
+    lab roles [M0022 ...] [--backfill]
+                                    each recorded dev arm's role (control, dose, idea,
+                                    treatment) and where it came from; --backfill records the
+                                    role of every dev arm that has none and whose method file
+                                    can still be read, once, and skips the rest. No trial row,
+                                    no status change: N and the looks do not move
     lab test M0007-A [--store DIR] [--roster-id ID] [--dry-run]
                                     the one counted look: run a promoted method's pre-registered
                                     variant once on the test window, record a `test` trial and set
@@ -323,11 +334,52 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     s = sub.add_parser(
         "reevaluate",
         help="re-judge recorded dev trials against the current luck bar; moves a method "
-             "rejected -> dev-eligible when the bars in force today clear every condition",
+             "rejected -> dev-eligible when the bars in force today clear every condition, or "
+             "with --demote dev-eligible -> rejected when no non-control arm does",
     )
     s.add_argument(
         "method", nargs="*", metavar="M0022",
-        help="methods to re-evaluate (default: every method that reads rejected)",
+        help="methods to re-evaluate (default: every method that reads rejected, or with "
+             "--demote every method that reads dev-eligible)",
+    )
+    s.add_argument(
+        "--demote", action="store_true",
+        help="take the one edge back instead: move a dev-eligible method none of whose dev "
+             "trials reads eligible at the bars in force today -- a recorded control arm never "
+             "does -- to rejected, and append a dated note to its analysis. No trial row is "
+             "written. Run `lab roles --backfill` first, or an unrecorded control still counts",
+    )
+
+    s = sub.add_parser(
+        "roles",
+        help="each recorded dev arm's role and where it came from; --backfill records the missing",
+        description=(
+            "An arm's role -- control, dose, idea or treatment -- is its author's one-line "
+            "rationale, read by control_shape.role_of. `lab run` records it beside every trial it "
+            "writes, and the lab's verdict reads that record: an arm registered to be beaten "
+            "never makes its method dev-eligible and is never the arm `lab promote` would "
+            "choose. Trials recorded before roles were kept have none. Without --backfill this "
+            "writes nothing: with method ids it lists every dev arm of those methods, its "
+            "recorded role and source, or what its method file reads now; without ids it counts "
+            "the recorded roles by role and source and the dev arms that still have none. "
+            "--backfill reads every method file once and records, in one transaction, the role "
+            "of every dev arm that has none and whose method file declares an arm with its id. "
+            "An arm it cannot read -- the P7a seed rows, which predate method files, or an id "
+            "the file no longer declares -- is skipped and counted, never guessed. A second run "
+            "records nothing. No trial row is touched, so the lab's N and the test-window looks "
+            "cannot move."
+        ),
+    )
+    s.add_argument(
+        "method", nargs="*", metavar="M0022",
+        help="methods to list arm by arm (default: a summary over every dev arm; with "
+             "--backfill, every method)",
+    )
+    s.add_argument(
+        "--backfill", action="store_true",
+        help="record the role of every dev arm that has none, read from its method file as it "
+             "is now. Arms whose file or arm cannot be read are skipped and counted. Idempotent: "
+             "an arm that has a role is never written twice",
     )
 
     s = sub.add_parser("test", help="the one counted look at the test window (design §3)")
@@ -2253,9 +2305,14 @@ def _reevaluate(conn, args) -> int:
     writes** (it can move a method across `rejected -> dev-eligible`) and **`lab luck` reads**
     (it prints the gate's state and its sensitivity to N, and touches nothing).
 
+    `--demote` takes the other edge instead, `dev-eligible -> rejected`, and is a separate act
+    (`_demote`): plain `lab reevaluate` never demotes anything (plan Decision D6).
+
     Like every other `lab` subcommand, the global `--dry-run` is ignored. The whole sweep is one
     transaction: either every method it unblocks moves, or none does.
     """
+    if getattr(args, "demote", False):
+        return _demote(conn, args)
     store.begin_immediate(conn)
     with conn:
         results = store.reevaluate(conn, args.method or None)
@@ -2293,6 +2350,147 @@ def _reevaluate(conn, args) -> int:
         # worktree, so this phase stages its own path allowlist by hand (Decision D10).
         print("Re-export the web snapshot with "
               "`python -m seer_engine lab export-json`, and commit it with lab/lab.sqlite.")
+    return 0
+
+
+def _demote(conn, args) -> int:
+    """`lab reevaluate --demote [M0022 ...]`: the one edge back, dev-eligible -> rejected.
+
+    `store.demote_method` decides, one method at a time, inside one transaction for the whole
+    sweep: a method moves only when it reads dev-eligible and none of its dev trials is eligible
+    under `store.verdict` at the gate in force now. Nothing is loaded, nothing is run and no trial
+    row is written, so N and the test-window looks are what they were.
+
+    A control arm counts as a control only once its role is recorded (`trial_roles`), so a sweep
+    run before `lab roles --backfill` demotes too little, never too much. The number of dev arms
+    in the swept methods that have no recorded role is printed so that order is visible.
+    """
+    store.begin_immediate(conn)
+    with conn:
+        results = store.demote(conn, args.method or None)
+        unroled = store.unroled_dev_trials(conn, [r.method_id for r in results])
+    if not results:
+        print("nothing to demote: no method reads dev-eligible")
+        return 0
+    g = results[0].gate
+    print(f"luck bar: {store.DSR_LABEL}   N policy: {g.policy}, N = {g.n}   "
+          f"drawdown screen: {tuning.DEV_MAX_DRAWDOWN:.0%}   a recorded control arm never counts")
+    print()
+    moved = 0
+    for r in results:
+        if r.moved:
+            moved += 1
+            print(f"  {r.method_id}: {r.status_before} -> {r.status_after}  (no dev trial reads "
+                  f"eligible today; {r.controls} of {r.dev_trials} recorded as control arms)")
+        elif r.status_before != "dev-eligible":
+            print(f"  {r.method_id}: reads {r.status_before}; only a dev-eligible method is "
+                  f"demoted, unchanged")
+        elif r.dev_trials == 0:
+            print(f"  {r.method_id}: no dev trial to judge it on; unchanged")
+        else:
+            print(f"  {r.method_id}: still dev-eligible ({', '.join(r.eligible_now)})")
+    if unroled:
+        print()
+        print(f"{len(unroled)} dev arm(s) of these methods have no recorded role, so a control "
+              f"arm among them still counts as eligible here. Run `lab roles --backfill`, then "
+              f"`lab reevaluate --demote` again.")
+    print()
+    print(f"{moved} method(s) moved dev-eligible -> rejected; "
+          f"test-window looks used: {store.test_looks(conn)}")
+    if moved:
+        print("Re-export the web snapshot with "
+              "`python -m seer_engine lab export-json`, and commit it with lab/lab.sqlite.")
+    return 0
+
+
+def _roles_cmd(conn, args) -> int:
+    """`lab roles [M0022 ...] [--backfill]`: each recorded dev arm's role, and the backfill.
+
+    An arm's role -- control, dose, idea or treatment -- is its author's one-line rationale, read
+    by `control_shape.role_of`. `lab run` records it beside every trial it writes (`trial_roles`,
+    source `recorded`), and `store.verdict` reads that record to refuse a control arm. Trials
+    recorded before the table existed have none, and this command is how they get one.
+
+    Without `--backfill` it writes nothing. With method ids it lists every dev arm of those
+    methods: its recorded role and source, or, for an arm with none, what its method file reads
+    now. Without ids it prints the recorded roles counted by role and source, and how many dev
+    arms still have none.
+
+    The method files are read once, through `_roles` -- the reader `lab twins` and `lab status`
+    already use -- and *before* the write lock, because `discover()` imports every method module
+    and a parallel `lab run` must not wait on that. `--backfill` then asks again, under the lock,
+    which dev arms have no role (a parallel run may have recorded some), and writes one
+    `source='backfill'` row for each whose method file declares an arm with its id, in one
+    transaction. An arm it cannot read -- the P7a seed rows, which predate method files, or an id
+    the file no longer declares -- is skipped and counted, never guessed. A second run writes
+    nothing: an arm that has a role is never offered again. No `trials` row is touched, so N and
+    the test-window looks do not move.
+    """
+    wanted = [str(m) for m in args.method]
+    for mid in wanted:
+        if store.get_method(conn, mid) is None:
+            raise store.LabError(f"no method {mid}")
+    scope = wanted or None
+    pending = store.unroled_dev_trials(conn, scope)
+    read = _roles(sorted({str(t["method_id"]) for t in pending}))
+
+    def key(t) -> tuple[str, str]:
+        return str(t["method_id"]), str(t["candidate_id"])
+
+    if args.backfill:
+        store.begin_immediate(conn)
+        with conn:
+            pending = store.unroled_dev_trials(conn, scope)
+            stamp = store.now_iso()
+            rows = [
+                store.RoleRow(
+                    trial_n=int(t["n"]), role=read[key(t)], source="backfill", measured=stamp
+                )
+                for t in pending
+                if key(t) in read
+            ]
+            store.insert_roles(conn, rows)
+        unread = sorted({str(t["method_id"]) for t in pending if key(t) not in read})
+        named = ", ".join(unread[:10]) + (
+            f" and {len(unread) - 10} more" if len(unread) > 10 else ""
+        )
+        print(f"recorded {len(rows)} role(s) (source backfill); skipped "
+              f"{len(pending) - len(rows)} dev arm(s) whose method file or arm cannot be read"
+              + (f" (in {named})" if unread else ""))
+        for role, count in sorted(Counter(r.role for r in rows).items()):
+            print(f"  {role:<10} {count}")
+        return 0
+
+    if wanted:
+        for mid in wanted:
+            print(mid)
+            for t in conn.execute(
+                "SELECT t.n, t.candidate_id, r.role, r.source FROM trials t "
+                "LEFT JOIN trial_roles r ON r.trial_n = t.n "
+                "WHERE t.method_id = ? AND t.window = 'dev' ORDER BY t.n",
+                (mid,),
+            ):
+                cid = str(t["candidate_id"])
+                if t["role"] is not None:
+                    print(f"  {cid:<32} {t['role']:<10} {t['source']}")
+                    continue
+                now = read.get((mid, cid))
+                said = (
+                    "no method file declares this arm" if now is None
+                    else f"its method file reads {now}; `lab roles --backfill` records it"
+                )
+                print(f"  {cid:<32} {'-':<10} not recorded ({said})")
+        return 0
+
+    print(f"dev arms: {store.dev_trial_count(conn)}")
+    for role, source, count in conn.execute(
+        "SELECT r.role, r.source, count(*) FROM trial_roles r JOIN trials t ON t.n = r.trial_n "
+        "WHERE t.window = 'dev' GROUP BY r.role, r.source ORDER BY r.role, r.source"
+    ):
+        print(f"  {role:<10} {source:<9} {count}")
+    readable = sum(1 for t in pending if key(t) in read)
+    print(f"  no role recorded: {len(pending)} ({readable} readable now, which "
+          f"`lab roles --backfill` records; {len(pending) - readable} cannot be read)")
     return 0
 
 
@@ -4203,6 +4401,7 @@ _HANDLERS = {
     "run": _run,
     "promote": _promote,
     "reevaluate": _reevaluate,
+    "roles": _roles_cmd,
     "test": _test,
     "remeasure": _remeasure,
     "costs": _costs,

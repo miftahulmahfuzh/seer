@@ -3,17 +3,17 @@
 **Package Path**: `web`
 **Package Code**: WEB
 **Last Updated**: 2026-11-12
-**Total Active Tasks**: 0
+**Total Active Tasks**: 1
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 0
+- P1 High: 1
 - P2 Medium: 0
 - P3 Low: 0
 - P4 Backlog: 0
-- Blocked: 0
+- Blocked: 1
 - Completed: 31
 
 ---
@@ -23,6 +23,15 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [ ] **P1-WEB-59NH** Phase 5: Snapshot and Sera pages
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns: the snapshot fields and `SNAPSHOT_VERSION`; `web/lib/sera` types, derive, glossary, fixture and tests; the method page's seventh condition and the comparison-book treatment of control arms; the how page's wording; the redone panel's plain words for the two new labels; the regenerated `web/data/lab.json`; `sera.md` in the feature map. Exit criteria: the snapshot test and the JSON sync test pass; the method page shows the yardstick row in plain words in both themes at phone and desktop widths; a row with no reading says so and is never drawn as a pass; no owner-facing text prints either new engine label raw.
+  - **Status**: blocked
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md` (phase 5 of 5)
+  - **Satisfies**: R2 — "you idea so we can implement them robustly" — part 2: "Judge ideas against it. An arm passes only if it beats roughly the top tenth of random books on its own setup, in place of today's 'beats SPY and clears the luck score'." · criteria: R2.4
+  - **Depends on**: P1-ENG-VZXN
+  - **Plan**: `.workflows/plan/P1-WEB-59NH.md`
 
 ### [P2] Medium
 

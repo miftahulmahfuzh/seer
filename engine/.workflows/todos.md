@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-11-13
-**Total Active Tasks**: 5
+**Total Active Tasks**: 4
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 3
+- P1 High: 2
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 2
-- Completed: 168
+- Blocked: 1
+- Completed: 169
 
 ---
 
@@ -23,14 +23,25 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
-- [ ] **P1-ENG-NI1B** Phase 1: Roles in the record, role-aware status and the demotion door
+- [x] **P1-ENG-NI1B** Phase 1: Roles in the record, role-aware status and the demotion door
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns: the `trial_roles` table and its helpers; `CONTROL_LABEL` in `store.verdict` and in `runner.trial_rows`; role rows written by `run_method`; the `dev-eligible → rejected` transition and `store.demote_method`; the way back for a demoted method in `reevaluate_method` (D10); `lab roles` and `lab reevaluate --demote`; their tests and the `lab-cli.md` feature-map entry. Exit criteria: a method whose only eligible arm is a control records `rejected`; a recorded control reads not eligible and is never chosen by `best_dev_eligible`; `--demote` moves a stale method and appends a dated note, and plain `lab reevaluate` takes it back once an arm clears again; `--backfill` is idempotent; invariant 5 holds.
-  - **Status**: in_progress
+  - **Status**: completed
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md` (phase 1 of 5)
   - **Satisfies**: R3 — "you idea so we can implement them robustly" — part 3: "Derive status from treatment arms only. Arm roles already exist (the hard gate reads them to refuse promoting a control); the status line just ignores them." · criteria: R3.1, R3.2, R3.3, R3.4
   - **Plan**: `.workflows/plan/P1-ENG-NI1B.md`
+  - **Completed**: 2026-11-13 14:40
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/lab/store.py, engine/src/seer_engine/lab/runner.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_roles.py, .claude/skills/verify-seer/features/lab-cli.md, engine/.workflows/todos.md, engine/.workflows/plan/P1-ENG-NI1B.md, engine/.workflows/plan/P1-ENG-M170.md, engine/.workflows/plan/P1-ENG-VZXN.md, web/.workflows/todos.md, web/.workflows/plan/P1-WEB-59NH.md, .workflows/plan/RANDOM_TWIN_YARDSTICK_PLAN.md
+  - **Proof**: verified-first-pass — 6 journeys, evidence /home/miftah/.local/state/seer-verify/1113-135053-184864/evidence
+  - **Drift**:
+    - none in code; every anchor matched and the plan's code blocks were applied verbatim
+    - Package column says engine/lab, which is not a tracked package; tasks filed under engine (ENG) and web (WEB)
+  - **Decided**:
+    - plan Package `engine/lab` has no todos.md → filed phases 1-4 under package `engine` (rung 6: existing convention, engine/.workflows/todos.md holds every lab task)
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats adjusted for this task only (rung 6: this file's precedent for every swarm-tracked set, incl. phase 2 of this set). Plan index: phase 1's TaskID cell ticked `(done 2026-11-13)` in the coordinator's copy and the worktree copy; `**Status:**` left at the coordinator's `phase 2/5 complete` (two of five phases are now done). P1-ENG-M170 unblocked: both its dependencies (P1-ENG-NI1B, P1-ENG-3B9A) are complete.
+    - Landing not attempted: swarm coordinator `orch-random-twin-yardstick` owns the merge of `feature/random-twin-yardstick`.
 - [x] **P1-ENG-3B9A** Phase 2: The random-twin engine
   - **Difficulty**: HARD
   - **Type**: Feature
@@ -52,7 +63,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns: the `trial_yardstick` table and its helpers (`YardstickRow.from_measurement`, `has_yardstick`, `insert_yardstick`, `yardstick_of`); `YARDSTICK_MIN_PERCENTILE`, `YARDSTICK_LABEL`, `yardstick_clears`, `yardstick_due`; the `lab yardstick` command with `_positive_count` and `_yardstick_line`, which phase 4 reuses; their tests and the `lab-cli.md` entry. Exit criteria: `lab yardstick M…` on a fixture lab writes one row per due arm and none on a second run; the trial count and `gate(conn).n` do not move; a non-reproducing arm exits 2 with nothing written; a not-applicable (bracket) reading is recorded with `reproduced` NULL; every shape phase 2's `Measurement` admits is a row `insert_yardstick` accepts.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md` (phase 3 of 5)
   - **Satisfies**: R1 — "you idea so we can implement them robustly" — part 1: "A random-book yardstick per setup. For each combination of pool, book size, cadence, weighting and safety switch, run a few hundred random books once and cache the distribution. These count against nothing." · criteria: R1.1, R1.2, R1.5, R1.6
   - **Depends on**: P1-ENG-NI1B, P1-ENG-3B9A

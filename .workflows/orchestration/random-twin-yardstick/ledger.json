@@ -40,22 +40,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "d6c322332e9f0387ef2faef12fba5663a9a76bff",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "trial_yardstick table, readers, bar/label, yardstick_due and lab yardstick landed as planned; decision: plan's test passed trial_n twice in two parametrised cases, row now built from merged keywords, assertions unchanged (rung 3); test_lab_hardgate buy-signal pin still red, a committed-lab id pin untouched by this phase; proof: verified-first-pass /home/miftah/.local/state/seer-verify/1113-142946-260580/evidence",
       "package": "engine/lab",
       "plan": ".workflows/plan/random-twin-yardstick/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-11-13T14:47:02+07:00",
       "satisfies": [
         "R1"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-M170",
       "title": "The yardstick record and `lab yardstick"
     },
     {
@@ -73,7 +73,7 @@
       "satisfies": [
         "R2"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The yardstick as a screen condition"
     },
@@ -100,6 +100,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "random-twin-yardstick",
-  "updated": "2026-11-13T14:19:18+07:00",
+  "updated": "2026-11-13T14:48:11+07:00",
   "worktree": "/home/miftah/.worktrees/seer/random-twin-yardstick"
 }

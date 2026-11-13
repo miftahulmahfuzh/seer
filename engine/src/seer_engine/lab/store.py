@@ -64,6 +64,14 @@ Tables:
   ``trials.n``. Triggers refuse every UPDATE and DELETE. **No schema version came with it**: the
   table is created by ``CREATE TABLE IF NOT EXISTS`` inside ``_SCHEMA`` on every connect, and
   ``role_of_trial`` answers None when it is absent.
+- ``trial_yardstick``: the random-twin yardstick of one dev trial -- the share of
+  ``yardstick.DRAWS`` random twin books (the arm's own decisions replayed with every picked name
+  swapped for an index member of similar trading size) that the arm out-earned, with every twin's
+  rate kept as JSON. One row per (trial, draw rule, research store); a repeat writes nothing.
+  It is a measurement of an arm already counted, never a trial: no ``trials`` row, no N, no
+  look. Added by ``CREATE TABLE IF NOT EXISTS`` on connect, with no schema version of its own, so
+  older checkouts sharing the database through ``SEER_LAB_DB`` open it unchanged. Triggers refuse
+  every UPDATE and DELETE.
 
 Schema versions (``meta.schema_version``): 1 is the first lab; 2 adds the ``synthesis`` insight
 kind; 3 adds the ``trial_moments`` side table; 4 adds the ``trial_funding`` side table (the
@@ -228,6 +236,20 @@ ROLE_SOURCES: tuple[str, ...] = ("recorded", "backfill")
 # and the verdict therefore agree on the run date. Worded as the condition the arm misses, the
 # way every other label is ("beats SPY TR", "PF >= 1.3").
 CONTROL_LABEL = "not a control arm"
+
+
+# The random-twin yardstick's bar (RANDOM_TWIN_YARDSTICK_PLAN.md Decision D9): an arm clears its
+# yardstick when it out-earned at least this share of its random twins -- books that replay the
+# arm's own decisions with every picked name swapped for a randomly drawn index member of similar
+# trading size (lab/yardstick.py). "Roughly the top tenth of random books" in the words of the
+# review the owner asked to have built. Not a CLI flag and not a policy: one number, cited, moved
+# only by editing this line, exactly as DSR_MIN is.
+YARDSTICK_MIN_PERCENTILE = 0.90
+
+# The yardstick's failure label, derived from the bar rather than retyped, for the reason
+# DSR_LABEL is derived from DSR_MIN: the label and the threshold can never disagree. Any screen
+# that reads the yardstick writes this string, and ``yardstick_due`` recognises it.
+YARDSTICK_LABEL = f"beats {YARDSTICK_MIN_PERCENTILE:.0%} of random twins"
 
 
 # The N the luck test deflates by, resolved through ``npolicy.effective_n``. ONE constant: the
@@ -584,6 +606,72 @@ BEGIN SELECT RAISE(ABORT, 'trial_roles are append-only: a role row is never upda
 BEGIN SELECT RAISE(ABORT, 'trial_roles are append-only: a role row is never deleted'); END""",
 )
 
+# The random-twin yardstick of one dev trial, measured on one research store under one draw rule
+# (RANDOM_TWIN_YARDSTICK_PLAN.md phase 3). ``lab yardstick`` writes it, and nothing it writes is
+# a trial: no ``trials`` row, no change to the luck gate's N, no test-window look. That is
+# requirement R1.2, and it is why this is a side table rather than a column.
+#
+# **The key is (trial, rule, store), and a repeat writes nothing.** ``rule_id`` is
+# ``yardstick.RULE_ID`` -- the draw rule's version, so a later rule is a new measurement rather
+# than a rewrite of this one -- and ``store_fingerprint`` is the research store the twins were
+# simulated on, because a twin's return is a statement about those prices and no other. A second
+# measurement of the same arm on the same store under the same rule would be the same number
+# again, so ``insert_yardstick`` refuses it by returning False (R1.5). A third measurement on a
+# rebuilt store is a new row. ``yardstick_of`` reads the newest.
+#
+# ``status`` is one of three words (``lab/yardstick.py`` decides which):
+#
+# - ``measured``        the twins ran and the arm out-earned ``beaten`` of ``draws`` of them;
+#                       ``percentile`` is that share.
+# - ``not-applicable``  the arm holds no picked stock (an ETF-only or cash-only book), or is a
+#                       bracket (``DESIGN_V0``) arm with no book decisions to replay, so there is
+#                       no name to swap and no twin was simulated: ``draws`` and ``beaten`` are 0
+#                       and there is no share and no shape ratio.
+# - ``unmatched``       the twins ran but did not trade like the arm -- median trade count or
+#                       turnover outside 0.5x..2.0x of the arm's own -- so their returns are not a
+#                       fair yardstick and the row never counts as clearing it. It still carries
+#                       its draws and its share, exactly as a measured row does.
+#
+# ``reproduced`` says whether the arm itself was re-run and matched its recorded trade count and
+# return: 1 when it was checked on the store the trial was recorded on, NULL on any other store
+# (nothing to check against) and NULL for a bracket arm, which is never re-run. A 0 is never
+# written -- an arm that does not reproduce is refused and records nothing (R1.6) -- but the
+# column admits it so a reader never has to guess what NULL means. ``rates_json`` carries every
+# twin's rate, sorted ascending as ``yardstick.Measurement.rates`` holds them, so the distribution
+# is cached, not just its summary.
+#
+# The CHECKs mirror ``yardstick.Measurement.__post_init__`` (plan Decision D11): a not-applicable
+# row has no draws, no twins beaten, no share and no ratio; a measured or unmatched row has at
+# least one draw and a share.
+YARDSTICK_STATUSES: tuple[str, ...] = ("measured", "not-applicable", "unmatched")
+
+_YARDSTICK_TABLE = f"""CREATE TABLE IF NOT EXISTS trial_yardstick (
+    trial_n           INTEGER NOT NULL REFERENCES trials(n),
+    rule_id           TEXT NOT NULL CHECK (length(trim(rule_id)) > 0),
+    store_fingerprint TEXT NOT NULL CHECK (length(trim(store_fingerprint)) > 0),
+    status            TEXT NOT NULL CHECK (status IN ({_quoted(YARDSTICK_STATUSES)})),
+    draws             INTEGER NOT NULL CHECK (draws >= 0),
+    arm_rate          REAL,
+    beaten            INTEGER NOT NULL CHECK (beaten >= 0 AND beaten <= draws),
+    percentile        REAL CHECK (percentile IS NULL OR (percentile >= 0 AND percentile <= 1)),
+    rates_json        TEXT NOT NULL,
+    trade_ratio       REAL,
+    turnover_ratio    REAL,
+    reproduced        INTEGER CHECK (reproduced IS NULL OR reproduced IN (0, 1)),
+    git_sha           TEXT NOT NULL CHECK (length(trim(git_sha)) > 0),
+    measured          TEXT NOT NULL CHECK (length(trim(measured)) > 0),
+    PRIMARY KEY (trial_n, rule_id, store_fingerprint),
+    CHECK (status <> 'not-applicable' OR (draws = 0 AND beaten = 0 AND percentile IS NULL
+                                          AND trade_ratio IS NULL AND turnover_ratio IS NULL)),
+    CHECK (status = 'not-applicable' OR (draws >= 1 AND percentile IS NOT NULL))
+)"""
+_YARDSTICK_TRIGGERS: tuple[str, ...] = (
+    """CREATE TRIGGER IF NOT EXISTS trial_yardstick_no_update BEFORE UPDATE ON trial_yardstick
+BEGIN SELECT RAISE(ABORT, 'trial_yardstick is append-only: a yardstick row is never updated'); END""",
+    """CREATE TRIGGER IF NOT EXISTS trial_yardstick_no_delete BEFORE DELETE ON trial_yardstick
+BEGIN SELECT RAISE(ABORT, 'trial_yardstick is append-only: a yardstick row is never deleted'); END""",
+)
+
 #: The backfill's capital rule, exact on every trial recorded before schema v5 (analysis M3).
 #: Cross-checked with ``git merge-base --is-ancestor d79fc83 <trials.git_sha>`` over all 26
 #: distinct ``git_sha`` values: the 20 shas behind trials #1..#128 predate ``d79fc83`` and none of
@@ -743,6 +831,12 @@ CREATE TABLE IF NOT EXISTS ideas_seen (
 {_ROLES_TRIGGERS[0]};
 
 {_ROLES_TRIGGERS[1]};
+
+{_YARDSTICK_TABLE};
+
+{_YARDSTICK_TRIGGERS[0]};
+
+{_YARDSTICK_TRIGGERS[1]};
 
 CREATE TRIGGER IF NOT EXISTS trials_no_update BEFORE UPDATE ON trials
 BEGIN SELECT RAISE(ABORT, 'trials are append-only: a trial row is never updated'); END;
@@ -3093,6 +3187,276 @@ def unroled_dev_trials(
         sql += f" AND t.method_id IN ({', '.join('?' for _ in ids)})"
         params.extend(ids)
     return conn.execute(sql + " ORDER BY t.n", params).fetchall()
+
+
+# --------------------------------------------------------------------------- trial yardstick
+
+
+@dataclass(frozen=True)
+class YardstickRow:
+    """One random-twin yardstick of one dev trial, on one store, under one draw rule.
+
+    The database half of ``yardstick.Measurement``; ``from_measurement`` is the one place the
+    simulator's value becomes a row, so ``lab yardstick`` and any later writer record the same
+    columns the same way. See ``_YARDSTICK_TABLE`` for what each column means.
+
+    - ``trial_n``            the dev ``trials.n`` the twins were drawn for.
+    - ``rule_id``            ``yardstick.RULE_ID``: the draw rule's version.
+    - ``store_fingerprint``  ``ResearchData.fingerprint`` of the store the twins ran on.
+    - ``status``             one of ``YARDSTICK_STATUSES``.
+    - ``draws``              how many twins were simulated (0 when not applicable).
+    - ``arm_rate``           the arm's own rate on that store (money-weighted return when funded,
+                             CAGR otherwise -- the rate ``make_row`` ranks on).
+    - ``beaten``             how many twins the arm out-earned; ties count against the arm. 0
+                             when not applicable (no twin was drawn).
+    - ``percentile``         ``beaten`` as a share of the twins; None only when not applicable.
+    - ``rates_json``         every twin's rate, as a JSON list, sorted ascending (the order
+                             ``yardstick.Measurement.rates`` holds them in).
+    - ``trade_ratio``        median twin trade count over the arm's.
+    - ``turnover_ratio``     median twin turnover over the arm's.
+    - ``reproduced``         True when the arm was re-run on its recording store and matched its
+                             recorded trade count and return; None when there was nothing to
+                             check against (another store) or nothing was re-run (a bracket arm,
+                             which reads not-applicable).
+    - ``git_sha``, ``measured``  the code and the moment of the measurement.
+    """
+
+    trial_n: int
+    rule_id: str
+    store_fingerprint: str
+    status: str
+    draws: int
+    arm_rate: float | None
+    beaten: int
+    percentile: float | None
+    rates_json: str
+    trade_ratio: float | None
+    turnover_ratio: float | None
+    reproduced: bool | None
+    git_sha: str
+    measured: str
+
+    @classmethod
+    def from_measurement(
+        cls,
+        m: Any,
+        *,
+        trial_n: int,
+        rule_id: str,
+        store_fingerprint: str,
+        checked: bool,
+        git_sha: str,
+        measured: str,
+    ) -> YardstickRow:
+        """The row for ``m`` (a ``yardstick.Measurement``), typed for the table.
+
+        ``m`` is duck-typed rather than imported: this module never imports the simulator, which
+        pulls in the whole book engine, because importing ``store`` is something the entire lab
+        does. ``checked`` says whether ``expect`` was passed to ``measure`` -- whether the trial was
+        recorded on this store -- and ``reproduced`` is NULL whenever it was not, whatever ``m``
+        carries, so "not checked" can never be written as "checked and passed".
+
+        **The one constructor of a row from a reading.** ``lab yardstick`` calls it with the
+        trial's real number; ``runner.run_method`` (phase 4) calls it with ``trial_n=0`` before
+        the trial is inserted and stamps the number with ``dataclasses.replace`` afterwards, as it
+        does every other side row. ``insert_yardstick`` refuses the ``0`` if it ever reaches it.
+        """
+        return cls(
+            trial_n=int(trial_n),
+            rule_id=str(rule_id),
+            store_fingerprint=str(store_fingerprint),
+            status=str(m.status),
+            draws=int(m.draws),
+            arm_rate=None if m.arm_rate is None else float(m.arm_rate),
+            beaten=int(m.beaten),
+            percentile=None if m.percentile is None else float(m.percentile),
+            rates_json=json.dumps([float(r) for r in m.rates], separators=(",", ":")),
+            trade_ratio=None if m.trade_ratio is None else float(m.trade_ratio),
+            turnover_ratio=None if m.turnover_ratio is None else float(m.turnover_ratio),
+            reproduced=None if not checked or m.reproduced is None else bool(m.reproduced),
+            git_sha=str(git_sha),
+            measured=str(measured),
+        )
+
+
+YARDSTICK_COLUMNS: tuple[str, ...] = tuple(f.name for f in fields(YardstickRow))
+
+
+def _has_yardstick_table(conn: sqlite3.Connection) -> bool:
+    """Whether this database has the ``trial_yardstick`` table at all.
+
+    ``connect`` always creates it, so a False here is a ``connect_readonly`` caller on a database
+    no yardstick-aware code has opened for writing -- the snapshot sync guard reading the
+    committed file is one. Every reader below answers "nothing recorded" in that case, as
+    ``funding_of`` does for a database that predates ``trial_funding``.
+    """
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'trial_yardstick'"
+    ).fetchone() is not None
+
+
+def has_yardstick(
+    conn: sqlite3.Connection, trial_n: int, rule_id: str, store_fingerprint: str
+) -> bool:
+    """Whether trial ``trial_n`` already has a yardstick under ``rule_id`` on ``store_fingerprint``.
+
+    The key ``insert_yardstick`` refuses on. ``lab yardstick`` asks before it simulates anything,
+    so a repeat costs no backtest as well as writing no row. False when the table is absent.
+    """
+    if not _has_yardstick_table(conn):
+        return False
+    return conn.execute(
+        "SELECT 1 FROM trial_yardstick WHERE trial_n = ? AND rule_id = ? AND store_fingerprint = ?",
+        (int(trial_n), str(rule_id), str(store_fingerprint)),
+    ).fetchone() is not None
+
+
+def yardstick_of(conn: sqlite3.Connection, trial_n: int) -> sqlite3.Row | None:
+    """The latest recorded yardstick of trial ``trial_n``, or None when it has none.
+
+    "Latest" is the newest ``measured`` stamp, ties broken by insertion order: one trial can carry
+    several rows -- one per store and draw rule -- and the newest is the one that describes the
+    store and the rule the lab uses now. None when the table itself is absent (a
+    ``connect_readonly`` caller; see ``_has_yardstick_table``), which reads the same as "never
+    measured" because that is exactly what it is.
+    """
+    if not _has_yardstick_table(conn):
+        return None
+    return conn.execute(
+        "SELECT * FROM trial_yardstick WHERE trial_n = ? ORDER BY measured DESC, rowid DESC LIMIT 1",
+        (int(trial_n),),
+    ).fetchone()
+
+
+def insert_yardstick(conn: sqlite3.Connection, row: YardstickRow) -> bool:
+    """Record one yardstick (the caller holds the transaction). False, writing nothing, on a repeat.
+
+    A repeat is the same (trial, rule, store) key: the same measurement again, which the lab keeps
+    once (R1.5). It is answered with False rather than an error so a sweep can be re-run after an
+    interruption and skip what it already did. The caller holds ``begin_immediate``, so the check
+    and the insert are one step against a parallel session.
+
+    Refused with ``LabError``, before anything is written:
+
+    - the pre-insert sentinel ``0`` or any trial number the lab does not hold;
+    - a ``test``-window trial: the yardstick grades a selection among dev results, and a test look
+      is a single pre-registered measurement with no selection in it;
+    - a status outside ``YARDSTICK_STATUSES``, or a row whose shape contradicts its status (the
+      same rule the table's CHECKs hold, stated as a sentence rather than a constraint name, and
+      the rule ``yardstick.Measurement.__post_init__`` holds for the reading it came from).
+    """
+    n = int(row.trial_n)
+    if n <= 0:
+        raise LabError(
+            f"a yardstick needs the trial number of a recorded trial, got {row.trial_n!r}"
+        )
+    trial = conn.execute("SELECT window FROM trials WHERE n = ?", (n,)).fetchone()
+    if trial is None:
+        raise LabError(f"no trial #{n}: a yardstick is recorded for a trial the lab holds")
+    if str(trial[0]) != "dev":
+        raise LabError(
+            f"trial #{n} is a {trial[0]} look, not a dev arm: the yardstick grades a selection "
+            "among dev results, and a test-window look has no selection in it"
+        )
+    if row.status not in YARDSTICK_STATUSES:
+        raise LabError(
+            f"trial #{n}: yardstick status must be one of {YARDSTICK_STATUSES}, got {row.status!r}"
+        )
+    if row.status == "not-applicable" and (
+        row.draws != 0
+        or row.beaten != 0
+        or row.percentile is not None
+        or row.trade_ratio is not None
+        or row.turnover_ratio is not None
+    ):
+        raise LabError(
+            f"trial #{n}: a not-applicable yardstick simulated no twin, so it has no draws, no "
+            f"twins beaten, no share and no shape ratio (draws={row.draws}, "
+            f"beaten={row.beaten!r}, percentile={row.percentile!r})"
+        )
+    if row.status != "not-applicable" and (
+        row.draws < 1
+        or row.percentile is None
+        or row.beaten is None
+        or not 0 <= row.beaten <= row.draws
+    ):
+        raise LabError(
+            f"trial #{n}: a {row.status} yardstick needs its twins and the share the arm beat "
+            f"(draws={row.draws}, beaten={row.beaten!r}, percentile={row.percentile!r})"
+        )
+    if has_yardstick(conn, n, row.rule_id, row.store_fingerprint):
+        return False
+    cols = ", ".join(f'"{c}"' for c in YARDSTICK_COLUMNS)
+    marks = ", ".join("?" for _ in YARDSTICK_COLUMNS)
+    values = [getattr(row, c) for c in YARDSTICK_COLUMNS]
+    values[YARDSTICK_COLUMNS.index("trial_n")] = n
+    values[YARDSTICK_COLUMNS.index("reproduced")] = (
+        None if row.reproduced is None else int(bool(row.reproduced))
+    )
+    conn.execute(f"INSERT INTO trial_yardstick ({cols}) VALUES ({marks})", values)
+    return True
+
+
+def yardstick_clears(row: Mapping[str, Any] | sqlite3.Row | None) -> bool | None:
+    """Does this yardstick reading clear the bar? None when there is no reading at all.
+
+    ``row`` is anything addressable by column name: the ``sqlite3.Row`` ``yardstick_of``
+    returns, a plain ``dict``, or ``dataclasses.asdict(YardstickRow)`` -- ``runner.trial_rows``
+    judges the reading it is about to insert, and ``lab yardstick`` the row it just built, so
+    every caller asks this one function and there is one clearing rule. Only ``status`` and
+    ``percentile`` are read.
+
+    - True:  ``measured`` with ``percentile >= YARDSTICK_MIN_PERCENTILE``, or ``not-applicable``
+             (a book with no picked stock has no name a twin could swap, so there is nothing for
+             it to beat and nothing it failed).
+    - False: ``measured`` below the bar, ``unmatched`` (its twins did not trade like it, so their
+             returns say nothing fair about it, and an unfair yardstick is never a pass), and any
+             status this code does not know.
+    - None:  ``row`` is None -- never measured. What that means is the caller's decision; this
+             function never reads a missing measurement as a pass.
+    """
+    if row is None:
+        return None
+    status = str(row["status"])
+    if status == "not-applicable":
+        return True
+    if status == "measured":
+        pct = row["percentile"]
+        return pct is not None and float(pct) >= YARDSTICK_MIN_PERCENTILE
+    return False
+
+
+def yardstick_due(
+    conn: sqlite3.Connection,
+    trial: Mapping[str, Any] | sqlite3.Row,
+    *,
+    at: Gate | None = None,
+) -> bool:
+    """Is ``trial`` an arm whose yardstick is worth measuring? Whether it already has one is not
+    asked here -- that depends on the store, which ``has_yardstick`` answers.
+
+    Due means all three:
+
+    - a **dev** row (a test look is never graded against twins);
+    - **not a recorded control** (``role_of_trial``): a control was registered to be beaten, and a
+      yardstick for it would grade the comparison book rather than an idea;
+    - its ``verdict`` fails **nothing but the yardstick itself** -- ``failed`` is empty, or holds
+      only ``YARDSTICK_LABEL``. An arm that already misses SPY, the drawdown screen, the luck test
+      or any other condition cannot be rescued by its twins, so measuring it would spend minutes of
+      simulation to change no reading. The second half is what keeps this right once the yardstick
+      is itself a condition in ``verdict``: an arm whose only failure is "no yardstick yet" or "a
+      failing yardstick on another store" is exactly the arm that needs one.
+
+    ``at`` is the gate, resolved once by a caller judging many trials.
+    """
+    if str(trial["window"]) != "dev":
+        return False
+    # control_shape.ROLE_CONTROL, spelled out: this module does not import control_shape, and
+    # test_lab_yardstick_record pins the two equal.
+    if role_of_trial(conn, int(trial["n"])) == "control":
+        return False
+    failed = verdict(conn, trial, at=at).failed
+    return all(label == YARDSTICK_LABEL for label in failed)
 
 
 # --------------------------------------------------------------------------- ideas_seen

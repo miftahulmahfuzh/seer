@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-11-13
-**Total Active Tasks**: 4
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
-- Blocked: 1
-- Completed: 169
+- Blocked: 0
+- Completed: 170
 
 ---
 
@@ -59,20 +59,30 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
     - test_lab_hardgate.py::test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways is red on the untouched base source (HEAD 34266dec exported to a scratch dir, run against a copy of lab.sqlite): the committed lab's buy-signal set is now M0284/M0383/M0562, the test pins M0072/M0258/M0284. Pre-existing red pin, out of scope per the index; not fixed.
     - test_lab_luck.py::test_owner_misses_is_a_one_line_delegation_and_reads_the_row_not_the_string failed once in the full run while phase 1 was mid-edit on store.py and passed when re-run alone; not from this phase.
     - Step 3 tasks were created by the peer phase-1 session first; this session created none.
-- [ ] **P1-ENG-M170** Phase 3: The yardstick record and `lab yardstick`
+- [x] **P1-ENG-M170** Phase 3: The yardstick record and `lab yardstick`
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns: the `trial_yardstick` table and its helpers (`YardstickRow.from_measurement`, `has_yardstick`, `insert_yardstick`, `yardstick_of`); `YARDSTICK_MIN_PERCENTILE`, `YARDSTICK_LABEL`, `yardstick_clears`, `yardstick_due`; the `lab yardstick` command with `_positive_count` and `_yardstick_line`, which phase 4 reuses; their tests and the `lab-cli.md` entry. Exit criteria: `lab yardstick M…` on a fixture lab writes one row per due arm and none on a second run; the trial count and `gate(conn).n` do not move; a non-reproducing arm exits 2 with nothing written; a not-applicable (bracket) reading is recorded with `reproduced` NULL; every shape phase 2's `Measurement` admits is a row `insert_yardstick` accepts.
-  - **Status**: open
+  - **Status**: completed
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md` (phase 3 of 5)
   - **Satisfies**: R1 — "you idea so we can implement them robustly" — part 1: "A random-book yardstick per setup. For each combination of pool, book size, cadence, weighting and safety switch, run a few hundred random books once and cache the distribution. These count against nothing." · criteria: R1.1, R1.2, R1.5, R1.6
   - **Depends on**: P1-ENG-NI1B, P1-ENG-3B9A
   - **Plan**: `.workflows/plan/P1-ENG-M170.md`
+  - **Completed**: 2026-11-13 15:10
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/lab/store.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_yardstick_record.py, .claude/skills/verify-seer/features/lab-cli.md, engine/.workflows/todos.md, .workflows/plan/RANDOM_TWIN_YARDSTICK_PLAN.md
+  - **Proof**: verified-first-pass — 5 journeys, evidence /home/miftah/.local/state/seer-verify/1113-142946-260580/evidence
+  - **Drift**:
+    - none in the code: every anchor matched the plan as phases 1 and 2 left the files
+  - **Decided**:
+    - The plan's test `test_insert_refuses_what_the_record_cannot_mean` passed trial_n twice for two parametrised cases (TypeError before any assertion) → the row is built from merged keywords so the case's own trial_n wins; assertions and match strings unchanged (rung 3: the code block's evident intent)
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats adjusted for this task only (rung 6: this file's precedent for every swarm-tracked set, incl. phases 1 and 2 of this set). Plan index: phase 3's TaskID cell ticked `(done 2026-11-13)` in the coordinator's copy and the worktree copy (phase 2's missing tick in the worktree copy added too); coordinator's `**Status:**` set to `phase 3/5 complete`. P1-ENG-VZXN unblocked: its one dependency (P1-ENG-M170) is complete.
+    - Landing not attempted: swarm coordinator `orch-random-twin-yardstick` owns the merge of `feature/random-twin-yardstick`.
 - [ ] **P1-ENG-VZXN** Phase 4: The yardstick as a screen condition
   - **Difficulty**: HARD
   - **Type**: Feature
   - **Context**: Owns: the yardstick condition in `store.verdict` and `YARDSTICK_SINCE`; measurement inside `runner.run_method` before the write lock and the label in `trial_rows`; the clause in `hardgate.check`; the yardstick clause in `prereg.gate_text`; the `lab run` wiring; design §10; the backfill runbook; every skill and `CLAUDE.md` line that lists the dev screen (grep-based: explore, Sera, stale-page skills); `labkit.stamp_yardstick` and the clearing readings in every fixture that promotes; their tests and the `lab-cli.md` entry. Exit criteria: a fixture arm that clears the other six conditions and loses to its twins records not eligible and its method `rejected`; an old arm flips in `verdict` once a failing row exists; `lab promote` refuses an unmeasured arm; a newly written pre-registration names the yardstick; invariant 5 holds.
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md` (phase 4 of 5)
   - **Satisfies**: R2 — "you idea so we can implement them robustly" — part 2: "Judge ideas against it. An arm passes only if it beats roughly the top tenth of random books on its own setup, in place of today's 'beats SPY and clears the luck score'." · criteria: R2.1, R2.2, R2.3
   - **Depends on**: P1-ENG-M170

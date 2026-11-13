@@ -171,6 +171,19 @@
                                     `lab promote` refuses on both (lab/hardgate.py, D19); `lab
                                     run` prints the same lines. No trial row, no status change: N
                                     and the looks do not move
+    lab yardstick M0562 [M0007 ...] | --arm M0562-W60-B100 | --pending [--limit N]
+                  [--jobs J] [--store DIR] [--dry-run]
+                                    measure recorded dev arms against random twins of
+                                    themselves: books that replay the arm's own decisions with
+                                    every picked name swapped for a randomly drawn index member
+                                    of similar trading size (lab/yardstick.py). One
+                                    trial_yardstick row per arm, draw rule and store, never a
+                                    trial: N and the looks do not move, and a repeat on the same
+                                    store simulates and writes nothing. Methods and --pending take
+                                    the due arms (eligible today, not a control); --arm forces one.
+                                    An arm recorded on the loaded store that no longer reproduces
+                                    its trade count and return is refused (exit 2) and nothing is
+                                    written for it
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
@@ -204,6 +217,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import hashlib
+import json
 import logging
 import math
 import os
@@ -253,6 +267,18 @@ def _positive_n(text: str) -> int:
         raise argparse.ArgumentTypeError(
             f"the deflated Sharpe is undefined below N = 2 trials, got {value}"
         )
+    return value
+
+
+def _positive_count(text: str) -> int:
+    """``--jobs J`` / ``--limit N``: a whole number of at least 1, refused by argparse otherwise,
+    so a zero or a negative never reaches the simulator as "no workers" or "no arms"."""
+    try:
+        value = int(text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"not an integer: {text!r}") from exc
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"must be 1 or more, got {value}")
     return value
 
 
@@ -975,6 +1001,51 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
                    help="methods (every recorded arm) or candidate ids to report")
     s.add_argument("--window", choices=store.WINDOWS, default="dev",
                    help="which window's recordings to compare (default: dev)")
+
+    s = sub.add_parser(
+        "yardstick",
+        # No literal `%` in any `help=` string below: argparse %-interpolates every `help=`.
+        help="measure recorded dev arms against random twins of themselves; no trial, no N",
+        description=(
+            "For each chosen dev arm, simulate the lab's fixed number of random twin books that "
+            "replay the arm's own decisions -- the same dates, weights, entries and exits -- with "
+            "every picked name replaced by a randomly drawn index member of similar trading size, "
+            "and record the share of twins the arm out-earned (lab/yardstick.py). One row per "
+            "arm, draw rule and research store goes to trial_yardstick; a repeat on the same store "
+            "is skipped before anything is simulated. Nothing here is a trial: no trials row, no "
+            "change to the luck gate's N and no test-window look. When the arm was recorded on "
+            "the loaded store, the arm itself is re-run first and must reproduce its recorded "
+            "trade count and return; one that does not is refused (exit 2) and nothing is written "
+            "for it. Named methods and --pending take the due arms only: eligible at today's bars "
+            "(or failing only on the yardstick), and not a control. --arm forces one arm, but "
+            "never a control."
+        ),
+    )
+    s.add_argument("method", nargs="*", metavar="M0562",
+                   help="methods whose due arms to measure")
+    pick = s.add_mutually_exclusive_group()
+    pick.add_argument("--arm", default=None, metavar="M0562-W60-B100",
+                      help="measure this one recorded dev arm whether or not it is due "
+                           "(a control is still refused)")
+    pick.add_argument("--pending", action="store_true",
+                      help="every due arm in the lab that has no yardstick on this store yet, "
+                           "oldest trial first")
+    s.add_argument("--limit", type=_positive_count, default=None, metavar="N",
+                   help="measure at most N arms this run (default: all of them); the rest are "
+                        "left for the next run, which skips what this one recorded")
+    s.add_argument("--jobs", type=_positive_count, default=1, metavar="J",
+                   help="worker processes for the twins (default 1). The result is identical "
+                        "for any J; only the time changes")
+    s.add_argument(
+        "--store",
+        type=Path,
+        default=Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR),
+        help=f"dev-window research store (default: {research.STORE_DIR}, or "
+             "$SEER_RESEARCH_STORE); a test-window or survivorship-check store is refused",
+    )
+    s.add_argument("--dry-run", action="store_true", default=argparse.SUPPRESS,
+                   help="measure and print, and write nothing (the global --dry-run does the "
+                        "same)")
 
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
@@ -3851,6 +3922,303 @@ def _twins(conn, args) -> int:
     return 0
 
 
+class _YardstickArm(NamedTuple):
+    """One arm ``lab yardstick`` will measure: its ``trials`` row, the ``Candidate`` its committed
+    method file declares, and the capital and funding its recorded run was given -- the three
+    inputs a re-run needs to be the same book (``runner.recorded_capital``)."""
+
+    trial: object
+    candidate: object
+    capital: object
+    contributions: object
+
+
+def _yardstick_control_refusal(candidate_id: str, how: str) -> store.LabError:
+    return store.LabError(
+        f"{candidate_id} is a control arm ({how}): it was registered to be beaten, and a "
+        f"yardstick for it would grade the comparison book rather than an idea. Nothing was "
+        f"measured"
+    )
+
+
+def _yardstick_trials(conn, args, at: store.Gate) -> tuple[list, bool]:
+    """The dev trial rows ``lab yardstick`` was asked about, and whether ``--arm`` forced them.
+
+    Exactly one selector: method ids (their due arms), ``--arm`` (one arm, due or not), or
+    ``--pending`` (every due arm in the lab, oldest trial first). Everything here reads the
+    database only -- no method file, no store -- so a bad request is refused in milliseconds.
+    """
+    from seer_engine.lab import control_shape
+
+    methods = list(dict.fromkeys(args.method or ()))
+    arm_id = getattr(args, "arm", None)
+    pending = bool(getattr(args, "pending", False))
+    if sum((bool(methods), arm_id is not None, pending)) != 1:
+        raise store.LabError(
+            "lab yardstick: say which arms -- method ids for their due arms, --arm for one named "
+            "arm, or --pending for every due arm in the lab -- and exactly one of the three"
+        )
+    if arm_id is not None:
+        row = conn.execute(
+            "SELECT * FROM trials WHERE candidate_id = ? AND window = 'dev'", (arm_id,)
+        ).fetchone()
+        if row is None:
+            raise store.LabError(
+                f"no recorded dev arm called {arm_id!r}: --arm takes a candidate id `lab run` "
+                f"recorded, like M0562-W60-B100. Nothing was measured"
+            )
+        if store.role_of_trial(conn, int(row["n"])) == control_shape.ROLE_CONTROL:
+            raise _yardstick_control_refusal(arm_id, "as recorded")
+        return [row], True
+    if pending:
+        rows = conn.execute("SELECT * FROM trials WHERE window = 'dev' ORDER BY n").fetchall()
+    else:
+        rows = []
+        for mid in methods:
+            if store.get_method(conn, mid) is None:
+                raise store.LabError(
+                    f"no method {mid} in the lab: nothing to measure, and reading that as "
+                    f"'nothing due' would be a false all-clear"
+                )
+            rows.extend(t for t in store.trials_of(conn, mid) if t["window"] == "dev")
+    return [t for t in rows if store.yardstick_due(conn, t, at=at)], False
+
+
+def _yardstick_arms(conn, trials, *, forced: bool) -> tuple[list[_YardstickArm], list[tuple[str, str]]]:
+    """Resolve each trial to the arm a re-run needs, before any store is loaded.
+
+    An arm with no readable method file (the P7a seed rows have none), no recorded capital, or a
+    rationale that marks it a control while no role is recorded for it yet (before ``lab roles
+    --backfill``) is skipped with its reason when it came from a sweep, and refused (exit 2) when
+    ``--arm`` named it: a named arm the command cannot measure is an answer the caller must see.
+    """
+    from seer_engine.lab import control_shape, runner
+
+    arms: list[_YardstickArm] = []
+    skipped: list[tuple[str, str]] = []
+    for t in trials:
+        cid = str(t["candidate_id"])
+        n = int(t["n"])
+        try:
+            _method, _path, candidate = runner.resolve_candidate(cid)
+            capital = runner.recorded_capital(conn, n)
+        except store.LabError as e:
+            if forced:
+                raise
+            skipped.append((cid, str(e)))
+            continue
+        if (
+            store.role_of_trial(conn, n) is None
+            and control_shape.role_of(candidate) == control_shape.ROLE_CONTROL
+        ):
+            if forced:
+                raise _yardstick_control_refusal(cid, "by its rationale")
+            skipped.append((cid, "a control arm by its rationale (`lab roles --backfill` records it)"))
+            continue
+        arms.append(_YardstickArm(t, candidate, capital, runner.recorded_contributions(conn, n)))
+    return arms, skipped
+
+
+def _yardstick_status(row: store.YardstickRow) -> str:
+    """The reading of one row in words, through ``store.yardstick_clears`` -- the one pass rule."""
+    from seer_engine.lab import yardstick
+
+    if row.status == yardstick.STATUS_NOT_APPLICABLE:
+        return "not applicable: the arm holds no picked stock"
+    if row.status == yardstick.STATUS_UNMATCHED:
+        return "unmatched: the twins did not trade like the arm, never a pass"
+    if store.yardstick_clears(dataclasses.asdict(row)):
+        return f"clears the bar ({store.YARDSTICK_LABEL})"
+    return f"below the bar ({store.YARDSTICK_LABEL})"
+
+
+_YARDSTICK_HEAD = (
+    f"{'arm':<30} {'twins':>5} {'beaten':>16} {'median twin':>11} {'arm rate':>9} "
+    f"{'trades':>7}  {'draw set':<12}  status"
+)
+
+
+def _yardstick_line(candidate_id: str, row: store.YardstickRow, note: str) -> str:
+    """One table row. ``draw set`` is the first 12 hex of sha256(rates_json): two runs of the same
+    arm on the same store print the same value whatever ``--jobs`` was, which is the check a
+    reader can make by eye. The one printer of a reading: ``lab run`` (phase 4) logs the readings
+    it took with this same function, so a reading reads the same wherever it was taken."""
+    rates = [float(r) for r in json.loads(row.rates_json) if r is not None]
+    median = statistics.median(rates) if rates else None
+    beaten = "-" if not row.draws else f"{row.beaten}/{row.draws} ({fmt_pct(row.percentile)})"
+    ratio = "-" if row.trade_ratio is None else f"{fmt_num(row.trade_ratio)}x"
+    digest = (
+        hashlib.sha256(row.rates_json.encode("utf-8")).hexdigest()[:12] if row.draws else "-"
+    )
+    return (
+        f"{candidate_id:<30} {row.draws:>5} {beaten:>16} {fmt_pct(median):>11} "
+        f"{fmt_pct(row.arm_rate):>9} {ratio:>7}  {digest:<12}  {_yardstick_status(row)}{note}"
+    )
+
+
+def _yardstick_footer(conn, n_before: int, looks_before: int) -> None:
+    print(
+        f"Lab N (dev trials): {n_before} before, {store.dev_trial_count(conn)} after; luck gate "
+        f"N = {store.gate(conn).n}; test-window looks used: {looks_before} before, "
+        f"{store.test_looks(conn)} after. A yardstick measures an arm already counted; it is "
+        f"never a trial."
+    )
+
+
+def _yardstick(conn, args) -> int:
+    """``lab yardstick``: measure recorded dev arms against random twins of themselves.
+
+    Requirement R1 of RANDOM_TWIN_YARDSTICK_PLAN.md. The simulation is ``yardstick.measure``
+    (phase 2); this command chooses the arms, gives each one the capital and funding its recorded
+    run had, and records what came back.
+
+    **Nothing it writes is a trial (R1.2).** One ``trial_yardstick`` row per arm, draw rule and
+    store, through ``store.insert_yardstick`` and nothing else: no ``trials`` row, no moments, no
+    funding, no status, no journal entry. N and the looks are printed before and after.
+
+    **A repeat writes nothing and simulates nothing (R1.5).** ``store.has_yardstick`` is asked
+    before the twins run, and ``insert_yardstick`` asks again under the write lock for a parallel
+    session that got there first. ``--jobs`` changes only the time: ``measure`` returns the same
+    value for any J, and J is not part of the row.
+
+    **An arm that does not reproduce is refused (R1.6).** When the trial was recorded on the
+    loaded store, ``expect=(trades, total_return)`` makes ``measure`` re-run the arm first and
+    raise ``yardstick.Unreproducible`` if the re-run differs: twins built from a book other than
+    the recorded one would grade the wrong book. That arm records nothing, the sweep goes on to
+    the next, and the command exits 2. On any other store there is nothing to check against;
+    ``expect`` is None and the row's ``reproduced`` is NULL. A bracket (``DESIGN_V0``) arm is
+    never re-run: ``measure`` answers ``not-applicable`` with ``reproduced`` None even when
+    ``expect`` is given, so R1.6 cannot fire for it, and it is recorded ``not-applicable`` with
+    ``reproduced`` NULL (plan Decision D12). There is no book to reproduce, so there is nothing
+    to refuse.
+
+    **Simulation never holds the lock.** Each arm is measured with no transaction open and
+    recorded in its own short ``begin_immediate``, so a parallel ``lab run`` waits milliseconds,
+    not minutes, and an interrupted sweep keeps every arm it finished.
+
+    Unlike most ``lab`` subcommands, the global ``--dry-run`` is honoured: it measures and prints
+    and writes nothing, which is what makes "the same result whatever --jobs" checkable by
+    running once each way.
+    """
+    from seer_engine.lab import runner, yardstick
+
+    g = store.gate(conn)
+    trials, forced = _yardstick_trials(conn, args, g)
+    arms, skipped = _yardstick_arms(conn, trials, forced=forced)
+    dry_run = bool(getattr(args, "dry_run", False))
+    jobs = int(getattr(args, "jobs", 1) or 1)
+    limit = getattr(args, "limit", None)
+    n_before = store.dev_trial_count(conn)
+    looks_before = store.test_looks(conn)
+    for cid, why in skipped:
+        print(f"skipped {cid}: {why}")
+    if not arms:
+        print("\nnothing to measure: no arm asked about is due -- eligible at today's bars and "
+              "not a control.")
+        _yardstick_footer(conn, n_before, looks_before)
+        return 0
+
+    if research.DEV_END != dev.DEV_END:
+        raise store.LabError("research.DEV_END differs from dev.DEV_END; refusing to run")
+    try:
+        purpose = research.declared_purpose(Path(args.store))
+    except ValueError:
+        purpose = None  # missing or unreadable: research.load_store below names the problem
+    if purpose is not None:
+        raise runner.survivorship_refusal("lab yardstick", purpose)
+    t0 = time.perf_counter()
+    try:
+        data = research.load_store(Path(args.store))
+    except FileNotFoundError as e:
+        raise store.LabError(
+            f"research store {args.store} is missing {e.filename or e}; build it with "
+            "`python -m seer_engine research_store`"
+        ) from e
+    except ValueError as e:
+        raise store.LabError(
+            f"{args.store}: {e}. `lab yardstick` measures on the dev window and nothing else, so "
+            f"a test-window store is refused here"
+        ) from e
+    log.info("research store %s loaded (%.1fs)", data.fingerprint[:12], time.perf_counter() - t0)
+    runner.refuse_survivorship_store(data, "lab yardstick")
+    fp = str(data.fingerprint)
+
+    measured_before = {
+        int(a.trial["n"])
+        for a in arms
+        if store.has_yardstick(conn, int(a.trial["n"]), yardstick.RULE_ID, fp)
+    }
+    for a in arms:
+        if int(a.trial["n"]) in measured_before:
+            print(f"{a.trial['candidate_id']}: already measured on store {fp[:12]} under "
+                  f"{yardstick.RULE_ID}; not measured again")
+    todo = [a for a in arms if int(a.trial["n"]) not in measured_before]
+    left = 0
+    if limit is not None and len(todo) > limit:
+        left = len(todo) - limit
+        todo = todo[:limit]
+    git_sha = runner.git_head(config.REPO_ROOT)
+
+    recorded = 0
+    refused: list[str] = []
+    if todo:
+        print(f"\nRandom-twin yardstick, rule {yardstick.RULE_ID}, {yardstick.DRAWS} twins per "
+              f"arm, store {fp[:12]}, {jobs} job(s)")
+        print(_YARDSTICK_HEAD)
+    for a in todo:
+        cid = str(a.trial["candidate_id"])
+        n = int(a.trial["n"])
+        checked = str(a.trial["store_fingerprint"]) == fp and a.trial["total_return"] is not None
+        expect = (int(a.trial["trades"]), float(a.trial["total_return"])) if checked else None
+        log.info("%s (trial #%d): measuring against %d twins", cid, n, yardstick.DRAWS)
+        try:
+            m = yardstick.measure(
+                data.market, data.dividends, data.spy_dividends, a.candidate,
+                initial_idr=a.capital, contributions=a.contributions,
+                draws=yardstick.DRAWS, jobs=jobs, expect=expect,
+            )
+        except yardstick.Unreproducible as e:
+            msg = (
+                f"{cid} (trial #{n}) does not reproduce on store {fp[:12]}, the store it was "
+                f"recorded on: {e}. Twins replay the arm's own decisions, so a yardstick built on "
+                f"a re-run that differs from the record would grade a different book. Nothing was "
+                f"written for it"
+            )
+            refused.append(msg)
+            print(f"{cid:<30} refused: does not reproduce its recorded trades and return")
+            continue
+        row = store.YardstickRow.from_measurement(
+            m, trial_n=n, rule_id=yardstick.RULE_ID, store_fingerprint=fp, checked=checked,
+            git_sha=git_sha, measured=store.now_iso(),
+        )
+        if dry_run:
+            note = "  (dry run: not recorded)"
+        else:
+            store.begin_immediate(conn)
+            with conn:
+                wrote = store.insert_yardstick(conn, row)
+            if wrote:
+                recorded += 1
+                note = ""
+            else:
+                note = "  (already recorded by a parallel session; kept theirs)"
+        print(_yardstick_line(cid, row, note))
+
+    print()
+    print(
+        f"{recorded} arm(s) recorded, {len(measured_before)} already measured on this store, "
+        f"{len(skipped)} skipped, {len(refused)} refused"
+        + (f", {left} due arm(s) left for a later run (--limit {limit})" if left else "")
+        + ("; dry run: nothing was written" if dry_run else "")
+    )
+    _yardstick_footer(conn, n_before, looks_before)
+    if refused:
+        for msg in refused:
+            log.error("%s", msg)
+        return 2
+    return 0
+
+
 def _exposure(conn, args) -> int:
     """``lab exposure M0030 [M0024 ...]``: a method's own picks, apart from what it parks.
 
@@ -4413,6 +4781,7 @@ _HANDLERS = {
     "gate": _gate,
     "control": _control,
     "twins": _twins,
+    "yardstick": _yardstick,
     "idea": _idea,
     "note": _note,
     "block": _block,

@@ -6,20 +6,20 @@
   "phases": [
     {
       "card": null,
-      "commit": null,
+      "commit": "c644d769f83cf8315a43f5d76f24b930e216aa68",
       "depends_on": [],
       "difficulty": "HARD",
       "n": 1,
-      "note": null,
+      "note": "signal registry + pure panel evaluator, 8 files verbatim from the plan, no decisions; S0001 reads weak on the real dev store (ic t +1.04) so do not assume it clears; proof: verified-first-pass /tmp/claude-1000/-home-miftah--worktrees-seer-sera-signal-panel/25196239-3ae1-4a7e-b9e1-34217419f431/scratchpad/p1-evidence",
       "package": "engine/lab",
       "plan": ".workflows/plan/sera-signal-panel/phase-1.md",
-      "reported_at": null,
+      "reported_at": "2026-11-14T05:51:54+07:00",
       "satisfies": [
         "R1",
         "R2"
       ],
-      "status": "pending",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-6CGV",
       "title": "Signal registry and the pure panel evaluator"
     },
     {
@@ -37,7 +37,7 @@
         "R3",
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Panel record: tables, published verdict, snapshot key"
     },
@@ -147,6 +147,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-signal-panel",
-  "updated": "2026-11-14T05:40:45+07:00",
+  "updated": "2026-11-14T05:51:54+07:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-signal-panel"
 }

@@ -43,25 +43,25 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "c67692c",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": null,
+      "note": "lab panel, panel-map, next-signal-id + panel_run.py (open_store/record for phase 4); decided: test fixtures' dev store carries the seeded benchmark's prices so D10 passes, check untouched; S0001 and S0002 both read 'no' on the real stores; proof: verified-first-pass /home/miftah/.local/state/seer-verify/1114-060150-100441/evidence",
       "package": "engine/commands`, `engine/lab",
       "plan": ".workflows/plan/sera-signal-panel/phase-3.md",
-      "reported_at": null,
+      "reported_at": "2026-11-14T06:11:06+07:00",
       "satisfies": [
         "R1",
         "R2",
         "R3",
         "R4"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-7F8X",
       "title": "lab panel`, `lab panel-map`, `lab next-signal-id"
     },
     {
@@ -79,7 +79,7 @@
       "satisfies": [
         "R3"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Replay the recorded stock-signal methods"
     },
@@ -99,7 +99,7 @@
       "satisfies": [
         "R4"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The panel gate in `lab run` and the one-chassis signal book"
     },
@@ -147,6 +147,6 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-signal-panel",
-  "updated": "2026-11-14T05:59:48+07:00",
+  "updated": "2026-11-14T06:11:27+07:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-signal-panel"
 }

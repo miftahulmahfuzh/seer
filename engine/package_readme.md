@@ -1894,6 +1894,15 @@ flagged as never having acted. Roles come from the method files (`_roles` /
   (`_nearest_methods`: stdlib IDF-weighted cosine over word sets, stopwords out, no network or
   model), each with score, status and up to four shared words. A hint, not a check: it never
   refuses and never fails the command; `lab run`'s repeat refusal is the guarantee.
+- **`lab idea` lists the controls those neighbours already hold (2026-11-13).** Still on stderr,
+  `_recorded_controls` prints up to eight control-role arms (`_roles`) of the listed methods, one
+  line per book named by its first recording (`twins.twins_of`): candidate, trial number, owning
+  method, `rules/allocator`, and `current store` or `older store only` (whether that book was
+  measured on the store of the lab's newest dev trial). A matching control on the current store is
+  *cited* by trial in the new method's hypothesis instead of re-run; a different book or an
+  older-store one is still run as a declared control. Nothing is copied into a trial row, so N,
+  DSR and D17/D19 are untouched (`lab/twins.py` docstring). A listing failure prints
+  `Recorded controls: not read (...)` and the reservation stands.
 - Nothing is written, no research store is opened, no method id is minted; recorded dev trials and
   test-window looks are printed before and after.
 - Refusals (`store.LabError`, exit 2): an id that is neither a method nor a recorded trial on the
@@ -1901,7 +1910,7 @@ flagged as never having acted. Roles come from the method files (`_roles` /
 - `lab status`: every row in `Near misses` and `Closest to eligible` now ends in a tag from
   `_book_tags`, e.g. `[control; = M0125-DV-C10]` or `[treatment; first of 4]`: the arm's role and
   whose book it is. Never raises; a row with neither gets no tag.
-- Tests: `tests/test_lab_twins.py` (20), `tests/test_lab_repeat_refusal.py` (19).
+- Tests: `tests/test_lab_twins.py` (24), `tests/test_lab_repeat_refusal.py` (19).
 
 ## Exported API
 

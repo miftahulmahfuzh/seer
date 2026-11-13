@@ -340,3 +340,82 @@ def test_the_handovers_book_was_first_recorded_as_m0125_dv_c10():
     finally:
         ro.close()
     assert hashlib.sha256(store.COMMITTED_DB.read_bytes()).hexdigest() == before
+
+# ------------------------------------------------------- lab idea lists recorded controls
+
+
+def _idea_args(db) -> argparse.Namespace:
+    return argparse.Namespace(
+        db=db, lab_command="idea", name="A dead zone on the drawdown brake",
+        family="drawdown-brake",
+        hypothesis="Trim the book in proportion to its fall below its own high, ignoring small falls",
+        source_kind="knowledge", source_ref="", parent=None,
+    )
+
+
+def _idea_lab(tmp_path, monkeypatch, *, roles, extra=None):
+    """A lab with M0001 (the neighbour) and the arms recorded by ``extra(c)``."""
+    db = tmp_path / "lab.sqlite"
+    c = store.connect(db)
+    with c:
+        store.add_method(c, id="M0001", name="A brake on the account's own fall",
+                         family="drawdown-brake", source_kind="knowledge",
+                         hypothesis="Trim in proportion to how far the book is below its own high",
+                         status="registered")
+    if extra:
+        extra(c)
+    c.close()
+    monkeypatch.setattr(lab_cmd, "_roles", lambda ids: roles)
+    return db
+
+
+def test_lab_idea_lists_a_neighbours_control_by_its_first_recording(tmp_path, monkeypatch, capsys):
+    def extra(c):
+        _arm(c, "M0001", "CTRL")
+
+    db = _idea_lab(tmp_path, monkeypatch, roles={("M0001", "M0001-CTRL"): "control"}, extra=extra)
+    assert lab_cmd.run(_idea_args(db)) == 0
+    got = capsys.readouterr()
+    assert got.out == "M0002\n"
+    assert "  M0001-CTRL  trial 1, M0001, MONTHLY_HOLD/TIMING, " in got.err
+
+
+def test_a_control_that_copies_an_earlier_book_is_named_by_the_earlier_one_once(
+    tmp_path, monkeypatch, capsys
+):
+    def extra(c):
+        _method_row(c, "M0009")
+        _arm(c, "M0009", "FIRST")            # n=1, the first recording
+        _arm(c, "M0001", "CTRL")             # n=2, same curve and trades
+
+    db = _idea_lab(tmp_path, monkeypatch, roles={("M0001", "M0001-CTRL"): "control"}, extra=extra)
+    lab_cmd.run(_idea_args(db))
+    err = capsys.readouterr().err
+    assert err.count("M0009-FIRST") == 1 and "M0001-CTRL  trial" not in err
+
+
+def test_the_store_of_the_newest_trial_decides_current_versus_older(tmp_path, monkeypatch, capsys):
+    def extra(c):
+        _arm(c, "M0001", "OLD", annual=0.10, store_fp="aaaaaaaa00")
+        _arm(c, "M0001", "NEW", annual=0.20, store_fp="640fc25e00")
+
+    roles = {("M0001", "M0001-OLD"): "control", ("M0001", "M0001-NEW"): "control"}
+    db = _idea_lab(tmp_path, monkeypatch, roles=roles, extra=extra)
+    lab_cmd.run(_idea_args(db))
+    err = capsys.readouterr().err
+    assert "M0001-OLD  trial 1, M0001, MONTHLY_HOLD/TIMING, older store only" in err
+    assert "M0001-NEW  trial 2, M0001, MONTHLY_HOLD/TIMING, current store" in err
+
+
+def test_unreadable_controls_never_fail_the_reservation_and_write_nothing_more(
+    tmp_path, monkeypatch, capsys
+):
+    db = _idea_lab(tmp_path, monkeypatch, roles={})
+    monkeypatch.setattr(lab_cmd, "_roles", lambda ids: (_ for _ in ()).throw(RuntimeError("boom")))
+    before = store.connect(db).execute("SELECT count(*) FROM trials").fetchone()[0]
+    assert lab_cmd.run(_idea_args(db)) == 0
+    got = capsys.readouterr()
+    assert got.out == "M0002\n" and "Recorded controls: not read (boom)" in got.err
+    c = store.connect(db)
+    assert c.execute("SELECT count(*) FROM trials").fetchone()[0] == before
+    assert c.execute("SELECT status FROM methods WHERE id = 'M0002'").fetchone()[0] == "idea"

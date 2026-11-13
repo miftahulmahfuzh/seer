@@ -3880,6 +3880,71 @@ def _nearest_methods(
     return out[:limit]
 
 
+#: Most recorded controls `lab idea` lists. Five neighbours rarely hold more than a handful.
+_IDEA_CONTROLS = 8
+
+
+def _recorded_controls(conn, method_ids: Sequence[str], *, limit: int = _IDEA_CONTROLS) -> list[str]:
+    """The control arms of ``method_ids`` the lab already holds, as printable lines, one per book.
+
+    **Why a listing and not a reuse.** A control re-run on a new method's frame prices the treatment,
+    and when its book is already recorded the re-run reproduces that trial byte for byte
+    (``lab/twins.py``): the same curve, metrics and trade count, a trial row of its own and no new
+    evidence. What the new method needs is the recorded numbers, which ``lab show`` prints. So a
+    child *cites* the first recording by trial in its hypothesis and spends the arm on a book the
+    lab has not recorded. Nothing is copied into a trial row, because a copy would be a twin
+    (hardgate D19) and a row nobody measured. The append-only rows are only read; N counts methods
+    with a dev trial, so citing moves it by nothing; D17 reads controls inside a method and an
+    absent one is UNRESOLVED, never a refusal.
+
+    **One line per book, named by its first recording.** An arm that is a later copy of an earlier
+    trial is reported as that earlier trial, once, so M0528-REL-RAND reads as the trial it copies.
+    ``current store`` means that book (the recording or any copy of it) was measured on the store the
+    lab's newest dev trial used, so it has been shown to reproduce on today's data. ``older store
+    only`` means it has not, and the child should re-run it as a declared control. ``rules/allocator``
+    are printed so the child can see whether its own control would be the same book: a different
+    rule, allocator or params is a different book and is re-run, not cited. The role is read from the
+    method files (``_roles``), which return ``{}`` when they cannot be read, so the listing is then
+    empty rather than wrong.
+    """
+    roles = _roles(list(method_ids))
+    row = conn.execute(
+        "SELECT store_fingerprint FROM trials WHERE window = 'dev' ORDER BY n DESC LIMIT 1"
+    ).fetchone()
+    current = str(row[0]) if row else ""
+    from seer_engine.lab import control_shape, twins
+
+    out: list[str] = []
+    seen: set[int] = set()
+    for mid in method_ids:
+        for (m, cid), role in roles.items():
+            if m != mid or role != control_shape.ROLE_CONTROL:
+                continue
+            own = conn.execute(
+                "SELECT n, store_fingerprint FROM trials WHERE candidate_id = ? AND window = 'dev'",
+                (cid,),
+            ).fetchone()
+            if own is None:
+                continue
+            found = twins.twins_of(conn, cid)
+            first_n = found[0].n if found and found[0].earlier else int(own[0])
+            if first_n in seen:
+                continue
+            seen.add(first_n)
+            first = conn.execute(
+                "SELECT candidate_id, method_id, rules_id, allocator_id FROM trials WHERE n = ?",
+                (first_n,),
+            ).fetchone()
+            on_current = current in {str(own[1]), *(t.store_fingerprint for t in found)}
+            out.append(
+                f"  {first[0]}  trial {first_n}, {first[1]}, {first[2]}/{first[3]}, "
+                f"{'current store' if on_current else 'older store only'}"
+            )
+            if len(out) >= limit:
+                return out
+    return out
+
+
 def _print_idea_neighbours(conn, mid: str, text: str) -> None:
     """Print, on stderr, the methods already in the lab closest in wording to ``mid``'s idea.
 
@@ -3909,6 +3974,21 @@ def _print_idea_neighbours(conn, mid: str, text: str) -> None:
         name = x.name if len(x.name) <= 90 else x.name[:87] + "..."
         print(f"  {x.id}  {x.score:.2f}  [{x.status}]  {name}", file=sys.stderr)
         print(f"         shares: {', '.join(x.shared)}", file=sys.stderr)
+    try:
+        held = _recorded_controls(conn, [x.id for x in near])
+    except Exception as e:  # noqa: BLE001 -- a hint must never fail a reservation already made
+        print(f"Recorded controls: not read ({e}).", file=sys.stderr)
+        return
+    if held:
+        print(
+            "Controls those methods already hold, named by first recording. When your own control "
+            "would be the same rules, allocator and params, and the book is on the current store, "
+            "cite it in your hypothesis (read it with `lab show`) and spend that arm on a book the "
+            "lab has not recorded. A different book, or an older-store one, is still run, declared:",
+            file=sys.stderr,
+        )
+        for line in held:
+            print(line, file=sys.stderr)
 
 
 def _idea(conn, args) -> int:

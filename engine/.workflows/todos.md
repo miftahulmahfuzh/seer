@@ -2,7 +2,7 @@
 
 **Package Path**: `engine`
 **Package Code**: ENG
-**Last Updated**: 2026-11-10
+**Last Updated**: 2026-11-13
 **Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 166
+- Completed: 167
 
 ---
 
@@ -1740,6 +1740,23 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P2-ENG-3UGL** Phase 1: idea lists recorded controls; skills say cite
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `_recorded_controls` in `commands/lab.py` plus its call in `_print_idea_neighbours`; tests; a `twins.py` docstring paragraph recording the reuse finding; wording in the sera-the-explorer and explore-and-experiment-new-method skills, `verify-seer/features/lab-cli.md` and one `CLAUDE.md` clause. Does not touch `lab run`, `hardgate`, `runner`, schema, lab rows, `lab/lab.sqlite` or `web/data/lab.json`. Exit: J1-J4 pass, ruff clean, pytest green, one commit on `main` pushed.
+  - **Status**: completed
+  - **Plan Set**: `.workflows/plan/LAB_CITE_RECORDED_CONTROLS_PLAN.md` (phase 1 of 1)
+  - **Satisfies**: R1, R2, R3, R4 — establish whether recorded control curves can be reused and whether reuse fits append-only, N, DSR and D19; `lab idea` reports which standard controls already exist (by first-recorded trial id); skills tell a child to cite a recorded control instead of re-running it; no lab row deleted or edited, smallest change, verified, explicit paths, pushed to main · criteria: R1.1, R2.1, R2.2, R2.3, R2.4, R3.1, R4.1
+  - **Depends on**: —
+  - **Plan**: `.workflows/plan/P2-ENG-3UGL.md`
+  - **Completed**: 2026-11-13 08:14
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/commands/lab.py, engine/src/seer_engine/lab/twins.py, engine/tests/test_lab_twins.py, .claude/skills/sera-the-explorer/SKILL.md, .claude/skills/explore-and-experiment-new-method/SKILL.md, .claude/skills/verify-seer/features/lab-cli.md, CLAUDE.md
+  - **Proof**: verified-first-pass — 4 journeys, evidence /tmp/j1.err, /tmp/h1
+  - **Drift**:
+    - Plan put the new tests in test_lab_repeat_refusal.py but its helpers _arm/_method_row live in test_lab_twins.py, so tests were appended to engine/tests/test_lab_twins.py instead (with a local _idea_args).
+  - **Decided**:
+    - Where the new tests live → test_lab_twins.py (rung 6: existing helpers' convention).
 - [x] **P2-ENG-LNQM** Phase 1: Refuse repeat books in `lab run`; neighbours in `lab idea`; skills
   - **Difficulty**: NORMAL
   - **Type**: Feature

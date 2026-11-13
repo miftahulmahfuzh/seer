@@ -204,6 +204,15 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
      the method it repeats ("M0125-DV-C10's book, never stepping aside"). Write that now, in the
      pre-registration. Name the recorded host in the hypothesis too, and never count the arm as a
      new book. A method whose every arm repeats a recorded book is refused however it is labelled.
+
+     **Before you write a control arm, read `lab idea`'s control list** (the reservation printed it;
+     `lab twins <neighbour>` shows the same books). If the control you were about to run is already a
+     recorded book on the current store with the same rules, allocator and params, **cite it** in
+     the hypothesis and the journal by its first-recorded candidate and trial number (`lab show` has
+     its numbers) and use the arm for a book the lab has not recorded. A recorded trial is the
+     measurement; re-running it records a twin row and no new evidence (M0545, M0561 and M0606 did
+     it eight times). Cite only on an exact match; a different frame, a different dial or an
+     older-store-only book is still run, declared. Never copy a recorded curve into a row.
    - Pure. Reads only bars dated ≤ `data_date`. Set `seen_keys`.
 5. **Test, then commit** only the method file. Run `pytest -q tests/test_lab_methods.py` and
    `ruff check src tests`. If the contract test fails, fix the method; never weaken the test.
@@ -290,7 +299,8 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    (plus `--parent`), drawn from what this result taught. It prints the new id on stdout and, on
    stderr, the five methods already in the lab whose wording is closest. Read them. If one is
    the same idea, `lab drop` the new id with the reason. Otherwise name the closest recorded
-   method in the hypothesis so the next session designs against it.
+   method in the hypothesis so the next session designs against it. The same stderr also
+   lists the controls those methods hold; cite them in the next hypothesis instead of re-running.
 10. **Promotion** if `lab run` printed an ELIGIBLE trial: solo, see **Promotion** below; child, report it.
 11. **Finish.**
     - Solo: run `lab stage`. It takes the database's write lock, regenerates `web/data/lab.json`

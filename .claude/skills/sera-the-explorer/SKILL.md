@@ -106,6 +106,15 @@ straight to `main`. These are distinct new files, so a rebase never conflicts.
      idea, `lab drop MNNNN --why "same idea as M00xx"` (an idea with no trial costs no N) and
      choose another. Otherwise write the closest one into the hypothesis ("closest recorded:
      M00xx, which …") so the child designs against it.
+   - **Cite a recorded control, don't re-run it.** `lab idea …` also lists, on stderr, the
+     controls those neighbours already hold, named by first recording (`M0108-DD20  trial 342, …,
+     current store`). Put the ones that fit the frame into the reserved hypothesis ("control
+     cited: M0108-DD20, trial 342") so the child does not spend an arm re-measuring them. Batch
+     0721 re-ran eight such arms (M0545, M0561, M0606): each was accepted as a declared control and
+     added a trial row and run time with no new evidence. A listed control is cited only when the
+     child's own control would be the same rules, allocator and params and the line says `current
+     store`; anything else is run as a declared control, as before. Nothing about `lab run`'s
+     repeat refusal changes.
    - **Reserve** each new idea with `lab idea …`, which prints its id. A backlog row keeps its id.
      The hypothesis can be a draft; the child sharpens it before its pre-registration commit.
    - Then `lab stage` + commit (`lab/lab.sqlite` and `web/data/lab.json`) + push ("lab: sera <stamp> reserves M00xx, M00yy").

@@ -619,7 +619,7 @@ function Tech({ t }: { t: LabTrial }) {
       </summary>
       <div className={s.techBody}>
         <dl className={s.techGrid}>
-          {techRows(t).map(([k, v]) => (
+          {techRows(t, lab.gate).map(([k, v]) => (
             <div key={k} className={s.techRow}>
               <dt>{k}</dt>
               <dd className="num">{v}</dd>

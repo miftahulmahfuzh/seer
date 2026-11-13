@@ -202,16 +202,16 @@ describe('marks / workedSummary', () => {
     expect(earned(trial())).toBe('—');
     expect(earnedVs(trial())).toBeNull();
 
-    const rows = Object.fromEntries(techRows(funded));
+    const rows = Object.fromEntries(techRows(funded, GATE));
     expect(rows['What the money earned']).toBe('+7.6% a year');
     expect(rows['The same deposits in SPY']).toBe('+7.1% a year');
-    expect(Object.keys(Object.fromEntries(techRows(trial())))).not.toContain('What the money earned');
+    expect(Object.keys(Object.fromEntries(techRows(trial(), GATE)))).not.toContain('What the money earned');
   });
 
   it('records whether the luck bar applied, from the engine and not from the window', () => {
-    const rows = Object.fromEntries(techRows(trial()));
+    const rows = Object.fromEntries(techRows(trial(), GATE));
     expect(rows['Luck bar applies']).toBe('yes');
-    const look = techRows(trial({ window: 'test', failedNow: ['beats SPY TR'] }));
+    const look = techRows(trial({ window: 'test', failedNow: ['beats SPY TR'] }), GATE);
     expect(Object.fromEntries(look)['Luck bar applies']).toBe(
       'no — a test run has nothing to discount for luck',
     );
@@ -279,17 +279,29 @@ describe('marks / workedSummary', () => {
 
   it('records the role and the reading in the technical record, and names a comparison book', () => {
     const s = armStates();
-    const pass = Object.fromEntries(techRows(s.measuredPass));
+    const pass = Object.fromEntries(techRows(s.measuredPass, GATE));
     expect(pass['Kind of variant']).toBe('the idea itself');
     expect(pass['Random look-alikes']).toBe('beat 187 of 200; it earned 11.2% a year, the middle look-alike 8.1%');
-    expect(Object.fromEntries(techRows(s.notMeasured))['Random look-alikes']).toBe('not measured yet');
-    expect(Object.fromEntries(techRows(s.notApplicable))['Random look-alikes']).toBe('does not apply: it only holds funds');
+    expect(Object.fromEntries(techRows(s.notMeasured, GATE))['Random look-alikes']).toBe('not measured yet');
+    expect(Object.fromEntries(techRows(s.notApplicable, GATE))['Random look-alikes']).toBe('does not apply: it only holds funds');
     expect(roleText('control')).toBe('a comparison book, built to be beaten');
     expect(roleText(null)).toBe('not recorded');
     expect(twinsRecord(s.unmatched)).toBe('not comparable: its look-alikes traded too differently from it');
     expect(techStatus(s.control)).toBe('comparison book');
     expect(techStatus(s.measuredFail)).toBe('missed 1');
     expect(techStatus(s.measuredPass)).toBe('eligible');
+  });
+
+  it('never prints either new engine label raw in the technical record’s verdict row', () => {
+    const s = armStates();
+    const now = (t: LabTrial) => Object.fromEntries(techRows(t, GATE))['Missed by today’s bars'];
+    expect(now(s.measuredFail)).toBe('beating 9 in 10 random look-alike books');
+    expect(now(s.control)).toBe('it is a comparison book, built to be beaten');
+    // An older label beside a new one: the old one unchanged, the new one in words.
+    expect(now(trial({ failedNow: ['beats SPY TR', 'beats 90% of random twins'] }))).toBe(
+      'beats SPY TR; beating 9 in 10 random look-alike books',
+    );
+    for (const t of Object.values(s)) expect(now(t)).not.toMatch(/random twins|not a control arm/);
   });
 
   it('puts the two new engine labels into plain words for the redone panel, and leaves the rest', () => {
@@ -356,7 +368,7 @@ describe('text', () => {
   });
   it('lists the technical record', () => {
     // Set apart on purpose: the record names the 0.95 bar of its run date, the verdict today's.
-    const rows = Object.fromEntries(techRows(trial({ failedNow: ['beats SPY TR', 'DSR >= 0.90'] })));
+    const rows = Object.fromEntries(techRows(trial({ failedNow: ['beats SPY TR', 'DSR >= 0.90'] }), GATE));
     expect(rows['Trial number']).toBe('#58');
     expect(rows['Code version (git)']).toBe('abc1234');
     expect(rows['Tries counted when run (N)']).toBe('58');
@@ -366,7 +378,7 @@ describe('text', () => {
     expect(rows['Luck score when run']).toBe('0.899 at N = 58');
     expect(rows['Missed when run']).toBe('beats SPY TR; DSR >= 0.95');
     expect(rows['Missed by today\u2019s bars']).toBe('beats SPY TR; DSR >= 0.90');
-    const clean = Object.fromEntries(techRows(trial({ failed: [], failedNow: [] })));
+    const clean = Object.fromEntries(techRows(trial({ failed: [], failedNow: [] }), GATE));
     expect(clean['Missed when run']).toBe('nothing: eligible');
     expect(clean['Missed by today\u2019s bars']).toBe('nothing: eligible');
   });

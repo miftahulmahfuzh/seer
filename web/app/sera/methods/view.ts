@@ -500,8 +500,15 @@ export function missInWords(label: string, gate: Gate): string {
   return label;
 }
 
-/** The full technical record of one trial, as label/value rows. */
-export function techRows(t: LabTrial): [string, string][] {
+/**
+ * The full technical record of one trial, as label/value rows.
+ *
+ * `gate` is here for one row: "Missed by today's bars" goes through `missInWords`, because the
+ * record sits on the page the owner reads and the two labels the lab grew on 2026-11-14 are
+ * engine text, not words (plan invariant 8, and phase 5's exit criterion that no owner-facing
+ * text prints either raw). Every older label prints as it always did.
+ */
+export function techRows(t: LabTrial, gate: Gate): [string, string][] {
   return [
     ['Trial number', `#${t.n}`],
     ['Window', `${t.window === 'dev' ? 'Development' : 'Test'}, ${t.start} → ${t.end}`],
@@ -522,7 +529,7 @@ export function techRows(t: LabTrial): [string, string][] {
     // which is a single try booked in advance.
     ['Luck bar applies', t.luckGated ? 'yes' : 'no — a test run has nothing to discount for luck'],
     ['Missed when run', t.failed.length ? t.failed.join('; ') : 'nothing: eligible'],
-    ['Missed by today’s bars', t.failedNow.length ? t.failedNow.join('; ') : 'nothing: eligible'],
+    ['Missed by today’s bars', t.failedNow.length ? t.failedNow.map(f => missInWords(f, gate)).join('; ') : 'nothing: eligible'],
     // Snapshot 8. What the arm was registered as, and how it did against its random look-alikes.
     ['Kind of variant', roleText(t.role)],
     ['Random look-alikes', twinsRecord(t)],

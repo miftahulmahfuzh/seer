@@ -56,6 +56,7 @@ from seer_engine.lab.methods.m0065_rebalance_day_residual import DAILY_RESIZE_FR
 from seer_engine.lab.methods.m0127_slot_relative_resize_band import T00
 from seer_engine.lab.methods.m0533_sell_side_or_cash_side import BAND0_NOTRIM, BAND0_TRIM, BAND1_NOTRIM
 from seer_engine.lab.methods.m0555_dip_timed_deposits import BASE as DEPOSIT_BASE
+from seer_engine.lab.methods.m0618_turtle_breakout_stocks import DAILY_HOLD_FRAC_GOTRADE_NORESIZE
 from seer_engine.lab.methods.m0555_dip_timed_deposits import DELAY3, DIP, MIRROR
 from seer_engine.sim.contributions import OWNER_MONTHLY
 from seer_engine.sim.rules import (
@@ -114,6 +115,9 @@ REALISTIC: dict[str, object] = {
     DIP.id: DIP,
     DELAY3.id: DELAY3,
     MIRROR.id: MIRROR,
+    # M0618's event-rule book is the owner's fractional Gotrade book checked daily with no resize,
+    # so a held name is left alone until its own exit. Already the money model: maps to itself.
+    DAILY_HOLD_FRAC_GOTRADE_NORESIZE.id: DAILY_HOLD_FRAC_GOTRADE_NORESIZE,
 }
 
 # Tapes that credit idle cash with the 13-week T-bill yield. They stay out of REALISTIC on

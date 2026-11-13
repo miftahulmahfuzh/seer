@@ -34,6 +34,7 @@ describe('glossary', () => {
         'paperTrading',
         'spyTr',
         'ownerInputs',
+        'randomTwin', 'twinsBeaten', 'comparisonBook',
       ].sort(),
     );
     for (const entry of Object.values(GLOSSARY)) {

@@ -2,7 +2,7 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-11-12
+**Last Updated**: 2026-11-13
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 31
+- Completed: 32
 
 ---
 
@@ -23,6 +23,32 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ### [P0] Critical
 
 ### [P1] High
+- [x] **P1-WEB-59NH** Phase 5: Snapshot and Sera pages
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns: the snapshot fields and `SNAPSHOT_VERSION`; `web/lib/sera` types, derive, glossary, fixture and tests; the method page's seventh condition and the comparison-book treatment of control arms; the how page's wording; the redone panel's plain words for the two new labels; the regenerated `web/data/lab.json`; `sera.md` in the feature map. Exit criteria: the snapshot test and the JSON sync test pass; the method page shows the yardstick row in plain words in both themes at phone and desktop widths; a row with no reading says so and is never drawn as a pass; no owner-facing text prints either new engine label raw.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/random-twin-yardstick/PLAN.md` (phase 5 of 5)
+  - **Satisfies**: R2 — "you idea so we can implement them robustly" — part 2: "Judge ideas against it. An arm passes only if it beats roughly the top tenth of random books on its own setup, in place of today's 'beats SPY and clears the luck score'." · criteria: R2.4
+  - **Depends on**: P1-ENG-VZXN
+  - **Plan**: `.workflows/plan/P1-WEB-59NH.md`
+  - **Completed**: 2026-11-13 16:45
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/lab/store.py, engine/tests/test_lab_snapshot.py, engine/tests/test_lab_gate_wording.py, engine/tests/test_lab_books.py, web/lib/sera/types.ts, web/lib/sera/derive.ts, web/lib/sera/glossary.ts, web/lib/sera/fixture.ts, web/lib/sera/lab.ts, web/lib/sera/lab.test.ts, web/lib/sera/derive.test.ts, web/lib/sera/glossary.test.ts, web/app/sera/methods/view.ts, web/app/sera/methods/view.test.ts, web/app/sera/methods/[id]/page.tsx, web/app/sera/methods/[id]/method.module.css, web/app/sera/methods/page.tsx, web/app/sera/how/view.ts, web/app/sera/how/view.test.ts, web/app/sera/how/page.tsx, web/app/sera/overview.ts, web/app/sera/overview.test.ts, web/components/sera/diagrams/geometry.ts, web/data/lab.json, .claude/skills/verify-seer/features/sera.md
+  - **Proof**: verified-first-pass — 6 journeys, evidence /home/miftah/.local/state/seer-verify/1113-155052-445583/evidence
+  - **Drift**:
+    - how/view.ts hurdles stage title was ['Five hurdles', '+ luck check'] with countTip 'cleared all six at once' (plan quoted only the detail lines); replaced whole as the plan's block says.
+    - web/node_modules (provisioned by hardlink) lacked `playwright`, so the first `shoot` failed; ran `npm ci` in web/ (package-lock unchanged) and relaunched the run. One `verify.sh up` also 500'd on a transient Google-font fetch; the retry worked.
+    - The technical record's 'Missed by today's bars' row still prints failedNow raw (so 'beats 90% of random twins' / 'not a control arm' can appear inside the collapsed technical record). The plan's techRows code block leaves it so and the exit criterion names only the redone panel; left as planned, flagged for the coordinator.
+    - Red on base, not from this phase: web lib/sera/lab.test.ts 'collapses the spent looks...' expects testLooks 5, HEAD's lab.json already says 6; engine test_lab_hardgate.py buy-signal pin (coordinator-reported red on base).
+  - **Decided**:
+    - engine/tests/test_lab_books.py pinned snapshot version 7 and is not in the plan's Files table → moved the pin to 8 with a one-line comment (rung 1: invariant 1, every lab test file passes; and Step 1's 'every pin of 7 moves')
+    - Raw engine labels in the technical record's 'Missed by today's bars' row → left as the plan's code block has it (rung 2/3: exit criteria name only the redone panel; techRows block is complete by construction)
+    - Completion: the `[x]` block left in place under `### [P1] High` rather than moved into `## Completed Tasks`, and Quick Stats adjusted for this task only (rung 6: precedent of phases 1-4 of this set). Plan index: phase 5's TaskID cell ticked `(done 2026-11-13)` in the coordinator's copy and the worktree copy; `**Status:**` set to `phase 5/5 complete`. No later phase to unblock.
+    - Landing not attempted: swarm coordinator `orch-random-twin-yardstick` owns the merge of `feature/random-twin-yardstick`.
+  - **Handoff from phase 4** (P1-ENG-VZXN, 2026-11-13):
+    - The snapshot's `failedNow` can now carry the engine label `beats 90% of random twins` (the yardstick condition); it must be shown in plain words, never raw.
+    - Any P5 proof command that quotes `lab yardstick M… --arm …` must use `lab yardstick --arm …` alone: phase 3's CLI takes method ids, one `--arm`, or `--pending`, exactly one.
 
 ### [P2] Medium
 

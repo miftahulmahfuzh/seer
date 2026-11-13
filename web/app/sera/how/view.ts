@@ -8,7 +8,7 @@ import { monthYear, type Era, type PipelineStage } from '../../../components/ser
 // itself, so there is no carrier to read it from — which is why this one bar comes from
 // `lib/golive.ts` while `gate.maxDrawdown` and every other lab bar still come from the snapshot.
 import { MIN_PAPER_MONTHS } from '../../../lib/golive';
-import { CONDITION_KEYS, type ConditionKey } from '../../../lib/sera/derive';
+import { CONDITION_KEYS, shareInWords, type ConditionKey } from '../../../lib/sera/derive';
 import { CONDITION_TERM, type GlossaryKey } from '../../../lib/sera/glossary';
 import type { Gate, LabMethod, LabSnapshot, LabTrial } from '../../../lib/sera/types';
 
@@ -115,16 +115,18 @@ export function pipelineStages(snap: HowInput): PipelineStage[] {
     },
     {
       key: 'hurdles',
-      title: ['Five hurdles', '+ luck check'],
+      // One title line, so the box has room for six detail lines above its count pill.
+      title: ['Seven hurdles'],
       detail: [
         'Beat SPY + dividends',
         `Worst fall ≤ ${pctLabel(g.maxDrawdown)}`,
         `PF ≥ ${num(g.minProfitFactor)} · ${count(g.minTrades)}+ trades`,
         'No owner inputs',
         `Luck check ≥ ${num(g.dsrMin)}`,
+        `Beat ${shareInWords(g.yardstickMin)} look-alikes`,
       ],
       count: `${count(c.eligible)} pass`,
-      countTip: `${count(c.eligible)} of ${count(c.devTrials)} tries cleared all six at once`,
+      countTip: `${count(c.eligible)} of ${count(c.devTrials)} tries clear every hurdle at once`,
       fails: true,
       weight: 1.35,
     },
@@ -239,6 +241,11 @@ export function hurdles(gate: Gate, tries: number): Hurdle[] {
       title: 'Not just luck',
       target: `Luck check ≥ ${num(gate.dsrMin)}`,
       plain: `Try enough ideas and one will look great by chance. The luck check discounts a result for every try ever made (N = ${count(gate.dsrN)} so far, out of ${count(tries)} runs on the practice years), so the bar rises as the lab keeps searching. How high it has to reach — ${num(gate.dsrMin)} — is the owner's call on how much doubt is acceptable.`,
+    },
+    yardstick: {
+      title: 'Better than random picks',
+      target: `Beats ${shareInWords(gate.yardstickMin)} random look-alikes`,
+      plain: `A strong result can come from the shape of a book — how many stocks it holds, how often it trades, when it steps aside — rather than from which stocks it picks. So each variant is replayed ${count(gate.yardstickDraws)} times on its own trading days and in its own amounts, with every stock it picked swapped for a random index stock of similar trading size, and it must earn more than at least ${shareInWords(gate.yardstickMin)} of those look-alikes. A book that only holds funds has no picks to swap, so this one does not apply to it.`,
     },
   };
   return CONDITION_KEYS.map(key => ({ key, term: CONDITION_TERM[key], ...text[key] }));

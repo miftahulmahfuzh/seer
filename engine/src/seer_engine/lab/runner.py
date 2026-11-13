@@ -20,10 +20,17 @@
    the variance of the daily Sharpe across those trials. *What* N counts is the policy's business
    and need not be a row count; this module never reads the policy's value, only the N it yields.
 4. Eligible = the five P7a D8 conditions and ``store.DSR_LABEL`` (DSR >= 0.90 since 2026-10-07;
-   LAB_LUCK_GATE_PLAN.md Decision D1). Insert the trials, set the method's ``source_sha`` and
-   status (``dev-eligible`` when any trial is eligible, else ``rejected``), all in one
-   transaction. ``store.verdict`` re-reads a recorded trial against the same threshold and N, so
-   a verdict is comparable across time rather than frozen at its run date.
+   LAB_LUCK_GATE_PLAN.md Decision D1), and never for an arm whose rationale reads as a control
+   (``store.CONTROL_LABEL``; random-twin-yardstick R3). Since 2026-11-14 also the random-twin
+   yardstick (``store.YARDSTICK_LABEL``; RANDOM_TWIN_YARDSTICK_PLAN.md phase 4): every
+   non-control arm that clears the others is measured against ``yardstick.DRAWS`` books that
+   repeat its every decision with the picked stocks swapped, **before** the write lock, and is
+   eligible only if it out-earned at least ``store.YARDSTICK_MIN_PERCENTILE`` of them. Insert the
+   trials, each arm's role (``store.trial_roles``) and each reading (``store.trial_yardstick``),
+   set the method's ``source_sha`` and status (``dev-eligible`` when any trial is eligible -- so
+   only a non-control arm can make it -- else ``rejected``), all in one transaction.
+   ``store.verdict`` re-reads a recorded trial against the same thresholds, N, role and reading,
+   so a verdict is comparable across time rather than frozen at its run date.
 5. Score the method's whole walk-forward record against the lab's shared geometry and record it
    (``hardgate.fold_verdict`` -> ``store.method_folds``), **in that same transaction**, so the
    curves this batch just produced are inside the record it keeps and a rolled-back run leaves
@@ -72,8 +79,8 @@ import logging
 import sqlite3
 import statistics
 import subprocess
-from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import asdict, dataclass, replace
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -87,7 +94,7 @@ from seer_engine.backtest.market import Market
 from seer_engine.backtest.runner import INITIAL_IDR
 from seer_engine.commands.backtest_dev import daily_moments, month_end_curve, registry_problem
 from seer_engine.fundamentals import coverage
-from seer_engine.lab import store, twins
+from seer_engine.lab import control_shape, store, twins, yardstick
 from seer_engine.lab.method import METHOD_ID, Amendment, Method, config_digest, config_text, source_sha
 from seer_engine.lab.real_costs import real_cost_problem
 from seer_engine.sim.contributions import OWNER_MONTHLY, ContributionSchedule
@@ -114,12 +121,24 @@ class Ran:
     deposit. **The existence of the row is the funded flag** (``store.FundingRow``), so None here
     must produce no row at all rather than a row of zeroes -- ``trial_funding`` CHECKs
     ``deposits_usd > 0`` and ``deposits_n >= 1`` and would refuse one.
+
+    ``role`` is ``control_shape.role_of`` on the candidate, set by ``trial_rows`` and recorded by
+    ``run_method`` as the trial's ``trial_roles`` row. None only for a ``Ran`` built by hand,
+    which records no role.
+
+    ``yardstick`` is the same pattern a third time: the random-twin reading ``run_method`` took for
+    this variant before the write lock, as the ``store.YardstickRow`` that will be inserted,
+    ``trial_n=0`` until the insert and stamped with ``dataclasses.replace`` afterwards. None when
+    the variant was not measured: a control, an arm that failed another condition, or an arm whose
+    measurement could not be taken. It defaults to None for the same reason ``moments`` does.
     """
 
     trial: store.TrialRow
     row: DevRow
     moments: store.MomentsRow | None = None
     funding: store.FundingRow | None = None
+    role: str | None = None
+    yardstick: store.YardstickRow | None = None
 
 
 @dataclass(frozen=True)
@@ -521,6 +540,109 @@ def _f(x: Any) -> float | None:
     return None if x is None else float(x)
 
 
+def _luck_inputs(
+    conn: sqlite3.Connection, method_id: str, results: Sequence[tuple[DevRow, Any]]
+) -> tuple[list[tuple[float, float, float] | None], int, float | None]:
+    """The deflated Sharpe's batch inputs for ``results``: each variant's daily moments, the N the
+    batch is judged at (``store.pending_gate``) and the variance of the daily Sharpe across every
+    recorded dev trial plus this batch.
+
+    One function, two callers. ``trial_rows`` records with it under the write lock;
+    ``_provisional_dsrs`` reads it before the lock to decide which arms are worth measuring
+    against their random twins. The order of the reads is the order ``trial_rows`` always used.
+    """
+    prior = store.dev_daily_sharpes(conn)
+    moments = [daily_moments(r.stats.daily_returns) for r, _ in results]
+    new_sharpes = [m[0] for m in moments if m is not None]
+    all_sharpes = prior + new_sharpes
+    n_trials = store.pending_gate(conn, method_id, len(results)).n
+    var_trials = statistics.variance(all_sharpes) if len(all_sharpes) >= 2 else None
+    return moments, n_trials, var_trials
+
+
+def _provisional_dsrs(
+    conn: sqlite3.Connection, method_id: str, results: Sequence[tuple[DevRow, Any]]
+) -> list[float | None]:
+    """Each variant's DSR as ``trial_rows`` would record it if the lab did not move first.
+
+    Read-only and outside any transaction. A parallel session can record a method between this
+    read and the write lock, and N or the variance can move. ``trial_rows`` therefore decides
+    again under the lock and fails closed on an arm that turns eligible there without a reading.
+    """
+    moments, n_trials, var_trials = _luck_inputs(conn, method_id, results)
+    out: list[float | None] = []
+    for (row, _), m in zip(results, moments, strict=True):
+        if m is None or var_trials is None:
+            out.append(None)
+        else:
+            out.append(dev.deflated_sharpe(
+                m[0], n_trials, var_trials, len(row.stats.daily_returns), m[1], m[2]
+            ))
+    return out
+
+
+def _due_for_yardstick(row: DevRow, dsr: float | None) -> bool:
+    """Is this just-simulated arm worth measuring against its random twins?
+
+    Exactly the arms the yardstick can still decide: not a control (a control is the arm a method
+    registered to be beaten, and phase 1 already fails it), clear of the five D8 conditions, and
+    clear of the luck test at the provisional DSR. Measuring anything else spends two workers and
+    minutes on a verdict that is already no.
+    """
+    if not row.eligible:
+        return False
+    if dsr is None or dsr < store.DSR_MIN:
+        return False
+    return control_shape.role_of(row.candidate) != control_shape.ROLE_CONTROL
+
+
+def _measure_yardsticks(
+    conn: sqlite3.Connection,
+    method: Method,
+    results: Sequence[tuple[DevRow, Any]],
+    data: research.ResearchData,
+    *,
+    capital: Decimal,
+    jobs: int,
+    measure: Callable[..., yardstick.Measurement],
+) -> dict[str, yardstick.Measurement]:
+    """Measure every arm ``_due_for_yardstick`` names, keyed by candidate id. Holds no lock.
+
+    Called between ``dev.run_registry`` and ``store.begin_immediate``, because it is the slowest
+    thing ``lab run`` does (``yardstick.DRAWS`` simulations per arm) and the write lock is
+    lab-wide: every parallel session would wait on it.
+
+    Each arm is re-run at the capital and on the funding it was just simulated with, and
+    ``expect`` hands ``measure`` the trade count and total return this run recorded, so a twin
+    replays the decisions of the very book that is about to be written. ``yardstick.Unreproducible``
+    leaves the arm out of the result: ``trial_rows`` then records it with the yardstick label, and
+    ``run_method`` logs the way back. Any other exception is a bug and propagates before anything
+    is written.
+    """
+    dsrs = _provisional_dsrs(conn, method.id, results)
+    due = [row for (row, _), dsr in zip(results, dsrs, strict=True) if _due_for_yardstick(row, dsr)]
+    out: dict[str, yardstick.Measurement] = {}
+    for i, row in enumerate(due):
+        met = row.stats.metrics
+        log.info(
+            "[yardstick %d/%d] %s cleared every other condition: measuring it against its random "
+            "twins (%d worker(s))",
+            i + 1, len(due), row.candidate.id, jobs,
+        )
+        try:
+            out[row.candidate.id] = measure(
+                data.market, data.dividends, data.spy_dividends, row.candidate,
+                initial_idr=capital, contributions=OWNER_MONTHLY, jobs=jobs,
+                expect=(int(met.trades), _f(met.total_return)),
+            )
+        except yardstick.Unreproducible as e:
+            log.warning(
+                "%s: its random twins could not be measured (%s). It will be recorded not "
+                "eligible.", row.candidate.id, e,
+            )
+    return out
+
+
 def trial_rows(
     conn: sqlite3.Connection,
     method: Method,
@@ -530,6 +652,7 @@ def trial_rows(
     git_sha: str,
     deposits: Sequence[Sequence[tuple[date, float]]] = (),
     schedule: str = OWNER_SCHEDULE_TEXT,
+    yardsticks: Mapping[str, yardstick.Measurement] | None = None,
 ) -> list[Ran]:
     """The trial rows for one method's dev results (``results``: (row, month-end curve)).
 
@@ -575,14 +698,30 @@ def trial_rows(
     reader of the row never reconstructs the plan from the dates. It travels with ``deposits``
     because the two describe one run: funding a batch on some other schedule and leaving this at
     its default would record a sentence the run never obeyed.
+
+    **A control arm is never eligible** (random-twin-yardstick R3). ``control_shape.role_of``
+    reads each candidate's role from its rationale -- the reader the hard gate's D18 uses at
+    ``lab promote`` -- and an arm registered to be beaten gets ``store.CONTROL_LABEL`` after the
+    luck label, so its ``eligible`` is False whatever its numbers. That one line is the whole of
+    the role-aware status: ``run_method``'s ``dev-eligible``/``rejected`` rule reads
+    ``trial.eligible`` and needs no second rule. The role travels on ``Ran.role`` so
+    ``run_method`` records it beside the trial (``store.RoleRow``), which is what lets
+    ``store.verdict`` say the same thing later without opening the method file.
+
+    ``yardsticks`` is the random-twin reading ``run_method`` took before the lock, per candidate
+    id. **None turns the rule off** -- the default, so a caller that never measures gets
+    byte-for-byte what this function recorded before the yardstick existed. Any mapping, even an
+    empty one, turns it on. Then a non-control arm that clears every other condition, the luck
+    test included, gets ``store.YARDSTICK_LABEL`` unless its reading clears (``yardstick_clears``:
+    a measured share at or above ``store.YARDSTICK_MIN_PERCENTILE``, or ``not-applicable``). An
+    arm that clears everything else and has **no** reading is labelled too. That happens when the
+    luck test moved between the provisional read and this one, or the measurement could not be
+    taken. The record fails closed; ``lab yardstick`` and ``lab reevaluate`` are the way back. A
+    control never gets the label: phase 1's ``CONTROL_LABEL`` already fails it. Every reading
+    becomes a ``store.YardstickRow`` on its ``Ran``, eligible or not, because a measurement is
+    worth keeping whatever it decided.
     """
-    prior = store.dev_daily_sharpes(conn)
-    moments = [daily_moments(r.stats.daily_returns) for r, _ in results]
-    new_sharpes = [m[0] for m in moments if m is not None]
-    all_sharpes = prior + new_sharpes
-    gate = store.pending_gate(conn, method.id, len(results))
-    n_trials = gate.n
-    var_trials = statistics.variance(all_sharpes) if len(all_sharpes) >= 2 else None
+    moments, n_trials, var_trials = _luck_inputs(conn, method.id, results)
     run_at = store.now_iso()
     flows: list[Sequence[tuple[date, float]]] = list(deposits) if deposits else [()] * len(results)
     if len(flows) != len(results):
@@ -610,6 +749,22 @@ def trial_rows(
         failed = list(row.failed)
         if dsr is None or dsr < store.DSR_MIN:
             failed.append(store.DSR_LABEL)
+        # R3: an arm registered to be beaten never makes its method eligible, whatever its
+        # numbers. After the luck label, the order `store.verdict` reads it back in.
+        role = control_shape.role_of(c)
+        if role == control_shape.ROLE_CONTROL:
+            failed.append(store.CONTROL_LABEL)
+        # The seventh condition (phase 4): the reading taken before the lock, as the row it becomes
+        # (phase 3's one constructor; trial_n=0 until the insert stamps it). Judged by the one
+        # clearing rule, `store.yardstick_clears`, on the same mapping the table will hold.
+        reading = None if yardsticks is None else yardsticks.get(c.id)
+        ystick = None if reading is None else store.YardstickRow.from_measurement(
+            reading, trial_n=0, rule_id=yardstick.RULE_ID, store_fingerprint=fingerprint,
+            checked=True, git_sha=git_sha, measured=run_at,
+        )
+        if yardsticks is not None and not failed:
+            if ystick is None or not store.yardstick_clears(asdict(ystick)):
+                failed.append(store.YARDSTICK_LABEL)
         worst = row.stats.worst_year
         trial = store.TrialRow(
             method_id=method.id,
@@ -652,7 +807,7 @@ def trial_rows(
             schedule=schedule,
             measured=run_at,
         )
-        out.append(Ran(trial=trial, row=row, moments=mom, funding=fund))
+        out.append(Ran(trial=trial, row=row, moments=mom, funding=fund, role=role, yardstick=ystick))
     return out
 
 
@@ -665,6 +820,8 @@ def run_method(
     git_sha: str,
     require_commit: bool = True,
     amend: bool = False,
+    yardstick_jobs: int = 1,
+    measure: Callable[..., yardstick.Measurement] = yardstick.measure,
 ) -> Run:
     """Run ``method`` on the dev window and record it (see the module docstring).
 
@@ -702,6 +859,17 @@ def run_method(
     (hardgate D15): no trial's ``eligible`` moves, no status moves differently, and a lab with no
     benchmark records the reason and completes. The fold majority is still a refusal at
     ``lab promote`` and nowhere else.
+
+    **The random-twin yardstick is measured here, before the write lock.** After the simulations
+    and before ``store.begin_immediate``, every arm that is not a control, clears the five D8
+    conditions and clears the luck test at the provisional DSR is handed to ``measure``
+    (``yardstick.measure``; a test injects its own). It gets this run's capital, funding and
+    recorded trade count and total return, and ``yardstick_jobs`` workers. Nothing slow runs
+    under the lock, because the lock is lab-wide. The readings go to ``trial_rows``, which labels
+    an arm that lost to its twins, and into ``trial_yardstick`` in the same transaction as the
+    trials, stamped with the numbers SQLite assigns: a trial and the reading that judged it are
+    one record or neither. An ``--amend`` run measures exactly the same way. ``lab test`` never
+    does, because a look is not a search.
     """
     refuse_survivorship_store(data, f"lab run {method.id}")
     amendment = preflight(conn, method, path, require_commit=require_commit, amend=amend)
@@ -722,6 +890,11 @@ def run_method(
         data.market, data.dividends, data.spy_dividends, candidates,
         on_result=on_result, contributions=OWNER_MONTHLY, initial_idr=capital,
     )
+    # The random-twin yardstick, measured HERE: after the simulations and before the write lock.
+    # It is the slowest thing a run does, and the lock is lab-wide.
+    yardsticks = _measure_yardsticks(
+        conn, method, results, data, capital=capital, jobs=yardstick_jobs, measure=measure,
+    )
     store.begin_immediate(conn)  # lab-wide N and the inserts, atomic against parallel sessions
     with conn:
         # A parallel session may have won a race. On the amendment path the re-check must resolve
@@ -734,7 +907,8 @@ def run_method(
                 f"flight. Nothing has been written; re-run `lab run --amend {method.id}`"
             )
         ran = trial_rows(
-            conn, method, results, fingerprint=data.fingerprint, git_sha=git_sha, deposits=deposits
+            conn, method, results, fingerprint=data.fingerprint, git_sha=git_sha,
+            deposits=deposits, yardsticks=yardsticks,
         )
         # The repeat check (lab/twins.py). It reads the exact `curve_json` and `trades` these rows
         # would write, and it runs under the write lock for the same reason the preflight above is
@@ -749,6 +923,19 @@ def run_method(
             )
         for i, (r, cash) in enumerate(zip(ran, deposits, strict=True)):
             _log_arm(i, len(ran), r.row, cash)
+        for r in ran:
+            if r.yardstick is None and store.YARDSTICK_LABEL in store.recorded_labels(r.trial.failed):
+                log.warning(
+                    "%s cleared every other condition but has no random-twin reading (the luck "
+                    "test moved under the write lock, or the twins could not be measured), so it "
+                    "is recorded not eligible. The way back: `lab yardstick --arm %s`, then "
+                    "`lab reevaluate %s`",
+                    # `--arm` alone: `lab yardstick` takes method ids, one --arm or --pending,
+                    # and exactly one of the three.
+                    r.trial.candidate_id, r.trial.candidate_id, method.id,
+                )
+        # Role-aware without a rule of its own: `trial_rows` already failed every control arm with
+        # `store.CONTROL_LABEL`, so only a non-control arm can make this method dev-eligible.
         status = "dev-eligible" if any(r.trial.eligible for r in ran) else "rejected"
         if store.get_method(conn, method.id) is None:
             store.add_method(
@@ -805,6 +992,22 @@ def run_method(
             )
             for n, r in zip(ns, ran, strict=True)
         ])
+        # Each arm's role, read from the candidate this run just simulated, in this same
+        # transaction (random-twin-yardstick R3). `store.verdict` reads it to refuse a control arm
+        # without importing the method file. Both paths record it -- a first run and `--amend` --
+        # and a batch refused above leaves none, because nothing has been written yet.
+        store.insert_roles(conn, [
+            store.RoleRow(trial_n=n, role=r.role, source="recorded", measured=r.trial.run_at)
+            for n, r in zip(ns, ran, strict=True)
+            if r.role is not None
+        ])
+        # The random-twin readings, stamped with the trial numbers SQLite just assigned, in this
+        # same transaction: a trial and the reading that judged it are recorded together or not
+        # at all. An arm that was not measured contributes no row; `store.verdict` reads "no row"
+        # as "not measured", which fails closed for every arm recorded from today.
+        for n, r in zip(ns, ran, strict=True):
+            if r.yardstick is not None:
+                store.insert_yardstick(conn, replace(r.yardstick, trial_n=n))
         # The fold verdict of this batch, computed HERE: after the trials, their moments, their
         # funding and their provenance are all in, and inside this same transaction. Three things
         # make that the only correct place.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
 from datetime import date
 from decimal import Decimal
@@ -154,3 +155,46 @@ def stamp_provenance(
         for n in trial_ns
         if store.provenance_of(conn, int(n)) is None
     ])
+
+
+def stamp_yardstick(
+    conn,
+    trial_ns: Iterable[int],
+    *,
+    status: str = "measured",
+    percentile: float = 1.0,
+    draws: int = 200,
+) -> None:
+    """Record a random-twin reading for fixture trials, the way ``lab run`` does for real ones.
+
+    ``hardgate.check`` refuses a variant with no reading that clears (D20), so a fixture that
+    expects ``lab promote`` to take a method, or to refuse it on a later clause, stamps its trials
+    here as it stamps their provenance. The default is a reading that clears: a ``measured``
+    share of 1.0. ``status="not-applicable"`` records no draws, no twins beaten and no share (the
+    shape ``yardstick.Measurement`` and the table's CHECKs require); any other status records
+    ``draws`` twins of which ``round(percentile * draws)`` were out-earned.
+
+    **Idempotent.** ``store.insert_yardstick`` returns False and writes nothing when the trial
+    already has a reading under this rule and store, so two helpers stamping the same trial never
+    collide. The caller holds the transaction, as with every ``store.insert_*``.
+    """
+    from seer_engine.lab import yardstick
+
+    for n in trial_ns:
+        if status == yardstick.STATUS_NOT_APPLICABLE:
+            row = store.YardstickRow(
+                trial_n=int(n), rule_id=yardstick.RULE_ID, store_fingerprint="test fixture",
+                status=status, draws=0, arm_rate=None, beaten=0, percentile=None,
+                rates_json="[]", trade_ratio=None, turnover_ratio=None, reproduced=None,
+                git_sha="test fixture", measured="test fixture",
+            )
+        else:
+            beaten = int(round(percentile * draws))
+            row = store.YardstickRow(
+                trial_n=int(n), rule_id=yardstick.RULE_ID, store_fingerprint="test fixture",
+                status=status, draws=draws, arm_rate=0.12, beaten=beaten,
+                percentile=beaten / draws, rates_json=json.dumps([0.05] * draws),
+                trade_ratio=1.0, turnover_ratio=1.0, reproduced=True,
+                git_sha="test fixture", measured="test fixture",
+            )
+        store.insert_yardstick(conn, row)

@@ -25,10 +25,13 @@ function requireGate(snap: LabSnapshot): LabSnapshot {
     g.dsrN >= 0 &&
     DSR_POLICIES.includes(g.dsrPolicy) &&
     typeof g.dsrNBasis === 'string' &&
-    g.dsrNBasis.length > 0;
+    g.dsrNBasis.length > 0 &&
+    Number.isFinite(g.yardstickMin) &&
+    Number.isInteger(g.yardstickDraws);
   if (!ok) {
     throw new Error(
-      'web/data/lab.json is missing a usable gate.dsrPolicy / gate.dsrN / gate.dsrNBasis. ' +
+      'web/data/lab.json is missing a usable gate.dsrPolicy / gate.dsrN / gate.dsrNBasis / ' +
+        'gate.yardstickMin / gate.yardstickDraws. ' +
         'Regenerate it with `python -m seer_engine lab export-json` and commit it.',
     );
   }

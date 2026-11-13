@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { DRAWDOWN_FAILURE_PREFIX, DSR_FAILURE_PREFIX, FAILURE_LABEL } from './derive';
+import {
+  CONTROL_LABEL, DRAWDOWN_FAILURE_PREFIX, DSR_FAILURE_PREFIX, FAILURE_LABEL, isYardstickLabel,
+} from './derive';
 import { childrenOf, insightsOf, lab, methodById, trialsOf } from './lab';
-import { DSR_POLICIES, INSIGHT_KINDS, METHOD_STATUSES, SOURCE_KINDS } from './types';
+import { ARM_ROLES, DSR_POLICIES, INSIGHT_KINDS, METHOD_STATUSES, SOURCE_KINDS, YARDSTICK_STATUSES } from './types';
 
 describe('lab snapshot (web/data/lab.json)', () => {
   it('has exactly the contract keys', () => {
-    expect(lab.version).toBe(7);
+    expect(lab.version).toBe(8);
     expect(Object.keys(lab).sort()).toEqual(
       ['asOf', 'benchmark', 'books', 'data', 'gate', 'ideasSeen', 'insights', 'methods', 'paper',
         'summary', 'trials', 'version'].sort(),
@@ -19,6 +21,9 @@ describe('lab snapshot (web/data/lab.json)', () => {
     expect(Number.isInteger(lab.gate.dsrN) && lab.gate.dsrN >= 0).toBe(true);
     expect(lab.gate.dsrNBasis.length).toBeGreaterThan(0);
     expect(lab.gate.devStart).toBe('1993-01-29');
+    // Snapshot 8: the random-twin bar and draw count, published from the engine's constants.
+    expect(lab.gate.yardstickMin > 0 && lab.gate.yardstickMin < 1).toBe(true);
+    expect(Number.isInteger(lab.gate.yardstickDraws) && lab.gate.yardstickDraws > 0).toBe(true);
   });
 
   it('collapses the spent looks and the buy signal to distinct strategies', () => {
@@ -57,16 +62,28 @@ describe('lab snapshot (web/data/lab.json)', () => {
     // that reason. Checked against the real snapshot rather than a fixture, because the failure
     // this guards against is a label the engine starts writing that the site stops recognising —
     // which renders a missed hurdle as a tick, silently, on the page the owner reads.
-    const known = new Set(Object.values(FAILURE_LABEL));
+    const known = new Set([...Object.values(FAILURE_LABEL), CONTROL_LABEL]);
     const unreadable = lab.trials
       .flatMap((t) => [...t.failed, ...t.failedNow])
       .filter(
         (f) =>
           !known.has(f) &&
           !f.startsWith(DSR_FAILURE_PREFIX) &&
-          !f.startsWith(DRAWDOWN_FAILURE_PREFIX),
+          !f.startsWith(DRAWDOWN_FAILURE_PREFIX) &&
+          !isYardstickLabel(f),
       );
     expect([...new Set(unreadable)]).toEqual([]);
+  });
+
+  it('publishes every arm\'s role and random-twin reading, or null', () => {
+    // A missing key reads as `undefined`, which neither branch accepts: a lab.json exported by an
+    // engine older than snapshot 8 fails here rather than rendering every arm as "not measured".
+    const bad = lab.trials.filter(
+      (t) =>
+        !(t.role === null || ARM_ROLES.includes(t.role)) ||
+        !(t.yardstick === null || YARDSTICK_STATUSES.includes(t.yardstick.status)),
+    );
+    expect(bad.map((t) => t.n)).toEqual([]);
   });
 
   it('still reads the two labels the owner moved the bars on', () => {

@@ -85,8 +85,8 @@ export default async function HowPage() {
 
         <Section
           eyebrow="The hurdles"
-          title="Six things every method must clear"
-          caption="A method passes the practice stage only if one of its variants clears all six at once. The numbers come from the lab’s own settings."
+          title="Seven things every method must clear"
+          caption="A method passes the practice stage only if one of its variants clears all seven at once. The numbers come from the lab’s own settings."
         >
           <div className={s.grid3}>
             {hs.map((h, i) => (

@@ -312,7 +312,7 @@ def test_the_snapshot_publishes_both_counters_and_the_names_under_them(conn):
                 start="2015-10-19", end="2026-10-01", curve_json="[]",
             )])
     snap = store.snapshot(conn)
-    assert snap["version"] == 7
+    assert snap["version"] == 8  # 7 when books arrived; 8 added role and yardstick per trial
     assert snap["summary"]["testLooks"] == 2
     assert snap["summary"]["testBooks"] == 1
     block, = snap["books"]["testLooks"]

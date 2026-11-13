@@ -885,6 +885,54 @@ row, no digest and no closed verdict.
 
 **Where it sits in ``check``.** Right after (D18) and before (D16): "what is this arm" and "whose
 book is it" are both about the arm's identity, and read in front of "is its fall honest".
+
+**(D20) Does the gate check that the variant beat books of its own shape drawn at random? -- Yes,
+from 2026-11-14 (RANDOM_TWIN_YARDSTICK_PLAN.md phase 4), and it fails closed: a variant with no
+reading is refused as well as one that lost.**
+
+The dev screen compared every arm with SPY and with zero, never with what a no-skill book of the
+same shape earns. Measured on the committed lab on 2026-11-13: 45 dev trials belong to the two
+deliberately meaningless families (``placebo-hash-order``, ``blind-draw-baseline``); 42 of them beat
+SPY and 14 were recorded eligible. Across all 2,051 dev trials on the main window, 362 were. The
+screen was grading the shape of a book, not the idea in it.
+
+**What a reading is** is ``lab/yardstick.py``'s definition and nothing else: ``yardstick.DRAWS``
+twin books that replay the arm's own recorded decisions (the same dates, weights, entries and
+exits) with each picked stock swapped for a randomly drawn index member of similar trading size,
+and the share of them the arm out-earned. ``lab run`` measures it before recording and
+``lab yardstick`` measures the arms recorded before that; both write ``trial_yardstick``, which
+counts against nothing: no trial row, no N, no look.
+
+**The clause.** The variant ``lab promote`` would pre-register must hold a reading that clears
+(``store.yardstick_clears``): a measured share at or above ``store.YARDSTICK_MIN_PERCENTILE``, or
+``not-applicable`` -- a book that holds no picked stock, such as an ETF switch, which has no stock
+to swap. A share below the bar, an ``unmatched`` reading (twins whose trade count or turnover fell
+outside half to twice the arm's) and **no reading at all** are refused.
+
+**Why absence refuses here, when (D16) and (D18) leave absence alone.** Those clauses read
+evidence the lab cannot always have: a fuller price history that does not exist for every arm, a
+method file that may be gone. A yardstick reading is a measurement the lab can always take, for
+free, on the store it already has: ``lab yardstick <method>`` is one command away. So "not
+measured" is a step not yet run, not evidence missing from the world, and the look and the owner's
+money wait for it.
+
+**Why here as well as in ``store.verdict``.** ``verdict`` is staged (Decision D5): an arm recorded
+before ``store.YARDSTICK_SINCE`` with no reading is judged on its six other conditions until the
+backfill measures it, so the shared lab does not lose every eligible arm on the day the rule
+lands. That staging is right for a research screen and wrong for the door to the look. This clause
+is the door, and it is not staged. When ``verdict`` already fails an arm on its reading,
+``best_dev_eligible`` never names it and this clause never sees it. The clause's own no on a
+losing reading is the second, independent one, for the day the two disagree.
+
+**Where it sits in ``check``.** Right after (D18) and before (D19). (D18) asks what the arm *is*;
+this asks whether what it earned is more than its shape earns by luck. Both are about the arm
+itself and read in front of "whose book is it", "is its fall honest" and "is its control shaped
+right".
+
+**What it does not do.** It does not replace the deflated Sharpe. A share among twins is a
+statement about one arm against its own shape, and it does not correct for the lab having tried
+hundreds of methods; ``store.DSR_MIN`` at the policy's N still does that, unchanged (index Decision
+D2). It does not touch the §1 real-money bar.
 """
 
 from __future__ import annotations
@@ -1233,6 +1281,57 @@ def book_twin_refusal(
                 f"run it as an amendment, which costs no method id"
             )
     return None
+
+
+def yardstick_refusal(
+    conn: sqlite3.Connection, method_id: str, candidate_id: str
+) -> str | None:
+    """Why (D20) will not pre-register ``candidate_id`` for ``method_id``; None when it will.
+
+    The sentence, without the "Nothing was written" tail ``check`` adds, in the shape
+    ``book_twin_refusal`` returns. The reading is the trial's latest ``trial_yardstick`` row
+    (``store.yardstick_of``) and the decision is ``store.yardstick_clears``, the rule
+    ``store.verdict`` reads. What differs is what None means: here it refuses.
+    """
+    from seer_engine.lab import yardstick
+
+    found = conn.execute(
+        "SELECT n FROM trials WHERE method_id = ? AND candidate_id = ? AND window = 'dev' "
+        "ORDER BY n LIMIT 1",
+        (method_id, candidate_id),
+    ).fetchone()
+    reading = None if found is None else store.yardstick_of(conn, int(found[0]))
+    if store.yardstick_clears(reading):
+        return None
+    bar = store.YARDSTICK_MIN_PERCENTILE
+    if reading is None:
+        return (
+            f"{candidate_id} -- the variant `lab promote` would pre-register -- has never been "
+            f"measured against its random twins: books that repeat its every decision (the same "
+            f"dates, weights, entries and exits) with each picked stock swapped for a randomly "
+            f"drawn index member of similar trading size. Without that reading nobody can say "
+            f"whether it earned more than its own shape earns by luck, and the gate fails closed "
+            f"on a missing measurement. The way back: `lab yardstick {method_id}`, which writes "
+            f"no trial, moves no N and spends no look; once the arm out-earns at least {bar:.0%} "
+            f"of its twins this clause is silent"
+        )
+    if str(reading["status"]) == yardstick.STATUS_UNMATCHED:
+        return (
+            f"{candidate_id} -- the variant `lab promote` would pre-register -- could not be "
+            f"matched by its random twins: their median trade count or turnover fell outside "
+            f"half to twice its own, so any margin over them would be partly fees and churn, and "
+            f"an unmatched reading never clears. The way back: register an arm whose shape its "
+            f"twins can follow and run it as an amendment, which costs no method id"
+        )
+    pct = reading["percentile"]
+    shown = "an unknown share" if pct is None else f"{float(pct):.1%}"
+    return (
+        f"{candidate_id} -- the variant `lab promote` would pre-register -- out-earned only "
+        f"{reading['beaten']} of its {reading['draws']} random twins ({shown}), under the "
+        f"{bar:.0%} bar: what it earned is what books of its own shape, holding stocks nobody "
+        f"chose, earn often enough to be luck. The way back: an arm that beats its twins, run as "
+        f"an amendment, which costs no method id"
+    )
 
 
 def mismatches(
@@ -2078,9 +2177,10 @@ def check(conn: sqlite3.Connection, method_id: str) -> None:
     second. Within (F) the picks' record comes first and the promoted variant's own record second
     (D11): the first says whether the lab's way of choosing works out of sample, the second
     whether the variant actually chosen won its folds itself. (D18) then asks what that variant
-    *is* and refuses a control arm, and (D19) asks whose book it is -- one another method recorded
+    *is* and refuses a control arm, (D20) asks whether it out-earned books of its own shape drawn
+    at random and refuses one that did not or was never measured, and (D19) asks whose book it is -- one another method recorded
     first, or this method's own control's -- before (D16) and (D17) ask whether its fall is honest
-    and its own control is shaped right. All four are statements about the same one arm, and "what
+    and its own control is shaped right. All five are statements about the same one arm, and "what
     is it" and "whose is it" read in front of the other two. All of it is cheap -- SQL, arithmetic on recorded curves
     and one read of the method file -- so the order is about the message, not the cost.
     """
@@ -2172,6 +2272,19 @@ def check(conn: sqlite3.Connection, method_id: str) -> None:
                     f"no override -- if the rule is wrong, change it in "
                     f"seer_engine/lab/hardgate.py and argue for it in the commit"
                 )
+        # (D20) The arm that takes the look must have out-earned books of its own shape drawn at
+        # random: its decisions replayed with every picked stock swapped (lab/yardstick.py). A
+        # reading below the bar, an unmatched one, and no reading at all are all refused --
+        # unlike (D16) and (D18), absence refuses here, because the lab can always take this
+        # measurement and `lab yardstick` is the way to take it. `store.verdict` stages the rule
+        # for arms recorded before `store.YARDSTICK_SINCE`; this door does not.
+        luck_said = yardstick_refusal(conn, method_id, candidate)
+        if luck_said is not None:
+            raise store.LabError(
+                f"{method_id} is not promoted: {luck_said} (D20). Nothing was written and no "
+                f"status moved. There is no override -- if the rule is wrong, change it in "
+                f"seer_engine/lab/hardgate.py and argue for it in the commit"
+            )
         # (D19) The arm that takes the look may not be a book the lab already holds: one another
         # method recorded first (promote that method instead), or this method's own control (the
         # treatment never acted). Read from recorded curves by `lab/twins.py`; a twin across store

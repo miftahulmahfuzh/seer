@@ -18,7 +18,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from labkit import stamp_provenance
+from labkit import stamp_provenance, stamp_yardstick
 from seer_engine.commands import lab as lab_cmd
 from seer_engine.lab import store
 
@@ -359,6 +359,8 @@ def _method_at(c, mid: str, *, status: str, family: str = "fam", trials=()) -> N
 
     Every trial is stamped with provenance on the lab's prices, because the gate refuses a trial
     whose prices are unknown (D10) and these fixtures are about the folds and the kin, not that.
+    Every trial also carries a random-twin reading that clears, because the gate refuses an
+    unmeasured variant (D20).
     """
     path = {
         "registered": ("registered",),
@@ -371,7 +373,9 @@ def _method_at(c, mid: str, *, status: str, family: str = "fam", trials=()) -> N
         store.add_method(c, id=mid, name=f"name {mid}", family=family,
                          source_kind="knowledge", hypothesis="h")
         if trials:
-            stamp_provenance(c, store.insert_trials(c, list(trials)))
+            ns = store.insert_trials(c, list(trials))
+            stamp_provenance(c, ns)
+            stamp_yardstick(c, ns)
         for s in path:
             store.update_method(c, mid, status=s)
 

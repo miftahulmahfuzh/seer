@@ -1,5 +1,5 @@
 /** Small builders for the sera unit tests. Never imported by app code. */
-import type { Gate, LabMethod, LabTrial } from './types';
+import type { Gate, LabMethod, LabTrial, LabYardstick } from './types';
 
 export const GATE: Gate = {
   maxDrawdown: 0.25,
@@ -9,6 +9,8 @@ export const GATE: Gate = {
   dsrPolicy: 'all-trials',
   dsrN: 110,
   dsrNBasis: '110 dev trials, every variant run counted as one independent look',
+  yardstickMin: 0.9,
+  yardstickDraws: 200,
   devStart: '1993-01-29',
   devEnd: '2015-10-16',
   testStart: '2015-10-19',
@@ -58,6 +60,10 @@ export function trial(over: Partial<LabTrial> = {}): LabTrial {
     dsr: 0.97,
     nTrialsAtRun: 55,
     luckGated: true,
+    // No role and no random-twin reading: the state of every arm the lab held when the check
+    // began. A test about either sets it.
+    role: null,
+    yardstick: null as LabYardstick | null,
     failedNow: [] as string[],
     eligibleNow: false,
     dsrNow: null as number | null,
@@ -103,5 +109,54 @@ export function method(over: Partial<LabMethod> = {}): LabMethod {
     updated: '2026-10-04',
     historical: false,
     ...over,
+  };
+}
+
+/** The engine's random-twin miss and control labels, as `failedNow` carries them. */
+export const TWINS_MISS = 'beats 90% of random twins';
+export const CONTROL = 'not a control arm';
+
+/** A measured random-twin reading: beat 187 of 200 look-alikes. */
+export function reading(over: Partial<LabYardstick> = {}): LabYardstick {
+  return {
+    status: 'measured',
+    percentile: 0.935,
+    draws: 200,
+    beaten: 187,
+    armRate: 0.112,
+    medianRate: 0.081,
+    tradeRatio: 1.04,
+    ...over,
+  };
+}
+
+/**
+ * One dev arm in each state the method page has to draw for the random-twin check, otherwise
+ * clean (it clears the six classic hurdles), so a test isolates the seventh.
+ *
+ * Built here rather than in each test because the committed snapshot cannot supply them: the
+ * committed lab has no role and no reading recorded yet, so on the real data every arm is
+ * `notMeasured`. These are the only way the other six states are exercised before the backfill.
+ */
+export function armStates() {
+  const clean = { failed: [] as string[], dsr: 0.97, dsrNow: 0.97 };
+  return {
+    measuredPass: trial({ ...clean, n: 101, candidateId: 'M0001-PASS', role: 'treatment', yardstick: reading(), failedNow: [] }),
+    measuredFail: trial({
+      ...clean, n: 102, candidateId: 'M0001-FAIL', role: 'treatment',
+      yardstick: reading({ percentile: 0.75, beaten: 150, armRate: 0.07 }), failedNow: [TWINS_MISS],
+    }),
+    unmatched: trial({
+      ...clean, n: 103, candidateId: 'M0001-ODD', role: 'treatment',
+      yardstick: reading({ status: 'unmatched', percentile: 0.96, beaten: 192, tradeRatio: 2.6 }), failedNow: [TWINS_MISS],
+    }),
+    notApplicable: trial({
+      ...clean, n: 104, candidateId: 'M0001-FUNDS', role: 'treatment',
+      yardstick: reading({ status: 'not-applicable', percentile: null, draws: 0, beaten: null, medianRate: null, tradeRatio: null }),
+      failedNow: [],
+    }),
+    notMeasured: trial({ ...clean, n: 105, candidateId: 'M0001-OLD', failedNow: [] }),
+    recentUnmeasured: trial({ ...clean, n: 106, candidateId: 'M0001-NEW', role: 'treatment', failedNow: [TWINS_MISS] }),
+    control: trial({ ...clean, n: 107, candidateId: 'M0001-RAND', role: 'control', failed: [CONTROL], failedNow: [CONTROL] }),
   };
 }

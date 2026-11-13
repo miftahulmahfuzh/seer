@@ -20,6 +20,7 @@ from seer_engine.backtest import dev, tuning
 from seer_engine.commands import lab as lab_cmd
 from seer_engine.lab import seed as seed_mod
 from seer_engine.lab import store
+from seer_engine.lab import yardstick as yardstick_mod
 from seer_engine.lab.seed import seed
 
 # ``insights`` as it read at v7: six columns, and an ``insights_no_update`` that refused every
@@ -137,7 +138,7 @@ TRIAL_KEYS = {"n", "methodId", "candidateId", "rulesId", "allocatorId", "configT
               "gitSha", "runAt", "totalReturn", "cagr", "maxDrawdown", "profitFactor", "pfInfinite", "trades",
               "sharpe", "exposure", "turnover", "worstYear", "worstYearReturn", "spyTrReturn", "spyTrCagr", "mar",
               "failed", "eligible", "dsr", "nTrialsAtRun", "luckGated", "failedNow", "eligibleNow", "dsrNow",
-              "mwr", "spyTrMwr", "curve"}
+              "mwr", "spyTrMwr", "role", "yardstick", "curve"}
 INSIGHT_KEYS = {"id", "kind", "title", "body", "methodId", "added",
                 "supersedes", "docKey", "version", "supersededBy"}
 
@@ -667,7 +668,9 @@ def test_the_v6_to_v7_migration_moves_not_one_byte_of_the_web_snapshot(tmp_path)
         assert store.snapshot_json(ro) == before
     finally:
         ro.close()
-    assert store.SNAPSHOT_VERSION == 7
+    # 7 when this was written; 8 since the random-twin fields (an additive change to the trials,
+    # not to this migration). The claim above is about the migration, and still holds.
+    assert store.SNAPSHOT_VERSION == 8
 
 
 def _v7_db(path):
@@ -941,12 +944,16 @@ def test_the_snapshot_follows_the_contract(lab):
     s = store.snapshot(lab)
     assert list(s) == ["version", "asOf", "gate", "data", "summary", "benchmark", "books",
                        "methods", "trials", "insights", "ideasSeen", "paper"]
-    assert s["version"] == 7
+    assert s["version"] == 8
     gate = s["gate"]
     assert list(gate) == [
         "maxDrawdown", "minProfitFactor", "minTrades", "dsrMin",
-        "dsrPolicy", "dsrN", "dsrNBasis", "devStart", "devEnd", "testStart",
+        "dsrPolicy", "dsrN", "dsrNBasis", "yardstickMin", "yardstickDraws",
+        "devStart", "devEnd", "testStart",
     ]
+    # The random-twin bar is the owner's too: published from the constants, never pinned here.
+    assert gate["yardstickMin"] == store.YARDSTICK_MIN_PERCENTILE
+    assert gate["yardstickDraws"] == yardstick_mod.DRAWS
     assert {k: gate[k] for k in ("minProfitFactor", "minTrades",
                                  "devStart", "devEnd", "testStart")} == {
         "minProfitFactor": 1.3, "minTrades": 100,
@@ -1007,6 +1014,9 @@ def test_the_snapshot_follows_the_contract(lab):
         # 128 recorded trials are unfunded. Both fields are null, and null is the definite answer
         # "this run was not fed", not a missing value.
         assert t["mwr"] is None and t["spyTrMwr"] is None
+        # No role and no random-twin reading is recorded in this fixture, which was the state of
+        # the committed lab when snapshot 8 shipped: both null, and null means "not recorded".
+        assert t["role"] is None and t["yardstick"] is None
         assert all(isinstance(p[0], str) and isinstance(p[1], float) for p in t["curve"])
     t55 = s["trials"][-1]
     assert t55["profitFactor"] is None and t55["pfInfinite"] is True
@@ -1358,3 +1368,88 @@ def test_the_committed_snapshot_is_the_export_of_the_committed_database():
     ids = {m["id"] for m in snap["methods"]}
     missing = sorted({p["methodId"] for p in snap["paper"]} - ids)
     assert not missing, f"paper provenance names methods the lab does not have: {missing}"
+
+
+def _twin_row(trial_n: int, **over):
+    """A ``trial_yardstick`` row: 200 twins earning 0.000..0.199, an arm earning 0.187.
+
+    Ties count against the arm (decision D7), so 0.187 beats the 187 twins below it and not the
+    one equal to it: 187 of 200, 0.935. The middle twin earns (0.099 + 0.100) / 2.
+    """
+    row = dict(
+        trial_n=trial_n, rule_id=yardstick_mod.RULE_ID, store_fingerprint="fp",
+        status=yardstick_mod.STATUS_MEASURED, draws=200, arm_rate=0.187, beaten=187,
+        percentile=0.935, rates_json=json.dumps([i / 1000 for i in range(200)]),
+        trade_ratio=1.04, turnover_ratio=0.98, reproduced=1, git_sha="abc",
+        measured="2026-11-14T00:00:00+00:00",
+    )
+    row.update(over)
+    return store.YardstickRow(**row)
+
+
+def test_a_trial_publishes_its_role_and_its_random_twin_reading(lab):
+    """Snapshot 8: the record of what an arm *is* and how it did against its random twins.
+
+    The verdict already says whether it clears (phase 4 puts the label in ``failedNow``); this is
+    the reading behind that sentence, and the one field that tells "nobody measured it" from
+    "it cleared" -- both of which leave ``failedNow`` without the label.
+    """
+    first = store.snapshot(lab)
+    assert all(t["role"] is None and t["yardstick"] is None for t in first["trials"])
+    with lab:
+        store.insert_roles(lab, [
+            store.RoleRow(trial_n=53, role="control", source="backfill",
+                          measured="2026-11-14T00:00:00+00:00"),
+            store.RoleRow(trial_n=55, role="treatment", source="backfill",
+                          measured="2026-11-14T00:00:00+00:00"),
+        ])
+        assert store.insert_yardstick(lab, _twin_row(55))
+        assert store.insert_yardstick(lab, _twin_row(
+            54, store_fingerprint=seed_mod.P7A_FINGERPRINT,
+            status=yardstick_mod.STATUS_NOT_APPLICABLE, draws=0, beaten=0, percentile=None,
+            rates_json="[]", trade_ratio=None, turnover_ratio=None,
+        ))
+    trials = {t["n"]: t for t in store.snapshot(lab)["trials"]}
+    assert trials[55]["role"] == "treatment"
+    assert trials[55]["yardstick"] == {
+        "status": "measured", "percentile": 0.935, "draws": 200, "beaten": 187,
+        "armRate": 0.187, "medianRate": 0.0995, "tradeRatio": 1.04,
+    }
+    # Not applicable: nothing was drawn, so nothing is ranked -- nulls, never NaN. The row stores
+    # beaten = 0 (Decision D11); the snapshot publishes it as null.
+    assert trials[54]["role"] is None
+    assert trials[54]["yardstick"] == {
+        "status": "not-applicable", "percentile": None, "draws": 0, "beaten": None,
+        "armRate": 0.187, "medianRate": None, "tradeRatio": None,
+    }
+    # A control: its role is published, and the verdict beside it is the engine's (phase 1's
+    # label), not something this export derived.
+    assert trials[53]["role"] == "control" and trials[53]["yardstick"] is None
+    assert store.CONTROL_LABEL in trials[53]["failedNow"]
+    assert all(t["role"] is None and t["yardstick"] is None for n, t in trials.items() if n < 53)
+    json.loads(store.snapshot_json(lab))  # still strict JSON
+
+
+def test_a_lab_without_the_role_and_twin_tables_publishes_nulls(lab, tmp_path):
+    """``snapshot`` answers on a read-only connection to a lab that predates both tables.
+
+    Every parallel Sera session runs an older checkout against the shared database, and the
+    committed ``lab/lab.sqlite`` itself has neither table until the backfill runs on ``main``. The
+    two helpers answer None when their table is absent, so the export is nulls -- never an error.
+    """
+    old = tmp_path / "old.sqlite"
+    dst = sqlite3.connect(old)
+    lab.backup(dst)
+    dst.execute("DROP TABLE trial_roles")
+    dst.execute("DROP TABLE trial_yardstick")
+    dst.commit()
+    dst.close()
+    ro = store.connect_readonly(old)
+    try:
+        names = {r[0] for r in ro.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        assert "trial_roles" not in names and "trial_yardstick" not in names
+        trials = store.snapshot(ro)["trials"]
+    finally:
+        ro.close()
+    assert len(trials) == 55
+    assert all(t["role"] is None and t["yardstick"] is None for t in trials)

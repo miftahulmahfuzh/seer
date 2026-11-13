@@ -19,7 +19,7 @@ from math import comb
 import numpy as np
 import pytest
 
-from labkit import LAB_PRICE_FINGERPRINT, stamp_provenance
+from labkit import LAB_PRICE_FINGERPRINT, stamp_provenance, stamp_yardstick
 from seer_engine.backtest import regime
 from seer_engine.lab import hardgate, survivorship_record, store
 from seer_engine.lab import walkforward as wf
@@ -106,11 +106,14 @@ def _benchmark(conn, *, prices: str | None = SAME_PRICES, stamped: bool = True,
 
 def _method(conn, mid="M0001", *, family="trend", parent=None, status="dev-eligible",
             annual=0.15, span=DEV_SPAN, curves=True, prices: str | None = SAME_PRICES,
-            stamped: bool = True, curve_json: str | None = None) -> None:
+            stamped: bool = True, curve_json: str | None = None, measured: bool = True) -> None:
     """One method with one dev trial, walked to ``status`` through the real transitions.
 
     The trial is stamped with provenance on ``prices`` unless ``stamped`` is False -- the gate
-    refuses an unstamped trial (D10), which is a test of its own below, not a default.
+    refuses an unstamped trial (D10), which is a test of its own below, not a default. It also
+    carries a random-twin reading that clears unless ``measured`` is False, as every arm
+    ``lab run`` records now does -- the gate refuses an unmeasured variant (D20), which is also a
+    test of its own below.
     """
     with conn:
         store.add_method(conn, id=mid, name=f"n{mid}", family=family, parent_id=parent,
@@ -126,6 +129,8 @@ def _method(conn, mid="M0001", *, family="trend", parent=None, status="dev-eligi
         )])
         if stamped:
             stamp_provenance(conn, ns, price_fingerprint=prices)
+        if measured:
+            stamp_yardstick(conn, ns)
         for step in {
             "registered": (),
             "dev-eligible": ("dev-eligible",),
@@ -326,6 +331,7 @@ def _variant(conn, mid: str, suffix: str, *, annual: float, config_text: str = "
             ),
         )])
         stamp_provenance(conn, ns, price_fingerprint=SAME_PRICES)
+        stamp_yardstick(conn, ns)
 
 
 def test_a_variant_is_scored_on_its_own_curve_not_on_its_siblings_picks(conn):
@@ -580,6 +586,7 @@ def _funded_trial(conn, mid: str, *, capital: str | None):
         )])
         if capital is not None:
             stamp_provenance(conn, [n], initial_idr=Decimal(capital))
+            stamp_yardstick(conn, [n])
     row = conn.execute(
         'SELECT n, candidate_id, start, "end", curve_json FROM trials WHERE n = ?', (n,)
     ).fetchone()
@@ -653,6 +660,110 @@ def test_lab_promote_exits_2_and_writes_nothing_when_the_kin_has_failed(tmp_path
     before = db.read_bytes()
     c.close()
 
+    assert _cli(tmp_path, db, prereg_dir) == 2
+    assert not prereg_dir.exists()
+    assert db.read_bytes() == before
+
+
+# ------------------------------------------------------------------ the random-twin yardstick (D20)
+
+
+def test_the_module_records_the_yardstick_decision():
+    doc = hardgate.__doc__ or ""
+    assert "(D20)" in doc
+    assert "random" in doc and "twins" in doc
+    assert "fails closed" in doc
+
+
+def test_the_gate_refuses_a_promoted_variant_never_measured_against_its_twins(conn, monkeypatch):
+    # The arm is named by patching `promoted_variant`, as every other clause test in this module
+    # names one: a one-trial fixture lab has no trial-Sharpe variance, so `best_dev_eligible`
+    # names nobody and `check` would never reach the per-arm clauses.
+    _benchmark(conn)
+    _method(conn, "M0001", measured=False)
+    monkeypatch.setattr(hardgate, "promoted_variant", lambda c, m: "M0001-A")
+    with pytest.raises(store.LabError) as e:
+        hardgate.check(conn, "M0001")
+    said = str(e.value)
+    assert "(D20)" in said
+    assert "never been measured against its random twins" in said
+    assert "`lab yardstick M0001`" in said
+    assert "Nothing was written and no status moved" in said
+
+
+def test_a_not_applicable_reading_clears_the_gate(conn, monkeypatch):
+    """A book that holds no picked stock has no twins, and that clears (R2.3's exception)."""
+    _benchmark(conn)
+    _method(conn, "M0001", measured=False)
+    (row,) = store.trials_of(conn, "M0001")
+    with conn:
+        stamp_yardstick(conn, [row["n"]], status="not-applicable")
+    monkeypatch.setattr(hardgate, "promoted_variant", lambda c, m: "M0001-A")
+    assert hardgate.yardstick_refusal(conn, "M0001", "M0001-A") is None
+    hardgate.check(conn, "M0001")  # does not raise
+
+
+def test_the_gate_refuses_a_variant_its_twins_out_earned_even_if_the_ranking_names_it(
+    conn, monkeypatch
+):
+    """The second, independent no. `store.verdict` fails a losing arm first, so
+    `best_dev_eligible` never names it; the clause still refuses it if the two ever disagree."""
+    _benchmark(conn)
+    _method(conn, "M0001", measured=False)
+    (row,) = store.trials_of(conn, "M0001")
+    with conn:
+        stamp_yardstick(conn, [row["n"]], percentile=0.50)
+    monkeypatch.setattr(hardgate, "promoted_variant", lambda c, m: "M0001-A")
+    with pytest.raises(store.LabError, match=r"out-earned only 100 of its 200 random twins"):
+        hardgate.check(conn, "M0001")
+
+
+def test_the_gate_refuses_an_unmatched_variant(conn, monkeypatch):
+    _benchmark(conn)
+    _method(conn, "M0001", measured=False)
+    (row,) = store.trials_of(conn, "M0001")
+    with conn:
+        stamp_yardstick(conn, [row["n"]], status="unmatched", percentile=0.99)
+    monkeypatch.setattr(hardgate, "promoted_variant", lambda c, m: "M0001-A")
+    with pytest.raises(store.LabError, match="could not be matched by its random twins"):
+        hardgate.check(conn, "M0001")
+
+
+def test_lab_promote_exits_2_and_writes_nothing_when_the_arm_was_never_measured(
+    tmp_path, monkeypatch
+):
+    db, prereg_dir = tmp_path / "lab.sqlite", tmp_path / "prereg"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0001", annual=0.15, measured=False)
+    assert "never been measured" in (hardgate.yardstick_refusal(c, "M0001", "M0001-A") or "")
+    before = db.read_bytes()
+    c.close()
+
+    monkeypatch.setattr(hardgate, "promoted_variant", lambda c, m: "M0001-A")
+    assert _cli(tmp_path, db, prereg_dir) == 2
+    assert not prereg_dir.exists()
+    assert db.read_bytes() == before
+    c = store.connect(db)
+    assert store.get_method(c, "M0001")["status"] == "dev-eligible"
+    c.close()
+
+
+def test_lab_promote_exits_2_and_writes_nothing_when_the_twins_out_earned_the_arm(
+    tmp_path, monkeypatch
+):
+    db, prereg_dir = tmp_path / "lab.sqlite", tmp_path / "prereg"
+    c = store.connect(db)
+    _benchmark(c)
+    _method(c, "M0001", annual=0.15, measured=False)
+    (row,) = store.trials_of(c, "M0001")
+    with c:
+        stamp_yardstick(c, [row["n"]], percentile=0.50)
+    assert "out-earned only" in (hardgate.yardstick_refusal(c, "M0001", "M0001-A") or "")
+    before = db.read_bytes()
+    c.close()
+
+    monkeypatch.setattr(hardgate, "promoted_variant", lambda c, m: "M0001-A")
     assert _cli(tmp_path, db, prereg_dir) == 2
     assert not prereg_dir.exists()
     assert db.read_bytes() == before
@@ -1354,6 +1465,7 @@ def _control_arm(conn, mid: str, suffix: str, *, trades: int, turnover: float,
             curve_json=_curve(_months(*DEV_SPAN), annual),
         )])
         stamp_provenance(conn, ns, price_fingerprint=SAME_PRICES)
+        stamp_yardstick(conn, ns)
 
 
 def _with_control(monkeypatch, mid: str = "M0001") -> None:
@@ -1721,6 +1833,7 @@ def _mirror_pair(conn, mid: str, *, annual_straight: float, annual_reversed: flo
                    curve_json=_curve(_months(*DEV_SPAN), annual_reversed)),
         ])
         stamp_provenance(conn, ns, price_fingerprint=SAME_PRICES)
+        stamp_yardstick(conn, ns)
 
 
 def test_lab_run_names_a_reversed_pair_that_has_no_always_invested_arm(
@@ -1910,6 +2023,7 @@ def _arm_row(conn, monkeypatch, mid: str, suffix: str, *, mar: float = 0.95, tra
             curve_json=_curve(_months(*DEV_SPAN), annual),
         )])
         stamp_provenance(conn, ns, price_fingerprint=SAME_PRICES)
+        stamp_yardstick(conn, ns)
     row = conn.execute(
         "SELECT * FROM trials WHERE candidate_id = ?", (f"{mid}-{suffix}",)
     ).fetchone()

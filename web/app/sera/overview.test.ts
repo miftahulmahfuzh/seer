@@ -72,6 +72,8 @@ const trial = (n: number, methodId: string, over: Partial<LabTrial> = {}): LabTr
   dsr: null,
   nTrialsAtRun: n,
   luckGated: true,
+  role: null,
+  yardstick: null,
   failedNow: [],
   eligibleNow: false,
   dsrNow: null,
@@ -99,7 +101,7 @@ const insight = (
 });
 
 const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
-  version: 7,
+  version: 8,
   asOf: '2026-10-04T14:12:24+00:00',
   gate: {
     maxDrawdown: 0.2,
@@ -109,6 +111,8 @@ const snap = (over: Partial<LabSnapshot> = {}): LabSnapshot => ({
     dsrPolicy: 'all-trials',
     dsrN: 4,
     dsrNBasis: '4 dev trials, every variant run counted as one independent look',
+    yardstickMin: 0.9,
+    yardstickDraws: 200,
     devStart: '1993-01-29',
     devEnd: '2015-10-16',
     testStart: '2015-10-19',
@@ -285,7 +289,7 @@ describe('state', () => {
 describe('hurdles', () => {
   it('has one bar per condition, scaled to the dev try count', () => {
     const h = hurdles(snap());
-    expect(h.groups.map(g => g.id)).toEqual(['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr']);
+    expect(h.groups.map(g => g.id)).toEqual(['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr', 'yardstick']);
     expect(h.domain).toEqual([0, 4]);
     expect(h.total).toBe(4);
     expect(h.groups[4].items[0]).toMatchObject({ value: 4, valueText: '4' });
@@ -294,14 +298,16 @@ describe('hurdles', () => {
     // not in the denominator the tip quotes.
     expect(h.groups[5].items[0]).toMatchObject({ value: 2, valueText: '2' });
     expect(h.groups[5].items[0].tip).toContain('older tries predate it');
+    expect(h.groups[6].items[0]).toMatchObject({ value: 0, valueText: '0' });
+    expect(h.groups[6].items[0].tip).toContain('not compared with random look-alikes yet');
     expect(h.hardest).toBe('Beats SPY');
   });
 });
 
 describe('closer', () => {
-  it('runs over dev try numbers on a 0–6 scale', () => {
+  it('runs over dev try numbers on a 0–7 scale', () => {
     const c = closer(snap());
-    expect(c.passedTicks).toHaveLength(7);
+    expect(c.passedTicks).toHaveLength(8);
     expect(c.passed[0].points.map(p => p[0])).toEqual([1, 2, 3, 4]);
     expect(c.passed[0].step).toBe(true);
     expect(c.latestPassed).toBe(6);

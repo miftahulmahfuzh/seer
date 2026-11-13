@@ -30,7 +30,7 @@ Design: `docs/plans/2026-10-04-method-lab-design.md`. CLI: `python -m seer_engin
 | python | `engine/.venv/bin/python` | `PYTHONPATH=$PWD/engine/src /home/miftah/seer/engine/.venv/bin/python` (a worktree has no venv) |
 | database | `lab/lab.sqlite` in this checkout | the shared one: `export SEER_LAB_DB=/home/miftah/seer/lab/lab.sqlite SEER_RESEARCH_STORE=/home/miftah/seer/engine/.research SEER_SV_STORE=/home/miftah/seer/engine/.research-sv` (the last one is what lets `lab survivorship` run from the worktree) |
 | commits | method file, then `lab stage` (`lab/lab.sqlite` + `web/data/lab.json`), to `main` | method file only; **never commit `lab/lab.sqlite` or `web/data/lab.json`** (the coordinator does) |
-| promotion | do it yourself (below) | `lab` marks it `dev-eligible`; report it, and the coordinator promotes |
+| promotion | do it yourself (below) | `lab` marks it `dev-eligible`; report it, and the coordinator promotes. A child never runs `lab promote`, `lab reevaluate --demote` or `lab yardstick --pending` |
 | end | short report to the user | report to the coordinator (below), then stop |
 
 Run every command from the checkout root (`engine/` for pytest). In child mode, `export` both
@@ -227,6 +227,16 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    notification, read the recorded trials, not the scroll, then continue. If a turn must end
    while the run is in flight, say what the real trigger is; a turn that ends on "I'll wait"
    with no live trigger is the failure.
+   **`lab run` now measures luck itself.** Every arm that clears the other six conditions (and is
+   not a control) is replayed against 200 random twins before it is recorded: books with its exact
+   dates, weights, entries and exits, holding randomly drawn index members of similar trading size
+   instead of its picks. It is recorded eligible only if it out-earned at least 90% of its random
+   twins (design §10). This adds a few minutes per eligible arm (`--jobs 2` by default; leave it
+   there, the machine has 11 GiB). The run logs one line per measured arm. An arm logged as
+   "has no random-twin reading" is recorded not eligible: solo, run the two commands the line names
+   (`lab yardstick --arm ...`, then `lab reevaluate MNNNN`); child, put the line in your report.
+   A hand-written random or blind arm is still allowed as a **control**, declared as one, but it
+   no longer decides whether the idea beat luck. The yardstick does that for every arm.
    **Exit 2 naming a repeated book** (`MNNNN-X = M00yy-Z, first recorded (trial …)`) means
    `lab run` found an arm whose book another method recorded first, and the arm did not declare
    it, or found that every arm repeats a recorded book. Nothing was recorded, no result was
@@ -381,13 +391,17 @@ Nobody approves this; you do it. Both commands exist — do not build them:
   per method), writes `docs/lab/prereg/MNNNN.md` with the `config_digest` **copied from that
   recorded trial**, and moves the method `dev-eligible → promoted`. The file records the gate it
   passed — the five conditions, the DSR threshold in force and the N the multiple-testing policy
-  resolved to that day — so the rule is pinned in git before any test number exists. It is written
+  resolved to that day, and (since 2026-11-14) that the arm out-earned at least 90% of its random
+  twins — so the rule is pinned in git before any test number exists. It is written
   once and never rewritten: a re-run with a better-looking variant available is a refusal, not an
   update. It loads no store, runs no backtest and spends no look. It also refuses (hardgate D19)
   when that arm is a book twin: of an earlier method's trial (promote that method, or nothing),
   or of one of its own method's controls (the treatment never acted). M0447 and M0488 are both
   dev-eligible on an arm whose curve is M0442-DVC10-FIXED730's. Like the fold and kin refusals,
   D19 has no override.
+  It also refuses (hardgate D20) when that arm has no random-twin reading that clears: it must
+  have out-earned at least 90% of its random twins, or hold no picked stock. The way back is
+  `lab yardstick <method>`, which writes no trial and spends no look; then promote again.
 - **`lab test <candidate>`:** takes the *variant* id (`M0007-RESID`), not the method id. It
   refuses a method that is not `promoted`, refuses a pre-registration that is missing,
   uncommitted, modified or names another configuration, refuses a configuration with no dev
@@ -586,6 +600,7 @@ Then:
 ```
 lab status | lab show M0007 | lab next-id | lab seen --find momentum
 lab run M0007                     # needs a committed method file; exit 2 if an undeclared arm repeats another method's book
+lab yardstick M0007               # measure a recorded arm against its 200 random twins; no trial, no N, no look
 lab twins M0488                   # report only: each arm's role and its first-recorded book twin (same curve); journals nothing
 lab costs M0007                   # report only: best variant at the flat 0.1% vs Gotrade's real fees; journals it, N unchanged
 lab survivorship M0069            # report only: every recorded variant on the dev store vs the survivorship-check store; journals it, N unchanged

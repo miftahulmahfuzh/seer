@@ -55,6 +55,23 @@ Tables:
   annotates; it does not gate**: the fold majority is a refusal at ``lab promote``
   (``hardgate.check``) and nowhere else, and no ``trials`` column changed meaning when this table
   arrived. Triggers refuse every UPDATE and DELETE.
+- ``trial_roles``: the part one dev trial's arm plays in its method's experiment -- ``control``,
+  ``dose``, ``idea`` or ``treatment``, read by ``control_shape.role_of`` from the arm's one-line
+  rationale -- recorded so that ``verdict`` can refuse a control arm without opening a method
+  file. ``lab run`` writes one row per trial in its own transaction (``source='recorded'``);
+  ``lab roles --backfill`` adds the rows for trials recorded before the table existed whose
+  method file can still be read (``source='backfill'``). At most one row per trial, keyed by
+  ``trials.n``. Triggers refuse every UPDATE and DELETE. **No schema version came with it**: the
+  table is created by ``CREATE TABLE IF NOT EXISTS`` inside ``_SCHEMA`` on every connect, and
+  ``role_of_trial`` answers None when it is absent.
+- ``trial_yardstick``: the random-twin yardstick of one dev trial -- the share of
+  ``yardstick.DRAWS`` random twin books (the arm's own decisions replayed with every picked name
+  swapped for an index member of similar trading size) that the arm out-earned, with every twin's
+  rate kept as JSON. One row per (trial, draw rule, research store); a repeat writes nothing.
+  It is a measurement of an arm already counted, never a trial: no ``trials`` row, no N, no
+  look. Added by ``CREATE TABLE IF NOT EXISTS`` on connect, with no schema version of its own, so
+  older checkouts sharing the database through ``SEER_LAB_DB`` open it unchanged. Triggers refuse
+  every UPDATE and DELETE.
 
 Schema versions (``meta.schema_version``): 1 is the first lab; 2 adds the ``synthesis`` insight
 kind; 3 adds the ``trial_moments`` side table; 4 adds the ``trial_funding`` side table (the
@@ -138,6 +155,13 @@ TRANSITIONS: tuple[tuple[str, str], ...] = (
     # ``has_trial`` refuses outright.
     ("rejected", "dev-eligible"),
     ("dev-eligible", "promoted"),
+    # The one edge back out of ``dev-eligible`` (random-twin-yardstick R3, 2026-11-13). Admitted
+    # only by ``demote_method``, and only for a method none of whose dev trials reads eligible
+    # under ``verdict`` today -- most often because the only arms that ever cleared the screen
+    # were control arms, which ``verdict`` refuses once their role is recorded. Like the
+    # ``rejected -> dev-eligible`` edge above, it erases no verdict: the trials stay in the
+    # append-only ``trials`` table, untouched, and the demotion is *appended* to the analysis.
+    ("dev-eligible", "rejected"),
     ("promoted", "test-passed"),
     ("promoted", "test-failed"),
     ("test-passed", "paper"),
@@ -187,6 +211,65 @@ def is_luck_label(label: str) -> bool:
     never of this shape, so the prefix is an exact discriminator.
     """
     return str(label).startswith(LUCK_LABEL_PREFIX)
+
+
+#: The roles ``control_shape.role_of`` can answer, spelled here as literals because this module
+#: imports nothing from the lab at module scope (see ``OWNER_INPUTS_LABEL``) and the
+#: ``trial_roles`` CHECK needs them when ``_SCHEMA`` is built. ``test_lab_roles`` pins this tuple
+#: to ``control_shape.ROLES``, so the two cannot drift apart.
+TRIAL_ROLES: tuple[str, ...] = ("control", "dose", "idea", "treatment")
+
+#: The one role anything refuses on: an arm registered to be beaten.
+CONTROL_ROLE = "control"
+
+#: How a ``trial_roles`` row came to be: written by the run that recorded the trial
+#: (``recorded``), or added after the fact by ``lab roles --backfill`` from the method file as it
+#: reads now (``backfill``).
+ROLE_SOURCES: tuple[str, ...] = ("recorded", "backfill")
+
+# The failure label of an arm registered to be beaten (random-twin-yardstick R3, 2026-11-13). It
+# is not a seventh screen condition and no threshold sits behind it: it says the arm's *role*
+# forbids eligibility whatever its numbers, so a method is never ``dev-eligible`` on the strength
+# of its own placebo, paired baseline or mirror. ``runner.trial_rows`` writes it into a new
+# control's ``trials.failed`` and ``verdict`` appends it for every trial whose ``trial_roles`` row
+# says ``control`` -- after the luck label, so the conditions keep their order -- and the record
+# and the verdict therefore agree on the run date. Worded as the condition the arm misses, the
+# way every other label is ("beats SPY TR", "PF >= 1.3").
+CONTROL_LABEL = "not a control arm"
+
+
+# The random-twin yardstick's bar (RANDOM_TWIN_YARDSTICK_PLAN.md Decision D9): an arm clears its
+# yardstick when it out-earned at least this share of its random twins -- books that replay the
+# arm's own decisions with every picked name swapped for a randomly drawn index member of similar
+# trading size (lab/yardstick.py). "Roughly the top tenth of random books" in the words of the
+# review the owner asked to have built. Not a CLI flag and not a policy: one number, cited, moved
+# only by editing this line, exactly as DSR_MIN is.
+YARDSTICK_MIN_PERCENTILE = 0.90
+
+# The yardstick's failure label, derived from the bar rather than retyped, for the reason
+# DSR_LABEL is derived from DSR_MIN: the label and the threshold can never disagree. Any screen
+# that reads the yardstick writes this string, and ``yardstick_due`` recognises it.
+YARDSTICK_LABEL = f"beats {YARDSTICK_MIN_PERCENTILE:.0%} of random twins"
+
+# The day the random-twin yardstick became a condition of the dev screen
+# (RANDOM_TWIN_YARDSTICK_PLAN.md Decision D5), compared with ``trials.run_at`` as text. ISO-8601
+# strings sort as dates, and "2026-11-14" sorts before every timestamp of that day, so "recorded
+# on or after it" is ``str(run_at) >= YARDSTICK_SINCE``.
+#
+# **Why a date at all.** On 2026-11-13 the committed lab held 256 dev arms that read eligible at
+# today's bars and not one yardstick reading. Failing every unmeasured arm at once would flip all
+# of them on the day the code lands, before ``lab yardstick --pending`` has measured one, and the
+# shared lab and the site would read "nothing is eligible" for the hours the backfill takes, for a
+# reason that is a queue and not a result. So the condition is staged:
+#
+# - an arm recorded BEFORE this date is judged by its reading once it has one, and by the six
+#   other conditions alone until then;
+# - an arm recorded ON OR AFTER it was measured by ``lab run`` itself, so an unmeasured one is a
+#   hole in the record and fails closed.
+#
+# ``lab promote`` (hardgate D20) is not staged: the look and the owner's money are never spent on
+# an arm nobody measured, whatever its age.
+YARDSTICK_SINCE = "2026-11-14"
 
 
 # The N the luck test deflates by, resolved through ``npolicy.effective_n``. ONE constant: the
@@ -511,6 +594,104 @@ BEGIN SELECT RAISE(ABORT, 'method_folds are append-only: a recorded fold verdict
 BEGIN SELECT RAISE(ABORT, 'method_folds are append-only: a recorded fold verdict is never deleted'); END""",
 )
 
+# The trial_roles side table and its two triggers (random-twin-yardstick R3, 2026-11-13).
+#
+# **What it records and why.** An arm's role is its author's one-line rationale, read by
+# ``control_shape.role_of``; it lives in the method file and nowhere in ``trials``. The hard gate
+# reads it at ``lab promote`` (hardgate D18), but ``verdict``, ``best_dev_eligible`` and the
+# ``lab run`` status line did not, so a method whose only eligible arm was its own placebo read
+# ``dev-eligible``. Recording the role beside the trial lets ``verdict`` refuse a control from the
+# database alone -- no method import on every read, and the same answer on a read-only snapshot
+# connection.
+#
+# A side table, not a column on ``trials``, for the reason every side table above is one:
+# ``ALTER TABLE trials ADD COLUMN`` would move every recorded row's bytes. ``trial_n`` is the
+# primary key, so a trial has at most one role and INSERT is the whole lifecycle; the two CHECKs
+# refuse a role ``role_of`` cannot answer and a source nobody writes.
+#
+# **No schema version.** Unlike every table above, this one arrived without a migration step:
+# ``_SCHEMA`` runs on every ``connect`` and ``CREATE TABLE IF NOT EXISTS`` adds it to an existing
+# v8 database in place. A version bump is a one-way door for every parallel checkout
+# (``_migrate``); an additive table whose reader answers None when it is absent is not.
+_ROLES_TABLE = f"""CREATE TABLE IF NOT EXISTS trial_roles (
+    trial_n  INTEGER PRIMARY KEY REFERENCES trials(n),
+    role     TEXT NOT NULL CHECK (role IN ({_quoted(TRIAL_ROLES)})),
+    source   TEXT NOT NULL CHECK (source IN ({_quoted(ROLE_SOURCES)})),
+    measured TEXT NOT NULL CHECK (length(trim(measured)) > 0)
+)"""
+_ROLES_TRIGGERS: tuple[str, ...] = (
+    """CREATE TRIGGER IF NOT EXISTS trial_roles_no_update BEFORE UPDATE ON trial_roles
+BEGIN SELECT RAISE(ABORT, 'trial_roles are append-only: a role row is never updated'); END""",
+    """CREATE TRIGGER IF NOT EXISTS trial_roles_no_delete BEFORE DELETE ON trial_roles
+BEGIN SELECT RAISE(ABORT, 'trial_roles are append-only: a role row is never deleted'); END""",
+)
+
+# The random-twin yardstick of one dev trial, measured on one research store under one draw rule
+# (RANDOM_TWIN_YARDSTICK_PLAN.md phase 3). ``lab yardstick`` writes it, and nothing it writes is
+# a trial: no ``trials`` row, no change to the luck gate's N, no test-window look. That is
+# requirement R1.2, and it is why this is a side table rather than a column.
+#
+# **The key is (trial, rule, store), and a repeat writes nothing.** ``rule_id`` is
+# ``yardstick.RULE_ID`` -- the draw rule's version, so a later rule is a new measurement rather
+# than a rewrite of this one -- and ``store_fingerprint`` is the research store the twins were
+# simulated on, because a twin's return is a statement about those prices and no other. A second
+# measurement of the same arm on the same store under the same rule would be the same number
+# again, so ``insert_yardstick`` refuses it by returning False (R1.5). A third measurement on a
+# rebuilt store is a new row. ``yardstick_of`` reads the newest.
+#
+# ``status`` is one of three words (``lab/yardstick.py`` decides which):
+#
+# - ``measured``        the twins ran and the arm out-earned ``beaten`` of ``draws`` of them;
+#                       ``percentile`` is that share.
+# - ``not-applicable``  the arm holds no picked stock (an ETF-only or cash-only book), or is a
+#                       bracket (``DESIGN_V0``) arm with no book decisions to replay, so there is
+#                       no name to swap and no twin was simulated: ``draws`` and ``beaten`` are 0
+#                       and there is no share and no shape ratio.
+# - ``unmatched``       the twins ran but did not trade like the arm -- median trade count or
+#                       turnover outside 0.5x..2.0x of the arm's own -- so their returns are not a
+#                       fair yardstick and the row never counts as clearing it. It still carries
+#                       its draws and its share, exactly as a measured row does.
+#
+# ``reproduced`` says whether the arm itself was re-run and matched its recorded trade count and
+# return: 1 when it was checked on the store the trial was recorded on, NULL on any other store
+# (nothing to check against) and NULL for a bracket arm, which is never re-run. A 0 is never
+# written -- an arm that does not reproduce is refused and records nothing (R1.6) -- but the
+# column admits it so a reader never has to guess what NULL means. ``rates_json`` carries every
+# twin's rate, sorted ascending as ``yardstick.Measurement.rates`` holds them, so the distribution
+# is cached, not just its summary.
+#
+# The CHECKs mirror ``yardstick.Measurement.__post_init__`` (plan Decision D11): a not-applicable
+# row has no draws, no twins beaten, no share and no ratio; a measured or unmatched row has at
+# least one draw and a share.
+YARDSTICK_STATUSES: tuple[str, ...] = ("measured", "not-applicable", "unmatched")
+
+_YARDSTICK_TABLE = f"""CREATE TABLE IF NOT EXISTS trial_yardstick (
+    trial_n           INTEGER NOT NULL REFERENCES trials(n),
+    rule_id           TEXT NOT NULL CHECK (length(trim(rule_id)) > 0),
+    store_fingerprint TEXT NOT NULL CHECK (length(trim(store_fingerprint)) > 0),
+    status            TEXT NOT NULL CHECK (status IN ({_quoted(YARDSTICK_STATUSES)})),
+    draws             INTEGER NOT NULL CHECK (draws >= 0),
+    arm_rate          REAL,
+    beaten            INTEGER NOT NULL CHECK (beaten >= 0 AND beaten <= draws),
+    percentile        REAL CHECK (percentile IS NULL OR (percentile >= 0 AND percentile <= 1)),
+    rates_json        TEXT NOT NULL,
+    trade_ratio       REAL,
+    turnover_ratio    REAL,
+    reproduced        INTEGER CHECK (reproduced IS NULL OR reproduced IN (0, 1)),
+    git_sha           TEXT NOT NULL CHECK (length(trim(git_sha)) > 0),
+    measured          TEXT NOT NULL CHECK (length(trim(measured)) > 0),
+    PRIMARY KEY (trial_n, rule_id, store_fingerprint),
+    CHECK (status <> 'not-applicable' OR (draws = 0 AND beaten = 0 AND percentile IS NULL
+                                          AND trade_ratio IS NULL AND turnover_ratio IS NULL)),
+    CHECK (status = 'not-applicable' OR (draws >= 1 AND percentile IS NOT NULL))
+)"""
+_YARDSTICK_TRIGGERS: tuple[str, ...] = (
+    """CREATE TRIGGER IF NOT EXISTS trial_yardstick_no_update BEFORE UPDATE ON trial_yardstick
+BEGIN SELECT RAISE(ABORT, 'trial_yardstick is append-only: a yardstick row is never updated'); END""",
+    """CREATE TRIGGER IF NOT EXISTS trial_yardstick_no_delete BEFORE DELETE ON trial_yardstick
+BEGIN SELECT RAISE(ABORT, 'trial_yardstick is append-only: a yardstick row is never deleted'); END""",
+)
+
 #: The backfill's capital rule, exact on every trial recorded before schema v5 (analysis M3).
 #: Cross-checked with ``git merge-base --is-ancestor d79fc83 <trials.git_sha>`` over all 26
 #: distinct ``git_sha`` values: the 20 shas behind trials #1..#128 predate ``d79fc83`` and none of
@@ -664,6 +845,18 @@ CREATE TABLE IF NOT EXISTS ideas_seen (
 {_FOLDS_TRIGGERS[0]};
 
 {_FOLDS_TRIGGERS[1]};
+
+{_ROLES_TABLE};
+
+{_ROLES_TRIGGERS[0]};
+
+{_ROLES_TRIGGERS[1]};
+
+{_YARDSTICK_TABLE};
+
+{_YARDSTICK_TRIGGERS[0]};
+
+{_YARDSTICK_TRIGGERS[1]};
 
 CREATE TRIGGER IF NOT EXISTS trials_no_update BEFORE UPDATE ON trials
 BEGIN SELECT RAISE(ABORT, 'trials are append-only: a trial row is never updated'); END;
@@ -1390,6 +1583,13 @@ def best_dev_eligible(
     does not outrank a higher-MAR one, which is why ``M0022-W-TV14`` (MAR 0.857, DSR 0.912) is
     the answer for M0022 and ``M0022-W-TV16`` (MAR 0.816, DSR 0.916) is not.
 
+    **A recorded control arm is never the answer** (random-twin-yardstick R3), and this function
+    has no rule of its own for it: ``verdict`` appends ``CONTROL_LABEL`` to every trial whose
+    ``trial_roles`` row says ``control``, so such a row is simply not eligible here. A trial with
+    no role row is judged exactly as before -- which is why ``lab roles --backfill`` exists, and
+    why hardgate D18 still reads the method file at ``lab promote`` as a second, independent
+    refusal.
+
     The gate is resolved once, after the rows are fetched, so a method with no comparable dev
     trial costs no estimator read at all.
 
@@ -1434,7 +1634,8 @@ class Verdict:
     """One dev trial's eligibility as it reads *now*.
 
     ``failed`` is the ordered tuple of failure labels (``trials.failed`` is the same list,
-    "; "-joined), owner conditions first in ``dev.FAILURE_LABELS`` order and the luck label last.
+    "; "-joined): owner conditions first in ``dev.FAILURE_LABELS`` order, then the luck label,
+    then ``CONTROL_LABEL`` for a trial recorded as a control arm, and ``YARDSTICK_LABEL`` last.
     ``eligible`` is ``failed == ()``, always.
 
     ``derived`` is True when the DSR in this verdict was **evaluated at ``n``**, and False when
@@ -1807,6 +2008,35 @@ def dsr_at(
     )
 
 
+def _yardstick_binds(
+    conn: sqlite3.Connection,
+    trial: Mapping[str, Any] | sqlite3.Row,
+    failed: tuple[str, ...],
+) -> bool:
+    """Does the random-twin yardstick fail ``trial`` today? ``failed`` is every other label
+    ``verdict`` has already decided for it, the control label included.
+
+    - **A control arm is never judged on it.** ``CONTROL_LABEL`` already fails a control, and a
+      control is the arm the method registered in order to be beaten. Adding a second label to
+      it would describe the control, not the idea.
+    - **A reading decides when there is one** (``yardstick_clears``): below the bar or
+      ``unmatched`` fails; at or above the bar, or ``not-applicable``, passes. This binds every
+      arm whatever its run date, which is how an old arm is re-judged once the backfill has
+      measured it.
+    - **No reading fails only an arm that would otherwise pass and was recorded on or after
+      ``YARDSTICK_SINCE``.** Such an arm went through a ``lab run`` that measures, so a missing
+      reading is a hole in the record. An older arm is left to its other conditions until it is
+      measured (Decision D5). An arm that already fails something else gains nothing from a
+      second label for a measurement nobody took.
+    """
+    if CONTROL_LABEL in failed:
+        return False
+    clears = yardstick_clears(yardstick_of(conn, int(trial["n"])))
+    if clears is None:
+        return not failed and str(trial["run_at"]) >= YARDSTICK_SINCE
+    return not clears
+
+
 def verdict(
     conn: sqlite3.Connection,
     trial: Mapping[str, Any] | sqlite3.Row,
@@ -1827,7 +2057,7 @@ def verdict(
     today, rather than by the bars in force on its run date. That is R2's comparability, obtained
     without rewriting anything.
 
-    **Nothing is ever returned verbatim.** Every one of the six conditions is decided here:
+    **Nothing is ever returned verbatim.** Every condition is decided here:
 
     - the four **threshold** owner conditions are re-derived from this row's recorded columns by
       ``owner_failures``, against the live ``tuning.DEV_MAX_DRAWDOWN`` /
@@ -1839,6 +2069,12 @@ def verdict(
       constant re-decides it;
     - the **luck** test is decided on ``dsr_at(conn, trial, g.n)`` -- this trial's DSR **at the
       gate's current N**, never at the N it happened to be run under.
+    - the **random-twin yardstick** is decided on the trial's latest ``trial_yardstick`` reading
+      (``yardstick_of``): below ``YARDSTICK_MIN_PERCENTILE`` or ``unmatched`` fails, and its label
+      goes last. An arm with no reading fails only when every other condition passes and it was
+      recorded on or after ``YARDSTICK_SINCE`` (Decision D5). A control arm is never judged on
+      it. On a lab with no reading and no trial on or after that date, this function returns
+      exactly what it returned before the yardstick existed (plan invariant 5).
 
     **The luck test is always evaluated at the current N, and that is the whole of R2.** An
     earlier draft re-thresholded the recorded ``dsr`` only when ``n_trials_at_run`` already
@@ -1857,6 +2093,14 @@ def verdict(
     strength of a luck test nobody ever ran. ``derived`` is False exactly in this case, and
     ``dsr`` is None with it.
 
+    **A recorded control arm is never eligible** (random-twin-yardstick R3). When this trial's
+    ``trial_roles`` row says ``control`` -- an arm registered to be beaten -- ``CONTROL_LABEL`` is
+    appended after the luck label, whatever its numbers. It is the label ``runner.trial_rows``
+    writes into a new control's ``failed``, so the record and this read agree on the run date,
+    and ``best_dev_eligible`` stops choosing controls with no rule of its own. A trial with no
+    role row, and every trial on a database without the table, reads exactly as it did before
+    the table existed.
+
     ``at`` resolves the gate once for a caller judging many trials. ``policy`` names a different
     policy for a read-only comparison (phase 5's ``lab luck``); the write paths never pass it.
     """
@@ -1872,6 +2116,17 @@ def verdict(
     # that was not passed. Nothing is admitted for being unmeasurable.
     if dsr is None or dsr < DSR_MIN:
         failed = failed + (DSR_LABEL,)
+    # An arm registered to be beaten never makes its method eligible, whatever its numbers. Read
+    # from the recorded role, never from the method file, so this read opens nothing; a trial with
+    # no role row (or a database without the table) is judged exactly as before.
+    if role_of_trial(conn, trial["n"]) == CONTROL_ROLE:
+        failed = failed + (CONTROL_LABEL,)
+    # The seventh condition (RANDOM_TWIN_YARDSTICK_PLAN.md, phase 4): did this arm out-earn the
+    # random twins that repeat its every decision with the picked stocks swapped? Last, after the
+    # control label, and never on a control. Staged by run date for an arm with no reading; see
+    # `_yardstick_binds` and `YARDSTICK_SINCE`.
+    if _yardstick_binds(conn, trial, failed):
+        failed = failed + (YARDSTICK_LABEL,)
     return Verdict(
         dsr=dsr, failed=failed, eligible=not failed, n=g.n, policy=g.policy,
         derived=dsr is not None,
@@ -1941,7 +2196,7 @@ REEVALUATION_MARKER = "Re-evaluated under the "
 
 @dataclass(frozen=True)
 class Reevaluation:
-    """What ``reevaluate_method`` found, and whether it moved the method."""
+    """What ``reevaluate_method`` or ``demote_method`` found, and whether it moved the method."""
 
     method_id: str
     status_before: str
@@ -1952,11 +2207,14 @@ class Reevaluation:
     derived: int                # dev trials whose DSR was evaluated at the gate's N
     unjudgeable: int            # dev trials with no evaluable DSR -- they fail the luck test
     dev_trials: int
+    eligible_now: tuple[str, ...] = ()  # candidate ids eligible under ``verdict`` now (demotion)
+    controls: int = 0                   # dev trials recorded as control arms (demotion)
 
 
 def _blocking(
     trial: Mapping[str, Any] | sqlite3.Row,
     funding: Mapping[str, Any] | sqlite3.Row | None = None,
+    reading: Mapping[str, Any] | sqlite3.Row | None = None,
 ) -> tuple[str, ...]:
     """The second, independent no: why this trial may **not** take the ``rejected`` edge.
 
@@ -1978,6 +2236,15 @@ def _blocking(
     ``rejected``, and ``lab reevaluate`` with no argument sweeps exactly those. The point of the
     repetition is that the comparison is written twice in two places, not that it is written
     against two different bars.
+
+    **The random-twin yardstick is said here a second time too** (RANDOM_TWIN_YARDSTICK_PLAN.md
+    phase 4). ``reading`` is ``yardstick_of(conn, trial["n"])``, or None. The rule is
+    ``_yardstick_binds``'s, the one ``verdict`` applies, written out again without calling it or
+    ``yardstick_clears``: a ``measured`` reading below ``YARDSTICK_MIN_PERCENTILE`` says no, any
+    status other than ``measured`` or ``not-applicable`` says no (``unmatched`` is the one there
+    is), and no reading says no only for an arm recorded on or after ``YARDSTICK_SINCE``. Control
+    arms never reach this function: ``verdict`` fails them first, and only an arm ``verdict``
+    calls eligible is checked here.
     """
     from seer_engine.backtest import dev, tuning
 
@@ -2008,6 +2275,26 @@ def _blocking(
             f"it recorded {OWNER_INPUTS_LABEL!r}, which is a property of the candidate and which "
             f"no threshold re-decides"
         )
+    if reading is not None:
+        status = str(reading["status"])
+        pct = reading["percentile"]
+        if status == "measured":
+            if pct is None or float(pct) < YARDSTICK_MIN_PERCENTILE:
+                out.append(
+                    f"it out-earned {reading['beaten']!r} of {reading['draws']!r} random twins "
+                    f"(share {pct!r}), under the {YARDSTICK_MIN_PERCENTILE:.0%} bar"
+                )
+        elif status != "not-applicable":
+            out.append(
+                f"its random-twin yardstick reads {status!r}, and only a measured share at or "
+                f"above {YARDSTICK_MIN_PERCENTILE:.0%}, or a book with no picked stock, clears it"
+            )
+    elif str(trial["run_at"]) >= YARDSTICK_SINCE:
+        out.append(
+            f"it was recorded at {trial['run_at']}, on or after {YARDSTICK_SINCE} when the "
+            f"random-twin yardstick became a condition, and it has never been measured against "
+            f"its twins"
+        )
     return tuple(out)
 
 
@@ -2022,7 +2309,10 @@ def reevaluate_method(conn: sqlite3.Connection, method_id: str) -> Reevaluation:
       False; there is no other edge into ``dev-eligible`` from here, so a method already moved
       is not moved twice.
     - at least one of its dev trials must be eligible under the derived verdict and not already
-      recorded eligible.
+      recorded eligible -- or, for a method ``demote_method`` moved here (its analysis carries
+      ``DEMOTION_MARKER``), eligible under the derived verdict whatever it recorded, because a
+      demotion is the one way a method reaches ``rejected`` while holding a recorded-eligible arm,
+      and the way back must be open to that same arm (random-twin-yardstick, Decision D10).
     - **every trial it relies on must clear all five conditions on a second, independently
       written check.** ``verdict`` already derives them; ``_blocking`` repeats the four
       comparisons against the same live constants in its own code, and refuses outright if the
@@ -2056,6 +2346,9 @@ def reevaluate_method(conn: sqlite3.Connection, method_id: str) -> Reevaluation:
     if row is None:
         raise LabError(f"no method {method_id}")
     status = str(row["status"])
+    # A method demote_method moved here may hold arms recorded eligible (1) that read eligible
+    # again today. They unblock it too; any other rejected method keeps the narrow rule.
+    demoted = DEMOTION_MARKER in str(row["analysis"] or "")
     trials = conn.execute(
         "SELECT * FROM trials WHERE method_id = ? AND window = 'dev' ORDER BY n", (method_id,)
     ).fetchall()
@@ -2068,16 +2361,15 @@ def reevaluate_method(conn: sqlite3.Connection, method_id: str) -> Reevaluation:
         derived += 1 if v.derived else 0
         if not v.eligible:
             continue
-        blocking = _blocking(t, funding_of(conn, t["n"]))
+        blocking = _blocking(t, funding_of(conn, t["n"]), yardstick_of(conn, int(t["n"])))
         if blocking:
             raise LabError(
                 f"{t['candidate_id']} reads eligible at {DSR_LABEL} under the {g.policy} policy "
                 f"(N={g.n}), but a second, independent check of its recorded numbers says "
                 f"otherwise: {'; '.join(blocking)}. Refusing to move {method_id} -- a method may "
-                f"only cross this edge when every one of the five conditions clears the bar in "
-                f"force today."
+                f"only cross this edge when every condition clears the bar in force today."
             )
-        if not bool(t["eligible"]):
+        if demoted or not bool(t["eligible"]):
             unblocked.append(str(t["candidate_id"]))
             verdicts[str(t["candidate_id"])] = v
     found = Reevaluation(
@@ -2151,6 +2443,150 @@ def reevaluate(
             for r in conn.execute("SELECT id FROM methods WHERE status = 'rejected' ORDER BY id")
         ]
     return [reevaluate_method(conn, m) for m in method_ids]
+
+
+# The first words of the analysis section ``demote_method`` appends. Like ``REEVALUATION_MARKER``
+# it is not an idempotence key: the edge it guards leads out of the only status it may be taken
+# from, so a method is demoted at most once per stay in ``dev-eligible``.
+DEMOTION_MARKER = "Demoted under the "
+
+
+def demote_method(conn: sqlite3.Connection, method_id: str) -> Reevaluation:
+    """Move a ``dev-eligible`` method none of whose dev trials reads eligible today to ``rejected``.
+
+    The mirror of ``reevaluate_method``, and **as narrow**. It may take exactly one edge, from
+    exactly one status, for exactly one reason:
+
+    - the method must read ``dev-eligible`` now. Any other status is left alone and ``moved`` is
+      False -- a ``promoted`` method in particular is a pre-registration, a promise this function
+      never unpicks.
+    - it must have at least one dev trial. A method with none has nothing to be judged on and is
+      left where it is rather than demoted on an absence.
+    - **no** dev trial of it may be eligible under ``verdict`` at the gate in force now. That one
+      rule covers both ways a status goes stale: a method whose only eligible arms were control
+      arms, which ``verdict`` refuses once their ``trial_roles`` row exists, and a method whose
+      arms have since sunk under the luck bar as N grew.
+
+    It is deliberately **not** run by plain ``lab reevaluate``. Demotion is an explicit act
+    (``lab reevaluate --demote``, plan Decision D6), for the reason ``reevaluate_method`` is
+    narrow: a sweep that could move a method either way on every call would let a status flicker
+    with every Sera batch.
+
+    It reads roles from ``trial_roles`` only. A control arm with no role row still counts as an
+    eligible arm here, so a sweep run before ``lab roles --backfill`` can only demote too little,
+    never too much; ``lab reevaluate --demote`` says so when it sees one.
+
+    Nothing in ``trials`` is written: no row is inserted, updated or deleted, so the lab's N does
+    not move and ``test_looks`` is untouched. What is written is one dated section appended to
+    ``analysis`` (append-only by trigger), in the owner's plain words because the method page
+    shows it, and the ``status`` column. Both happen in the caller's transaction, so a crash
+    leaves neither.
+
+    The caller holds the transaction (``begin_immediate`` / ``with conn``), as every other writer
+    in this module does.
+    """
+    from seer_engine.backtest import tuning  # for the drawdown screen named in the analysis text
+
+    row = get_method(conn, method_id)
+    if row is None:
+        raise LabError(f"no method {method_id}")
+    status = str(row["status"])
+    trials = conn.execute(
+        "SELECT * FROM trials WHERE method_id = ? AND window = 'dev' ORDER BY n", (method_id,)
+    ).fetchall()
+    g = gate(conn)
+    eligible_now: list[str] = []
+    derived = 0
+    controls = 0
+    for t in trials:
+        v = verdict(conn, t, at=g)
+        derived += 1 if v.derived else 0
+        if role_of_trial(conn, t["n"]) == CONTROL_ROLE:
+            controls += 1
+        if v.eligible:
+            eligible_now.append(str(t["candidate_id"]))
+    found = Reevaluation(
+        method_id=method_id,
+        status_before=status,
+        status_after=status,
+        moved=False,
+        gate=g,
+        unblocked=(),
+        derived=derived,
+        unjudgeable=len(trials) - derived,
+        dev_trials=len(trials),
+        eligible_now=tuple(eligible_now),
+        controls=controls,
+    )
+    if status != "dev-eligible" or not trials or eligible_now:
+        return found
+
+    k = len(trials)
+    runs = "1 run" if k == 1 else f"{k} runs"
+    if controls == 0:
+        why = (
+            "None of them is a comparison arm: each misses at least one condition at today's bars."
+        )
+    elif controls == k:
+        why = (
+            "Every one of them is a comparison arm, registered in advance to be beaten, and a "
+            "comparison arm never counts."
+        )
+    else:
+        arms = (
+            "1 of them is a comparison arm" if controls == 1
+            else f"{controls} of them are comparison arms"
+        )
+        why = (
+            f"{arms}, registered in advance to be beaten, which never count; each of the others "
+            f"misses at least one condition at today's bars."
+        )
+    lines = [
+        "# Re-evaluation",
+        "",
+        f"{DEMOTION_MARKER}bars in force on {date.today().isoformat()}: the luck test (a "
+        f"deflated Sharpe of at least {DSR_MIN:.2f}, with the lab's count of tries at {g.n}), "
+        f"the {tuning.DEV_MAX_DRAWDOWN:.0%} drawdown screen, and the rule that a comparison arm "
+        f"never makes a method worth studying.",
+        "",
+        f"None of this method's {runs} on the study window clears every condition today. {why}",
+        "",
+        "Nothing recorded changed: every run keeps the numbers and the verdict it was given on "
+        "its own day. Status moves from dev-eligible back to rejected.",
+    ]
+    append_analysis(conn, method_id, "\n".join(lines))
+    update_method(conn, method_id, status="rejected")
+    return Reevaluation(
+        method_id=method_id,
+        status_before=status,
+        status_after="rejected",
+        moved=True,
+        gate=g,
+        unblocked=(),
+        derived=derived,
+        unjudgeable=len(trials) - derived,
+        dev_trials=len(trials),
+        eligible_now=(),
+        controls=controls,
+    )
+
+
+def demote(
+    conn: sqlite3.Connection, method_ids: Sequence[str] | None = None
+) -> list[Reevaluation]:
+    """``demote_method`` over ``method_ids``, or over every ``dev-eligible`` method when None.
+
+    The caller holds the transaction, so the whole sweep is one atomic unit: either every method
+    it demotes moves, or none does.
+    """
+    if method_ids is None:
+        method_ids = [
+            str(r[0])
+            for r in conn.execute(
+                "SELECT id FROM methods WHERE status = 'dev-eligible' ORDER BY id"
+            )
+        ]
+    return [demote_method(conn, m) for m in method_ids]
 
 
 # --------------------------------------------------------------------------- trial moments
@@ -2730,6 +3166,389 @@ def insert_folds(conn: sqlite3.Connection, row: FoldRow) -> None:
     )
 
 
+# --------------------------------------------------------------------------- trial roles
+
+
+@dataclass(frozen=True)
+class RoleRow:
+    """The part one dev trial's arm plays in its method's experiment (``_ROLES_TABLE``).
+
+    - ``trial_n``  the ``trials.n`` this describes. ``insert_trials`` assigns it, so
+                   ``run_method`` builds the row after the insert; ``insert_roles`` refuses the
+                   pre-insert sentinel ``0``.
+    - ``role``     one of ``TRIAL_ROLES``: ``control_shape.role_of`` on the arm's rationale.
+    - ``source``   ``"recorded"`` when the run that recorded the trial wrote it, from the
+                   candidate it had just simulated; ``"backfill"`` when ``lab roles --backfill``
+                   added it later from the method file as it reads now.
+    - ``measured`` an ISO timestamp: the trial's own ``run_at`` for a recorded row, the moment
+                   of the backfill for a backfilled one.
+    """
+
+    trial_n: int
+    role: str
+    source: str
+    measured: str
+
+
+ROLE_COLUMNS: tuple[str, ...] = tuple(f.name for f in fields(RoleRow))
+
+
+def role_of_trial(conn: sqlite3.Connection, trial_n: int) -> str | None:
+    """The recorded role of one trial's arm (one of ``TRIAL_ROLES``), or None when it has none.
+
+    None is the normal answer for every trial recorded before the table existed whose role has
+    not been backfilled -- the P7a seed rows never will be, having no method file -- and for every
+    test-window look, which ``lab run`` does not record. It means "not known", never "not a
+    control": ``verdict`` then judges the trial exactly as it did before roles were recorded.
+
+    A database opened read-only by a checkout that never created the table has no
+    ``trial_roles`` at all, and is answered the same way, exactly as ``funding_of`` answers for
+    ``trial_funding`` -- ``snapshot`` runs on ``connect_readonly`` and must keep working there.
+    """
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'trial_roles'"
+    ).fetchone() is None:
+        return None
+    row = conn.execute(
+        "SELECT role FROM trial_roles WHERE trial_n = ?", (int(trial_n),)
+    ).fetchone()
+    return None if row is None else str(row[0])
+
+
+def insert_roles(conn: sqlite3.Connection, rows: Sequence[RoleRow]) -> None:
+    """Record the role of trials that already exist (the caller holds the transaction).
+
+    Append-only and one row per trial: a trial that already has a role is refused rather than
+    overwritten, so ``lab roles --backfill`` is made idempotent by asking ``unroled_dev_trials``
+    for what is still missing instead of racing the triggers. The role and the source are checked
+    here, once, with a sentence a reader can act on; the table's CHECKs are the floor under it.
+    ``trial_n`` must be a real trial number -- the foreign key enforces that the trial exists, and
+    the explicit check turns the pre-insert sentinel ``0`` into a readable refusal.
+    """
+    cols = ", ".join(f'"{c}"' for c in ROLE_COLUMNS)
+    marks = ", ".join("?" for _ in ROLE_COLUMNS)
+    for r in rows:
+        if r.trial_n <= 0:
+            raise LabError(
+                f"roles need the trial number insert_trials assigned, got {r.trial_n!r}: insert "
+                "the trial first, then record its role"
+            )
+        if r.role not in TRIAL_ROLES:
+            raise LabError(
+                f"trial {r.trial_n}: {r.role!r} is not a role control_shape.role_of can answer "
+                f"({', '.join(TRIAL_ROLES)})"
+            )
+        if r.source not in ROLE_SOURCES:
+            raise LabError(
+                f"trial {r.trial_n}: source {r.source!r} is not one of {', '.join(ROLE_SOURCES)}"
+            )
+        if role_of_trial(conn, r.trial_n) is not None:
+            raise LabError(
+                f"trial {r.trial_n} already has a recorded role: trial_roles is append-only, and "
+                "a second role for one arm would be two answers to one question"
+            )
+        conn.execute(
+            f"INSERT INTO trial_roles ({cols}) VALUES ({marks})",
+            [getattr(r, c) for c in ROLE_COLUMNS],
+        )
+
+
+def unroled_dev_trials(
+    conn: sqlite3.Connection, method_ids: Sequence[str] | None = None
+) -> list[sqlite3.Row]:
+    """Every dev trial with no ``trial_roles`` row, in trial order; only ``method_ids``' when given.
+
+    What ``lab roles --backfill`` still has to read, and what ``lab reevaluate --demote`` warns
+    about: a control arm in this list still counts as eligible, because ``verdict`` refuses only a
+    role it can read from the record. On a database without the table every dev trial is listed.
+    An empty ``method_ids`` lists nothing.
+    """
+    have_table = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'trial_roles'"
+    ).fetchone() is not None
+    sql = "SELECT t.* FROM trials t WHERE t.window = 'dev'"
+    params: list[Any] = []
+    if have_table:
+        sql += " AND NOT EXISTS (SELECT 1 FROM trial_roles r WHERE r.trial_n = t.n)"
+    if method_ids is not None:
+        ids = [str(m) for m in method_ids]
+        if not ids:
+            return []
+        sql += f" AND t.method_id IN ({', '.join('?' for _ in ids)})"
+        params.extend(ids)
+    return conn.execute(sql + " ORDER BY t.n", params).fetchall()
+
+
+# --------------------------------------------------------------------------- trial yardstick
+
+
+@dataclass(frozen=True)
+class YardstickRow:
+    """One random-twin yardstick of one dev trial, on one store, under one draw rule.
+
+    The database half of ``yardstick.Measurement``; ``from_measurement`` is the one place the
+    simulator's value becomes a row, so ``lab yardstick`` and any later writer record the same
+    columns the same way. See ``_YARDSTICK_TABLE`` for what each column means.
+
+    - ``trial_n``            the dev ``trials.n`` the twins were drawn for.
+    - ``rule_id``            ``yardstick.RULE_ID``: the draw rule's version.
+    - ``store_fingerprint``  ``ResearchData.fingerprint`` of the store the twins ran on.
+    - ``status``             one of ``YARDSTICK_STATUSES``.
+    - ``draws``              how many twins were simulated (0 when not applicable).
+    - ``arm_rate``           the arm's own rate on that store (money-weighted return when funded,
+                             CAGR otherwise -- the rate ``make_row`` ranks on).
+    - ``beaten``             how many twins the arm out-earned; ties count against the arm. 0
+                             when not applicable (no twin was drawn).
+    - ``percentile``         ``beaten`` as a share of the twins; None only when not applicable.
+    - ``rates_json``         every twin's rate, as a JSON list, sorted ascending (the order
+                             ``yardstick.Measurement.rates`` holds them in).
+    - ``trade_ratio``        median twin trade count over the arm's.
+    - ``turnover_ratio``     median twin turnover over the arm's.
+    - ``reproduced``         True when the arm was re-run on its recording store and matched its
+                             recorded trade count and return; None when there was nothing to
+                             check against (another store) or nothing was re-run (a bracket arm,
+                             which reads not-applicable).
+    - ``git_sha``, ``measured``  the code and the moment of the measurement.
+    """
+
+    trial_n: int
+    rule_id: str
+    store_fingerprint: str
+    status: str
+    draws: int
+    arm_rate: float | None
+    beaten: int
+    percentile: float | None
+    rates_json: str
+    trade_ratio: float | None
+    turnover_ratio: float | None
+    reproduced: bool | None
+    git_sha: str
+    measured: str
+
+    @classmethod
+    def from_measurement(
+        cls,
+        m: Any,
+        *,
+        trial_n: int,
+        rule_id: str,
+        store_fingerprint: str,
+        checked: bool,
+        git_sha: str,
+        measured: str,
+    ) -> YardstickRow:
+        """The row for ``m`` (a ``yardstick.Measurement``), typed for the table.
+
+        ``m`` is duck-typed rather than imported: this module never imports the simulator, which
+        pulls in the whole book engine, because importing ``store`` is something the entire lab
+        does. ``checked`` says whether ``expect`` was passed to ``measure`` -- whether the trial was
+        recorded on this store -- and ``reproduced`` is NULL whenever it was not, whatever ``m``
+        carries, so "not checked" can never be written as "checked and passed".
+
+        **The one constructor of a row from a reading.** ``lab yardstick`` calls it with the
+        trial's real number; ``runner.run_method`` (phase 4) calls it with ``trial_n=0`` before
+        the trial is inserted and stamps the number with ``dataclasses.replace`` afterwards, as it
+        does every other side row. ``insert_yardstick`` refuses the ``0`` if it ever reaches it.
+        """
+        return cls(
+            trial_n=int(trial_n),
+            rule_id=str(rule_id),
+            store_fingerprint=str(store_fingerprint),
+            status=str(m.status),
+            draws=int(m.draws),
+            arm_rate=None if m.arm_rate is None else float(m.arm_rate),
+            beaten=int(m.beaten),
+            percentile=None if m.percentile is None else float(m.percentile),
+            rates_json=json.dumps([float(r) for r in m.rates], separators=(",", ":")),
+            trade_ratio=None if m.trade_ratio is None else float(m.trade_ratio),
+            turnover_ratio=None if m.turnover_ratio is None else float(m.turnover_ratio),
+            reproduced=None if not checked or m.reproduced is None else bool(m.reproduced),
+            git_sha=str(git_sha),
+            measured=str(measured),
+        )
+
+
+YARDSTICK_COLUMNS: tuple[str, ...] = tuple(f.name for f in fields(YardstickRow))
+
+
+def _has_yardstick_table(conn: sqlite3.Connection) -> bool:
+    """Whether this database has the ``trial_yardstick`` table at all.
+
+    ``connect`` always creates it, so a False here is a ``connect_readonly`` caller on a database
+    no yardstick-aware code has opened for writing -- the snapshot sync guard reading the
+    committed file is one. Every reader below answers "nothing recorded" in that case, as
+    ``funding_of`` does for a database that predates ``trial_funding``.
+    """
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'trial_yardstick'"
+    ).fetchone() is not None
+
+
+def has_yardstick(
+    conn: sqlite3.Connection, trial_n: int, rule_id: str, store_fingerprint: str
+) -> bool:
+    """Whether trial ``trial_n`` already has a yardstick under ``rule_id`` on ``store_fingerprint``.
+
+    The key ``insert_yardstick`` refuses on. ``lab yardstick`` asks before it simulates anything,
+    so a repeat costs no backtest as well as writing no row. False when the table is absent.
+    """
+    if not _has_yardstick_table(conn):
+        return False
+    return conn.execute(
+        "SELECT 1 FROM trial_yardstick WHERE trial_n = ? AND rule_id = ? AND store_fingerprint = ?",
+        (int(trial_n), str(rule_id), str(store_fingerprint)),
+    ).fetchone() is not None
+
+
+def yardstick_of(conn: sqlite3.Connection, trial_n: int) -> sqlite3.Row | None:
+    """The latest recorded yardstick of trial ``trial_n``, or None when it has none.
+
+    "Latest" is the newest ``measured`` stamp, ties broken by insertion order: one trial can carry
+    several rows -- one per store and draw rule -- and the newest is the one that describes the
+    store and the rule the lab uses now. None when the table itself is absent (a
+    ``connect_readonly`` caller; see ``_has_yardstick_table``), which reads the same as "never
+    measured" because that is exactly what it is.
+    """
+    if not _has_yardstick_table(conn):
+        return None
+    return conn.execute(
+        "SELECT * FROM trial_yardstick WHERE trial_n = ? ORDER BY measured DESC, rowid DESC LIMIT 1",
+        (int(trial_n),),
+    ).fetchone()
+
+
+def insert_yardstick(conn: sqlite3.Connection, row: YardstickRow) -> bool:
+    """Record one yardstick (the caller holds the transaction). False, writing nothing, on a repeat.
+
+    A repeat is the same (trial, rule, store) key: the same measurement again, which the lab keeps
+    once (R1.5). It is answered with False rather than an error so a sweep can be re-run after an
+    interruption and skip what it already did. The caller holds ``begin_immediate``, so the check
+    and the insert are one step against a parallel session.
+
+    Refused with ``LabError``, before anything is written:
+
+    - the pre-insert sentinel ``0`` or any trial number the lab does not hold;
+    - a ``test``-window trial: the yardstick grades a selection among dev results, and a test look
+      is a single pre-registered measurement with no selection in it;
+    - a status outside ``YARDSTICK_STATUSES``, or a row whose shape contradicts its status (the
+      same rule the table's CHECKs hold, stated as a sentence rather than a constraint name, and
+      the rule ``yardstick.Measurement.__post_init__`` holds for the reading it came from).
+    """
+    n = int(row.trial_n)
+    if n <= 0:
+        raise LabError(
+            f"a yardstick needs the trial number of a recorded trial, got {row.trial_n!r}"
+        )
+    trial = conn.execute("SELECT window FROM trials WHERE n = ?", (n,)).fetchone()
+    if trial is None:
+        raise LabError(f"no trial #{n}: a yardstick is recorded for a trial the lab holds")
+    if str(trial[0]) != "dev":
+        raise LabError(
+            f"trial #{n} is a {trial[0]} look, not a dev arm: the yardstick grades a selection "
+            "among dev results, and a test-window look has no selection in it"
+        )
+    if row.status not in YARDSTICK_STATUSES:
+        raise LabError(
+            f"trial #{n}: yardstick status must be one of {YARDSTICK_STATUSES}, got {row.status!r}"
+        )
+    if row.status == "not-applicable" and (
+        row.draws != 0
+        or row.beaten != 0
+        or row.percentile is not None
+        or row.trade_ratio is not None
+        or row.turnover_ratio is not None
+    ):
+        raise LabError(
+            f"trial #{n}: a not-applicable yardstick simulated no twin, so it has no draws, no "
+            f"twins beaten, no share and no shape ratio (draws={row.draws}, "
+            f"beaten={row.beaten!r}, percentile={row.percentile!r})"
+        )
+    if row.status != "not-applicable" and (
+        row.draws < 1
+        or row.percentile is None
+        or row.beaten is None
+        or not 0 <= row.beaten <= row.draws
+    ):
+        raise LabError(
+            f"trial #{n}: a {row.status} yardstick needs its twins and the share the arm beat "
+            f"(draws={row.draws}, beaten={row.beaten!r}, percentile={row.percentile!r})"
+        )
+    if has_yardstick(conn, n, row.rule_id, row.store_fingerprint):
+        return False
+    cols = ", ".join(f'"{c}"' for c in YARDSTICK_COLUMNS)
+    marks = ", ".join("?" for _ in YARDSTICK_COLUMNS)
+    values = [getattr(row, c) for c in YARDSTICK_COLUMNS]
+    values[YARDSTICK_COLUMNS.index("trial_n")] = n
+    values[YARDSTICK_COLUMNS.index("reproduced")] = (
+        None if row.reproduced is None else int(bool(row.reproduced))
+    )
+    conn.execute(f"INSERT INTO trial_yardstick ({cols}) VALUES ({marks})", values)
+    return True
+
+
+def yardstick_clears(row: Mapping[str, Any] | sqlite3.Row | None) -> bool | None:
+    """Does this yardstick reading clear the bar? None when there is no reading at all.
+
+    ``row`` is anything addressable by column name: the ``sqlite3.Row`` ``yardstick_of``
+    returns, a plain ``dict``, or ``dataclasses.asdict(YardstickRow)`` -- ``runner.trial_rows``
+    judges the reading it is about to insert, and ``lab yardstick`` the row it just built, so
+    every caller asks this one function and there is one clearing rule. Only ``status`` and
+    ``percentile`` are read.
+
+    - True:  ``measured`` with ``percentile >= YARDSTICK_MIN_PERCENTILE``, or ``not-applicable``
+             (a book with no picked stock has no name a twin could swap, so there is nothing for
+             it to beat and nothing it failed).
+    - False: ``measured`` below the bar, ``unmatched`` (its twins did not trade like it, so their
+             returns say nothing fair about it, and an unfair yardstick is never a pass), and any
+             status this code does not know.
+    - None:  ``row`` is None -- never measured. What that means is the caller's decision; this
+             function never reads a missing measurement as a pass.
+    """
+    if row is None:
+        return None
+    status = str(row["status"])
+    if status == "not-applicable":
+        return True
+    if status == "measured":
+        pct = row["percentile"]
+        return pct is not None and float(pct) >= YARDSTICK_MIN_PERCENTILE
+    return False
+
+
+def yardstick_due(
+    conn: sqlite3.Connection,
+    trial: Mapping[str, Any] | sqlite3.Row,
+    *,
+    at: Gate | None = None,
+) -> bool:
+    """Is ``trial`` an arm whose yardstick is worth measuring? Whether it already has one is not
+    asked here -- that depends on the store, which ``has_yardstick`` answers.
+
+    Due means all three:
+
+    - a **dev** row (a test look is never graded against twins);
+    - **not a recorded control** (``role_of_trial``): a control was registered to be beaten, and a
+      yardstick for it would grade the comparison book rather than an idea;
+    - its ``verdict`` fails **nothing but the yardstick itself** -- ``failed`` is empty, or holds
+      only ``YARDSTICK_LABEL``. An arm that already misses SPY, the drawdown screen, the luck test
+      or any other condition cannot be rescued by its twins, so measuring it would spend minutes of
+      simulation to change no reading. The second half is what keeps this right once the yardstick
+      is itself a condition in ``verdict``: an arm whose only failure is "no yardstick yet" or "a
+      failing yardstick on another store" is exactly the arm that needs one.
+
+    ``at`` is the gate, resolved once by a caller judging many trials.
+    """
+    if str(trial["window"]) != "dev":
+        return False
+    # control_shape.ROLE_CONTROL, spelled out: this module does not import control_shape, and
+    # test_lab_yardstick_record pins the two equal.
+    if role_of_trial(conn, int(trial["n"])) == "control":
+        return False
+    failed = verdict(conn, trial, at=at).failed
+    return all(label == YARDSTICK_LABEL for label in failed)
+
+
 # --------------------------------------------------------------------------- ideas_seen
 
 
@@ -3066,7 +3885,17 @@ def as_mapping(row: sqlite3.Row) -> Mapping[str, Any]:
 # page was overstating the first and the lab was overstating the second. Derived at export time
 # like the version chain above, and for the same reason: it cuts walk-forward folds and runs the
 # kin rule, which is not work a React component may do. See ``lab/books.py`` and ``lab/firings.py``.
-SNAPSHOT_VERSION = 7
+#
+# 8 adds each trial's ``role`` and ``yardstick``, and ``gate.yardstickMin`` / ``gate.yardstickDraws``.
+# On 2026-11-14 the lab grew a seventh screen condition: a dev arm must out-earn
+# ``YARDSTICK_MIN_PERCENTILE`` of its random twins, books that replay its own decisions with every
+# picked name swapped for a random index member of similar trading size. It also started recording
+# which arms are controls. ``failedNow`` already carries both answers as labels (``verdict``), but a
+# label is a verdict and not a reading: from it alone the page could say "missed" and not "beat 150
+# of 200", and it could not tell an arm nobody has measured from one that cleared -- the one
+# confusion the method page must never make. Both fields are null when their table is absent or
+# holds no row for the trial, which was every trial the committed lab held when this version shipped.
+SNAPSHOT_VERSION = 8
 EXPECTED_FAILURE_SEP = "\n\nExpected failure: "  # how lab ideas write their hypothesis
 
 
@@ -3175,8 +4004,49 @@ def _snapshot_curve(text: str) -> list[list[Any]]:
     return out
 
 
+def _snapshot_yardstick(y: Mapping[str, Any] | sqlite3.Row | None) -> dict[str, Any] | None:
+    """One ``trial_yardstick`` row as the web reads it, or None when the trial has none.
+
+    A reading, not a verdict. Whether the arm clears is decided once, by ``verdict``, and reaches
+    the web as the label in ``failedNow``; this is the measurement that sentence is about, so the
+    page can say *how* it went ("beat 187 of 200") and not only *that* it went. ``medianRate`` is
+    the middle twin's rate, worked out here from ``rates_json`` so the web never parses a list it
+    only wants one number from. ``rates_json`` itself stays out: 200 floats per arm across the
+    whole lab is weight the page has no use for.
+
+    ``_num`` and ``_opt_int`` keep the published shape strict JSON: a not-applicable reading has
+    no draws to rank against, and its null ``percentile`` must stay null rather than become NaN,
+    which ``snapshot_json`` refuses. Its ``beaten`` is stored as 0 (the table mirrors
+    ``yardstick.Measurement``, plan Decision D11) and is **published as null**: "beat 0 of 0" is
+    not a reading, and the page tells "does not apply" from a result by ``status`` and a null.
+    """
+    if y is None:
+        return None
+    from statistics import median
+
+    status = str(y["status"])
+    raw = y["rates_json"]
+    rates = [
+        float(r) for r in (json.loads(raw) if raw else [])
+        if r is not None and math.isfinite(float(r))
+    ]
+    return {
+        "status": status,
+        "percentile": _num(y["percentile"]),
+        "draws": _opt_int(y["draws"]),
+        "beaten": None if status == "not-applicable" else _opt_int(y["beaten"]),
+        "armRate": _num(y["arm_rate"]),
+        "medianRate": _num(median(rates)) if rates else None,
+        "tradeRatio": _num(y["trade_ratio"]),
+    }
+
+
 def _snapshot_trial(
-    t: Mapping[str, Any], v: Verdict, f: Mapping[str, Any] | sqlite3.Row | None = None
+    t: Mapping[str, Any],
+    v: Verdict,
+    f: Mapping[str, Any] | sqlite3.Row | None = None,
+    role: str | None = None,
+    y: Mapping[str, Any] | sqlite3.Row | None = None,
 ) -> dict[str, Any]:
     """One ``trials`` row as the web reads it: the record, **and** the verdict it reads as now.
 
@@ -3206,6 +4076,13 @@ def _snapshot_trial(
     cannot tell that from a hurdle that was cleared. It published a tick on 0.513013 against a
     bar of 0.90. **Three states, not two**: gated and cleared, gated and missed (``dsrNow`` may be
     null -- nothing is admitted for being unmeasurable), and not gated at all.
+
+    ``role`` is :func:`role_of_trial` and ``y`` is :func:`yardstick_of` (snapshot 8). The random-
+    twin condition has the same trap ``luckGated`` closed, one condition over: an arm nobody has
+    measured has no label in ``failedNow``, and neither has one that cleared. ``yardstick`` is what
+    tells them apart, so it is published whole or as null, and null means "not measured" -- never
+    a pass. ``role`` lets the page show a control arm as the comparison book it was registered as,
+    instead of an idea that failed a seventh hurdle.
     """
     pf = t["profit_factor"]
     return {
@@ -3250,6 +4127,9 @@ def _snapshot_trial(
         "failedNow": list(v.failed),
         "eligibleNow": v.eligible,
         "dsrNow": _num(v.dsr),
+        # Snapshot 8: the arm's registered role and its latest random-twin reading, or null.
+        "role": role,
+        "yardstick": _snapshot_yardstick(y),
         "curve": _snapshot_curve(t["curve_json"]),
     }
 
@@ -3289,8 +4169,10 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
     Deterministic: the same database gives the same value; there is no wall-clock time in it
     (``asOf`` is the latest timestamp found in the data, "" for an empty lab). Reads only what
     schema v1 and v2 share and never touches ``meta``, so it works on a read-only connection to
-    a database that has not been migrated -- the one table added since, ``trial_funding``, is
-    reached only through ``funding_of``, which answers None when it does not exist. Gate and data
+    a database that has not been migrated -- the tables added since, ``trial_funding``,
+    ``trial_roles`` and ``trial_yardstick``, are reached only through ``funding_of``,
+    ``role_of_trial`` and ``yardstick_of``, each of which answers None when its table does not
+    exist. Gate and data
     facts come from the engine's constants;
     the gate's ``dsrPolicy`` / ``dsrN`` / ``dsrNBasis`` are resolved from ``DSR_POLICY`` against
     ``trials`` at export time rather than stored, so the published gate follows the constant
@@ -3312,6 +4194,7 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
     from seer_engine import dates, research
     from seer_engine.backtest import dev, tuning
     from seer_engine.lab import seed
+    from seer_engine.lab import yardstick as _yardstick
     from seer_engine.paper import roster
 
     def count(sql: str) -> int:
@@ -3346,6 +4229,10 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
             "minTrades": dev._MIN_TRADES,
             "dsrMin": DSR_MIN,
             **gate_block,
+            # Snapshot 8: the random-twin bar and how many twins it is read against. Published, not
+            # retyped in the web, for the reason ``dsrMin`` is: the owner moves bars.
+            "yardstickMin": YARDSTICK_MIN_PERCENTILE,
+            "yardstickDraws": _yardstick.DRAWS,
             "devStart": research.STORE_START.isoformat(),
             "devEnd": dev.DEV_END.isoformat(),
             "testStart": dates.next_session(dev.DEV_END).isoformat(),
@@ -3396,7 +4283,13 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
         # One gate, resolved once and passed down: `published_verdict` judges every row against
         # the same N, which is also the `gate.dsrN` published above.
         "trials": [
-            _snapshot_trial(t, published_verdict(conn, t, at=g), funding_of(conn, t["n"]))
+            _snapshot_trial(
+                t,
+                published_verdict(conn, t, at=g),
+                funding_of(conn, t["n"]),
+                role_of_trial(conn, t["n"]),
+                yardstick_of(conn, t["n"]),
+            )
             for t in _dicts(conn, "SELECT * FROM trials ORDER BY n")
         ],
         # ``supersedes`` and ``docKey`` as the writer recorded them; ``version`` and

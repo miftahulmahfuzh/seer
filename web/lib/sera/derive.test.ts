@@ -3,20 +3,25 @@ import {
   bestVariant,
   books,
   closest,
+  conditionOk,
   conditionsPassed,
   drawdownSeries,
   excessCagr,
   families,
   funnel,
   gateChecks,
+  isComparisonBook,
+  isYardstickLabel,
   misses,
   moneyWeighted,
   progress,
+  shareInWords,
   spyForWindow,
   trialsByMethod,
+  twinsState,
   yearlyReturns,
 } from './derive';
-import { GATE, method, trial } from './fixture';
+import { armStates, CONTROL, GATE, method, trial } from './fixture';
 import type { Benchmark } from './types';
 
 describe('moneyWeighted', () => {
@@ -50,9 +55,9 @@ describe('gateChecks', () => {
   });
 
 
-  it('lists six hurdles in order with plain labels, values and targets from the gate', () => {
+  it('lists seven hurdles in order with plain labels, values and targets from the gate', () => {
     const checks = gateChecks(trial(), GATE);
-    expect(checks.map((c) => c.key)).toEqual(['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr']);
+    expect(checks.map((c) => c.key)).toEqual(['spy', 'drawdown', 'pf', 'trades', 'owner', 'dsr', 'yardstick']);
     expect(checks.map((c) => c.label)).toEqual([
       'Beats SPY',
       'Max drawdown',
@@ -60,6 +65,7 @@ describe('gateChecks', () => {
       'Trade count',
       'Owner inputs',
       'Luck check',
+      'Beats look-alikes',
     ]);
     expect(checks[0]).toEqual({
       key: 'spy',
@@ -77,6 +83,10 @@ describe('gateChecks', () => {
     expect(checks[3]).toMatchObject({ value: '240', target: '100 or more', ok: true });
     expect(checks[4]).toMatchObject({ value: 'none needed', target: 'none needed', ok: true });
     expect(checks[5]).toMatchObject({ value: '0.97', target: '0.9 or more', ok: true });
+    // No reading on the default fixture: the seventh is pending, never a tick.
+    expect(checks[6]).toMatchObject({
+      value: 'not measured yet', target: 'beats at least 9 in 10 random look-alike books', ok: null,
+    });
   });
 
   it('reads targets from the gate, not constants', () => {
@@ -215,6 +225,7 @@ describe('funnel', () => {
       ['trades', 3, 3, 3],
       ['owner', 3, 3, 3],
       ['dsr', 1, 2, 3],
+      ['yardstick', 0, 0, 3],
     ]);
     expect(rows[5].label).toBe('Luck check');
   });
@@ -375,5 +386,92 @@ describe('books', () => {
     const [b] = books([{ lead: 'M9999', others: ['M8888'], why: {} }], ms);
     expect(b.lead.name).toBe('M9999');
     expect(b.others[0]).toEqual({ id: 'M8888', name: 'M8888', why: 'the same strategy as this one' });
+  });
+});
+
+describe('the random-twin condition', () => {
+  const s = armStates();
+
+  it('matches the engine label by both ends and a number, never the SPY label', () => {
+    expect(isYardstickLabel('beats 90% of random twins')).toBe(true);
+    expect(isYardstickLabel('beats 92.5% of random twins')).toBe(true);
+    expect(isYardstickLabel('beats SPY TR')).toBe(false);
+    expect(isYardstickLabel('beats % of random twins')).toBe(false);
+  });
+
+  it('is three-state: cleared, missed, or nothing to score', () => {
+    expect(conditionOk(s.measuredPass, 'yardstick')).toBe(true);
+    expect(conditionOk(s.measuredFail, 'yardstick')).toBe(false);
+    expect(conditionOk(s.unmatched, 'yardstick')).toBe(false);
+    expect(conditionOk(s.recentUnmeasured, 'yardstick')).toBe(false);
+    expect(conditionOk(s.notApplicable, 'yardstick')).toBe(null);
+    expect(conditionOk(s.notMeasured, 'yardstick')).toBe(null);
+    expect(conditionOk(trial({ window: 'test', failed: [] }), 'yardstick')).toBe(null);
+    expect(twinsState(trial({ window: 'test', failed: [] }))).toBe('test-look');
+  });
+
+  it('never draws a missing reading as a pass', () => {
+    // The arm clears the six classic hurdles and has never been measured: six cleared, nothing
+    // missed, and the seventh is pending — not a seventh tick.
+    expect(conditionsPassed(s.notMeasured)).toBe(6);
+    expect(misses(s.notMeasured)).toEqual([]);
+    expect(gateChecks(s.notMeasured, GATE)[6]).toMatchObject({ key: 'yardstick', value: 'not measured yet', ok: null });
+    // An unmatched reading out-earned 192 of 200 and still does not pass.
+    expect(gateChecks(s.unmatched, GATE)[6]).toMatchObject({
+      value: 'look-alikes traded too differently to compare', ok: false,
+    });
+  });
+
+  it('prints the reading, and the bar from the gate', () => {
+    expect(gateChecks(s.measuredPass, GATE)[6]).toEqual({
+      key: 'yardstick',
+      label: 'Beats look-alikes',
+      value: 'beat 187 of 200',
+      target: 'beats at least 9 in 10 random look-alike books',
+      ok: true,
+    });
+    expect(gateChecks(s.measuredFail, { ...GATE, yardstickMin: 0.95 })[6]).toMatchObject({
+      value: 'beat 150 of 200', target: 'beats at least 19 in 20 random look-alike books', ok: false,
+    });
+    expect(gateChecks(s.recentUnmeasured, GATE)[6]).toMatchObject({ value: 'not measured', ok: false });
+    expect(shareInWords(0.9)).toBe('9 in 10');
+    expect(shareInWords(0.95)).toBe('19 in 20');
+    expect(shareInWords(0.925)).toBe('925 in 1000');
+  });
+
+  it('says a book that only holds funds has nothing to swap', () => {
+    expect(gateChecks(s.notApplicable, GATE)[6]).toMatchObject({
+      value: 'does not apply', target: 'does not apply to a book that only holds funds', ok: null,
+    });
+  });
+
+  it('counts a reading in the funnel only where the arm was judged on it', () => {
+    const rows = funnel(Object.values(s));
+    // Seven dev arms; judged on it: the pass, the fail, the unmatched and the recent unmeasured.
+    expect(rows[6]).toMatchObject({ key: 'yardstick', passing: 1, measured: 4, total: 7 });
+  });
+});
+
+describe('comparison books', () => {
+  const s = armStates();
+
+  it('knows a control by its recorded role or by the engine label alone', () => {
+    expect(isComparisonBook(s.control)).toBe(true);
+    expect(isComparisonBook(trial({ failed: [CONTROL] }))).toBe(true);
+    expect(isComparisonBook(s.measuredPass)).toBe(false);
+  });
+
+  it('never counts the control label as a missed hurdle', () => {
+    expect(misses(s.control)).toEqual([]);
+    expect(s.control.eligibleNow).toBe(false);
+  });
+
+  it('never makes a comparison book the method\'s best variant or its nearest miss', () => {
+    // The control misses nothing; the treatment misses the random-twin check. Without the rule
+    // the control would headline the method.
+    expect(bestVariant([s.control, s.measuredFail])?.n).toBe(102);
+    expect(closest([s.control, s.measuredFail], 1).map((t) => t.n)).toEqual([102]);
+    // A method made only of comparison books still has something to show.
+    expect(bestVariant([s.control])?.n).toBe(107);
   });
 });

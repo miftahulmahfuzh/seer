@@ -9,9 +9,11 @@ export type LabSnapshot = {
    * 6 added the journal's version chain (`supersedes` / `docKey` / `version` / `supersededBy`)
    *   and split the journal count: `summary.insights` now counts documents, not rows;
    * 7 added `books` and `summary.testBooks` — the buy signal and the spent looks collapsed from
-   *   method ids to distinct strategies, because a method id is not a strategy.
+   *   method ids to distinct strategies, because a method id is not a strategy;
+   * 8 added each trial's `role` and `yardstick` (its random-twin reading) and the gate's
+   *   `yardstickMin` / `yardstickDraws` — the seventh condition, and which arms are comparison books.
    */
-  version: 7;
+  version: 8;
   asOf: string;
   gate: {
     maxDrawdown: number;
@@ -25,6 +27,10 @@ export type LabSnapshot = {
     dsrN: number;
     /** One line of evidence for that N, written by the engine. Display as given; never parse it. */
     dsrNBasis: string;
+    /** The random-twin bar (`lab.store.YARDSTICK_MIN_PERCENTILE`): the share of look-alikes a dev arm must out-earn. */
+    yardstickMin: number;
+    /** How many random look-alike books each arm is measured against (`lab.yardstick.DRAWS`). */
+    yardstickDraws: number;
     devStart: '1993-01-29';
     devEnd: '2015-10-16';
     testStart: '2015-10-19';
@@ -235,6 +241,20 @@ export type LabTrial = {
    * could be scored), and `!luckGated` (does not apply).
    */
   luckGated: boolean;
+  /**
+   * The arm's registered role (`lab.store.role_of_trial`), or null when none is recorded — every
+   * arm the committed lab held when snapshot 8 shipped. `control` is a comparison book: built to be
+   * beaten, never a candidate. Read it through `derive.isComparisonBook`, which also honours the
+   * engine's own label for a control.
+   */
+  role: ArmRole | null;
+  /**
+   * The arm's latest random-twin reading (`lab.store.yardstick_of`), or null when it has none.
+   * A reading is a measurement, not a verdict: whether the arm clears is the engine's call, made in
+   * `failedNow`, and `derive.twinsState` is the one place the two are combined. Null is "not
+   * measured", never a pass.
+   */
+  yardstick: LabYardstick | null;
   curve: [string, number][];
 };
 
@@ -328,3 +348,32 @@ export const DSR_POLICY_LABEL: Record<DsrPolicy, string> = {
   methods: 'one look per distinct idea',
   effective: 'one look per independent return stream',
 };
+
+/** An arm's registered role (`lab.control_shape.ROLES`). `control` is a comparison book. */
+export type ArmRole = 'control' | 'dose' | 'idea' | 'treatment';
+
+/** How a random-twin measurement came out (`lab.yardstick.STATUS_*`). */
+export type YardstickStatus = 'measured' | 'not-applicable' | 'unmatched';
+
+/** One random-twin reading as the engine publishes it (`store._snapshot_yardstick`). */
+export type LabYardstick = {
+  status: YardstickStatus;
+  /** Share of the look-alikes the arm out-earned (ties count against it); null when none were drawn. */
+  percentile: number | null;
+  /** How many look-alikes were drawn: 0 or null for a book that only holds funds. */
+  draws: number | null;
+  /** How many of them the arm out-earned. */
+  beaten: number | null;
+  /** The arm's own rate: what the money earned on a funded run, yearly growth otherwise. */
+  armRate: number | null;
+  /** The middle look-alike's rate, on the same measure. */
+  medianRate: number | null;
+  /** The look-alikes' median trade count over the arm's own. */
+  tradeRatio: number | null;
+};
+
+/** Mirrors `lab.control_shape.ROLES`; `engine/tests/test_lab_gate_wording.py` pins the two. */
+export const ARM_ROLES = ['control', 'dose', 'idea', 'treatment'] as const satisfies readonly ArmRole[];
+
+/** Mirrors `lab.yardstick.STATUS_*`; pinned by the same engine test. */
+export const YARDSTICK_STATUSES = ['measured', 'not-applicable', 'unmatched'] as const satisfies readonly YardstickStatus[];

@@ -600,3 +600,87 @@ the owner's call.
 The question is put to him in `docs/plans/2026-10-12-lab-n-and-amendments-owner-decision.md`
 (Decision B), together with the separate question of what `lab` should print as N (Decision A).
 **Until he answers, this section describes a door that is open and uncounted.**
+
+## 10. Revision 2026-11-13 (owner's instruction of 2026-11-13): the random-twin yardstick
+
+**This section records a change made by a plan set acting under the owner's instruction of
+2026-11-13** — "you idea so we can implement them robustly" — which pointed at a review's three
+recommendations: a random-book yardstick per setup that counts against nothing, ideas judged
+against it, and status derived from treatment arms only. It does not move the §1 real-money bar,
+`DSR_MIN`, the N policy or any of the five P7a conditions.
+
+The sections it qualifies are left exactly as written.
+
+### 10.1 What changed
+
+The dev screen has a **seventh condition**: an arm passes only if it out-earned at least 90% of
+its **random twins** (`store.YARDSTICK_MIN_PERCENTILE = 0.90`, `lab/yardstick.py`'s `DRAWS = 200`).
+
+- **What a twin is.** A book that replays the arm's own recorded decisions (the same dates,
+  weights, entries and exits) with every picked stock swapped for an index member of similar
+  trading size, drawn at random: one within 25 ranks of the real pick by 63-day median dollar
+  volume, kept for the whole holding spell. The statistic is the rate the screen already ranks on
+  (money-weighted return when funded, CAGR otherwise), and a tie counts against the arm.
+- **Where it is read.** `lab run` measures every non-control arm that clears the other six
+  conditions before it records it, outside the lab-wide write lock. `store.verdict` fails an arm
+  whose reading is below the bar or `unmatched`. `lab promote` refuses an arm with no reading that
+  clears (hardgate D20). `lab reevaluate`'s second, independent check says the same no in its own
+  words.
+- **Old arms are staged.** An arm recorded before 2026-11-14 (`store.YARDSTICK_SINCE`) is judged on
+  its six other conditions until `lab yardstick` measures it, and on its reading from then on. An
+  arm recorded on or after that date with no reading fails. `lab promote` is not staged.
+- **Readings count against nothing.** A reading is a row in `trial_yardstick`, keyed by trial, rule
+  and research store. It inserts no trial, does not move N and spends no look.
+- **Controls.** An arm the method registered to be beaten (a control, by its own rationale) is
+  never measured and never makes a method `dev-eligible` (the same plan set's phase 1).
+  Hand-written random and blind arms remain allowed as controls; they no longer decide the luck
+  question, the yardstick does.
+
+### 10.2 Why
+
+Measured 2026-11-13 on the committed `lab/lab.sqlite` at `f83fb237`:
+
+- 45 dev trials belong to the two deliberately meaningless families (`placebo-hash-order`,
+  `blind-draw-baseline`). 42 beat SPY and 14 were recorded eligible.
+- Across the 2,051 dev trials on the main window, 362 were recorded eligible.
+- At today's bars (`methods` policy, N = 415), 256 dev arms in 125 methods read eligible. 64 of
+  them are control arms; 192 non-control arms in 97 methods remain. 182 methods read
+  `dev-eligible`, and 94 of them have an eligible non-control arm.
+
+A screen that books with no idea in them pass a third of the time is grading the shape of a book
+(its pool, its size, its cadence, its weighting, its switch), not the idea in it. The fair
+comparison for an idea is the same shape holding stocks nobody chose.
+
+"Per setup" became "per arm" because the lab has no machine-readable setup: every method writes its
+own allocator. What every arm does expose is its sequence of decisions, and replaying them is exact.
+A probe on `M0562-W60-B100` reproduced the arm to the last digit (money-weighted return
+0.1494087982869519, 203 trades, 237 decisions).
+
+### 10.3 What still guards it
+
+- The six existing conditions, `DSR_MIN = 0.90` and `DSR_POLICY = "methods"` are untouched. The
+  yardstick is **added**, not swapped in for "beats SPY and clears the luck score": a share among
+  twins says whether an arm beat its own shape, and says nothing about the lab having tried
+  hundreds of methods. The deflated Sharpe still answers that.
+- `trials` and `trial_yardstick` are append-only. No recorded row is edited; a verdict is
+  re-derived, as §7 established.
+- A reading that cannot be reproduced (the re-run does not match the recorded trade count and
+  return) is refused, not recorded.
+- `unmatched` (twins whose median trade count or turnover fell outside half to twice the arm's)
+  never clears. A margin over books that traded differently would be partly fees and churn.
+
+### 10.4 What it does not fix
+
+- **The handicap equal-weight books carry against a cap-weighted SPY over 2015–2026** is untouched.
+  A twin shares the arm's weighting, so the yardstick cancels that handicap inside its own
+  comparison and says nothing about whether the shape can beat SPY in the later years.
+- **The DSR ratchet** is untouched. N still rises with every new method and retroactively lowers
+  every recorded DSR; the yardstick neither loosens nor tightens that.
+- Bracket-engine (`DESIGN_V0`) candidates and books with no picked stock read `not-applicable`,
+  which clears. For them the screen is what it was before.
+
+### 10.5 The re-judging pass
+
+The 192 non-control arms that read eligible on 2026-11-13 are measured once, on `main`, after the
+code lands: `docs/runbooks/yardstick-backfill.md`. Until then they read as they did, by the staging
+above, and `lab promote` refuses each of them until it is measured.

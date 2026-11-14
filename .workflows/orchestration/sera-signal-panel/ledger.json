@@ -50,10 +50,10 @@
       ],
       "difficulty": "NORMAL",
       "n": 3,
-      "note": "lab panel, panel-map, next-signal-id + panel_run.py (open_store/record for phase 4); decided: test fixtures' dev store carries the seeded benchmark's prices so D10 passes, check untouched; S0001 and S0002 both read 'no' on the real stores; proof: verified-first-pass /home/miftah/.local/state/seer-verify/1114-060150-100441/evidence",
+      "note": "verifier: verified R1.2, R2.2, R4.3, and its halves of R2.1/R2.3/R3.2; D10 untouched by the fixture fix; decision: test dev stores take labkit.LAB_PRICE_FINGERPRINT (plan fixtures used a smoke-priced store D10 refuses)",
       "package": "engine/commands`, `engine/lab",
       "plan": ".workflows/plan/sera-signal-panel/phase-3.md",
-      "reported_at": "2026-11-14T06:11:06+07:00",
+      "reported_at": "2026-11-14T07:58:22+07:00",
       "satisfies": [
         "R1",
         "R2",
@@ -92,10 +92,10 @@
       ],
       "difficulty": "HARD",
       "n": 5,
-      "note": "panel gate D21 in runner.preflight + signal_book one chassis; decided: env read moved hardgate->runner.default_store_dir (plan's os.environ in hardgate reddened test_there_is_no_override), drive-script arm changed to unrecorded width top=37 so the exit 2 is D21 not the repeat check; full suite run once before the fix (only invariant 11 red after), affected files re-run green after; PLAN.md tick is uncommitted in main checkout for the coordinator; proof: verified-after-fix /home/miftah/.local/state/seer-verify/1114-072147-105601/evidence",
+      "note": "verifier: verified R4.1, R4.2; full engine suite on 608caed 10178 passed / 1 failed (invariant 11 baseline) / 6 skipped; decisions: env read moved to runner.default_store_dir (existing no-override test left unedited); drive-script arm at an unrecorded width so exit 2 is D21",
       "package": "engine/lab",
       "plan": ".workflows/plan/sera-signal-panel/phase-5.md",
-      "reported_at": "2026-11-14T07:25:09+07:00",
+      "reported_at": "2026-11-14T07:58:22+07:00",
       "satisfies": [
         "R4"
       ],
@@ -111,10 +111,10 @@
       ],
       "difficulty": "NORMAL",
       "n": 6,
-      "note": "/sera/signals page + seventh Sera tab (phone bar 364 px, 48 px tabs); tsc clean, view tests 20/20, npm test no new red (baseline lab.test.ts testLooks 5 vs 6 left alone); proof: verified-first-pass /home/miftah/.local/state/seer-verify/1114-072752-122418/evidence",
+      "note": "verifier: verified R6.2 and page half of R6.3; npm test 829 passed / 1 baseline red; map_drift: features/sera.md says api shows the pager strings but verify.sh api truncates (fixed by coordinator)",
       "package": "web",
       "plan": ".workflows/plan/sera-signal-panel/phase-6.md",
-      "reported_at": "2026-11-14T07:32:42+07:00",
+      "reported_at": "2026-11-14T07:58:22+07:00",
       "satisfies": [
         "R6"
       ],
@@ -147,7 +147,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-signal-panel",
-  "updated": "2026-11-14T07:32:42+07:00",
+  "updated": "2026-11-14T07:58:22+07:00",
   "verified_at": "2026-11-14T06:48:11+07:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-signal-panel"
 }

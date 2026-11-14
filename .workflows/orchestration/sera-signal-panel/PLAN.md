@@ -6,7 +6,7 @@
 **Worktree:** `/home/miftah/.worktrees/seer/sera-signal-panel`
 **Branch:** `feature/sera-signal-panel` (base: `origin/main` @ `b0652d2`)
 **Phases:** 7
-**Status:** phase 5/7 complete
+**Status:** phase 6/7 complete
 **Coordinator:** —
 
 ---
@@ -224,7 +224,7 @@ where era `2009-2015` is published under `recent` and each era object is `{"mont
 | 1 | Signal registry and the pure panel evaluator | R1, R2 | `engine/lab` | 8 | — | HARD | `.workflows/plan/sera-signal-panel/phase-1.md` | `P1-ENG-6CGV` | — |
 | 2 | Panel record: tables, published verdict, snapshot key | R2, R3, R6 | `engine/lab`, `web/lib/sera` | 11 | — | HARD | `.workflows/plan/sera-signal-panel/phase-2.md` | `P1-ENG-1MOB` | — |
 | 3 | `lab panel`, `lab panel-map`, `lab next-signal-id` | R1, R2, R3, R4 | `engine/commands`, `engine/lab` | 5 | 1, 2 | NORMAL | `.workflows/plan/sera-signal-panel/phase-3.md` | `P1-ENG-7F8X` (done 2026-11-14) | — |
-| 4 | Replay the recorded stock-signal methods | R3 | `engine/lab`, `engine/commands` | 5 | 3 | HARD | `.workflows/plan/sera-signal-panel/phase-4.md` | `P1-ENG-3AY5` | — |
+| 4 | Replay the recorded stock-signal methods | R3 | `engine/lab`, `engine/commands` | 5 | 3 | HARD | `.workflows/plan/sera-signal-panel/phase-4.md` | `P1-ENG-3AY5` (done 2026-11-14) | — |
 | 5 | The panel gate in `lab run` and the one-chassis signal book | R4 | `engine/lab` | 12 | 1, 2 | HARD | `.workflows/plan/sera-signal-panel/phase-5.md` | `P1-ENG-KGFN` (done 2026-11-14) | — |
 | 6 | The signal map on `/sera/signals` | R6 | `web` | 8 | 2 | NORMAL | `.workflows/plan/sera-signal-panel/phase-6.md` | `P1-WEB-4JM6` (done 2026-11-14) | — |
 | 7 | Skills, runbook and docs for the two-stage flow | R5 | `.claude/skills`, `docs` | 6 | 3, 4, 5 | NORMAL | `.workflows/plan/sera-signal-panel/phase-7.md` | `P1-ROOT-F485` | — |

@@ -66,21 +66,21 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "ca43338c06a24211ceec0c7ae4404eb1f4ce772b",
       "depends_on": [
         3
       ],
       "difficulty": "HARD",
       "n": 4,
-      "note": null,
+      "note": "lab panel-replay + runbook; full sweep on a private lab copy: 1720 selected, 1679 recorded, 41 skipped, frozen hashes unchanged; decision: real-store sweep run at --jobs 1 not 2 per invariant 6 (--jobs 2 untimed, runbook says so); proof: verified-first-pass /home/miftah/.local/state/seer-verify/1114-061317-129963/evidence",
       "package": "engine/lab`, `engine/commands",
       "plan": ".workflows/plan/sera-signal-panel/phase-4.md",
-      "reported_at": null,
+      "reported_at": "2026-11-14T08:29:53+07:00",
       "satisfies": [
         "R3"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-3AY5",
       "title": "Replay the recorded stock-signal methods"
     },
     {
@@ -139,7 +139,7 @@
       "satisfies": [
         "R5"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "Skills, runbook and docs for the two-stage flow"
     }
@@ -147,7 +147,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-signal-panel",
-  "updated": "2026-11-14T07:58:22+07:00",
+  "updated": "2026-11-14T08:30:11+07:00",
   "verified_at": "2026-11-14T06:48:11+07:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-signal-panel"
 }

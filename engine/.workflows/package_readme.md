@@ -54,7 +54,9 @@ ones: `migrate`, `nightly`, `backfill`, `universe`, `fundamentals`, `shares`, `p
 Runs a committed method on the dev window and records every arm. `--jobs` (default 2) is the
 number of worker processes for the random-twin yardstick; the reading does not depend on it.
 After recording it logs one `random-twin yardstick:` line per measured arm, in the same format
-`lab yardstick` prints.
+`lab yardstick` prints. A method with an arm that picks index members is refused with exit 2 by
+the panel gate (D21) unless it names a panelled signal or declares `panel_exempt` (see "The panel
+gate" below); `--amend` is held to the same rule.
 
 #### `lab yardstick (M0562 ... | --arm M0562-W60-B100 | --pending) [--limit N] [--jobs J] [--store DIR] [--dry-run]`
 Measures recorded dev arms against their random twins. Exactly one way to pick arms: method ids
@@ -91,7 +93,22 @@ and the committed signal files.
 ```python
 # lab/runner.py
 def run_method(conn, method, path, data, *, git_sha, require_commit=True, amend=False,
-               yardstick_jobs=1, measure=yardstick.measure) -> Run
+               yardstick_jobs=1, measure=yardstick.measure) -> Run   # passes data.fingerprint to preflight
+def preflight(conn, method, path, *, require_commit=True, amend=False,
+              dev_fingerprint=None) -> Amendment | None   # calls hardgate.panel_gate last
+def default_store_dir() -> Path    # $SEER_RESEARCH_STORE or research.STORE_DIR (the one env read)
+
+# lab/method.py (phase 5)
+SIGNAL_ID = re.compile(r"S\d{4}")                # pinned equal to signal.SIGNAL_ID by a test
+PANEL_EXEMPT_KINDS = ("chassis", "control-study", "market")
+Method.signal: str | None = None; Method.panel_exempt: str = ""   # shape-checked in __post_init__
+
+# lab/signal_book.py (phase 5: the one chassis a panelled signal is booked on)
+WIDTH = 20; SWITCH = ("SPY", 200); ID_PREFIX = "SB-"
+GATED_SUFFIX = "N20"; NOGATE_SUFFIX = "N20-NOGATE"; RULES = MONTHLY_HOLD_FRAC_GOTRADE
+class BookParams(trend=SWITCH | None); class SignalPrepared; class SignalBook; class MarketSignalBook
+def book_allocator(signal) -> SignalBook          # allocator id "SB-" + signal.id
+def standard_candidates(signal, method_id, added) -> tuple[Candidate, Candidate]  # (N20, N20-NOGATE)
 def trial_rows(..., yardsticks: Mapping[str, yardstick.Measurement] | None = None) -> ...
 
 # lab/yardstick.py
@@ -148,6 +165,12 @@ def next_signal_id(conn) -> str     # store.next_signal_id(conn, taken=signal.di
 # lab/hardgate.py
 def check(conn, method_id) -> None                 # raises LabError on any refusal
 def yardstick_refusal(conn, method_id, candidate_id) -> str | None
+# (D21) the panel gate, run by runner.preflight (phase 5)
+def picks_members(c) -> bool                       # backtest.dev._reads's rule, restated
+def dev_store_dir() -> Path                        # delegates to runner.default_store_dir()
+def dev_store_fingerprint(store_dir=None) -> str   # manifest.json only; ValueError if unreadable
+def panel_refusal(conn, method, candidates, *, dev_fingerprint=None) -> str | None
+def panel_gate(conn, method, candidates, *, dev_fingerprint=None) -> None   # raises LabError
 
 # lab/prereg.py
 def gate_text(conn=None) -> str                    # the gate as written into a pre-registration
@@ -202,7 +225,7 @@ deflated Sharpe and does not touch the §1 real-money bar.
 
 ### Data flow of `lab run`
 
-1. Preflight (committed method file, unrun digest, store checks; a survivorship-check store is refused first).
+1. Preflight (committed method file, unrun digest, store checks; a survivorship-check store is refused first). The panel gate (D21) is the last preflight refusal, after the repeat check and before any store loads.
 2. `dev.run_registry` simulates every arm.
 3. `_measure_yardsticks`, **before the write lock**: provisional DSRs (`_provisional_dsrs`) pick the arms still worth measuring (`_due_for_yardstick`: not a control, clear of the five D8 conditions and the provisional luck test); each is measured at its own capital and funding. This is the slowest step and the lab-wide write lock is not held during it.
 4. `store.begin_immediate`, then `trial_rows` decides again under the lock. An arm that clears everything but has no reading (luck moved between reads, or `Unreproducible`) is labelled with `YARDSTICK_LABEL`: the record fails closed, and `lab yardstick` + `lab reevaluate` is the way back.
@@ -258,6 +281,50 @@ Phase 4's replay reuses `Subject` (`mode="picks"`), `check_stores`, `open_store`
 `Counts` and `footer` with its own store loop, so the D10 pin and fingerprint check live once.
 `panel_map` ranks on the dev store of the most recent dev panel; panels measured only on older dev
 stores are counted, not ranked.
+
+### The panel gate in `lab run` (D21, phase 5)
+
+The seam between the two stages: the book lab runs only signals that cleared the panel.
+`hardgate.panel_gate` is called last in `runner.preflight`, so a refusal loads no store, records
+nothing and spends no method id (exit 2). Nothing that bypasses `runner.preflight` meets it
+(`lab remeasure`, `lab costs`, `lab reevaluate`, `lab yardstick`, the seeded `H-*` rows,
+`method.discover()`).
+
+- **Who binds**: a method where an arm about to run (`all_candidates()`, or the pending
+  amendment's candidates on `--amend`) picks index members (`picks_members`: a bracket strategy,
+  or an allocator whose `uses_members(params)` is True). Market switches and ETF rotations never
+  bind.
+- **Ways through**: `panel_exempt` set (`"chassis: ..."`, `"control-study: ..."` or
+  `"market: ..."` plus a reason, checked at construction) passes. `signal` set passes only if the
+  signal is discoverable, every non-control arm (`control_shape.role_of`) has the config digest of
+  one of `signal_book.standard_candidates` (checked first, no store needed), the signal has a panel
+  on the dev fingerprint recorded from the file's current `source_sha`, and its published verdict
+  clears there. Neither set: refused. A method may not set both.
+- **Which store**: `run_method` passes `data.fingerprint`; its first `preflight` precedes any
+  simulation, so that check is authoritative. A caller that has not loaded the store passes None
+  and the gate reads the default store's `manifest.json` (`dev_store_fingerprint`), and only for a
+  signal method whose arms already have the standard shape. The env read (`$SEER_RESEARCH_STORE`)
+  lives in `runner.default_store_dir()`; `hardgate.dev_store_dir()` delegates to it so hardgate
+  reads no environment variable.
+- Fails closed: missing signal file, no panel on this store, changed signal file, no clearing
+  verdict, or an unreadable manifest each refuse. No override flag.
+- Existing test fixtures that run a member-picking `FACTOR`/`BLEND` method (`test_lab_exposure`,
+  `test_lab_gate_probe`, `test_lab_survivorship`, `test_lab_yardstick_gate`) declare
+  `panel_exempt="chassis: ..."`. `Method.signal` and `panel_exempt` sit outside every config
+  digest, so no committed method file, sha or digest moved.
+
+**The signal book (`lab/signal_book.py`)**: the one chassis. On each monthly decision date
+(`MONTHLY_HOLD_FRAC_GOTRADE`) the pool is F4's screen (`tree_rank.SCREEN` via
+`f_factor.factor_rows` / `FactorPrepared.rows_on`), each pool name is scored with
+`Signal.scores` (the same cut the panel measured), and the `WIDTH` highest finite scores (ties by
+symbol) are held at `equal_weight(WIDTH)`. The gated arm (`<method>-N20`) holds nothing when SPY
+closes at or below its 200-day average (`f_factor.trend_on`); the `<method>-N20-NOGATE` arm never
+steps aside. `BookParams` admits only those two settings. The allocator id is `"SB-" + signal.id`,
+so two methods booking one signal get identical digests and the second is refused by the repeat
+check: one signal, one book. A signal with `market_fields` gets a `MarketSignalBook`
+(`prepare_market`; history-only path targets nothing). Pure: no DB, clock, files or randomness.
+The method template (`.claude/skills/explore-and-experiment-new-method/method_template.py`) now
+shows the signal form first and the own-allocator form with `panel_exempt` second.
 
 ### Pre-registration text
 

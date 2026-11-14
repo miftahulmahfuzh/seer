@@ -91,6 +91,7 @@ def _method(*cands: Candidate) -> Method:
         id="M0001", name="yardstick test", family="trend", source_kind="knowledge",
         source_ref="", hypothesis="h", expected_failure="f",
         candidates=tuple(cands) if cands else (_cand("M0001-A"),),
+        panel_exempt="chassis: a fixture book for the random-twin yardstick, not a stock-picking idea",
     )
 
 

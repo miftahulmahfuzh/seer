@@ -69,6 +69,7 @@ def _method(cands=None) -> Method:
         id="M0001", name="Fast movers, bought only in a rising market", family="factor",
         source_kind="knowledge", source_ref="", hypothesis="h", expected_failure="f",
         candidates=cands or (_cand("M0001-A", GATED_PARAMS), _cand("M0001-B", OPEN_PARAMS)),
+        panel_exempt="chassis: a fixture book for the gate probe, not a stock-picking idea",
     )
 
 

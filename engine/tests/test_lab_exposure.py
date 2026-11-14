@@ -66,6 +66,7 @@ def _method(cands=None) -> Method:
         id="M0001", name="Half the market, half quiet stocks", family="factor",
         source_kind="knowledge", source_ref="", hypothesis="h", expected_failure="f",
         candidates=cands or (_cand("M0001-A", PARAMS_A), _cand("M0001-B", PARAMS_B)),
+        panel_exempt="chassis: a fixture book for the exposure report, not a stock-picking idea",
     )
 
 

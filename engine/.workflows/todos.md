@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-11-14
-**Total Active Tasks**: 4
+**Total Active Tasks**: 3
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 2
+- P1 High: 1
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 174
+- Completed: 175
 
 ---
 
@@ -1691,15 +1691,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Satisfies**: R3 — replay the already-run stock-signal methods through the panel in one pass without changing any config digest or frozen record · criteria: R3.1
   - **Depends on**: P1-ENG-7F8X
   - **Plan**: `engine/.workflows/plan/P1-ENG-3AY5.md`
-- [ ] **P1-ENG-KGFN** Phase 5: The panel gate in `lab run` and the one-chassis signal book
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `Method.signal`, `Method.panel_exempt`, `method.SIGNAL_ID`, `method.PANEL_EXEMPT_KINDS` in `lab/method.py`; `lab/signal_book.py` (scores through `Signal.scores`); the D21 rule in `hardgate.py` and its call in `runner.preflight`; `method_template.py`; `tests/test_lab_panel_gate.py`, `tests/test_lab_signal_book.py`; the `panel_exempt` fixture edits in `tests/test_lab_exposure.py`, `tests/test_lab_gate_probe.py`, `tests/test_lab_survivorship.py`, `tests/test_lab_yardstick_gate.py`; the refusal line and gotcha in `features/lab-cli.md`. Does not touch `commands/lab.py`; `store.py`; any recorded method file. Exit: `lab run` on a scratch DB refuses an unpanelled member-picking method with exit 2 and an unchanged trial count, refuses a signal method with a hand-written treatment arm, accepts a signal method built from `standard_candidates` whose signal clears, and accepts an exempt chassis method; the full engine suite is green apart from invariant 11's baseline.
-  - **Status**: open
-  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 5 of 7)
-  - **Satisfies**: R4 — the book lab runs only signals that clear the panel, on one fixed chassis, with the bar enforced as an exit-2 refusal · criteria: R4.1, R4.2
-  - **Depends on**: P1-ENG-6CGV, P1-ENG-1MOB
-  - **Plan**: `engine/.workflows/plan/P1-ENG-KGFN.md`
 
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"
@@ -1838,6 +1829,26 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-KGFN** Phase 5: The panel gate in `lab run` and the one-chassis signal book
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `Method.signal`, `Method.panel_exempt`, `method.SIGNAL_ID`, `method.PANEL_EXEMPT_KINDS` in `lab/method.py`; `lab/signal_book.py` (scores through `Signal.scores`); the D21 rule in `hardgate.py` and its call in `runner.preflight`; `method_template.py`; `tests/test_lab_panel_gate.py`, `tests/test_lab_signal_book.py`; the `panel_exempt` fixture edits in `tests/test_lab_exposure.py`, `tests/test_lab_gate_probe.py`, `tests/test_lab_survivorship.py`, `tests/test_lab_yardstick_gate.py`; the refusal line and gotcha in `features/lab-cli.md`. Does not touch `commands/lab.py`; `store.py`; any recorded method file. Exit: `lab run` on a scratch DB refuses an unpanelled member-picking method with exit 2 and an unchanged trial count, refuses a signal method with a hand-written treatment arm, accepts a signal method built from `standard_candidates` whose signal clears, and accepts an exempt chassis method; the full engine suite is green apart from invariant 11's baseline.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 5 of 7)
+  - **Satisfies**: R4 — the book lab runs only signals that clear the panel, on one fixed chassis, with the bar enforced as an exit-2 refusal · criteria: R4.1, R4.2
+  - **Depends on**: P1-ENG-6CGV, P1-ENG-1MOB
+  - **Plan**: `engine/.workflows/plan/P1-ENG-KGFN.md`
+  - **Completed**: 2026-11-14 07:23
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/lab/method.py, engine/src/seer_engine/lab/signal_book.py, engine/src/seer_engine/lab/hardgate.py, engine/src/seer_engine/lab/runner.py, .claude/skills/explore-and-experiment-new-method/method_template.py, engine/tests/test_lab_panel_gate.py, engine/tests/test_lab_signal_book.py, engine/tests/test_lab_exposure.py, engine/tests/test_lab_gate_probe.py, engine/tests/test_lab_survivorship.py, engine/tests/test_lab_yardstick_gate.py, .claude/skills/verify-seer/features/lab-cli.md
+  - **Proof**: verified-after-fix — 4 journeys, evidence /home/miftah/.local/state/seer-verify/1114-072147-105601/evidence
+  - **Drift**:
+    - This session resumed phase 5 after a WSL restart; the predecessor's edits were on disk and were diffed block by block against the plan (all equal) before verification.
+    - The plan's hardgate.dev_store_dir read os.environ, which fails the existing test_lab_hardgate.py::test_there_is_no_override (hardgate source may not contain 'environ'). The plan did not foresee it.
+  - **Decided**:
+    - hardgate.dev_store_dir read the environment and reddened test_there_is_no_override -> env read moved to new runner.default_store_dir(); hardgate.dev_store_dir delegates to it; `import os` dropped from hardgate (tie-break: a failing check is fixed in code, never relaxed; both files in Owns)
+    - Proof drive script's hand-built arm (FactorParams momentum top=20) repeats a recorded book, so lab run exited 2 at the repeat check and not D21 -> arm changed to an unrecorded width (top=37), pass conditions unchanged; a sentence saying so added to the lab-cli.md gotcha (rung 2: exit criteria demand a D21 refusal)
+    - Completion: block moved to the top of `## Completed Tasks` beside phases 1-3 of this set (their precedent). Plan index: phase 5's TaskID cell ticked `(done 2026-11-14)` in the coordinator's copy (left uncommitted for the coordinator, as phases 1-3 were) and `**Status:**` set to `phase 4/7 complete`. Nothing unblocked: P1-ROOT-F485 (phase 7) also waits on P1-ENG-3AY5 (phase 4). Landing not attempted: swarm coordinator `orch-sera-signal-panel` owns it.
 - [x] **P1-ENG-7F8X** Phase 3: `lab panel`, `lab panel-map`, `lab next-signal-id`
   - **Difficulty**: NORMAL
   - **Type**: Feature

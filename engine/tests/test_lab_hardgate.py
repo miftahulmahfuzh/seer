@@ -2502,7 +2502,16 @@ def test_a_method_with_no_promotable_variant_shows_a_dash_and_cannot_fire(
 # A test that only pinned the suppressions would let a later edit quietly re-break M0072 while
 # still reading green.
 BUY_SIGNAL_BEFORE: frozenset[str] = frozenset({"M0092", "M0197", "M0243", "M0258"})
-BUY_SIGNAL_AFTER: frozenset[str] = frozenset({"M0072", "M0258", "M0284"})
+BUY_SIGNAL_AFTER: frozenset[str] = frozenset({"M0284"})
+# The id that leads the book's entry: the first of its names that still has a promotable arm.
+BUY_SIGNAL_LEAD = "M0284"
+# (2026-11-14) M0072 and M0258 left the set the way M0092 did, and nothing about the book changed.
+# At N=422 `lab walkforward` reads "no variant would be promoted" for both: M0072-Z2-RAWRANK scored
+# 0.9109 at N=81 and no longer clears the luck bar. M0284 promotes the same curve under its own
+# digest, still clears (0.902303, one of the eleven the command itself lists as sitting within
+# 0.005 of the bar) and now leads the entry alone, so the lead is a name here and the collapse is
+# asserted only over whichever names still fire. The both-ways guarantee is unchanged: no false
+# alarm from the first reading fires, and the book the hindsight column was hiding still does.
 # (2026-11-08) M0092 left this set, and nothing about its book changed. Its best arm recorded DSR
 # 0.911 at N=64; the luck bar is judged at the lab's current N (344 on this date), where that arm
 # no longer clears it, so `lab walkforward` reads "no variant would be promoted" for M0092 and
@@ -2587,23 +2596,25 @@ def test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways(
     assert BUY_SIGNAL_AFTER <= fired, (
         f"the buy signal no longer names all of {sorted(BUY_SIGNAL_AFTER)}, only {sorted(fired)}"
     )
-    lead = [ln for ln in block[1].splitlines() if ln.strip().startswith("M0072:")]
-    assert len(lead) == 1, "M0072's book is named once, as the lead of its own entry"
-    assert out.count("the same book under another name") == 1
+    lead = [ln for ln in block[1].splitlines() if ln.strip().startswith(f"{BUY_SIGNAL_LEAD}:")]
+    assert len(lead) == 1, "the book is named once, as the lead of its own entry"
     collapsed = {
         ln.strip().split(" ", 1)[0]
         for ln in block[1].splitlines()
-        if "written as a version of M0072" in ln or "a later version of M0072" in ln
+        if f"written as a version of {BUY_SIGNAL_LEAD}" in ln
+        or f"a later version of {BUY_SIGNAL_LEAD}" in ln
     }
-    assert collapsed == BUY_SIGNAL_AFTER - {"M0072"}, (
-        f"M0072's book collapses {sorted(collapsed)}, not {sorted(BUY_SIGNAL_AFTER - {'M0072'})}"
+    assert collapsed == BUY_SIGNAL_AFTER - {BUY_SIGNAL_LEAD}, (
+        f"the book collapses {sorted(collapsed)}, "
+        f"not {sorted(BUY_SIGNAL_AFTER - {BUY_SIGNAL_LEAD})}"
     )
+    assert out.count("the same book under another name") == (1 if collapsed else 0)
     # the two false alarms are gone...
     assert not (fired & (BUY_SIGNAL_BEFORE - BUY_SIGNAL_AFTER)), "a suppressed false alarm is back"
     # ...and the true positive the old column was hiding is present. This half is the one a
     # one-way reading of the change would drop.
-    assert "M0072" in fired, "M0072 is the true positive the hindsight column was suppressing"
-    assert "M0072" not in BUY_SIGNAL_BEFORE
+    assert BUY_SIGNAL_LEAD in fired, "the true positive the hindsight column was suppressing"
+    assert BUY_SIGNAL_LEAD not in BUY_SIGNAL_BEFORE
 
     # (2026-10-21) The own-arm fold majority, BUY_CONDITIONS[3]. The set above did NOT move when
     # it was added, and that is the assertion worth keeping: each of the three wins its folds on
@@ -2614,7 +2625,7 @@ def test_the_buy_signal_fires_on_the_promoted_arm_and_the_set_moved_both_ways(
     # A book's entry runs from its own lead line to the next lead line -- a line at the same
     # indent naming a different id. Found structurally, so no other book's id appears here.
     lines = block[1].splitlines()
-    start = next(i for i, ln in enumerate(lines) if ln.strip().startswith("M0072:"))
+    start = next(i for i, ln in enumerate(lines) if ln.strip().startswith(f"{BUY_SIGNAL_LEAD}:"))
     lead_at = re.compile(r"^" + " " * (len(lines[start]) - len(lines[start].lstrip())) + r"M\d+: ")
     end = next(
         (i for i in range(start + 1, len(lines)) if lead_at.match(lines[i])),

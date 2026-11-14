@@ -85,22 +85,22 @@
     },
     {
       "card": null,
-      "commit": null,
+      "commit": "3f1a95a",
       "depends_on": [
         1,
         2
       ],
       "difficulty": "HARD",
       "n": 5,
-      "note": null,
+      "note": "panel gate D21 in runner.preflight + signal_book one chassis; decided: env read moved hardgate->runner.default_store_dir (plan's os.environ in hardgate reddened test_there_is_no_override), drive-script arm changed to unrecorded width top=37 so the exit 2 is D21 not the repeat check; full suite run once before the fix (only invariant 11 red after), affected files re-run green after; PLAN.md tick is uncommitted in main checkout for the coordinator; proof: verified-after-fix /home/miftah/.local/state/seer-verify/1114-072147-105601/evidence",
       "package": "engine/lab",
       "plan": ".workflows/plan/sera-signal-panel/phase-5.md",
-      "reported_at": null,
+      "reported_at": "2026-11-14T07:25:09+07:00",
       "satisfies": [
         "R4"
       ],
-      "status": "spawned",
-      "task_id": null,
+      "status": "done",
+      "task_id": "P1-ENG-KGFN",
       "title": "The panel gate in `lab run` and the one-chassis signal book"
     },
     {
@@ -118,7 +118,7 @@
       "satisfies": [
         "R6"
       ],
-      "status": "pending",
+      "status": "spawned",
       "task_id": null,
       "title": "The signal map on `/sera/signals"
     },
@@ -147,7 +147,7 @@
   "plan": "/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md",
   "repo": "/home/miftah/seer",
   "slug": "sera-signal-panel",
-  "updated": "2026-11-14T06:55:56+07:00",
+  "updated": "2026-11-14T07:25:31+07:00",
   "verified_at": "2026-11-14T06:48:11+07:00",
   "worktree": "/home/miftah/.worktrees/seer/sera-signal-panel"
 }

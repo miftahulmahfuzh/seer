@@ -76,6 +76,7 @@ what this paragraph is about.
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
 import statistics
 import subprocess
@@ -280,6 +281,16 @@ def pending_amendment(conn: sqlite3.Connection, method: Method) -> Amendment:
     return method.amendments[len(recorded)]
 
 
+def default_store_dir() -> Path:
+    """The dev store ``lab run`` loads when ``--store`` is not given: ``commands/lab.py``'s default.
+
+    ``$SEER_RESEARCH_STORE``, else ``research.STORE_DIR``. Here rather than in ``hardgate`` (whose
+    panel gate, D21, asks for it through ``hardgate.dev_store_dir``) because that module reads
+    nothing from the environment.
+    """
+    return Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR)
+
+
 def preflight(
     conn: sqlite3.Connection,
     method: Method,
@@ -287,6 +298,7 @@ def preflight(
     *,
     require_commit: bool = True,
     amend: bool = False,
+    dev_fingerprint: str | None = None,
 ) -> Amendment | None:
     """Every refusal ``lab run`` makes before loading data (``store.LabError``).
 
@@ -303,6 +315,15 @@ def preflight(
     Either way the "this configuration already ran" check is made only against the candidates this
     run is about to execute: on an amendment the originals have dev trials by definition, and
     checking them would refuse every amendment that ever existed.
+
+    Last, the panel gate (``hardgate.panel_gate``, D21): a method with an arm that chooses among
+    index members runs only behind a signal whose published panel verdict clears on the dev store
+    being loaded, on that signal's standard book, or under a declared ``panel_exempt``. It reads
+    ``all_candidates()`` on a plain run and the pending amendment's candidates on ``--amend``.
+    ``dev_fingerprint`` is the fingerprint of the store the run loads: ``run_method`` passes
+    ``data.fingerprint``; a caller that has not loaded the store passes None and the gate reads the
+    default store's manifest, and only for a method that names a signal. It is last so every older
+    refusal keeps its message and its order.
     """
     if require_commit:
         problem = registry_problem(path)
@@ -357,6 +378,17 @@ def preflight(
                 (config_digest(c),),
             ).fetchone()
             raise store.LabError(f"{c.id} repeats {hit[0]}, which already ran on the dev window")
+    # Decision D21 (lab/hardgate.py). A local import for the reason `Run`'s docstring gives:
+    # `hardgate.trial_deposits` imports this module inside its body, and the import graph stays
+    # acyclic only while neither imports the other at module scope.
+    from seer_engine.lab import hardgate
+
+    hardgate.panel_gate(
+        conn,
+        method,
+        method.all_candidates() if amendment is None else amendment.candidates,
+        dev_fingerprint=dev_fingerprint,
+    )
     return amendment
 
 
@@ -872,7 +904,10 @@ def run_method(
     does, because a look is not a search.
     """
     refuse_survivorship_store(data, f"lab run {method.id}")
-    amendment = preflight(conn, method, path, require_commit=require_commit, amend=amend)
+    amendment = preflight(
+        conn, method, path, require_commit=require_commit, amend=amend,
+        dev_fingerprint=data.fingerprint,
+    )
     candidates = method.candidates if amendment is None else amendment.candidates
     capital = INITIAL_IDR
     results: list[tuple[DevRow, Any]] = []
@@ -900,7 +935,10 @@ def run_method(
         # A parallel session may have won a race. On the amendment path the re-check must resolve
         # the *same* amendment, or the trials just produced would be filed under another block's
         # hypothesis.
-        again = preflight(conn, method, path, require_commit=False, amend=amend)
+        again = preflight(
+            conn, method, path, require_commit=False, amend=amend,
+            dev_fingerprint=data.fingerprint,
+        )
         if again is not amendment:
             raise store.LabError(
                 f"{method.id}: another session recorded an amendment while this run was in "

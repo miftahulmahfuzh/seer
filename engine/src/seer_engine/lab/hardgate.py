@@ -933,6 +933,69 @@ right".
 statement about one arm against its own shape, and it does not correct for the lab having tried
 hundreds of methods; ``store.DSR_MIN`` at the policy's N still does that, unchanged (index Decision
 D2). It does not touch the §1 real-money bar.
+
+**(D21) Does `lab run` book a stock-picking idea the panel never screened? -- No. From 2026-11-13
+``runner.preflight`` REFUSES a method with an arm that chooses among index members unless it
+names a signal that cleared the panel on the dev store about to be loaded and books only that
+signal's standard chassis, or declares why the panel does not apply.**
+
+Every clause above judges a book. A book is one concentrated portfolio through the full simulator,
+and on that instrument the luck of which twenty names were drawn is as large as most signal
+effects (SERA_SIGNAL_PANEL_PLAN.md, Why). The panel (``lab/panel.py``, ``lab panel``) asks the
+prior question across the whole pool, stock by month, on both stores and three eras, with its own
+false-discovery correction (``panel_verdict.published``), and writes no trial and moves no N. This
+clause is the seam between the two stages: the book lab runs only signals that cleared.
+
+**Who it binds.** A method binds when any arm about to run -- ``all_candidates()`` on a plain run,
+the pending amendment's candidates on ``--amend`` -- chooses among index members: a bracket
+``Strategy`` (it trades members), or an ``Allocator`` whose ``uses_members(params)`` is True.
+That is ``backtest.dev._reads``'s own rule (``picks_members``). A method of market switches and
+ETF rotations does not bind and never meets this clause.
+
+**The three ways through, and nothing else.**
+
+- ``panel_exempt`` set (``method.PANEL_EXEMPT_KINDS``: ``chassis:``, ``control-study:``,
+  ``market:``, then the reason, checked at construction): passes. The reason is in the committed
+  file, which is the pre-registration, so the exemption is argued in git like every other choice.
+- ``signal`` set: the signal must be discoverable (``signal.discover()``); every arm about to run
+  that is not a declared control (``control_shape.role_of``, the reader D17, D19 and the runner
+  already use) must have the config digest of one of ``signal_book.standard_candidates``; the
+  signal must have a panel on the dev store's fingerprint (``store.has_panel`` with
+  ``panel.RULE_ID``) recorded from the file as it is on disk now (``panel_signals.source_sha`` ==
+  ``signal.source_sha``); and its published verdict on that fingerprint must clear. The arm shape
+  is checked first because it needs no store.
+- neither: refused.
+
+**Why ``lab run`` and not ``lab promote``.** (D15)'s argument runs the other way here. A run
+spends a method id, and under ``store.DSR_POLICY = 'methods'`` every method id deflates every
+other method's DSR. A screen that waits until promotion lets every unscreened idea raise the bar
+for the ones that were screened. ``lab idea`` stays free: an idea row costs nothing and is how a
+queued idea waits for its signal.
+
+**Which store.** The fingerprint is ``ResearchData.fingerprint`` of the store the run loads.
+``runner.run_method`` passes ``data.fingerprint``, and its first ``preflight`` comes before any
+simulation, so that check is the authoritative one. ``commands/lab.py:_run`` calls ``preflight``
+before the load and passes nothing, so the clause reads the manifest of the default store
+(``dev_store_fingerprint``: ``$SEER_RESEARCH_STORE`` or ``research.STORE_DIR``) without loading
+it. ``research.load_store`` refuses a store whose files do not hash to its manifest's fingerprint,
+so the manifest's value is the one a successful load would carry.
+
+**Fails closed.** No discoverable signal, no panel on this store, a signal file changed since its
+panel, no published verdict, or an unreadable manifest: each refuses. There is no flag.
+
+**What it does not reach.** Nothing that does not go through ``runner.preflight``: ``lab
+remeasure`` (``remeasure.preflight``), ``lab costs``, ``lab reevaluate``, ``lab yardstick``, the
+seeded ``H-*`` rows (``lab/seed.py``), and ``method.discover()``, which constructs every committed
+file and checks only the two fields' shape. Measured on the committed lab at ``b0652d2`` (this
+phase's planning, read-only): 387 of the 412 method files have an arm that chooses members; 411 of
+the 412 have dev trials, so a plain ``lab run`` already refuses them as having run; the one without
+(M0111) is ``rejected`` and refused by the same status check before this clause. No committed file
+became unrunnable. An ``--amend`` of one of the 387 declares ``panel_exempt`` in the commit that
+adds the amendment.
+
+**Where it sits.** Last in ``preflight``, after the repeat check, so every older refusal keeps its
+message and its order, and before ``research.load_store``, so a refusal loads nothing, records
+nothing and spends no method id.
 """
 
 from __future__ import annotations
@@ -944,12 +1007,19 @@ import sqlite3
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from seer_engine.backtest import regime, tuning
 from seer_engine.lab import store, survivorship_record
 from seer_engine.lab import walkforward as wf
+from seer_engine.sim.rules import is_bracket
+
+if TYPE_CHECKING:  # typing only: the panel modules are imported inside the functions that use them
+    from seer_engine.backtest.dev import Candidate
+    from seer_engine.lab.method import Method
 
 #: The fewest scoreable folds that count as evidence. See (D2) in the module docstring: the rule
 #: is "every fold the geometry yields, AND at least this many". Four is what the recorded
@@ -1453,6 +1523,168 @@ def pin_dev_store(conn: sqlite3.Connection, price_fingerprint: str | None) -> No
             f"--store at a copy of the one the lab was measured on (the sync-research-store "
             f"skill). Moving the lab's prices is a change argued in git (D10), not a flag on "
             f"this command"
+        )
+
+
+def picks_members(c: Candidate) -> bool:
+    """Whether ``c`` chooses among index members: the rule ``backtest.dev._reads`` applies.
+
+    A bracket ``Strategy`` trades members and nothing else; an ``Allocator`` says so through
+    ``uses_members(params)``. Restated rather than imported because ``_reads`` also validates the
+    lookback and symbols and raises on a bad candidate, which is not this question.
+    """
+    if is_bracket(c.rules):
+        return True
+    return bool(c.allocator.uses_members(c.params))
+
+
+def dev_store_dir() -> Path:
+    """The store ``lab run`` loads when ``--store`` is not given: ``commands/lab.py``'s default.
+
+    Answered by ``runner.default_store_dir``, not here: this module reads no variable of the
+    process, and a test in ``test_lab_hardgate`` holds its source to that. Where the store lives
+    is where a run reads its data, not a way round a gate, so it belongs with the runner.
+    """
+    from seer_engine.lab import runner
+
+    return runner.default_store_dir()
+
+
+def dev_store_fingerprint(store_dir: Path | None = None) -> str:
+    """The fingerprint of the dev store at ``store_dir`` (default ``dev_store_dir()``), unloaded.
+
+    Read from ``manifest.json`` alone: ``research.load_store`` refuses a store whose files do not
+    hash to its manifest's fingerprint, so this is the ``ResearchData.fingerprint`` a successful
+    load would carry, without the full load. ValueError when the manifest is missing, unreadable
+    or names no fingerprint.
+    """
+    from seer_engine import research
+
+    where = dev_store_dir() if store_dir is None else Path(store_dir)
+    path, manifest = research._manifest_json(where)
+    fingerprint = manifest.get("fingerprint")
+    if not isinstance(fingerprint, str) or not fingerprint:
+        raise ValueError(f"{path}: names no fingerprint")
+    return fingerprint
+
+
+def panel_refusal(
+    conn: sqlite3.Connection,
+    method: Method,
+    candidates: Sequence[Candidate],
+    *,
+    dev_fingerprint: str | None = None,
+) -> str | None:
+    """Why (D21) will not let ``method`` run ``candidates``; None when it will.
+
+    ``candidates`` are the arms about to run (``runner.preflight`` passes ``all_candidates()``,
+    or the pending amendment's). ``dev_fingerprint`` is the dev store's fingerprint; None reads it
+    from the default store's manifest, and only when the method names a signal and its arms have
+    the standard shape. The sentence, without the "Nothing ran" tail ``panel_gate`` adds. Reads
+    the panel tables and the signal files; writes nothing.
+    """
+    pickers = [c.id for c in candidates if picks_members(c)]
+    if not pickers or method.panel_exempt:
+        return None
+    if method.signal is None:
+        return (
+            f"{method.id} picks index members ({describe(pickers)}) and names neither a panelled "
+            f"signal (`signal=`) nor a panel exemption (`panel_exempt=`). A stock-picking idea is "
+            f"screened on the stock-by-month panel before it is ever booked: write it as a signal "
+            f"file (`lab next-signal-id`, then seer_engine/lab/signals/sNNNN_<slug>.py, "
+            f"committed), run `lab panel SNNNN`, and once it clears name it here with "
+            f"`signal=\"SNNNN\"` and build the arms with `signal_book.standard_candidates`. A "
+            f"method that picks members to measure a chassis, a control or the market itself "
+            f"declares `panel_exempt=\"chassis: <why>\"`, `\"control-study: <why>\"` or "
+            f"`\"market: <why>\"` instead"
+        )
+    from seer_engine.lab import control_shape, panel, panel_verdict, signal_book
+    from seer_engine.lab import signal as signals
+    from seer_engine.lab.method import config_digest
+
+    found = signals.discover().get(method.signal)
+    if found is None:
+        return (
+            f"{method.id} names signal {method.signal}, and no seer_engine/lab/signals/"
+            f"s{method.signal[1:]}_*.py exports it. Write and commit the signal file, run "
+            f"`lab panel {method.signal}`, and run this method once the signal clears"
+        )
+    sig, path = found
+    standard = {
+        config_digest(c) for c in signal_book.standard_candidates(sig, method.id, candidates[0].added)
+    }
+    hand = [
+        c.id
+        for c in candidates
+        if control_shape.role_of(c) != control_shape.ROLE_CONTROL and config_digest(c) not in standard
+    ]
+    if hand:
+        return (
+            f"{method.id} names signal {sig.id}, so its arms are that signal's standard book -- "
+            f"`signal_book.standard_candidates`: the twenty highest-scored members of F4's pool, "
+            f"equal weight, monthly at Gotrade's fees, one arm behind the SPY 200-day switch and "
+            f"one never stepping aside -- plus any declared controls. {describe(hand)} is neither: "
+            f"a hand-built treatment beside a panelled signal is a second idea the panel never "
+            f"screened. Build the arms with `standard_candidates`, and open a foil's rationale "
+            f"with \"Control:\""
+        )
+    if dev_fingerprint is None:
+        try:
+            dev_fingerprint = dev_store_fingerprint()
+        except ValueError as e:
+            return (
+                f"{method.id} names signal {sig.id}, and the fingerprint of the dev store this run "
+                f"would load cannot be read from its manifest ({e}). Point SEER_RESEARCH_STORE at "
+                f"the store `lab run` loads"
+            )
+    recorded = next((r for r in store.panel_signals(conn) if str(r["id"]) == sig.id), None)
+    if recorded is None or not store.has_panel(conn, sig.id, panel.RULE_ID, dev_fingerprint):
+        return (
+            f"{method.id} names signal {sig.id}, which has no panel on the dev store this run "
+            f"would load (fingerprint {dev_fingerprint[:12]}). Run `lab panel {sig.id}` -- it "
+            f"measures both stores, writes no trial and moves no N -- and run this method once "
+            f"the signal clears"
+        )
+    on_disk = signals.source_sha(path)
+    if str(recorded["source_sha"]) != on_disk:
+        return (
+            f"{method.id} names signal {sig.id}, whose file no longer hashes to the sha its panel "
+            f"was measured on ({str(recorded['source_sha'])[:12]} recorded, {on_disk[:12]} on "
+            f"disk). The panel judged the committed file, not this one: restore it from git. A "
+            f"changed idea is a new signal id"
+        )
+    verdict = panel_verdict.published(conn, dev_fingerprint=dev_fingerprint).get(sig.id)
+    if verdict is None or not verdict.clears:
+        why = (
+            "; ".join(verdict.reasons)
+            if verdict is not None and verdict.reasons
+            else "it has no published verdict on this store"
+        )
+        return (
+            f"{method.id} names signal {sig.id}, which did not clear the panel on this dev store: "
+            f"{why}. A signal that does not order next-month returns across the pool is not "
+            f"booked, and the panel's no is the finding; nothing in the method file changes it"
+        )
+    return None
+
+
+def panel_gate(
+    conn: sqlite3.Connection,
+    method: Method,
+    candidates: Sequence[Candidate],
+    *,
+    dev_fingerprint: str | None = None,
+) -> None:
+    """Refuse ``method`` under (D21). Raises ``store.LabError``; silent when it may run.
+
+    Called by ``runner.preflight`` last, before any store is loaded, so a refusal records nothing
+    and spends no method id.
+    """
+    why = panel_refusal(conn, method, candidates, dev_fingerprint=dev_fingerprint)
+    if why is not None:
+        raise store.LabError(
+            f"{why}. Nothing ran and nothing was recorded, and no method id was spent: the luck "
+            f"gate's N is what it was (lab/hardgate.py, D21)"
         )
 
 

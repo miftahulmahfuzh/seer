@@ -1,8 +1,9 @@
 # Package: ROOT (seer)
 
 **Location**: `.` (repository root)
-**Last Updated**: 2026-11-06 (lab-book-twins, P2-ROOT-M3ZV: `/calculate-assets` now prints the
-named arm's role and its book twin before the money, from one read-only `lab.sqlite` look)
+**Last Updated**: 2026-11-14 (sera-signal-panel phase 7, P1-ROOT-F485: the lab skills, CLAUDE.md
+and the new `docs/runbooks/signal-panel.md` describe the two-stage flow, a signal panel sweep first
+and a stage-two `lab run` only for a cleared signal or a non-signal idea)
 
 ## Overview
 
@@ -51,6 +52,11 @@ shares, Gotrade's real fitted fee schedule (`cost_model="gotrade"`), and his rea
 (5,000,000 IDR arriving on the 25th of each month on top of the opening book) — and report every
 result beside its parent in a single batch table.
 
+Since the signal panel landed, every twin's method file carries
+`panel_exempt="chassis: real-fee twin of MNNNN"`: a twin changes how its parent trades, not which
+stocks it picks, and without the exemption `lab run` refuses (exit 2) any twin whose parent picks
+index members.
+
 Arguments: one comma-separated list. Each item may be a bare `MNNNN` id, a full
 `seertrade.site/sera/methods/MNNNN` URL, or a pinned candidate id such as `M0007-N20-RAW`; the forms
 may be mixed in one invocation, with or without spaces after the commas. Parsing is **per item, not
@@ -93,15 +99,28 @@ tree; and a redo is minutes of mechanical work with no research between items.
 #### `/explore-and-experiment-new-method`
 
 Purpose: research, implement, pre-register and run a genuinely new method, then analyse, promote or
-queue a follow-up variation. Also the per-method worker a Sera batch spawns via `--method MNNNN`.
-Ships `method_template.py`, the fallback starting point when a twin cannot reuse its parent's
-allocator.
+queue a follow-up variation (only when the result names one). Also the per-method worker a Sera
+batch spawns via `--method MNNNN`. Ships `method_template.py` (the fallback starting point when a
+twin cannot reuse its parent's allocator, plus the signal-book form) and `signal_template.py`.
+
+Its first fork: a rule for choosing which stocks to hold is a **signal** first. Solo, it writes
+`engine/src/seer_engine/lab/signals/sNNNN_<slug>.py` (id from `lab next-signal-id`), commits it as
+the pre-registration, runs `lab panel SNNNN`, reads the corrected verdict in `lab panel-map`,
+journals, and stops unless it cleared. A cleared signal gets one fixed book: `signal="SNNNN"` plus
+`standard_candidates(...)` from `lab/signal_book.py`, no extra treatment arm. A market switch, brake,
+portfolio construction, deposit rule or control study skips the panel and carries a `panel_exempt`
+reason. A child session never writes or panels a signal.
 
 #### `/sera-the-explorer`
 
-Purpose: coordinate `<num-methods>` parallel `/explore-and-experiment-new-method` child sessions,
-each in its own worktree, and make itself the sole committer of the lab database. Also resumes or
-reports on a batch already running.
+Purpose: coordinate the two-stage lab. **Stage one** Sera runs herself, with no children: a sweep
+(`--sweep K`, default 12; `--sweep 0` skips it) writes K signal files, commits them in one
+pre-registration commit, panels them and reads the corrected map. **Stage two** launches
+`<num-methods>` parallel `/explore-and-experiment-new-method` child sessions, each in its own
+worktree, at most 4 at a time across every Sera on the machine, and only for a signal that cleared
+the panel or an idea that is not a stock-picking signal. Sera is the sole committer of the lab
+database and of signal files, writes one synthesis per run, and also resumes or reports on a batch
+already running.
 
 #### `/sync-research-store`
 
@@ -175,7 +194,9 @@ such commit must also carry `web/data/lab.json` or CI fails.
 pre-registration — plus the `*_PLAN.md` plan sets, see below); `analyzer/` (the `/analyze`
 reports those plan sets are built from); `design/` (UI prototypes); `backtests/` (dated results
 with their CSV and SVG); `handover/` (dated session handovers); `lab/prereg/` (pre-registrations);
-`runbooks/` (`data-pipeline.md`, `paper-trading.md`, `monitoring.md`).
+`runbooks/` (`data-pipeline.md`, `paper-trading.md`, `monitoring.md`, and `signal-panel.md`:
+running `lab panel` sweeps and the `lab panel-replay` of recorded stock-signal methods, their
+measured cost on this machine, and the frozen-record checks).
 
 ### Plan sets and their analyses
 
@@ -206,7 +227,20 @@ documents (`2026-10-04-method-lab-design.md`) and these `SCREAMING_SNAKE_PLAN.md
                                        readme-updater  ->  package_readme.md
 ```
 
-The lab's own flow is separate and runs through the skills:
+The lab's own flow is separate and runs through the skills, in two stages. Stage one, for a
+stock-picking idea, spends no N:
+
+```
+lab next-signal-id
+   -> write engine/src/seer_engine/lab/signals/sNNNN_*.py
+   -> git commit the file            <- the signal's pre-registration (a sweep: one commit for all K)
+   -> lab panel SNNNN … --store engine/.research --sv-store engine/.research-sv
+   -> lab panel-map                  <- false-discovery-corrected verdict, computed on read
+   -> lab insight; stop unless cleared (lab drop the idea row it answered)
+```
+
+Stage two, for a cleared signal (its one fixed book, `signal="SNNNN"`) or a non-signal idea
+(`panel_exempt` reason); `lab run` refuses a stock-picking arm with neither:
 
 ```
 lab idea (reserve id + hypothesis)
@@ -319,6 +353,10 @@ lab luck --limit 0    # read-only: every recorded DSR re-scored at today's count
 lab costs M0007       # report only: flat fees vs Gotrade's real ones
 lab idea …            # reserve an id and a hypothesis; prints the new id
 lab run MNNNN --store /home/miftah/seer/engine/.research
+lab next-signal-id    # the id for the next signal file
+lab panel SNNNN …     # stage one: measure committed signals on both stores, no N spent
+lab panel-map --kind signal   # every panel ranked under one correction, with its verdict
+lab panel-replay      # the recorded stock-* arms as pick-set panels (see docs/runbooks/signal-panel.md)
 lab stage             # once, at the end: snapshot + git-add the database
 ```
 
@@ -336,6 +374,8 @@ lab stage             # once, at the end: snapshot + git-add the database
   silently tests the main checkout instead of the branch.
 - **A method file's module number must equal its `METHOD.id`** (`m0032_*.py` ↔ `id="M0032"`), or
   `discover()` raises for the whole lab, not just that method.
+- **A signal file is never edited after its panel.** A changed parameter is a new signal id, and
+  it counts in the correction.
 - **Never type a luck bar or a method count into prose.** They are the owner's dials and they move;
   read them from `lab status` at run time.
 - **Never fetch a `seertrade.site` URL.** The site is behind the Sera gate and the repo holds

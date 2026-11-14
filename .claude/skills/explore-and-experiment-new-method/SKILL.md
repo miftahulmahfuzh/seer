@@ -8,8 +8,10 @@ description: Use when asked to explore, research, try or experiment with a new t
 Three iron rules. Breaking the letter of a rule breaks its spirit too.
 
 1. **We never stop trying, we never give up.** Each run explores **one idea** end to end,
-   records every trial, writes what it learned, and leaves at least one next idea queued. A
-   failed method is a result. A run that queues nothing is the only real failure.
+   records every trial or panel, and writes what it learned. A failed method is a result, and
+   so is a signal that did not clear the panel. A run queues a next idea only when its result
+   names one (step 9). On 2026-11-13, 194 of the 197 ideas waiting in the queue were variations
+   nobody had run: a rule that made every run add one built a pile, not a search.
 2. **No human in the loop.** Decide everything yourself and assume where you have to. Never use
    `AskUserQuestion`, never end a turn on a question, never wait for approval: not for the idea,
    the variants, a failing check, a promotion or a paper-roster entry. Write down what you
@@ -26,7 +28,7 @@ Design: `docs/plans/2026-10-04-method-lab-design.md`. CLI: `python -m seer_engin
 | | Solo (`/explore-and-experiment-new-method`) | Child (`… --method MNNNN --coordinator NAME`) |
 |---|---|---|
 | started by | the user or `/loop` | `/sera-the-explorer`, in its own worktree and tmux window |
-| idea | you choose it | already reserved as an `idea` row `MNNNN`; refine it, keep its id |
+| idea | you choose it; a rule for choosing which stocks to hold is a signal first (step 3a) | already reserved as an `idea` row `MNNNN`: either the book of a signal that cleared the panel (its hypothesis names `S00xx`; build its one fixed chassis, step 4) or an idea that is not a stock-picking signal (refine it, keep its id). A child never writes or panels a signal |
 | python | `engine/.venv/bin/python` | `PYTHONPATH=$PWD/engine/src /home/miftah/seer/engine/.venv/bin/python` (a worktree has no venv) |
 | database | `lab/lab.sqlite` in this checkout | the shared one: `export SEER_LAB_DB=/home/miftah/seer/lab/lab.sqlite SEER_RESEARCH_STORE=/home/miftah/seer/engine/.research SEER_SV_STORE=/home/miftah/seer/engine/.research-sv` (the last one is what lets `lab survivorship` run from the worktree) |
 | commits | method file, then `lab stage` (`lab/lab.sqlite` + `web/data/lab.json`), to `main` | method file only; **never commit `lab/lab.sqlite` or `web/data/lab.json`** (the coordinator does) |
@@ -72,6 +74,8 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    > • which pre-registration fields the template requires, and which the parent left thin
    > • whether `lab seen` already holds this idea, and under what key
    > • N, the DSR bar, and test looks spent, as `lab status` prints them
+   > • if the reserved row names a signal `S00xx`: its readings and verdict as `lab panel-map`
+   >   prints them
    > No file dumps, no trial tables, no narration.
 
    What comes back is **someone else's measurement**. It is good enough to choose the idea and
@@ -87,6 +91,73 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
      (WebSearch/WebFetch).
    - **knowledge**: what you already know.
    - **backlog**: an `idea` row. Reuse its id.
+
+   **The first fork: is this a rule for choosing which stocks to hold?** Then it is a
+   **signal**, and it goes through the panel before any method file exists.
+   - This applies to every new picking rule. It also applies to every queued idea row whose
+     family begins `stock-` and whose new part is a ranking.
+   - It does not apply to a market switch, a brake, portfolio construction, a deposit rule or a
+     control study. Those go straight to step 4 as a method with a `panel_exempt` reason.
+   - Two rules do not apply to signal ideas: "queue at least one next idea" (gone, step 9) and
+     Sera's one-per-family slate rule. A sweep may hold many variants of one family, because
+     every variant counts in the panel's correction.
+   - Child mode never takes this fork. A child is handed the book of a signal that already
+     cleared, or a non-signal idea.
+
+   **3a. A signal (solo; Sera does the same for a whole sweep):**
+   1. **Write the file.** `lab next-signal-id` prints the id (`S00xx`). Write
+      `engine/src/seer_engine/lab/signals/s00xx_<slug>.py` from `signal_template.py` (this
+      folder). It exports `SIGNAL = Signal(...)` with these fields:
+      - `id`;
+      - a plain `name`;
+      - a `family` named by what it ranks on;
+      - `source_kind` and `source_ref`;
+      - `hypothesis` and `expected_failure`, written **now**, before any number exists;
+      - `lookback` (at most 473 bars);
+      - `score` (higher is better; a name with no opinion gets no value);
+      - `market_fields`, if it reads market series or share counts;
+      - `seen_keys`;
+      - `idea_id="M00yy"`, when it answers a queued idea row.
+   2. **A queued stock-signal idea row becomes a signal like this.** `lab show M00yy` gives the
+      row's name, family and hypothesis.
+      - **Its new part is which stocks it picks.** The signal copies the row's family, source
+        kind and source ref, sharpens the hypothesis into a score, and sets `idea_id="M00yy"`.
+        The row keeps its id for the book, if the signal clears.
+      - **Its new part is a brake, a cadence or a sizing dial on another method's picks.** It
+        is not a signal. It is judged by the host's replay verdict in
+        `lab panel-map --kind replay`. If the host cleared, go to step 4 with
+        `panel_exempt="chassis: <the wrapper> on <host candidate>'s picks"`. If the host did not
+        clear, run `lab drop M00yy --why "panel: its picks are <host>'s, which did not clear the panel"`.
+   3. **Test.** `cd engine && pytest -q tests/test_lab_signals.py && ruff check src tests`. Fix
+      the signal; never weaken the test.
+   4. **Commit only the signal file and push it.** The commit is the pre-registration:
+      `lab: S00xx pre-registered — <the idea in plain words>`. `lab panel` refuses an
+      uncommitted or modified signal file (exit 2, nothing recorded).
+   5. **Panel it:** `lab panel S00xx`. Run it like `lab run` in step 6: the command itself, in
+      the background, redirected to a file.
+      - It measures the signal on the dev store and on the survivorship store, each over the
+        whole window, before 2009 and 2009-2015.
+      - For each, it reports the months measured, the rank correlation and its t, the
+        top-minus-pool spread a year and its t, and the slope on next month's return after
+        removing momentum, beta, size and volatility, with its t.
+      - It records no trial, and N does not move.
+   6. **Read the verdict in `lab panel-map`.** A signal clears only when all three hold:
+      - its dev whole-window controlled slope is positive, and survives the false-discovery
+        correction across every distinct pick set the lab has recorded;
+      - its dev 2009-2015 spread is positive;
+      - its survivorship whole-window slope is positive.
+
+      The verdict names each failed condition in plain words. It is computed on read, so it can
+      change as later panels join the correction.
+   7. **Journal one insight** (step 8) saying what the panel found, in plain words. Gate it
+      first.
+   8. **Stop unless it cleared.**
+      - **Not cleared:** drop the idea row it answered,
+        `lab drop M00yy --why "panel: <the verdict's reason, plain>"`. Then `lab stage`, commit,
+        push, and report (step 11). Do not write a method file. Do not tweak the signal and
+        panel it again: a changed parameter is a new signal id, and it counts in the correction.
+      - **Cleared:** keep `M00yy`, or reserve the book with `lab idea …`, and go to step 4's
+        signal form.
 
    Then check:
    - `lab seen --find <words>` — the step 2 packet already answered this. Re-run it yourself
@@ -120,6 +191,9 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
      20-F/40-F (BIDU, CHKP, VOD, …) and a few successor tickers whose filing history does not
      reach back (PSKY, VTRS, DXC). A
      size-weighted book should still carry a weight ceiling (M0047).
+     A **signal** has two more limits. Its lookback is capped at 473 bars, the smoke fixture
+     every lab rule is checked on. A signal that reads company fundamentals has a panel only
+     from 2009, where the fundamentals panel starts, so its before-2009 era is empty.
      If it isn't testable:
      `lab block <id> --on "<data>"` plus a `data-wish` insight. Solo: choose another idea.
      Child: report `blocked`.
@@ -159,6 +233,35 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
 
 4. **Write** `engine/src/seer_engine/lab/methods/mNNNN_<slug>.py` from `method_template.py`
    (this folder). Solo: the id comes from `lab next-id`, or from the backlog row.
+   - **A cleared signal: one fixed chassis.**
+     - The method file names the signal and takes its arms from the signal book:
+       `signal="S00xx"` and `candidates=standard_candidates(...)` from
+       `seer_engine.lab.signal_book`, as `method_template.py`'s signal form shows, plus any
+       declared controls.
+     - That is twenty equal slots from the pool, on `MONTHLY_HOLD_FRAC_GOTRADE`, with one arm
+       behind the SPY 200-day switch and one never stepping aside.
+     - No hand-written allocator, no extra treatment arm, no dial. The panel already chose the
+       ranking; the book only prices it.
+     - `lab run` refuses a signal method that has any other non-control arm (exit 2, nothing
+       recorded, no N spent).
+     - Fractional shares, real fees and the mirror's third arm (bullets below) are already true
+       of the chassis. The control-citing bullet still applies.
+   - **Not a signal: name the exemption.** `lab run` refuses a method that has an arm picking
+     index members but no cleared signal (exit 2, no N spent), unless the method carries
+     `panel_exempt`. That is one line beginning with one of three prefixes:
+     - `chassis: …`: the idea changes how a book is built or traded (width, weights, cadence,
+       a brake on the book's own account, a deposit rule, real fees), and its picks are a named
+       host's. Examples: `chassis: real-fee twin of M0029`, `chassis: per-stock 200-day exit on
+       a book of every eligible member`.
+     - `market: …`: a market-wide switch decides how much to hold, not which stocks. Example:
+       `market: VIX term-structure switch over M0007-N20-RAW's picks`.
+     - `control-study: …`: the method exists to measure a control (a random draw, a placebo, a
+       blind arm).
+
+     The exemption is a claim in the pre-registration, and it is honest only when it is true.
+     An arm whose picks differ from the named host's by a ranking is a signal, whatever the
+     line says. Writing `chassis:` on a new picking rule to get past the gate falsifies the
+     pre-registration, exactly as relabelling a treatment as a control does.
    - 1–6 fixed variants. `hypothesis` and `expected_failure` are written **now**, before any result.
    - New logic is an `Allocator` with `id = "MNNNN"`. Reuse `f_factor`, `f_index`,
      `f_rotation`, `f_swing`, `allocator.VOLTARGET`/`BLEND` where you can.
@@ -249,6 +352,23 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    commit is the new pre-registration, so say in its message what changed and why) and run
    `lab run MNNNN` again (`--amend` for an amendment). Never relabel a treatment as a control to
    get past the check.
+   **Exit 2 whose message ends "(lab/hardgate.py, D21)"** is the panel gate, and it has one of
+   these causes. "picks index members (…) and names neither a panelled signal (`signal=`) nor a
+   panel exemption (`panel_exempt=`)": the method has a picking arm and no answer. "so its arms
+   are that signal's standard book": it names a signal and carries a non-control arm that is not
+   the signal's standard book. "has no panel on the dev store this run would load", "did not
+   clear the panel on this dev store" or "no longer hashes to the sha its panel was measured on":
+   the named signal is not cleared on this store as committed. Nothing was recorded and no N was
+   spent. Fix it without asking anyone:
+   - A picking idea goes back to step 3a as a signal (child: report `blocked` with the line).
+   - A signal method is rebuilt from `standard_candidates` alone, plus declared controls.
+   - A true chassis change, market switch or control study adds its honest `panel_exempt` line.
+
+   Then re-commit and re-run. A signal that cleared when the run was planned can stop clearing
+   when later panels join the correction, because the verdict is computed on read. Solo: then
+   `lab drop MNNNN --why "panel: no longer clears after later panels joined the correction"`.
+   Child: report `blocked` with that reason. Never add an exemption to a picking rule to get
+   through.
 7. **Analyze honestly** in a scratch file, then `lab note MNNNN --file F --verdict "<one line>"`.
    Run **The gate** (below) before the `lab note`: the analysis only ever grows, so a number
    that goes in wrong stays on the owner's page with its correction underneath it.
@@ -276,6 +396,7 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
      Rp 86-155 million to every M0050 version, enough to make a losing book look acceptable
    - **why**: the mechanism, not just the numbers
    - whether the hypothesis held and whether the expected failure happened
+   - for a signal's book: what the panel's three readings predicted, against what the book did
    - comparison with the parent or near misses. A method from M0030 or earlier was measured at
      the flat 0.1%; compare against its numbers from `lab costs <id>` (both fees side by side),
      never against its recorded trial, or the fees decide the comparison instead of the idea
@@ -305,23 +426,33 @@ check stays green there, and `lab stage` writes the JSON into the checkout that 
    - A number earns its place only with its meaning: "lost 13% at its worst, where SPY lost 55%".
    Ids, digests and mechanics belong in the method's analysis (step 7), which is the audit record.
    (`synthesis` is Sera's batch summary; a single run never uses it.)
-9. **Queue at least one next idea**: `lab idea --name … --family … --source-kind … --hypothesis …`
-   (plus `--parent`), drawn from what this result taught. It prints the new id on stdout and, on
-   stderr, the five methods already in the lab whose wording is closest. Read them. If one is
-   the same idea, `lab drop` the new id with the reason. Otherwise name the closest recorded
-   method in the hypothesis so the next session designs against it. The same stderr also
-   lists the controls those methods hold; cite them in the next hypothesis instead of re-running.
+9. **Queue a next idea only when the result names one (optional).**
+   - Why optional: a queue entry nobody will run is noise. On 2026-11-13, 194 of the 197 ideas
+     in the queue were variations nobody had run (iron rule 1). If the result names no next
+     step, queue nothing, and say `next: none` in the report.
+   - When it does name one: `lab idea --name … --family … --source-kind … --hypothesis …` (plus
+     `--parent`). It prints the new id on stdout. On stderr it prints the five methods already
+     in the lab whose wording is closest. Read them. If one is the same idea, `lab drop` the
+     new id with the reason. Otherwise name the closest recorded method in the hypothesis, so
+     the next session designs against it. The same stderr also lists the controls those methods
+     hold; cite them in the next hypothesis instead of re-running.
+   - A next idea that is a rule for choosing stocks waits in the queue for a sweep, which turns
+     it into a signal (step 3a). A signal that did not clear never queues its own tweak: a
+     tweak is a new signal, written in a later sweep, and it counts in the correction.
 10. **Promotion** if `lab run` printed an ELIGIBLE trial: solo, see **Promotion** below; child, report it.
 11. **Finish.**
     - Solo: run `lab stage`. It takes the database's write lock, regenerates `web/data/lab.json`
       (the snapshot seertrade.site/sera is built from) and `git add`s both files. Never
       `git add lab/lab.sqlite` by hand. Commit both files and push; Vercel redeploys the site from
-      that push. Then give a short report: idea, result vs SPY, verdict, insight, next idea, N, test looks.
+      that push. Then give a short report: the idea (for a signal, its three readings and
+      whether it cleared), result vs SPY when a book ran, verdict, insight, next idea or "none",
+      N, test looks. A panel never moves N.
     - Child: make sure your method file is on `origin/main`. Run **The gate** once more on the
       verdict and the status you are about to send — the coordinator will quote them in the
       synthesis and cannot check them. Then
       `SendMessage` to the coordinator (re-read `ListAgents` first):
-      `DONE MNNNN <rejected|dev-eligible|blocked> — <verdict>; next: M00xx`. When it reports no
+      `DONE MNNNN <rejected|dev-eligible|blocked> — <verdict>; next: M00xx` (or `next: none`
+      when the result named no next step). When it reports no
       agent named the coordinator, the coordinator is not a Claude session (it may be Hermes or
       another driver): stop there, because the shared database and your tmux pane already carry
       everything. Never commit `lab/lab.sqlite`
@@ -361,7 +492,8 @@ claim about to be made | the command that produces it | measured now | MATCH / U
 
 Every number you are about to write goes in a row — result vs SPY, N, the DSR bar, DSR itself,
 worst year, the fall, exposure, turnover, trades, the parent comparison, the fold record, every
-method, candidate and insight id. A claim whose source is memory, a handover brief, the step 2
+panel reading (months, the controlled slope and its t, the 2009-2015 spread, the survivorship
+slope, the corrected q) and verdict, and every method, candidate, signal and insight id. A claim whose source is memory, a handover brief, the step 2
 packet, or a run you did not watch finish is **UNVERIFIED** until a command in this session
 reproduces it. Run the commands now; the table is clean when no row is left UNVERIFIED.
 
@@ -382,6 +514,11 @@ run leans on figures it did not produce. The traps that catch this run in partic
   first-recorded trial, already in the lab. In the analysis, the insight and the `DONE` line,
   name it by its first-recorded candidate from `lab twins MNNNN`. M0488-DVC10-NEVER reached the
   owner as a new book; it is M0125-DV-C10, first recorded as trial 519.
+- **A panel verdict moves.** It is computed on read, across every recorded panel. A "clears" or
+  a q copied from an earlier `lab panel-map` may be stale, so read it again right before
+  writing it.
+- **A panel reading is not a book.** A cleared signal has not beaten SPY, and has no DSR, until
+  its book has run. Never write a panel's spread as a return.
 
 ## Promotion (dev-eligible): autonomous, one counted look
 
@@ -428,7 +565,8 @@ Then:
 0. **Fit check, before anything is promoted.** The candidate's `rules` must be fractional
    (`fractional=True`, a `-frac` preset) whenever it holds more than a handful of names. If the
    best eligible variant is whole-share, do not promote it. Register a new variation method with
-   one variant, the same config on the `-frac` twin, run it on dev, and promote that one if it is
+   one variant, the same config on the `-frac` twin (with `panel_exempt="chassis: fractional
+   twin of MNNNN"` when it picks index members), run it on dev, and promote that one if it is
    still eligible. A look spent on a configuration that could not buy its own picks is wasted and
    can never be retaken. Read the test trial's `exposure` against the dev trial's afterwards. A
    test exposure far below dev exposure means the look measured cash, and the analysis must say so.
@@ -436,6 +574,7 @@ Then:
    it, run `lab costs MNNNN` (report only: no trial, N unchanged; it journals what the fees did).
    If its best variant stops beating SPY, or breaks a go-live condition at real fees, do not
    promote it. If it still passes, register its real-fee twin as a one-variant variation method
+   (with `panel_exempt="chassis: real-fee twin of MNNNN"` when it picks index members)
    on the `-gotrade` preset, run it on dev, and promote that one if it is still eligible. Paper
    pays real fees, so the look is spent on the configuration paper would trade, or not at all.
 0b. **Durability check, and the one moment buying data is worth it.** A twenty-year average hides
@@ -591,7 +730,12 @@ Then:
 | "Max DD 21% is basically 20%" | The bar is 20% since 2026-10-07 (design §1 item 4, the owner's call) and "basically" is not a comparison. Never edit §1/§5, `tuning` thresholds or the P7a registry — they are the owner's dials, not yours. |
 | "The luck bar is still too high; nudge it" | Never. `DSR_MIN` is the owner's risk appetite and `DSR_POLICY` is the owner's call on what counts as an independent look (design §7). Run `lab luck` to see the sensitivity, journal what you found, and leave both alone. |
 | "The gather agent already read N, just use its number" | A subagent's figure is unverified by construction. Re-read anything that lands in the analysis, the journal or a report with the command the packet names. |
-| "Nothing worked, stop here" | Journal the insight and queue the next idea. |
+| "Nothing worked, stop here" | Journal the insight and report it. Queue a next idea only if the result names one (step 9). A signal that did not clear is a finished result, not a failure. |
+| "This picking idea is obviously good; skip the panel and write the method" | Never. A rule for choosing stocks is a signal first (step 3a). `lab run` refuses an unpanelled picking method (exit 2). |
+| "The panel nearly cleared; nudge the lookback and panel it again" | A changed parameter is a new signal id, written and committed as its own pre-registration, and it counts in the correction. Never edit a signal file after its panel. |
+| "Mark it `panel_exempt`, it's basically a chassis change" | Only when it is true: the picks are a named host's. A new ranking under an exemption falsifies the pre-registration. |
+| "Add a second treatment arm to the signal's book" | Never. A cleared signal runs on one fixed chassis (`standard_candidates`); `lab run` refuses any other non-control arm. |
+| "Queue a next idea, the old rule says every run must" | Not any more. 194 of the 197 queued ideas on 2026-11-13 were variations nobody had run. Queue one only when the result names it. |
 | "Child: commit lab.sqlite too" | Never, and never `web/data/lab.json` either. A binary file committed by two sessions is a conflict nobody can merge. |
 | "Solo: `git add lab/lab.sqlite` is quicker" | Always `lab stage`. It is the only thing that keeps `web/data/lab.json` in sync, and CI fails a lab commit without it. |
 
@@ -599,7 +743,11 @@ Then:
 
 ```
 lab status | lab show M0007 | lab next-id | lab seen --find momentum
-lab run M0007                     # needs a committed method file; exit 2 if an undeclared arm repeats another method's book
+lab next-signal-id                # the next free signal id
+lab panel S0003                   # stage one: a committed signal on the dev and survivorship stores, three eras; no trial, N unchanged; exit 2 if uncommitted
+lab panel --pending               # every committed signal with no panel on the current stores
+lab panel-map --top 20 --kind signal   # every panel ranked by its controlled slope, with the corrected verdict; --kind replay|all
+lab run M0007                     # needs a committed method file; exit 2 if an undeclared arm repeats another method's book, or a picking arm has no cleared signal and no panel_exempt
 lab yardstick M0007               # measure a recorded arm against its 200 random twins; no trial, no N, no look
 lab twins M0488                   # report only: each arm's role and its first-recorded book twin (same curve); journals nothing
 lab costs M0007                   # report only: best variant at the flat 0.1% vs Gotrade's real fees; journals it, N unchanged

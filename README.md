@@ -190,6 +190,11 @@ analysis in plain language, and an opinion that ends with a recommendation.
 | ![Ideas](docs/media/sera-ideas.png) | ![How it works](docs/media/sera-how.png) |
 | **Ideas** — the backlog, the blocked-on-data wishlist, the reading list | **How it works** — the path, the calendar, the hurdles, the honesty rules |
 
+**Signals** (`/sera/signals`) is the map of the lab's first stage. It shows every stock-picking
+rule the lab has measured on the signal panel, its own new ideas and the replayed picks of every
+book it already ran, ranked. Each rule is named by what it does, with its verdict in everyday
+words.
+
 Every chart on these pages is hand-built SVG — a dependency-free chart kit of about a thousand
 lines, because a 300 kB charting library for a private research site is a bad trade.
 
@@ -331,11 +336,14 @@ on the production database.
 
 ### 9. Research that runs without a human
 
-Two skills drive the lab end to end with nobody in the loop: one explores a single idea
-(pre-register → run → plain-language analysis → at least one insight → at least one queued idea),
-and one fans out several of those in parallel, each in its own git worktree and terminal window,
-promotes what qualifies, and closes the batch with a synthesis. Every roster change, promotion and
-rejection is journalled.
+Two skills drive the lab end to end with nobody in the loop. A stock-picking idea is first
+written as a signal and measured on a stock-by-month panel of every index member, on two data
+stores, under one false-discovery correction across every panel ever recorded. Sera writes and
+panels a dozen at a time in one session. Only a signal that survives the correction becomes a
+book: one pre-registered method on one fixed chassis, run by a child session in its own git
+worktree and terminal window. An idea that is not a stock-picking rule (a market switch, a
+brake, a deposit rule) goes to a child the same way. Sera promotes what qualifies and closes each
+run with one synthesis. Every roster change, promotion and rejection is journalled.
 
 ### 10. It closes the loop to actual money
 
@@ -455,18 +463,43 @@ SQLite triggers** — a verdict can never be quietly rewritten. The engine stage
 it under the database's write lock on every lab commit, a CI test fails any commit whose JSON does
 not match its database, and the site reads only that snapshot.
 
+The lab has two stages.
+
+**Stage one is the signal panel.** A rule for choosing which stocks to hold is a signal: a
+committed file with a pre-registered hypothesis, scored for every index member at every month
+end of the development window. `lab panel` measures how well that score orders next month's
+returns, on the development store and on a second store that has the dead companies back. It
+reads the whole window, before 2009, and 2009-2015 apart. It gives a rank correlation, a
+top-minus-pool spread, and a slope after removing momentum, beta, size and volatility, each with
+its t-statistic.
+
+The panel carries its own multiple-testing correction, Benjamini-Hochberg across every distinct
+pick set ever recorded, the lab's replayed books included. For that reason a panel never counts
+toward the luck gate's N. A signal clears only when three things hold: its controlled slope
+survives that correction, its 2009-2015 spread is positive, and its slope stays positive with
+the dead companies back.
+
+**Stage two is the book lab below**, and it runs a cleared signal on one fixed chassis only.
+`lab run` refuses a stock-picking method whose signal has not cleared.
+
 ```
-idea  →  pre-registered file (committed)  →  dev run  →  verdict
-                                                 │
-                                        dev-eligible?  →  promote  →  one test-window look
-                                                 │                          │
-                                              rejected                 pass / fail
-                                                                            │
-                                                                     forward paper
-                                                                            │
-                                                                       18 months
-                                                                            │
-                                                                       real money
+stock-picking idea  →  signal file (committed)  →  panel: two stores, three eras, one correction
+                                                                │
+                                                     clears?  ──┴── no  →  recorded; nothing spent
+                                                        │
+                                                       yes
+                                                        │
+other idea  ─────────→  pre-registered file (committed)  →  dev run  →  verdict
+                                                                │
+                                                       dev-eligible?  →  promote  →  one test-window look
+                                                                │                          │
+                                                             rejected                 pass / fail
+                                                                                           │
+                                                                                    forward paper
+                                                                                           │
+                                                                                      18 months
+                                                                                           │
+                                                                                      real money
 ```
 
 ### Where the search stands
@@ -517,7 +550,7 @@ engine/          Python 3.11 package `seer_engine` — the whole pipeline
     sim/           the fill simulator, trade rules, Gotrade fees, contributions
     strategies/    A, B, C, the P7a factor families, allocators, evidence
     backtest/      backtest, walk-forward, dev runner, report, registry
-    lab/           pre-registration, the N policy, the derived verdict, methods/
+    lab/           pre-registration, the N policy, the derived verdict, methods/, signals/, the panel
     paper/         pure night functions mirroring the runner loop bodies
     sean/          the owner's real ledger (the Python half of contract B)
     fundamentals/  SEC EDGAR facts
@@ -632,6 +665,7 @@ python -m seer_engine [--dry-run] [-v|-vv] <command>
 | `backtest` · `backtest_wf` · `backtest_b` | Strategy A, the walk-forward, the ML ranker |
 | `research_store` · `backtest_dev` | Build the local research store; run the dev search |
 | `lab run/test/promote/remeasure/reevaluate/luck/status/costs/names` | The method lab |
+| `lab panel/panel-map/panel-replay/next-signal-id` | Stage one: measure stock-picking signals on the panel, rank them under the correction |
 | `compare` · `promote` | Compare roster candidates; promote one onto the roster |
 | `sean marks` · `sean calibrate` | Mark real holdings; calibrate against real receipts |
 | `fundamentals` | SEC EDGAR company facts |

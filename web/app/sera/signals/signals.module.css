@@ -1,0 +1,50 @@
+/* The signal map: tally chips, the finding, then one ranked list, read the same way at 390 and 1280.
+   One presentation, not a desktop table plus phone cards, so each page's HTML carries each row once. */
+.page { display: flex; flex-direction: column; gap: 12px; }
+.tally { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0 2px; }
+.tally :global(.chip) { background: var(--sheet); }
+
+.finding { margin: 0; font-size: 17px; line-height: 1.5; max-width: 72ch; }
+.empty { margin: 0; font-size: 16px; line-height: 1.5; color: var(--ink-2); max-width: 72ch; }
+
+.rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--hair);
+}
+.row:last-child { border-bottom: 0; }
+.rank { font-size: 22px; line-height: 1.3; color: var(--ink-3); text-align: right; }
+.main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.name { margin: 0; font-size: 19px; font-weight: 500; line-height: 1.3; overflow-wrap: anywhere; }
+.text { margin: 0; font-size: 15.5px; line-height: 1.5; }
+.sub { margin: 0; font-size: 14.5px; line-height: 1.45; color: var(--ink-2); }
+.why { margin: 0; padding-left: 18px; font-size: 14.5px; line-height: 1.45; color: var(--ink-2); }
+
+/* Chips here hold sentences ("The same picks as …"), so they wrap: a 30 px floor, not a fixed
+   30 px pill, and `white-space: normal` over globals.css's nowrap. Two classes deep so the rule
+   wins over the global `.chip` whatever order the stylesheets load in. */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips :global(.chip), .head .verdict {
+  white-space: normal;
+  height: auto;
+  min-height: 30px;
+  padding: 5px 14px;
+  line-height: 1.3;
+  font-size: 14px;
+}
+.chips :global(.chip) { background: var(--stone); }
+.head .verdict { display: inline-flex; align-items: center; gap: 6px; background: var(--sheet); }
+.head .pass { color: var(--pos); }
+.head .miss { color: var(--ink-2); }
+
+.pager { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding-top: 12px; font-size: 14px; color: var(--ink-2); }
+
+@media (max-width: 1023.98px) {
+  .row { grid-template-columns: 34px minmax(0, 1fr); gap: 10px; }
+  .rank { font-size: 17px; }
+  .name { font-size: 17px; }
+}

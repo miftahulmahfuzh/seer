@@ -330,6 +330,15 @@ Rules for the file:
   right before running anything.
 - `source_kind="variation"`, `parent_id=$MNNNN`, `family` = the parent's family verbatim, and
   `source_ref` = **the same marker-prefixed string you reserved with**.
+- **`panel_exempt="chassis: real-fee twin of $MNNNN"`**, with the parent's id written out (for
+  example `chassis: real-fee twin of M0029`).
+  - A twin changes how its parent trades, not which stocks it picks, and that is what a
+    `chassis:` exemption says.
+  - Without it, `lab run` refuses any twin whose parent picks index members (exit 2, nothing
+    recorded, no N spent). Since the signal panel landed, a stock-picking method must name a
+    cleared signal or carry an exemption.
+  - `m0029_blend_fractional.py` predates the field, so the copy does not carry the line. Add it.
+  - Never write any other text there: the exemption is a claim in the pre-registration.
 - `hypothesis` = what you reserved. `expected_failure` = the way it most likely fails, written now.
 - **`rules` must be a real-fee fractional preset**: `sim.rules.MONTHLY_HOLD_FRAC_GOTRADE`, or
   `MONTHLY_RANK_WEEKLY_RESIZE_FRAC_GOTRADE` when the parent reranks monthly and resizes weekly, or

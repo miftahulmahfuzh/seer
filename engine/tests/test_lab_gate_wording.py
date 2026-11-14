@@ -323,6 +323,13 @@ def test_the_web_mirrors_the_engines_arm_roles_and_reading_statuses() -> None:
     }
 
 
+def test_the_web_mirrors_the_engines_panel_kinds() -> None:
+    """The kinds of panel row snapshot 9 publishes, as typed in ``web/lib/sera/types.ts``."""
+    rel = "web/lib/sera/types.ts"
+    src = (config.REPO_ROOT / rel).read_text(encoding="utf-8")
+    assert _ts_string_list(src, "PANEL_KINDS", rel) == set(store.PANEL_KINDS)
+
+
 # ------------------------------------------------------------------- the lab journal's newest note
 
 #: The drawdown bar a journal note may state without being stale, because the note that states it

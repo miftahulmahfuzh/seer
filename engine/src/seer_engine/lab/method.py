@@ -39,6 +39,24 @@ MODULE_NAME = re.compile(r"m(\d{4})_[a-z0-9_]+")
 SOURCE_KINDS: tuple[str, ...] = ("paper", "blog", "github", "knowledge", "variation")
 MAX_VARIANTS = 6
 
+#: A signal id, ``S0001``: the same pattern as ``signal.SIGNAL_ID``. Restated, not imported,
+#: because ``lab/signal.py`` imports this module (``SOURCE_KINDS``) and an import back would be a
+#: cycle; ``test_lab_panel_gate`` pins the two patterns equal.
+SIGNAL_ID = re.compile(r"S\d{4}")
+
+#: The three reasons a method whose arms choose among index members may skip the panel
+#: (lab/hardgate.py, D21). ``panel_exempt`` must begin with one of them and a colon, then say why.
+PANEL_EXEMPT_KINDS: tuple[str, ...] = ("chassis", "control-study", "market")
+
+
+def _exemption_ok(text: str) -> bool:
+    """True when ``text`` begins ``<kind>:`` for a kind in ``PANEL_EXEMPT_KINDS`` and gives a reason."""
+    for kind in PANEL_EXEMPT_KINDS:
+        prefix = f"{kind}:"
+        if text.startswith(prefix) and text[len(prefix):].strip():
+            return True
+    return False
+
 
 def config_text(c: Candidate) -> str:
     """Canonical text of what ``c`` does: rules, allocator id and params (not id or family)."""
@@ -127,6 +145,19 @@ class Method:
     one ``method_amendments`` row each, so the record is always a prefix of the file. Every reader
     that asks "what variants does this method have" wants ``all_candidates()``, not ``candidates``:
     ``candidates`` is the original batch and nothing else.
+
+    ``signal`` and ``panel_exempt`` are how a method answers the panel gate (lab/hardgate.py,
+    D21), which ``lab run`` applies to any method with an arm that chooses among index members.
+    ``signal`` names a registered signal (``S0001``, a file under ``lab/signals/``) whose
+    published panel verdict must clear on the dev store the run loads; the method's non-control
+    arms must then be that signal's standard book (``signal_book.standard_candidates``).
+    ``panel_exempt`` says why the panel does not apply -- ``"chassis: ..."`` (a brake, a width, a
+    cadence measured on a book), ``"control-study: ..."`` (how controls behave) or
+    ``"market: ..."`` (a market-level rule that still holds members) -- followed by the reason.
+    A method carries one or neither, never both. Both default to "not given", which is every
+    method file committed before 2026-11-13, so adding them moved no file, no sha and no digest.
+    Construction only checks their shape; whether they satisfy the gate is decided at ``lab run``,
+    never at import or discovery.
     """
 
     id: str
@@ -140,6 +171,8 @@ class Method:
     parent_id: str | None = None
     seen_keys: tuple[str, ...] = field(default=())
     amendments: tuple[Amendment, ...] = field(default=())
+    signal: str | None = None
+    panel_exempt: str = ""
 
     def all_candidates(self) -> tuple[Candidate, ...]:
         """Every variant this method has ever pre-registered: the originals, then each amendment's.
@@ -202,6 +235,24 @@ class Method:
         for key in self.seen_keys:
             if not isinstance(key, str) or ":" not in key:
                 raise ValueError(f"{self.id}: seen key {key!r} must look like kind:value")
+        # The panel gate's two answers (D21). Shape only: this runs on import, for every committed
+        # method file, and the gate itself runs at `lab run`.
+        if self.signal is not None and (
+            not isinstance(self.signal, str) or SIGNAL_ID.fullmatch(self.signal) is None
+        ):
+            raise ValueError(f"{self.id}: signal must look like S0001, got {self.signal!r}")
+        if not isinstance(self.panel_exempt, str):
+            raise TypeError(f"{self.id}: panel_exempt must be a str, got {type(self.panel_exempt).__name__}")
+        if self.panel_exempt and not _exemption_ok(self.panel_exempt):
+            kinds = ", ".join(f"'{k}:'" for k in PANEL_EXEMPT_KINDS)
+            raise ValueError(
+                f"{self.id}: panel_exempt must begin with one of {kinds} and then say why, "
+                f"got {self.panel_exempt!r}"
+            )
+        if self.signal is not None and self.panel_exempt:
+            raise ValueError(
+                f"{self.id}: a method names a signal or declares a panel exemption, never both"
+            )
 
 
 def methods_package() -> ModuleType:

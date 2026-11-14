@@ -28,7 +28,7 @@ function asOfLabel(iso: string): string {
  *
  * Below 1024 px the header is also the top of the page -- Sera's rail is gone and its tab bar
  * floats at the bottom -- so the eyebrow is what names the section there, and the way back to Seer
- * joins sign-out in the aside because the six-tab bar has no room for it (SeraBackLink renders
+ * joins sign-out in the aside because the seven-tab bar has no room for it (SeraBackLink renders
  * nothing on a desk, and nothing outside /sera: this header is Sean's too).
  */
 export function PageHeader({ eyebrow, title, lede, asOf, aside }: PageHeaderProps) {

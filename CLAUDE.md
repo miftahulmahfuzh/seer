@@ -25,7 +25,10 @@ a report or another agent.
   - `strategies/`, `backtest/`, `paper/` (pure night functions that mirror the runner loops),
     `sean/` (the owner's real-money ledger), `fundamentals/` (SEC EDGAR).
   - `lab/`: pre-registration, N policy, hard gate, DSR. `lab/methods/mNNNN_<slug>.py` holds one
-    method per file, each exporting `METHOD = Method(...)`.
+    method per file, each exporting `METHOD = Method(...)`. `lab/signals/sNNNN_<slug>.py` holds
+    one stock-picking signal per file, each exporting `SIGNAL = Signal(...)`. `lab/panel.py`
+    measures a signal on a stock-by-month panel (stage one), and `lab/signal_book.py` is the one
+    fixed book a cleared signal runs as (stage two).
 - `web/`: Next.js 16 and React 19 with the app router. It is a read-only view over Neon; only Sean
   writes. `/sera` reads the committed `web/data/lab.json`. **This Next.js is newer than your
   training data, so read `node_modules/next/dist/docs/` before writing web code** (see
@@ -69,6 +72,14 @@ entry in the same commit.
 
 - The method file must be **committed before** `lab run MNNNN`. That commit is the
   pre-registration, and the runner refuses uncommitted or already-run digests.
+- **Two stages.** A rule for choosing which stocks to hold is a signal first. Commit its file
+  (get the id from `lab next-signal-id`); then `lab panel SNNNN` measures it on the dev store and
+  the survivorship store, records the readings append-only and spends no N. `lab panel-map`
+  ranks every panel under one false-discovery correction, computed on read. Only a signal that
+  clears gets a method, and that method is `signal="SNNNN"` plus `standard_candidates(...)`.
+  `lab run` refuses (exit 2) a method with an arm that picks index members unless it names a
+  cleared signal or carries `panel_exempt` (`chassis:`, `market:` or `control-study:`). A signal
+  file is never edited after its panel; a tweak is a new id.
 - Get the next free id with `lab next-id`. After a lab change, `lab stage` writes
   `web/data/lab.json` and git-adds it with `lab.sqlite`. CI checks that the two agree row for row.
 - The dev window ends 2015-10-16. The test window is spent once per method (`lab test`) and
@@ -76,8 +87,9 @@ entry in the same commit.
 - Parallel sessions share state through `SEER_LAB_DB` and `SEER_RESEARCH_STORE`. The research
   store is `engine/.research/` (gitignored; use the `sync-research-store` skill).
 - Exit codes: 0 means ok, 2 means the lab's rules refused the request, 1 means an error.
-- Commit messages follow the existing style: `lab: M00NN pre-registered — …` and
-  `lab: M00NN rejected (plain reason)`.
+- Commit messages follow the existing style: `lab: M00NN pre-registered — …`,
+  `lab: M00NN rejected (plain reason)`, `lab: S00NN pre-registered — …` and, for a sweep,
+  `lab: sera <stamp> pre-registers S00aa..S00bb`.
 
 ## Experiment protocol
 
@@ -86,8 +98,12 @@ pre-register the hypothesis and every arm in a committed method file → run the
 the treatment (cite a recorded control by trial instead when it is the same book on the current
 store; `lab run` itself measures every otherwise-eligible arm against its random twins, so a
 hand-written random arm is a control, not the luck test) → survivorship and sanity check → record
-the verdict (accept or reject) in the journal → queue the follow-up ideas → report to the
-coordinator. Pre-registration is not skippable, least of all when the result looks obvious.
+the verdict (accept or reject) in the journal → queue a follow-up idea only when the result names
+one → report to the coordinator. A stock-picking idea runs a shorter order first, as a signal:
+verify the store → commit the signal file → `lab panel` → read the corrected verdict in
+`lab panel-map` → journal → stop unless it cleared. Only a cleared signal goes on to the steps
+above, as its one fixed book. Pre-registration is not skippable, least of all when the result
+looks obvious.
 
 ## Invariants that are easy to break
 

@@ -72,6 +72,15 @@ Tables:
   look. Added by ``CREATE TABLE IF NOT EXISTS`` on connect, with no schema version of its own, so
   older checkouts sharing the database through ``SEER_LAB_DB`` open it unchanged. Triggers refuse
   every UPDATE and DELETE.
+- ``panel_signals`` and ``panel_results``: stage one of the lab, the stock-by-month signal panel.
+  One ``panel_signals`` row per thing measured -- a committed signal file (``S0001``) or a replay
+  of a recorded dev arm (its candidate id, with ``method_id`` set) -- and one ``panel_results``
+  row per (signal, panel rule, research store, era) with the reading: months, rank correlation,
+  top-minus-pool spread and the controlled slope, each with its t-statistic. Neither is a trial:
+  no N, no look. Which signals *clear* is never stored; ``lab/panel_verdict.py`` works it out on
+  read, because the false-discovery correction moves with every panel added. Created by ``CREATE
+  TABLE IF NOT EXISTS`` on connect with no schema version, and every reader answers empty when
+  they are absent. Triggers refuse every UPDATE and DELETE.
 
 Schema versions (``meta.schema_version``): 1 is the first lab; 2 adds the ``synthesis`` insight
 kind; 3 adds the ``trial_moments`` side table; 4 adds the ``trial_funding`` side table (the
@@ -692,6 +701,94 @@ BEGIN SELECT RAISE(ABORT, 'trial_yardstick is append-only: a yardstick row is ne
 BEGIN SELECT RAISE(ABORT, 'trial_yardstick is append-only: a yardstick row is never deleted'); END""",
 )
 
+# The stock-by-month signal panel (SERA_SIGNAL_PANEL_PLAN.md phase 2): stage one of the lab. A
+# stock-picking idea is measured here -- does its ranking order next month's returns across the
+# index? -- before it is ever simulated as a book. Two tables, both written only by ``lab panel``
+# and ``lab panel-replay`` (phases 3 and 4), and neither of them is a trial: no ``trials`` row, no
+# change to the luck gate's N, no test-window look. The panel carries its own multiple-testing
+# correction (``lab/panel_verdict.py``) and that correction is never stored, because it moves
+# every time another panel is recorded.
+#
+# ``panel_signals`` is one row per thing measured. A ``signal`` is a committed file under
+# ``lab/signals/`` and its id is ``S0001``; a ``replay`` is one recorded dev arm of a method that
+# already ran, re-read as a pick set, and its id is that arm's own candidate id (``M0614-V1``)
+# with ``method_id`` naming the method. The two CHECKs make the mixed cases unrepresentable: a
+# signal that names a method, a replay that does not, a replay whose id is some other method's
+# arm. ``source_sha`` is the file the measurement read -- the signal file, or the method file of a
+# replay -- and ``insert_panel_signal`` refuses the same id from a different file, because a
+# signal is frozen once it has been panelled exactly as a method is frozen once it has run.
+#
+# ``panel_results`` is one row per (signal, panel rule, research store, era). ``rule_id`` is
+# ``panel_verdict.RULE_ID``, so a later rule is a new measurement rather than a rewrite;
+# ``store_fingerprint`` is the store the reading was taken on -- its full ``ResearchData.fingerprint``
+# (the manifest's ``"fingerprint"``, what ``trials.store_fingerprint`` holds), not its price
+# fingerprint, so a refreshed optional file means a re-panel, which is cheap -- and ``store_role``
+# says which of the two stores that is. A repeat of the key writes nothing (``insert_panel_results`` skips it), so a
+# sweep interrupted half way can simply be run again. ``ic_mean`` / ``ic_t`` are NULL together: a
+# replay is a set of picks with no score to rank, so it has no rank correlation. ``picks_hash`` is
+# the same on every era of one reading (it hashes the whole month-by-month top bucket), and it is
+# what makes two panels twins.
+#
+# **No schema version**, for the reason ``trial_roles`` gave: ``CREATE TABLE IF NOT EXISTS`` adds
+# both tables to an existing v8 database on connect, every reader answers empty when they are
+# absent, and a version bump is a one-way door for every parallel checkout.
+PANEL_KINDS: tuple[str, ...] = ("signal", "replay")
+PANEL_STORE_ROLES: tuple[str, ...] = ("dev", "survivorship")
+#: Mirrors ``panel.ERAS`` (phase 1): the whole dev window, the years before 2009, and 2009-2015.
+PANEL_ERAS: tuple[str, ...] = ("all", "pre2009", "2009-2015")
+
+_PANEL_SIGNALS_TABLE = f"""CREATE TABLE IF NOT EXISTS panel_signals (
+    id               TEXT PRIMARY KEY,
+    kind             TEXT NOT NULL CHECK (kind IN ({_quoted(PANEL_KINDS)})),
+    name             TEXT NOT NULL CHECK (length(trim(name)) > 0),
+    family           TEXT NOT NULL CHECK (length(trim(family)) > 0),
+    hypothesis       TEXT NOT NULL CHECK (length(trim(hypothesis)) > 0),
+    expected_failure TEXT NOT NULL CHECK (length(trim(expected_failure)) > 0),
+    source_kind      TEXT NOT NULL CHECK (source_kind IN ({_quoted(SOURCE_KINDS)})),
+    source_ref       TEXT NOT NULL DEFAULT '',
+    method_id        TEXT REFERENCES methods(id),
+    source_sha       TEXT NOT NULL CHECK (length(trim(source_sha)) > 0),
+    created          TEXT NOT NULL CHECK (length(trim(created)) > 0),
+    CHECK (kind <> 'signal' OR (id GLOB 'S[0-9][0-9][0-9][0-9]' AND method_id IS NULL)),
+    CHECK (kind <> 'replay' OR (method_id IS NOT NULL
+                                AND substr(id, 1, length(method_id) + 1) = method_id || '-'))
+)"""
+_PANEL_SIGNALS_TRIGGERS: tuple[str, ...] = (
+    """CREATE TRIGGER IF NOT EXISTS panel_signals_no_update BEFORE UPDATE ON panel_signals
+BEGIN SELECT RAISE(ABORT, 'panel_signals are append-only: a panel signal row is never updated'); END""",
+    """CREATE TRIGGER IF NOT EXISTS panel_signals_no_delete BEFORE DELETE ON panel_signals
+BEGIN SELECT RAISE(ABORT, 'panel_signals are append-only: a panel signal row is never deleted'); END""",
+)
+
+_PANEL_RESULTS_TABLE = f"""CREATE TABLE IF NOT EXISTS panel_results (
+    signal_id         TEXT NOT NULL REFERENCES panel_signals(id),
+    rule_id           TEXT NOT NULL CHECK (length(trim(rule_id)) > 0),
+    store_role        TEXT NOT NULL CHECK (store_role IN ({_quoted(PANEL_STORE_ROLES)})),
+    store_fingerprint TEXT NOT NULL CHECK (length(trim(store_fingerprint)) > 0),
+    era               TEXT NOT NULL CHECK (era IN ({_quoted(PANEL_ERAS)})),
+    months            INTEGER NOT NULL CHECK (months >= 1),
+    mean_pool         REAL NOT NULL CHECK (mean_pool >= 0),
+    mean_scored       REAL NOT NULL CHECK (mean_scored >= 0),
+    ic_mean           REAL,
+    ic_t              REAL,
+    spread_top        REAL NOT NULL,
+    spread_t          REAL NOT NULL,
+    fm_slope          REAL NOT NULL,
+    fm_t              REAL NOT NULL,
+    top_turnover      REAL NOT NULL CHECK (top_turnover >= 0 AND top_turnover <= 1),
+    picks_hash        TEXT NOT NULL CHECK (length(trim(picks_hash)) > 0),
+    git_sha           TEXT NOT NULL CHECK (length(trim(git_sha)) > 0),
+    measured          TEXT NOT NULL CHECK (length(trim(measured)) > 0),
+    PRIMARY KEY (signal_id, rule_id, store_fingerprint, era),
+    CHECK ((ic_mean IS NULL) = (ic_t IS NULL))
+)"""
+_PANEL_RESULTS_TRIGGERS: tuple[str, ...] = (
+    """CREATE TRIGGER IF NOT EXISTS panel_results_no_update BEFORE UPDATE ON panel_results
+BEGIN SELECT RAISE(ABORT, 'panel_results are append-only: a panel reading is never updated'); END""",
+    """CREATE TRIGGER IF NOT EXISTS panel_results_no_delete BEFORE DELETE ON panel_results
+BEGIN SELECT RAISE(ABORT, 'panel_results are append-only: a panel reading is never deleted'); END""",
+)
+
 #: The backfill's capital rule, exact on every trial recorded before schema v5 (analysis M3).
 #: Cross-checked with ``git merge-base --is-ancestor d79fc83 <trials.git_sha>`` over all 26
 #: distinct ``git_sha`` values: the 20 shas behind trials #1..#128 predate ``d79fc83`` and none of
@@ -857,6 +954,18 @@ CREATE TABLE IF NOT EXISTS ideas_seen (
 {_YARDSTICK_TRIGGERS[0]};
 
 {_YARDSTICK_TRIGGERS[1]};
+
+{_PANEL_SIGNALS_TABLE};
+
+{_PANEL_SIGNALS_TRIGGERS[0]};
+
+{_PANEL_SIGNALS_TRIGGERS[1]};
+
+{_PANEL_RESULTS_TABLE};
+
+{_PANEL_RESULTS_TRIGGERS[0]};
+
+{_PANEL_RESULTS_TRIGGERS[1]};
 
 CREATE TRIGGER IF NOT EXISTS trials_no_update BEFORE UPDATE ON trials
 BEGIN SELECT RAISE(ABORT, 'trials are append-only: a trial row is never updated'); END;
@@ -3839,6 +3948,381 @@ def as_mapping(row: sqlite3.Row) -> Mapping[str, Any]:
     return {k: row[k] for k in row.keys()}
 
 
+# --------------------------------------------------------------------------- signal panel
+
+
+@dataclass(frozen=True)
+class PanelSignalRow:
+    """One thing the panel measured: a registered signal, or a replay of a recorded dev arm.
+
+    - ``id``                ``S0001`` for a signal; the replayed arm's candidate id for a replay.
+    - ``kind``              one of ``PANEL_KINDS``.
+    - ``name``, ``family``  what it ranks on, in plain words, and the family it belongs to.
+    - ``hypothesis``, ``expected_failure``  as pre-registered in the file.
+    - ``source_kind``, ``source_ref``  where the idea came from (``SOURCE_KINDS``).
+    - ``method_id``         the method a replay belongs to; None for a signal.
+    - ``source_sha``        sha256 of the file the measurement read (signal file or method file).
+    - ``created``           when the row was first recorded; the twin rule's "earlier".
+    """
+
+    id: str
+    kind: str
+    name: str
+    family: str
+    hypothesis: str
+    expected_failure: str
+    source_kind: str
+    source_ref: str
+    method_id: str | None
+    source_sha: str
+    created: str
+
+
+@dataclass(frozen=True)
+class PanelResultRow:
+    """One era of one panel reading, on one research store, under one panel rule.
+
+    The database half of phase 1's ``panel.EraStats``; ``from_era`` is the one place a reading
+    becomes a row. Every rate is a fraction. ``spread_top`` is annualised; ``fm_slope`` is
+    **monthly**, never annualised: the mean next-month return per standard deviation of score (or
+    per pick, for a replay) after the momentum, beta, size and volatility controls. A reader that
+    prints a yearly slope multiplies by 12 and never prints the two as one unit. Each ``*_t`` is
+    that series' t-statistic over
+    ``months``. ``ic_mean`` / ``ic_t`` are None together, and always None for a replay.
+    """
+
+    signal_id: str
+    rule_id: str
+    store_role: str
+    store_fingerprint: str
+    era: str
+    months: int
+    mean_pool: float
+    mean_scored: float
+    ic_mean: float | None
+    ic_t: float | None
+    spread_top: float
+    spread_t: float
+    fm_slope: float
+    fm_t: float
+    top_turnover: float
+    picks_hash: str
+    git_sha: str
+    measured: str
+
+    @classmethod
+    def from_era(
+        cls,
+        stats: Any,
+        *,
+        signal_id: str,
+        rule_id: str,
+        store_role: str,
+        store_fingerprint: str,
+        picks_hash: str,
+        git_sha: str,
+        measured: str,
+    ) -> PanelResultRow:
+        """The row for ``stats`` (a ``panel.EraStats``), typed for the table.
+
+        Duck-typed rather than imported, for the reason ``YardstickRow.from_measurement`` is: the
+        whole lab imports ``store``, and ``panel`` pulls in the research loader. The fields read
+        are ``era``, ``months``, ``mean_pool``, ``mean_scored``, ``ic_mean``, ``ic_t``,
+        ``spread_top``, ``spread_t``, ``fm_slope``, ``fm_t`` and ``top_turnover``.
+        """
+        return cls(
+            signal_id=str(signal_id),
+            rule_id=str(rule_id),
+            store_role=str(store_role),
+            store_fingerprint=str(store_fingerprint),
+            era=str(stats.era),
+            months=int(stats.months),
+            mean_pool=float(stats.mean_pool),
+            mean_scored=float(stats.mean_scored),
+            ic_mean=None if stats.ic_mean is None else float(stats.ic_mean),
+            ic_t=None if stats.ic_t is None else float(stats.ic_t),
+            spread_top=float(stats.spread_top),
+            spread_t=float(stats.spread_t),
+            fm_slope=float(stats.fm_slope),
+            fm_t=float(stats.fm_t),
+            top_turnover=float(stats.top_turnover),
+            picks_hash=str(picks_hash),
+            git_sha=str(git_sha),
+            measured=str(measured),
+        )
+
+
+PANEL_SIGNAL_COLUMNS: tuple[str, ...] = tuple(f.name for f in fields(PanelSignalRow))
+PANEL_RESULT_COLUMNS: tuple[str, ...] = tuple(f.name for f in fields(PanelResultRow))
+
+
+def _is_signal_id(text: str) -> bool:
+    """``S`` and four ASCII digits: the shape a signal file's id takes (``lab/signal.py``)."""
+    s = str(text)
+    return len(s) == 5 and s[0] == "S" and s[1:].isascii() and s[1:].isdigit()
+
+
+def _has_panel_tables(conn: sqlite3.Connection) -> bool:
+    """Whether this database has both panel tables.
+
+    ``connect`` always creates them, so False means a ``connect_readonly`` caller on a database
+    no panel-aware code has opened for writing -- the snapshot sync guard reading the committed
+    file is one. Every reader below then answers "nothing recorded", which is what it is.
+    """
+    names = {
+        str(r[0])
+        for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' "
+            "AND name IN ('panel_signals', 'panel_results')"
+        )
+    }
+    return names == {"panel_signals", "panel_results"}
+
+
+def panel_signals(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    """Every recorded panel signal and replay, by id. Empty when the tables are absent."""
+    if not _has_panel_tables(conn):
+        return []
+    return _dicts(conn, "SELECT * FROM panel_signals ORDER BY id")
+
+
+def panel_results(conn: sqlite3.Connection, signal_id: str | None = None) -> list[dict[str, Any]]:
+    """Every recorded panel reading (or one signal's), oldest first. Empty when the tables are absent.
+
+    Oldest first -- ``measured``, then insertion order -- so a reader that keeps the last row it
+    sees for a key holds the newest one. ``panel_verdict`` relies on that.
+    """
+    if not _has_panel_tables(conn):
+        return []
+    if signal_id is None:
+        return _dicts(conn, "SELECT * FROM panel_results ORDER BY measured, rowid")
+    return _dicts(
+        conn,
+        "SELECT * FROM panel_results WHERE signal_id = ? ORDER BY measured, rowid",
+        (str(signal_id),),
+    )
+
+
+def has_panel(conn: sqlite3.Connection, signal_id: str, rule_id: str, store_fingerprint: str) -> bool:
+    """Whether ``signal_id`` already has a reading under ``rule_id`` on ``store_fingerprint``.
+
+    ``lab panel`` asks before it measures, so a repeat costs no panel run as well as writing no
+    row. False when the tables are absent.
+    """
+    if not _has_panel_tables(conn):
+        return False
+    return conn.execute(
+        "SELECT 1 FROM panel_results WHERE signal_id = ? AND rule_id = ? AND store_fingerprint = ? "
+        "LIMIT 1",
+        (str(signal_id), str(rule_id), str(store_fingerprint)),
+    ).fetchone() is not None
+
+
+def next_signal_id(conn: sqlite3.Connection, taken: Iterable[str] = ()) -> str:
+    """The next free ``S0001``-style id: one above the highest recorded **and** named in ``taken``.
+
+    ``taken`` is for the caller that also knows the signal files on disk: a file is committed
+    before it is panelled, so the database alone would hand a second session an id a committed
+    file already holds. Anything in ``taken`` that is not a signal id is ignored. A replay's id
+    is an arm's candidate id and never consumes a signal number.
+    """
+    used = [int(str(s)[1:]) for s in taken if _is_signal_id(s)]
+    if _has_panel_tables(conn):
+        row = conn.execute(
+            "SELECT max(CAST(substr(id, 2) AS INTEGER)) FROM panel_signals WHERE kind = 'signal'"
+        ).fetchone()
+        if row[0] is not None:
+            used.append(int(row[0]))
+    return f"S{max(used, default=0) + 1:04d}"
+
+
+def insert_panel_signal(conn: sqlite3.Connection, row: PanelSignalRow) -> bool:
+    """Record one panel signal (the caller holds the transaction). False, writing nothing, on a repeat.
+
+    A repeat is the same id from the same ``source_sha``: the same file panelled again, which a
+    re-run sweep does. The same id from a **different** file is refused -- a panelled signal is
+    frozen, so a changed idea takes a new id, exactly as a changed method does.
+
+    Refused with ``LabError`` before anything is written, the table's CHECKs stated as sentences:
+    a kind outside ``PANEL_KINDS``; an empty name, family, hypothesis, expected failure, sha or
+    timestamp; a ``source_kind`` outside ``SOURCE_KINDS``; a signal whose id is not ``S####`` or
+    that names a method; a replay that names no method, whose id is not one of that method's arms,
+    or whose arm has no dev trial -- a replay re-reads an arm the lab recorded, nothing else.
+    """
+    sid = str(row.id)
+    if row.kind not in PANEL_KINDS:
+        raise LabError(f"panel signal {sid}: kind must be one of {PANEL_KINDS}, got {row.kind!r}")
+    for col in ("name", "family", "hypothesis", "expected_failure", "source_sha", "created"):
+        if not str(getattr(row, col) or "").strip():
+            raise LabError(f"panel signal {sid}: {col} is empty")
+    if row.source_kind not in SOURCE_KINDS:
+        raise LabError(
+            f"panel signal {sid}: source_kind must be one of {SOURCE_KINDS}, got {row.source_kind!r}"
+        )
+    if row.kind == "signal":
+        if not _is_signal_id(sid):
+            raise LabError(f"a signal's id is S followed by four digits, got {sid!r}")
+        if row.method_id is not None:
+            raise LabError(
+                f"signal {sid} names method {row.method_id}: only a replay belongs to a method"
+            )
+    else:
+        mid = row.method_id
+        if not mid:
+            raise LabError(
+                f"replay {sid} names no method: a replay is one recorded arm of a method"
+            )
+        if not sid.startswith(f"{mid}-"):
+            raise LabError(
+                f"replay {sid} is not an arm of {mid}: a replay's id is the candidate id it replays"
+            )
+        if conn.execute(
+            "SELECT 1 FROM trials WHERE candidate_id = ? AND method_id = ? AND window = 'dev'",
+            (sid, mid),
+        ).fetchone() is None:
+            raise LabError(
+                f"replay {sid}: no dev trial of {mid} has that arm; a replay re-reads an arm the "
+                "lab recorded"
+            )
+    existing = conn.execute(
+        "SELECT kind, source_sha FROM panel_signals WHERE id = ?", (sid,)
+    ).fetchone()
+    if existing is not None:
+        if (str(existing[0]), str(existing[1])) == (row.kind, str(row.source_sha)):
+            return False
+        raise LabError(
+            f"{sid} is already recorded from a different file (sha {str(existing[1])[:12]}): a "
+            "panelled signal is frozen, so a changed idea takes a new id"
+        )
+    cols = ", ".join(f'"{c}"' for c in PANEL_SIGNAL_COLUMNS)
+    marks = ", ".join("?" for _ in PANEL_SIGNAL_COLUMNS)
+    conn.execute(
+        f"INSERT INTO panel_signals ({cols}) VALUES ({marks})",
+        [getattr(row, c) for c in PANEL_SIGNAL_COLUMNS],
+    )
+    return True
+
+
+def _check_panel_result(row: PanelResultRow, kind: str) -> None:
+    """Refuse a row that cannot be a reading, with a sentence rather than a constraint name."""
+    sid = row.signal_id
+    for col in ("rule_id", "store_fingerprint", "picks_hash", "git_sha", "measured"):
+        if not str(getattr(row, col) or "").strip():
+            raise LabError(f"panel result {sid}: {col} is empty")
+    if row.store_role not in PANEL_STORE_ROLES:
+        raise LabError(
+            f"panel result {sid}: store_role must be one of {PANEL_STORE_ROLES}, got {row.store_role!r}"
+        )
+    if row.era not in PANEL_ERAS:
+        raise LabError(f"panel result {sid}: era must be one of {PANEL_ERAS}, got {row.era!r}")
+    if int(row.months) < 1:
+        raise LabError(
+            f"panel result {sid} {row.era}: measured no month, and a reading with no months is "
+            "not recorded"
+        )
+    for col in ("mean_pool", "mean_scored", "spread_top", "spread_t", "fm_slope", "fm_t", "top_turnover"):
+        value = getattr(row, col)
+        if value is None or not math.isfinite(float(value)):
+            raise LabError(
+                f"panel result {sid} {row.era}: {col} must be a finite number, got {value!r}"
+            )
+    if float(row.mean_pool) < 0 or float(row.mean_scored) < 0:
+        raise LabError(f"panel result {sid} {row.era}: a pool size is never negative")
+    if not 0.0 <= float(row.top_turnover) <= 1.0:
+        raise LabError(
+            f"panel result {sid} {row.era}: top_turnover is a share of the top bucket, between 0 "
+            f"and 1, got {row.top_turnover!r}"
+        )
+    if (row.ic_mean is None) != (row.ic_t is None):
+        raise LabError(
+            f"panel result {sid} {row.era}: the rank correlation and its t-statistic are recorded "
+            "together or not at all"
+        )
+    if row.ic_mean is not None:
+        for col in ("ic_mean", "ic_t"):
+            value = getattr(row, col)
+            if not math.isfinite(float(value)):
+                raise LabError(
+                    f"panel result {sid} {row.era}: {col} must be a finite number, got {value!r}"
+                )
+        if kind == "replay":
+            raise LabError(
+                f"replay {sid} has a rank correlation: a replay is a pick set with no score to rank"
+            )
+
+
+def insert_panel_results(conn: sqlite3.Connection, rows: Iterable[PanelResultRow]) -> int:
+    """Record panel readings (the caller holds the transaction). Returns how many were new.
+
+    A row whose key -- (signal, rule, store, era) -- is already recorded is skipped: the same
+    reading again, which a re-run sweep produces. Every row is checked before any is written, so
+    a refused batch leaves nothing behind. Refused with ``LabError``:
+
+    - a signal that is not recorded (record the signal first, in the same transaction);
+    - a row that cannot be a reading (``_check_panel_result``);
+    - a store fingerprint already recorded under the other role: one store is either the dev
+      store or the survivorship store, never both;
+    - eras of one reading (signal, rule, store) with different ``picks_hash``: the hash covers
+      the whole month-by-month pick series, so it cannot differ by era.
+    """
+    batch = list(rows)
+    kinds: dict[str, str] = {}
+    for row in batch:
+        sid = str(row.signal_id)
+        if sid not in kinds:
+            found = conn.execute("SELECT kind FROM panel_signals WHERE id = ?", (sid,)).fetchone()
+            if found is None:
+                raise LabError(f"no panel signal {sid}: record the signal before its results")
+            kinds[sid] = str(found[0])
+        _check_panel_result(row, kinds[sid])
+    role_of: dict[str, str] = {}
+    hash_of: dict[tuple[str, str, str], str] = {}
+    for row in batch:
+        fp = str(row.store_fingerprint)
+        role = role_of.get(fp)
+        if role is None:
+            got = conn.execute(
+                "SELECT store_role FROM panel_results WHERE store_fingerprint = ? LIMIT 1", (fp,)
+            ).fetchone()
+            role = str(row.store_role) if got is None else str(got[0])
+            role_of[fp] = role
+        if role != row.store_role:
+            raise LabError(
+                f"store {fp[:12]} is recorded as the {role} store; it cannot also be the "
+                f"{row.store_role} store"
+            )
+        key = (str(row.signal_id), str(row.rule_id), fp)
+        prior = hash_of.get(key)
+        if prior is None:
+            got = conn.execute(
+                "SELECT picks_hash FROM panel_results WHERE signal_id = ? AND rule_id = ? "
+                "AND store_fingerprint = ? LIMIT 1",
+                key,
+            ).fetchone()
+            prior = str(row.picks_hash) if got is None else str(got[0])
+            hash_of[key] = prior
+        if prior != row.picks_hash:
+            raise LabError(
+                f"{row.signal_id}: every era of one reading shares its pick set, but {row.era} "
+                f"carries a different one on store {fp[:12]}"
+            )
+    cols = ", ".join(f'"{c}"' for c in PANEL_RESULT_COLUMNS)
+    marks = ", ".join("?" for _ in PANEL_RESULT_COLUMNS)
+    inserted = 0
+    for row in batch:
+        if conn.execute(
+            "SELECT 1 FROM panel_results WHERE signal_id = ? AND rule_id = ? "
+            "AND store_fingerprint = ? AND era = ?",
+            (row.signal_id, row.rule_id, row.store_fingerprint, row.era),
+        ).fetchone() is not None:
+            continue
+        values = [getattr(row, c) for c in PANEL_RESULT_COLUMNS]
+        values[PANEL_RESULT_COLUMNS.index("months")] = int(row.months)
+        conn.execute(f"INSERT INTO panel_results ({cols}) VALUES ({marks})", values)
+        inserted += 1
+    return inserted
+
+
 # --------------------------------------------------------------------------- web snapshot
 
 # 2 adds the derived verdict to every trial (``failedNow`` / ``eligibleNow`` / ``dsrNow``). The
@@ -3895,7 +4379,17 @@ def as_mapping(row: sqlite3.Row) -> Mapping[str, Any]:
 # of 200", and it could not tell an arm nobody has measured from one that cleared -- the one
 # confusion the method page must never make. Both fields are null when their table is absent or
 # holds no row for the trial, which was every trial the committed lab held when this version shipped.
-SNAPSHOT_VERSION = 8
+#
+# 9 adds ``panel``, the last top-level key: stage one of the lab, every signal and replayed arm
+# measured on the stock-by-month panel (``panel_signals`` / ``panel_results``), each with its
+# readings by store and era and the verdict ``panel_verdict.published`` works out at export time
+# -- whether it clears, its q-value in the false-discovery correction, the plain-words reasons it
+# does not, and the earlier panel it is a twin of. The verdict is derived here and never stored,
+# for the reason ``books`` is: the correction reads the whole population and moves with every panel
+# recorded, and a React component may not run it. ``2009-2015`` is published as ``recent``, a key
+# the web can name. Empty ``signals`` when the tables are absent or hold no row, which was the
+# committed lab when this version shipped.
+SNAPSHOT_VERSION = 9
 EXPECTED_FAILURE_SEP = "\n\nExpected failure: "  # how lab ideas write their hypothesis
 
 
@@ -3925,9 +4419,9 @@ def _opt_int(x: Any) -> int | None:
     return None if x is None else int(x)
 
 
-def _dicts(conn: sqlite3.Connection, sql: str) -> list[dict[str, Any]]:
+def _dicts(conn: sqlite3.Connection, sql: str, params: Sequence[Any] = ()) -> list[dict[str, Any]]:
     """Rows as dicts, whatever the connection's row_factory."""
-    cur = conn.execute(sql)
+    cur = conn.execute(sql, tuple(params))
     names = [d[0] for d in cur.description]
     return [dict(zip(names, row)) for row in cur.fetchall()]
 
@@ -4172,7 +4666,8 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
     a database that has not been migrated -- the tables added since, ``trial_funding``,
     ``trial_roles`` and ``trial_yardstick``, are reached only through ``funding_of``,
     ``role_of_trial`` and ``yardstick_of``, each of which answers None when its table does not
-    exist. Gate and data
+    exist, and ``panel_signals`` / ``panel_results`` only through ``panel_signals``,
+    ``panel_results`` and ``panel_verdict`` (which reads through them), which answer empty. Gate and data
     facts come from the engine's constants;
     the gate's ``dsrPolicy`` / ``dsrN`` / ``dsrNBasis`` are resolved from ``DSR_POLICY`` against
     ``trials`` at export time rather than stored, so the published gate follows the constant
@@ -4321,6 +4816,8 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
             for sid, p in sorted(roster.LAB_PROVENANCE.items())
             if sid in {e.id for e in roster.active()}
         ],
+        # Snapshot 9: stage one of the lab. Readings as recorded, verdicts as judged now.
+        "panel": _snapshot_panel(conn),
     }
 
 
@@ -4358,6 +4855,76 @@ def _snapshot_books(conn: sqlite3.Connection) -> dict[str, Any]:
     except (LabError, sqlite3.Error):
         return {"firing": [], "testLooks": []}
     return {"firing": block(firing), "testLooks": block(looks)}
+
+
+#: The panel's era names as the web reads them. ``2009-2015`` is not a name a reader can write as
+#: ``x.y``, so it is published as ``recent``; the order is ``PANEL_ERAS``'.
+_PANEL_ERA_KEYS: tuple[tuple[str, str], ...] = tuple(zip(PANEL_ERAS, ("all", "pre2009", "recent")))
+
+
+def _snapshot_panel_era(r: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """One ``panel_results`` row as the web reads it, or None when that era has no row."""
+    if r is None:
+        return None
+    return {
+        "months": int(r["months"]),
+        "ic": _num(r["ic_mean"]),
+        "icT": _num(r["ic_t"]),
+        "spread": _num(r["spread_top"]),
+        "spreadT": _num(r["spread_t"]),
+        "slope": _num(r["fm_slope"]),
+        "slopeT": _num(r["fm_t"]),
+        "turnover": _num(r["top_turnover"]),
+    }
+
+
+def _snapshot_panel_store(eras: Mapping[str, Mapping[str, Any]]) -> dict[str, Any] | None:
+    """One store's readings by era, or None when the panel was never measured on that store."""
+    if not eras:
+        return None
+    return {key: _snapshot_panel_era(eras.get(era)) for era, key in _PANEL_ERA_KEYS}
+
+
+def _snapshot_panel(conn: sqlite3.Connection) -> dict[str, Any]:
+    """The ``panel`` block: the rule, the false-discovery rate, and every recorded panel.
+
+    One dev store is resolved once (``panel_verdict.current_dev_fingerprint``) and handed to both
+    the readings and the verdicts, so a row's numbers and its verdict always describe the same
+    store. Signals are ranked by their dev whole-window controlled slope, highest first, as
+    ``lab panel-map`` ranks them; a panel not measured on that store goes last; ties go by id, so
+    the export stays deterministic. Empty ``signals`` when the tables are absent or hold no row.
+    """
+    from seer_engine.lab import panel_verdict as _pv
+
+    fp = _pv.current_dev_fingerprint(conn)
+    reads = _pv.readings(conn, dev_fingerprint=fp)
+    verdicts = _pv.published(conn, dev_fingerprint=fp)
+    rows: list[dict[str, Any]] = []
+    for s in panel_signals(conn):
+        sid = str(s["id"])
+        v = verdicts[sid]
+        r = reads[sid]
+        rows.append({
+            "id": sid,
+            "kind": s["kind"],
+            "name": s["name"],
+            "family": s["family"],
+            "methodId": s["method_id"],
+            "clears": v.clears,
+            "q": _num(v.q),
+            "reasons": list(v.reasons),
+            "twinOf": v.twin_of,
+            "dev": _snapshot_panel_store(r.dev),
+            "survivorship": _snapshot_panel_store(r.survivorship),
+        })
+
+    def rank(row: Mapping[str, Any]) -> tuple[bool, float, str]:
+        whole = (row["dev"] or {}).get("all")
+        slope = None if whole is None else whole["slope"]
+        return (slope is None, -(slope or 0.0), str(row["id"]))
+
+    rows.sort(key=rank)
+    return {"rule": _pv.RULE_ID, "fdr": _pv.FDR, "signals": rows}
 
 
 def snapshot_json(conn: sqlite3.Connection) -> str:

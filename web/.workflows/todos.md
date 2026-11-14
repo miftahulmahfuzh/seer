@@ -2,7 +2,7 @@
 
 **Package Path**: `web`
 **Package Code**: WEB
-**Last Updated**: 2026-11-13
+**Last Updated**: 2026-11-14
 **Total Active Tasks**: 0
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
@@ -14,7 +14,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 - P3 Low: 0
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 32
+- Completed: 33
 
 ---
 
@@ -49,7 +49,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Handoff from phase 4** (P1-ENG-VZXN, 2026-11-13):
     - The snapshot's `failedNow` can now carry the engine label `beats 90% of random twins` (the yardstick condition); it must be shown in plain words, never raw.
     - Any P5 proof command that quotes `lab yardstick M… --arm …` must use `lab yardstick --arm …` alone: phase 3's CLI takes method ids, one `--arm`, or `--pending`, exactly one.
-
 ### [P2] Medium
 
 ### [P3] Low
@@ -61,6 +60,27 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+
+- [x] **P1-WEB-4JM6** Phase 6: The signal map on `/sera/signals`
+  - **Difficulty**: NORMAL
+  - **Type**: Feature
+  - **Context**: Owns `web/app/sera/signals/page.tsx`, `view.ts`, `view.test.ts`, `signals.module.css`; the seventh tab in `web/components/sera/SeraNav.tsx` and `SeraNav.module.css`; the "six-tab bar" comment in `web/components/sera/PageHeader.tsx`; `.claude/skills/verify-seer/features/sera.md`. Does not touch `types.ts` beyond importing the phase-2 types; `fixture.ts`; `features/README.md`; the engine. Exit: the page renders an empty state on the committed snapshot and a ranked map on a fixture snapshot, at 390 and 1280 wide in both themes, with no id, digest or code in the owner-visible text; a measured store with a missing era reads "not enough months to say".
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 6 of 7)
+  - **Satisfies**: R6 — panel results persisted in lab.sqlite with a snapshot key and shown on /sera in plain language · criteria: R6.2, R6.3
+  - **Depends on**: P1-ENG-1MOB
+  - **Plan**: `web/.workflows/plan/P1-WEB-4JM6.md`
+  - **Completed**: 2026-11-14 07:30
+  - **Method**: /implement
+  - **Files**: web/app/sera/signals/view.ts, web/app/sera/signals/view.test.ts, web/app/sera/signals/page.tsx, web/app/sera/signals/signals.module.css, web/components/sera/SeraNav.tsx, web/components/sera/SeraNav.module.css, web/components/sera/PageHeader.tsx, .claude/skills/verify-seer/features/sera.md, web/.workflows/todos.md
+  - **Proof**: verified-first-pass — 3 journeys, evidence /home/miftah/.local/state/seer-verify/1114-072752-122418/evidence
+  - **Drift**:
+    - verify.sh `api` prints only the first ~80 lines of visible text, so J2/J3's string checks on rows past the cut and on the pager were made against the shoot step's full page-text files and the saved full HTML (aria-label="Next page" only on page 1, "Previous page" only on page 2; zero ids in visible text and in aria-label/data-tip).
+    - In 390-wide dev screenshots the Next.js dev indicator sits over the first tab of the phone bar; dev-only, all seven tabs fit the 364 px pill with no horizontal scroll.
+  - **Decided**:
+    - npm test has one red on the base → treated as baseline, not fixed (invariant 11's rule / coordinator note; the test and snapshot are phase 2's files).
+    - Status was still `blocked` though its dependency P1-ENG-1MOB (phase 2, a36757e) had landed → flipped straight to completed (coordinator instruction).
+    - Completion: block moved to the top of `## Completed Tasks` (precedent of this set's earlier phases). Plan index: phase 6's TaskID cell ticked `(done 2026-11-14)` in the coordinator's copy, left uncommitted for the coordinator; `**Status:**` set to `phase 5/7 complete`. Nothing unblocked: P1-ROOT-F485 (phase 7) still waits on P1-ENG-3AY5 (phase 4). Landing not attempted: swarm coordinator `orch-sera-signal-panel` owns it.
 
 - [x] **P2-WEB-SF4E** Phase 1: ChartPanel: left legend row, toggle highlight, pick seeds it
   - **Difficulty**: NORMAL

@@ -106,3 +106,120 @@ unchanged across J2, J3 and J4.
 Sera's preflight, once, from the main checkout, against the shared `lab/lab.sqlite`, when the
 panel holds no replay rows. The procedure, including how its `lab stage` commit is made, is in
 "The first replay" below. A phase session never runs it.
+
+## A sweep, step by step
+
+This section is for Sera (`.claude/skills/sera-the-explorer`, step 3) or a solo explore session
+panelling one signal. Run it in the main checkout, where the research stores live. Run it only
+when nothing else is loading a store:
+- no child's `lab run`: `tmux list-windows -a -F '#S #W' | grep explore-M` prints nothing;
+- no other `lab panel` or `lab panel-replay`: `ps -eo args | grep '[l]ab panel'` prints
+  nothing.
+
+```bash
+REPO=/home/miftah/seer
+PY=$REPO/engine/.venv/bin/python
+SV=$REPO/engine/.research-sv
+LOGS=$REPO/.workflows/sera/<run-id>
+cd $REPO
+
+# 1. Ids: the first free one (it counts committed signal files with no panel yet), then consecutive.
+$PY -m seer_engine lab next-signal-id
+
+# 2. Write one engine/src/seer_engine/lab/signals/sNNNN_<slug>.py per idea from
+#    .claude/skills/explore-and-experiment-new-method/signal_template.py, then name them all:
+SWEEP="engine/src/seer_engine/lab/signals/s0003_<slug>.py engine/src/seer_engine/lab/signals/s0004_<slug>.py"
+
+# 3. The contract test (purity, unique ids, no look-ahead) and lint.
+(cd engine && $PY -m pytest -q -n0 tests/test_lab_signals.py && $PY -m ruff check src tests)
+
+# 4. The pre-registration: one commit for the whole sweep, by explicit path.
+git fetch origin main -q && git merge --ff-only origin/main
+git add -- $SWEEP
+git commit -m "lab: sera <stamp> pre-registers S0003..S0004" -- $SWEEP
+git push origin HEAD:main
+
+# 5. Stage one: every committed signal with no panel on these two stores.
+$PY -m seer_engine lab panel --pending --store $REPO/engine/.research --sv-store $SV --jobs 2 > $LOGS/panel.txt 2>&1; echo "exit $?"
+
+# 6. Publish the panel rows.
+$PY -m seer_engine lab stage
+git commit -m "lab: sera <stamp> panels S0003..S0004"
+git push origin HEAD:main
+
+# 7. The corrected verdicts, once the whole sweep is recorded.
+$PY -m seer_engine lab panel-map --kind signal
+$PY -m seer_engine lab panel-map --kind all
+```
+
+| `lab panel` exit | Meaning | What to do |
+|---|---|---|
+| 0 | every pending signal was recorded, or nothing was pending; `--pending` lists an uncommitted signal file as skipped | commit any skipped file and run again, then read the map (step 7 above) |
+| 2 | refused; nothing recorded: a named signal file uncommitted or modified, a store that is not the dev store, or no survivorship store | commit the file, point `--store` at `engine/.research`, or rebuild the survivorship store (`docs/runbooks/survivorship-store.md`), then run again |
+| 1 | an error | read the traceback in `$LOGS/panel.txt`, fix, run again; a signal already recorded on these stores is skipped |
+
+After reading the map, act on each signal of the sweep:
+- **Cleared.** Reserve its book with `lab idea`, or keep the queued row the signal's `idea_id`
+  names. Hand it to one child: a method file with `signal="S00xx"` and `standard_candidates(...)`
+  plus declared controls, nothing else.
+- **Not cleared.** `lab drop M00yy --why "panel: <reason>"` for the queued row it answered.
+  Nothing, for a new idea.
+
+Then `lab stage`, commit, push. A signal file is never edited after its panel; a tweak is a new
+signal id in a later sweep. Every `lab panel`, `lab panel-replay` and `lab panel-map` leaves the
+luck gate's N unchanged.
+
+## The first replay
+
+The replay records one pick-set panel per recorded dev candidate of every method whose family
+begins `stock-`. It touches no trial, config digest or method file. It is the first job of the
+panel, and it is run **once per lab, by Sera's preflight** (`sera-the-explorer`, step 2b), from
+the main checkout. No plan phase and no worktree ever runs it against the shared
+`lab/lab.sqlite`.
+
+**When.** Run it when `lab panel-map --kind replay` prints "no replay panel recorded yet", or when `main` carries
+`lab: panel replay, batch <k>` commits but no `lab: panel replay complete` commit (an
+interrupted replay).
+
+**Never** run it while a child's `lab run`, a sweep's `lab panel` or a peer's replay is live.
+Each of these loads the research stores, and five concurrent sessions have already taken this
+machine down.
+
+```bash
+REPO=/home/miftah/seer
+PY=$REPO/engine/.venv/bin/python
+SV=$REPO/engine/.research-sv
+LOGS=$REPO/.workflows/sera/<run-id>
+cd $REPO
+
+# The whole replay in one run, no --limit (it counts previously skipped arms; see "The replay" above).
+# --jobs 1: the only setting a full replay has been measured to the end on this machine.
+$PY -m seer_engine lab panel-replay --family-like 'stock-%' --store $REPO/engine/.research --sv-store $SV --jobs 1 > $LOGS/replay-<k>.txt 2>&1; echo "exit $?"
+$PY -m seer_engine lab stage
+git commit -m "lab: panel replay, batch <k>"     # no pathspec: lab stage staged both files under its lock
+git push origin HEAD:main
+```
+
+If a run was interrupted, run it again (batch k+1): a finished arm is not measured twice. It is
+done when a run prints `recorded 0 replay panel(s)`. Then read `lab panel-map --kind replay`: twins
+are collapsed, and each row has its corrected verdict.
+
+Write the map's synthesis as one `lab insight --kind synthesis`, in plain words, gated by the
+`claim-verifier` subagent. It says:
+- how many recorded books were replayed;
+- how many distinct pick sets that came to;
+- how many cleared;
+- which kinds of ranking lead and which read as noise;
+- what that means for the queued ideas.
+
+Then publish it:
+
+```bash
+$PY -m seer_engine lab stage
+git commit -m "lab: panel replay complete — the map of the explored space"
+git push origin HEAD:main
+```
+
+If the map shows no cleared panel, and the queue has no stock-picking ranking left, Sera writes
+the `risk` insight that names this universe as closed for price-and-volume stock picking
+(`sera-the-explorer`, step 8).

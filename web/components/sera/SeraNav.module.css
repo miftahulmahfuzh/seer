@@ -28,17 +28,19 @@
   background: var(--bar);
 }
 
-/* Sera's phone navigation: Seer's own floating pill (Nav.module.css .bar), at Seer's own metrics.
-   The only number that differs is the width, because Sera has six sections where Seer has four:
-   6 x 52 tab + 5 x 4 gap + 2 x 8 padding = 348 px, which fits the 390 px floor with 21 px of
-   gutter each side and 414 with 33 px. There is no wordmark and no back button in here on purpose
-   -- that is what pays for the sixth tab at full size (SeraNav.tsx). */
+/* Sera's phone navigation: Seer's own floating pill (Nav.module.css .bar), at Seer's own height.
+   Sera has seven sections where Seer has four, so the width and the tracks differ:
+   7 x 48 tab + 6 x 2 gap + 2 x 8 padding = 364 px, which fits the 390 px floor with 13 px of
+   gutter each side and 414 with 25 px. At the rail's 52 px and 4 px gap seven tabs would need
+   404 px and overflow a phone; the seventh tab (the signal map) is paid for by 4 px of each tab's
+   width, never its 52 px height. There is no wordmark and no back button in here on purpose
+   -- that is what leaves room for seven (SeraNav.tsx). */
 .bar {
   position: fixed;
   left: 50%;
   bottom: max(11px, calc((var(--safe-bottom) - 4px) * 0.7));
   transform: translateX(-50%);
-  width: 348px;
+  width: 364px;
   height: 68px;
   border-radius: 999px;
   background: var(--bar);
@@ -49,13 +51,17 @@
 
 .barTabs {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
   height: 100%;
 }
 
-/* One tab, whichever pill holds it. In .barTabs the 1fr track resolves to exactly 52 px, so the
-   bar and the rail show the same button at the same size. */
+/* In the bar a tab takes its 48 px track; the rail's 52 px floor (.tab below) would push the
+   seventh tab out of the pill. */
+.barTabs > .tab, .barTabs > .active { min-width: 0; }
+
+/* One tab, whichever pill holds it: 52 px wide in the rail, its 48 px track in .barTabs, 52 px tall
+   in both, so the bar and the rail show the same button at nearly the same size. */
 .tab, .active {
   position: relative;
   display: flex;

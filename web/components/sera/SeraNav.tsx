@@ -1,6 +1,6 @@
 'use client';
 
-import { Ban, Eye, FlaskConical, LayoutDashboard, Lightbulb, NotebookPen, Workflow } from 'lucide-react';
+import { Ban, Eye, FlaskConical, LayoutDashboard, Lightbulb, NotebookPen, Radar, Workflow } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import s from './SeraNav.module.css';
@@ -8,6 +8,7 @@ import s from './SeraNav.module.css';
 const TABS = [
   { href: '/sera', icon: LayoutDashboard, tip: 'Overview' },
   { href: '/sera/methods', icon: FlaskConical, tip: 'Methods' },
+  { href: '/sera/signals', icon: Radar, tip: 'Signal map' },
   { href: '/sera/journal', icon: NotebookPen, tip: 'Journal' },
   { href: '/sera/ideas', icon: Lightbulb, tip: 'Ideas' },
   { href: '/sera/gotrade', icon: Ban, tip: 'Not on Gotrade' },
@@ -29,11 +30,12 @@ const inSera = (path: string): boolean => path === '/sera' || path.startsWith('/
  * is globals.css's `.desk-only` / `.mobile-only`, not a media query here — one switch for the
  * whole app, so the nav can never disagree with the stylesheets about where the break is.
  *
- * The phone bar carries the six section tabs and nothing else. It has no wordmark because Seer's
+ * The phone bar carries the seven section tabs and nothing else. It has no wordmark because Seer's
  * bar has none either and because PageHeader already prints "Sera · the method lab" as the eyebrow
- * at the top of every page; dropping it is what leaves room for all six tabs at the rail's full
- * 52 px size (6 × 52 + 5 × 4 gap + 2 × 8 padding = 348 px, which clears the 390 px floor with
- * 21 px of gutter either side). The way back to Seer moved out of the bar for the same reason and
+ * at the top of every page; dropping it is what leaves room for all seven tabs (7 × 48 + 6 × 2 gap
+ * + 2 × 8 padding = 364 px, which clears the 390 px floor with 13 px of gutter either side). The
+ * seventh tab, the signal map, cost the bar's tabs 4 px of width each; their height stays the
+ * rail's 52 px. The way back to Seer moved out of the bar for the same reason and
  * now sits beside sign-out in PageHeader — see SeraBackLink below.
  *
  * `journalUnseen` is the number of journal entries not yet seen, read server-side in
@@ -68,7 +70,7 @@ export function SeraNav({ journalUnseen = 0 }: { journalUnseen?: number }) {
 }
 
 /**
- * The six tabs themselves, rendered into whichever container asked for them. One definition, so a
+ * The seven tabs themselves, rendered into whichever container asked for them. One definition, so a
  * tooltip, an aria-label or the Journal badge cannot end up right in the rail and wrong in the bar.
  */
 function Tabs({ path, unseen }: { path: string; unseen: number }) {
@@ -92,7 +94,7 @@ function Tabs({ path, unseen }: { path: string; unseen: number }) {
 }
 
 /**
- * The way back to Seer on a phone. The bar below 1024 px is six section tabs and no more, so this
+ * The way back to Seer on a phone. The bar below 1024 px is seven section tabs and no more, so this
  * leaves-the-area control goes where the other one already is: beside sign-out in PageHeader's
  * aside. The desktop rail keeps its own `.back` and never renders this.
  *

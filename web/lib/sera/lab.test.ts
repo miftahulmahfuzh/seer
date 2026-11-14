@@ -47,7 +47,8 @@ describe('lab snapshot (web/data/lab.json)', () => {
     // happening. The look count is a literal on purpose: spending a look should bring you here.
     const members = (bs: typeof lab.books.testLooks) => bs.flatMap((b) => [b.lead, ...b.others]);
 
-    expect(lab.summary.testLooks).toBe(5);
+    // (2026-11-14) Six now: the sixth look went to M0497, a book of its own, so four strategies.
+    expect(lab.summary.testLooks).toBe(6);
     expect(lab.summary.testBooks).toBe(lab.books.testLooks.length);
     expect(members(lab.books.testLooks).length).toBe(lab.summary.testLooks);
 

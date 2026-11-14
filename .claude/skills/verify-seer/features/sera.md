@@ -22,7 +22,7 @@ $V api RUN GET /sera/methods/M0007         # "M0007 · Residual momentum: ...", 
 $V api RUN GET /sera/methods/M0007         # "Beats look-alikes: not measured yet" (committed lab: no readings yet)
 $V api RUN GET /sera/how                   # "Seven things every method must clear", "Better than random picks"
 $V api RUN GET /sera/signals               # "The signal map", "No idea has been measured yet.", "Nothing measured yet" (committed lab: no panel rows until Sera's first replay)
-$V api RUN GET '/sera/signals?page=2'      # with fixture rows (see Gotchas): "Page 2 of 2", "[Previous page]"
+$V api RUN GET '/sera/signals?page=2'      # with fixture rows (see Gotchas): "Page 2 of 2", "[Previous page]" — in the saved HTML or `shoot`'s page text; `api` truncates what it prints
 $V labsql RUN "select max(id) from insights"                                 # 891
 $V api RUN POST /api/sera/journal/seen '{"ids":[891,890],"via":"click"}'      # HTTP 204, no body
 $V sql RUN "select insight_id, via from journal_seen order by 1"             # 890 | click, 891 | click

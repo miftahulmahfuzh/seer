@@ -109,7 +109,7 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Difficulty**: NORMAL
   - **Type**: Feature
   - **Context**: Owns `.claude/skills/sera-the-explorer/SKILL.md`, `.claude/skills/explore-and-experiment-new-method/SKILL.md`, the one paragraph in `.claude/skills/redo-sera-experiments/SKILL.md` that mints a twin (it now carries `panel_exempt`), `CLAUDE.md` (Layout, The lab, Experiment protocol), `README.md`, and the two Sera-facing sections appended to `docs/runbooks/signal-panel.md` ("A sweep, step by step", "The first replay"). Does not touch any code; `signal_template.py`; `method_template.py`; any feature-map file. Exit: both skills describe the sweep, the stage-two launch for a cleared signal, the unchanged path for non-signal ideas, the routing of queued stock-signal idea rows, the first replay run without `--limit`, and the `feature-wish` step for a promotable signal book; every command they name exists with those flags (J3).
-  - **Status**: blocked
+  - **Status**: open
   - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 7 of 7)
   - **Satisfies**: R5 — the Sera and explore skills send signal ideas through the panel, with one synthesis per sweep and the queued stock-signal ideas routed through it · criteria: R5.1, R5.2
   - **Depends on**: P1-ENG-7F8X, P1-ENG-3AY5, P1-ENG-KGFN

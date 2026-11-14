@@ -38,3 +38,40 @@ $V labsql RUN "select count(*) from trials"       # T, unchanged
 - The uncommitted-file refusal is driven by adding an untracked `sNNNN_*.py` (a copy of a seed signal with its id changed) to the checkout under test, running `lab panel` on it, then deleting it. Remove the file before anything else runs: `lab next-signal-id` counts it while it exists.
 - A panel is keyed on the dev store's fingerprint. After a dev store change every signal is pending again, which is intended.
 - Counts in this file are examples. Read them back with `labsql` (CLAUDE.md, Claim verification).
+
+## Replay: `lab panel-replay`
+
+- `lab panel-replay [M0614 ...] [--family-like PATTERN] [--limit N] [--store DIR] [--sv-store DIR] [--jobs 1|2]`: every recorded dev arm of every method whose family is like PATTERN (default `stock-%`) becomes a pick-set panel. The arm's own allocator is called at each month end with nothing held, its fixed instruments and names outside the pool are dropped, and the rest are measured on the dev store and then the survivorship-check store. Each arm is recorded in one transaction: a `panel_signals` row of kind `replay` under the candidate id with `method_id` set, plus its `panel_results` rows.
+- The report prints how many arms were selected, already recorded and attempted; per store, the arms measured, the wall time and the time per arm; `recorded K replay panel(s), one transaction each`; the held-aware count; and a skipped table, counted by reason with one line per arm. The reasons are: method file does not import, arm no longer in its file, configuration drifted, bracket strategy, picks no index members, a store lacks its data, allocator raised, or never picked 5 pool names in a month. It ends with the same N / luck gate N / looks footer as `lab panel`.
+- A re-run measures only arms with no panel on the current dev store, plus the ones it skipped before. With nothing left it prints "nothing to replay: no store was loaded".
+- Refused, exit 2, nothing loaded: a named method with no dev trial in the family, a malformed id, and every store refusal `lab panel` makes. `--jobs` above 2 is refused by argparse (exit 2). Exit 1 only when the run attempted arms and the selection holds no replay panel at all.
+
+### Driving it with verify.sh
+
+```sh
+$V up --no-web --empty
+SV=/home/miftah/seer/engine/.research-sv
+DB=$HOME/.local/state/seer-verify/RUN/lab.sqlite
+sqlite3 "file:$DB?mode=ro" "select * from trials order by n" | sha256sum                 # keep
+sqlite3 "file:$DB?mode=ro" "select id, source_sha from methods order by id" | sha256sum   # keep
+$V lab RUN panel-replay --sv-store $SV --limit 20      # minutes: "20 attempted this run", "recorded K replay panel(s)", a skipped table; exit 0
+$V labsql RUN "select count(*) from panel_signals where kind = 'replay'"                                   # K
+$V labsql RUN "select count(*) from (select distinct signal_id, store_role from panel_results where signal_id in (select id from panel_signals where kind = 'replay'))"   # 2K
+$V lab RUN panel-replay --sv-store $SV --jobs 1        # the rest of the sweep: run it in the background (see docs/runbooks/signal-panel.md for its measured time)
+$V lab RUN panel-replay --sv-store $SV                 # "recorded 0"; every finished arm counted as already recorded; exit 0
+$V lab RUN panel-replay M0205 --sv-store $SV           # exit 2: M0205 is not a stock-* method
+$V lab RUN panel-replay --jobs 3                       # exit 2 (argparse)
+$V lab RUN panel-map --kind replay --top 15            # the replays ranked by controlled slope, twins marked
+sqlite3 "file:$DB?mode=ro" "select * from trials order by n" | sha256sum                 # same as kept
+sqlite3 "file:$DB?mode=ro" "select id, source_sha from methods order by id" | sha256sum   # same as kept
+git status --short engine/src/seer_engine/lab/methods                                    # nothing
+```
+
+### Gotchas (replay)
+
+- Pass `--sv-store` every time: `$V lab` starts from `env -i` and does not export `SEER_SV_STORE`.
+- The full sweep loads both stores and runs every recorded stock arm's allocator on each. Run it with Bash `run_in_background`, never under a foreground timeout, and never beside another store-loading command (invariant 6: at most two such sessions on this machine).
+- An arm that was skipped is attempted again on every run, so a re-run after a complete sweep still loads both stores whenever any arm was skipped. That is by design: a fixed file or store may now feed it.
+- Never run it against `/home/miftah/seer/lab/lab.sqlite` from a phase session. The production replay is run once from the main checkout by Sera (phase 7).
+- `held-aware` arms (keep bands, rules that read what is held) are measured from an empty book every month. Their panel is an approximation, and the report says how many there are.
+- Counts here are examples. Read them back with `labsql` (CLAUDE.md, Claim verification).

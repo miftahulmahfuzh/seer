@@ -3,18 +3,18 @@
 **Package Path**: `engine`
 **Package Code**: ENG
 **Last Updated**: 2026-11-14
-**Total Active Tasks**: 3
+**Total Active Tasks**: 2
 
 TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random uppercase alphanumerics, unique).
 
 ## Quick Stats
 - P0 Critical: 0
-- P1 High: 1
+- P1 High: 0
 - P2 Medium: 1
 - P3 Low: 1
 - P4 Backlog: 0
 - Blocked: 0
-- Completed: 175
+- Completed: 176
 
 ---
 
@@ -1682,16 +1682,6 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
   - **Commit**: `d89c324`
   - **Verified**: by the swarm coordinator from git, not from the phase's report — `d89c324` is an ancestor of the branch and carries exactly the five declared paths, no peer file and no lab state. Guardrails re-measured independently: `factor_rows` and `fundamental_rows` both report `price_basis='adjusted'`, `KEYWORD_ONLY`, read back from `inspect.signature`; `FactorParams` still 10 fields and `FundamentalParams` still 8, neither gained one; `lab/lab.sqlite` md5 9dbbf873209e82c8303f7f7117cb0682, `web/data/lab.json` md5 9bf2b2e1740c4e27a0380056dd6649e0 and `engine/tests/test_registry.py` md5 73ceb3ca56220477d1eeee901eee84fa all byte-identical to the pre-wave baseline. Full suite **7763 passed, 4 skipped, 0 failed**; `ruff check engine` clean.
   - **Note**: invariant 8 — the unmoved `price_basis="adjusted"` default — is the guarantee phase 3's four `factor_rows` arms (M0260, M0261, M0262, M0334) depend on. It held, so the retrofit prices against the same pool as the arms it is subtracted from.
-- [ ] **P1-ENG-3AY5** Phase 4: Replay the recorded stock-signal methods
-  - **Difficulty**: HARD
-  - **Type**: Feature
-  - **Context**: Owns `lab/panel_replay.py` (candidate -> picks scorer through `prepare_for` and `targets_prepared` with `held=frozenset()`; stores loaded through `panel_run.open_store`; row name = the method's own name); `lab panel-replay` in `commands/lab.py`; `tests/test_lab_panel_replay.py`; `docs/runbooks/signal-panel.md` (operator half); an appended `## Replay` section in `features/signal-panel.md`. Does not touch any file under `lab/methods/`; `trials`; phase 3's three subcommands except to sit beside them; `panel_run.py`. Exit: on a scratch copy of the lab DB and the real stores, `lab panel-replay` over every `stock-%` method completes, `lab panel-map` prints the ranked map with twins collapsed, and the sha256 of every `trials` row and of `methods.source_sha` is unchanged.
-  - **Status**: open
-  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 4 of 7)
-  - **Satisfies**: R3 — replay the already-run stock-signal methods through the panel in one pass without changing any config digest or frozen record · criteria: R3.1
-  - **Depends on**: P1-ENG-7F8X
-  - **Plan**: `engine/.workflows/plan/P1-ENG-3AY5.md`
-
 ### [P2] Medium
 - [ ] **P2-ENG-N3LB** `name_count.py`'s docstring still calls the dev trial count "the lab's N"
   - **Difficulty**: EASY
@@ -1829,6 +1819,25 @@ TaskID format: `P{Priority}-{PackageCode}-{4CharID}` (4CharID = 4 random upperca
 ---
 
 ## Completed Tasks
+- [x] **P1-ENG-3AY5** Phase 4: Replay the recorded stock-signal methods
+  - **Difficulty**: HARD
+  - **Type**: Feature
+  - **Context**: Owns `lab/panel_replay.py` (candidate -> picks scorer through `prepare_for` and `targets_prepared` with `held=frozenset()`; stores loaded through `panel_run.open_store`; row name = the method's own name); `lab panel-replay` in `commands/lab.py`; `tests/test_lab_panel_replay.py`; `docs/runbooks/signal-panel.md` (operator half); an appended `## Replay` section in `features/signal-panel.md`. Does not touch any file under `lab/methods/`; `trials`; phase 3's three subcommands except to sit beside them; `panel_run.py`. Exit: on a scratch copy of the lab DB and the real stores, `lab panel-replay` over every `stock-%` method completes, `lab panel-map` prints the ranked map with twins collapsed, and the sha256 of every `trials` row and of `methods.source_sha` is unchanged.
+  - **Status**: completed
+  - **Plan Set**: `/home/miftah/seer/.workflows/orchestration/sera-signal-panel/PLAN.md` (phase 4 of 7)
+  - **Satisfies**: R3 — replay the already-run stock-signal methods through the panel in one pass without changing any config digest or frozen record · criteria: R3.1
+  - **Depends on**: P1-ENG-7F8X
+  - **Plan**: `engine/.workflows/plan/P1-ENG-3AY5.md`
+  - **Completed**: 2026-11-14 08:28
+  - **Method**: /implement
+  - **Files**: engine/src/seer_engine/lab/panel_replay.py, engine/src/seer_engine/commands/lab.py, engine/tests/test_lab_panel_replay.py, docs/runbooks/signal-panel.md, .claude/skills/verify-seer/features/signal-panel.md
+  - **Proof**: verified-first-pass — 5 journeys, evidence /home/miftah/.local/state/seer-verify/1114-061317-129963/evidence (journey outputs under evidence/p4)
+  - **Drift**:
+    - This session resumed phase 4 after a WSL restart; the predecessor's on-disk panel_replay.py is byte-identical to the plan's code block.
+    - test_lab_panel_replay.py: the dev test store carries labkit.LAB_PRICE_FINGERPRINT as its price fingerprint (phase 3's fixture fix; D10 refuses any other on a seeded lab). The plan's block used the store fingerprint.
+  - **Decided**:
+    - J3/J4 --jobs -> 1 instead of the plan's 2 (rung 1: invariant 6, machine memory; the --jobs 2 sweep was running when WSL restarted, and the coordinator set one job). The runbook's measured table and the feature map's driving block say --jobs 1; the runbook states --jobs 2 was not timed.
+    - Completion: block moved to the top of `## Completed Tasks` beside phases 1-3 and 5 of this set (their precedent). Plan index: phase 4's TaskID cell ticked `(done 2026-11-14)` in the coordinator's copy (left uncommitted for the coordinator, as earlier phases were) and `**Status:**` set to `phase 6/7 complete`. P1-ROOT-F485 (phase 7) unblocked: all three of its dependencies (P1-ENG-7F8X, P1-ENG-3AY5, P1-ENG-KGFN) are complete. Landing not attempted: swarm coordinator `orch-sera-signal-panel` owns it.
 - [x] **P1-ENG-KGFN** Phase 5: The panel gate in `lab run` and the one-chassis signal book
   - **Difficulty**: HARD
   - **Type**: Feature

@@ -203,6 +203,18 @@
                                     the three eras' spread. Writes nothing
     lab next-signal-id              the next free signal id: one past both the record and the
                                     committed signal files
+    lab panel-replay [M0614 ...] [--family-like PATTERN] [--limit N] [--store DIR]
+                     [--sv-store DIR] [--jobs 1|2]
+                                    stage one's first job: every recorded dev arm of each method
+                                    whose family is like PATTERN (default stock-%) as a pick-set
+                                    panel. The arm's own allocator is called at each month end
+                                    with nothing held, and the names it returns are measured on
+                                    the dev store, then the survivorship-check store, and recorded
+                                    in one transaction per arm (panel_signals kind replay, id =
+                                    the candidate id). An arm already recorded on the dev store is
+                                    not measured again; an arm that cannot be replayed is reported
+                                    with the reason and the sweep goes on. Never a trial: N, the
+                                    luck gate's N and the looks do not move
     lab idea --name ... --hypothesis ...   queue an idea (prints its id)
     lab note M0007 --file F [--verdict V]  append analysis / set the verdict
     lab block M0007 --on "what data"       an idea the store cannot test
@@ -224,9 +236,9 @@
     lab seed                        one-time import of the pre-lab record
 
 Parallel sessions (sera-the-explorer) share one database: SEER_LAB_DB sets --db,
-SEER_RESEARCH_STORE sets --store, and SEER_SV_STORE sets the --sv-store of lab survivorship and
-lab panel. A worktree has none of the three stores of its own, so a child exports all three to
-the main checkout's.
+SEER_RESEARCH_STORE sets --store, and SEER_SV_STORE sets the --sv-store of lab survivorship,
+lab panel and lab panel-replay. A worktree has none of the three stores of its own, so a child
+exports all three to the main checkout's.
 
 Exit 0 on success; 2 when the lab's rules refuse the request; 1 on any other error.
 """
@@ -1144,6 +1156,56 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
 
     sub.add_parser("next-signal-id",
                    help="the next free signal id: one past the record and the committed signal files")
+
+    s = sub.add_parser(
+        "panel-replay",
+        # `help=` strings are %-interpolated by argparse: the one `%` below is written `%%`.
+        help="record a pick-set panel for every recorded dev arm of the stock-picking methods",
+        description=(
+            "Replay every recorded dev arm of each method whose family is like --family-like "
+            "(default stock-%) through the signal panel. The arm's own allocator is called at "
+            "each month end of the dev window with that month's index members and nothing held; "
+            "its fixed instruments and any name outside the panel's pool are dropped, and the "
+            "rest are its picks. The panel measures them on the dev store and then on the "
+            "survivorship-check store (never both in memory), and each arm is recorded in one "
+            "transaction once both have measured it: a panel_signals row of kind replay under "
+            "the arm's candidate id, and its panel_results rows. An arm already recorded on the "
+            "dev store is not measured again, so a stopped run resumes. An arm that cannot be "
+            "replayed (its file no longer imports, its configuration drifted from the recorded "
+            "digest, a store lacks data it reads, its allocator raises, it never picks enough "
+            "names) is reported with the reason and the sweep goes on. No trial, no moment, no "
+            "status and no journal entry: the lab's N, the luck gate's N and the test-window "
+            "looks do not move."
+        ),
+    )
+    s.add_argument("method", nargs="*", metavar="M0614",
+                   help="replay only these methods (default: every method in the family)")
+    s.add_argument("--family-like", default=None, metavar="PATTERN",
+                   help="SQL LIKE pattern on methods.family (default: stock-%%)")
+    s.add_argument("--limit", type=_positive_count, default=None, metavar="N",
+                   help="attempt at most N unfinished arms, in trial order, then stop; run again "
+                        "for the next batch")
+    s.add_argument(
+        "--store",
+        type=Path,
+        default=Path(os.environ.get("SEER_RESEARCH_STORE") or research.STORE_DIR),
+        help=f"dev-window research store (default: {research.STORE_DIR}, or "
+             "$SEER_RESEARCH_STORE); a store declaring another window, or carrying a purpose "
+             "marker, is refused from its manifest",
+    )
+    s.add_argument(
+        "--sv-store",
+        type=Path,
+        default=Path(os.environ.get("SEER_SV_STORE") or research.SV_STORE_DIR),
+        help=f"the survivorship-check store (default: {research.SV_STORE_DIR}, or "
+             "$SEER_SV_STORE); required, and refused unless its manifest says purpose "
+             "survivorship-check. From a worktree, export SEER_SV_STORE to the main checkout's "
+             "engine/.research-sv",
+    )
+    s.add_argument("--jobs", type=int, choices=(1, 2), default=1, metavar="J",
+                   help="worker processes forked after each store loads, one allocator group at a "
+                        "time (1 or 2, default 1). Each worker prepares its own allocators, so two "
+                        "is the ceiling on this machine; the records are identical for either")
 
     s = sub.add_parser("idea", help="queue an idea in the backlog")
     s.add_argument("--name", required=True)
@@ -4964,6 +5026,47 @@ def _next_signal_id(conn, args) -> int:
     return 0
 
 
+def _panel_replay(conn, args) -> int:
+    """``lab panel-replay [M0614 ...]``: every recorded stock-signal arm as a pick-set panel.
+
+    ``lab.panel_replay`` holds the replay. This handler only wires the flags, prints the report,
+    and prints N, the luck gate's N and the looks before and after (``panel_run.footer``), so the
+    invariant shows on every run. It writes ``panel_signals`` (kind ``replay``) and
+    ``panel_results`` rows and nothing else. It exits 1 when the run attempted arms and the
+    selection still holds no replay panel at all, so nothing could be replayed. A re-run whose
+    remaining arms are all unreplayable exits 0, because the sweep itself is complete.
+    """
+    from seer_engine.lab import panel_replay, panel_run, runner
+
+    if research.DEV_END != dev.DEV_END:
+        raise store.LabError("research.DEV_END differs from dev.DEV_END; refusing to run")
+    before = panel_run.Counts.read(conn)
+    t0 = time.perf_counter()
+    rep = panel_replay.run(
+        conn,
+        Path(args.store),
+        Path(args.sv_store),
+        git_sha=runner.git_head(config.REPO_ROOT),
+        method_ids=args.method,
+        family_like=args.family_like,
+        limit=args.limit,
+        jobs=args.jobs,
+    )
+    print(panel_replay.format_report(rep))
+    print()
+    stage = (" Read the map with `python -m seer_engine lab panel-map --kind replay`; solo, "
+             "`python -m seer_engine lab stage` so seertrade.site/sera shows it."
+             if rep.recorded else "")
+    print(panel_run.footer(conn, before, lead="No trial was recorded.") + stage)
+    log.info("lab panel-replay: %d recorded, %d skipped (%.1fs)",
+             len(rep.recorded), len(rep.skipped), time.perf_counter() - t0)
+    if rep.attempted and not (rep.recorded or rep.already or rep.lost):
+        log.error("lab panel-replay: none of the %d attempted arm(s) could be replayed, and the "
+                  "selection holds no replay panel", rep.attempted)
+        return 1
+    return 0
+
+
 _HANDLERS = {
     "status": _status,
     "regime": _regime,
@@ -5002,6 +5105,7 @@ _HANDLERS = {
     "panel": _panel,
     "panel-map": _panel_map,
     "next-signal-id": _next_signal_id,
+    "panel-replay": _panel_replay,
     "export": _export,
     "export-json": _export_json,
     "seed": _seed,

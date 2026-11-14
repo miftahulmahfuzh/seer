@@ -48,7 +48,7 @@ ones: `migrate`, `nightly`, `backfill`, `universe`, `fundamentals`, `shares`, `p
 
 `lab` subcommands that matter for this document: `next-id`, `run MNNNN`, `show`, `status`,
 `reevaluate`, `demote`, `promote`, `test`, `stage`, `yardstick`, and the signal panel's `panel`,
-`panel-map` and `next-signal-id`.
+`panel-map`, `next-signal-id` and `panel-replay`.
 
 #### `lab run MNNNN [--amend] [--jobs J]`
 Runs a committed method on the dev window and records every arm. `--jobs` (default 2) is the
@@ -87,6 +87,17 @@ research store and writes nothing.
 #### `lab next-signal-id`
 The next free signal id alone on stdout (the N footer goes to stderr): one past both the record
 and the committed signal files.
+
+#### `lab panel-replay [M0614 ...] [--family-like PATTERN] [--limit N] [--store DIR] [--sv-store DIR] [--jobs J]`
+Replays every recorded dev arm of each method whose family is LIKE `--family-like` (default
+`stock-%`) through the panel as a pick set: the arm's own allocator is called at each dev month end
+with that month's index members and nothing held, and the names it returns (minus fixed
+instruments and names outside the pool) are its picks. Measured on the dev store, then the
+survivorship-check store, and recorded per arm in one transaction as a `replay` panel under the
+arm's candidate id. Already-recorded arms are skipped, so a stopped run resumes; `--limit` caps the
+unfinished arms attempted. An arm that cannot be replayed (no import, drifted digest, missing data,
+allocator raised, too few picks) is reported and the sweep goes on. `--jobs` is 1 or 2. Writes no
+trial, status or journal entry: N, the luck gate's N and the looks do not move.
 
 ### Key Python entry points
 
@@ -161,6 +172,16 @@ def record(conn, subject, dev_run, sv_run, *, git_sha, measured) -> bool  # Fals
 def panel_map(conn, *, kind="all") -> tuple[str | None, list[MapRow], int]
 def format_map(...) -> str; def format_reading(...) -> str; def footer(conn, before, *, lead) -> str
 def next_signal_id(conn) -> str     # store.next_signal_id(conn, taken=signal.discover())
+
+# lab/panel_replay.py (phase 4: what `lab panel-replay` calls; writes only through panel_run.record)
+COMMAND = "lab panel-replay"; FAMILY_LIKE = "stock-%"
+class Recorded; class Work; class Skip; class Outcome; class StorePass; class Report; class PickScorer
+def select(conn, *, method_ids=(), family_like=FAMILY_LIKE) -> tuple[Recorded, ...]  # LabError on a bad id
+def unfinished(conn, selected, dev_fingerprint) -> tuple[list[Recorded], int]
+def resolve(selected, load) -> tuple[list[Work], list[Skip]]   # config_digest must equal the recorded one
+def run(conn, dev_dir, sv_dir, *, git_sha, method_ids=(), family_like=None, limit=None, jobs=1,
+        load=None, now=store.now_iso) -> Report
+def format_report(rep: Report) -> str
 
 # lab/hardgate.py
 def check(conn, method_id) -> None                 # raises LabError on any refusal
@@ -387,6 +408,9 @@ engine/.venv/bin/python -m seer_engine lab next-signal-id
 SEER_SV_STORE=/home/miftah/seer/engine/.research-sv \
   engine/.venv/bin/python -m seer_engine lab panel S0001        # signal file committed first
 engine/.venv/bin/python -m seer_engine lab panel-map --top 20
+SEER_SV_STORE=/home/miftah/seer/engine/.research-sv \
+  engine/.venv/bin/python -m seer_engine lab panel-replay --limit 50
+engine/.venv/bin/python -m seer_engine lab panel-map --kind replay --top 20
 ```
 
 ### Gotchas
@@ -395,7 +419,7 @@ engine/.venv/bin/python -m seer_engine lab panel-map --top 20
 - `unmatched` never clears: the fix is a new arm (an amendment), not a remeasure.
 - argparse `help=` strings are %-interpolated; escape `%` as `%%`.
 - Closed records (`backtest/registry.py`, past reports, existing lab rows) are frozen.
-- `lab panel` needs a survivorship-check store; a worktree has none, so export `SEER_SV_STORE` (and `SEER_RESEARCH_STORE`) to the main checkout's stores.
+- `lab panel` and `lab panel-replay` need a survivorship-check store; a worktree has none, so export `SEER_SV_STORE` (and `SEER_RESEARCH_STORE`) to the main checkout's stores.
 
 ## Notes
 
@@ -410,7 +434,8 @@ The signal panel is the sera-signal-panel plan set (`.workflows/plan/sera-signal
 the signal registry and pure evaluator, phase 2 (task P1-ENG-1MOB) the append-only panel tables,
 `panel_verdict.published` and the `panel` key in `web/data/lab.json`, phase 3 (task P1-ENG-7F8X)
 `lab/panel_run.py` and the `lab panel`, `lab panel-map` and `lab next-signal-id` commands
-(feature-map entry `.claude/skills/verify-seer/features/signal-panel.md`). Phase 4 adds the replay
-of recorded methods.
+(feature-map entry `.claude/skills/verify-seer/features/signal-panel.md`), phase 4 (task
+P1-ENG-3AY5) `lab/panel_replay.py` and `lab panel-replay`, the replay of recorded methods (runbook
+`docs/runbooks/signal-panel.md`).
 
 Documentation Created: 2026-11-13

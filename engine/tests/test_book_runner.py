@@ -1278,3 +1278,19 @@ def test_an_unfunded_run_is_byte_identical():
     assert book_runner._daily_returns(equity, ()) == book_runner._daily_returns(equity)
     assert book_runner._year_returns(equity, ()) == book_runner._year_returns(equity)
     assert strategy_metrics(equity, [], ()).max_drawdown == strategy_metrics(equity, []).max_drawdown
+
+
+def test_value_path_scales_every_target_by_path_over_equity():
+    """``value_path_growth``: behind the path the book is told to hold all of it, ahead of it only
+    ``path / equity``, and the cap floors the share at one minus itself."""
+    two = (
+        Target(symbol="AAA", weight=Decimal("0.6"), last=Decimal("10")),
+        Target(symbol="BBB", weight=Decimal("0.4"), last=Decimal("20")),
+    )
+    scaled = book_runner._value_path_scaled
+    assert scaled(two, Decimal("120"), Decimal("100"), None) == two  # behind the path: never above 1
+    half = scaled(two, Decimal("50"), Decimal("100"), None)
+    assert [(t.symbol, t.weight) for t in half] == [("AAA", Decimal("0.3")), ("BBB", Decimal("0.2"))]
+    capped = scaled(two, Decimal("50"), Decimal("100"), Decimal("0.2"))
+    assert [t.weight for t in capped] == [Decimal("0.48"), Decimal("0.32")]
+    assert scaled(two, Decimal("0"), Decimal("100"), None) == ()  # nothing wanted: targets dropped

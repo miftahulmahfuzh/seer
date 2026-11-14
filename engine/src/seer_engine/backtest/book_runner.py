@@ -223,6 +223,23 @@ def _with_idle(
     return targets + (Target(symbol=idle, weight=to_weight(residual), last=q(idle_bar.close)),), True
 
 
+def _value_path_scaled(
+    targets: tuple[Target, ...], path: Decimal, equity: Decimal, cap: Decimal | None
+) -> tuple[Target, ...]:
+    """``targets`` with every weight scaled by ``path / equity``, never above 1 and, under ``cap``,
+    never below ``1 - cap``: value averaging's share of the account (``rules.value_path_growth``).
+    A weight the scale quantizes to nothing drops its target."""
+    scale = Decimal(1) if equity <= 0 else min(Decimal(1), path / equity)
+    if cap is not None:
+        scale = max(scale, Decimal(1) - cap)
+    out: list[Target] = []
+    for t in targets:
+        w = scale_weight(t.weight, scale)
+        if w is not None:
+            out.append(replace(t, weight=w))
+    return tuple(out)
+
+
 def _spy_sma_gate_open(market: Market, data_date: date, window: int, above: bool) -> bool:
     """True when SPY's close on ``data_date`` is below (or, ``above``, above) its own
     ``window``-session average through ``data_date``. False with too little history, never a
@@ -391,6 +408,17 @@ def run_book(
     # ``add_gate_max_wait``. Reset on every credited deposit; the run's starting capital counts as
     # session 0's "deposit", so a max-wait gate can force the opening buy too.
     sessions_since_deposit = 0
+    # ``value_path_growth``: the path the invested money is steered toward. It opens at the starting
+    # capital, takes every deposit at the next rank session, and compounds once per rank session
+    # after the first (monthly; ``TradeRules`` refuses the lever on any other cadence).
+    value_path = cash0
+    value_path_pending = _ZERO
+    value_path_opened = False
+    value_path_monthly = (
+        None
+        if rules.value_path_growth is None
+        else Decimal(repr((1.0 + float(rules.value_path_growth)) ** (1.0 / 12.0)))
+    )
     snapshots: list[BookSnapshot] = [
         BookSnapshot(date=data_date, cash_usd=book.cash, equity_usd=book.equity, invested_usd=_ZERO)
     ]
@@ -412,6 +440,7 @@ def run_book(
                 cashflows.append((session, credit))
                 deposited = credit
                 sessions_since_deposit = 0
+                value_path_pending += credit
         held = book.held()
         targets: tuple[Target, ...] | None = None
         idle_added = False
@@ -427,6 +456,15 @@ def run_book(
             else:
                 wanted = allocator.targets_prepared(prepared, members, data_date, mine, params)
             if rank:
+                if value_path_monthly is not None:
+                    if value_path_opened:
+                        value_path *= value_path_monthly
+                    value_path += value_path_pending
+                    value_path_pending = _ZERO
+                    value_path_opened = True
+                    wanted = _value_path_scaled(
+                        tuple(wanted), value_path, book.equity, rules.value_path_reserve_cap
+                    )
                 last_rank = tuple(wanted)
                 basket = last_rank
             else:

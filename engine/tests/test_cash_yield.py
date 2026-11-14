@@ -61,7 +61,8 @@ def test_cash_yield_defaults_to_none_and_is_a_pinned_no_op():
     assert LEVERS_SINCE_PINS["cash_yield"] is None
     # Append-only, newest last. resize_band (2026-10-20), reserve_basis (2026-10-27), resize_adds
     # (M0269), resize_trims with add_gate_vix (M0519, 2026-11-08) and add_gate_spy_sma /
-    # add_gate_spy_sma_above / add_gate_max_wait (M0555, 2026-11-12) were appended after
+    # add_gate_spy_sma_above / add_gate_max_wait (M0555, 2026-11-12) and value_path_growth with
+    # value_path_reserve_cap (M0651, 2026-11-14) were appended after
     # cash_yield; what this pins is the ORDER, not that any one of them is forever the newest
     # lever -- the last line moves on every append, exactly as it did at resize_band.
     levers = list(LEVERS_SINCE_PINS)
@@ -72,7 +73,10 @@ def test_cash_yield_defaults_to_none_and_is_a_pinned_no_op():
     assert levers.index("add_gate_max_wait") > levers.index("add_gate_spy_sma_above") > levers.index(
         "add_gate_spy_sma"
     ) > levers.index("add_gate_vix")
-    assert levers[-1] == "add_gate_max_wait"
+    assert levers.index("value_path_reserve_cap") > levers.index("value_path_growth") > levers.index(
+        "add_gate_max_wait"
+    )
+    assert levers[-1] == "value_path_reserve_cap"
     assert is_pinned_default("cash_yield", None) is True
     assert is_pinned_default("cash_yield", "T13W") is False
 

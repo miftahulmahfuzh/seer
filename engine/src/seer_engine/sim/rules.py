@@ -49,6 +49,17 @@ target below its band is left alone, so the trim's proceeds stay in cash. Entrie
 held are untouched. A book-engine lever, a ``LEVERS_SINCE_PINS`` no-op at True; it needs
 ``resize=True``.
 
+``value_path_growth`` (2026-11-14, M0651) is value averaging (Edleson 1991). It is a rule about
+dollars, and an allocator is never shown the account, so it lives here beside the other
+account-reading levers. ``backtest.book_runner.run_book`` keeps a target path for the invested
+money: the starting capital, plus every deposit, grown at this rate a year (compounded once per
+rank session). On each rank session every target weight is scaled by ``path / equity``, never above
+1, so a book behind its path is told to hold more and a book ahead of it less. With
+``resize_trims=False`` that means "buy more than the deposit after a fall, less or nothing after a
+rise, never sell". ``value_path_reserve_cap`` floors the scale at one minus itself, so the cash the
+path leaves waiting is never more than that share of the account. Both are book-engine levers,
+monthly only, and ``LEVERS_SINCE_PINS`` no-ops at None.
+
 ``reserve_basis`` says how much of one night's buy budget an order holds while the rest of the rank
 is sized. "order" (every rule set before 2026-10-27) reserves the order at its LIMIT the moment it
 is sized, before any bar is read, and never gives any of it back: an order that found no bar, one
@@ -165,6 +176,8 @@ class TradeRules:
     add_gate_spy_sma: int | None = None
     add_gate_spy_sma_above: bool = False
     add_gate_max_wait: int | None = None
+    value_path_growth: Decimal | None = None
+    value_path_reserve_cap: Decimal | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.id, str):
@@ -284,6 +297,19 @@ class TradeRules:
                 raise TypeError(f"add_gate_max_wait must be an int or None, got {type(self.add_gate_max_wait).__name__}")
             if not 1 <= self.add_gate_max_wait <= 252:
                 raise ValueError(f"add_gate_max_wait must be in 1..252, got {self.add_gate_max_wait}")
+        if self.value_path_growth is not None:
+            if not isinstance(self.value_path_growth, Decimal) or not Decimal(0) <= self.value_path_growth <= 1:
+                raise TypeError("value_path_growth must be a Decimal in 0..1 (a year) or None")
+            if self.engine != "book" or not self.resize or self.cadence != "monthly" or self.resize_cadence is not None:
+                raise ValueError(
+                    "value_path_growth is a book-engine lever read once a month: it needs resize=True, "
+                    "cadence='monthly' and no resize_cadence"
+                )
+        if self.value_path_reserve_cap is not None:
+            if not isinstance(self.value_path_reserve_cap, Decimal) or not Decimal(0) < self.value_path_reserve_cap < 1:
+                raise TypeError("value_path_reserve_cap must be a Decimal strictly between 0 and 1, or None")
+            if self.value_path_growth is None:
+                raise ValueError("value_path_reserve_cap needs value_path_growth set: there is no path to cap")
         if (
             not self.resize_trims
             or self.add_gate_vix is not None
@@ -330,6 +356,8 @@ _V0_LEVERS: tuple[object, ...] = (
     None,
     None,
     False,
+    None,
+    None,
     None,
 )
 
@@ -485,6 +513,10 @@ LEVERS_SINCE_PINS: dict[str, object] = {
     "add_gate_spy_sma_above": False,  # flips add_gate_spy_sma's condition to "above", 2026-11-12
     "add_gate_max_wait": None,  # forces an add after this many sessions of no deposit, whatever the
     # other gates say, 2026-11-12
+    "value_path_growth": None,  # value averaging: the invested money is steered toward a path that
+    # grows this much a year plus every deposit, 2026-11-14
+    "value_path_reserve_cap": None,  # the largest share of the account value averaging may leave in
+    # cash, 2026-11-14
 }
 
 
@@ -738,6 +770,17 @@ def describe_rules(rules: TradeRules) -> tuple[str, ...]:
         lines.append(
             f"Top-up gate override: a held position is topped up regardless of any other gate once "
             f"{rules.add_gate_max_wait} sessions have passed since the last deposit."
+        )
+    if rules.value_path_growth is not None:
+        lines.append(
+            f"Value averaging: each month the invested money is steered toward a path that grows "
+            f"{rules.value_path_growth * 100:f}% a year plus every deposit; behind the path the "
+            f"book buys more than the deposit out of its cash, ahead of it the book buys less or nothing."
+        )
+    if rules.value_path_reserve_cap is not None:
+        lines.append(
+            f"Value-averaging cash cap: the cash left waiting is never more than "
+            f"{rules.value_path_reserve_cap * 100:f}% of the account."
         )
     if rules.reserve_basis == "fill":
         lines.append(

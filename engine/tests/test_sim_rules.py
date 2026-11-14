@@ -441,6 +441,8 @@ def test_a_lever_added_after_the_pins_is_left_out_of_canonical_text_at_its_defau
         "add_gate_spy_sma": None,
         "add_gate_spy_sma_above": False,
         "add_gate_max_wait": None,
+        "value_path_growth": None,
+        "value_path_reserve_cap": None,
     }
 
 
@@ -588,3 +590,14 @@ def test_describe_target_basis_changes_only_the_rebalance_line():
 
 def test_resize_basis_is_not_an_owner_input():
     assert rule_owner_inputs(replace(MONTHLY_HOLD, id="x", resize_basis="target")) == ()
+
+
+def test_value_path_levers_are_monthly_book_levers():
+    va = replace(MONTHLY_HOLD, id="x", value_path_growth=Decimal("0.02"), value_path_reserve_cap=Decimal("0.2"))
+    assert any("Value averaging" in line for line in rules.describe_rules(va))
+    with pytest.raises(ValueError):
+        replace(MONTHLY_HOLD, id="x", value_path_reserve_cap=Decimal("0.2"))  # a cap with no path
+    with pytest.raises(ValueError):
+        replace(MONTHLY_HOLD, id="x", resize_cadence="weekly", value_path_growth=Decimal("0.02"))
+    with pytest.raises(TypeError):
+        replace(MONTHLY_HOLD, id="x", value_path_growth=0.02)
